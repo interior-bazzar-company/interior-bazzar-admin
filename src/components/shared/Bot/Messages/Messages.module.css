@@ -3,17 +3,18 @@
   bottom: 20px;
   right: 100px;
   width: 300px;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  border-radius: 0;
+  border: 1px solid #000000;
   z-index: 9999;
   animation: slideUp 0.3s ease-out;
   overflow: hidden;
-  background-color: var(--bg-primary-color);
-  color: var(--text-white-color);
+  background-color: #ffffff;
+  color: #000000;
 }
 
 .chatHeader {
-  background: var(--bg-theme-color);
+  background: #ffffff;
+  border-bottom: 2px solid #000000;
   padding: 15px;
   display: flex;
   justify-content: space-between;
@@ -23,18 +24,20 @@
 .chatHeader h3 {
   margin: 0;
   font-size: 16px;
-  font-weight: 600;
-  color: var(--text-white-color);
+  font-weight: 800;
+  color: #000000;
+  text-transform: uppercase;
 }
 
 .closeButton {
   background: none;
   border: none;
-  color: var(--text-white-color);
+  color: #000000;
   font-size: 24px;
   cursor: pointer;
   padding: 0;
   line-height: 1;
+  font-weight: 800;
 }
 
 .questionsContainer {
@@ -47,22 +50,23 @@
 }
 
 .questionButton {
-  background: #f5f5f5;
-  border: none;
+  background: #ffffff;
+  border: 1px solid #000000;
   padding: 12px 15px;
-  border-radius: 8px;
+  border-radius: 4px;
   text-align: left;
   cursor: pointer;
   transition: all 0.2s ease;
   font-size: 14px;
-  color: var(--text-dark-color);
+  color: #000000;
   width: 100%;
+  font-weight: 600;
 }
 
 .questionButton:hover {
-  background: var(--bg-theme-color);
-  color: var(--text-white-color);
-  transform: translateX(5px);
+  background: #000000;
+  color: #ffffff;
+  border-color: #000000;
 }
 
 @keyframes slideUp {

@@ -1,0 +1,112 @@
+.popupOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.popupContent {
+  background-color: #ffffff;
+  padding: 28px;
+  border-radius: 0;
+  border: 1px solid #000000;
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.popupHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.popupTitle {
+  font-size: 15px;
+  color: #000000;
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.5;
+  text-transform: uppercase;
+}
+
+.popupTitle strong {
+  font-weight: 800;
+}
+
+.remarkTextarea {
+  width: 100%;
+  min-height: 130px;
+  padding: 14px;
+  border: 1px solid #000000;
+  border-radius: 0;
+  outline: none;
+  font-size: 14px;
+  resize: vertical;
+  font-family: inherit;
+  transition: all 0.2s;
+  box-sizing: border-box;
+  background-color: #ffffff;
+  color: #000000;
+}
+
+.remarkTextarea:focus {
+  border-color: #111827;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.cancelBtn {
+  background-color: #ffffff;
+  border: 1px solid #000000;
+  color: #000000;
+  padding: 9px 22px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 14px;
+  transition: all 0.15s;
+  text-transform: uppercase;
+}
+
+.cancelBtn:hover {
+  background-color: #000000;
+  color: #ffffff;
+}
+
+.saveBtn {
+  background-color: #ffffff;
+  color: #000000;
+  border: 1px solid #000000;
+  padding: 9px 26px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 800;
+  font-size: 14px;
+  transition: all 0.15s;
+  text-transform: uppercase;
+}
+
+.saveBtn:hover:not(:disabled) {
+  background-color: #000000;
+  color: #ffffff;
+}
+
+.saveBtn:disabled {
+  background-color: #ffffff;
+  color: #999999;
+  border-color: #999999;
+  cursor: not-allowed;
+}

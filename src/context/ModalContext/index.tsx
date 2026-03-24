@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from "react";
+import React, { createContext, useContext, useState, useCallback, useMemo } from "react";
 import Modal from "../../components/overlays/Modal";
 
 // Define types for the context values
@@ -19,16 +19,18 @@ export const useModal = () => {
 export const ModalProvider = ({ children }: { children: React.ReactNode }) => {
     const [modalContent, setModalContent] = useState<React.ReactNode | null>(null);
 
-    const showModal = (content: React.ReactNode) => {
+    const showModal = useCallback((content: React.ReactNode) => {
         setModalContent(content);
-    };
+    }, []);
 
-    const closeModal = () => {
+    const closeModal = useCallback(() => {
         setModalContent(null);
-    };
+    }, []);
+
+    const value = useMemo(() => ({ showModal, closeModal }), [showModal, closeModal]);
 
     return (
-        <ModalContext.Provider value={{ showModal, closeModal }}>
+        <ModalContext.Provider value={value}>
             {children}
             {modalContent && (
                 <Modal onClose={closeModal}>

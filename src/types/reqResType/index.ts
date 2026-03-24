@@ -1,6 +1,7 @@
 import type { AUTH_VARS } from "../../utils/constants/app";
 import type {
   AdminBusinessListType,
+  AdminBusinessListTypeV2,
   AdminLeadType,
   BusinessCardProps,
   FunnelLeadType,
@@ -37,13 +38,20 @@ export interface GetPaginatedAdminLeadsType {
   pageNo: number;
   hasNext: boolean;
   totalPages: number;
-  leads: AdminLeadType[];
+  leads?: AdminLeadType[];
+  results?: AdminLeadType[];
 }
 export interface GetPaginatedAdminBusinessesType {
   pageNo: number;
   hasNext: boolean;
   totalPages: number;
   businesses: AdminBusinessListType[];
+}
+export interface GetPaginatedAdminBusinessesTypeV2 {
+  pageNo: number;
+  hasNext: boolean;
+  totalPages: number;
+  businesses: AdminBusinessListTypeV2[];
 }
 export interface GetPaginatedFunnelLeadType {
   pageNo: number;
@@ -67,6 +75,7 @@ export interface GetPaginated {
 export interface LeadsAnalytics {
   unassignedLeads: number;
   assignedLeads: number;
+  platformLeads: number;
   totalLeads: number;
   todayLeads: number;
 }

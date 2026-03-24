@@ -3,20 +3,22 @@ import apiService from "../../apiService";
 import type {
   ApiResponseType,
   BusinessSearchResType,
-  GetPaginatedAdminLeadsType,
   GetPaginatedAdminBusinessesType,
+  GetPaginatedAdminBusinessesTypeV2,
   GetPaginatedFunnelLeadType,
-  LeadsAnalytics,
   UserGrowthAnalytics,
 } from "../../../types/reqResType";
 import { logger } from "../../../utils/logger";
 import type {
   AdminLeadType,
   BusinessType,
+  LeadFilterType,
   SignupData,
+  DashboardV2Type,
 } from "../../../types/content";
 
 export class AdminService {
+
   static async fetchTotalUsers() {
     try {
       const url = `${appUrl.admin}/total-users/`;
@@ -37,10 +39,33 @@ export class AdminService {
       throw error;
     }
   }
-  static async fetchLeads(pageNo: number, pageSize: number) {
+  static async fetchBusinessesv2(data: {
+    page_number: number;
+    page_size: number;
+    start_date?: string;
+    end_date?: string;
+    plan?: string;
+  }) {
     try {
-      const url = `${appUrl.admin}/query/${pageNo}/${pageSize}/`;
-      const response: ApiResponseType<GetPaginatedAdminLeadsType> =
+      const url = `${appUrl.admin}/v2/paginate-business/`;
+      const response: ApiResponseType<GetPaginatedAdminBusinessesTypeV2> =
+        await apiService.getPostApiResponse(url, data);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+  static async fetchLeads(pageNo: number, pageSize: number, filters?: LeadFilterType) {
+    try {
+      // Using v2/query which is specifically for paginated leads as per AIDOCS
+      let url = `${appUrl.admin}/v2/query/?pageNo=${pageNo}&pageSize=${pageSize}`;
+      if (filters) {
+        if (filters.leadStatus) url += `&leadStatus=${encodeURIComponent(filters.leadStatus)}`;
+        if (filters.filterStatus) url += `&stages=${encodeURIComponent(filters.filterStatus)}`;
+        if (filters.category) url += `&status=${encodeURIComponent(filters.category)}`;
+        if (filters.searchText) url += `&searchText=${encodeURIComponent(filters.searchText)}`;
+      }
+      const response: ApiResponseType<any> =
         await apiService.getGetApiResponse(url);
       return response;
     } catch (error) {
@@ -120,9 +145,30 @@ export class AdminService {
   }
   static async getLeadsAnalytics() {
     try {
-      const url = `${appUrl.admin}/leads/`;
-      const response: ApiResponseType<LeadsAnalytics> =
+      const url = `${appUrl.admin}/v2/leads/`;
+      const response: ApiResponseType<any> =
         await apiService.getGetApiResponse(url);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+  static async createLead(data: any) {
+    try {
+      const url = `${appUrl.admin}/v2/query/`;
+      const response: ApiResponseType<any> =
+        await apiService.getPostApiResponse(url, data);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  static async postLeadsStatsV2(data: { start_date: string; end_date: string; page_number: number; page_size: number }) {
+    try {
+      const url = `${appUrl.admin}/v2/leads/stats/`;
+      const response: ApiResponseType<any> =
+        await apiService.getPostApiResponse(url, data);
       return response;
     } catch (error) {
       throw error;
@@ -130,7 +176,7 @@ export class AdminService {
   }
   static async getUserGrowthAnalytics() {
     try {
-      const url = `${appUrl.admin}/users/`;
+      const url = `${appUrl.admin}/analytics/users/`;
       const response: ApiResponseType<UserGrowthAnalytics[]> =
         await apiService.getGetApiResponse(url);
       return response;
@@ -138,4 +184,35 @@ export class AdminService {
       throw error;
     }
   }
+  static async getDetailedLeadAnalytics() {
+    try {
+      const url = `${appUrl.admin}/v2/analytics/leads/`;
+      const response: ApiResponseType<any[]> =
+        await apiService.getGetApiResponse(url);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+  static async fetchDashboardV2() {
+    try {
+      const url = `${appUrl.admin}/v2/dashboard/`;
+      const response: ApiResponseType<DashboardV2Type> =
+        await apiService.getGetApiResponse(url);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  static async updateQuery(leadId: number, data: any) {
+    try {
+      const url = `${appUrl.admin}/v2/query/${leadId}/`;
+      const response: ApiResponseType<any> = await apiService.getPutApiResponse(url, data);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+
 }

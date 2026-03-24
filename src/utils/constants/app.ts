@@ -25,6 +25,8 @@ export const PAGES = {
   DASHBOARD: "/dashboard",
   ADMIN_LEADS: "/admin/leads",
   ADMIN_BUSINESS: "/admin/business",
+  ADMIN_BUSINESS_DASHBOARD: "/admin/business-dashboard", // NEW PAGE
+  ADMIN_USER_MANAGE: "/admin/manage-users", // NEW PAGE
   ADMIN_ANALYTICS: "/admin/analytics",
   ADMIN_IMAGE_UPLOAD: "/admin/image-upload",
   ADMIN_FUNNEL_LEADS: "/admin/funnel-leads",

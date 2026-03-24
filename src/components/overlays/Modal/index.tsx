@@ -1,6 +1,7 @@
 import styles from "./Modal.module.css";
 import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { FiX } from "react-icons/fi";
 
 
 interface ModalProps {
@@ -104,16 +105,16 @@ const Modal: React.FC<ModalProps> = ({ onClose, children }) => {
         );
     };
 
+
     return createPortal(
         <div data-dialog="true" className={styles.modal}>
             <div
                 ref={backdropRef}
-                onClick={handleClose}
                 className={styles.modalBackdrop}
             />
             <div ref={contentRef} className={styles.modalContent} tabIndex={-1}>
                 <button onClick={handleClose} className={styles.modalClose}>
-                    &times;
+                    <FiX size={24} />
                 </button>
                 {children}
             </div>

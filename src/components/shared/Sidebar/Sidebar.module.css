@@ -1,135 +1,141 @@
 .sidebar {
   height: 100vh;
   display: flex;
-  overflow: hidden;
+  overflow: visible;
   flex-direction: column;
-  transition: width 0.3s ease;
-  background-color: var(--bg-sidebar-color);
-  /* background: linear-gradient(180deg, #4caf50, #1b5e20); */
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  background-color: var(--notion-bg-page);
+  border-right: 1px solid var(--notion-border);
+  position: relative;
 }
+
 .topContainer {
-  top: 0;
-  z-index: 10;
-  padding: 20px 5px;
-  position: sticky;
-  background-color: var(--bg-sidebar-color-dark);
+  padding: 20px 16px 12px;
+  background-color: transparent;
 }
-.top {
+
+.userProfile {
   display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 6px;
+  object-fit: cover;
+  background-color: var(--notion-bg-selected);
+  border: 1px solid var(--notion-border);
+}
+
+.userInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.userName {
+  font-weight: 500;
+  font-size: 13.5px;
+  color: var(--notion-text);
+}
+
+.userRole {
+  font-size: 11px;
+  color: var(--notion-text-muted);
 }
 
 .hamburger {
-  width: 100%;
-  height: 30px;
-  display: flex;
-  cursor: pointer;
+  position: absolute;
+  right: -12px;
+  top: 24px;
+  width: 35px;
+  height: 35px;
+  background-color: var(--notion-bg);
+  border: 1px solid var(--notion-border);
   border-radius: 50%;
+  display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-white-color);
-  margin: auto 5px;
+  cursor: pointer;
+  z-index: 100;
+  font-size: 10px;
+  color: var(--notion-text-muted);
+  transition: all 0.15s;
 }
-/* .hamburger:hover {
-  background-color: var(--bg-sidebar-color);
-} */
+
+.hamburger:hover {
+  background-color: var(--notion-bg-hover);
+  color: var(--notion-text);
+}
+
 .open {
   width: 240px;
-  justify-content: space-evenly;
 }
 
 .closed {
-  width: 80px;
-}
-.closedTop {
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.logo {
-  margin: auto;
-}
-.logoImage {
-  height: 50px;
-}
-.logoIcon {
-  font-size: 1.25rem;
-}
-
-.logoText {
-  font-weight: bold;
-  color: var(--color-text-dark);
-  font-size: var(--font-size-h5);
-}
-
-.toggleBtn {
-  border: none;
-  cursor: pointer;
-  background: none;
-  font-size: 1.2rem;
-  color: var(--color-text-dark);
-}
-
-.section {
-  margin: var(--space-md) 0;
-}
-
-.sectionTitle {
-  text-transform: uppercase;
-  font-size: var(--font-size-xs);
-  color: var(--color-text-light);
-  margin-bottom: var(--space-xs);
+  width: 56px;
 }
 
 .navItem {
   display: flex;
   cursor: pointer;
   align-items: center;
-  gap: var(--space-sm);
-  padding: var(--space-sm);
-  color: var(--color-text-dark);
-  font-size: var(--font-size-body);
-  transition: background-color 0.2s ease;
-  border-radius: var(--standard-border-radius2);
+  gap: 8px;
+  padding: 7px 12px;
+  color: var(--notion-text);
+  font-size: 13.5px;
+  font-weight: 400;
+  transition: background 0.12s ease;
+  border-radius: 4px;
 }
-.navItem .icon {
-  font-size: var(--font-size-body);
-}
+
 .navItem:hover {
-  background-color: var(--bg-section-color);
+  background-color: var(--notion-bg-hover);
+}
+
+.activeNavItem {
+  background-color: var(--notion-bg-selected) !important;
+  color: var(--notion-text) !important;
+  font-weight: 500;
 }
 
 .card {
   text-align: center;
-  padding: var(--space-md);
-  margin: var(--space-md) 0;
-  color: var(--color-text-white);
-  border-radius: var(--standard-border-radius);
-  background: linear-gradient(to top right, #a78bfa, #c084fc);
+  padding: var(--space-sm);
+  margin: var(--space-sm) 0;
+  color: var(--notion-text);
+  border-radius: 6px;
+  border: 1px solid var(--notion-border);
+  background: var(--notion-bg);
 }
 
 .cardTitle {
   margin-bottom: var(--space-xs);
-  font-size: var(--font-size-body);
+  font-size: 13px;
+  font-weight: 500;
 }
 
 .progressBar {
   height: 6px;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: 4px;
   margin: var(--space-xs) 0;
-  background: var(--bg-section-color);
+  background: var(--notion-border);
 }
 
 .progressFill {
   height: 100%;
-  background-color: #facc15; /* optional: consider adding to variables */
+  background-color: var(--notion-text);
+  border-radius: 4px;
 }
 
 .limitText {
-  font-size: var(--font-size-xs);
+  font-size: 11px;
   margin-bottom: var(--space-xs);
+  font-weight: 400;
+  color: var(--notion-text-muted);
 }
 
 .learnMore {
@@ -138,33 +144,25 @@
   background: none;
   margin: var(--space-xxs) 0;
   text-decoration: underline;
-  color: var(--color-text-white);
-  font-size: var(--font-size-small);
+  color: var(--notion-text-muted);
+  font-size: 0.75rem;
 }
 
 .upgradeBtn {
-  border: none;
+  border: 1px solid var(--notion-border);
   cursor: pointer;
-  border-radius: 999px;
+  border-radius: 4px;
   margin-top: var(--space-xs);
-  color: var(--color-text-white);
-  font-size: var(--font-size-small);
-  background: var(--color-text-black);
-  padding: var(--space-xs) var(--space-md);
+  color: var(--notion-text);
+  font-size: 0.75rem;
+  background: var(--notion-bg);
+  padding: 6px 14px;
+  font-weight: 500;
+  transition: all 0.15s;
 }
 
-.themeToggle {
-  display: flex;
-  justify-content: center;
-}
-
-.toggleDark {
-  border: none;
-  cursor: pointer;
-  font-size: 1.1rem;
-  border-radius: 50%;
-  padding: var(--space-xs);
-  background: var(--bg-section-color);
+.upgradeBtn:hover {
+  background-color: var(--notion-bg-hover);
 }
 
 .navItemWithSub {
@@ -174,86 +172,76 @@
 
 .subMenu {
   display: flex;
-  margin-top: 0.25rem;
-  padding-left: 1.5rem;
-  gap: var(--space-xs);
+  margin-top: 2px;
+  padding-left: 1.25rem;
+  gap: 2px;
   flex-direction: column;
+  animation: slideIn 0.2s ease forwards;
 }
 
 .subItem {
   cursor: pointer;
-  padding: var(--space-xs) 0;
-  transition: background 0.2s;
-  color: var(--color-text-light);
-  font-size: var(--font-size-small);
-  border-radius: var(--standard-border-radius2);
+  padding: 5px 10px;
+  transition: background 0.12s;
+  color: var(--notion-text-muted);
+  font-size: 13px;
+  border-radius: 4px;
 }
 
 .subItem:hover {
-  color: var(--color-text-dark);
-  background-color: var(--bg-section-color);
+  background-color: var(--notion-bg-hover);
+  color: var(--notion-text);
+}
+
+.activeSubItem {
+  background-color: var(--notion-bg-selected) !important;
+  color: var(--notion-text) !important;
+  font-weight: 500;
 }
 
 @keyframes slideIn {
   from {
     opacity: 0;
-    transform: translateY(-5px);
+    transform: translateY(-4px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
   }
 }
 
-@keyframes slideOut {
-  from {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(-5px);
-  }
-}
-
-.subMenu {
-  display: flex;
-  gap: var(--space-xs);
-  padding-left: 1.5rem;
-  flex-direction: column;
-  animation: slideIn 0.3s ease forwards;
-}
-
-.subMenuExit {
-  animation: slideOut 0.2s ease forwards;
-}
-
-/* new changes  */
 .linksContainer {
   flex: 1;
   display: flex;
   overflow-y: auto;
-  gap: var(--space-xs);
+  gap: 2px;
   flex-direction: column;
-  padding: var(--padding-lg);
+  padding: 8px 10px;
 }
 
 .bottomContainer {
-  width: 240px;
-  position: absolute;
-  bottom: 0;
+  width: 100%;
+  padding: 12px;
+  background-color: transparent;
+  border-top: 1px solid var(--notion-border);
 }
 
 .uspButton {
   width: 100%;
-  display: inline-block;
-  background: var(--bg-black-color);
-  color: var(--text-white-color);
-  padding: var(--space-lg) var(--space-md);
+  padding: 8px 14px;
+  background-color: var(--notion-bg);
+  color: var(--notion-text-muted);
+  border: 1px solid var(--notion-border);
+  font-weight: 500;
+  font-size: 13px;
   cursor: pointer;
-  font-size: var(--font-size-h6);
-  border: 4px solid transparent;
-  box-shadow: 0 4px 12px rgba(255, 0, 204, 0.5); /* inset*/
-  background: linear-gradient(#000, #000) padding-box,
-    linear-gradient(45deg, rgb(255, 0, 204), #3333ff, #00ffcc) border-box;
+  transition: all 0.15s;
+  text-align: center;
+  border-radius: 4px;
+}
+
+.uspButton:hover {
+  background-color: var(--notion-bg-hover);
+  color: var(--notion-text);
 }

@@ -8,7 +8,7 @@ import type { ApiResponseType } from "../../types/reqResType";
 import { useAppDispatch, useAppSelector } from "../../redux/store/hook";
 import { TokenService } from "../../api/apiService/authHelper/TokenService";
 const useInitUser = () => {
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const { logout } = useLogout();
   const dispatch = useAppDispatch();
   const auth = useAppSelector((state) => state.auth);

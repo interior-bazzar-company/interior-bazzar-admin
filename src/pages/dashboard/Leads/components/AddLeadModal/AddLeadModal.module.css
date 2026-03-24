@@ -1,0 +1,110 @@
+.container {
+  padding: 24px;
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  width: 900px;
+  max-width: 100%;
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #000000;
+  margin-bottom: 24px;
+  text-transform: uppercase;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #000000;
+  text-transform: uppercase;
+}
+
+.field input, 
+.field select, 
+.field textarea {
+  padding: 10px 12px;
+  border: 1px solid #000000;
+  border-radius: 0;
+  font-size: 14px;
+  color: #000000;
+  outline: none;
+  transition: all 0.2s;
+  background-color: #ffffff;
+}
+
+.field input:focus, 
+.field select:focus, 
+.field textarea:focus {
+  border-color: #000000;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.cancelBtn {
+  padding: 10px 20px;
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: #000000;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.2s;
+}
+
+.cancelBtn:hover {
+  background-color: #000000;
+  color: #ffffff;
+}
+
+.submitBtn {
+  padding: 10px 24px;
+  background: #ffffff;
+  border: 1px solid #000000;
+  border-radius: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: #000000;
+  cursor: pointer;
+  text-transform: uppercase;
+  transition: all 0.2s;
+}
+
+.submitBtn:hover:not(:disabled) {
+  background-color: #000000;
+  color: #ffffff;
+}
+
+.submitBtn:disabled {
+  background: #ffffff;
+  color: #999999;
+  border-color: #999999;
+  cursor: not-allowed;
+}

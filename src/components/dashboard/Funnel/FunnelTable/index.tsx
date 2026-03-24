@@ -15,6 +15,7 @@ const FunnelTable = ({ filter }: { filter: BusinessFilterType }) => {
         leads,
         totalPages,
         incrementPage,
+        noAccess,
     } = useFunnelTable(filter);
 
     const handleLeadDetailView = (lead: FunnelLeadType) => {
@@ -44,10 +45,16 @@ const FunnelTable = ({ filter }: { filter: BusinessFilterType }) => {
                 </thead>
                 <tbody>
                     {loading ? Array.from({ length: pageSize }).map((_, i) => <tr key={i}>
-                        <td colSpan={10}>
+                        <td colSpan={9}>
                             loading....
                         </td>
-                    </tr>) : leads.map((lead) => (
+                    </tr>) : noAccess ? (
+                        <tr>
+                            <td colSpan={9} style={{ textAlign: "center", padding: "32px", color: "#ef4444", fontWeight: "600" }}>
+                                You don't have access to this resource.
+                            </td>
+                        </tr>
+                    ) : leads.map((lead) => (
                         <tr key={lead.id}>
                             <td>{renderValue(lead.id)}</td>
                             <td>{renderValue(lead.name)}</td>

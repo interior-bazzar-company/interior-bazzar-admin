@@ -1,20 +1,19 @@
-import { Link } from "react-router-dom";
 import styles from "./Sidebar.module.css";
-import { LeftIcon, RightIcon } from "../../ui";
-import { PAGES } from "../../../utils/constants/app";
 import SidebarLink from "../AdminLayout/SidebarLink";
-import type { Sidebarlink } from "../../../types/global";
-import { STATIC_IMAGES } from "../../../utils/constants/image";
+import type { Sidebarlink, BaseUser } from "../../../types/global";
+
 const Sidebar = ({
   links,
   activeLink,
   sidebarOpen,
   toggleSidebar,
+  user,
 }: {
   links: Sidebarlink[];
   activeLink: string;
   sidebarOpen: boolean;
   toggleSidebar: () => void;
+  user?: BaseUser | null;
 }) => {
 
 
@@ -22,29 +21,24 @@ const Sidebar = ({
     <aside
       className={`${styles.sidebar} ${sidebarOpen ? styles.open : styles.closed} `}
     >
-      {/* Top */}
-      <div className={`${styles.topContainer}`}>
-        <div
-          className={`${styles.top} ${sidebarOpen ? styles.open : styles.closedTop}`}
-        >
-          {sidebarOpen && (
-            <Link
-              to={PAGES.HOME}
-              className={`${styles.logoContainer}`}
-            >
-              <img
-                loading="lazy"
-                alt="Interior Bazzar Logo"
-                className={`${styles.logo}`}
-                src={STATIC_IMAGES.LOGO}
-              />
+      <div className={styles.hamburger} onClick={toggleSidebar}>
+          {sidebarOpen ? '❮' : '❯'}
+      </div>
 
-            </Link>
-          )}
-          <div className={styles.hamburger} onClick={toggleSidebar}>
-            {sidebarOpen ? <LeftIcon /> : <RightIcon />}
+      <div className={`${styles.topContainer}`}>
+        {sidebarOpen && (
+          <div className={styles.userProfile}>
+            <img 
+              src={user?.profile_image_url || "https://secure.gravatar.com/avatar/60c0429a1737e96e7090f4d36ef1945d?s=100&d=mm&r=g"} 
+              className={styles.avatar} 
+              alt="User" 
+            />
+            <div className={styles.userInfo}>
+              <span className={styles.userName}>{user?.username || "Admin"}</span>
+              <span className={styles.userRole}>{user?.role || "Sub-Admin"}</span>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <div className={`${styles.linksContainer} scrollbar-hidden `}>

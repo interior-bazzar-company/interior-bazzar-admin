@@ -12,6 +12,7 @@ const useFunnelTable = (filter: TableFilterType) => {
   const [hasNext, setHasNext] = useState<boolean>(false);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [pageSize] = useState<number>(20);
+  const [noAccess, setNoAccess] = useState<boolean>(false);
 
   const fetchBusinesses = async () => {
     try {
@@ -24,8 +25,9 @@ const useFunnelTable = (filter: TableFilterType) => {
       setHasNext(res.data.hasNext);
       setTotalPages(res.data.totalPages);
       setLeads(res.data.leads);
-    } catch (e) {
+    } catch (e: any) {
       logger.error("Error while fetching businesses: ", e);
+      if (e.code === 401 || e.code === 403) setNoAccess(true);
     } finally {
       setLoading(false);
     }
@@ -51,6 +53,7 @@ const useFunnelTable = (filter: TableFilterType) => {
     setPageNo,
     leads,
     totalPages,
+    noAccess,
     incrementPage,
   };
 };

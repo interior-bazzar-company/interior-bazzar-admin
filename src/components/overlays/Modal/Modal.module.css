@@ -17,53 +17,78 @@
   width: 100%;
   height: 100%;
   position: absolute;
-  background-color: rgba(0, 0, 0, 0.5);
-  animation: showModal 0.1s linear forwards;
+  background-color: rgba(15, 15, 15, 0.5);
+  animation: showModal 0.12s ease forwards;
 }
 
 .modalContent {
-  padding: 40px;
-  overflow: auto;
-  max-width: 80vw;
-  max-height: 60vw;
-  max-height: 100%;
+  padding: 32px 36px;
+  width: 50vw;
+  min-width: 580px;
+  max-width: 95vw;
+  max-height: 90vh;
   overflow-y: auto;
-  border-radius: 6px;
+  border-radius: 8px;
   position: relative;
-  color: var(--text-light-color);
-  animation: showModal 0.1s linear forwards;
-  background-color: var(--bg-primary-color);
+  color: var(--notion-text);
+  animation: showModal 0.12s ease forwards;
+  background-color: var(--notion-bg);
+  border: 1px solid var(--notion-border);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08) !important;
+  box-sizing: border-box;
+}
+
+@media (max-width: 1024px) {
+  .modalContent {
+    width: 70vw;
+    min-width: 480px;
+  }
+}
+
+@media (max-width: 768px) {
+  .modalContent {
+    width: 100vw;
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+    padding: 24px 20px;
+    min-width: unset;
+    border: none;
+  }
 }
 
 .modalClose {
-  top: 0px;
-  right: 15px;
+  top: 12px;
+  right: 12px;
   border: none;
-  font-size: 2rem;
   cursor: pointer;
   position: absolute;
   background-color: transparent;
-  color: var(--text-light-color);
+  color: var(--notion-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 4px;
+  transition: all 0.15s;
+  z-index: 10;
+}
+
+.modalClose:hover {
+  background-color: var(--notion-bg-hover);
+  color: var(--notion-text);
 }
 
 .hideModal {
-  animation: hideModal 0.1s linear forwards !important;
+  animation: hideModal 0.1s ease forwards !important;
 }
 
 @keyframes showModal {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+  from { opacity: 0; transform: scale(0.98); }
+  to   { opacity: 1; transform: scale(1); }
 }
 
 @keyframes hideModal {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
+  from { opacity: 1; transform: scale(1); }
+  to   { opacity: 0; transform: scale(0.98); }
 }

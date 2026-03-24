@@ -7,6 +7,7 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
     activeLink,
     sideBarOpen,
     sidebarLinks,
+    userProfile,
     toggleSidebar,
   } = useAdmin();
 
@@ -18,6 +19,7 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
           activeLink={activeLink}
           sidebarOpen={sideBarOpen}
           toggleSidebar={toggleSidebar}
+          user={userProfile}
         />
       </div>
       <div className={`${styles.headerContainer}`}>

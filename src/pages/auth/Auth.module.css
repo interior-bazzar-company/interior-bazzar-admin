@@ -5,8 +5,8 @@
   align-items: center;
   flex-direction: column;
   justify-content: center;
-  background-color: var(--color-primary-section);
-  color: var(--color-text-dark);
+  background-color: #ffffff;
+  color: #000000;
   overflow: hidden;
 }
 
@@ -92,12 +92,11 @@
 }
 
 .container {
-  /* max-width: 400px; */
   margin: 0px auto;
   padding: 30px;
-  border-radius: 10px;
-  background: var(--color-bg-primary);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-radius: 0;
+  border: 1px solid #000000;
+  background: #ffffff;
   height: 100%;
 }
 
@@ -140,9 +139,10 @@
 }
 
 .link {
-  color: var(--bg-theme-color);
+  color: #000000;
   cursor: pointer;
   text-decoration: underline;
+  font-weight: 600;
 }
 
 .loginText {

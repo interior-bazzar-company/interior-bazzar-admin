@@ -1,10 +1,14 @@
 export interface BusinessFilterType {
   sortBy: string;
   searchText: string;
+  plan?: string;
 }
 export interface LeadFilterType {
   sortBy: string;
   searchText: string;
+  category: string;
+  leadStatus: string;
+  filterStatus: string;
 }
 export interface TableFilterType {
   sortBy: string;
@@ -12,11 +16,28 @@ export interface TableFilterType {
 }
 
 /*###########    A N A L Y T I C S    ####################################################################*/
-
+export type DashboardStatsType = {
+  totalBusinesses: number;
+  weeklySignups: number;
+  totalActiveBusinesses: number;
+  totalInactiveBusinesses: number;
+  plan_metrics: Record<string, number>;
+};
 export interface MetricCardType {
   title: string;
   value: number;
   colorHex?: string;
+}
+
+export interface LeadsDashboardStatsType {
+  unassignedLeads: number;
+  assignedLeads: number;
+  platformLeads: number;
+  totalLeads: number;
+  todayLeads: number;
+  statusMetrics: Record<string, number>;
+  adminStatusMetrics: Record<string, number>;
+  stageMetrics: Record<string, number>;
 }
 
 export interface SignupData {
@@ -24,6 +45,14 @@ export interface SignupData {
   clients: number;
   businesses: number;
   users: number;
+}
+
+export interface DashboardV2Type {
+  totalBusinesses: number;
+  weeklySignups: number;
+  totalActiveBusinesses: number;
+  totalInactiveBusinesses: number;
+  plan_metrics: Record<string, number>;
 }
 
 /*###########    E      N      D    ####################################################################*/
@@ -72,11 +101,24 @@ export interface AdminLeadType {
   name: string;
   phone: string;
   email: string;
-  interested: string;
-  query: string;
+  interested: string | null;
+  query: string | null;
   country: string;
   city: string;
-  assigned: string;
+  assigned: string | null;
+  leadStatus?: string;
+  stage?: string;
+  state?: string;
+  type?: 'product' | 'service' | 'catalogue';
+  itemId?: number;
+  status?: string;
+  tag?: string;
+  priority?: string;
+  remark?: string;
+  logs?: Array<{
+    event: string;
+    timestamp: string;
+  }>;
 }
 
 export interface FunnelLeadType {
@@ -105,6 +147,16 @@ export interface AdminBusinessListType {
   totalLeads: number;
   assignedLeads: number;
   platformLeads: number;
+}
+export interface AdminBusinessListTypeV2 {
+  id: number;
+  name: string;
+  plan: string;
+  joinAt: string;
+  date: string;
+  totalLeads: number;
+  assignedLead: number;
+  platformLead: number;
 }
 
 

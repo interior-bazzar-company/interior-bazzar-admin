@@ -5,7 +5,7 @@
 
 .sidebarContainer {
   height: 100%;
-  overflow-y: auto;
+  z-index: 10;
 }
 
 .headerContainer {
@@ -14,8 +14,7 @@
   display: flex;
   overflow: hidden;
   flex-direction: column;
-
-  background-color: var(--bg-section-color);
+  background-color: var(--notion-bg);
 }
 
 .container {
@@ -29,65 +28,80 @@
   flex-wrap: nowrap;
   overflow: auto;
   gap: var(--space-xs);
-  padding: var(--padding-lg) 0;
-  background-color: var(--bg-primary-color);
+  padding: 12px 0;
+  background-color: var(--notion-bg);
+  border-bottom: 1px solid var(--notion-divider);
 }
+
 .breadcrumStripContainer {
   display: flex;
   justify-content: space-between;
-  padding: var(--padding-lg) 0;
+  padding: 12px 0;
 }
+
 .breadcrumbs {
   display: flex;
   align-items: center;
   gap: var(--space-xs);
-  margin: var(--margin-md) var(--margin-md);
+  margin: 12px 24px;
 }
 
 .content {
   flex: 1;
   width: 100%;
-  overflow: auto auto;
-  margin: auto auto;
+  overflow: auto;
+  margin: 0;
+  background-color: var(--notion-bg);
 }
 
 .btnContainer {
   display: flex;
   gap: var(--gap-xl);
   align-items: center;
-  margin-right: var(--margin-xxl);
+  margin-right: 24px;
 }
+
 .saveBtn {
   display: flex;
   margin-left: auto;
   gap: var(--margin-xs);
-  color: var(--text-white-color);
-  background-color: var(--bg-black-color);
-  padding: var(--padding-xs) var(--padding-xxl);
+  color: var(--theme-bg-base);
+  background-color: var(--notion-bg-solid);
+  padding: 6px 20px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: opacity 0.15s;
+}
+
+.saveBtn:hover {
+  opacity: 0.9;
 }
 
 /* temp */
 .toggleBtnContainer {
   display: flex;
   justify-content: center;
-  border-radius: 25px;
-  border: 1px solid var(--border-light-color);
+  border-radius: 6px;
+  border: 1px solid var(--notion-border);
 }
+
 .toggleBtn {
-  padding: 5px 20px;
-  border-radius: 20px;
+  padding: 4px 16px;
+  border-radius: 4px;
+  font-size: 12px;
 }
+
 .active {
-  color: var(--text-white-color);
-  background-color: green;
+  color: var(--theme-bg-base);
+  background-color: var(--color-status-green);
 }
+
 .inactive {
-  color: var(--text-white-color);
-  background-color: red;
+  color: var(--theme-bg-base);
+  background-color: var(--color-status-red);
 }
-/* select input field */
-/* .selectContainer {
-} */
+
 .select {
   padding: 0;
   margin: 0;
@@ -96,13 +110,26 @@
 .tabSwitchContainer {
   display: flex;
   justify-content: flex-start;
-  gap: var(--gap-xl);
-  margin: 0 var(--margin-md);
+  gap: 20px;
+  margin: 0 24px;
+  border-bottom: 1px solid var(--notion-divider);
 }
+
 .tab {
   cursor: pointer;
-  color: var(--text-light-color);
+  color: var(--notion-text-muted);
+  font-size: 13.5px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid transparent;
+  transition: all 0.15s;
 }
+
+.tab:hover {
+  color: var(--notion-text);
+}
+
 .activeTab {
-  color: var(--text-black-color);
+  color: var(--notion-text);
+  border-bottom-color: var(--notion-border-focus);
+  font-weight: 500;
 }

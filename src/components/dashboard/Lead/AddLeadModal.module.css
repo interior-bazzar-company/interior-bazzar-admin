@@ -1,0 +1,117 @@
+.modalContent {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.modalTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--notion-text);
+  letter-spacing: -0.012em;
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .formGrid {
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fullWidth {
+  grid-column: span 2;
+}
+
+.formGroup label {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--notion-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.input,
+.select,
+.textarea {
+  padding: 8px 12px;
+  border: 1px solid var(--notion-border);
+  border-radius: 6px;
+  font-size: 14px;
+  outline: none;
+  background-color: var(--notion-bg);
+  transition: all 0.15s ease;
+  color: var(--notion-text);
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  border-color: var(--notion-border-focus);
+}
+
+.textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 12px;
+  width: 100%;
+}
+
+.cancelBtn {
+  background-color: transparent;
+  border: 1px solid var(--notion-border);
+  color: var(--notion-text-muted);
+  padding: 8px 18px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.15s;
+  font-size: 13.5px;
+}
+
+.cancelBtn:hover {
+  background-color: var(--notion-bg-hover);
+  color: var(--notion-text);
+}
+
+.saveBtn {
+  background-color: var(--notion-bg-solid);
+  color: var(--theme-bg-base);
+  border: 1px solid var(--notion-bg-solid);
+  padding: 8px 24px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.15s;
+  font-size: 13.5px;
+}
+
+.saveBtn:hover {
+  opacity: 0.9;
+}
+
+.saveBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

@@ -17,9 +17,10 @@ const ensurePlainHeaders = (headers: unknown): Record<string, string> => {
 export const fetchWithAuthRetry = async (
   url: string,
   options: RequestInit,
+  auth = true,
   retry = true
 ): Promise<Response> => {
-  const accessToken = TokenService.getAccessToken();
+  const accessToken = auth ? TokenService.getAccessToken() : null;
   const baseHeaders = ensurePlainHeaders(options.headers);
   const headers: Record<string, string> = {
     ...(baseHeaders || {}),

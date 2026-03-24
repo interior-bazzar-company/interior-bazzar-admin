@@ -1,14 +1,14 @@
 .card {
-  padding: var(--padding-xxl);
-  border-radius: var(--radius-lg);
-  background: var(--bg-primary-color);
-  /* border: 1px solid #e5e5e5; */
-  /* box-shadow: 0 2px 6px rgba(0, 0, 0, 1); */
+  padding: 32px;
+  border-radius: 0;
+  background: #ffffff;
+  border: 1px solid #000000;
 }
 
 .title {
-  font-weight: 600;
+  font-weight: 800;
   margin-bottom: 1.5rem;
-  color: var(--text-theme-color);
-  font-size: calc(2 * var(--font-size-base));
+  color: #000000;
+  font-size: 24px;
+  text-transform: uppercase;
 }

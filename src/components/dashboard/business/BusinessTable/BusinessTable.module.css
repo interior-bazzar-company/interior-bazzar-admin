@@ -4,130 +4,129 @@
   height: 90vh;
   overflow: auto;
   border-radius: 8px;
-  padding-bottom: calc(2 * var(--padding-xxl));
+  border: 1px solid var(--notion-border);
+  padding-bottom: 40px;
+  background-color: var(--notion-bg);
+  box-shadow: var(--notion-shadow);
 }
+
 .table {
   width: 100%;
   border-collapse: collapse;
   min-width: 800px;
-  /* border: 2px solid red; */
-  /* box-shadow: 0px 0px 10px rgba(0, 0, 0, 1); */
+  font-size: 13.5px;
 }
 
 .table thead {
   top: 0;
   z-index: 10;
   position: sticky;
-  color: var(--text-white-color);
-  background-color: var(--bg-theme-color);
+  color: var(--notion-text-muted);
+  background-color: var(--notion-bg-page);
+  border-bottom: 1px solid var(--notion-divider);
 }
-.table thead {
-  border-radius: var(--radius-xs);
-}
+
 .table th {
-  border-right: 1px solid white;
+  border-right: 1px solid var(--notion-divider);
+  padding: 12px;
+  text-align: center;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 11px;
 }
+
 .table th:last-child {
   border-right: none;
 }
-.table th,
+
 .table td {
   padding: 12px;
   text-align: center;
-  max-width: 100px;
+  max-width: 120px;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-
-  border-bottom: 1px solid var(--border-light-color);
+  border-bottom: 1px solid var(--notion-divider);
+  border-right: 1px solid var(--notion-divider);
+  color: var(--notion-text);
+  background-color: var(--notion-bg);
 }
-.table thead {
-  overflow: auto;
 
-  box-shadow: 0px 0px 10px rgba(0, 0, 0, 1);
+.table td:last-child {
+  border-right: none;
 }
-table td {
-  background-color: #fbfbfb;
+
+.table tbody tr:hover td {
+  background-color: var(--notion-bg-hover);
 }
 
 .badge {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
-  padding: 4px 10px;
-  border-radius: 6px;
+  padding: 3px 8px;
+  border-radius: 4px;
   display: inline-block;
-  color: var(--text-white-color);
+  color: var(--notion-text);
+  border: 1px solid var(--notion-border);
+  background-color: var(--notion-bg);
 }
 
-/* TAGS */
-
+/* TAGS - Keep colors but make them chips as requested */
 .default {
-  background-color: var(--color-default);
+  background-color: var(--notion-bg);
+  border: 1px solid var(--notion-border);
 }
 .query {
-  background-color: var(--color-query);
+  border-color: var(--color-query);
+  color: var(--color-query);
+  background: color-mix(in srgb, var(--color-query) 10%, white);
 }
 .aifiltered {
-  background-color: var(--color-aifiltered);
+  border-color: var(--color-aifiltered);
+  color: var(--color-aifiltered);
+  background: color-mix(in srgb, var(--color-aifiltered) 10%, white);
 }
 .manualfiltered {
-  background-color: var(--color-manualfiltered);
-}
-
-/* STATUS */
-.prospect {
-  background-color: var(--color-prospect);
-}
-.followup {
-  background-color: var(--color-followup);
-}
-.hotprospect {
-  background-color: var(--color-hotprospect);
-}
-.crack {
-  background-color: var(--color-crack);
-}
-.deny {
-  background-color: var(--color-deny);
-}
-
-/* PRIORITY */
-.low {
-  background-color: var(--color-low);
-}
-.medium {
-  background-color: var(--color-medium);
-}
-.high {
-  background-color: var(--color-high);
+  border-color: var(--color-manualfiltered);
+  color: var(--color-manualfiltered);
+  background: color-mix(in srgb, var(--color-manualfiltered) 10%, white);
 }
 
 .pagination {
   width: 100%;
-  gap: 8px;
+  gap: 4px;
   display: flex;
   margin-top: 16px;
-  justify-content: center; /* center instead of flex-end */
-  flex-wrap: wrap; /* wrap instead of overflow */
+  justify-content: center;
+  flex-wrap: wrap;
 }
 
 .pagination button {
-  padding: 6px 12px;
+  padding: 5px 12px;
   cursor: pointer;
-  border-radius: 6px;
-  border: 1px solid #ddd;
+  border-radius: 4px;
+  border: 1px solid var(--notion-border);
+  background: var(--notion-bg);
+  color: var(--notion-text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
 
-  transition: all 0.2s ease;
+.pagination button:hover:not(:disabled) {
+  background-color: var(--notion-bg-hover);
+  color: var(--notion-text);
 }
 
 .pagination button:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
 .activePage {
-  color: #fff;
-  background: var(--bg-theme-color);
-  border-color: var(--bg-theme-color);
-  font-weight: bold;
+  color: var(--notion-text) !important;
+  background: var(--notion-bg-selected) !important;
+  border-color: var(--notion-border-focus) !important;
+  font-weight: 600;
 }

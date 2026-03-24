@@ -3,29 +3,31 @@ import { logger } from "../../../../utils/logger";
 import { AdminService } from "../../../../api/modules/admin";
 import type {
   AdminLeadType,
-  BusinessFilterType,
+  LeadFilterType,
 } from "../../../../types/content";
-const useLeadTable = (_filters: BusinessFilterType) => {
+const useLeadTable = (filters: LeadFilterType) => {
   const [pageSize] = useState<number>(20);
   const [pageNo, setPageNo] = useState<number>(1);
   const [loading, setLoading] = useState<boolean>(false);
   const [hasNext, setHasNext] = useState<boolean>(false);
   const [leads, setLeads] = useState<AdminLeadType[]>([]);
   const [totalPages, setTotalPages] = useState<number>(1);
+  const [noAccess, setNoAccess] = useState<boolean>(false);
 
   const fetchLeads = async () => {
     try {
       setLoading(true);
-      const res = await AdminService.fetchLeads(pageNo, pageSize);
+      const res = await AdminService.fetchLeads(pageNo, pageSize, filters);
       if (!res.response) {
         logger.error("Failed to fetch leads");
         return;
       }
-      setLeads(res.data.leads);
-      setHasNext(res.data.hasNext);
-      setTotalPages(res.data.totalPages);
-    } catch (e) {
+      setLeads(res.data?.leads || res.data?.results || []);
+      setHasNext(res.data?.hasNext || false);
+      setTotalPages(res.data?.totalPages || 1);
+    } catch (e: any) {
       logger.error("Error while fetching leads: ", e);
+      if (e.code === 401 || e.code === 403) setNoAccess(true);
     } finally {
       setLoading(false);
     }
@@ -37,7 +39,11 @@ const useLeadTable = (_filters: BusinessFilterType) => {
   useEffect(() => {
     fetchLeads();
     return () => {};
-  }, [pageNo]);
+  }, [pageNo, filters]);
+
+  useEffect(() => {
+    setPageNo(1);
+  }, [filters]);
   const incrementPage = () => {
     if (pageNo < totalPages) {
       setPageNo((prev) => prev + 1);
@@ -51,6 +57,7 @@ const useLeadTable = (_filters: BusinessFilterType) => {
     loading,
     pageSize,
     totalPages,
+    noAccess,
     setPageNo,
     incrementPage,
     onLeadAssigned,

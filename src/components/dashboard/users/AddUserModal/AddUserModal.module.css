@@ -1,0 +1,187 @@
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modalContent {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .modalContent {
+    padding: 0;
+  }
+}
+
+.title {
+  font-size: 20px;
+  color: #000000;
+  font-weight: 800;
+  margin: 0 0 24px 0;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid #000000;
+  border-radius: 4px;
+  overflow: hidden;
+  width: 100%;
+}
+
+.inputField {
+  width: 100%;
+  padding: 16px;
+  border: none;
+  border-bottom: 1px solid #000000;
+  background: #ffffff;
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+  color: #000000;
+}
+
+.inputField::placeholder {
+  color: #6b7280;
+}
+
+.inputField:last-child {
+  border-bottom: none;
+}
+
+.selectWrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.selectField {
+  width: 100%;
+  padding: 16px;
+  border: none;
+  background: #ffffff;
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+  color: #000000;
+  appearance: none;
+}
+
+.chevron {
+  position: absolute;
+  right: 16px;
+  pointer-events: none;
+}
+
+.actions {
+  display: flex;
+  justify-content: center;
+  /* Centered based on mockup alignment */
+  gap: 16px;
+  margin-top: 32px;
+}
+
+.cancelBtn {
+  background-color: #ffffff;
+  border: 1px solid #000000;
+  color: #000000;
+  padding: 10px 32px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 15px;
+  transition: all 0.15s;
+  text-transform: uppercase;
+}
+
+.cancelBtn:hover {
+  background-color: #000000;
+  color: #ffffff;
+}
+
+.primaryBtn {
+  background-color: #ffffff;
+  color: #000000;
+  border: 1px solid #000000;
+  padding: 10px 48px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 800;
+  font-size: 15px;
+  transition: all 0.15s;
+  text-transform: uppercase;
+}
+
+.primaryBtn:hover {
+  background-color: #000000;
+  color: #ffffff;
+}
+
+.primaryBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.rolesSection {
+  padding: 16px;
+  background-color: #ffffff;
+  border-top: 1px solid #000000;
+}
+
+.rolesTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: #000000;
+  margin: 0 0 12px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.rolesGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.roleItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  color: #1f2937;
+  transition: color 0.2s;
+}
+
+.roleItem:hover {
+  color: #000;
+}
+
+.roleItem input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #000;
+}
+
+.loadingText {
+  font-size: 12px;
+  color: #6b7280;
+  font-style: italic;
+}

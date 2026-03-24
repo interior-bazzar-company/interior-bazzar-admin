@@ -18,11 +18,13 @@ export class AppUrl {
   page: string;
   contact: string;
   qna: string;
+  rbac: string;
   lead: string;
   quote: string;
   feedback: string;
   constructor() {
     this.admin = `v1/admin`;
+    this.rbac = `v1/rbac`;
     this.auth = `v1/auth`;
     this.user = `v1/user`;
     this.common = `v1/common`;

@@ -1,88 +1,86 @@
 .button {
-  border: none;
+  border: 1px solid var(--notion-border);
   cursor: pointer;
-  padding: 10px 30px;
-  display: inline-block;
-  color: var(--text-white-color);
-  font-size: var(--font-size-base);
-  background-color: var(--bg-theme-color);
-}
-
-.button.delete {
-  background-color: var(--delete-color);
-}
-
-.button.edit {
-  background-color: var(--edit-color);
-}
-
-.button.default {
-  background-color: var(--bg-theme-color);
-}
-
-.button.theme {
-  background-color: var(--bg-theme-dark);
-  color: var(--text-white-color);
-}
-
-.button.contact {
-  background-color: #007bff;
-  color: var(--text-white-color);
-}
-.button.view {
-  background-color: #28a745;
-  color: var(--text-white-color);
-}
-
-.button.gradient {
-  background: linear-gradient(90deg, #4caf50, #1b5e20);
-  color: var(--text-white-color);
+  padding: 8px 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--notion-text);
+  font-size: 14px;
+  font-weight: 500;
+  background-color: var(--notion-bg);
+  border-radius: 6px;
+  transition: all 0.15s ease;
+  box-shadow: var(--notion-shadow);
 }
 
 .button:hover {
-  opacity: 0.8;
+  background-color: var(--notion-bg-hover);
 }
 
-.movingBackground {
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: linear-gradient(270deg, #ff00cc, #3333ff, #00ccff);
-  background-size: 600% 600%;
-  font-weight: 600;
-  animation: gradientShift 6s ease infinite;
-  border-radius: calc(var(--padding-xxl) + 5px);
+.button:active {
+  background-color: var(--notion-bg-selected);
 }
 
-.movingBorderButtonBase {
-  position: relative;
-  color: var(--color-text-white);
-  border-radius: var(--radius-xl);
-  background-color: var(--color-bg-black);
-  padding: 4px 0;
-  margin: 5px;
-  width: 200px;
+.button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
-@keyframes gradientShift {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
-  }
+.button.theme,
+.button.primary {
+  background-color: var(--notion-bg-solid);
+  color: var(--theme-bg-base);
+  border-color: var(--notion-bg-solid);
+}
+
+.button.theme:hover,
+.button.primary:hover {
+  opacity: 0.9;
+}
+
+.button.delete,
+.button.danger {
+  color: #eb5757;
+  background-color: var(--notion-bg);
+}
+
+.button.delete:hover,
+.button.danger:hover {
+  background-color: #fbeaea;
+}
+
+.button.edit,
+.button.secondary {
+  color: var(--notion-text);
+  background-color: var(--notion-bg-page);
+}
+
+.button.contact {
+  color: #2383e2;
+  background-color: var(--notion-bg);
+}
+
+.button.view {
+  color: #0f7b6c;
+  background-color: var(--notion-bg);
+}
+
+.button.gradient {
+  background-color: var(--notion-bg-solid);
+  color: var(--theme-bg-base);
 }
 
 .radiusLg {
-  border-radius: var(--radius-xs);
+  border-radius: 6px;
 }
+
 .radius {
-  border-radius: var(--radius-xxl);
+  border-radius: 999px;
 }
+
 .ctaLink {
   width: fit-content;
+  text-decoration: none;
 }

@@ -1,0 +1,51 @@
+.popupContent {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: transparent;
+}
+
+.popupHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.popupTitle {
+  font-size: 16px;
+  color: var(--notion-text);
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.popupTitle strong {
+  font-weight: 700;
+  color: var(--notion-bg-solid);
+  margin-right: 8px;
+}
+
+.logsTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.logsTable th, .logsTable td {
+  border: 1px solid var(--notion-divider);
+  padding: 10px 14px;
+  font-size: 13.5px;
+  color: var(--notion-text);
+}
+
+.logsTable th {
+  font-weight: 600;
+  color: var(--notion-text-muted);
+  background-color: var(--notion-bg-page);
+  text-transform: uppercase;
+  font-size: 11px;
+}
+
+.logsTable td {
+  background-color: var(--notion-bg);
+}

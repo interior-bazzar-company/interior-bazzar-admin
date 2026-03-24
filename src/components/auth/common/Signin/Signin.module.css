@@ -1,16 +1,16 @@
 .card {
-  padding: var(--padding-xxl);
-  border-radius: var(--radius-lg);
-  /* border: 1px solid #e5e5e5; */
-  background: var(--bg-primary-color);
-  /* box-shadow: 0 2px 6px rgba(0, 0, 0, 1); */
+  padding: 32px;
+  border-radius: 0;
+  border: 1px solid #000000;
+  background: #ffffff;
 }
 
 .title {
-  font-weight: 600;
+  font-weight: 800;
   margin-bottom: 1.5rem;
-  color: var(--text-theme-color);
-  font-size: calc(2 * var(--font-size-base));
+  color: #000000;
+  font-size: 24px;
+  text-transform: uppercase;
 }
 
 .form {
@@ -25,9 +25,10 @@
 
 .radioLabel {
   display: block;
-  font-weight: 600;
-  color: var(--text-theme-color);
+  font-weight: 700;
+  color: #000000;
   margin-bottom: var(--margin-lg);
+  text-transform: uppercase;
 }
 
 .options {
@@ -38,7 +39,8 @@
 
 .options label {
   font-size: 1rem;
-  color: var(--text-dark-color);
+  color: #000000;
+  font-weight: 600;
 }
 .input {
   width: 400px;
@@ -53,8 +55,10 @@
 }
 .forgotPasswordLink {
   font-size: var(--font-size-xs);
-  color: var(--text-theme-color);
+  color: #000000;
   text-align: center;
+  text-decoration: underline;
+  font-weight: 700;
 }
 .footerText {
   margin-top: 1rem;
@@ -64,10 +68,9 @@
 }
 
 .footerText a {
-  /* color: #2e7d32; */
-  color: var(--text-theme-color);
-  text-decoration: none;
-  font-weight: 500;
+  color: #000000;
+  text-decoration: underline;
+  font-weight: 700;
 }
 
 .footerText a:hover {

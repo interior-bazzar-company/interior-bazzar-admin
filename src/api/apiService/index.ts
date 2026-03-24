@@ -28,7 +28,7 @@ export class ApiService {
       (request as RequestInit).signal = options.signal;
     }
     //new end
-    const response = await fetchWithAuthRetry(this.buildUrl(url), request);
+    const response = await fetchWithAuthRetry(this.buildUrl(url), request, options.auth ?? true);
 
     return this.returnResponse(response, options.responseType ?? "json");
   }
@@ -44,7 +44,7 @@ export class ApiService {
       options.responseType ?? "json",
       options.auth ?? true
     );
-    const response = await fetchWithAuthRetry(this.buildUrl(url), request);
+    const response = await fetchWithAuthRetry(this.buildUrl(url), request, options.auth ?? true);
     return this.returnResponse(response, options.responseType ?? "json");
   }
 
@@ -59,7 +59,7 @@ export class ApiService {
       "json",
       options.auth ?? true
     );
-    const response = await fetchWithAuthRetry(this.buildUrl(url), request);
+    const response = await fetchWithAuthRetry(this.buildUrl(url), request, options.auth ?? true);
     return this.returnResponse(response, options.responseType ?? "json");
   }
 
@@ -75,7 +75,7 @@ export class ApiService {
       options.auth ?? true
     );
 
-    const response = await fetchWithAuthRetry(this.buildUrl(url), request);
+    const response = await fetchWithAuthRetry(this.buildUrl(url), request, options.auth ?? true);
     return this.returnResponse(response, options.responseType ?? "json");
   }
 
@@ -90,7 +90,7 @@ export class ApiService {
       "json",
       options.auth ?? true
     );
-    const response = await fetchWithAuthRetry(this.buildUrl(url), request);
+    const response = await fetchWithAuthRetry(this.buildUrl(url), request, options.auth ?? true);
     return this.returnResponse(response, options.responseType ?? "json");
   }
 
@@ -178,7 +178,7 @@ export class ApiService {
     const errBody = body as Partial<ApiResponseType<unknown>>;
     throw new AppExceptions(
       errBody.message || "Unexpected error",
-      errBody.code || -1,
+      errBody.code || response.status,
       errBody.response || false
     );
   }

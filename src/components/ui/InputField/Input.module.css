@@ -1,77 +1,106 @@
 .input {
   width: 100%;
-  padding: var(--padding-lg);
+  padding: 10px 14px;
   display: block;
-  margin: 0px auto;
-  border-radius: var(--radius-xs);
-  font-size: var(--font-size-base);
-  border: 1px solid var(--border-light-color);
+  margin: 0;
+  border-radius: 6px;
+  font-size: 14px;
+  background-color: var(--notion-bg);
+  border: 1px solid var(--notion-border);
+  color: var(--notion-text);
   outline: none;
+  transition: border-color 0.15s, background-color 0.15s;
 }
+
+.input::placeholder {
+  color: var(--notion-text-hint);
+}
+
 .input:focus {
-  border-color: var(--bg-black-color);
-  outline: none;
+  border-color: var(--notion-border-focus);
+  background-color: var(--theme-bg-base);
 }
+
 .input:disabled {
   cursor: not-allowed;
-  background-color: var(--bg-section-color);
+  background-color: var(--notion-bg-page);
+  color: var(--notion-text-muted);
 }
 
 .passwordContainer {
   position: relative;
 }
+
 .eyeIcon {
   position: absolute;
-  right: var(--padding-xs);
+  right: 12px;
   top: 50%;
   transform: translateY(-50%);
   cursor: pointer;
+  color: var(--notion-text-muted);
+  font-size: 16px;
+  display: flex;
+  align-items: center;
 }
+
 .selectWrapper {
   flex-grow: 1;
   position: relative;
-  border-radius: var(--radius-xs);
-  border: 1px solid var(--border-light-color);
+  border-radius: 6px;
+  border: 1px solid var(--notion-border);
+  background-color: var(--notion-bg);
+  transition: border-color 0.15s;
+}
+
+.selectWrapper:focus-within {
+  border-color: var(--notion-border-focus);
 }
 
 .select {
+  width: 100%;
   outline: none;
   appearance: none;
-  position: inherit;
   border: none;
-  padding: var(--padding-lg) 0;
-  padding-left: var(--padding-xs);
-  border-radius: var(--radius-xs);
-}
-.select:focus {
-  border: none;
-  outline: none;
-  position: inherit;
+  padding: 10px 14px;
+  padding-right: 36px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--notion-text);
+  font-size: 14px;
+  cursor: pointer;
 }
 
 .angleDown {
   top: 50%;
-  font-weight: 600;
+  pointer-events: none;
   position: absolute;
-  right: var(--padding-xxl);
+  right: 12px;
   transform: translateY(-50%);
-  color: var(--text-black-color);
-  font-size: var(--font-size-body);
+  color: var(--notion-text-muted);
+  font-size: 12px;
 }
 
 .option {
-  color: var(--text-black-color);
-  background-color: var(--bg-primary-color);
+  color: var(--notion-text);
+  background-color: var(--notion-bg);
 }
 
 .textarea {
-  height: 100px;
+  min-height: 100px;
   width: 100%;
-  padding: var(--padding-lg);
+  padding: 10px 14px;
   display: block;
-  margin: 0px auto;
-  border-radius: var(--radius-xs);
-  font-size: var(--font-size-base);
-  border: 1px solid var(--border-light-color);
+  margin: 0;
+  border-radius: 6px;
+  font-size: 14px;
+  background-color: var(--notion-bg);
+  border: 1px solid var(--notion-border);
+  color: var(--notion-text);
   outline: none;
+  resize: vertical;
+  transition: border-color 0.15s;
+}
+
+.textarea:focus {
+  border-color: var(--notion-border-focus);
 }

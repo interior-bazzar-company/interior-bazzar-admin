@@ -35,35 +35,33 @@
 /* Alert box style */
 .alert {
   display: flex;
-  color: var(--text-white-color);
+  color: #000000;
+  background-color: #ffffff;
+  border: 2px solid #000000;
   align-items: center;
   justify-content: space-between;
   min-width: 300px;
   max-width: 500px;
   padding: 12px 20px;
-  border-radius: 8px;
-  font-weight: 500;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  border-radius: 0;
+  font-weight: 700;
   gap: 12px;
   animation-duration: 0.3s;
   animation-fill-mode: both;
 }
 
 /* Alert types */
-.success {
-  background-color: var(--bg-success-color);
+.success, .error, .warning, .info {
+  background-color: #ffffff;
+  border-color: #000000;
 }
 
 .error {
-  background-color: var(--bg-error-color);
+  border-width: 4px;
 }
 
 .warning {
-  background-color: var(--bg-warning-color);
-}
-
-.info {
-  background-color: var(--bg-info-color);
+  border-style: dashed;
 }
 
 /* Basic Positions for All Alerts */
@@ -218,9 +216,9 @@
 .closeButton {
   background: transparent;
   border: none;
-  color: white;
+  color: #000000;
   font-size: 20px;
-  font-weight: bold;
+  font-weight: 900;
   cursor: pointer;
   padding: 0;
   line-height: 1;

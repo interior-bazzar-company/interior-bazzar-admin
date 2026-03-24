@@ -12,7 +12,9 @@ import PublicRoute from "./PublicRoutes";
 import AdminLoader from "../components/shared/AdminLoader";
 import LeadDashboard from "../pages/dashboard/Leads";
 import Businessses from "../pages/dashboard/Businesses";
-import Analytics from "../pages/dashboard/Analytics";
+import BusinessDashboard from "../pages/dashboard/BusinessDashboard"; // NEW
+import UserManage from "../pages/dashboard/UserManage"; // NEW
+import Analytics from "../pages/dashboard/AnalyticsV2"; // UPDATED V2
 import ImageUpload from "../pages/dashboard/ImageUpload";
 import FunnelPage from "../pages/dashboard/Funnel";
 
@@ -52,6 +54,22 @@ const UserRoutes = () => {
         element: (
           <ProtectedRoute>
             <Businessses />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: PAGES.ADMIN_BUSINESS_DASHBOARD,
+        element: (
+          <ProtectedRoute>
+            <BusinessDashboard />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: PAGES.ADMIN_USER_MANAGE,
+        element: (
+          <ProtectedRoute>
+            <UserManage />
           </ProtectedRoute>
         ),
       },

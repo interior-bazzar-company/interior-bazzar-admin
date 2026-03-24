@@ -1,10 +1,11 @@
 import React from "react";
-import useLeadTable from "./useLeadTable";
-import AssignLead from "../../AssignLead";
-import styles from "./LeadTable.module.css";
 import { useModal } from "../../../../context/ModalContext";
+import useLeadTable from "./useLeadTable";
+import styles from "./LeadTable.module.css";
 import type { AdminLeadType, LeadFilterType } from "../../../../types/content";
 import LeadDetail from "../LeadDetail";
+import AssignLead from "../../AssignLead";
+
 const LeadTable = React.memo(({ filter }: { filter: LeadFilterType }) => {
 
     const {
@@ -16,15 +17,21 @@ const LeadTable = React.memo(({ filter }: { filter: LeadFilterType }) => {
         setPageNo,
         totalPages,
         incrementPage,
-        onLeadAssigned,
+        noAccess,
+        onLeadAssigned
     } = useLeadTable(filter);
+    
     const { showModal } = useModal();
-    const handleAssignClick = (lead: AdminLeadType) => {
-        showModal(<AssignLead lead={lead} onAssigned={onLeadAssigned} />)
+
+    const handleViewLead = (lead: AdminLeadType) => {
+        showModal(<LeadDetail lead={lead} />);
     };
-    const handleViewClick = (lead: AdminLeadType) => {
-        showModal(<LeadDetail lead={lead} />)
-    }
+
+    const handleAssignClick = (lead: AdminLeadType) => {
+        showModal(<AssignLead lead={lead} onAssigned={onLeadAssigned} />);
+    };
+    
+    // Handlers mapped dynamically below
     const renderValue = (value: string | null | undefined) => {
         if (!value) return "--";
         return value;
@@ -40,34 +47,35 @@ const LeadTable = React.memo(({ filter }: { filter: LeadFilterType }) => {
                         <th>Phone</th>
                         <th>Mail</th>
                         <th>Interested</th>
-                        <th>Query</th>
-                        <th>Country</th>
-                        <th>City</th>
-                        <th>Assigned</th>
-                        <th>View</th>
+                        <th>Assign</th>
+                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     {loading ?
                         Array.from({ length: pageSize }).map((_, i) => <tr key={i}>
-                            <td colSpan={10}>
+                            <td colSpan={7}>
                                 loading....
                             </td>
-                        </tr>) : leads.map((lead) => (
+                        </tr>) : noAccess ? (
+                    <tr>
+                        <td colSpan={7} style={{ textAlign: "center", padding: "32px", color: "#ef4444", fontWeight: "600" }}>
+                            You don't have access to this resource.
+                        </td>
+                    </tr>
+                ) : leads.map((lead) => (
                             <tr key={lead.id}>
                                 <td>{renderValue(lead.date)}</td>
-                                <td>{renderValue(lead.name)}</td>
+                                <td 
+                                    onClick={() => handleViewLead(lead)}
+                                    style={{ cursor: 'pointer', color: 'var(--color-brand-primary)', fontWeight: 600 }}
+                                >
+                                    {renderValue(lead.name)}
+                                </td>
                                 <td>{renderValue(lead.phone)}</td>
                                 <td>{renderValue(lead.email)}</td>
                                 <td>
                                     {renderValue(lead.interested)}
-                                </td>
-                                <td>{renderValue(lead.query)}</td>
-                                <td>
-                                    {renderValue(lead.country)}
-                                </td>
-                                <td>
-                                    {renderValue(lead.city)}
                                 </td>
                                 <td>
                                     <button
@@ -80,7 +88,7 @@ const LeadTable = React.memo(({ filter }: { filter: LeadFilterType }) => {
                                 <td>
                                     <button
                                         className={styles.assignButton}
-                                        onClick={() => handleViewClick(lead)}
+                                        onClick={() => handleViewLead(lead)}
                                     >
                                         View
                                     </button>
@@ -90,6 +98,7 @@ const LeadTable = React.memo(({ filter }: { filter: LeadFilterType }) => {
 
                 </tbody>
             </table>
+
             <div className={styles.pagination}>
                 <button
                     disabled={pageNo === 1}

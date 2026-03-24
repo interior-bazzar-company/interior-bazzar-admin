@@ -1,0 +1,89 @@
+.container {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin: 14px 0;
+}
+
+/* KPI ROW */
+
+.kpiRow {
+    display: flex;
+    justify-content: space-around;
+    padding: 1%;
+}
+
+.card {
+    background: #ffffff;
+    border: 1px solid #000000;
+    border-radius: 0;
+    padding: 16px 22px;
+    min-width: 160px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.cardTitle {
+    font-size: 13px;
+    font-weight: 700;
+    color: #000000;
+    margin: auto;
+    text-transform: uppercase;
+}
+
+.cardValue {
+    font-size: 26px;
+    font-weight: 800;
+    color: #000000;
+    margin: auto;
+}
+
+/* PLAN ROW */
+
+.planRow {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 1%;
+}
+
+.planLabel {
+    font-size: 14px;
+    font-weight: 600;
+    min-width: 80px;
+}
+
+.planList {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.planChip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #ffffff;
+    border: 1.5px solid #000000;
+    border-radius: 4px;
+    padding: 6px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #000000;
+}
+
+.dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #4c8dff;
+}
+
+.planName {
+    color: #000000;
+}
+
+.planCount {
+    font-weight: 700;
+}

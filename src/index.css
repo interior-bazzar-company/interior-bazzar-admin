@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
 @import "tailwindcss";
 
 *,
@@ -7,20 +7,21 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  box-shadow: none !important;
 }
 
 html {
   font-size: 16px;
   font-weight: 400;
   scroll-behavior: smooth;
-  font-family: "Poppins", sans-serif;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 body {
-  font-size: 16px;
+  font-size: 15px;
   line-height: 1.6;
-  color: var(--color-text-dark);
-  font-family: var(--font-primary);
+  color: var(--color-text-primary);
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -moz-osx-font-smoothing: grayscale;
   -webkit-font-smoothing: antialiased;
   background-color: var(--color-bg-primary);
@@ -48,135 +49,158 @@ button {
   background: none;
   font-family: inherit;
 }
+
 .container {
   max-width: var(--max-width-container);
   margin: 0 auto;
 }
+
 .linewrap-1 {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   display: -webkit-box;
+  line-clamp: 1;
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
 }
+
 .linewrap-2 {
   overflow: hidden;
   text-overflow: ellipsis;
   display: -webkit-box;
+  line-clamp: 2;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
 }
+
 .linewrap-3 {
   overflow: hidden;
   text-overflow: ellipsis;
   display: -webkit-box;
+  line-clamp: 3;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
 }
-/* Always hidden */
+
 .scrollbar-hidden {
   overflow: auto;
-  -ms-overflow-style: none; /* IE & Edge */
-  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
-
 .scrollbar-hidden::-webkit-scrollbar {
-  display: none; /* Chrome, Safari */
+  display: none;
 }
 
-/* Hidden until hover */
 .scrollbar-hover {
   overflow: auto;
-  -ms-overflow-style: none; /* IE & Edge */
-  scrollbar-width: none; /* Firefox (default hidden) */
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 .scrollbar-hover::-webkit-scrollbar {
   width: 0;
   height: 0;
 }
-
-/* Show on hover */
 .scrollbar-hover:hover {
-  scrollbar-width: thin; /* Firefox */
+  scrollbar-width: thin;
 }
-
 .scrollbar-hover:hover::-webkit-scrollbar {
-  width: 8px; /* Chrome, Safari */
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
-
 .scrollbar-hover:hover::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.4);
+  background-color: rgba(0, 0, 0, 0.15);
   border-radius: 4px;
 }
+
 .shimmer {
-  background: linear-gradient(90deg, #e0e0e0 25%, #f5f5f5 37%, #e0e0e0 63%);
+  background: linear-gradient(90deg, #f0efed 25%, #faf9f7 37%, #f0efed 63%);
   background-size: 400% 100%;
   animation: shimmer 1.6s ease-in-out infinite;
 }
-/* =======================
-   DESIGN TOKENS
-========================== */
+
+@keyframes shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* =====================
+   NOTION DESIGN TOKENS (DYNAMIC DERIVATIVE THEME)
+====================== */
 :root {
-  /* Brand Colors */
-  --color-brand-primary: rgb(25, 71, 45);
-  --color-brand-dark: #113712;
+  /* MAIN ROOT COLOR - Change this to change the whole theme! */
+  --theme-color: #000000;
+  --theme-bg-base: #ffffff; /* Typically white, but could be black for dark mode */
 
-  /* Background Colors */
-  --color-bg-primary: #ffffff;
-  /* --color-bg-section: #f3efef;
-  --color-bg-section-dark: #a09a9a; */
-  --color-bg-section: #f9f9f9;
-  --color-bg-section-dark: #eeeeee;
-  --color-bg-black: #131313;
-  --color-bg-black-section: #343434;
-  --color-success-bg: #4caf50;
-  --color-warning-bg: #ff9800;
-  --color-error-bg: #ff0015;
-  --color-info-bg: #2196f3;
-  --color-text-red: #ff0000;
-  --color-sidebar-bg: #113712;
-  --color-sidebar-bg-dark: #072208;
-  /* Text Colors */
-  --color-text-primary: #000000;
-  --color-text-dark: #121212;
-  --color-text-light: #424242;
-  --color-text-white: #ffffff;
-  --color-text-black: #0e0e0e;
-  --color-text-link: #000099;
-  --color-text-highlight: #ffa500;
+  /* Derived Text Colors */
+  --notion-text: var(--theme-color);
+  --notion-text-muted: color-mix(in srgb, var(--theme-color) 60%, var(--theme-bg-base));
+  --notion-text-hint: color-mix(in srgb, var(--theme-color) 40%, var(--theme-bg-base));
 
-  /* Border Colors   */
-  --color-border-primary: #6e6e6e;
-  --color-border-dark: var(--color-text-dark);
-  --color-border-light: var(--color-text-light);
-  --color-border-black: var(--color-text-black);
+  /* Derived Background Colors */
+  --notion-bg: var(--theme-bg-base);
+  --notion-bg-page: color-mix(in srgb, var(--theme-color) 3%, var(--theme-bg-base));
+  --notion-bg-hover: color-mix(in srgb, var(--theme-color) 6%, var(--theme-bg-base));
+  --notion-bg-selected: color-mix(in srgb, var(--theme-color) 10%, var(--theme-bg-base));
+  --notion-bg-solid: var(--theme-color);
 
-  --color-default: rgb(62, 14, 234);
-  --color-query: #3498db;
-  --color-aifiltered: purple;
-  --color-manualfiltered: orange;
+  /* Derived Border Colors */
+  --notion-border: color-mix(in srgb, var(--theme-color) 14%, var(--theme-bg-base));
+  --notion-border-focus: color-mix(in srgb, var(--theme-color) 30%, var(--theme-bg-base));
+  --notion-divider: color-mix(in srgb, var(--theme-color) 9%, var(--theme-bg-base));
 
-  /* Status */
-  --color-prospect: orange;
-  --color-followup: blue;
-  --color-hotprospect: hotpink;
-  --color-crack: green;
-  --color-deny: red;
+  /* Brand */
+  --color-brand-primary: var(--notion-bg-solid);
+  --color-brand-dark: color-mix(in srgb, var(--theme-color) 80%, black);
 
-  /* Priority */
-  --color-low: gray;
-  --color-medium: blue;
-  --color-high: green;
-  /* Font Families */
-  --font-primary: "Poppins", sans-serif;
-  --font-secondary: var(--font-primary);
+  /* Backgrounds */
+  --color-bg-primary: var(--notion-bg);
+  --color-bg-section: var(--notion-bg-page);
+  --color-bg-section-dark: var(--notion-bg-selected);
+  --color-bg-black: var(--notion-bg-solid);
+  --color-bg-black-section: var(--color-brand-dark);
+  
+  /* Status Backgounds */
+  --color-success-bg: #dcfce7;
+  --color-warning-bg: #fef3c7;
+  --color-error-bg: #fee2e2;
+  --color-info-bg: #e0f2fe;
+  
+  /* Sidebar */
+  --color-sidebar-bg: var(--notion-bg-page);
+  --color-sidebar-bg-dark: var(--notion-bg-selected);
+
+  /* Text Aliases */
+  --color-text-primary: var(--notion-text);
+  --color-text-dark: var(--notion-text);
+  --color-text-light: var(--notion-text-muted);
+  --color-text-white: var(--theme-bg-base);
+  --color-text-black: var(--notion-text);
+  --color-text-link: var(--notion-text);
+  --color-text-highlight: var(--notion-text);
+  --color-text-red: #ef4444;
+
+  /* Border Aliases */
+  --color-border-primary: var(--notion-border);
+  --color-border-dark: var(--notion-border-focus);
+  --color-border-light: var(--notion-divider);
+  --color-border-black: var(--notion-text);
+
+  /* Status Colors */
+  --color-default: var(--notion-text-muted);
+  --color-query: #3b82f6;
+  --color-aifiltered: #8b5cf6;
+  --color-manualfiltered: #f97316;
+  --color-status-blue: #3b82f6;
+  --color-status-green: #22c55e;
+  --color-status-orange: #f97316;
+  --color-status-red: #ef4444;
+  --color-status-purple: #8b5cf6;
 
   /* Layout */
-  --max-width-container: 1200px;
-  --standard-border-radius: 20px;
-  --standard-border-radius2: 5px;
+  --max-width-container: 1400px;
+  --standard-border-radius: 6px;
+  --standard-border-radius2: 4px;
 
   /* Spacing */
   --space-xxs: 0.25rem;
@@ -188,22 +212,18 @@ button {
   --space-xxl: 3rem;
 
   /* Typography */
-  --font-size-h1: 2.5rem;
-  --font-size-h2: 2rem;
-  --font-size-h3: 1.75rem;
-  --font-size-h4: 1.5rem;
-  --font-size-h5: 1.25rem;
-  --font-size-h6: 1.125rem;
+  --font-size-h1: 2rem;
+  --font-size-h2: 1.75rem;
+  --font-size-h3: 1.5rem;
+  --font-size-h4: 1.25rem;
+  --font-size-h5: 1.125rem;
+  --font-size-h6: 1rem;
   --font-size-body-lg: 1rem;
-  --font-size-body: 1.1rem;
-  --font-size-base: 1.1rem;
+  --font-size-body: 0.9375rem;
+  --font-size-base: 0.9375rem;
   --font-size-sm: 0.875rem;
   --font-size-xs: 0.75rem;
-  /* Font Sizes */
-  --font-size-xxs: 0.625rem;
-  --font-size-xs: 0.75rem;
-  --font-size-sm: 0.875rem;
-  --font-size-base: 1rem;
+  --font-size-xxs: 0.6875rem;
   --font-size-lg: 1.125rem;
   --font-size-xl: 1.25rem;
 
@@ -215,7 +235,7 @@ button {
   --padding-xl: 0.7rem;
   --padding-xxl: 1.5rem;
 
-  /* margin */
+  /* Margin */
   --margin-xxs: 0.3rem;
   --margin-xs: 0.4rem;
   --margin-sm: 0.45rem;
@@ -225,7 +245,7 @@ button {
   --margin-xxl: 1rem;
   --margin-xxxl: 1.5rem;
 
-  /* gap */
+  /* Gap */
   --gap-xl: 1rem;
   --gap-xxs: 0.3rem;
   --gap-xs: 0.4rem;
@@ -236,15 +256,14 @@ button {
   --gap-xxxl: 1.5rem;
 
   /* Border Radius */
-  --radius-xs: 0.313rem;
-  --radius-sm: 0.75rem;
-  --radius-md: 1rem;
-  --radius-lg: 1.5rem;
-  --radius-xl: 2rem;
-  --radius-xxl: 3rem;
+  --radius-xs: 3px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-xxl: 16px;
 
-  /* 🔁 Legacy Aliases (for backward compatibility if needed) */
-  /* Background Colors */
+  /* Legacy aliases */
   --bg-theme-dark: var(--color-brand-dark);
   --bg-theme-color: var(--color-brand-primary);
   --bg-primary-color: var(--color-bg-primary);
@@ -258,8 +277,6 @@ button {
   --bg-info-color: var(--color-info-bg);
   --bg-sidebar-color: var(--color-sidebar-bg);
   --bg-sidebar-color-dark: var(--color-sidebar-bg-dark);
-
-  /* Text Colors */
   --text-theme-color: var(--color-brand-primary);
   --text-theme-dark-color: var(--color-brand-dark);
   --text-primary-color: var(--color-text-primary);
@@ -270,128 +287,57 @@ button {
   --text-link-color: var(--color-text-link);
   --text-highlight-color: var(--color-text-highlight);
   --text-red-color: var(--color-text-red);
-  /* Border Colors */
   --border-dark-color: var(--color-border-dark);
   --border-light-color: var(--color-border-light);
   --border-theme-color: var(--color-brand-primary);
   --border-black-color: var(--color-border-black);
-  /* temp colors for testing */
-  --edit-color: #ffc107;
-  --delete-color: #dc3545;
-
-  --default-color: #28a745;
-  /* Radius */
+  --edit-color: var(--color-text-primary);
+  --delete-color: #ef4444;
+  --default-color: var(--color-text-primary);
   --standard-radius: var(--standard-border-radius);
   --standard-radius2: var(--standard-border-radius2);
 
-  /* =======================
-   RESPONSIVE BREAKPOINTS
-========================== */
-  --bp-xxs: 350px; /* very small phones */
-  --bp-xs: 450px; /* small phones */
-  --bp-sm: 576px; /* large phones */
-  --bp-md: 768px; /* tablets */
-  --bp-lg: 900px; /* small laptops */
-  --bp-xl: 1200px; /* desktops */
+  /* Responsive breakpoints */
+  --bp-xxs: 350px;
+  --bp-xs: 450px;
+  --bp-sm: 576px;
+  --bp-md: 768px;
+  --bp-lg: 900px;
+  --bp-xl: 1200px;
 }
 
-/* =======================
-   RESPONSIVE TOKENS
-========================== */
+/* Responsive tokens */
 @media (max-width: 1024px) {
   :root {
-    --font-size-h1: 2.25rem;
-    --font-size-h2: 1.875rem;
-    --font-size-h3: 1.625rem;
-    --font-size-h4: 1.375rem;
-    --font-size-h5: 1.125rem;
-    --font-size-h6: 1rem;
-    --font-size-body: 0.875rem;
-    --standard-padding: var(--space-sm);
-  }
-}
-
-@media (max-width: 768px) {
-  :root {
-    --font-size-h1: 2rem;
+    --font-size-h1: 1.75rem;
     --font-size-h2: 1.5rem;
     --font-size-h3: 1.25rem;
     --font-size-h4: 1.125rem;
     --font-size-h5: 1rem;
     --font-size-h6: 0.9375rem;
-    --font-size-body: 0.8125rem;
-    --standard-padding: var(--space-xs);
+    --font-size-body: 0.875rem;
   }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 768px) {
   :root {
-    --font-size-h1: 1.75rem;
-    --font-size-h2: 1.375rem;
+    --font-size-h1: 1.5rem;
+    --font-size-h2: 1.25rem;
     --font-size-h3: 1.125rem;
     --font-size-h4: 1rem;
-    --font-size-h5: 0.875rem;
-    --font-size-h6: 0.8125rem;
-    --font-size-body: 0.75rem;
-    --standard-padding: var(--space-xxs);
+    --font-size-h5: 0.9375rem;
+    --font-size-h6: 0.875rem;
+    --font-size-body: 0.8125rem;
   }
 }
 
-/* =======================
-   TYPOGRAPHY ELEMENTS
-========================== */
-h1 {
-  font-weight: 700;
-  color: var(--color-text-dark);
-  font-size: var(--font-size-h1);
-  font-family: var(--font-primary);
-  color: var(--text-black-color);
-}
-
-h2 {
-  font-weight: 600;
-  font-size: var(--font-size-h2);
-  color: var(--text-black-color);
-}
-
-h3 {
-  font-weight: 600;
-  font-size: var(--font-size-h3);
-  color: var(--text-black-color);
-}
-
-h4 {
-  font-weight: 500;
-  font-size: var(--font-size-h4);
-  margin-bottom: var(--space-xs);
-  color: var(--text-black-color);
-}
-
-h5 {
-  font-size: var(--font-size-h5);
-  margin-bottom: var(--space-xxs);
-  color: var(--text-black-color);
-  font-weight: 500;
-}
-
-h6 {
-  font-weight: 500;
-  font-size: var(--font-size-h6);
-  margin-bottom: var(--space-xxs);
-  color: var(--text-black-color);
-}
-
-p {
-  color: var(--color-text-light);
-  font-size: var(--font-size-body);
-}
-
-li {
-  margin-bottom: var(--space-xs);
-  font-size: var(--font-size-body);
-}
-
-strong {
-  font-weight: 600;
-  color: var(--color-text-dark);
-}
+/* Typography */
+h1 { font-weight: 700; color: var(--color-text-dark); font-size: var(--font-size-h1); letter-spacing: -0.02em; }
+h2 { font-weight: 600; font-size: var(--font-size-h2); color: var(--color-text-dark); letter-spacing: -0.015em; }
+h3 { font-weight: 600; font-size: var(--font-size-h3); color: var(--color-text-dark); }
+h4 { font-weight: 500; font-size: var(--font-size-h4); margin-bottom: var(--space-xs); color: var(--color-text-dark); }
+h5 { font-size: var(--font-size-h5); margin-bottom: var(--space-xxs); color: var(--color-text-dark); font-weight: 500; }
+h6 { font-weight: 500; font-size: var(--font-size-h6); margin-bottom: var(--space-xxs); color: var(--color-text-dark); }
+p  { color: var(--color-text-light); font-size: var(--font-size-body); }
+li { margin-bottom: var(--space-xs); font-size: var(--font-size-body); }
+strong { font-weight: 600; color: var(--color-text-dark); }

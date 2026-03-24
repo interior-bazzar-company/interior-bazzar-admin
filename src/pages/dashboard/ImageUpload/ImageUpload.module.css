@@ -1,8 +1,8 @@
-/* Theme color based on your uploaded image */
+/* Minimalist B&W Theme */
 :root {
-  --theme-color: #2a3b2a; /* dark green from your image */
-  --theme-hover: #1f2c1f;
-  --accent-color: #17a2b8;
+  --theme-color: #000000;
+  --theme-hover: #000000;
+  --accent-color: #000000;
 }
 
 .wrapper {
@@ -10,12 +10,12 @@
   flex-direction: column;
   gap: 20px;
   padding: 20px;
-  border-radius: 12px;
-  background: #f4f6f4;
+  border-radius: 0;
+  background: #ffffff;
   max-width: 420px;
   margin: 0 auto;
   font-family: sans-serif;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  border: 1px solid #000000;
 }
 
 .selectorRow {
@@ -39,18 +39,18 @@
 .select {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
+  border: 1px solid #000000;
+  border-radius: 4px;
   font-size: 14px;
   outline: none;
   appearance: none;
-  background-color: #fff;
+  background-color: #ffffff;
   cursor: pointer;
+  color: #000000;
 }
 
 .select:focus {
-  border-color: var(--theme-color);
-  box-shadow: 0 0 0 2px rgba(42, 59, 42, 0.2);
+  border-color: #000000;
 }
 
 .angleDown {
@@ -66,9 +66,10 @@
 .previewWrapper {
   width: 100%;
   position: relative;
-  border-radius: 12px;
+  border-radius: 0;
   overflow: hidden;
-  background: #e8eee8;
+  background: #ffffff;
+  border: 1px solid #000000;
 }
 .deleteIcon {
   position: absolute;
@@ -104,13 +105,14 @@
 .uploadButton {
   width: 100%;
   padding: 12px;
-  border-radius: 8px;
-  background: var(--theme-color);
-  color: #fff;
-  font-weight: 600;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #000000;
+  font-weight: 700;
   cursor: pointer;
-  border: none;
-  transition: background 0.2s;
+  border: 1px solid #000000;
+  transition: all 0.2s;
+  text-transform: uppercase;
 }
 
 .uploadButton:hover {
@@ -134,7 +136,7 @@
 
 .progressBar {
   height: 100%;
-  background: #28a745;
+  background: #000000;
   transition: width 0.3s ease;
 }
 
@@ -155,13 +157,14 @@
 
 .copyButton {
   padding: 8px 12px;
-  border-radius: 8px;
-  background: var(--accent-color);
-  color: white;
-  font-weight: 600;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #000000;
+  font-weight: 700;
   cursor: pointer;
-  border: none;
-  transition: background 0.2s;
+  border: 1px solid #000000;
+  transition: all 0.2s;
+  text-transform: uppercase;
 }
 
 .copyButton:hover {
