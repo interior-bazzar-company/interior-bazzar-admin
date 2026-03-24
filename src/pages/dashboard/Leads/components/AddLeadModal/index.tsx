@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import styles from "./AddLeadModal.module.css";
-import { AdminService } from "../../../../api/modules/admin";
+import { AdminService } from "../../../../../api/modules/admin";
 
 interface AddLeadModalProps {
   onClose: () => void;

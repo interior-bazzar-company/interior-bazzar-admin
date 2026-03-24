@@ -40,6 +40,14 @@ const AssignLead = ({ lead, onAssigned }: { lead: AdminLeadType, onAssigned: (le
     return (
         <>
             <div className={styles.wrapper}>
+                <style>{`
+                    @media (min-width: 769px) {
+                        div[data-dialog="true"] > div:last-child {
+                            width: 85vw !important;
+                            max-width: 1100px !important;
+                        }
+                    }
+                `}</style>
 
                 <div className={styles.leftColumn}>
 
@@ -145,26 +153,24 @@ const AssignLead = ({ lead, onAssigned }: { lead: AdminLeadType, onAssigned: (le
                         <div className={styles.noBusiness}>
                             selcte business to see here
                         </div>}
-                    <div className={styles.rightColumn}>
-                        <div className={styles.leadCard}>
-                            <h4 className={styles.cardTitle}>Lead Info</h4>
-                            <div className={styles.leadBody}>
-
-                                <div className={styles.rowItem}>
-                                    <div className={styles.rowLabel}>Name</div>
-                                    <div className={styles.rowValue}>{lead.name}</div>
-                                </div>
-                                <div className={styles.rowItem}>
-                                    <div className={styles.rowLabel}>Inrested</div>
-                                    <div className={styles.rowValue}>{lead.interested}</div>
-                                </div>
-                                <div className={styles.rowItem}>
-                                    <div className={styles.rowLabel}>Query</div>
-                                    <div className={styles.rowValue}>{lead.query}</div>
-                                </div>
+                </div>
+                <div className={styles.rightColumn}>
+                    <div className={styles.leadCard}>
+                        <h4 className={styles.cardTitle}>Lead Info</h4>
+                        <div className={styles.leadBody}>
+                            <div className={styles.rowItem}>
+                                <div className={styles.rowLabel}>Name</div>
+                                <div className={styles.rowValue}>{lead.name}</div>
+                            </div>
+                            <div className={styles.rowItem}>
+                                <div className={styles.rowLabel}>Inrested</div>
+                                <div className={styles.rowValue}>{lead.interested}</div>
+                            </div>
+                            <div className={styles.rowItem}>
+                                <div className={styles.rowLabel}>Query</div>
+                                <div className={styles.rowValue}>{lead.query}</div>
                             </div>
                         </div>
-
                     </div>
                     <div className={styles.assignRow}>
                         <Button radius onClick={handleAssignLead} disabled={loading?.assign || !selectedBusiness}>
