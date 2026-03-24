@@ -1,28 +1,150 @@
 .leadDashboardContainer {
-  padding: 0px var(--padding-xxl);
-  max-height: 100%;
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
-.sectionHeader {
+
+/* Top Bar */
+.topBar {
   display: flex;
-  gap: var(--gap-lg);
-  align-items: center;
-  margin: 10px 0px;
+  justify-content: flex-end;
+  margin-bottom: 32px;
 }
-.icon {
-  aspect-ratio: 1/1;
-  color: var(--text-light-color);
+
+.topActions {
+  display: flex;
+  gap: 12px;
 }
-.sectionPara {
+
+.analyticsBtn, .addBtn {
+  padding: 8px 16px;
+  border: 1px solid #000;
+  background: #fff;
   font-weight: 600;
-  font-size: var(--font-size-sm);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s;
 }
-.filteresContainer {
+
+.analyticsBtn:hover, .addBtn:hover {
+  background: #f3f4f6;
+}
+
+/* Stats Row */
+.statsRow {
   display: flex;
-  gap: var(--gap-lg);
-  width: fit-content;
-  justify-content: flex-start;
-  margin: 10px 0px;
+  gap: 24px;
+  margin-top: 32px;
+  margin-bottom: 48px;
+  justify-content: center;
 }
-.select {
-  width: 150px;
+
+.statCard {
+  border: 1px solid #000;
+  padding: 20px 40px;
+  min-width: 200px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #fff;
+}
+
+.statLabel {
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #000;
+  letter-spacing: 0.05em;
+}
+
+.statValue {
+  font-size: 32px;
+  font-weight: 800;
+  color: #000;
+}
+
+/* Filters Section */
+.filtersSection {
+  margin-bottom: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.filterRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.filterTitle {
+  font-weight: 600;
+  color: #6b7280;
+  font-size: 14px;
+  min-width: 100px;
+}
+
+.chipsContainer {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.filterChip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid #000;
+  background: #fff;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.filterChip:hover {
+  background: #f9fafb;
+}
+
+.activeChip {
+  background: #f3f4f6;
+  border-width: 2px;
+}
+
+.chipDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.chipLabel {
+  font-size: 14px;
+  font-weight: 600;
+  color: #000;
+}
+
+.chipCount {
+  font-size: 14px;
+  font-weight: 600;
+  color: #000;
+  margin-left: 4px;
+}
+
+/* Table Container */
+.tableContainer {
+  margin-top: 24px;
+  background: #fff;
+}
+
+/* Error message styling */
+.accessDenied {
+  padding: 32px;
+  text-align: center;
+  background-color: #ffffff;
+  color: #000000;
+  border: 2px solid #000000;
+  font-weight: 800;
+  text-transform: uppercase;
 }

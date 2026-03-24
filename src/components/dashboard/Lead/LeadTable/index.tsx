@@ -5,6 +5,7 @@ import styles from "./LeadTable.module.css";
 import type { AdminLeadType, LeadFilterType } from "../../../../types/content";
 import LeadDetail from "../LeadDetail";
 import AssignLead from "../../AssignLead";
+import LogsPopup from "../LogsPopup";
 
 const LeadTable = React.memo(({ filter }: { filter: LeadFilterType }) => {
 
@@ -47,6 +48,7 @@ const LeadTable = React.memo(({ filter }: { filter: LeadFilterType }) => {
                         <th>Phone</th>
                         <th>Mail</th>
                         <th>Interested</th>
+                        <th>Logs</th>
                         <th>Assign</th>
                         <th>Action</th>
                     </tr>
@@ -54,12 +56,12 @@ const LeadTable = React.memo(({ filter }: { filter: LeadFilterType }) => {
                 <tbody>
                     {loading ?
                         Array.from({ length: pageSize }).map((_, i) => <tr key={i}>
-                            <td colSpan={7}>
+                            <td colSpan={8}>
                                 loading....
                             </td>
                         </tr>) : noAccess ? (
                     <tr>
-                        <td colSpan={7} style={{ textAlign: "center", padding: "32px", color: "#ef4444", fontWeight: "600" }}>
+                        <td colSpan={8} style={{ textAlign: "center", padding: "32px", color: "#ef4444", fontWeight: "600" }}>
                             You don't have access to this resource.
                         </td>
                     </tr>
@@ -76,6 +78,23 @@ const LeadTable = React.memo(({ filter }: { filter: LeadFilterType }) => {
                                 <td>{renderValue(lead.email)}</td>
                                 <td>
                                     {renderValue(lead.interested)}
+                                </td>
+                                <td>
+                                    <button 
+                                        className={styles.assignButton} 
+                                        onClick={() => {
+                                            const formattedLogs = lead.logs && lead.logs.length > 0 
+                                                ? lead.logs.map(log => ({ created: log.timestamp, tag: lead.tag || "Update", desc: log.event }))
+                                                : [];
+                                            showModal(<LogsPopup leadId={lead.id} logs={formattedLogs} />);
+                                        }}
+                                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', background: 'none', border: '1px solid #e5e7eb', color: '#000', padding: '4px 8px' }}
+                                    >
+                                        <span style={{ border: '1px solid #EAB308', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 'bold' }}>
+                                            {lead.logs ? lead.logs.length : 0}
+                                        </span>
+                                        <span style={{ fontSize: '12px' }}>Logs</span>
+                                    </button>
                                 </td>
                                 <td>
                                     <button
