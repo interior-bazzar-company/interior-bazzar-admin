@@ -26,12 +26,14 @@ const BusinessTable = ({ filter }: { filter: BusinessFilterType }) => {
         <thead>
           <tr>
             <th>ID</th>
-            <th>Join At</th>
-            <th>Name</th>
+            <th>Joined</th>
             <th>Plan</th>
+            <th>Last purchase</th>
+            <th>Expired</th>
+            <th>Name</th>
+            {/* <th>Lead Kota</th> */}
             <th>Assigned Leads</th>
             <th>Platform Leads</th>
-            <th>Total Leads</th>
           </tr>
         </thead>
         <tbody>
@@ -43,20 +45,23 @@ const BusinessTable = ({ filter }: { filter: BusinessFilterType }) => {
             <tr key={business.id}>
               <td>{renderValue(business.id)}</td>
               <td>{renderValue(business.joinAt)}</td>
+              <td>{renderValue(business.plan)}</td>
+              <td>{renderValue(business.lastPurchase)}</td>
+              <td>{renderValue(business.expireAt)}</td>
               <td>{renderValue(business.name)}</td>
-              <td>
+              {/* <td>
                 {Array.isArray(business.plan)
                   ? business.plan.map(p => p.name).join(", ")
                   : renderValue(business.plan as unknown as string)}
-              </td>
+              </td> */}
 
               <td>
-                {renderValue(business.assignedLeads)}
+                {business.assignedLeads}
               </td>
-              <td>{renderValue(business.platformLeads)}</td>
-              <td>
+              <td>{business.platformLeads}</td>
+              {/* <td>
                 {renderValue(business.totalLeads)}
-              </td>
+              </td> */}
             </tr>
           ))}
 
@@ -131,9 +136,11 @@ export const BusinessTableV2 = ({ filter }: { filter: BusinessFilterType }) => {
       <table className={styles.table}>
         <thead>
           <tr>
-            <th>Joined At</th>
+            <th>ID</th>
+            <th>Joined</th>
             <th>Plan</th>
-            <th>Date</th>
+            <th>Last purchase</th>
+            <th>Expired</th>
             <th>Name</th>
             <th>Assigned Leads</th>
             <th>Platform Leads</th>
@@ -158,18 +165,20 @@ export const BusinessTableV2 = ({ filter }: { filter: BusinessFilterType }) => {
               )
               : businesses.map((business) => (
                 <tr key={business.id}>
+                  <td>{renderValue(business.id)}</td>
                   <td>{renderValue(business.joinAt)}</td>
                   <td>{renderValue(business.plan)}</td>
-                  <td>{renderValue(business.date)}</td>
+                  <td>{renderValue(business.lastPurchase)}</td>
+                  <td>{renderValue(business.expireAt)}</td>
                   <td
                     onClick={() => handleViewBusiness(business)}
                     style={{ cursor: 'pointer', color: 'var(--color-brand-primary)', fontWeight: 600 }}
                   >
                     {renderValue(business.name)}
                   </td>
-                  <td>{renderValue(business.assignedLead)}</td>
-                  <td>{renderValue(business.platformLead)}</td>
-                  <td>{renderValue(business.totalLeads)}</td>
+                  <td>{business.assignedLead}</td>
+                  <td>{business.platformLead}</td>
+                  <td>{business.totalLeads}</td>
                 </tr>
               ))}
         </tbody>

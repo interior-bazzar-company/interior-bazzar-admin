@@ -38,6 +38,7 @@ export interface LeadsDashboardStatsType {
   statusMetrics: Record<string, number>;
   adminStatusMetrics: Record<string, number>;
   stageMetrics: Record<string, number>;
+  categoryMetrics: Record<string, number>;
 }
 
 export interface SignupData {
@@ -98,6 +99,7 @@ export interface AdsQueryForm {
 export interface AdminLeadType {
   id: number;
   date: string;
+  updatedAt: string;
   name: string;
   phone: string;
   email: string;
@@ -107,6 +109,7 @@ export interface AdminLeadType {
   city: string;
   assigned: string | null;
   leadStatus?: string;
+  category?: string|null;
   stage?: string;
   state?: string;
   type?: 'product' | 'service' | 'catalogue';
@@ -142,8 +145,11 @@ export interface AdminBusinessPlanType {
 export interface AdminBusinessListType {
   id: number;
   name: string;
-  plan: AdminBusinessPlanType[]; // ✅ FIXED
+  plan: string; // ✅ FIXED
   joinAt: string;
+  lastPurchase: string;
+  expireAt: string;
+  date: string;
   totalLeads: number;
   assignedLeads: number;
   platformLeads: number;
@@ -153,6 +159,8 @@ export interface AdminBusinessListTypeV2 {
   name: string;
   plan: string;
   joinAt: string;
+  lastPurchase: string;
+  expireAt: string;
   date: string;
   totalLeads: number;
   assignedLead: number;

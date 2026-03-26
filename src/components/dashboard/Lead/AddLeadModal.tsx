@@ -3,6 +3,7 @@ import styles from "./AddLeadModal.module.css";
 import { useModal } from "../../../context/ModalContext";
 import useToast from "../../shared/Toast/useToast";
 import { AdminService } from "../../../api/modules/admin";
+import { LEAD_STATUS, STAGES } from "../../../utils/constants/lead";
 
 interface AddLeadModalProps {
   onSuccess?: () => void;
@@ -21,8 +22,8 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onSuccess }) => {
     city: "",
     state: "",
     country: "India",
-    leadStatus: "new",
-    stage: "discovery",
+    leadStatus: LEAD_STATUS[0],
+    stage: STAGES[0],
   });
 
   const [loading, setLoading] = useState(false);
@@ -74,7 +75,12 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onSuccess }) => {
       
       const res = await AdminService.createLead(payload);
       
-      if (res.response) {
+      let apiRes: any = res;
+      if (Array.isArray(res) && res.length > 0) {
+        apiRes = res[0];
+      }
+
+      if (apiRes.response) {
          showToast({ 
            greeting: "Success", 
            booldMessage: "Created", 
@@ -87,7 +93,7 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onSuccess }) => {
          showToast({ 
            greeting: "Error", 
            booldMessage: "Failed", 
-           normalMessage: res.message || "Could not create lead", 
+           normalMessage: apiRes.message || "Could not create lead", 
            type: "error" 
          });
       }
@@ -199,22 +205,18 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onSuccess }) => {
          <div className={styles.formGroup}>
            <label>Lead Status</label>
            <select name="leadStatus" value={formData.leadStatus} onChange={handleChange} className={styles.select}>
-             <option value="new">New</option>
-             <option value="assigned">Assigned</option>
-             <option value="deny">Deny</option>
-             <option value="rejected">Rejected</option>
-             <option value="pending">Pending</option>
+             {LEAD_STATUS.map(status => (
+                <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>
+             ))}
            </select>
          </div>
 
          <div className={styles.formGroup}>
            <label>Funnel Stage</label>
            <select name="stage" value={formData.stage} onChange={handleChange} className={styles.select}>
-             <option value="discovery">Discovery</option>
-             <option value="evaluation">Evaluation</option>
-             <option value="proposal">Proposal</option>
-             <option value="negotiation">Negotiation</option>
-             <option value="closed">Closed</option>
+             {STAGES.map(stage => (
+                <option key={stage} value={stage}>{stage.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</option>
+             ))}
            </select>
          </div>
 

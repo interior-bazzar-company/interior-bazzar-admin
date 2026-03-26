@@ -11,6 +11,7 @@ const useLeads = () => {
   const { showModal } = useModal();
   const [stats, setStats] = useState<LeadsDashboardStatsType | null>(null);
   const [noAccess, setNoAccess] = useState<boolean>(false);
+  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
   const [filters, setFilters] = useState<LeadFilterType>({
     sortBy: "",
@@ -76,7 +77,10 @@ const useLeads = () => {
 
 
   const handleAddClick = () => {
-    showModal(<AddLeadModal onSuccess={fetchLeadsStats} />);
+    showModal(<AddLeadModal onSuccess={() => {
+      fetchLeadsStats();
+      setRefreshTrigger(prev => prev + 1);
+    }} />);
   };
 
   return {
@@ -88,6 +92,7 @@ const useLeads = () => {
     handleFilterClick,
     handleAddClick,
     noAccess,
+    refreshTrigger,
   };
 };
 

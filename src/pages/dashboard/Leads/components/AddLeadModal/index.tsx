@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import styles from "./AddLeadModal.module.css";
 import { AdminService } from "../../../../../api/modules/admin";
-
+import { LEAD_STATUS, STAGES } from "../../../../../utils/constants/lead";
 interface AddLeadModalProps {
   onClose: () => void;
   onSuccess: () => void;
@@ -18,8 +18,8 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onClose, onSuccess }) => {
     city: "",
     state: "",
     country: "India",
-    leadStatus: "New",
-    stage: "New Lead",
+    leadStatus: LEAD_STATUS[0],
+    stage: STAGES[0],
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -88,17 +88,17 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onClose, onSuccess }) => {
           <div className={styles.field}>
             <label>Status</label>
             <select name="leadStatus" value={formData.leadStatus} onChange={handleChange}>
-               <option value="New">New</option>
-               <option value="Assigned">Assigned</option>
-               <option value="In Progress">In Progress</option>
+               {LEAD_STATUS.map(status => (
+                 <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>
+               ))}
             </select>
           </div>
           <div className={styles.field}>
             <label>Stage</label>
             <select name="stage" value={formData.stage} onChange={handleChange}>
-               <option value="New Lead">New Lead</option>
-               <option value="Contacted">Contacted</option>
-               <option value="Qualified">Qualified</option>
+               {STAGES.map(stage => (
+                 <option key={stage} value={stage}>{stage.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</option>
+               ))}
             </select>
           </div>
         </div>

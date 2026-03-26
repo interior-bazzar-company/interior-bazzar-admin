@@ -6,8 +6,9 @@ import type { AdminLeadType, LeadFilterType } from "../../../../types/content";
 import LeadDetail from "../LeadDetail";
 import AssignLead from "../../AssignLead";
 import LogsPopup from "../LogsPopup";
+import UpdateLeadModal from "../UpdateLeadModal";
 
-const LeadTable = React.memo(({ filter }: { filter: LeadFilterType }) => {
+const LeadTable = React.memo(({ filter, refreshTrigger }: { filter: LeadFilterType, refreshTrigger?: number }) => {
 
     const {
         leads,
@@ -20,7 +21,7 @@ const LeadTable = React.memo(({ filter }: { filter: LeadFilterType }) => {
         incrementPage,
         noAccess,
         onLeadAssigned
-    } = useLeadTable(filter);
+    } = useLeadTable(filter, refreshTrigger);
     
     const { showModal } = useModal();
 
@@ -28,8 +29,16 @@ const LeadTable = React.memo(({ filter }: { filter: LeadFilterType }) => {
         showModal(<LeadDetail lead={lead} />);
     };
 
-    const handleAssignClick = (lead: AdminLeadType) => {
+    const handleAssignClick = (e: React.MouseEvent, lead: AdminLeadType) => {
+        e.stopPropagation();
         showModal(<AssignLead lead={lead} onAssigned={onLeadAssigned} />);
+    };
+    
+    const handleEditClick = (e: React.MouseEvent, lead: AdminLeadType) => {
+        e.stopPropagation();
+        showModal(<UpdateLeadModal lead={lead} onSuccess={(updatedLead) => {
+            if (updatedLead) onLeadAssigned(updatedLead);
+        }} />);
     };
     
     // Handlers mapped dynamically below
@@ -43,14 +52,25 @@ const LeadTable = React.memo(({ filter }: { filter: LeadFilterType }) => {
             <table className={styles.table}>
                 <thead>
                     <tr>
-                        <th>Date</th>
+                        <th>Created</th>
+                        <th>Updated</th>
                         <th>Name</th>
                         <th>Phone</th>
                         <th>Mail</th>
                         <th>Interested</th>
+                        <th>Tag</th>
+                        <th>Category</th>
+                        <th>Filter Stage</th>
+                        <th>Status</th>
+                        <th>Query</th>
+                        <th>Assigned business</th>
+                        <th>Business Status </th>
                         <th>Logs</th>
+                        <th>Lead Id</th>
+                        <th>Remark</th>
                         <th>Assign</th>
-                        <th>Action</th>
+                        <th>Edit</th>
+                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -66,23 +86,29 @@ const LeadTable = React.memo(({ filter }: { filter: LeadFilterType }) => {
                         </td>
                     </tr>
                 ) : leads.map((lead) => (
-                            <tr key={lead.id}>
+                            <tr key={lead.id} onClick={() => handleViewLead(lead)} style={{ cursor: 'pointer', transition: 'background-color 0.2s' }}>
                                 <td>{renderValue(lead.date)}</td>
-                                <td 
-                                    onClick={() => handleViewLead(lead)}
-                                    style={{ cursor: 'pointer', color: 'var(--color-brand-primary)', fontWeight: 600 }}
-                                >
-                                    {renderValue(lead.name)}
+                                <td>{renderValue(lead.updatedAt)}</td>
+                                <td>
+                                    <span style={{ color: 'var(--color-brand-primary)', fontWeight: 600 }}>{renderValue(lead.name)}</span>
                                 </td>
                                 <td>{renderValue(lead.phone)}</td>
                                 <td>{renderValue(lead.email)}</td>
                                 <td>
                                     {renderValue(lead.interested)}
                                 </td>
+                                <td>{renderValue(lead.tag || "")}</td>
+                                <td>{renderValue(lead.category || "")}</td>
+                                <td>{renderValue(lead.stage || "")}</td>
+                                <td>{renderValue(lead.leadStatus || "")}</td>
+                                <td>{renderValue(lead.query || "")}</td>
+                                <td>{renderValue(lead.assigned || "")}</td>
+                                <td>{renderValue(lead.status || "")}</td>
                                 <td>
                                     <button 
                                         className={styles.assignButton} 
-                                        onClick={() => {
+                                        onClick={(e) => {
+                                            e.stopPropagation();
                                             const formattedLogs = lead.logs && lead.logs.length > 0 
                                                 ? lead.logs.map(log => ({ created: log.timestamp, tag: lead.tag || "Update", desc: log.event }))
                                                 : [];
@@ -96,10 +122,12 @@ const LeadTable = React.memo(({ filter }: { filter: LeadFilterType }) => {
                                         <span style={{ fontSize: '12px' }}>Logs</span>
                                     </button>
                                 </td>
+                                <td>{lead.id}</td>
+                                <td>{renderValue(lead.remark)}</td>
                                 <td>
                                     <button
                                         className={`${styles.assignButton} ${lead.assigned ? styles.assigned : ""}`}
-                                        onClick={() => handleAssignClick(lead)}
+                                        onClick={(e) => handleAssignClick(e, lead)}
                                     >
                                         {lead.assigned ? "Assigned" : "Assign"}
                                     </button>
@@ -107,9 +135,9 @@ const LeadTable = React.memo(({ filter }: { filter: LeadFilterType }) => {
                                 <td>
                                     <button
                                         className={styles.assignButton}
-                                        onClick={() => handleViewLead(lead)}
+                                        onClick={(e) => handleEditClick(e, lead)}
                                     >
-                                        View
+                                        Edit
                                     </button>
                                 </td>
                             </tr>

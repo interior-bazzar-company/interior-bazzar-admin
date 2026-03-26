@@ -5,7 +5,7 @@ import type {
   AdminLeadType,
   LeadFilterType,
 } from "../../../../types/content";
-const useLeadTable = (filters: LeadFilterType) => {
+const useLeadTable = (filters: LeadFilterType, refreshTrigger?: number) => {
   const [pageSize] = useState<number>(20);
   const [pageNo, setPageNo] = useState<number>(1);
   const [loading, setLoading] = useState<boolean>(false);
@@ -39,7 +39,7 @@ const useLeadTable = (filters: LeadFilterType) => {
   useEffect(() => {
     fetchLeads();
     return () => {};
-  }, [pageNo, filters]);
+  }, [pageNo, filters, refreshTrigger]);
 
   useEffect(() => {
     setPageNo(1);

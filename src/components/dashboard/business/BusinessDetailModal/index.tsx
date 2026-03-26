@@ -33,19 +33,19 @@ const BusinessDetailModal: React.FC<BusinessDetailModalProps> = ({ business }) =
           </div>
           <div className={styles.infoItem}>
             <label>Expiry Date</label>
-            <p>{business.expire || "--"}</p>
+            <p>{business.expireAt || "--"}</p>
           </div>
-          <div className={styles.infoItem}>
+          {/* <div className={styles.infoItem}>
             <label>Lead Kota</label>
             <p>{business.leadsKota || 0}</p>
-          </div>
+          </div> */}
           <div className={styles.infoItem}>
             <label>Assigned Leads</label>
-            <p>{business.assignedLeads || 0}</p>
+            <p>{business.assignedLead || 0}</p>
           </div>
           <div className={styles.infoItem}>
             <label>Platform Leads</label>
-            <p>{business.platformLeads || 0}</p>
+            <p>{business.platformLead || 0}</p>
           </div>
           <div className={styles.infoItem}>
             <label>Total Leads</label>

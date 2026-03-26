@@ -28,6 +28,28 @@ const LeadDetail = ({ lead }: { lead: AdminLeadType }) => {
                         <label>Interested In</label>
                         <p>{lead.interested || "--"}</p>
                     </div>
+                    {/* ####################################### */}
+                    
+                    <div className={styles.infoItem}>
+                        <label>Tag</label>
+                        <p>{lead.tag || "--"}</p>
+                    </div>
+                    <div className={styles.infoItem}>
+                        <label>Category</label>
+                        <p>{lead.category || "--"}</p>
+                    </div>
+                    <div className={styles.infoItem}>
+                        <label>Query</label>
+                        <p>{lead.query || "--"}</p>
+                    </div>
+                    <div className={styles.infoItem}>
+                        <label>Business status</label>
+                        <p>{lead.status || "--"}</p>
+                    </div><div className={styles.infoItem}>
+                        <label>Remark</label>
+                        <p>{lead.remark || "--"}</p>
+                    </div>
+                    {/* ####################################### */}
                     <div className={styles.infoItem}>
                         <label>Status</label>
                         <p className={styles.statusBadge}>{lead.leadStatus || "New"}</p>
@@ -36,17 +58,10 @@ const LeadDetail = ({ lead }: { lead: AdminLeadType }) => {
                         <label>Stage</label>
                         <p>{lead.stage || "Discovery"}</p>
                     </div>
-                    <div className={styles.infoItem}>
-                        <label>Type</label>
-                        <p>{lead.type || "Service"}</p>
-                    </div>
-                    <div className={styles.infoItem}>
-                        <label>Item ID</label>
-                        <p>{lead.itemId || "--"}</p>
-                    </div>
+                    
                     <div className={styles.infoItem}>
                         <label>Location</label>
-                        <p>{lead.city || "--"}, {lead.country || "--"}</p>
+                        <p>{lead.city || "--"}, {lead.state || "--"}, {lead.country || "--"}</p>
                     </div>
                     <div className={styles.infoItem}>
                         <label>Assigned To</label>

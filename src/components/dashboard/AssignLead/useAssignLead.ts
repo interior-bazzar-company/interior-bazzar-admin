@@ -106,9 +106,13 @@ const useAssignLead = (
         businessId: selectedBusiness.id,
       };
       const res = await AdminService.assignLeadToBusiness(data);
-      if (!res.response) return;
+      let apiRes: any = res;
+      if (Array.isArray(res) && res.length > 0) {
+        apiRes = res[0];
+      }
+      if (!apiRes.response) return;
       closeModal();
-      onAssigned(res.data);
+      onAssigned(apiRes.data);
       showAlert("Lead assigned successfully.", "success");
     }).catch(() => {
       alert("Failed to assign lead.");

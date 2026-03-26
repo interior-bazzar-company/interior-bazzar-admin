@@ -62,7 +62,7 @@ export class AdminService {
       if (filters) {
         if (filters.leadStatus) url += `&leadStatus=${encodeURIComponent(filters.leadStatus)}`;
         if (filters.filterStatus) url += `&stages=${encodeURIComponent(filters.filterStatus)}`;
-        if (filters.category) url += `&status=${encodeURIComponent(filters.category)}`;
+        if (filters.category) url += `&category=${encodeURIComponent(filters.category)}`;
         if (filters.searchText) url += `&searchText=${encodeURIComponent(filters.searchText)}`;
       }
       const response: ApiResponseType<any> =
