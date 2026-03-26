@@ -4,7 +4,7 @@ import type { AdminLeadType } from "../../../types/content";
 import { useModal } from "../../../context/ModalContext";
 import { useAlert } from "../../../context/AlertContext";
 import { AdminService } from "../../../api/modules/admin";
-import { LEAD_STATUS, STAGES } from "../../../utils/constants/lead";
+import { LEAD_STATUS, STAGES, LEAD_TAGS } from "../../../utils/constants/lead";
 
 interface UpdateLeadModalProps {
   lead: AdminLeadType;
@@ -155,13 +155,11 @@ const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({ lead, onSuccess }) =>
 
         <div className={styles.formGroup}>
           <label>Tag</label>
-          <input
-            name="tag"
-            placeholder="e.g. hot"
-            value={formData.tag}
-            onChange={handleChange}
-            className={styles.input}
-          />
+          <select name="tag" value={formData.tag} onChange={handleChange} className={styles.select}>
+            {LEAD_TAGS.map(tag => (
+               <option key={tag} value={tag}>{tag.charAt(0).toUpperCase() + tag.slice(1)}</option>
+            ))}
+          </select>
         </div>
 
         <div className={`${styles.formGroup} ${styles.fullWidth}`}>

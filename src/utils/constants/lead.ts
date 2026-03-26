@@ -21,3 +21,13 @@ export const STATUS = [
     "un-responsive",
     "deny"
 ];
+
+export const LEAD_TAGS = [
+    "default",
+    "query",
+    "aifiltered",
+    "manualfiltered",
+    "verified",
+    "nearby",
+    "normal"
+];

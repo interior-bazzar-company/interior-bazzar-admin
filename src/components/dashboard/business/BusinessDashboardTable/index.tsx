@@ -4,6 +4,7 @@ import styles from "./BusinessDashboardTable.module.css";
 import useBusinessDashboardTable from "./useBusinessDashboardTable";
 import type { AdminBusinessDashboardRowType } from "../../../../types/content/businessDashboard";
 import BusinessRemarksPopup from "../BusinessRemarksPopup";
+import BusinessBuyPlanModal from "../BusinessBuyPlanModal";
 
 const PLAN_COLORS: Record<string, string> = {
   "Network Leader": "#000000",
@@ -51,6 +52,16 @@ const BusinessDashboardTable: React.FC<Props> = ({ filter }) => {
       <BusinessRemarksPopup
         businessId={business.id}
         currentRemark={business.remark ?? ""}
+        onSuccess={refetch}
+      />
+    );
+  };
+
+  const handleBuyPlanClick = (business: AdminBusinessDashboardRowType) => {
+    showModal(
+      <BusinessBuyPlanModal
+        planId={business.id}
+        currentIntent={business.buyPlan}
         onSuccess={refetch}
       />
     );
@@ -155,15 +166,36 @@ const BusinessDashboardTable: React.FC<Props> = ({ filter }) => {
 
                   {/* Buy Plan */}
                   <td>
-                    {business.buyPlan ? (
-                      <span className={styles.planBadge}>
-                        <span
-                          className={styles.planDot}
-                          style={{ backgroundColor: getPlanColor(business.buyPlan) }}
-                        />
-                        {business.buyPlan}
-                      </span>
-                    ) : "--"}
+                    <button
+                      onClick={() => handleBuyPlanClick(business)}
+                      style={{
+                        background: "none",
+                        border: "1px solid #d1d5db",
+                        borderRadius: "6px",
+                        padding: "6px 12px",
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        minWidth: "70px",
+                        transition: "background 0.2s"
+                      }}
+                      onMouseOver={(e) => (e.currentTarget.style.background = "#f3f4f6")}
+                      onMouseOut={(e) => (e.currentTarget.style.background = "none")}
+                      title="Update Buy Plan"
+                    >
+                      {business.buyPlan ? (
+                        <span className={styles.planBadge} style={{ border: 'none', padding: 0, background: 'none' }}>
+                          <span
+                            className={styles.planDot}
+                            style={{ backgroundColor: getPlanColor(business.buyPlan) }}
+                          />
+                          {business.buyPlan}
+                        </span>
+                      ) : (
+                        <span style={{ color: "#4b5563", fontSize: "0.85rem", fontWeight: 500 }}>Update</span>
+                      )}
+                    </button>
                   </td>
 
                   {/* Remark */}

@@ -109,7 +109,7 @@ export interface AdminLeadType {
   city: string;
   assigned: string | null;
   leadStatus?: string;
-  category?: string|null;
+  category?: string | null;
   stage?: string;
   state?: string;
   type?: 'product' | 'service' | 'catalogue';
@@ -158,6 +158,7 @@ export interface AdminBusinessListType {
   assignedLeads: number;
   platformLeads: number;
 }
+
 export interface AdminBusinessListTypeV2 {
   id: number;
   name: string;
@@ -166,6 +167,9 @@ export interface AdminBusinessListTypeV2 {
   lastPurchase: string;
   expireAt: string;
   date: string;
+  kota: number | 0;
+  buyIntent: string | "";
+  planId: number | 0;
   totalLeads: number;
   assignedLead: number;
   platformLead: number;

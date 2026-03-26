@@ -3,7 +3,7 @@ import styles from "./AddLeadModal.module.css";
 import { useModal } from "../../../context/ModalContext";
 import { useAlert } from "../../../context/AlertContext";
 import { AdminService } from "../../../api/modules/admin";
-import { LEAD_STATUS, STAGES } from "../../../utils/constants/lead";
+import { LEAD_STATUS, STAGES, LEAD_TAGS } from "../../../utils/constants/lead";
 
 interface AddLeadModalProps {
   onSuccess?: () => void;
@@ -24,7 +24,7 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onSuccess }) => {
     country: "India",
     leadStatus: LEAD_STATUS[0],
     stage: STAGES[0],
-    tag: "",
+    tag: LEAD_TAGS[0],
     remark: "",
   });
 
@@ -206,13 +206,11 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onSuccess }) => {
 
          <div className={styles.formGroup}>
            <label>Tag</label>
-           <input 
-             name="tag" 
-             placeholder="e.g. hot, cold, warm"
-             value={formData.tag} 
-             onChange={handleChange} 
-             className={styles.input} 
-           />
+           <select name="tag" value={formData.tag} onChange={handleChange} className={styles.select}>
+             {LEAD_TAGS.map(tag => (
+                <option key={tag} value={tag}>{tag.charAt(0).toUpperCase() + tag.slice(1)}</option>
+             ))}
+           </select>
          </div>
 
          <div className={`${styles.formGroup} ${styles.fullWidth}`}>

@@ -34,6 +34,7 @@ const BusinessTable = ({ filter }: { filter: BusinessFilterType }) => {
             {/* <th>Lead Kota</th> */}
             <th>Assigned Leads</th>
             <th>Platform Leads</th>
+            
           </tr>
         </thead>
         <tbody>
@@ -104,6 +105,7 @@ const BusinessTable = ({ filter }: { filter: BusinessFilterType }) => {
 
 import BusinessDetailModal from "../BusinessDetailModal";
 import { useModal } from "../../../../context/ModalContext";
+import BusinessBuyPlanModal from "../BusinessBuyPlanModal";
 
 export const BusinessTableV2 = ({ filter }: { filter: BusinessFilterType }) => {
   const {
@@ -121,6 +123,16 @@ export const BusinessTableV2 = ({ filter }: { filter: BusinessFilterType }) => {
 
   const handleViewBusiness = (business: any) => {
     showModal(<BusinessDetailModal business={business} />);
+  };
+
+  const handleBuyPlanClick = (business: any) => {
+    showModal(
+      <BusinessBuyPlanModal
+        planId={business.id}
+        currentIntent={business.buyIntent}
+        onSuccess={() => setPageNo((prev) => prev)} // force re-render/refetch in BusinessTableV2
+      />
+    );
   };
 
   const renderValue = (
@@ -142,9 +154,11 @@ export const BusinessTableV2 = ({ filter }: { filter: BusinessFilterType }) => {
             <th>Last purchase</th>
             <th>Expired</th>
             <th>Name</th>
+            <th>Kota</th>
             <th>Assigned Leads</th>
             <th>Platform Leads</th>
             <th>Total Leads</th>
+            <th>Buy Plan</th>
           </tr>
         </thead>
 
@@ -176,9 +190,34 @@ export const BusinessTableV2 = ({ filter }: { filter: BusinessFilterType }) => {
                   >
                     {renderValue(business.name)}
                   </td>
+                  <td>{business.kota}</td>
                   <td>{business.assignedLead}</td>
                   <td>{business.platformLead}</td>
                   <td>{business.totalLeads}</td>
+                  <td>
+                    <button
+                      onClick={() => handleBuyPlanClick(business)}
+                      style={{
+                        background: "none",
+                        border: "1px solid #d1d5db",
+                        borderRadius: "6px",
+                        padding: "6px 12px",
+                        cursor: "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        minWidth: "70px",
+                        transition: "background 0.2s"
+                      }}
+                      onMouseOver={(e) => (e.currentTarget.style.background = "#f3f4f6")}
+                      onMouseOut={(e) => (e.currentTarget.style.background = "none")}
+                      title="Update Buy Plan"
+                    >
+                      {business.buyIntent ? business.buyIntent : (
+                        <span style={{ color: "#4b5563", fontSize: "0.85rem", fontWeight: 500 }}>Update</span>
+                      )}
+                    </button>
+                  </td>
                 </tr>
               ))}
         </tbody>

@@ -67,4 +67,19 @@ export class AdminBusinessDashboardService {
       throw error;
     }
   }
+
+  /** Update / save buy plan intent on a business */
+  static async updateBusinessBuyPlan(planId: number, buyIntent: string) {
+    try {
+      const url = `${appUrl.admin}/v2/business/plan/`;
+      const response: ApiResponseType<any> = await apiService.getPostApiResponse(url, {
+        buyIntent,
+        planId,
+      });
+      return response;
+    } catch (error) {
+      logger.error("AdminBusinessDashboardService.updateBusinessBuyPlan error:", error);
+      throw error;
+    }
+  }
 }
