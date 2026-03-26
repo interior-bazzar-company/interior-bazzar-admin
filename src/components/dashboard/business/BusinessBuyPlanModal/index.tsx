@@ -59,35 +59,33 @@ const BusinessBuyPlanModal: React.FC<Props> = ({ planId, currentIntent, onSucces
   };
 
   return (
-    <div className={styles.popupOverlay}>
-      <div className={styles.popupContent}>
-        <div className={styles.popupHeader}>
-          <h2 className={styles.popupTitle}>
-            <strong>Update Buy Plan</strong>
-          </h2>
-        </div>
+    <div className={styles.popupContent}>
+      <div className={styles.popupHeader}>
+        <h2 className={styles.popupTitle}>
+          <strong>Update Buy Plan</strong>
+        </h2>
+      </div>
 
-        <select
-          value={intent}
-          onChange={(e) => setIntent(e.target.value)}
-          className={styles.dropdown}
-          disabled={loading}
-        >
-          {OPTIONS.map((opt) => (
-            <option key={opt} value={opt}>
-              {opt}
-            </option>
-          ))}
-        </select>
+      <select
+        value={intent}
+        onChange={(e) => setIntent(e.target.value)}
+        className={styles.dropdown}
+        disabled={loading}
+      >
+        {OPTIONS.map((opt) => (
+          <option key={opt} value={opt}>
+            {opt}
+          </option>
+        ))}
+      </select>
 
-        <div className={styles.actions}>
-          <button onClick={closeModal} className={styles.cancelBtn} disabled={loading}>
-            Cancel
-          </button>
-          <button onClick={handleSave} className={styles.saveBtn} disabled={loading}>
-            {loading ? "Saving..." : "Save"}
-          </button>
-        </div>
+      <div className={styles.actions}>
+        <button onClick={closeModal} className={styles.cancelBtn} disabled={loading}>
+          Cancel
+        </button>
+        <button onClick={handleSave} className={styles.saveBtn} disabled={loading}>
+          {loading ? "Saving..." : "Save"}
+        </button>
       </div>
     </div>
   );
