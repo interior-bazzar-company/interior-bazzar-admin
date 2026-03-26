@@ -28,6 +28,10 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onSuccess }) => {
 
   const [loading, setLoading] = useState(false);
 
+  const [clientLogs, setClientLogs] = useState<{by: string; message: string}[]>([]);
+  const [newLogBy, setNewLogBy] = useState("business");
+  const [newLogMessage, setNewLogMessage] = useState("");
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     setFormData(prev => ({
       ...prev,
@@ -71,6 +75,7 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onSuccess }) => {
         city: formData.city || undefined,
         state: formData.state || undefined,
         country: formData.country || undefined,
+        clientLogs: clientLogs.length > 0 ? clientLogs : undefined,
       };
       
       const res = await AdminService.createLead(payload);
@@ -220,9 +225,70 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onSuccess }) => {
            </select>
          </div>
 
-
-
-
+         {/* Client Logs Section */}
+         <div className={`${styles.formGroup} ${styles.fullWidth}`}>
+           <label>Client Logs</label>
+           
+           <div className={styles.logsSection}>
+             <table className={styles.logsTable}>
+               <thead>
+                 <tr>
+                   <th style={{ width: '120px' }}>By</th>
+                   <th>Message</th>
+                 </tr>
+               </thead>
+               <tbody>
+                 {clientLogs.length > 0 ? (
+                   clientLogs.map((log, idx) => (
+                     <tr key={idx}>
+                       <td>{log.by === 'business' ? 'Business' : 'Client'}</td>
+                       <td>{log.message}</td>
+                     </tr>
+                   ))
+                 ) : (
+                   <tr>
+                     <td colSpan={2} style={{ textAlign: "center", color: "var(--notion-text-muted)" }}>
+                       No logs added yet
+                     </td>
+                   </tr>
+                 )}
+               </tbody>
+             </table>
+             
+             <div className={styles.addLogContainer}>
+                <select 
+                  value={newLogBy} 
+                  onChange={(e) => setNewLogBy(e.target.value)} 
+                  className={styles.select}
+                  style={{ width: '120px' }}
+                >
+                  <option value="business">Business</option>
+                  <option value="client">Client</option>
+                </select>
+                <input 
+                  type="text" 
+                  placeholder="Add a new log message..." 
+                  value={newLogMessage}
+                  onChange={(e) => setNewLogMessage(e.target.value)}
+                  className={styles.input}
+                  style={{ flex: 1 }}
+                />
+                <button 
+                  type="button" 
+                  className={styles.addLogBtn} 
+                  onClick={() => {
+                    if (newLogMessage.trim()) {
+                      setClientLogs([...clientLogs, { by: newLogBy, message: newLogMessage }]);
+                      setNewLogMessage("");
+                    }
+                  }}
+                >
+                  Add Log
+                </button>
+             </div>
+           </div>
+         </div>
+         
       </div>
       
       <div className={styles.actions}>

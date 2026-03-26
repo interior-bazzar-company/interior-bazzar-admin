@@ -122,6 +122,10 @@ export interface AdminLeadType {
     event: string;
     timestamp: string;
   }>;
+  clientLogs?: Array<{
+    by: string;
+    message: string;
+  }>;
 }
 
 export interface FunnelLeadType {

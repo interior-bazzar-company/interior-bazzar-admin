@@ -26,9 +26,12 @@ const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({ lead, onSuccess }) =>
     city: lead.city || "",
     state: lead.state || "",
     country: lead.country || "India",
-    type: lead.type || "service",
-    itemId: lead.itemId ? String(lead.itemId) : ""
   });
+
+  const existingClientLogs = lead.clientLogs || [];
+  const [newLogs, setNewLogs] = useState<{by: string; message: string}[]>([]);
+  const [newLogBy, setNewLogBy] = useState("business");
+  const [newLogMessage, setNewLogMessage] = useState("");
 
   const [loading, setLoading] = useState(false);
 
@@ -55,8 +58,9 @@ const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({ lead, onSuccess }) =>
         city: formData.city || undefined,
         state: formData.state || undefined,
         country: formData.country || undefined,
-        type: formData.type || undefined,
-        itemId: formData.itemId ? parseInt(formData.itemId) : undefined
+        clientLogs: [...existingClientLogs, ...newLogs].length > 0 
+          ? [...existingClientLogs, ...newLogs] 
+          : undefined
       };
       
       const res = await AdminService.updateQuery(lead.id, payload);
@@ -128,15 +132,6 @@ const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({ lead, onSuccess }) =>
             </select>
           </div>
 
-          {/* <div className={styles.formGroup}>
-            <label>Type</label>
-            <select name="type" value={formData.type} onChange={handleChange} className={styles.select}>
-              <option value="product">Product</option>
-              <option value="service">Service</option>
-              <option value="catalogue">Catalogue</option>
-            </select>
-          </div> */}
-
           <div className={styles.formGroup}>
             <label>City</label>
             <input name="city" value={formData.city} onChange={handleChange} className={styles.input} />
@@ -152,21 +147,86 @@ const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({ lead, onSuccess }) =>
             <input name="country" value={formData.country} onChange={handleChange} className={styles.input} />
           </div>
 
-          {/* <div className={styles.formGroup}>
-            <label>Item ID (Optional)</label>
-            <input 
-              name="itemId" 
-              type="number"
-              value={formData.itemId} 
-              onChange={handleChange} 
-              className={styles.input} 
-            />
-          </div> */}
+          <div className={`${styles.formGroup} ${styles.fullWidth}`}>
+            <label>Query</label>
+            <textarea name="query" value={formData.query} onChange={handleChange} className={styles.textarea} />
+          </div>
 
-         <div className={styles.formGroup}>
-           <label>Query</label>
-           <textarea name="query" value={formData.query} onChange={handleChange} className={styles.textarea} />
-         </div>
+          {/* Client Logs Section */}
+          <div className={`${styles.formGroup} ${styles.fullWidth}`}>
+            <label>Client Logs</label>
+            
+            <div className={styles.logsSection}>
+              <table className={styles.logsTable}>
+                <thead>
+                  <tr>
+                    <th style={{ width: '120px' }}>By</th>
+                    <th>Message</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {existingClientLogs.length === 0 && newLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan={2} style={{ textAlign: "center", color: "var(--notion-text-muted)" }}>
+                        No logs available
+                      </td>
+                    </tr>
+                  ) : null}
+
+                  {/* Render existing logs initially sent from backend */}
+                  {existingClientLogs.map((log, idx) => (
+                    <tr key={`existing-${idx}`}>
+                      <td>{log.by === 'business' ? 'Business' : 'Client'}</td>
+                      <td>{log.message}</td>
+                    </tr>
+                  ))}
+
+                  {/* Render newly added logs */}
+                  {newLogs.map((log, idx) => (
+                    <tr key={`new-${idx}`}>
+                      <td>
+                         <span style={{ color: 'var(--notion-text-muted)', fontSize: '12px', marginRight: '4px' }}>[New]</span>
+                         {log.by === 'business' ? 'Business' : 'Client'}
+                      </td>
+                      <td>{log.message}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              
+              <div className={styles.addLogContainer}>
+                 <select 
+                   value={newLogBy} 
+                   onChange={(e) => setNewLogBy(e.target.value)} 
+                   className={styles.select}
+                   style={{ width: '120px' }}
+                 >
+                   <option value="business">Business</option>
+                   <option value="client">Client</option>
+                 </select>
+                 <input 
+                   type="text" 
+                   placeholder="Add a new log message..." 
+                   value={newLogMessage}
+                   onChange={(e) => setNewLogMessage(e.target.value)}
+                   className={styles.input}
+                   style={{ flex: 1 }}
+                 />
+                 <button 
+                   type="button" 
+                   className={styles.addLogBtn} 
+                   onClick={() => {
+                     if (newLogMessage.trim()) {
+                       setNewLogs([...newLogs, { by: newLogBy, message: newLogMessage }]);
+                       setNewLogMessage("");
+                     }
+                   }}
+                 >
+                   Add Log
+                 </button>
+              </div>
+            </div>
+          </div>
       </div>
       
       <div className={styles.actions}>

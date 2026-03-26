@@ -106,3 +106,67 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Logs Section */
+.logsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.sectionLabel {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--notion-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.logsTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.logsTable th, .logsTable td {
+  border: 1px solid var(--notion-divider);
+  padding: 10px 14px;
+  font-size: 13.5px;
+  color: var(--notion-text);
+  text-align: left;
+}
+
+.logsTable th {
+  font-weight: 600;
+  color: var(--notion-text-muted);
+  background-color: var(--notion-bg-page);
+  text-transform: uppercase;
+  font-size: 11px;
+}
+
+.logsTable td {
+  background-color: var(--notion-bg);
+}
+
+.addLogContainer {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.addLogBtn {
+  background-color: var(--notion-bg-hover);
+  border: 1px solid var(--notion-border);
+  color: var(--notion-text);
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 13.5px;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.addLogBtn:hover {
+  background-color: var(--notion-border);
+}
