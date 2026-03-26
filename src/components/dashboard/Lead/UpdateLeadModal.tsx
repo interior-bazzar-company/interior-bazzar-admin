@@ -58,9 +58,7 @@ const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({ lead, onSuccess }) =>
         city: formData.city || undefined,
         state: formData.state || undefined,
         country: formData.country || undefined,
-        clientLogs: [...existingClientLogs, ...newLogs].length > 0 
-          ? [...existingClientLogs, ...newLogs] 
-          : undefined
+        clientLogs: newLogs.length > 0 ? newLogs : undefined
       };
       
       const res = await AdminService.updateQuery(lead.id, payload);
