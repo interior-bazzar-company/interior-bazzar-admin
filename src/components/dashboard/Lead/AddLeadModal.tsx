@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import styles from "./AddLeadModal.module.css";
 import { useModal } from "../../../context/ModalContext";
-import useToast from "../../shared/Toast/useToast";
+import { useAlert } from "../../../context/AlertContext";
 import { AdminService } from "../../../api/modules/admin";
 import { LEAD_STATUS, STAGES } from "../../../utils/constants/lead";
 
@@ -11,7 +11,7 @@ interface AddLeadModalProps {
 
 const AddLeadModal: React.FC<AddLeadModalProps> = ({ onSuccess }) => {
   const { closeModal } = useModal();
-  const { showToast } = useToast();
+  const { showAlert } = useAlert();
   
   const [formData, setFormData] = useState({
     name: "",
@@ -41,22 +41,12 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onSuccess }) => {
 
   const handleSave = async () => {
     if (!formData.name || !formData.phone) {
-      showToast({ 
-        greeting: "Warning", 
-        booldMessage: "Incomplete Form", 
-        normalMessage: "Name and Phone are required", 
-        type: "error" 
-      });
+      showAlert("Name and Phone are required", "error");
       return;
     }
 
     if (formData.phone.length < 7 || formData.phone.length > 15 || !/^\d+$/.test(formData.phone)) {
-      showToast({ 
-        greeting: "Warning", 
-        booldMessage: "Invalid Phone", 
-        normalMessage: "Phone must contain 7-15 digits only", 
-        type: "error" 
-      });
+      showAlert("Phone must contain 7-15 digits only", "error");
       return;
     }
 
@@ -86,29 +76,14 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onSuccess }) => {
       }
 
       if (apiRes.response) {
-         showToast({ 
-           greeting: "Success", 
-           booldMessage: "Created", 
-           normalMessage: "Lead created successfully", 
-           type: "success" 
-         });
+         showAlert("Lead created successfully", "success");
          if (onSuccess) onSuccess();
          closeModal();
       } else {
-         showToast({ 
-           greeting: "Error", 
-           booldMessage: "Failed", 
-           normalMessage: apiRes.message || "Could not create lead", 
-           type: "error" 
-         });
+         showAlert(apiRes.message || "Could not create lead", "error");
       }
     } catch (e: any) {
-      showToast({ 
-        greeting: "Error", 
-        booldMessage: "Failed", 
-        normalMessage: e.message || "Failed to create lead", 
-        type: "error" 
-      });
+      showAlert(e.message || "Failed to create lead", "error");
     } finally {
       setLoading(false);
     }

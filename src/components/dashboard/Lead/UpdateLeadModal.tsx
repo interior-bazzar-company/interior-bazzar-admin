@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import styles from "./UpdateLeadModal.module.css";
 import type { AdminLeadType } from "../../../types/content";
 import { useModal } from "../../../context/ModalContext";
-import useToast from "../../shared/Toast/useToast";
+import { useAlert } from "../../../context/AlertContext";
 import { AdminService } from "../../../api/modules/admin";
 import { LEAD_STATUS, STAGES } from "../../../utils/constants/lead";
 
@@ -13,7 +13,7 @@ interface UpdateLeadModalProps {
 
 const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({ lead, onSuccess }) => {
   const { closeModal } = useModal();
-  const { showToast } = useToast();
+  const { showAlert } = useAlert();
   
   const [formData, setFormData] = useState({
     name: lead.name || "",
@@ -69,19 +69,19 @@ const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({ lead, onSuccess }) =>
       }
 
       if (apiRes.response) {
-         showToast({ greeting: "Success", booldMessage: "Saved", normalMessage: "Lead updated successfully", type: "success" });
+         showAlert("Lead updated successfully", "success");
          if (onSuccess) onSuccess(apiRes.data);
          closeModal();
       } else {
-         showToast({ greeting: "Error", booldMessage: "Failed", normalMessage: "Could not update lead", type: "error" });
+         showAlert("Could not update lead", "error");
       }
     } catch (e: any) {
       if (e.message && e.message.toLowerCase().includes("access not granted")) {
-          showToast({ greeting: "Error", booldMessage: "Access Denied", normalMessage: "Access not granted", type: "error" });
+          showAlert("Access not granted", "error");
       } else if (e.code === 403) {
-          showToast({ greeting: "Error", booldMessage: "Access Denied", normalMessage: "Access not granted", type: "error" });
+          showAlert("Access not granted", "error");
       } else {
-          showToast({ greeting: "Error", booldMessage: "Failed", normalMessage: e.message || "Failed to update lead", type: "error" });
+          showAlert(e.message || "Failed to update lead", "error");
       }
     } finally {
       setLoading(false);

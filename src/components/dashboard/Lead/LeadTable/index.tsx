@@ -66,6 +66,7 @@ const LeadTable = React.memo(({ filter, refreshTrigger }: { filter: LeadFilterTy
                         <th>Assigned business</th>
                         <th>Business Status </th>
                         <th>Logs</th>
+                        <th>Client Logs</th>
                         <th>Lead Id</th>
                         <th>Remark</th>
                         <th>Assign</th>
@@ -122,6 +123,21 @@ const LeadTable = React.memo(({ filter, refreshTrigger }: { filter: LeadFilterTy
                                         <span style={{ fontSize: '12px' }}>Logs</span>
                                     </button>
                                 </td>
+                                <td>
+                                    <button 
+                                         className={styles.assignButton} 
+                                         onClick={(e) => {
+                                             e.stopPropagation();
+                                             showModal(<LogsPopup leadId={lead.id} logs={lead.clientLogs || []} type="client" />);
+                                         }}
+                                         style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', background: 'none', border: '1px solid #e5e7eb', color: '#000', padding: '4px 8px' }}
+                                     >
+                                         <span style={{ border: '1px solid #3b82f6', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 'bold' }}>
+                                             {lead.clientLogs ? lead.clientLogs.length : 0}
+                                         </span>
+                                         <span style={{ fontSize: '12px' }}>Client Logs</span>
+                                     </button>
+                                 </td>
                                 <td>{lead.id}</td>
                                 <td>{renderValue(lead.remark)}</td>
                                 <td>
