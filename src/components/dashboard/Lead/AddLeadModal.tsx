@@ -24,6 +24,8 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onSuccess }) => {
     country: "India",
     leadStatus: LEAD_STATUS[0],
     stage: STAGES[0],
+    tag: "",
+    remark: "",
   });
 
   const [loading, setLoading] = useState(false);
@@ -65,6 +67,8 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onSuccess }) => {
         city: formData.city || undefined,
         state: formData.state || undefined,
         country: formData.country || undefined,
+        tag: formData.tag || undefined,
+        remark: formData.remark || undefined,
         clientLogs: clientLogs.length > 0 ? clientLogs : undefined,
       };
       
@@ -198,6 +202,29 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onSuccess }) => {
                 <option key={stage} value={stage}>{stage.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</option>
              ))}
            </select>
+         </div>
+
+         <div className={styles.formGroup}>
+           <label>Tag</label>
+           <input 
+             name="tag" 
+             placeholder="e.g. hot, cold, warm"
+             value={formData.tag} 
+             onChange={handleChange} 
+             className={styles.input} 
+           />
+         </div>
+
+         <div className={`${styles.formGroup} ${styles.fullWidth}`}>
+           <label>Remark</label>
+           <textarea 
+             name="remark" 
+             placeholder="Internal remarks..."
+             value={formData.remark} 
+             onChange={handleChange} 
+             className={styles.textarea} 
+             style={{ minHeight: '60px' }}
+           />
          </div>
 
          {/* Client Logs Section */}
