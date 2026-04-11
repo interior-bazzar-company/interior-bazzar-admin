@@ -5,9 +5,9 @@ import useToast from "../../../shared/Toast/useToast";
 import { AdminBusinessDashboardService } from "../../../../api/modules/admin/adminBusinessDashboard";
 
 interface Props {
-  planId: number;
+  planId: number | undefined;
   currentIntent?: string;
-  onSuccess?: () => void;
+  onSuccess?: (newIntent: string) => void;
 }
 
 const OPTIONS = ["sales", "website", "refrance"];
@@ -35,7 +35,7 @@ const BusinessBuyPlanModal: React.FC<Props> = ({ planId, currentIntent, onSucces
           normalMessage: "Buy Plan updated successfully",
           type: "success",
         });
-        if (onSuccess) onSuccess();
+        if (onSuccess) onSuccess(intent);
         closeModal();
       } else {
         showToast({

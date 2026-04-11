@@ -1,8 +1,10 @@
 .wrapper {
   width: 100%;
-  overflow-x: auto;
-  border: 1px solid #000000;
-  background-color: #ffffff;
+  overflow: auto;
+  border: 1px solid var(--notion-border);
+  background-color: var(--notion-bg);
+  border-radius: 8px;
+  box-shadow: var(--notion-shadow);
 }
 
 .table {
@@ -12,36 +14,55 @@
   min-width: 1200px;
 }
 
-.table thead tr {
-  background-color: #ffffff;
-  border-bottom: 1.5px solid #000000;
+.table thead {
+  top: 0;
+  z-index: 10;
+  position: sticky;
+  color: var(--notion-text-muted);
+  background-color: var(--notion-bg-page);
+  border-bottom: 1px solid var(--notion-divider);
 }
 
 .table th {
   padding: 12px 14px;
   text-align: left;
-  font-weight: 700;
-  color: #000000;
-  border-bottom: 2px solid #000000;
+  font-weight: 600;
+  color: var(--notion-text-muted);
+  border-right: 1px solid var(--notion-divider);
   white-space: nowrap;
-  font-size: 13px;
+  font-size: 11px;
   text-transform: uppercase;
+  letter-spacing: 0.05em;
+
+  /* Resizability */
+  resize: horizontal;
+  overflow: auto;
+  min-width: 100px;
+}
+
+.table th:last-child {
+  border-right: none;
 }
 
 .table td {
   padding: 12px 14px;
-  color: #000000;
-  border-bottom: 1px solid #000000;
+  color: var(--notion-text);
+  border-bottom: 1px solid var(--notion-divider);
+  border-right: 1px solid var(--notion-divider);
   vertical-align: middle;
   font-size: 13px;
+  background-color: var(--notion-bg);
+
+  /* Resizability */
+  resize: vertical;
 }
 
-.table tbody tr:last-child td {
-  border-bottom: none;
+.table td:last-child {
+  border-right: none;
 }
 
-.table tbody tr:hover {
-  background-color: #fafafa;
+.table tbody tr:hover td {
+  background-color: var(--notion-bg-hover);
 }
 
 /* Plan badge */
@@ -49,13 +70,13 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background-color: #ffffff;
-  border: 1px solid #000000;
+  background-color: var(--notion-bg);
+  border: 1px solid var(--notion-border);
   border-radius: 4px;
   padding: 4px 10px;
   font-size: 12px;
-  font-weight: 600;
-  color: #000000;
+  font-weight: 500;
+  color: var(--notion-text);
   white-space: nowrap;
 }
 
@@ -71,18 +92,18 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  border: 1px solid #000000;
+  border: 1px solid var(--notion-border);
   border-radius: 4px;
   padding: 4px 12px;
   font-size: 12px;
-  background: #ffffff;
+  background: var(--notion-bg);
   cursor: default;
   white-space: nowrap;
-  color: #000000;
+  color: var(--notion-text);
 }
 
 .starIcon {
-  color: #9ca3af;
+  color: var(--notion-text-hint);
   font-size: 14px;
 }
 
@@ -91,20 +112,20 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: #ffffff;
-  border: 1px solid #000000;
+  background: var(--notion-bg);
+  border: 1px solid var(--notion-border);
   border-radius: 4px;
   padding: 4px 10px;
   cursor: pointer;
   font-size: 12px;
-  color: #000000;
+  color: var(--notion-text);
   white-space: nowrap;
   transition: all 0.15s;
 }
 
 .logsBtn:hover {
-  background-color: #000000;
-  color: #ffffff;
+  background-color: var(--notion-bg-hover);
+  border-color: var(--notion-border-focus);
 }
 
 .logsCount {
@@ -114,17 +135,17 @@
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  border: 1.5px solid #000000;
+  border: 1.5px solid var(--notion-border);
   font-size: 11px;
   font-weight: 700;
-  color: #000000;
+  color: var(--notion-text);
 }
 
 /* Remark cell */
 .remarkCell {
   cursor: pointer;
-  color: #374151;
-  max-width: 120px;
+  color: var(--notion-text);
+  max-width: 150px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -132,7 +153,7 @@
 
 .remarkCell:hover {
   text-decoration: underline;
-  color: #111827;
+  color: var(--notion-text);
 }
 
 /* Pagination */
@@ -141,7 +162,7 @@
   align-items: center;
   gap: 6px;
   padding: 14px 16px;
-  justify-content: flex-end;
+  justify-content: center;
   flex-wrap: wrap;
 }
 
@@ -149,18 +170,19 @@
   min-width: 32px;
   height: 32px;
   padding: 0 8px;
-  border: 1px solid #000000;
+  border: 1px solid var(--notion-border);
   border-radius: 4px;
-  background: #ffffff;
-  color: #000000;
+  background: var(--notion-bg);
+  color: var(--notion-text-muted);
   font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.15s;
 }
 
 .pagination button:hover:not(:disabled) {
-  background-color: #000000;
-  color: #ffffff;
+  background-color: var(--notion-bg-hover);
+  color: var(--notion-text);
 }
 
 .pagination button:disabled {
@@ -169,12 +191,14 @@
 }
 
 .activePage {
-  background-color: #000000 !important;
-  color: #ffffff !important;
-  border-color: #000000 !important;
+  background-color: var(--notion-bg-selected) !important;
+  color: var(--notion-text) !important;
+  border-color: var(--notion-border-focus) !important;
+  font-weight: 600;
 }
 
 /* Loading skeleton row */
 .loadingRow td {
-  color: #9ca3af;
+  color: var(--notion-text-hint);
 }
+

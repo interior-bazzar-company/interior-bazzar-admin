@@ -16,6 +16,7 @@ export interface AdminBusinessDashboardRowType {
   logs?: number;         // count of logs
   logsDate?: string;     // date of most recent log
   buyPlan?: string;      // e.g. "Sales" — plan for buy recommendation
+  planId?: number | undefined;       // e.g. "Sales" — plan for buy recommendation
   remark?: string;       // free-text remark saved by admin
 }
 

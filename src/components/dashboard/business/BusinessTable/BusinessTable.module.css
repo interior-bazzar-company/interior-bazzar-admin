@@ -34,6 +34,11 @@
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-size: 11px;
+  
+  /* Resizability */
+  resize: horizontal;
+  overflow: auto;
+  min-width: 80px;
 }
 
 .table th:last-child {
@@ -51,6 +56,9 @@
   border-right: 1px solid var(--notion-divider);
   color: var(--notion-text);
   background-color: var(--notion-bg);
+  
+  /* Resizability */
+  resize: vertical;
 }
 
 .table td:last-child {

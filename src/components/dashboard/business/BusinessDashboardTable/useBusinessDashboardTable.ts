@@ -63,6 +63,7 @@ const useBusinessDashboardTable = (filter: BusinessDashboardTableFilter) => {
     noAccess,
     incrementPage,
     refetch: fetchBusinesses,
+    setBusinesses,
   };
 };
 

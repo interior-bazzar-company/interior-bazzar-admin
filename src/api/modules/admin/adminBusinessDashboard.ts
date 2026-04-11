@@ -69,7 +69,7 @@ export class AdminBusinessDashboardService {
   }
 
   /** Update / save buy plan intent on a business */
-  static async updateBusinessBuyPlan(planId: number, buyIntent: string) {
+  static async updateBusinessBuyPlan(planId: number | undefined, buyIntent: string) {
     try {
       const url = `${appUrl.admin}/v2/business/plan/`;
       const response: ApiResponseType<any> = await apiService.getPostApiResponse(url, {

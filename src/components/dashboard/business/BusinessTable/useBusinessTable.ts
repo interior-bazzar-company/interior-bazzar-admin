@@ -114,6 +114,7 @@ export const useBusinessTableV2 = (_filter: BusinessFilterType) => {
     businesses,
     totalPages,
     incrementPage,
+    setBusinesses,
   };
 };
 

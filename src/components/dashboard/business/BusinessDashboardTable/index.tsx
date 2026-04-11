@@ -43,6 +43,7 @@ const BusinessDashboardTable: React.FC<Props> = ({ filter }) => {
     incrementPage,
     refetch,
     noAccess,
+    setBusinesses,
   } = useBusinessDashboardTable(filter ?? {});
 
   const { showModal } = useModal();
@@ -60,9 +61,14 @@ const BusinessDashboardTable: React.FC<Props> = ({ filter }) => {
   const handleBuyPlanClick = (business: AdminBusinessDashboardRowType) => {
     showModal(
       <BusinessBuyPlanModal
-        planId={business.id}
+        planId={business.planId}
         currentIntent={business.buyPlan}
-        onSuccess={refetch}
+        onSuccess={(newIntent) => {
+          setBusinesses((prev) =>
+            prev.map((b) => (b.id === business.id ? { ...b, buyPlan: newIntent } : b))
+          );
+          refetch();
+        }}
       />
     );
   };
@@ -89,127 +95,127 @@ const BusinessDashboardTable: React.FC<Props> = ({ filter }) => {
         <tbody>
           {loading
             ? Array.from({ length: pageSize > 5 ? 5 : pageSize }).map((_, i) => (
-                <tr key={i} className={styles.loadingRow}>
-                  <td colSpan={12} style={{ textAlign: "center", color: "#9ca3af" }}>
-                    Loading...
-                  </td>
-                </tr>
-              ))
+              <tr key={i} className={styles.loadingRow}>
+                <td colSpan={12} style={{ textAlign: "center", color: "#9ca3af" }}>
+                  Loading...
+                </td>
+              </tr>
+            ))
             : noAccess ? (
-                <tr>
-                  <td colSpan={12} style={{ textAlign: "center", padding: "32px", color: "#ef4444", fontWeight: "600" }}>
-                    You don't have access to this resource.
-                  </td>
-                </tr>
-              )
-            : businesses.length === 0
-            ? (
-                <tr>
-                  <td colSpan={12} style={{ textAlign: "center", padding: "32px", color: "#9ca3af" }}>
-                    No businesses found
-                  </td>
-                </tr>
-              )
-            : businesses.map((business) => (
-                <tr key={business.id}>
-                  {/* Create */}
-                  <td>{renderValue(business.joinAt)}</td>
+              <tr>
+                <td colSpan={12} style={{ textAlign: "center", padding: "32px", color: "#ef4444", fontWeight: "600" }}>
+                  You don't have access to this resource.
+                </td>
+              </tr>
+            )
+              : businesses.length === 0
+                ? (
+                  <tr>
+                    <td colSpan={12} style={{ textAlign: "center", padding: "32px", color: "#9ca3af" }}>
+                      No businesses found
+                    </td>
+                  </tr>
+                )
+                : businesses.map((business) => (
+                  <tr key={business.id}>
+                    {/* Create */}
+                    <td>{renderValue(business.joinAt)}</td>
 
-                  {/* Plan badge */}
-                  <td>
-                    {business.plan ? (
-                      <span className={styles.planBadge}>
-                        <span
-                          className={styles.planDot}
-                          style={{ backgroundColor: getPlanColor(business.plan) }}
-                        />
-                        {business.plan}
-                      </span>
-                    ) : "--"}
-                  </td>
-
-                  {/* Last Purchase */}
-                  <td>{renderValue(business.lastPurchase)}</td>
-
-                  {/* Plans Expired */}
-                  <td>{renderValue(business.expire)}</td>
-
-                  {/* Username */}
-                  <td>{renderValue(business.name)}</td>
-
-                  {/* Lead Kota */}
-                  <td>{renderValue(business.leadsKota)}</td>
-
-                  {/* Assigned Leads */}
-                  <td>{renderValue(business.assignedLeads)}</td>
-
-                  {/* Platform Leads */}
-                  <td>{renderValue(business.platformLeads)}</td>
-
-                  {/* Feedback */}
-                  <td>
-                    <span className={styles.feedbackChip}>
-                      {business.feedback ?? "Ask"}
-                      <span className={styles.starIcon}>☆</span>
-                    </span>
-                  </td>
-
-                  {/* Logs */}
-                  <td>
-                    <button className={styles.logsBtn} disabled>
-                      <span className={styles.logsCount}>
-                        {business.logs ?? 0}
-                      </span>
-                      {business.logsDate ? business.logsDate : "--"}
-                    </button>
-                  </td>
-
-                  {/* Buy Plan */}
-                  <td>
-                    <button
-                      onClick={() => handleBuyPlanClick(business)}
-                      style={{
-                        background: "none",
-                        border: "1px solid #d1d5db",
-                        borderRadius: "6px",
-                        padding: "6px 12px",
-                        cursor: "pointer",
-                        display: "inline-flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        minWidth: "70px",
-                        transition: "background 0.2s"
-                      }}
-                      onMouseOver={(e) => (e.currentTarget.style.background = "#f3f4f6")}
-                      onMouseOut={(e) => (e.currentTarget.style.background = "none")}
-                      title="Update Buy Plan"
-                    >
-                      {business.buyPlan ? (
-                        <span className={styles.planBadge} style={{ border: 'none', padding: 0, background: 'none' }}>
+                    {/* Plan badge */}
+                    <td>
+                      {business.plan ? (
+                        <span className={styles.planBadge}>
                           <span
                             className={styles.planDot}
-                            style={{ backgroundColor: getPlanColor(business.buyPlan) }}
+                            style={{ backgroundColor: getPlanColor(business.plan) }}
                           />
-                          {business.buyPlan}
+                          {business.plan}
                         </span>
-                      ) : (
-                        <span style={{ color: "#4b5563", fontSize: "0.85rem", fontWeight: 500 }}>Update</span>
-                      )}
-                    </button>
-                  </td>
+                      ) : "--"}
+                    </td>
 
-                  {/* Remark */}
-                  <td
-                    className={styles.remarkCell}
-                    onClick={() => handleRemarkClick(business)}
-                    title={business.remark ?? ""}
-                  >
-                    {business.remark ? business.remark : (
-                      <span style={{ color: "#9ca3af" }}>Add remark…</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                    {/* Last Purchase */}
+                    <td>{renderValue(business.lastPurchase)}</td>
+
+                    {/* Plans Expired */}
+                    <td>{renderValue(business.expire)}</td>
+
+                    {/* Username */}
+                    <td>{renderValue(business.name)}</td>
+
+                    {/* Lead Kota */}
+                    <td>{renderValue(business.leadsKota)}</td>
+
+                    {/* Assigned Leads */}
+                    <td>{renderValue(business.assignedLeads)}</td>
+
+                    {/* Platform Leads */}
+                    <td>{renderValue(business.platformLeads)}</td>
+
+                    {/* Feedback */}
+                    <td>
+                      <span className={styles.feedbackChip}>
+                        {business.feedback ?? "Ask"}
+                        <span className={styles.starIcon}>☆</span>
+                      </span>
+                    </td>
+
+                    {/* Logs */}
+                    <td>
+                      <button className={styles.logsBtn} disabled>
+                        <span className={styles.logsCount}>
+                          {business.logs ?? 0}
+                        </span>
+                        {business.logsDate ? business.logsDate : "--"}
+                      </button>
+                    </td>
+
+                    {/* Buy Plan */}
+                    <td>
+                      <button
+                        onClick={() => handleBuyPlanClick(business)}
+                        style={{
+                          background: "none",
+                          border: "1px solid #d1d5db",
+                          borderRadius: "6px",
+                          padding: "6px 12px",
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          minWidth: "70px",
+                          transition: "background 0.2s"
+                        }}
+                        onMouseOver={(e) => (e.currentTarget.style.background = "#f3f4f6")}
+                        onMouseOut={(e) => (e.currentTarget.style.background = "none")}
+                        title="Update Buy Plan"
+                      >
+                        {business.buyPlan ? (
+                          <span className={styles.planBadge} style={{ border: 'none', padding: 0, background: 'none' }}>
+                            <span
+                              className={styles.planDot}
+                              style={{ backgroundColor: getPlanColor(business.buyPlan) }}
+                            />
+                            {business.buyPlan}
+                          </span>
+                        ) : (
+                          <span style={{ color: "#4b5563", fontSize: "0.85rem", fontWeight: 500 }}>Update</span>
+                        )}
+                      </button>
+                    </td>
+
+                    {/* Remark */}
+                    <td
+                      className={styles.remarkCell}
+                      onClick={() => handleRemarkClick(business)}
+                      title={business.remark ?? ""}
+                    >
+                      {business.remark ? business.remark : (
+                        <span style={{ color: "#9ca3af" }}>Add remark…</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
         </tbody>
       </table>
 

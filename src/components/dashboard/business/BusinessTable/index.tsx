@@ -34,7 +34,7 @@ const BusinessTable = ({ filter }: { filter: BusinessFilterType }) => {
             {/* <th>Lead Kota</th> */}
             <th>Assigned Leads</th>
             <th>Platform Leads</th>
-            
+
           </tr>
         </thead>
         <tbody>
@@ -117,6 +117,7 @@ export const BusinessTableV2 = ({ filter }: { filter: BusinessFilterType }) => {
     businesses,
     totalPages,
     incrementPage,
+    setBusinesses,
   } = useBusinessTableV2(filter);
 
   const { showModal } = useModal();
@@ -128,9 +129,14 @@ export const BusinessTableV2 = ({ filter }: { filter: BusinessFilterType }) => {
   const handleBuyPlanClick = (business: any) => {
     showModal(
       <BusinessBuyPlanModal
-        planId={business.id}
+        planId={business.planId}
         currentIntent={business.buyIntent}
-        onSuccess={() => setPageNo((prev) => prev)} // force re-render/refetch in BusinessTableV2
+        onSuccess={(newIntent: string) => {
+          setBusinesses((prev: any) =>
+            prev.map((b: any) => (b.id === business.id ? { ...b, buyIntent: newIntent } : b))
+          );
+          setPageNo((prev) => prev); // force re-render/refetch in BusinessTableV2
+        }}
       />
     );
   };
