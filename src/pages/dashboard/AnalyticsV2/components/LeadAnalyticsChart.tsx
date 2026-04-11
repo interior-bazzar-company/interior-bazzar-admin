@@ -194,7 +194,7 @@ const LeadAnalyticsChart: React.FC<LeadAnalyticsChartProps> = ({ data, isExpande
               }}
             />
             <Legend verticalAlign="top" height={36}/>
-            {selectedKeys.map((key, i) => (
+            {selectedKeys.map((key) => (
               <Line
                 key={key}
                 type="monotone"
