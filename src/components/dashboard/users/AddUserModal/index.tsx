@@ -71,7 +71,7 @@ const AddUserModal: React.FC<Props> = ({ onSuccess, user }) => {
         if (res.response && Array.isArray(res.data)) {
           setRoles(res.data);
           // Only auto-select if not editing or if current selection is empty
-          if (res.data.length > 0 && !formData.selectedRoleId) {
+          if (res.data.length > 0 && !formData.selectedRoleIds) {
             setFormData(prev => ({ ...prev, selectedRoleId: String(res.data[0].id) }));
           }
         }
@@ -82,7 +82,7 @@ const AddUserModal: React.FC<Props> = ({ onSuccess, user }) => {
       }
     };
     fetchDropdownRoles();
-  }, [formData.selectedRoleId]);
+  }, [formData.selectedRoleIds]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
