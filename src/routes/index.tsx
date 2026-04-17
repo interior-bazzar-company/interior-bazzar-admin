@@ -17,6 +17,7 @@ import UserManage from "../pages/dashboard/UserManage"; // NEW
 import Analytics from "../pages/dashboard/AnalyticsV2"; // UPDATED V2
 import ImageUpload from "../pages/dashboard/ImageUpload";
 import FunnelPage from "../pages/dashboard/Funnel";
+import GMBLeads from "../pages/dashboard/GMBLeads";
 
 const UserRoutes = () => {
   const { loading } = useInitUser();
@@ -94,6 +95,14 @@ const UserRoutes = () => {
         element: (
           <ProtectedRoute>
             <FunnelPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: PAGES.ADMIN_GMB_LEADS,
+        element: (
+          <ProtectedRoute>
+            <GMBLeads />
           </ProtectedRoute>
         ),
       },

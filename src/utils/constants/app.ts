@@ -30,6 +30,7 @@ export const PAGES = {
   ADMIN_ANALYTICS: "/admin/analytics",
   ADMIN_IMAGE_UPLOAD: "/admin/image-upload",
   ADMIN_FUNNEL_LEADS: "/admin/funnel-leads",
+  ADMIN_GMB_LEADS: "/admin/gmb-leads",
 };
 
 export const EMPLOYEE_ROLES = {

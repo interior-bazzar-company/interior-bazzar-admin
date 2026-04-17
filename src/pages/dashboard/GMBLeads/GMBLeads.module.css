@@ -1,0 +1,158 @@
+.gmbLeadsContainer {
+  padding: 24px;
+  max-width: 1600px;
+  margin: 0 auto;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--notion-bg);
+  min-height: 100vh;
+}
+
+.topBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+}
+
+.searchForm {
+  display: flex;
+  background: white;
+  border: 1px solid var(--notion-border);
+  border-radius: 6px;
+  padding: 4px 12px;
+  align-items: center;
+  width: 300px;
+}
+
+.searchInput {
+  border: none;
+  outline: none;
+  width: 100%;
+  padding: 6px;
+  font-size: 14px;
+}
+
+.searchIconBtn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--notion-text-muted);
+  display: flex;
+  align-items: center;
+}
+
+.topActions {
+  display: flex;
+  gap: 12px;
+}
+
+.actionBtn {
+  padding: 8px 16px;
+  border: 1px solid var(--notion-border);
+  background: var(--notion-bg);
+  color: var(--notion-text);
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s;
+  font-size: 14px;
+}
+
+.actionBtn:hover {
+  background: var(--notion-bg-hover);
+  border-color: var(--notion-border-focus);
+}
+
+.filtersSection {
+  margin-bottom: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px;
+  background: #f9f9fb;
+  border-radius: 12px;
+  border: 1px solid #eee;
+}
+
+.filterRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.filterTitle {
+  font-weight: 600;
+  color: var(--notion-text-muted);
+  font-size: 12px;
+  min-width: 100px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.chipsContainer {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filterChip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border: 1px solid var(--notion-border);
+  background: white;
+  cursor: pointer;
+  border-radius: 20px;
+  transition: all 0.15s;
+  color: #4b5563;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.filterChip:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+}
+
+.activeChip {
+  background: #ebf5ff;
+  border-color: #3b82f6;
+  color: #1d4ed8;
+}
+
+.chipDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.tableContainer {
+  background: white;
+  border: 1px solid var(--notion-border);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+/* Badge Styles */
+.badge {
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.badgeGmb { background: #e0f2fe; color: #0369a1; }
+.badgeYelp { background: #fee2e2; color: #b91c1c; }
+.badgeYellowPages { background: #fef9c3; color: #854d0e; }
+
+/* Status Badges */
+.statusBadge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}

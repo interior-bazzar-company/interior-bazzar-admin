@@ -4,7 +4,8 @@ import {
   MdBusinessCenter, 
   MdAnalytics, 
   MdOutlineImage, 
-  MdFilterAlt 
+  MdFilterAlt,
+  MdOutlineLocationOn
 } from "react-icons/md";
 import { useMemo, useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
@@ -49,6 +50,12 @@ const useAdmin = () => {
       label: "Funnel Leads",
       url: PAGES.ADMIN_FUNNEL_LEADS,
       icon: MdFilterAlt,
+      subLinks: [],
+    },
+    {
+      label: "GMB Leads",
+      url: PAGES.ADMIN_GMB_LEADS,
+      icon: MdOutlineLocationOn,
       subLinks: [],
     },
   ]);
