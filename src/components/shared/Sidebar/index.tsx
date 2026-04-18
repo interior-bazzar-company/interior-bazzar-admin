@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { FiSettings, FiLogOut } from "react-icons/fi";
 import styles from "./Sidebar.module.css";
 import SidebarLink from "../AdminLayout/SidebarLink";

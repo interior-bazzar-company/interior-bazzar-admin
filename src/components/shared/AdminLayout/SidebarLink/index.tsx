@@ -2,7 +2,7 @@ import { NavLink, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { MdChevronRight } from "react-icons/md";
 import styles from "./SidebarLink.module.css";
-import type { NavlinkItem, Sidebarlink } from "../../../../types/global";
+import type { Sidebarlink } from "../../../../types/global";
 
 const SidebarLink = (
     { item, style = { radius: false, active: false }, isOpen, }:
@@ -59,7 +59,7 @@ const SidebarLink = (
                         <NavLink
                             key={index}
                             to={sub.url}
-                            className={({ isActive }) => 
+                            className={() => 
                                 `${styles.subLink} ${location.pathname + location.search === sub.url ? styles.subActive : ""}`
                             }
                         >
