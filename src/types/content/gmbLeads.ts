@@ -14,9 +14,11 @@ export interface GMBLeadType {
   phone?: string;
   website?: string;
   mapLink?: string;
+  gmbLink?: string;
   socialLinks?: string[];
   waMessage?: string;
-  assignedUser?: string;
+  assignedUser?: any;
+  assignedUserId?: number | null;
   rankingRate?: number;
   tier?: string;
   platform?: string;
@@ -24,6 +26,8 @@ export interface GMBLeadType {
   category?: string;
   status?: string;
   logs?: GMBLogType[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface GMBLeadResponse {

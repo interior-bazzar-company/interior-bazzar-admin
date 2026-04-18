@@ -2,8 +2,13 @@ import React, { createContext, useContext, useState, useCallback, useMemo } from
 import Modal from "../../components/overlays/Modal";
 
 // Define types for the context values
+interface ModalConfig {
+    width?: string;
+    maxWidth?: string;
+}
+
 interface ModalContextType {
-    showModal: (content: React.ReactNode) => void;
+    showModal: (content: React.ReactNode, config?: ModalConfig) => void;
     closeModal: () => void;
 }
 
@@ -18,13 +23,16 @@ export const useModal = () => {
 
 export const ModalProvider = ({ children }: { children: React.ReactNode }) => {
     const [modalContent, setModalContent] = useState<React.ReactNode | null>(null);
+    const [modalConfig, setModalConfig] = useState<ModalConfig | null>(null);
 
-    const showModal = useCallback((content: React.ReactNode) => {
+    const showModal = useCallback((content: React.ReactNode, config?: ModalConfig) => {
         setModalContent(content);
+        setModalConfig(config || null);
     }, []);
 
     const closeModal = useCallback(() => {
         setModalContent(null);
+        setModalConfig(null);
     }, []);
 
     const value = useMemo(() => ({ showModal, closeModal }), [showModal, closeModal]);
@@ -33,7 +41,7 @@ export const ModalProvider = ({ children }: { children: React.ReactNode }) => {
         <ModalContext.Provider value={value}>
             {children}
             {modalContent && (
-                <Modal onClose={closeModal}>
+                <Modal onClose={closeModal} width={modalConfig?.width} maxWidth={modalConfig?.maxWidth}>
                     {modalContent}
                 </Modal>
             )}

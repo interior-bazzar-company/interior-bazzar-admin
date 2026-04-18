@@ -106,6 +106,7 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onSuccess }) => {
              onChange={handleChange} 
              className={styles.input} 
            />
+           <span className={styles.helpText}>Full name of the prospect</span>
          </div>
          
          <div className={styles.formGroup}>
@@ -117,6 +118,7 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onSuccess }) => {
              onChange={handleChange} 
              className={styles.input} 
            />
+           <span className={styles.helpText}>Primary contact number (7-15 digits)</span>
          </div>
 
          <div className={styles.formGroup}>
@@ -129,6 +131,7 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onSuccess }) => {
              onChange={handleChange} 
              className={styles.input} 
            />
+           <span className={styles.helpText}>Optional: Prospect's email</span>
          </div>
 
          <div className={styles.formGroup}>
@@ -140,6 +143,7 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onSuccess }) => {
              onChange={handleChange} 
              className={styles.input} 
            />
+           <span className={styles.helpText}>Service or product category of interest</span>
          </div>
 
          <div className={`${styles.formGroup} ${styles.fullWidth}`}>
@@ -151,6 +155,7 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onSuccess }) => {
              onChange={handleChange} 
              className={styles.textarea} 
            />
+           <span className={styles.helpText}>Specific details or questions from the prospect</span>
          </div>
 
          <div className={styles.formGroup}>
@@ -162,6 +167,7 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onSuccess }) => {
              onChange={handleChange} 
              className={styles.input} 
            />
+           <span className={styles.helpText}>Prospect's current location city</span>
          </div>
 
          <div className={styles.formGroup}>
@@ -173,6 +179,7 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onSuccess }) => {
              onChange={handleChange} 
              className={styles.input} 
            />
+           <span className={styles.helpText}>State or province</span>
          </div>
 
          <div className={styles.formGroup}>
@@ -184,6 +191,7 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onSuccess }) => {
              onChange={handleChange} 
              className={styles.input} 
            />
+           <span className={styles.helpText}>Default: India</span>
          </div>
 
          <div className={styles.formGroup}>
@@ -193,6 +201,7 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onSuccess }) => {
                 <option key={status} value={status}>{status.charAt(0).toUpperCase() + status.slice(1)}</option>
              ))}
            </select>
+           <span className={styles.helpText}>Current status in the process</span>
          </div>
 
          <div className={styles.formGroup}>
@@ -202,6 +211,7 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onSuccess }) => {
                 <option key={stage} value={stage}>{stage.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</option>
              ))}
            </select>
+           <span className={styles.helpText}>Position in the sales funnel</span>
          </div>
 
          <div className={styles.formGroup}>
@@ -211,6 +221,7 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onSuccess }) => {
                 <option key={tag} value={tag}>{tag.charAt(0).toUpperCase() + tag.slice(1)}</option>
              ))}
            </select>
+           <span className={styles.helpText}>Categorize lead for better filtering</span>
          </div>
 
          <div className={`${styles.formGroup} ${styles.fullWidth}`}>
@@ -223,6 +234,7 @@ const AddLeadModal: React.FC<AddLeadModalProps> = ({ onSuccess }) => {
              className={styles.textarea} 
              style={{ minHeight: '60px' }}
            />
+           <span className={styles.helpText}>Additional internal context or notes</span>
          </div>
 
          {/* Client Logs Section */}

@@ -1,6 +1,9 @@
+import React, { useState, useRef, useEffect } from "react";
+import { FiSettings, FiLogOut } from "react-icons/fi";
 import styles from "./Sidebar.module.css";
 import SidebarLink from "../AdminLayout/SidebarLink";
 import type { Sidebarlink, BaseUser } from "../../../types/global";
+import useLogout from "../../../hooks/auth/useLogout";
 
 const Sidebar = ({
   links,
@@ -15,7 +18,19 @@ const Sidebar = ({
   toggleSidebar: () => void;
   user?: BaseUser | null;
 }) => {
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const { logout } = useLogout();
+  const popoverRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
+        setPopoverOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
     <aside
@@ -50,6 +65,21 @@ const Sidebar = ({
             isOpen={sidebarOpen}
           />
         ))}
+      </div>
+
+      <div className={styles.settingsWrapper} ref={popoverRef}>
+        {popoverOpen && (
+          <div className={styles.settingsPopover}>
+            <div className={`${styles.popoverItem} ${styles.logoutItem}`} onClick={logout}>
+              <FiLogOut size={16} />
+              <span>Log out</span>
+            </div>
+          </div>
+        )}
+        <div className={styles.settingsTrigger} onClick={() => setPopoverOpen(!popoverOpen)}>
+          <FiSettings size={20} />
+          {sidebarOpen && <span className={styles.settingsLabel}>Settings</span>}
+        </div>
       </div>
     </aside>
   );

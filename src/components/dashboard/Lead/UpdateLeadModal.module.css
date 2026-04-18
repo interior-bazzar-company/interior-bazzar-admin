@@ -20,6 +20,10 @@
   width: 100%;
 }
 
+.fullWidth {
+  grid-column: 1 / -1;
+}
+
 @media (max-width: 768px) {
   .formGrid {
     grid-template-columns: 1fr;

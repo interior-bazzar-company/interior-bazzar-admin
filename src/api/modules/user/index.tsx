@@ -1,13 +1,13 @@
 import appUrl from "../../endpoints";
 import apiService from "../../apiService";
 import type { ApiResponseType } from "../../../types/reqResType";
-import type { BaseUser, ProfileForm, ProfileFormResponse } from "../../../types/global";
+import type { UserProfileResponse, ProfileForm, ProfileFormResponse } from "../../../types/global";
 
 export class UserService {
     static async getLoggedInUser() {
         try {
             const url = `${appUrl.user}/profile/`;
-            const response: ApiResponseType<BaseUser> =
+            const response: ApiResponseType<UserProfileResponse> =
                 await apiService.getGetApiResponse(url);
             return response;
         } catch (error) {

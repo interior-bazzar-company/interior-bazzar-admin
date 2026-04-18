@@ -220,6 +220,84 @@
   padding: 8px 10px;
 }
 
+.settingsWrapper {
+  position: relative;
+  padding: 8px 12px;
+  border-top: 1px solid var(--notion-border);
+  margin-top: auto;
+  width: 100%;
+}
+
+.settingsTrigger {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  padding: 8px 10px;
+  border-radius: 6px;
+  transition: all 0.2s;
+  color: var(--notion-text);
+}
+
+.settingsTrigger:hover {
+  background-color: var(--notion-bg-hover);
+}
+
+.settingsLabel {
+  font-size: 13.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  animation: fadeIn 0.2s ease forwards;
+}
+
+.settingsPopover {
+  position: absolute;
+  bottom: 100%;
+  left: 10px;
+  width: 200px;
+  background-color: var(--notion-bg);
+  border: 1px solid var(--notion-border);
+  border-radius: 8px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+  padding: 6px;
+  margin-bottom: 10px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.15s ease-out;
+}
+
+.popoverItem {
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--notion-text);
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: background 0.15s;
+}
+
+.popoverItem:hover {
+  background-color: var(--notion-bg-hover);
+}
+
+.logoutItem {
+  color: #dc2626 !important;
+  font-weight: 500;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 .bottomContainer {
   width: 100%;
   padding: 12px;

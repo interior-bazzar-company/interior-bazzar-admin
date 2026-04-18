@@ -463,8 +463,19 @@ export interface SignupFormResponse {
   [AUTH_VARS.ACCESS]: string;
   [AUTH_VARS.REFRESH]: string;
 }
-export interface LoginFormResponse {
-  user: BaseUser;
+export interface PlanInfo {
+  id: number;
+  planId: string;
+  planName: string;
+  isActive: boolean;
+  expireDate?: string;
+}
+
+export interface UserProfileResponse extends BaseUser {
+  plan?: PlanInfo;
+}
+
+export interface LoginFormResponse extends UserProfileResponse {
   [AUTH_VARS.ACCESS]: string;
   [AUTH_VARS.REFRESH]: string;
 }
@@ -477,6 +488,8 @@ export interface BaseUser {
   username: string;
   role: UserRoleValue;
   profile_image_url?: string;
+  isSuperAdmin: boolean;
+  is_superuser?: boolean;
 }
 
 export interface LoginForm {

@@ -178,3 +178,11 @@
 .addLogBtn:hover {
   background-color: var(--notion-border);
 }
+
+.helpText {
+  font-size: 10.5px;
+  color: var(--notion-text-muted);
+  font-style: italic;
+  margin-top: -2px;
+  opacity: 0.8;
+}

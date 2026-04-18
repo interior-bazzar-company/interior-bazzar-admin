@@ -44,4 +44,59 @@ export class GMBService {
       throw error;
     }
   }
+
+  static async ingestGMBData(data: Partial<GMBLeadType> | Partial<GMBLeadType>[]) {
+    try {
+      const url = `${appUrl.admin}/v1/ingest/gmb-data/`;
+      const response: ApiResponseType<{ processedCount: number; totalReceived: number }> = await apiService.getPostApiResponse(url, data);
+      return response;
+    } catch (error) {
+      logger.error("Error ingesting GMB data:", error);
+      throw error;
+    }
+  }
+
+  static async createLead(data: Partial<GMBLeadType>) {
+    try {
+      const url = `${appUrl.admin}/v1/leads/create/`;
+      const response: ApiResponseType<GMBLeadType> = await apiService.getPostApiResponse(url, data);
+      return response;
+    } catch (error) {
+      logger.error("Error creating GMB lead:", error);
+      throw error;
+    }
+  }
+
+  static async fetchAdmins() {
+    try {
+      const url = `${appUrl.admin}/v1/admins/`;
+      const response: ApiResponseType<{ id: number; username: string; name: string }[]> = await apiService.getGetApiResponse(url);
+      return response;
+    } catch (error) {
+      logger.error("Error fetching eligible admins:", error);
+      throw error;
+    }
+  }
+
+  static async fetchUserLeads(userId: number, pageNo: number, pageSize: number) {
+    try {
+      const url = `${appUrl.admin}/v1/leads/user/${userId}/?pageNo=${pageNo}&pageSize=${pageSize}`;
+      const response: ApiResponseType<GMBLeadResponse> = await apiService.getGetApiResponse(url);
+      return response;
+    } catch (error) {
+      logger.error(`Error fetching leads for user ${userId}:`, error);
+      throw error;
+    }
+  }
+
+  static async autoAssignLeads() {
+    try {
+      const url = `${appUrl.admin}/v1/leads/auto-assign/`;
+      const response: ApiResponseType<{ processedCount: number }> = await apiService.getPostApiResponse(url, {});
+      return response;
+    } catch (error) {
+      logger.error("Error triggering auto-assignment:", error);
+      throw error;
+    }
+  }
 }

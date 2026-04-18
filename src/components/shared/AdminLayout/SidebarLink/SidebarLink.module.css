@@ -57,3 +57,47 @@
 .justify {
   justify-content: center;
 }
+
+.linkWrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.chevron {
+  font-size: 18px;
+  color: #94a3b8;
+  transition: transform 0.2s ease;
+}
+
+.rotate {
+  transform: rotate(90deg);
+}
+
+.subLinksContainer {
+  display: flex;
+  flex-direction: column;
+  padding-left: 44px;
+  margin-top: 4px;
+  gap: 4px;
+}
+
+.subLink {
+  padding: 8px 12px;
+  font-size: 14px;
+  color: #64748b;
+  text-decoration: none;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.subLink:hover {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+.subActive {
+  background-color: #f1f5f9;
+  color: var(--color-brand-primary) !important;
+  font-weight: 600;
+}

@@ -2,7 +2,7 @@ export const AUTH_VARS = {
   ACCESS: "accessToken",
   REFRESH: "refreshToken",
   SESSION: "sessionKey",
-};
+} as const;
 
 export const RESEND_COOLDOWN = 30; //seconds
 
@@ -30,7 +30,7 @@ export const PAGES = {
   ADMIN_ANALYTICS: "/admin/analytics",
   ADMIN_IMAGE_UPLOAD: "/admin/image-upload",
   ADMIN_FUNNEL_LEADS: "/admin/funnel-leads",
-  ADMIN_GMB_LEADS: "/admin/gmb-leads",
+  ADMIN_GMB_LEADS: "/admin/sales-intelligence",
 };
 
 export const EMPLOYEE_ROLES = {

@@ -1,5 +1,5 @@
 import React from "react";
-import { MdOutlineWhatsApp, MdVisibility, MdEdit, MdPersonAdd, MdStar } from "react-icons/md";
+import { MdWhatsapp, MdVisibility, MdEdit, MdStar } from "react-icons/md";
 import type { GMBLeadType } from "../../../../types/content/gmbLeads";
 import styles from "../GMBLeads.module.css";
 import tableStyles from "../../../../components/dashboard/Lead/LeadTable/LeadTable.module.css";
@@ -9,7 +9,6 @@ interface LeadTableProps {
   loading: boolean;
   onView: (lead: GMBLeadType) => void;
   onEdit: (lead: GMBLeadType) => void;
-  onAssign: (lead: GMBLeadType) => void;
   pageNo: number;
   totalPages: number;
   hasNext: boolean;
@@ -21,7 +20,6 @@ const LeadTable: React.FC<LeadTableProps> = ({
   loading,
   onView,
   onEdit,
-  onAssign,
   pageNo,
   totalPages,
   hasNext,
@@ -116,8 +114,8 @@ const LeadTable: React.FC<LeadTableProps> = ({
                   ) : "--"}
                 </td>
                 <td>
-                  {lead.mapLink ? (
-                    <a href={lead.mapLink} target="_blank" rel="noreferrer" style={{ color: "#dc2626" }}>Map</a>
+                  {(lead.mapLink || lead.gmbLink) ? (
+                    <a href={lead.mapLink || lead.gmbLink} target="_blank" rel="noreferrer" style={{ color: "#dc2626", fontWeight: 600 }}>Map</a>
                   ) : "--"}
                 </td>
                 <td style={{ fontStyle: "italic", color: "#6b7280", background: "#f9fafb" }}>
@@ -140,18 +138,26 @@ const LeadTable: React.FC<LeadTableProps> = ({
                         className={tableStyles.assignButton}
                         onClick={() => window.open(lead.waMessage, '_blank')}
                         title="WhatsApp"
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '36px' }}
                       >
-                        <MdOutlineWhatsApp size={18} color="#25D366" />
+                        <MdWhatsapp size={18} color="#25D366" />
                       </button>
                     )}
-                    <button className={tableStyles.assignButton} onClick={() => onView(lead)} title="Full Data">
-                      <MdVisibility size={18} />
+                    <button 
+                      className={tableStyles.assignButton} 
+                      onClick={() => onView(lead)} 
+                      title="Full Data"
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '36px' }}
+                    >
+                      <MdVisibility size={18} color="var(--notion-text)" />
                     </button>
-                    <button className={tableStyles.assignButton} onClick={() => onEdit(lead)} title="Edit">
-                      <MdEdit size={18} />
-                    </button>
-                    <button className={tableStyles.assignButton} onClick={() => onAssign(lead)} title="Assign">
-                      <MdPersonAdd size={18} />
+                    <button 
+                      className={tableStyles.assignButton} 
+                      onClick={() => onEdit(lead)} 
+                      title="Edit"
+                      style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '36px' }}
+                    >
+                      <MdEdit size={18} color="var(--notion-text)" />
                     </button>
                   </div>
                 </td>

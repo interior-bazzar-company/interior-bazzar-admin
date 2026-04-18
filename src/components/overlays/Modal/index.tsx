@@ -7,9 +7,11 @@ import { FiX } from "react-icons/fi";
 interface ModalProps {
     onClose: () => void;
     children: ReactNode;
+    width?: string;
+    maxWidth?: string;
 }
 
-const Modal: React.FC<ModalProps> = ({ onClose, children }) => {
+const Modal: React.FC<ModalProps> = ({ onClose, children, width, maxWidth }) => {
     const contentRef = useRef<HTMLDivElement>(null);
     const backdropRef = useRef<HTMLDivElement>(null);
     const previouslyFocusedElement = useRef<HTMLElement | null>(null);
@@ -112,7 +114,7 @@ const Modal: React.FC<ModalProps> = ({ onClose, children }) => {
                 ref={backdropRef}
                 className={styles.modalBackdrop}
             />
-            <div ref={contentRef} className={styles.modalContent} tabIndex={-1}>
+            <div ref={contentRef} className={styles.modalContent} tabIndex={-1} style={{ width: width || undefined, maxWidth: maxWidth || undefined }}>
                 <button onClick={handleClose} className={styles.modalClose}>
                     <FiX size={24} />
                 </button>
