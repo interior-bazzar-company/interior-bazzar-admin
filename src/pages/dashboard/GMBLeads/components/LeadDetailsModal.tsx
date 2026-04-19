@@ -19,11 +19,14 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ lead, onSuccess, re
   const [loading, setLoading] = useState(false);
   const [remark, setRemark] = useState(lead.remark || "");
   const [status, setStatus] = useState(lead.status || "New");
+  const [phone, setPhone] = useState(lead.phone || "");
+  const [city, setCity] = useState(lead.city || "");
+  const [state, setState] = useState(lead.state || "");
 
   const handleSave = async () => {
     setLoading(true);
     try {
-      const res = await GMBService.updateLead(lead.id, { remark, status });
+      const res = await GMBService.updateLead(lead.id, { remark, status, phone, city, state });
       if (res.response) {
         showAlert("Lead updated successfully", "success");
         if (onSuccess) onSuccess();
@@ -73,21 +76,41 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ lead, onSuccess, re
             <label>Phone</label>
             <div style={{ position: 'relative' }}>
               <MdPhone style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
-              <input className={modalStyles.input} style={{ paddingLeft: '35px' }} value={lead.phone || "--"} readOnly />
+              <input 
+                className={modalStyles.input} 
+                style={{ paddingLeft: '35px' }} 
+                value={phone} 
+                onChange={(e) => setPhone(e.target.value)}
+                readOnly={readOnly}
+              />
             </div>
           </div>
           <div className={modalStyles.formGroup}>
-            <label>Category</label>
+            <label>Location (City)</label>
             <div style={{ position: 'relative' }}>
-              <MdCategory style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
-              <input className={modalStyles.input} style={{ paddingLeft: '35px' }} value={lead.category || "--"} readOnly />
+              <MdPlace style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
+              <input 
+                className={modalStyles.input} 
+                style={{ paddingLeft: '35px' }} 
+                value={city} 
+                onChange={(e) => setCity(e.target.value)}
+                readOnly={readOnly}
+                placeholder="City"
+              />
             </div>
           </div>
           <div className={modalStyles.formGroup}>
-            <label>Platform</label>
+            <label>State</label>
             <div style={{ position: 'relative' }}>
-              <MdLabel style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
-              <input className={modalStyles.input} style={{ paddingLeft: '35px' }} value={lead.platform || "GMB"} readOnly />
+              <MdLayers style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
+              <input 
+                className={modalStyles.input} 
+                style={{ paddingLeft: '35px' }} 
+                value={state} 
+                onChange={(e) => setState(e.target.value)}
+                readOnly={readOnly}
+                placeholder="State"
+              />
             </div>
           </div>
           <div className={modalStyles.formGroup}>
@@ -99,6 +122,7 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ lead, onSuccess, re
             </div>
           </div>
 
+          {/* Row 2 */}
           <div className={modalStyles.formGroup}>
             <label>Tier & Ranking</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', height: '38px', padding: '0 10px', background: '#f9fafb', borderRadius: '6px', border: '1px solid #e5e7eb' }}>
@@ -149,6 +173,21 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ lead, onSuccess, re
             <input className={modalStyles.input} value={lead.assignedUser ? (typeof lead.assignedUser === 'object' ? lead.assignedUser.name : lead.assignedUser) : "None"} readOnly style={{ fontSize: '13px' }} />
           </div>
 
+          {/* Row 3 */}
+          <div className={modalStyles.formGroup}>
+            <label>Category</label>
+            <div style={{ position: 'relative' }}>
+              <MdCategory style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
+              <input className={modalStyles.input} style={{ paddingLeft: '35px' }} value={lead.category || "--"} readOnly />
+            </div>
+          </div>
+          <div className={modalStyles.formGroup}>
+            <label>Platform</label>
+            <div style={{ position: 'relative' }}>
+              <MdLabel style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
+              <input className={modalStyles.input} style={{ paddingLeft: '35px' }} value={lead.platform || "GMB"} readOnly />
+            </div>
+          </div>
           <div className={modalStyles.formGroup}>
             <label>Created At</label>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', height: '38px', padding: '0 12px', background: '#f9fafb', borderRadius: '6px', border: '1px solid #e5e7eb', fontSize: '11px', color: '#6b7280' }}>

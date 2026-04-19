@@ -24,6 +24,8 @@ export interface GMBLeadType {
   platform?: string;
   remark?: string;
   category?: string;
+  city?: string;
+  state?: string;
   status?: string;
   logs?: GMBLogType[];
   createdAt?: string;
