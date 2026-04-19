@@ -194,7 +194,7 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ lead, onSuccess, re
             onChange={(e) => setRemark(e.target.value)}
             placeholder="Add internal remarks..."
             disabled={readOnly}
-            style={{ minHeight: '80px', background: '#fff9db', fontStyle: 'italic', marginTop: '6px' }}
+            style={{ minHeight: '150px', background: '#fff9db', fontStyle: 'italic', marginTop: '6px' }}
           />
         </div>
 
