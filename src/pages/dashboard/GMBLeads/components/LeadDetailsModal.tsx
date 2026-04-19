@@ -186,7 +186,7 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ lead, onSuccess, re
         </div>
       </div>
 
-        <div className={modalStyles.fullWidth}>
+        <div className={modalStyles.formGroup} style={{ width: '100%' }}>
           <label>Remark</label>
           <textarea 
             className={modalStyles.textarea} 
@@ -194,12 +194,12 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ lead, onSuccess, re
             onChange={(e) => setRemark(e.target.value)}
             placeholder="Add internal remarks..."
             disabled={readOnly}
-            style={{ minHeight: '150px', background: '#fff9db', fontStyle: 'italic', marginTop: '6px' }}
+            style={{ minHeight: '120px', background: '#fff9db', fontStyle: 'italic', marginTop: '6px' }}
           />
         </div>
 
         {/* Logs */}
-        <div className={modalStyles.fullWidth}>
+        <div className={modalStyles.formGroup} style={{ width: '100%' }}>
           <label>Digital Footprint (Logs)</label>
           <div className={modalStyles.logsSection} style={{ maxHeight: '200px', overflowY: 'auto' }}>
             <table className={modalStyles.logsTable}>
