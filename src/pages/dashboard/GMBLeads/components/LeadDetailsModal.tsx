@@ -20,13 +20,13 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ lead, onSuccess, re
   const [remark, setRemark] = useState(lead.remark || "");
   const [status, setStatus] = useState(lead.status || "New");
   const [phone, setPhone] = useState(lead.phone || "");
-  const [city, setCity] = useState(lead.city || "");
+  // const [city, setCity] = useState(lead.city || "");
   const [state, setState] = useState(lead.state || "");
 
   const handleSave = async () => {
     setLoading(true);
     try {
-      const res = await GMBService.updateLead(lead.id, { remark, status, phone, city, state });
+      const res = await GMBService.updateLead(lead.id, { remark, status, phone, state });
       if (res.response) {
         showAlert("Lead updated successfully", "success");
         if (onSuccess) onSuccess();
@@ -61,7 +61,7 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ lead, onSuccess, re
   return (
     <div className={modalStyles.modalContent} style={{ width: '100%' }}>
       <h2 className={modalStyles.modalTitle}>{readOnly ? "Lead Details" : "Update Lead"}</h2>
-      
+
       <div style={{ maxHeight: '180px', overflowY: 'auto', paddingRight: '12px', marginBottom: '20px' }}>
         <div className={modalStyles.formGrid} style={{ gridTemplateColumns: 'repeat(5, 1fr)', gap: '15px' }}>
           {/* Row 1 & 2 */}
@@ -76,16 +76,16 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ lead, onSuccess, re
             <label>Phone</label>
             <div style={{ position: 'relative' }}>
               <MdPhone style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
-              <input 
-                className={modalStyles.input} 
-                style={{ paddingLeft: '35px' }} 
-                value={phone} 
+              <input
+                className={modalStyles.input}
+                style={{ paddingLeft: '35px' }}
+                value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 readOnly={readOnly}
               />
             </div>
           </div>
-          <div className={modalStyles.formGroup}>
+          {/* <div className={modalStyles.formGroup}>
             <label>Location (City)</label>
             <div style={{ position: 'relative' }}>
               <MdPlace style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
@@ -98,15 +98,15 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ lead, onSuccess, re
                 placeholder="City"
               />
             </div>
-          </div>
+          </div> */}
           <div className={modalStyles.formGroup}>
             <label>State</label>
             <div style={{ position: 'relative' }}>
               <MdLayers style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
-              <input 
-                className={modalStyles.input} 
-                style={{ paddingLeft: '35px' }} 
-                value={state} 
+              <input
+                className={modalStyles.input}
+                style={{ paddingLeft: '35px' }}
+                value={state}
                 onChange={(e) => setState(e.target.value)}
                 readOnly={readOnly}
                 placeholder="State"
@@ -156,9 +156,9 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ lead, onSuccess, re
           </div>
           <div className={modalStyles.formGroup}>
             <label>Status</label>
-            <select 
-              className={modalStyles.select} 
-              value={status} 
+            <select
+              className={modalStyles.select}
+              value={status}
               onChange={(e) => setStatus(e.target.value)}
               disabled={readOnly}
               style={{ height: '38px', fontSize: '13px' }}
@@ -203,12 +203,12 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ lead, onSuccess, re
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', padding: '10px', background: '#f9fafb', borderRadius: '6px', border: '1px solid #e5e7eb', minHeight: '60px' }}>
             {lead.socialLinks && lead.socialLinks.length > 0 ? (
               lead.socialLinks.map((link, i) => (
-                <a key={i} href={link} target="_blank" rel="noreferrer" style={{ 
-                  padding: '2px 10px', 
-                  borderRadius: '15px', 
-                  background: '#eff6ff', 
-                  color: '#1d4ed8', 
-                  fontSize: '11px', 
+                <a key={i} href={link} target="_blank" rel="noreferrer" style={{
+                  padding: '2px 10px',
+                  borderRadius: '15px',
+                  background: '#eff6ff',
+                  color: '#1d4ed8',
+                  fontSize: '11px',
                   textDecoration: 'none',
                   fontWeight: 500,
                   border: '1px solid #dbeafe'
@@ -225,52 +225,52 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ lead, onSuccess, re
         </div>
       </div>
 
-        <div className={modalStyles.formGroup} style={{ width: '100%' }}>
-          <label>Remark</label>
-          <textarea 
-            className={modalStyles.textarea} 
-            value={remark} 
-            onChange={(e) => setRemark(e.target.value)}
-            placeholder="Add internal remarks..."
-            disabled={readOnly}
-            style={{ minHeight: '120px', background: '#fff9db', fontStyle: 'italic', marginTop: '6px' }}
-          />
-        </div>
+      <div className={modalStyles.formGroup} style={{ width: '100%' }}>
+        <label>Remark</label>
+        <textarea
+          className={modalStyles.textarea}
+          value={remark}
+          onChange={(e) => setRemark(e.target.value)}
+          placeholder="Add internal remarks..."
+          disabled={readOnly}
+          style={{ minHeight: '120px', background: '#fff9db', fontStyle: 'italic', marginTop: '6px' }}
+        />
+      </div>
 
-        {/* Logs */}
-        <div className={modalStyles.formGroup} style={{ width: '100%' }}>
-          <label>Digital Footprint (Logs)</label>
-          <div className={modalStyles.logsSection} style={{ maxHeight: '200px', overflowY: 'auto' }}>
-            <table className={modalStyles.logsTable}>
-              <thead>
-                <tr>
-                  <th style={{ width: '200px' }}>Date</th>
-                  <th style={{ width: '150px' }}>By</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lead.logs && lead.logs.length > 0 ? (
-                  lead.logs.map((log, idx) => (
-                    <tr key={idx}>
-                      <td>{log.timestamp}</td>
-                      <td>
-                        <span style={{ padding: '2px 8px', borderRadius: '4px', background: '#f3f4f6', fontSize: '12px' }}>
-                          {log.triggered_by || "System"}
-                        </span>
-                      </td>
-                      <td style={{ fontWeight: 500 }}>{log.event}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={3} style={{ textAlign: 'center', padding: '12px', color: '#6b7280' }}>No logs found</td>
+      {/* Logs */}
+      <div className={modalStyles.formGroup} style={{ width: '100%' }}>
+        <label>Digital Footprint (Logs)</label>
+        <div className={modalStyles.logsSection} style={{ maxHeight: '200px', overflowY: 'auto' }}>
+          <table className={modalStyles.logsTable}>
+            <thead>
+              <tr>
+                <th style={{ width: '200px' }}>Date</th>
+                <th style={{ width: '150px' }}>By</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lead.logs && lead.logs.length > 0 ? (
+                lead.logs.map((log, idx) => (
+                  <tr key={idx}>
+                    <td>{log.timestamp}</td>
+                    <td>
+                      <span style={{ padding: '2px 8px', borderRadius: '4px', background: '#f3f4f6', fontSize: '12px' }}>
+                        {log.triggered_by || "System"}
+                      </span>
+                    </td>
+                    <td style={{ fontWeight: 500 }}>{log.event}</td>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={3} style={{ textAlign: 'center', padding: '12px', color: '#6b7280' }}>No logs found</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
+      </div>
 
       <div className={modalStyles.actions}>
         <div style={{ marginRight: 'auto', fontSize: '12px', color: '#9ca3af' }}>
