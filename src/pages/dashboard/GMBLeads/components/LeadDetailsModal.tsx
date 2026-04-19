@@ -205,22 +205,22 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ lead, onSuccess, re
             <table className={modalStyles.logsTable}>
               <thead>
                 <tr>
-                  <th style={{ width: '200px' }}>Event</th>
                   <th style={{ width: '200px' }}>Date</th>
-                  <th>By</th>
+                  <th style={{ width: '150px' }}>By</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
                 {lead.logs && lead.logs.length > 0 ? (
                   lead.logs.map((log, idx) => (
                     <tr key={idx}>
-                      <td style={{ fontWeight: 500 }}>{log.event}</td>
                       <td>{log.timestamp}</td>
                       <td>
                         <span style={{ padding: '2px 8px', borderRadius: '4px', background: '#f3f4f6', fontSize: '12px' }}>
                           {log.triggered_by || "System"}
                         </span>
                       </td>
+                      <td style={{ fontWeight: 500 }}>{log.event}</td>
                     </tr>
                   ))
                 ) : (
