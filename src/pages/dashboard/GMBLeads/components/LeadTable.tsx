@@ -100,7 +100,7 @@ const LeadTable: React.FC<LeadTableProps> = ({
             leads.map((lead) => (
               <tr key={lead.id}>
                 <td style={{ fontWeight: 600, color: "#111827" }}>{lead.businessName}</td>
-                <td>{lead.address?.split(',').slice(-2, -1)[0]?.trim().split(' ')[0] || "--"}</td>
+                <td>{lead.state || "--"}</td>
                 <td>
                   <a href={`tel:${lead.phone}`} style={{ color: "#3b82f6", textDecoration: "none" }}>
                     {lead.phone || "--"}
@@ -134,7 +134,7 @@ const LeadTable: React.FC<LeadTableProps> = ({
                 <td>
                   <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
                     {lead.waMessage && (
-                      <button 
+                      <button
                         className={tableStyles.assignButton}
                         onClick={() => window.open(lead.waMessage, '_blank')}
                         title="WhatsApp"
@@ -143,17 +143,17 @@ const LeadTable: React.FC<LeadTableProps> = ({
                         <MdWhatsapp size={18} color="#25D366" />
                       </button>
                     )}
-                    <button 
-                      className={tableStyles.assignButton} 
-                      onClick={() => onView(lead)} 
+                    <button
+                      className={tableStyles.assignButton}
+                      onClick={() => onView(lead)}
                       title="Full Data"
                       style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '36px' }}
                     >
                       <MdVisibility size={18} color="var(--notion-text)" />
                     </button>
-                    <button 
-                      className={tableStyles.assignButton} 
-                      onClick={() => onEdit(lead)} 
+                    <button
+                      className={tableStyles.assignButton}
+                      onClick={() => onEdit(lead)}
                       title="Edit"
                       style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '36px' }}
                     >
@@ -171,9 +171,9 @@ const LeadTable: React.FC<LeadTableProps> = ({
         <div className={tableStyles.pagination}>
           <button disabled={pageNo === 1} onClick={() => setPageNo(pageNo - 1)}>Prev</button>
           {Array.from({ length: totalPages }).map((_, i) => (
-            <button 
-              key={i} 
-              className={pageNo === i + 1 ? tableStyles.activePage : ""} 
+            <button
+              key={i}
+              className={pageNo === i + 1 ? tableStyles.activePage : ""}
               onClick={() => setPageNo(i + 1)}
             >
               {i + 1}
