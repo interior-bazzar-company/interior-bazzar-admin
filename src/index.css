@@ -341,3 +341,10 @@ h6 { font-weight: 500; font-size: var(--font-size-h6); margin-bottom: var(--spac
 p  { color: var(--color-text-light); font-size: var(--font-size-body); }
 li { margin-bottom: var(--space-xs); font-size: var(--font-size-body); }
 strong { font-weight: 600; color: var(--color-text-dark); }
+
+/* Global Table Resizer Fix */
+::-webkit-resizer {
+  background: transparent !important;
+  background-image: none !important;
+  outline: none !important;
+}
