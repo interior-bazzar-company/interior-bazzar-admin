@@ -47,6 +47,9 @@
   border-bottom: 1px solid var(--notion-divider);
   border-right: 1px solid var(--notion-divider);
   vertical-align: middle;
+
+  /* Resizability */
+  resize: vertical;
 }
 
 .table td:last-child {

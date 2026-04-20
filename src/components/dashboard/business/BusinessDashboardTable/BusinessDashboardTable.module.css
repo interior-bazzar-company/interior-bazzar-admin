@@ -52,6 +52,9 @@
   vertical-align: middle;
   font-size: 13px;
   background-color: var(--notion-bg);
+
+  /* Resizability */
+  resize: vertical;
 }
 
 .table td:last-child {

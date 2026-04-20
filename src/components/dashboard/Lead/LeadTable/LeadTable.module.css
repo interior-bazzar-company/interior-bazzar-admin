@@ -59,6 +59,9 @@
   border-right: 1px solid var(--notion-divider);
   color: var(--notion-text);
   background-color: var(--notion-bg);
+  
+  /* Resizability Logic for rows */
+  resize: vertical;
 }
 
 .table td:last-child {

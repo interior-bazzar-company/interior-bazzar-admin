@@ -342,9 +342,8 @@ p  { color: var(--color-text-light); font-size: var(--font-size-body); }
 li { margin-bottom: var(--space-xs); font-size: var(--font-size-body); }
 strong { font-weight: 600; color: var(--color-text-dark); }
 
-/* Global Table Resizer Fix */
+/* Global Table Resizer Fix - Hide the // but keep it functional */
 ::-webkit-resizer {
-  background: transparent !important;
+  background-color: transparent !important;
   background-image: none !important;
-  outline: none !important;
 }
