@@ -13,7 +13,7 @@ dist-ssr
 *.local
 
 # Ignore specific environment files
-# .env
+.env
 .env.test
 .env.dev
 .env.prod
