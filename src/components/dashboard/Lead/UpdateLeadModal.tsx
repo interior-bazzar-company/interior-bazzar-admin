@@ -187,23 +187,7 @@ const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({ lead, onSuccess }) =>
                 </tr>
               </thead>
               <tbody>
-                {existingClientLogs.length === 0 && newLogs.length === 0 ? (
-                  <tr>
-                    <td colSpan={2} style={{ textAlign: "center", color: "var(--notion-text-muted)" }}>
-                      No logs available
-                    </td>
-                  </tr>
-                ) : null}
-
-                {/* Render existing logs initially sent from backend */}
-                {existingClientLogs.map((log, idx) => (
-                  <tr key={`existing-${idx}`}>
-                    <td>{log.by === 'business' ? 'Business' : 'Client'}</td>
-                    <td>{log.message}</td>
-                  </tr>
-                ))}
-
-                {/* Render newly added logs */}
+                {/* Render newly added logs at the top */}
                 {newLogs.map((log, idx) => (
                   <tr key={`new-${idx}`}>
                     <td>
@@ -213,6 +197,24 @@ const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({ lead, onSuccess }) =>
                     <td>{log.message}</td>
                   </tr>
                 ))}
+
+                {existingClientLogs.length === 0 && newLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan={2} style={{ textAlign: "center", color: "var(--notion-text-muted)" }}>
+                      No logs available
+                    </td>
+                  </tr>
+                ) : null}
+
+                {/* Render existing logs initially sent from backend */}
+                {[...existingClientLogs].reverse().map((log, idx) => (
+                  <tr key={`existing-${idx}`}>
+                    <td>{log.by === 'business' ? 'Business' : 'Client'}</td>
+                    <td>{log.message}</td>
+                  </tr>
+                ))}
+
+
               </tbody>
             </table>
 
@@ -239,7 +241,7 @@ const UpdateLeadModal: React.FC<UpdateLeadModalProps> = ({ lead, onSuccess }) =>
                 className={styles.addLogBtn}
                 onClick={() => {
                   if (newLogMessage.trim()) {
-                    setNewLogs([...newLogs, { by: newLogBy, message: newLogMessage }]);
+                    setNewLogs([{ by: newLogBy, message: newLogMessage }, ...newLogs]);
                     setNewLogMessage("");
                   }
                 }}

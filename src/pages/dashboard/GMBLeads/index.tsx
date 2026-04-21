@@ -17,6 +17,7 @@ const GMBLeads = () => {
         totalPages,
         hasNext,
         filters,
+        kpis,
         handleFilterClick,
         handleLeadUpdated,
         handleAddClick,
@@ -116,6 +117,7 @@ const GMBLeads = () => {
 
             <FilterBar 
                 filters={filters} 
+                kpis={kpis}
                 handleFilterClick={handleFilterClick} 
             />
 

@@ -251,7 +251,7 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ lead, onSuccess, re
             </thead>
             <tbody>
               {lead.logs && lead.logs.length > 0 ? (
-                lead.logs.map((log, idx) => (
+                [...lead.logs].reverse().map((log, idx) => (
                   <tr key={idx}>
                     <td>{log.timestamp}</td>
                     <td>

@@ -133,7 +133,7 @@ const LeadTable: React.FC<LeadTableProps> = ({
                 </td>
                 <td>
                   <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
-                    {lead.waMessage && (
+                    {lead.waMessage && lead.waMessage.trim() !== "" && (
                       <button
                         className={tableStyles.assignButton}
                         onClick={() => window.open(lead.waMessage, '_blank')}
@@ -170,15 +170,30 @@ const LeadTable: React.FC<LeadTableProps> = ({
       {totalPages > 1 && (
         <div className={tableStyles.pagination}>
           <button disabled={pageNo === 1} onClick={() => setPageNo(pageNo - 1)}>Prev</button>
-          {Array.from({ length: totalPages }).map((_, i) => (
-            <button
-              key={i}
-              className={pageNo === i + 1 ? tableStyles.activePage : ""}
-              onClick={() => setPageNo(i + 1)}
-            >
-              {i + 1}
-            </button>
-          ))}
+          
+          {(() => {
+            const maxVisible = 7;
+            let start = Math.max(1, pageNo - Math.floor(maxVisible / 2));
+            let end = Math.min(totalPages, start + maxVisible - 1);
+
+            if (end - start + 1 < maxVisible) {
+              start = Math.max(1, end - maxVisible + 1);
+            }
+
+            return Array.from({ length: end - start + 1 }).map((_, i) => {
+              const p = start + i;
+              return (
+                <button
+                  key={p}
+                  className={pageNo === p ? tableStyles.activePage : ""}
+                  onClick={() => setPageNo(p)}
+                >
+                  {p}
+                </button>
+              );
+            });
+          })()}
+
           <button disabled={!hasNext} onClick={() => setPageNo(pageNo + 1)}>Next</button>
         </div>
       )}

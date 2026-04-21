@@ -44,7 +44,7 @@ const LogsPopup: React.FC<LogsPopupProps> = ({ logs, title, type = "system" }) =
         </thead>
         <tbody>
           {logs.length > 0 ? (
-            logs.map((log, idx) => (
+            [...logs].reverse().map((log, idx) => (
               <tr key={idx}>
                 {type === "system" ? (
                   <>

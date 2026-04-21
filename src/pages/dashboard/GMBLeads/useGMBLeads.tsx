@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { GMBService } from "../../../api/modules/gmbLeads";
-import type { GMBLeadType } from "../../../types/content/gmbLeads";
+import type { GMBLeadType, GMBKPIDataType } from "../../../types/content/gmbLeads";
 import { logger } from "../../../utils/logger";
 import { useModal } from "../../../context/ModalContext";
 import { useAlert } from "../../../context/AlertContext";
@@ -25,10 +25,12 @@ const useGMBLeads = () => {
     const [searchText, setSearchText] = useState("");
     const [filters, setFilters] = useState({
         city: "",
+        state: "",
         min_rating: "",
         status: "",
         platform: ""
     });
+    const [kpis, setKpis] = useState<GMBKPIDataType | null>(null);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
     // Superadmin specific states
@@ -56,6 +58,17 @@ const useGMBLeads = () => {
             logger.error("Failed to fetch admins", error);
         }
     }, [isSuperAdmin]);
+
+    const fetchKPIs = useCallback(async () => {
+        try {
+            const res = await GMBService.fetchKPIs();
+            if (res.response) {
+                setKpis(res.data);
+            }
+        } catch (error) {
+            logger.error("Failed to fetch KPIs", error);
+        }
+    }, []);
 
     const fetchLeads = useCallback(async () => {
         setLoading(true);
@@ -85,8 +98,9 @@ const useGMBLeads = () => {
     }, [pageNo, pageSize, filters, searchText, isSuperAdmin, selectedAdminId]);
 
     useEffect(() => {
+        fetchKPIs();
         if (isSuperAdmin) fetchAdmins();
-    }, [isSuperAdmin, fetchAdmins]);
+    }, [isSuperAdmin, fetchAdmins, fetchKPIs]);
 
     useEffect(() => {
         fetchLeads();
@@ -112,6 +126,7 @@ const useGMBLeads = () => {
 
     const handleLeadUpdated = () => {
         setRefreshTrigger(prev => prev + 1);
+        fetchKPIs(); // Refresh KPIs if lead updated
     };
 
     const handleAddClick = () => {
@@ -125,6 +140,7 @@ const useGMBLeads = () => {
             if (res.response) {
                 showAlert(`Successfully assigned ${res.data.processedCount} leads`, "success");
                 setRefreshTrigger(prev => prev + 1);
+                fetchKPIs();
             }
         } catch (error: any) {
             showAlert(error.message || "Auto-assignment failed", "error");
@@ -150,6 +166,7 @@ const useGMBLeads = () => {
         totalPages,
         hasNext,
         filters,
+        kpis,
         searchText,
         isSuperAdmin,
         eligibleAdmins,

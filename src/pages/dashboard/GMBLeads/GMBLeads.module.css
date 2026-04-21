@@ -74,6 +74,31 @@
   border: 1px solid #eee;
 }
 
+.dropDownRow {
+  display: flex;
+  gap: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #efeff2;
+  margin-bottom: 8px;
+}
+
+.filterSelect {
+  padding: 8px 12px;
+  border: 1px solid var(--notion-border);
+  border-radius: 8px;
+  font-size: 14px;
+  min-width: 220px;
+  outline: none;
+  cursor: pointer;
+  background-color: white;
+  transition: all 0.2s;
+}
+
+.filterSelect:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+}
+
 .filterRow {
   display: flex;
   align-items: center;

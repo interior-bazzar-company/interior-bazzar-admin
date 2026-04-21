@@ -10,6 +10,7 @@ export class GMBService {
       let url = `${appUrl.admin}/v1/leads/my-leads/?pageNo=${pageNo}&pageSize=${pageSize}`;
       if (filters) {
         if (filters.city) url += `&city=${encodeURIComponent(filters.city)}`;
+        if (filters.state) url += `&state=${encodeURIComponent(filters.state)}`;
         if (filters.min_rating) url += `&min_rating=${filters.min_rating}`;
         if (filters.status) url += `&status=${encodeURIComponent(filters.status)}`;
         if (filters.platform) url += `&platform=${encodeURIComponent(filters.platform)}`;
@@ -19,6 +20,17 @@ export class GMBService {
       return response;
     } catch (error) {
       logger.error("Error fetching GMB leads:", error);
+      throw error;
+    }
+  }
+
+  static async fetchKPIs() {
+    try {
+      const url = `${appUrl.admin}/v1/leads/kpis/`;
+      const response: ApiResponseType<any> = await apiService.getGetApiResponse(url);
+      return response;
+    } catch (error) {
+      logger.error("Error fetching lead KPIs:", error);
       throw error;
     }
   }

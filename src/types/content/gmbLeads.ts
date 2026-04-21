@@ -39,3 +39,17 @@ export interface GMBLeadResponse {
   totalPages: number;
   hasNext: boolean;
 }
+
+export interface GMBKPIType {
+  label: string;
+  value: string;
+  count: number;
+}
+
+export interface GMBKPIDataType {
+  state: GMBKPIType[];
+  city: GMBKPIType[];
+  status: GMBKPIType[];
+  platform: GMBKPIType[];
+  rating: GMBKPIType[];
+}
