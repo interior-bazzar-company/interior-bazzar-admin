@@ -126,6 +126,7 @@ const useGMBLeads = () => {
 
     const handleLeadUpdated = () => {
         setRefreshTrigger(prev => prev + 1);
+        setPageNo(1);
         fetchKPIs(); // Refresh KPIs if lead updated
     };
 

@@ -22,11 +22,12 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ lead, onSuccess, re
   const [phone, setPhone] = useState(lead.phone || "");
   // const [city, setCity] = useState(lead.city || "");
   const [state, setState] = useState(lead.state || "");
+  const [platform, setPlatform] = useState(lead.platform || "GMB");
 
   const handleSave = async () => {
     setLoading(true);
     try {
-      const res = await GMBService.updateLead(lead.id, { remark, status, phone, state });
+      const res = await GMBService.updateLead(lead.id, { remark, status, phone, state, platform });
       if (res.response) {
         showAlert("Lead updated successfully", "success");
         if (onSuccess) onSuccess();
@@ -185,7 +186,18 @@ const LeadDetailsModal: React.FC<LeadDetailsModalProps> = ({ lead, onSuccess, re
             <label>Platform</label>
             <div style={{ position: 'relative' }}>
               <MdLabel style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
-              <input className={modalStyles.input} style={{ paddingLeft: '35px' }} value={lead.platform || "GMB"} readOnly />
+              <select
+                className={modalStyles.select}
+                style={{ paddingLeft: '35px', height: '38px', fontSize: '13px' }}
+                value={platform}
+                onChange={(e) => setPlatform(e.target.value)}
+                disabled={readOnly}
+              >
+                <option value="GMB">GMB</option>
+                <option value="Website">Website</option>
+                <option value="MY">MY</option>
+                <option value="ADS">ADS</option>
+              </select>
             </div>
           </div>
           <div className={modalStyles.formGroup}>

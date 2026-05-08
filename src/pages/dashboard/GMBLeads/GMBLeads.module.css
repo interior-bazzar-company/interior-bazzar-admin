@@ -172,6 +172,9 @@
 .badgeGmb { background: #e0f2fe; color: #0369a1; }
 .badgeYelp { background: #fee2e2; color: #b91c1c; }
 .badgeYellowPages { background: #fef9c3; color: #854d0e; }
+.badgeWebsite { background: #f0f9ff; color: #0284c7; }
+.badgeMy { background: #fdf2f8; color: #be185d; }
+.badgeAds { background: #ecfdf5; color: #047857; }
 
 /* Status Badges */
 .statusBadge {

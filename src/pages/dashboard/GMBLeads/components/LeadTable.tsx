@@ -1,5 +1,6 @@
 import React from "react";
-import { MdWhatsapp, MdVisibility, MdEdit, MdStar } from "react-icons/md";
+// import { MdWhatsapp, MdVisibility, MdEdit, MdStar } from "react-icons/md";
+import { MdWhatsapp, MdEdit, MdStar } from "react-icons/md";
 import type { GMBLeadType } from "../../../../types/content/gmbLeads";
 import styles from "../GMBLeads.module.css";
 import tableStyles from "../../../../components/dashboard/Lead/LeadTable/LeadTable.module.css";
@@ -18,7 +19,7 @@ interface LeadTableProps {
 const LeadTable: React.FC<LeadTableProps> = ({
   leads,
   loading,
-  onView,
+  // onView,
   onEdit,
   pageNo,
   totalPages,
@@ -63,6 +64,9 @@ const LeadTable: React.FC<LeadTableProps> = ({
       case "gmb": return styles.badgeGmb;
       case "yelp": return styles.badgeYelp;
       case "yellowpages": return styles.badgeYellowPages;
+      case "website": return styles.badgeWebsite;
+      case "my": return styles.badgeMy;
+      case "ads": return styles.badgeAds;
       default: return "";
     }
   };
@@ -72,17 +76,17 @@ const LeadTable: React.FC<LeadTableProps> = ({
       <table className={tableStyles.table}>
         <thead>
           <tr>
-            <th>Business Name</th>
-            <th>State</th>
-            <th>Phone</th>
-            <th>Rating</th>
-            <th>Location</th>
-            <th>Web</th>
-            <th>Map</th>
-            <th>Remark</th>
-            <th>Platform</th>
-            <th>Status</th>
             <th>Actions</th>
+            <th>Business Name</th>
+            <th>Phone</th>
+            <th>State</th>
+            <th>Location</th>
+            <th>Remark</th>
+            <th>Status</th>
+            <th>Platform</th>
+            <th>Rating</th>
+            <th>Web</th>
+            {/* <th>Map</th> */}
           </tr>
         </thead>
         <tbody>
@@ -99,38 +103,6 @@ const LeadTable: React.FC<LeadTableProps> = ({
           ) : (
             leads.map((lead) => (
               <tr key={lead.id}>
-                <td style={{ fontWeight: 600, color: "#111827" }}>{lead.businessName}</td>
-                <td>{lead.state || "--"}</td>
-                <td>
-                  <a href={`tel:${lead.phone}`} style={{ color: "#3b82f6", textDecoration: "none" }}>
-                    {lead.phone || "--"}
-                  </a>
-                </td>
-                <td>{renderStars(lead.ratingValue || lead.rating)}</td>
-                <td title={lead.address}>{lead.address || "--"}</td>
-                <td>
-                  {lead.website ? (
-                    <a href={lead.website} target="_blank" rel="noreferrer" style={{ color: "#3b82f6" }}>Link</a>
-                  ) : "--"}
-                </td>
-                <td>
-                  {(lead.mapLink || lead.gmbLink) ? (
-                    <a href={lead.mapLink || lead.gmbLink} target="_blank" rel="noreferrer" style={{ color: "#dc2626", fontWeight: 600 }}>Map</a>
-                  ) : "--"}
-                </td>
-                <td style={{ fontStyle: "italic", color: "#6b7280", background: "#f9fafb" }}>
-                  {lead.remark || "--"}
-                </td>
-                <td>
-                  <span className={`${styles.badge} ${getPlatformBadgeClass(lead.platform)}`}>
-                    {lead.platform || "GMB"}
-                  </span>
-                </td>
-                <td>
-                  <span className={styles.statusBadge} style={getStatusBadgeClass(lead.status)}>
-                    {lead.status || "NEW"}
-                  </span>
-                </td>
                 <td>
                   <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
                     {lead.waMessage && lead.waMessage.trim() !== "" && (
@@ -143,14 +115,14 @@ const LeadTable: React.FC<LeadTableProps> = ({
                         <MdWhatsapp size={18} color="#25D366" />
                       </button>
                     )}
-                    <button
+                    {/* <button
                       className={tableStyles.assignButton}
                       onClick={() => onView(lead)}
                       title="Full Data"
                       style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minWidth: '36px' }}
                     >
                       <MdVisibility size={18} color="var(--notion-text)" />
-                    </button>
+                    </button> */}
                     <button
                       className={tableStyles.assignButton}
                       onClick={() => onEdit(lead)}
@@ -161,6 +133,42 @@ const LeadTable: React.FC<LeadTableProps> = ({
                     </button>
                   </div>
                 </td>
+                <td style={{ fontWeight: 600, color: "#111827" }}><a href={lead.mapLink || lead.gmbLink} target="_blank" rel="noreferrer">{lead.businessName}</a></td>
+                <td>
+                  <a href={`tel:${lead.phone}`} style={{ color: "#3b82f6", textDecoration: "none" }}>
+                    {lead.phone || "--"}
+                  </a>
+                </td>
+                <td>{lead.state || "--"}</td>
+                <td title={lead.address}>{lead.address || "--"}</td>
+                <td style={{ fontStyle: "italic", color: "#6b7280", background: "#f9fafb" }}>
+                  {lead.remark || "--"}
+                </td>
+                <td>
+                  <span className={styles.statusBadge} style={getStatusBadgeClass(lead.status)}>
+                    {lead.status || "NEW"}
+                  </span>
+                </td>
+                <td>
+                  <span className={`${styles.badge} ${getPlatformBadgeClass(lead.platform)}`}>
+                    {lead.platform || "GMB"}
+                  </span>
+                </td>
+                <td>{renderStars(lead.ratingValue || lead.rating)}</td>
+                <td>
+                  {lead.website ? (
+                    <a href={lead.website} target="_blank" rel="noreferrer" style={{ color: "#3b82f6" }}>Link</a>
+                  ) : "--"}
+                </td>
+                {/* <td>
+                  {(lead.mapLink || lead.gmbLink) ? (
+                    <a href={lead.mapLink || lead.gmbLink} target="_blank" rel="noreferrer" style={{ color: "#dc2626", fontWeight: 600 }}>Map</a>
+                  ) : "--"}
+                </td> */}
+                
+                
+                
+                
               </tr>
             ))
           )}

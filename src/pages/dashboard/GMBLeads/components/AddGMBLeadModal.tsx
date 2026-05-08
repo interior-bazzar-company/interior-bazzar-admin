@@ -132,13 +132,18 @@ const AddGMBLeadModal: React.FC<AddGMBLeadModalProps> = ({ onSuccess }) => {
           <label>Platform</label>
           <div style={{ position: 'relative' }}>
             <MdLabel style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#6b7280' }} />
-            <input 
+            <select 
               name="platform"
               className={styles.input} 
               style={{ paddingLeft: '35px' }} 
               value={formData.platform}
               onChange={handleChange}
-            />
+            >
+              <option value="GMB">GMB</option>
+              <option value="Website">Website</option>
+              <option value="MY">MY</option>
+              <option value="ADS">ADS</option>
+            </select>
           </div>
           <span className={styles.helpText}>Source platform (default: GMB)</span>
         </div>
