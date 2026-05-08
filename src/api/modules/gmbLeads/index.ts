@@ -11,7 +11,7 @@ export class GMBService {
     try {
       const isDefaultView = pageNo === 1 && (!filters || Object.values(filters).every(v => !v));
       if (isDefaultView) {
-        const cached = getCache<GMBLeadResponse>(CACHE_KEYS.GMB_LEAD_LIST_PAGE_1, 'session');
+        const cached = getCache<ApiResponseType<GMBLeadResponse>>(CACHE_KEYS.GMB_LEAD_LIST_PAGE_1, 'session');
         if (cached) return cached;
       }
 
@@ -39,7 +39,7 @@ export class GMBService {
 
   static async fetchKPIs() {
     try {
-      const cached = getCache<any>(CACHE_KEYS.GMB_KPIs, 'session');
+      const cached = getCache<ApiResponseType<any>>(CACHE_KEYS.GMB_KPIs, 'session');
       if (cached) return cached;
 
       const url = `${appUrl.admin}/v1/leads/kpis/`;
@@ -102,7 +102,7 @@ export class GMBService {
 
   static async fetchAdmins() {
     try {
-      const cached = getCache<{ id: number; username: string; name: string }[]>(CACHE_KEYS.ADMIN_TEAM_LIST, 'local');
+      const cached = getCache<ApiResponseType<{ id: number; username: string; name: string }[]>>(CACHE_KEYS.ADMIN_TEAM_LIST, 'local');
       if (cached) return cached;
 
       const url = `${appUrl.admin}/v1/admins/`;
@@ -123,7 +123,7 @@ export class GMBService {
     try {
       const cacheKey = `${CACHE_KEYS.GMB_USER_LEADS}_${userId}_page_1`;
       if (pageNo === 1) {
-        const cached = getCache<GMBLeadResponse>(cacheKey, 'session');
+        const cached = getCache<ApiResponseType<GMBLeadResponse>>(cacheKey, 'session');
         if (cached) return cached;
       }
 

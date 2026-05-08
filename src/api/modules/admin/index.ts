@@ -23,7 +23,7 @@ export class AdminService {
 
   static async fetchTotalUsers() {
     try {
-      const cached = getCache<{ totalUsers: number }>(CACHE_KEYS.TOTAL_USERS, 'session');
+      const cached = getCache<ApiResponseType<{ totalUsers: number }>>(CACHE_KEYS.TOTAL_USERS, 'session');
       if (cached) return cached;
 
       const url = `${appUrl.admin}/total-users/`;
@@ -42,7 +42,7 @@ export class AdminService {
   static async fetchBusinesses(pageNo: number, pageSize: number) {
     try {
       if (pageNo === 1) {
-        const cached = getCache<GetPaginatedAdminBusinessesType>(CACHE_KEYS.BUSINESS_LIST_PAGE_1, 'session');
+        const cached = getCache<ApiResponseType<GetPaginatedAdminBusinessesType>>(CACHE_KEYS.BUSINESS_LIST_PAGE_1, 'session');
         if (cached) return cached;
       }
 
@@ -68,7 +68,7 @@ export class AdminService {
   }) {
     try {
       const cacheKey = `${CACHE_KEYS.BUSINESS_LIST_V2}_${JSON.stringify(data)}`;
-      const cached = getCache<GetPaginatedAdminBusinessesTypeV2>(cacheKey, 'session');
+      const cached = getCache<ApiResponseType<GetPaginatedAdminBusinessesTypeV2>>(cacheKey, 'session');
       if (cached) return cached;
 
       const url = `${appUrl.admin}/v2/paginate-business/`;
@@ -88,7 +88,7 @@ export class AdminService {
     try {
       const isDefaultView = pageNo === 1 && (!filters || Object.values(filters).every(v => !v));
       if (isDefaultView) {
-        const cached = getCache<any>(CACHE_KEYS.LEAD_LIST_PAGE_1, 'session');
+        const cached = getCache<ApiResponseType<any>>(CACHE_KEYS.LEAD_LIST_PAGE_1, 'session');
         if (cached) return cached;
       }
 
@@ -116,7 +116,7 @@ export class AdminService {
   static async fetchFunnelLeads(pageNo: number, pageSize: number) {
     try {
       if (pageNo === 1) {
-        const cached = getCache<GetPaginatedFunnelLeadType>(CACHE_KEYS.FUNNEL_LIST_PAGE_1, 'session');
+        const cached = getCache<ApiResponseType<GetPaginatedFunnelLeadType>>(CACHE_KEYS.FUNNEL_LIST_PAGE_1, 'session');
         if (cached) return cached;
       }
 
@@ -137,7 +137,7 @@ export class AdminService {
   static async getSearchedBusinesses(query: string, signal?: AbortSignal) {
     try {
       const cacheKey = `${CACHE_KEYS.SEARCH_RESULTS}_${query}`;
-      const cached = getCache<BusinessSearchResType>(cacheKey, 'session');
+      const cached = getCache<ApiResponseType<BusinessSearchResType>>(cacheKey, 'session');
       if (cached) return cached;
 
       const url = `${appUrl.admin}/business/search/${encodeURIComponent(
@@ -158,7 +158,7 @@ export class AdminService {
   static async getBusinessDetail(businessId: number, signal?: AbortSignal) {
     try {
       const cacheKey = `${CACHE_KEYS.BUSINESS_DETAIL}_${businessId}`;
-      const cached = getCache<BusinessType>(cacheKey, 'session');
+      const cached = getCache<ApiResponseType<BusinessType>>(cacheKey, 'session');
       if (cached) return cached;
 
       const url = `${appUrl.admin}/business/${businessId}/`;
@@ -192,7 +192,7 @@ export class AdminService {
   /* Get  Analytics here  */
   static async getAllAnalytics() {
     try {
-      const cached = getCache<any>(CACHE_KEYS.ALL_ANALYTICS, 'session');
+      const cached = getCache<ApiResponseType<any>>(CACHE_KEYS.ALL_ANALYTICS, 'session');
       if (cached) return cached;
 
       const url = `${appUrl.admin}/analytics/`;
@@ -211,7 +211,7 @@ export class AdminService {
   }
   static async getBusinessAnalytics() {
     try {
-      const cached = getCache<SignupData[]>(CACHE_KEYS.BUSINESS_ANALYTICS, 'local');
+      const cached = getCache<ApiResponseType<SignupData[]>>(CACHE_KEYS.BUSINESS_ANALYTICS, 'local');
       if (cached) return cached;
 
       const url = `${appUrl.admin}/chart/`;
@@ -229,7 +229,7 @@ export class AdminService {
   }
   static async getLeadsAnalytics() {
     try {
-      const cached = getCache<any>(CACHE_KEYS.LEADS_SUMMARY, 'session');
+      const cached = getCache<ApiResponseType<any>>(CACHE_KEYS.LEADS_SUMMARY, 'session');
       if (cached) return cached;
 
       const url = `${appUrl.admin}/v2/leads/`;
@@ -259,7 +259,7 @@ export class AdminService {
   static async postLeadsStatsV2(data: { start_date: string; end_date: string; page_number: number; page_size: number }) {
     try {
       const cacheKey = `${CACHE_KEYS.LEADS_STATS_V2}_${JSON.stringify(data)}`;
-      const cached = getCache<any>(cacheKey, 'session');
+      const cached = getCache<ApiResponseType<any>>(cacheKey, 'session');
       if (cached) return cached;
 
       const url = `${appUrl.admin}/v2/leads/stats/`;
@@ -277,7 +277,7 @@ export class AdminService {
   }
   static async getUserGrowthAnalytics() {
     try {
-      const cached = getCache<UserGrowthAnalytics[]>(CACHE_KEYS.USER_GROWTH, 'local');
+      const cached = getCache<ApiResponseType<UserGrowthAnalytics[]>>(CACHE_KEYS.USER_GROWTH, 'local');
       if (cached) return cached;
 
       const url = `${appUrl.admin}/analytics/users/`;
@@ -295,7 +295,7 @@ export class AdminService {
   }
   static async getDetailedLeadAnalytics() {
     try {
-      const cached = getCache<any[]>(CACHE_KEYS.DETAILED_LEAD_ANALYTICS, 'local');
+      const cached = getCache<ApiResponseType<any[]>>(CACHE_KEYS.DETAILED_LEAD_ANALYTICS, 'local');
       if (cached) return cached;
 
       const url = `${appUrl.admin}/v2/analytics/leads/`;
@@ -313,7 +313,7 @@ export class AdminService {
   }
   static async fetchDashboardV2() {
     try {
-      const cached = getCache<DashboardV2Type>(CACHE_KEYS.DASHBOARD_V2, 'session');
+      const cached = getCache<ApiResponseType<DashboardV2Type>>(CACHE_KEYS.DASHBOARD_V2, 'session');
       if (cached) return cached;
 
       const url = `${appUrl.admin}/v2/dashboard/`;

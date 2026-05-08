@@ -18,7 +18,7 @@ export class AdminUserManagementService {
   /** Fetch users created by the requesting admin */
   static async fetchUsers() {
     try {
-      const cached = getCache<AdminUserType[]>(CACHE_KEYS.USER_MANAGEMENT_LIST, 'session');
+      const cached = getCache<ApiResponseType<AdminUserType[]>>(CACHE_KEYS.USER_MANAGEMENT_LIST, 'session');
       if (cached) return cached;
 
       const url = `${appUrl.admin}/users/`;
@@ -74,7 +74,7 @@ export class AdminUserManagementService {
   /** Fetch available roles for dropdowns */
   static async fetchRoles() {
     try {
-      const cached = getCache<RoleType[]>(CACHE_KEYS.RBAC_ROLES, 'local');
+      const cached = getCache<ApiResponseType<RoleType[]>>(CACHE_KEYS.RBAC_ROLES, 'local');
       if (cached) return cached;
 
       // Use the actual RBAC module path

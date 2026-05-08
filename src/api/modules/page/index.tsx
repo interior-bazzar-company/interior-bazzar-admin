@@ -7,7 +7,7 @@ export class PageService {
     static async getDisclaimer() {
         try {
             const cacheKey = `${CACHE_KEYS.CMS_CONTENT}_disclaimer`;
-            const cached = getCache<any>(cacheKey, 'local');
+            const cached = getCache<ApiResponseType<any>>(cacheKey, 'local');
             if (cached) return cached;
 
             const url = `${appUrl.page}/disclaimer/`;
@@ -25,7 +25,7 @@ export class PageService {
     static async getPrivacyPolicy() {
         try {
             const cacheKey = `${CACHE_KEYS.CMS_CONTENT}_privacy_policy`;
-            const cached = getCache<any>(cacheKey, 'local');
+            const cached = getCache<ApiResponseType<any>>(cacheKey, 'local');
             if (cached) return cached;
 
             const url = `${appUrl.page}/privacy-policy/`;
@@ -43,7 +43,7 @@ export class PageService {
     static async getReturnRefund() {
         try {
             const cacheKey = `${CACHE_KEYS.CMS_CONTENT}_return_refund`;
-            const cached = getCache<any>(cacheKey, 'local');
+            const cached = getCache<ApiResponseType<any>>(cacheKey, 'local');
             if (cached) return cached;
 
             const url = `${appUrl.page}/return-and-refund/`;
@@ -61,7 +61,7 @@ export class PageService {
     static async getTermsConditon() {
         try {
             const cacheKey = `${CACHE_KEYS.CMS_CONTENT}_terms_condition`;
-            const cached = getCache<any>(cacheKey, 'local');
+            const cached = getCache<ApiResponseType<any>>(cacheKey, 'local');
             if (cached) return cached;
 
             const url = `${appUrl.page}/terms-and-conditions/`;
@@ -79,7 +79,7 @@ export class PageService {
     static async getPaymentPage() {
         try {
             const cacheKey = `${CACHE_KEYS.CMS_CONTENT}_payment`;
-            const cached = getCache<any>(cacheKey, 'local');
+            const cached = getCache<ApiResponseType<any>>(cacheKey, 'local');
             if (cached) return cached;
 
             const url = `${appUrl.page}/payment/`;
@@ -97,7 +97,7 @@ export class PageService {
     static async getImportantLinks() {
         try {
             const cacheKey = `${CACHE_KEYS.CMS_CONTENT}_important_links`;
-            const cached = getCache<any>(cacheKey, 'local');
+            const cached = getCache<ApiResponseType<any>>(cacheKey, 'local');
             if (cached) return cached;
 
             const url = `${appUrl.page}/important-links/`;
@@ -115,7 +115,7 @@ export class PageService {
     static async getQna() {
         try {
             const cacheKey = `${CACHE_KEYS.CMS_CONTENT}_qna`;
-            const cached = getCache<any>(cacheKey, 'local');
+            const cached = getCache<ApiResponseType<any>>(cacheKey, 'local');
             if (cached) return cached;
 
             const url = `${appUrl.page}/qna/`;
@@ -133,7 +133,7 @@ export class PageService {
     static async getLegal() {
         try {
             const cacheKey = `${CACHE_KEYS.CMS_CONTENT}_legal`;
-            const cached = getCache<any>(cacheKey, 'local');
+            const cached = getCache<ApiResponseType<any>>(cacheKey, 'local');
             if (cached) return cached;
 
             const url = `${appUrl.page}/legal/`;
@@ -151,7 +151,7 @@ export class PageService {
     static async getLeadPolicy() {
         try {
             const cacheKey = `${CACHE_KEYS.CMS_CONTENT}_lead_policy`;
-            const cached = getCache<any>(cacheKey, 'local');
+            const cached = getCache<ApiResponseType<any>>(cacheKey, 'local');
             if (cached) return cached;
 
             const url = `${appUrl.page}/lead-policy/`;

@@ -8,7 +8,7 @@ import { getCache, setCache, CACHE_KEYS } from "../../../utils/cache";
 export class UserService {
     static async getLoggedInUser() {
         try {
-            const cached = getCache<UserProfileResponse>(CACHE_KEYS.USER_PROFILE, 'session');
+            const cached = getCache<ApiResponseType<UserProfileResponse>>(CACHE_KEYS.USER_PROFILE, 'session');
             if (cached) return cached;
 
             const url = `${appUrl.user}/profile/`;
