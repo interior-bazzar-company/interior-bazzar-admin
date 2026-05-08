@@ -12,12 +12,22 @@ import type {
 } from "../../../types/content/userManagement";
 import { logger } from "../../../utils/logger";
 
+import { getCache, setCache, CACHE_KEYS } from "../../../utils/cache";
+
 export class AdminUserManagementService {
   /** Fetch users created by the requesting admin */
   static async fetchUsers() {
     try {
+      const cached = getCache<AdminUserType[]>(CACHE_KEYS.USER_MANAGEMENT_LIST, 'session');
+      if (cached) return cached;
+
       const url = `${appUrl.admin}/users/`;
       const response: ApiResponseType<AdminUserType[]> = await apiService.getGetApiResponse(url);
+
+      if (response.response) {
+        setCache(CACHE_KEYS.USER_MANAGEMENT_LIST, response, 10, 'session');
+      }
+
       return response;
     } catch (error) {
       logger.error("AdminUserManagementService.fetchUsers error:", error);
@@ -64,9 +74,17 @@ export class AdminUserManagementService {
   /** Fetch available roles for dropdowns */
   static async fetchRoles() {
     try {
+      const cached = getCache<RoleType[]>(CACHE_KEYS.RBAC_ROLES, 'local');
+      if (cached) return cached;
+
       // Use the actual RBAC module path
       const url = `${appUrl.rbac}/roles/`;
       const response: ApiResponseType<RoleType[]> = await apiService.getGetApiResponse(url);
+
+      if (response.response) {
+        setCache(CACHE_KEYS.RBAC_ROLES, response, 60, 'local');
+      }
+
       return response;
     } catch (error) {
       logger.error("AdminUserManagementService.fetchRoles error:", error);

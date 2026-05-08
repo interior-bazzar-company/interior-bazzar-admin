@@ -3,12 +3,22 @@ import apiService from "../../apiService";
 import type { ApiResponseType } from "../../../types/reqResType";
 import type { UserProfileResponse, ProfileForm, ProfileFormResponse } from "../../../types/global";
 
+import { getCache, setCache, CACHE_KEYS } from "../../../utils/cache";
+
 export class UserService {
     static async getLoggedInUser() {
         try {
+            const cached = getCache<UserProfileResponse>(CACHE_KEYS.USER_PROFILE, 'session');
+            if (cached) return cached;
+
             const url = `${appUrl.user}/profile/`;
             const response: ApiResponseType<UserProfileResponse> =
                 await apiService.getGetApiResponse(url);
+
+            if (response.response) {
+                setCache(CACHE_KEYS.USER_PROFILE, response, 1440, 'session'); // 24 hours
+            }
+
             return response;
         } catch (error) {
             throw error;
