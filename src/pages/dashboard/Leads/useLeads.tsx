@@ -93,6 +93,7 @@ const useLeads = () => {
     handleSearchChange,
     handleFilterClick,
     handleLeadUpdated,
+    handleAddClick,
     noAccess,
     refreshTrigger,
   };
