@@ -17,7 +17,7 @@ import type {
   DashboardV2Type,
 } from "../../../types/content";
 
-import { getCache, setCache, CACHE_KEYS } from "../../../utils/cache";
+import { getCache, setCache, CACHE_KEYS, clearCache } from "../../../utils/cache";
 
 export class AdminService {
 
@@ -183,6 +183,12 @@ export class AdminService {
       const url = `${appUrl.admin}/lead/assign/`;
       const response: ApiResponseType<AdminLeadType> =
         await apiService.getPostApiResponse(url, data);
+
+      if (response.response) {
+        clearCache(CACHE_KEYS.LEAD_LIST_PAGE_1, 'session');
+        clearCache(CACHE_KEYS.LEADS_SUMMARY, 'session');
+      }
+
       return response;
     } catch (error) {
       throw error;
@@ -250,6 +256,13 @@ export class AdminService {
       const url = `${appUrl.admin}/v2/query/`;
       const response: ApiResponseType<any> =
         await apiService.getPostApiResponse(url, data);
+
+      if (response.response) {
+        clearCache(CACHE_KEYS.LEAD_LIST_PAGE_1, 'session');
+        clearCache(CACHE_KEYS.LEADS_SUMMARY, 'session');
+        clearCache(CACHE_KEYS.ALL_ANALYTICS, 'session');
+      }
+
       return response;
     } catch (error) {
       throw error;
@@ -334,6 +347,12 @@ export class AdminService {
     try {
       const url = `${appUrl.admin}/v2/query/${leadId}/`;
       const response: ApiResponseType<any> = await apiService.getPutApiResponse(url, data);
+
+      if (response.response) {
+        clearCache(CACHE_KEYS.LEAD_LIST_PAGE_1, 'session');
+        clearCache(CACHE_KEYS.LEADS_SUMMARY, 'session');
+      }
+
       return response;
     } catch (error) {
       throw error;

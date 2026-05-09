@@ -4,7 +4,7 @@ import type { ApiResponseType } from "../../../types/reqResType";
 import type { GMBLeadResponse, GMBLeadType } from "../../../types/content/gmbLeads";
 import { logger } from "../../../utils/logger";
 
-import { getCache, setCache, CACHE_KEYS } from "../../../utils/cache";
+import { getCache, setCache, CACHE_KEYS, clearCache } from "../../../utils/cache";
 
 export class GMBService {
   static async fetchMyLeads(pageNo: number, pageSize: number, filters?: any) {
@@ -60,6 +60,12 @@ export class GMBService {
     try {
       const url = `${appUrl.admin}/v1/leads/${leadId}/`;
       const response: ApiResponseType<GMBLeadType> = await apiService.getPatchApiResponse(url, data);
+
+      if (response.response) {
+        clearCache(CACHE_KEYS.GMB_LEAD_LIST_PAGE_1, 'session');
+        clearCache(CACHE_KEYS.GMB_KPIs, 'session');
+      }
+
       return response;
     } catch (error) {
       logger.error(`Error updating GMB lead ${leadId}:`, error);
@@ -71,6 +77,14 @@ export class GMBService {
     try {
       const url = `${appUrl.admin}/v1/leads/assign/`;
       const response: ApiResponseType<{ status: string; user: string }> = await apiService.getPostApiResponse(url, data);
+
+      if (response.response) {
+        clearCache(CACHE_KEYS.GMB_LEAD_LIST_PAGE_1, 'session');
+        clearCache(CACHE_KEYS.GMB_KPIs, 'session');
+        // Also clear user-specific leads cache for the assigned user
+        clearCache(`${CACHE_KEYS.GMB_USER_LEADS}_${data.user_id}_page_1`, 'session');
+      }
+
       return response;
     } catch (error) {
       logger.error(`Error assigning GMB lead ${data.lead_id}:`, error);
@@ -82,6 +96,12 @@ export class GMBService {
     try {
       const url = `${appUrl.admin}/v1/ingest/gmb-data/`;
       const response: ApiResponseType<{ processedCount: number; totalReceived: number }> = await apiService.getPostApiResponse(url, data);
+
+      if (response.response) {
+        clearCache(CACHE_KEYS.GMB_LEAD_LIST_PAGE_1, 'session');
+        clearCache(CACHE_KEYS.GMB_KPIs, 'session');
+      }
+
       return response;
     } catch (error) {
       logger.error("Error ingesting GMB data:", error);
@@ -93,6 +113,12 @@ export class GMBService {
     try {
       const url = `${appUrl.admin}/v1/leads/create/`;
       const response: ApiResponseType<GMBLeadType> = await apiService.getPostApiResponse(url, data);
+
+      if (response.response) {
+        clearCache(CACHE_KEYS.GMB_LEAD_LIST_PAGE_1, 'session');
+        clearCache(CACHE_KEYS.GMB_KPIs, 'session');
+      }
+
       return response;
     } catch (error) {
       logger.error("Error creating GMB lead:", error);
@@ -145,6 +171,12 @@ export class GMBService {
     try {
       const url = `${appUrl.admin}/v1/leads/auto-assign/`;
       const response: ApiResponseType<{ processedCount: number }> = await apiService.getPostApiResponse(url, {});
+
+      if (response.response) {
+        clearCache(CACHE_KEYS.GMB_LEAD_LIST_PAGE_1, 'session');
+        clearCache(CACHE_KEYS.GMB_KPIs, 'session');
+      }
+
       return response;
     } catch (error) {
       logger.error("Error triggering auto-assignment:", error);

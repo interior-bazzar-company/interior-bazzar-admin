@@ -52,6 +52,7 @@ const LeadDashboard = () => {
         // handleSearch,
         handleFilterClick,
         handleAddClick,
+        handleLeadUpdated,
         noAccess: noAccessStats,
         refreshTrigger
     } = useLeads();
@@ -118,17 +119,19 @@ const LeadDashboard = () => {
                             <div className={styles.chipsContainer}>
                                 {stats?.categoryMetrics && Object.keys(stats.categoryMetrics).length > 0 ? (() => {
                                     return Object.entries(stats.categoryMetrics)
-                                        .filter(([key]) => key !== "")
-                                        .map(([key, count], index) => (
-                                        <FilterChip 
-                                            key={key}
-                                            label={key.charAt(0).toUpperCase() + key.slice(1)} 
-                                            count={count} 
-                                            dotColor={CHIP_COLORS[index % CHIP_COLORS.length]} 
-                                            isActive={filters.category !== "" && filters.category === key} 
-                                            onClick={() => handleFilterClick("category", key)} 
-                                        />
-                                    ));
+                                        .map(([key, count], index) => {
+                                            const label = (key === "" || key === null || key === "null") ? "None" : key;
+                                            return (
+                                                <FilterChip 
+                                                    key={key}
+                                                    label={label.charAt(0).toUpperCase() + label.slice(1)} 
+                                                    count={count} 
+                                                    dotColor={CHIP_COLORS[index % CHIP_COLORS.length]} 
+                                                    isActive={filters.category !== "" && filters.category === key} 
+                                                    onClick={() => handleFilterClick("category", key)} 
+                                                />
+                                            );
+                                        });
                                 })() : (
                                     <>
                                         <FilterChip label="Residential" count={0} dotColor={CHIP_COLORS[0]} isActive={filters.leadStatus === "New"} onClick={() => handleFilterClick("leadStatus", "New")} />
@@ -140,19 +143,21 @@ const LeadDashboard = () => {
                         <div className={styles.filterRow}>
                             <span className={styles.filterTitle}>Lead Status</span>
                             <div className={styles.chipsContainer}>
-                                {stats?.statusMetrics && Object.keys(stats.statusMetrics).length > 0 ? (() => {
-                                    return Object.entries(stats.statusMetrics)
-                                        .filter(([key]) => key !== "")
-                                        .map(([key, count], index) => (
-                                        <FilterChip 
-                                            key={key}
-                                            label={key.charAt(0).toUpperCase() + key.slice(1)} 
-                                            count={count} 
-                                            dotColor={CHIP_COLORS[index % CHIP_COLORS.length]} 
-                                            isActive={filters.leadStatus !== "" && filters.leadStatus === key} 
-                                            onClick={() => handleFilterClick("leadStatus", key)} 
-                                        />
-                                    ));
+                                {stats?.adminStatusMetrics && Object.keys(stats.adminStatusMetrics).length > 0 ? (() => {
+                                    return Object.entries(stats.adminStatusMetrics)
+                                        .map(([key, count], index) => {
+                                            const label = (key === "" || key === null || key === "null") ? "None" : key;
+                                            return (
+                                                <FilterChip 
+                                                    key={key}
+                                                    label={label.charAt(0).toUpperCase() + label.slice(1)} 
+                                                    count={count} 
+                                                    dotColor={CHIP_COLORS[index % CHIP_COLORS.length]} 
+                                                    isActive={filters.leadStatus !== "" && filters.leadStatus === key} 
+                                                    onClick={() => handleFilterClick("leadStatus", key)} 
+                                                />
+                                            );
+                                        });
                                 })() : (
                                     <>
                                         <FilterChip label="New" count={0} dotColor={CHIP_COLORS[0]} isActive={filters.leadStatus === "New"} onClick={() => handleFilterClick("leadStatus", "New")} />
@@ -169,17 +174,19 @@ const LeadDashboard = () => {
                             <div className={styles.chipsContainer}>
                                 {stats?.stageMetrics && Object.keys(stats.stageMetrics).length > 0 ? (() => {
                                     return Object.entries(stats.stageMetrics)
-                                        .filter(([key]) => key !== "")
-                                        .map(([key, count], index) => (
-                                        <FilterChip 
-                                            key={key}
-                                            label={key.charAt(0).toUpperCase() + key.slice(1)} 
-                                            count={count} 
-                                            dotColor={CHIP_COLORS[index % CHIP_COLORS.length]} 
-                                            isActive={filters.filterStatus !== "" && filters.filterStatus === key} 
-                                            onClick={() => handleFilterClick("filterStatus", key)}
-                                        />
-                                    ));
+                                        .map(([key, count], index) => {
+                                            const label = (key === "" || key === null || key === "null") ? "None" : key;
+                                            return (
+                                                <FilterChip 
+                                                    key={key}
+                                                    label={label.charAt(0).toUpperCase() + label.slice(1)} 
+                                                    count={count} 
+                                                    dotColor={CHIP_COLORS[index % CHIP_COLORS.length]} 
+                                                    isActive={filters.filterStatus !== "" && filters.filterStatus === key} 
+                                                    onClick={() => handleFilterClick("filterStatus", key)}
+                                                />
+                                            );
+                                        });
                                 })() : (
                                     <> 
                                         <FilterChip label="Pending" count={0} dotColor={CHIP_COLORS[0]} isActive={filters.filterStatus === "Pending"} onClick={() => handleFilterClick("filterStatus", "Pending")} />
@@ -193,7 +200,7 @@ const LeadDashboard = () => {
             )}
 
             <div className={styles.tableContainer}>
-                <LeadTable filter={filters} refreshTrigger={refreshTrigger} />
+                <LeadTable filter={filters} refreshTrigger={refreshTrigger} onUpdate={handleLeadUpdated} />
             </div>
         </section>
     )

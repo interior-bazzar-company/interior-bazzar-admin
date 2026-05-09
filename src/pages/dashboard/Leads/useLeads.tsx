@@ -76,11 +76,13 @@ const useLeads = () => {
   };
 
 
+  const handleLeadUpdated = useCallback(() => {
+    fetchLeadsStats();
+    setRefreshTrigger(prev => prev + 1);
+  }, [fetchLeadsStats]);
+
   const handleAddClick = () => {
-    showModal(<AddLeadModal onSuccess={() => {
-      fetchLeadsStats();
-      setRefreshTrigger(prev => prev + 1);
-    }} />);
+    showModal(<AddLeadModal onSuccess={handleLeadUpdated} />);
   };
 
   return {
@@ -90,7 +92,7 @@ const useLeads = () => {
     handleSearch,
     handleSearchChange,
     handleFilterClick,
-    handleAddClick,
+    handleLeadUpdated,
     noAccess,
     refreshTrigger,
   };

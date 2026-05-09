@@ -8,7 +8,7 @@ import AssignLead from "../../AssignLead";
 import LogsPopup from "../LogsPopup";
 import UpdateLeadModal from "../UpdateLeadModal";
 
-const LeadTable = React.memo(({ filter, refreshTrigger }: { filter: LeadFilterType, refreshTrigger?: number }) => {
+const LeadTable = React.memo(({ filter, refreshTrigger, onUpdate }: { filter: LeadFilterType, refreshTrigger?: number, onUpdate?: () => void }) => {
 
     const {
         leads,
@@ -31,13 +31,17 @@ const LeadTable = React.memo(({ filter, refreshTrigger }: { filter: LeadFilterTy
 
     const handleAssignClick = (e: React.MouseEvent, lead: AdminLeadType) => {
         e.stopPropagation();
-        showModal(<AssignLead lead={lead} onAssigned={onLeadAssigned} />);
+        showModal(<AssignLead lead={lead} onAssigned={(updatedLead) => {
+            onLeadAssigned(updatedLead);
+            if (onUpdate) onUpdate();
+        }} />);
     };
     
     const handleEditClick = (e: React.MouseEvent, lead: AdminLeadType) => {
         e.stopPropagation();
         showModal(<UpdateLeadModal lead={lead} onSuccess={(updatedLead) => {
             if (updatedLead) onLeadAssigned(updatedLead);
+            if (onUpdate) onUpdate();
         }} />);
     };
     
