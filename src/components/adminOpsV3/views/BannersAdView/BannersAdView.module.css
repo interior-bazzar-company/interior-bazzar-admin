@@ -1,0 +1,31 @@
+.head { margin-bottom: 20px; }
+.head h1 { font-size: 22px; font-weight: 700; color: var(--color-text-primary, #16233a); }
+.head p { color: var(--color-text-secondary, #6b7280); font-size: 14px; margin-top: 4px; }
+
+.notice { padding: 10px 14px; border-radius: 8px; font-size: 14px; margin-bottom: 14px; }
+.ok  { background: #e7f6ec; color: #15803d; border: 1px solid #bbe6c9; }
+.err { background: #fdecec; color: #b91c1c; border: 1px solid #f5c2c2; }
+
+.tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.tab { padding: 7px 16px; border-radius: 999px; border: 1px solid var(--color-border, #e5e7eb); background: #fff; color: var(--color-text-secondary, #4b5563); font-size: 13px; text-transform: capitalize; cursor: pointer; }
+.tabActive { background: var(--color-brand-primary, rgb(25, 71, 45)); color: #fff; border-color: var(--color-brand-primary, rgb(25, 71, 45)); }
+
+.tableWrap { width: 100%; overflow-x: auto; border: 1px solid var(--color-border, #e5e7eb); border-radius: 12px; }
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th, .table td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--color-border, #eef0f2); }
+.table th { background: #f8fafb; font-weight: 600; color: var(--color-text-secondary, #6b7280); font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+.status { text-transform: capitalize; font-size: 13px; }
+
+.actions { display: flex; gap: 6px; white-space: nowrap; }
+.approve, .reject, .cancel { padding: 6px 12px; border-radius: 6px; font-size: 13px; cursor: pointer; border: 1px solid transparent; }
+.approve { background: #e7f6ec; color: #15803d; border-color: #bbe6c9; }
+.reject { background: #fdecec; color: #b91c1c; border-color: #f5c2c2; }
+.cancel { background: #fff; border-color: var(--color-border, #d1d5db); color: var(--color-text-secondary, #6b7280); }
+.approve:disabled, .reject:disabled { opacity: .6; cursor: default; }
+
+.rejectRow td { background: #fdf6f6; }
+.rejectForm { display: flex; gap: 8px; align-items: center; }
+.rejectForm input { flex: 1; padding: 7px 10px; border: 1px solid var(--color-border, #cbd5e1); border-radius: 6px; font-size: 13px; }
+.reason { font-size: 13px; color: #b91c1c; background: #fdf6f6; }
+
+.empty { padding: 40px; text-align: center; color: var(--color-text-secondary, #9ca3af); border: 1px dashed var(--color-border, #e5e7eb); border-radius: 12px; }

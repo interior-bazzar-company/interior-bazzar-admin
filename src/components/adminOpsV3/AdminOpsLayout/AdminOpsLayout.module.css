@@ -1,0 +1,162 @@
+/* ── AdminOpsLayout ── prototype chrome (dashboard-admin.html): topbar 64px,
+   sidebar 268px, brand green #085041, paper surfaces. See admin-visual-ref.md. */
+.shell {
+  --ops-green: #085041;
+  --ops-green-light: #e1f5ee;
+  --ops-green-mint: #9fe1cb;
+  --ops-bg: #f7f6f2;
+  --ops-paper: #fffdf8;
+  --ops-border: #e8e6df;
+  --ops-border-strong: #d3d0c5;
+  --ops-text: #1a1a17;
+  --ops-muted: #57524a;
+  --ops-hover: #eeece5;
+  --ops-topbar-h: 64px;
+  --ops-nav-w: 268px;
+  min-height: 100vh;
+  background: var(--ops-bg);
+  color: var(--ops-text);
+  font-family: "Inter", system-ui, sans-serif;
+}
+.topbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--ops-topbar-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 22px;
+  background: var(--ops-paper);
+  border-bottom: 1px solid var(--ops-border);
+  z-index: 20;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.brandMark {
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--ops-green);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: 17px;
+}
+.brandText {
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: 18px;
+}
+.topRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.roleBadge {
+  background: var(--ops-green-light);
+  color: var(--ops-green);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.sidebar {
+  position: fixed;
+  top: var(--ops-topbar-h);
+  left: 0;
+  bottom: 0;
+  width: var(--ops-nav-w);
+  overflow-y: auto;
+  padding: 12px 10px 40px;
+  background: var(--ops-paper);
+  border-right: 1px solid var(--ops-border);
+}
+.group {
+  margin-top: 4px;
+}
+.groupHead {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--ops-muted);
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+.navItem {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ops-text);
+  font-family: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.navItem:hover {
+  background: var(--ops-hover);
+}
+.navItem.active {
+  background: var(--ops-green-light);
+  color: var(--ops-green);
+  font-weight: 700;
+}
+.navItem.solo {
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.navItem i {
+  font-size: 16px;
+}
+.content {
+  margin-top: var(--ops-topbar-h);
+  margin-left: var(--ops-nav-w);
+  padding: 26px 32px;
+  min-height: calc(100vh - var(--ops-topbar-h));
+}
+.placeholder {
+  max-width: 640px;
+}
+.phEyebrow {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ops-green);
+}
+.phTitle {
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: 30px;
+  margin: 6px 0 8px;
+}
+.phSub {
+  color: var(--ops-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+@media (max-width: 900px) {
+  .sidebar {
+    display: none;
+  }
+  .content {
+    margin-left: 0;
+  }
+}

@@ -1,0 +1,222 @@
+/* ── OverviewView ── ported verbatim from prototype/dashboard-admin.html
+   overviewView (line 2047) styles. Tokens come from the AdminOps shell
+   (--ops-*), with prototype fallbacks so the view also renders standalone. */
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.head h1 {
+  font-family: "DM Serif Display", Georgia, serif;
+  font-style: italic;
+  font-size: 30px;
+  font-weight: 400;
+  color: var(--ops-text, #1a1a17);
+  line-height: 1.1;
+}
+.head p {
+  color: var(--ops-muted, #635e55);
+  font-size: 13.5px;
+  margin-top: 5px;
+}
+.rangePick {
+  display: flex;
+  gap: 4px;
+  background: #fff;
+  border: 1px solid var(--ops-border, #e8e6df);
+  border-radius: 10px;
+  padding: 3px;
+}
+.rangePick button {
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12.5px;
+  font-family: inherit;
+  color: var(--ops-muted, #635e55);
+  cursor: pointer;
+}
+.rangePick button.on {
+  background: var(--ops-green-light, #e1f5ee);
+  color: var(--ops-green, #085041);
+  font-weight: 700;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 26px;
+}
+.tile {
+  background: #fff;
+  border: 1px solid var(--ops-border, #e8e6df);
+  border-radius: 14px;
+  padding: 17px 18px;
+}
+.tTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.tIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  background: var(--ops-green-light, #e1f5ee);
+  color: var(--ops-green, #085041);
+}
+.tIcon.amber {
+  background: #f8efde;
+  color: #ba7517;
+}
+.tVal {
+  font-family: "DM Serif Display", Georgia, serif;
+  font-style: italic;
+  font-size: 30px;
+  color: #0f0f0a;
+  margin-top: 12px;
+  line-height: 1;
+}
+.tLabel {
+  color: var(--ops-muted, #635e55);
+  font-size: 12.5px;
+  margin-top: 5px;
+}
+.tDelta {
+  font-size: 11.5px;
+  font-weight: 600;
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.tDelta.up { color: var(--ops-green, #085041); }
+.tDelta.down { color: #b3401f; }
+.tDelta.flat { color: var(--ops-muted, #635e55); }
+
+.cols {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 20px;
+  align-items: start;
+}
+.panel {
+  background: #fff;
+  border: 1px solid var(--ops-border, #e8e6df);
+  border-radius: 14px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.panel h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f0f0a;
+  margin-bottom: 3px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sub {
+  color: var(--ops-muted, #635e55);
+  font-size: 12px;
+  margin-bottom: 16px;
+}
+
+.actionRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--ops-border, #e8e6df);
+}
+.arIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+.arIcon.warn { background: #f8efde; color: #ba7517; }
+.arIcon.red { background: #fbeae4; color: #b3401f; }
+.arIcon.ok { background: var(--ops-green-light, #e1f5ee); color: var(--ops-green, #085041); }
+.arBody { flex: 1; }
+.arBody b { font-size: 13.5px; color: #1a1a17; }
+.arBody small { display: block; color: var(--ops-muted, #635e55); font-size: 11.5px; margin-top: 2px; }
+.arCount {
+  font-family: "DM Serif Display", Georgia, serif;
+  font-style: italic;
+  font-size: 22px;
+  color: #0f0f0a;
+}
+.arGo {
+  padding: 7px 12px;
+  border: 1px solid var(--ops-border-strong, #d3d0c5);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ops-green, #085041);
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+}
+.arGo:hover { background: var(--ops-green-light, #e1f5ee); }
+
+.miniBars {
+  display: flex;
+  align-items: flex-end;
+  gap: 7px;
+  height: 90px;
+  margin-top: 6px;
+}
+.mb {
+  flex: 1;
+  background: var(--ops-green-mint, #9fe1cb);
+  border-radius: 4px 4px 0 0;
+  min-height: 4px;
+}
+.mb.hi { background: var(--ops-green, #085041); }
+.legend {
+  display: flex;
+  gap: 16px;
+  margin-top: 12px;
+  font-size: 11.5px;
+  color: var(--ops-muted, #635e55);
+}
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+
+.feedItem {
+  display: flex;
+  gap: 11px;
+  padding: 11px 0;
+  border-top: 1px solid var(--ops-border, #e8e6df);
+  font-size: 12.5px;
+}
+.feedDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #1d9e75;
+  margin-top: 5px;
+  flex-shrink: 0;
+}
+.fiTime {
+  color: var(--ops-muted, #635e55);
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+@media (max-width: 1000px) {
+  .tiles { grid-template-columns: repeat(2, 1fr); }
+  .cols { grid-template-columns: 1fr; }
+}

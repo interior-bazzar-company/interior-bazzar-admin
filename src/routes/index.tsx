@@ -18,6 +18,9 @@ import Analytics from "../pages/dashboard/AnalyticsV2"; // UPDATED V2
 import ImageUpload from "../pages/dashboard/ImageUpload";
 import FunnelPage from "../pages/dashboard/Funnel";
 import GMBLeads from "../pages/dashboard/GMBLeads";
+import AdminOpsLayout from "../components/adminOpsV3/AdminOpsLayout";
+import RequireAdminOps from "../components/adminOpsV3/RequireAdminOps";
+import AdminOpsLogin from "../pages/AdminOps/Login";
 
 const UserRoutes = () => {
   const { loading } = useInitUser();
@@ -129,6 +132,17 @@ const UserRoutes = () => {
       <Routes>
         {renderRoutesWithLayout(routesConfig.fullPage, FullPageLayout)}
         {renderRoutesWithLayout(routesConfig.admin, AdminLayout)}
+        {/* v3 Admin Ops Console — own staff login (prototype-ported) + self-contained
+            shell. Static /login must precede /:section so it isn't captured as a section. */}
+        <Route path={PAGES.ADMIN_OPS_LOGIN} element={<AdminOpsLogin />} />
+        <Route
+          path={PAGES.ADMIN_OPS_ROOT}
+          element={<RequireAdminOps><AdminOpsLayout /></RequireAdminOps>}
+        />
+        <Route
+          path={PAGES.ADMIN_OPS_SECTION}
+          element={<RequireAdminOps><AdminOpsLayout /></RequireAdminOps>}
+        />
       </Routes>
     </>
   );

@@ -31,6 +31,10 @@ export const PAGES = {
   ADMIN_IMAGE_UPLOAD: "/admin/image-upload",
   ADMIN_FUNNEL_LEADS: "/admin/funnel-leads",
   ADMIN_GMB_LEADS: "/admin/sales-intelligence",
+  // v3 Admin Ops Console (promptsadmin) — self-contained shell at /v3/admin
+  ADMIN_OPS_ROOT: "/v3/admin",
+  ADMIN_OPS_LOGIN: "/v3/admin/login", // staff sign-in ported from prototype/admin-login.html
+  ADMIN_OPS_SECTION: "/v3/admin/:section", // section = a module key (admin-ops-nav.content.ts)
 };
 
 export const EMPLOYEE_ROLES = {
