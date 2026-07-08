@@ -26,10 +26,11 @@ const TemplatesView = () => {
       ) : (
         <div className={styles.tableWrap}>
           <table className={styles.table}>
-            <thead><tr><th>Key</th><th>Channel</th><th>Subject</th><th>Active</th><th></th></tr></thead>
+            <thead><tr><th>Name</th><th>Key</th><th>Channel</th><th>Subject</th><th>Active</th><th></th></tr></thead>
             <tbody>
               {v.rows.map((t) => (
                 <tr key={t.id}>
+                  <td>{t.name || "—"}</td>
                   <td className={styles.key}>{t.key}</td>
                   <td>{t.channel}</td>
                   <td>{t.subject || "—"}</td>
@@ -49,6 +50,7 @@ const TemplatesView = () => {
         <div className={styles.overlay} onClick={v.closeModal}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <h2>{v.modal.id == null ? "Add template" : "Edit template"}</h2>
+            <label>Name<input value={v.modal.form.name} onChange={(e) => v.setField("name", e.target.value)} placeholder="e.g. Lead enquiry alert" /></label>
             <label>Key<input value={v.modal.form.key} disabled={v.modal.id != null} onChange={(e) => v.setField("key", e.target.value)} /></label>
             <label>Channel
               <select value={v.modal.form.channel} onChange={(e) => v.setField("channel", e.target.value)}>
@@ -56,6 +58,12 @@ const TemplatesView = () => {
                 <option value="whatsapp">whatsapp</option><option value="push">push</option><option value="inapp">inapp</option>
               </select>
             </label>
+            {v.modal.form.channel === "sms" && (
+              <label>DLT Template ID
+                <input value={v.modal.form.dltId} onChange={(e) => v.setField("dltId", e.target.value)} placeholder="e.g. 1207161234567890" />
+                <span className={styles.hint}>Required for India SMS delivery</span>
+              </label>
+            )}
             <label>Subject<input value={v.modal.form.subject} onChange={(e) => v.setField("subject", e.target.value)} /></label>
             <label>Body<textarea rows={4} value={v.modal.form.body} onChange={(e) => v.setField("body", e.target.value)} /></label>
             <label>Variables (comma-separated)<input value={v.modal.form.variables} onChange={(e) => v.setField("variables", e.target.value)} placeholder="name, otp, link" /></label>

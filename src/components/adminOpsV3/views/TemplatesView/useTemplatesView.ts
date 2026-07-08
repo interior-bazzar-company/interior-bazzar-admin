@@ -5,13 +5,14 @@ import { useEffect, useState } from "react";
 import AdminOpsService from "../../../../api/modules/adminOps";
 
 export interface TemplateRow {
-  id: number; key: string; channel: string; subject: string; body: string;
-  variables: string[]; active: boolean;
+  id: number; key: string; name: string; channel: string; dltId: string;
+  subject: string; body: string; variables: string[]; active: boolean;
 }
 export interface TemplateForm {
-  key: string; channel: string; subject: string; body: string; variables: string; active: boolean;
+  key: string; name: string; channel: string; dltId: string;
+  subject: string; body: string; variables: string; active: boolean;
 }
-const EMPTY: TemplateForm = { key: "", channel: "email", subject: "", body: "", variables: "", active: true };
+const EMPTY: TemplateForm = { key: "", name: "", channel: "email", dltId: "", subject: "", body: "", variables: "", active: true };
 
 const useTemplatesView = () => {
   const [rows, setRows] = useState<TemplateRow[]>([]);
@@ -32,7 +33,7 @@ const useTemplatesView = () => {
   const openAdd = () => setModal({ id: null, form: { ...EMPTY } });
   const openEdit = (t: TemplateRow) => setModal({
     id: t.id,
-    form: { key: t.key, channel: t.channel, subject: t.subject, body: t.body, variables: (t.variables || []).join(", "), active: t.active },
+    form: { key: t.key, name: t.name || "", channel: t.channel, dltId: t.dltId || "", subject: t.subject, body: t.body, variables: (t.variables || []).join(", "), active: t.active },
   });
   const closeModal = () => setModal(null);
   const setField = (k: keyof TemplateForm, val: string | boolean) =>
@@ -43,8 +44,10 @@ const useTemplatesView = () => {
     if (!modal.form.key.trim()) { setNotice({ kind: "err", msg: "Key is required." }); return; }
     setSaving(true);
     const payload = {
-      key: modal.form.key.trim(), channel: modal.form.channel, subject: modal.form.subject,
-      body: modal.form.body, active: modal.form.active,
+      key: modal.form.key.trim(), name: modal.form.name.trim(), channel: modal.form.channel,
+      // DLT id only meaningful for SMS; send "" for other channels.
+      dltId: modal.form.channel === "sms" ? modal.form.dltId.trim() : "",
+      subject: modal.form.subject, body: modal.form.body, active: modal.form.active,
       variables: modal.form.variables.split(",").map((s) => s.trim()).filter(Boolean),
     };
     const res = modal.id == null
