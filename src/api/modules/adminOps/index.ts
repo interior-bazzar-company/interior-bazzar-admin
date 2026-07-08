@@ -220,9 +220,14 @@ export class AdminOpsService {
   static brandLogo() {
     return apiService.getGetApiResponse<any>(`${base}/brand-logo/`);
   }
-  static setBrandLogo(data: { logoUrl?: string; faviconUrl?: string }) {
+  static setBrandLogo(data: { logoUrl?: string; faviconUrl?: string; tagline?: string }) {
     return apiService.getPutApiResponse<any>(`${base}/brand-logo/`, data);
   }
+  // Scheduled seasonal logos (task 27)
+  static listLogos() { return apiService.getGetApiResponse<any>(`${base}/brand-logo/logos/`); }
+  static createLogo(data: any) { return apiService.getPostApiResponse<any>(`${base}/brand-logo/logos/`, data); }
+  static updateLogo(id: number, data: any) { return apiService.getPutApiResponse<any>(`${base}/brand-logo/logos/${id}/`, data); }
+  static deleteLogo(id: number) { return apiService.getDeleteApiResponse<any>(`${base}/brand-logo/logos/${id}/`); }
 
   // ── Slots ──
   static slots() {
