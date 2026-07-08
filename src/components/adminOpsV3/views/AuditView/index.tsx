@@ -19,22 +19,22 @@ const AuditView = () => {
 
       {v.loading ? (
         <div className={styles.empty}>Loading audit log…</div>
-      ) : v.entries.length === 0 ? (
-        <div className={styles.empty}>No audit entries{v.module ? ` for “${v.module}”` : ""}.</div>
       ) : (
         <>
           <div className={styles.tableWrap}>
             <table className={styles.table}>
-              <thead><tr><th>When</th><th>Actor</th><th>Role</th><th>Module</th><th>Action</th><th>Detail</th></tr></thead>
+              <thead><tr><th>When</th><th>Actor</th><th>Role</th><th>Action</th><th>Module</th><th>Detail</th></tr></thead>
               <tbody>
-                {v.entries.map((e) => (
+                {v.entries.length === 0 ? (
+                  <tr><td colSpan={6} style={{ textAlign: "center", padding: 30, color: "#9ca3af" }}>No audit entries{v.module ? ` for “${v.module}”` : ""}.</td></tr>
+                ) : v.entries.map((e) => (
                   <tr key={e.id}>
-                    <td>{e.ts ? e.ts.replace("T", " ").slice(0, 19) : "—"}</td>
+                    <td className={styles.mono} style={{ whiteSpace: "nowrap" }}>{e.ts ? e.ts.replace("T", " ").slice(0, 19) : "—"}</td>
                     <td>{e.actor || "system"}</td>
-                    <td>{e.role || "—"}</td>
+                    <td>{e.role ? <span className={`${styles.pill} ${styles.off}`}>{e.role}</span> : "—"}</td>
+                    <td><b>{e.action}</b></td>
                     <td className={styles.mono}>{e.module}</td>
-                    <td>{e.action}</td>
-                    <td style={{ maxWidth: 320, overflow: "hidden", textOverflow: "ellipsis" }}>{e.detail || "—"}</td>
+                    <td style={{ maxWidth: 320, overflow: "hidden", textOverflow: "ellipsis", color: "#6b7280" }}>{e.detail || "—"}</td>
                   </tr>
                 ))}
               </tbody>
