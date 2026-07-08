@@ -121,6 +121,11 @@ export class AdminOpsService {
     return apiService.getPostApiResponse<any>(`${base}/businesses/${id}/toggle-verified/`, {});
   }
 
+  // ── Payments ──
+  static payments(params: { status?: string; refunded?: boolean; pageNo?: number; pageSize?: number } = {}) {
+    return apiService.getGetApiResponse<any>(`${base}/payments/${qs(params)}`);
+  }
+
   // ── Refunds ──
   static refund(txnId: number, data: { amount?: string; reason: string; reject?: boolean }) {
     return apiService.getPostApiResponse<any>(`${base}/payments/${txnId}/refund/`, data);

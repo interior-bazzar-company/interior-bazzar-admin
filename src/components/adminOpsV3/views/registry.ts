@@ -19,6 +19,8 @@ import ReportsView from "./ReportsView";
 import BrandLogoView from "./BrandLogoView";
 import SupportView from "./SupportView";
 import RolesView from "./RolesView";
+import PaymentsView from "./PaymentsView";
+import RefundsView from "./RefundsView";
 
 export interface AdminViewProps {
   goSection: (key: string) => void;
@@ -41,4 +43,6 @@ export const VIEW_REGISTRY: Record<string, ComponentType<AdminViewProps>> = {
   "brand-logo": BrandLogoView,
   support: SupportView,
   roles: RolesView,
+  payments: PaymentsView,
+  refunds: RefundsView,
 };
