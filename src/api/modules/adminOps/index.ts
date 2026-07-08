@@ -182,8 +182,16 @@ export class AdminOpsService {
   }
 
   // ── Payments ──
-  static payments(params: { status?: string; refunded?: boolean; pageNo?: number; pageSize?: number } = {}) {
+  static payments(params: { status?: string; refunded?: boolean; paymentMethod?: string; pageNo?: number; pageSize?: number } = {}) {
     return apiService.getGetApiResponse<any>(`${base}/payments/${qs(params)}`);
+  }
+
+  // ── Manual-payment verify/reject (task 11) ──
+  static verifyPayment(txnId: number) {
+    return apiService.getPostApiResponse<any>(`${base}/payments/${txnId}/verify/`, {});
+  }
+  static rejectPayment(txnId: number, reason: string) {
+    return apiService.getPostApiResponse<any>(`${base}/payments/${txnId}/reject/`, { reason });
   }
 
   // ── Refunds ──
