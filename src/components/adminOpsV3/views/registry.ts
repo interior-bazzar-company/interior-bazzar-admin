@@ -10,6 +10,15 @@ import BannersAdView from "./BannersAdView";
 import TemplatesView from "./TemplatesView";
 import BuyersView from "./BuyersView";
 import BusinessesView from "./BusinessesView";
+import SlotsView from "./SlotsView";
+import WeightsView from "./WeightsView";
+import RevenueView from "./RevenueView";
+import AuditView from "./AuditView";
+import TestimonialsView from "./TestimonialsView";
+import ReportsView from "./ReportsView";
+import BrandLogoView from "./BrandLogoView";
+import SupportView from "./SupportView";
+import RolesView from "./RolesView";
 
 export interface AdminViewProps {
   goSection: (key: string) => void;
@@ -23,4 +32,13 @@ export const VIEW_REGISTRY: Record<string, ComponentType<AdminViewProps>> = {
   templates: TemplatesView,
   buyers: BuyersView,
   businesses: BusinessesView,
+  slots: SlotsView,
+  weights: WeightsView,
+  revenue: RevenueView,
+  audit: AuditView,
+  testimonials: TestimonialsView,
+  reports: ReportsView,
+  "brand-logo": BrandLogoView,
+  support: SupportView,
+  roles: RolesView,
 };

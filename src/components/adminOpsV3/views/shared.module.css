@@ -1,0 +1,55 @@
+/* Shared styles for admin ops-console views (ponytail: one module, not per-view). */
+.head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+.head h1 { font-size: 22px; font-weight: 700; color: var(--color-text-primary, #16233a); }
+.head p { color: var(--color-text-secondary, #6b7280); font-size: 14px; margin-top: 4px; max-width: 640px; }
+.add { padding: 8px 16px; border-radius: 8px; border: none; background: var(--color-brand-primary, rgb(25, 71, 45)); color: #fff; font-size: 14px; cursor: pointer; white-space: nowrap; }
+
+.search { display: flex; gap: 8px; }
+.search input { padding: 8px 12px; border: 1px solid var(--color-border, #cbd5e1); border-radius: 8px; font-size: 14px; min-width: 200px; }
+.search button { padding: 8px 16px; border-radius: 8px; border: none; background: var(--color-brand-primary, rgb(25, 71, 45)); color: #fff; font-size: 14px; cursor: pointer; }
+
+.notice { padding: 10px 14px; border-radius: 8px; font-size: 14px; margin-bottom: 14px; }
+.ok  { background: #e7f6ec; color: #15803d; border: 1px solid #bbe6c9; }
+.err { background: #fdecec; color: #b91c1c; border: 1px solid #f5c2c2; }
+
+.tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+.tab { padding: 7px 16px; border-radius: 999px; border: 1px solid var(--color-border, #e5e7eb); background: #fff; color: var(--color-text-secondary, #4b5563); font-size: 13px; text-transform: capitalize; cursor: pointer; }
+.tabActive { background: var(--color-brand-primary, rgb(25, 71, 45)); color: #fff; border-color: var(--color-brand-primary, rgb(25, 71, 45)); }
+
+.tableWrap { width: 100%; overflow-x: auto; border: 1px solid var(--color-border, #e5e7eb); border-radius: 12px; }
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th, .table td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--color-border, #eef0f2); }
+.table th { background: #f8fafb; font-weight: 600; color: var(--color-text-secondary, #6b7280); font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+.table tbody tr:last-child td { border-bottom: none; }
+.num { width: 70px; padding: 6px 8px; border: 1px solid var(--color-border, #cbd5e1); border-radius: 6px; font-size: 13px; }
+.mono { font-family: ui-monospace, monospace; font-size: 13px; }
+
+.actions { display: flex; gap: 6px; justify-content: flex-end; white-space: nowrap; }
+.edit, .save, .cancel, .del, .grant, .revoke, .approve, .reject { padding: 6px 12px; border-radius: 6px; font-size: 13px; cursor: pointer; border: 1px solid transparent; }
+.edit { background: #fff; border-color: var(--color-border, #d1d5db); color: var(--color-text-primary, #374151); }
+.save, .grant, .approve { background: var(--color-brand-primary, rgb(25, 71, 45)); color: #fff; }
+.grant, .approve { background: #e7f6ec; color: #15803d; border-color: #bbe6c9; }
+.save:disabled, .approve:disabled, .reject:disabled { opacity: .6; cursor: default; }
+.cancel { background: #fff; border-color: var(--color-border, #d1d5db); color: var(--color-text-secondary, #6b7280); }
+.del, .reject, .revoke { background: #fdecec; color: #b91c1c; border-color: #f5c2c2; }
+
+.pill { padding: 4px 12px; border-radius: 999px; font-size: 12px; text-transform: capitalize; }
+.on  { background: #e7f6ec; color: #15803d; }
+.off { background: #f3f4f6; color: #6b7280; }
+.amber { background: #fef3e2; color: #b45309; }
+
+.empty { padding: 40px; text-align: center; color: var(--color-text-secondary, #9ca3af); border: 1px dashed var(--color-border, #e5e7eb); border-radius: 12px; }
+
+.overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, .45); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 20px; }
+.modal, .confirm { background: #fff; border-radius: 14px; padding: 24px; width: 100%; max-width: 520px; box-shadow: 0 20px 50px rgba(0,0,0,.25); max-height: 90vh; overflow-y: auto; }
+.modal h2, .confirm h2 { font-size: 18px; font-weight: 700; margin-bottom: 16px; }
+.modal label { display: block; font-size: 13px; color: var(--color-text-secondary, #4b5563); margin-bottom: 12px; }
+.modal input:not([type=checkbox]), .modal textarea, .modal select { width: 100%; margin-top: 4px; padding: 8px 10px; border: 1px solid var(--color-border, #cbd5e1); border-radius: 8px; font-size: 14px; font-family: inherit; }
+.check { display: flex; align-items: center; gap: 8px; }
+.modalActions { display: flex; gap: 8px; margin-top: 8px; }
+
+/* KPI grid (revenue / overview-style) */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 22px; }
+.kpi { border: 1px solid var(--color-border, #e5e7eb); border-radius: 12px; padding: 18px; background: #fff; }
+.kpi .val { font-size: 26px; font-weight: 700; color: var(--color-text-primary, #16233a); }
+.kpi .lbl { font-size: 13px; color: var(--color-text-secondary, #6b7280); margin-top: 4px; }
