@@ -1,31 +1,44 @@
-// ── FeedbackView ── admin User Feedback triage (promptsadmin task 34).
-// List + mark-viewed. Data: /api/v1/admin/feedback/.
-import { useEffect, useState } from "react";
+// ── FeedbackView ── admin User Feedback triage (task 34 + master task 23).
+// 3-state tab board: New → Reviewing → Closed. UI only; logic in useFeedbackView.
 import styles from "../shared.module.css";
-import AdminOpsService from "../../../../api/modules/adminOps";
-
-interface FB { id: number; contact: string; feedback: string; status: string; user: string | null; createdAt: string; }
+import useFeedbackView, { FEEDBACK_TABS, TAB_ACTIONS, renderFeedback, type FeedbackTab } from "./useFeedbackView";
 
 const FeedbackView = () => {
-  const [rows, setRows] = useState<FB[]>([]);
-  const [loading, setLoading] = useState(true);
-  const load = () => { setLoading(true); AdminOpsService.feedback().then((r) => { if (r?.response) setRows(r.data.feedback || []); }).catch(() => {}).finally(() => setLoading(false)); };
-  useEffect(() => { load(); }, []);
-  const mark = async (id: number) => { const r = await AdminOpsService.setFeedbackStatus(id, "viewed").catch(() => null); if (r?.response) load(); };
+  const v = useFeedbackView();
+  const tab = v.tab as FeedbackTab;
+  const actions = TAB_ACTIONS[tab] ?? [];
 
   return (
     <div>
-      <div className={styles.head}><h1>User Feedback</h1><p>Feedback submitted by users. Mark items as viewed once triaged.</p></div>
-      {loading ? <div className={styles.empty}>Loading feedback…</div> : rows.length === 0 ? <div className={styles.empty}>No feedback yet.</div> : (
+      <div className={styles.head}><h1>User Feedback</h1><p>Feedback submitted by users. Triage: New → Reviewing → Closed.</p></div>
+
+      {v.notice && <div className={`${styles.notice} ${v.notice.kind === "ok" ? styles.ok : styles.err}`}>{v.notice.msg}</div>}
+
+      <div className={styles.tabs}>
+        {FEEDBACK_TABS.map((t) => (
+          <button key={t} type="button" className={`${styles.tab} ${v.tab === t ? styles.tabActive : ""}`} onClick={() => v.setTab(t)} style={{ textTransform: "capitalize" }}>{t}</button>
+        ))}
+      </div>
+
+      {v.loading ? (
+        <div className={styles.empty}>Loading feedback…</div>
+      ) : v.rows.length === 0 ? (
+        <div className={styles.empty}>No {tab} feedback.</div>
+      ) : (
         <div className={styles.tableWrap}>
           <table className={styles.table}>
-            <thead><tr><th>From</th><th>Contact</th><th>Feedback</th><th>Status</th><th></th></tr></thead>
+            <thead><tr><th>From</th><th>Feedback</th><th>When</th><th></th></tr></thead>
             <tbody>
-              {rows.map((f) => (
+              {v.rows.map((f) => (
                 <tr key={f.id}>
-                  <td>{f.user || "—"}</td><td>{f.contact}</td><td style={{ maxWidth: 340 }}>{f.feedback}</td>
-                  <td><span className={styles.pill}>{f.status || "new"}</span></td>
-                  <td className={styles.actions}><button type="button" className={styles.edit} onClick={() => mark(f.id)}>Mark viewed</button></td>
+                  <td>{f.user || f.contact || "Anonymous"}</td>
+                  <td style={{ maxWidth: 420 }}>{renderFeedback(f.feedback)}</td>
+                  <td>{f.createdAt ? f.createdAt.slice(0, 10) : "—"}</td>
+                  <td className={styles.actions}>
+                    {actions.map((a) => (
+                      <button key={a.status} type="button" className={styles[a.kind]} onClick={() => v.setStatus(f.id, a.status)}>{a.label}</button>
+                    ))}
+                  </td>
                 </tr>
               ))}
             </tbody>

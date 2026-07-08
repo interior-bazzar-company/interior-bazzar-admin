@@ -30,6 +30,7 @@ import CatRegionView from "./CatRegionView";
 import FeedbackView from "./FeedbackView";
 import PlanRequestsView from "./PlanRequestsView";
 import ContentView from "./ContentView";
+import BusinessModerationView from "./BusinessModerationView";
 
 export interface AdminViewProps {
   goSection: (key: string) => void;
@@ -63,5 +64,5 @@ export const VIEW_REGISTRY: Record<string, ComponentType<AdminViewProps>> = {
   feedback: FeedbackView,
   "plan-requests": PlanRequestsView,
   content: ContentView,
-  "cat-biz": BusinessesView, // business moderation reuses the businesses view
+  "cat-biz": BusinessModerationView, // own 6-column moderation view (task 18)
 };

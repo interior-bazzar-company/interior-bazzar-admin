@@ -4,10 +4,23 @@ import { useParams, useNavigate } from "react-router-dom";
 import { PAGES } from "../../../utils/constants/app";
 import { ADMIN_OPS_NAV, ADMIN_OPS_MODULES } from "../../../content/admin-ops-nav.content";
 import { canSee, levelFor, OPS_ROLE_LABEL, type OpsRole } from "../../../content/admin-ops-rbac";
+import { useAppSelector } from "../../../redux/store/hook";
+import useLogout from "../../../hooks/auth/useLogout";
 
 const useAdminOpsLayout = () => {
   const { section } = useParams<{ section?: string }>();
   const navigate = useNavigate();
+  const { logout } = useLogout();
+
+  // Signed-in admin for the topbar user chip (hydrated by useInitUser).
+  const user = useAppSelector((s) => s.user.user);
+
+  // Sign out: clear tokens + auth/user state, then hard-replace to login so the
+  // back button can't return to the console.
+  const signOut = () => {
+    logout();
+    navigate(PAGES.ADMIN_OPS_LOGIN, { replace: true });
+  };
 
   // Acting role — TODO(backend, promptsadmin task 55): resolve from
   // GET /api/v1/admin/me/permissions/. Placeholder until then: super_admin (sees
@@ -42,7 +55,7 @@ const useAdminOpsLayout = () => {
 
   return {
     nav, activeKey, activeLabel, activeLevel, collapsed, toggleGroup, goSection,
-    role, roleLabel: OPS_ROLE_LABEL[role],
+    role, roleLabel: OPS_ROLE_LABEL[role], user, signOut,
   };
 };
 

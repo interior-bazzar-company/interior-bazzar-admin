@@ -5,9 +5,26 @@ import AdminOpsService from "../../../../api/modules/adminOps";
 
 export interface ReportRow {
   id: number; targetType: string; targetId: string; reason: string; status: string;
-  reporter: string | null; reporterEmail: string; resolver: string | null; createdAt: string;
+  reporter: string | null; reporterEmail: string; resolver: string | null;
+  createdAt: string; updatedAt: string;
 }
-export const REPORT_TABS = ["open", "resolved", "dismissed"] as const;
+// 4-state moderation board (task 21).
+export const REPORT_TABS = ["open", "reviewing", "actioned", "dismissed"] as const;
+export type ReportTab = (typeof REPORT_TABS)[number];
+// Per-tab actions: label → target status (dismissed tab is terminal, no actions).
+export const TAB_ACTIONS: Record<ReportTab, Array<{ label: string; status: string; kind: "grant" | "del" }>> = {
+  open: [
+    { label: "Review", status: "reviewing", kind: "grant" },
+    { label: "Take action", status: "actioned", kind: "grant" },
+    { label: "Dismiss", status: "dismissed", kind: "del" },
+  ],
+  reviewing: [
+    { label: "Take action", status: "actioned", kind: "grant" },
+    { label: "Dismiss", status: "dismissed", kind: "del" },
+  ],
+  actioned: [{ label: "Dismiss", status: "dismissed", kind: "del" }],
+  dismissed: [],
+};
 
 const useReportsView = () => {
   const [tab, setTab] = useState<string>("open");

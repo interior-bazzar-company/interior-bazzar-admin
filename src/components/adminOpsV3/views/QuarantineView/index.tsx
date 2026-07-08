@@ -9,7 +9,10 @@ const QuarantineView = () => (
     blurb="Enquiries held for genuineness review. Release the good ones, confirm spam on the rest."
     fetcher={() => AdminOpsService.quarantine() as any}
     action={(id, status) => AdminOpsService.quarantineAction(id, status) as any}
-    actions={[{ label: "Release", status: "released", kind: "grant" }, { label: "Confirm spam", status: "spam", kind: "del" }]}
+    // Release → 'routing' so the lead re-enters the Routing queue (which excludes
+    // only quarantine/spam). Confirm spam → 'spam' (stays excluded).
+    actions={[{ label: "Release", status: "routing", kind: "grant" }, { label: "Confirm spam", status: "spam", kind: "del" }]}
+    showReason
   />
 );
 

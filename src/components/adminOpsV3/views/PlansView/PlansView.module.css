@@ -6,30 +6,70 @@
 .ok  { background: #e7f6ec; color: #15803d; border: 1px solid #bbe6c9; }
 .err { background: #fdecec; color: #b91c1c; border: 1px solid #f5c2c2; }
 
-.tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+/* Tab stripe: family tabs on the left, + Add plan pinned to the right end. */
+.stripe { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+.tabs { display: flex; gap: 8px; flex-wrap: wrap; }
 .tab {
   padding: 7px 16px; border-radius: 999px; border: 1px solid var(--color-border, #e5e7eb);
   background: #fff; color: var(--color-text-secondary, #4b5563); font-size: 13px;
   text-transform: capitalize; cursor: pointer;
 }
 .tabActive {
-  background: var(--color-brand-primary, rgb(25, 71, 45)); color: #fff;
-  border-color: var(--color-brand-primary, rgb(25, 71, 45));
+  background: var(--color-brand-primary, #085041); color: #fff;
+  border-color: var(--color-brand-primary, #085041);
+}
+.addPlan {
+  padding: 8px 16px; border-radius: 999px; border: 1px dashed var(--color-brand-primary, #085041);
+  background: #fff; color: var(--color-brand-primary, #085041); font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.addPlan:hover { background: #e1f5ee; }
+
+/* Card grid — prototype .plan-card parity. */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+.card {
+  position: relative; background: #fffdf8; border: 1px solid var(--color-border, #e8e6df);
+  border-radius: 14px; padding: 20px; display: flex; flex-direction: column;
+}
+.archived { opacity: 0.5; }
+
+.eyebrow { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #085041; }
+.name { font-family: "DM Serif Display", Georgia, serif; font-size: 22px; color: #1a1a17; margin: 4px 0 8px; }
+.chip {
+  align-self: flex-start; font-size: 11px; font-weight: 600; color: #57524a;
+  background: #eeece5; border-radius: 999px; padding: 3px 10px; margin-bottom: 10px;
+}
+.price { font-size: 28px; font-weight: 700; color: #1a1a17; }
+.period { font-size: 13px; font-weight: 400; color: #857f74; }
+.was { font-size: 12px; color: #857f74; text-decoration: line-through; margin-top: 2px; }
+.sub { font-size: 13px; color: #57524a; margin: 10px 0 0; line-height: 1.5; }
+.limits { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.limits li { font-size: 13px; color: #57524a; padding-left: 18px; position: relative; }
+.limits li::before { content: "✓"; position: absolute; left: 0; color: #085041; font-weight: 700; }
+.archivedBadge {
+  align-self: flex-start; margin-top: 12px; font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: #b3401f; background: #fbeae4; border-radius: 6px; padding: 3px 8px;
 }
 
-.tableWrap { width: 100%; overflow-x: auto; border: 1px solid var(--color-border, #e5e7eb); border-radius: 12px; }
-.table { width: 100%; border-collapse: collapse; font-size: 14px; }
-.table th, .table td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--color-border, #eef0f2); }
-.table th { background: #f8fafb; font-weight: 600; color: var(--color-text-secondary, #6b7280); font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
-.table tbody tr:last-child td { border-bottom: none; }
-.table input { width: 100%; padding: 6px 8px; border: 1px solid var(--color-border, #cbd5e1); border-radius: 6px; font-size: 13px; }
-.editRow { background: #f8fafb; }
-
-.actions { display: flex; gap: 6px; white-space: nowrap; }
-.edit, .save, .cancel { padding: 6px 12px; border-radius: 6px; font-size: 13px; cursor: pointer; border: 1px solid transparent; }
-.edit { background: #fff; border-color: var(--color-border, #d1d5db); color: var(--color-text-primary, #374151); }
-.save { background: var(--color-brand-primary, rgb(25, 71, 45)); color: #fff; }
+.actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+.edit, .save, .cancel, .archive {
+  padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid transparent;
+}
+.edit { background: #fff; border-color: var(--color-border, #d3d0c5); color: #1a1a17; }
+.save { background: var(--color-brand-primary, #085041); color: #fff; }
 .save:disabled { opacity: .6; cursor: default; }
-.cancel { background: #fff; border-color: var(--color-border, #d1d5db); color: var(--color-text-secondary, #6b7280); }
+.cancel { background: #fff; border-color: var(--color-border, #d3d0c5); color: #57524a; }
+.archive { background: #fff; border-color: #e0b6a6; color: #b3401f; }
+.archive:disabled { opacity: .6; cursor: default; }
 
-.empty { padding: 40px; text-align: center; color: var(--color-text-secondary, #9ca3af); border: 1px dashed var(--color-border, #e5e7eb); border-radius: 12px; }
+/* Edit / create form card */
+.editing { gap: 0; }
+.field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.field > span { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #857f74; }
+.field input, .field textarea {
+  width: 100%; padding: 8px 10px; border: 1px solid var(--color-border, #d3d0c5);
+  border-radius: 8px; font-size: 13px; font-family: inherit; resize: vertical;
+}
+.formRow { display: flex; gap: 10px; }
+.formRow .field { flex: 1; min-width: 0; }
+
+.empty { padding: 40px; text-align: center; color: var(--color-text-secondary, #9ca3af); border: 1px dashed var(--color-border, #e5e7eb); border-radius: 12px; grid-column: 1 / -1; }

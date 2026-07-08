@@ -10,20 +10,41 @@ import styles from "./AdminOpsLayout.module.css";
 import useAdminOpsLayout from "./useAdminOpsLayout";
 import { VIEW_REGISTRY } from "../views/registry";
 
+// Two-letter initials from a display name (falls back to "IB").
+const initialsOf = (name?: string) =>
+  (name || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase() || "IB";
+
 const AdminOpsLayout = ({ children }: { children?: ReactNode }) => {
   const v = useAdminOpsLayout();
 
   return (
     <div className={styles.shell}>
-      {/* Topbar */}
+      {/* Topbar — logo brand · sign out · signed-in user chip. Prototype's
+          global search / "View portal" / role-switcher were test-only, omitted. */}
       <header className={styles.topbar}>
         <div className={styles.brand}>
           <span className={styles.brandMark}>IB</span>
-          <span className={styles.brandText}>Ops Console</span>
+          <span className={styles.brandText}>Interior bazzar</span>
+          <span className={styles.adminBadge}>ADMIN</span>
         </div>
-        {/* TODO(task 55): resolve role + user menu from /me/permissions */}
+        {/* TODO(task 55): role in chip resolves from /me/permissions once wired */}
         <div className={styles.topRight}>
-          <span className={styles.roleBadge}>{v.roleLabel}</span>
+          <button type="button" className={styles.signOut} onClick={v.signOut}>
+            <i className="ti ti-logout" /> Sign out
+          </button>
+          <div className={styles.userChip}>
+            <span className={styles.userAvatar}>{initialsOf(v.user?.name)}</span>
+            <span className={styles.userMeta}>
+              <span className={styles.userName}>{v.user?.name || "Signed in"}</span>
+              <span className={styles.userRole}>{v.roleLabel}</span>
+            </span>
+          </div>
         </div>
       </header>
 

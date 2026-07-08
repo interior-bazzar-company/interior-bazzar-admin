@@ -23,7 +23,7 @@ const RefundsView = () => {
       ) : (
         <div className={styles.tableWrap}>
           <table className={styles.table}>
-            <thead><tr><th>Order</th><th>Txn</th><th>For</th><th>Amount</th><th>Refunded</th></tr></thead>
+            <thead><tr><th>Order</th><th>Txn</th><th>For</th><th>Amount</th><th>Refunded</th><th>Status</th><th>Reason</th><th>Actioned by</th><th>Date</th></tr></thead>
             <tbody>
               {v.rows.map((p) => (
                 <tr key={p.id}>
@@ -32,6 +32,10 @@ const RefundsView = () => {
                   <td>{p.paymentFor || "—"}</td>
                   <td>₹{p.amount || "0"}</td>
                   <td>₹{p.refundAmount || p.amount || "0"}</td>
+                  <td><span className={`${styles.pill} ${p.refundStatus === "REFUNDED" ? styles.on : styles.off}`}>{p.refundStatus || "—"}</span></td>
+                  <td>{p.refundReason || "—"}</td>
+                  <td>{p.refundedBy || "—"}</td>
+                  <td>{p.refundedAt ? p.refundedAt.slice(0, 10) : "—"}</td>
                 </tr>
               ))}
             </tbody>

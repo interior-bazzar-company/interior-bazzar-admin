@@ -1,16 +1,33 @@
-// ── WeightsView ── admin Qualification Weights (port of prototype weightsView).
-// Signal→weight editor + add row + save (level-3). Data: /api/v1/admin/weights/.
+// ── WeightsView ── admin Qualification Weights (task 15). Fixed signal + tier-
+// threshold sliders with a live score/tier preview. UI only; logic in the hook.
 import styles from "../shared.module.css";
-import useWeightsView from "./useWeightsView";
+import useWeightsView, { SIGNALS, THRESHOLDS, type SliderDef } from "./useWeightsView";
 
 const WeightsView = () => {
   const v = useWeightsView();
 
+  const slider = (s: SliderDef) => (
+    <div key={s.key} className={styles.sliderRow}>
+      <span className={styles.sliderLabel}>{s.label}</span>
+      <input
+        type="range"
+        min={s.min}
+        max={s.max}
+        value={v.values[s.key] ?? s.def}
+        onChange={(e) => v.setValue(s.key, Number(e.target.value))}
+      />
+      <span className={styles.sliderVal}>+{v.values[s.key] ?? s.def}</span>
+    </div>
+  );
+
   return (
     <div>
       <div className={styles.head}>
-        <h1>Qualification Weights</h1>
-        <p>Signal weights the lead-qualification pipeline reads. Changes are recorded to the audit log.</p>
+        <div>
+          <h1>Qualification Weights</h1>
+          <p>Signal weights + tier thresholds the lead qualification pipeline reads. Only NEW leads are affected. Changes are audited.</p>
+        </div>
+        <button type="button" className={styles.cancel} onClick={v.resetDefaults}>Reset defaults</button>
       </div>
 
       {v.notice && <div className={`${styles.notice} ${v.notice.kind === "ok" ? styles.ok : styles.err}`}>{v.notice.msg}</div>}
@@ -19,29 +36,20 @@ const WeightsView = () => {
         <div className={styles.empty}>Loading weights…</div>
       ) : (
         <>
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead><tr><th>Signal</th><th>Weight</th></tr></thead>
-              <tbody>
-                {v.rows.length === 0 ? (
-                  <tr><td colSpan={2} style={{ color: "#9ca3af" }}>No weights configured. Add one below.</td></tr>
-                ) : v.rows.map((r) => (
-                  <tr key={r.key}>
-                    <td className={styles.mono}>{r.key}</td>
-                    <td><input className={styles.num} value={r.value} onChange={(e) => v.setValue(r.key, e.target.value)} /></td>
-                  </tr>
-                ))}
-                <tr>
-                  <td><input className={styles.num} style={{ width: 180 }} placeholder="new signal key" value={v.newKey} onChange={(e) => v.setNewKey(e.target.value)} /></td>
-                  <td>
-                    <input className={styles.num} placeholder="0.0" value={v.newVal} onChange={(e) => v.setNewVal(e.target.value)} />{" "}
-                    <button type="button" className={styles.edit} onClick={v.addRow}>Add</button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+          <div className={styles.preview}>
+            <span>Sample fully-qualified lead scores</span>
+            <b className={styles.previewScore}>{v.preview.score}</b>
+            <span className={`${styles.pill} ${styles[`tier${v.preview.tier}`] || ""}`}>Tier {v.preview.tier}</span>
+            <span className={styles.previewNote}>urgency signals not yet scored (no timeline field)</span>
           </div>
-          <div style={{ marginTop: 16 }}>
+
+          <h3 className={styles.sliderGroupHead}>Signals</h3>
+          {SIGNALS.map(slider)}
+
+          <h3 className={styles.sliderGroupHead}>Tier thresholds</h3>
+          {THRESHOLDS.map(slider)}
+
+          <div style={{ marginTop: 18 }}>
             <button type="button" className={styles.save} disabled={v.saving} onClick={v.save}>{v.saving ? "Saving…" : "Save weights"}</button>
           </div>
         </>

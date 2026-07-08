@@ -4,6 +4,7 @@ import { logger } from "../../utils/logger";
 import type { BaseUser } from "../../types/global";
 import { UserService } from "../../api/modules/user";
 import { setAuth } from "../../redux/slice/authSlice";
+import { setUser } from "../../redux/slice/userSlice";
 import type { ApiResponseType } from "../../types/reqResType";
 import { useAppDispatch, useAppSelector } from "../../redux/store/hook";
 import { TokenService } from "../../api/apiService/authHelper/TokenService";
@@ -33,6 +34,7 @@ const useInitUser = () => {
         logout();
         return;
       }
+      dispatch(setUser(res.data));
       dispatch(setAuth({ isAuthenticated: true }));
     } catch (error) {
       logout();

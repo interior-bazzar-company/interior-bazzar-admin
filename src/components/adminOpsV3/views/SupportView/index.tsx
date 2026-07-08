@@ -3,8 +3,22 @@
 // Data: /api/v1/admin/support/.
 import styles from "../shared.module.css";
 import useSupportView, { SUPPORT_TABS } from "./useSupportView";
+import type { TicketRow } from "./useSupportView";
 
 const label = (s: string) => s.replace(/_/g, " ");
+
+// Distinct pill colour per status (open vs in_progress must differ).
+const STATUS_PILL: Record<string, string> = { open: styles.amber, in_progress: styles.info, resolved: styles.on, closed: styles.off };
+
+// Age/SLA: hours since last activity. Red >=48h, amber >=24h; none once resolved/closed.
+const hoursSince = (iso: string) => { const t = new Date(iso).getTime(); return isNaN(t) ? null : (Date.now() - t) / 3600000; };
+const sla = (t: TicketRow) => {
+  if (t.status === "resolved" || t.status === "closed") return null;
+  const h = hoursSince(t.lastReplyAt || t.createdAt);
+  if (h === null) return null;
+  const text = h < 24 ? `${Math.floor(h)}h` : `${Math.floor(h / 24)}d`;
+  return { text, cls: h >= 48 ? styles.red : h >= 24 ? styles.amber : styles.off };
+};
 
 const SupportView = () => {
   const v = useSupportView();
@@ -31,17 +45,21 @@ const SupportView = () => {
       ) : (
         <div className={styles.tableWrap}>
           <table className={styles.table}>
-            <thead><tr><th>Subject</th><th>From</th><th>Status</th><th>Updated</th><th></th></tr></thead>
+            <thead><tr><th>Subject</th><th>From</th><th>Status</th><th>Age</th><th>Updated</th><th></th></tr></thead>
             <tbody>
-              {v.rows.map((t) => (
+              {v.rows.map((t) => {
+                const s = sla(t);
+                return (
                 <tr key={t.id}>
                   <td>{t.subject}</td>
                   <td>{t.user || t.email || "—"}</td>
-                  <td><span className={styles.pill}>{label(t.status)}</span></td>
+                  <td><span className={`${styles.pill} ${STATUS_PILL[t.status] || styles.off}`}>{label(t.status)}</span></td>
+                  <td>{s ? <span className={`${styles.pill} ${s.cls}`}>{s.text}</span> : "—"}</td>
                   <td>{(t.lastReplyAt || t.createdAt || "").slice(0, 10) || "—"}</td>
                   <td className={styles.actions}><button type="button" className={styles.edit} onClick={() => v.open(t.id)}>Open</button></td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
