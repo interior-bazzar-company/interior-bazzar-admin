@@ -1,11 +1,12 @@
 // ── useAdminOpsLayout ── sidebar collapse state + active section resolution.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { PAGES } from "../../../utils/constants/app";
 import { ADMIN_OPS_NAV, ADMIN_OPS_MODULES } from "../../../content/admin-ops-nav.content";
 import { canSee, levelFor, OPS_ROLE_LABEL, type OpsRole } from "../../../content/admin-ops-rbac";
 import { useAppSelector } from "../../../redux/store/hook";
 import useLogout from "../../../hooks/auth/useLogout";
+import AdminOpsService from "../../../api/modules/adminOps";
 
 const useAdminOpsLayout = () => {
   const { section } = useParams<{ section?: string }>();
@@ -22,10 +23,24 @@ const useAdminOpsLayout = () => {
     navigate(PAGES.ADMIN_OPS_LOGIN, { replace: true });
   };
 
-  // Acting role — TODO(backend, promptsadmin task 55): resolve from
-  // GET /api/v1/admin/me/permissions/. Placeholder until then: super_admin (sees
-  // all). The backend authorizes every action regardless of this client value.
-  const role: OpsRole = "super_admin";
+  // Acting role — resolved from GET /api/v1/admin/me/permissions/ (task 55). Nav
+  // gating uses the static PERMS map keyed by OpsRole; a backend role name outside
+  // that union (e.g. a custom-created role) stays least-privileged for nav but is
+  // still authorized server-side by its real module levels.
+  // ponytail: least-privileged ("analyst") until permissions resolve — avoids a
+  // flash of the full super_admin nav for a non-super user. roleName holds the raw
+  // backend name for the topbar chip label.
+  const [role, setRole] = useState<OpsRole>("analyst");
+  const [roleName, setRoleName] = useState<string | null>(null);
+  useEffect(() => {
+    AdminOpsService.mePermissions()
+      .then((res) => {
+        const r = res?.data?.role ?? null;
+        setRoleName(r);
+        if (r && r in OPS_ROLE_LABEL) setRole(r as OpsRole);
+      })
+      .catch(() => {});
+  }, []);
 
   // Nav gated by RBAC level: hide any module the role can't see (level 0), and
   // drop groups left empty. (admin-rbac-plan.md; nav gating is not security by
@@ -55,7 +70,9 @@ const useAdminOpsLayout = () => {
 
   return {
     nav, activeKey, activeLabel, activeLevel, collapsed, toggleGroup, goSection,
-    role, roleLabel: OPS_ROLE_LABEL[role], user, signOut,
+    role,
+    roleLabel: roleName ? (OPS_ROLE_LABEL[roleName as OpsRole] ?? roleName) : OPS_ROLE_LABEL[role],
+    user, signOut,
   };
 };
 

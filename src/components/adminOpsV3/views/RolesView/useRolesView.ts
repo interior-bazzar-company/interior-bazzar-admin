@@ -42,7 +42,32 @@ const useRolesView = () => {
     } else setNotice({ kind: "err", msg: `Could not save ${role.name}.` });
   };
 
-  return { roles, moduleKeys, loading, saving, dirty, notice, cycle, saveRole };
+  // ── Add role ── inline draft row: name + a module→level map that cycles.
+  const [draft, setDraft] = useState<{ name: string; modules: Record<string, number> } | null>(null);
+  const startDraft = () => setDraft({ name: "", modules: {} });
+  const cancelDraft = () => setDraft(null);
+  const setDraftName = (name: string) => setDraft((d) => (d ? { ...d, name } : d));
+  const cycleDraft = (mod: string) =>
+    setDraft((d) => (d ? { ...d, modules: { ...d.modules, [mod]: ((d.modules[mod] ?? 0) + 1) % 4 } } : d));
+
+  const saveDraft = async () => {
+    if (!draft) return;
+    const name = draft.name.trim();
+    if (!name) { setNotice({ kind: "err", msg: "Role name is required." }); return; }
+    setSaving("__draft__");
+    const res = await AdminOpsService.createRole(name, draft.modules).catch(() => null);
+    setSaving("");
+    if (res?.response) {
+      setNotice({ kind: "ok", msg: `Role "${name}" created.` });
+      setDraft(null);
+      await load();
+    } else setNotice({ kind: "err", msg: res?.message || `Could not create "${name}".` });
+  };
+
+  return {
+    roles, moduleKeys, loading, saving, dirty, notice, cycle, saveRole,
+    draft, startDraft, cancelDraft, setDraftName, cycleDraft, saveDraft,
+  };
 };
 
 export default useRolesView;

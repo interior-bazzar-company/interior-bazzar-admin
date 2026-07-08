@@ -19,6 +19,46 @@ const RolesView = () => {
 
       {v.notice && <div className={`${shared.notice} ${v.notice.kind === "ok" ? shared.ok : shared.err}`}>{v.notice.msg}</div>}
 
+      {/* Add role — inline draft: name + a module→level cell row that cycles. */}
+      {!v.draft ? (
+        <div className={styles.addBar}>
+          <button type="button" className={styles.addBtn} onClick={v.startDraft} disabled={v.loading}>
+            + Add role
+          </button>
+        </div>
+      ) : (
+        <div className={styles.draft}>
+          <div className={styles.draftTop}>
+            <input
+              className={styles.draftName}
+              placeholder="Role name (e.g. test_ops)"
+              value={v.draft.name}
+              onChange={(e) => v.setDraftName(e.target.value)}
+              autoFocus
+            />
+            <button type="button" className={styles.addBtn} disabled={v.saving === "__draft__"} onClick={v.saveDraft}>
+              {v.saving === "__draft__" ? "Creating…" : "Create"}
+            </button>
+            <button type="button" className={styles.ghostBtn} onClick={v.cancelDraft}>Cancel</button>
+          </div>
+          <div className={styles.draftCells}>
+            {v.moduleKeys.map((mod) => {
+              const lvl = v.draft!.modules[mod] ?? 0;
+              return (
+                <span
+                  key={mod}
+                  className={`${styles.draftCell} ${styles["lvl" + lvl]}`}
+                  onClick={() => v.cycleDraft(mod)}
+                  title="click to cycle level"
+                >
+                  {mod} <b>{LEVELS[lvl]}</b>
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {v.loading ? (
         <div className={shared.empty}>Loading roles…</div>
       ) : (

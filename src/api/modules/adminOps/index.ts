@@ -85,6 +85,9 @@ export class AdminOpsService {
   static updateRole(roleName: string, modules: AdminModules) {
     return apiService.getPutApiResponse<any>(`${base}/roles/`, { roleName, modules });
   }
+  static createRole(name: string, modules: AdminModules) {
+    return apiService.getPostApiResponse<any>(`${base}/roles/`, { name, modules });
+  }
 
   // ── Audit ──
   static audit(params: { module?: string; role?: string; pageNo?: number; pageSize?: number } = {}) {
