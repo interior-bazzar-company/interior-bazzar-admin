@@ -49,10 +49,21 @@ export interface BannerInput {
   startsAt: string | null; endsAt: string | null;
   buttons: BannerButton[]; metrics: BannerMetric[]; businessIds: number[];
 }
+export interface RevenueBar { label: string; amount: number; }
+export interface MonthPoint { month: string; amount: number; }
+export interface RevenueAssumptions {
+  avgLifetimeMonths: number; grossMargin: number; revenueTarget: number; newCustomersThisMonth: number;
+}
+export interface ExpenseRow { id: number; label: string; amount: number; category: string; kind: string; incurredAt: string | null }
 export interface RevenueOverview {
   grossRevenue: number; refunded: number; netRevenue: number; mrr: number;
-  cac: number; payingCustomers: number; expensesTotal: number; net: number;
-  expenses: Array<{ id: number; label: string; amount: number; category: string; incurredAt: string | null }>;
+  arpu: number; activeSubscribers: number; cac: number; payingCustomers: number;
+  salesThisMonth: number; momDeltaPct: number;
+  revenueByFamily: RevenueBar[]; monthlyRevenue: MonthPoint[];
+  expensesTotal: number; expensesFixed: number; expensesReinvest: number; net: number;
+  ltv: number; ltvCac: number; paybackMonths: number;
+  assumptions: RevenueAssumptions;
+  expenses: ExpenseRow[];
 }
 
 const qs = (params: Record<string, any>) => {
@@ -86,8 +97,11 @@ export class AdminOpsService {
   static revenue() {
     return apiService.getGetApiResponse<RevenueOverview>(`${base}/revenue/`);
   }
-  static addExpense(data: { label: string; amount: number; category?: string; incurredAt?: string }) {
+  static addExpense(data: { label: string; amount: number; category?: string; kind?: string; incurredAt?: string }) {
     return apiService.getPostApiResponse<any>(`${base}/revenue/expense/`, data);
+  }
+  static setAssumptions(data: Partial<RevenueAssumptions>) {
+    return apiService.getPutApiResponse<RevenueAssumptions>(`${base}/revenue/assumptions/`, data);
   }
 
   // ── Plans & pricing ──
@@ -135,6 +149,14 @@ export class AdminOpsService {
   static rejectAd(id: number, reason: string) {
     return apiService.getPostApiResponse<any>(`${base}/banners-ad/${id}/reject/`, { reason });
   }
+  // House/fallback ad (AdCampaign with no advertiser, auto-approved to live).
+  static createFallbackAd(data: {
+    placement: string; page?: string; image?: string; eyebrow?: string;
+    heading?: string; sub?: string; features?: string[]; ctaLabel?: string;
+    ctaLink?: string; theme?: string;
+  }) {
+    return apiService.getPostApiResponse<any>(`${base}/banners-ad/fallback/`, data);
+  }
 
   // ── Buyers ──
   static buyers(params: { search?: string; pageNo?: number; pageSize?: number } = {}) {
@@ -150,6 +172,10 @@ export class AdminOpsService {
   }
   static toggleBusinessVerified(id: number) {
     return apiService.getPostApiResponse<any>(`${base}/businesses/${id}/toggle-verified/`, {});
+  }
+  // Catalog & Trust > Businesses Moderation (distinct shape from the Users list).
+  static businessModeration(params: { search?: string; pageNo?: number; pageSize?: number } = {}) {
+    return apiService.getGetApiResponse<any>(`${base}/businesses/moderation/${qs(params)}`);
   }
 
   // ── Payments ──
@@ -227,6 +253,9 @@ export class AdminOpsService {
   static deleteTestimonial(id: number) {
     return apiService.getDeleteApiResponse<any>(`${base}/testimonials/${id}/`);
   }
+  static reorderTestimonial(id: number, index: number) {
+    return apiService.getPostApiResponse<any>(`${base}/testimonials/${id}/reorder/`, { index });
+  }
 
   // ── Reports ──
   static reports(params: { status?: string; pageNo?: number; pageSize?: number } = {}) {
@@ -237,24 +266,37 @@ export class AdminOpsService {
   }
 
   // ── Subscriptions ──
-  static subs(params: { status?: string } = {}) { return apiService.getGetApiResponse<any>(`${base}/subs/${qs(params)}`); }
+  static subs(params: { family?: string; status?: string; pageNo?: number; pageSize?: number } = {}) { return apiService.getGetApiResponse<any>(`${base}/subs/${qs(params)}`); }
 
   // ── Routing / Quarantine (LeadQuery) ──
-  static routing(params: { status?: string; pageNo?: number } = {}) { return apiService.getGetApiResponse<any>(`${base}/routing/${qs(params)}`); }
+  static routing(params: { status?: string; tier?: string; pageNo?: number } = {}) { return apiService.getGetApiResponse<any>(`${base}/routing/${qs(params)}`); }
   static routingAction(id: number, status: string) { return apiService.getPostApiResponse<any>(`${base}/routing/${id}/action/`, { status }); }
+  // Admin add/edit lead (LeadQuery via the v2 admin lead endpoints — NOT the GMB system).
+  static createLead(data: Record<string, any>) { return apiService.getPostApiResponse<any>(`${base}/v2/query/`, data); }
+  static updateLead(id: number, data: Record<string, any>) { return apiService.getPutApiResponse<any>(`${base}/v2/query/${id}/`, data); }
   static quarantine(params: { status?: string; pageNo?: number } = {}) { return apiService.getGetApiResponse<any>(`${base}/quarantine/${qs(params)}`); }
   static quarantineAction(id: number, status: string) { return apiService.getPostApiResponse<any>(`${base}/quarantine/${id}/action/`, { status }); }
 
   // ── Web analytics ──
-  static webAnalytics() { return apiService.getGetApiResponse<any>(`${base}/web-analytics/`); }
+  static webAnalytics(params: { start?: string; end?: string } = {}) { return apiService.getGetApiResponse<any>(`${base}/web-analytics/${qs(params)}`); }
 
   // ── Reviews ──
   static reviews(params: { pageNo?: number } = {}) { return apiService.getGetApiResponse<any>(`${base}/reviews/${qs(params)}`); }
   static hideReview(id: number) { return apiService.getPostApiResponse<any>(`${base}/reviews/${id}/hide/`, {}); }
+  static reviewsQA(params: { pageNo?: number } = {}) { return apiService.getGetApiResponse<any>(`${base}/reviews/qa/${qs(params)}`); }
+  static hideQuestion(id: number) { return apiService.getPostApiResponse<any>(`${base}/reviews/qa/${id}/hide/`, {}); }
 
   // ── Taxonomy (cat-region) ──
   static taxonomy() { return apiService.getGetApiResponse<any>(`${base}/taxonomy/`); }
-  static addCategory(value: string, label: string) { return apiService.getPostApiResponse<any>(`${base}/taxonomy/`, { value, label }); }
+  static addCategory(value: string, label: string, trending = false) { return apiService.getPostApiResponse<any>(`${base}/taxonomy/`, { value, label, trending }); }
+  static updateCategory(id: number, data: { label?: string; value?: string; trending?: boolean; index?: number; isActive?: boolean }) { return apiService.getPutApiResponse<any>(`${base}/taxonomy/category/${id}/`, data); }
+  static deleteCategory(id: number) { return apiService.getDeleteApiResponse<any>(`${base}/taxonomy/category/${id}/`); }
+  static addSegment(data: { value: string; label: string; trending?: boolean; categoryIds?: number[] }) { return apiService.getPostApiResponse<any>(`${base}/taxonomy/segment/`, data); }
+  static updateSegment(id: number, data: { value?: string; label?: string; trending?: boolean; isActive?: boolean; categoryIds?: number[] }) { return apiService.getPutApiResponse<any>(`${base}/taxonomy/segment/${id}/`, data); }
+  static deleteSegment(id: number) { return apiService.getDeleteApiResponse<any>(`${base}/taxonomy/segment/${id}/`); }
+  static addState(data: { name: string; value?: string; countryId?: number }) { return apiService.getPostApiResponse<any>(`${base}/taxonomy/state/`, data); }
+  static updateState(id: number, data: { name?: string; value?: string; countryId?: number }) { return apiService.getPutApiResponse<any>(`${base}/taxonomy/state/${id}/`, data); }
+  static deleteState(id: number) { return apiService.getDeleteApiResponse<any>(`${base}/taxonomy/state/${id}/`); }
 
   // ── Feedback ──
   static feedback(params: { status?: string; pageNo?: number } = {}) { return apiService.getGetApiResponse<any>(`${base}/feedback/${qs(params)}`); }
@@ -263,10 +305,14 @@ export class AdminOpsService {
   // ── Plan requests ──
   static planRequests(params: { stage?: string; pageNo?: number } = {}) { return apiService.getGetApiResponse<any>(`${base}/plan-requests/${qs(params)}`); }
   static setPlanRequestStage(id: number, stage: string) { return apiService.getPostApiResponse<any>(`${base}/plan-requests/${id}/stage/`, { stage }); }
+  static verifyPlanRequest(id: number, data: { subscriptionId: number; entityType: string }) { return apiService.getPostApiResponse<any>(`${base}/plan-requests/${id}/verify/`, data); }
 
   // ── Content (blog) ──
   static content(params: { pageNo?: number } = {}) { return apiService.getGetApiResponse<any>(`${base}/content/${qs(params)}`); }
   static toggleBlogFeatured(id: number) { return apiService.getPostApiResponse<any>(`${base}/content/${id}/feature/`, {}); }
+  static createBlog(data: any) { return apiService.getPostApiResponse<any>(`${base}/content/`, data); }
+  static updateBlog(id: number, data: any) { return apiService.getPutApiResponse<any>(`${base}/content/${id}/`, data); }
+  static deleteBlog(id: number) { return apiService.getDeleteApiResponse<any>(`${base}/content/${id}/`); }
 }
 
 export default AdminOpsService;
