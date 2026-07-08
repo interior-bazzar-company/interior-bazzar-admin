@@ -19,14 +19,35 @@ export interface AuditEntry {
   id: number; actor: string | null; role: string | null;
   action: string; module: string; detail: string | null; ts: string | null;
 }
+export interface PlanFeature {
+  text: string;
+}
 export interface PlanRow {
   id: number; planFamily: string; entityType: string; title: string;
   subtitle: string; tier: number; amount: string; payableAmount: string;
   discountPercentage: string; duration: string; tag: string;
+  features: PlanFeature[]; isActive: boolean;
 }
+export interface BannerButton { label: string; link: string; isPrimary: boolean; }
+export interface BannerMetric { metric: string; description: string; index: number; }
+export interface BannerBusinessRef { id: number; name: string; }
+export type BannerAudience = "all" | "buyers" | "sellers";
+// Full HomeHeroBanner slide (interior_advertisement.HomeHeroBanner) — the model
+// the public site actually renders. Replaces the old dead app_ib.Banners shape.
 export interface BannerRow {
-  id: number; title: string; supportText: string; bannerUrl: string;
-  order: number; isActive: boolean;
+  id: number; page: string; tag: string; title: string; description: string;
+  audience: BannerAudience; displayOrder: number; isActive: boolean;
+  backgroundGradient: string; backgroundImageUrl: string;
+  startsAt: string | null; endsAt: string | null;
+  buttons: BannerButton[]; metrics: BannerMetric[]; businesses: BannerBusinessRef[];
+}
+// Editor payload sent to create/update (businesses referenced by id, max 2).
+export interface BannerInput {
+  page: string; tag: string; title: string; description: string;
+  audience: BannerAudience; displayOrder?: number; isActive: boolean;
+  backgroundGradient: string; backgroundImageUrl: string;
+  startsAt: string | null; endsAt: string | null;
+  buttons: BannerButton[]; metrics: BannerMetric[]; businessIds: number[];
 }
 export interface RevenueOverview {
   grossRevenue: number; refunded: number; netRevenue: number; mrr: number;
@@ -76,16 +97,26 @@ export class AdminOpsService {
   static updatePlan(id: number, data: Partial<PlanRow>) {
     return apiService.getPutApiResponse<PlanRow>(`${base}/plans/${id}/`, data);
   }
-
-  // ── House banners ──
-  static bannersHouse() {
-    return apiService.getGetApiResponse<{ banners: BannerRow[] }>(`${base}/banners-house/`);
+  static addPlan(data: Partial<PlanRow> & { planFamily: string }) {
+    return apiService.getPostApiResponse<PlanRow>(`${base}/plans/`, data);
   }
-  static createBanner(data: { title: string; supportText?: string; bannerUrl?: string; isActive?: boolean }) {
+  // isActive=false archives (hidden from buyers); true re-activates.
+  static setPlanActive(id: number, isActive: boolean) {
+    return apiService.getPostApiResponse<PlanRow>(`${base}/plans/${id}/archive/`, { isActive });
+  }
+
+  // ── House banners (real HomeHeroBanner hero slides) ──
+  static bannersHouse(page?: string) {
+    return apiService.getGetApiResponse<{ banners: BannerRow[] }>(`${base}/banners-house/${qs({ page })}`);
+  }
+  static createBanner(data: BannerInput) {
     return apiService.getPostApiResponse<BannerRow>(`${base}/banners-house/`, data);
   }
-  static updateBanner(id: number, data: Partial<BannerRow>) {
+  static updateBanner(id: number, data: BannerInput) {
     return apiService.getPutApiResponse<BannerRow>(`${base}/banners-house/${id}/`, data);
+  }
+  static toggleBanner(id: number) {
+    return apiService.getPostApiResponse<BannerRow>(`${base}/banners-house/${id}/toggle/`, {});
   }
   static deleteBanner(id: number) {
     return apiService.getDeleteApiResponse<any>(`${base}/banners-house/${id}/`);
