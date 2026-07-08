@@ -28,23 +28,35 @@ const BuyersView = () => {
       ) : (
         <div className={styles.tableWrap}>
           <table className={styles.table}>
-            <thead><tr><th>Username</th><th>Verified</th><th>Status</th><th>Joined</th><th></th></tr></thead>
+            <thead><tr><th>Buyer</th><th>Phone</th><th>Enquiries</th><th>Saved</th><th>Status</th><th></th></tr></thead>
             <tbody>
               {v.rows.map((b) => (
                 <tr key={b.id}>
-                  <td>{b.username}</td>
-                  <td>{b.isVerified ? "Yes" : "No"}</td>
+                  <td>
+                    <div className={styles.buyerName}>{b.username}</div>
+                    <div className={styles.buyerSub}>{b.location || "—"}</div>
+                  </td>
+                  <td>{b.phone || "—"}</td>
+                  <td>{b.queryCount}</td>
+                  <td>{b.savedCount}</td>
                   <td><span className={`${styles.pill} ${b.isActive ? styles.on : styles.off}`}>{b.isActive ? "Active" : "Blocked"}</span></td>
-                  <td>{b.joinedAt ? b.joinedAt.slice(0, 10) : "—"}</td>
                   <td className={styles.actions}>
                     <button type="button" className={b.isActive ? styles.block : styles.activate} onClick={() => v.toggle(b)}>
-                      {b.isActive ? "Block" : "Activate"}
+                      {b.isActive ? "Block" : "Unblock"}
                     </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {!v.loading && v.total > 0 && (
+        <div className={styles.pager}>
+          <button type="button" disabled={v.pageNo <= 1} onClick={v.prev}>← Prev</button>
+          <span>Page {v.pageNo} of {v.totalPages} · {v.total} buyers</span>
+          <button type="button" disabled={v.pageNo >= v.totalPages} onClick={v.next}>Next →</button>
         </div>
       )}
     </div>

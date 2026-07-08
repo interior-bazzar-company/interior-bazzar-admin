@@ -24,3 +24,10 @@
 .activate { background: #e7f6ec; color: #15803d; border-color: #bbe6c9; }
 
 .empty { padding: 40px; text-align: center; color: var(--color-text-secondary, #9ca3af); border: 1px dashed var(--color-border, #e5e7eb); border-radius: 12px; }
+
+.buyerName { font-weight: 600; color: var(--color-text-primary, #16233a); }
+.buyerSub { font-size: 12px; color: var(--color-text-secondary, #6b7280); }
+
+.pager { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 16px; font-size: 13px; color: var(--color-text-secondary, #6b7280); }
+.pager button { padding: 7px 14px; border-radius: 8px; border: 1px solid var(--color-border, #d1d5db); background: #fff; cursor: pointer; font-size: 13px; }
+.pager button:disabled { opacity: 0.4; cursor: default; }
