@@ -1,7 +1,7 @@
 // ── BusinessesView ── admin Businesses table (port of prototype businessesView).
 // Search + IB-verified badge toggle. Data: /api/v1/admin/businesses/.
 import styles from "./BusinessesView.module.css";
-import useBusinessesView from "./useBusinessesView";
+import useBusinessesView, { remainingLabel, responseLabel } from "./useBusinessesView";
 
 const BusinessesView = () => {
   const v = useBusinessesView();
@@ -28,22 +28,41 @@ const BusinessesView = () => {
       ) : (
         <div className={styles.tableWrap}>
           <table className={styles.table}>
-            <thead><tr><th>Business</th><th>Owner</th><th>Verified</th><th></th></tr></thead>
+            <thead><tr><th>Business</th><th>Location</th><th>Status</th><th>Plan</th><th>Badge</th><th>Enquiries</th><th>Response</th><th></th></tr></thead>
             <tbody>
               {v.rows.map((b) => (
                 <tr key={b.id}>
-                  <td>{b.businessName}</td>
-                  <td>{b.owner || "—"}</td>
-                  <td><span className={`${styles.pill} ${b.isVerified ? styles.on : styles.off}`}>{b.isVerified ? "Verified" : "Unverified"}</span></td>
+                  <td>
+                    <div className={styles.bizName}>{b.businessName}</div>
+                    <div className={styles.bizSub}>{b.owner || "—"}</div>
+                  </td>
+                  <td>{b.location || "—"}</td>
+                  <td><span className={`${styles.pill} ${b.status === "active" ? styles.on : styles.off}`}>{b.status === "active" ? "Active" : "Inactive"}</span></td>
+                  <td>
+                    {b.planName ? (
+                      <div><div className={styles.bizName}>{b.planName}</div><div className={styles.bizSub}>{remainingLabel(b.planExpireAt)}</div></div>
+                    ) : "—"}
+                  </td>
+                  <td><span className={`${styles.pill} ${b.badge === "verified" ? styles.on : styles.pending}`}>{b.badge === "verified" ? "Verified" : "Pending"}</span></td>
+                  <td>{b.enquiries}</td>
+                  <td>{responseLabel(b.responseSeconds)}</td>
                   <td className={styles.actions}>
                     <button type="button" className={b.isVerified ? styles.revoke : styles.grant} onClick={() => v.toggle(b)}>
-                      {b.isVerified ? "Revoke badge" : "Verify"}
+                      {b.isVerified ? "Revoke" : "Verify"}
                     </button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {!v.loading && v.total > 0 && (
+        <div className={styles.pager}>
+          <button type="button" disabled={v.pageNo <= 1} onClick={v.prev}>← Prev</button>
+          <span>Page {v.pageNo} of {v.totalPages} · {v.total} businesses</span>
+          <button type="button" disabled={v.pageNo >= v.totalPages} onClick={v.next}>Next →</button>
         </div>
       )}
     </div>
