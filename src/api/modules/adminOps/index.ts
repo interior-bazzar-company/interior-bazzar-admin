@@ -204,6 +204,38 @@ export class AdminOpsService {
   static resolveReport(id: number, status: string) {
     return apiService.getPutApiResponse<any>(`${base}/reports/${id}/`, { status });
   }
+
+  // ── Subscriptions ──
+  static subs(params: { status?: string } = {}) { return apiService.getGetApiResponse<any>(`${base}/subs/${qs(params)}`); }
+
+  // ── Routing / Quarantine (LeadQuery) ──
+  static routing(params: { status?: string; pageNo?: number } = {}) { return apiService.getGetApiResponse<any>(`${base}/routing/${qs(params)}`); }
+  static routingAction(id: number, status: string) { return apiService.getPostApiResponse<any>(`${base}/routing/${id}/action/`, { status }); }
+  static quarantine(params: { status?: string; pageNo?: number } = {}) { return apiService.getGetApiResponse<any>(`${base}/quarantine/${qs(params)}`); }
+  static quarantineAction(id: number, status: string) { return apiService.getPostApiResponse<any>(`${base}/quarantine/${id}/action/`, { status }); }
+
+  // ── Web analytics ──
+  static webAnalytics() { return apiService.getGetApiResponse<any>(`${base}/web-analytics/`); }
+
+  // ── Reviews ──
+  static reviews(params: { pageNo?: number } = {}) { return apiService.getGetApiResponse<any>(`${base}/reviews/${qs(params)}`); }
+  static hideReview(id: number) { return apiService.getPostApiResponse<any>(`${base}/reviews/${id}/hide/`, {}); }
+
+  // ── Taxonomy (cat-region) ──
+  static taxonomy() { return apiService.getGetApiResponse<any>(`${base}/taxonomy/`); }
+  static addCategory(value: string, label: string) { return apiService.getPostApiResponse<any>(`${base}/taxonomy/`, { value, label }); }
+
+  // ── Feedback ──
+  static feedback(params: { status?: string; pageNo?: number } = {}) { return apiService.getGetApiResponse<any>(`${base}/feedback/${qs(params)}`); }
+  static setFeedbackStatus(id: number, status: string) { return apiService.getPostApiResponse<any>(`${base}/feedback/${id}/status/`, { status }); }
+
+  // ── Plan requests ──
+  static planRequests(params: { stage?: string; pageNo?: number } = {}) { return apiService.getGetApiResponse<any>(`${base}/plan-requests/${qs(params)}`); }
+  static setPlanRequestStage(id: number, stage: string) { return apiService.getPostApiResponse<any>(`${base}/plan-requests/${id}/stage/`, { stage }); }
+
+  // ── Content (blog) ──
+  static content(params: { pageNo?: number } = {}) { return apiService.getGetApiResponse<any>(`${base}/content/${qs(params)}`); }
+  static toggleBlogFeatured(id: number) { return apiService.getPostApiResponse<any>(`${base}/content/${id}/feature/`, {}); }
 }
 
 export default AdminOpsService;

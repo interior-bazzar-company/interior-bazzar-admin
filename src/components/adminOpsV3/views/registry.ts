@@ -21,6 +21,15 @@ import SupportView from "./SupportView";
 import RolesView from "./RolesView";
 import PaymentsView from "./PaymentsView";
 import RefundsView from "./RefundsView";
+import SubsView from "./SubsView";
+import RoutingView from "./RoutingView";
+import QuarantineView from "./QuarantineView";
+import WebView from "./WebView";
+import ReviewsView from "./ReviewsView";
+import CatRegionView from "./CatRegionView";
+import FeedbackView from "./FeedbackView";
+import PlanRequestsView from "./PlanRequestsView";
+import ContentView from "./ContentView";
 
 export interface AdminViewProps {
   goSection: (key: string) => void;
@@ -45,4 +54,14 @@ export const VIEW_REGISTRY: Record<string, ComponentType<AdminViewProps>> = {
   roles: RolesView,
   payments: PaymentsView,
   refunds: RefundsView,
+  subs: SubsView,
+  routing: RoutingView,
+  quarantine: QuarantineView,
+  web: WebView,
+  reviews: ReviewsView,
+  "cat-region": CatRegionView,
+  feedback: FeedbackView,
+  "plan-requests": PlanRequestsView,
+  content: ContentView,
+  "cat-biz": BusinessesView, // business moderation reuses the businesses view
 };
