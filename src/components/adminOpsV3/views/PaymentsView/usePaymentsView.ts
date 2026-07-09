@@ -6,7 +6,7 @@ import AdminOpsService from "../../../../api/modules/adminOps";
 export interface PaymentRow {
   id: number; orderId: string; transactionId: string; amount: string;
   paymentFor: string; orderStatus: string; refundStatus: string; refundAmount: string; createdAt: string;
-  paymentMethod?: string;
+  paymentMethod?: string; proofUrl?: string;
   refundReason?: string | null; refundedBy?: string | null; refundedAt?: string | null;
   verifiedAt?: string | null;
 }

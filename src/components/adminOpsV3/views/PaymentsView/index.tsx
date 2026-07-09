@@ -33,7 +33,7 @@ const PaymentsView = () => {
           ) : (
             <div className={styles.tableWrap}>
               <table className={styles.table}>
-                <thead><tr><th>Order</th><th>Txn</th><th>For</th><th>Amount</th><th></th></tr></thead>
+                <thead><tr><th>Order</th><th>Txn</th><th>For</th><th>Amount</th><th>Proof</th><th></th></tr></thead>
                 <tbody>
                   {v.pending.map((p) => (
                     <tr key={p.id}>
@@ -41,6 +41,7 @@ const PaymentsView = () => {
                       <td className={styles.mono}>{p.transactionId || "—"}</td>
                       <td>{p.paymentFor || "—"}</td>
                       <td>₹{p.amount || "0"}</td>
+                      <td>{p.proofUrl ? <a href={p.proofUrl} target="_blank" rel="noreferrer">View</a> : "—"}</td>
                       <td className={styles.actions}>
                         <button type="button" className={styles.save} disabled={v.busy} onClick={() => v.verify(p.id)}>Approve</button>
                         <button type="button" className={styles.del} disabled={v.busy} onClick={() => v.reject(p.id)}>Reject</button>
