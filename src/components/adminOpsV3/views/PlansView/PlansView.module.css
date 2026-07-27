@@ -51,7 +51,7 @@
 }
 
 .actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
-.edit, .save, .cancel, .archive {
+.edit, .save, .cancel, .archive, .delete {
   padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: 1px solid transparent;
 }
 .edit { background: #fff; border-color: var(--color-border, #d3d0c5); color: #1a1a17; }
@@ -60,6 +60,8 @@
 .cancel { background: #fff; border-color: var(--color-border, #d3d0c5); color: #57524a; }
 .archive { background: #fff; border-color: #e0b6a6; color: #b3401f; }
 .archive:disabled { opacity: .6; cursor: default; }
+.delete { background: #fbeae4; border-color: #e0b6a6; color: #b3401f; }
+.delete:disabled { opacity: .6; cursor: default; }
 
 /* Edit / create form card */
 .editing { gap: 0; }
@@ -73,3 +75,20 @@
 .formRow .field { flex: 1; min-width: 0; }
 
 .empty { padding: 40px; text-align: center; color: var(--color-text-secondary, #9ca3af); border: 1px dashed var(--color-border, #e5e7eb); border-radius: 12px; grid-column: 1 / -1; }
+
+/* Cycle rows on the (read-only) plan card */
+.cycleList { margin-top: 12px; display: flex; flex-direction: column; gap: 4px; border-top: 1px solid var(--color-border, #e8e6df); padding-top: 10px; }
+.cycleLine { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: #57524a; }
+.cycleOn { color: #085041; font-weight: 600; }
+.cycleOff { color: #b3401f; font-weight: 600; }
+
+/* Cycles editor inside the edit form */
+.cycles { margin-bottom: 12px; border-top: 1px solid var(--color-border, #e8e6df); padding-top: 10px; }
+.cyclesHead { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #857f74; margin-bottom: 8px; }
+.cycleRow, .cycleAdd { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+.cycleDur { font-size: 13px; font-weight: 600; color: #1a1a17; min-width: 44px; }
+.cyclePrice { flex: 1; min-width: 60px; padding: 6px 8px; border: 1px solid var(--color-border, #d3d0c5); border-radius: 6px; font-size: 13px; font-family: inherit; }
+.cycleBtn { padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; background: #fff; border: 1px solid var(--color-border, #d3d0c5); color: #1a1a17; }
+.cycleBtn:disabled { opacity: .5; cursor: default; }
+.cycleRemove { padding: 6px 10px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; background: #fbeae4; border: 1px solid #e0b6a6; color: #b3401f; }
+.cycleRemove:disabled { opacity: .5; cursor: default; }

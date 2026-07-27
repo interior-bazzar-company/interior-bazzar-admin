@@ -12,6 +12,7 @@ const RoutingView = () => (
     action={(id, status) => AdminOpsService.routingAction(id, status) as any}
     actions={[{ label: "Flag", status: "flagged", kind: "grant" }, { label: "Discard", status: "discarded", kind: "del" }]}
     tierFilter
+    assignable
     onAdd={(data: LeadForm) => AdminOpsService.createLead(data) as any}
     onEdit={(id: number, data: LeadForm) => AdminOpsService.updateLead(id, data) as any}
   />

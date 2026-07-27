@@ -59,6 +59,29 @@
 .pager { display: flex; gap: 8px; align-items: center; margin-top: 14px; }
 .pagerInfo { font-size: 13px; color: var(--color-text-secondary, #6b7280); }
 
+/* Routing / quarantine queue — card layout (mirrors prototype dashboard-admin). */
+.headRight { display: flex; align-items: center; gap: 14px; }
+.count { font-family: "DM Serif Display", Georgia, serif; font-style: italic; font-size: 30px; color: var(--color-text-primary, #16233a); line-height: 1; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--color-text-secondary, #6b7280); margin-bottom: 12px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend .pill { padding: 2px 8px; font-size: 11px; }
+
+.cards { display: flex; flex-direction: column; gap: 12px; }
+.card { border: 1px solid var(--color-border, #e8e6df); border-left: 4px solid #d1d5db; border-radius: 12px; padding: 14px 16px; background: #fff; }
+.brdA { border-left-color: #085041; }
+.brdB { border-left-color: #1d9e75; }
+.brdC { border-left-color: #ba7517; }
+.brdD, .brdE { border-left-color: #a98a3a; }
+.brdWarn { border-left-color: #e8c87a; }
+.cardTop { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+.cardTop .mono { font-weight: 700; color: var(--color-text-primary, #16233a); }
+.score { font-size: 12.5px; font-weight: 700; color: var(--color-text-primary, #16233a); }
+.cardMeta { display: flex; gap: 18px; flex-wrap: wrap; font-size: 13px; color: var(--color-text-secondary, #57524a); margin-bottom: 10px; }
+.cardMeta span { display: inline-flex; align-items: center; gap: 5px; }
+.cardMeta i { color: var(--color-text-secondary, #9ca3af); }
+.cardReq { background: #f8fafb; border-radius: 8px; padding: 10px 12px; font-size: 13.5px; color: #1a1a17; margin-bottom: 12px; }
+.cardActions { display: flex; gap: 8px; flex-wrap: wrap; }
+
 /* Lead qualification tier badges (routing). A = strongest → E = weakest. */
 .tierA { background: #085041; color: #fff; }
 .tierB { background: #1d9e75; color: #fff; }

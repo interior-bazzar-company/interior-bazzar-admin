@@ -72,7 +72,7 @@ const PaymentsView = () => {
                       <td><span className={styles.pill}>{p.orderStatus || "—"}</span></td>
                       <td>{refundCell(p)}</td>
                       <td className={styles.actions}>
-                        {p.refundStatus !== "REFUNDED" && (
+                        {p.orderStatus === "PAID" && (
                           <button type="button" className={styles.edit} onClick={() => v.openRefund(p)}>Refund</button>
                         )}
                       </td>

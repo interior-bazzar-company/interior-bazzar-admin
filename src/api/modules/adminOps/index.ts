@@ -22,11 +22,19 @@ export interface AuditEntry {
 export interface PlanFeature {
   text: string;
 }
+export interface PlanCycle {
+  id: number; durationMonths: number; price: string; oldPrice: string | null;
+  badgeLabel: string; isActive: boolean;
+}
+export type PlanCycleInput = {
+  durationMonths: number; price: string; oldPrice?: string; badgeLabel?: string; isActive?: boolean;
+};
 export interface PlanRow {
   id: number; planFamily: string; entityType: string; title: string;
   subtitle: string; tier: number; amount: string; payableAmount: string;
   discountPercentage: string; duration: string; tag: string;
-  features: PlanFeature[]; isActive: boolean;
+  badge?: string; badgeIcon?: string;
+  features: PlanFeature[]; billingCycles: PlanCycle[]; isActive: boolean;
 }
 export interface BannerButton { label: string; link: string; isPrimary: boolean; }
 export interface BannerMetric { metric: string; description: string; index: number; }
@@ -97,8 +105,8 @@ export class AdminOpsService {
   }
 
   // ── Revenue ──
-  static revenue() {
-    return apiService.getGetApiResponse<RevenueOverview>(`${base}/revenue/`);
+  static revenue(params: { start?: string; end?: string } = {}) {
+    return apiService.getGetApiResponse<RevenueOverview>(`${base}/revenue/${qs(params)}`);
   }
   static addExpense(data: { label: string; amount: number; category?: string; kind?: string; incurredAt?: string }) {
     return apiService.getPostApiResponse<any>(`${base}/revenue/expense/`, data);
@@ -114,12 +122,26 @@ export class AdminOpsService {
   static updatePlan(id: number, data: Partial<PlanRow>) {
     return apiService.getPutApiResponse<PlanRow>(`${base}/plans/${id}/`, data);
   }
-  static addPlan(data: Partial<PlanRow> & { planFamily: string }) {
+  static addPlan(data: Partial<PlanRow> & { planFamily: string; cycles?: PlanCycleInput[] }) {
     return apiService.getPostApiResponse<PlanRow>(`${base}/plans/`, data);
+  }
+  // Billing cycles (child rows of a plan).
+  static addCycle(planId: number, data: PlanCycleInput) {
+    return apiService.getPostApiResponse<PlanCycle>(`${base}/plans/${planId}/cycles/`, data);
+  }
+  static updateCycle(planId: number, cycleId: number, data: Partial<PlanCycleInput>) {
+    return apiService.getPutApiResponse<PlanCycle>(`${base}/plans/${planId}/cycles/${cycleId}/`, data);
+  }
+  static deleteCycle(planId: number, cycleId: number) {
+    return apiService.getDeleteApiResponse<{ id: number; deleted: boolean }>(`${base}/plans/${planId}/cycles/${cycleId}/`);
   }
   // isActive=false archives (hidden from buyers); true re-activates.
   static setPlanActive(id: number, isActive: boolean) {
     return apiService.getPostApiResponse<PlanRow>(`${base}/plans/${id}/archive/`, { isActive });
+  }
+  // Soft delete: hidden from admin + public; existing subscribers keep the plan.
+  static deletePlan(id: number) {
+    return apiService.getDeleteApiResponse<{ id: number; deleted: boolean }>(`${base}/plans/${id}/`);
   }
 
   // ── House banners (real HomeHeroBanner hero slides) ──

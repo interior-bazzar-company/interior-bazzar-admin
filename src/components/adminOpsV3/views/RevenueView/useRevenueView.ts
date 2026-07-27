@@ -7,7 +7,12 @@ import AdminOpsService, { type RevenueOverview, type RevenueAssumptions } from "
 const useRevenueView = () => {
   const [data, setData] = useState<RevenueOverview | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; msg: string } | null>(null);
+
+  // date range — gross/family/expenses only (MRR/ARPU + 6-month trend stay all-time)
+  const [start, setStart] = useState<string>("");
+  const [end, setEnd] = useState<string>("");
 
   // add-expense form
   const [label, setLabel] = useState("");
@@ -22,14 +27,30 @@ const useRevenueView = () => {
 
   const load = async () => {
     setLoading(true);
-    const res = await AdminOpsService.revenue().catch(() => null);
+    const res = await AdminOpsService.revenue({ start: start || undefined, end: end || undefined }).catch(() => null);
     if (res?.response && res.data) {
-      setData(res.data);
-      if (res.data.assumptions) setAssume(res.data.assumptions);
+      const d = res.data;
+      // Zero-fill every field so a partial/empty payload can never crash the render.
+      setData({
+        grossRevenue: d.grossRevenue ?? 0, refunded: d.refunded ?? 0, netRevenue: d.netRevenue ?? 0,
+        mrr: d.mrr ?? 0, arpu: d.arpu ?? 0, activeSubscribers: d.activeSubscribers ?? 0,
+        cac: d.cac ?? 0, payingCustomers: d.payingCustomers ?? 0,
+        salesThisMonth: d.salesThisMonth ?? 0, momDeltaPct: d.momDeltaPct ?? 0,
+        revenueByFamily: d.revenueByFamily ?? [], monthlyRevenue: d.monthlyRevenue ?? [],
+        expensesTotal: d.expensesTotal ?? 0, expensesFixed: d.expensesFixed ?? 0,
+        expensesReinvest: d.expensesReinvest ?? 0, net: d.net ?? 0,
+        ltv: d.ltv ?? 0, ltvCac: d.ltvCac ?? 0, paybackMonths: d.paybackMonths ?? 0,
+        assumptions: d.assumptions ?? { avgLifetimeMonths: 18, grossMargin: 0.7, revenueTarget: 0, newCustomersThisMonth: 0 },
+        expenses: d.expenses ?? [],
+      });
+      setError(false);
+      if (d.assumptions) setAssume(d.assumptions);
+    } else {
+      setError(true);
     }
     setLoading(false);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [start, end]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const addExpense = async () => {
     if (!label.trim() || !amount.trim()) { setNotice({ kind: "err", msg: "Label and amount are required." }); return; }
@@ -50,7 +71,8 @@ const useRevenueView = () => {
   };
 
   return {
-    data, loading, notice,
+    data, loading, error, notice,
+    start, setStart, end, setEnd,
     label, setLabel, amount, setAmount, category, setCategory, kind, setKind, saving, addExpense,
     assume, setAssumeField, savingAssume, saveAssumptions,
   };

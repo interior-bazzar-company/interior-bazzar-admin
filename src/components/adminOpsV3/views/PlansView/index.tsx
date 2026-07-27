@@ -2,8 +2,63 @@
 // Dynamic family tabs + plan cards + inline edit/create form. Price edits are
 // level-3 (backend audits). Archive hides a plan from the public site (isActive)
 // while keeping it here so it can be re-activated. Data: /api/v1/admin/plans/.
+import { useState } from "react";
 import styles from "./PlansView.module.css";
-import usePlansView from "./usePlansView";
+import usePlansView, { cycleLabel } from "./usePlansView";
+import type { PlanRow } from "../../../../api/modules/adminOps";
+
+// Cycles editor inside the edit form: existing cycles (inline price + active toggle +
+// remove) and an add-cycle sub-form. Wired to the hook handlers.
+const CyclesEditor = ({ plan, v }: { plan: PlanRow; v: ReturnType<typeof usePlansView> }) => {
+  const [prices, setPrices] = useState<Record<number, string>>({});
+  const [add, setAdd] = useState({ durationMonths: "", price: "", oldPrice: "", badgeLabel: "" });
+
+  const submitAdd = () => {
+    const months = Number(add.durationMonths);
+    if (!months || Number.isNaN(months) || !add.price.trim()) return;
+    v.addCycle(plan.id, {
+      durationMonths: months, price: add.price.trim(),
+      ...(add.oldPrice.trim() ? { oldPrice: add.oldPrice.trim() } : {}),
+      ...(add.badgeLabel.trim() ? { badgeLabel: add.badgeLabel.trim() } : {}),
+    }).then((ok) => ok && setAdd({ durationMonths: "", price: "", oldPrice: "", badgeLabel: "" }));
+  };
+
+  return (
+    <div className={styles.cycles}>
+      <span className={styles.cyclesHead}>Billing cycles</span>
+      {plan.billingCycles?.map((c) => {
+        const busy = v.cycleBusy === c.id;
+        const edited = prices[c.id] ?? c.price;
+        return (
+          <div key={c.id} className={styles.cycleRow}>
+            <span className={styles.cycleDur}>{cycleLabel(c.durationMonths)}</span>
+            <input className={styles.cyclePrice} value={edited}
+              onChange={(e) => setPrices((p) => ({ ...p, [c.id]: e.target.value }))} />
+            <button type="button" className={styles.cycleBtn} disabled={busy || edited === c.price}
+              onClick={() => v.saveCycle(plan.id, c.id, { price: edited })}>Save</button>
+            <button type="button" className={styles.cycleBtn} disabled={busy}
+              onClick={() => v.toggleCycleActive(plan.id, c.id, !c.isActive)}>
+              {c.isActive ? "active" : "disabled"}
+            </button>
+            <button type="button" className={styles.cycleRemove} disabled={busy}
+              onClick={() => v.removeCycle(plan.id, c.id, cycleLabel(c.durationMonths))}>Remove</button>
+          </div>
+        );
+      })}
+      <div className={styles.cycleAdd}>
+        <input className={styles.cyclePrice} value={add.durationMonths} placeholder="Months"
+          onChange={(e) => setAdd((a) => ({ ...a, durationMonths: e.target.value }))} />
+        <input className={styles.cyclePrice} value={add.price} placeholder="Price ₹"
+          onChange={(e) => setAdd((a) => ({ ...a, price: e.target.value }))} />
+        <input className={styles.cyclePrice} value={add.oldPrice} placeholder="Old ₹"
+          onChange={(e) => setAdd((a) => ({ ...a, oldPrice: e.target.value }))} />
+        <input className={styles.cyclePrice} value={add.badgeLabel} placeholder="Badge"
+          onChange={(e) => setAdd((a) => ({ ...a, badgeLabel: e.target.value }))} />
+        <button type="button" className={styles.cycleBtn} disabled={v.cycleBusy === -1} onClick={submitAdd}>Add cycle</button>
+      </div>
+    </div>
+  );
+};
 
 const PlansView = () => {
   const v = usePlansView();
@@ -47,15 +102,30 @@ const PlansView = () => {
             <input value={v.form.duration} onChange={(e) => v.setField("duration", e.target.value)} placeholder="Monthly / Annual" />
           </label>
         </div>
+        <div className={styles.formRow}>
+          <label className={styles.field}>
+            <span>Tag (plan key)</span>
+            <input value={v.form.tag} onChange={(e) => v.setField("tag", e.target.value)} placeholder="e.g. arch-starter" />
+          </label>
+          <label className={styles.field}>
+            <span>Tier (ordering)</span>
+            <input value={v.form.tier} onChange={(e) => v.setField("tier", e.target.value)} placeholder="e.g. 1" />
+          </label>
+        </div>
         <label className={styles.field}>
-          <span>Tag</span>
-          <input value={v.form.tag} onChange={(e) => v.setField("tag", e.target.value)} placeholder="e.g. Popular" />
+          <span>Badge (public ribbon)</span>
+          <input value={v.form.badge} onChange={(e) => v.setField("badge", e.target.value)} placeholder="e.g. Most popular" />
         </label>
         <label className={styles.field}>
           <span>Features (one per line)</span>
           <textarea rows={4} value={v.form.features} onChange={(e) => v.setField("features", e.target.value)}
             placeholder={"Unlimited leads\nPriority support\n…"} />
         </label>
+        {/* Cycles editor — only for existing plans (needs a planId; create a plan first). */}
+        {!v.creating && planId != null && (() => {
+          const plan = v.rows.find((r) => r.id === planId);
+          return plan ? <CyclesEditor plan={plan} v={v} /> : null;
+        })()}
         <div className={styles.actions}>
           <button type="button" className={styles.save} disabled={v.saving} onClick={v.savePlan}>
             {v.saving ? "Saving…" : v.creating ? "Create" : "Save"}
@@ -132,9 +202,30 @@ const PlansView = () => {
                       {p.features.map((f, i) => <li key={i}>{f.text}</li>)}
                     </ul>
                   )}
+                  {p.billingCycles?.length > 0 && (
+                    <div className={styles.cycleList}>
+                      {p.billingCycles.map((c) => (
+                        <div key={c.id} className={styles.cycleLine}>
+                          <span>{cycleLabel(c.durationMonths)} — ₹{c.price}</span>
+                          <span className={c.isActive ? styles.cycleOn : styles.cycleOff}>
+                            {c.isActive ? "[active]" : "[disabled]"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {!p.isActive && <span className={styles.archivedBadge}>Archived</span>}
                   <div className={styles.actions}>
                     <button type="button" className={styles.edit} onClick={() => v.startEdit(p)}>Edit</button>
+                    <button
+                      type="button"
+                      className={styles.delete}
+                      disabled={v.deletingId === p.id}
+                      onClick={() => v.deletePlan(p)}
+                      title="Soft delete — existing subscribers keep the plan until expiry"
+                    >
+                      {v.deletingId === p.id ? "Deleting…" : "Delete"}
+                    </button>
                   </div>
                 </div>
               )

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { PAGES } from "../../../utils/constants/app";
 import { ADMIN_OPS_NAV, ADMIN_OPS_MODULES } from "../../../content/admin-ops-nav.content";
-import { canSee, levelFor, OPS_ROLE_LABEL, type OpsRole } from "../../../content/admin-ops-rbac";
+import { levelFor, OPS_ROLE_LABEL, type OpsRole } from "../../../content/admin-ops-rbac";
 import { useAppSelector } from "../../../redux/store/hook";
 import useLogout from "../../../hooks/auth/useLogout";
 import AdminOpsService from "../../../api/modules/adminOps";
@@ -32,29 +32,42 @@ const useAdminOpsLayout = () => {
   // backend name for the topbar chip label.
   const [role, setRole] = useState<OpsRole>("analyst");
   const [roleName, setRoleName] = useState<string | null>(null);
+  // Backend-resolved per-module levels — authoritative once loaded. Covers
+  // legacy/custom role names (e.g. migrated prod "Admin", "sales team") that
+  // aren't OpsRole keys and used to silently degrade to analyst.
+  const [modules, setModules] = useState<Record<string, number> | null>(null);
   useEffect(() => {
     AdminOpsService.mePermissions()
       .then((res) => {
         const r = res?.data?.role ?? null;
+        const mods = res?.data?.modules ?? null;
         setRoleName(r);
+        if (mods && typeof mods === "object") setModules(mods);
         if (r && r in OPS_ROLE_LABEL) setRole(r as OpsRole);
+        else if (mods && Object.values(mods).every((l) => l === 3))
+          setRole("super_admin"); // legacy is_full_access role under a custom name
       })
       .catch(() => {});
   }, []);
+
+  // Level resolution: the backend modules map wins; the static PERMS map only
+  // fills in until permissions resolve (least-privileged analyst default).
+  const lvl = (key: string) =>
+    modules ? (modules[key] ?? 0) : levelFor(role, key);
 
   // Nav gated by RBAC level: hide any module the role can't see (level 0), and
   // drop groups left empty. (admin-rbac-plan.md; nav gating is not security by
   // itself — the backend authorizes too.)
   const nav = ADMIN_OPS_NAV
-    .map((g) => ({ ...g, items: g.items.filter((i) => canSee(role, i.key)) }))
+    .map((g) => ({ ...g, items: g.items.filter((i) => lvl(i.key) >= 1) }))
     .filter((g) => g.items.length > 0);
 
   // Active module key: the :section param, defaulting to "overview". A section the
   // role can't see falls back to overview.
   const requested = section && section in ADMIN_OPS_MODULES ? section : "overview";
-  const activeKey = canSee(role, requested) ? requested : "overview";
+  const activeKey = lvl(requested) >= 1 ? requested : "overview";
   const activeLabel = ADMIN_OPS_MODULES[activeKey] ?? "Overview";
-  const activeLevel = levelFor(role, activeKey);
+  const activeLevel = lvl(activeKey);
 
   // Collapsed groups (all open by default; Overview is solo so never collapses).
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());

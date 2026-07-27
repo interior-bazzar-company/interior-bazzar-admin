@@ -28,13 +28,21 @@ const RevenueView = () => {
   return (
     <div>
       <div className={styles.head}>
-        <h1>Revenue &amp; Unit Economics</h1>
-        <p>Real revenue from payments &amp; active plans. Cards marked (est.) derive from the editable assumptions below.</p>
+        <div>
+          <h1>Revenue &amp; Unit Economics</h1>
+          <p>Real revenue from payments &amp; active plans. Cards marked (est.) derive from the editable assumptions below. Date range scopes gross/family/expenses; MRR/ARPU and the 6-month trend stay all-time.</p>
+        </div>
+        <div className={styles.search}>
+          <input type="date" value={v.start} onChange={(e) => v.setStart(e.target.value)} aria-label="Start date" />
+          <input type="date" value={v.end} onChange={(e) => v.setEnd(e.target.value)} aria-label="End date" />
+        </div>
       </div>
 
       {v.notice && <div className={`${styles.notice} ${v.notice.kind === "ok" ? styles.ok : styles.err}`}>{v.notice.msg}</div>}
 
-      {v.loading || !d ? <div className={styles.empty}>Loading revenue…</div> : (
+      {v.loading ? <div className={styles.empty}>Loading revenue…</div>
+        : v.error || !d ? <div className={styles.empty}>Couldn't load revenue — check your access or try again.</div>
+        : (
         <>
           <div className={styles.kpis}>
             <div className={styles.kpi}><div className={styles.val}>{inr(d.mrr)}</div><div className={styles.lbl}>MRR (equivalent)</div></div>
@@ -77,6 +85,7 @@ const RevenueView = () => {
             {/* Revenue by family */}
             <div className={styles.panel}>
               <h3 className={styles.sliderGroupHead}>Revenue by family</h3>
+              <p style={{ color: "#9ca3af", fontSize: 12, margin: "0 0 8px" }}>Plan purchases split by family; payments made before this was tracked show as “PLAN”.</p>
               {bars(d.revenueByFamily)}
             </div>
           </div>
