@@ -455,8 +455,14 @@ function CtxPane({ dl, c, p }: { dl: any; c: any; p: Params }) {
           ["Interested in", dl.interested_in],
           ["Enquiry", <span className="mono">{dl.enquiry_id}</span>],
           ["Created", D.fmtDate(dl.created_at)],
-          dl.expected_close_date ? ["Expected close", D.fmtDate(dl.expected_close_date)] : null,
-          dl.discount_pct === null || dl.discount_pct === undefined ? null : ["Discount", dl.discount_pct + "%"]
+          /* Both rows are ALWAYS present, with a null value where there is no
+             figure — KvList renders that as the faint em-dash. The prototype's
+             `.filter(Boolean)` runs over the rows, not the values, so an empty
+             expected-close still occupies its line. Hiding the row instead
+             makes the panel change height per deal and quietly loses the fact
+             that the field exists and is unset. */
+          ["Expected close", dl.expected_close_date ? D.fmtDate(dl.expected_close_date) : null],
+          ["Discount", dl.discount_pct === null || dl.discount_pct === undefined ? null : dl.discount_pct + "%"]
         ].filter(Boolean)) as [ReactNode, ReactNode][]} />
       </div>
 

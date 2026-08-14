@@ -20,4 +20,21 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // The ported admin panel. Two rules are relaxed here and nowhere else.
+    files: ['src/admin/**/*.{ts,tsx}'],
+    rules: {
+      // The shell deliberately keeps its API — can(), useNav(), usePageChrome(),
+      // useShell() — beside the components that define the contexts, and ui/ is a
+      // barrel of 19 components plus the helpers they share. Splitting either to
+      // win back fast refresh would scatter one contract across several files.
+      // Structural, not a TODO.
+      'react-refresh/only-export-components': 'off',
+      // src/admin/engines/ is ~6000 lines of untyped ES5 ported verbatim from the
+      // prototype, declared `any` on purpose because the whole layer is replaced
+      // by HTTP calls later. Every view that calls it inherits that. TEMPORARY:
+      // delete this line once the engines are behind typed API modules.
+      '@typescript-eslint/no-explicit-any': 'warn',
+    },
+  },
 ])

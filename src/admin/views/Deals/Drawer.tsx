@@ -132,9 +132,12 @@ export function DealDrawer({ dealRef, p }: { dealRef: string; p: Params }) {
           ["Enquiry", <span className="mono">{dl.enquiry_id}</span>],
           ["Created", D.fmtDate(dl.created_at)],
           ["Stage age", Math.abs(D.days(D.d(dl.stage_since))) + " days"],
-          dl.expected_close_date ? ["Expected close", D.fmtDate(dl.expected_close_date)] : null,
-          dl.discount_pct === null || dl.discount_pct === undefined ? null
-            : ["Discount", <>{dl.discount_pct}%{dl.is_target2_eligible ? null
+          /* Always present, null value where there is no figure — KvList draws
+             the faint em-dash. The prototype's filter runs over rows, not
+             values, so an unset field keeps its line. */
+          ["Expected close", dl.expected_close_date ? D.fmtDate(dl.expected_close_date) : null],
+          ["Discount", dl.discount_pct === null || dl.discount_pct === undefined ? null
+            : <>{dl.discount_pct}%{dl.is_target2_eligible ? null
                 : <> <Pill text="Target 2 ineligible" tone="bad" /></>}</>],
           /* Priority is not a fact row any more. It is a control, eighteen
              lines up, and a read-only copy of a value you can edit above is a

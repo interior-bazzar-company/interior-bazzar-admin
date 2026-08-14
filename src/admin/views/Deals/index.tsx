@@ -115,7 +115,6 @@ export default function Deals() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wantsDrawer, id, search]);
 
-  if (p.smoke === "analytics") return <SmokeAnalytics />; // TEMP-SMOKE
   if (view === "chat") return <ChatWorkspace id={id} p={p} list={list} scope={scope} />;
   if (view === "tags") return <TagsView p={p} />;
 

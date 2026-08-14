@@ -21,7 +21,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from "react";
 import { Link, Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Icon, richText } from "../ui";
-import { setGo } from "../ui/nav";
+import { go as uiGo, setGo } from "../ui/nav";
 import { IBData, IBTeam } from "../engines";
 import config from "../../config";
 import { GROUP_OF, HOME_ROUTE, ITEMS, MODULES } from "./modules";
@@ -78,9 +78,14 @@ export function usePageChrome(c: Chrome) {
 }
 
 /* -------------------------------------------------------------- navigation */
+/* The default is the module-level `go`, not a no-op, and that matters: layers
+   (drawer, modal, popover) are portalled out of ShellProvider, which sits ABOVE
+   AdminShell, so anything rendered into one is outside this context. A no-op
+   default made every link inside a drawer silently dead. `go` is the same
+   function the ui/ components route through, so both trees navigate. */
 const NavCtx = createContext<{ go: (hash: string) => void; back: () => void }>({
-  go: () => {},
-  back: () => {},
+  go: uiGo,
+  back: () => window.history.back(),
 });
 export const useNav = () => useContext(NavCtx);
 

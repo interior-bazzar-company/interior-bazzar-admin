@@ -40,7 +40,25 @@ export function actor() {
   return { name: u.name, role: u.role, id: u.id };
 }
 export function head() { return E.isHead(actor()); }
-export function inr(p: number, o?: { compact?: boolean }) { return D.inr(p, o); }
+/* PORTED FAITHFULLY, INCLUDING THE SWALLOWED ARGUMENT.
+
+   The prototype's wrapper is `function inr(p) { return D.inr(p); }` — one
+   parameter. Sixteen call sites in views-deals.js pass `{ compact:true }` and
+   every one of them is silently discarded, so this module renders full Indian
+   grouping (₹29,20,000) and never the abbreviated form (₹29.20L).
+
+   Forwarding the option "fixes" that and changes what every money figure in
+   Deals looks like, which is not a port. Note that views-invoice.js and
+   views-quotation.js DO forward it — the omission is specific to this file, so
+   it reads as an accident rather than a house style. But `admin-data.js` also
+   says of the grouping helper: "Never thousands grouping. Never decimals", and
+   the compact form has decimals. Two readings, so this keeps what the prototype
+   actually renders and leaves the decision visible.
+   The `o` parameter stays in the signature so the sixteen call sites still say
+   what they meant. */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- see above: the
+// unused parameter IS the ported behaviour.
+export function inr(p: number, _o?: { compact?: boolean }) { return D.inr(p); }
 export function rupees(v: unknown) {
   const n = Number(String(v).replace(/[^\d.]/g, ""));
   return isNaN(n) ? 0 : Math.round(n * 100);
