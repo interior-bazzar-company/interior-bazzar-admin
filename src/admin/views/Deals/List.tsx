@@ -8,11 +8,14 @@ import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import { can } from "../../shell/AdminShell";
 import {
-  ALL_STAGES, D, E, STAGE, STRIP_STAGES, dealHash, head, inr, merge, omit, place, urgency, useFilters
+  ALL_STAGES, D, STAGE, STRIP_STAGES, dealHash, head, inr, merge, omit, place, urgency,
+  useFilters
 } from "./useDeals";
-import type { Params } from "./useDeals";
+import type { DealsApiState, Params } from "./useDeals";
+import { legacyPriorityInt, legacyStageInt } from "./adapter";
 import { ChainDots, MoneyCell, NextCell, OwnerCell, TagChips } from "./bits";
 import { useActs } from "./Modals";
+import AdminLoader from "../../../components/shared/AdminLoader";
 
 /* The strip reads as one table row: cells of equal build, ruled off from each
    other, sitting on the same baseline. Total first, then the funnel one stage
@@ -64,9 +67,7 @@ export function AttnStrip({ p, m }: {
    nothing left over, so its counts go beside the title — same cells, same
    order, same filtering, and the routes keep `view` so pressing one narrows
    the chat list rather than throwing you back to the table. */
-export function TbStats({ p, scope }: { p: Params; scope: any[] }) {
-  const byStage: Record<number, number> = {};
-  scope.forEach((d: any) => { byStage[d.stage] = (byStage[d.stage] || 0) + 1; });
+export function TbStats({ p, m }: { p: Params; m: { byStage: Record<number, number>; total: number } }) {
   const cell = (k: string, v: number, route: string, on: boolean, dot?: string) => (
     <button key={k} className={"tb-stat" + (on ? " on" : "")} data-go={route} title={v + " " + k}
       onClick={() => go(route)}>
@@ -76,10 +77,10 @@ export function TbStats({ p, scope }: { p: Params; scope: any[] }) {
   );
   return (
     <span className="tb-stats">
-      {cell("total", scope.length,
+      {cell("total", m.total,
         "#/deals" + qs(omit(p, ["stage", "stalled", "next", "priority"])),
         !p.stage && !p.stalled && !p.next && !p.priority)}
-      {STRIP_STAGES.map((s) => cell(D.STAGES[s].label.toLowerCase(), byStage[s] || 0,
+      {STRIP_STAGES.map((s) => cell(D.STAGES[s].label.toLowerCase(), m.byStage[s] || 0,
         "#/deals" + qs(merge(p, { stage: String(p.stage) === String(s) ? "" : s })),
         String(p.stage) === String(s), D.STAGES[s].tone || ""))}
     </span>
@@ -103,23 +104,48 @@ export function TbMoney({ outstanding, collected }: { outstanding: number; colle
   );
 }
 
+/* Stage/Priority Select options, sourced from the API's own vocabulary once
+   it has loaded — so a stage or priority row added server-side shows up here
+   with no code edit. Falls back to the local D.STAGES/D.PRIORITY vocab (the
+   pre-load state, and the pre-API baseline) while the first fetch is still
+   in flight. Values stay legacy ints either way — see the comment above
+   apiStageKey() in useDeals.ts for why the URL param can't just be the raw
+   API key. */
+function stageOptions(apiStages: { key: string; label: string; tone: string }[]) {
+  return (apiStages.length ? apiStages.map((s) => ({ v: String(legacyStageInt(s)), l: s.label }))
+    : ALL_STAGES.map((s) => ({ v: String(s), l: D.STAGES[s].label })));
+}
+function priorityOptions(apiPriorities: { key: string; label: string }[]) {
+  return (apiPriorities.length ? apiPriorities.map((pr) => ({ v: String(legacyPriorityInt(pr)), l: pr.label }))
+    : [{ v: "3", l: "Urgent" }, { v: "2", l: "High" }, { v: "1", l: "Normal" }]);
+}
+
+/* The panel's existing "no access" copy (registry.tsx's Denied, for the
+   whole-module gate) — repeated here rather than imported, since that one is
+   for a module you can't see at all and this is a 403 arriving mid-session
+   from a live fetch. Same words, so the two never read as different rules. */
+function DealsDenied() {
+  return (
+    <EmptyState icon="shield" title="You do not have access to this module"
+      body="Deals is not in your effective access for this session. Access is granted by role, not requested per page — ask an Admin to review your role in Settings → Team." />
+  );
+}
+
 /* ==========================================================================
-   THE LIST WORKSPACE
+   THE LIST WORKSPACE — Table and Pipeline. Reads the API directly (Chat and
+   Tags, elsewhere in this module, still read the local engine).
    ====================================================================== */
-export function DealsList({ id, p, scope, list, outstanding, collected }: {
-  id: string | null; p: Params; scope: any[]; list: any[]; outstanding: number; collected: number;
+export function DealsList({ id, p, api, outstanding, collected }: {
+  id: string | null; p: Params; api: DealsApiState; outstanding: number; collected: number;
 }) {
   const acts = useActs(p);
   const { onFilter, onSearch, onUnfilter } = useFilters(p, id);
   const view = p.view === "board" ? "board" : "table";
 
-  /* Counted over `scope`, not `list` — the strip has to keep showing what a
-     stage holds while you are standing inside another one, or the cell you
-     need to click next reads 0. */
-  const byStage: Record<number, number> = {};
-  scope.forEach((d: any) => { byStage[d.stage] = (byStage[d.stage] || 0) + 1; });
-
   const tagsHash = "#/deals" + qs(merge(p, { view: "tags" }));
+
+  if (api.loading && !api.list.length) return <AdminLoader />;
+  if (api.forbidden) return <DealsDenied />;
 
   return (
     <div className="dls">
@@ -130,19 +156,19 @@ export function DealsList({ id, p, scope, list, outstanding, collected }: {
       <div className="dls-cmd">
         <SearchField ph="Search name, business, email, phone, city or deal ref…" val={p.q} onFilter={onSearch} />
         <Select name="stage" label="Stage" value={p.stage} onFilter={onFilter}
-          options={ALL_STAGES.map((s) => ({ v: String(s), l: D.STAGES[s].label }))} />
+          options={stageOptions(api.stages)} />
         {head()
           ? <Select name="owner" label="Owner" value={p.owner} onFilter={onFilter}
-              options={E.Assignment.roster().members.map((m: any) => String(m.id))} />
+              options={api.owners.map((o) => ({ v: String(o.id), l: o.name }))} />
           : null}
         <Select name="priority" label="Priority" value={p.priority} onFilter={onFilter}
-          options={[{ v: "3", l: "Urgent" }, { v: "2", l: "High" }, { v: "1", l: "Normal" }]} />
+          options={priorityOptions(api.priorities)} />
         <Select name="sort" label="Sort" value={p.sort} onFilter={onFilter}
           options={[{ v: "", l: "Sort: Newest first" }, { v: "age", l: "Stage age" },
             { v: "close", l: "Expected close" }, { v: "value", l: "Deal value" },
             { v: "out", l: "Outstanding" }, { v: "act", l: "Last activity" }]} />
         <Select name="tag" label="List" value={p.tag} onFilter={onFilter}
-          options={E.Tags.all().map((t: any) => ({ v: String(t.slug), l: t.label + " (" + t.count + ")" }))} />
+          options={api.tags.map((t) => ({ v: t.slug, l: t.label }))} />
         {/* Managing tags belongs next to filtering by them, not in a list of
             ways to look at deals. */}
         <button className="btn icon" title="Manage lists" aria-label="Manage lists" data-go={tagsHash}
@@ -158,7 +184,11 @@ export function DealsList({ id, p, scope, list, outstanding, collected }: {
           : null}
       </div>
 
-      <AttnStrip p={p} m={{ byStage, outstanding, collected, total: scope.length }} />
+      {/* outstanding/collected: ponytail — local-engine seed data, not DB
+          truth. See index.tsx: no invoice/payment models exist server-side
+          yet, so these two figures still come from IBDeals' own local scope,
+          not the API deals just fetched above. */}
+      <AttnStrip p={p} m={{ byStage: api.counts.byStage, outstanding, collected, total: api.counts.total }} />
 
       <FilterChips params={omit(p, ["view"])} onUnfilter={onUnfilter}
         labels={{ q: "Search", stage: "Stage", owner: "Owner", priority: "Priority",
@@ -166,8 +196,8 @@ export function DealsList({ id, p, scope, list, outstanding, collected }: {
 
       <div className={"dls-body" + (view === "board" ? " is-board" : "")}>
         {view === "board"
-          ? <Board list={list} sel={id} p={p} />
-          : <DealsTable list={list} sel={id} p={p} onCreate={() => acts.create()} onClearFilters={() => onUnfilter("*")} />}
+          ? <Board list={api.list} sel={id} p={p} />
+          : <DealsTable list={api.list} sel={id} p={p} onCreate={() => acts.create()} onClearFilters={() => onUnfilter("*")} />}
       </div>
     </div>
   );
@@ -218,7 +248,7 @@ function DealsTable({ list, sel, p, onCreate, onClearFilters }: {
                   {d.deal_id} · {place(d)} · {d.interested_in}
                   {d.duplicate_count ? <> <span title="repeat submissions">·{d.duplicate_count}</span></> : null}
                 </div>
-                <TagChips dealId={d.deal_id} max={3} />
+                <TagChips dealId={d.deal_id} max={3} tags={d.tags} />
               </td>
               <td>
                 <Pill text={D.STAGES[d.stage].label} tone={D.STAGES[d.stage].tone} />
@@ -294,8 +324,11 @@ function BoardCard({ d, sel, p }: { d: any; sel: string | null; p: Params }) {
       data-go={to} onClick={() => go(to)}>
       <div className="n1"><span className="nm">{d.customer_name}</span><span className="rf">{d.deal_id}</span></div>
       <div className="n2"><ChainDots dl={d} />
-        <span className="amt tnum">{d.outstanding ? inr(d.outstanding, { compact: true })
-          : d.deal_value ? "₹0" : "—"}</span>
+        {/* ponytail: outstanding is chain data — undefined (not a real 0) on
+            an API-backed deal. Rendering "₹0" there would claim it's fully
+            collected when collection was never checked. */}
+        <span className="amt tnum">{d.outstanding === undefined ? "—"
+          : d.outstanding ? inr(d.outstanding, { compact: true }) : "₹0"}</span>
       </div>
       <div className="age">{Math.abs(D.days(D.d(d.stage_since)))}d in stage{tail ? <> · {tail}</> : null}</div>
     </button>

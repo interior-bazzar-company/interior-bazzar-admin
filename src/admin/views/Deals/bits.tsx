@@ -8,14 +8,21 @@
    ============================================================================= */
 import type { ReactNode } from "react";
 import { Icon, Notice, avatarTone, initials } from "../../ui";
-import { D, E, STAGE, inr } from "./useDeals";
+import { D, E, EMPTY_CHAIN, STAGE, inr } from "./useDeals";
 import type { Refusal } from "./useDeals";
 
 /* Chain state at a glance: which deals are stuck waiting on a quote, without
-   opening one. */
+   opening one.
+   ponytail: quotation/invoice status and the payment count are chain data —
+   no invoice/payment models exist server-side yet, so an API-backed deal
+   carries neither `quotation_status`/`invoice_status` nor a local
+   E.Chain.state() row. Missing reads as "none" (blank chip), and
+   E.Chain.state() falls back to EMPTY_CHAIN instead of throwing on null. This
+   whole cell is local-engine seed data standing in for a chain that isn't
+   real yet — not DB truth. */
 export function ChainDots({ dl }: { dl: any }) {
-  const c = E.Chain.state(dl.deal_id);
-  const q = dl.quotation_status, i = dl.invoice_status;
+  const c = E.Chain.state(dl.deal_id) || EMPTY_CHAIN;
+  const q = dl.quotation_status || "none", i = dl.invoice_status || "none";
   const sq = (label: string, tone: string, title: string) =>
     <span className={tone} title={title}>{label}</span>;
   return (
@@ -55,8 +62,13 @@ export function toneName(v?: string) {
   return hit ? hit[1] : "No colour";
 }
 
-export function TagChips({ dealId, max }: { dealId: string; max?: number }) {
-  const tags = E.Tags.forDeal(dealId);
+/* `tags` is optional and, when passed, wins over the local engine lookup —
+   an API-backed deal carries its own tags straight off the wire (adapter.ts),
+   and E.Tags.forDeal() knows nothing about a ref the local engine never
+   seeded. Chat/Pipeline's local-engine rows don't pass it, so they keep
+   reading E.Tags.forDeal() exactly as before. */
+export function TagChips({ dealId, max, tags: given }: { dealId: string; max?: number; tags?: any[] }) {
+  const tags = given !== undefined ? given : E.Tags.forDeal(dealId);
   if (!tags.length) return null;
   const cap = max || tags.length;
   const shown = tags.slice(0, cap);
@@ -83,6 +95,10 @@ export function MoneyCell({ d }: { d: any }) {
         <div className="sub">quoted, not won</div>
       </>
     );
+  // ponytail: revenue_collected/outstanding are chain data — undefined for an
+  // API-backed row (no invoice/payment models yet). Render the value alone
+  // rather than fabricate a 0%/fully-collected bar.
+  if (d.revenue_collected === undefined) return <div className="amt tnum">{inr(d.deal_value)}</div>;
   const pct = Math.max(0, Math.min(100, Math.round(d.revenue_collected / d.deal_value * 100)));
   return (
     <>

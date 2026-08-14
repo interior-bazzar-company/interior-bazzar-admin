@@ -15,12 +15,16 @@
      3. The UI is a convenience, never the enforcement. The engine re-checks
         everything; rendering a different button changes nothing.
    ============================================================================= */
-import { useCallback, useEffect, useReducer, useRef } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import type { MouseEvent, ReactNode } from "react";
 import { IBData, IBDeals } from "../../engines";
 import { qs } from "../../ui";
 import { go } from "../../ui/nav";
 import { useShell } from "../../shell/ShellContext";
+import { currentActor } from "../../auth/session";
+import AdminOpsService from "../../../api/modules/adminOps";
+import type { DealPersonRef, DealPriorityVocab, DealStageVocab, DealTagVocab } from "../../../api/modules/adminOps";
+import { adaptByStage, adaptDeal, adaptTimeline, dateOnly, ownersFromRows } from "./adapter";
 
 export const D = IBData;
 export const E = IBDeals;
@@ -35,10 +39,10 @@ export function paramsOf(sp: URLSearchParams): Params {
   return o;
 }
 
-export function actor() {
-  const u = D.TeamStore.current() || { name: "System", role: "super_admin" };
-  return { name: u.name, role: u.role, id: u.id };
-}
+/* Who did this — the real signed-in identity now, not IBData.TeamStore's
+   localStorage session. Deals' own data flow (the local engine below) is
+   untouched; only where it reads "who is acting" changed. */
+export const actor = currentActor;
 export function head() { return E.isHead(actor()); }
 /* PORTED FAITHFULLY, INCLUDING THE SWALLOWED ARGUMENT.
 
@@ -56,8 +60,7 @@ export function head() { return E.isHead(actor()); }
    actually renders and leaves the decision visible.
    The `o` parameter stays in the signature so the sixteen call sites still say
    what they meant. */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- see above: the
-// unused parameter IS the ported behaviour.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- see above: the unused parameter IS the ported behaviour.
 export function inr(p: number, _o?: { compact?: boolean }) { return D.inr(p); }
 export function rupees(v: unknown) {
   const n = Number(String(v).replace(/[^\d.]/g, ""));
@@ -287,3 +290,161 @@ export function isoToday() {
   return t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" +
          String(t.getDate()).padStart(2, "0");
 }
+
+/* ==========================================================================
+   THE API READ PATH — List (Table/Pipeline) and Drawer only. Chat and Tags
+   keep reading filteredScope()/E above, untouched, per this pass's scope.
+   ====================================================================== */
+
+/* `p.stage`/`p.priority` stay LEGACY INTS in the URL — the same params Chat/
+   Tags and the local outstanding/collected aggregate below still read via
+   filteredScope(). Converting the Select options to emit raw API keys would
+   silently break both the moment a filter carries across a view switch, so
+   the int stays the address and only the OUTGOING request gets translated. */
+function apiStageKey(legacyStage?: string): string | undefined {
+  if (!legacyStage) return undefined;
+  const row = D.STAGES[Number(legacyStage)];
+  return row ? row.key : undefined; // a synthetic (unmapped) int has no server key to send back
+}
+/* IBData.PRIORITY only carries labels ("Normal"/"High"/"Urgent"), no key —
+   lower-cased label is the best available guess at the server's priorityKey
+   (the one example in the contract, "normal", matches this exactly). Confirm
+   against a live filter response if this ever mis-hits. */
+function apiPriorityKey(legacyPriority?: string): string | undefined {
+  const label = D.PRIORITY[Number(legacyPriority)];
+  return label ? String(label).toLowerCase() : undefined;
+}
+
+/** `response === false` is this API's failure envelope over HTTP 200 — see
+ * the comment above AdminOpsService's Deals methods. `code === 403` is a
+ * permission refusal; everything else (code 202 included) is "no such
+ * record" here, since a list fetch has no single ref to be missing. */
+function apiOk<T>(res: { response: boolean; code: number; data: T }): { ok: true; data: T } | { ok: false; forbidden: boolean } {
+  if (res.response === false) return { ok: false, forbidden: res.code === 403 };
+  return { ok: true, data: res.data };
+}
+
+export interface DealsApiState {
+  loading: boolean;
+  forbidden: boolean;
+  error: string | null;
+  list: any[];
+  counts: { total: number; byStage: Record<number, number> };
+  stages: DealStageVocab[];
+  priorities: DealPriorityVocab[];
+  tags: DealTagVocab[];
+  owners: DealPersonRef[];
+}
+const DEALS_API_IDLE: DealsApiState = {
+  loading: true, forbidden: false, error: null, list: [],
+  counts: { total: 0, byStage: {} }, stages: [], priorities: [], tags: [], owners: [],
+};
+
+/* Fetches the deals list for the current filters — Table and Pipeline only
+   (index.tsx mounts DealsList, which calls this, only for those two views).
+   ponytail: pageSize 500, no pager — the ported UI never had one (the
+   prototype doesn't either); a scope past 500 deals silently won't all show.
+   Add real pagination if that count is ever realistic. */
+export function useDealsApi(p: Params): DealsApiState {
+  const [state, setState] = useState<DealsApiState>(DEALS_API_IDLE);
+  const key = JSON.stringify({
+    stage: p.stage || "", priority: p.priority || "", owner: p.owner || "",
+    tag: p.tag || "", q: p.q || "", stalled: p.stalled || "", sort: p.sort || "",
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+    setState((s) => ({ ...s, loading: true }));
+    AdminOpsService.deals({
+      stage: apiStageKey(p.stage), priority: apiPriorityKey(p.priority),
+      owner: p.owner || undefined, tag: p.tag || undefined, search: p.q || undefined,
+      stalled: p.stalled === "1" ? "1" : undefined,
+      // Only the two dropdown values that map onto the contract's sort enum
+      // are forwarded; age/close/out/act have no server-side equivalent
+      // (they need chain/remark data this endpoint doesn't return) and are
+      // dropped rather than sent as a value the server would have to guess at.
+      sort: p.sort === "value" ? "value" : undefined,
+      pageNo: 1, pageSize: 500,
+    }).then((res) => {
+      if (cancelled) return;
+      const r = apiOk(res);
+      if (!r.ok) {
+        setState({ ...DEALS_API_IDLE, loading: false, forbidden: r.forbidden,
+          error: r.forbidden ? null : "Could not load deals." });
+        return;
+      }
+      const data = r.data;
+      setState({
+        loading: false, forbidden: false, error: null,
+        list: data.deals.map(adaptDeal),
+        counts: { total: data.counts.total, byStage: adaptByStage(data.counts.byStage, data.stages) },
+        stages: data.stages, priorities: data.priorities, tags: data.tags,
+        owners: ownersFromRows(data.deals),
+      });
+    }).catch(() => {
+      if (cancelled) return;
+      setState({ ...DEALS_API_IDLE, loading: false, error: "Could not load deals." });
+    });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  return state;
+}
+
+export interface DealApiState {
+  loading: boolean;
+  forbidden: boolean;
+  notFound: boolean;
+  deal: any | null;
+  timeline: { kind: string; tone: string; at: string; by: string; text: string }[];
+}
+const DEAL_API_IDLE: DealApiState = { loading: true, forbidden: false, notFound: false, deal: null, timeline: [] };
+
+/** Fetches one deal's detail (fields, transitions, remarks) for the Drawer. */
+export function useDealApi(ref: string | null): DealApiState {
+  const [state, setState] = useState<DealApiState>(DEAL_API_IDLE);
+
+  useEffect(() => {
+    if (!ref) return;
+    let cancelled = false;
+    setState((s) => ({ ...s, loading: true }));
+    AdminOpsService.deal(ref).then((res) => {
+      if (cancelled) return;
+      const r = apiOk(res);
+      if (!r.ok) {
+        setState({ ...DEAL_API_IDLE, loading: false, forbidden: r.forbidden, notFound: !r.forbidden });
+        return;
+      }
+      const data = r.data;
+      const deal = adaptDeal(data.deal);
+      // The one Drawer field the list row doesn't carry: the latest remark's
+      // timestamp, read off the (already createdAt-descending) remarks array.
+      // Through dateOnly() like every other date the adapter emits — the wire
+      // sends a full ISO datetime and D.fmtDate()/D.relative() both parse
+      // date-only strings, so passing it raw rendered "NaN undefined NaN".
+      deal.last_remark_at = data.remarks.length ? dateOnly(data.remarks[0].createdAt) : null;
+      setState({
+        loading: false, forbidden: false, notFound: false, deal,
+        timeline: adaptTimeline(data.transitions, data.remarks),
+      });
+    }).catch(() => {
+      if (cancelled) return;
+      setState({ ...DEAL_API_IDLE, loading: false, notFound: true });
+    });
+    return () => { cancelled = true; };
+  }, [ref]);
+
+  return state;
+}
+
+/* Shape returned when E.Chain.state() has nothing for this ref — a real
+   API-backed deal is not in the local engine's own seed data, so that lookup
+   returns null. Every action gated on these flags simply stays ABSENT
+   (guardrail: absent, not greyed) rather than crash on a null read. This is
+   local-engine seed data standing in for a chain that has no backend model
+   yet — not DB truth. */
+export const EMPTY_CHAIN = {
+  quote: null, quoteStatus: "none", invoices: [], openInvoice: null,
+  payments: [], uninvoiced: null, canCreateQuote: false, canRaiseInvoice: false, canLogPayment: false,
+};

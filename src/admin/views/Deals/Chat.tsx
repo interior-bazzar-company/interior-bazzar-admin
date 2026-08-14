@@ -12,32 +12,40 @@ import { can } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import { IBQuote } from "../../engines";
 import {
-  D, E, STAGE, actor, chanOf, head, inr, place, prioTone, setChan, urgency, usePop
+  D, E, EMPTY_CHAIN, STAGE, chanOf, head, inr, place, prioTone, setChan, urgency, useDealApi, usePop
 } from "./useDeals";
 import type { Params } from "./useDeals";
 import { ChainDots, MoneyCellCtx, Rich, TagChips, orDash, toneClass } from "./bits";
 import { useActs } from "./Modals";
 import { ChipMenu, CHIP_LABEL, GateBody, MoreMenu, Odot, PrioMenu, StageMenu, chipOptions } from "./menus";
+import AdminLoader from "../../../components/shared/AdminLoader";
 
-export function ChatWorkspace({ id, p, list, scope }: {
-  id: string | null; p: Params; list: any[]; scope: any[];
+export function ChatWorkspace({ id, p, list }: {
+  id: string | null; p: Params; list: any[];
 }) {
   const shell = useShell();
   const acts = useActs(p);
   const canCreate = can("deals", "create");
-  let dl = id ? E.dealOf(id) : null;
 
-  const outOfScope = !!(id && dl && !E.inScope(actor(), dl));
+  /* ponytail: falls back to the first row of the already-loaded, filter-
+     matching API list when no id is in the URL — the same "open something"
+     behaviour the old local-engine version had (`list[0] || scope[0]`), just
+     sourced from the one shared fetch instead of filteredScope(). */
+  const ref = id || (list.length ? list[0].deal_id : null);
+
+  /* The selected deal always resolves through the API, never through
+     E.dealOf() — that only knows the 14 locally-seeded demo deals, and a
+     deal created later in the DB has no local counterpart. Table/Pipeline's
+     Drawer (Drawer.tsx) already resolves this exact way; Chat now matches. */
+  const detail = useDealApi(ref);
+
   useEffect(() => {
-    if (!outOfScope) return;
+    if (!detail.forbidden) return;
     shell.toast("403 out_of_scope — that deal is not yours.", "bad");
     go("#/deals");
-  }, [outOfScope, shell]);
+  }, [detail.forbidden, shell]);
 
-  if (outOfScope) dl = null;
-  if (!dl) dl = list[0] || scope[0] || null;
-
-  if (!dl) return (
+  if (!ref) return (
     <div className="dws"><div className="dws-panes" style={{ gridTemplateColumns: "1fr" }}>
       <EmptyState icon="deal" title="No deals yet"
         body={"Deals arrive from the funnel and are assigned by round-robin." +
@@ -48,7 +56,26 @@ export function ChatWorkspace({ id, p, list, scope }: {
     </div></div>
   );
 
-  const c = E.Chain.state(dl.deal_id);
+  if (detail.loading) return <AdminLoader />;
+  if (detail.forbidden) return null;   // redirecting via the effect above
+
+  /* The ref genuinely is not in the API's deal set (bad/stale URL, or the
+     account never had it) — the panel's own not-found state, never a
+     silent fall-back onto an unrelated deal. */
+  if (detail.notFound || !detail.deal) return (
+    <div className="dws"><div className="dws-panes" style={{ gridTemplateColumns: "1fr" }}>
+      <EmptyState icon="deal" title="Deal not found"
+        body={"“" + ref + "” is not in the API's deal set."} />
+    </div></div>
+  );
+
+  const dl = detail.deal;
+  /* ponytail: E.Chain.state() is local-engine seed data — no invoice/payment
+     models exist server-side yet. Falls back to EMPTY_CHAIN for a ref the
+     local engine never seeded (any real API-only deal) — same guard
+     Drawer.tsx already uses — so every gated action below reads as
+     unavailable rather than crashing on a null read. */
+  const c = E.Chain.state(dl.deal_id) || EMPTY_CHAIN;
 
   /* No full-width header any more: the deal's identity belongs at the top of
      the column that is actually about that deal, and the money belongs with
@@ -57,7 +84,7 @@ export function ChatWorkspace({ id, p, list, scope }: {
     <div className="dws">
       <div className="dws-panes">
         <ListPane list={list} dl={dl} p={p} />
-        <ChatPane dl={dl} p={p} />
+        <ChatPane dl={dl} ev={detail.timeline} p={p} />
         <CtxPane dl={dl} c={c} p={p} />
       </div>
     </div>
@@ -139,6 +166,10 @@ function ListPane({ list, dl, p }: { list: any[]; dl: any; p: Params }) {
 function Row({ d, dl, p }: { d: any; dl: any; p: Params }) {
   const u = urgency(d);
   const over = d.next_action && D.days(D.d(d.next_action.date)) < 0 && d.stage < STAGE.WON;
+  // `last_remark_at` is only ever set on the ONE deal fetched in full by
+  // useDealApi() (see useDeals.ts) — the API's list endpoint doesn't return
+  // it per row, so every other row here falls back to created_at, same as
+  // it would for a deal with no remarks yet.
   const when = d.is_stalled ? "Stalled"
     : over ? Math.abs(D.days(D.d(d.next_action.date))) + "d overdue"
     : D.relative(d.last_remark_at || d.created_at);
@@ -147,15 +178,19 @@ function Row({ d, dl, p }: { d: any; dl: any; p: Params }) {
     <a className={"dws-row" + (dl.deal_id === d.deal_id ? " on" : "")} data-go={to} onClick={() => go(to)}>
       <div className="l1">
         <span className={"name" + (u ? " " + u.cls : "")} title={u ? u.why : ""}>{d.customer_name}</span>
-        <span className="amt tnum">{d.outstanding ? inr(d.outstanding, { compact: true })
-          : d.deal_value ? "₹0" : "—"}</span>
+        {/* ponytail: outstanding is chain data — undefined (not a real 0) on
+            an API-backed row. "₹0" would claim it's fully collected when
+            collection was never checked; "—" says the figure isn't tracked
+            at all. Same rule BoardCard already applies in List.tsx. */}
+        <span className="amt tnum">{d.outstanding === undefined ? "—"
+          : d.outstanding ? inr(d.outstanding, { compact: true }) : "₹0"}</span>
       </div>
       <div className="l2">
         <span className={"pill xs" + (D.STAGES[d.stage].tone ? " " + D.STAGES[d.stage].tone : "")}>
           {D.STAGES[d.stage].label}</span>
         <span className={"time" + (u ? " " + u.cls : "")}>{when}</span>
       </div>
-      <TagChips dealId={d.deal_id} max={2} />
+      <TagChips dealId={d.deal_id} max={2} tags={d.tags} />
       <div className="l3"><ChainDots dl={d} /></div>
     </a>
   );
@@ -186,8 +221,21 @@ function rowCls(e: any) {
   return "log";
 }
 
-function ChatPane({ dl, p }: { dl: any; p: Params }) {
-  const ev = E.Activity.timeline(dl.deal_id).slice().reverse();   // chronological, oldest first
+/* `apiEv` is the API's transitions+remarks, already shaped by adaptTimeline()
+   (useDeals.ts's useDealApi) — real STAGE/REMARK/SYSTEM events, sorted newest
+   first same as E.Activity.timeline() was. NOT equivalent on one axis: the
+   API's remark model carries no channel (whatsapp/email/remark) — DealRemark
+   has no such field (confirmed against a live GET .../deals/<ref>/) — so
+   every remark here renders with the generic "Remark" label and "log" bubble
+   style; the old local engine's whatsapp/email-coloured bubbles were entirely
+   local-only pretend data, and there is nothing server-side to recover them
+   from. Quote/invoice/payment lines the local engine's own timeline also
+   produced are absent too, for the same reason Drawer.tsx's TimelineTab omits
+   them: those chains are still local-only. */
+function ChatPane({ dl, ev: apiEv, p }: {
+  dl: any; ev: { kind: string; tone: string; at: string; by: string; text: string }[]; p: Params;
+}) {
+  const ev = apiEv.slice().reverse();   // chronological, oldest first
   const scroll = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const el = scroll.current;
@@ -326,7 +374,13 @@ function Head({ dl, p }: { dl: any; p: Params }) {
 
 /* The deal's tags, on their own strip under the header — visible without
    opening a dialog, and editable from the same place. Every tag carries an ×,
-   and it takes that tag off THIS deal only. */
+   and it takes that tag off THIS deal only.
+   ponytail: reads E.Tags.forDeal() — local engine — deliberately, unlike the
+   read-only TagChips elsewhere (Row above, List.tsx) which now prefer the
+   API's own `dl.tags`. There is no tag-write endpoint (AdminOpsService has no
+   apply/unapply/create/rename/delete for lists), so × here and the List
+   editor both still mutate the local engine only; reading that same store
+   back is what makes the removal show up immediately without a refetch. */
 function TagRow({ dl, p }: { dl: any; p: Params }) {
   const acts = useActs(p);
   const tags = E.Tags.forDeal(dl.deal_id);
@@ -418,6 +472,15 @@ function CtxPane({ dl, c, p }: { dl: any; c: any; p: Params }) {
   const Q = IBQuote || { LABEL: {}, TONE: {} };
   const quotes = E.quotesFor(dl.deal_id).sort((a: any, b: any) => b.version - a.version);
   const invs = E.invoicesFor(dl.deal_id);
+  /* ponytail: collected/outstanding are chain data — no invoice/payment
+     models exist server-side yet, so adaptDeal() never sets them on `dl` (the
+     API deal). Read off the local engine's OWN copy of this ref instead —
+     same fallback Drawer.tsx already uses for its Collected/Outstanding
+     figures — and leave it undefined (renders "—", never a fabricated ₹0)
+     for a ref the local engine never seeded. */
+  const localDl = E.dealOf(dl.deal_id);
+  const collected = localDl ? localDl.revenue_collected : undefined;
+  const outstanding = localDl ? localDl.outstanding : undefined;
   return (
     <aside className="dws-ctx">
       {/* The money came out of the old full-width header. It reads as context,
@@ -429,9 +492,9 @@ function CtxPane({ dl, c, p }: { dl: any; c: any; p: Params }) {
         <div className="dls-attn dws-money">
           <MoneyCellCtx k="deal value" v={dl.deal_value ? inr(dl.deal_value, { compact: true }) : "—"} />
           <span className="dls-sep"></span>
-          <MoneyCellCtx k="collected" v={inr(dl.revenue_collected, { compact: true })} tone="ok" />
+          <MoneyCellCtx k="collected" v={inr(collected, { compact: true })} tone="ok" />
           <span className="dls-sep"></span>
-          <MoneyCellCtx k="outstanding" v={inr(dl.outstanding, { compact: true })} tone="warn" />
+          <MoneyCellCtx k="outstanding" v={inr(outstanding, { compact: true })} tone="warn" />
         </div>
       </div>
 

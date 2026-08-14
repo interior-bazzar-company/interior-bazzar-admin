@@ -11,12 +11,13 @@ import { go } from "../../ui/nav";
 import { useShell } from "../../shell/ShellContext";
 import { IBQuote } from "../../engines";
 import {
-  D, E, STAGE, actor, head, inr, listHash, place, prioTone, useEngineTick, usePop, val
+  D, E, EMPTY_CHAIN, STAGE, head, inr, listHash, place, prioTone, useDealApi, useEngineTick, usePop, val
 } from "./useDeals";
 import type { Params } from "./useDeals";
 import { Fig, Rich, orDash } from "./bits";
 import { useActs } from "./Modals";
 import { PrioMenu } from "./menus";
+import AdminLoader from "../../../components/shared/AdminLoader";
 
 export function DealDrawer({ dealRef, p }: { dealRef: string; p: Params }) {
   useEngineTick();
@@ -24,24 +25,43 @@ export function DealDrawer({ dealRef, p }: { dealRef: string; p: Params }) {
   const acts = useActs(p);
   const pop = usePop();
   const [tab, setTab] = useState("timeline");
+  const api = useDealApi(dealRef);
 
-  const dl = E.dealOf(dealRef);
-  const missing = !dl;
-  const out = !!(dl && !E.inScope(actor(), dl));
+  /* Scoping is server-enforced now (a 403 IS "out of scope") rather than
+     re-checked against the local engine's own inScope() — that function
+     knows only the local seed's owner/co-owner, not the real session. */
   useEffect(() => {
-    if (missing) {
-      shell.toast("Deal " + dealRef + " not found — 404 deal_not_found.", "bad");
+    if (api.loading) return;
+    if (api.notFound) {
+      shell.toast("Deal " + dealRef + " not found.", "bad");
       shell.closeLayer(); go("#/deals"); return;
     }
-    if (out) {
-      shell.toast("403 out_of_scope — that deal is not yours.", "bad");
+    if (api.forbidden) {
+      shell.toast("403 — that deal is not yours.", "bad");
       shell.closeLayer(); go("#/deals");
     }
-  }, [missing, out, dealRef, shell]);
-  if (!dl || out) return null;
+  }, [api.loading, api.notFound, api.forbidden, dealRef, shell]);
 
-  const c = E.Chain.state(dealRef);
-  const pct = dl.deal_value ? Math.round(dl.revenue_collected / dl.deal_value * 100) : 0;
+  if (api.loading) return <AdminLoader />;
+  if (!api.deal || api.forbidden || api.notFound) return null;
+  const dl = api.deal;
+
+  /* ponytail: E.Chain.state() and everything under `c` (Set deal value /
+     Create quote / Raise invoice / Log payment gating, `uninvoiced`) is
+     local-engine seed data — no invoice/payment models exist server-side
+     yet. It returns null for a ref the local engine never seeded (any real
+     API deal), so it falls back to EMPTY_CHAIN: every gated action then
+     reads as unavailable and stays ABSENT rather than crash on a null read. */
+  const c = E.Chain.state(dealRef) || EMPTY_CHAIN;
+  /* ponytail: Collected/Outstanding are chain data too. They still come from
+     the local engine's OWN copy of this ref (not the API `dl` above) — if
+     the ref isn't seeded there, which a real API deal usually isn't, there
+     is nothing local to show and inr(undefined) already renders "—". */
+  const localDl = E.dealOf(dealRef);
+  const collected = localDl ? localDl.revenue_collected : undefined;
+  const localOutstanding = localDl ? localDl.outstanding : undefined;
+  const pct = dl.deal_value && collected
+    ? Math.max(0, Math.min(100, Math.round(collected / dl.deal_value * 100))) : 0;
   const over = dl.next_action && D.days(D.d(dl.next_action.date)) < 0 && dl.stage < STAGE.WON;
   const back = listHash(p);
 
@@ -92,18 +112,24 @@ export function DealDrawer({ dealRef, p }: { dealRef: string; p: Params }) {
         {/* money — the fastest read of "how close is this to Won" */}
         <div style={{ display: "flex", gap: "28px", flexWrap: "wrap", marginBottom: "12px" }}>
           <Fig k="Deal value" v={dl.deal_value ? inr(dl.deal_value) : "—"} />
-          <Fig k="Collected" v={inr(dl.revenue_collected)} style={{ color: "var(--ok)" }} />
-          <Fig k="Outstanding" v={inr(dl.outstanding)}
-            style={{ color: dl.outstanding ? "var(--warn)" : "var(--ok)" }} />
+          <Fig k="Collected" v={inr(collected)} style={{ color: "var(--ok)" }} />
+          <Fig k="Outstanding" v={inr(localOutstanding)}
+            style={{ color: localOutstanding ? "var(--warn)" : "var(--ok)" }} />
         </div>
         <div className="bar"><i className="ok" style={{ width: pct + "%" }}></i></div>
         <div className="faint" style={{ fontSize: "var(--text-md)", marginTop: "6px" }}>
           {pct}% collected · Closed-Won unlocks at ₹0 outstanding
         </div>
 
+        {/* ponytail: the whole chain block below — ChainStrip, the uninvoiced
+            note and AllInvoiceLinks — is local-engine seed data. ChainStrip
+            reads IBData's OWN local deal store (not IBDeals, and not the API)
+            and renders nothing when the ref isn't in it, which is the case
+            for any real API-backed deal; the same goes for `c.uninvoiced` and
+            AllInvoiceLinks' E.invoicesFor(). Not DB truth. */}
         <SectionHead title="Document chain" />
         <ChainStrip dealRef={dealRef} here="deal" />
-        {c.uninvoiced > 0 && dl.quotation_status === "final"
+        {c.uninvoiced && c.uninvoiced > 0 && dl.quotation_status === "final"
           ? <div className="faint" style={{ fontSize: "var(--text-md)", marginTop: "8px" }}>
               {inr(c.uninvoiced)} of the deal is still uninvoiced.</div>
           : null}
@@ -157,11 +183,13 @@ export function DealDrawer({ dealRef, p }: { dealRef: string; p: Params }) {
 
         <div className="tabs" style={{ marginTop: "22px" }}>
           {tabBtn("timeline", "Timeline")}
+          {/* ponytail: these two counts are local-engine (chain) data — see
+              PaymentsTab/DocumentsTab below. */}
           {tabBtn("payments", "Payments", E.paymentsFor(dealRef).length)}
           {tabBtn("documents", "Documents", E.quotesFor(dealRef).length + E.invoicesFor(dealRef).length)}
         </div>
         <div data-tabbody="timeline" className={tab === "timeline" ? undefined : "hide"}>
-          <TimelineTab dl={dl} p={p} /></div>
+          <TimelineTab dl={dl} ev={api.timeline} p={p} /></div>
         <div data-tabbody="payments" className={tab === "payments" ? undefined : "hide"}>
           <PaymentsTab dl={dl} p={p} /></div>
         <div data-tabbody="documents" className={tab === "documents" ? undefined : "hide"}>
@@ -222,9 +250,13 @@ function ActionBar({ dl, c, p }: { dl: any; c: any; p: Params }) {
   return <>{out}</>;
 }
 
-function TimelineTab({ dl, p }: { dl: any; p: Params }) {
+/* `ev` comes from the API (transitions + remarks, adapted in adapter.ts) —
+   real timeline events. Quote/invoice/payment lines the local engine's own
+   Activity.timeline() also produces are absent here, because those chains
+   are still local-only (PaymentsTab/DocumentsTab below), not because they
+   didn't happen. */
+function TimelineTab({ dl, ev, p }: { dl: any; ev: { kind: string; tone: string; at: string; by: string; text: string }[]; p: Params }) {
   const acts = useActs(p);
-  const ev = E.Activity.timeline(dl.deal_id);
   const add = () => {
     const text = val("dlQuickRemark");
     if (!text) return;
@@ -265,6 +297,8 @@ function TimelineTab({ dl, p }: { dl: any; p: Params }) {
   );
 }
 
+/* ponytail: local-engine seed data end to end — no payment models exist
+   server-side yet. A real API-backed deal simply has no rows here. */
 function PaymentsTab({ dl, p }: { dl: any; p: Params }) {
   const acts = useActs(p);
   const rows = E.paymentsFor(dl.deal_id);
@@ -306,7 +340,9 @@ function PaymentsTab({ dl, p }: { dl: any; p: Params }) {
    cancelled ones, so "all" means all, not just the ones still live. This sits
    right under the chain strip (which only ever shows the current one + a
    "+N more" count) so the deal detail view surfaces every invoice link without
-   a tab click. */
+   a tab click.
+   ponytail: local-engine seed data — no invoice models exist server-side
+   yet. Empty for any real API-backed deal, same as the chain strip above. */
 function AllInvoiceLinks({ dealRef }: { dealRef: string }) {
   const invs = E.invoicesFor(dealRef);
   if (!invs.length) return null;
@@ -331,6 +367,8 @@ function AllInvoiceLinks({ dealRef }: { dealRef: string }) {
   );
 }
 
+/* ponytail: local-engine seed data — no quotation/invoice models exist
+   server-side yet. Empty for a real API-backed deal. */
 function DocumentsTab({ dl, c }: { dl: any; c: any }) {
   const Q = IBQuote || { LABEL: {}, TONE: {} };
   const quotes = E.quotesFor(dl.deal_id).sort((a: any, b: any) => b.version - a.version);

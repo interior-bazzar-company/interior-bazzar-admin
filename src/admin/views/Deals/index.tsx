@@ -21,7 +21,7 @@ import { Icon } from "../../ui";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import {
-  actor, filteredScope, listHash, omit, openOutstanding, paramsOf, useEngineTick, usePop, viewOf, E, VIEWS
+  actor, filteredScope, listHash, omit, openOutstanding, paramsOf, useDealsApi, useEngineTick, usePop, viewOf, E, VIEWS
 } from "./useDeals";
 import { DealsList, TbMoney, TbStats } from "./List";
 import { ChatWorkspace } from "./Chat";
@@ -46,8 +46,18 @@ export default function Deals() {
   const view = viewOf(p);
   const me = actor();
 
-  const f = filteredScope(me, p);
-  const scope = f.scope, list = f.list;
+  /* THE ONE FETCH — shared by all four views (chat/table/board/tags). Keyed
+     on the filter params only: useDealsApi's own `key` already omits `view`
+     and the selected `id` (see useDeals.ts), so switching between them reuses
+     this same load instead of refiring the request or flashing empty. */
+  const api = useDealsApi(p);
+
+  /* ponytail: outstanding/collected are chain data — no invoice/payment
+     models exist server-side yet, so these two figures (the header's, and
+     the strip's) still come from the LOCAL engine's own scope, not the API
+     `api.list` every view now reads. `scope` here stays local-engine only,
+     for this pair of totals. */
+  const { scope } = filteredScope(me, p);
   const outstanding = openOutstanding(scope);
   const collected = E.Analytics.forActor(me, false).collected;
 
@@ -81,13 +91,13 @@ export default function Deals() {
       ? <span className="tb-title">Deals</span>
       : <>
           <span className="tb-title">Deals</span>
-          <TbStats p={p} scope={scope} />
+          <TbStats p={p} m={{ byStage: api.counts.byStage, total: api.counts.total }} />
           <TbMoney outstanding={outstanding} collected={collected} />
         </>
-    // `scope` is a fresh array on every engine read, so the strip is keyed on
-    // the params that produced it plus the two figures it prints.
+    // `p`/`api.counts` are fresh objects on every read, so the strip is keyed
+    // on the params that produced it plus the two figures it prints.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ), [view, search, outstanding, collected]);
+  ), [view, search, api.counts, outstanding, collected]);
 
   /* ---------------------------------------------------- where "up" is ---
      The shell asks this only when there is no in-session history to walk back
@@ -115,11 +125,10 @@ export default function Deals() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wantsDrawer, id, search]);
 
-  if (view === "chat") return <ChatWorkspace id={id} p={p} list={list} scope={scope} />;
+  if (view === "chat") return <ChatWorkspace id={id} p={p} list={api.list} />;
   if (view === "tags") return <TagsView p={p} />;
 
   return (
-    <DealsList id={id} p={p} scope={scope} list={list}
-      outstanding={outstanding} collected={collected} />
+    <DealsList id={id} p={p} api={api} outstanding={outstanding} collected={collected} />
   );
 }
