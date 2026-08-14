@@ -85,7 +85,7 @@ const BrandLogoView = () => {
             </div>
             <div style={{ marginBottom: 16 }}>
               <label style={{ display: "block", fontSize: 13, color: "#4b5563", marginBottom: 6 }}>Default tagline</label>
-              <input style={{ width: "100%", padding: "9px 11px", border: "1px solid #cbd5e1", borderRadius: 8 }} value={v.tagline} onChange={(e) => v.setTagline(e.target.value)} placeholder="e.g. Little things." />
+              <input style={{ width: "100%", padding: "9px 11px", border: "1px solid #cbd5e1", borderRadius: 8 }} value={v.tagline} onChange={(e) => v.setTagline(e.target.value)} placeholder="e.g. find lovable space" />
             </div>
             <button type="button" className={styles.save} disabled={v.savingDefaults} onClick={v.saveDefaults}>{v.savingDefaults ? "Saving…" : "Save defaults"}</button>
           </div>
