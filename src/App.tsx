@@ -4,17 +4,17 @@ import { Provider } from "react-redux";
 import ParentContextProvider from "./context";
 import { BrowserRouter as Router } from "react-router-dom";
 import ErrorBoundary from "./components/shared/ErrorBoundary";
+import { ShellProvider } from "./admin/shell/ShellContext";
 
 function App() {
-
   return (
     <ErrorBoundary>
       <ParentContextProvider>
         <Provider store={store}>
           <Router>
-            {/* <ScrollToTop /> */}
-            <UserRoutes />
-
+            <ShellProvider>
+              <UserRoutes />
+            </ShellProvider>
           </Router>
         </Provider>
       </ParentContextProvider>

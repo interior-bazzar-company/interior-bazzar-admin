@@ -4,13 +4,35 @@
 <head>
   <meta charset="UTF-8" />
   <link rel="icon" type="image/x-icon" href="/ib.ico" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Interior Bazzar Admin Panel</title>
-  <!-- v3 admin ops console icons + fonts (ported from prototype/dashboard-admin.html) -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="color-scheme" content="light dark" />
+  <title>Interior bazzar · Admin</title>
+  <meta name="description"
+    content="Interior bazzar Admin — the single operating workspace for every module." />
+
+  <!-- Brand faces. Local-first with a graceful system fallback; nothing here blocks paint. -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display:ital@0;1&family=Cormorant+Garamond:ital@1&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" media="print" onload="this.media = 'all'"
+    href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&display=swap" />
+  <noscript>
+    <link rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Serif+Display:ital@1&family=DM+Mono&display=swap" />
+  </noscript>
+
+  <script>
+    // Pre-paint so the panel never flashes the wrong theme. main.tsx re-runs the
+    // same resolution; this one exists only to beat the first paint.
+    (function () {
+      try {
+        var r = document.documentElement,
+          t = localStorage.getItem("ib_admin_theme"),
+          d = localStorage.getItem("ib_admin_density");
+        r.setAttribute("data-theme", t ? JSON.parse(t) : "dark");
+        if (d) r.setAttribute("data-density", JSON.parse(d));
+      } catch (e) { }
+    })();
+  </script>
 </head>
 
 <body>
