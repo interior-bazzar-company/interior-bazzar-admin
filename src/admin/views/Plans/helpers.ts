@@ -5,6 +5,12 @@
    ===================================================================== */
 import { IBData, IBPlans } from "../../engines";
 
+/* engines/index.d.ts declares every namespace `any` on purpose, so a plan, a
+   pricing row, a feature and an event all arrive untyped. One alias for that,
+   rather than the escape hatch written out again at twenty call sites. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type FromEngine = any;
+
 /* "1 months" reads as a typo. One helper, used by the drawer table and the
    pricing editor alike, so the two cannot disagree. */
 export function monthsLabel(n: number) { return n + (n === 1 ? " month" : " months"); }
@@ -20,7 +26,7 @@ export function catIndex(k: string) {
 }
 
 export function sorter(k?: string) {
-  return function (a: any, b: any) {
+  return function (a: FromEngine, b: FromEngine) {
     if (k === "title") return a.title < b.title ? -1 : 1;
     if (k === "updated") return (b.updated_at || "") < (a.updated_at || "") ? -1 : 1;
     if (k === "members") return IBPlans.membersOf(b).length - IBPlans.membersOf(a).length;
@@ -52,7 +58,7 @@ export function sorter(k?: string) {
 /* The one failure state a catalogue can have: on sale, and unpriceable.
    The engine refuses to create it, so this rail is here for records that
    predate the guard or arrive from a store written by an older build. */
-export function urgency(pl: any): { cls: string; why: string } | null {
+export function urgency(pl: FromEngine): { cls: string; why: string } | null {
   if (pl.status === "active" && !IBPlans.activeRows(pl).length)
     return { cls: "u-bad", why: "On sale with no active price — it cannot be quoted" };
   if (pl.status === "draft" && !pl.pricing.length)
@@ -69,4 +75,5 @@ export function actor() {
 
 /* A refusal from an engine: { ok:false, http:403, code:"forbidden", detail } */
 export type Refusal = { ok: false; http: number; code: string; detail: string };
-export const isRefusal = (r: any): r is Refusal => !!r && r.ok === false;
+export const isRefusal = (r: unknown): r is Refusal =>
+  !!r && (r as { ok?: unknown }).ok === false;

@@ -120,6 +120,17 @@ export function qs(obj: Record<string, string | number | null | undefined>) {
 }
 export function cap(s?: string | null) { return String(s || "").charAt(0).toUpperCase() + String(s || "").slice(1); }
 
+/* The seeded audit log stores references inside its `text` as `<b>PAY-4503</b>`.
+   The prototype wrote that string straight into the cell; innerHTML is banned
+   here, so the one tag becomes a real element. Both readers of that log — the
+   Audit page and the shell's Activity popover — go through this, so neither can
+   drift into showing the raw tags. */
+export function richText(s: string): ReactNode[] {
+  return String(s)
+    .split(/(<b>[\s\S]*?<\/b>)/g)
+    .map((part, i) => (part.slice(0, 3) === "<b>" ? <b key={i}>{part.slice(3, -4)}</b> : part));
+}
+
 /* --- small render helpers every view shares ------------------------------ */
 /* `text` is the prototype's first argument; `children` is the same slot spelt
    the way JSX callers reach for. Both render in the one place the text went. */

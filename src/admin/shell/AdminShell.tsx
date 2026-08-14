@@ -20,7 +20,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
-import { Icon } from "../ui";
+import { Icon, richText } from "../ui";
 import { setGo } from "../ui/nav";
 import { IBData, IBTeam } from "../engines";
 import config from "../../config";
@@ -564,7 +564,7 @@ function ActivityButton() {
                   >
                     <span className={"tag " + (a.tone || "")}>{a.type}</span>
                     <span className="bd">
-                      {a.text}
+                      {richText(a.text)}
                       <span className="by">
                         {a.actor} · {a.role}
                       </span>

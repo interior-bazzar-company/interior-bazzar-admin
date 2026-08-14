@@ -16,8 +16,16 @@ import type { ModuleItem } from "../shell/modules";
 import { can, useNav } from "../shell/AdminShell";
 import { useParams, useLocation } from "react-router-dom";
 
+import Audit from "./Audit";
+import Design from "./Design";
+import Plans from "./Plans";
+
 /** route key → the component that owns that workspace. */
-export const VIEWS: Record<string, ComponentType> = {};
+export const VIEWS: Record<string, ComponentType> = {
+  audit: Audit,
+  design: Design,
+  plans: Plans,
+};
 
 export function ViewHost() {
   const params = useParams();
