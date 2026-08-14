@@ -23,6 +23,7 @@ import { Link, Outlet, useLocation, useNavigate, useParams } from "react-router-
 import { Icon } from "../ui";
 import { setGo } from "../ui/nav";
 import { IBData, IBTeam } from "../engines";
+import config from "../../config";
 import { GROUP_OF, HOME_ROUTE, ITEMS, MODULES } from "./modules";
 import { LS, currentDensity, currentTheme, setDensity, setTheme, useShell } from "./ShellContext";
 import { CommandPalette } from "./CommandPalette";
@@ -700,6 +701,18 @@ function AccountButton({ user }: { user: TeamUser | null }) {
           <div className="msep" />
           {item("#/team", "user", "My account")}
           {item("#/roles", "shield", "Effective access")}
+          <button
+            className="mi"
+            data-act="preview"
+            onClick={() => {
+              shell.closePop();
+              window.open(config.FRONTEND_URL, "_blank");
+              shell.toast("Portal opened in a new tab — a one-way preview, not a role change.");
+            }}
+          >
+            <Icon name="ext" />
+            Preview portal<span className="r">↗</span>
+          </button>
           {item("#/design", "sparkle", "Design system", "↗")}
           <button
             className="mi"
