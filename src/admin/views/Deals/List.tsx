@@ -8,12 +8,11 @@ import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import { can } from "../../shell/AdminShell";
 import {
-  ALL_STAGES, D, E, STAGE, STRIP_STAGES, dealHash, head, inr, merge, omit, place, urgency
+  ALL_STAGES, D, E, STAGE, STRIP_STAGES, dealHash, head, inr, merge, omit, place, urgency, useFilters
 } from "./useDeals";
 import type { Params } from "./useDeals";
 import { ChainDots, MoneyCell, NextCell, OwnerCell, TagChips } from "./bits";
 import { useActs } from "./Modals";
-import { useFilters } from "./useDeals";
 
 /* The strip reads as one table row: cells of equal build, ruled off from each
    other, sitting on the same baseline. Total first, then the funnel one stage

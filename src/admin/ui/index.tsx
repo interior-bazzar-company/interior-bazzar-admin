@@ -32,6 +32,8 @@ import type { CSSProperties, ReactNode } from "react";
 import { IBData } from "../engines";
 import { go } from "./nav";
 
+export { BRAND_MARK, BrandLogo } from "./brand";
+
 /* ================================================================ ICONS === */
 /* The icon set IS these path strings — there is no icon library. They are kept
    as raw markup (rather than JSX elements) because the shell reads a path out

@@ -20,7 +20,7 @@ import { Fragment } from "react";
 import type { ReactNode } from "react";
 import { IBData, IBInvoice, IBQuote } from "../../engines";
 import { inr, quoteNumberOf } from "./helpers";
-import { BRAND_MARK } from "./brand";
+import { BRAND_MARK } from "../../ui";
 
 const D = IBData, N = IBInvoice, Q = IBQuote;
 

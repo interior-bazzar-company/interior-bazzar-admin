@@ -31,7 +31,7 @@ import { Fragment } from "react";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { D, Q, inr } from "./core";
-import { BrandLogo } from "./brand";
+import { BrandLogo } from "../../ui";
 
 /* Where the money goes. Verbatim from the account, and shared by the
    quotation and the invoice so a customer paying against either transfers to
