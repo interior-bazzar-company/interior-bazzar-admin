@@ -19,12 +19,16 @@ import { useParams, useLocation } from "react-router-dom";
 import Audit from "./Audit";
 import Design from "./Design";
 import Plans from "./Plans";
+import Team from "./Team";
+import Roles from "./Roles";
 
 /** route key → the component that owns that workspace. */
 export const VIEWS: Record<string, ComponentType> = {
   audit: Audit,
   design: Design,
   plans: Plans,
+  team: Team,
+  roles: Roles,
 };
 
 export function ViewHost() {
