@@ -21,6 +21,9 @@ import Design from "./Design";
 import Plans from "./Plans";
 import Team from "./Team";
 import Roles from "./Roles";
+import Invoices from "./Invoices";
+import Quotations from "./Quotations";
+import Deals from "./Deals"; // TEMP-SMOKE-DEALS
 
 /** route key → the component that owns that workspace. */
 export const VIEWS: Record<string, ComponentType> = {
@@ -29,6 +32,9 @@ export const VIEWS: Record<string, ComponentType> = {
   plans: Plans,
   team: Team,
   roles: Roles,
+  invoices: Invoices,
+  quotations: Quotations,
+  deals: Deals, // TEMP-SMOKE-DEALS
 };
 
 export function ViewHost() {

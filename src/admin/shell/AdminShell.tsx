@@ -54,15 +54,27 @@ type Chrome = {
 const ChromeCtx = createContext<(c: Chrome) => void>(() => {});
 
 /** A view declares its own topbar and its own parent. Call it once, at the top
-    of the component; passing a new object every render is fine, the shell
-    compares by field. */
+    of the component. Passing fresh JSX every render is fine and expected.
+
+    It republishes ONCE PER LOCATION, not once per render, and that is the whole
+    design. `crumbs` and `right` are React elements, so they are a new object on
+    every render; an effect that depended on them would setState → re-render the
+    view → new element → fire again, forever. The dependency is therefore the
+    URL, which is what a view's topbar is actually a function of — every claim
+    in this panel is derived from the route, the id and the query. A view whose
+    topbar must change without the URL changing would not update here; none does,
+    because the prototype keeps view-mode in the query string for exactly this
+    kind of reason. */
 export function usePageChrome(c: Chrome) {
   const set = useContext(ChromeCtx);
-  const { crumbs, right, parent } = c;
+  const location = useLocation();
+  const here = location.pathname + location.search;
+  const latest = useRef(c);
+  latest.current = c;
   useEffect(() => {
-    set({ crumbs, right, parent });
+    set(latest.current);
     return () => set({});
-  }, [set, crumbs, right, parent]);
+  }, [set, here]);
 }
 
 /* -------------------------------------------------------------- navigation */

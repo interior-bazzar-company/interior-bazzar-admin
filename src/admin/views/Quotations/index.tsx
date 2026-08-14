@@ -18,7 +18,7 @@
      #/quotations/<id>?mode=preview     the customer-facing render, then Issue
    ============================================================================= */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { EmptyState } from "../../ui";
 import { useNav, usePageChrome } from "../../shell/AdminShell";
@@ -59,11 +59,13 @@ export default function Quotations() {
      sub-modes of the record, so they go up to the record first, one step at a
      time, rather than skipping the screen the user was working in. */
   const isList = !id && !p["new"] && !p.mode;
-  usePageChrome({
-    crumbs: isList ? <span className="tb-title">Quotations</span> : undefined,
-    right: isList ? "" : undefined,
-    parent: parentOf(id, p)
-  });
+  /* The memo is no longer load-bearing — usePageChrome republishes per location,
+     not per render — but it costs nothing and keeps the element stable. */
+  const crumbs = useMemo(
+    () => (isList ? <span className="tb-title">Quotations</span> : undefined),
+    [isList]
+  );
+  usePageChrome({ crumbs, right: isList ? "" : undefined, parent: parentOf(id, p) });
 
   if (p["new"] === "1") return <PickDeal p={p} />;
 
