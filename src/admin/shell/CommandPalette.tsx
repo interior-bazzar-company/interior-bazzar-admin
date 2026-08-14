@@ -9,7 +9,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Icon, Pill } from "../ui";
 import { IBData } from "../engines";
-import { GROUP_OF, ITEMS, MODULES } from "./modules";
+import { getGroupOf, getItems, getModules } from "./modules";
 import { LS, useShell } from "./ShellContext";
 
 type Hit = {
@@ -33,7 +33,7 @@ const ACTIONS = [
 
 function navTargets(): Hit[] {
   const out: Hit[] = [];
-  MODULES.forEach((g) => {
+  getModules().forEach((g) => {
     g.items.forEach((it) => {
       out.push({
         icon: it.icon,
@@ -53,7 +53,7 @@ function recents(): Hit[] {
   const list = LS.get<{ route: string; id: string }[]>("ib_admin_recents", []).slice(0, 4);
   return list
     .map((r) => {
-      const item = ITEMS[r.route];
+      const item = getItems()[r.route];
       if (!item) return null;
       let sub = "";
       if (r.route === "deals") {
@@ -72,7 +72,7 @@ function recents(): Hit[] {
         title: r.id,
         sub: item.label + (sub ? " · " + sub : ""),
         chain: null,
-        group: GROUP_OF[r.route] || undefined,
+        group: getGroupOf()[r.route] || undefined,
       } as Hit;
     })
     .filter(Boolean) as Hit[];

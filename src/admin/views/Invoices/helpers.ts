@@ -5,6 +5,7 @@
    of these was a plain function in the prototype and stays one.
    ============================================================================= */
 import { IBData, IBDeals, IBInvoice, IBQuote } from "../../engines";
+import { currentActor } from "../../auth/session";
 
 const D = IBData, N = IBInvoice, E = IBDeals, Q = IBQuote;
 
@@ -14,10 +15,8 @@ const D = IBData, N = IBInvoice, E = IBDeals, Q = IBQuote;
 export const REMARK_PRESETS = ["Slot booking", "Installment 1", "Installment 2",
   "Installment 3", "Installment 4", "Installment 5"];
 
-export function actor() {
-  const u = D.TeamStore.current() || { name: "System", role: "super_admin" };
-  return { name: u.name, role: u.role, id: u.id };
-}
+// Who did this — the real signed-in identity now, not IBData.TeamStore.
+export const actor = currentActor;
 export function head() { return E.isHead(actor()); }
 export function inr(p: number, o?: { compact?: boolean }) { return D.inr(p, o); }
 export function rupees(v: string) { const n = Number(String(v).replace(/[^\d.]/g, "")); return isNaN(n) ? 0 : Math.round(n * 100); }

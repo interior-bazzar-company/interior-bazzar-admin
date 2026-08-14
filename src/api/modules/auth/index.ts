@@ -35,6 +35,31 @@ export class AuthService {
       throw error;
     }
   }
+  /** Admin panel sign-in — same endpoint, `portal: "admin"` added per the
+   * admin RBAC contract. The server refuses a non-admin account with the
+   * same generic wording as bad credentials; it never tells the caller which
+   * reason applied. */
+  static async signinAdmin(data: LoginForm) {
+    try {
+      const url = `${appUrl.auth}/signin/`;
+      const response: ApiResponseType<LoginFormResponse> =
+        await apiService.getPostApiResponse(url, { ...data, portal: "admin" });
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
+  /** Ends the server-side UserSession. Best-effort from the caller's point of
+   * view — local tokens are cleared regardless of whether this succeeds. */
+  static async signout() {
+    try {
+      const url = `${appUrl.auth}/signout/`;
+      const response: ApiResponseType<unknown> = await apiService.getPostApiResponse(url, {});
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  }
   static async deleteAccount() {
     try {
       const url = `${appUrl.auth}/delete-account/`;

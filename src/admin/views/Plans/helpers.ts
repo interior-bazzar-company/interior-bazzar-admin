@@ -4,6 +4,7 @@
    three surfaces cannot disagree with each other.
    ===================================================================== */
 import { IBData, IBPlans } from "../../engines";
+import { currentActor } from "../../auth/session";
 
 /* engines/index.d.ts declares every namespace `any` on purpose, so a plan, a
    pricing row, a feature and an event all arrive untyped. One alias for that,
@@ -67,11 +68,9 @@ export function urgency(pl: FromEngine): { cls: string; why: string } | null {
 }
 
 /* The prototype read `S.state.user`, which the shell never set — so it always
-   fell through to this literal. Here the signed-in member is really available,
+   fell through to a literal. The signed-in member is really available now,
    which is what that expression was reaching for. */
-export function actor() {
-  return IBData.TeamStore.current() || { name: "Admin", role: "super_admin" };
-}
+export const actor = currentActor;
 
 /* A refusal from an engine: { ok:false, http:403, code:"forbidden", detail } */
 export type Refusal = { ok: false; http: number; code: string; detail: string };

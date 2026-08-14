@@ -1,62 +1,61 @@
 /* =====================================================================
-   ROLES — the write paths, ported from the M["rl-*"] handlers.
-   Editing a role is the point of the page, so the editor carries the
-   whole matrix: name, description, status, and every module × action the
-   product actually has.
+   ROLES — the write paths: create, edit, delete. Real requests to
+   /api/v1/admin/roles/ now, not the local IBTeam engine.
    ===================================================================== */
 import { useState } from "react";
-import { IBTeam } from "../../engines";
+import AdminOpsService from "../../../api/modules/adminOps";
+import type { RolesModuleDef } from "../../../api/modules/adminOps";
 import { Field, Icon, Notice, SectionHead } from "../../ui";
-import { ErrSlot, MatrixTable, actor, readMatrix, val } from "../teamShared";
+import { ErrSlot, LevelMatrix, errOf, readLevelMatrix, val } from "../teamShared";
 import type { EngineErr, Ops, Role } from "../teamShared";
 
-export function RoleModal({ role, ops }: { role: Role | null; ops: Ops }) {
+export function RoleModal({ role, mods, ops }: { role: Role | null; mods: RolesModuleDef[]; ops: Ops }) {
   const [err, setErr] = useState<EngineErr | null>(null);
+  const [busy, setBusy] = useState(false);
   const isNew = !role;
 
-  function save() {
-    const payload = {
-      name: val("rlName"), description: val("rlDesc"),
-      status: val("rlStatus"), permissions: readMatrix(),
-    };
-    const r = role
-      ? IBTeam.Roles.update(role.role_id, payload, actor())
-      : IBTeam.Roles.create(payload, actor());
-    if (r.ok === false) return setErr(r);
-    ops.done(role ? "Role saved." : "Role created.", "#/roles/" + r.data.role_id);
+  async function save() {
+    if (busy) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const name = val("rlName");
+      const modules = readLevelMatrix();
+      const res = role
+        ? await AdminOpsService.updateRole(role.id, { name, modules })
+        : await AdminOpsService.createRole(name, modules);
+      ops.done(role ? "Role saved." : "Role created.", "#/roles/" + res.data.id);
+    } catch (e) {
+      setErr(errOf(e));
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
     <>
       <div className="md-h">
         <h3>{isNew ? "Create role" : "Edit role"}</h3>
-        <p>{isNew ? "A name, and what it may do" : role!.role_id}</p>
+        <p>{isNew ? "A name, and what it may do" : "#" + role!.id}</p>
         <button className="md-x" data-close="1" onClick={ops.closeLayer}><Icon name="x" /></button>
       </div>
       <div className="md-b">
         <ErrSlot err={err} />
         <SectionHead title="Role" />
         <Field id="rlName" label="Role name" req value={role ? role.name : ""} ph="Sales Manager" />
-        <Field id="rlDesc" label="Description" type="textarea" value={role ? role.description : ""}
-               ph="One line saying what this responsibility covers."
-               help="Read by whoever assigns the role. Say what the job is, not which boxes are ticked." />
-        <Field id="rlStatus" label="Status" type="select" options={[
-          { v: "active", l: "Active — grants its permissions", sel: !role || role.status === "active" },
-          { v: "inactive", l: "Inactive — held but grants nothing", sel: !!role && role.status !== "active" },
-        ]} />
         <SectionHead title="Permissions" />
-        <MatrixTable role={role} editable />
+        <LevelMatrix mods={mods} levels={role && role.isFullAccess ? null : (role ? role.modules : {})} editable />
         <div className="help" style={{ marginTop: 8 }}>
-          <b>A dash means the module has no such action</b> — it is not a permission being withheld.{" "}
-          <b>View is the gate</b>: without it the module leaves that member's sidebar and the route is
-          refused, whatever else is ticked.
+          <b>0 · None</b> — <b>1 · Read</b> — <b>2 · Write</b> — <b>3 · Sensitive</b>. Read is the gate: a
+          module below Read leaves that member's sidebar and the route is refused, whatever an action
+          would otherwise allow.
         </div>
       </div>
       <div className="md-f">
         <span className="spacer"></span>
         <button className="btn" data-close="1" onClick={ops.closeLayer}>Cancel</button>
-        <button className="btn pri" data-act="rl-save" data-ref={role ? role.role_id : undefined}
-                onClick={save}>{isNew ? "Create role" : "Save role"}</button>
+        <button className="btn pri" data-act="rl-save" data-ref={role ? role.id : undefined}
+                onClick={save} disabled={busy}>{isNew ? "Create role" : "Save role"}</button>
       </div>
     </>
   );
@@ -64,13 +63,20 @@ export function RoleModal({ role, ops }: { role: Role | null; ops: Ops }) {
 
 export function RoleDeleteModal({ role, ops }: { role: Role; ops: Ops }) {
   const [err, setErr] = useState<EngineErr | null>(null);
-  const holders = IBTeam.members().filter(
-    (u: Record<string, unknown>) => IBTeam.roleIdsOf(u).indexOf(role.role_id) >= 0).length;
+  const [busy, setBusy] = useState(false);
 
-  function remove() {
-    const r = IBTeam.Roles.remove(role.role_id, actor());
-    if (r.ok === false) return setErr(r);
-    ops.done("Role deleted.", "#/roles");
+  async function remove() {
+    if (busy) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      await AdminOpsService.deleteRole(role.id);
+      ops.done("Role deleted.", "#/roles");
+    } catch (e) {
+      setErr(errOf(e));
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -82,11 +88,10 @@ export function RoleDeleteModal({ role, ops }: { role: Role; ops: Ops }) {
       </div>
       <div className="md-b">
         <ErrSlot err={err} />
-        {holders ? (
+        {role.userCount ? (
           <Notice tone="bad" ico="alert" text={
-            <><b>{holders} member(s) hold this role.</b> Deleting it would leave those accounts
-              pointing at a role that does not exist. Move them off it first, or deactivate the role
-              instead — an inactive role grants nothing and keeps the history readable.</>
+            <><b>{role.userCount} member(s) hold this role.</b> The server refuses to delete a role that
+              is still in use — move them off it first.</>
           } />
         ) : (
           <Notice tone="bad" text="Nobody holds this role, so it can go outright." />
@@ -95,8 +100,8 @@ export function RoleDeleteModal({ role, ops }: { role: Role; ops: Ops }) {
       <div className="md-f">
         <span className="spacer"></span>
         <button className="btn" data-close="1" onClick={ops.closeLayer}>Cancel</button>
-        <button className="btn dgr" data-act="rl-del-go" data-ref={role.role_id}
-                onClick={remove}>Delete role</button>
+        <button className="btn dgr" data-act="rl-del-go" data-ref={role.id}
+                onClick={remove} disabled={busy}>Delete role</button>
       </div>
     </>
   );

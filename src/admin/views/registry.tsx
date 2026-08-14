@@ -11,7 +11,7 @@
    ============================================================================= */
 import type { ComponentType } from "react";
 import { EmptyState, Notice } from "../ui";
-import { ITEMS } from "../shell/modules";
+import { getItems } from "../shell/modules";
 import type { ModuleItem } from "../shell/modules";
 import { can, useNav } from "../shell/AdminShell";
 import { useParams, useLocation } from "react-router-dom";
@@ -41,7 +41,7 @@ export function ViewHost() {
   const params = useParams();
   const location = useLocation();
   const route = (location.pathname.split("/").filter(Boolean)[0] || "deals").toLowerCase();
-  const item = ITEMS[route];
+  const item = getItems()[route];
 
   if (!item) return <NotFound route={route} />;
   if (!can(item.key)) return <Denied item={item} />;

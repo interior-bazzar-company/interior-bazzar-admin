@@ -20,6 +20,7 @@
 import { useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 import { IBData, IBDeals, IBQuote } from "../../engines";
+import { currentActor } from "../../auth/session";
 
 export const D: any = IBData;
 export const E: any = IBDeals;
@@ -36,10 +37,8 @@ export type QtCtx = {
   closeLayer: () => void;
 };
 
-export function actor() {
-  const u = D.TeamStore.current() || { name: "System", role: "super_admin" };
-  return { name: u.name, role: u.role, id: u.id };
-}
+// Who did this — the real signed-in identity now, not IBData.TeamStore.
+export const actor = currentActor;
 export function head() { return E.isHead(actor()); }
 export function inr(p: number, o?: any) { return D.inr(p, o); }
 export function rupees(v: any) { const n = Number(String(v).replace(/[^\d.]/g, "")); return isNaN(n) ? 0 : Math.round(n * 100); }

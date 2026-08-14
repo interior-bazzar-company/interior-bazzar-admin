@@ -1,12 +1,20 @@
 /* =============================================================================
    Interior bazzar — Admin · the module inventory
    -----------------------------------------------------------------------------
-   Ported verbatim from prototype/admin-panel/admin-access/assets/admin-shell.js.
+   THE single module list now comes from the server — `me/permissions/`'s
+   `modules[]`, ordered by `displayOrder` and grouped by `groupLabel`. Nav,
+   routing, breadcrumbs and the permission matrix all read the SAME resolved
+   session (admin/auth/session.ts), so a Module row added on the server changes
+   the nav with no code edit here — and nav and permissions can never disagree,
+   because they are the same array.
 
-   MODULES[] is the single list. Nav, routing, breadcrumbs, permission keys and
-   the permission matrix all read it. One list, five consumers. Adding a surface
-   means adding one row here — never a second registry somewhere else.
+   `icon` and `route` stay client-side concerns — the server has no opinion on
+   which SVG a module gets. `route` defaults to the module key itself, and
+   `icon` falls back through the `Icon` component's own "unknown name → doc"
+   behaviour, so a module key with no entry in ICON_OF still renders instead
+   of guessing.
    ============================================================================= */
+import { getSession } from "../auth/session";
 
 export type ModuleItem = {
   key: string;
@@ -15,71 +23,77 @@ export type ModuleItem = {
   route: string;
   /** badge key in IBData.derive.badges(); absent = no queue count on this item */
   q?: string;
-  /** the module document this surface came from, for traceability */
-  module?: string;
 };
 
 export type ModuleGroup = {
   group: string;
-  note: string;
   items: ModuleItem[];
 };
 
-export const MODULES: ModuleGroup[] = [
-  /* Sales is THE CHAIN, and only the chain: a deal becomes a quotation, a
-     quotation becomes an invoice. Three modules, in the order the work runs
-     through them. */
-  {
-    group: "Sales",
-    note: "what Interior bazzar sells",
-    items: [
-      { key: "deals", label: "Deals", icon: "deal", route: "deals", q: "deals", module: "M1" },
-      { key: "quotations", label: "Quotations", icon: "quote", route: "quotations", q: "quotations", module: "M2" },
-      { key: "invoices", label: "Invoices", icon: "invoice", route: "invoices", q: "invoices", module: "M3" },
-    ],
-  },
+/** Icon names verified against ICONS in admin/ui/index.tsx. A key with no
+ * entry here falls through to Icon's own "doc" default rather than guessing. */
+const ICON_OF: Record<string, string> = {
+  deals: "deal",
+  quotations: "quote",
+  invoices: "invoice",
+  plans: "tag",
+  team: "team",
+  roles: "shield",
+  audit: "history",
+  design: "sparkle",
+};
+/** Sidebar queue-count keys, from IBData.derive.badges(). A module with no
+ * entry here shows no badge, which is correct for anything the prototype
+ * never counted (Plans, Roles, Audit, Design). */
+const Q_OF: Record<string, string> = {
+  deals: "deals",
+  quotations: "quotations",
+  invoices: "invoices",
+  team: "team",
+};
 
-  /* Plans stands on its own, and the separation is the point: it is not a
-     step of the chain, it is the thing the chain is priced FROM. Deals,
-     Quotations and Invoices are worked through, one after another; the
-     catalogue is configured once and then read. Putting it in Sales made it
-     look like a fourth step.
-
-     It is no longer under "Marketplace" either — that heading meant "who we
-     serve", which was true only while this module also showed subscriptions.
-     It does not. */
-  {
-    group: "Catalogue",
-    note: "what we sell, and what it costs",
-    items: [{ key: "plans", label: "Plans", icon: "tag", route: "plans", module: "M8" }],
-  },
-
-  {
-    group: "Settings",
-    note: "configuration, done rarely",
-    items: [
-      { key: "team", label: "Team", icon: "team", route: "team", q: "team", module: "M7" },
-      /* Roles and Audit had working view functions and no MODULES entry, so
-         the router 404'd both — the two surfaces the Team module needs most.
-         Registered here, which is also what gives them permission keys. */
-      { key: "roles", label: "Roles", icon: "shield", route: "roles", module: "M7" },
-      { key: "audit", label: "Audit log", icon: "history", route: "audit", module: "M7" },
-      { key: "design", label: "Design system", icon: "sparkle", route: "design" },
-    ],
-  },
-];
-
-export const ITEMS: Record<string, ModuleItem> = {};
-export const GROUP_OF: Record<string, string | null> = {};
-MODULES.forEach((g) => {
-  g.items.forEach((it) => {
-    ITEMS[it.route] = it;
-    GROUP_OF[it.route] = g.group || null;
+export function getModules(): ModuleGroup[] {
+  const s = getSession();
+  const mods = s ? s.modules.slice().sort((a, b) => a.displayOrder - b.displayOrder) : [];
+  const groups: ModuleGroup[] = [];
+  const byGroup: Record<string, ModuleGroup> = {};
+  mods.forEach((m) => {
+    const g = m.groupLabel || "";
+    if (!byGroup[g]) {
+      byGroup[g] = { group: g, items: [] };
+      groups.push(byGroup[g]);
+    }
+    byGroup[g].items.push({
+      key: m.key,
+      label: m.label,
+      icon: ICON_OF[m.key] || "doc",
+      route: m.key,
+      q: Q_OF[m.key],
+    });
   });
-});
+  return groups;
+}
 
-export const moduleKeys = () => Object.keys(ITEMS);
-export const moduleLabel = (k: string) => (ITEMS[k] ? ITEMS[k].label : k);
+export function getItems(): Record<string, ModuleItem> {
+  const out: Record<string, ModuleItem> = {};
+  getModules().forEach((g) => g.items.forEach((it) => { out[it.route] = it; }));
+  return out;
+}
 
-/** The default landing route. The prototype boots to #/deals. */
+export function getGroupOf(): Record<string, string | null> {
+  const out: Record<string, string | null> = {};
+  getModules().forEach((g) => g.items.forEach((it) => { out[it.route] = g.group || null; }));
+  return out;
+}
+
+export const moduleKeys = () => Object.keys(getItems());
+export const moduleLabel = (k: string) => {
+  const it = getItems()[k];
+  return it ? it.label : k;
+};
+
+/** The default landing route. The prototype boots to #/deals. Kept static:
+ * it is where "/" redirects to, not a permission — a member without `deals`
+ * access still lands there and ViewHost shows the Denied state, same as any
+ * other route it cannot see. */
 export const HOME_ROUTE = "deals";

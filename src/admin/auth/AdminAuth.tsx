@@ -1,52 +1,73 @@
 /* =============================================================================
    Auth — the React port of prototype/admin-panel/admin-access/admin-auth.html.
-   Identical model and storage: users and sessions come from IBData.TeamStore,
-   which is the SAME `ib_team_users` / `ib_team_session` store the panel's
-   Settings → Team reads.
+   -----------------------------------------------------------------------------
+   Signs in against the real server (POST v1/auth/signin/, portal: "admin")
+   instead of IBData.TeamStore's localStorage demo accounts. The demo-accounts
+   box and the seeded demo credentials are gone — the only way in is a real
+   session, and the panel's own RBAC matrix (admin/auth/session.ts) decides
+   what it is worth once it exists.
 
-   Two things differ from the prototype, both forced by the move to real routes:
+   Two things differ from the prototype, both forced by the move to real
+   routes and a real backend:
      - the panel lives at real paths, so `next` is a PATH, not a hash. It is
        still accepted only in one shape — a same-origin path — and an absolute,
        protocol-relative or scheme-bearing value is REFUSED, not sanitised.
      - the four steps are React state rather than `.step.on` class flipping;
        the emitted class names are unchanged.
+
+   WHERE THIS DIFFERS FROM THE 9-STATE PROTOTYPE PORT, and why (see the report
+   for the full account — this is the short version in the code that has to
+   live with the decision):
+
+     · "Account locked" (a client-side 5-failed-attempt counter written into
+       TeamStore) had no server equivalent to port — the counter itself was
+       the localStorage credential path this phase deletes, and the API
+       contract does not expose a "locked" reason distinct from "wrong
+       credentials" (deliberately: revealing an account is locked, rather
+       than possibly-wrong, is exactly the kind of half-revealed answer the
+       generic wording exists to prevent). The banner's COPY is kept — wired
+       to a standard HTTP 423 (Locked) status, which the backend does not yet
+       send — so the state activates without fabricating a client-side
+       attempt count if the backend ever adopts it, but is not reachable today.
+     · The component-level "blocked" step (two distinct titles for suspended
+       vs deactivated) is gone outright: the contract's `user` object carries
+       no status field to tell the two apart, and — per the contract — a
+       correct-password sign-in against an inactive account now FAILS at
+       sign-in with the same generic message, so this screen (which only ever
+       rendered AFTER a successful credential check) can no longer be reached
+       that way. The generic "Access withdrawn" banner below (worded
+       "suspended, deactivated or locked" without distinguishing) is what a
+       plain `?blocked=1` shows — an existing session that failed to resolve
+       at all. A second, more specific "Access withdrawn" body — "This
+       account can no longer sign in." — is also restored (prototype
+       admin-auth.html:405, dormant there behind a client-side re-resolve this
+       phase has no equivalent for): RequireSession now sends a session that
+       DID resolve but failed the server's admin gate (soft-deleted, demoted,
+       role-stripped) to `?blocked=gate`, and that is where this string
+       renders. The two are not the same claim: one is "we couldn't tell",
+       the other is "we asked, and the answer is no".
+     · The "remaining attempts" figure in the invalid-credentials banner is
+       restored dormant, alongside LOCKED_BANNER's HTTP-423 wiring: the count
+       was TeamStore's client-side `failedAttempts`, which this phase deleted
+       along with the rest of the local demo store, and no server field
+       replaces it yet. `invalidBanner()` accepts one if the backend ever
+       adds it; nothing today supplies it, so the line never renders — never
+       a fabricated count, per guardrail 6.
    ========================================================================== */
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { IBData, IBTeam } from "../engines";
+import { AppExceptions } from "../../api/apiService";
+import { AuthService } from "../../api/modules/auth";
+import { TokenService } from "../../api/apiService/authHelper/TokenService";
+import type { LoginFormResponse } from "../../types/global";
+import { clearSession, grantsOf, isZeroAccess, loadSession } from "./session";
 import "../../styles/admin-theme.css";
 import "./admin-auth.css";
 
-const TS = IBData.TeamStore;
-
-type TeamUser = {
-  id: string;
-  name: string;
-  email: string;
-  username?: string;
-  status: string;
-  role: string | null;
-  failedAttempts?: number;
-  lastLogin?: number | null;
-};
-
-type Step = "login" | "pending" | "blocked" | "active";
+type Identity = { name: string; role: string | null; grants: string[] };
+type Step = "login" | "pending" | "active";
 type Banner = { kind: string; title: string; body: ReactNode };
-
-/* Hashing lives in the team engine so the sign-in page and the panel cannot
-   disagree about what a valid password is. */
-function verify(user: TeamUser, plain: string): boolean {
-  return IBTeam.verifyPassword(user, plain);
-}
-function byUsername(list: TeamUser[], name: string): TeamUser | null {
-  const v = String(name || "").trim().toLowerCase();
-  if (!v) return null;
-  for (let i = 0; i < list.length; i++)
-    if (String(list[i].username || "").toLowerCase() === v) return list[i];
-  return null;
-}
-const MAX_ATTEMPTS: number = TS.MAX_ATTEMPTS;
 
 /* The redirect target. `next` is accepted only as a same-origin PATH, never as
    an arbitrary URL: an absolute or protocol-relative value from a query string
@@ -55,17 +76,6 @@ function nextPath(n: string | null): string {
   const v = n || "";
   return /^\/[A-Za-z0-9\-_/?=&.%]*$/.test(v) && v.indexOf("//") === -1 ? v : "/deals";
 }
-
-/* Seeded demo passwords, named here because a hashed record cannot give one
-   back. These are the four in the README — prototype credentials, not secrets.
-   Anyone created through the Team module has a generated password the admin
-   passed on, and is deliberately absent from this list. */
-const DEMO_PW: Record<string, string> = {
-  "founder@interiorbazzar.com": "admin123",
-  "r.menon@interiorbazzar.com": "sales123",
-  "priya.nair@interiorbazzar.com": "priya1234",
-  "k.iyer@interiorbazzar.com": "kiyer1234",
-};
 
 const LOCKED_BANNER: Banner = {
   kind: "err2",
@@ -76,6 +86,50 @@ const LOCKED_BANNER: Banner = {
     </>
   ),
 };
+/* Restored from the prototype (admin-auth.html:311) — dormant, like
+   LOCKED_BANNER above: the "N attempts remain" count was TeamStore's
+   client-side `failedAttempts` counter, deleted along with the rest of the
+   local demo store. No server response field replaces it yet, so this takes
+   one if the backend ever adds it and renders nothing extra otherwise —
+   never a fabricated count (guardrail 6). Every existing call site passes no
+   argument, so this is inert until something supplies a real number. */
+function invalidBanner(attemptsRemaining?: number): Banner {
+  return {
+    kind: "err2",
+    title: "That email or password isn’t right",
+    body: (
+      <>
+        Check both and try again.
+        {typeof attemptsRemaining === "number" && (
+          <>
+            {" "}
+            <b>{attemptsRemaining}</b> attempts remain before a lock.
+          </>
+        )}
+      </>
+    ),
+  };
+}
+const INVALID_BANNER = invalidBanner();
+const WITHDRAWN_BANNER: Banner = {
+  kind: "err2",
+  title: "Access withdrawn",
+  body: "This account is suspended, deactivated or locked. Contact an Admin.",
+};
+/* Restored from the prototype (admin-auth.html:405) — the distinct body for
+   a session that resolved but failed the server's admin gate, as opposed to
+   WITHDRAWN_BANNER above (a session that didn't resolve at all). Wired to
+   RequireSession's `?blocked=gate` (session.gateOk === false). */
+const GATE_BLOCKED_BANNER: Banner = {
+  kind: "err2",
+  title: "Access withdrawn",
+  body: "This account can no longer sign in. Contact an Admin.",
+};
+const SIGNED_OUT_BANNER: Banner = {
+  kind: "ok2",
+  title: "Signed out",
+  body: "Your session has been cleared on this device.",
+};
 
 export default function AdminAuth() {
   const navigate = useNavigate();
@@ -85,8 +139,8 @@ export default function AdminAuth() {
   const [banner, setBanner] = useState<Banner | null>(null);
   const [who, setWho] = useState("");
   const [pass, setPass] = useState("");
-  const [user, setUser] = useState<TeamUser | null>(null);
-  const [demo, setDemo] = useState<{ email: string; name: string; role: string; status: string }[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [user, setUser] = useState<Identity | null>(null);
   const passRef = useRef<HTMLInputElement>(null);
   const booted = useRef(false);
 
@@ -94,72 +148,36 @@ export default function AdminAuth() {
     navigate(nextPath(params.get("next")));
   }
 
-  /* ---------- register ---------- */
-  function handleLogin() {
+  /* ---------- sign in ---------- */
+  async function handleLogin() {
+    if (busy) return;
     setBanner(null);
-    const users = TS.load() as TeamUser[];
-    /* Members have a username as well as an email now, and an operator reading
-       credentials down a phone gives whichever is shorter. Accept both. */
-    const u: TeamUser | null = TS.byEmail(users, who.trim()) || byUsername(users, who.trim());
-
-    if (u && u.status === "locked") {
-      setBanner(LOCKED_BANNER);
-      return;
-    }
-
-    /* Verified against the stored SALTED HASH, never a stored password — there
-       is no plaintext in the record to compare with any more. A record written
-       before hashing existed is migrated on its first successful sign-in. */
-    if (!u || !verify(u, pass)) {
-      // Generic message — never reveal which half was wrong.
-      if (u) {
-        u.failedAttempts = (u.failedAttempts || 0) + 1;
-        if (u.failedAttempts >= MAX_ATTEMPTS) {
-          u.status = "locked";
-          TS.save(users);
-          setBanner(LOCKED_BANNER);
-          return;
-        }
-        TS.save(users);
+    setBusy(true);
+    try {
+      const res = await AuthService.signinAdmin({ username: who.trim(), password: pass });
+      const data = res.data as LoginFormResponse;
+      TokenService.setTokens(data.accessToken, data.refreshToken);
+      const s = await loadSession(true);
+      if (!s) {
+        clearSession();
+        setBanner(INVALID_BANNER);
+        return;
       }
-      const remaining = u ? MAX_ATTEMPTS - (u.failedAttempts || 0) : 0;
-      setBanner({
-        kind: "err2",
-        title: "That email or password isn’t right",
-        body: (
-          <>
-            Check both and try again.
-            {u ? (
-              <>
-                {" "}
-                <b>{remaining}</b> attempts remain before a lock.
-              </>
-            ) : null}
-          </>
-        ),
-      });
-      return;
+      setUser({ name: s.user.name, role: s.role, grants: grantsOf(s) });
+      setStep(isZeroAccess(s) ? "pending" : "active");
+    } catch (e) {
+      clearSession();
+      // Generic message — never reveal which half was wrong, and never
+      // distinguish "locked" from "wrong" either (see the header note).
+      setBanner(e instanceof AppExceptions && e.code === 423 ? LOCKED_BANNER : INVALID_BANNER);
+    } finally {
+      setBusy(false);
     }
-
-    u.failedAttempts = 0;
-
-    if (u.status === "suspended" || u.status === "deactivated") {
-      TS.save(users);
-      setUser(u);
-      setStep("blocked");
-      return;
-    }
-
-    u.lastLogin = Date.now();
-    TS.save(users);
-    TS.setSession(u.id);
-
-    setUser(u);
-    setStep(u.status === "pending" || !u.role ? "pending" : "active");
   }
 
   function handleLogout() {
-    TS.clearSession();
+    void AuthService.signout().catch(() => {});
+    clearSession();
     setPass("");
     setUser(null);
     setStep("login");
@@ -170,70 +188,34 @@ export default function AdminAuth() {
     if (e.key === "Enter") handleLogin();
   }
 
-  function fill(email: string, pw: string) {
-    setWho(email);
-    setPass(pw);
-    passRef.current?.focus();
-  }
-
   /* ---------- boot ---------- */
   useEffect(() => {
     if (booted.current) return;
     booted.current = true;
 
-    const list = TS.load() as TeamUser[];
-    setDemo(
-      list
-        .filter((u) => DEMO_PW[u.email])
-        .map((u) => {
-          const r = u.role ? IBTeam.roleOf(u.role) : null;
-          return {
-            email: u.email,
-            name: u.name,
-            role: r ? r.name : u.role ? TS.ROLE_LABEL[u.role] || u.role : "No role",
-            status: u.status,
-          };
-        }),
-    );
+    if (params.get("bye")) setBanner(SIGNED_OUT_BANNER);
+    if (params.get("blocked") === "gate") setBanner(GATE_BLOCKED_BANNER);
+    else if (params.get("blocked")) setBanner(WITHDRAWN_BANNER);
 
-    if (params.get("bye"))
-      setBanner({ kind: "ok2", title: "Signed out", body: "Your session has been cleared on this device." });
-    if (params.get("blocked"))
-      setBanner({
-        kind: "err2",
-        title: "Access withdrawn",
-        body: "This account is suspended, deactivated or locked. Contact an Admin.",
-      });
-
-    const current = TS.current() as TeamUser | null;
-    if (!current) return;
-
-    // Re-resolve the outcome from the USER RECORD rather than trusting the session.
-    if (current.status === "suspended" || current.status === "deactivated" || current.status === "locked") {
-      TS.clearSession();
-      setBanner({
-        kind: "err2",
-        title: "Access withdrawn",
-        body: "This account can no longer sign in. Contact an Admin.",
-      });
-      return;
-    }
-    if (current.status === "pending" || !current.role) {
-      setUser(current);
-      setStep("pending");
-      return;
-    }
-
-    // A live session with a role: say so, and offer the door rather than
-    // silently bouncing — a redirect loop is the worst thing a guard can do.
-    setUser(current);
-    setStep("active");
-    if (!params.get("pending") && !params.get("bye") && !params.get("blocked")) enterPanel();
+    /* A token already on this device — re-resolve from the SERVER, never
+       trust a stored session blob. */
+    if (!TokenService.getAccessToken()) return;
+    loadSession().then((s) => {
+      if (!s) {
+        clearSession();
+        setBanner(WITHDRAWN_BANNER);
+        return;
+      }
+      setUser({ name: s.user.name, role: s.role, grants: grantsOf(s) });
+      if (isZeroAccess(s)) {
+        setStep("pending");
+        return;
+      }
+      setStep("active");
+      if (!params.get("pending") && !params.get("bye") && !params.get("blocked")) enterPanel();
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const isSusp = user ? user.status === "suspended" : true;
-  const grants: string[] = user && user.role ? TS.ROLE_GRANTS[user.role] || [] : [];
 
   return (
     <div className="auth">
@@ -314,27 +296,9 @@ export default function AdminAuth() {
               <div className="err" id="err-loginPass" />
             </div>
 
-            <button className="btn pri lg full" onClick={handleLogin}>Sign in</button>
-
-            <div className="demo">
-              <div className="demo-h">
-                <svg className="ic sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
-                  <circle cx="12" cy="12" r="9" /><path d="M12 8v4.5M12 16h.01" />
-                </svg>
-                DEMO ACCOUNTS — PROTOTYPE ONLY
-              </div>
-              <div id="demoRows">
-                {demo.map((r) => (
-                  <div className="demo-r" key={r.email}>
-                    <div>
-                      <b>{r.name}</b>
-                      <div className="m">{r.role} · {r.status}</div>
-                    </div>
-                    <button onClick={() => fill(r.email, DEMO_PW[r.email])}>Use</button>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <button className="btn pri lg full" onClick={handleLogin} disabled={busy}>
+              {busy ? "Signing in…" : "Sign in"}
+            </button>
 
             <div className="foot">
               Accounts are created by an admin — there is no public sign-up. Lost your password? Ask an admin
@@ -365,22 +329,6 @@ export default function AdminAuth() {
             <button className="btn lg full" onClick={handleLogout} style={{ marginTop: 18 }}>Sign out</button>
           </div>
 
-          {/* -------------------------------------------------------- BLOCKED */}
-          <div className={"step" + (step === "blocked" ? " on" : "")} id="step-blocked">
-            <div className="icon-round stop">
-              <svg className="ic lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"
-                   strokeLinecap="round" strokeLinejoin="round"><rect x="4.6" y="10" width="14.8" height="10" rx="2" /><path d="M8 10V7.2a4 4 0 0 1 8 0V10" /></svg>
-            </div>
-            <h2 id="blockedTitle">{isSusp ? "Access suspended" : "Account deactivated"}</h2>
-            <p className="lede" id="blockedMsg">
-              {isSusp
-                ? "Your access has been temporarily suspended. Contact an Admin if you believe this is a mistake."
-                : "This account has been deactivated. Historical activity is retained; contact an Admin about restoration."}
-            </p>
-            <div style={{ height: 22 }} />
-            <button className="btn lg full" onClick={handleLogout}>Back to sign in</button>
-          </div>
-
           {/* --------------------------------------------------------- ACTIVE */}
           <div className={"step" + (step === "active" ? " on" : "")} id="step-active">
             <div className="icon-round ok3">
@@ -390,11 +338,11 @@ export default function AdminAuth() {
             <h2 id="activeTitle">{user ? "Welcome back, " + user.name.split(" ")[0] : "Welcome back"}</h2>
             <p className="lede" id="activeMsg">
               {user && user.role
-                ? "Signed in as " + TS.ROLE_LABEL[user.role] + ". Effective access, resolved fresh for this session:"
+                ? "Signed in as " + user.role + ". Effective access, resolved fresh for this session:"
                 : ""}
             </p>
             <div className="grants" id="activeGrants">
-              {grants.map((g) => (
+              {(user ? user.grants : []).map((g) => (
                 <span className="chip" key={g}>{g}</span>
               ))}
             </div>

@@ -608,38 +608,15 @@
     analyst:["Read-only across most modules"]
   };
 
+  /* The eight demo records (including plaintext passwords admin123/sales123/
+     priya1234/kiyer1234) used to be written into every admin's localStorage
+     on the shell's first render — TeamStore.load() seeds on a cache miss.
+     They were never reachable for authentication (AdminAuth signs in against
+     the real server), so this was never an auth bypass; it was still
+     credential material persisted to disk for no reason. Definition of done
+     says the four demo accounts are gone — so this seeds nothing. */
   function seedTeam() {
-    // Anchored to the same fixed clock as the business data, so a seeded
-    // member's "last login" never drifts ahead of the June 2026 dataset.
-    // A genuinely NEW registration still stamps Date.now(), which is correct —
-    // it happened now.
-    var now = TODAY.getTime() + 9 * 3600000, day = 86400000;
-    return [
-      { id:"u1", name:"Vishal Shakya", email:"founder@interiorbazzar.com", phone:"+919810000001",
-        password:"admin123", status:"active", role:"super_admin",
-        registeredAt:now - day*180, lastLogin:now - 3600000, failedAttempts:0 },
-      { id:"u2", name:"R. Menon", email:"r.menon@interiorbazzar.com", phone:"+919810000002",
-        password:"sales123", status:"active", role:"sales_agent",
-        registeredAt:now - day*40, lastLogin:now - 7200000, failedAttempts:0 },
-      { id:"u3", name:"Priya Nair", email:"priya.nair@interiorbazzar.com", phone:"+919810000003",
-        password:"priya1234", status:"pending", role:null,
-        registeredAt:now - day*2, lastLogin:null, failedAttempts:0 },
-      { id:"u4", name:"K. Iyer", email:"k.iyer@interiorbazzar.com", phone:"+919810000004",
-        password:"kiyer1234", status:"suspended", role:"content",
-        registeredAt:now - day*70, lastLogin:now - day*6, failedAttempts:0 },
-      { id:"u5", name:"A. Rao", email:"a.rao@interiorbazzar.com", phone:"+919810000005",
-        password:"arao1234", status:"active", role:"ops_manager",
-        registeredAt:now - day*95, lastLogin:now - day*1, failedAttempts:0 },
-      { id:"u6", name:"Nandini Shah", email:"nandini@interiorbazzar.com", phone:"+919810000006",
-        password:"nandini123", status:"pending", role:null,
-        registeredAt:now - day*4, lastLogin:now - day*3, failedAttempts:0 },
-      { id:"u7", name:"Devang Patel", email:"devang@interiorbazzar.com", phone:"+919810000007",
-        password:"devang123", status:"pending", role:null,
-        registeredAt:now - day*1, lastLogin:null, failedAttempts:0 },
-      { id:"u8", name:"Sana Fernandes", email:"sana@interiorbazzar.com", phone:"+919810000008",
-        password:"sana12345", status:"active", role:"finance",
-        registeredAt:now - day*140, lastLogin:now - 18000000, failedAttempts:0 }
-    ];
+    return [];
   }
 
   var TeamStore = {

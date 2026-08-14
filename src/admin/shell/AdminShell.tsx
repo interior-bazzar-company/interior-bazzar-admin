@@ -22,25 +22,26 @@ import type { ReactNode } from "react";
 import { Link, Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Icon, richText } from "../ui";
 import { go as uiGo, setGo } from "../ui/nav";
-import { IBData, IBTeam } from "../engines";
+import { IBData } from "../engines";
 import config from "../../config";
-import { GROUP_OF, HOME_ROUTE, ITEMS, MODULES } from "./modules";
+import { AuthService } from "../../api/modules/auth";
+import type { MePermissions } from "../../api/modules/adminOps";
+import { getModules, getGroupOf, getItems, HOME_ROUTE } from "./modules";
+import { can, canWrite, clearSession, getSession, grantsOf } from "../auth/session";
 import { LS, currentDensity, currentTheme, setDensity, setTheme, useShell } from "./ShellContext";
 import { CommandPalette } from "./CommandPalette";
 
 /* ------------------------------------------------------------------- gate */
-/* v1 asks IBTeam, which resolves the signed-in user's roles into a flat
-   permission set. No view may ever branch on a role NAME. (TEAM_OPERATION §0.3)
-   If the Team engine is not loaded it falls back to permissive, because a
-   missing permission system must not silently lock a developer out of a
-   prototype. That fallback is safe here and would NOT be safe on a server:
-   there, an unavailable authorization service must deny, not allow. */
-export function can(moduleKey: string, action?: string): boolean {
-  const T = IBTeam;
-  if (!T) return true;
-  return T.can(T.currentUser(), moduleKey, action || "view");
-}
-export const canWrite = (moduleKey: string, action?: string) => can(moduleKey, action || "edit");
+/* The single permission gate for the whole panel, resolved server-side and
+   cached in admin/auth/session.ts. No view may ever branch on a role NAME.
+   (TEAM_OPERATION §0.3) — `can()` reads a module KEY + action against the
+   resolved matrix, never a role. Re-exported here (rather than only from
+   session.ts) because every view in this panel already imports it from
+   "../../shell/AdminShell" and that import path is the contract, not this
+   file's internals. An unresolved matrix DENIES: RequireSession never lets a
+   view render before the fetch settles, so "unresolved" here only ever means
+   "signed out", not "still loading". */
+export { can, canWrite };
 
 /* ----------------------------------------------------------------- chrome */
 type Chrome = {
@@ -109,6 +110,12 @@ export default function AdminShell() {
   const [stuck, setStuck] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
+
+  /* THE single module list, resolved once by RequireSession before this
+     component ever mounts — nav, routing and the permission matrix all read
+     the same array, so they cannot disagree. */
+  const MODULES = getModules();
+  const ITEMS = getItems();
 
   const route = (location.pathname.split("/").filter(Boolean)[0] || HOME_ROUTE).toLowerCase();
   const id = params.id ? decodeURIComponent(params.id) : null;
@@ -262,14 +269,15 @@ export default function AdminShell() {
 
   /* ------------------------------------------- title, scroll, mobile nav */
   useEffect(() => {
-    document.title = (ITEMS[route] ? ITEMS[route].label + " · " : "") + "Interior bazzar Admin";
+    const item = getItems()[route];
+    document.title = (item ? item.label + " · " : "") + "Interior bazzar Admin";
     if (scroller.current) scroller.current.scrollTop = 0;
     setStuck(false);
     if (window.matchMedia && window.matchMedia("(max-width:1180px)").matches) setNavOpen(false);
     if (id && known) remember(route, id);
   }, [route, id, known, here]);
 
-  const user = IBData.TeamStore.current();
+  const session = getSession();
   const badges = IBData.derive.badges();
   const t = backTo();
 
@@ -342,7 +350,7 @@ export default function AdminShell() {
             </nav>
 
             <div className="sb-foot">
-              <AccountButton user={user} />
+              <AccountButton session={session} />
               <button
                 className="sb-toggle"
                 id="sbToggle"
@@ -482,8 +490,8 @@ function Crumbs({
      already says "Deals" is pure duplication. */
   if (claimed) return <>{claimed}</>;
 
-  const item = ITEMS[route];
-  const grp = GROUP_OF[route];
+  const item = getItems()[route];
+  const grp = getGroupOf()[route];
 
   /* On a record, a create flow or a sub-mode the chain is GONE. `Sales ›
      Quotations › IB-QT-2026-00208` asked the user to read a hierarchy to work
@@ -630,11 +638,13 @@ type AuditRow = {
 };
 
 /* --------------------------------------------------------------- account */
-function AccountButton({ user }: { user: TeamUser | null }) {
+function AccountButton({ session }: { session: MePermissions | null }) {
   const shell = useShell();
   const { go } = useNav();
   const ref = useRef<HTMLButtonElement>(null);
   const [, force] = useState(0);
+  const user = session ? session.user : null;
+  const roleLabel = session ? session.role || "Pending role" : "—";
 
   const open = () => {
     const el = ref.current;
@@ -643,7 +653,7 @@ function AccountButton({ user }: { user: TeamUser | null }) {
       shell.closePop();
       return;
     }
-    const grants: string[] = user && user.role ? IBData.TeamStore.ROLE_GRANTS[user.role] || [] : [];
+    const grants: string[] = session ? grantsOf(session) : [];
     const swatch = (act: "theme" | "density", opts: [string, string][], cur: string) => (
       <div className="btn-group" style={{ width: "100%" }}>
         {opts.map((o) => (
@@ -685,12 +695,12 @@ function AccountButton({ user }: { user: TeamUser | null }) {
       <>
         <div className="pop-h">
           <span className={"av lg " + avatarTone(user ? user.name : "")}>
-            {initials(user ? user.name : "??")}
+            {user ? user.initials : "??"}
           </span>
           <span>
             <b style={{ fontSize: 13.5 }}>{user ? user.name : "Not signed in"}</b>
             <div className="faint" style={{ fontSize: 12 }}>
-              {user ? IBData.TeamStore.ROLE_LABEL[user.role] || "Pending role" : "—"}
+              {roleLabel}
             </div>
           </span>
         </div>
@@ -717,7 +727,7 @@ function AccountButton({ user }: { user: TeamUser | null }) {
           </div>
           <div className="msep" />
           {item("#/team", "user", "My account")}
-          {item("#/roles", "shield", "Effective access")}
+          {can("roles") && item("#/roles", "shield", "Effective access")}
           <button
             className="mi"
             data-act="preview"
@@ -730,7 +740,7 @@ function AccountButton({ user }: { user: TeamUser | null }) {
             <Icon name="ext" />
             Preview portal<span className="r">↗</span>
           </button>
-          {item("#/design", "sparkle", "Design system", "↗")}
+          {can("design") && item("#/design", "sparkle", "Design system", "↗")}
           <button
             className="mi"
             data-act="shortcuts"
@@ -769,13 +779,11 @@ function AccountButton({ user }: { user: TeamUser | null }) {
   return (
     <button ref={ref} className="sb-user" data-act="account" onClick={open}>
       <span className={"av " + avatarTone(user ? user.name : "")} id="meAvatar">
-        {initials(user ? user.name : "")}
+        {user ? user.initials : ""}
       </span>
       <span className="who rail-hide">
         <b id="meName">{user ? user.name : "…"}</b>
-        <span id="meRole">
-          {user ? IBData.TeamStore.ROLE_LABEL[user.role] || "Pending role" : "…"}
-        </span>
+        <span id="meRole">{user ? roleLabel : "…"}</span>
       </span>
       {/* inline rather than <Icon>, to keep the prototype's own colour override */}
       <svg className="ic sm rail-hide" viewBox="0 0 24 24" style={{ color: "var(--text-3)" }}>
@@ -785,13 +793,18 @@ function AccountButton({ user }: { user: TeamUser | null }) {
   );
 }
 
+/* Sign-out ends the server-side UserSession (best-effort — local tokens are
+   cleared regardless of whether that call succeeds) and then clears the
+   cached matrix, same as the guard elsewhere: local state is cleared even on
+   a failed request. */
 function SignOut({ onDone }: { onDone: () => void }) {
   return (
     <Link
       className="mi dgr"
       to="/login?bye=1"
       onClick={() => {
-        IBData.TeamStore.clearSession();
+        void AuthService.signout().catch(() => {});
+        clearSession();
         onDone();
       }}
     >
@@ -801,8 +814,6 @@ function SignOut({ onDone }: { onDone: () => void }) {
   );
 }
 
-type TeamUser = { name: string; role: string; status?: string } | null;
-
 /* --------------------------------------------------------------- recents */
 export function remember(route: string, id: string) {
   let list = LS.get<{ route: string; id: string; at: number }[]>("ib_admin_recents", []);
@@ -811,10 +822,6 @@ export function remember(route: string, id: string) {
   LS.set("ib_admin_recents", list.slice(0, 12));
 }
 
-function initials(name: string) {
-  const p = String(name || "").trim().split(/\s+/);
-  return ((p[0] || "")[0] || "").toUpperCase() + ((p[1] || "")[0] || "").toUpperCase();
-}
 function avatarTone(name: string) {
   let n = 0;
   const s = String(name || "");
