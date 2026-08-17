@@ -9,8 +9,9 @@
      3. How you get there — global search, cross-module links, recents
      4. Who you are     — session, identity, effective access, sign out
 
-   It owns no business data. Every number it shows is read from IBData; every
-   action it offers is a link into a module.
+   It owns no business data and no store of its own: the Activity bell reads
+   the server's audit trail, the command palette searches deals through the
+   API, and every action it offers is a link into a module.
 
    ROUTING — the prototype is a hash router (`#/deals/IB-D-1042?tab=x`); this
    app uses real paths (`/deals/IB-D-1042?tab=x`). Every ported view still
@@ -20,16 +21,17 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
-import { Icon, richText } from "../ui";
+import { Icon } from "../ui";
 import { go as uiGo, setGo } from "../ui/nav";
-import { IBData } from "../engines";
 import config from "../../config";
 import { AuthService } from "../../api/modules/auth";
-import type { MePermissions } from "../../api/modules/adminOps";
-import { getModules, getGroupOf, getItems, HOME_ROUTE } from "./modules";
+import AdminOpsService, { call } from "../../api/modules/adminOps";
+import type { AuditEntry, MePermissions } from "../../api/modules/adminOps";
+import { getModules, getGroupOf, getItems, moduleLabel, HOME_ROUTE } from "./modules";
 import { can, canWrite, clearSession, getSession, grantsOf } from "../auth/session";
 import { LS, currentDensity, currentTheme, setDensity, setTheme, useShell } from "./ShellContext";
 import { CommandPalette } from "./CommandPalette";
+import ErrorBoundary from "../../components/shared/ErrorBoundary";
 
 /* ------------------------------------------------------------------- gate */
 /* The single permission gate for the whole panel, resolved server-side and
@@ -240,11 +242,8 @@ export default function AdminShell() {
       if (chord === "g") {
         const map: Record<string, string> = {
           d: "deals",
-          q: "quotations",
-          i: "invoices",
           s: "plans",
           t: "team",
-          y: "design",
         };
         const dest = map[e.key.toLowerCase()];
         chord = null;
@@ -278,7 +277,12 @@ export default function AdminShell() {
   }, [route, id, known, here]);
 
   const session = getSession();
-  const badges = IBData.derive.badges();
+  /* No nav badges. They came from IBData.derive.badges() — queue counts over
+     the browser-side seed store ("deals with no quotation", "members pending a
+     role"), so every module wore a number that described demo data. A count in
+     the navigation is a promise that something needs doing; it comes back when
+     it can be counted from the server. */
+  const badges: Record<string, { n: number; alert: boolean }> = {};
   const t = backTo();
 
   return (
@@ -458,7 +462,13 @@ export default function AdminShell() {
               onScroll={(e) => setStuck(e.currentTarget.scrollTop > 4)}
             >
               <div id="page">
-                <Outlet />
+                {/* A view that throws mid-render takes itself down, not the
+                    panel: the sidebar, the topbar and the way out stay on
+                    screen. Keyed on the location so leaving the broken page
+                    clears the error — a boundary has no reset of its own. */}
+                <ErrorBoundary key={here}>
+                  <Outlet />
+                </ErrorBoundary>
               </div>
             </div>
           </main>
@@ -537,105 +547,140 @@ function BannerDock() {
 }
 
 /* -------------------------------------------------------------- activity */
+/* THE BELL. Reads the same trail the Audit log does — `v1/admin/audit/`, one
+   fetch per open, newest 25 — instead of the browser-side array of invented
+   events it used to render. It is a peek at that page, never a second source:
+   same rows, same order, and "Full log" is the same query without the limit.
+
+   Fetched on OPEN, not on mount. The shell renders on every route change and
+   nobody watches a bell they have not pressed; polling it would be a request
+   per minute for a list that is usually unchanged. */
 function ActivityButton() {
   const shell = useShell();
   const ref = useRef<HTMLButtonElement>(null);
   const { go } = useNav();
+  const [rows, setRows] = useState<AuditEntry[] | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  /* Nobody with no audit access should be offered a bell that can only ever
+     say 403 — locked actions are ABSENT, not greyed, here as everywhere. */
+  if (!can("audit")) return null;
+
+  const dayOf = (ts: string | null) => (ts ? ts.slice(0, 10) : "");
+  const dayLabel = (day: string) => {
+    const today = new Date();
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    const y = new Date(today); y.setDate(today.getDate() - 1);
+    if (day === iso(today)) return "Today";
+    if (day === iso(y)) return "Yesterday";
+    /* Its own Intl call rather than ui/format's fmtDate: this one wants the
+       locale's own rendering of a day heading, and "15 Aug 2026" is one line. */
+    const d = new Date(day + "T00:00:00");
+    return isNaN(d.getTime()) ? day
+      : d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+  };
+  const timeOf = (ts: string | null) => {
+    if (!ts) return "";
+    const d = new Date(ts);
+    return isNaN(d.getTime()) ? "" : d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: false });
+  };
+
+  const body = (list: AuditEntry[] | null, error: boolean) => {
+    if (error) return <div className="pop-b"><div className="faint" style={{ padding: "14px 12px" }}>
+      Could not reach the audit log.</div></div>;
+    if (list === null) return <div className="pop-b"><div className="faint" style={{ padding: "14px 12px" }}>
+      Loading…</div></div>;
+    if (!list.length) return <div className="pop-b"><div className="faint" style={{ padding: "14px 12px" }}>
+      Nothing recorded yet.</div></div>;
+
+    const byDay: Record<string, AuditEntry[]> = {};
+    list.forEach((a) => { (byDay[dayOf(a.ts)] = byDay[dayOf(a.ts)] || []).push(a); });
+    return (
+      <div className="pop-b">
+        {Object.keys(byDay).sort().reverse().map((day) => (
+          <div key={day}>
+            <div className="dayline">{dayLabel(day)}</div>
+            {byDay[day].map((a) => {
+              /* Straight to the module's own slice of the log. There is no
+                 per-entry route to offer: the trail records what happened, and
+                 the record it happened to may since have been deleted — which
+                 is often exactly the entry somebody is reading. */
+              const to = "#/audit?module=" + encodeURIComponent(a.module);
+              return (
+                <button key={a.id} className="fd" data-go={to}
+                  style={{ width: "100%", textAlign: "left" }}
+                  onClick={() => { shell.closePop(); go(to); }}>
+                  <span className={"tag " + (DESTRUCTIVE_ACTION.test(a.action) ? "bad" : "")}>
+                    {a.action.replace(/_/g, " ")}
+                  </span>
+                  <span className="bd">
+                    {a.detail || moduleLabel(a.module)}
+                    <span className="by">{a.actor || "system"}{a.role ? " · " + a.role : ""}</span>
+                  </span>
+                  <span className="at">{timeOf(a.ts)}</span>
+                </button>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const chrome = (list: AuditEntry[] | null, error: boolean) => (
+    <>
+      <div className="pop-h">
+        <Icon name="bell" />
+        <b>Activity</b>
+        <span className="spacer" />
+        <span className="faint" style={{ fontSize: 12 }}>All modules</span>
+      </div>
+      {body(list, error)}
+      <div className="pop-f">
+        Append-only · the same trail the Audit log shows
+        <span className="spacer" />
+        <button className="btn sm" data-go="#/audit"
+          onClick={() => { shell.closePop(); go("#/audit"); }}>Full log</button>
+      </div>
+    </>
+  );
 
   const open = () => {
     const el = ref.current;
     if (!el) return;
-    if (shell.popAnchor === el) {
-      shell.closePop();
-      return;
-    }
-    const byDay: Record<string, AuditRow[]> = {};
-    (IBData.audit as AuditRow[]).forEach((a) => {
-      const day = a.at.slice(0, 10);
-      (byDay[day] = byDay[day] || []).push(a);
-    });
-    const todayKey = "2026-06-28";
-    const yKey = "2026-06-27";
-    shell.openPop(
-      el,
-      <>
-        <div className="pop-h">
-          <Icon name="bell" />
-          <b>Activity</b>
-          <span className="spacer" />
-          <span className="faint" style={{ fontSize: 12 }}>
-            All modules
-          </span>
-        </div>
-        <div className="pop-b">
-          {Object.keys(byDay)
-            .sort()
-            .reverse()
-            .map((day) => (
-              <div key={day}>
-                <div className="dayline">
-                  {day === todayKey ? "Today" : day === yKey ? "Yesterday" : IBData.fmtDate(day)}
-                </div>
-                {byDay[day].map((a, i) => (
-                  <button
-                    key={i}
-                    className="fd"
-                    data-go={a.route}
-                    style={{ width: "100%", textAlign: "left" }}
-                    onClick={() => {
-                      shell.closePop();
-                      go(a.route);
-                    }}
-                  >
-                    <span className={"tag " + (a.tone || "")}>{a.type}</span>
-                    <span className="bd">
-                      {richText(a.text)}
-                      <span className="by">
-                        {a.actor} · {a.role}
-                      </span>
-                    </span>
-                    <span className="at">{a.at.slice(11)}</span>
-                  </button>
-                ))}
-              </div>
-            ))}
-        </div>
-        <div className="pop-f">
-          Append-only · <span className="mono">ib_admin_audit</span>
-          <span className="spacer" />
-          <button
-            className="btn sm"
-            data-go="#/audit"
-            onClick={() => {
-              shell.closePop();
-              go("#/audit");
-            }}
-          >
-            Full log
-          </button>
-        </div>
-      </>,
-      { width: 460 }
-    );
+    if (shell.popAnchor === el) { shell.closePop(); return; }
+
+    /* Opened with whatever was last fetched — a re-open should not blank the
+       list it just showed — and refreshed underneath. */
+    setFailed(false);
+    shell.openPop(el, chrome(rows, false), { width: 460 });
+    call(AdminOpsService.audit({ pageSize: 25 }))
+      .then((d) => {
+        setRows(d.entries);
+        if (ref.current) shell.openPop(ref.current, chrome(d.entries, false), { width: 460 });
+      })
+      .catch(() => {
+        setFailed(true);
+        if (ref.current) shell.openPop(ref.current, chrome(rows, true), { width: 460 });
+      });
   };
 
   return (
-    <button ref={ref} className="tb-btn" data-act="activity" aria-label="Activity" title="Activity" onClick={open}>
+    <button ref={ref} className="tb-btn" data-act="activity" aria-label="Activity" title="Activity"
+      onClick={open}>
       <Icon name="bell" />
-      <span className="pip" />
+      {/* The pip used to be permanent — a notification dot that never cleared
+          says nothing. It marks a failed read now, which is the one thing about
+          this button worth flagging without opening it. */}
+      {failed ? <span className="pip" /> : null}
     </button>
   );
 }
 
-type AuditRow = {
-  at: string;
-  route: string;
-  type: string;
-  tone?: string;
-  text: string;
-  actor: string;
-  role: string;
-};
+/* The same words the server counts as destructive (DESTRUCTIVE_WORDS in
+   AuditValidators.py), for toning a row only — the filtering and the counts
+   are the server's. */
+const DESTRUCTIVE_ACTION = /delete|reject|cancel|archive|revoke|remove|reverse/i;
 
 /* --------------------------------------------------------------- account */
 function AccountButton({ session }: { session: MePermissions | null }) {
@@ -740,7 +785,6 @@ function AccountButton({ session }: { session: MePermissions | null }) {
             <Icon name="ext" />
             Preview portal<span className="r">↗</span>
           </button>
-          {can("design") && item("#/design", "sparkle", "Design system", "↗")}
           <button
             className="mi"
             data-act="shortcuts"

@@ -172,6 +172,12 @@
   --sidebar-active:var(--bg-selected);
   --surface-raised:#ffffff;
 
+  /* skeleton — the resting bar and the light that sweeps across it. Two
+     tokens, because the sweep must be BRIGHTER than the bar in both themes
+     and no single ramp step is on the right side of that in both. */
+  --sk:var(--sand-4);
+  --sk-sheen:var(--sand-2);
+
   /* text */
   --text:var(--sand-12);
   --text-2:var(--sand-11);
@@ -324,6 +330,7 @@
     --bg-hover:var(--sand-4); --bg-active:var(--sand-5); --bg-selected:var(--green-4);
     --sidebar-hover:var(--sand-4); --sidebar-active:var(--bg-selected);
     --surface-raised:var(--sand-3);
+    --sk-sheen:var(--sand-6);   /* dark: the sweep is a LIGHTER step, not sand-2 */
     --brand-mint:var(--green-11);
     --line-control:var(--sand-9);
     --brand-ink:#04140f;
@@ -391,6 +398,7 @@
   --bg-hover:var(--sand-4); --bg-active:var(--sand-5); --bg-selected:var(--green-4);
   --sidebar-hover:var(--sand-4); --sidebar-active:var(--bg-selected);
   --surface-raised:var(--sand-3);
+  --sk-sheen:var(--sand-6);     /* dark: the sweep is a LIGHTER step, not sand-2 */
   --brand-mint:var(--green-11);
   --line-control:var(--sand-9);     /* 3.78:1 on the content plane */
   --brand-ink:#04140f;              /* dark: near-black on #12a594 = 6.15:1.
@@ -1089,6 +1097,16 @@ select.inp::-ms-expand{ display:none }
 .tbl .rowact{ opacity:0; transition:opacity var(--duration) var(--ease) }
 .tbl tr:hover .rowact,.tbl tr:focus-within .rowact{ opacity:1 }
 
+/* A modal's search-and-pick list — "which deal is this quotation/invoice
+   for". One row = one candidate; picking it commits immediately, there is
+   no separate confirm step. */
+.pick-list{ display:flex; flex-direction:column; gap:4px; max-height:360px; overflow-y:auto }
+.pick-row{ display:flex; align-items:center; gap:10px; width:100%; text-align:left;
+           padding:var(--space-2) var(--space-3); border:1px solid var(--line-2); border-radius:var(--radius-lg);
+           background:var(--bg); cursor:pointer; font:inherit; color:inherit }
+.pick-row:hover{ background:var(--bg-inset) }
+.pick-row:disabled{ opacity:.6; cursor:default }
+
 
 
 
@@ -1235,9 +1253,51 @@ a.lk:hover{ border-color:var(--brand); background:var(--brand-tint) }
 .tag.bad{ background:var(--bad-bg); color:var(--bad) }
 .tag.info{ background:var(--info-bg); color:var(--info) }
 .fd .bd{ flex:1; min-width:0; line-height:1.45 }
-.fd .by{ font-size:var(--text-sm); color:var(--text-3); margin-top:2px }
+/* A byline sits UNDER the line it credits. It was inline, which read as
+   "…customer wants a site visitadmin · Admin" — the actor ran straight into
+   the last word of the entry. */
+.fd .by{ display:block; font-size:var(--text-sm); color:var(--text-3); margin-top:2px }
 .fd .at{ flex:0 0 auto; margin-left:auto; font-size:var(--text-sm);
          color:var(--text-3); white-space:nowrap }
+/* IN-PLACE LOADING. The full-page loader is for a screen that has nothing on
+   it yet; this is for one pane whose own record is being swapped while the
+   rest of the page stays exactly where it is. */
+.pane-load{ display:flex; flex-direction:column; align-items:center; justify-content:center;
+            gap:var(--space-3); padding:var(--space-8) var(--space-4);
+            color:var(--text-3); font-size:var(--text-md) }
+.spinner{ width:22px; height:22px; border-radius:var(--radius-full);
+          border:2px solid var(--line-2); border-top-color:var(--brand);
+          animation:spin .7s linear infinite }
+.spinner.sm{ width:14px; height:14px; border-width:1.5px }
+@keyframes spin{ to{ transform:rotate(360deg) } }
+@media (prefers-reduced-motion:reduce){ .spinner{ animation-duration:2.4s } }
+
+/* SHIMMER. What a LIST wears while its first fetch is in flight. It is the
+   page's own skeleton — the same .dls command row, attention strip and body
+   the real screen uses — so the layout is already in place when the rows
+   arrive and nothing jumps. A spinner in the middle of an empty plane says
+   "wait"; this says "here is the shape of what is coming". */
+.sk{ display:block; position:relative; overflow:hidden; flex:0 0 auto;
+     background:var(--sk); border-radius:var(--radius-md) }
+.sk::after{ content:""; position:absolute; inset:0; transform:translateX(-100%);
+            background:linear-gradient(90deg,transparent,var(--sk-sheen),transparent);
+            animation:sheen 1.3s linear infinite }
+@keyframes sheen{ to{ transform:translateX(100%) } }
+/* The sweep is the whole point of a shimmer, so with motion reduced it is not
+   replaced by a slower sweep — it is dropped for a static bar. */
+@media (prefers-reduced-motion:reduce){ .sk::after{ animation:none } }
+
+/* Compounded with the band's own class, not standalone: .dls-attn / .dls-body
+   are declared LOWER in this file with `padding` shorthands, and at equal
+   specificity the later rule wins — a bare .sk-attn{padding-top:…} silently
+   lost. */
+.dls-cmd .sk{ height:var(--control-md) }
+.dls-attn.sk-attn{ gap:var(--space-6); padding:var(--space-3) var(--page-pad) }
+.sk-attn .sk{ width:72px; height:30px }
+.dls-body.sk-rows{ display:flex; flex-direction:column; gap:var(--space-2);
+                   padding:var(--space-4) var(--page-pad) var(--space-6) }
+.sk-rows .sk{ height:42px }
+
 .dayline{ font-size:var(--text-xs); font-weight:var(--weight-semibold);
           color:var(--text-3); padding:var(--space-3) 0 var(--space-1) }
 .dayline:first-child{ padding-top:var(--space-1) }
@@ -2064,6 +2124,14 @@ button.dls-stat:hover{ background:var(--bg-hover) }
    drops a size — the one row in this list that is deliberately not a bubble. */
 .dws-msg.log{ --bub:var(--bg-inset); --bub-ink:var(--text-2); --bub-line:transparent }
 .dws-msg.log .dws-bubble{ font-size:var(--text-md) }
+
+/* The real send. Rides the same --bub-line variable the bubble above it set,
+   so the link reads as part of that message rather than a stray control —
+   one more surface the wa/em channel classes colour for free. */
+.dws-openchan{ display:inline-flex; align-items:center; gap:4px; margin-top:4px;
+               font-size:var(--text-2xs); font-weight:var(--weight-semibold);
+               color:var(--bub-line, var(--text-3)); text-decoration:none }
+.dws-openchan:hover{ text-decoration:underline }
 
 .dws-composer{ margin:var(--space-3) var(--space-5) var(--space-4); background:var(--bg);
                border:1px solid var(--line-2); border-radius:var(--radius-xl); box-shadow:var(--shadow-sm); flex:0 0 auto }

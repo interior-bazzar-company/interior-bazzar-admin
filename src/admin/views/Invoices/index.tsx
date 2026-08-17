@@ -1,128 +1,165 @@
-/* =============================================================================
-   Invoice — Module 3 · interface
-   -----------------------------------------------------------------------------
-   Every screen in INVOICE_IA.md.
-
-   The list is the one place Invoice deliberately differs from Quotation. A
-   quotation list answers *what have we offered?* An invoice list answers
-   **who owes us money, and how late are they?** — so it opens with four money
-   tiles and sorts by due date, overdue first.
-
-   Two principles carried from Modules 1 and 2, plus two of its own:
-     1. Locked actions are ABSENT, not greyed.
-     2. Every modal states the rule BEFORE you commit.
-     3. THE TWO AXES ARE NEVER MERGED — two strips, two chips, two filters.
-     4. THERE IS NO `Record payment` BUTTON ANYWHERE IN THIS MODULE. Money is
-        logged on the deal, and the absence is the boundary made visible.
-
-   Routes
-     #/invoices                      list
-     #/invoices?new=1[&deal=DL-…]    step 1 · deal AND quotation, both required
-     #/invoices/<id>                 detail — Plan / Document / Payment / History
-     #/invoices/<id>?mode=edit       step 2 · the builder
-     #/invoices/<id>?mode=preview    the Invoice render, then Issue
-   ============================================================================= */
-import { useEffect, useMemo } from "react";
-import { useParams } from "react-router-dom";
-import { EmptyState } from "../../ui";
-import { usePageChrome } from "../../shell/AdminShell";
+/* =====================================================================
+   INVOICES — the list. Same five bands as Quotations/Deals/Plans.
+   ===================================================================== */
+import { useCallback, useMemo, useState } from "react";
+import { useParams, useSearchParams } from "react-router-dom";
+import { inr, fmtDate } from "../../ui/format";
+import { EmptyState, FilterChips, Notice, Pill, Select, StatStrip, qs, Icon } from "../../ui";
+import type { StatCell } from "../../ui";
+import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
-import { IBDeals, IBInvoice } from "../../engines";
-import { actor, quoteNumberOf } from "./helpers";
-import { useInvoices } from "./useInvoices";
-import { InvoiceList } from "./InvoiceList";
-import { InvoicePick } from "./InvoicePick";
-import { InvoiceBuilder } from "./InvoiceBuilder";
-import { InvoiceDetail, InvoicePreview } from "./InvoiceDetail";
+import { ListSkeleton } from "../../ui";
+import { STATUS_LABEL, STATUS_TONE, useInvoicesList } from "./api";
+import InvoiceDetail from "./Detail";
+import InvoiceBuilder from "./Builder";
+import InvoicePreview from "./Preview";
+import PickInvoiceModal from "./PickModal";
 
-const N = IBInvoice, E = IBDeals;
+const STATUSES = ["draft", "issued", "cancelled"];
 
+/* THE MODULE ROUTER — list / detail / builder / preview, the four screens the
+   prototype has (views-invoice.js). No drawer: see Quotations/index.tsx. */
 export default function Invoices() {
-  const routeParams = useParams();
-  const id = routeParams.id ? decodeURIComponent(routeParams.id) : null;
-  const { p, setFilter, unfilter, go, act } = useInvoices(id);
-  const shell = useShell();
+  const raw = useParams().id;
+  const id = raw ? Number(raw) : null;
+  const [sp] = useSearchParams();
+  const mode = sp.get("mode") || "";
+  const tab = sp.get("tab") || "lines";
+  const routeParams: Record<string, string> = {};
+  sp.forEach((v, k) => { if (k !== "mode") routeParams[k] = v; });
+  if (id && mode === "preview") return <InvoicePreview id={id} params={routeParams} />;
+  if (id && mode === "edit") return <InvoiceBuilder id={id} params={routeParams} />;
+  if (id) return <InvoiceDetail id={id} tab={tab} params={routeParams} />;
+  return <InvoicesList />;
+}
 
-  const inv = id ? N.invoiceOf(id) : null;
-  const dl = inv ? E.dealOf(inv.deal_id) : null;
-  const outOfScope = !!(inv && dl && !E.inScope(actor(), dl));
+function InvoicesList() {
+  const [sp] = useSearchParams();
+  const { go } = useNav();
+  const { modal, closeLayer, toast } = useShell();
+  const [tick, setTick] = useState(0);
+  const bump = useCallback(() => setTick((t) => t + 1), []);
 
-  /* ---------------------------------------------------------- the topbar */
-  /* The same nav bar Deals and Quotations have: the module's name where the
-     crumb "Sales › Invoices" used to sit above a heading that already said
-     Invoice. Claimed for the LIST only — on a record, a create flow or a
-     sub-mode this returns nothing so the shell's flat label and Back button own
-     the bar, rather than a module title competing with them. */
-  const isList = !id && !p["new"] && !p.mode;
-  const crumbs = useMemo(
-    () => (isList ? <span className="tb-title">Invoices</span> : undefined),
-    [isList]
-  );
+  const params: Record<string, string> = {};
+  sp.forEach((v, k) => { params[k] = v; });
+  const p = { status: params.status || "", sort: params.sort || "" };
 
-  /* --------------------------------------------------- where "up" is --- */
-  /* The fallback the shell's Back uses when there is no in-session history —
-     a pasted URL, or a refresh. An invoice has TWO NOT NULL parents, and the
-     nearer one wins: the quotation is the document this invoice was written
-     from, and the deal is one further step up from there. Walking one link at
-     a time is what makes repeated Back retrace the chain
-     invoice → quotation → deal instead of teleporting to its far end. */
-  const parent = useMemo(() => {
-    if (id) {
-      if (p.mode) return "#/invoices/" + encodeURIComponent(id);       // sub-mode → the record
-      const rec = N.invoiceOf(id);
-      if (rec) {
-        const qn = quoteNumberOf(rec);
-        if (qn) return "#/quotations/" + encodeURIComponent(qn);
-        if (rec.deal_id) return "#/deals/" + encodeURIComponent(rec.deal_id);
-      }
-      return "#/invoices";
-    }
-    if (p["new"] === "1") return p.deal ? "#/deals/" + encodeURIComponent(p.deal) : "#/invoices";
-    return null;
-  }, [id, p]);
+  const { loading, rows, error } = useInvoicesList(tick, { status: p.status || undefined });
 
-  usePageChrome({ crumbs, parent });
+  const crumbs = useMemo(() => <span className="tb-title">Invoices</span>, []);
+  usePageChrome({ crumbs, right: null, parent: null });
 
-  /* Issued content is frozen. The prototype toasted from inside its render
-     pass and fell through to the detail screen; a React render may not do
-     that, so the refusal fires as an effect and the fall-through stays. */
-  const frozen = !!(inv && p.mode === "edit" && inv.invoice_status !== N.DOC.DRAFT);
-  useEffect(() => {
-    if (frozen) shell.toast("422 invoice_not_editable — issued content is frozen.", "bad");
-  }, [frozen, shell]);
+  /* A new draft opens on its own editor page -- the reference and the proof it
+     needs before issuing are entered there, not in a panel over the list. */
+  const done = useCallback((msg: string, ref: number | null) => {
+    closeLayer(); toast(msg);
+    go(ref ? "#/invoices/" + ref + "?mode=edit" : "#/invoices");
+    bump();
+  }, [closeLayer, toast, go, bump]);
 
-  if (p["new"] === "1")
-    return <InvoicePick p={p} setFilter={setFilter} go={go} onCreate={act.create} />;
+  const onFilter = (name: string, value: string) => {
+    go("#/invoices" + qs({ ...params, [name]: value }));
+  };
+  const onUnfilter = (k: string) => {
+    const q2: Record<string, string> = {};
+    if (k !== "*") for (const x in params) if (x !== k) q2[x] = params[x];
+    go("#/invoices" + qs(q2));
+  };
 
-  if (id) {
-    if (!inv) return <NotFound id={id} go={go} />;
-    if (outOfScope) return <Denied go={go} />;
-    if (p.mode === "edit" && !frozen)
-      return <InvoiceBuilder key={inv.row_version} inv={inv} go={go} act={act} />;
-    if (p.mode === "preview") return <InvoicePreview inv={inv} go={go} act={act} />;
-    return <InvoiceDetail inv={inv} p={p} go={go} act={act} />;
+  const byStatus: Record<string, number> = {};
+  rows.forEach((inv) => { byStatus[inv.status] = (byStatus[inv.status] || 0) + 1; });
+  function route(k: string, v: string) {
+    const q2: Record<string, string> = { ...params };
+    q2[k] = String(params[k] || "") === String(v) ? "" : v;
+    return "#/invoices" + qs(q2);
   }
+  const paidTotal = rows.filter((r) => r.status === "issued").reduce((a, r) => a + r.grandTotalPaise, 0);
+  const cells: (StatCell | "sep")[] = [
+    { k: "invoices", v: rows.length, to: route("status", ""), on: !p.status },
+    "sep",
+    ...STATUSES.filter((s) => byStatus[s]).map((s) => ({
+      k: STATUS_LABEL[s].toLowerCase(), v: byStatus[s] || 0,
+      to: route("status", s), on: p.status === s, tone: STATUS_TONE[s],
+    })),
+    "sep",
+    { k: "collected", v: inr(paidTotal), title: "Sum of every issued invoice's grand total" },
+  ];
 
-  return <InvoiceList p={p} setFilter={setFilter} unfilter={unfilter} go={go} onExport={act.exportCsv} />;
-}
+  const chips = Object.keys(params).filter((k) => params[k]).length > 0;
 
-function NotFound({ id, go }: { id: string; go: (h: string) => void }) {
+  const openPick = () => {
+    if (!can("invoices", "create")) return toast("403 — you do not have invoice-creation access.", "bad");
+    modal(<PickInvoiceModal onClose={closeLayer} onDone={(iid: number) => done("Invoice drafted.", iid)} />, "wide");
+  };
+
+  if (loading && !rows.length) return <ListSkeleton />;
+
   return (
-    <div className="page">
-      <EmptyState icon="invoice" title="404 invoice_not_found"
-        body={<>No invoice with the reference <b>{id}</b>.</>}
-        action={<button className="btn" data-go="#/invoices" onClick={() => go("#/invoices")}>Back to Invoice</button>} />
+    <div className="dls">
+      <div className="dls-cmd">
+        <Select key={"status" + p.status} name="status" label="Status" value={p.status} onFilter={onFilter}
+          options={STATUSES.map((s) => ({ v: s, l: STATUS_LABEL[s] }))} />
+        <Select key={"sort" + p.sort} name="sort" label="Sort" value={p.sort} onFilter={onFilter}
+          options={[{ v: "newest", l: "Newest first" }, { v: "oldest", l: "Oldest first" }]} />
+        <span className="spacer"></span>
+        {can("invoices", "create")
+          ? <button className="btn pri" data-act="inv-new" onClick={openPick}><Icon name="plus" />Create invoice</button>
+          : null}
+      </div>
+
+      <StatStrip cells={cells} />
+
+      {error ? <Notice tone="bad" ico="alert" text={<><b>Could not load invoices.</b> {error}</>} /> : null}
+
+      {chips ? <div className="dls-chips">
+        <FilterChips params={params} onUnfilter={onUnfilter} labels={{ status: "Status", sort: "Sort" }} />
+      </div> : null}
+
+      <div className="dls-body">
+        <InvoicesTable rows={rows} p={p} go={go} onUnfilter={onUnfilter} openPick={openPick} />
+      </div>
     </div>
   );
 }
 
-function Denied({ go }: { go: (h: string) => void }) {
+function InvoicesTable({ rows, p, go, onUnfilter, openPick }: {
+  rows: ReturnType<typeof useInvoicesList>["rows"]; p: Record<string, string>;
+  go: (h: string) => void; onUnfilter: (k: string) => void; openPick: () => void;
+}) {
+  const filtered = !!p.status;
+  if (!rows.length)
+    return <EmptyState
+      icon="invoice" title={filtered ? "No invoices match this filter" : "No invoices yet"}
+      body={filtered ? "Nothing matches. Clear the filter to widen the search."
+        : "An invoice is raised against an accepted quotation, once payment has already come in."}
+      action={filtered
+        ? <button className="btn" data-unfilter="*" onClick={() => onUnfilter("*")}>Clear filter</button>
+        : can("invoices", "create")
+          ? <button className="btn pri" data-act="inv-new" onClick={openPick}>Create invoice</button>
+          : null} />;
+
   return (
-    <div className="page">
-      <EmptyState icon="lock" title="403 out_of_scope"
-        body={"That invoice belongs to a deal that is not yours. Scope resolves through the parent deal " +
-          "on every call — an invoice identifier grants nothing on its own, and the attempt was logged."}
-        action={<button className="btn" data-go="#/invoices" onClick={() => go("#/invoices")}>Back to Invoice</button>} />
-    </div>
+    <table className="tbl dls-tbl"><thead><tr>
+      <th style={{ width: "3px" }}></th><th>Invoice</th><th>Deal</th><th>Status</th>
+      <th className="n">Amount</th><th>Due</th><th>Owner</th>
+    </tr></thead><tbody>
+      {rows.map((inv) => {
+        const to = "#/invoices/" + inv.id;
+        return (
+          <tr key={inv.id} className="clickable" data-go={to} onClick={() => go(to)}>
+            <td className="rail"><i></i></td>
+            <td>
+              <div className="cell-1">{inv.invoiceNumber || <span className="faint">Draft</span>}</div>
+              <div className="cell-2">against {inv.quotationNumber || "—"}</div>
+            </td>
+            <td><span className="mono">{inv.dealRef}</span></td>
+            <td><Pill text={STATUS_LABEL[inv.status]} tone={STATUS_TONE[inv.status]} /></td>
+            <td className="n tnum">{inr(inv.grandTotalPaise)}</td>
+            <td>{fmtDate(inv.dueDate)}</td>
+            <td>{inv.owner ? inv.owner.name : <span className="faint">—</span>}</td>
+          </tr>
+        );
+      })}
+    </tbody></table>
   );
 }

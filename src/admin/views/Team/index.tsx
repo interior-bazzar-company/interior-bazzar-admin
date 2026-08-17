@@ -19,6 +19,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import AdminOpsService from "../../../api/modules/adminOps";
+import { errMessage } from "../../../api/apiService";
 import {
   EmptyState, FilterChips, Icon, SearchField, Select, StatStrip, qs,
 } from "../../ui";
@@ -27,7 +28,7 @@ import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import { Avatar, RoleChips } from "../teamShared";
 import type { Member, Ops, Role } from "../teamShared";
-import AdminLoader from "../../../components/shared/AdminLoader";
+import { ListSkeleton } from "../../ui";
 import MemberDrawer from "./MemberDrawer";
 import { MemberNewModal } from "./memberModals";
 import AccessRequests, { pendingRequests } from "./AccessRequests";
@@ -64,7 +65,9 @@ export default function Team() {
         setRows(u.data);
         setRoles(r.data.roles);
       })
-      .catch(() => { if (!cancelled) { setRows([]); setRoles([]); } });
+      /* An empty list is a claim ("nobody here"); a failed read is not. Say
+         which one this is, or a down service reads as an empty team. */
+      .catch((e) => { if (!cancelled) { setRows([]); setRoles([]); toast(errMessage(e), "bad"); } });
     return () => { cancelled = true; };
   }, [tick]);
 
@@ -81,6 +84,12 @@ export default function Team() {
     drawer(<MemberDrawer member={u} roles={roles} ops={ops} />);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, tick, rows]);
+
+  /* …and it closes itself when the id goes away. Without this, deleting a
+     member left their drawer on screen — over a list that no longer had them —
+     still offering Edit and Delete on a record the server had dropped. Same
+     line Plans, Quotations and Invoices already carry. */
+  useEffect(() => { if (!id) return; return () => closeLayer(); }, [id, closeLayer]);
 
   /* ----------------------------------------------------------- filters -- */
   const typing = useRef<number | undefined>(undefined);
@@ -110,7 +119,7 @@ export default function Team() {
     return "#/team" + qs(q);
   }
 
-  if (!rows) return <AdminLoader />;
+  if (!rows) return <ListSkeleton />;
 
   /* -------------------------------------------------------------- rows -- */
   let list = rows.slice();

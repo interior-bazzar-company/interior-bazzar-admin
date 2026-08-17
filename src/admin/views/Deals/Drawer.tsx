@@ -1,35 +1,38 @@
 /* =============================================================================
    Deals — THE DRAWER. Table and Pipeline open a deal here; Chat replaces it
    with its own three-pane workspace.
+   -----------------------------------------------------------------------------
+   Everything on this screen is the deal detail endpoint's response: the facts,
+   the stage history, the remarks. The Payments and Documents tabs, the chain
+   strip, the collected/outstanding bar and the invoice chips are gone — every
+   one of them rendered the browser-side engine's seed store, which held rows
+   for fourteen demo deals and nothing for a real one. There are no payment,
+   invoice or quotation models server-side; when there are, they come back
+   reading from them.
    ============================================================================= */
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import type { ReactNode } from "react";
-import {
-  ChainStrip, Icon, KvList, Notice, Pill, SectionHead, Table, cap
-} from "../../ui";
+import { Icon, KvList, Notice, PaneLoading, Pill, SectionHead } from "../../ui";
 import { go } from "../../ui/nav";
 import { useShell } from "../../shell/ShellContext";
-import { IBQuote } from "../../engines";
 import {
-  D, E, EMPTY_CHAIN, STAGE, head, inr, listHash, place, prioTone, useDealApi, useEngineTick, usePop, val
+  D, STAGE, daysFrom, head, inr, listHash, place, prioTone, relativeDate, useDealApi,
+  useEngineTick, usePop, val
 } from "./useDeals";
 import type { Params } from "./useDeals";
-import { Fig, Rich, orDash } from "./bits";
+import { Fig, Rich, TagChips, orDash } from "./bits";
 import { useActs } from "./Modals";
 import { PrioMenu } from "./menus";
-import AdminLoader from "../../../components/shared/AdminLoader";
 
 export function DealDrawer({ dealRef, p }: { dealRef: string; p: Params }) {
   useEngineTick();
   const shell = useShell();
   const acts = useActs(p);
   const pop = usePop();
-  const [tab, setTab] = useState("timeline");
   const api = useDealApi(dealRef);
 
-  /* Scoping is server-enforced now (a 403 IS "out of scope") rather than
-     re-checked against the local engine's own inScope() — that function
-     knows only the local seed's owner/co-owner, not the real session. */
+  /* Scoping is server-enforced (a 403 IS "out of scope") rather than
+     re-checked client-side against a store that knows only its own seed. */
   useEffect(() => {
     if (api.loading) return;
     if (api.notFound) {
@@ -42,34 +45,17 @@ export function DealDrawer({ dealRef, p }: { dealRef: string; p: Params }) {
     }
   }, [api.loading, api.notFound, api.forbidden, dealRef, shell]);
 
-  if (api.loading) return <AdminLoader />;
-  if (!api.deal || api.forbidden || api.notFound) return null;
+  /* Only when there is nothing to show. A REFRESH — every write re-fetches
+     this deal — keeps what is on screen and swaps it when the response lands,
+     so adding a remark does not blank the drawer you are reading. `stale`
+     covers the other half: if the ref changed, the deal in hand belongs to a
+     different record and must not be rendered under the new one's name. */
+  if (api.forbidden || api.notFound) return null;
+  if (!api.deal || api.stale) return <PaneLoading label={"Opening " + dealRef + "…"} />;
   const dl = api.deal;
 
-  /* ponytail: E.Chain.state() and everything under `c` (Set deal value /
-     Create quote / Raise invoice / Log payment gating, `uninvoiced`) is
-     local-engine seed data — no invoice/payment models exist server-side
-     yet. It returns null for a ref the local engine never seeded (any real
-     API deal), so it falls back to EMPTY_CHAIN: every gated action then
-     reads as unavailable and stays ABSENT rather than crash on a null read. */
-  const c = E.Chain.state(dealRef) || EMPTY_CHAIN;
-  /* ponytail: Collected/Outstanding are chain data too. They still come from
-     the local engine's OWN copy of this ref (not the API `dl` above) — if
-     the ref isn't seeded there, which a real API deal usually isn't, there
-     is nothing local to show and inr(undefined) already renders "—". */
-  const localDl = E.dealOf(dealRef);
-  const collected = localDl ? localDl.revenue_collected : undefined;
-  const localOutstanding = localDl ? localDl.outstanding : undefined;
-  const pct = dl.deal_value && collected
-    ? Math.max(0, Math.min(100, Math.round(collected / dl.deal_value * 100))) : 0;
-  const over = dl.next_action && D.days(D.d(dl.next_action.date)) < 0 && dl.stage < STAGE.WON;
+  const over = dl.next_action && daysFrom(dl.next_action.date) < 0 && dl.stage < STAGE.WON;
   const back = listHash(p);
-
-  const tabBtn = (k: string, label: string, n?: number) => (
-    <button className={tab === k ? "on" : ""} data-tab={k} onClick={() => setTab(k)}>
-      {label}{n ? <span className="n">{n}</span> : null}
-    </button>
-  );
 
   return (
     <>
@@ -81,12 +67,8 @@ export function DealDrawer({ dealRef, p }: { dealRef: string; p: Params }) {
               {dl.business_name ? <span className="faint">{dl.business_name}</span> : null}
               <Pill text={D.STAGES[dl.stage].label} tone={D.STAGES[dl.stage].tone} />
               {/* PRIORITY, EDITABLE, IN THE TOP SECTION — the same control Chat
-                  has, not a second implementation of it: same menu, same
-                  Lifecycle.setPriority, same three values, same tones. It was a
-                  read-only pill here, and only here, which meant a deal opened
-                  from Table could be read as Urgent and never made Urgent.
-                  Worse, the pill vanished entirely at Normal, so the one deal
-                  you most wanted to raise showed no priority control at all. */}
+                  has, not a second implementation of it: same menu, same call,
+                  same three values, same tones. */}
               <button className={"dws-priobtn " + prioTone(dl.priority)} data-act="dl-priomenu"
                 data-ref={dl.deal_id} aria-haspopup="menu"
                 title="Priority · visual triage only, it never changes who the deal goes to"
@@ -98,8 +80,8 @@ export function DealDrawer({ dealRef, p }: { dealRef: string; p: Params }) {
               {dl.is_stalled ? <Pill text="Stalled" tone="warn" /> : null}
             </div>
             <div className="mono" style={{ fontSize: "var(--text-md)", color: "var(--text-2)", marginTop: "5px" }}>
-              {dl.deal_id} · {dl.phone}{dl.email ? " · " + dl.email : ""} · {place(dl)} · {dl.enquiry_id}
-              {dl.duplicate_count ? " · " + dl.duplicate_count + " repeat submission(s)" : ""}
+              {dl.deal_id} · {dl.phone}{dl.email ? " · " + dl.email : ""} · {place(dl)}
+              {dl.enquiry_id ? " · " + dl.enquiry_id : ""}
             </div>
           </div>
           <span className="spacer"></span>
@@ -109,36 +91,18 @@ export function DealDrawer({ dealRef, p }: { dealRef: string; p: Params }) {
       </div>
 
       <div className="dw-b">
-        {/* money — the fastest read of "how close is this to Won" */}
+        {/* ONE figure, because one is what is stored. Collected, outstanding
+            and the % bar came from the local payment store and would be a
+            claim about money nobody recorded. */}
         <div style={{ display: "flex", gap: "28px", flexWrap: "wrap", marginBottom: "12px" }}>
-          <Fig k="Deal value" v={dl.deal_value ? inr(dl.deal_value) : "—"} />
-          <Fig k="Collected" v={inr(collected)} style={{ color: "var(--ok)" }} />
-          <Fig k="Outstanding" v={inr(localOutstanding)}
-            style={{ color: localOutstanding ? "var(--warn)" : "var(--ok)" }} />
+          <Fig k="Deal value" v={dl.deal_value ? inr(dl.deal_value) : "not quoted yet"} />
+          <Fig k="Stage age" v={Math.abs(daysFrom(dl.stage_since)) + " days"} />
         </div>
-        <div className="bar"><i className="ok" style={{ width: pct + "%" }}></i></div>
-        <div className="faint" style={{ fontSize: "var(--text-md)", marginTop: "6px" }}>
-          {pct}% collected · Closed-Won unlocks at ₹0 outstanding
-        </div>
-
-        {/* ponytail: the whole chain block below — ChainStrip, the uninvoiced
-            note and AllInvoiceLinks — is local-engine seed data. ChainStrip
-            reads IBData's OWN local deal store (not IBDeals, and not the API)
-            and renders nothing when the ref isn't in it, which is the case
-            for any real API-backed deal; the same goes for `c.uninvoiced` and
-            AllInvoiceLinks' E.invoicesFor(). Not DB truth. */}
-        <SectionHead title="Document chain" />
-        <ChainStrip dealRef={dealRef} here="deal" />
-        {c.uninvoiced && c.uninvoiced > 0 && dl.quotation_status === "final"
-          ? <div className="faint" style={{ fontSize: "var(--text-md)", marginTop: "8px" }}>
-              {inr(c.uninvoiced)} of the deal is still uninvoiced.</div>
-          : null}
-        <AllInvoiceLinks dealRef={dealRef} />
 
         {dl.next_action
           ? <div className={"notice " + (over ? "bad" : "")} style={{ marginTop: "16px" }}>
               <Icon name={over ? "alert" : "clock"} />
-              <div><b>Next action {D.relative(dl.next_action.date)}{over ? " — overdue" : ""}</b>
+              <div><b>Next action {relativeDate(dl.next_action.date)}{over ? " — overdue" : ""}</b>
                 <div style={{ marginTop: "2px" }}>{dl.next_action.note}</div></div>
               <span className="spacer"></span>
               <button className="btn sm" data-act="dl-clear-next" data-ref={dealRef}
@@ -150,63 +114,36 @@ export function DealDrawer({ dealRef, p }: { dealRef: string; p: Params }) {
         <SectionHead title="Deal facts" />
         <KvList cls="wide" pairs={([
           ["Owner", <>{dl.owner_id || "—"}{dl.co_owner_id
-            ? <> <span className="faint">+ {dl.co_owner_id} ({dl.split_ratio || ""})</span></> : null}</>],
+            ? <> <span className="faint">+ {dl.co_owner_id}</span></> : null}</>],
           ["Business", orDash(dl.business_name)],
           ["Email", dl.email ? <a href={"mailto:" + dl.email}>{dl.email}</a> : <span className="faint">—</span>],
           ["Location", place(dl)],
-          ["Interested in", dl.interested_in],
-          ["Enquiry", <span className="mono">{dl.enquiry_id}</span>],
+          ["Interested in", orDash(dl.interested_in)],
+          dl.enquiry_id ? ["Enquiry", <span className="mono">{dl.enquiry_id}</span>] : null,
           ["Created", D.fmtDate(dl.created_at)],
-          ["Stage age", Math.abs(D.days(D.d(dl.stage_since))) + " days"],
           /* Always present, null value where there is no figure — KvList draws
-             the faint em-dash. The prototype's filter runs over rows, not
-             values, so an unset field keeps its line. */
+             the faint em-dash rather than dropping the line. */
           ["Expected close", dl.expected_close_date ? D.fmtDate(dl.expected_close_date) : null],
-          ["Discount", dl.discount_pct === null || dl.discount_pct === undefined ? null
-            : <>{dl.discount_pct}%{dl.is_target2_eligible ? null
-                : <> <Pill text="Target 2 ineligible" tone="bad" /></>}</>],
-          /* Priority is not a fact row any more. It is a control, eighteen
-             lines up, and a read-only copy of a value you can edit above is a
-             second place for it to look wrong. */
-          ["Last remark", <>{D.fmtDate(dl.last_remark_at)}
+          ["Lists", dl.tags && dl.tags.length ? <TagChips tags={dl.tags} /> : null],
+          ["Last remark", <>{dl.last_remark_at ? D.fmtDate(dl.last_remark_at) : <span className="faint">none</span>}
             {dl.is_stalled ? <> <Pill text="stalled" tone="warn" /></> : null}</>],
           dl.close_reason ? ["Close reason", dl.close_reason] : null
         ].filter(Boolean)) as [ReactNode, ReactNode][]} />
 
-        {dl.stage === STAGE.WON
-          ? <Notice tone="warn" ico="alert" text={<>
-              <b>AD-01 — this deal emitted <span className="mono">deal.won</span> and nothing consumed it.</b> No
-              module creates the subscription or activates the profile. The customer has paid in full and still has
-              no route to receive enquiries. This is the highest-priority gap in the suite, and the engine records
-              it rather than pretending otherwise.</>} />
-          : null}
-
-        <div className="tabs" style={{ marginTop: "22px" }}>
-          {tabBtn("timeline", "Timeline")}
-          {/* ponytail: these two counts are local-engine (chain) data — see
-              PaymentsTab/DocumentsTab below. */}
-          {tabBtn("payments", "Payments", E.paymentsFor(dealRef).length)}
-          {tabBtn("documents", "Documents", E.quotesFor(dealRef).length + E.invoicesFor(dealRef).length)}
-        </div>
-        <div data-tabbody="timeline" className={tab === "timeline" ? undefined : "hide"}>
-          <TimelineTab dl={dl} ev={api.timeline} p={p} /></div>
-        <div data-tabbody="payments" className={tab === "payments" ? undefined : "hide"}>
-          <PaymentsTab dl={dl} p={p} /></div>
-        <div data-tabbody="documents" className={tab === "documents" ? undefined : "hide"}>
-          <DocumentsTab dl={dl} c={c} /></div>
+        <SectionHead title="Timeline" desc="Stage moves and remarks, newest first" />
+        <TimelineTab dl={dl} ev={api.timeline} p={p} />
       </div>
 
-      <div className="dw-f"><ActionBar dl={dl} c={c} p={p} /></div>
+      <div className="dw-f"><ActionBar dl={dl} p={p} /></div>
     </>
   );
 }
 
-/* Exactly one new action appears per chain step, and unavailable actions are
-   ABSENT rather than greyed out. `Raise invoice` does not exist until the quote
-   is accepted; `Log payment` does not exist until an invoice is raised — and it
-   disappears again once that invoice is settled, because the balance needs its
-   own invoice. */
-function ActionBar({ dl, c, p }: { dl: any; c: any; p: Params }) {
+/* Locked actions are ABSENT, not greyed. What survives here is what the server
+   has an endpoint for; Close is separated from Change stage because it is the
+   one move that needs the level-3 permission and a reason people re-read a
+   year later. */
+function ActionBar({ dl, p }: { dl: any; p: Params }) {
   const acts = useActs(p);
   const ref = dl.deal_id;
   const out: ReactNode[] = [];
@@ -217,44 +154,19 @@ function ActionBar({ dl, c, p }: { dl: any; c: any; p: Params }) {
   );
 
   out.push(btn("remark", "dl-remark", "Add remark", () => acts.remark(ref)));
-  if (E.Lifecycle.legalTargets(ref).length)
-    out.push(btn("stage", "dl-stage", "Change stage", () => acts.stage(ref)));
-
-  // Door A of QUOTATION_IA §2 — the primary path into Module 2. The builder,
-  // the revision and Mark accepted all live over there; this is a link, not a
-  // second implementation of them.
-  if (c.quoteStatus === "none" && c.canCreateQuote) {
-    out.push(btn("quote", "qt-from-deal", "Create quote", () => acts.createQuote(ref), "pri", "plus"));
-  } else if (c.quoteStatus === "issued") {
-    const to = "#/quotations/" + (c.quote ? (c.quote.quotation_number || c.quote.quotation_id) : "");
-    out.push(<button key="openq" className="btn pri" data-go={to} onClick={() => go(to)}>Open quotation ↗</button>);
-  } else if (c.canRaiseInvoice) {
-    const to = "#/invoices?new=1&deal=" + ref;
-    out.push(<button key="raise" className="btn pri" data-go={to} onClick={() => go(to)}>
-      <Icon name="plus" />Raise invoice · {inr(c.uninvoiced)}</button>);
-  } else if (c.canLogPayment) {
-    out.push(btn("pay", "dl-pay", "Log payment", () => acts.pay(ref), "pri"));
-  }
-  if (!dl.deal_value && c.quoteStatus !== "accepted")
-    out.push(btn("value", "dl-value", "Set deal value", () => acts.value(ref)));
-
-  // Was reachable only from Chat's context panel — a user working exclusively
-  // in Table/Pipeline had no way to correct a name/phone/email without
-  // switching the whole module into Chat view first.
+  out.push(btn("stage", "dl-stage", "Change stage", () => acts.stage(ref, dl.stage)));
+  out.push(btn("value", "dl-value", dl.deal_value ? "Change value" : "Set deal value", () => acts.value(ref)));
   out.push(btn("edit", "dl-edit", "Edit deal", () => acts.edit(ref)));
   out.push(btn("tags", "dl-tag", "Lists", () => acts.tags(ref)));
-  out.push(btn("co", "dl-coassign", "Co-assign", () => acts.coassign(ref)));
   if (head()) out.push(btn("re", "dl-reassign", "Reassign", () => acts.reassign(ref)));
   out.push(<span key="sp" className="spacer"></span>);
-  out.push(btn("close", "dl-close", "Close deal", () => acts.closeDeal(ref), "dgr"));
+  if (head()) out.push(btn("close", "dl-close", "Close deal", () => acts.closeDeal(ref), "dgr"));
   return <>{out}</>;
 }
 
-/* `ev` comes from the API (transitions + remarks, adapted in adapter.ts) —
-   real timeline events. Quote/invoice/payment lines the local engine's own
-   Activity.timeline() also produces are absent here, because those chains
-   are still local-only (PaymentsTab/DocumentsTab below), not because they
-   didn't happen. */
+/* `ev` is the API's own transitions + remarks, adapted in adapter.ts. It is
+   the whole history there is: the engine's quote/invoice/payment lines are
+   gone with the stores that invented them. */
 function TimelineTab({ dl, ev, p }: { dl: any; ev: { kind: string; tone: string; at: string; by: string; text: string }[]; p: Params }) {
   const acts = useActs(p);
   const add = () => {
@@ -274,8 +186,7 @@ function TimelineTab({ dl, ev, p }: { dl: any; ev: { kind: string; tone: string;
             <button className="btn pri" data-act="dl-quick" data-ref={dl.deal_id} onClick={add}>Add</button>
           </div>
           <div className="help">Three clicks and one text field — the most repeated action in the module.
-            Adding a remark also clears the stalled flag
-            {dl.stage === STAGE.DEAL ? " and moves this deal to Followup" : ""}.</div>
+            Adding a remark also clears the stalled flag.</div>
         </div>
       </div>
       <div className="tl">
@@ -292,136 +203,11 @@ function TimelineTab({ dl, ev, p }: { dl: any; ev: { kind: string; tone: string;
           </div>
         ))}
       </div>
-      <Notice ico="lock" text={<>Nothing in this timeline is editable or deletable. <b>There is no PUT and no DELETE endpoint</b> for a remark or a payment — immutability is enforced by the absence of the API, not by a permission check.</>} />
-    </>
-  );
-}
-
-/* ponytail: local-engine seed data end to end — no payment models exist
-   server-side yet. A real API-backed deal simply has no rows here. */
-function PaymentsTab({ dl, p }: { dl: any; p: Params }) {
-  const acts = useActs(p);
-  const rows = E.paymentsFor(dl.deal_id);
-  return (
-    <>
-      <Table
-        cols={[{ label: "Payment" }, { label: "Amount", cls: "n" }, { label: "Mode · reference" },
-          { label: "Invoice" }, { label: "Attribution" }, { label: "", cls: "c" }]}
-        empty={{ icon: "cash", title: "No payment yet",
-          body: "Money is received against an invoice. Raise one from the chain above — there is no advance, no token and no unallocated payment." }}
-        rows={rows.map((pay: any) => {
-          const rev = pay.type === "reversal";
-          return (
-            <tr key={pay.payment_id} className={rev || pay.voided ? "dim" : undefined}>
-              <td className="mono cell-1">{pay.payment_id}
-                {pay.reverses_payment_id ? <div className="cell-2">reverses {pay.reverses_payment_id}</div> : null}</td>
-              <td className="n" style={rev ? { color: "var(--bad)" } : undefined}>
-                <b>{rev ? "−" : ""}{inr(Math.abs(pay.amount_paise))}</b></td>
-              <td>{pay.mode}<div className="cell-2 mono">{pay.reference}</div></td>
-              <td className="mono" style={{ fontSize: "var(--text-sm)" }}>{pay.invoice_id || "—"}</td>
-              <td>{pay.owner_id || "—"}
-                {pay.co_owner_id ? <div className="cell-2">+ {pay.co_owner_id} · {pay.split_ratio || ""}</div> : null}</td>
-              <td className="c">
-                {!rev && !pay.voided && head()
-                  ? <button className="btn sm dgr rowact" data-act="dl-reverse" data-pay={pay.payment_id}
-                      onClick={() => acts.reverse(pay.payment_id)}>Reverse</button>
-                  : rev ? <span className="pill bad xs">reversal</span>
-                  : pay.voided ? <span className="pill dead xs">reversed</span> : null}
-              </td>
-            </tr>
-          );
-        })} />
-      <Notice ico="shield" text={<><b>Every ledger row carries an invoice and an attribution snapshot.</b> Owner, co-owner and split are copied onto the row at write time — a later reassignment never re-attributes money already collected. A correction is a <b>reversal</b>: a negative entry referencing the original, which is never amended or deleted.</>} />
-    </>
-  );
-}
-
-/* Every invoice this deal has ever raised, as a clickable chip — including
-   cancelled ones, so "all" means all, not just the ones still live. This sits
-   right under the chain strip (which only ever shows the current one + a
-   "+N more" count) so the deal detail view surfaces every invoice link without
-   a tab click.
-   ponytail: local-engine seed data — no invoice models exist server-side
-   yet. Empty for any real API-backed deal, same as the chain strip above. */
-function AllInvoiceLinks({ dealRef }: { dealRef: string }) {
-  const invs = E.invoicesFor(dealRef);
-  if (!invs.length) return null;
-  return (
-    <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "10px" }}>
-      {invs.map((i: any) => {
-        // .pill.line and a tone class (.ok/.warn/.dead) collide at equal CSS
-        // specificity — line would silently win and swallow the tone. Skip it
-        // and use the plain toned pill, same as every status pill elsewhere.
-        const tone = i.status === "paid" ? "ok" : i.status === "cancelled" ? "dead"
-          : i.status === "draft" ? "" : "warn";
-        const to = "#/invoices/" + (i.number || i.invoice_id);
-        return (
-          <a key={i.invoice_id} className={"pill" + (tone ? " " + tone : "")} data-go={to} onClick={() => go(to)}>
-            <Icon name="invoice" size="sm" />
-            <span className="mono">{i.number || "Draft"}</span>
-            <span className="faint" style={{ marginLeft: "5px" }}>{inr(i.amount_paise, { compact: true })}</span>
-          </a>
-        );
-      })}
-    </div>
-  );
-}
-
-/* ponytail: local-engine seed data — no quotation/invoice models exist
-   server-side yet. Empty for a real API-backed deal. */
-function DocumentsTab({ dl, c }: { dl: any; c: any }) {
-  const Q = IBQuote || { LABEL: {}, TONE: {} };
-  const quotes = E.quotesFor(dl.deal_id).sort((a: any, b: any) => b.version - a.version);
-  const invs = E.invoicesFor(dl.deal_id);
-  return (
-    <>
-      <SectionHead title="Quotations" desc={quotes.length + " version(s)"} />
-      {quotes.length
-        ? <div className="card">
-            {quotes.map((q: any) => {
-              const to = "#/quotations/" + (q.quotation_number || q.quotation_id);
-              return (
-                <div className="q" key={q.quotation_id}>
-                  <span className="qi"><Icon name="quote" /></span>
-                  <span className="qt">
-                    <a className="lnk mono" data-go={to} onClick={() => go(to)}>
-                      <b>{(q.quotation_number || "Draft") + " · v" + q.version}</b></a>
-                    <span>{inr(q.grand_total_paise)}{q.discount_pct ? " · " + q.discount_pct + "% off" : ""}
-                      {" · valid to " + D.fmtDate(q.valid_until)}</span>
-                  </span>
-                  <span><Pill text={Q.LABEL[q.status] || cap(q.status)} tone={Q.TONE[q.status]} /></span>
-                </div>
-              );
-            })}
-          </div>
-        : <div className="card"><div className="card-b faint" style={{ fontSize: "var(--text-md)" }}>
-            No quotation on this deal.</div></div>}
-
-      <SectionHead title="Invoices" desc={invs.length + " raised · " + inr(c.uninvoiced) + " uninvoiced"} />
-      {invs.length
-        ? <div className="card">
-            {invs.map((i: any) => {
-              const to = "#/invoices/" + (i.number || i.invoice_id);
-              return (
-                <div className="q" key={i.invoice_id}>
-                  <span className="qi"><Icon name="invoice" /></span>
-                  <span className="qt">
-                    <a className="lnk mono" data-go={to} onClick={() => go(to)}><b>{i.number || "Draft"}</b></a>
-                    <span>{inr(i.amount_paise)} · received {inr(i.received_paise)} · due {D.fmtDate(i.due)}
-                      {i.cancelled_reason ? " · " + i.cancelled_reason : ""}</span>
-                  </span>
-                  <span><Pill text={cap(i.status)}
-                    tone={i.status === "paid" ? "ok" : i.status === "cancelled" ? "dead" : "warn"} /></span>
-                </div>
-              );
-            })}
-          </div>
-        : <div className="card"><div className="card-b faint" style={{ fontSize: "var(--text-md)" }}>
-            Invoices become possible once a quotation is Accepted.{" "}
-            <b>Billing against a number the customer has not accepted is the error that gate prevents.</b>
-          </div></div>}
-
-      <Notice ico="link" text={<><b>Deals stores four scalars only</b> — <span className="mono">quotation_id · quotation_status · invoice_id · invoice_status</span>. Line items, tax and the rendered PDF stay inside Modules 2 and 3. That is what keeps the modules decoupled.</>} />
+      <Notice ico="lock" text={<>
+        Nothing in this timeline is editable or deletable. <b>There is no PUT and no DELETE endpoint</b>{" "}
+        for a remark or a transition — immutability is enforced by the absence of the API, not by a
+        permission check.
+      </>} />
     </>
   );
 }

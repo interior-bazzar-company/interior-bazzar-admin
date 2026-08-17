@@ -21,12 +21,37 @@
 import AdminOpsService from "../../api/modules/adminOps";
 import type { MePermissions } from "../../api/modules/adminOps";
 import { TokenService } from "../../api/apiService/authHelper/TokenService";
+import { isServiceError } from "../../api/apiService";
 
 let session: MePermissions | null = null;
 let inflight: Promise<MePermissions | null> | null = null;
+let unreachable = false;
+
+/** Modules the server still sends that this panel does not show anywhere —
+ *  not in the nav, not in the effective-access chips.
+ *    design    the design-system gallery: a reference page used to BUILD this
+ *              admin, not a thing anyone administers.
+ *    payments  no screen was ever built for it; the route only ever rendered
+ *              the "in your access, no surface yet" notice. Payment is already
+ *              where it belongs — recorded against the invoice that received
+ *              it, in Invoices.
+ *  ponytail: hidden here rather than by deleting the server's Module rows,
+ *  because those rows still carry the grants issued against them; drop them
+ *  server-side and this set goes with them. Lives in this file (not modules.ts)
+ *  because modules.ts already imports from here — the other direction would
+ *  be a cycle. */
+export const HIDDEN_MODULES = new Set(["design", "payments"]);
 
 export function getSession(): MePermissions | null {
   return session;
+}
+
+/** Why the last `loadSession()` came back empty. "Down" is NOT "denied": a
+ *  restarting backend must not read as a withdrawn account, and it must not
+ *  clear the tokens on this device — the guard shows a retry screen instead of
+ *  signing the user out over a failed fetch. Reset on every attempt. */
+export function sessionUnreachable(): boolean {
+  return unreachable;
 }
 
 /** Fetch `me/permissions/` and cache it. Concurrent callers share one request.
@@ -36,6 +61,7 @@ export async function loadSession(force = false): Promise<MePermissions | null> 
   if (!force && inflight) return inflight;
   inflight = (async () => {
     try {
+      unreachable = false;
       const res = await AdminOpsService.mePermissions();
       /* `name` is null on the wire whenever the account has no UserProfile row
          — the API says "there is no profile name" rather than inventing one,
@@ -47,7 +73,8 @@ export async function loadSession(force = false): Promise<MePermissions | null> 
         ? { ...res.data, user: { ...res.data.user, name: res.data.user?.name || res.data.user?.username || "" } }
         : res.data;
       return session;
-    } catch {
+    } catch (e) {
+      unreachable = isServiceError(e);
       session = null;
       return null;
     } finally {
@@ -87,7 +114,9 @@ export const canWrite = (moduleKey: string, action?: string) => can(moduleKey, a
  * so the two can never list different things for the same session. */
 export function grantsOf(s: MePermissions): string[] {
   if (s.isFullAccess) return ["Everything"];
-  return s.modules.filter((m) => m.level > 0).map((m) => m.label);
+  return s.modules
+    .filter((m) => m.level > 0 && !HIDDEN_MODULES.has(m.key))
+    .map((m) => m.label);
 }
 
 /** "Who did this" for the local-only engines (Deals/Invoices/Plans/Quotations)

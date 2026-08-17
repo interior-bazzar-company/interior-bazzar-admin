@@ -1,63 +1,126 @@
 /* =============================================================================
    Admin Access · Audit log
    -----------------------------------------------------------------------------
-   Ported 1:1 from prototype/admin-panel/admin-access/assets/views-settings.js
-   (`V.audit`). Only that view came across: the same file also defines
-   V.content, V.marketing, V.reviews and V.support, none of which has a row in
-   the module inventory, so the router never reaches them.
+   THE trail, from `v1/admin/audit/` (interior_admin AuditViews). Every level-3
+   action across the panel appends one row through `append_audit()` — 68 call
+   sites in 23 controllers today — so this is the one screen that can answer
+   "who changed that, and when" about anything.
 
-   Same list shell every other module's list page uses now (Deals, Quotations,
-   Invoices, Team): a .dls-cmd command row, one clickable StatStrip instead of a
-   paragraph of prose, then a viewport-bounded table body. Audit keeps its own
-   data — When/Type/Action/Actor/Module, nothing invented — this only changes
-   the chrome around it.
+   It used to read `IBTeam.audit()`: a localStorage array seeded with invented
+   events, which meant the page most likely to be opened in an argument was the
+   least likely to be true.
 
-   READ SURFACE. The log is append-only (`ib_admin_audit`): there is no edit, no
-   delete and no "clear log" here, and there was none in the prototype either.
+   FILTERING IS SERVER-SIDE, all of it. A log only grows, so a page that
+   filtered the twenty rows it happened to hold would answer "no entries match"
+   about a log that contains the entry. Search, module, severity and paging all
+   go to the endpoint; the facet counts come back with the page and are counted
+   over the whole filtered log, never over the rows on screen.
+
+   Same list shell every other module uses: a .dls-cmd command row, one
+   clickable StatStrip, then a viewport-bounded table body.
+
+   READ SURFACE. The log is append-only: there is no edit, no delete and no
+   "clear log" here, and there is no endpoint for one either.
    ============================================================================= */
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { FilterChips, Icon, Pill, SearchField, Select, StatStrip, Table, qs, richText } from "../../ui";
+import AdminOpsService, { call } from "../../../api/modules/adminOps";
+import { errMessage } from "../../../api/apiService";
+import type { AuditEntry, AuditFacets } from "../../../api/modules/adminOps";
+import { FilterChips, Icon, Notice, Pill, SearchField, Select, StatStrip, Table } from "../../ui";
 import type { StatCell } from "../../ui";
-import { useNav } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
-import { IBData, IBTeam } from "../../engines";
+import { moduleLabel } from "../../shell/modules";
+import { ListSkeleton } from "../../ui";
 
-type AuditRow = {
-  at: string;
-  type: string;
-  tone?: string;
-  actor: string;
-  role: string;
-  module: string;
-  text: string;
-  ref?: string | null;
-  route: string;
-};
+const PAGE_SIZE = 40;
 
-/* `richText` lives in ui/ because the shell's Activity popover reads the same
-   log and must render the references the same way. Team-written events (see
-   IBTeam.record) carry no markup at all and pass through untouched. */
+/* The same words the SERVER counts as destructive (DESTRUCTIVE_WORDS in
+   AuditValidators). Repeated here only to tone a row — the filter and the
+   counts are the server's, so the two cannot disagree about which rows they
+   select, and at worst a row is toned differently from how it is counted. */
+const DESTRUCTIVE = /delete|reject|cancel|archive|revoke|remove|reverse/i;
+
+/** `plan_price_updated` → `price updated`. The module is its own column, so
+ *  repeating it inside the action is noise; the underscores are a key, not a
+ *  sentence. */
+function actionLabel(action: string, moduleKey: string) {
+  const singular = moduleKey.replace(/s$/, "");
+  return action.replace(new RegExp("^" + singular + "_"), "").replace(/_/g, " ");
+}
+
+/** "17 Aug 2026, 06:41". The row is a forensic record — the time matters as
+ *  much as the day, and it is what orders two entries a second apart. */
+function stamp(ts: string | null) {
+  if (!ts) return "—";
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return ts;
+  return d.toLocaleString("en-IN", {
+    day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false,
+  });
+}
+
 export default function Audit() {
   const [sp, setSp] = useSearchParams();
-  const { go } = useNav();
   const shell = useShell();
 
-  /* Filters live in the URL, exactly as `?tone=bad&module=Finance` did in the
-     hash: a filtered log is linkable and survives a refresh. */
+  /* Filters live in the URL: a filtered log is linkable and survives a
+     refresh, which is exactly what you want when you are sending somebody a
+     link to the thing that happened. */
   const p: Record<string, string> = {
     q: sp.get("q") || "",
     module: sp.get("module") || "",
-    tone: sp.get("tone") || "",
+    sev: sp.get("sev") || "",
   };
 
-  /* Same 220ms the shell's delegated `input` handler used, so typing does not
-     push a history entry per keystroke. The field is uncontrolled, so the
-     caret stays put across the re-render without the prototype's pendingFocus
-     dance. */
+  const [rows, setRows] = useState<AuditEntry[] | null>(null);
+  const [facets, setFacets] = useState<AuditFacets>({ modules: {}, roles: {}, destructive: 0, routine: 0 });
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const key = JSON.stringify(p);
+  /* A filter change starts the list again at page 1 — appending page 2 of a
+     different query onto page 1 of the old one is how a log stops being a
+     record of anything. */
+  useEffect(() => { setPage(1); setRows(null); }, [key]);
+
+  const params = useCallback((pageNo: number) => ({
+    search: p.q || undefined,
+    module: p.module || undefined,
+    destructive: p.sev === "bad" ? "1" : p.sev === "routine" ? "0" : undefined,
+    pageNo, pageSize: PAGE_SIZE,
+  }), [p.q, p.module, p.sev]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setError(null);
+    call(AdminOpsService.audit(params(1)))
+      .then((d) => {
+        if (cancelled) return;
+        setRows(d.entries); setFacets(d.facets); setTotal(d.total); setPage(1);
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        setRows([]); setError(errMessage(e));
+      });
+    return () => { cancelled = true; };
+  }, [key, params]);
+
+  const more = () => {
+    setLoadingMore(true);
+    call(AdminOpsService.audit(params(page + 1)))
+      .then((d) => {
+        setRows((cur) => (cur || []).concat(d.entries));
+        setPage(d.pageNo); setTotal(d.total); setLoadingMore(false);
+      })
+      .catch((e: unknown) => { setError(errMessage(e)); setLoadingMore(false); });
+  };
+
+  /* ------------------------------------------------------------- filters -- */
   const typing = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(typing.current), []);
-
   const setParam = (name: string, value: string) => {
     const next: Record<string, string> = { ...p, [name]: value };
     const out: Record<string, string> = {};
@@ -71,86 +134,66 @@ export default function Audit() {
   };
   const onUnfilter = (k: string) => (k === "*" ? setSp({}) : setParam(k, ""));
 
-  /* Reads through IBTeam so member, role and permission events appear
-     beside the seeded ones. Same store shape, one reader. */
-  const src: AuditRow[] = (IBTeam ? IBTeam.audit() : IBData.audit) as AuditRow[];
-  let list = src.slice();
-  if (p.module) list = list.filter((a) => a.module === p.module);
-  /* The strip's axis: `tone` is already on every record, closed to a
-     handful of values (unlike `module`, which already has its own select
-     and would just be a worse copy of it here), and — unlike `type` — it
-     has an actual severity a Sales/Admin user scans for first. */
-  if (p.tone === "bad" || p.tone === "warn") list = list.filter((a) => a.tone === p.tone);
-  else if (p.tone === "normal") list = list.filter((a) => a.tone !== "bad" && a.tone !== "warn");
-  if (p.q) {
-    const s = p.q.toLowerCase();
-    list = list.filter(
-      (a) => (a.text + " " + a.actor + " " + a.module + " " + (a.ref || "")).toLowerCase().indexOf(s) >= 0
-    );
-  }
+  const sevRoute = (v: string) => {
+    const next: Record<string, string> = { ...p, sev: p.sev === v ? "" : v };
+    const out: Record<string, string> = {};
+    for (const k in next) if (next[k]) out[k] = next[k];
+    return "#/audit" + (Object.keys(out).length ? "?" + new URLSearchParams(out).toString() : "");
+  };
 
-  const mods: Record<string, number> = {};
-  src.forEach((a) => {
-    mods[a.module] = (mods[a.module] || 0) + 1;
-  });
-  const counts: { bad: number; warn: number } = { bad: 0, warn: 0 };
-  src.forEach((a) => {
-    if (a.tone === "bad" || a.tone === "warn") counts[a.tone as "bad" | "warn"]++;
-  });
+  const filtered = !!(p.q || p.module || p.sev);
+  const moduleKeys = Object.keys(facets.modules).sort();
 
-  const filtered = !!(p.q || p.module || p.tone);
-  const hasChips = !!(p.q || p.module || p.tone);
-  const toneRoute = (v: string) => "#/audit" + qs({ ...p, tone: p.tone === v ? "" : v });
-
+  /* Total first, then the one split that matters when you open this page in an
+     argument: how much of what happened was destructive. Both cells filter. */
   const cells: (StatCell | "sep")[] = [
-    { k: "total", v: src.length, to: toneRoute(""), on: !p.tone },
+    { k: "entries", v: total, to: sevRoute(""), on: !p.sev },
     "sep",
-    {
-      k: "critical", v: counts.bad, dot: counts.bad ? "bad" : "", tone: counts.bad ? "bad" : "",
-      to: toneRoute("bad"), on: p.tone === "bad", title: "Entries flagged critical",
-    },
-    {
-      k: "warning", v: counts.warn, dot: counts.warn ? "warn" : "", tone: counts.warn ? "warn" : "",
-      to: toneRoute("warn"), on: p.tone === "warn", title: "Entries flagged warning",
-    },
-    {
-      k: "normal", v: src.length - counts.bad - counts.warn, dot: "ok",
-      to: toneRoute("normal"), on: p.tone === "normal",
-    },
+    { k: "destructive", v: facets.destructive,
+      dot: facets.destructive ? "bad" : "", tone: facets.destructive ? "bad" : "",
+      to: sevRoute("bad"), on: p.sev === "bad",
+      title: "Deletes, rejections, cancellations, archives and reversals" },
+    { k: "routine", v: facets.routine, dot: "ok",
+      to: sevRoute("routine"), on: p.sev === "routine",
+      title: "Everything else — creates, edits, status changes" },
   ];
+
+  const csv = () => {
+    const list = rows || [];
+    const head = ["when", "module", "action", "actor", "role", "detail"];
+    const lines = [head].concat(list.map((a) => [
+      a.ts || "", a.module, a.action, a.actor || "system", a.role || "", a.detail || "",
+    ]));
+    const text = lines.map((r) => r.map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(",")).join("\n");
+    const el = document.createElement("a");
+    el.href = "data:text/csv;charset=utf-8," + encodeURIComponent(text);
+    el.download = "audit-log.csv"; el.click();
+    shell.toast("Exported the " + list.length + " entries loaded here" +
+      (list.length < total ? " of " + total + " — load more first for the rest." : "."));
+  };
+
+  if (rows === null) return <ListSkeleton />;
 
   return (
     <div className="dls">
       <div className="dls-cmd">
-        <SearchField ph="Search actor, action or reference…" val={p.q} onFilter={onFilter} />
-        <Select
-          name="module"
-          label="Module"
-          options={Object.keys(mods).map((m) => ({ v: m, l: m + " (" + mods[m] + ")" }))}
-          value={p.module}
-          onFilter={onFilter}
-        />
+        <SearchField key={"q" + p.q} ph="Search actor, action, module or reference…" val={p.q} onFilter={onFilter} />
+        <Select key={"module" + p.module} name="module" label="Module" value={p.module} onFilter={onFilter}
+          options={moduleKeys.map((m) => ({ v: m, l: moduleLabel(m) + " (" + facets.modules[m] + ")" }))} />
         <span className="spacer"></span>
-        <button
-          className="btn"
-          data-act="stub"
-          data-what="Export audit log"
-          data-where="the Team module"
-          onClick={() => shell.stub("Export audit log", "the Team module")}
-        >
+        <button className="btn" data-act="au-export" onClick={csv}>
           <Icon name="download" />Export
         </button>
       </div>
 
       <StatStrip cells={cells} />
 
-      {hasChips ? (
+      {error ? <Notice tone="bad" ico="alert" text={<><b>Could not load the log.</b> {error}</>} /> : null}
+
+      {filtered ? (
         <div className="dls-chips">
-          <FilterChips
-            params={p}
-            labels={{ q: "Search", module: "Module", tone: "Severity" }}
-            onUnfilter={onUnfilter}
-          />
+          <FilterChips params={p} labels={{ q: "Search", module: "Module", sev: "Severity" }}
+            onUnfilter={onUnfilter} />
         </div>
       ) : null}
 
@@ -158,38 +201,54 @@ export default function Audit() {
         <Table
           scroll
           min="900px"
-          cols={[{ label: "When" }, { label: "Type" }, { label: "Action" }, { label: "Actor" }, { label: "Module" }]}
+          cols={[{ label: "When" }, { label: "Module" }, { label: "Action" }, { label: "Detail" }, { label: "Actor" }]}
           empty={{
             icon: "history",
             title: filtered ? "No entries match" : "Nothing recorded yet",
-            body: filtered ? "Nothing in the log matches. Clear a filter to widen the search." : "",
+            body: filtered
+              ? "Nothing in the log matches. Clear a filter to widen the search."
+              : "The trail fills as sensitive actions are taken — a price change, a role edit, a deal closed.",
             action: filtered ? (
-              <button className="btn" data-unfilter="*" onClick={() => onUnfilter("*")}>
-                Clear all filters
-              </button>
-            ) : (
-              ""
-            ),
+              <button className="btn" data-unfilter="*" onClick={() => onUnfilter("*")}>Clear all filters</button>
+            ) : "",
           }}
-          rows={list.map((a, i) => (
-            <tr key={i} className="clickable" data-go={a.route} onClick={() => go(a.route)}>
+          rows={rows.map((a) => (
+            <tr key={a.id}>
               <td className="mono nowrap" style={{ fontSize: "var(--text-sm)", color: "var(--text-2)" }}>
-                {a.at}
+                {stamp(a.ts)}
               </td>
+              <td><Pill text={moduleLabel(a.module)} tone="line" /></td>
               <td>
-                <span className={"tag " + (a.tone || "")}>{a.type}</span>
+                <span className={"tag " + (DESTRUCTIVE.test(a.action) ? "bad" : "")}>
+                  {actionLabel(a.action, a.module)}
+                </span>
               </td>
-              <td>{richText(a.text)}</td>
+              {/* The detail is the record. It is written by the controller that
+                  acted, carries the reference (`deal=DL-2501`, `plan=7`), and is
+                  rendered as the plain text it is — never parsed for markup. */}
+              <td className="mono" style={{ fontSize: "var(--text-sm)" }}>{a.detail || "—"}</td>
               <td>
-                {a.actor}
-                <div className="cell-2">{a.role}</div>
-              </td>
-              <td>
-                <Pill text={a.module} tone="line" />
+                {a.actor || <span className="faint">system</span>}
+                <div className="cell-2">{a.role || "—"}</div>
               </td>
             </tr>
           ))}
         />
+
+        {rows.length < total ? (
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "12px 2px" }}>
+            <button className="btn" data-act="au-more" disabled={loadingMore} onClick={more}>
+              {loadingMore ? "Loading…" : "Load older entries"}
+            </button>
+            <span className="faint" style={{ fontSize: "var(--text-sm)" }}>
+              Showing {rows.length} of {total}
+            </span>
+          </div>
+        ) : rows.length ? (
+          <div className="faint" style={{ fontSize: "var(--text-sm)", padding: "12px 2px" }}>
+            All {total} entr{total === 1 ? "y" : "ies"} shown.
+          </div>
+        ) : null}
       </div>
     </div>
   );

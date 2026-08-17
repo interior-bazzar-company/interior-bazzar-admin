@@ -14,22 +14,25 @@ import { Navigate, useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
 import AdminLoader from "../components/shared/AdminLoader";
 import { TokenService } from "../api/apiService/authHelper/TokenService";
-import { clearSession, getSession, isZeroAccess, loadSession } from "../admin/auth/session";
+import { clearSession, getSession, isZeroAccess, loadSession, sessionUnreachable } from "../admin/auth/session";
+import ServiceDown from "../components/shared/ServiceDown";
 
 export default function RequireSession({ children }: { children: ReactNode }) {
   const location = useLocation();
   const [ready, setReady] = useState(!!getSession());
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     if (getSession()) return;
     let cancelled = false;
+    setReady(false);
     loadSession().then(() => {
       if (!cancelled) setReady(true);
     });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
 
   const next = encodeURIComponent(location.pathname + location.search);
 
@@ -37,6 +40,12 @@ export default function RequireSession({ children }: { children: ReactNode }) {
   if (!ready) return <AdminLoader />;
 
   const session = getSession();
+  /* The service could not be reached — a stopped backend, a restart, a dropped
+     connection. That is NOT an answer about this account, so it must not be
+     shown as one and must not clear the tokens: the panel waits, with its own
+     screen and a retry, and the same session resumes the moment the server is
+     back. Only a resolved refusal below signs anybody out. */
+  if (!session && sessionUnreachable()) return <ServiceDown onRetry={() => setAttempt((n) => n + 1)} />;
   if (!session) {
     clearSession();
     return <Navigate to="/login?blocked=1" replace />;

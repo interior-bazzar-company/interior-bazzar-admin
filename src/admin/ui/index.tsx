@@ -27,10 +27,10 @@
       defaultValue for the same reason: they read like the DOM the prototype
       produced. Pass a `key` if a view needs a field to reset.
    ============================================================================= */
-import { Fragment } from "react";
-import type { CSSProperties, ReactNode } from "react";
-import { IBData } from "../engines";
+import { Fragment, useState } from "react";
+import type { ReactNode } from "react";
 import { go } from "./nav";
+import { fmtDate } from "./format";
 
 export { BRAND_MARK, BrandLogo } from "./brand";
 
@@ -121,6 +121,60 @@ export function qs(obj: Record<string, string | number | null | undefined>) {
   return p.length ? "?" + p.join("&") : "";
 }
 export function cap(s?: string | null) { return String(s || "").charAt(0).toUpperCase() + String(s || "").slice(1); }
+
+/* Hand a link to the user in whatever way the browser actually supports: the
+   OS share sheet where there is one (the user picks WhatsApp / mail / whatever
+   themselves), the clipboard otherwise. Returns the line to toast, or null when
+   there is nothing to say — the share sheet already spoke, and a cancelled
+   sheet is a decision, not a failure.
+
+   Both document blocks (quotations, invoices) go through this, so neither can
+   drift back to printing a link into a toast that fades before it can be
+   selected. The caller still renders the link on screen: a clipboard write can
+   be refused by permissions policy and then the visible text is the only copy
+   route left. */
+export async function shareOrCopy(url: string, title: string): Promise<string | null> {
+  if (navigator.share) {
+    try {
+      await navigator.share({ title, url });
+      return null;
+    } catch (e) {
+      if ((e as { name?: string }).name === "AbortError") return null;
+      // anything else (no handler registered, not allowed here) falls through
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    return "Link copied to the clipboard.";
+  } catch {
+    return "Could not copy automatically — select the link below.";
+  }
+}
+
+/* The link itself, selectable for as long as it is wanted, with its own copy
+   button. The share sheet is the fast path; this is the row that still works
+   when there is no sheet and the clipboard was refused, and it is the reason a
+   share link no longer has to be read off a fading toast.
+
+   Feedback is local state rather than a toast so this stays usable from
+   anywhere in the app — the shell's toast context imports THIS module. */
+export function ShareLine({ link, expires, title }: { link: string; expires?: string; title: string }) {
+  const [said, setSaid] = useState("");
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
+      {/* .inp so it is a themed control, not an OS-white box on a dark panel;
+          it already carries a readonly state. */}
+      <input className="inp mono" readOnly value={link} style={{ flex: "1 1 260px", minWidth: 0 }}
+        onFocus={(e) => e.currentTarget.select()} />
+      <button className="btn sm" onClick={async () => setSaid(await shareOrCopy(link, title) || "Shared.")}>
+        <Icon name="doc" size="sm" />Copy
+      </button>
+      <span className="faint" style={{ fontSize: "var(--text-sm)" }}>
+        {said ? said + " " : ""}{expires ? "Expires " + fmtDate(expires) : ""}
+      </span>
+    </div>
+  );
+}
 
 /* The seeded audit log stores references inside its `text` as `<b>PAY-4503</b>`.
    The prototype wrote that string straight into the cell; innerHTML is banned
@@ -241,6 +295,42 @@ export function EmptyState(o: EmptyStateProps) {
   );
 }
 
+/* One pane waiting on its own record, while the page around it stays put.
+   NOT the full-page AdminLoader: that one is for a screen with nothing on it
+   yet, and using it for a record swap throws the whole layout away and brings
+   it back — which reads as a reload of something the user did not reload. */
+export function PaneLoading({ label }: { label?: ReactNode }) {
+  return (
+    <div className="pane-load" role="status" aria-live="polite">
+      <span className="spinner" aria-hidden="true" />
+      <span>{label || "Loading…"}</span>
+    </div>
+  );
+}
+
+/* A LIST waiting on its first fetch. Every list screen in this panel is the
+   same three bands — command row, attention strip, rows — so one skeleton
+   covers all of them, and the layout the rows land in is already on screen
+   before they arrive. Purely decorative: one `role="status"` for the screen
+   reader, `aria-hidden` on the bars themselves. */
+export function ListSkeleton({ rows = 8 }: { rows?: number }) {
+  const bars = (n: number, w?: number) =>
+    Array.from({ length: n }, (_, i) => (
+      <span className="sk" key={i} aria-hidden="true" style={w ? { width: w } : undefined} />
+    ));
+  return (
+    <div className="dls" role="status" aria-label="Loading">
+      <div className="dls-cmd">
+        {bars(2, 148)}
+        <span className="spacer" />
+        {bars(1, 132)}
+      </div>
+      <div className="dls-attn sk-attn">{bars(5)}</div>
+      <div className="dls-body sk-rows">{bars(rows)}</div>
+    </div>
+  );
+}
+
 /* `text` was documented as already-built HTML in the prototype; here it is a
    ReactNode, and `children` is the same slot for callers who prefer JSX. */
 export function Notice({ text, tone, ico, children }: { text?: ReactNode; tone?: string; ico?: string; children?: ReactNode }) {
@@ -248,6 +338,25 @@ export function Notice({ text, tone, ico, children }: { text?: ReactNode; tone?:
     <div className={"notice" + (tone ? " " + tone : "")}>
       <Icon name={ico || "alert"} />
       <div>{text}{children}</div>
+    </div>
+  );
+}
+
+/* The prototype's `.tabs` row — the theme already carries the styling, only the
+   component was missing. `n` is a count badge; a zero prints nothing rather than
+   a "0" nobody needs to read. */
+export function Tabs({ items, cur, onPick }: {
+  items: { k: string; label: string; n?: number }[];
+  cur: string;
+  onPick: (k: string) => void;
+}) {
+  return (
+    <div className="tabs">
+      {items.map((t) => (
+        <button key={t.k} className={t.k === cur ? "on" : ""} onClick={() => onPick(t.k)}>
+          {t.label}{t.n ? <span className="n">{t.n}</span> : null}
+        </button>
+      ))}
     </div>
   );
 }
@@ -272,75 +381,6 @@ export function KvList({ pairs, cls }: { pairs: [ReactNode, ReactNode][]; cls?: 
         </Fragment>
       ))}
     </dl>
-  );
-}
-
-/* One totals breakdown for the whole app. Quotation's pRow() and Invoice's
-   pr() were the identical row shape, independently re-derived; this is the
-   union — Quotation supplies gross/discount, Invoice omits them (its
-   discount was already applied in the quotation it came from). */
-export interface CommercialSummaryProps {
-  gross?: number | null;
-  grossLabel?: string;
-  discount?: number;
-  taxable?: number;
-  taxableLabel?: string;
-  taxApplicable?: boolean;
-  intra?: boolean;
-  gstRate?: number;
-  cgst?: number;
-  sgst?: number;
-  igst?: number;
-  grand?: number;
-}
-export function CommercialSummary(o: CommercialSummaryProps) {
-  let n = 0;
-  const row = (k: ReactNode, v: ReactNode, extra?: CSSProperties) => (
-    <div key={n++} style={{ display: "flex", justifyContent: "space-between", padding: "4px 0", ...extra }}>
-      <span>{k}</span><span className="tnum">{v}</span>
-    </div>
-  );
-  const hasGross = o.gross !== undefined && o.gross !== null;
-  return (
-    <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "14px" }}>
-      <div style={{ minWidth: "320px" }}>
-        {hasGross ? row(o.grossLabel || "Gross amount", IBData.inr(o.gross)) : null}
-        {o.discount ? row("Discount", "−" + IBData.inr(o.discount)) : null}
-        {row(o.taxableLabel || "Taxable value", IBData.inr(o.taxable),
-             hasGross ? { borderTop: "1px solid var(--line)", paddingTop: "6px" } : undefined)}
-        {!o.taxApplicable ? row(<span className="faint">Tax</span>, <span className="faint">Not applicable</span>)
-          : o.intra ? <>
-              {row("CGST (" + ((o.gstRate as number) / 2) + "%)", IBData.inr(o.cgst))}
-              {row("SGST (" + ((o.gstRate as number) / 2) + "%)", IBData.inr(o.sgst))}
-            </>
-            : row("IGST (" + o.gstRate + "%)", IBData.inr(o.igst))}
-        {row(<b>Grand total</b>, <b>{IBData.inr(o.grand)}</b>,
-             { borderTop: "2px solid var(--line-2)", paddingTop: "8px", fontSize: "var(--text-lg)" })}
-      </div>
-    </div>
-  );
-}
-
-/* Notes/terms are captured on every document but neither module showed them
-   again after the builder — reading them meant opening Preview. Renders
-   nothing for a field that's empty, so an unused terms field stays silent. */
-export function NotesTerms({ notes, terms }: { notes?: string; terms?: string }) {
-  if (!notes && !terms) return null;
-  return (
-    <>
-      <SectionHead title="Notes & terms" />
-      <div className="card"><div className="card-b">
-        {notes ? <div>
-          <span className="fg-lb" style={{ display: "block", marginBottom: "4px" }}>Notes</span>
-          <div style={{ whiteSpace: "pre-wrap" }}>{notes}</div>
-        </div> : null}
-        {notes && terms ? <div style={{ height: "14px" }}></div> : null}
-        {terms ? <div>
-          <span className="fg-lb" style={{ display: "block", marginBottom: "4px" }}>Terms</span>
-          <div style={{ whiteSpace: "pre-wrap" }}>{terms}</div>
-        </div> : null}
-      </div></div>
-    </>
   );
 }
 
@@ -483,77 +523,3 @@ export function FilterChips({ params, labels, onUnfilter }: {
   );
 }
 
-/* --- the chain strip: the component that makes modules feel like one app -- */
-interface ChainCell {
-  k: string;
-  v: string;
-  to?: string;
-  state?: string;
-  meta?: ReactNode;
-  why?: string;
-}
-export function ChainStrip({ dealRef, here }: { dealRef: string; here?: string }) {
-  const dl = IBData.dealOf(dealRef); if (!dl) return null;
-  const c = IBData.chainOf(dealRef), m = IBData.dealMoney(dl);
-  const cells: ChainCell[] = [];
-
-  cells.push({ k:"Deal", v:dl.ref, to:"#/deals/" + dl.ref, state:"done",
-    meta:<Pill text={IBData.STAGES[dl.stage].label} tone={IBData.STAGES[dl.stage].tone} /> });
-
-  if (!c.quote) {
-    cells.push({ k:"Quotation", v:"—", state:"locked", why:"No quotation yet. Create one from this deal." });
-  } else {
-    cells.push({ k:"Quotation", v:c.quote.ref, to:"#/quotations/" + c.quote.ref,
-      state:c.quote.status === "accepted" ? "done" : "here",
-      meta:<><Pill text={cap(c.quote.status)} tone={c.quote.status === "accepted" ? "ok" : "warn"} />
-           {" "}<span className="faint">v{c.quote.v}</span></> });
-  }
-
-  if (c.quoteStatus !== "accepted") {
-    cells.push({ k:"Invoice", v:"—", state:"locked",
-      why:c.quote ? "Quote is " + cap(c.quote.status) + ", not Accepted." : "Needs an accepted quotation." });
-  } else if (!c.invoices.length) {
-    cells.push({ k:"Invoice", v:"—", state:"locked", why:"Quote accepted — raise the first invoice." });
-  } else {
-    const last = c.invoices[c.invoices.length - 1];
-    cells.push({ k:"Invoice", v:last.ref, to:"#/invoices/" + last.ref,
-      state:last.pay === "paid" ? "done" : "here",
-      meta:<><Pill text={last.pay === "paid" ? "Paid" : last.pay === "overdue" ? "Overdue" : "Unpaid"}
-                  tone={last.pay === "paid" ? "ok" : last.pay === "overdue" ? "bad" : "warn"} />
-           {c.invoices.length > 1 ? <>{" "}<span className="faint">+{c.invoices.length - 1} more</span></> : null}</> });
-  }
-
-  if (!c.payments.length) {
-    cells.push({ k:"Payment", v:"—", state:"locked",
-      why:c.invoices.length ? "Awaiting a receipt against the open invoice." : "Money is received against an invoice." });
-  } else {
-    const p = c.payments[0];
-    cells.push({ k:"Payment", v:p.ref, to:"#/payments/" + p.ref,
-      state:m.outstanding === 0 ? "done" : "here",
-      meta:<Pill text={IBData.inr(c.payments.reduce((a: number, x: { amount: number }) => a + x.amount, 0)) + " received"} tone="ok" /> });
-  }
-
-  return (
-    <div className="chain">
-      {cells.map((c2, i) => {
-        const cls = "lk " + (here && c2.k.toLowerCase().indexOf(here) === 0 ? "here" : c2.state);
-        const inner = (
-          <>
-            <div className="k">{c2.k}</div>
-            <div className="v"><span className="mono trunc">{c2.v}</span>{c2.to ? <Icon name="ext" size="sm" /> : null}</div>
-            {c2.meta ? <div className="m">{c2.meta}</div> : null}
-            {c2.why ? <div className="why">{c2.why}</div> : null}
-          </>
-        );
-        return (
-          <Fragment key={i}>
-            {i ? <span className="sep"><Icon name="chevr" size="sm" /></span> : null}
-            {c2.to
-              ? <a className={cls} data-go={c2.to} onClick={() => go(c2.to as string)}>{inner}</a>
-              : <div className={cls}>{inner}</div>}
-          </Fragment>
-        );
-      })}
-    </div>
-  );
-}

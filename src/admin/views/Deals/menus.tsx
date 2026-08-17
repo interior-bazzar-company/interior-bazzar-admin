@@ -12,9 +12,9 @@ import { Icon, qs } from "../../ui";
 import { go } from "../../ui/nav";
 import { useShell } from "../../shell/ShellContext";
 import {
-  ALL_STAGES, D, E, PRIO_HINT, VIEWS, VIEW_ORDER, head, merge, prioTone, viewOf
+  ALL_STAGES, D, PRIO_HINT, VIEWS, VIEW_ORDER, head, merge, prioTone, viewOf
 } from "./useDeals";
-import type { Params } from "./useDeals";
+import type { DealsApiState, Params } from "./useDeals";
 import { Mi, toneClass } from "./bits";
 
 /* Every stage, every time, all of them pressable. There is no matrix to be
@@ -86,13 +86,13 @@ export function MoreMenu({ dl, onValue, onReassign, onClose }: {
   dl: any; onValue: () => void; onReassign: () => void; onClose: () => void;
 }) {
   const shell = useShell();
-  const c = E.Chain.state(dl.deal_id);
   const fire = (fn: () => void) => { shell.closePop(); fn(); };
   return (
     <div className="pop-b">
-      {!dl.deal_value && c.quoteStatus !== "accepted"
-        ? <Mi act="dl-value" ico="tag" label="Set deal value" hint="The agreed total" onClick={() => fire(onValue)} />
-        : null}
+      {/* Offered whether or not a value is already set — it is the only way to
+          correct one, now that no accepted quotation can write it for you. */}
+      <Mi act="dl-value" ico="tag" label={dl.deal_value ? "Change deal value" : "Set deal value"}
+        hint="The agreed total" onClick={() => fire(onValue)} />
       {head()
         ? <Mi act="dl-reassign" ico="recon" label="Reassign" hint="Change the owner" onClick={() => fire(onReassign)} />
         : null}
@@ -111,26 +111,31 @@ export const CHIP_LABEL: Record<string, string> = {
    render as toned pills on the rows, so the dot in the menu is the same
    signal, not a new one. Owner and Sort have no colour to be faithful to,
    and inventing one would imply a meaning that does not exist. */
-export function chipOptions(name: string): { v: string | number; l: string; dot?: string }[] {
+/* Every option list comes from the ONE fetch the page already made — the API
+   returns its own stage, priority and tag vocabularies with the list, and the
+   owners are the ones actually on it. Nothing here is a hardcoded enum, and
+   nothing reads a second store that could disagree with the rows on screen.
+   `out` (sort by outstanding) is gone with the payment data it ranked on. */
+export function chipOptions(name: string, api: DealsApiState): { v: string | number; l: string; dot?: string }[] {
   if (name === "stage") return ALL_STAGES.map((s) => ({ v: s, l: D.STAGES[s].label, dot: D.STAGES[s].tone || "" }));
   /* A tag's dot draws from the tag palette, not the status one — same class
      the pill on the row uses, so the menu and the row cannot disagree. */
-  if (name === "tag") return E.Tags.all().map((t: any) => ({ v: t.slug, l: t.label, dot: toneClass(t.tone).replace(/^ /, "") }));
+  if (name === "tag") return api.tags.map((t) => ({ v: t.slug, l: t.label, dot: toneClass(t.tone).replace(/^ /, "") }));
   if (name === "priority") return [{ v: 3, l: "Urgent", dot: "bad" }, { v: 2, l: "High", dot: "warn" }, { v: 1, l: "Normal", dot: "" }];
-  if (name === "owner") return E.Assignment.roster().members.map((m: any) => ({ v: m.id, l: m.id }));
+  if (name === "owner") return api.owners.map((m) => ({ v: m.id, l: m.name }));
   if (name === "sort") return [{ v: "", l: "Newest first" }, { v: "age", l: "Stage age" },
     { v: "close", l: "Close date" }, { v: "value", l: "Deal value" },
-    { v: "out", l: "Outstanding" }, { v: "act", l: "Last activity" }];
+    { v: "act", l: "Last activity" }];
   return [];
 }
 export function Odot({ o }: { o?: { dot?: string } | null }) {
   return o && o.dot !== undefined ? <span className={"dws-odot " + o.dot}></span> : null;
 }
 
-export function ChipMenu({ name, p }: { name: string; p: Params }) {
+export function ChipMenu({ name, p, api }: { name: string; p: Params; api: DealsApiState }) {
   const shell = useShell();
   const cur = p[name];
-  const opts = chipOptions(name);
+  const opts = chipOptions(name, api);
   const nav = (to: string) => { shell.closePop(); go(to); };
   const rows: ReactNode[] = [];
   // Clearing is its own row rather than a blank option, which reads as a gap.

@@ -1,30 +1,50 @@
 /* =============================================================================
    Deals — the ONE place the wire shape (DealRow, from AdminOpsService.deals()/
    .deal()) becomes the record shape List.tsx / Drawer.tsx / bits.tsx already
-   render: the deals-engine.js runtime shape (deal_id, customer_name,
-   deal_value, stage as an int 1–6, priority as an int 1–3, …) — a verbatim
-   prototype port, so this is the only file that needs to know the wire shape
-   exists.
+   render: the field names the ported prototype views use (deal_id,
+   customer_name, deal_value, stage as an int 1–6, priority as an int 1–3, …),
+   so this is the only file that needs to know the wire shape exists.
 
    Chain data (revenue_collected, outstanding, quotation_status,
    invoice_status, duplicate_count) is deliberately NOT produced here — there
    are no invoice/payment models server-side yet, so those fields are left
-   unset rather than guessed. See useDeals.ts / Drawer.tsx / bits.tsx for the
-   `ponytail:` comments marking every place that still reads the local engine
-   for them.
+   unset and every consumer renders nothing rather than a guess.
    ============================================================================= */
-import { IBData } from "../../engines";
+import { fmtDate, inr } from "../../ui/format";
 import type {
   DealPersonRef, DealPriorityVocab, DealRemark, DealRow, DealStageVocab, DealTransition,
 } from "../../../api/modules/adminOps";
 
-const D = IBData;
+/* ------------------------------------------------------ the URL's vocabulary */
+/* This was IBData.STAGES / IBData.PRIORITY, and it is the one piece of the
+   deleted engine layer that had to stay — because it is not data, it is the
+   mapping between the server's stage KEY and the integer this panel's own URLs
+   carry (`#/deals?stage=3`). Something client-side has to own that mapping;
+   the server has no opinion about the panel's query string.
 
-/* stageKey -> legacy int, built from IBData.STAGES — the vocabulary IS data,
+   What it does NOT own is what you read on screen. Every label and tone here
+   is overwritten with the server's own the moment a deals response lands (see
+   `legacyStageInt` below, which matches by key and grafts unknown stages in),
+   so these strings are only ever visible in the instant before the first
+   fetch resolves. Add a stage server-side and it appears here under its real
+   name with no edit to this file. */
+export const STAGES: Record<number, { key: string; label: string; tone: string; hint: string }> = {
+  1: { key: "new",         label: "New",         tone: "",     hint: "Fresh lead" },
+  2: { key: "followup",    label: "Followup",    tone: "warn", hint: "Interested conversation" },
+  3: { key: "slot",        label: "Slot Booked", tone: "info", hint: "Paid slot registration amount" },
+  4: { key: "installment", label: "Installment", tone: "info", hint: "Paying the plan down" },
+  5: { key: "won",         label: "Won",         tone: "ok",   hint: "Paid in full" },
+  6: { key: "lost",        label: "Lost",        tone: "dead", hint: "Denied" },
+};
+export const PRIORITY: Record<number, string> = { 1: "Normal", 2: "High", 3: "Urgent" };
+
+const D = { STAGES, PRIORITY, fmtDate, inr };
+
+/* stageKey -> legacy int, built from STAGES above — the vocabulary IS data,
    so this reads the map rather than hardcoding one. Extended at runtime for a
    stage key the port has never seen: rather than crash (`D.STAGES[d.stage]`
    would be undefined) or silently drop the deal, a synthetic int (1000+) is
-   grafted onto D.STAGES itself using the API's own label/tone, so every
+   grafted onto STAGES itself using the API's own label/tone, so every
    existing `D.STAGES[d.stage]` lookup across List/Drawer/bits keeps working
    and the deal renders under its real name. It just never gets a dedicated
    cell in the funnel strip — STRIP_STAGES/ALL_STAGES are computed once, at
@@ -45,7 +65,7 @@ export function legacyStageInt(s: { key: string; label: string; tone: string }):
 }
 
 /* priorityKey -> legacy int 1..3, matched by LABEL (case-insensitive) against
-   IBData.PRIORITY = {1:"Normal",2:"High",3:"Urgent"}. Label over displayOrder:
+   PRIORITY above ({1:"Normal",2:"High",3:"Urgent"}). Label over displayOrder:
    the label is the one thing both sides agree is the priority's identity — a
    reordered priority row would silently swap High and Urgent under an
    order-based match. Priority never gates an action in this read-only pass
@@ -54,7 +74,7 @@ export function legacyStageInt(s: { key: string; label: string; tone: string }):
    should, never a wrong permission or a wrong figure. */
 export function legacyPriorityInt(p: DealPriorityVocab | { key: string; label: string }): number {
   const hit = Object.keys(D.PRIORITY).find(
-    (k) => String(D.PRIORITY[k]).toLowerCase() === (p.label || "").toLowerCase()
+    (k) => String(D.PRIORITY[Number(k)]).toLowerCase() === (p.label || "").toLowerCase()
   );
   return hit ? Number(hit) : 1;
 }
@@ -65,10 +85,9 @@ export function legacyPriorityInt(p: DealPriorityVocab | { key: string; label: s
    string, so a datetime makes `+p[2]` parse "27T00:00:00Z" as NaN and every
    "Nd in stage" rendered "NaNd in stage".
 
-   Trimming here rather than widening the engine's d(): converting the wire
-   shape into the legacy shape is exactly this adapter's job, the legacy shape
-   has always been date-only, and the engine is a verbatim port that other
-   modules still share. One helper, applied to every date the adapter emits,
+   Trimming here rather than in the formatter: converting the wire shape into
+   the legacy shape is exactly this adapter's job, and the legacy shape has
+   always been date-only. One helper, applied to every date the adapter emits,
    so a new date field cannot reintroduce the bug by being passed raw. */
 export function dateOnly(v: string | null | undefined): string | null {
   if (!v) return null;
@@ -150,17 +169,22 @@ function escHtml(s: string) {
 }
 
 /* transitions + remarks -> the engine's own timeline event shape
-   ({kind,tone,at,by,text}), so Drawer's TimelineTab renders it with zero
-   changes to the JSX. Quote/invoice/payment events are absent — those chains
-   are still local-only (see Drawer.tsx's PaymentsTab/DocumentsTab). Sorted
-   newest first, same rule the engine's own Activity.timeline() uses. */
+   ({kind,tone,at,by,text,channel}), so Drawer's TimelineTab renders it with
+   zero changes to the JSX. Quote/invoice/payment events are absent — those
+   chains are still local-only (see Drawer.tsx's PaymentsTab/DocumentsTab).
+   Sorted newest first, same rule the engine's own Activity.timeline() uses.
+
+   `channel` carries DealRemark.typeKey through for REMARK rows (manual /
+   whatsapp / email) — real now, unlike the old local-engine version's
+   coloured-but-fake channel tabs (see Chat.tsx). Meaningless on non-REMARK
+   rows, left undefined there. */
 export function adaptTimeline(transitions: DealTransition[], remarks: DealRemark[]) {
-  const out: { kind: string; tone: string; at: string; by: string; text: string }[] = [];
+  const out: { kind: string; tone: string; at: string; by: string; text: string; channel?: string }[] = [];
   remarks.forEach((r) => {
     out.push({
       kind: r.typeKey === "system" ? "SYSTEM" : "REMARK", tone: "",
       at: r.createdAt, by: r.author ? r.author.name : (r.typeLabel || "System"),
-      text: r.text,
+      text: r.text, channel: r.typeKey,
     });
   });
   transitions.forEach((t) => {

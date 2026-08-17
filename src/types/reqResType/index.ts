@@ -24,7 +24,14 @@ export interface ApiErrorType {
 
 export interface RequestOptions {
   auth?: boolean;
-  responseType?: "json" | "text" | "blob" | "arrayBuffer";
+  /** "formdata" tells apiService.createRequest to send `body` as-is (a
+   *  FormData instance) instead of JSON.stringify-ing it — the runtime branch
+   *  for this already existed, this literal was just never in the type so
+   *  nothing could reach it. The response is still parsed as JSON either way
+   *  (returnResponse's switch has no "formdata" case, so it falls to the
+   *  default `response.json()`), which is exactly right: a multipart
+   *  REQUEST with a JSON response, e.g. a file upload. */
+  responseType?: "json" | "text" | "blob" | "arrayBuffer" | "formdata";
   signal?: AbortSignal;
 }
 // admin panel here

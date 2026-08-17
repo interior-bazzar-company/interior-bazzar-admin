@@ -57,11 +57,11 @@
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { AppExceptions } from "../../api/apiService";
+import { AppExceptions, isServiceError } from "../../api/apiService";
 import { AuthService } from "../../api/modules/auth";
 import { TokenService } from "../../api/apiService/authHelper/TokenService";
 import type { LoginFormResponse } from "../../types/global";
-import { clearSession, grantsOf, isZeroAccess, loadSession } from "./session";
+import { clearSession, grantsOf, isZeroAccess, loadSession, sessionUnreachable } from "./session";
 import "../../styles/admin-theme.css";
 import "./admin-auth.css";
 
@@ -125,6 +125,15 @@ const GATE_BLOCKED_BANNER: Banner = {
   title: "Access withdrawn",
   body: "This account can no longer sign in. Contact an Admin.",
 };
+/* The service could not be reached at all. Deliberately says nothing about a
+   host, a port or a status code — and, just as deliberately, is NOT
+   INVALID_BANNER: telling somebody their password is wrong when the server is
+   simply down sends them to reset a credential that was never the problem. */
+const SERVICE_BANNER: Banner = {
+  kind: "err2",
+  title: "Something went wrong",
+  body: "We couldn’t reach the service just now. Please try again in a moment.",
+};
 const SIGNED_OUT_BANNER: Banner = {
   kind: "ok2",
   title: "Signed out",
@@ -139,6 +148,7 @@ export default function AdminAuth() {
   const [banner, setBanner] = useState<Banner | null>(null);
   const [who, setWho] = useState("");
   const [pass, setPass] = useState("");
+  const [showPass, setShowPass] = useState(false);
   const [busy, setBusy] = useState(false);
   const [user, setUser] = useState<Identity | null>(null);
   const passRef = useRef<HTMLInputElement>(null);
@@ -159,6 +169,13 @@ export default function AdminAuth() {
       TokenService.setTokens(data.accessToken, data.refreshToken);
       const s = await loadSession(true);
       if (!s) {
+        /* Credentials were accepted and tokens are already stored; only the
+           permission read failed. If that was the service, keep them — the
+           next attempt resumes — and never call it a bad password. */
+        if (sessionUnreachable()) {
+          setBanner(SERVICE_BANNER);
+          return;
+        }
         clearSession();
         setBanner(INVALID_BANNER);
         return;
@@ -166,6 +183,12 @@ export default function AdminAuth() {
       setUser({ name: s.user.name, role: s.role, grants: grantsOf(s) });
       setStep(isZeroAccess(s) ? "pending" : "active");
     } catch (e) {
+      // An unreachable server is not a verdict on the credentials — say so,
+      // and leave whatever is on this device alone.
+      if (isServiceError(e)) {
+        setBanner(SERVICE_BANNER);
+        return;
+      }
       clearSession();
       // Generic message — never reveal which half was wrong, and never
       // distinguish "locked" from "wrong" either (see the header note).
@@ -179,6 +202,7 @@ export default function AdminAuth() {
     void AuthService.signout().catch(() => {});
     clearSession();
     setPass("");
+    setShowPass(false);
     setUser(null);
     setStep("login");
     setBanner(null);
@@ -202,6 +226,12 @@ export default function AdminAuth() {
     if (!TokenService.getAccessToken()) return;
     loadSession().then((s) => {
       if (!s) {
+        /* Down, not denied. Keep the tokens and say the honest thing — wiping
+           a good session because the server blinked is the bug this replaces. */
+        if (sessionUnreachable()) {
+          setBanner(SERVICE_BANNER);
+          return;
+        }
         clearSession();
         setBanner(WITHDRAWN_BANNER);
         return;
@@ -290,9 +320,16 @@ export default function AdminAuth() {
 
             <div className="fg">
               <label htmlFor="loginPass">Password</label>
-              <input className="inp" type="password" id="loginPass" autoComplete="current-password"
-                     placeholder="••••••••" ref={passRef} value={pass}
-                     onChange={(e) => setPass(e.target.value)} onKeyDown={onKey} />
+              <div className="pw">
+                <input className="inp" type={showPass ? "text" : "password"} id="loginPass"
+                       autoComplete="current-password"
+                       placeholder="••••••••" ref={passRef} value={pass}
+                       onChange={(e) => setPass(e.target.value)} onKeyDown={onKey} />
+                <button type="button" className="tlink" onClick={() => setShowPass((v) => !v)}
+                        aria-label={(showPass ? "Hide" : "Show") + " password"}>
+                  {showPass ? "Hide" : "Show"}
+                </button>
+              </div>
               <div className="err" id="err-loginPass" />
             </div>
 

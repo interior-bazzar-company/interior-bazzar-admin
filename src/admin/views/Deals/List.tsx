@@ -8,14 +8,14 @@ import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import { can } from "../../shell/AdminShell";
 import {
-  ALL_STAGES, D, STAGE, STRIP_STAGES, dealHash, head, inr, merge, omit, place, urgency,
-  useFilters
+  ALL_STAGES, D, STAGE, STRIP_STAGES, daysFrom, dealHash, head, inr, localSort, merge, omit,
+  place, urgency, useDealCounts, useFilters
 } from "./useDeals";
 import type { DealsApiState, Params } from "./useDeals";
 import { legacyPriorityInt, legacyStageInt } from "./adapter";
-import { ChainDots, MoneyCell, NextCell, OwnerCell, TagChips } from "./bits";
+import { MoneyCell, NextCell, OwnerCell, TagChips } from "./bits";
 import { useActs } from "./Modals";
-import AdminLoader from "../../../components/shared/AdminLoader";
+import { ListSkeleton } from "../../ui";
 
 /* The strip reads as one table row: cells of equal build, ruled off from each
    other, sitting on the same baseline. Total first, then the funnel one stage
@@ -31,7 +31,7 @@ import AdminLoader from "../../../components/shared/AdminLoader";
    two read-outs render as plain cells and are visibly quieter. */
 export function AttnStrip({ p, m }: {
   p: Params;
-  m: { byStage: Record<number, number>; outstanding: number; collected: number; total: number };
+  m: { byStage: Record<number, number>; total: number };
 }) {
   /* Toggling: clicking the stage you are already on clears it back to Total,
      so the strip never becomes a trap you have to leave via the chip row. */
@@ -52,13 +52,9 @@ export function AttnStrip({ p, m }: {
       to: stageRoute(s), on: String(p.stage) === String(s),
       dot: D.STAGES[s].tone || ""
     })),
-    /* The money used to be pushed to the far right by a spacer, which put a
-       hand's width of nothing between Won and the figure Won produces. They
-       are the same thought — the funnel, and what came out of it. */
-    "sep",
-    { k: "outstanding", v: inr(m.outstanding, { compact: true }), tone: "warn" },
-    "sep",
-    { k: "collected", v: inr(m.collected, { compact: true }), tone: "ok" }
+    /* No money cells. Outstanding and collected were sums over the browser's
+       own payment store — two figures with no source, sitting in the row a
+       reader trusts most. They come back when payments do. */
   ];
   return <StatStrip cells={cells} />;
 }
@@ -67,7 +63,11 @@ export function AttnStrip({ p, m }: {
    nothing left over, so its counts go beside the title — same cells, same
    order, same filtering, and the routes keep `view` so pressing one narrows
    the chat list rather than throwing you back to the table. */
-export function TbStats({ p, m }: { p: Params; m: { byStage: Record<number, number>; total: number } }) {
+export function TbStats({ p }: { p: Params }) {
+  /* Reads the counts itself rather than taking them as a prop: the topbar
+     chrome is captured once per route change, so a prop would freeze at
+     whatever the numbers were before the fetch landed. */
+  const m = useDealCounts();
   const cell = (k: string, v: number, route: string, on: boolean, dot?: string) => (
     <button key={k} className={"tb-stat" + (on ? " on" : "")} data-go={route} title={v + " " + k}
       onClick={() => go(route)}>
@@ -83,23 +83,6 @@ export function TbStats({ p, m }: { p: Params; m: { byStage: Record<number, numb
       {STRIP_STAGES.map((s) => cell(D.STAGES[s].label.toLowerCase(), m.byStage[s] || 0,
         "#/deals" + qs(merge(p, { stage: String(p.stage) === String(s) ? "" : s })),
         String(p.stage) === String(s), D.STAGES[s].tone || ""))}
-    </span>
-  );
-}
-
-/* The strip's other half — the two money read-outs — sitting immediately
-   after Won, because that is the cell that produces them. Not buttons, and
-   styled a shade quieter, because neither one filters anything. */
-export function TbMoney({ outstanding, collected }: { outstanding: number; collected: number }) {
-  const ro = (k: string, v: string, tone: string) => (
-    <span className={"tb-stat ro " + tone} title={v + " " + k}>
-      <span className="v tnum">{v}</span><span className="k">{k}</span>
-    </span>
-  );
-  return (
-    <span className="tb-money">
-      {ro("outstanding", inr(outstanding, { compact: true }), "warn")}
-      {ro("collected", inr(collected, { compact: true }), "ok")}
     </span>
   );
 }
@@ -135,16 +118,19 @@ function DealsDenied() {
    THE LIST WORKSPACE — Table and Pipeline. Reads the API directly (Chat and
    Tags, elsewhere in this module, still read the local engine).
    ====================================================================== */
-export function DealsList({ id, p, api, outstanding, collected }: {
-  id: string | null; p: Params; api: DealsApiState; outstanding: number; collected: number;
+export function DealsList({ id, p, api }: {
+  id: string | null; p: Params; api: DealsApiState;
 }) {
   const acts = useActs(p);
   const { onFilter, onSearch, onUnfilter } = useFilters(p, id);
   const view = p.view === "board" ? "board" : "table";
+  /* `value` and the default order come back already sorted; stage age, close
+     date and last activity are ordered here, over the page that arrived. */
+  const rows = localSort(api.list, p.sort);
 
   const tagsHash = "#/deals" + qs(merge(p, { view: "tags" }));
 
-  if (api.loading && !api.list.length) return <AdminLoader />;
+  if (api.loading && !api.list.length) return <ListSkeleton />;
   if (api.forbidden) return <DealsDenied />;
 
   return (
@@ -166,7 +152,7 @@ export function DealsList({ id, p, api, outstanding, collected }: {
         <Select name="sort" label="Sort" value={p.sort} onFilter={onFilter}
           options={[{ v: "", l: "Sort: Newest first" }, { v: "age", l: "Stage age" },
             { v: "close", l: "Expected close" }, { v: "value", l: "Deal value" },
-            { v: "out", l: "Outstanding" }, { v: "act", l: "Last activity" }]} />
+            { v: "act", l: "Last activity" }]} />
         <Select name="tag" label="List" value={p.tag} onFilter={onFilter}
           options={api.tags.map((t) => ({ v: t.slug, l: t.label }))} />
         {/* Managing tags belongs next to filtering by them, not in a list of
@@ -174,7 +160,15 @@ export function DealsList({ id, p, api, outstanding, collected }: {
         <button className="btn icon" title="Manage lists" aria-label="Manage lists" data-go={tagsHash}
           onClick={() => go(tagsHash)}><Icon name="tag" /></button>
         <span className="spacer"></span>
-        <button className="btn" data-act="dl-export" onClick={() => acts.exportCsv()}>
+        {/* The stall sweep also runs nightly on cron (sweep_stalled_deals).
+            The button is for when you want the flags right now — after a
+            weekend of catching up, say — and it is the same one call. */}
+        {head()
+          ? <button className="btn icon" data-act="dl-stall" title="Run the stall sweep now"
+              aria-label="Run the stall sweep now" onClick={() => acts.stallJob()}>
+              <Icon name="clock" /></button>
+          : null}
+        <button className="btn" data-act="dl-export" onClick={() => acts.exportCsv(rows)}>
           <Icon name="download" />Export
           {head() ? null : <span className="pill warn xs" style={{ marginLeft: "4px" }}>Head</span>}
         </button>
@@ -184,11 +178,7 @@ export function DealsList({ id, p, api, outstanding, collected }: {
           : null}
       </div>
 
-      {/* outstanding/collected: ponytail — local-engine seed data, not DB
-          truth. See index.tsx: no invoice/payment models exist server-side
-          yet, so these two figures still come from IBDeals' own local scope,
-          not the API deals just fetched above. */}
-      <AttnStrip p={p} m={{ byStage: api.counts.byStage, outstanding, collected, total: api.counts.total }} />
+      <AttnStrip p={p} m={{ byStage: api.counts.byStage, total: api.counts.total }} />
 
       <FilterChips params={omit(p, ["view"])} onUnfilter={onUnfilter}
         labels={{ q: "Search", stage: "Stage", owner: "Owner", priority: "Priority",
@@ -196,8 +186,8 @@ export function DealsList({ id, p, api, outstanding, collected }: {
 
       <div className={"dls-body" + (view === "board" ? " is-board" : "")}>
         {view === "board"
-          ? <Board list={api.list} sel={id} p={p} />
-          : <DealsTable list={api.list} sel={id} p={p} onCreate={() => acts.create()} onClearFilters={() => onUnfilter("*")} />}
+          ? <Board list={rows} sel={id} p={p} />
+          : <DealsTable list={rows} sel={id} p={p} onCreate={() => acts.create()} onClearFilters={() => onUnfilter("*")} />}
       </div>
     </div>
   );
@@ -213,8 +203,8 @@ function DealsTable({ list, sel, p, onCreate, onClearFilters }: {
       title={filtered ? "No deals match these filters" : "No deals yet"}
       body={filtered
         ? "Nothing in the pipeline matches. Clear a filter to widen the search."
-        : "Deals arrive from the funnel and are assigned by round-robin." +
-          (canCreate ? " You can also create one for off-funnel business." : "")}
+        : "Nothing in the pipeline yet." +
+          (canCreate ? " Create one for an inbound call, a walk-in or a referral." : "")}
       action={filtered
         ? <button className="btn" data-unfilter="*" onClick={onClearFilters}>Clear all filters</button>
         : (canCreate ? <button className="btn pri" data-act="dl-create" onClick={onCreate}>Create deal</button> : null)} />
@@ -223,8 +213,8 @@ function DealsTable({ list, sel, p, onCreate, onClearFilters }: {
   return (
     <table className="tbl dls-tbl">
       <thead><tr>
-        <th style={{ width: "3px" }}></th><th>Deal</th><th>Stage</th><th>Chain</th>
-        <th className="n">Value · collected</th><th>Owner</th><th>Next action</th>
+        <th style={{ width: "3px" }}></th><th>Deal</th><th>Stage</th>
+        <th className="n">Deal value</th><th>Owner</th><th>Next action</th>
       </tr></thead>
       <tbody>
         {list.map((d: any) => {
@@ -245,16 +235,14 @@ function DealsTable({ list, sel, p, onCreate, onClearFilters }: {
                   {d.is_stalled ? <> <span className="pill bad xs">Stalled</span></> : null}
                 </div>
                 <div className="cell-2 mono">
-                  {d.deal_id} · {place(d)} · {d.interested_in}
-                  {d.duplicate_count ? <> <span title="repeat submissions">·{d.duplicate_count}</span></> : null}
+                  {d.deal_id} · {place(d)}{d.interested_in ? " · " + d.interested_in : ""}
                 </div>
-                <TagChips dealId={d.deal_id} max={3} tags={d.tags} />
+                <TagChips max={3} tags={d.tags} />
               </td>
               <td>
                 <Pill text={D.STAGES[d.stage].label} tone={D.STAGES[d.stage].tone} />
-                <div className="cell-2">{Math.abs(D.days(D.d(d.stage_since)))}d in stage</div>
+                <div className="cell-2">{Math.abs(daysFrom(d.stage_since))}d in stage</div>
               </td>
-              <td><ChainDots dl={d} /></td>
               <td className="n dls-money"><MoneyCell d={d} /></td>
               <td><OwnerCell d={d} /></td>
               <td className="dls-na"><NextCell d={d} /></td>
@@ -312,7 +300,7 @@ function Board({ list, sel, p }: { list: any[]; sel: string | null; p: Params })
 
 function BoardCard({ d, sel, p }: { d: any; sel: string | null; p: Params }) {
   const u = urgency(d);
-  const days = d.next_action ? D.days(D.d(d.next_action.date)) : null;
+  const days = d.next_action ? daysFrom(d.next_action.date) : null;
   /* The board's job is spotting what is rotting, so the card leads with the
      reason it is flagged and falls back to the next action only when calm. */
   const tail = d.is_stalled ? <span className="flag">stalled</span>
@@ -323,14 +311,12 @@ function BoardCard({ d, sel, p }: { d: any; sel: string | null; p: Params }) {
     <button className={"dls-card" + (u ? " " + u.cls : "") + (sel === d.deal_id ? " on" : "")}
       data-go={to} onClick={() => go(to)}>
       <div className="n1"><span className="nm">{d.customer_name}</span><span className="rf">{d.deal_id}</span></div>
-      <div className="n2"><ChainDots dl={d} />
-        {/* ponytail: outstanding is chain data — undefined (not a real 0) on
-            an API-backed deal. Rendering "₹0" there would claim it's fully
-            collected when collection was never checked. */}
-        <span className="amt tnum">{d.outstanding === undefined ? "—"
-          : d.outstanding ? inr(d.outstanding, { compact: true }) : "₹0"}</span>
+      <div className="n2">
+        {/* The deal's own value. null means nothing has been quoted yet, which
+            is not the same as zero and must not render as one. */}
+        <span className="amt tnum">{d.deal_value ? inr(d.deal_value, { compact: true }) : "—"}</span>
       </div>
-      <div className="age">{Math.abs(D.days(D.d(d.stage_since)))}d in stage{tail ? <> · {tail}</> : null}</div>
+      <div className="age">{Math.abs(daysFrom(d.stage_since))}d in stage{tail ? <> · {tail}</> : null}</div>
     </button>
   );
 }

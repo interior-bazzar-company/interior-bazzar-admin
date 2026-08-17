@@ -14,7 +14,7 @@
    behaviour, so a module key with no entry in ICON_OF still renders instead
    of guessing.
    ============================================================================= */
-import { getSession } from "../auth/session";
+import { getSession, HIDDEN_MODULES } from "../auth/session";
 
 export type ModuleItem = {
   key: string;
@@ -34,27 +34,26 @@ export type ModuleGroup = {
  * entry here falls through to Icon's own "doc" default rather than guessing. */
 const ICON_OF: Record<string, string> = {
   deals: "deal",
-  quotations: "quote",
-  invoices: "invoice",
   plans: "tag",
   team: "team",
   roles: "shield",
   audit: "history",
-  design: "sparkle",
 };
 /** Sidebar queue-count keys, from IBData.derive.badges(). A module with no
  * entry here shows no badge, which is correct for anything the prototype
- * never counted (Plans, Roles, Audit, Design). */
+ * never counted (Plans, Roles, Audit). */
 const Q_OF: Record<string, string> = {
   deals: "deals",
-  quotations: "quotations",
-  invoices: "invoices",
   team: "team",
 };
 
 export function getModules(): ModuleGroup[] {
   const s = getSession();
-  const mods = s ? s.modules.slice().sort((a, b) => a.displayOrder - b.displayOrder) : [];
+  const mods = s
+    ? s.modules
+        .filter((m) => !HIDDEN_MODULES.has(m.key))
+        .sort((a, b) => a.displayOrder - b.displayOrder)
+    : [];
   const groups: ModuleGroup[] = [];
   const byGroup: Record<string, ModuleGroup> = {};
   mods.forEach((m) => {

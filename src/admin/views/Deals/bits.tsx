@@ -8,35 +8,15 @@
    ============================================================================= */
 import type { ReactNode } from "react";
 import { Icon, Notice, avatarTone, initials } from "../../ui";
-import { D, E, EMPTY_CHAIN, STAGE, inr } from "./useDeals";
+import { STAGE, daysFrom, inr, relativeDate } from "./useDeals";
 import type { Refusal } from "./useDeals";
 
-/* Chain state at a glance: which deals are stuck waiting on a quote, without
-   opening one.
-   ponytail: quotation/invoice status and the payment count are chain data —
-   no invoice/payment models exist server-side yet, so an API-backed deal
-   carries neither `quotation_status`/`invoice_status` nor a local
-   E.Chain.state() row. Missing reads as "none" (blank chip), and
-   E.Chain.state() falls back to EMPTY_CHAIN instead of throwing on null. This
-   whole cell is local-engine seed data standing in for a chain that isn't
-   real yet — not DB truth. */
-export function ChainDots({ dl }: { dl: any }) {
-  const c = E.Chain.state(dl.deal_id) || EMPTY_CHAIN;
-  const q = dl.quotation_status || "none", i = dl.invoice_status || "none";
-  const sq = (label: string, tone: string, title: string) =>
-    <span className={tone} title={title}>{label}</span>;
-  return (
-    <span className="dls-cd">
-      {sq("Q", q === "none" ? "" : q === "accepted" ? "ok" : q === "rejected" ? "bad" : "warn",
-        q === "none" ? "No quotation yet" : "Quotation " + q)}
-      {sq("I", i === "none" ? "" : i === "paid" ? "ok" : i === "cancelled" ? "bad" : "warn",
-        i === "none" ? (q === "accepted" ? "Ready to invoice" : "Locked — needs an Accepted quotation")
-                     : "Invoice " + i)}
-      {sq("₹", c.payments.length ? "ok" : "",
-        c.payments.length ? c.payments.length + " payment(s) received" : "No payment yet")}
-    </span>
-  );
-}
+/* ChainDots — the Q / I / ₹ squares — is GONE. It read quotation, invoice and
+   payment state out of the local engine's seed store; none of those has a
+   model server-side, so on a real deal all three squares were blank and on a
+   seeded one they described records nobody else could see. It returns with the
+   chain it was reporting on.
+   ------------------------------------------------------------------------- */
 
 /* A tag pill takes `tag-<hue>`, never the bare tone name: `.pill.red` does not
    exist, and `.pill.bad` — which it would otherwise have collided with — means
@@ -62,16 +42,14 @@ export function toneName(v?: string) {
   return hit ? hit[1] : "No colour";
 }
 
-/* `tags` is optional and, when passed, wins over the local engine lookup —
-   an API-backed deal carries its own tags straight off the wire (adapter.ts),
-   and E.Tags.forDeal() knows nothing about a ref the local engine never
-   seeded. Chat/Pipeline's local-engine rows don't pass it, so they keep
-   reading E.Tags.forDeal() exactly as before. */
-export function TagChips({ dealId, max, tags: given }: { dealId: string; max?: number; tags?: any[] }) {
-  const tags = given !== undefined ? given : E.Tags.forDeal(dealId);
-  if (!tags.length) return null;
-  const cap = max || tags.length;
-  const shown = tags.slice(0, cap);
+/* Tags come off the deal row itself — the list and detail responses both
+   carry them — so there is no lookup to get wrong and nothing to be stale
+   against the row beside it. */
+export function TagChips({ max, tags }: { max?: number; tags?: any[] }) {
+  const all = tags || [];
+  if (!all.length) return null;
+  const cap = max || all.length;
+  const shown = all.slice(0, cap);
   return (
     <span className="dls-tags">
       {shown.map((t: any) => (
@@ -79,7 +57,7 @@ export function TagChips({ dealId, max, tags: given }: { dealId: string; max?: n
           {t.label}
         </span>
       ))}
-      {tags.length > cap ? <span className="pill xs faint">+{tags.length - cap}</span> : null}
+      {all.length > cap ? <span className="pill xs faint">+{all.length - cap}</span> : null}
     </span>
   );
 }
@@ -95,21 +73,10 @@ export function MoneyCell({ d }: { d: any }) {
         <div className="sub">quoted, not won</div>
       </>
     );
-  // ponytail: revenue_collected/outstanding are chain data — undefined for an
-  // API-backed row (no invoice/payment models yet). Render the value alone
-  // rather than fabricate a 0%/fully-collected bar.
-  if (d.revenue_collected === undefined) return <div className="amt tnum">{inr(d.deal_value)}</div>;
-  const pct = Math.max(0, Math.min(100, Math.round(d.revenue_collected / d.deal_value * 100)));
-  return (
-    <>
-      <div className="amt tnum">{inr(d.deal_value)}</div>
-      <div className="bar"><i style={{ width: pct + "%" }}></i></div>
-      <div className="sub">
-        {!d.outstanding ? "fully collected"
-          : <>{d.revenue_collected ? pct + "% · " : ""}<b>{inr(d.outstanding)}</b> outstanding</>}
-      </div>
-    </>
-  );
+  /* Value alone. The collected bar and the "x% · ₹y outstanding" line are
+     gone with the payment store that fed them — a progress bar drawn from seed
+     money is a claim about collection nobody made. */
+  return <div className="amt tnum">{inr(d.deal_value)}</div>;
 }
 
 export function OwnerCell({ d }: { d: any }) {
@@ -126,11 +93,11 @@ export function OwnerCell({ d }: { d: any }) {
 export function NextCell({ d }: { d: any }) {
   if (d.stage >= STAGE.WON || !d.next_action)
     return d.close_reason ? <div className="n">{d.close_reason}</div> : <span className="faint">—</span>;
-  const days = D.days(D.d(d.next_action.date));
+  const days = daysFrom(d.next_action.date);
   return (
     <>
       <div className={"t" + (days < 0 ? " over" : "")}>
-        {days < 0 ? Math.abs(days) + "d overdue" : D.relative(d.next_action.date)}
+        {days < 0 ? Math.abs(days) + "d overdue" : relativeDate(d.next_action.date)}
       </div>
       <div className="n">{d.next_action.note}</div>
     </>

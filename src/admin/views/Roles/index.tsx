@@ -18,13 +18,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import AdminOpsService from "../../../api/modules/adminOps";
+import { errMessage } from "../../../api/apiService";
 import type { RolesModuleDef } from "../../../api/modules/adminOps";
 import { EmptyState, FilterChips, Icon, SearchField, StatStrip, qs } from "../../ui";
 import type { StatCell } from "../../ui";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
+import { HIDDEN_MODULES } from "../../auth/session";
 import { useShell } from "../../shell/ShellContext";
 import type { Ops, Role } from "../teamShared";
-import AdminLoader from "../../../components/shared/AdminLoader";
+import { ListSkeleton } from "../../ui";
 import RoleDrawer from "./RoleDrawer";
 import { RoleModal } from "./roleModals";
 
@@ -63,8 +65,14 @@ export default function Roles() {
   useEffect(() => {
     let cancelled = false;
     AdminOpsService.listRoles()
-      .then((res) => { if (!cancelled) setData(res.data); })
-      .catch(() => { if (!cancelled) setData({ modules: [], roles: [] }); });
+      /* Same hidden set the nav uses: a module with no screen anywhere must not
+         be offerable as a grant either, or the matrix hands out access to a
+         page that does not exist. */
+      .then((res) => { if (!cancelled) setData({
+        roles: res.data.roles,
+        modules: res.data.modules.filter((m) => !HIDDEN_MODULES.has(m.key)),
+      }); })
+      .catch((e) => { if (!cancelled) { setData({ modules: [], roles: [] }); toast(errMessage(e), "bad"); } });
     return () => { cancelled = true; };
   }, [tick]);
 
@@ -79,6 +87,11 @@ export default function Roles() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, tick, data]);
 
+  /* …and it closes itself when the id goes away — deleting a role otherwise
+     left its drawer open over a list that no longer listed it. Same line Plans,
+     Quotations and Invoices already carry. */
+  useEffect(() => { if (!id) return; return () => closeLayer(); }, [id, closeLayer]);
+
   /* ----------------------------------------------------------- filters -- */
   function setSearch(name: string, value: string) {
     const q: Record<string, string> = { ...p, [name]: value };
@@ -92,7 +105,7 @@ export default function Roles() {
     go("#/roles");
   }
 
-  if (!data) return <AdminLoader />;
+  if (!data) return <ListSkeleton />;
 
   /* -------------------------------------------------------------- rows -- */
   let rows: Role[] = data.roles.slice();

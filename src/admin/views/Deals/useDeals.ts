@@ -17,21 +17,54 @@
    ============================================================================= */
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import type { MouseEvent, ReactNode } from "react";
-import { IBData, IBDeals } from "../../engines";
 import { qs } from "../../ui";
+import { fmtDate, inr as inrFmt } from "../../ui/format";
 import { go } from "../../ui/nav";
+import { can } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import { currentActor } from "../../auth/session";
 import AdminOpsService from "../../../api/modules/adminOps";
 import type { DealPersonRef, DealPriorityVocab, DealStageVocab, DealTagVocab } from "../../../api/modules/adminOps";
-import { adaptByStage, adaptDeal, adaptTimeline, dateOnly, ownersFromRows } from "./adapter";
+import { AppExceptions } from "../../../api/apiService";
+import { PRIORITY, STAGES, adaptByStage, adaptDeal, adaptTimeline, dateOnly, ownersFromRows } from "./adapter";
 
-export const D = IBData;
-export const E = IBDeals;
-export const STAGE = E.STAGE;
+/* `D` was the whole IBData engine — a seeded localStorage store plus its
+   helpers. What is left of it is four things that hold no records: the stage
+   and priority vocabularies (adapter.ts, where the server's own rows are
+   grafted in on every response) and the two formatters. Kept under the same
+   name because six files and ~50 call sites read `D.STAGES[int]` / `D.inr()`,
+   and the shape of those calls is the contract, not where the object is
+   built. This module stores nothing: every read and write below is an HTTP
+   call to interior_admin. */
+export const D = { STAGES, PRIORITY, fmtDate, inr: inrFmt };
+
+/* The two stage ints the UI branches on by name. Resolved from D.STAGES by
+   KEY rather than hardcoded, because adapter.ts can graft new server stages
+   into that map at runtime — and `stage >= WON` (the "settled" test used all
+   over this module) only holds if these are the ints the server's own
+   terminal stages mapped to. */
+function stageIntByKey(key: string, fallback: number): number {
+  for (const k in D.STAGES) if (D.STAGES[k].key === key) return Number(k);
+  return fallback;
+}
+export const STAGE = {
+  DEAL: stageIntByKey("new", 1), FOLLOWUP: stageIntByKey("followup", 2),
+  SLOT: stageIntByKey("slot", 3), INSTALLMENT: stageIntByKey("installment", 4),
+  WON: stageIntByKey("won", 5), LOST: stageIntByKey("lost", 6),
+};
 
 export type Params = Record<string, string>;
 export type Refusal = { ok?: false; http: number; code: string; detail?: string };
+
+/** A thrown API failure in the shape every dialog in this module already
+ *  renders. The real API has one message string rather than the local engine's
+ *  slug + detail, so `code` is left empty and ErrSlot prints the message
+ *  alone — inventing a slug to fill the old layout would be a code nobody can
+ *  look up. */
+export function refusalOf(e: unknown): Refusal {
+  if (e instanceof AppExceptions) return { http: e.code, code: "", detail: e.message };
+  return { http: 0, code: "", detail: "Could not reach the server. Try again." };
+}
 
 export function paramsOf(sp: URLSearchParams): Params {
   const o: Params = {};
@@ -43,7 +76,11 @@ export function paramsOf(sp: URLSearchParams): Params {
    localStorage session. Deals' own data flow (the local engine below) is
    untouched; only where it reads "who is acting" changed. */
 export const actor = currentActor;
-export function head() { return E.isHead(actor()); }
+/* "Head" used to be a string comparison against the local engine's own role
+   names. It is a PERMISSION now: `deals.close` is the module's level-3 verb,
+   which is exactly the tier the head-only controls (owner filter, reassign,
+   export) were guarding. One source of truth, and the server re-checks it. */
+export function head() { return can("deals", "close"); }
 /* PORTED FAITHFULLY, INCLUDING THE SWALLOWED ARGUMENT.
 
    The prototype's wrapper is `function inr(p) { return D.inr(p); }` — one
@@ -76,6 +113,32 @@ export function place(d: any) {
   const st = d.state && d.state !== "—" ? d.state : "";
   return d.city + (st ? ", " + st : "");
 }
+/* THE REAL CLOCK. `IBData.days()`/`relative()` measure against a FIXED today
+   (28 June 2026) — deliberately, so the prototype's seeded "3d overdue" never
+   drifted as the file aged. Every date on this screen is a live row now, so a
+   deal moved ten seconds ago was rendering "50d in stage". These two are the
+   same functions against `new Date()`, and Deals uses them everywhere it used
+   to call D.days/D.relative. `D.fmtDate` is untouched: formatting a date has
+   no opinion about when now is, and the other modules still need the fixed
+   clock for their own seeded data. */
+function midnight(d: Date) { return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); }
+/** Whole days from today to `iso`. Positive is the future, negative the past —
+ *  the same sign convention D.days() used, so no caller had to be re-read. */
+export function daysFrom(iso?: string | null): number {
+  if (!iso) return 0;
+  const p = String(iso).slice(0, 10).split("-");
+  const then = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+  return Math.round((midnight(then) - midnight(new Date())) / 86400000);
+}
+export function relativeDate(iso?: string | null): string {
+  if (!iso) return "—";
+  const n = daysFrom(iso);
+  if (n === 0) return "today";
+  if (n === 1) return "tomorrow";
+  if (n === -1) return "yesterday";
+  return n > 0 ? "in " + n + "d" : Math.abs(n) + "d ago";
+}
+
 /* Priority's colour in one place, so the header chip and its menu cannot
    disagree about whether Urgent is red or amber. */
 export function prioTone(v: number) { return v === 3 ? "bad" : v === 2 ? "warn" : ""; }
@@ -103,54 +166,21 @@ export function omit(p: Params, keys: string[]): Params {
   return o;
 }
 
-function sorter(key: string | undefined, order: Map<any, number>) {
-  return function (a: any, b: any) {
-    if (key === "value") return (b.deal_value || 0) - (a.deal_value || 0);
-    if (key === "out") return b.outstanding - a.outstanding;
+/* The two sorts the server cannot do — it has no remark-recency column and no
+   stage-age column — applied over the page the API returned. `value` and the
+   default are sent as `sort=` and arrive already ordered; these two are the
+   honest client-side remainder, and they sort what is on screen, not the whole
+   pipeline. `out` (outstanding) is GONE: it ranked deals by a figure that came
+   from the local engine's seed money. */
+export function localSort(list: any[], key?: string) {
+  if (key !== "age" && key !== "close" && key !== "act") return list;
+  const out = list.slice();
+  out.sort((a, b) => {
     if (key === "close") return (a.expected_close_date || "9999") < (b.expected_close_date || "9999") ? -1 : 1;
-    if (key === "act") return a.last_remark_at > b.last_remark_at ? -1 : 1;
-    if (key === "age") return a.stage_since < b.stage_since ? -1 : 1;    // stage age, oldest first
-    return (order.get(b) as number) - (order.get(a) as number);          // default: newest created first
-  };
-}
-
-/* Shared by every view mode (Table/Pipeline/Chat) so filtering never drifts
-   between them — one definition of "which deals match these params." */
-export function filteredScope(me: any, p: Params) {
-  const scope = E.Analytics.scopeOf(me);
-  let list = scope.slice();
-
-  if (p.stage) list = list.filter((d: any) => String(d.stage) === String(p.stage));
-  if (p.owner) list = list.filter((d: any) => d.owner_id === p.owner);
-  if (p.priority) list = list.filter((d: any) => String(d.priority) === String(p.priority));
-  if (p.stalled === "1") list = list.filter((d: any) => d.is_stalled);
-  if (p.tag) {
-    const tagged = E.Tags.dealsWith(p.tag);
-    list = list.filter((d: any) => tagged.indexOf(d.deal_id) >= 0);
-  }
-  if (p.next === "overdue") list = list.filter((d: any) =>
-    d.stage < STAGE.WON && d.next_action && D.days(D.d(d.next_action.date)) < 0);
-  if (p.q) {
-    const q = p.q.toLowerCase();
-    list = list.filter((d: any) =>
-      (d.deal_id + " " + d.customer_name + " " + (d.business_name || "") + " " +
-       (d.email || "") + " " + d.city + " " + (d.state || "") + " " + d.phone + " " +
-       d.interested_in).toLowerCase().indexOf(q) >= 0);
-  }
-  // Latest-created-first is the default — true insertion order (the array is
-  // append-only; nothing ever reorders it), not updated_at, so an old deal
-  // edited today does not jump to the top.
-  const order = new Map<any, number>();
-  scope.forEach((d: any, i: number) => order.set(d, i));
-  list.sort(sorter(p.sort, order));
-  return { scope, list };
-}
-
-/* Outstanding over the open deals in scope — one sum, so the topbar read-out,
-   the list's attention strip and the chat pane's Money block can never
-   disagree about what "outstanding" means for the same scope. */
-export function openOutstanding(scope: any[]) {
-  return scope.reduce((a: number, d: any) => a + (d.stage < STAGE.WON ? d.outstanding : 0), 0);
+    if (key === "act") return (a.last_remark_at || "") > (b.last_remark_at || "") ? -1 : 1;
+    return (a.stage_since || "") < (b.stage_since || "") ? -1 : 1;   // oldest in stage first
+  });
+  return out;
 }
 
 /* One 3px rail replaces the old priority column. Colour must never be the
@@ -161,7 +191,7 @@ export function openOutstanding(scope: any[]) {
 export function urgency(d: any): { cls: string; why: string } | null {
   if (d.stage >= STAGE.WON) return null;
   if (d.is_stalled) return { cls: "u-bad", why: "Stalled — no remark past the threshold" };
-  if (d.next_action && D.days(D.d(d.next_action.date)) < 0)
+  if (d.next_action && daysFrom(d.next_action.date) < 0)
     return { cls: "u-bad", why: "Next action overdue" };
   if (d.priority === 3) return { cls: "u-warn", why: "Urgent priority" };
   if (d.priority === 2) return { cls: "u-info", why: "High priority" };
@@ -199,23 +229,37 @@ export function dealHash(id: string, p: Params) {
 }
 
 /* ==========================================================================
-   THE RE-RENDER PUMP — React's stand-in for the prototype's `S.render()`.
-   The engines mutate localStorage and return; nothing observes them. Any
-   surface that reads engine state subscribes with useEngineTick(), and every
-   mutating handler calls render() exactly where the prototype called
-   S.render(). Drawer and modal content live in a portal above this view, so
-   they subscribe for themselves rather than re-rendering with the list.
+   THE REFETCH PUMP — one signal, `render()`, meaning "the server data this
+   module is showing has changed".
+
+   It used to mean "the local engine mutated, re-read it". Now every write is
+   an HTTP call, so the same signal bumps DATA_VERSION, which is a dependency
+   of both API hooks below: one call after a successful write re-fetches the
+   list AND the open drawer, and every existing call site keeps working.
+
+   Drawer and modal content live in a portal above the view, so they subscribe
+   for themselves rather than re-rendering with the list.
    ====================================================================== */
 const subs = new Set<() => void>();
+let DATA_VERSION = 0;
 export function useEngineTick() {
   const [, force] = useReducer((n: number) => n + 1, 0);
   useEffect(() => { subs.add(force); return () => { subs.delete(force); }; }, []);
 }
-export function render() { subs.forEach((f) => f()); }
+/** Subscribes AND returns the current version, so a hook can put it straight
+ *  into an effect's dependencies. */
+function useDataVersion() {
+  const [, force] = useReducer((n: number) => n + 1, 0);
+  useEffect(() => { subs.add(force); return () => { subs.delete(force); }; }, []);
+  return DATA_VERSION;
+}
+export function render() { DATA_VERSION += 1; subs.forEach((f) => f()); }
 
-/* The composer's selected outbound channel — module state, reset to "remark"
-   after every successful send, exactly as the prototype's `var CHAN`. */
-let CHAN = "remark";
+/* The composer's selected outbound channel — module state, reset to "manual"
+   after every successful send, exactly as the prototype's `var CHAN`. Uses
+   the DealRemarkType key directly ("manual", not the prototype's "remark")
+   so nothing has to translate between the two. */
+let CHAN = "manual";
 export function chanOf() { return CHAN; }
 export function setChan(v: string) { CHAN = v; }
 
@@ -285,11 +329,10 @@ export function useFilters(p: Params, id: string | null) {
   return { onFilter, onSearch, onUnfilter };
 }
 
-export function isoToday() {
-  const t = D.TODAY;
-  return t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" +
-         String(t.getDate()).padStart(2, "0");
-}
+/* `isoToday()` lived here and read the engine's frozen 28-June-2026 "today".
+   It had no callers, so it went with the engine rather than being repointed
+   at the real clock — `daysFrom()`/`relativeDate()` above are what this
+   module actually measures with. */
 
 /* ==========================================================================
    THE API READ PATH — List (Table/Pipeline) and Drawer only. Chat and Tags
@@ -301,7 +344,7 @@ export function isoToday() {
    filteredScope(). Converting the Select options to emit raw API keys would
    silently break both the moment a filter carries across a view switch, so
    the int stays the address and only the OUTGOING request gets translated. */
-function apiStageKey(legacyStage?: string): string | undefined {
+export function apiStageKey(legacyStage?: string): string | undefined {
   if (!legacyStage) return undefined;
   const row = D.STAGES[Number(legacyStage)];
   return row ? row.key : undefined; // a synthetic (unmapped) int has no server key to send back
@@ -310,7 +353,7 @@ function apiStageKey(legacyStage?: string): string | undefined {
    lower-cased label is the best available guess at the server's priorityKey
    (the one example in the contract, "normal", matches this exactly). Confirm
    against a live filter response if this ever mis-hits. */
-function apiPriorityKey(legacyPriority?: string): string | undefined {
+export function apiPriorityKey(legacyPriority?: string): string | undefined {
   const label = D.PRIORITY[Number(legacyPriority)];
   return label ? String(label).toLowerCase() : undefined;
 }
@@ -322,6 +365,26 @@ function apiPriorityKey(legacyPriority?: string): string | undefined {
 function apiOk<T>(res: { response: boolean; code: number; data: T }): { ok: true; data: T } | { ok: false; forbidden: boolean } {
   if (res.response === false) return { ok: false, forbidden: res.code === 403 };
   return { ok: true, data: res.data };
+}
+
+/* THE COUNTS, AS A LIVE SUBSCRIPTION.
+
+   Chat puts the funnel counts in the TOPBAR, and the shell only accepts a new
+   chrome when the ROUTE changes (usePageChrome keys on pathname+search). The
+   counts arrive later than that — after the fetch, and again after every write
+   — so a chrome captured at navigation time reads "0 total" over a populated
+   list, which is exactly what it did.
+
+   Kept in a module store with its OWN subscriber set rather than reusing
+   `subs`: that one is a dependency of the fetch effect, so notifying through
+   it here would re-fire the request that just produced these numbers. */
+type Counts = { total: number; byStage: Record<number, number> };
+let LAST_COUNTS: Counts = { total: 0, byStage: {} };
+const countSubs = new Set<() => void>();
+export function useDealCounts(): Counts {
+  const [, force] = useReducer((n: number) => n + 1, 0);
+  useEffect(() => { countSubs.add(force); return () => { countSubs.delete(force); }; }, []);
+  return LAST_COUNTS;
 }
 
 export interface DealsApiState {
@@ -347,9 +410,11 @@ const DEALS_API_IDLE: DealsApiState = {
    Add real pagination if that count is ever realistic. */
 export function useDealsApi(p: Params): DealsApiState {
   const [state, setState] = useState<DealsApiState>(DEALS_API_IDLE);
+  const version = useDataVersion();
   const key = JSON.stringify({
     stage: p.stage || "", priority: p.priority || "", owner: p.owner || "",
     tag: p.tag || "", q: p.q || "", stalled: p.stalled || "", sort: p.sort || "",
+    version,
   });
 
   useEffect(() => {
@@ -374,10 +439,13 @@ export function useDealsApi(p: Params): DealsApiState {
         return;
       }
       const data = r.data;
+      const counts = { total: data.counts.total, byStage: adaptByStage(data.counts.byStage, data.stages) };
+      LAST_COUNTS = counts;
+      countSubs.forEach((f) => f());
       setState({
         loading: false, forbidden: false, error: null,
         list: data.deals.map(adaptDeal),
-        counts: { total: data.counts.total, byStage: adaptByStage(data.counts.byStage, data.stages) },
+        counts,
         stages: data.stages, priorities: data.priorities, tags: data.tags,
         owners: ownersFromRows(data.deals),
       });
@@ -398,21 +466,44 @@ export interface DealApiState {
   notFound: boolean;
   deal: any | null;
   timeline: { kind: string; tone: string; at: string; by: string; text: string }[];
+  /** TRUE when what is in hand belongs to a DIFFERENT deal than the one asked
+   *  for — i.e. you switched records and the new one has not landed yet.
+   *
+   *  This is the distinction that decides whether anything is allowed to flash.
+   *  A refresh of the SAME deal (every write calls render(), which re-fetches)
+   *  is never stale: the content on screen is still true, so it is left alone
+   *  and quietly replaced when the response arrives. A switch to another deal
+   *  IS stale: the previous deal's messages must not sit under the new deal's
+   *  name for even one frame, so the panes that show them — and only those —
+   *  render a spinner. */
+  stale: boolean;
 }
-const DEAL_API_IDLE: DealApiState = { loading: true, forbidden: false, notFound: false, deal: null, timeline: [] };
+const DEAL_API_IDLE: DealApiState = {
+  loading: true, forbidden: false, notFound: false, deal: null, timeline: [], stale: false,
+};
 
-/** Fetches one deal's detail (fields, transitions, remarks) for the Drawer. */
+/** Fetches one deal's detail (fields, transitions, remarks) for the Drawer and
+ *  the chat workspace. */
 export function useDealApi(ref: string | null): DealApiState {
   const [state, setState] = useState<DealApiState>(DEAL_API_IDLE);
+  /** Which deal the state actually describes. Compared against `ref` below to
+   *  produce `stale`; kept in a ref rather than in state because it changes
+   *  with the data, never on its own. */
+  const dataRef = useRef<string | null>(null);
+  const version = useDataVersion();
 
   useEffect(() => {
     if (!ref) return;
     let cancelled = false;
-    setState((s) => ({ ...s, loading: true }));
+    /* The previous deal is KEPT here, deliberately — clearing it is what made
+       a switch blank the screen. `forbidden`/`notFound` are cleared, because
+       those describe the ref that has just been left behind. */
+    setState((s) => ({ ...s, loading: true, forbidden: false, notFound: false }));
     AdminOpsService.deal(ref).then((res) => {
       if (cancelled) return;
       const r = apiOk(res);
       if (!r.ok) {
+        dataRef.current = ref;
         setState({ ...DEAL_API_IDLE, loading: false, forbidden: r.forbidden, notFound: !r.forbidden });
         return;
       }
@@ -421,30 +512,25 @@ export function useDealApi(ref: string | null): DealApiState {
       // The one Drawer field the list row doesn't carry: the latest remark's
       // timestamp, read off the (already createdAt-descending) remarks array.
       // Through dateOnly() like every other date the adapter emits — the wire
-      // sends a full ISO datetime and D.fmtDate()/D.relative() both parse
+      // sends a full ISO datetime and D.fmtDate()/relativeDate() both parse
       // date-only strings, so passing it raw rendered "NaN undefined NaN".
       deal.last_remark_at = data.remarks.length ? dateOnly(data.remarks[0].createdAt) : null;
+      dataRef.current = ref;
       setState({
-        loading: false, forbidden: false, notFound: false, deal,
+        loading: false, forbidden: false, notFound: false, stale: false, deal,
         timeline: adaptTimeline(data.transitions, data.remarks),
       });
     }).catch(() => {
       if (cancelled) return;
+      dataRef.current = ref;
       setState({ ...DEAL_API_IDLE, loading: false, notFound: true });
     });
     return () => { cancelled = true; };
-  }, [ref]);
+  }, [ref, version]);
 
-  return state;
+  /* Computed on every render rather than stored: `ref` can change in the same
+     commit that renders, and a stored flag would be one render behind — which
+     is exactly the frame the wrong deal's chat would be visible in. */
+  return { ...state, stale: !!ref && dataRef.current !== ref };
 }
 
-/* Shape returned when E.Chain.state() has nothing for this ref — a real
-   API-backed deal is not in the local engine's own seed data, so that lookup
-   returns null. Every action gated on these flags simply stays ABSENT
-   (guardrail: absent, not greyed) rather than crash on a null read. This is
-   local-engine seed data standing in for a chain that has no backend model
-   yet — not DB truth. */
-export const EMPTY_CHAIN = {
-  quote: null, quoteStatus: "none", invoices: [], openInvoice: null,
-  payments: [], uninvoiced: null, canCreateQuote: false, canRaiseInvoice: false, canLogPayment: false,
-};

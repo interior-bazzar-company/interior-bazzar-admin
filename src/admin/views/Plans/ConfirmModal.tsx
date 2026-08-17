@@ -1,14 +1,16 @@
 /* =====================================================================
-   The three guard modals — take off sale, archive, delete. Same shape in
-   the prototype (header · error slot · one notice · cancel/confirm), so
-   one component with the copy passed in, rather than three copies of the
-   same markup that can drift.
+   The guard modals — take off sale, delete. Same shape (header · error
+   slot · one notice · cancel/confirm), so one component with the copy
+   passed in, rather than copies of the same markup that can drift.
+
+   `run` is the API call. A refusal is RENDERED here, in the dialog that
+   tried it, never swallowed — and the dialog stays open so the notice it
+   just contradicted is still on screen.
    ===================================================================== */
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { Icon, Notice } from "../../ui";
-import { isRefusal } from "./helpers";
-import type { Refusal } from "./helpers";
+import { errMessage } from "../../../api/apiService";
 
 export default function ConfirmModal({
   heading, sub, notice, tone, ico, confirmLabel, confirmCls, act, run, onClose
@@ -21,11 +23,11 @@ export default function ConfirmModal({
   confirmLabel: string;
   confirmCls: string;
   act: string;
-  /** Runs the engine call. Returns the engine's own result; a refusal is rendered, not swallowed. */
-  run: () => unknown;
+  run: () => Promise<unknown>;
   onClose: () => void;
 }) {
-  const [err, setErr] = useState<Refusal | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   return (
     <>
       <div className="md-h">
@@ -35,20 +37,17 @@ export default function ConfirmModal({
       </div>
       <div className="md-b">
         <div id="plErr">
-          {err ? <Notice tone="bad" text={<>
-            <b>{err.http} <span className="mono">{err.code}</span></b>
-            <div style={{ marginTop: "3px" }}>{err.detail}</div>
-          </>} /> : null}
+          {err ? <Notice tone="bad" text={<b>{err}</b>} /> : null}
         </div>
         <Notice tone={tone} ico={ico} text={notice} />
       </div>
       <div className="md-f">
         <span className="spacer"></span>
         <button className="btn" data-close="1" onClick={onClose}>Cancel</button>
-        <button className={confirmCls} data-act={act} onClick={() => {
-          const r = run();
-          if (isRefusal(r)) setErr(r);
-        }}>{confirmLabel}</button>
+        <button className={confirmCls} data-act={act} disabled={busy} onClick={() => {
+          setErr(null); setBusy(true);
+          run().catch((e: unknown) => { setErr(errMessage(e)); setBusy(false); });
+        }}>{busy ? "Working…" : confirmLabel}</button>
       </div>
     </>
   );

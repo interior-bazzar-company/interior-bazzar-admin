@@ -69,6 +69,11 @@ body{ background:var(--bg); overflow-x:hidden }
 .linkrow{ display:flex; align-items:center; justify-content:space-between; margin-top:-8px; margin-bottom:16px }
 .tlink{ font-size:var(--text-sm); color:var(--brand); font-weight:500 }
 .tlink:hover{ text-decoration:underline }
+/* Show/hide sits INSIDE the field — a password nobody can read back is how a
+   typo becomes "wrong credentials". Reuses .tlink; only the placement is new. */
+.pw{ position:relative }
+.pw .inp{ padding-right:58px }
+.pw .tlink{ position:absolute; right:11px; top:50%; transform:translateY(-50%) }
 .foot{ margin-top:22px; padding-top:18px; border-top:1px solid var(--line); font-size:var(--text-md); color:var(--text-2) }
 
 .demo{ margin-top:22px; border:1px solid var(--line); border-radius:var(--r-md); overflow:hidden }

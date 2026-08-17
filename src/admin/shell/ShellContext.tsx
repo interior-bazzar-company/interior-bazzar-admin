@@ -213,11 +213,8 @@ export function ShellProvider({ children }: { children: ReactNode }) {
     const rows: [string, string][] = [
       ["⌘ K  /  Ctrl K", "Open search"],
       ["G then D", "Deals"],
-      ["G then Q", "Quotations"],
-      ["G then I", "Invoices"],
       ["G then S", "Subscriptions & Plans"],
       ["G then T", "Team"],
-      ["G then Y", "Design system"],
       ["[", "Collapse or expand the sidebar"],
       ["Esc", "Close the topmost layer"],
       ["?", "This list"],

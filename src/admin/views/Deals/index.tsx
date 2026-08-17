@@ -21,17 +21,13 @@ import { Icon } from "../../ui";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import {
-  actor, filteredScope, listHash, omit, openOutstanding, paramsOf, useDealsApi, useEngineTick, usePop, viewOf, E, VIEWS
+  listHash, omit, paramsOf, useDealsApi, useEngineTick, usePop, viewOf, VIEWS
 } from "./useDeals";
-import { DealsList, TbMoney, TbStats } from "./List";
+import { DealsList, TbStats } from "./List";
 import { ChatWorkspace } from "./Chat";
 import { TagsView } from "./Tags";
 import { DealDrawer } from "./Drawer";
 import { ViewMenu } from "./menus";
-
-/* Sales Analytics is a second surface of this module, on its own route
-   (`#/sales-analytics`) — re-exported here so one import reaches both. */
-export { default as SalesAnalytics } from "./SalesAnalytics";
 
 export default function Deals() {
   useEngineTick();
@@ -44,22 +40,12 @@ export default function Deals() {
   const search = sp.toString();
   const p = useMemo(() => paramsOf(sp), [sp]);
   const view = viewOf(p);
-  const me = actor();
 
   /* THE ONE FETCH — shared by all four views (chat/table/board/tags). Keyed
      on the filter params only: useDealsApi's own `key` already omits `view`
      and the selected `id` (see useDeals.ts), so switching between them reuses
      this same load instead of refiring the request or flashing empty. */
   const api = useDealsApi(p);
-
-  /* ponytail: outstanding/collected are chain data — no invoice/payment
-     models exist server-side yet, so these two figures (the header's, and
-     the strip's) still come from the LOCAL engine's own scope, not the API
-     `api.list` every view now reads. `scope` here stays local-engine only,
-     for this pair of totals. */
-  const { scope } = filteredScope(me, p);
-  const outstanding = openOutstanding(scope);
-  const collected = E.Analytics.forActor(me, false).collected;
 
   /* ------------------------------------------------------------- topbar */
   /* Deals claims the breadcrumb slot for its view switcher. The crumb there
@@ -91,13 +77,12 @@ export default function Deals() {
       ? <span className="tb-title">Deals</span>
       : <>
           <span className="tb-title">Deals</span>
-          <TbStats p={p} m={{ byStage: api.counts.byStage, total: api.counts.total }} />
-          <TbMoney outstanding={outstanding} collected={collected} />
+          <TbStats p={p} />
         </>
-    // `p`/`api.counts` are fresh objects on every read, so the strip is keyed
-    // on the params that produced it plus the two figures it prints.
+    // TbStats subscribes to the counts itself, so this only has to be rebuilt
+    // when the view or the filters change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  ), [view, search, api.counts, outstanding, collected]);
+  ), [view, search]);
 
   /* ---------------------------------------------------- where "up" is ---
      The shell asks this only when there is no in-session history to walk back
@@ -125,10 +110,8 @@ export default function Deals() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wantsDrawer, id, search]);
 
-  if (view === "chat") return <ChatWorkspace id={id} p={p} list={api.list} />;
+  if (view === "chat") return <ChatWorkspace id={id} p={p} api={api} />;
   if (view === "tags") return <TagsView p={p} />;
 
-  return (
-    <DealsList id={id} p={p} api={api} outstanding={outstanding} collected={collected} />
-  );
+  return <DealsList id={id} p={p} api={api} />;
 }

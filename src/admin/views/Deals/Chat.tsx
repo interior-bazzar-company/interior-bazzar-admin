@@ -1,43 +1,100 @@
 /* =============================================================================
    CHAT WORKSPACE — the "Chat" view mode. Replaces the drawer for this one mode
-   only; Table and Pipeline keep opening the drawer exactly as before. Same
-   filteredScope() as the other two, so the deal picked here is always a deal
-   the current filters would also show in Table/Pipeline.
+   only; Table and Pipeline keep opening the drawer exactly as before. It reads
+   the SAME fetch as those two, so the deal picked here is always a deal the
+   current filters would also show there.
+
+   The quotation card, the invoice cards, the collected/outstanding read-outs
+   and the co-assignment stack are still gone — each rendered a browser-side
+   store with no model behind it.
+
+   The WhatsApp/Email composer channels are BACK, but not as they were. In the
+   prototype a message "sent via WhatsApp" was a coloured bubble and nothing
+   else — no model, no actual send. Now: `channel` is DealRemark.typeKey, a
+   real column (manual/whatsapp/email, see DealsController.CLIENT_REMARK_TYPES),
+   and a whatsapp/email-tagged remark grows a genuinely new "Open ↗" link that
+   was never in the prototype either — wa.me / mailto prefilled with the exact
+   text just logged, so the agent writes the message once and sends it for
+   real, instead of retyping it in a second app.
    ============================================================================= */
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { EmptyState, Icon, KvList, Pill, SearchField, avatarTone, cap, initials, qs } from "../../ui";
+import { EmptyState, Icon, KvList, PaneLoading, Pill, SearchField, avatarTone, cap, initials, qs } from "../../ui";
 import { go } from "../../ui/nav";
 import { can } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
-import { IBQuote } from "../../engines";
 import {
-  D, E, EMPTY_CHAIN, STAGE, chanOf, head, inr, place, prioTone, setChan, urgency, useDealApi, usePop
+  D, STAGE, chanOf, daysFrom, head, inr, place, prioTone, relativeDate, setChan, urgency,
+  useDealApi, usePop
 } from "./useDeals";
-import type { Params } from "./useDeals";
-import { ChainDots, MoneyCellCtx, Rich, TagChips, orDash, toneClass } from "./bits";
+import type { DealsApiState, Params } from "./useDeals";
+import { MoneyCellCtx, Rich, TagChips, orDash, toneClass } from "./bits";
 import { useActs } from "./Modals";
-import { ChipMenu, CHIP_LABEL, GateBody, MoreMenu, Odot, PrioMenu, StageMenu, chipOptions } from "./menus";
-import AdminLoader from "../../../components/shared/AdminLoader";
+import { ChipMenu, CHIP_LABEL, MoreMenu, Odot, PrioMenu, StageMenu, chipOptions } from "./menus";
 
-export function ChatWorkspace({ id, p, list }: {
-  id: string | null; p: Params; list: any[];
+export function ChatWorkspace({ id, p, api }: {
+  id: string | null; p: Params; api: DealsApiState;
 }) {
-  const shell = useShell();
+  const list = api.list;
   const acts = useActs(p);
   const canCreate = can("deals", "create");
 
   /* ponytail: falls back to the first row of the already-loaded, filter-
      matching API list when no id is in the URL — the same "open something"
-     behaviour the old local-engine version had (`list[0] || scope[0]`), just
-     sourced from the one shared fetch instead of filteredScope(). */
+     behaviour the module has always had, sourced from the one shared fetch. */
   const ref = id || (list.length ? list[0].deal_id : null);
 
-  /* The selected deal always resolves through the API, never through
-     E.dealOf() — that only knows the 14 locally-seeded demo deals, and a
-     deal created later in the DB has no local counterpart. Table/Pipeline's
-     Drawer (Drawer.tsx) already resolves this exact way; Chat now matches. */
-  const detail = useDealApi(ref);
+  /* Nothing matched, but only because of a FILTER: the workspace stays exactly
+     where it is — list pane with its chips (the only way back out) and its own
+     "no deals match" line, detail panes blank. Taking the whole page over with
+     an empty state would hide the very controls you need to widen the search,
+     and claim the pipeline is empty when it is not. The full-page state is for
+     the one case it is true: no filters, no deals. */
+  const filtered = !!(p.q || p.stage || p.tag || p.owner || p.priority || p.next || p.stalled);
+
+  if (!ref && !filtered) return (
+    <div className="dws"><div className="dws-panes" style={{ gridTemplateColumns: "1fr" }}>
+      <EmptyState icon="deal" title="No deals yet"
+        body={"Nothing in the pipeline yet." +
+          (canCreate ? " Create one for an inbound call, a walk-in or a referral." : " Once one exists, its chat opens here.")}
+        action={canCreate
+          ? <button className="btn pri" data-act="dl-create" onClick={() => acts.create()}>Create deal</button>
+          : null} />
+    </div></div>
+  );
+
+  /* THE SPLIT THAT KEEPS THE LIST STILL.
+
+     The detail fetch used to live here, in the parent of all three panes, so
+     every response — a deal switch, and every write, since each one re-fetches
+     — re-rendered the list too, and the "nothing loaded yet" branch returned a
+     full-page loader that took the whole workspace down with it.
+
+     `<DetailPanes>` owns that fetch now. The list renders from `api`, which
+     changes only when the FILTERS change, so picking another deal moves
+     nothing on the left. The two halves of this screen have genuinely separate
+     reasons to re-render, and now they are separate components to match.
+
+     `ref` (the URL param), not the loaded deal's id — the list highlight has
+     to jump to the clicked row the instant it is clicked, not wait for that
+     deal's own fetch to resolve. */
+  return (
+    <div className="dws">
+      <div className="dws-panes">
+        <ListPane list={list} activeRef={ref || ""} p={p} api={api} />
+        {ref
+          ? <DetailPanes dealRef={ref} p={p} />
+          : <><section className="dws-chat" /><aside className="dws-ctx" /></>}
+      </div>
+    </div>
+  );
+}
+
+/* The two panes that are about ONE deal. Everything here re-renders when the
+   selected deal's data changes; nothing outside it does. */
+function DetailPanes({ dealRef, p }: { dealRef: string; p: Params }) {
+  const shell = useShell();
+  const detail = useDealApi(dealRef);
 
   useEffect(() => {
     if (!detail.forbidden) return;
@@ -45,60 +102,55 @@ export function ChatWorkspace({ id, p, list }: {
     go("#/deals");
   }, [detail.forbidden, shell]);
 
-  if (!ref) return (
-    <div className="dws"><div className="dws-panes" style={{ gridTemplateColumns: "1fr" }}>
-      <EmptyState icon="deal" title="No deals yet"
-        body={"Deals arrive from the funnel and are assigned by round-robin." +
-          (canCreate ? " You can also create one for off-funnel business." : " Once one exists, its chat opens here.")}
-        action={canCreate
-          ? <button className="btn pri" data-act="dl-create" onClick={() => acts.create()}>Create deal</button>
-          : null} />
-    </div></div>
-  );
-
-  if (detail.loading) return <AdminLoader />;
   if (detail.forbidden) return null;   // redirecting via the effect above
 
-  /* The ref genuinely is not in the API's deal set (bad/stale URL, or the
-     account never had it) — the panel's own not-found state, never a
+  /* `stale` is "what I am holding belongs to a DIFFERENT deal" — you have just
+     clicked another row. That is the only case with something to hide, and
+     these two panes are the only things that hide it.
+
+     A refresh of the SAME deal (after a remark, a stage move, a tag — every
+     write re-fetches) is not stale: what is on screen is still true, so it is
+     left alone and swapped when the response lands. A write never makes the
+     conversation blink, and a switch never shows the previous deal's messages
+     under the new deal's name. */
+  if (detail.stale || (!detail.deal && detail.loading)) {
+    return (
+      <>
+        <section className="dws-chat"><PaneLoading label={"Opening " + dealRef + "\u2026"} /></section>
+        <aside className="dws-ctx"><PaneLoading label="" /></aside>
+      </>
+    );
+  }
+
+  /* The ref genuinely is not in the API's deal set (a stale link, or an
+     account that never had it) — the panel's own not-found state, never a
      silent fall-back onto an unrelated deal. */
-  if (detail.notFound || !detail.deal) return (
-    <div className="dws"><div className="dws-panes" style={{ gridTemplateColumns: "1fr" }}>
+  if (!detail.deal) return (
+    <section className="dws-chat">
       <EmptyState icon="deal" title="Deal not found"
-        body={"“" + ref + "” is not in the API's deal set."} />
-    </div></div>
+        body={"\u201c" + dealRef + "\u201d is not in the API's deal set."} />
+    </section>
   );
 
-  const dl = detail.deal;
-  /* ponytail: E.Chain.state() is local-engine seed data — no invoice/payment
-     models exist server-side yet. Falls back to EMPTY_CHAIN for a ref the
-     local engine never seeded (any real API-only deal) — same guard
-     Drawer.tsx already uses — so every gated action below reads as
-     unavailable rather than crashing on a null read. */
-  const c = E.Chain.state(dl.deal_id) || EMPTY_CHAIN;
-
-  /* No full-width header any more: the deal's identity belongs at the top of
-     the column that is actually about that deal, and the money belongs with
-     the rest of its context on the right. */
   return (
-    <div className="dws">
-      <div className="dws-panes">
-        <ListPane list={list} dl={dl} p={p} />
-        <ChatPane dl={dl} ev={detail.timeline} p={p} />
-        <CtxPane dl={dl} c={c} p={p} />
-      </div>
-    </div>
+    <>
+      <ChatPane dl={detail.deal} ev={detail.timeline} p={p} />
+      <CtxPane dl={detail.deal} p={p} />
+    </>
   );
 }
 
 /* ============================================================ LIST PANE === */
-function ListPane({ list, dl, p }: { list: any[]; dl: any; p: Params }) {
+function ListPane({ list, activeRef, p, api }: { list: any[]; activeRef: string; p: Params; api: DealsApiState }) {
   const acts = useActs(p);
   const pop = usePop();
   const timer = useRef<number | undefined>(undefined);
   const onSearch = (name: string, value: string) => {
     window.clearTimeout(timer.current);
-    const to = "#/deals/" + encodeURIComponent(dl.deal_id) + qs({ ...p, [name]: value });
+    // No selection (a filter matched nothing) — keep the id segment off the URL
+    // entirely rather than emitting "#/deals/?q=…".
+    const to = "#/deals" + (activeRef ? "/" + encodeURIComponent(activeRef) : "")
+      + qs({ ...p, [name]: value });
     timer.current = window.setTimeout(() => go(to), 220);
   };
   useEffect(() => () => window.clearTimeout(timer.current), []);
@@ -113,12 +165,12 @@ function ListPane({ list, dl, p }: { list: any[]; dl: any; p: Params }) {
     const label = CHIP_LABEL[name] || name;
     const on = value !== undefined && value !== null && value !== "";
     let sel: { v: string | number; l: string; dot?: string } | null = null;
-    if (on) chipOptions(name).forEach((o) => { if (String(o.v) === String(value)) sel = o; });
+    if (on) chipOptions(name, api).forEach((o) => { if (String(o.v) === String(value)) sel = o; });
     const chosen = sel as { l: string; dot?: string } | null;
     return (
       <button className={"dws-chip" + (on ? " on" : "")} data-act="dl-chipmenu" data-name={name}
         aria-haspopup="menu" aria-label={label + (on ? ": " + ((chosen && chosen.l) || value) : "")}
-        onClick={(e) => pop(e, <ChipMenu name={name} p={p} />,
+        onClick={(e) => pop(e, <ChipMenu name={name} p={p} api={api} />,
           { width: 210, cls: "pop-views pop-chip", align: "left" })}>
         {/* the chosen option's colour rides on the chip too, so it survives the
             menu closing — otherwise the dot would only ever be seen
@@ -155,7 +207,7 @@ function ListPane({ list, dl, p }: { list: any[]; dl: any; p: Params }) {
       </div>
       <div className="dws-list-scroll">
         {list.length
-          ? list.map((d: any) => <Row key={d.deal_id} d={d} dl={dl} p={p} />)
+          ? list.map((d: any) => <Row key={d.deal_id} d={d} activeRef={activeRef} p={p} />)
           : <div className="faint" style={{ fontSize: "var(--text-md)", padding: "16px 10px" }}>
               No deals match these filters.</div>}
       </div>
@@ -163,77 +215,78 @@ function ListPane({ list, dl, p }: { list: any[]; dl: any; p: Params }) {
   );
 }
 
-function Row({ d, dl, p }: { d: any; dl: any; p: Params }) {
+function Row({ d, activeRef, p }: { d: any; activeRef: string; p: Params }) {
   const u = urgency(d);
-  const over = d.next_action && D.days(D.d(d.next_action.date)) < 0 && d.stage < STAGE.WON;
+  const over = d.next_action && daysFrom(d.next_action.date) < 0 && d.stage < STAGE.WON;
   // `last_remark_at` is only ever set on the ONE deal fetched in full by
   // useDealApi() (see useDeals.ts) — the API's list endpoint doesn't return
   // it per row, so every other row here falls back to created_at, same as
   // it would for a deal with no remarks yet.
   const when = d.is_stalled ? "Stalled"
-    : over ? Math.abs(D.days(D.d(d.next_action.date))) + "d overdue"
-    : D.relative(d.last_remark_at || d.created_at);
+    : over ? Math.abs(daysFrom(d.next_action.date)) + "d overdue"
+    : relativeDate(d.last_remark_at || d.created_at);
   const to = "#/deals/" + d.deal_id + qs(p);
   return (
-    <a className={"dws-row" + (dl.deal_id === d.deal_id ? " on" : "")} data-go={to} onClick={() => go(to)}>
+    <a className={"dws-row" + (activeRef === d.deal_id ? " on" : "")} data-go={to} onClick={() => go(to)}>
       <div className="l1">
         <span className={"name" + (u ? " " + u.cls : "")} title={u ? u.why : ""}>{d.customer_name}</span>
-        {/* ponytail: outstanding is chain data — undefined (not a real 0) on
-            an API-backed row. "₹0" would claim it's fully collected when
-            collection was never checked; "—" says the figure isn't tracked
-            at all. Same rule BoardCard already applies in List.tsx. */}
-        <span className="amt tnum">{d.outstanding === undefined ? "—"
-          : d.outstanding ? inr(d.outstanding, { compact: true }) : "₹0"}</span>
+        {/* The deal's own value — the only money on the record. Null means
+            nothing has been quoted yet, which is not ₹0. */}
+        <span className="amt tnum">{d.deal_value ? inr(d.deal_value, { compact: true }) : "—"}</span>
       </div>
       <div className="l2">
         <span className={"pill xs" + (D.STAGES[d.stage].tone ? " " + D.STAGES[d.stage].tone : "")}>
           {D.STAGES[d.stage].label}</span>
         <span className={"time" + (u ? " " + u.cls : "")}>{when}</span>
       </div>
-      <TagChips dealId={d.deal_id} max={2} tags={d.tags} />
-      <div className="l3"><ChainDots dl={d} /></div>
+      <TagChips max={2} tags={d.tags} />
     </a>
   );
 }
 
 /* ============================================================ CHAT PANE === */
 function dayLabel(iso: string) {
-  const n = D.days(D.d(iso));
+  const n = daysFrom(iso);
   if (n === 0) return "Today";
   if (n === -1) return "Yesterday";
   return D.fmtDate(iso);
 }
+/* One short name per channel, mirroring the prototype's CHAN_CLS — every
+   surface that colours itself by channel (bubble, badge, composer button)
+   takes it from here, and the CSS needs one class per channel and nothing
+   else (see .dws-msg.wa / .dws-msg.em in admin-theme.css). */
+const CHAN_CLS: Record<string, string> = { whatsapp: "wa", email: "em", manual: "rmk" };
+function chanCls(channel?: string) { return CHAN_CLS[channel || "manual"] || "rmk"; }
+
 function kindLabel(e: any) {
-  if (e.kind === "REMARK") return e.channel === "whatsapp" ? "WhatsApp" : e.channel === "email" ? "Email" : "Remark";
-  return cap(String(e.kind).toLowerCase());
+  if (e.kind !== "REMARK") return cap(String(e.kind).toLowerCase());
+  return e.channel === "whatsapp" ? "WhatsApp" : e.channel === "email" ? "Email" : "Remark";
 }
-/* One short name per channel, and every surface that colours itself by channel
-   — bubble, avatar, composer button — takes it from here. */
-const CHAN_CLS: Record<string, string> = { whatsapp: "wa", email: "em", remark: "rmk" };
-function chanCls(channel: string) { return CHAN_CLS[channel] || "rmk"; }
-/* Email used to be the bare `out` class and picked up the brand colour by
-   default, which is why it and WhatsApp diverged: one was styled, the other
-   was whatever `out` happened to be. Both are named now. */
 function rowCls(e: any) {
   if (e.kind !== "REMARK") return "log";
   if (e.channel === "whatsapp") return "out wa";
   if (e.channel === "email") return "out em";
   return "log";
 }
+/* Digits only, no leading zero/plus — the shape wa.me needs. Indian numbers
+   here are stored "+91 90322 19614"; a bare 10-digit number (no country code
+   captured) is assumed domestic and gets 91 prefixed, same assumption the
+   rest of the panel makes about where these deals are. */
+function waDigits(phone: string) {
+  const digits = String(phone || "").replace(/\D/g, "");
+  if (digits.length === 10) return "91" + digits;
+  return digits;
+}
 
 /* `apiEv` is the API's transitions+remarks, already shaped by adaptTimeline()
    (useDeals.ts's useDealApi) — real STAGE/REMARK/SYSTEM events, sorted newest
-   first same as E.Activity.timeline() was. NOT equivalent on one axis: the
-   API's remark model carries no channel (whatsapp/email/remark) — DealRemark
-   has no such field (confirmed against a live GET .../deals/<ref>/) — so
-   every remark here renders with the generic "Remark" label and "log" bubble
-   style; the old local engine's whatsapp/email-coloured bubbles were entirely
-   local-only pretend data, and there is nothing server-side to recover them
-   from. Quote/invoice/payment lines the local engine's own timeline also
-   produced are absent too, for the same reason Drawer.tsx's TimelineTab omits
-   them: those chains are still local-only. */
+   first same as the prototype's Activity.timeline() was. `channel` on a
+   REMARK row is DealRemark.typeKey (manual/whatsapp/email) — a real, stored
+   field. Quote/invoice/payment lines the local engine's own timeline also
+   produced are still absent, for the same reason Drawer.tsx's TimelineTab
+   omits them: those chains are still local-only. */
 function ChatPane({ dl, ev: apiEv, p }: {
-  dl: any; ev: { kind: string; tone: string; at: string; by: string; text: string }[]; p: Params;
+  dl: any; ev: { kind: string; tone: string; at: string; by: string; text: string; channel?: string }[]; p: Params;
 }) {
   const ev = apiEv.slice().reverse();   // chronological, oldest first
   const scroll = useRef<HTMLDivElement>(null);
@@ -250,6 +303,15 @@ function ChatPane({ dl, ev: apiEv, p }: {
       body.push(<div className="dws-daydiv" key={"d" + i}><span>{dayLabel(day)}</span></div>);
       lastDay = day;
     }
+    // The real send — new, not in the prototype. A whatsapp/email remark
+    // carries the exact text just logged into the link, so the agent writes
+    // it once here and the second app opens ready to actually send it.
+    const openHref = e.kind !== "REMARK" ? null
+      : e.channel === "whatsapp" && dl.phone
+        ? "https://wa.me/" + waDigits(dl.phone) + "?text=" + encodeURIComponent(e.text)
+      : e.channel === "email" && dl.email
+        ? "mailto:" + dl.email + "?body=" + encodeURIComponent(e.text)
+      : null;
     body.push(
       <div className={"dws-msg " + rowCls(e)} key={i}>
         {e.kind !== "REMARK"
@@ -261,6 +323,11 @@ function ChatPane({ dl, ev: apiEv, p }: {
           <div className="dws-bubble">
             {e.kind === "REMARK" || e.kind === "SYSTEM" ? e.text : <Rich text={e.text} />}
           </div>
+          {openHref
+            ? <a className="dws-openchan" href={openHref} target="_blank" rel="noreferrer">
+                <Icon name="link" size="sm" />Open in {e.channel === "whatsapp" ? "WhatsApp" : "Email"}
+              </a>
+            : null}
         </div>
       </div>
     );
@@ -280,40 +347,35 @@ function ChatPane({ dl, ev: apiEv, p }: {
   );
 }
 
-/* Who the deal belongs to, as faces rather than a line of text.
+/* Who the deal belongs to, as faces rather than a line of text. Owner leads,
+   any co-owner sits behind — the stack IS the answer to "is this shared",
+   readable before a word is.
 
-   The owner leads and any co-owner overlaps behind — the stack IS the answer
-   to "is this shared", readable before a single word is. A pending request
-   sits third with a dashed ring, because a co-assignment that has been asked
-   for and not answered is a different fact from one that was granted.
+   There is no pending-request face and no split percentage any more: the
+   server stores an owner and a co-owner, and nothing else. A request queue and
+   a commission split are both records, and neither has a table.
 
-   The whole stack is the button that opens Co-assign, so the way to change who
-   is on a deal is to press the people already on it. */
+   The stack is the button that opens Reassign, so the way to change who is on
+   a deal is to press the people already on it. Head-only, because that is who
+   the server lets reassign. */
 function People({ dl, p }: { dl: any; p: Params }) {
   const acts = useActs(p);
-  const pend = E.coAssignmentsFor(dl.deal_id).filter((x: any) => x.status === "pending")[0];
-  const split = dl.split_ratio ? String(dl.split_ratio).replace(/\s/g, "") : null;
-
-  const face = (name: string, cls: string, tip: string) => (
-    <span key={name + cls} className={"av sm " + avatarTone(name) + (cls ? " " + cls : "")} title={tip}>
-      {initials(name)}
-    </span>
+  const face = (name: string, tip: string) => (
+    <span key={name} className={"av sm " + avatarTone(name)} title={tip}>{initials(name)}</span>
   );
-  const faces = [face(dl.owner_id, "", "Owner · " + dl.owner_id + (split ? " · " + split.split(/[/:]/)[0] + "%" : ""))];
-  if (dl.co_owner_id) faces.push(face(dl.co_owner_id, "",
-    "Co-owner · " + dl.co_owner_id + (split ? " · " + split.split(/[/:]/)[1] + "%" : "")));
-  if (pend) faces.push(face(pend.co_owner, "pending", "Requested · " + pend.co_owner + " · awaiting a decision"));
+  const faces = [face(dl.owner_id || "—", "Owner · " + (dl.owner_id || "unassigned"))];
+  if (dl.co_owner_id) faces.push(face(dl.co_owner_id, "Co-owner · " + dl.co_owner_id));
 
   const tip = dl.co_owner_id
-    ? dl.owner_id + " with " + dl.co_owner_id + (split ? " · split " + split : "") + " — click to change"
-    : "Owned by " + dl.owner_id + (pend ? " · " + pend.co_owner + " requested" : "") + " — click to co-assign";
+    ? dl.owner_id + " with " + dl.co_owner_id + (head() ? " — click to change" : "")
+    : "Owned by " + (dl.owner_id || "nobody") + (head() ? " — click to reassign" : "");
 
+  if (!head()) return <span className="dws-people" title={tip}>{faces}</span>;
   return (
-    <button className="dws-people" data-act="dl-coassign" data-ref={dl.deal_id} title={tip} aria-label={tip}
-      onClick={() => acts.coassign(dl.deal_id)}>
+    <button className="dws-people" data-act="dl-reassign" data-ref={dl.deal_id} title={tip} aria-label={tip}
+      onClick={() => acts.reassign(dl.deal_id)}>
       {faces}
-      {dl.co_owner_id || pend ? null
-        : <span className="av sm dws-people-add"><Icon name="plus" size="sm" /></span>}
+      {dl.co_owner_id ? null : <span className="av sm dws-people-add"><Icon name="plus" size="sm" /></span>}
     </button>
   );
 }
@@ -332,7 +394,7 @@ function Head({ dl, p }: { dl: any; p: Params }) {
             quotation and every tier gate downstream — so it reads as its own
             accented chip rather than as the first half of a sentence about
             geography. */}
-        <span className="pill brand">{dl.interested_in}</span>
+        {dl.interested_in ? <span className="pill brand">{dl.interested_in}</span> : null}
         <span className="pill">{place(dl)}</span>
       </div>
       <span className="spacer"></span>
@@ -356,7 +418,7 @@ function Head({ dl, p }: { dl: any; p: Params }) {
              deal's job, not the generic modal's. A quick pick lands on the same
              guarded flow the dedicated Close-deal button does. */
           if (to === STAGE.LOST || to === STAGE.WON) acts.closeDeal(dl.deal_id);
-          else acts.stageRemark(dl.deal_id, to);
+          else acts.stageRemark(dl.deal_id, to, dl.stage);
         }} />, { width: 280, cls: "pop-views" })}>
         <span className={"dws-sdot " + (D.STAGES[dl.stage].tone || "")}></span>
         {D.STAGES[dl.stage].label}<Icon name="chev" size="sm" />
@@ -375,15 +437,13 @@ function Head({ dl, p }: { dl: any; p: Params }) {
 /* The deal's tags, on their own strip under the header — visible without
    opening a dialog, and editable from the same place. Every tag carries an ×,
    and it takes that tag off THIS deal only.
-   ponytail: reads E.Tags.forDeal() — local engine — deliberately, unlike the
-   read-only TagChips elsewhere (Row above, List.tsx) which now prefer the
-   API's own `dl.tags`. There is no tag-write endpoint (AdminOpsService has no
-   apply/unapply/create/rename/delete for lists), so × here and the List
-   editor both still mutate the local engine only; reading that same store
-   back is what makes the removal show up immediately without a refetch. */
+
+   Read straight off the deal the API returned, so what is on screen is what is
+   stored; the × posts the removal and the refetch brings the row back without
+   it. */
 function TagRow({ dl, p }: { dl: any; p: Params }) {
   const acts = useActs(p);
-  const tags = E.Tags.forDeal(dl.deal_id);
+  const tags = dl.tags || [];
   return (
     <div className="dws-tagrow">
       {tags.length
@@ -409,17 +469,25 @@ function TagRow({ dl, p }: { dl: any; p: Params }) {
    wall of text. Caps out and scrolls internally past COMPOSER_MAX so a very
    long draft cannot push the send button off the bottom of the pane. */
 const COMPOSER_MAX = 160;
-const CHAN_PH: Record<string, string> = {
-  remark: "Log a call, a site visit, or what you told the customer…",
+
+// One placeholder per channel — what the box hints depends on how the text
+// is about to go out, same three strings the prototype used.
+const CHAN_PLACEHOLDER: Record<string, string> = {
+  manual: "Log a call, a site visit, or what you told the customer…",
   whatsapp: "Message sent to the customer via WhatsApp…",
-  email: "Message sent to the customer via email…"
+  email: "Message sent to the customer via email…",
 };
+const CHAN_LABEL: Record<string, string> = { manual: "Remark", whatsapp: "WhatsApp", email: "Email" };
 
 function Composer({ dl, p }: { dl: any; p: Params }) {
   const acts = useActs(p);
   const shell = useShell();
   const ta = useRef<HTMLTextAreaElement>(null);
-  const [chan, setLocalChan] = useState(chanOf());
+  const [busy, setBusy] = useState(false);
+  // Module state (chanOf/setChan), mirrored locally so picking a tab
+  // re-renders this composer — the prototype's `var CHAN` had a whole page
+  // re-render to lean on; React needs its own trigger.
+  const [chan, setChanLocal] = useState(chanOf());
 
   const grow = () => {
     const el = ta.current; if (!el) return;
@@ -430,37 +498,42 @@ function Composer({ dl, p }: { dl: any; p: Params }) {
   };
   useEffect(grow, []);
 
+  const pick = (ch: string) => { setChan(ch); setChanLocal(ch); };
+
+  /* The box is cleared only on a write the SERVER accepted — clearing
+     optimistically loses what somebody typed the one time it matters. */
   const send = () => {
     const text = ta.current ? ta.current.value.trim() : "";
     if (!text) return shell.toast("Write something before sending.", "bad");
-    if (!acts.send(dl.deal_id, text, chan)) return;
-    if (ta.current) { ta.current.value = ""; grow(); }
-    setChan("remark");            // reset after every successful send
-    setLocalChan("remark");
+    setBusy(true);
+    acts.send(dl.deal_id, text, chan).then((ok: boolean) => {
+      setBusy(false);
+      if (!ok) return;
+      if (ta.current) { ta.current.value = ""; grow(); }
+      setChanLocal(chanOf());   // acts.send resets the module state to manual
+    });
   };
 
   return (
     <div className="dws-composer">
       <div className="dws-chans">
-        {["remark", "whatsapp", "email"].map((ch) => (
-          /* The channel class rides along even when the button is off, so the
-             one `on` rule can colour it without a second lookup. */
-          <button key={ch} className={"dws-chanbtn " + chanCls(ch) + (chan === ch ? " on" : "")}
-            data-act="dl-chan" data-chan={ch}
-            onClick={() => {
-              // No re-render of the deal here, or an in-progress draft in the
-              // textarea would be wiped just for switching the channel.
-              setChan(ch); setLocalChan(ch);
-            }}>
-            {ch === "remark" ? "Remark" : ch === "whatsapp" ? "WhatsApp" : "Email"}
+        {["manual", "whatsapp", "email"].map((ch) => (
+          <button key={ch} type="button"
+            className={"dws-chanbtn " + chanCls(ch) + (chan === ch ? " on" : "")}
+            data-act="dl-chan" data-chan={ch} onClick={() => pick(ch)}>
+            {CHAN_LABEL[ch]}
           </button>
         ))}
       </div>
-      <textarea id="dwsComposerText" rows={1} ref={ta} placeholder={CHAN_PH[chan]} onInput={grow} />
+      <textarea id="dwsComposerText" rows={1} ref={ta}
+        placeholder={CHAN_PLACEHOLDER[chan]} onInput={grow} />
       <div className="dws-composer-foot">
-        <span className="hint">Logged to the deal timeline</span>
-        <button className="dws-send" data-act="dl-send" data-ref={dl.deal_id} onClick={send}>
-          Send<Icon name="arrow" size="sm" />
+        <span className="hint">
+          {chan === "manual" ? "Appended to the deal timeline · clears the stalled flag"
+            : "Logged to the deal timeline · opens " + CHAN_LABEL[chan] + " to actually send it"}
+        </span>
+        <button className="dws-send" data-act="dl-send" data-ref={dl.deal_id} disabled={busy} onClick={send}>
+          {busy ? "Sending" : "Send"}<Icon name="arrow" size="sm" />
         </button>
       </div>
     </div>
@@ -468,33 +541,16 @@ function Composer({ dl, p }: { dl: any; p: Params }) {
 }
 
 /* ========================================================== CONTEXT PANE === */
-function CtxPane({ dl, c, p }: { dl: any; c: any; p: Params }) {
-  const Q = IBQuote || { LABEL: {}, TONE: {} };
-  const quotes = E.quotesFor(dl.deal_id).sort((a: any, b: any) => b.version - a.version);
-  const invs = E.invoicesFor(dl.deal_id);
-  /* ponytail: collected/outstanding are chain data — no invoice/payment
-     models exist server-side yet, so adaptDeal() never sets them on `dl` (the
-     API deal). Read off the local engine's OWN copy of this ref instead —
-     same fallback Drawer.tsx already uses for its Collected/Outstanding
-     figures — and leave it undefined (renders "—", never a fabricated ₹0)
-     for a ref the local engine never seeded. */
-  const localDl = E.dealOf(dl.deal_id);
-  const collected = localDl ? localDl.revenue_collected : undefined;
-  const outstanding = localDl ? localDl.outstanding : undefined;
+function CtxPane({ dl, p }: { dl: any; p: Params }) {
   return (
     <aside className="dws-ctx">
-      {/* The money came out of the old full-width header. It reads as context,
-          not identity, so it sits with the rest of the facts. Built from the
-          same cells as the list page's strip, so one deal's money and the whole
-          scope's money are read the same way in both views. */}
+      {/* ONE money cell, because one figure is stored. Collected and
+          outstanding were sums over a payment store that has no table behind
+          it — three cells where only the first was ever real. */}
       <div>
         <div className="dws-ctx-h">Money</div>
         <div className="dls-attn dws-money">
-          <MoneyCellCtx k="deal value" v={dl.deal_value ? inr(dl.deal_value, { compact: true }) : "—"} />
-          <span className="dls-sep"></span>
-          <MoneyCellCtx k="collected" v={inr(collected, { compact: true })} tone="ok" />
-          <span className="dls-sep"></span>
-          <MoneyCellCtx k="outstanding" v={inr(outstanding, { compact: true })} tone="warn" />
+          <MoneyCellCtx k="deal value" v={dl.deal_value ? inr(dl.deal_value, { compact: true }) : "not quoted"} />
         </div>
       </div>
 
@@ -515,157 +571,53 @@ function CtxPane({ dl, c, p }: { dl: any; c: any; p: Params }) {
         <div className="dws-ctx-h">Deal facts</div>
         <KvList pairs={([
           ["Owner", <>{dl.owner_id || "—"}{dl.co_owner_id ? <> <span className="faint">+ {dl.co_owner_id}</span></> : null}</>],
-          ["Interested in", dl.interested_in],
-          ["Enquiry", <span className="mono">{dl.enquiry_id}</span>],
+          ["Interested in", orDash(dl.interested_in)],
           ["Created", D.fmtDate(dl.created_at)],
           /* Both rows are ALWAYS present, with a null value where there is no
-             figure — KvList renders that as the faint em-dash. The prototype's
-             `.filter(Boolean)` runs over the rows, not the values, so an empty
-             expected-close still occupies its line. Hiding the row instead
-             makes the panel change height per deal and quietly loses the fact
-             that the field exists and is unset. */
+             figure — KvList renders that as the faint em-dash. Hiding the row
+             instead makes the panel change height per deal and quietly loses
+             the fact that the field exists and is unset. */
           ["Expected close", dl.expected_close_date ? D.fmtDate(dl.expected_close_date) : null],
-          ["Discount", dl.discount_pct === null || dl.discount_pct === undefined ? null : dl.discount_pct + "%"]
+          ["Stage age", Math.abs(daysFrom(dl.stage_since)) + " days"]
         ].filter(Boolean)) as [ReactNode, ReactNode][]} />
-      </div>
-
-      {quotes.length
-        ? <div>
-            <div className="dws-ctx-h">Quotation</div>
-            {(() => {
-              const q = quotes[0];
-              const to = "#/quotations/" + (q.quotation_number || q.quotation_id);
-              return (
-                <a className="dws-chain-card" data-go={to} onClick={() => go(to)}>
-                  <div className="dws-chain-ic q"><Icon name="quote" /></div>
-                  <div className="dws-chain-body">
-                    <div className="t1">{q.quotation_number || "Draft"}{" "}
-                      <span className="faint" style={{ fontWeight: "var(--weight-normal)" }}>v{q.version}</span></div>
-                    <div className="t2">{Q.LABEL[q.status] || cap(q.status)} · {inr(q.grand_total_paise)}</div>
-                  </div>
-                </a>
-              );
-            })()}
-          </div>
-        : null}
-
-      <div>
-        <div className="dws-ctx-h">Invoices
-          <span style={{ fontWeight: "var(--weight-normal)", textTransform: "none", letterSpacing: 0 }}>
-            {invs.length ? invs.length + " raised" : ""}</span>
-        </div>
-        {invs.length
-          ? invs.map((i: any) => {
-              const icCls = i.status === "paid" ? "ok" : i.status === "cancelled" ? "dead" : "warn";
-              const to = "#/invoices/" + (i.number || i.invoice_id);
-              return (
-                <a key={i.invoice_id} className="dws-chain-card" data-go={to} onClick={() => go(to)}>
-                  <div className={"dws-chain-ic " + icCls}><Icon name="invoice" /></div>
-                  <div className="dws-chain-body">
-                    <div className="t1">{i.number || "Draft"}</div>
-                    <div className="t2">{cap(i.status)} · {inr(i.amount_paise)}
-                      {i.cancelled_reason ? " · " + i.cancelled_reason : ""}</div>
-                  </div>
-                </a>
-              );
-            })
-          : <div className="faint" style={{ fontSize: "var(--text-sm)" }}>None yet.</div>}
       </div>
 
       <div>
         <div className="dws-ctx-h">Actions</div>
-        <div className="dws-actions"><ChatActions dl={dl} c={c} p={p} /></div>
+        <div className="dws-actions"><ChatActions dl={dl} p={p} /></div>
       </div>
     </aside>
   );
 }
 
-/* The context panel keeps only what money needs. Add remark is gone: the
-   composer three inches to the left already does that.
+/* What the panel keeps is what the server has an endpoint for. Add remark is
+   not here — the composer three inches to the left already does that.
 
-   The two chain actions sit side by side, always, in that order — because that
-   IS the chain: a quotation becomes an invoice becomes money. Showing only
-   whichever one happens to be legal right now made the panel change shape under
-   you and hid the sequence the whole module is built on.
-
-   Neither is ever disabled. A greyed control invites a click and answers it
-   with nothing; these stay live and, when the chain is not ready for them, say
-   what has to happen first. That is the gate button below, and the reason it
-   can exist at all is that the engine already computes the gate. */
-function ChatActions({ dl, c, p }: { dl: any; c: any; p: Params }) {
+   Create quote, Raise invoice, Log payment and View response have all gone
+   with the stores behind them: there is no quotation, invoice, payment or
+   enquiry model, so every one of those was a button that either did nothing or
+   wrote a record only this browser could see. A gate button explaining why a
+   feature is unavailable is still a feature you are advertising. */
+function ChatActions({ dl, p }: { dl: any; p: Params }) {
   const acts = useActs(p);
-  const pop = usePop();
-  const q = c.quote, qref = q ? (q.quotation_number || q.quotation_id) : "";
-
-  const GateBtn = ({ label, ico, title, body }: { label: string; ico: string; title: string; body: ReactNode }) => (
-    <button className="btn gated" data-act="dl-gate" data-ref={dl.deal_id} data-title={title} title={title}
-      onClick={(e) => pop(e, <GateBody title={title} body={body} />, { width: 264, cls: "pop-views" })}>
-      <Icon name={ico} />{label}
-    </button>
-  );
-
-  /* Quote: open the one that exists, or create the first. Creating is refused
-     on a closed deal — QT-OD-11, and Module 2 owns that rule — so the button is
-     gated here rather than firing a red toast a click later. */
-  const quote = c.quoteStatus !== "none"
-    ? <a className="btn pri" data-go={"#/quotations/" + qref} onClick={() => go("#/quotations/" + qref)}>
-        <Icon name="quote" />Open quote</a>
-    : dl.stage >= STAGE.WON
-      ? <GateBtn label="Create quote" ico="quote"
-          title={"This deal is " + D.STAGES[dl.stage].label}
-          body="A quotation is an offer, and a closed deal is not open to one. Reopen the deal first and the draft can be raised against it (QT-OD-11)." />
-      : <button className="btn pri" data-act="qt-from-deal" data-ref={dl.deal_id}
-          onClick={() => acts.createQuote(dl.deal_id)}><Icon name="plus" />Create quote</button>;
-
-  /* Invoice: legal only once a quotation is accepted and something is left to
-     bill. INVOICE_CHAIN_CONTRACT §3 — Module 3 owns the builder, so this links
-     into it rather than re-implementing a raise here. */
-  const invHash = "#/invoices?new=1&deal=" + dl.deal_id;
-  const gate = invoiceGate(c);
-  const invoice = c.canRaiseInvoice
-    ? <a className="btn pri" data-go={invHash} onClick={() => go(invHash)}><Icon name="invoice" />Raise invoice</a>
-    : <GateBtn label="Raise invoice" ico="invoice" title={gate.title} body={gate.body} />;
-
-  const enq = E.enquiryOf(dl.deal_id);
-
   return (
     <>
-      <div className="dws-pair">{quote}{invoice}</div>
-      {c.canLogPayment
-        ? <button className="btn pri" data-act="dl-pay" data-ref={dl.deal_id} onClick={() => acts.pay(dl.deal_id)}>
-            <Icon name="cash" />Log payment</button>
-        : null}
-      {/* The record pair: what we hold, and what they sent. Neither is primary —
-          both are things you can always do and rarely the thing to do next.
-          View response is gated the same way Raise invoice is: a deal keyed in
-          by hand has no form, and a button that opens an empty dialog is worse
-          than one that says so before you click. */}
       <div className="dws-pair">
-        <button className="btn" data-act="dl-edit" data-ref={dl.deal_id} onClick={() => acts.edit(dl.deal_id)}>
+        <button className="btn pri" data-act="dl-edit" data-ref={dl.deal_id} onClick={() => acts.edit(dl.deal_id)}>
           <Icon name="doc" />Edit deal</button>
-        {enq && enq.response
-          ? <button className="btn" data-act="dl-response" data-ref={dl.deal_id}
-              onClick={() => acts.response(dl.deal_id)}><Icon name="quote" />View response</button>
-          : <GateBtn label="View response" ico="quote" title="No funnel response"
-              body={"This deal was keyed in by hand" + (enq && enq.source ? " (" + enq.source + ")" : "") +
-                ", not through the funnel, so there is no submitted form to show."} />}
+        <button className="btn" data-act="dl-value" data-ref={dl.deal_id} onClick={() => acts.value(dl.deal_id)}>
+          <Icon name="tag" />{dl.deal_value ? "Change value" : "Set value"}</button>
       </div>
+      <div className="dws-pair">
+        <button className="btn" data-act="dl-tag" data-ref={dl.deal_id} onClick={() => acts.tags(dl.deal_id)}>
+          <Icon name="tag" />Lists</button>
+        <button className="btn" data-act="dl-stage" data-ref={dl.deal_id}
+          onClick={() => acts.stage(dl.deal_id, dl.stage)}><Icon name="recon" />Change stage</button>
+      </div>
+      {head()
+        ? <button className="btn dgr" data-act="dl-close" data-ref={dl.deal_id}
+            onClick={() => acts.closeDeal(dl.deal_id)}><Icon name="x" />Close deal</button>
+        : null}
     </>
   );
-}
-
-/* Why an invoice cannot be raised yet, in the words of the rule that stops it.
-   Read straight off the same `Chain.state` the enabled path reads, so the
-   button and the guard can never disagree about whether it is open. */
-function invoiceGate(c: any): { title: string; body: ReactNode } {
-  if (c.quoteStatus === "none")
-    return { title: "There is no quotation yet",
-      body: "An invoice bills an accepted quotation — it never invents its own amount. Create the quote first, issue it, and raise the invoice once the customer accepts." };
-  if (c.quoteStatus !== "accepted")
-    return { title: "The quotation is not accepted yet",
-      body: "This deal's quotation is " + c.quoteStatus + ". Until the customer accepts it there is no agreed amount to bill, so Module 3 refuses the raise." };
-  if (!c.uninvoiced)
-    return { title: "Everything is invoiced",
-      body: "The accepted value of this deal is fully covered by invoices already raised. There is nothing left to bill." };
-  return { title: "Not available yet", body: "The chain is not ready for an invoice on this deal." };
 }

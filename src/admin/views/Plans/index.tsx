@@ -1,35 +1,39 @@
 /* =====================================================================
-   PLANS — the catalogue, and the only place a standard price is set.
+   PLANS — the catalogue, and the only place a price is set.
    ---------------------------------------------------------------------
-   Renders the same five bands as Deals, Quotations and Invoices: a title
-   in the topbar, a command row, one stat strip, the active filters, and a
-   table in a viewport-bounded body. Nothing here is a new design; the
-   whole point is that an agent who can read the Deals table can read this
-   one without being taught.
+   Reads and writes `v1/admin/plans/` (interior_admin PlansViews). These are
+   the same Subscription / PlanBillingCycle rows the public plans page
+   renders from, so a price changed here is the price a buyer is charged —
+   the controller drops the public plans cache on every write, and the
+   change is live immediately.
 
-   The old page was a mock — three tiers typed into the view at prices
-   that disagreed with what the quotation engine actually sold. It is gone.
+   Renders the same five bands as Deals, Quotations and Invoices: a title in
+   the topbar, a command row, one stat strip, the active filters, and a table
+   in a viewport-bounded body.
 
-   Two surfaces, switched from the topbar:
-     Catalogue      what we sell            ← this module owns it
-     Subscriptions  who is on what          ← DERIVED from M6 Users,
-                                              read-only, no write path
+   Two states, not four. The server has one `isActive` flag per plan (plus a
+   soft delete), so "draft" and "inactive" — engine inventions with nowhere
+   to be stored — are gone rather than shown as states a save would silently
+   drop. On sale · off sale is the whole vocabulary.
    ===================================================================== */
-import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { IBData, IBPlans } from "../../engines";
+import AdminOpsService from "../../../api/modules/adminOps";
+import { errMessage } from "../../../api/apiService";
 import {
-  EmptyState, FilterChips, Icon, Pill, SearchField, Select, StatStrip, qs
+  EmptyState, FilterChips, Icon, Notice, Pill, SearchField, Select, StatStrip, qs
 } from "../../ui";
 import type { StatCell } from "../../ui";
-import { useNav, usePageChrome } from "../../shell/AdminShell";
+import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
+import { ListSkeleton } from "../../ui";
 import PlanDrawer from "./PlanDrawer";
 import type { Act } from "./PlanDrawer";
 import PlanModal from "./PlanModal";
 import ConfirmModal from "./ConfirmModal";
-import { actor, isRefusal, money, monthsLabel, sorter, urgency } from "./helpers";
-import type { FromEngine } from "./helpers";
+import { call, familiesOf, rangeOf, usePlans } from "./api";
+import type { Plan } from "./api";
+import { familyLabel, money, monthsLabel, sorter, statusOf, urgency } from "./helpers";
 
 export default function Plans() {
   const raw = useParams().id;
@@ -37,117 +41,78 @@ export default function Plans() {
   const [sp] = useSearchParams();
   const { go } = useNav();
   const { drawer, modal, closeLayer, toast } = useShell();
-  const [tick, bump] = useReducer((n: number) => n + 1, 0);
+  const [tick, setTick] = useState(0);
+  const bump = useCallback(() => setTick((t) => t + 1), []);
 
   const params: Record<string, string> = {};
   sp.forEach((v, k) => { params[k] = v; });
-  const p = { q: params.q || "", cat: params.cat || "", status: params.status || "", sort: params.sort || "" };
+  const p = { q: params.q || "", fam: params.fam || "", status: params.status || "", sort: params.sort || "" };
+
+  const { loading, plans, error } = usePlans(tick);
 
   /* ---------------------------------------------------------- topbar --- */
-  /* The module's name, and nothing on the right.
-
-     There used to be a Catalogue / Subscriptions switcher there. The
-     subscriptions surface is gone — Plans owns the catalogue and only ever
-     read membership, which M6 Users owns — so a switcher between one thing
-     and nothing is a control that answers a question nobody has. Where a
-     plan's members are is still on the plan itself, in Where it is used. */
   const crumbs = useMemo(() => <span className="tb-title">Plans</span>, []);
-  /* ---------------------------------------------------- where "up" is --- */
   usePageChrome({ crumbs, right: null, parent: id ? "#/plans" + qs(params) : null });
 
   /* ---------------------------------------------------------- writes --- */
-  const done = useCallback((msg: string, ref: string | null) => {
+  const done = useCallback((msg: string, ref: number | null) => {
     closeLayer(); toast(msg);
-    go(ref ? "#/plans/" + encodeURIComponent(ref) : "#/plans");
+    go(ref ? "#/plans/" + ref : "#/plans");
     bump();
-  }, [closeLayer, toast, go]);
+  }, [closeLayer, toast, go, bump]);
 
   const act = useCallback<Act>((a, ref) => {
-    if (a === "pl-new") return modal(<PlanModal plan={null} onClose={closeLayer} onDone={done} />, "wide");
+    if (a === "pl-new") return modal(<PlanModal plan={null} families={familiesOf(plans)}
+      onClose={closeLayer} onDone={done} />, "wide");
 
-    const pl = ref ? IBPlans.planOf(ref) : null;
+    const pl = ref ? plans.filter((x) => x.id === ref)[0] : null;
     if (!pl || !ref) return;
 
-    if (a === "pl-edit") return modal(<PlanModal plan={pl} onClose={closeLayer} onDone={done} />, "wide");
+    if (a === "pl-edit") return modal(<PlanModal plan={pl} families={familiesOf(plans)}
+      onClose={closeLayer} onDone={done} />, "wide");
 
-    /* ------------------------------------------------------- status --- */
+    /* ------------------------------------------------------- on sale --- */
     if (a === "pl-on") {
-      const r = IBPlans.Catalogue.setStatus(ref, IBPlans.STATUS.ACTIVE, actor());
-      if (isRefusal(r)) return toast(r.http + " " + r.code + " — " + r.detail, "bad");
-      toast("On sale — it can now be picked in a quotation.");
-      return bump();
-    }
-    if (a === "pl-restore") {
-      const r = IBPlans.Catalogue.setStatus(ref, IBPlans.STATUS.INACTIVE, actor());
-      if (isRefusal(r)) return toast(r.http + " " + r.code + " — " + r.detail, "bad");
-      toast("Restored as Inactive — put it on sale when the price is right.");
-      return bump();
+      call(AdminOpsService.setPlanActive(ref, true))
+        .then(() => { toast("On sale — it is on the public plans page now."); bump(); })
+        .catch((e: unknown) => toast(errMessage(e), "bad"));
+      return;
     }
     if (a === "pl-off") {
-      const mem = IBPlans.membersOf(pl).length;
       return modal(<ConfirmModal
         heading="Take off sale" sub={pl.title} onClose={closeLayer}
         ico="shield" confirmLabel="Take off sale" confirmCls="btn pri" act="pl-off-go"
         notice={<>
-          <b>It disappears from the quotation picker.</b> Nothing else changes:{" "}
-          {mem ? <>the <b>{mem}</b> member(s) on it keep their membership, and </> : null}
-          every quotation that already names it keeps its own copy of the price.
+          <b>It disappears from the public plans page and can no longer be bought.</b> Nothing else
+          changes: everyone already subscribed keeps their plan until it expires, and you can put it
+          back on sale at any time.
         </>}
-        run={() => {
-          const r = IBPlans.Catalogue.setStatus(ref, IBPlans.STATUS.INACTIVE, actor());
-          if (isRefusal(r)) return r;
-          done("Taken off sale.", ref);
-          return r;
-        }} />);
-    }
-    if (a === "pl-archive") {
-      const refs = IBPlans.referencesTo(ref);
-      return modal(<ConfirmModal
-        heading="Archive plan" sub={pl.title} onClose={closeLayer}
-        ico="lock" confirmLabel="Archive" confirmCls="btn pri" act="pl-archive-go"
-        notice={<>
-          <b>Archived, not deleted, because history points at it.</b> {refs.quotations} quotation
-          line(s) and {refs.members} membership(s) name this plan. Deleting it would leave those
-          records pointing at something that does not exist — archiving keeps them explainable and
-          takes it out of the catalogue.
-        </>}
-        run={() => {
-          const r = IBPlans.Catalogue.setStatus(ref, IBPlans.STATUS.ARCHIVED, actor());
-          if (isRefusal(r)) return r;
-          done("Archived.", null);
-          return r;
-        }} />);
+        run={() => call(AdminOpsService.setPlanActive(ref, false)).then(() => done("Taken off sale.", ref))} />);
     }
     if (a === "pl-del") {
       return modal(<ConfirmModal
         heading="Delete plan" sub={pl.title} onClose={closeLayer}
         tone="bad" confirmLabel="Delete plan" confirmCls="btn dgr" act="pl-del-go"
         notice={<>
-          Nothing references this plan — no quotation line, no membership — so it can go outright.
-          The moment anything does, this button becomes <b>Archive</b> instead.
+          <b>Hidden everywhere, but never unpicked from history.</b> The plan leaves this catalogue
+          and the public page and can never be bought again. Subscriptions already sold on it keep
+          working to their expiry — deleting the row underneath them would leave those records
+          pointing at nothing.
         </>}
-        run={() => {
-          const r = IBPlans.Catalogue.remove(ref, actor());
-          if (isRefusal(r)) return r;
-          done("Plan deleted.", null);
-          return r;
-        }} />);
+        run={() => call(AdminOpsService.deletePlan(ref)).then(() => done("Plan deleted.", null))} />);
     }
-  }, [modal, closeLayer, toast, done]);
+  }, [modal, closeLayer, toast, done, bump, plans]);
 
   /* ---------------------------------------------------------- drawer --- */
-  /* The prototype opened the drawer from the router on every render and let
-     render() close it again first. Here the effect is the render: it re-opens
-     on `tick`, which is what `S.render()` did after every mutation. */
+  /* The drawer IS the record: it re-opens on every data change, which is what
+     the prototype's render() did after a write. */
   useEffect(() => {
-    if (!id) return;
-    const pl = IBPlans.planOf(id);
+    if (!id || loading) return;
+    const pl = plans.filter((x) => String(x.id) === id)[0];
     if (!pl) { toast("404 plan_not_found — no plan " + id + ".", "bad"); go("#/plans"); return; }
     drawer(<PlanDrawer plan={pl} act={act} go={go} />);
-  }, [id, tick, act, drawer, go, toast]);
+  }, [id, tick, loading, plans, act, drawer, go, toast]);
 
-  /* Leaving the record closes its drawer, the way the prototype's render()
-     dropped every layer before drawing the next route. */
   useEffect(() => { if (!id) return; return () => closeLayer(); }, [id, closeLayer]);
 
   /* --------------------------------------------------------- filters --- */
@@ -155,12 +120,11 @@ export default function Plans() {
   const caret = useRef<number | null>(null);
 
   const onFilter = (name: string, value: string) => {
-    const q2 = { ...params, [name]: value };
-    go("#/plans" + (id ? "/" + encodeURIComponent(id) : "") + qs(q2));
+    go("#/plans" + (id ? "/" + encodeURIComponent(id) : "") + qs({ ...params, [name]: value }));
   };
   /* Typing is debounced 220ms, and the caret is handed back afterwards — the
-     input is remounted by the new `q` in the URL, exactly as the prototype's
-     innerHTML swap replaced it, so the focus has to be re-asked for. */
+     input is remounted by the new `q` in the URL, so the focus has to be
+     re-asked for. */
   const onSearch = (name: string, value: string) => {
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => {
@@ -185,30 +149,19 @@ export default function Plans() {
   };
 
   /* ------------------------------------------------------- catalogue --- */
-  const all = IBPlans.all();
-  let rows = all.slice();
-
-  /* Archived plans are history. They are out of the list unless asked for
-     by name, because a catalogue that shows what we no longer sell beside
-     what we do is a catalogue you have to read twice. */
-  if (p.status === "archived") rows = rows.filter((x: FromEngine) => x.status === "archived");
-  else if (p.status) rows = rows.filter((x: FromEngine) => x.status === p.status);
-  else rows = rows.filter((x: FromEngine) => x.status !== "archived");
-
-  if (p.cat) rows = rows.filter((x: FromEngine) => x.category === p.cat);
+  const families = familiesOf(plans);
+  let rows = plans.slice();
+  if (p.status) rows = rows.filter((x) => statusOf(x) === p.status);
+  if (p.fam) rows = rows.filter((x) => x.family === p.fam);
   if (p.q) {
     const s = p.q.toLowerCase();
-    rows = rows.filter((x: FromEngine) =>
-      (x.title + " " + x.plan_id + " " + (x.description || "") + " " +
-        x.features.map((f: FromEngine) => f.label).join(" ")).toLowerCase().indexOf(s) >= 0);
+    rows = rows.filter((x) =>
+      (x.title + " " + x.subtitle + " " + x.tag + " " + x.features.join(" ")).toLowerCase().indexOf(s) >= 0);
   }
   rows.sort(sorter(p.sort));
 
-  const live = all.filter((x: FromEngine) => x.status !== "archived");
-  const byCat: Record<string, number> = {};
-  live.forEach((x: FromEngine) => { byCat[x.category] = (byCat[x.category] || 0) + 1; });
-  let members = 0;
-  all.forEach((x: FromEngine) => { members += IBPlans.membersOf(x).length; });
+  const byFam: Record<string, number> = {};
+  plans.forEach((x) => { byFam[x.family] = (byFam[x.family] || 0) + 1; });
 
   function route(k: string, v: string) {
     const q2: Record<string, string> = { ...params };
@@ -216,54 +169,55 @@ export default function Plans() {
     return "#/plans" + qs(q2);
   }
 
-  /* Categories first, because "what do we sell" is the question this page
-     answers; then the two states that decide whether it can be sold at
-     all; then the one number that says whether anybody bought it. */
+  /* Families first, because "what do we sell" is the question this page
+     answers; then the one state that decides whether it can be bought. */
   const cells: (StatCell | "sep")[] = ([
-    { k: "total", v: live.length, to: route("cat", ""), on: !p.cat && !p.status },
+    { k: "plans", v: plans.length, to: route("fam", ""), on: !p.fam && !p.status },
     "sep"
-  ] as (StatCell | "sep")[]).concat(IBPlans.CATEGORIES.map((c: FromEngine) => ({
-    k: c.label.toLowerCase(), v: byCat[c.key] || 0,
-    to: route("cat", c.key), on: p.cat === c.key, title: c.blurb
+  ] as (StatCell | "sep")[]).concat(families.map((f) => ({
+    k: familyLabel(f).toLowerCase(), v: byFam[f] || 0,
+    to: route("fam", f), on: p.fam === f, title: familyLabel(f) + " plans"
   }))).concat([
     "sep",
-    { k: "active", v: live.filter((x: FromEngine) => x.status === "active").length,
+    { k: "on sale", v: plans.filter((x) => x.active).length,
       dot: "ok", to: route("status", "active"), on: p.status === "active",
-      title: "On sale — selectable in a quotation" },
-    { k: "draft", v: live.filter((x: FromEngine) => x.status === "draft").length,
-      dot: "", to: route("status", "draft"), on: p.status === "draft",
-      title: "Being written — not sellable yet" },
-    "sep",
-    { k: "members", v: members, tone: "ok",
-      title: "Memberships pointing at a plan — read from Users, never stored here" }
+      title: "Live on the public plans page" },
+    { k: "off sale", v: plans.filter((x) => !x.active).length,
+      dot: "", to: route("status", "off"), on: p.status === "off",
+      title: "Hidden from buyers — existing subscribers unaffected" }
   ] as (StatCell | "sep")[]);
 
-  const chips = Object.keys(params).filter((k) => params[k] && k !== "tab").length > 0;
+  const chips = Object.keys(params).filter((k) => params[k]).length > 0;
+
+  if (loading && !plans.length) return <ListSkeleton />;
 
   return (
     <div className="dls">
       <div className="dls-cmd">
         <SearchField key={"q" + p.q} ph="Search plan, description or feature…" val={p.q} onFilter={onSearch} />
-        <Select key={"cat" + p.cat} name="cat" label="Category" value={p.cat} onFilter={onFilter}
-          options={IBPlans.CATEGORIES.map((c: FromEngine) => ({ v: c.key, l: c.label + " (" + (byCat[c.key] || 0) + ")" }))} />
+        <Select key={"fam" + p.fam} name="fam" label="Family" value={p.fam} onFilter={onFilter}
+          options={families.map((f) => ({ v: f, l: familyLabel(f) + " (" + (byFam[f] || 0) + ")" }))} />
         <Select key={"status" + p.status} name="status" label="Status" value={p.status} onFilter={onFilter}
-          options={["active", "draft", "inactive", "archived"].map((st) => ({ v: st, l: IBPlans.LABEL[st] }))} />
+          options={[{ v: "active", l: "On sale" }, { v: "off", l: "Off sale" }]} />
         <Select key={"sort" + p.sort} name="sort" label="Sort" value={p.sort} onFilter={onFilter}
           options={[
-            { v: "", l: "Sort: Category" }, { v: "title", l: "Title" },
-            { v: "price", l: "Price, high first" }, { v: "updated", l: "Recently updated" },
-            { v: "members", l: "Members" }]} />
+            { v: "", l: "Sort: Card order" }, { v: "title", l: "Title" },
+            { v: "price", l: "Price, high first" }]} />
         <span className="spacer"></span>
-        <button className="btn pri" data-act="pl-new" onClick={() => act("pl-new")}>
-          <Icon name="plus" />Create plan
-        </button>
+        {can("plans", "create")
+          ? <button className="btn pri" data-act="pl-new" onClick={() => act("pl-new")}>
+              <Icon name="plus" />Create plan
+            </button>
+          : null}
       </div>
 
       <StatStrip cells={cells} />
 
+      {error ? <Notice tone="bad" ico="alert" text={<><b>Could not load the catalogue.</b> {error}</>} /> : null}
+
       {chips ? <div className="dls-chips">
         <FilterChips params={params} onUnfilter={onUnfilter}
-          labels={{ q: "Search", cat: "Category", status: "Status", sort: "Sort" }} />
+          labels={{ q: "Search", fam: "Family", status: "Status", sort: "Sort" }} />
       </div> : null}
 
       <div className="dls-body">
@@ -274,45 +228,44 @@ export default function Plans() {
 }
 
 function PlansTable({ rows, p, act, go, onUnfilter }: {
-  rows: FromEngine[]; p: Record<string, string>; act: Act; go: (h: string) => void; onUnfilter: (k: string) => void;
+  rows: Plan[]; p: Record<string, string>; act: Act; go: (h: string) => void; onUnfilter: (k: string) => void;
 }) {
-  const filtered = !!(p.q || p.cat || p.status);
+  const filtered = !!(p.q || p.fam || p.status);
   if (!rows.length)
     return <EmptyState
       icon="tag" title={filtered ? "No plans match these filters" : "No plans yet"}
       body={filtered ? "Nothing matches. Clear a filter to widen the search."
-        : "A plan is what we sell: a title, a category, what it includes, and a price for each " +
+        : "A plan is what we sell: a title, a family, what it includes, and a price for each " +
           "duration it is offered on."}
       action={filtered
         ? <button className="btn" data-unfilter="*" onClick={() => onUnfilter("*")}>Clear all filters</button>
-        : <button className="btn pri" data-act="pl-new" onClick={() => act("pl-new")}>Create plan</button>} />;
+        : can("plans", "create")
+          ? <button className="btn pri" data-act="pl-new" onClick={() => act("pl-new")}>Create plan</button>
+          : null} />;
 
   return (
     <table className="tbl dls-tbl"><thead><tr>
-      <th style={{ width: "3px" }}></th><th>Plan</th><th>Category</th><th>Durations</th>
-      <th className="n">Price</th><th>Status</th><th className="n">Members</th><th>Updated</th>
+      <th style={{ width: "3px" }}></th><th>Plan</th><th>Family</th><th>Durations</th>
+      <th className="n">Price</th><th>Status</th><th className="n">Tier</th>
     </tr></thead><tbody>
-      {rows.map((pl: FromEngine) => {
+      {rows.map((pl) => {
         const u = urgency(pl);
-        const rng = IBPlans.rangeOf(pl);
-        const mem = IBPlans.membersOf(pl).length;
-        const to = "#/plans/" + pl.plan_id;
+        const rng = rangeOf(pl);
+        const to = "#/plans/" + pl.id;
         return (
-          <tr key={pl.plan_id}
-            className={"clickable" + (u ? " " + u.cls : "") + (pl.status === "archived" ? " dim" : "")}
+          <tr key={pl.id}
+            className={"clickable" + (u ? " " + u.cls : "") + (pl.active ? "" : " dim")}
             data-go={to} onClick={() => go(to)}>
             <td className="rail"><i title={u ? u.why : undefined}></i></td>
             <td>
-              <div className="cell-1">{pl.title}</div>
-              <div className="cell-2">{pl.description || "—"}</div>
+              <div className="cell-1">{pl.title}{pl.badge ? <> <span className="pill xs">{pl.badge}</span></> : null}</div>
+              <div className="cell-2">{pl.subtitle || pl.tag || "—"}</div>
             </td>
-            <td><Pill text={IBPlans.categoryLabel(pl.category)} /></td>
+            <td><Pill text={familyLabel(pl.family)} /></td>
             <td><DurationChips pl={pl} /></td>
             <td className="n tnum"><PriceCell rng={rng} /></td>
-            <td><Pill text={IBPlans.LABEL[pl.status]} tone={IBPlans.TONE[pl.status]} /></td>
-            <td className="n tnum">{mem || <span className="faint">—</span>}</td>
-            <td><div className="cell-2">{IBData.fmtDate(pl.updated_at)}
-              <div className="cell-2">rev {pl.revision}</div></div></td>
+            <td>{pl.active ? <Pill text="On sale" tone="ok" /> : <Pill text="Off sale" />}</td>
+            <td className="n tnum faint">{pl.tier || "—"}</td>
           </tr>
         );
       })}
@@ -320,28 +273,28 @@ function PlansTable({ rows, p, act, go, onUnfilter }: {
   );
 }
 
-/* Every duration this plan can be sold on, as chips. An inactive row is
+/* Every duration this plan can be sold on, as chips. A switched-off cycle is
    shown struck through rather than hidden: "we used to sell 6 months and
    stopped" is a fact worth seeing from the list. */
-function DurationChips({ pl }: { pl: FromEngine }) {
-  if (!pl.pricing.length) return <span className="faint">not priced</span>;
+function DurationChips({ pl }: { pl: Plan }) {
+  if (!pl.cycles.length) return <span className="faint">not priced</span>;
   return (
     <span className="dls-tags">
-      {pl.pricing.map((r: FromEngine, i: number) => (
-        <span key={i} className={"pill xs" + (r.active ? "" : " dead")}
-          title={monthsLabel(r.months) + " · " + money(IBPlans.finalOf(r)) + (r.active ? "" : " · not on sale")}
-          style={r.active ? undefined : { textDecoration: "line-through" }}>
-          {r.months}m
+      {pl.cycles.map((c) => (
+        <span key={c.id} className={"pill xs" + (c.active ? "" : " dead")}
+          title={monthsLabel(c.months) + " · " + money(c.price) + (c.active ? "" : " · not on sale")}
+          style={c.active ? undefined : { textDecoration: "line-through" }}>
+          {c.months}m
         </span>
       ))}
     </span>
   );
 }
 
-/* A range, not a price. A plan with four durations does not have "a
-   price", and printing only one of them is how a list page starts
-   misleading the person reading it. */
-function PriceCell({ rng }: { rng: FromEngine }) {
+/* A range, not a price. A plan with three durations does not have "a price",
+   and printing only one of them is how a list page starts misleading the
+   person reading it. */
+function PriceCell({ rng }: { rng: { lo: number; hi: number } | null }) {
   if (!rng) return <span className="faint">—</span>;
   if (rng.lo === rng.hi) return <>{money(rng.lo)}</>;
   return <>{money(rng.lo)}<div className="cell-2">to {money(rng.hi)}</div></>;

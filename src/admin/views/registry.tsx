@@ -14,31 +14,28 @@ import { EmptyState, Notice } from "../ui";
 import { getItems } from "../shell/modules";
 import type { ModuleItem } from "../shell/modules";
 import { can, useNav } from "../shell/AdminShell";
-import { useParams, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 
 import Audit from "./Audit";
-import Design from "./Design";
 import Plans from "./Plans";
 import Team from "./Team";
 import Roles from "./Roles";
-import Invoices from "./Invoices";
-import Quotations from "./Quotations";
 import Deals from "./Deals";
+import Quotations from "./Quotations";
+import Invoices from "./Invoices";
 
 /** route key → the component that owns that workspace. */
 export const VIEWS: Record<string, ComponentType> = {
   audit: Audit,
-  design: Design,
   plans: Plans,
   team: Team,
   roles: Roles,
-  invoices: Invoices,
-  quotations: Quotations,
   deals: Deals,
+  quotations: Quotations,
+  invoices: Invoices,
 };
 
 export function ViewHost() {
-  const params = useParams();
   const location = useLocation();
   const route = (location.pathname.split("/").filter(Boolean)[0] || "deals").toLowerCase();
   const item = getItems()[route];
@@ -48,7 +45,14 @@ export function ViewHost() {
 
   const View = VIEWS[route];
   if (!View) return <ComingSoon item={item} />;
-  return <View key={route + "/" + (params.id || "")} />;
+  /* KEYED ON THE ROUTE ONLY, never on the record id.
+     It used to be `route + "/" + id`, which made React unmount and remount the
+     whole module every time you opened a different record — so picking another
+     deal in the chat list threw away the list fetch, the vocabularies and the
+     open detail, and the module came back from zero behind a full-page loader.
+     A record change is a change of what a module is SHOWING, not a change of
+     module; every view here already reads `useParams().id` and reacts to it. */
+  return <View key={route} />;
 }
 
 function NotFound({ route }: { route: string }) {
@@ -74,22 +78,26 @@ function NotFound({ route }: { route: string }) {
   );
 }
 
+/* A module the signed-in member HOLDS, that this panel has no surface for.
+   Two things land here now: modules that were never built, and Quotations /
+   Invoices — which were built, but read and wrote a browser-side store with
+   no server behind it. Rendering seeded records that only existed in this
+   tab was worse than rendering nothing, so the screens went and the route
+   stayed. */
 function ComingSoon({ item }: { item: ModuleItem }) {
   return (
     <div className="page">
       <div className="ph">
         <div className="ph-t">
           <h1>{item.label}</h1>
-          <div className="scope">
-            This surface has no module in <span className="mono">modules/</span> yet.
-          </div>
+          <div className="scope">Nothing to show here yet.</div>
         </div>
       </div>
       <Notice tone="warn">
-        <b>Inherited from the previous panel, not yet rebuilt.</b> {item.label} existed only inside{" "}
-        <span className="mono">dashboard-admin.html</span>, which was deleted in commit{" "}
-        <span className="mono">02d5ff3</span>. The nav slot is reserved so the route never dies; the
-        surface is scheduled at step 9 of the integration sequence.
+        <b>{item.label} is in your access, but this panel has no surface for it yet.</b> Every screen
+        here reads live records from the server, and there is no {item.label.toLowerCase()} API to
+        read. The nav slot stays so the route never dies — the screen comes back when the data behind
+        it is real.
       </Notice>
     </div>
   );

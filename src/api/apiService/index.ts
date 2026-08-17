@@ -13,6 +13,27 @@ export class AppExceptions extends Error {
   }
 }
 
+/** The ONE thing a screen says when the failure is ours, not the user's: the
+ *  server is unreachable, it answered 5xx, or it answered something that isn't
+ *  JSON (an nginx 502 page, a Django traceback). None of those carry a message
+ *  worth showing — a stack trace, a hostname, a "connection refused" or an
+ *  upstream error page is internal detail, so it is dropped here at the
+ *  boundary rather than trusted not to reach a toast. Only a real, deliberate
+ *  4xx business message from the API is ever printed as-is. */
+export const SERVICE_MESSAGE = "Something went wrong. Please try again in a moment.";
+
+/** "The service is having a problem", as opposed to a refusal the user can act
+ *  on. Guards use it to hold a session through a backend restart instead of
+ *  signing the user out over a failed fetch. */
+export const isServiceError = (e: unknown) => e instanceof AppExceptions && e.code >= 500;
+
+/** The message a screen may print for any thrown thing. An AppExceptions has
+ *  already passed the boundary above, so its text is either a real 4xx reason
+ *  meant for a person or SERVICE_MESSAGE; anything else is an unplanned JS
+ *  error whose text ("x is not a function", "Failed to fetch") is internal —
+ *  so it becomes the generic line instead of reaching a toast. */
+export const errMessage = (e: unknown) => (e instanceof AppExceptions ? e.message : SERVICE_MESSAGE);
+
 export class ApiService {
   private buildUrl = (url: string) => {
     return `${config.BASE_URL}${url.startsWith("/") ? url : `/${url}`}`;
@@ -167,11 +188,18 @@ export class ApiService {
           body = await response.json();
       }
     } catch (error) {
-      throw new AppExceptions("Failed to parse response", 500, false);
+      // Not JSON — an nginx 502 page, a Django debug traceback, a truncated
+      // body. Whatever it is, it is not for the user to read.
+      throw new AppExceptions(SERVICE_MESSAGE, 502, false);
     }
 
     if (response.ok) {
       return body as ApiResponseType<T>;
+    }
+
+    // 5xx is never the caller's fault and never carries a printable reason.
+    if (response.status >= 500) {
+      throw new AppExceptions(SERVICE_MESSAGE, response.status, false);
     }
 
     // Handle error response shape

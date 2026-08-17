@@ -1,35 +1,35 @@
 /* =============================================================================
    Interior bazzar — Admin · global search  (⌘K)
    -----------------------------------------------------------------------------
-   Ported from admin-shell.js §SEARCH. Three sources in one list: the data index
-   (deals, quotations, invoices, payments, client deals, users), the nav targets,
-   and the small set of global actions. Empty query shows recents, then Jump-to.
+   Two sources: the DEALS the server can find, and the nav targets. Empty query
+   shows recents, then Jump-to.
+
+   What it used to search was `IBData.searchIndex()` — a browser-side index of
+   demo deals, quotations, invoices, payments and client deals. Typing a real
+   deal reference found nothing and typing a demo one opened a record that does
+   not exist, which is the worst pair of behaviours a search box can have.
+
+   Only deals are searched because deals are what the panel can search: the
+   endpoint takes a `search` param over name, business, email, phone and ref.
+   Quotations and invoices join this list when their own search does.
    ============================================================================= */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Icon, Pill } from "../ui";
-import { IBData } from "../engines";
+import { Icon } from "../ui";
+import AdminOpsService, { call } from "../../api/modules/adminOps";
+import { can } from "../auth/session";
 import { getGroupOf, getItems, getModules } from "./modules";
-import { LS, useShell } from "./ShellContext";
+import { LS } from "./ShellContext";
 
 type Hit = {
   icon?: string;
   route?: string;
   title: string;
   sub?: string;
-  chain?: string | null;
-  action?: number;
   hay?: string;
   group?: string;
 };
 type Group = { name: string; items: Hit[] };
-
-const ACTIONS = [
-  { title: "Create a deal", sub: "Sales → Deals", icon: "plus", act: "Create deal", where: "the Deals module", hay: "create deal new" },
-  { title: "Create a quotation", sub: "Sales → Quotations", icon: "plus", act: "Create quotation", where: "the Quotation module", hay: "create quotation quote new" },
-  { title: "Raise an invoice", sub: "Sales → Invoices", icon: "plus", act: "Raise invoice", where: "the Invoice module", hay: "raise invoice new bill" },
-  { title: "Export CSV", sub: "Current list", icon: "download", act: "Export CSV", where: "the current module", hay: "export csv download" },
-];
 
 function navTargets(): Hit[] {
   const out: Hit[] = [];
@@ -38,7 +38,6 @@ function navTargets(): Hit[] {
       out.push({
         icon: it.icon,
         group: "Navigate",
-        chain: null,
         route: "#/" + it.route,
         title: it.label,
         sub: (g.group ? g.group + " · " : "") + "#/" + it.route,
@@ -49,81 +48,84 @@ function navTargets(): Hit[] {
   return out;
 }
 
+/* The last few records opened, from localStorage. The subtitle is the module
+   name and nothing else: it used to carry a stage or an amount looked up in the
+   local stores, which for a real reference was simply blank and for a demo one
+   was a figure from nowhere. */
 function recents(): Hit[] {
   const list = LS.get<{ route: string; id: string }[]>("ib_admin_recents", []).slice(0, 4);
   return list
     .map((r) => {
       const item = getItems()[r.route];
       if (!item) return null;
-      let sub = "";
-      if (r.route === "deals") {
-        const dl = IBData.dealOf(r.id);
-        sub = dl ? dl.who + " · " + IBData.STAGES[dl.stage].label : "";
-      } else if (r.route === "invoices") {
-        const iv = IBData.invoiceOf(r.id);
-        sub = iv ? IBData.inr(iv.amount) + " · " + iv.pay : "";
-      } else if (r.route === "quotations") {
-        const q = IBData.quoteOf(r.id);
-        sub = q ? IBData.inr(q.value) + " · " + q.status : "";
-      }
       return {
         icon: item.icon,
         route: "#/" + r.route + "/" + r.id,
         title: r.id,
-        sub: item.label + (sub ? " · " + sub : ""),
-        chain: null,
+        sub: item.label,
         group: getGroupOf()[r.route] || undefined,
       } as Hit;
     })
     .filter(Boolean) as Hit[];
 }
 
-let INDEX: Hit[] | null = null;
-const index = () => (INDEX ? INDEX : (INDEX = IBData.searchIndex() as Hit[]));
+/** Deals matching `q`, from the server. Debounced by the caller; capped at
+ *  eight, because a palette is a jump list and not a list view. */
+function useDealHits(q: string): { hits: Hit[]; searching: boolean } {
+  const [hits, setHits] = useState<Hit[]>([]);
+  const [searching, setSearching] = useState(false);
+  const term = q.trim();
 
-function searchAll(q: string): Group[] {
-  q = q.trim().toLowerCase();
+  useEffect(() => {
+    if (term.length < 2 || !can("deals")) { setHits([]); setSearching(false); return; }
+    let cancelled = false;
+    setSearching(true);
+    const t = window.setTimeout(() => {
+      call(AdminOpsService.deals({ search: term, pageSize: 8 }))
+        .then((d) => {
+          if (cancelled) return;
+          setHits(d.deals.map((row) => ({
+            icon: "deal",
+            group: "Deals",
+            route: "#/deals/" + row.ref,
+            title: row.contactName + (row.businessName ? " · " + row.businessName : ""),
+            sub: row.ref + " · " + row.stageLabel + (row.city ? " · " + row.city : ""),
+          })));
+          setSearching(false);
+        })
+        .catch(() => { if (!cancelled) { setHits([]); setSearching(false); } });
+    }, 200);
+    return () => { cancelled = true; window.clearTimeout(t); };
+  }, [term]);
+
+  return { hits, searching };
+}
+
+function staticGroups(q: string): Group[] {
+  const term = q.trim().toLowerCase();
   const groups: Group[] = [];
-  if (!q) {
+  if (!term) {
     const rec = recents();
     if (rec.length) groups.push({ name: "Recent", items: rec });
     groups.push({ name: "Jump to", items: navTargets().slice(0, 6) });
     return groups;
   }
-  const hits = index().filter((x) => (x.hay || "").indexOf(q) >= 0);
-  const byGroup: Record<string, Hit[]> = {};
-  hits.slice(0, 40).forEach((h) => {
-    const g = h.group || "";
-    (byGroup[g] = byGroup[g] || []).push(h);
-  });
-  ["Sales", "Marketplace"].forEach((g) => {
-    if (byGroup[g]) groups.push({ name: g, items: byGroup[g].slice(0, 6) });
-  });
-  const nav = navTargets().filter((x) => (x.hay || "").indexOf(q) >= 0).slice(0, 4);
+  const nav = navTargets().filter((x) => (x.hay || "").indexOf(term) >= 0).slice(0, 4);
   if (nav.length) groups.push({ name: "Navigate", items: nav });
-  const acts = ACTIONS.filter((a) => a.hay.indexOf(q) >= 0).slice(0, 3);
-  if (acts.length)
-    groups.push({
-      name: "Actions",
-      items: acts.map((a) => ({
-        icon: a.icon,
-        title: a.title,
-        sub: a.sub,
-        action: ACTIONS.indexOf(a),
-        chain: null,
-      })),
-    });
   return groups;
 }
 
 export function CommandPalette({ onClose, go }: { onClose: () => void; go: (h: string) => void }) {
-  const shell = useShell();
   const [q, setQ] = useState("");
   const [sel, setSel] = useState(0);
   const input = useRef<HTMLInputElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const { hits, searching } = useDealHits(q);
 
-  const groups = useMemo(() => searchAll(q), [q]);
+  const groups = useMemo(() => {
+    const out = hits.length ? [{ name: "Deals", items: hits }] : [];
+    return out.concat(staticGroups(q));
+  }, [q, hits]);
   const flat = useMemo(() => groups.reduce<Hit[]>((a, g) => a.concat(g.items), []), [groups]);
 
   useEffect(() => {
@@ -141,10 +143,6 @@ export function CommandPalette({ onClose, go }: { onClose: () => void; go: (h: s
   const choose = (it: Hit) => {
     onClose();
     if (it.route) go(it.route);
-    else if (it.action !== undefined) {
-      const a = ACTIONS[it.action];
-      shell.stub(a.act, a.where);
-    }
   };
 
   const onKey = (e: React.KeyboardEvent) => {
@@ -174,7 +172,7 @@ export function CommandPalette({ onClose, go }: { onClose: () => void; go: (h: s
           <input
             ref={input}
             id="cmdkInput"
-            placeholder="Search deals, invoices, users, references…"
+            placeholder="Search deals by name, business, phone or ref…"
             autoComplete="off"
             spellCheck={false}
             value={q}
@@ -194,12 +192,11 @@ export function CommandPalette({ onClose, go }: { onClose: () => void; go: (h: s
           {!groups.length ? (
             <div style={{ padding: "34px 20px", textAlign: "center" }}>
               <div className="faint" style={{ fontSize: 13.5 }}>
-                No match.
+                {searching ? "Searching…" : "No match."}
               </div>
               <div className="faint" style={{ fontSize: 12.5, marginTop: 6 }}>
-                Try a reference — <span className="mono">DL-</span>,{" "}
-                <span className="mono">IB-QT-</span>, <span className="mono">IB-INV-</span>,{" "}
-                <span className="mono">PAY-</span>, <span className="mono">IB-CD-</span>.
+                Deals are searched by name, business, email, phone or reference —{" "}
+                <span className="mono">DL-2501</span>.
               </div>
             </div>
           ) : (
@@ -224,9 +221,6 @@ export function CommandPalette({ onClose, go }: { onClose: () => void; go: (h: s
                         <span>{it.sub || ""}</span>
                       </span>
                       <span className="r">
-                        {it.chain && (
-                          <Pill tone={it.chain === "Marketplace" ? "info" : "brand"}>{it.chain}</Pill>
-                        )}
                         {i === sel && <span className="kbd">↵</span>}
                       </span>
                     </button>
@@ -246,7 +240,7 @@ export function CommandPalette({ onClose, go }: { onClose: () => void; go: (h: s
           </span>
           <span className="spacer" />
           <span>
-            Out-of-scope references return <b>403</b> — never an empty result
+            Deals are searched on the server — you see what you have access to
           </span>
         </div>
       </div>
