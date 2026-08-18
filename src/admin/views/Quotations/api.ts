@@ -26,7 +26,10 @@ export const STATUS_LABEL: Record<string, string> = {
 };
 export const STATUS_TONE: Record<string, string> = {
   draft: "", issued: "warn", accepted: "ok", rejected: "bad",
-  expired: "dead", superseded: "dead", cancelled: "dead",
+  /* Cancelled is red, not grey-struck: it used to render identically to
+     superseded, and the two mean opposite things — one was replaced by a
+     newer version, the other was killed. */
+  expired: "dead", superseded: "dead", cancelled: "bad",
 };
 
 /** ₹1,23,456.50 (typed by a human) → 12345650 paise. Blank/garbage → 0. */

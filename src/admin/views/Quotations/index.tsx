@@ -12,6 +12,7 @@ import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import { ListSkeleton } from "../../ui";
 import { STATUS_LABEL, STATUS_TONE, useQuotationsList } from "./api";
+import type { QuotationRow } from "./api";
 import { partyLine } from "./helpers";
 import QuotationDetail from "./Detail";
 import QuotationBuilder from "./Builder";
@@ -142,7 +143,7 @@ function QuotationsTable({ rows, p, go, onUnfilter, openPick }: {
 
   return (
     <table className="tbl dls-tbl"><thead><tr>
-      <th style={{ width: "3px" }}></th><th>Quotation</th><th>Deal</th><th>Status</th>
+      <th style={{ width: "3px" }}></th><th>Quotation</th><th>Status</th><th>Deal</th>
       <th className="n">Value</th><th>Valid until</th><th>Owner</th>
     </tr></thead><tbody>
       {rows.map((q) => {
@@ -151,17 +152,49 @@ function QuotationsTable({ rows, p, go, onUnfilter, openPick }: {
           <tr key={q.id} className="clickable" data-go={to} onClick={() => go(to)}>
             <td className="rail"><i></i></td>
             <td>
-              <div className="cell-1">{q.quotationNumber || <span className="faint">Draft</span>} <span className="faint">v{q.version}</span></div>
+              <div className="cell-1 mono">
+                {q.quotationNumber || <span className="faint">Assigned on issue</span>}{" "}
+                <span className="pill xs">v{q.version}</span>
+              </div>
               <div className="cell-2">{partyLine(q)}</div>
             </td>
-            <td><span className="mono">{q.dealRef}</span></td>
-            <td><Pill text={STATUS_LABEL[q.status]} tone={STATUS_TONE[q.status]} /></td>
+            <td>
+              <Pill text={STATUS_LABEL[q.status]} tone={STATUS_TONE[q.status]} />
+              <div className="cell-2">{q.issuedAt ? "issued " + fmtDate(q.issuedAt) : "made " + fmtDate(q.createdAt)}</div>
+            </td>
+            <td className="mono cell-2">{q.dealRef}</td>
             <td className="n tnum">{inr(q.grandTotalPaise)}</td>
-            <td>{fmtDate(q.validUntil)}</td>
+            <td><ValidityChip q={q} /></td>
             <td>{q.owner ? q.owner.name : <span className="faint">—</span>}</td>
           </tr>
         );
       })}
     </tbody></table>
   );
+}
+
+/* Valid until, read the way the prototype reads it (views-quotation.js
+   validityChip): a date nobody is waiting on is quiet, and only an ISSUED
+   quotation's deadline earns colour — struck red once it has lapsed, red
+   inside 3 days, amber inside a week, with the countdown underneath. */
+function ValidityChip({ q }: { q: QuotationRow }) {
+  if (q.status !== "issued")
+    return q.validUntil ? <span className="faint">{fmtDate(q.validUntil)}</span> : <span className="faint">—</span>;
+  const d = daysUntil(q.validUntil);
+  if (d < 0) return <span style={{ textDecoration: "line-through", color: "var(--bad)" }}>{fmtDate(q.validUntil)}</span>;
+  const style = d <= 3 ? { color: "var(--bad)", fontWeight: 500 } : d <= 7 ? { color: "var(--warn)" } : undefined;
+  return <>
+    <span style={style}>{fmtDate(q.validUntil)}</span>
+    <div className="cell-2">{d === 0 ? "today" : "in " + d + "d"}</div>
+  </>;
+}
+
+/** Whole days from today to a date-only ISO string. Local-time field parse,
+ *  same reason fmtDate does it that way. */
+function daysUntil(iso: string | null | undefined): number {
+  if (!iso) return 0;
+  const p = String(iso).slice(0, 10).split("-");
+  const then = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+  const now = new Date(); now.setHours(0, 0, 0, 0);
+  return Math.round((then.getTime() - now.getTime()) / 86400000);
 }
