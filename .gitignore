@@ -32,3 +32,9 @@ dist-ssr
 
 # AI Docs
 AIDOCS/
+### Interior Bazzar — no JSON in the repo
+# Matches the backend rule: every .json is ignored project-wide. Already-tracked files
+# (package.json, package-lock.json, tsconfig*.json, src/locales/*/translation.json)
+# stay tracked — git ignores untracked files only — but any NEW json, a new locale file
+# included, has to be forced in with `git add -f` or it will silently never be committed.
+*.json
