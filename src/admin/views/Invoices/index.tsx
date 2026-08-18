@@ -10,6 +10,9 @@ import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import { ListSkeleton } from "../../ui";
 import { STATUS_LABEL, STATUS_TONE, useInvoicesList } from "./api";
+import type { InvoiceRow } from "./api";
+import { addonsOf, planItemOf } from "./helpers";
+import { daysFrom, relativeDate } from "../Deals/useDeals";
 import InvoiceDetail from "./Detail";
 import InvoiceBuilder from "./Builder";
 import InvoicePreview from "./Preview";
@@ -140,26 +143,85 @@ function InvoicesTable({ rows, p, go, onUnfilter, openPick }: {
 
   return (
     <table className="tbl dls-tbl"><thead><tr>
-      <th style={{ width: "3px" }}></th><th>Invoice</th><th>Deal</th><th>Status</th>
-      <th className="n">Amount</th><th>Due</th><th>Owner</th>
+      <th style={{ width: "3px" }}></th><th>Invoice</th><th>Status</th><th>Chain</th>
+      <th className="n">Amount · received</th><th>Due</th><th>Owner</th>
     </tr></thead><tbody>
       {rows.map((inv) => {
         const to = "#/invoices/" + inv.id;
+        const over = inv.status === "draft" && daysFrom(inv.dueDate) < 0;
         return (
-          <tr key={inv.id} className="clickable" data-go={to} onClick={() => go(to)}>
-            <td className="rail"><i></i></td>
+          <tr key={inv.id} className={"clickable" + (over ? " u-bad" : "") + (inv.status === "cancelled" ? " dim" : "")}
+            data-go={to} onClick={() => go(to)}>
+            <td className="rail"><i title={over ? "Past its due date and still a draft — never issued" : undefined}></i></td>
             <td>
-              <div className="cell-1">{inv.invoiceNumber || <span className="faint">Draft</span>}</div>
-              <div className="cell-2">against {inv.quotationNumber || "—"}</div>
+              <div className="cell-1 mono">
+                {inv.invoiceNumber || <span className="faint">Assigned on issue</span>}
+              </div>
+              <div className="cell-2">{inv.billing.name || "—"}
+                {lineOf(inv) ? <span className="faint"> · {lineOf(inv)}</span> : null}</div>
             </td>
-            <td><span className="mono">{inv.dealRef}</span></td>
-            <td><Pill text={STATUS_LABEL[inv.status]} tone={STATUS_TONE[inv.status]} /></td>
-            <td className="n tnum">{inr(inv.grandTotalPaise)}</td>
-            <td>{fmtDate(inv.dueDate)}</td>
+            <td>
+              <Pill text={STATUS_LABEL[inv.status]} tone={STATUS_TONE[inv.status]} />
+              <div className="cell-2">{inv.issuedAt
+                ? "issued " + fmtDate(inv.issuedAt)
+                : "made " + fmtDate(inv.invoiceDate || inv.createdAt)}</div>
+            </td>
+            {/* Deal and quote were two reference columns; one chain cell, the
+                nearer link under the further one. Plain text, not links --
+                both records are one press away from the invoice itself. */}
+            <td>
+              <div className="cell-1 mono">{inv.dealRef}</div>
+              <div className="cell-2 mono faint">{inv.quotationNumber || "—"}</div>
+            </td>
+            <td className="n dls-money"><MoneyCell inv={inv} /></td>
+            <td><DueCell inv={inv} /></td>
             <td>{inv.owner ? inv.owner.name : <span className="faint">—</span>}</td>
           </tr>
         );
       })}
     </tbody></table>
   );
+}
+
+/* What this invoice is FOR, under the customer's name -- the plan line's own
+   remark if it has one, otherwise which installment it is. */
+function lineOf(inv: InvoiceRow): string {
+  const plan = planItemOf(inv);
+  if (!plan) return "";
+  const setup = addonsOf(inv).length ? " + setup" : "";
+  if (plan.remark) return plan.remark + setup;
+  if (plan.installmentCount) return "Installment " + plan.installmentSeq + " of " + plan.installmentCount + setup;
+  return inr(plan.amountPaise) + setup;
+}
+
+/* Amount and how much of it has landed, one cell. Received is all-or-nothing
+   by construction: Issue writes ONE ledger row for the whole grand total in
+   the same transaction that freezes the invoice (InvoicesController.Issue),
+   so an issued invoice is fully received and anything else is nothing. No
+   figure here is estimated. */
+function MoneyCell({ inv }: { inv: InvoiceRow }) {
+  const amt = inr(inv.grandTotalPaise);
+  if (inv.status === "cancelled")
+    return <><div className="amt tnum faint">{amt}</div><div className="sub">cancelled</div></>;
+  if (inv.status !== "issued")
+    return <><div className="amt tnum">{amt}</div><div className="sub"><b>nothing received</b></div></>;
+  return <>
+    <div className="amt tnum">{amt}</div>
+    <div className="bar"><i style={{ width: "100%" }}></i></div>
+    <div className="sub">fully received</div>
+  </>;
+}
+
+/* The date, and how far off it is from today. Once the money is in, the due
+   date is history -- it stays for the record, without the countdown. */
+function DueCell({ inv }: { inv: InvoiceRow }) {
+  if (inv.status === "cancelled") return <span className="faint">—</span>;
+  if (inv.status === "issued") return <span className="faint">{fmtDate(inv.dueDate)}</span>;
+  const n = daysFrom(inv.dueDate);
+  return <>
+    {fmtDate(inv.dueDate)}
+    {n < 0
+      ? <div className="cell-2" style={{ color: "var(--bad)", fontWeight: 500 }}>+{Math.abs(n)}d</div>
+      : <div className="cell-2">{relativeDate(inv.dueDate)}</div>}
+  </>;
 }
