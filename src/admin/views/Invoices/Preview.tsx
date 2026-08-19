@@ -7,12 +7,13 @@
    ===================================================================== */
 import { useState } from "react";
 import AdminOpsService from "../../../api/modules/adminOps";
-import { EmptyState, Icon, PaneLoading, publicDocUrl, qs, ShareLine, shareOrCopy } from "../../ui";
+import { EmptyState, PaneLoading, copyToClipboard, publicDocUrl, qs, ShareLine, shareOrCopy } from "../../ui";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import { errMessage } from "../../../api/apiService";
 import { inr } from "../../ui/format";
 import { STATUS_LABEL, call, useInvoice } from "./api";
+import { Mi } from "../Deals/bits";
 import DocPage from "../Quotations/DocPage";
 import IssueModal from "./IssueModal";
 
@@ -72,14 +73,19 @@ export default function InvoicePreview({ id, params }: {
           : "The document exactly as the customer has it. " + (inv.billing.name || "") + " · " + STATUS_LABEL[inv.status]}
         fetchHtml={() => call(AdminOpsService.invoiceDocHtml(inv.id))}
         banner={share ? <ShareLine link={share.link} expires={share.expires} /> : null}
-        acts={<>
-          <button className="btn" onClick={() => go(detail)}><Icon name="chevl" />Back</button>
+        back={() => go(detail)}
+        menu={<>
           {isDraft && can("invoices", "issue")
-            ? <button className="btn pri" onClick={issue}><Icon name="check" />Issue invoice</button>
+            ? <Mi ico="check" label="Issue invoice"
+                hint="Spends the number and writes the payment" onClick={issue} />
             : null}
           {!isDraft
-            ? <button className="btn" onClick={getLink}>
-                <Icon name="link" />{share ? "New share link" : "Get share link"}</button>
+            ? <Mi ico="link" label={share ? "New share link" : "Create share link"}
+                hint="An expiring link, logged as SHARED" onClick={getLink} />
+            : null}
+          {share
+            ? <Mi ico="doc" label="Copy link" hint="The link minted above"
+                onClick={() => { void copyToClipboard(share.link).then((said) => toast(said)); }} />
             : null}
         </>} />
   );

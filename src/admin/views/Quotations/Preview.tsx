@@ -11,11 +11,12 @@
    ===================================================================== */
 import { useState } from "react";
 import AdminOpsService from "../../../api/modules/adminOps";
-import { EmptyState, Icon, PaneLoading, ShareLine, publicDocUrl, shareOrCopy, qs } from "../../ui";
+import { EmptyState, PaneLoading, ShareLine, copyToClipboard, publicDocUrl, shareOrCopy, qs } from "../../ui";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import { errMessage } from "../../../api/apiService";
 import { STATUS_LABEL, call, useQuotation } from "./api";
+import { Mi } from "../Deals/bits";
 import { partyLine } from "./helpers";
 import { VersionRail } from "./Detail";
 import DocPage from "./DocPage";
@@ -73,14 +74,22 @@ export default function QuotationPreview({ id, params }: {
         fetchHtml={() => call(AdminOpsService.quotationDocHtml(q.id))}
         rail={<VersionRail q={q} />}
         banner={share ? <ShareLine link={share.link} expires={share.expires} /> : null}
-        acts={<>
-          <button className="btn" onClick={() => go(detail)}><Icon name="chevl" />Back</button>
+        back={() => go(detail)}
+        menu={<>
           {isDraft && can("quotations", "issue")
-            ? <button className="btn pri" onClick={issue}><Icon name="check" />Issue quotation</button>
+            ? <Mi ico="check" label="Issue quotation"
+                hint="Spends the number — irreversible" onClick={issue} />
             : null}
           {!isDraft && q.hasDocument
-            ? <button className="btn" onClick={getLink}>
-                <Icon name="link" />{share ? "New share link" : "Get share link"}</button>
+            ? <Mi ico="link" label={share ? "New share link" : "Create share link"}
+                hint="An expiring link, logged as SHARED" onClick={getLink} />
+            : null}
+          {/* Only once there is a link to copy — the minting button already
+              offers it to the share sheet, this is the second time you want it
+              and the toast is gone. */}
+          {share
+            ? <Mi ico="doc" label="Copy link" hint="The link minted above"
+                onClick={() => { void copyToClipboard(share.link).then((said) => toast(said)); }} />
             : null}
         </>} />
   );
