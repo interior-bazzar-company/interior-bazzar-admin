@@ -37,6 +37,26 @@ export function inr(paise: number | null | undefined, opts?: { compact?: boolean
   return (neg ? "−" : "") + out; // U+2212 minus, not a hyphen
 }
 
+const ONES = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+  "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+const TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+const two = (n: number) => (n < 20 ? ONES[n] : TENS[Math.floor(n / 10)] + (n % 10 ? " " + ONES[n % 10] : ""));
+const three = (n: number) =>
+  (n > 99 ? ONES[Math.floor(n / 100)] + " Hundred" + (n % 100 ? " " : "") : "") + (n % 100 ? two(n % 100) : "");
+
+/** Paise → "Rupees Four Lakh Seventy Two Thousand Only". Lakh/crore scale, the
+ *  way an Indian commercial document states its total under the figure. */
+export function inrWords(paise: number | null | undefined): string {
+  let n = Math.round(Math.abs(paise || 0) / 100);
+  if (!n) return "Rupees Zero Only";
+  const parts: string[] = [];
+  ([[10000000, "Crore"], [100000, "Lakh"], [1000, "Thousand"]] as [number, string][]).forEach(([u, label]) => {
+    if (n >= u) { parts.push(two(Math.floor(n / u)) + " " + label); n %= u; }
+  });
+  if (n) parts.push(three(n));
+  return "Rupees " + parts.join(" ") + " Only";
+}
+
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /** "2026-06-27" → "27 Jun 2026". Takes a date-only ISO string or a Date.

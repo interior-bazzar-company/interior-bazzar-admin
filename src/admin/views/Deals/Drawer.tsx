@@ -4,7 +4,7 @@
    -----------------------------------------------------------------------------
    Everything on this screen is the deal detail endpoint's response: the facts,
    the stage history, the remarks. The Payments and Documents tabs, the chain
-   strip, the collected/outstanding bar and the invoice chips are gone — every
+   strip and the invoice chips are gone — every
    one of them rendered the browser-side engine's seed store, which held rows
    for fourteen demo deals and nothing for a real one. There are no payment,
    invoice or quotation models server-side; when there are, they come back
@@ -91,11 +91,14 @@ export function DealDrawer({ dealRef, p }: { dealRef: string; p: Params }) {
       </div>
 
       <div className="dw-b">
-        {/* ONE figure, because one is what is stored. Collected, outstanding
-            and the % bar came from the local payment store and would be a
-            claim about money nobody recorded. */}
+        {/* The same three money figures the chat pane's context column shows,
+            from the same server-computed fields — a deal must not read as
+            settled here and owing there. All three are sums of real rows; the
+            % bar stays gone, it was drawn from a store nobody wrote to. */}
         <div style={{ display: "flex", gap: "28px", flexWrap: "wrap", marginBottom: "12px" }}>
           <Fig k="Deal value" v={dl.deal_value ? inr(dl.deal_value) : "not quoted yet"} />
+          <Fig k="Collected" v={inr(dl.revenue_collected || 0)} />
+          <Fig k="Outstanding" v={inr(dl.outstanding || 0)} />
           <Fig k="Stage age" v={Math.abs(daysFrom(dl.stage_since)) + " days"} />
         </div>
 

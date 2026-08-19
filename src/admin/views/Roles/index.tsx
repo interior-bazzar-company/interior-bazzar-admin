@@ -2,25 +2,26 @@
    ROLES — what a responsibility means, as a per-module level.
    ---------------------------------------------------------------------
    Rewired onto GET /api/v1/admin/roles/, which returns the module
-   inventory AND the roles in one call — the same module list `me/
-   permissions/` uses to drive the nav, so this page and the sidebar can
-   never disagree about what a "module" is.
+   inventory — each with the VERBS it supports — AND the roles in one call.
+   Same module list `me/permissions/` uses to drive the nav, so this page and
+   the sidebar can never disagree about what a "module" is.
 
      /roles       every role, and how many people hold it (userCount,
                   given by the server — no separate members fetch)
      /roles/:id   the role drawer — its per-module levels
 
-   Roles carry no active/inactive status in this contract (unlike the old
-   local engine) — a role exists or it doesn't. `isSystem` replaces the old
-   "Super Admin is protected" special case for every system-seeded role,
-   not just one.
+   A role carries an ACTIVE/INACTIVE status (`isActive`). Inactive is not a
+   soft delete: the role keeps its name, its matrix and its members, but the
+   server drops it from every permission resolve, so it grants nothing.
+   `isSystem` is separate — it protects every system-seeded role from edit
+   and delete, not just Super Admin.
    ===================================================================== */
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import AdminOpsService from "../../../api/modules/adminOps";
 import { errMessage } from "../../../api/apiService";
 import type { RolesModuleDef } from "../../../api/modules/adminOps";
-import { EmptyState, FilterChips, Icon, SearchField, StatStrip, qs } from "../../ui";
+import { EmptyState, FilterChips, Icon, Pill, SearchField, StatStrip, qs } from "../../ui";
 import type { StatCell } from "../../ui";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { HIDDEN_MODULES } from "../../auth/session";
@@ -32,11 +33,20 @@ import { RoleModal } from "./roleModals";
 
 function ModuleChips({ role, mods }: { role: Role; mods: RolesModuleDef[] }) {
   if (role.isFullAccess) return <span className="pill brand xs">everything</span>;
-  const held = mods.filter((m) => (role.modules[m.key] || 0) > 0);
+  /* `view` is the gate, so a module without it is not granted however many
+     other verbs carry a tick — count what the server would actually honour. */
+  const held = mods.filter((m) => (role.modules[m.key] || []).indexOf("view") >= 0);
   if (!held.length) return <span className="faint">nothing yet</span>;
   return (
     <span className="dls-tags">
-      {held.slice(0, 5).map((m) => <span className="pill xs" key={m.key}>{m.label}</span>)}
+      {held.slice(0, 5).map((m) => {
+        const n = (role.modules[m.key] || []).length;
+        return (
+          <span className="pill xs" key={m.key} title={(role.modules[m.key] || []).join(", ")}>
+            {m.label}{n > 1 ? <span className="faint"> ·{n}</span> : null}
+          </span>
+        );
+      })}
       {held.length > 5 ? <span className="pill xs faint">+{held.length - 5}</span> : null}
     </span>
   );
@@ -122,6 +132,9 @@ export default function Roles() {
   const cells: (StatCell | "sep")[] = [
     { k: "roles", v: data.roles.length },
     "sep",
+    { k: "inactive", v: data.roles.filter((r) => !r.isActive).length,
+      title: "Deactivated roles — still assigned, but grant nothing" },
+    "sep",
     { k: "protected", v: data.roles.filter((r) => r.isSystem).length,
       title: "System roles — cannot be edited or deleted" },
   ];
@@ -152,7 +165,7 @@ export default function Roles() {
           <table className="tbl dls-tbl">
             <thead>
               <tr>
-                <th style={{ width: "3px" }}></th><th>Role</th><th>Modules granted</th>
+                <th style={{ width: "3px" }}></th><th>Role</th><th>Status</th><th>Modules granted</th>
                 <th className="n">Members</th><th className="c">Edit</th>
               </tr>
             </thead>
@@ -168,6 +181,9 @@ export default function Roles() {
                         {r.isSystem ? <> <span className="pill brand xs">protected</span></> : null}
                       </div>
                     </td>
+                    <td>{r.isActive
+                      ? <Pill text="Active" tone="ok" />
+                      : <Pill text="Inactive" title="Still assigned, but grants nothing" />}</td>
                     <td><ModuleChips role={r} mods={data.modules} /></td>
                     <td className="n tnum">{r.userCount || <span className="faint">—</span>}</td>
                     <td className="c">

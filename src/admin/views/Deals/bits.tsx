@@ -11,12 +11,41 @@ import { Icon, Notice, avatarTone, initials } from "../../ui";
 import { STAGE, daysFrom, inr, relativeDate } from "./useDeals";
 import type { Refusal } from "./useDeals";
 
-/* ChainDots — the Q / I / ₹ squares — is GONE. It read quotation, invoice and
-   payment state out of the local engine's seed store; none of those has a
-   model server-side, so on a real deal all three squares were blank and on a
-   seeded one they described records nobody else could see. It returns with the
-   chain it was reporting on.
+/* ChainDots — the Q / I / ₹ squares. It was removed when the chain lived only
+   in the browser's seed store; interior_deals_billing has the models now, so
+   the three states come off the deal row itself (quotationStatus /
+   invoiceStatus / paid, see DealsController._with_chain).
+
+   Q  a quotation exists, and where it stands
+   I  an invoice exists, and whether it is settled
+   ₹  money actually received
+
+   Every square is ALWAYS drawn — the blank one is the point. Three squares in
+   a fixed order read as a progress track you can scan down a column; showing
+   only the lit ones would make each row a different shape and hide the fact
+   that a deal has no quotation at all. Colour is never the only carrier: each
+   square says what it means in its own title.
    ------------------------------------------------------------------------- */
+export function ChainDots({ d }: { d: any }) {
+  const q: string = d.quotation_status || "none";
+  const i: string = d.invoice_status || "none";
+  const paid = !!d.paid;
+  /* No 'cancelled' branch on either: the server reports the LIVE document and
+     resolves a withdrawn one to 'none' (see _invoice_ui_status), so a tone for
+     it here would be a branch nothing can reach. */
+  return (
+    <span className="dls-cd">
+      <span className={q === "none" ? "" : q === "accepted" ? "ok" : q === "rejected" ? "bad" : "warn"}
+        title={q === "none" ? "No quotation yet" : "Quotation " + q}>Q</span>
+      <span className={i === "none" ? "" : i === "paid" ? "ok" : "warn"}
+        title={i === "none"
+          ? (q === "accepted" ? "Ready to invoice" : "Locked — needs an accepted quotation")
+          : "Invoice " + i}>I</span>
+      <span className={paid ? "ok" : ""}
+        title={paid ? "Payment received" : "No payment yet"}>₹</span>
+    </span>
+  );
+}
 
 /* A tag pill takes `tag-<hue>`, never the bare tone name: `.pill.red` does not
    exist, and `.pill.bad` — which it would otherwise have collided with — means

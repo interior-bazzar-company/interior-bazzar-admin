@@ -13,11 +13,14 @@
           These are THE money: GapsController._plan_cycles() calls them
           "money source of truth" and the checkout charges from them.
 
-   Does NOT have, so this module no longer shows it: draft/archived as
-   separate states (there is one `isActive` flag), per-row discounts and
-   installment plans, a revision counter, created/updated stamps, and a
-   member count per plan. Those were engine inventions. A figure with no
-   row behind it is worse than no figure.
+   Has too · created/updated stamps, the archive flag (the soft delete), and
+        the usage counts the list computes — memberships that point at the plan
+        and quotation lines that name it.
+
+   Does NOT have, so this module still does not show it: draft as a separate
+   state (a plan is on sale, off sale, or archived), per-row discounts,
+   installment plans, and a revision counter. Those were engine inventions.
+   A figure with no row behind it is worse than no figure.
 
    Failure envelope: this endpoint family answers HTTP 200 ALWAYS and puts
    the refusal in `response:false` — `call()` below is the one place that
@@ -42,6 +45,14 @@ export type Cycle = {
   active: boolean;
 };
 
+/** One bullet on the public plan card. `detail` is the smaller line under it
+ *  ("Interest · Intent · Urgency") — most features have none. */
+export type Feature = { text: string; detail: string };
+
+/** What POINTS AT a plan. Quotation lines carry no plan FK — they snapshot the
+ *  title as free text — so the count is of lines that NAME this plan. */
+export type Usage = { members: number; membersActive: number; quotationLines: number };
+
 export type Plan = {
   id: number;
   family: string;
@@ -60,8 +71,12 @@ export type Plan = {
   tag: string;
   badge: string;
   badgeIcon: string;
-  features: string[];
+  features: Feature[];
   active: boolean;
+  /** Archived: out of the catalogue for good, still readable and restorable. */
+  archived: boolean;
+  updatedAt: string;
+  usage: Usage;
   cycles: Cycle[];
 };
 
@@ -98,10 +113,15 @@ export function adaptPlan(p: PlanRow): Plan {
     tag: p.tag || "",
     badge: p.badge || "",
     badgeIcon: p.badgeIcon || "",
-    /* The server stores [{text}] but accepts [str] or [{text}] on write.
-       Flattened here so the whole module handles one shape. */
-    features: (p.features || []).map((f) => (typeof f === "string" ? f : f.text)).filter(Boolean),
+    /* The server stores [{text, subItem}] but accepts [str] too. Normalised to
+       one shape here so the drawer and the editor cannot disagree. */
+    features: (p.features || [])
+      .map((f) => (typeof f === "string" ? { text: f, detail: "" } : { text: f.text, detail: f.subItem || "" }))
+      .filter((f) => f.text),
     active: !!p.isActive,
+    archived: !!p.isArchived,
+    updatedAt: p.updatedAt || "",
+    usage: p.usage || { members: 0, membersActive: 0, quotationLines: 0 },
     cycles: (p.billingCycles || []).map(adaptCycle).sort((a, b) => a.months - b.months),
   };
 }

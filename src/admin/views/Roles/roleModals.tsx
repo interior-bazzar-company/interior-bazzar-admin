@@ -6,7 +6,7 @@ import { useState } from "react";
 import AdminOpsService from "../../../api/modules/adminOps";
 import type { RolesModuleDef } from "../../../api/modules/adminOps";
 import { Field, Icon, Notice, SectionHead } from "../../ui";
-import { ErrSlot, LevelMatrix, errOf, readLevelMatrix, val } from "../teamShared";
+import { ActionMatrix, ErrSlot, errOf, readActionMatrix, val } from "../teamShared";
 import type { EngineErr, Ops, Role } from "../teamShared";
 
 export function RoleModal({ role, mods, ops }: { role: Role | null; mods: RolesModuleDef[]; ops: Ops }) {
@@ -20,10 +20,11 @@ export function RoleModal({ role, mods, ops }: { role: Role | null; mods: RolesM
     setErr(null);
     try {
       const name = val("rlName");
-      const modules = readLevelMatrix();
+      const modules = readActionMatrix();
+      const isActive = val("rlStatus") === "active";
       const res = role
-        ? await AdminOpsService.updateRole(role.id, { name, modules })
-        : await AdminOpsService.createRole(name, modules);
+        ? await AdminOpsService.updateRole(role.id, { name, modules, isActive })
+        : await AdminOpsService.createRole(name, modules, isActive);
       ops.done(role ? "Role saved." : "Role created.", "#/roles/" + res.data.id);
     } catch (e) {
       setErr(errOf(e));
@@ -43,12 +44,19 @@ export function RoleModal({ role, mods, ops }: { role: Role | null; mods: RolesM
         <ErrSlot err={err} />
         <SectionHead title="Role" />
         <Field id="rlName" label="Role name" req value={role ? role.name : ""} ph="Sales Manager" />
+        <Field id="rlStatus" label="Status" type="select"
+               options={[
+                 { v: "active", l: "Active", sel: !role || role.isActive },
+                 { v: "inactive", l: "Inactive", sel: !!role && !role.isActive },
+               ]}
+               help="Inactive keeps the role and its members, but grants nothing — the server drops it from every permission check." />
         <SectionHead title="Permissions" />
-        <LevelMatrix mods={mods} levels={role && role.isFullAccess ? null : (role ? role.modules : {})} editable />
+        <ActionMatrix mods={mods} grants={role && role.isFullAccess ? null : (role ? role.modules : {})} editable />
         <div className="help" style={{ marginTop: 8 }}>
-          <b>0 · None</b> — <b>1 · Read</b> — <b>2 · Write</b> — <b>3 · Sensitive</b>. Read is the gate: a
-          module below Read leaves that member's sidebar and the route is refused, whatever an action
-          would otherwise allow.
+          A dash means the module has no such action — it is not a permission being withheld.
+          <b> View is the gate</b>: without it the module leaves that member's sidebar and the API
+          refuses every route on it, whatever else is ticked — so ticking any verb ticks view, and
+          clearing view clears the row.
         </div>
       </div>
       <div className="md-f">

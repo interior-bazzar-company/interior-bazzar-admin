@@ -464,9 +464,12 @@ export default function AdminShell() {
               <div id="page">
                 {/* A view that throws mid-render takes itself down, not the
                     panel: the sidebar, the topbar and the way out stay on
-                    screen. Keyed on the location so leaving the broken page
-                    clears the error — a boundary has no reset of its own. */}
-                <ErrorBoundary key={here}>
+                    screen. `resetKey`, NOT `key`: keying this on the location
+                    rebuilt the whole view on every navigation, so picking
+                    another record threw away the module's loaded list and
+                    refetched it. resetKey clears a SHOWING error on the same
+                    signal and leaves a healthy view alone. */}
+                <ErrorBoundary resetKey={here}>
                   <Outlet />
                 </ErrorBoundary>
               </div>

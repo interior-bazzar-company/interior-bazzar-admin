@@ -8,7 +8,7 @@
    invoice that is the only number anybody is looking for — and the payment
    block is a first-class fact, not a footnote.
    ===================================================================== */
-import { useCallback, useState } from "react";
+import { Fragment, useCallback, useState } from "react";
 import type { ReactNode } from "react";
 import AdminOpsService from "../../../api/modules/adminOps";
 import type { InvoiceRow } from "../../../api/modules/adminOps";
@@ -19,10 +19,16 @@ import { useShell } from "../../shell/ShellContext";
 import { errMessage } from "../../../api/apiService";
 import { STATUS_LABEL, STATUS_TONE, call, useInvoice } from "./api";
 import { addonsOf, planItemOf } from "./helpers";
+import { ChainStrip } from "../chainStrip";
+import { usePlanCatalogue, useQuotation } from "../Quotations/api";
+import { planLabel } from "../Quotations/helpers";
+import { daysFrom } from "../Deals/useDeals";
 import { EventLog, ProofsBlock } from "./Form";
 import ReasonModal from "./ReasonModal";
 
-const TABS = ["lines", "payment", "document", "history"];
+/* The prototype's order (views-invoice.js detail): what was bought, then
+   the paper, then the money, then the log. */
+const TABS = ["plan", "document", "payment", "history"];
 
 export default function InvoiceDetail({ id, tab, params }: {
   id: number; tab: string; params: Record<string, string>;
@@ -30,9 +36,14 @@ export default function InvoiceDetail({ id, tab, params }: {
   const [tick, setTick] = useState(0);
   const bump = useCallback(() => setTick((t) => t + 1), []);
   const { loading, invoice, notFound } = useInvoice(id, tick);
-  const { modal, closeLayer, toast } = useShell();
+  /* The chain strip draws the quotation cell from the document itself, not
+     from whatever the deal's latest quotation happens to be -- so fetch the one
+     THIS invoice was raised against. Before the early returns below: the hook
+     order has to be the same on every render, and `null` is a no-op fetch. */
+  const { quotation } = useQuotation(invoice ? invoice.quotationId : null, 0);
+  const { modal, closeLayer, toast, openPop, closePop, popAnchor } = useShell();
   const { go } = useNav();
-  const cur = TABS.indexOf(tab) >= 0 ? tab : "lines";
+  const cur = TABS.indexOf(tab) >= 0 ? tab : "plan";
 
   usePageChrome({ crumbs: <span className="tb-title">Invoices</span>, right: null,
                   parent: "#/invoices" });
@@ -50,18 +61,56 @@ export default function InvoiceDetail({ id, tab, params }: {
   const isDraft = inv.status === "draft";
   const to = (extra: Record<string, string>) => "#/invoices/" + inv.id + qs({ ...params, ...extra });
 
-  const doAction = (label: string, run: () => Promise<unknown>) => {
-    toast(label + "…");
-    run().then(() => { toast(label + " done."); bump(); })
-      .catch((e: unknown) => toast(errMessage(e), "bad"));
-  };
-
   const openCancel = () => modal(<ReasonModal
     heading="Cancel invoice" sub={inv.invoiceNumber || "Draft"} label="Reason"
     required={inv.status === "issued"} confirmLabel="Cancel invoice" confirmCls="btn dgr"
     onClose={closeLayer}
     run={(reason) => call(AdminOpsService.cancelInvoice(inv.id, reason))
       .then(() => { closeLayer(); bump(); toast("Invoice cancelled."); })} />);
+
+  /* Everything occasional behind one trailing menu -- the same move Quotations
+     made, and the prototype's actionBar + M["in-more"]. */
+
+  /* "Save as draft", the prototype's in-save-draft: it commits the draft as it
+     stands and assigns no number. Nothing is typed on THIS page, so the patch
+     carries only the rowVersion -- which is not a no-op write: the server
+     re-checks that the draft is still a draft, refuses a stale rowVersion
+     ("Someone else saved this draft while you were editing"), recalculates the
+     totals and bumps the version. Same write the builder's Save makes, minus
+     the fields. */
+  const saveDraft = () => call(AdminOpsService.saveInvoice(inv.id, { rowVersion: inv.rowVersion }))
+    .then(() => { bump(); toast("Draft saved. No number is assigned until it is issued."); })
+    .catch((e: unknown) => toast(errMessage(e), "bad"));
+  const moreMenu = (e: React.MouseEvent<HTMLElement>) => {
+    const el = e.currentTarget as HTMLElement;
+    if (popAnchor === el) return closePop();
+    const mi = (ico: string, label: string, hint: string, run: () => void, cls?: string) => (
+      <button className={"mi" + (cls ? " " + cls : "")} onClick={() => { closePop(); run(); }}>
+        <Icon name={ico} /><span><b>{label}</b><span className="d">{hint}</span></span>
+      </button>
+    );
+    const items: ReactNode[] = [];
+    if (isDraft && can("invoices", "edit"))
+      items.push(mi("check", "Save as draft", "Keeps everything applied so far. No number is assigned.",
+        saveDraft));
+    if (inv.status !== "cancelled" && can("invoices", "cancel"))
+      items.push(isDraft
+        ? mi("x", "Cancel draft", "Consumes no number, so nothing dangles", openCancel, "dgr")
+        : mi("x", "Cancel invoice", "The number stays spent -- a correction is a new invoice",
+             openCancel, "dgr"));
+    if (!items.length)
+      items.push(<div key="none" className="pop-b" style={{ padding: "10px 12px" }}>
+        <span className="faint">Nothing else to do on this one.</span></div>);
+    openPop(el, <div className="pop-b">{items.map((n, i) => <Fragment key={i}>{n}</Fragment>)}</div>,
+      { width: 268, cls: "pop-views" });
+  };
+
+  /* Issued means the ledger row is already written, in the same transaction
+     (InvoicesController.Issue) -- so received is the whole grand total or it is
+     nothing, and the balance is the rest. No figure here is estimated. */
+  const received = inv.status === "issued" ? inv.grandTotalPaise : 0;
+  const balance = inv.grandTotalPaise - received;
+  const over = inv.status === "draft" ? Math.max(0, -daysFrom(inv.dueDate)) : 0;
 
   return (
     <div className="page wide">
@@ -92,6 +141,11 @@ export default function InvoiceDetail({ id, tab, params }: {
               </>
             : <button className="btn pri" onClick={() => go(to({ mode: "preview" }))}>
                 <Icon name="invoice" />View document</button>}
+          {/* Issue has no button anywhere here: it happens on the preview,
+              because nobody should freeze a document they have not just
+              looked at. */}
+          <button className="btn icon" data-act="in-more" aria-haspopup="menu"
+            aria-label="More actions" title="More actions" onClick={moreMenu}><Icon name="dots" /></button>
         </div>
       </div>
 
@@ -99,16 +153,18 @@ export default function InvoiceDetail({ id, tab, params }: {
         <Notice tone="" text={<>This invoice is cancelled{inv.cancellationReason ? " — " + inv.cancellationReason : ""}.</>} />
       ) : null}
 
-      {/* The balance, not the total: what is still owed is the question this
-          page is opened to answer. */}
-      <div style={{ marginBottom: "16px" }}>
-        <div style={{ fontSize: "var(--text-sm)", color: "var(--text-2)" }}>
-          {inv.status === "issued" ? "Settled" : "Grand total"}
-        </div>
-        <div className="tnum" style={{ fontSize: "var(--text-2xl)", fontWeight: 600,
-                                       marginTop: "2px", color: "var(--brand)" }}>
-          {inr(inv.grandTotalPaise)}
-        </div>
+      {/* What it is worth, what came in, what is still owed, and by when --
+          the prototype's four figures. One grand total answered none of the
+          three questions an invoice is opened with. */}
+      <div style={{ display: "flex", gap: "28px", flexWrap: "wrap", marginBottom: "16px" }}>
+        <Fig k="Amount" v={inr(inv.grandTotalPaise)} />
+        <Fig k="Received" v={inr(received)} color={received ? "var(--ok)" : undefined} />
+        <Fig k="Balance" v={inr(balance)} color={balance ? undefined : "var(--ok)"} />
+        <Fig k={inv.status === "cancelled" ? "Cancelled" : over ? "Overdue by" : "Due"}
+          v={inv.status === "cancelled" ? fmtDate(inv.cancelledAt)
+            : over ? over + " day" + (over === 1 ? "" : "s")
+              : fmtDate(inv.dueDate)}
+          color={over ? "var(--bad)" : undefined} />
       </div>
 
       <SectionHead title="Facts" />
@@ -118,14 +174,14 @@ export default function InvoiceDetail({ id, tab, params }: {
 
       <div style={{ marginTop: "22px" }}>
         <Tabs cur={cur} onPick={(k) => go(to({ tab: k }))} items={[
-          { k: "lines", label: "Lines" },
-          { k: "payment", label: "Payment" },
+          { k: "plan", label: "Plan" },
           { k: "document", label: "Document" },
+          { k: "payment", label: "Payment" },
           { k: "history", label: "History", n: inv.events ? inv.events.length : 0 },
         ]} />
       </div>
 
-      {cur === "lines" ? <LinesTab inv={inv} />
+      {cur === "plan" ? <PlanTab inv={inv} />
         : cur === "payment" ? <PaymentTab inv={inv} onChanged={bump} />
         : cur === "document" ? <DocumentTab inv={inv} onView={() => go(to({ mode: "preview" }))} onRegenerated={bump} />
         : inv.events && inv.events.length ? <EventLog events={inv.events} />
@@ -142,58 +198,117 @@ export default function InvoiceDetail({ id, tab, params }: {
         </>
       ) : null}
 
-      <div className="card-f" style={{ marginTop: "18px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
-        {isDraft && can("invoices", "issue")
-          ? <button className="btn pri" onClick={() => doAction("Issuing",
-              () => call(AdminOpsService.issueInvoice(inv.id)))}><Icon name="check" />Issue</button>
-          : null}
-        {inv.status !== "cancelled" && can("invoices", "cancel")
-          ? <button className="btn dgr" onClick={openCancel}>Cancel invoice</button>
-          : null}
-      </div>
+      {/* Where this document sits in the sequence, and why the next link is not
+          there yet. The same strip the quotation page carries. */}
+      <SectionHead title="Related" />
+      <ChainStrip dealRef={inv.dealRef} here="invoice" quotation={quotation} />
     </div>
   );
 }
 
+function Fig({ k, v, color }: { k: string; v: ReactNode; color?: string }) {
+  return (
+    <div>
+      <div style={{ fontSize: "var(--text-sm)", color: "var(--text-2)" }}>{k}</div>
+      <div className="tnum" style={{ fontSize: "var(--text-2xl)", fontWeight: 600,
+                                     marginTop: "2px", color }}>{v}</div>
+    </div>
+  );
+}
+
+/* The prototype's Facts list (views-invoice.js detail), in its order: where
+   this invoice came from, who owns it, when it happened, and what it is taxed
+   as. Phone and GSTIN are not here -- they are billing fields that print on
+   the document, one click away, rather than facts about the invoice. Invoice
+   date stays because it is NOT the created date: it is the date the document
+   carries, and an agent can set it. */
 function facts(inv: InvoiceRow, go: (h: string) => void): [ReactNode, ReactNode][] {
+  /* Only a draft can be overdue -- issuing writes the ledger row in the same
+     transaction, so an issued invoice is paid. Same rule as the list. */
+  const over = inv.status === "draft" ? Math.max(0, -daysFrom(inv.dueDate)) : 0;
   const rows: ([ReactNode, ReactNode] | null)[] = [
     ["Deal", <a className="lnk mono" onClick={() => go("#/deals/" + inv.dealRef)}>{inv.dealRef}</a>],
-    ["Billed to", <>{inv.billing.name} <span className="faint">{inv.billing.address}</span></>],
-    ["Phone", <span className="mono">{inv.billing.phone}</span>],
-    ["GSTIN", inv.billing.gstin || <span className="faint">—</span>],
-    ["Invoice date", fmtDate(inv.invoiceDate)],
-    ["Payment due", fmtDate(inv.dueDate)],
+    ["Quotation", inv.quotationId
+      ? <a className="lnk mono" onClick={() => go("#/quotations/" + inv.quotationId)}>
+          {inv.quotationNumber || "#" + inv.quotationId}</a>
+      : <Pill text="missing" tone="bad" />],
+    ["Customer", <>{inv.billing.name || "—"} <span className="faint">{inv.billing.address}</span></>],
     ["Owner", inv.owner ? inv.owner.name : <span className="faint">—</span>],
+    ["Created", fmtDate(inv.createdAt) + (inv.createdBy ? " by " + inv.createdBy.name : "")],
     inv.issuedAt ? ["Issued", fmtDate(inv.issuedAt) + (inv.issuedBy ? " by " + inv.issuedBy.name : "")] : null,
-    inv.cancelledAt ? ["Cancelled", fmtDate(inv.cancelledAt)] : null,
+    ["Invoice date", fmtDate(inv.invoiceDate)],
+    ["Due", <>{fmtDate(inv.dueDate)}
+      {over ? <span style={{ color: "var(--bad)" }}>{" · +" + over + "d"}</span> : null}</>],
     ["Place of supply", <>{inv.placeOfSupply} <span className="faint">
       {inv.igstPaise ? "inter-state · IGST" : "intra-state · CGST + SGST"}</span></>],
     ["Tax", <Pill text={inv.taxMode === "not_applicable" ? "Not applicable" : "Applicable"}
                   tone={inv.taxMode === "not_applicable" ? "warn" : ""} />],
+    /* The money is the deal ledger's, written by the issue transaction itself
+       -- so an unissued invoice has none, whatever reference was typed on it. */
+    ["Payment", inv.status === "issued"
+      ? <><span className="mono">{inv.paymentReference || "—"}</span>{" "}
+          <span className="faint">· from the deal ledger</span></>
+      : <span className="faint">none yet</span>],
+    inv.cancelledAt
+      ? ["Cancelled", fmtDate(inv.cancelledAt) + (inv.cancelledBy ? " by " + inv.cancelledBy.name : "")
+          + (inv.cancellationReason ? " · " + inv.cancellationReason : "")]
+      : null,
   ];
   return rows.filter(Boolean) as [ReactNode, ReactNode][];
 }
 
-function LinesTab({ inv }: { inv: InvoiceRow }) {
+/* WHAT WAS BOUGHT, then what it costs -- the prototype's planTab. The plan
+   card first, because "AutoGrowth · Scale, installment 2 of 4" is the answer to
+   "what is this invoice for"; the priced lines under it are the arithmetic.
+
+   The feature chips are the tier itself, read back off the plan catalogue by
+   the name stored on the line -- the same match Quotations' builder makes
+   (Form.tsx PlanBlock). A hand-typed name, or a tier since retired, simply
+   renders without them. HSN moves under the description, where the prototype
+   keeps it: it is a tax code, not a column anyone scans. */
+function PlanTab({ inv }: { inv: InvoiceRow }) {
+  const { plans } = usePlanCatalogue();
   const plan = planItemOf(inv);
   const addons = addonsOf(inv);
   const items = [plan, ...addons].filter(Boolean) as NonNullable<typeof plan>[];
   const taxed = inv.taxMode !== "not_applicable";
+  const cat = plan ? plans.find((c) => planLabel(c) === plan.description) : null;
+  const feats = cat ? (cat.features || []).map((f) => (typeof f === "string" ? f : f.text)).filter(Boolean) : [];
   return (
     <>
+      <div style={{ height: "12px" }}></div>
+      {plan ? (
+        <div className="card"><div className="card-b">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px" }}>
+            <div>
+              <b style={{ fontSize: "var(--text-lg)" }}>{plan.description}</b>
+              <div className="faint" style={{ fontSize: "var(--text-md)" }}>
+                {plan.remark
+                  || (plan.installmentCount
+                    ? "Installment " + plan.installmentSeq + " of " + plan.installmentCount
+                    : "Full amount")}
+              </div>
+            </div>
+            <div className="tnum" style={{ fontSize: "var(--text-xl)", fontWeight: 600 }}>
+              {inr(plan.amountPaise)}</div>
+          </div>
+          {feats.length
+            ? <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", marginTop: "10px" }}>
+                {feats.map((f, i) => <span key={i} className="pill xs" title={f}>{f}</span>)}
+              </div>
+            : null}
+        </div></div>
+      ) : null}
+      <div style={{ height: "12px" }}></div>
       <Table
-        cols={[{ label: "Description" }, { label: "HSN/SAC" }, { label: "Taxable", cls: "n" },
+        cols={[{ label: "Description" }, { label: "Taxable", cls: "n" },
                { label: "GST", cls: "n" }, { label: "Line total", cls: "n" }]}
         rows={items.map((it) => (
           <tr key={it.id}>
             <td>
               <b>{it.description}</b>
-              {it.remark ? <div className="cell-2">{it.remark}</div> : null}
-              {it.installmentCount
-                ? <div className="cell-2">installment {it.installmentSeq} of {it.installmentCount}</div>
-                : null}
+              {it.hsn ? <div className="cell-2 mono">HSN {it.hsn}</div> : null}
             </td>
-            <td className="mono">{it.hsn || <span className="faint">—</span>}</td>
             <td className="n">{inr(it.taxableAmountPaise)}</td>
             <td className="n">{inr(it.taxAmountPaise)}<div className="cell-2">{it.taxRate}%</div></td>
             <td className="n"><b>{inr(it.lineTotalPaise)}</b></td>
@@ -234,7 +349,10 @@ function PaymentTab({ inv, onChanged }: { inv: InvoiceRow; onChanged: () => void
             : <span className="faint">— required to issue</span>],
         ]} />
       </div></div>
-      {inv.status === "draft" ? <ProofsBlock inv={inv} onChanged={onChanged} /> : null}
+      {/* Always listed -- on an issued invoice this is what it was issued ON,
+          which is the question the tab exists to answer. The block itself
+          drops the attach button when the server would refuse it. */}
+      <ProofsBlock inv={inv} onChanged={onChanged} />
     </>
   );
 }

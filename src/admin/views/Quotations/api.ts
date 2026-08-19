@@ -14,7 +14,7 @@
    ===================================================================== */
 import { useEffect, useState } from "react";
 import AdminOpsService, { call } from "../../../api/modules/adminOps";
-import type { QuotationRow, QuotationsListResponse } from "../../../api/modules/adminOps";
+import type { PlanRow, QuotationRow, QuotationsListResponse } from "../../../api/modules/adminOps";
 import { AppExceptions } from "../../../api/apiService";
 
 export { call };
@@ -106,5 +106,25 @@ export function useQuotation(id: number | null, tick: number): QuotationState {
       .catch(() => { if (!cancelled) setState({ loading: false, quotation: null, notFound: true }); });
     return () => { cancelled = true; };
   }, [id, tick]);
+  return state;
+}
+
+/** The real plan catalogue (`v1/admin/plans/`, app_ib.Subscription) — the same
+ *  rows the Plans module edits and the pricing page reads. Archived plans are
+ *  left out: a plan that is not sold is not quotable. A session without plan
+ *  access simply gets an empty list, and the builder falls back to a typed
+ *  plan name rather than breaking. */
+export function usePlanCatalogue(): { plans: PlanRow[]; loading: boolean } {
+  const [state, setState] = useState<{ plans: PlanRow[]; loading: boolean }>({ plans: [], loading: true });
+  useEffect(() => {
+    let cancelled = false;
+    AdminOpsService.plans()
+      .then((r) => {
+        if (cancelled) return;
+        setState({ loading: false, plans: r.response === false ? [] : (r.data.plans || []).filter((p) => p.isActive && !p.isArchived) });
+      })
+      .catch(() => { if (!cancelled) setState({ plans: [], loading: false }); });
+    return () => { cancelled = true; };
+  }, []);
   return state;
 }

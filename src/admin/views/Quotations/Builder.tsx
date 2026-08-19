@@ -1,22 +1,19 @@
 /* =====================================================================
    QUOTATION — the builder PAGE (`?mode=edit`), the prototype's builder().
 
+   Step 2 of 2: step 1 picked the deal (PickDeal.tsx), this prices it. The
+   page is a header plus BuilderBody's two columns — three numbered steps on
+   the left, the live summary and the one Save in the sticky rail.
+
    Draft-only, and the guard is the same one the server enforces: there is no
    PUT on an issued quotation, so an issued one is bounced back to its detail
    page with the reason rather than shown a form that could not save.
-
-   The form itself is the one the drawer carried — same fields, same single
-   Save, now with a page's width to lay them out in and the customer/party
-   block beside them instead of scrolled past.
    ===================================================================== */
 import { useCallback, useState } from "react";
-import { EmptyState, Icon, KvList, Notice, PaneLoading, Pill, SectionHead, qs } from "../../ui";
-import { inr } from "../../ui/format";
+import { EmptyState, Icon, Notice, PaneLoading, Pill, qs } from "../../ui";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
-import { STATUS_LABEL, STATUS_TONE, useQuotation } from "./api";
-import { partyLine } from "./helpers";
-import { EditForm } from "./Form";
-import { VersionRail } from "./Detail";
+import { STATUS_LABEL, useQuotation } from "./api";
+import { BuilderBody } from "./Form";
 
 export default function QuotationBuilder({ id, params }: {
   id: number; params: Record<string, string>;
@@ -68,13 +65,15 @@ export default function QuotationBuilder({ id, params }: {
     <div className="page wide">
       <div className="ph">
         <div className="ph-t">
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-            <h1 className="mono">{q.quotationNumber || "Draft"}</h1>
-            <Pill text={"v" + q.version} />
-            <Pill text={STATUS_LABEL[q.status]} tone={STATUS_TONE[q.status]} />
+          <div className="faint" style={{ fontSize: "var(--text-sm)" }}>
+            Step 2 of 2 ·{" "}
+            <a className="lnk" data-go={"#/deals/" + q.dealRef} onClick={() => go("#/deals/" + q.dealRef)}>
+              {q.dealRef}</a> · v{q.version}
           </div>
+          <h1>{q.parentQuotationId ? "Revision" : "New quotation"}</h1>
           <div className="scope">
-            Editing — nothing here is with the customer until you issue it.
+            <Pill text="Draft" />{" "}
+            <span className="mono">Number assigned on issue</span>
           </div>
         </div>
         <div className="acts">
@@ -84,23 +83,7 @@ export default function QuotationBuilder({ id, params }: {
         </div>
       </div>
 
-      <VersionRail q={q} />
-
-      <SectionHead title="Customer" desc="Tracked live from the deal until this quotation is issued." />
-      <div className="card"><div className="card-b">
-        <KvList cls="wide" pairs={[
-          ["Party", partyLine(q)],
-          ["Email", q.party.email || <span className="faint">—</span>],
-          ["Phone", <span className="mono">{q.party.phone}</span>],
-          ["Location", [q.party.city, q.party.state].filter(Boolean).join(", ") || "—"],
-          ["GSTIN", q.party.gstin || <span className="faint">—</span>],
-          ["Grand total", <b>{inr(q.grandTotalPaise)}</b>],
-        ]} />
-      </div></div>
-
-      <div style={{ marginTop: "18px" }}>
-        <EditForm q={q} onSaved={bump} />
-      </div>
+      <BuilderBody q={q} onSaved={bump} />
     </div>
   );
 }

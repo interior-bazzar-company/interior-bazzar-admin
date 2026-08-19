@@ -1,12 +1,13 @@
 /* =====================================================================
    INVOICES — the list. Same five bands as Quotations/Deals/Plans.
    ===================================================================== */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { inr, fmtDate } from "../../ui/format";
-import { EmptyState, FilterChips, Notice, Pill, Select, StatStrip, qs, Icon } from "../../ui";
+import { EmptyState, FilterChips, Notice, Pill, SearchField, Select, StatStrip, qs, Icon } from "../../ui";
 import type { StatCell } from "../../ui";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
+import { getSession } from "../../auth/session";
 import { useShell } from "../../shell/ShellContext";
 import { ListSkeleton } from "../../ui";
 import { STATUS_LABEL, STATUS_TONE, useInvoicesList } from "./api";
@@ -16,9 +17,10 @@ import { daysFrom, relativeDate } from "../Deals/useDeals";
 import InvoiceDetail from "./Detail";
 import InvoiceBuilder from "./Builder";
 import InvoicePreview from "./Preview";
-import PickInvoiceModal from "./PickModal";
+import PickInvoice from "./PickDeal";
 
 const STATUSES = ["draft", "issued", "cancelled"];
+const NEW_HASH = "#/invoices?new=1";
 
 /* THE MODULE ROUTER — list / detail / builder / preview, the four screens the
    prototype has (views-invoice.js). No drawer: see Quotations/index.tsx. */
@@ -27,7 +29,11 @@ export default function Invoices() {
   const id = raw ? Number(raw) : null;
   const [sp] = useSearchParams();
   const mode = sp.get("mode") || "";
-  const tab = sp.get("tab") || "lines";
+  const tab = sp.get("tab") || "plan";
+  /* `?new=1` is step 1 of creating one -- a page, not a dialog over the list,
+     exactly as Quotations does it. `&deal=` is its second half. See
+     PickDeal.tsx. */
+  if (!id && sp.get("new") === "1") return <PickInvoice dealRef={sp.get("deal") || ""} />;
   const routeParams: Record<string, string> = {};
   sp.forEach((v, k) => { if (k !== "mode") routeParams[k] = v; });
   if (id && mode === "preview") return <InvoicePreview id={id} params={routeParams} />;
@@ -39,74 +45,156 @@ export default function Invoices() {
 function InvoicesList() {
   const [sp] = useSearchParams();
   const { go } = useNav();
-  const { modal, closeLayer, toast } = useShell();
-  const [tick, setTick] = useState(0);
-  const bump = useCallback(() => setTick((t) => t + 1), []);
+  const { toast } = useShell();
 
   const params: Record<string, string> = {};
   sp.forEach((v, k) => { params[k] = v; });
-  const p = { status: params.status || "", sort: params.sort || "" };
+  const p = { q: params.q || "", status: params.status || "", owner: params.owner || "", sort: params.sort || "" };
 
-  const { loading, rows, error } = useInvoicesList(tick, { status: p.status || undefined });
+  /* The WHOLE page, then narrowed below -- same reason Quotations fetches
+     unfiltered: the strip has to keep counting the states you are NOT looking
+     at, and a server-side `?status=` makes every other cell read 0 the moment
+     you pick one.
+     ponytail: 200-row ceiling (PAGE_SIZE_MAX). Move q/owner to the API and add
+     a counts endpoint when invoices outgrow one page. */
+  const { loading, rows: all, error } = useInvoicesList(0, { sort: p.sort || undefined });
 
   const crumbs = useMemo(() => <span className="tb-title">Invoices</span>, []);
   usePageChrome({ crumbs, right: null, parent: null });
 
-  /* A new draft opens on its own editor page -- the reference and the proof it
-     needs before issuing are entered there, not in a panel over the list. */
-  const done = useCallback((msg: string, ref: number | null) => {
-    closeLayer(); toast(msg);
-    go(ref ? "#/invoices/" + ref + "?mode=edit" : "#/invoices");
-    bump();
-  }, [closeLayer, toast, go, bump]);
-
   const onFilter = (name: string, value: string) => {
     go("#/invoices" + qs({ ...params, [name]: value }));
   };
+  /* Typing would otherwise push one history entry per keystroke -- the same
+     220ms Deals and Quotations debounce on. */
+  const timer = useRef(0);
+  const search = sp.toString();
+  const onSearch = useCallback((name: string, value: string) => {
+    const next: Record<string, string> = {};
+    new URLSearchParams(search).forEach((v, k) => { next[k] = v; });
+    next[name] = value;
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => go("#/invoices" + qs(next)), 220);
+  }, [search, go]);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
   const onUnfilter = (k: string) => {
     const q2: Record<string, string> = {};
     if (k !== "*") for (const x in params) if (x !== k) q2[x] = params[x];
     go("#/invoices" + qs(q2));
   };
 
+  const rows = useMemo(() => {
+    let r = all;
+    /* `overdue` is an attention filter rather than a document state, but it
+       behaves exactly like one -- pick it, the list narrows -- so it rides in
+       the Status control instead of holding a cell of its own. */
+    if (p.status === "overdue") r = r.filter(isOverdue);
+    else if (p.status) r = r.filter((x) => x.status === p.status);
+    if (p.owner) r = r.filter((x) => String(x.owner ? x.owner.id : "") === p.owner);
+    if (p.q) {
+      const s = p.q.toLowerCase();
+      r = r.filter((x) => ((x.invoiceNumber || "draft") + " " + x.dealRef + " " +
+        (x.quotationNumber || "") + " " + (x.billing.name || "")).toLowerCase().includes(s));
+    }
+    return r;
+  }, [all, p.status, p.owner, p.q]);
+
+  /* Owner is a full-access control only: every other session is already scoped
+     to its own rows, so the picker would be a one-option list filtering
+     nothing. Locked controls are ABSENT here, not greyed -- same as
+     Quotations. */
+  const session = getSession();
+  const head = !!(session && session.isFullAccess);
+  const owners = useMemo(() => {
+    const m = new Map<number, string>();
+    all.forEach((x) => { if (x.owner) m.set(x.owner.id, x.owner.name); });
+    return Array.from(m, ([v, l]) => ({ v: String(v), l }));
+  }, [all]);
+
+  /* Received is neither estimated nor recomputed here: Issue writes ONE ledger
+     row for the whole grand total in the same transaction that freezes the
+     invoice (InvoicesController.Issue), so an issued invoice is fully received
+     and anything else is nothing -- the same rule MoneyCell states on every
+     row. Outstanding is what that leaves over, and it is zero unless the
+     ledger write right after Issue failed.
+     ponytail: reads zero even in that repair case, because the list row
+     carries no ledger figure. Add `receivedPaise` to _invoice_dict and sum it
+     here if the stuck case ever has to be visible from the list. */
   const byStatus: Record<string, number> = {};
-  rows.forEach((inv) => { byStatus[inv.status] = (byStatus[inv.status] || 0) + 1; });
+  let invoiced = 0, received = 0, overdue = 0;
+  all.forEach((inv) => {
+    byStatus[inv.status] = (byStatus[inv.status] || 0) + 1;
+    if (inv.status === "issued") { invoiced += inv.grandTotalPaise; received += inv.grandTotalPaise; }
+    if (isOverdue(inv)) overdue += 1;
+  });
+  const outstanding = invoiced - received;
   function route(k: string, v: string) {
     const q2: Record<string, string> = { ...params };
     q2[k] = String(params[k] || "") === String(v) ? "" : v;
     return "#/invoices" + qs(q2);
   }
-  const paidTotal = rows.filter((r) => r.status === "issued").reduce((a, r) => a + r.grandTotalPaise, 0);
+  /* Cancelled is not a cell: it is where an invoice LEAVES the run, not a
+     position in it -- one pick away in the Status control instead. Overdue
+     takes its place, because that is the number that gets worse while nobody
+     looks at it. */
   const cells: (StatCell | "sep")[] = [
-    { k: "invoices", v: rows.length, to: route("status", ""), on: !p.status },
+    { k: "total", v: all.length, to: route("status", ""), on: !p.status },
     "sep",
-    ...STATUSES.filter((s) => byStatus[s]).map((s) => ({
-      k: STATUS_LABEL[s].toLowerCase(), v: byStatus[s] || 0,
-      to: route("status", s), on: p.status === s, tone: STATUS_TONE[s],
-    })),
+    { k: "draft", v: byStatus.draft || 0, dot: "", to: route("status", "draft"), on: p.status === "draft" },
+    { k: "paid", v: byStatus.issued || 0, dot: "ok", to: route("status", "issued"), on: p.status === "issued" },
     "sep",
-    { k: "collected", v: inr(paidTotal), title: "Sum of every issued invoice's grand total" },
+    { k: "overdue", v: overdue, dot: overdue ? "bad" : "", tone: overdue ? "bad" : "",
+      to: route("status", "overdue"), on: p.status === "overdue",
+      title: "Past its due date with the money still not logged" },
+    "sep",
+    { k: "invoiced", v: inr(invoiced, { compact: true }), title: "Issued and not cancelled" },
+    "sep",
+    { k: "received", v: inr(received, { compact: true }), tone: "ok",
+      title: "Written to the deal ledger by Issue itself, in the same transaction -- not recomputed here" },
+    "sep",
+    { k: "outstanding", v: inr(outstanding, { compact: true }), tone: outstanding ? "bad" : "",
+      title: "Stuck after Issue -- needs Log payment on the deal" },
   ];
 
   const chips = Object.keys(params).filter((k) => params[k]).length > 0;
 
-  const openPick = () => {
-    if (!can("invoices", "create")) return toast("403 — you do not have invoice-creation access.", "bad");
-    modal(<PickInvoiceModal onClose={closeLayer} onDone={(iid: number) => done("Invoice drafted.", iid)} />, "wide");
+  const openPick = () => go(NEW_HASH);
+
+  /* What the list endpoint actually returns, and nothing more -- the rows on
+     screen, filters and all. Amounts stay in paise, unrounded. */
+  const exportCsv = () => {
+    const out: (string | number)[][] = [["invoice_number", "status", "deal_ref", "quotation_number",
+      "customer", "amount_paise", "invoice_date", "due_date", "issued_at", "owner"]];
+    rows.forEach((x) => out.push([x.invoiceNumber || "", x.status, x.dealRef, x.quotationNumber || "",
+      x.billing.name || "", x.grandTotalPaise, x.invoiceDate || "", x.dueDate || "",
+      x.issuedAt || "", x.owner ? x.owner.name : ""]));
+    const csv = out.map((r) => r.map((c) => JSON.stringify(String(c))).join(",")).join("\n");
+    const a = document.createElement("a");
+    a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
+    a.download = "invoices.csv"; a.click();
+    toast("Exported " + rows.length + " invoices -- the rows currently filtered. Amounts are in paise, unrounded.");
   };
 
-  if (loading && !rows.length) return <ListSkeleton />;
+  if (loading && !all.length) return <ListSkeleton />;
 
   return (
     <div className="dls">
       <div className="dls-cmd">
+        <SearchField ph="Search invoice no, deal, quote or customer…" val={p.q} onFilter={onSearch} />
         <Select key={"status" + p.status} name="status" label="Status" value={p.status} onFilter={onFilter}
-          options={STATUSES.map((s) => ({ v: s, l: STATUS_LABEL[s] }))} />
+          options={STATUSES.map((s) => ({ v: s, l: STATUS_LABEL[s] + " (" + (byStatus[s] || 0) + ")" }))
+            .concat([{ v: "overdue", l: "Overdue (" + overdue + ")" }])} />
+        {head
+          ? <Select key={"owner" + p.owner} name="owner" label="Owner" value={p.owner}
+              onFilter={onFilter} options={owners} />
+          : null}
         <Select key={"sort" + p.sort} name="sort" label="Sort" value={p.sort} onFilter={onFilter}
           options={[{ v: "newest", l: "Newest first" }, { v: "oldest", l: "Oldest first" }]} />
         <span className="spacer"></span>
+        <button className="btn" data-act="in-export" onClick={exportCsv}><Icon name="download" />Export</button>
         {can("invoices", "create")
-          ? <button className="btn pri" data-act="inv-new" onClick={openPick}><Icon name="plus" />Create invoice</button>
+          ? <button className="btn pri" data-act="inv-new" data-go={NEW_HASH} onClick={openPick}>
+              <Icon name="plus" />Create invoice</button>
           : null}
       </div>
 
@@ -115,7 +203,8 @@ function InvoicesList() {
       {error ? <Notice tone="bad" ico="alert" text={<><b>Could not load invoices.</b> {error}</>} /> : null}
 
       {chips ? <div className="dls-chips">
-        <FilterChips params={params} onUnfilter={onUnfilter} labels={{ status: "Status", sort: "Sort" }} />
+        <FilterChips params={params} onUnfilter={onUnfilter}
+          labels={{ q: "Search", status: "Status", owner: "Owner", sort: "Sort" }} />
       </div> : null}
 
       <div className="dls-body">
@@ -129,16 +218,16 @@ function InvoicesTable({ rows, p, go, onUnfilter, openPick }: {
   rows: ReturnType<typeof useInvoicesList>["rows"]; p: Record<string, string>;
   go: (h: string) => void; onUnfilter: (k: string) => void; openPick: () => void;
 }) {
-  const filtered = !!p.status;
+  const filtered = !!(p.q || p.status || p.owner);
   if (!rows.length)
     return <EmptyState
-      icon="invoice" title={filtered ? "No invoices match this filter" : "No invoices yet"}
-      body={filtered ? "Nothing matches. Clear the filter to widen the search."
+      icon="invoice" title={filtered ? "No invoices match these filters" : "No invoices yet"}
+      body={filtered ? "Nothing matches. Clear a filter to widen the search."
         : "An invoice is raised against an accepted quotation, once payment has already come in."}
       action={filtered
-        ? <button className="btn" data-unfilter="*" onClick={() => onUnfilter("*")}>Clear filter</button>
+        ? <button className="btn" data-unfilter="*" onClick={() => onUnfilter("*")}>Clear all filters</button>
         : can("invoices", "create")
-          ? <button className="btn pri" data-act="inv-new" onClick={openPick}>Create invoice</button>
+          ? <button className="btn pri" data-act="inv-new" data-go={NEW_HASH} onClick={openPick}>Create invoice</button>
           : null} />;
 
   return (
@@ -148,7 +237,7 @@ function InvoicesTable({ rows, p, go, onUnfilter, openPick }: {
     </tr></thead><tbody>
       {rows.map((inv) => {
         const to = "#/invoices/" + inv.id;
-        const over = inv.status === "draft" && daysFrom(inv.dueDate) < 0;
+        const over = isOverdue(inv);
         return (
           <tr key={inv.id} className={"clickable" + (over ? " u-bad" : "") + (inv.status === "cancelled" ? " dim" : "")}
             data-go={to} onClick={() => go(to)}>
@@ -181,6 +270,15 @@ function InvoicesTable({ rows, p, go, onUnfilter, openPick }: {
       })}
     </tbody></table>
   );
+}
+
+/* Past its due date with the money still not logged. Drafts count -- an
+   invoice nobody issued, whose own due date has already passed, is the most
+   overdue thing on this page: money that was never even asked for. Issued
+   means the ledger row is already written, so it can never be overdue. Used by
+   both the strip and the row rail, so the two can never disagree. */
+function isOverdue(inv: InvoiceRow): boolean {
+  return inv.status === "draft" && daysFrom(inv.dueDate) < 0;
 }
 
 /* What this invoice is FOR, under the customer's name -- the plan line's own

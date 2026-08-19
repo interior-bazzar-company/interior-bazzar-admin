@@ -4,6 +4,11 @@ import { Component, type ErrorInfo, type ReactNode } from "react";
 
 interface Props {
   children: ReactNode;
+  /** Changes to this clear a showing error. Use it INSTEAD of `key` for that
+   *  job: a key change destroys and rebuilds the children on every change,
+   *  which threw away a healthy view's state (and its fetched data) on every
+   *  navigation. This only fires when there is an error to clear. */
+  resetKey?: string;
 }
 interface State {
   hasError: boolean;
@@ -14,6 +19,11 @@ class ErrorBoundary extends Component<Props, State> {
 
   static getDerivedStateFromError(): State {
     return { hasError: true };
+  }
+
+  componentDidUpdate(prev: Props) {
+    if (this.state.hasError && prev.resetKey !== this.props.resetKey)
+      this.setState({ hasError: false });
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {

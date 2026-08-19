@@ -8,9 +8,9 @@
    `userCount`, from the server, is the real total and is what is shown.
    ===================================================================== */
 import type { RolesModuleDef } from "../../../api/modules/adminOps";
-import { Icon, Pill } from "../../ui";
+import { Icon, Notice, Pill } from "../../ui";
 import { can } from "../../shell/AdminShell";
-import { LevelMatrix } from "../teamShared";
+import { ActionMatrix } from "../teamShared";
 import type { Ops, Role } from "../teamShared";
 import { RoleDeleteModal, RoleModal } from "./roleModals";
 
@@ -22,6 +22,9 @@ export default function RoleDrawer({ role: r, mods, ops }: { role: Role; mods: R
           <div style={{ minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <h2 style={{ fontSize: "var(--text-2xl)", fontWeight: 600 }}>{r.name}</h2>
+              {r.isActive
+                ? <Pill text="Active" tone="ok" />
+                : <Pill text="Inactive" title="Still assigned, but grants nothing" />}
               {r.isSystem ? <Pill text="Protected" tone="brand" /> : null}
             </div>
             <div style={{ fontSize: "var(--text-md)", color: "var(--text-2)", marginTop: 5 }}>
@@ -35,7 +38,13 @@ export default function RoleDrawer({ role: r, mods, ops }: { role: Role; mods: R
       </div>
 
       <div className="dw-b">
-        <LevelMatrix mods={mods} levels={r.isFullAccess ? null : r.modules} />
+        {r.isActive ? null : (
+          <Notice tone="warn" ico="alert" text={
+            <>This role is <b>inactive</b>: the ticks below are kept, but the server
+              ignores them, so its {r.userCount} member(s) get nothing from it.</>
+          } />
+        )}
+        <ActionMatrix mods={mods} grants={r.isFullAccess ? null : r.modules} />
       </div>
 
       <div className="dw-f">

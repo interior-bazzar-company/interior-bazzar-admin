@@ -27,10 +27,11 @@
       defaultValue for the same reason: they read like the DOM the prototype
       produced. Pass a `key` if a view needs a field to reset.
    ============================================================================= */
-import { Fragment, useState } from "react";
+import { Fragment, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { go } from "./nav";
 import { fmtDate } from "./format";
+import config from "../../config";
 
 export { BRAND_MARK, BrandLogo } from "./brand";
 
@@ -151,22 +152,90 @@ export async function shareOrCopy(url: string, title: string): Promise<string | 
   }
 }
 
+/* Copy, and only copy — no share sheet. A button labelled Copy that opens the
+   OS share dialog leaves the clipboard untouched the moment the user closes
+   that dialog, and "Shared." over an untouched clipboard is indistinguishable
+   from a copy that silently failed. That was the bug.
+
+   `input` is the on-screen field holding the same text: where the async
+   clipboard is unavailable — any origin that is not localhost or https, e.g.
+   the panel opened on a LAN IP from `vite --host` — the field is selected and
+   the legacy copy command run on it. Deprecated, and still the only route
+   there. Returns the line to show. */
+export async function copyToClipboard(text: string, input?: HTMLInputElement | null): Promise<string> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return "Copied.";
+  } catch { /* insecure origin, or a permissions policy that refuses — fall through */ }
+  if (input) {
+    input.focus();
+    input.select();
+    try {
+      if (document.execCommand("copy")) return "Copied.";
+    } catch { /* fall through to the manual instruction */ }
+    return "Press Ctrl+C — the link is selected.";
+  }
+  return "Could not copy — select the link and copy it.";
+}
+
+/* A customer-facing document link, absolute. The API hands back a ROOT-relative
+   path ("/q/<token>") and that root is DJANGO's, not this panel's — the public
+   document views are mounted at the site root, deliberately outside /api (see
+   interior_deals_billing/urls.py). Resolving it against `location.origin` is
+   what made "Get share link" hand out a 404 on the admin host. */
+export function publicDocUrl(path: string): string {
+  try {
+    return new URL(path, new URL(config.BASE_URL).origin).href;
+  } catch {
+    /* A relative BASE_URL (same-origin deploy behind one nginx) — then this
+       panel and Django really do share an origin. */
+    return new URL(path, location.origin).href;
+  }
+}
+
+/* Print a server-rendered document sheet without leaving the page it was
+   pressed on. The sheet carries its own @page rules, so going through a frame
+   is what keeps the panel's sidebar and topbar out of the output — the same
+   trick DocPage uses, minus the page. Same sandbox as DocPage: same-origin so
+   the frame can be driven, modals so print() is allowed, no scripts. */
+export function printHtml(html: string, title: string) {
+  const f = document.createElement("iframe");
+  f.setAttribute("aria-hidden", "true");
+  f.setAttribute("sandbox", "allow-same-origin allow-modals");
+  f.title = title;
+  f.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
+  f.srcdoc = html;
+  f.onload = () => {
+    const w = f.contentWindow;
+    if (!w) { f.remove(); return; }
+    w.focus();
+    w.print();
+    /* The dialog is modal on the tab, so by the time print() returns the user
+       has answered it. A beat, then the frame goes. */
+    window.setTimeout(() => f.remove(), 1000);
+  };
+  document.body.appendChild(f);
+}
+
 /* The link itself, selectable for as long as it is wanted, with its own copy
-   button. The share sheet is the fast path; this is the row that still works
-   when there is no sheet and the clipboard was refused, and it is the reason a
-   share link no longer has to be read off a fading toast.
+   button — and it is the reason a share link no longer has to be read off a
+   fading toast. This row is also the last resort: when the clipboard is refused
+   the text is still on screen, selected, ready for Ctrl+C.
 
    Feedback is local state rather than a toast so this stays usable from
    anywhere in the app — the shell's toast context imports THIS module. */
-export function ShareLine({ link, expires, title }: { link: string; expires?: string; title: string }) {
+export function ShareLine({ link, expires }: { link: string; expires?: string }) {
   const [said, setSaid] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
       {/* .inp so it is a themed control, not an OS-white box on a dark panel;
           it already carries a readonly state. */}
-      <input className="inp mono" readOnly value={link} style={{ flex: "1 1 260px", minWidth: 0 }}
+      <input ref={inputRef} className="inp mono" readOnly value={link} style={{ flex: "1 1 260px", minWidth: 0 }}
         onFocus={(e) => e.currentTarget.select()} />
-      <button className="btn sm" onClick={async () => setSaid(await shareOrCopy(link, title) || "Shared.")}>
+      {/* Copy copies. The share sheet stays on "share link", which is the button
+          that asks for one — this one only ever touches the clipboard. */}
+      <button className="btn sm" onClick={async () => setSaid(await copyToClipboard(link, inputRef.current))}>
         <Icon name="doc" size="sm" />Copy
       </button>
       <span className="faint" style={{ fontSize: "var(--text-sm)" }}>

@@ -7,7 +7,7 @@ import AdminOpsService from "../../../api/modules/adminOps";
 import type { AuditEntry } from "../../../api/modules/adminOps";
 import { EmptyState, Icon, KvList, Notice, Pill, SectionHead } from "../../ui";
 import { can } from "../../shell/AdminShell";
-import { familyLabel, inr, money, monthsLabel } from "./helpers";
+import { dateLabel, familyLabel, inr, money, monthsLabel } from "./helpers";
 import { rangeOf, savingOf } from "./api";
 import type { Cycle, Plan } from "./api";
 
@@ -24,11 +24,14 @@ export default function PlanDrawer({ plan, act, go }: { plan: Plan; act: Act; go
           <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
             <h2 style={{ fontSize: "var(--text-2xl)", fontWeight: 600 }}>{pl.title}</h2>
             <Pill text={familyLabel(pl.family)} />
-            {pl.active ? <Pill text="On sale" tone="ok" /> : <Pill text="Off sale" />}
+            {pl.archived
+              ? <Pill text="Archived" />
+              : pl.active ? <Pill text="On sale" tone="ok" /> : <Pill text="Off sale" />}
             {pl.badge ? <Pill text={pl.badge} tone="warn" /> : null}
           </div>
           <div className="mono" style={{ fontSize: "var(--text-md)", color: "var(--text-2)", marginTop: "5px" }}>
             #{pl.id}{pl.tag ? " · " + pl.tag : ""}{pl.tier ? " · tier " + pl.tier : ""}
+            {pl.updatedAt ? " · updated " + dateLabel(pl.updatedAt) : ""}
           </div>
         </div>
         <span className="spacer"></span>
@@ -42,7 +45,15 @@ export default function PlanDrawer({ plan, act, go }: { plan: Plan; act: Act; go
           ? <p style={{ color: "var(--text-2)", marginBottom: "14px" }}>{pl.subtitle}</p>
           : null}
 
-        {pl.active && !pl.cycles.filter((c) => c.active).length
+        {pl.archived
+          ? <Notice ico="lock" text={<>
+              <b>Archived — out of the catalogue, and kept.</b> It cannot be bought and cannot be put
+              back on sale until it is restored. Everything that already names it — quotation lines,
+              memberships, the audit trail — still reads as it always did.
+            </>} />
+          : null}
+
+        {!pl.archived && pl.active && !pl.cycles.filter((c) => c.active).length
           ? <Notice tone="bad" ico="alert" text={<>
               <b>On sale with nothing to sell it at.</b> The public plans page prices a card from its
               active durations only, so this one renders with no price and cannot be bought. Switch a
@@ -57,11 +68,32 @@ export default function PlanDrawer({ plan, act, go }: { plan: Plan; act: Act; go
         {pl.features.length
           ? <ul className="pl-feats">
               {pl.features.map((f, i) => (
-                <li key={i}><Icon name="check" size="sm" /><span><b>{f}</b></span></li>
+                <li key={i}><Icon name="check" size="sm" /><span>
+                  <b>{f.text}</b>
+                  {/* The detail line the public card prints under the bullet. Most
+                      features have none — an empty one renders nothing, not a gap. */}
+                  {f.detail ? <div className="d">{f.detail}</div> : null}
+                </span></li>
               ))}
             </ul>
           : <EmptyState icon="quote" title="No features listed"
               body="The plan card on the public page would show an empty list." />}
+
+        <SectionHead title="Where it is used"
+          desc="What already points at this plan — and would be left unexplainable if the row went away." />
+        <KvList cls="wide" pairs={[
+          /* Quotation lines carry no plan FK: the line snapshots a title typed by
+             hand. Counted by the NAME they carry, and labelled as such — a link
+             this weak must not be printed as if it were a foreign key. */
+          ["On quotations", pl.usage.quotationLines
+            ? <>{pl.usage.quotationLines} line{pl.usage.quotationLines === 1 ? "" : "s"}{" "}
+                <span className="faint">· matched by the title they name</span></>
+            : <span className="faint">none</span>],
+          ["Members", pl.usage.members
+            ? <>{pl.usage.members} bought{" "}
+                <span className="faint">· {pl.usage.membersActive} still active</span></>
+            : <span className="faint">none</span>]
+        ]} />
 
         <SectionHead title="Plan record" />
         <KvList cls="wide" pairs={[
@@ -88,9 +120,10 @@ export default function PlanDrawer({ plan, act, go }: { plan: Plan; act: Act; go
         <History planId={pl.id} />
 
         <Notice ico="lock" text={<>
-          <b>A price change here is live for the next buyer, immediately.</b> Saving drops the public
-          plans cache, so the new figure is on the site at once. Subscriptions already sold keep the
-          price they were bought at — nothing here reaches back into them.
+          <b>Editing this plan cannot change a quotation that already exists.</b> A quotation copies
+          the price, the discount, the term and the feature list at the moment it is created, and
+          reads nothing from here afterwards. New quotations get the new numbers; issued ones keep
+          theirs.
         </>} />
       </div>
 
@@ -167,7 +200,7 @@ function History({ planId }: { planId: number }) {
           <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
             <span className="pill xs">{e.action.replace(/^plan_/, "")}</span>
             <span className="faint" style={{ fontSize: "var(--text-sm)", marginLeft: "auto" }}>
-              {e.ts ? new Date(e.ts).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
+              {dateLabel(e.ts || "")}
             </span>
           </div>
           <div style={{ fontSize: "var(--text-base)", lineHeight: 1.45, marginTop: "5px" }}>{e.detail || "—"}</div>
@@ -183,6 +216,16 @@ function History({ planId }: { planId: number }) {
    level 2; the server re-checks all of it either way. */
 function ActionBar({ pl, act }: { pl: Plan; act: Act }) {
   const mayEdit = can("plans", "edit") || can("plans", "pricing");
+
+  /* An archived plan sells nothing, so the sale switches are gone rather than
+     offered and then refused — restore is the only way back to the catalogue. */
+  if (pl.archived)
+    return can("plans", "archive")
+      ? <><span className="spacer"></span>
+          <button className="btn pri" data-act="pl-restore" data-ref={pl.id}
+            onClick={() => act("pl-restore", pl.id)}><Icon name="check" />Restore plan</button></>
+      : null;
+
   return (
     <>
       {mayEdit
@@ -197,9 +240,11 @@ function ActionBar({ pl, act }: { pl: Plan; act: Act }) {
               onClick={() => act("pl-on", pl.id)}><Icon name="check" />Put on sale</button>)
         : null}
       <span className="spacer"></span>
+      {/* Archive, never delete: every row that names this plan has to keep
+          resolving. Not styled danger-red, because nothing is destroyed. */}
       {can("plans", "archive")
-        ? <button className="btn dgr" data-act="pl-del" data-ref={pl.id}
-            onClick={() => act("pl-del", pl.id)}>Delete</button>
+        ? <button className="btn" data-act="pl-archive" data-ref={pl.id}
+            onClick={() => act("pl-archive", pl.id)}>Archive</button>
         : null}
     </>
   );

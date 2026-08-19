@@ -10,13 +10,15 @@
    IBTeam.can() was.
 
    can()/canWrite() implement the rule from the API contract verbatim:
-     level = modules[key]?.level ?? 0
-     if (level < 1) return false
-     min   = actions[key + "." + (action || "view")] ?? 3
-     return level >= min
-   isFullAccess short-circuits to true. An unresolved matrix DENIES — there is
-   no permissive fallback here (unlike the old prototype-era can()), because an
-   unavailable authorization service must deny on a real server.
+     held = modules[key]?.actions ?? []
+     if (!held.includes("view")) return false     // view is the gate
+     return held.includes(action || "view")
+   That set is the SAME one the server refuses with (Permissions.can_with_grants),
+   so a button this greys out is a button the API would 403 — never a UI-only
+   guess. isFullAccess short-circuits to true, which also covers verbs that have
+   no ModuleAction row yet. An unresolved matrix DENIES — there is no permissive
+   fallback here (unlike the old prototype-era can()), because an unavailable
+   authorization service must deny on a real server.
    ============================================================================= */
 import AdminOpsService from "../../api/modules/adminOps";
 import type { MePermissions } from "../../api/modules/adminOps";
@@ -95,17 +97,17 @@ export function clearSession() {
 export function isZeroAccess(s: MePermissions): boolean {
   if (s.isFullAccess) return false;
   if (!s.role) return true;
-  return !s.modules.some((m) => m.level > 0);
+  return !s.modules.some((m) => m.actions.length > 0);
 }
 
 export function can(moduleKey: string, action?: string): boolean {
   if (!session) return false;
   if (session.isFullAccess) return true;
-  const mod = session.modules.find((m) => m.key === moduleKey);
-  const level = mod ? mod.level : 0;
-  if (level < 1) return false;
-  const min = session.actions[moduleKey + "." + (action || "view")] ?? 3;
-  return level >= min;
+  const held = session.modules.find((m) => m.key === moduleKey)?.actions || [];
+  /* `view` is the gate: without it the module is not this session's at all, so
+     no other verb on it counts however it got granted. */
+  if (held.indexOf("view") < 0) return false;
+  return held.indexOf(action || "view") >= 0;
 }
 export const canWrite = (moduleKey: string, action?: string) => can(moduleKey, action || "edit");
 
@@ -115,7 +117,7 @@ export const canWrite = (moduleKey: string, action?: string) => can(moduleKey, a
 export function grantsOf(s: MePermissions): string[] {
   if (s.isFullAccess) return ["Everything"];
   return s.modules
-    .filter((m) => m.level > 0 && !HIDDEN_MODULES.has(m.key))
+    .filter((m) => m.actions.indexOf("view") >= 0 && !HIDDEN_MODULES.has(m.key))
     .map((m) => m.label);
 }
 

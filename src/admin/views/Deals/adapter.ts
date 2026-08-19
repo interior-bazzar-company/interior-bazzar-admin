@@ -5,10 +5,11 @@
    customer_name, deal_value, stage as an int 1–6, priority as an int 1–3, …),
    so this is the only file that needs to know the wire shape exists.
 
-   Chain data (revenue_collected, outstanding, quotation_status,
-   invoice_status, duplicate_count) is deliberately NOT produced here — there
-   are no invoice/payment models server-side yet, so those fields are left
-   unset and every consumer renders nothing rather than a guess.
+   The chain (quotation_status, invoice_status, paid) and the money
+   (revenue_collected, outstanding) ARE produced here now — interior_deals_billing
+   has the models and the deals endpoint annotates every row from them.
+   duplicate_count is still deliberately absent: the server does not compute it,
+   and every consumer renders nothing rather than a guess.
    ============================================================================= */
 import { fmtDate, inr } from "../../ui/format";
 import type {
@@ -127,11 +128,15 @@ export function adaptDeal(row: DealRow): any {
     // checked; every call site already treats a falsy duplicate_count as
     // "say nothing", so undefined reads exactly like the old 0 did.
     //
-    // revenue_collected / outstanding / quotation_status / invoice_status:
-    // also intentionally omitted. These are chain (invoice/payment) data —
-    // no backend models exist yet. bits.tsx (MoneyCell, ChainDots) and
-    // Drawer.tsx both check for `undefined` explicitly and render "value
-    // only" / a blank chip rather than fabricate a collected or paid state.
+    // The Q / I / ₹ chain, straight off the row — interior_deals_billing
+    // computes it (DealsController._with_chain), nothing is derived here.
+    quotation_status: row.quotationStatus || "none",
+    invoice_status: row.invoiceStatus || "none",
+    paid: !!row.paid,
+    // Money, straight through in paise. The server sums the ledger; nothing is
+    // added up, apportioned or estimated on this side.
+    revenue_collected: row.collectedPaise,
+    outstanding: row.outstandingPaise,
   };
 }
 

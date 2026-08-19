@@ -10,11 +10,13 @@
    without, and they are entered in the same sitting.
    ===================================================================== */
 import { useCallback, useState } from "react";
-import { EmptyState, Icon, KvList, Notice, PaneLoading, Pill, SectionHead, qs } from "../../ui";
-import { inr, fmtDate } from "../../ui/format";
+import { EmptyState, Icon, Notice, PaneLoading, Pill, qs } from "../../ui";
+import { inr } from "../../ui/format";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
-import { STATUS_LABEL, STATUS_TONE, useInvoice } from "./api";
-import { EditForm, ProofsBlock } from "./Form";
+import { STATUS_LABEL, useInvoice } from "./api";
+import type { InvoiceRow } from "./api";
+import { BuilderBody } from "./Form";
+import { planItemOf } from "./helpers";
 
 export default function InvoiceBuilder({ id, params }: {
   id: number; params: Record<string, string>;
@@ -66,12 +68,15 @@ export default function InvoiceBuilder({ id, params }: {
     <div className="page wide">
       <div className="ph">
         <div className="ph-t">
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-            <h1 className="mono">{inv.invoiceNumber || "Draft"}</h1>
-            <Pill text={STATUS_LABEL[inv.status]} tone={STATUS_TONE[inv.status]} />
+          <div className="faint" style={{ fontSize: "var(--text-sm)" }}>
+            Step 2 of 2 ·{" "}
+            <a className="lnk" data-go={"#/deals/" + inv.dealRef} onClick={() => go("#/deals/" + inv.dealRef)}>
+              {inv.dealRef}</a>
           </div>
+          <h1>New invoice</h1>
           <div className="scope">
-            Editing — the number is allocated by issuing, not by saving.
+            <Pill text="Draft" />{" "}
+            <span className="mono">Number assigned on issue</span>
           </div>
         </div>
         <div className="acts">
@@ -81,21 +86,33 @@ export default function InvoiceBuilder({ id, params }: {
         </div>
       </div>
 
-      <SectionHead title="Billed to" desc="Frozen onto the document when it is issued." />
-      <div className="card"><div className="card-b">
-        <KvList cls="wide" pairs={[
-          ["Name", inv.billing.name],
-          ["Address", inv.billing.address],
-          ["Phone", <span className="mono">{inv.billing.phone}</span>],
-          ["Payment due", fmtDate(inv.dueDate)],
-          ["Grand total", <b>{inr(inv.grandTotalPaise)}</b>],
-        ]} />
+      {/* The source strip -- both links and what this draft is billing, always
+          visible. An invoice that loses sight of its quotation is the one thing
+          the issue guards refuse outright. */}
+      <div className="card" style={{ marginBottom: "14px" }}><div className="card-b"
+        style={{ display: "flex", gap: "22px", flexWrap: "wrap", alignItems: "center" }}>
+        <a className="lnk mono" data-go={"#/deals/" + inv.dealRef}
+          onClick={() => go("#/deals/" + inv.dealRef)}>{inv.dealRef} ↗</a>
+        {inv.quotationId
+          ? <a className="lnk mono" data-go={"#/quotations/" + inv.quotationId}
+              onClick={() => go("#/quotations/" + inv.quotationId)}>
+              {inv.quotationNumber || "quotation"} ↗</a>
+          : <span className="pill bad xs">quotation_required</span>}
+        <span style={{ marginLeft: "auto" }} className="tnum">
+          <b>{inr(inv.grandTotalPaise)}</b>
+          <span className="faint">{" · " + installmentLine(inv)}</span>
+        </span>
       </div></div>
 
-      <div style={{ marginTop: "18px" }}>
-        <EditForm inv={inv} onSaved={bump} />
-      </div>
-      <ProofsBlock inv={inv} onChanged={bump} />
+      <BuilderBody inv={inv} onSaved={bump} />
     </div>
   );
+}
+
+/* What this draft is billing, in the words the quotation's schedule used. */
+function installmentLine(inv: InvoiceRow): string {
+  const plan = planItemOf(inv);
+  if (plan && plan.installmentCount)
+    return "installment " + plan.installmentSeq + " of " + plan.installmentCount;
+  return "this invoice";
 }

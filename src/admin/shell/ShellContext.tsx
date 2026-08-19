@@ -22,6 +22,7 @@ import {
 } from "react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { Icon, Notice, KvList } from "../ui";
 
 /* ------------------------------------------------------------------ storage */
@@ -138,6 +139,23 @@ export function ShellProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const closePop = useCallback(() => setPop(null), []);
+
+  /* Closing a DRAWER by hand has to drop the record id from the URL as well.
+     Every drawer's own X already does it (`closeLayer(); go("#/plans")`); the
+     scrim and Escape only nulled the layer, so the URL went on naming a record
+     that was no longer on screen — and clicking that same row then navigated
+     nowhere, which is why the drawer would not re-open until you opened some
+     other record first. Routes are only `/:route` and `/:route/:id`, so "up" is
+     the first segment; the query survives because it is the list's filters.
+     Modals are left alone: they open over Detail PAGES too, and Escape there
+     must close the modal, not leave the record. */
+  const navigate = useNavigate();
+  const { pathname, search } = useLocation();
+  const dismiss = useCallback(() => {
+    closeLayer();
+    const seg = pathname.split("/").filter(Boolean);
+    if (seg.length > 1) navigate("/" + seg[0] + search, { replace: true });
+  }, [closeLayer, navigate, pathname, search]);
 
   const drawer = useCallback((node: ReactNode) => {
     lastFocus.current = document.activeElement;
@@ -295,9 +313,9 @@ export function ShellProvider({ children }: { children: ReactNode }) {
                 whole complaint. */}
             <div
               className="scrim"
-              {...(layer.kind === "drawer" ? { "data-close": "1", onClick: closeLayer } : {})}
+              {...(layer.kind === "drawer" ? { "data-close": "1", onClick: dismiss } : {})}
             />
-            <LayerBox layer={layer} onClose={closeLayer} />
+            <LayerBox layer={layer} onClose={layer.kind === "drawer" ? dismiss : closeLayer} />
           </>,
           document.body
         )}

@@ -15,12 +15,12 @@
    that is edit it and send it; on anything else it is read it or supersede it.
    Everything occasional sits behind the trailing menu.
    ===================================================================== */
-import { useCallback, useState } from "react";
+import { Fragment, useCallback, useState } from "react";
 import type { ReactNode } from "react";
 import AdminOpsService from "../../../api/modules/adminOps";
 import type { QuotationRow } from "../../../api/modules/adminOps";
 import {
-  EmptyState, Icon, KvList, PaneLoading, Pill, SectionHead, Table, Tabs, qs,
+  EmptyState, Icon, KvList, PaneLoading, Pill, SectionHead, Table, Tabs, printHtml, publicDocUrl, qs, shareOrCopy,
 } from "../../ui";
 import { inr, fmtDate } from "../../ui/format";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
@@ -29,6 +29,8 @@ import { errMessage } from "../../../api/apiService";
 import { STATUS_LABEL, STATUS_TONE, call, useQuotation, useQuotationVersions } from "./api";
 import { addonsOf, partyLine, planItemOf } from "./helpers";
 import ReasonModal from "./ReasonModal";
+import ReviseModal from "./ReviseModal";
+import { ChainStrip } from "../chainStrip";
 
 const TABS = ["items", "document", "versions", "history"];
 
@@ -38,7 +40,7 @@ export default function QuotationDetail({ id, tab, params }: {
   const [tick, setTick] = useState(0);
   const bump = useCallback(() => setTick((t) => t + 1), []);
   const { loading, quotation, notFound } = useQuotation(id, tick);
-  const { modal, closeLayer, toast } = useShell();
+  const { modal, closeLayer, toast, openPop, closePop, popAnchor } = useShell();
   const { go } = useNav();
   const cur = TABS.indexOf(tab) >= 0 ? tab : "items";
 
@@ -70,11 +72,71 @@ export default function QuotationDetail({ id, tab, params }: {
     run={(reason) => call(AdminOpsService.rejectQuotation(q.id, reason))
       .then(() => { closeLayer(); bump(); toast("Quotation rejected."); })} />);
 
+  /* Everything occasional lives behind one trailing menu — the two verdicts
+     and the draft's cancel. There used to be a second bar of the same buttons
+     at the very bottom of the page, which meant the actions were in two places
+     and neither was where you looked. */
+  const moreMenu = (e: React.MouseEvent<HTMLElement>) => {
+    const el = e.currentTarget as HTMLElement;
+    if (popAnchor === el) return closePop();
+    const mi = (ico: string, label: string, hint: string, run: () => void, cls?: string) => (
+      <button className={"mi" + (cls ? " " + cls : "")} onClick={() => { closePop(); run(); }}>
+        <Icon name={ico} /><span><b>{label}</b><span className="d">{hint}</span></span>
+      </button>
+    );
+    const items: ReactNode[] = [];
+    /* The document three, first — they are what somebody on an issued
+       quotation reaches for most, and none of them changes anything. */
+    if (!isDraft && q.hasDocument)
+      items.push(mi("download", "Download as PDF", "The issued document, as the customer has it", download));
+    if (!isDraft)
+      items.push(mi("doc", "Print", "Opens the document and prints it", print));
+    if (!isDraft && q.hasDocument)
+      items.push(mi("link", "Share link", "An expiring link, logged as SHARED", share));
+    const canAccept = can("quotations", "accept");
+    if (canAccept && (q.status === "issued" || q.status === "rejected" || q.status === "expired"))
+      items.push(mi("check", "Mark accepted", "Writes " + inr(q.grandTotalPaise) + " to " + q.dealRef,
+        () => doAction("Accepting", () => call(AdminOpsService.acceptQuotation(q.id)))));
+    if (canAccept && q.status === "issued")
+      items.push(mi("x", "Mark rejected", "Records the customer's no", openReject, "dgr"));
+    if (isDraft && can("quotations", "cancel"))
+      items.push(mi("x", "Cancel draft", "Consumes no number, so nothing dangles",
+        () => doAction("Cancelling", () => call(AdminOpsService.cancelQuotation(q.id))), "dgr"));
+    if (!items.length)
+      items.push(<div key="none" className="pop-b" style={{ padding: "10px 12px" }}>
+        <span className="faint">Nothing else to do on this one.</span></div>);
+    openPop(el, <div className="pop-b">{items.map((n, i) => <Fragment key={i}>{n}</Fragment>)}</div>,
+      { width: 268, cls: "pop-views" });
+  };
+
+  const docTitle = (q.quotationNumber || "Quotation") + " · Interior bazzar";
+  const openSheet = () => call(AdminOpsService.quotationDocHtml(q.id))
+    .then((d) => printHtml(d.html, docTitle))
+    .catch((e: unknown) => toast(errMessage(e), "bad"));
+  /* Print and Download open the same sheet — there is no stored PDF to stream,
+     the document IS this HTML and the browser makes the file. What Download
+     adds is the DOWNLOADED event on the record, which is the half that
+     actually has to be logged. */
+  const print = () => openSheet();
+  const download = () => call(AdminOpsService.quotationDocDownload(q.id))
+    .then(() => { toast("Opening " + (q.quotationNumber || "the document") + " — choose “Save as PDF”."); return openSheet(); })
+    .catch((e: unknown) => toast(errMessage(e), "bad"));
+  const share = () => call(AdminOpsService.quotationDocShare(q.id))
+    .then(async (d) => {
+      const link = publicDocUrl(d.link);
+      const said = await shareOrCopy(link, docTitle);
+      toast((said ? said + " " : "Share link issued. ") + "Expires " + fmtDate(d.expires) + ", logged as SHARED.");
+    })
+    .catch((e: unknown) => toast(errMessage(e), "bad"));
+
+  /* Confirmed first — Revise sits next to the button you press most, and one
+     stray click would otherwise clone a document. Already a draft? Then there
+     is nothing to clone and nothing to explain: open the editor. */
   const revise = () => {
-    toast("Revising…");
-    call(AdminOpsService.reviseQuotation(q.id))
-      .then((row) => { toast("Revision opened."); go("#/quotations/" + row.id + "?mode=edit"); })
-      .catch((e: unknown) => toast(errMessage(e), "bad"));
+    if (isDraft) return go(to({ mode: "edit" }));
+    modal(<ReviseModal q={q} onClose={closeLayer}
+      run={() => call(AdminOpsService.reviseQuotation(q.id))
+        .then((row) => { closeLayer(); toast("Revision opened as v" + row.version + "."); go("#/quotations/" + row.id + "?mode=edit"); })} />);
   };
 
   return (
@@ -101,6 +163,7 @@ export default function QuotationDetail({ id, tab, params }: {
                   : null}
                 <button className="btn pri" onClick={() => go(to({ mode: "preview" }))}>
                   Preview &amp; issue</button>
+                <MoreBtn onClick={moreMenu} />
               </>
             : <>
                 <button className="btn" onClick={() => go(to({ mode: "preview" }))}>
@@ -108,6 +171,7 @@ export default function QuotationDetail({ id, tab, params }: {
                 {can("quotations", "edit")
                   ? <button className="btn pri" onClick={revise}><Icon name="plus" />Revise</button>
                   : null}
+                <MoreBtn onClick={moreMenu} />
               </>}
         </div>
       </div>
@@ -161,28 +225,19 @@ export default function QuotationDetail({ id, tab, params }: {
         </>
       ) : null}
 
-      <div className="card-f" style={{ marginTop: "18px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
-        {q.status === "issued" && can("quotations", "accept")
-          ? <>
-              <button className="btn pri" onClick={() => doAction("Accepting",
-                () => call(AdminOpsService.acceptQuotation(q.id)))}><Icon name="check" />Accept</button>
-              <button className="btn dgr" onClick={openReject}>Reject</button>
-            </>
-          : null}
-        {(q.status === "rejected" || q.status === "expired") && can("quotations", "accept")
-          ? <button className="btn pri" onClick={() => doAction("Accepting",
-              () => call(AdminOpsService.acceptQuotation(q.id)))}><Icon name="check" />Accept</button>
-          : null}
-        {isDraft && can("quotations", "issue")
-          ? <button className="btn pri" onClick={() => doAction("Issuing",
-              () => call(AdminOpsService.issueQuotation(q.id)))}><Icon name="check" />Issue</button>
-          : null}
-        {isDraft && can("quotations", "cancel")
-          ? <button className="btn" onClick={() => doAction("Cancelling",
-              () => call(AdminOpsService.cancelQuotation(q.id)))}>Cancel draft</button>
-          : null}
-      </div>
+      {/* Where this document sits in the sequence, and why the next link is
+          not there yet. Same strip the invoice page carries. */}
+      <SectionHead title="Related" />
+      <ChainStrip dealRef={q.dealRef} here="quotation" quotation={q} />
+
     </div>
+  );
+}
+
+function MoreBtn({ onClick }: { onClick: (e: React.MouseEvent<HTMLElement>) => void }) {
+  return (
+    <button className="btn icon" data-act="qt-more" aria-haspopup="menu"
+      aria-label="More actions" title="More actions" onClick={onClick}><Icon name="dots" /></button>
   );
 }
 

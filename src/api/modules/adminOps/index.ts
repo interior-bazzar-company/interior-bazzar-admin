@@ -29,14 +29,16 @@ export async function call<T>(p: Promise<ApiResponseType<T>>): Promise<T> {
 }
 
 /** One row of `me/permissions/`'s `modules[]` — the single list that drives
- * both the sidebar nav and the permission matrix. `level`: 0 none, 1 read,
- * 2 write, 3 sensitive. */
+ * both the sidebar nav and the permission matrix. `actions` is what this
+ * session MAY DO on the module, resolved server-side: the exact set the API
+ * itself enforces with. An empty array is no access at all, and `view` is the
+ * gate — a module without it is refused whatever else is listed. */
 export interface AdminModuleInfo {
   key: string;
   label: string;
   groupLabel: string;
   displayOrder: number;
-  level: number;
+  actions: string[];
 }
 export interface MeUser {
   id: number;
@@ -51,8 +53,10 @@ export interface MePermissions {
   isFullAccess: boolean;
   user: MeUser;
   modules: AdminModuleInfo[];
-  /** "moduleKey.action" -> minimum level required. Missing = treat as 3. */
-  actions: Record<string, number>;
+  /** "moduleKey.action" -> the tier that verb sits at (1 read, 2 write,
+   * 3 sensitive). METADATA, not authorization — nothing is checked against it
+   * any more; the roles editor reads it to mark its sensitive columns. */
+  actionLevels: Record<string, number>;
   /** True when the user passes the admin gate, false when a soft-deleted,
    * demoted or role-stripped account does not — distinct from `role: null`
    * (a genuine new hire awaiting a role). Optional: older/racing backends
@@ -61,19 +65,33 @@ export interface MePermissions {
   gateOk?: boolean;
 }
 
-/** roles/ editor grid — a role's grant is moduleKey -> level (0..3). */
-export type RoleModules = Record<string, number>;
+/** roles/ editor grid — a role's grant is moduleKey -> the action keys it
+ *  holds there. A module absent from the map, or mapped to [], is not granted.
+ *  Per ACTION, not per level: "may GET but may not POST" is a first-class
+ *  answer now, which a 0..3 tier could not express. */
+export type RoleModules = Record<string, string[]>;
+/** A verb a module supports. `minLevel` is how sensitive it is (1 read,
+ *  2 write, 3 sensitive) — display only, it authorizes nothing. */
+export interface RoleActionDef {
+  key: string;
+  minLevel: number;
+}
 export interface RolesModuleDef {
   key: string;
   label: string;
   groupLabel: string;
   displayOrder: number;
+  /** The columns this module offers. Empty = no tickable verb at all. */
+  actions: RoleActionDef[];
 }
 export interface AdminRole {
   id: number;
   name: string;
   isFullAccess: boolean;
   isSystem: boolean;
+  /** Deactivated roles stay assigned but grant nothing — the server drops
+      them from every permission resolve. */
+  isActive: boolean;
   portal: string;
   userCount: number;
   modules: RoleModules;
@@ -98,6 +116,13 @@ export interface AdminUserRow {
   email: string;
   phone: string;
   roles: AdminUserRole[];
+  /** Account facts (AdminUserTasks._accountFacts). Optional: a backend that
+   * predates them omits them, and "no field" must read as unknown — never as
+   * a deactivated account or a member who never signed in. `lastLogin` is ""
+   * when the account genuinely has no sign-in on record. */
+  isActive?: boolean;
+  addedAt?: string;
+  lastLogin?: string;
 }
 export interface AdminUserInput {
   username: string;
@@ -127,6 +152,8 @@ export interface AuditResponse {
 }
 export interface PlanFeature {
   text: string;
+  /** Detail line printed under the bullet on the public card. Optional. */
+  subItem?: string;
 }
 export interface PlanCycle {
   id: number; durationMonths: number; price: string; oldPrice: string | null;
@@ -142,8 +169,13 @@ export interface PlanRow {
   /** Card order inside the family, 1 = first. Siblings shift to make room. */
   displayIndex?: number;
   badge?: string; badgeIcon?: string;
-  /** Stored as [{text}]; writes accept plain strings too. */
+  /** Stored as [{text, subItem?}]; writes accept plain strings too. */
   features: (PlanFeature | string)[]; billingCycles: PlanCycle[]; isActive: boolean;
+  /** Archived = the soft delete. Out of the catalogue, still listed for admins. */
+  isArchived?: boolean;
+  createdAt?: string | null; updatedAt?: string | null;
+  /** What points at this plan. Only the list endpoint fills it. */
+  usage?: { members: number; membersActive: number; quotationLines: number } | null;
 }
 export interface BannerButton { label: string; link: string; isPrimary: boolean; }
 export interface BannerMetric { metric: string; description: string; index: number; }
@@ -222,13 +254,32 @@ export interface DealRow {
   tags: DealTagVocab[];
   createdAt: string;
   updatedAt: string;
+  /** The Q / I / ₹ chain. `quotationStatus` is the LIVE quotation's status
+   *  ("none" when there is none, or a revision has superseded every one);
+   *  `invoiceStatus` is "none" | "draft" | "paid" — an invoice cannot be
+   *  issued without its payment, so there is no issued-but-unpaid state to
+   *  report; `paid` is a payment on the ledger that has not been reversed. */
+  quotationStatus: string;
+  invoiceStatus: string;
+  paid: boolean;
+  /** Money, in paise, and both are SUMS OF REAL ROWS — `collectedPaise` is the
+   *  DealPayment ledger (reversals are negative rows, so they subtract
+   *  themselves), `outstandingPaise` is the agreed value minus it, floored at
+   *  zero. Never an estimate or a projection. */
+  collectedPaise: number;
+  outstandingPaise: number;
 }
 export interface DealsListResponse {
   deals: DealRow[];
   total: number;
   pageNo: number;
   pageSize: number;
-  counts: { total: number; byStage: Record<string, number> };
+  /** `collectedPaise` / `outstandingPaise` cover the same scope byStage does —
+   *  the filters WITHOUT the stage narrowing — and both are sums of real rows.
+   *  Outstanding is floored per deal, so one overpaid deal cannot cancel out
+   *  another's genuine shortfall. */
+  counts: { total: number; byStage: Record<string, number>;
+            collectedPaise: number; outstandingPaise: number };
   stages: DealStageVocab[];
   priorities: DealPriorityVocab[];
   tags: DealTagVocab[];
@@ -373,6 +424,12 @@ export interface InvoiceEventRow {
   id: number; eventType: string; actor: DealPersonRef | null; actorRole: string;
   detail: string; createdAt: string;
 }
+/** What the server needs about a file the browser uploaded to S3 itself.
+ *  `fileUrl` must be the one the presign call handed back — the server derives
+ *  the storage key from it and refuses any other host. */
+export interface InvoiceProofUpload {
+  fileUrl: string; filename: string; mime: string; bytes: number;
+}
 export interface InvoiceProofRow {
   id: number; filename: string; mime: string; bytes: number; url: string | null;
   uploadedBy: DealPersonRef | null; uploadedAt: string; removed: boolean;
@@ -451,10 +508,10 @@ export class AdminOpsService {
   static listRoles() {
     return apiService.getGetApiResponse<RolesListResponse>(`${base}/roles/`);
   }
-  static createRole(name: string, modules: RoleModules) {
-    return apiService.getPostApiResponse<AdminRole>(`${base}/roles/`, { name, modules });
+  static createRole(name: string, modules: RoleModules, isActive = true) {
+    return apiService.getPostApiResponse<AdminRole>(`${base}/roles/`, { name, modules, isActive });
   }
-  static updateRole(id: number, data: { name?: string; modules: RoleModules }) {
+  static updateRole(id: number, data: { name?: string; modules: RoleModules; isActive?: boolean }) {
     return apiService.getPutApiResponse<AdminRole>(`${base}/roles/`, { id, ...data });
   }
   // Contract-specified (§3); not yet wired server-side as of this write — see report.
@@ -532,9 +589,14 @@ export class AdminOpsService {
   static setPlanActive(id: number, isActive: boolean) {
     return apiService.getPostApiResponse<PlanRow>(`${base}/plans/${id}/archive/`, { isActive });
   }
-  // Soft delete: hidden from admin + public; existing subscribers keep the plan.
-  static deletePlan(id: number) {
-    return apiService.getDeleteApiResponse<{ id: number; deleted: boolean }>(`${base}/plans/${id}/`);
+  // Archive: out of the catalogue and never buyable again, still listed for admins;
+  // existing subscribers keep the plan, and the records naming it stay explainable.
+  static archivePlan(id: number) {
+    return apiService.getDeleteApiResponse<PlanRow>(`${base}/plans/${id}/`);
+  }
+  // Restore an archived plan. It comes back OFF sale — never a silent re-launch.
+  static setPlanArchived(id: number, archived: boolean) {
+    return apiService.getPostApiResponse<PlanRow>(`${base}/plans/${id}/archive/`, { archived });
   }
 
   // ── House banners (real HomeHeroBanner hero slides) ──
@@ -935,14 +997,13 @@ export class AdminOpsService {
     return apiService.getPostApiResponse<{ storageKey: string; link: string; expires: string }>(
       `${base}/invoices/${id}/document/share/`, {});
   }
-  /** multipart/form-data — the one place this feature handles a real
-   *  uploaded file (a bank-transfer screenshot); every other document row in
-   *  Quotations/Invoices is metadata-only. Draft-only. */
-  static attachInvoiceProof(id: number, file: File) {
-    const body = new FormData();
-    body.append("file", file);
+  /** The receipt for a file the BROWSER already put in S3 with a presigned PUT
+   *  (CommonService.getUploadUrl, intent PaymentScreenshot). The bytes never
+   *  cross this API — a phone photo of a bank slip is exactly the payload that
+   *  dies in a proxied multipart POST. Draft-only. */
+  static attachInvoiceProof(id: number, upload: InvoiceProofUpload) {
     return apiService.getPostApiResponse<InvoiceProofRow>(
-      `${base}/invoices/${id}/proofs/`, body, { responseType: "formdata" });
+      `${base}/invoices/${id}/proofs/`, upload);
   }
   static invoiceProof(id: number, proofId: number) {
     return apiService.getGetApiResponse<InvoiceProofRow>(`${base}/invoices/${id}/proofs/${proofId}/`);

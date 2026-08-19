@@ -11,9 +11,9 @@ import {
   ALL_STAGES, D, STAGE, STRIP_STAGES, daysFrom, dealHash, head, inr, localSort, merge, omit,
   place, urgency, useDealCounts, useFilters
 } from "./useDeals";
-import type { DealsApiState, Params } from "./useDeals";
+import type { Counts, DealsApiState, Params } from "./useDeals";
 import { legacyPriorityInt, legacyStageInt } from "./adapter";
-import { MoneyCell, NextCell, OwnerCell, TagChips } from "./bits";
+import { ChainDots, MoneyCell, NextCell, OwnerCell, TagChips } from "./bits";
 import { useActs } from "./Modals";
 import { ListSkeleton } from "../../ui";
 
@@ -29,10 +29,7 @@ import { ListSkeleton } from "../../ui";
    Money is deliberately not clickable. A cell that highlights on hover and
    does nothing on click is worse than one that never invited the press, so the
    two read-outs render as plain cells and are visibly quieter. */
-export function AttnStrip({ p, m }: {
-  p: Params;
-  m: { byStage: Record<number, number>; total: number };
-}) {
+export function AttnStrip({ p, m }: { p: Params; m: Counts }) {
   /* Toggling: clicking the stage you are already on clears it back to Total,
      so the strip never becomes a trap you have to leave via the chip row. */
   const stageRoute = (s: number) =>
@@ -52,9 +49,18 @@ export function AttnStrip({ p, m }: {
       to: stageRoute(s), on: String(p.stage) === String(s),
       dot: D.STAGES[s].tone || ""
     })),
-    /* No money cells. Outstanding and collected were sums over the browser's
-       own payment store — two figures with no source, sitting in the row a
-       reader trusts most. They come back when payments do. */
+    /* The money used to be pushed to the far right by a spacer, which put a
+       hand's width of nothing between Won and the figure Won produces. They are
+       the same thought — the funnel, and what came out of it — so they sit
+       together, divided by the same hairline as every other pair.
+
+       Neither cell is a link: every other cell filters the list, and there is
+       no "show me the outstanding ones" filter for these to route to. A cell
+       that looks clickable and is not is worse than one that plainly reads. */
+    "sep",
+    { k: "outstanding", v: inr(m.outstanding, { compact: true }), tone: "warn" },
+    "sep",
+    { k: "collected", v: inr(m.collected, { compact: true }), tone: "ok" },
   ];
   return <StatStrip cells={cells} />;
 }
@@ -75,6 +81,11 @@ export function TbStats({ p }: { p: Params }) {
       <span className="v tnum">{v}</span><span className="k">{k}</span>
     </button>
   );
+  const money = (k: string, v: string, tone: string) => (
+    <span key={k} className={"tb-stat ro " + tone} title={v + " " + k}>
+      <span className="v tnum">{v}</span><span className="k">{k}</span>
+    </span>
+  );
   return (
     <span className="tb-stats">
       {cell("total", m.total,
@@ -83,6 +94,14 @@ export function TbStats({ p }: { p: Params }) {
       {STRIP_STAGES.map((s) => cell(D.STAGES[s].label.toLowerCase(), m.byStage[s] || 0,
         "#/deals" + qs(merge(p, { stage: String(p.stage) === String(s) ? "" : s })),
         String(p.stage) === String(s), D.STAGES[s].tone || ""))}
+      {/* The same two figures the table strip ends on, in the same order —
+          Chat has no room for the strip in its body, so the topbar carries the
+          whole row or the two views disagree about what the pipeline is worth.
+          Read-outs, not buttons: there is nothing for them to filter to. */}
+      <span className="tb-sep"></span>
+      {money("outstanding", inr(m.outstanding, { compact: true }), "warn")}
+      <span className="tb-sep"></span>
+      {money("collected", inr(m.collected, { compact: true }), "ok")}
     </span>
   );
 }
@@ -178,7 +197,7 @@ export function DealsList({ id, p, api }: {
           : null}
       </div>
 
-      <AttnStrip p={p} m={{ byStage: api.counts.byStage, total: api.counts.total }} />
+      <AttnStrip p={p} m={api.counts} />
 
       <FilterChips params={omit(p, ["view"])} onUnfilter={onUnfilter}
         labels={{ q: "Search", stage: "Stage", owner: "Owner", priority: "Priority",
@@ -213,7 +232,7 @@ function DealsTable({ list, sel, p, onCreate, onClearFilters }: {
   return (
     <table className="tbl dls-tbl">
       <thead><tr>
-        <th style={{ width: "3px" }}></th><th>Deal</th><th>Stage</th>
+        <th style={{ width: "3px" }}></th><th>Deal</th><th>Stage</th><th>Chain</th>
         <th className="n">Deal value</th><th>Owner</th><th>Next action</th>
       </tr></thead>
       <tbody>
@@ -243,6 +262,7 @@ function DealsTable({ list, sel, p, onCreate, onClearFilters }: {
                 <Pill text={D.STAGES[d.stage].label} tone={D.STAGES[d.stage].tone} />
                 <div className="cell-2">{Math.abs(daysFrom(d.stage_since))}d in stage</div>
               </td>
+              <td><ChainDots d={d} /></td>
               <td className="n dls-money"><MoneyCell d={d} /></td>
               <td><OwnerCell d={d} /></td>
               <td className="dls-na"><NextCell d={d} /></td>
@@ -312,6 +332,7 @@ function BoardCard({ d, sel, p }: { d: any; sel: string | null; p: Params }) {
       data-go={to} onClick={() => go(to)}>
       <div className="n1"><span className="nm">{d.customer_name}</span><span className="rf">{d.deal_id}</span></div>
       <div className="n2">
+        <ChainDots d={d} />
         {/* The deal's own value. null means nothing has been quoted yet, which
             is not the same as zero and must not render as one. */}
         <span className="amt tnum">{d.deal_value ? inr(d.deal_value, { compact: true }) : "—"}</span>

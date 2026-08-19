@@ -4,20 +4,101 @@
    does no fetching of its own — it re-renders whenever its parent's `tick`
    changes, same as the prototype's re-open-on-every-write behaviour.
 
-   FIELDS THE OLD LOCAL RECORD HAD THAT THE REAL ONE DOES NOT: designation,
-   avatar, account status (active/inactive/suspended/locked), last sign-in,
-   registration date, failed-attempt count. None of interior_admin's
-   AdminUserViews expose these today, so none of them are rendered here —
-   showing them against no data would be exactly the fabrication guardrail 6
-   forbids. See the report for the full account.
+   FIELDS THE OLD LOCAL RECORD HAD THAT THE REAL ONE STILL DOES NOT:
+   designation, avatar, the locked/suspended half of account status, and the
+   failed-attempt count — no column records any of them, and a fabricated
+   "0 failed attempts" reads as a fact. Everything else the prototype shows
+   is here and real: `isActive`, `addedAt` and `lastLogin` come off the user
+   record (AdminUserTasks._accountFacts), and Effective access is resolved
+   from the roles this member holds — the same levels the server enforces.
    ===================================================================== */
-import { Icon, KvList, Notice, Pill, SectionHead } from "../../ui";
+import { EmptyState, Icon, KvList, Notice, Pill, SectionHead } from "../../ui";
+import { fmtDate } from "../../ui/format";
 import { can } from "../../shell/AdminShell";
+import { getSession, HIDDEN_MODULES } from "../../auth/session";
 import { Avatar, RoleChips } from "../teamShared";
 import type { Member, Ops, Role } from "../teamShared";
 import {
   MemberDeleteModal, MemberEditModal, MemberRolesModal, MemberSendCredentialsModal,
 } from "./memberModals";
+
+/* The prototype's ACTION_LABEL. The keys are the server's own
+   (ModuleAction.key), so anything unlisted falls back to the key itself
+   rather than disappearing. */
+const ACTION_LABEL: Record<string, string> = {
+  view: "View", create: "Create", edit: "Edit", stage: "Change stage",
+  payment: "Log payment", close: "Close", export: "Export", record: "Record",
+  issue: "Issue", accept: "Accept", cancel: "Cancel", reverse: "Reverse",
+  pricing: "Set pricing", status: "Activate", archive: "Archive", roles: "Manage roles",
+};
+
+/** A member's grants: the UNION of the verbs their roles tick — the same
+    resolution resolve_grants() does server-side. Inactive roles contribute
+    nothing there, so they must contribute nothing here either. */
+function grantsOfMember(u: Member, roles: Role[]): Record<string, string[]> {
+  const held = new Set((u.roles || []).map((r) => r.id));
+  const out: Record<string, string[]> = {};
+  roles.filter((r) => held.has(r.id) && r.isActive).forEach((r) => {
+    Object.keys(r.modules || {}).forEach((k) => {
+      (r.modules[k] || []).forEach((a) => {
+        const list = (out[k] = out[k] || []);
+        if (list.indexOf(a) < 0) list.push(a);
+      });
+    });
+  });
+  return out;
+}
+
+/* WHAT THEY CAN ACTUALLY DO, resolved. A list of role names answers "what are
+   they called"; this answers "what happens when they click". The module list
+   comes off the resolved session and the verbs off the roles themselves — the
+   same two tables can() asks, so this pane and the panel cannot disagree. */
+function EffectiveAccess({ u, roles }: { u: Member; roles: Role[] }) {
+  const s = getSession();
+  if (u.isActive === false)
+    return <Notice tone="warn" ico="lock" text={
+      <><b>This account is inactive.</b> Whatever its roles say, it cannot sign in and every
+        call it makes would be refused.</>
+    } />;
+  if (u.isSuperAdmin || roles.some((r) => r.isFullAccess && (u.roles || []).some((x) => x.id === r.id)))
+    return <Notice ico="shield" text={
+      <><b>Everything.</b> Full access is a grant, not a list — it resolves to a wildcard, so a
+        module added tomorrow is included without anybody editing a matrix.</>
+    } />;
+
+  const grants = grantsOfMember(u, roles);
+  /* `view` is the gate: a module ticked everywhere except view grants nothing,
+     so it must not be listed here as if it did. */
+  const mods = (s ? s.modules : []).filter(
+    (m) => !HIDDEN_MODULES.has(m.key) && (grants[m.key] || []).indexOf("view") >= 0);
+  if (!mods.length)
+    return <EmptyState icon="lock" title="No access to anything"
+                       body="This member can sign in and will see an empty panel. Assign a role." />;
+
+  return (
+    <ul className="pl-feats">
+      {mods.map((m) => {
+        const acts = (grants[m.key] || []).filter((a) => a !== "view");
+        return (
+          <li key={m.key}>
+            <Icon name="check" size="sm" />
+            <span>
+              <b>{m.label}</b>
+              <span className="d">{acts.length
+                ? acts.map((a) => ACTION_LABEL[a] || a).join(" · ")
+                : "View only"}</span>
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function StatusPill({ u }: { u: Member }) {
+  if (u.isActive === undefined) return <span className="faint">—</span>;
+  return u.isActive ? <Pill text="Active" tone="ok" /> : <Pill text="Inactive" tone="bad" />;
+}
 
 export default function MemberDrawer({ member: u, roles, ops }: { member: Member; roles: Role[]; ops: Ops }) {
   return (
@@ -28,6 +109,7 @@ export default function MemberDrawer({ member: u, roles, ops }: { member: Member
           <div style={{ minWidth: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
               <h2 style={{ fontSize: "var(--text-2xl)", fontWeight: 600 }}>{u.name}</h2>
+              <StatusPill u={u} />
               {u.isSuperAdmin ? <Pill text="Full access" tone="brand" /> : null}
               {u.isVerified ? <Pill text="Verified" tone="ok" /> : null}
             </div>
@@ -52,8 +134,19 @@ export default function MemberDrawer({ member: u, roles, ops }: { member: Member
         <SectionHead title="Access" />
         <KvList cls="wide" pairs={[
           ["Username", <span className="mono">{u.username || "—"}</span>],
+          ["Account status", <StatusPill u={u} />],
           ["Roles", u.roles.length ? <RoleChips u={u} />
             : <span className="faint">none — this account can sign in and do nothing</span>],
+        ]} />
+
+        <SectionHead title="Effective access" />
+        <EffectiveAccess u={u} roles={roles} />
+
+        <SectionHead title="Activity" />
+        <KvList cls="wide" pairs={[
+          ["Last sign-in", u.lastLogin ? fmtDate(u.lastLogin)
+            : <span className="faint">never signed in</span>],
+          ["Added", u.addedAt ? fmtDate(u.addedAt) : <span className="faint">—</span>],
         ]} />
 
         <SectionHead title="Security" />

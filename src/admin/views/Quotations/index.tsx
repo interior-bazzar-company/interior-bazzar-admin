@@ -3,23 +3,25 @@
    title in the topbar, a command row, one stat strip, the active filters,
    and a table in a viewport-bounded body.
    ===================================================================== */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { inr, fmtDate } from "../../ui/format";
-import { EmptyState, FilterChips, Notice, Pill, Select, StatStrip, qs, Icon } from "../../ui";
+import { EmptyState, FilterChips, Notice, Pill, SearchField, Select, StatStrip, qs, Icon } from "../../ui";
 import type { StatCell } from "../../ui";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
+import { getSession } from "../../auth/session";
 import { ListSkeleton } from "../../ui";
 import { STATUS_LABEL, STATUS_TONE, useQuotationsList } from "./api";
 import type { QuotationRow } from "./api";
-import { partyLine } from "./helpers";
+import { daysUntil, filterQuotations, partyLine, summarize } from "./helpers";
 import QuotationDetail from "./Detail";
 import QuotationBuilder from "./Builder";
 import QuotationPreview from "./Preview";
-import PickDealModal from "./PickDealModal";
+import PickDeal from "./PickDeal";
 
 const STATUSES = ["draft", "issued", "accepted", "rejected", "expired", "superseded", "cancelled"];
+const NEW_HASH = "#/quotations?new=1";
 
 /* THE MODULE ROUTER. Four screens, exactly as the prototype has them
    (views-quotation.js: list / detail / builder / preview) -- no drawer. A 720px
@@ -34,6 +36,8 @@ export default function Quotations() {
   const tab = sp.get("tab") || "items";
   const routeParams: Record<string, string> = {};
   sp.forEach((v, k) => { if (k !== "mode") routeParams[k] = v; });
+  /* `?new=1` is step 1 of creating one — a page, not a dialog over the list. */
+  if (!id && sp.get("new") === "1") return <PickDeal />;
   if (id && mode === "preview") return <QuotationPreview id={id} params={routeParams} />;
   if (id && mode === "edit") return <QuotationBuilder id={id} params={routeParams} />;
   if (id) return <QuotationDetail id={id} tab={tab} params={routeParams} />;
@@ -43,70 +47,126 @@ export default function Quotations() {
 function QuotationsList() {
   const [sp] = useSearchParams();
   const { go } = useNav();
-  const { modal, closeLayer, toast } = useShell();
-  const [tick, setTick] = useState(0);
-  const bump = useCallback(() => setTick((t) => t + 1), []);
+  const { toast } = useShell();
 
   const params: Record<string, string> = {};
   sp.forEach((v, k) => { params[k] = v; });
-  const p = { status: params.status || "", sort: params.sort || "" };
+  const p = { q: params.q || "", status: params.status || "", owner: params.owner || "", sort: params.sort || "" };
 
-  const { loading, rows, error } = useQuotationsList(tick, { status: p.status || undefined });
+  /* The WHOLE page, then narrowed below. Status/owner/search all filter
+     client-side because the strip has to keep counting the states you are NOT
+     looking at — a server-side `?status=` makes every other cell read 0 the
+     moment you pick one.
+     ponytail: 200-row ceiling (PAGE_SIZE_MAX). Move q/owner to the API and add
+     a counts endpoint when quotations outgrow one page. */
+  const { loading, rows: all, error } = useQuotationsList(0, { sort: p.sort || undefined });
 
   const crumbs = useMemo(() => <span className="tb-title">Quotations</span>, []);
   usePageChrome({ crumbs, right: null, parent: null });
 
-  /* A new draft opens on its own editor page -- the prototype's builder(). */
-  const done = useCallback((msg: string, ref: number | null) => {
-    closeLayer(); toast(msg);
-    go(ref ? "#/quotations/" + ref + "?mode=edit" : "#/quotations");
-    bump();
-  }, [closeLayer, toast, go, bump]);
-
   const onFilter = (name: string, value: string) => {
     go("#/quotations" + qs({ ...params, [name]: value }));
   };
+  /* Typing would otherwise push one history entry per keystroke — the same
+     220ms the Deals search debounces on. */
+  const timer = useRef(0);
+  const search = sp.toString();
+  const onSearch = useCallback((name: string, value: string) => {
+    const next: Record<string, string> = {};
+    new URLSearchParams(search).forEach((v, k) => { next[k] = v; });
+    next[name] = value;
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => go("#/quotations" + qs(next)), 220);
+  }, [search, go]);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+
   const onUnfilter = (k: string) => {
     const q2: Record<string, string> = {};
     if (k !== "*") for (const x in params) if (x !== k) q2[x] = params[x];
     go("#/quotations" + qs(q2));
   };
 
-  const byStatus: Record<string, number> = {};
-  rows.forEach((q) => { byStatus[q.status] = (byStatus[q.status] || 0) + 1; });
+  const rows = filterQuotations(all, p);
+
+  /* Owner is a full-access control only: every other session is already scoped
+     to its own rows, so the picker would be a one-option list filtering
+     nothing. Locked controls are ABSENT here, not greyed. */
+  const session = getSession();
+  const head = !!(session && session.isFullAccess);
+  const owners = useMemo(() => {
+    const m = new Map<number, string>();
+    all.forEach((x) => { if (x.owner) m.set(x.owner.id, x.owner.name); });
+    return Array.from(m, ([v, l]) => ({ v: String(v), l }));
+  }, [all]);
+
+  const { byStatus, expiring, awaitingPaise, agreedPaise } = summarize(all);
   function route(k: string, v: string) {
     const q2: Record<string, string> = { ...params };
     q2[k] = String(params[k] || "") === String(v) ? "" : v;
     return "#/quotations" + qs(q2);
   }
+  /* Seven cells, in the order a quotation is worked: how many there are, the
+     three live states, the one number that gets worse while nobody looks at
+     it, then the money those states hold. Rejected/expired/superseded/
+     cancelled are where a quotation LEAVES the funnel, not a position in it —
+     each is one pick away in the Status control instead. */
   const cells: (StatCell | "sep")[] = [
-    { k: "quotations", v: rows.length, to: route("status", ""), on: !p.status },
+    { k: "total", v: all.length, to: route("status", ""), on: !p.status },
     "sep",
-    ...STATUSES.filter((s) => byStatus[s]).map((s) => ({
-      k: STATUS_LABEL[s].toLowerCase(), v: byStatus[s] || 0,
-      to: route("status", s), on: p.status === s, tone: STATUS_TONE[s],
-    })),
+    { k: "draft", v: byStatus.draft || 0, dot: "", to: route("status", "draft"), on: p.status === "draft" },
+    { k: "issued", v: byStatus.issued || 0, dot: "info", to: route("status", "issued"), on: p.status === "issued" },
+    { k: "accepted", v: byStatus.accepted || 0, dot: "ok", to: route("status", "accepted"), on: p.status === "accepted" },
+    "sep",
+    { k: "expiring", v: expiring, dot: expiring ? "bad" : "", tone: expiring ? "bad" : "",
+      to: route("status", "expiring"), on: p.status === "expiring",
+      title: "Issued quotations within 3 days of lapsing" },
+    "sep",
+    { k: "awaiting", v: inr(awaitingPaise, { compact: true }), tone: "warn",
+      title: "Value of quotations issued and not yet answered" },
+    "sep",
+    { k: "agreed", v: inr(agreedPaise, { compact: true }), tone: "ok",
+      title: "Value of accepted quotations — the agreed value written back to the deals" },
   ];
 
   const chips = Object.keys(params).filter((k) => params[k]).length > 0;
 
-  const openPick = () => {
-    if (!can("quotations", "create")) return toast("403 — you do not have quotation-creation access.", "bad");
-    modal(<PickDealModal onClose={closeLayer} onDone={(qid: number) => done("Quotation drafted.", qid)} />, "wide");
+  /* Step 1 of 2 — its own page. See PickDeal.tsx. */
+  const openPick = () => go(NEW_HASH);
+
+  /* What the list endpoint actually returns, and nothing more — the rows on
+     screen, filters and all. Amounts stay in paise, unrounded. */
+  const exportCsv = () => {
+    const out: (string | number)[][] = [["quotation_number", "version", "status", "deal_ref",
+      "customer", "value_paise", "quotation_date", "valid_until", "issued_at", "owner"]];
+    rows.forEach((x) => out.push([x.quotationNumber || "", x.version, x.status, x.dealRef,
+      partyLine(x), x.grandTotalPaise, x.quotationDate || "", x.validUntil || "",
+      x.issuedAt || "", x.owner ? x.owner.name : ""]));
+    const csv = out.map((r) => r.map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(",")).join("\n");
+    const a = document.createElement("a");
+    a.href = "data:text/csv;charset=utf-8," + encodeURIComponent(csv);
+    a.download = "quotations.csv"; a.click();
+    toast("Exported " + rows.length + " quotations — the rows currently filtered. Amounts are in paise, unrounded.");
   };
 
-  if (loading && !rows.length) return <ListSkeleton />;
+  if (loading && !all.length) return <ListSkeleton />;
 
   return (
     <div className="dls">
       <div className="dls-cmd">
+        <SearchField ph="Search quotation no, deal ref or customer…" val={p.q} onFilter={onSearch} />
         <Select key={"status" + p.status} name="status" label="Status" value={p.status} onFilter={onFilter}
-          options={STATUSES.map((s) => ({ v: s, l: STATUS_LABEL[s] }))} />
+          options={STATUSES.map((s) => ({ v: s, l: STATUS_LABEL[s] + " (" + (byStatus[s] || 0) + ")" }))
+            .concat([{ v: "expiring", l: "Expiring ≤3 days (" + expiring + ")" }])} />
+        {head
+          ? <Select key={"owner" + p.owner} name="owner" label="Owner" value={p.owner}
+              onFilter={onFilter} options={owners} />
+          : null}
         <Select key={"sort" + p.sort} name="sort" label="Sort" value={p.sort} onFilter={onFilter}
           options={[{ v: "newest", l: "Newest first" }, { v: "oldest", l: "Oldest first" }]} />
         <span className="spacer"></span>
+        <button className="btn" data-act="qt-export" onClick={exportCsv}><Icon name="download" />Export</button>
         {can("quotations", "create")
-          ? <button className="btn pri" data-act="qt-new" onClick={openPick}><Icon name="plus" />Create quotation</button>
+          ? <button className="btn pri" data-act="qt-new" data-go={NEW_HASH} onClick={openPick}><Icon name="plus" />Create quotation</button>
           : null}
       </div>
 
@@ -115,7 +175,8 @@ function QuotationsList() {
       {error ? <Notice tone="bad" ico="alert" text={<><b>Could not load quotations.</b> {error}</>} /> : null}
 
       {chips ? <div className="dls-chips">
-        <FilterChips params={params} onUnfilter={onUnfilter} labels={{ status: "Status", sort: "Sort" }} />
+        <FilterChips params={params} onUnfilter={onUnfilter}
+          labels={{ q: "Search", status: "Status", owner: "Owner", sort: "Sort" }} />
       </div> : null}
 
       <div className="dls-body">
@@ -126,19 +187,19 @@ function QuotationsList() {
 }
 
 function QuotationsTable({ rows, p, go, onUnfilter, openPick }: {
-  rows: ReturnType<typeof useQuotationsList>["rows"]; p: Record<string, string>;
+  rows: QuotationRow[]; p: Record<string, string>;
   go: (h: string) => void; onUnfilter: (k: string) => void; openPick: () => void;
 }) {
-  const filtered = !!p.status;
+  const filtered = !!(p.q || p.status || p.owner);
   if (!rows.length)
     return <EmptyState
-      icon="quote" title={filtered ? "No quotations match this filter" : "No quotations yet"}
-      body={filtered ? "Nothing matches. Clear the filter to widen the search."
+      icon="quote" title={filtered ? "No quotations match these filters" : "No quotations yet"}
+      body={filtered ? "Nothing matches. Clear a filter to widen the search."
         : "A quotation is born inside a deal — open a deal and quote it, or start one from here."}
       action={filtered
-        ? <button className="btn" data-unfilter="*" onClick={() => onUnfilter("*")}>Clear filter</button>
+        ? <button className="btn" data-unfilter="*" onClick={() => onUnfilter("*")}>Clear all filters</button>
         : can("quotations", "create")
-          ? <button className="btn pri" data-act="qt-new" onClick={openPick}>Create quotation</button>
+          ? <button className="btn pri" data-act="qt-new" data-go={NEW_HASH} onClick={openPick}>Create quotation</button>
           : null} />;
 
   return (
@@ -187,14 +248,4 @@ function ValidityChip({ q }: { q: QuotationRow }) {
     <span style={style}>{fmtDate(q.validUntil)}</span>
     <div className="cell-2">{d === 0 ? "today" : "in " + d + "d"}</div>
   </>;
-}
-
-/** Whole days from today to a date-only ISO string. Local-time field parse,
- *  same reason fmtDate does it that way. */
-function daysUntil(iso: string | null | undefined): number {
-  if (!iso) return 0;
-  const p = String(iso).slice(0, 10).split("-");
-  const then = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
-  const now = new Date(); now.setHours(0, 0, 0, 0);
-  return Math.round((then.getTime() - now.getTime()) / 86400000);
 }

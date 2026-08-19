@@ -89,17 +89,26 @@ export default function Plans() {
         </>}
         run={() => call(AdminOpsService.setPlanActive(ref, false)).then(() => done("Taken off sale.", ref))} />);
     }
-    if (a === "pl-del") {
+    if (a === "pl-archive") {
+      const lines = pl.usage.quotationLines, members = pl.usage.members;
       return modal(<ConfirmModal
-        heading="Delete plan" sub={pl.title} onClose={closeLayer}
-        tone="bad" confirmLabel="Delete plan" confirmCls="btn dgr" act="pl-del-go"
+        heading="Archive plan" sub={pl.title} onClose={closeLayer}
+        ico="lock" confirmLabel="Archive" confirmCls="btn pri" act="pl-archive-go"
         notice={<>
-          <b>Hidden everywhere, but never unpicked from history.</b> The plan leaves this catalogue
-          and the public page and can never be bought again. Subscriptions already sold on it keep
-          working to their expiry — deleting the row underneath them would leave those records
-          pointing at nothing.
+          <b>Archived, not deleted, because history points at it.</b> {lines} quotation line
+          {lines === 1 ? "" : "s"} and {members} membership{members === 1 ? "" : "s"} name this plan.
+          Deleting it would leave those records pointing at something that does not exist —
+          archiving keeps them explainable and takes it out of the catalogue.
         </>}
-        run={() => call(AdminOpsService.deletePlan(ref)).then(() => done("Plan deleted.", null))} />);
+        run={() => call(AdminOpsService.archivePlan(ref)).then(() => done("Archived.", ref))} />);
+    }
+    if (a === "pl-restore") {
+      /* Restored OFF sale on purpose — see PlansController.SetArchived. Said here
+         too, because "restore" reads like "put it back the way it was". */
+      call(AdminOpsService.setPlanArchived(ref, false))
+        .then(() => { toast("Restored — back in the catalogue, off sale."); bump(); })
+        .catch((e: unknown) => toast(errMessage(e), "bad"));
+      return;
     }
   }, [modal, closeLayer, toast, done, bump, plans]);
 
@@ -151,17 +160,25 @@ export default function Plans() {
   /* ------------------------------------------------------- catalogue --- */
   const families = familiesOf(plans);
   let rows = plans.slice();
+  /* Archived plans are OUT of the default catalogue — the page answers "what do
+     we sell", and a shelf of dead plans buries it. They are one filter away, and
+     the drawer opens for any of them by id whatever the filter says. */
   if (p.status) rows = rows.filter((x) => statusOf(x) === p.status);
+  else rows = rows.filter((x) => !x.archived);
   if (p.fam) rows = rows.filter((x) => x.family === p.fam);
   if (p.q) {
     const s = p.q.toLowerCase();
     rows = rows.filter((x) =>
-      (x.title + " " + x.subtitle + " " + x.tag + " " + x.features.join(" ")).toLowerCase().indexOf(s) >= 0);
+      (x.title + " " + x.subtitle + " " + x.tag + " " +
+        x.features.map((f) => f.text + " " + f.detail).join(" ")).toLowerCase().indexOf(s) >= 0);
   }
   rows.sort(sorter(p.sort));
 
+  /* Counted over the LIVE catalogue: an archived plan is not one of the things
+     we sell, and folding it into the family tallies would overstate every one. */
+  const live = plans.filter((x) => !x.archived);
   const byFam: Record<string, number> = {};
-  plans.forEach((x) => { byFam[x.family] = (byFam[x.family] || 0) + 1; });
+  live.forEach((x) => { byFam[x.family] = (byFam[x.family] || 0) + 1; });
 
   function route(k: string, v: string) {
     const q2: Record<string, string> = { ...params };
@@ -172,19 +189,22 @@ export default function Plans() {
   /* Families first, because "what do we sell" is the question this page
      answers; then the one state that decides whether it can be bought. */
   const cells: (StatCell | "sep")[] = ([
-    { k: "plans", v: plans.length, to: route("fam", ""), on: !p.fam && !p.status },
+    { k: "plans", v: live.length, to: route("fam", ""), on: !p.fam && !p.status },
     "sep"
   ] as (StatCell | "sep")[]).concat(families.map((f) => ({
     k: familyLabel(f).toLowerCase(), v: byFam[f] || 0,
     to: route("fam", f), on: p.fam === f, title: familyLabel(f) + " plans"
   }))).concat([
     "sep",
-    { k: "on sale", v: plans.filter((x) => x.active).length,
+    { k: "on sale", v: live.filter((x) => x.active).length,
       dot: "ok", to: route("status", "active"), on: p.status === "active",
       title: "Live on the public plans page" },
-    { k: "off sale", v: plans.filter((x) => !x.active).length,
+    { k: "off sale", v: live.filter((x) => !x.active).length,
       dot: "", to: route("status", "off"), on: p.status === "off",
-      title: "Hidden from buyers — existing subscribers unaffected" }
+      title: "Hidden from buyers — existing subscribers unaffected" },
+    { k: "archived", v: plans.filter((x) => x.archived).length,
+      dot: "", to: route("status", "archived"), on: p.status === "archived",
+      title: "Out of the catalogue for good — still readable, and restorable" }
   ] as (StatCell | "sep")[]);
 
   const chips = Object.keys(params).filter((k) => params[k]).length > 0;
@@ -198,7 +218,8 @@ export default function Plans() {
         <Select key={"fam" + p.fam} name="fam" label="Family" value={p.fam} onFilter={onFilter}
           options={families.map((f) => ({ v: f, l: familyLabel(f) + " (" + (byFam[f] || 0) + ")" }))} />
         <Select key={"status" + p.status} name="status" label="Status" value={p.status} onFilter={onFilter}
-          options={[{ v: "active", l: "On sale" }, { v: "off", l: "Off sale" }]} />
+          options={[{ v: "active", l: "On sale" }, { v: "off", l: "Off sale" },
+            { v: "archived", l: "Archived" }]} />
         <Select key={"sort" + p.sort} name="sort" label="Sort" value={p.sort} onFilter={onFilter}
           options={[
             { v: "", l: "Sort: Card order" }, { v: "title", l: "Title" },
@@ -254,7 +275,7 @@ function PlansTable({ rows, p, act, go, onUnfilter }: {
         const to = "#/plans/" + pl.id;
         return (
           <tr key={pl.id}
-            className={"clickable" + (u ? " " + u.cls : "") + (pl.active ? "" : " dim")}
+            className={"clickable" + (u ? " " + u.cls : "") + (pl.active && !pl.archived ? "" : " dim")}
             data-go={to} onClick={() => go(to)}>
             <td className="rail"><i title={u ? u.why : undefined}></i></td>
             <td>
@@ -264,7 +285,9 @@ function PlansTable({ rows, p, act, go, onUnfilter }: {
             <td><Pill text={familyLabel(pl.family)} /></td>
             <td><DurationChips pl={pl} /></td>
             <td className="n tnum"><PriceCell rng={rng} /></td>
-            <td>{pl.active ? <Pill text="On sale" tone="ok" /> : <Pill text="Off sale" />}</td>
+            <td>{pl.archived
+              ? <Pill text="Archived" />
+              : pl.active ? <Pill text="On sale" tone="ok" /> : <Pill text="Off sale" />}</td>
             <td className="n tnum faint">{pl.tier || "—"}</td>
           </tr>
         );

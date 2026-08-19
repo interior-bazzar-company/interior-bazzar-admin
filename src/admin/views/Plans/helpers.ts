@@ -26,8 +26,20 @@ export const inr = (rupees: number) => "₹" + IN.format(rupees);
  *  there is no label table to fall out of sync with them. */
 export const familyLabel = (k: string) => (k ? k.charAt(0).toUpperCase() + k.slice(1) : "—");
 
-export const STATUS_LABEL: Record<string, string> = { active: "On sale", off: "Off sale" };
-export const statusOf = (pl: Plan) => (pl.active ? "active" : "off");
+export const STATUS_LABEL: Record<string, string> = {
+  active: "On sale", off: "Off sale", archived: "Archived"
+};
+/* Archived outranks on/off sale: an archived plan cannot be bought whatever its
+   isActive flag says, so showing it as "on sale" would be a lie. */
+export const statusOf = (pl: Plan) => (pl.archived ? "archived" : pl.active ? "active" : "off");
+
+/** "17 Aug 2026", or "—". One formatter for every date this module prints. */
+export function dateLabel(iso: string) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? "—"
+    : d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+}
 
 export function sorter(k?: string) {
   return function (a: Plan, b: Plan) {
@@ -49,6 +61,9 @@ export function sorter(k?: string) {
    public page renders prices from ACTIVE billing cycles only, so a live plan
    with none shows a card nobody can purchase. */
 export function urgency(pl: Plan): { cls: string; why: string } | null {
+  /* Nothing about an archived plan is urgent — it is out of the catalogue on
+     purpose, and flagging it would bury the live plans that do need attention. */
+  if (pl.archived) return null;
   if (pl.active && !pl.cycles.filter((c) => c.active).length)
     return { cls: "u-bad", why: "On sale with no active price — the plans page shows it with nothing to buy" };
   if (!pl.active && !pl.cycles.length)

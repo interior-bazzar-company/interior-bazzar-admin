@@ -11,10 +11,10 @@
    KNOWN LIMITATION, not a bug here: the list endpoint
    (`getSelfCreatedUsersController`) returns only members the SIGNED-IN
    admin created, not the whole team. There is no "everyone" endpoint yet.
-   See the report for the full list of fields the old local engine had that
-   the real user record does not (status/lifecycle, designation, avatar,
-   last sign-in, registration date) — those columns and controls are gone
-   rather than shown against data that doesn't exist.
+   Of the fields the old local engine had, active/last sign-in/added are now
+   real (AdminUserTasks._accountFacts) and render in the drawer; designation,
+   avatar, the locked/suspended statuses and the failed-attempt count have no
+   column behind them and stay off the screen rather than being invented.
    ===================================================================== */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";

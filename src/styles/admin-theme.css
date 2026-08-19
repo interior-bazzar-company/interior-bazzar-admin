@@ -711,7 +711,7 @@ b,strong{ font-weight:var(--weight-semibold) }
 .tb-stat{ flex:0 0 auto; display:flex; align-items:baseline; gap:5px; white-space:nowrap;
           padding:3px var(--space-2) !important; border:0; border-radius:var(--radius-sm);
           background:none; color:var(--text-2) }
-.tb-stat:hover{ background:var(--bg-hover) }
+button.tb-stat:hover{ background:var(--bg-hover) }
 .tb-stat .v{ font-size:var(--text-md); font-weight:var(--weight-semibold); color:var(--text) }
 .tb-stat .k{ font-size:var(--text-sm); color:var(--text-3) }
 .tb-stat.on{ background:var(--brand-tint) }
@@ -720,6 +720,15 @@ b,strong{ font-weight:var(--weight-semibold) }
 /* Read-outs: no hover and no pointer, because neither figure filters anything
    and a cell that lights up under the cursor promises otherwise. */
 .tb-stat.ro{ cursor:default }
+/* Same tone rules as .dls-stat, so collected reads green and outstanding amber
+   in the topbar exactly as they do in the table strip. The tone is on the
+   FIGURE, never the label — the colour is about the money, not the word. */
+.tb-stat.ok .v{ color:var(--ok) }
+.tb-stat.warn .v{ color:var(--warn) }
+/* The same hairline .dls-sep draws between strip cells, sized for this row —
+   it is what keeps the money from reading as a sixth stage count. */
+.tb-sep{ flex:0 0 auto; width:1px; height:14px; background:var(--line-2);
+         margin:0 var(--space-1) }
 .tb-stat.ro:hover{ background:none }
 .tb-stat.ro.warn .v{ color:var(--warn) }
 .tb-stat.ro.ok .v{ color:var(--ok) }
@@ -2215,6 +2224,26 @@ button.dls-stat:hover{ background:var(--bg-hover) }
                      overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .dws-chain-body .t2{ font-size:var(--text-xs); color:var(--text-3); margin-top:1px;
                      overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+/* THE EMPTY SLOT. Same box as a chain card, dotted and centred: the block keeps
+   its shape whether or not the document exists, so the column does not jump as
+   a deal moves along the chain -- and the empty state IS the way to fill it,
+   rather than a sentence telling you to go and find the module that does.
+   `.gated` is the same "not yet" the Actions buttons use: still dotted, still
+   clickable, and it answers with the rule that is stopping it. */
+.dws-chain-add{ display:flex; align-items:center; justify-content:center; gap:6px; width:100%;
+                padding:var(--space-3) var(--space-2); border-radius:var(--radius-md);
+                border:1px dashed var(--line-control); background:none; cursor:pointer;
+                color:var(--text-2); font-size:var(--text-sm); font-weight:var(--weight-semibold);
+                transition:border-color var(--duration-fast) var(--ease) }
+.dws-chain-add .ic{ width:14px; height:14px; flex-basis:14px }
+.dws-chain-add:hover{ border-style:solid; border-color:var(--brand);
+                      background:var(--brand-tint); color:var(--brand-text) }
+.dws-chain-add:disabled{ cursor:default; opacity:.6 }
+.dws-chain-add:disabled:hover{ border-style:dashed; border-color:var(--line-control);
+                               background:none; color:var(--text-2) }
+.dws-chain-add.gated{ color:var(--text-3) }
+.dws-chain-add.gated:hover{ border-style:dashed; border-color:var(--line-control);
+                            background:var(--bg-hover); color:var(--text-2) }
 /* The primary action keeps a full row; the rest pair up two-across, which
    halves the column's tallest block without hiding anything behind a menu. */
 /* The funnel response lives in the Edit dialog and only there — the context
@@ -2553,7 +2582,7 @@ button.dls-stat:hover{ background:var(--bg-hover) }
 .pl-feats li .d{ font-size:var(--text-md); color:var(--text-2); line-height:1.45 }
 .pl-fkey{ font-size:var(--text-2xs); color:var(--text-3) }
 
-/* The feature editor: a name, an optional registry key, and a way out. */
+/* The feature editor: a name, the optional detail line under it, and a way out. */
 .pl-frow{ display:grid; grid-template-columns:1fr 200px var(--control-sm);
           gap:var(--space-2); align-items:center; margin-bottom:var(--space-2) }
 .pl-frow .inp{ height:var(--control-md) }
@@ -2563,7 +2592,8 @@ button.dls-stat:hover{ background:var(--bg-hover) }
   .pl-row{ grid-template-columns:1fr 1fr; row-gap:var(--space-2);
            border:1px solid var(--line); padding:var(--space-3) }
   .pl-frow{ grid-template-columns:1fr var(--control-sm) }
-  .pl-frow .pl-fkey{ grid-column:1 / -1 }
+  .pl-frow .pl-fkey,
+  .pl-frow .pl-fdetail{ grid-column:1 / -1 }
 }
 
 /* ----------------------------------------------------------------------------

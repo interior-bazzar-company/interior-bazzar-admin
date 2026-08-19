@@ -6,7 +6,7 @@
    No test runner in this project — run it directly:
      npx esbuild src/admin/ui/format.test.ts --bundle --format=esm --outfile=t.mjs && node t.mjs
 */
-import { fmtDate, inr } from "./format";
+import { fmtDate, inr, inrWords } from "./format";
 
 /* Its own two-line assert rather than node:assert, so this file typechecks
    with the app's own tsconfig (no @types/node) and stays runnable. */
@@ -43,5 +43,19 @@ assert.equal(fmtDate(new Date(2026, 7, 17)), "17 Aug 2026");
 assert.equal(fmtDate(null), "—");
 assert.equal(fmtDate(""), "—");
 assert.equal(fmtDate("not-a-date"), "—");
+
+// The total in words, as an Indian commercial document states it under the
+// figure. Lakh/crore scale, never the short scale.
+assert.equal(inrWords(0), "Rupees Zero Only");
+assert.equal(inrWords(null), "Rupees Zero Only");
+assert.equal(inrWords(100), "Rupees One Only");
+assert.equal(inrWords(1900), "Rupees Nineteen Only");
+assert.equal(inrWords(4500), "Rupees Forty Five Only");
+assert.equal(inrWords(10500), "Rupees One Hundred Five Only");
+assert.equal(inrWords(4720000), "Rupees Forty Seven Thousand Two Hundred Only");
+assert.equal(inrWords(292000000), "Rupees Twenty Nine Lakh Twenty Thousand Only");
+assert.equal(inrWords(15000000000), "Rupees Fifteen Crore Only");
+// Paise round to the nearest rupee, same as inr() shows it.
+assert.equal(inrWords(150), "Rupees Two Only");
 
 console.log("format.ts: all checks passed");

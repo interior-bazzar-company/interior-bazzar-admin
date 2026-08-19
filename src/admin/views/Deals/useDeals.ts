@@ -24,7 +24,9 @@ import { can } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import { currentActor } from "../../auth/session";
 import AdminOpsService from "../../../api/modules/adminOps";
-import type { DealPersonRef, DealPriorityVocab, DealStageVocab, DealTagVocab } from "../../../api/modules/adminOps";
+import type {
+  DealPersonRef, DealPriorityVocab, DealStageVocab, DealTagVocab, InvoiceRow, QuotationRow
+} from "../../../api/modules/adminOps";
 import { AppExceptions } from "../../../api/apiService";
 import { PRIORITY, STAGES, adaptByStage, adaptDeal, adaptTimeline, dateOnly, ownersFromRows } from "./adapter";
 
@@ -378,8 +380,8 @@ function apiOk<T>(res: { response: boolean; code: number; data: T }): { ok: true
    Kept in a module store with its OWN subscriber set rather than reusing
    `subs`: that one is a dependency of the fetch effect, so notifying through
    it here would re-fire the request that just produced these numbers. */
-type Counts = { total: number; byStage: Record<number, number> };
-let LAST_COUNTS: Counts = { total: 0, byStage: {} };
+export type Counts = { total: number; byStage: Record<number, number>; collected: number; outstanding: number };
+let LAST_COUNTS: Counts = { total: 0, byStage: {}, collected: 0, outstanding: 0 };
 const countSubs = new Set<() => void>();
 export function useDealCounts(): Counts {
   const [, force] = useReducer((n: number) => n + 1, 0);
@@ -392,7 +394,7 @@ export interface DealsApiState {
   forbidden: boolean;
   error: string | null;
   list: any[];
-  counts: { total: number; byStage: Record<number, number> };
+  counts: Counts;
   stages: DealStageVocab[];
   priorities: DealPriorityVocab[];
   tags: DealTagVocab[];
@@ -400,7 +402,8 @@ export interface DealsApiState {
 }
 const DEALS_API_IDLE: DealsApiState = {
   loading: true, forbidden: false, error: null, list: [],
-  counts: { total: 0, byStage: {} }, stages: [], priorities: [], tags: [], owners: [],
+  counts: { total: 0, byStage: {}, collected: 0, outstanding: 0 },
+  stages: [], priorities: [], tags: [], owners: [],
 };
 
 /* Fetches the deals list for the current filters — Table and Pipeline only
@@ -439,7 +442,14 @@ export function useDealsApi(p: Params): DealsApiState {
         return;
       }
       const data = r.data;
-      const counts = { total: data.counts.total, byStage: adaptByStage(data.counts.byStage, data.stages) };
+      const counts = {
+        total: data.counts.total,
+        byStage: adaptByStage(data.counts.byStage, data.stages),
+        // Paise straight through, same as every other money field — the strip
+        // formats, it never arithmetics.
+        collected: data.counts.collectedPaise || 0,
+        outstanding: data.counts.outstandingPaise || 0,
+      };
       LAST_COUNTS = counts;
       countSubs.forEach((f) => f());
       setState({
@@ -534,3 +544,60 @@ export function useDealApi(ref: string | null): DealApiState {
   return { ...state, stale: !!ref && dataRef.current !== ref };
 }
 
+
+/* ==========================================================================
+   THE DEAL'S DOCUMENTS — its quotations and its invoices.
+
+   Deliberately NOT folded into the deals endpoint. A list of documents is a
+   detail of ONE deal, and the deals list already carries fifteen of them; the
+   row only needs the three-state chain (quotationStatus / invoiceStatus /
+   paid, see DealsController._with_chain), which is what it gets. These two
+   fetch when a deal is OPENED, not when the list loads, and they reuse the
+   endpoints Quotations and Invoices already read — so there is one server-side
+   definition of "this deal's documents", not a second one grafted onto Deals.
+   ====================================================================== */
+export interface DealDocsState {
+  loading: boolean;
+  /** Newest first — the panel shows the current quotation, which is the top one. */
+  quotations: QuotationRow[];
+  invoices: InvoiceRow[];
+}
+const DOCS_IDLE: DealDocsState = { loading: true, quotations: [], invoices: [] };
+
+export function useDealDocs(ref: string | null): DealDocsState {
+  const [state, setState] = useState<DealDocsState>(DOCS_IDLE);
+  const version = useDataVersion();
+
+  useEffect(() => {
+    if (!ref) { setState({ loading: false, quotations: [], invoices: [] }); return; }
+    let cancelled = false;
+    setState((s) => ({ ...s, loading: true }));
+    /* Both, or neither. A half-drawn chain — quotations in, invoices still
+       pending — reads as "no invoices yet", which is a different and wrong
+       statement about the deal.
+       ponytail: pageSize 50 on each, no pager. A deal with more than fifty
+       quotations is a data problem, not a paging one. */
+    Promise.all([
+      AdminOpsService.quotations({ deal: ref, pageSize: 50 }),
+      AdminOpsService.invoices({ deal: ref, pageSize: 50 }),
+    ]).then(([q, i]) => {
+      if (cancelled) return;
+      setState({
+        loading: false,
+        // Newest version first, so [0] is the quotation that is live.
+        quotations: (q.response === false ? [] : q.data.quotations || [])
+          .slice().sort((a, b) => b.version - a.version || b.id - a.id),
+        invoices: (i.response === false ? [] : i.data.invoices || [])
+          .slice().sort((a, b) => b.id - a.id),
+      });
+    }).catch(() => {
+      // A failure here must not blank the pane that is ALREADY correct about
+      // the deal. Empty + not-loading renders the "none yet" affordance, which
+      // is the same thing the panel shows before anything is raised.
+      if (!cancelled) setState({ loading: false, quotations: [], invoices: [] });
+    });
+    return () => { cancelled = true; };
+  }, [ref, version]);
+
+  return state;
+}
