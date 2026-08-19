@@ -1972,6 +1972,10 @@ button.dls-stat:hover{ background:var(--bg-hover) }
    to hold the row — and it shortens with an ellipsis, never a second line. */
 .dws-money .dls-stat .k{ max-width:100%; overflow:hidden; text-overflow:ellipsis }
 .dws-money .dls-sep{ height:auto; align-self:stretch; margin:0 }
+/* Collected-vs-outstanding, sitting under the three figures it is drawn from.
+   Nothing about the row above changed — this only adds the ratio the three
+   numbers imply. */
+.dws-mbar{ margin-top:var(--space-2) }
 
 /* 320, not 286. The extra 34px is what puts the three money figures on one
    line — they were wrapping to two, which made a row of three peers read as a
@@ -2070,9 +2074,12 @@ button.dls-stat:hover{ background:var(--bg-hover) }
    Chat's own list used to fold "stalled/overdue" and "urgent priority" into
    one boolean and silently dropped priority entirely; now it reads the same
    signal every other surface does. */
-.dws-row .time.u-bad,.dws-row .name.u-bad{ color:var(--bad) }
-.dws-row .time.u-warn,.dws-row .name.u-warn{ color:var(--warn) }
-.dws-row .time.u-info,.dws-row .name.u-info{ color:var(--info) }
+.dws-row .time.u-bad{ color:var(--bad) }
+.dws-row .time.u-warn{ color:var(--warn) }
+.dws-row .time.u-info{ color:var(--info) }
+/* The name itself never takes the urgency colour — it is the row's identity,
+   so it stays --text while the time/pills/tags carry the signal. */
+.dws-row .name{ color:var(--text) }
 /* Same tone vocabulary as every pill/dot in the app (D.STAGES[n].tone), not a
    bespoke palette of its own — Installment used to read as blue everywhere
    except here, where it fell through to the neutral default. */

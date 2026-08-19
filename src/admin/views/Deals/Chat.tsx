@@ -566,6 +566,12 @@ function CtxPane({ dl, p }: { dl: any; p: Params }) {
   const docs = useDealDocs(dl.deal_id);
   const quote: QuotationRow | null = docs.quotations.length ? docs.quotations[0] : null;
 
+  /* Clamped: an overpaid deal is a data question, not a bar that runs past its
+     track. Same units on both sides (paise), so the ratio needs no conversion. */
+  const collectedPct = dl.deal_value
+    ? Math.min(100, Math.round(((dl.revenue_collected || 0) / dl.deal_value) * 100))
+    : 0;
+
   return (
     <aside className="dws-ctx">
       {/* Three cells, and all three are REAL: deal value is the agreed total on
@@ -582,6 +588,16 @@ function CtxPane({ dl, p }: { dl: any; p: Params }) {
           <span className="dls-sep"></span>
           <MoneyCellCtx k="outstanding" v={inr(dl.outstanding || 0, { compact: true })} tone="warn" />
         </div>
+        {/* Added under the three figures, not in place of them: full width is
+            the deal value, the green run is collected, the amber remainder is
+            outstanding — the same numbers as a ratio, which the row above
+            makes you work out. No deal value, no denominator, no bar. */}
+        {dl.deal_value ? (
+          <div className="bar dws-mbar" title={collectedPct + "% collected"}>
+            <i className="ok" style={{ width: collectedPct + "%" }}></i>
+            <i className="warn" style={{ width: 100 - collectedPct + "%" }}></i>
+          </div>
+        ) : null}
       </div>
 
       {/* Who you are talking to, before the deal mechanics — the composer sits
