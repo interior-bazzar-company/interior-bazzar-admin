@@ -14,7 +14,7 @@
    behaviour, so a module key with no entry in ICON_OF still renders instead
    of guessing.
    ============================================================================= */
-import { getSession, HIDDEN_MODULES } from "../auth/session";
+import { getSession, HIDDEN_MODULES, PROTO_MODULES } from "../auth/session";
 
 export type ModuleItem = {
   key: string;
@@ -38,7 +38,21 @@ const ICON_OF: Record<string, string> = {
   team: "team",
   roles: "shield",
   audit: "history",
+  "business-enquiries": "route",
 };
+
+/* ---------------------------------------------------------- proto rows ---
+   Modules being built frontend-first, which the server therefore has no
+   `Module` row for yet. They are appended to whatever the session returned, so
+   a real row for the same key always wins — the day the API ships its row, the
+   entry here stops being used before anyone deletes it, and the nav does not
+   double up.
+
+   `group` matches an existing server group label so the module lands in the
+   sidebar where it belongs rather than in a section of one. */
+const PROTO_ROWS: { key: string; label: string; group: string }[] = [
+  { key: "business-enquiries", label: "Business Enquiries", group: "Client Ops" },
+];
 /** Sidebar queue-count keys, from IBData.derive.badges(). A module with no
  * entry here shows no badge, which is correct for anything the prototype
  * never counted (Plans, Roles, Audit). */
@@ -56,20 +70,29 @@ export function getModules(): ModuleGroup[] {
     : [];
   const groups: ModuleGroup[] = [];
   const byGroup: Record<string, ModuleGroup> = {};
-  mods.forEach((m) => {
-    const g = m.groupLabel || "";
-    if (!byGroup[g]) {
-      byGroup[g] = { group: g, items: [] };
-      groups.push(byGroup[g]);
+  const put = (key: string, label: string, group: string) => {
+    if (!byGroup[group]) {
+      byGroup[group] = { group, items: [] };
+      groups.push(byGroup[group]);
     }
-    byGroup[g].items.push({
-      key: m.key,
-      label: m.label,
-      icon: ICON_OF[m.key] || "doc",
-      route: m.key,
-      q: Q_OF[m.key],
+    byGroup[group].items.push({
+      key,
+      label,
+      icon: ICON_OF[key] || "doc",
+      route: key,
+      q: Q_OF[key],
     });
-  });
+  };
+  mods.forEach((m) => put(m.key, m.label, m.groupLabel || ""));
+  /* Appended last and only if the server did not send the key, so a real
+     Module row always takes precedence over the proto stand-in. Also gated on
+     a session existing at all: a signed-out browser must see no nav. */
+  if (s) {
+    const seen = new Set(mods.map((m) => m.key));
+    PROTO_ROWS.forEach((r) => {
+      if (!seen.has(r.key) && PROTO_MODULES.has(r.key)) put(r.key, r.label, r.group);
+    });
+  }
   return groups;
 }
 

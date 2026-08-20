@@ -1,0 +1,1689 @@
+{
+  "$comment": "Stands in for GET /api/v1/business-enquiries and GET /api/v1/business-enquiries/{id}. One auditable record per valid funnel or portal submission. `owner` is who is working it — null means nobody has claimed it. `requirement` is EDITABLE while the enquiry is Generated and frozen the moment a person marks it Qualified; `qualification.frozenAt` is null until then. `contactLog[]` is the qualification workstream and `remarks[]` is the internal note thread — the log holds what the CUSTOMER said, remarks hold what WE think, and neither is ever exported, copied, printed or imaged and `followUpAt` is when a promised callback is due. `assignments[]` is history and is never overwritten; `activeAssignmentId` is the single nullable pointer that enforces one active assignment. `events[]` is append-only. There is no budget field anywhere in this file, on purpose.",
+  "generatedAt": "2026-08-20T09:00:00+05:30",
+  "enquiries": [
+    {
+      "enquiryId": "IB-BE-2026-0064",
+      "submissionId": "man-4b21c0de-8f77-42aa-9d31-55ee01",
+      "source": {
+        "kind": "own",
+        "page": "manual/phone",
+        "label": "Added by us · Phone call",
+        "createdBy": "D. Kapoor",
+        "via": "phone"
+      },
+      "customer": {
+        "name": "Ganesh R.",
+        "phone": "+91 98•••••••27",
+        "email": null
+      },
+      "requirement": {
+        "category": "Civil & Renovation",
+        "service": "Bathroom renovation",
+        "city": "Mumbai",
+        "state": "Maharashtra",
+        "locality": "Andheri West",
+        "pincode": "400058",
+        "projectType": "Residential · 2BHK",
+        "intent": "project",
+        "text": "Rang the office directly — two bathrooms, wants to start after the monsoon."
+      },
+      "qualification": {
+        "contactVerified": false,
+        "verifiedVia": null,
+        "genuineness": "unconfirmed",
+        "genuinenessNote": "Not yet established by a person",
+        "urgency": "30_90d",
+        "requirementSummary": null,
+        "version": null,
+        "frozenAt": null,
+        "checklist": {
+          "reachable": true,
+          "requirement": true,
+          "genuine": false,
+          "urgency": true
+        },
+        "qualifiedBy": null,
+        "qualifiedByRole": null
+      },
+      "status": "generated",
+      "tier": "C",
+      "createdAt": "2026-08-20T09:42:00+05:30",
+      "activeAssignmentId": null,
+      "assignments": [],
+      "outcome": null,
+      "owner": {
+        "id": "u-103",
+        "name": "D. Kapoor"
+      },
+      "followUpAt": null,
+      "tags": [
+        "contact-made"
+      ],
+      "contactLog": [
+        {
+          "logId": "cl-0064-1",
+          "channel": "call",
+          "direction": "inbound",
+          "at": "2026-08-20T09:40:00+05:30",
+          "actor": "D. Kapoor",
+          "actorRole": "Operations lead",
+          "outcome": "connected",
+          "response": "Two bathrooms in Andheri West, wants to start once the rains are over. Found us through a neighbour who used the platform last year.",
+          "note": "Rang the office line. Typed the enquiry up straight after the call.",
+          "followUpAt": null
+        }
+      ],
+      "sla": {
+        "ackHours": 24,
+        "dueAt": null,
+        "breached": false,
+        "breachedAt": null
+      },
+      "events": [
+        {
+          "eventId": "ev-0064-1",
+          "type": "INTAKE",
+          "actor": "D. Kapoor",
+          "actorRole": "Operations",
+          "at": "2026-08-20T09:42:00+05:30",
+          "note": "Added by us · Phone call · submission_id man-4b21…01 · created by D. Kapoor · not a duplicate"
+        },
+        {
+          "eventId": "ev-0064-2",
+          "type": "CONTACT",
+          "actor": "D. Kapoor",
+          "actorRole": "Operations",
+          "at": "2026-08-20T09:40:00+05:30",
+          "note": "Call · Connected · inbound · tagged contact-made · new-enquiry removed"
+        }
+      ],
+      "remarks": []
+    },
+    {
+      "enquiryId": "IB-BE-2026-0061",
+      "submissionId": "e41a90bc-7712-4f0a-b3d8-6611aa",
+      "source": {
+        "kind": "funnel",
+        "page": "funnel/interior-design-delhi",
+        "label": "Interior Design · Delhi",
+        "createdBy": null,
+        "via": null
+      },
+      "customer": {
+        "name": "Ritu B.",
+        "phone": "+91 98•••••••06",
+        "email": null
+      },
+      "requirement": {
+        "category": "Interior Design",
+        "service": "Full home interiors",
+        "city": "New Delhi",
+        "state": "Delhi",
+        "locality": "Greater Kailash",
+        "pincode": "110048",
+        "projectType": "Residential · 4BHK",
+        "intent": "project",
+        "text": "Whole flat, want to see designs first."
+      },
+      "qualification": {
+        "contactVerified": true,
+        "verifiedVia": "OTP",
+        "genuineness": "unconfirmed",
+        "genuinenessNote": "Not yet established by a person",
+        "urgency": "30_90d",
+        "requirementSummary": null,
+        "version": null,
+        "frozenAt": null,
+        "checklist": {
+          "reachable": true,
+          "requirement": false,
+          "genuine": true,
+          "urgency": false
+        },
+        "qualifiedBy": null,
+        "qualifiedByRole": null
+      },
+      "status": "generated",
+      "tier": "B",
+      "createdAt": "2026-08-20T08:05:00+05:30",
+      "activeAssignmentId": null,
+      "assignments": [],
+      "outcome": null,
+      "tags": [
+        "contact-made",
+        "callback-due",
+        "requirement-unclear"
+      ],
+      "contactLog": [
+        {
+          "logId": "cl-0061-2",
+          "channel": "call",
+          "direction": "outbound",
+          "at": "2026-08-20T08:52:00+05:30",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "outcome": "callback_requested",
+          "response": "In a meeting — asked us to call back after 4pm today.",
+          "note": "Second attempt. Sounds genuine, just busy.",
+          "followUpAt": "2026-08-20T16:00:00+05:30"
+        },
+        {
+          "logId": "cl-0061-1",
+          "channel": "call",
+          "direction": "outbound",
+          "at": "2026-08-20T08:20:00+05:30",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "outcome": "connected",
+          "response": "Confirmed she submitted it. Says 4BHK in GK but is not sure yet whether it is the full flat or only the two bedrooms.",
+          "note": "Scope is genuinely undecided — cannot confirm the requirement on this call.",
+          "followUpAt": null
+        }
+      ],
+      "sla": {
+        "ackHours": 24,
+        "dueAt": null,
+        "breached": false,
+        "breachedAt": null
+      },
+      "events": [
+        {
+          "eventId": "ev-0061-3",
+          "type": "CONTACT",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "at": "2026-08-20T08:52:00+05:30",
+          "note": "Call · Callback requested · due 20 Aug 16:00 · tagged callback-due"
+        },
+        {
+          "eventId": "ev-0061-2",
+          "type": "CONTACT",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "at": "2026-08-20T08:20:00+05:30",
+          "note": "Call · Connected · tagged contact-made · new-enquiry removed"
+        },
+        {
+          "eventId": "ev-0061-1",
+          "type": "INTAKE",
+          "actor": "System",
+          "actorRole": "system",
+          "at": "2026-08-20T08:05:00+05:30",
+          "note": "funnel/interior-design-delhi · submission_id e41a…aa · not a duplicate · tagged new-enquiry"
+        }
+      ],
+      "owner": {
+        "id": "u-101",
+        "name": "R. Menon"
+      },
+      "followUpAt": "2026-08-20T16:00:00+05:30",
+      "remarks": [
+        {
+          "remarkId": "rm-0061-2",
+          "text": "Her architect is the one who decides. Worth asking for that number on the callback rather than pitching to Ritu.",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "at": "2026-08-20T08:55:00+05:30"
+        },
+        {
+          "remarkId": "rm-0061-1",
+          "text": "Third enquiry from this building in six weeks. Someone in there is recommending us.",
+          "actor": "D. Kapoor",
+          "actorRole": "Operations lead",
+          "at": "2026-08-20T08:30:00+05:30"
+        }
+      ]
+    },
+    {
+      "enquiryId": "IB-BE-2026-0062",
+      "submissionId": "77c2e5f9-33ab-4e10-96b7-2244cc",
+      "source": {
+        "kind": "portal",
+        "page": "portal/enquire",
+        "label": "Interior bazzar portal · Enquire",
+        "createdBy": null,
+        "via": null
+      },
+      "customer": {
+        "name": "Arjun V.",
+        "phone": "+91 99•••••••58",
+        "email": "a•••••@gmail.com"
+      },
+      "requirement": {
+        "category": "Modular Kitchen",
+        "service": null,
+        "city": "New Delhi",
+        "state": "Delhi",
+        "locality": null,
+        "pincode": null,
+        "projectType": null,
+        "intent": null,
+        "text": "Need a kitchen done."
+      },
+      "qualification": {
+        "contactVerified": false,
+        "verifiedVia": null,
+        "genuineness": "unconfirmed",
+        "genuinenessNote": "Not yet established by a person",
+        "urgency": null,
+        "requirementSummary": null,
+        "version": null,
+        "frozenAt": null,
+        "checklist": {
+          "reachable": false,
+          "requirement": false,
+          "genuine": false,
+          "urgency": false
+        },
+        "qualifiedBy": null,
+        "qualifiedByRole": null
+      },
+      "status": "generated",
+      "tier": "D",
+      "createdAt": "2026-08-19T18:30:00+05:30",
+      "activeAssignmentId": null,
+      "assignments": [],
+      "outcome": null,
+      "tags": [
+        "unreachable"
+      ],
+      "contactLog": [
+        {
+          "logId": "cl-0062-2",
+          "channel": "call",
+          "direction": "outbound",
+          "at": "2026-08-20T09:15:00+05:30",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "outcome": "no_answer",
+          "response": null,
+          "note": "Second attempt, morning. No answer.",
+          "followUpAt": null
+        },
+        {
+          "logId": "cl-0062-1",
+          "channel": "call",
+          "direction": "outbound",
+          "at": "2026-08-19T19:02:00+05:30",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "outcome": "no_answer",
+          "response": null,
+          "note": "First attempt, same evening.",
+          "followUpAt": null
+        }
+      ],
+      "sla": {
+        "ackHours": 24,
+        "dueAt": null,
+        "breached": false,
+        "breachedAt": null
+      },
+      "events": [
+        {
+          "eventId": "ev-0062-3",
+          "type": "CONTACT",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "at": "2026-08-20T09:15:00+05:30",
+          "note": "Call · No answer · tagged unreachable"
+        },
+        {
+          "eventId": "ev-0062-2",
+          "type": "CONTACT",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "at": "2026-08-19T19:02:00+05:30",
+          "note": "Call · No answer · new-enquiry removed"
+        },
+        {
+          "eventId": "ev-0062-1",
+          "type": "INTAKE",
+          "actor": "System",
+          "actorRole": "system",
+          "at": "2026-08-19T18:30:00+05:30",
+          "note": "portal/enquire · submission_id 77c2…cc · not a duplicate · tagged new-enquiry"
+        }
+      ],
+      "owner": {
+        "id": "u-102",
+        "name": "S. Iyer"
+      },
+      "followUpAt": null,
+      "remarks": []
+    },
+    {
+      "enquiryId": "IB-BE-2026-0063",
+      "submissionId": "1d8f4406-b0c1-4a72-8f35-9900dd",
+      "source": {
+        "kind": "funnel",
+        "page": "funnel/interior-design-bengaluru",
+        "label": "Interior Design · Bengaluru",
+        "createdBy": null,
+        "via": null
+      },
+      "customer": {
+        "name": "Sneha P.",
+        "phone": "+91 97•••••••34",
+        "email": null
+      },
+      "requirement": {
+        "category": "Interior Design",
+        "service": "Living room",
+        "city": "Bengaluru",
+        "state": "Karnataka",
+        "locality": "Indiranagar",
+        "pincode": "560038",
+        "projectType": null,
+        "intent": null,
+        "text": "Living room makeover, 2BHK rental."
+      },
+      "qualification": {
+        "contactVerified": true,
+        "verifiedVia": "OTP",
+        "genuineness": "unconfirmed",
+        "genuinenessNote": "Not yet established by a person",
+        "urgency": null,
+        "requirementSummary": null,
+        "version": null,
+        "frozenAt": null,
+        "checklist": {
+          "reachable": false,
+          "requirement": false,
+          "genuine": false,
+          "urgency": false
+        },
+        "qualifiedBy": null,
+        "qualifiedByRole": null
+      },
+      "status": "generated",
+      "tier": "C",
+      "createdAt": "2026-08-20T08:58:00+05:30",
+      "activeAssignmentId": null,
+      "assignments": [],
+      "outcome": null,
+      "tags": [
+        "new-enquiry"
+      ],
+      "contactLog": [],
+      "sla": {
+        "ackHours": 24,
+        "dueAt": null,
+        "breached": false,
+        "breachedAt": null
+      },
+      "events": [
+        {
+          "eventId": "ev-0063-1",
+          "type": "INTAKE",
+          "actor": "System",
+          "actorRole": "system",
+          "at": "2026-08-20T08:58:00+05:30",
+          "note": "funnel/interior-design-bengaluru · submission_id 1d8f…dd · not a duplicate · tagged new-enquiry"
+        }
+      ],
+      "owner": null,
+      "followUpAt": null,
+      "remarks": []
+    },
+    {
+      "enquiryId": "IB-BE-2026-0047",
+      "submissionId": "8f3ad41c-9e77-4a10-b0c5-1cf2c2",
+      "source": {
+        "kind": "funnel",
+        "page": "funnel/interior-design-delhi",
+        "label": "Interior Design · Delhi",
+        "createdBy": null,
+        "via": null
+      },
+      "customer": {
+        "name": "Priya M.",
+        "phone": "+91 98•••••••42",
+        "email": "p•••••@gmail.com"
+      },
+      "requirement": {
+        "category": "Interior Design",
+        "service": "Full home interiors",
+        "city": "New Delhi",
+        "state": "Delhi",
+        "locality": "Vasant Kunj",
+        "pincode": "110070",
+        "projectType": "Residential · 3BHK",
+        "intent": "project",
+        "text": "3BHK full interior, Vasant Kunj — need to start by month-end."
+      },
+      "qualification": {
+        "contactVerified": true,
+        "verifiedVia": "OTP",
+        "genuineness": "passed",
+        "genuinenessNote": "No trivial-name or rate-limit flag",
+        "urgency": "within_30d",
+        "requirementSummary": "Residential 3BHK, full-scope, immediate start",
+        "version": "qualification v4",
+        "frozenAt": "2026-08-18T09:14:00+05:30",
+        "checklist": {
+          "reachable": true,
+          "requirement": true,
+          "genuine": true,
+          "urgency": true
+        },
+        "qualifiedBy": "R. Menon",
+        "qualifiedByRole": "Operations"
+      },
+      "status": "ready",
+      "tier": "B",
+      "createdAt": "2026-08-18T09:14:00+05:30",
+      "activeAssignmentId": null,
+      "assignments": [],
+      "outcome": null,
+      "sla": {
+        "ackHours": 24,
+        "dueAt": null,
+        "breached": false,
+        "breachedAt": null
+      },
+      "events": [
+        {
+          "eventId": "ev-0047-3",
+          "type": "MATCHED",
+          "actor": "System",
+          "actorRole": "system",
+          "at": "2026-08-18T09:15:00+05:30",
+          "note": "10 subscribed → 4 eligible, 6 excluded with reasons · rule v3"
+        },
+        {
+          "eventId": "ev-0047-2",
+          "type": "QUALIFIED",
+          "actor": "System",
+          "actorRole": "system",
+          "at": "2026-08-18T09:14:00+05:30",
+          "note": "Snapshot frozen · qualification v4"
+        },
+        {
+          "eventId": "ev-0047-1",
+          "type": "INTAKE",
+          "actor": "System",
+          "actorRole": "system",
+          "at": "2026-08-18T09:14:00+05:30",
+          "note": "funnel/interior-design-delhi · submission_id 8f3a…c2 · not a duplicate"
+        }
+      ],
+      "tags": [
+        "contact-made",
+        "hot"
+      ],
+      "contactLog": [
+        {
+          "logId": "cl-0047-2",
+          "channel": "call",
+          "direction": "outbound",
+          "at": "2026-08-18T09:12:00+05:30",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "outcome": "connected",
+          "response": "Confirmed 3BHK in Vasant Kunj, full interiors including false ceiling and wardrobes. Wants work to start by month-end — possession is done, family moves in October.",
+          "note": "Confirmed category and locality against the form. Marked urgent.",
+          "followUpAt": null
+        },
+        {
+          "logId": "cl-0047-1",
+          "channel": "whatsapp",
+          "direction": "outbound",
+          "at": "2026-08-18T09:02:00+05:30",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "outcome": "replied",
+          "response": "Yes this is Priya, I filled the form last night.",
+          "note": "Opened on WhatsApp first — she replied inside two minutes.",
+          "followUpAt": null
+        }
+      ],
+      "owner": {
+        "id": "u-101",
+        "name": "R. Menon"
+      },
+      "followUpAt": null,
+      "remarks": []
+    },
+    {
+      "enquiryId": "IB-BE-2026-0052",
+      "submissionId": "b21c7708-0f44-4e29-91aa-77ad03",
+      "source": {
+        "kind": "funnel",
+        "page": "funnel/modular-kitchen-hyderabad",
+        "label": "Modular Kitchen · Hyderabad",
+        "createdBy": null,
+        "via": null
+      },
+      "customer": {
+        "name": "Suresh K.",
+        "phone": "+91 97•••••••18",
+        "email": null
+      },
+      "requirement": {
+        "category": "Modular Kitchen",
+        "service": "L-shaped modular kitchen",
+        "city": "Hyderabad",
+        "state": "Telangana",
+        "locality": "Gachibowli",
+        "pincode": "500032",
+        "projectType": "Residential · 2BHK",
+        "intent": "product",
+        "text": "L-shaped modular kitchen for a 2BHK."
+      },
+      "qualification": {
+        "contactVerified": true,
+        "verifiedVia": "OTP",
+        "genuineness": "passed",
+        "genuinenessNote": "No flags",
+        "urgency": "30_90d",
+        "requirementSummary": "Residential 2BHK, single-room scope, flexible start",
+        "version": "qualification v4",
+        "frozenAt": "2026-08-19T22:05:00+05:30",
+        "checklist": {
+          "reachable": true,
+          "requirement": true,
+          "genuine": true,
+          "urgency": true
+        },
+        "qualifiedBy": "R. Menon",
+        "qualifiedByRole": "Operations"
+      },
+      "status": "ready",
+      "tier": "C",
+      "createdAt": "2026-08-19T22:05:00+05:30",
+      "activeAssignmentId": null,
+      "assignments": [],
+      "outcome": null,
+      "exception": {
+        "code": "no_eligible_business",
+        "note": "All 10 subscribed businesses were excluded before scoring. Held at Ready to Assign — this is a supply gap, not an invalid enquiry."
+      },
+      "sla": {
+        "ackHours": 24,
+        "dueAt": null,
+        "breached": false,
+        "breachedAt": null
+      },
+      "events": [
+        {
+          "eventId": "ev-0052-3",
+          "type": "MATCHED",
+          "actor": "System",
+          "actorRole": "system",
+          "at": "2026-08-19T22:06:00+05:30",
+          "note": "10 subscribed → 0 eligible · 422 no_eligible_business · Operations notified"
+        },
+        {
+          "eventId": "ev-0052-2",
+          "type": "QUALIFIED",
+          "actor": "System",
+          "actorRole": "system",
+          "at": "2026-08-19T22:05:00+05:30",
+          "note": "Snapshot frozen · qualification v4"
+        },
+        {
+          "eventId": "ev-0052-1",
+          "type": "INTAKE",
+          "actor": "System",
+          "actorRole": "system",
+          "at": "2026-08-19T22:05:00+05:30",
+          "note": "funnel/modular-kitchen-hyderabad · submission_id b21c…03 · not a duplicate"
+        }
+      ],
+      "tags": [
+        "contact-made"
+      ],
+      "contactLog": [
+        {
+          "logId": "cl-0052-1",
+          "channel": "call",
+          "direction": "outbound",
+          "at": "2026-08-19T21:58:00+05:30",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "outcome": "connected",
+          "response": "L-shaped kitchen for a 2BHK in Gachibowli. Not urgent, wants it done before Diwali.",
+          "note": "Confirmed. Flagged that we may have nobody covering Hyderabad for kitchens.",
+          "followUpAt": null
+        }
+      ],
+      "owner": {
+        "id": "u-101",
+        "name": "R. Menon"
+      },
+      "followUpAt": null,
+      "remarks": []
+    },
+    {
+      "enquiryId": "IB-BE-2026-0055",
+      "submissionId": "c9e4410a-7a51-4d2b-8b19-40be55",
+      "source": {
+        "kind": "portal",
+        "page": "portal/enquire",
+        "label": "Interior bazzar portal · Enquire",
+        "createdBy": null,
+        "via": null
+      },
+      "customer": {
+        "name": "Kavya N.",
+        "phone": "+91 90•••••••73",
+        "email": null
+      },
+      "requirement": {
+        "category": "Modular Kitchen",
+        "service": "Kitchen + wardrobe",
+        "city": "Bengaluru",
+        "state": "Karnataka",
+        "locality": "Koramangala",
+        "pincode": "560034",
+        "projectType": "Residential · 3BHK",
+        "intent": "project",
+        "text": "Kitchen and two wardrobes, moving in next quarter."
+      },
+      "qualification": {
+        "contactVerified": true,
+        "verifiedVia": "OTP",
+        "genuineness": "passed",
+        "genuinenessNote": "No flags",
+        "urgency": "90_plus",
+        "requirementSummary": "Residential 3BHK, two-room scope, planning ahead",
+        "version": "qualification v4",
+        "frozenAt": "2026-08-20T08:41:00+05:30",
+        "checklist": {
+          "reachable": true,
+          "requirement": true,
+          "genuine": true,
+          "urgency": true
+        },
+        "qualifiedBy": "R. Menon",
+        "qualifiedByRole": "Operations"
+      },
+      "status": "qualified",
+      "tier": "C",
+      "createdAt": "2026-08-20T08:41:00+05:30",
+      "activeAssignmentId": null,
+      "assignments": [],
+      "outcome": null,
+      "sla": {
+        "ackHours": 24,
+        "dueAt": null,
+        "breached": false,
+        "breachedAt": null
+      },
+      "events": [
+        {
+          "eventId": "ev-0055-2",
+          "type": "QUALIFIED",
+          "actor": "System",
+          "actorRole": "system",
+          "at": "2026-08-20T08:41:00+05:30",
+          "note": "Snapshot frozen · qualification v4 · matching not run yet"
+        },
+        {
+          "eventId": "ev-0055-1",
+          "type": "INTAKE",
+          "actor": "System",
+          "actorRole": "system",
+          "at": "2026-08-20T08:41:00+05:30",
+          "note": "portal/enquire · submission_id c9e4…55 · not a duplicate"
+        }
+      ],
+      "tags": [
+        "contact-made"
+      ],
+      "contactLog": [
+        {
+          "logId": "cl-0055-1",
+          "channel": "whatsapp",
+          "direction": "outbound",
+          "at": "2026-08-20T08:38:00+05:30",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "outcome": "replied",
+          "response": "Kitchen plus two wardrobes. Handover is in October, so no rush.",
+          "note": "Confirmed on chat, no call needed.",
+          "followUpAt": null
+        }
+      ],
+      "owner": {
+        "id": "u-101",
+        "name": "R. Menon"
+      },
+      "followUpAt": null,
+      "remarks": []
+    },
+    {
+      "enquiryId": "IB-BE-2026-0031",
+      "submissionId": "5d70b219-3c88-4b73-a4e0-9931aa",
+      "source": {
+        "kind": "funnel",
+        "page": "funnel/interior-design-delhi",
+        "label": "Interior Design · Delhi",
+        "createdBy": null,
+        "via": null
+      },
+      "customer": {
+        "name": "Nikhil A.",
+        "phone": "+91 99•••••••81",
+        "email": "n•••••@outlook.com"
+      },
+      "requirement": {
+        "category": "Interior Design",
+        "service": "Living + dining refresh",
+        "city": "New Delhi",
+        "state": "Delhi",
+        "locality": "Saket",
+        "pincode": "110017",
+        "projectType": "Residential · 2BHK",
+        "intent": "project",
+        "text": "Living and dining refresh, keeping the existing kitchen."
+      },
+      "qualification": {
+        "contactVerified": true,
+        "verifiedVia": "OTP",
+        "genuineness": "passed",
+        "genuinenessNote": "No flags",
+        "urgency": "within_30d",
+        "requirementSummary": "Residential 2BHK, partial scope, immediate start",
+        "version": "qualification v4",
+        "frozenAt": "2026-08-20T07:30:00+05:30",
+        "checklist": {
+          "reachable": true,
+          "requirement": true,
+          "genuine": true,
+          "urgency": true
+        },
+        "qualifiedBy": "R. Menon",
+        "qualifiedByRole": "Operations"
+      },
+      "status": "assigned",
+      "tier": "B",
+      "createdAt": "2026-08-20T07:30:00+05:30",
+      "activeAssignmentId": "as-0031-1",
+      "assignments": [
+        {
+          "assignmentId": "as-0031-1",
+          "businessId": "bz-001",
+          "businessName": "Studio Aangan",
+          "candidateRank": 1,
+          "candidateScore": 89,
+          "eligibleCount": 4,
+          "factorSnapshot": {
+            "category": 30,
+            "location": 25,
+            "segment": 11,
+            "keywords": 7,
+            "capacity": 10,
+            "fairness": 3,
+            "quality": 3
+          },
+          "ruleVersion": "v3",
+          "assignedBy": "R. Menon",
+          "assignedByRole": "Operations",
+          "assignedAt": "2026-08-20T07:58:00+05:30",
+          "deliveryStatus": "pending",
+          "deliveredAt": null,
+          "overrideReason": null,
+          "supersededAt": null
+        }
+      ],
+      "outcome": null,
+      "sla": {
+        "ackHours": 24,
+        "dueAt": null,
+        "breached": false,
+        "breachedAt": null
+      },
+      "events": [
+        {
+          "eventId": "ev-0031-4",
+          "type": "ASSIGNED",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "at": "2026-08-20T07:58:00+05:30",
+          "note": "Studio Aangan · rank 1 of 4 eligible · score 89 · rule v3 · factors frozen · capacity 4→5"
+        },
+        {
+          "eventId": "ev-0031-3",
+          "type": "MATCHED",
+          "actor": "System",
+          "actorRole": "system",
+          "at": "2026-08-20T07:31:00+05:30",
+          "note": "10 subscribed → 4 eligible, 6 excluded with reasons · rule v3"
+        },
+        {
+          "eventId": "ev-0031-2",
+          "type": "QUALIFIED",
+          "actor": "System",
+          "actorRole": "system",
+          "at": "2026-08-20T07:30:00+05:30",
+          "note": "Snapshot frozen · qualification v4"
+        },
+        {
+          "eventId": "ev-0031-1",
+          "type": "INTAKE",
+          "actor": "System",
+          "actorRole": "system",
+          "at": "2026-08-20T07:30:00+05:30",
+          "note": "funnel/interior-design-delhi · submission_id 5d70…aa · not a duplicate"
+        }
+      ],
+      "tags": [
+        "contact-made"
+      ],
+      "contactLog": [
+        {
+          "logId": "cl-0031-1",
+          "channel": "call",
+          "direction": "outbound",
+          "at": "2026-08-20T07:30:00+05:30",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "outcome": "connected",
+          "response": "Just the living and dining — kitchen was done two years ago and we are happy with it. Want it looking done before Diwali.",
+          "note": "Confirmed the requirement as submitted.",
+          "followUpAt": null
+        }
+      ],
+      "owner": {
+        "id": "u-101",
+        "name": "R. Menon"
+      },
+      "followUpAt": null,
+      "remarks": []
+    },
+    {
+      "enquiryId": "IB-BE-2026-0044",
+      "submissionId": "a0c8f3e2-5511-4c07-8de6-2244bb",
+      "source": {
+        "kind": "funnel",
+        "page": "funnel/interior-design-bengaluru",
+        "label": "Interior Design · Bengaluru",
+        "createdBy": null,
+        "via": null
+      },
+      "customer": {
+        "name": "Anjali R.",
+        "phone": "+91 99•••••••07",
+        "email": "a•••••@gmail.com"
+      },
+      "requirement": {
+        "category": "Interior Design",
+        "service": "Villa interiors",
+        "city": "Bengaluru",
+        "state": "Karnataka",
+        "locality": "Whitefield",
+        "pincode": "560066",
+        "projectType": "Residential · 4BHK villa",
+        "intent": "project",
+        "text": "Villa interiors, 4BHK, possession next month."
+      },
+      "qualification": {
+        "contactVerified": true,
+        "verifiedVia": "OTP",
+        "genuineness": "passed",
+        "genuinenessNote": "No flags",
+        "urgency": "within_30d",
+        "requirementSummary": "Residential 4BHK villa, full-scope, possession-driven",
+        "version": "qualification v4",
+        "frozenAt": "2026-08-17T22:12:00+05:30",
+        "checklist": {
+          "reachable": true,
+          "requirement": true,
+          "genuine": true,
+          "urgency": true
+        },
+        "qualifiedBy": "R. Menon",
+        "qualifiedByRole": "Operations"
+      },
+      "status": "delivered",
+      "tier": "A",
+      "createdAt": "2026-08-17T22:12:00+05:30",
+      "activeAssignmentId": "as-0044-1",
+      "assignments": [
+        {
+          "assignmentId": "as-0044-1",
+          "businessId": "bz-007",
+          "businessName": "Terra Interiors",
+          "candidateRank": 1,
+          "candidateScore": 84,
+          "eligibleCount": 2,
+          "factorSnapshot": {
+            "category": 30,
+            "location": 25,
+            "segment": 12,
+            "keywords": 6,
+            "capacity": 6,
+            "fairness": 3,
+            "quality": 2
+          },
+          "ruleVersion": "v3",
+          "assignedBy": "R. Menon",
+          "assignedByRole": "Operations",
+          "assignedAt": "2026-08-17T22:14:00+05:30",
+          "deliveryStatus": "delivered",
+          "deliveredAt": "2026-08-17T22:14:00+05:30",
+          "overrideReason": null,
+          "supersededAt": null
+        }
+      ],
+      "outcome": null,
+      "sla": {
+        "ackHours": 24,
+        "dueAt": "2026-08-18T22:14:00+05:30",
+        "breached": true,
+        "breachedAt": "2026-08-19T00:20:00+05:30"
+      },
+      "events": [
+        {
+          "eventId": "ev-0044-5",
+          "type": "SLA_BREACH",
+          "actor": "System",
+          "actorRole": "system",
+          "at": "2026-08-19T00:20:00+05:30",
+          "note": "Nightly sweep · status = Delivered AND acknowledgedAt IS NULL AND now > deliveredAt + 24h"
+        },
+        {
+          "eventId": "ev-0044-4",
+          "type": "DELIVERED",
+          "actor": "System",
+          "actorRole": "system",
+          "at": "2026-08-17T22:14:00+05:30",
+          "note": "Published to Terra Interiors · notification sent · contact released"
+        },
+        {
+          "eventId": "ev-0044-3",
+          "type": "ASSIGNED",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "at": "2026-08-17T22:14:00+05:30",
+          "note": "Terra Interiors · rank 1 of 2 eligible · score 84 · rule v3"
+        },
+        {
+          "eventId": "ev-0044-2",
+          "type": "MATCHED",
+          "actor": "System",
+          "actorRole": "system",
+          "at": "2026-08-17T22:13:00+05:30",
+          "note": "10 subscribed → 2 eligible, 8 excluded with reasons · rule v3"
+        },
+        {
+          "eventId": "ev-0044-1",
+          "type": "INTAKE",
+          "actor": "System",
+          "actorRole": "system",
+          "at": "2026-08-17T22:12:00+05:30",
+          "note": "funnel/interior-design-bengaluru · submission_id a0c8…bb · not a duplicate"
+        }
+      ],
+      "tags": [
+        "contact-made"
+      ],
+      "contactLog": [
+        {
+          "logId": "cl-0044-1",
+          "channel": "call",
+          "direction": "outbound",
+          "at": "2026-08-17T22:12:00+05:30",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "outcome": "connected",
+          "response": "Villa in Whitefield, four bedrooms. We get possession on the 12th and I would like work starting the week after.",
+          "note": "Confirmed the requirement as submitted.",
+          "followUpAt": null
+        }
+      ],
+      "owner": {
+        "id": "u-101",
+        "name": "R. Menon"
+      },
+      "followUpAt": null,
+      "remarks": [
+        {
+          "remarkId": "rm-0044-1",
+          "text": "Terra have gone quiet on the last two as well. If this one breaches too, it is a pattern and not a bad week.",
+          "actor": "D. Kapoor",
+          "actorRole": "Operations lead",
+          "at": "2026-08-19T09:10:00+05:30"
+        }
+      ]
+    },
+    {
+      "enquiryId": "IB-BE-2026-0041",
+      "submissionId": "77aa1290-6b3e-49f5-9c81-5544cc",
+      "source": {
+        "kind": "funnel",
+        "page": "funnel/interior-design-mumbai",
+        "label": "Interior Design · Mumbai",
+        "createdBy": null,
+        "via": null
+      },
+      "customer": {
+        "name": "Mohit S.",
+        "phone": "+91 98•••••••63",
+        "email": null
+      },
+      "requirement": {
+        "category": "Interior Design",
+        "service": "2BHK renovation",
+        "city": "Mumbai",
+        "state": "Maharashtra",
+        "locality": "Powai",
+        "pincode": "400076",
+        "projectType": "Residential · 2BHK",
+        "intent": "project",
+        "text": "2BHK renovation, flexible timeline."
+      },
+      "qualification": {
+        "contactVerified": true,
+        "verifiedVia": "OTP",
+        "genuineness": "passed",
+        "genuinenessNote": "No flags",
+        "urgency": "30_90d",
+        "requirementSummary": "Residential 2BHK, renovation scope, flexible start",
+        "version": "qualification v4",
+        "frozenAt": "2026-08-16T11:20:00+05:30",
+        "checklist": {
+          "reachable": true,
+          "requirement": true,
+          "genuine": true,
+          "urgency": true
+        },
+        "qualifiedBy": "R. Menon",
+        "qualifiedByRole": "Operations"
+      },
+      "status": "acknowledged",
+      "tier": "B",
+      "createdAt": "2026-08-16T11:20:00+05:30",
+      "activeAssignmentId": "as-0041-1",
+      "assignments": [
+        {
+          "assignmentId": "as-0041-1",
+          "businessId": "bz-002",
+          "businessName": "Deco Nest Interiors",
+          "candidateRank": 1,
+          "candidateScore": 86,
+          "eligibleCount": 2,
+          "factorSnapshot": {
+            "category": 30,
+            "location": 22,
+            "segment": 15,
+            "keywords": 8,
+            "capacity": 6,
+            "fairness": 3,
+            "quality": 2
+          },
+          "ruleVersion": "v3",
+          "assignedBy": "R. Menon",
+          "assignedByRole": "Operations",
+          "assignedAt": "2026-08-16T11:22:00+05:30",
+          "deliveryStatus": "delivered",
+          "deliveredAt": "2026-08-16T11:22:00+05:30",
+          "overrideReason": null,
+          "supersededAt": null
+        }
+      ],
+      "outcome": {
+        "assignmentId": "as-0041-1",
+        "acknowledgedAt": "2026-08-16T15:00:00+05:30",
+        "firstContactAt": "2026-08-16T16:12:00+05:30",
+        "status": "in_progress",
+        "outcome": null,
+        "reason": null,
+        "notes": "Site visit booked for Saturday.",
+        "updatedBy": "Deco Nest Interiors",
+        "updatedAt": "2026-08-16T16:12:00+05:30"
+      },
+      "sla": {
+        "ackHours": 24,
+        "dueAt": "2026-08-17T11:22:00+05:30",
+        "breached": false,
+        "breachedAt": null
+      },
+      "events": [
+        {
+          "eventId": "ev-0041-5",
+          "type": "ACKNOWLEDGED",
+          "actor": "Deco Nest Interiors",
+          "actorRole": "Business",
+          "at": "2026-08-16T15:00:00+05:30",
+          "note": "Acknowledged 3h 38m after delivery · within SLA"
+        },
+        {
+          "eventId": "ev-0041-4",
+          "type": "DELIVERED",
+          "actor": "System",
+          "actorRole": "system",
+          "at": "2026-08-16T11:22:00+05:30",
+          "note": "Published to Deco Nest Interiors · notification sent · contact released"
+        },
+        {
+          "eventId": "ev-0041-3",
+          "type": "ASSIGNED",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "at": "2026-08-16T11:22:00+05:30",
+          "note": "Deco Nest Interiors · rank 1 of 2 eligible · score 86 · rule v3"
+        },
+        {
+          "eventId": "ev-0041-2",
+          "type": "MATCHED",
+          "actor": "System",
+          "actorRole": "system",
+          "at": "2026-08-16T11:21:00+05:30",
+          "note": "10 subscribed → 2 eligible, 8 excluded with reasons · rule v3"
+        },
+        {
+          "eventId": "ev-0041-1",
+          "type": "INTAKE",
+          "actor": "System",
+          "actorRole": "system",
+          "at": "2026-08-16T11:20:00+05:30",
+          "note": "funnel/interior-design-mumbai · submission_id 77aa…cc · not a duplicate"
+        }
+      ],
+      "tags": [
+        "contact-made"
+      ],
+      "contactLog": [
+        {
+          "logId": "cl-0041-2",
+          "channel": "call",
+          "direction": "outbound",
+          "at": "2026-08-16T11:18:00+05:30",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "outcome": "connected",
+          "response": "2BHK in Powai, renovation not a fresh fit-out. Timeline is open — sometime in the next two to three months.",
+          "note": "Corrected the form: it came in as 'full home interiors', it is a renovation.",
+          "followUpAt": null
+        },
+        {
+          "logId": "cl-0041-1",
+          "channel": "call",
+          "direction": "outbound",
+          "at": "2026-08-16T10:40:00+05:30",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "outcome": "no_answer",
+          "response": null,
+          "note": "Rang out.",
+          "followUpAt": null
+        }
+      ],
+      "owner": {
+        "id": "u-101",
+        "name": "R. Menon"
+      },
+      "followUpAt": null,
+      "remarks": []
+    },
+    {
+      "enquiryId": "IB-BE-2026-0038",
+      "submissionId": "3311ffa4-2d90-4a66-b7c2-8877dd",
+      "source": {
+        "kind": "funnel",
+        "page": "funnel/furniture-hyderabad",
+        "label": "Furniture · Hyderabad",
+        "createdBy": null,
+        "via": null
+      },
+      "customer": {
+        "name": "Fatima Z.",
+        "phone": "+91 96•••••••55",
+        "email": null
+      },
+      "requirement": {
+        "category": "Furniture",
+        "service": "Dining sets",
+        "city": "Hyderabad",
+        "state": "Telangana",
+        "locality": "Kondapur",
+        "pincode": "500084",
+        "projectType": "Residential · pieces",
+        "intent": "product",
+        "text": "Looking at dining sets, no fixed date."
+      },
+      "qualification": {
+        "contactVerified": true,
+        "verifiedVia": "OTP",
+        "genuineness": "passed",
+        "genuinenessNote": "No flags",
+        "urgency": "browsing",
+        "requirementSummary": "Residential, individual pieces, no fixed date",
+        "version": "qualification v4",
+        "frozenAt": "2026-08-11T13:02:00+05:30",
+        "checklist": {
+          "reachable": true,
+          "requirement": true,
+          "genuine": true,
+          "urgency": true
+        },
+        "qualifiedBy": "R. Menon",
+        "qualifiedByRole": "Operations"
+      },
+      "status": "converted",
+      "tier": "D",
+      "createdAt": "2026-08-11T13:02:00+05:30",
+      "activeAssignmentId": "as-0038-1",
+      "assignments": [
+        {
+          "assignmentId": "as-0038-1",
+          "businessId": "bz-003",
+          "businessName": "Ambient Works",
+          "candidateRank": 1,
+          "candidateScore": 81,
+          "eligibleCount": 1,
+          "factorSnapshot": {
+            "category": 30,
+            "location": 25,
+            "segment": 9,
+            "keywords": 6,
+            "capacity": 8,
+            "fairness": 2,
+            "quality": 1
+          },
+          "ruleVersion": "v3",
+          "assignedBy": "R. Menon",
+          "assignedByRole": "Operations",
+          "assignedAt": "2026-08-11T13:40:00+05:30",
+          "deliveryStatus": "delivered",
+          "deliveredAt": "2026-08-11T13:40:00+05:30",
+          "overrideReason": null,
+          "supersededAt": null
+        }
+      ],
+      "outcome": {
+        "assignmentId": "as-0038-1",
+        "acknowledgedAt": "2026-08-11T15:10:00+05:30",
+        "firstContactAt": "2026-08-12T10:40:00+05:30",
+        "status": "closed",
+        "outcome": "converted",
+        "reason": "Order placed",
+        "notes": "Dining set plus two accent chairs.",
+        "updatedBy": "Ambient Works",
+        "updatedAt": "2026-08-19T17:26:00+05:30"
+      },
+      "sla": {
+        "ackHours": 24,
+        "dueAt": "2026-08-12T13:40:00+05:30",
+        "breached": false,
+        "breachedAt": null
+      },
+      "events": [
+        {
+          "eventId": "ev-0038-6",
+          "type": "OUTCOME",
+          "actor": "Ambient Works",
+          "actorRole": "Business",
+          "at": "2026-08-19T17:26:00+05:30",
+          "note": "Converted · Order placed · capacity released, Ambient Works 2→1"
+        },
+        {
+          "eventId": "ev-0038-5",
+          "type": "ACKNOWLEDGED",
+          "actor": "Ambient Works",
+          "actorRole": "Business",
+          "at": "2026-08-11T15:10:00+05:30",
+          "note": "Acknowledged 1h 30m after delivery"
+        },
+        {
+          "eventId": "ev-0038-4",
+          "type": "DELIVERED",
+          "actor": "System",
+          "actorRole": "system",
+          "at": "2026-08-11T13:40:00+05:30",
+          "note": "Published to Ambient Works · notification sent · contact released"
+        },
+        {
+          "eventId": "ev-0038-3",
+          "type": "ASSIGNED",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "at": "2026-08-11T13:40:00+05:30",
+          "note": "Ambient Works · rank 1 of 1 eligible · score 81 · rule v3"
+        },
+        {
+          "eventId": "ev-0038-2",
+          "type": "MATCHED",
+          "actor": "System",
+          "actorRole": "system",
+          "at": "2026-08-11T13:03:00+05:30",
+          "note": "10 subscribed → 1 eligible, 9 excluded with reasons · rule v3"
+        },
+        {
+          "eventId": "ev-0038-1",
+          "type": "INTAKE",
+          "actor": "System",
+          "actorRole": "system",
+          "at": "2026-08-11T13:02:00+05:30",
+          "note": "funnel/furniture-hyderabad · submission_id 3311…dd · not a duplicate · tagged new-enquiry"
+        }
+      ],
+      "tags": [
+        "contact-made"
+      ],
+      "contactLog": [
+        {
+          "logId": "cl-0038-1",
+          "channel": "call",
+          "direction": "outbound",
+          "at": "2026-08-11T13:02:00+05:30",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "outcome": "connected",
+          "response": "Mainly a dining set, six seater. Might add a couple of chairs for the living room if I like them.",
+          "note": "Confirmed the requirement as submitted.",
+          "followUpAt": null
+        }
+      ],
+      "owner": {
+        "id": "u-101",
+        "name": "R. Menon"
+      },
+      "followUpAt": null,
+      "remarks": []
+    },
+    {
+      "enquiryId": "IB-BE-2026-0036",
+      "submissionId": "9be2c057-4188-4f31-a0d4-1122ee",
+      "source": {
+        "kind": "funnel",
+        "page": "funnel/interior-design-pune",
+        "label": "Interior Design · Pune",
+        "createdBy": null,
+        "via": null
+      },
+      "customer": {
+        "name": "Rahul T.",
+        "phone": "+91 91•••••••20",
+        "email": null
+      },
+      "requirement": {
+        "category": "Interior Design",
+        "service": "Full home interiors",
+        "city": "Pune",
+        "state": "Maharashtra",
+        "locality": "Kharadi",
+        "pincode": "411014",
+        "projectType": "Residential · 3BHK",
+        "intent": "project",
+        "text": "Planning ahead for next year."
+      },
+      "qualification": {
+        "contactVerified": true,
+        "verifiedVia": "OTP",
+        "genuineness": "passed",
+        "genuinenessNote": "No flags",
+        "urgency": "90_plus",
+        "requirementSummary": "Residential 3BHK, full-scope, next-year timeline",
+        "version": "qualification v4",
+        "frozenAt": "2026-08-08T10:15:00+05:30",
+        "checklist": {
+          "reachable": true,
+          "requirement": true,
+          "genuine": true,
+          "urgency": true
+        },
+        "qualifiedBy": "R. Menon",
+        "qualifiedByRole": "Operations"
+      },
+      "status": "not_converted",
+      "tier": "C",
+      "createdAt": "2026-08-08T10:15:00+05:30",
+      "activeAssignmentId": "as-0036-2",
+      "assignments": [
+        {
+          "assignmentId": "as-0036-1",
+          "businessId": "bz-002",
+          "businessName": "Deco Nest Interiors",
+          "candidateRank": 1,
+          "candidateScore": 79,
+          "eligibleCount": 2,
+          "factorSnapshot": {
+            "category": 30,
+            "location": 18,
+            "segment": 13,
+            "keywords": 7,
+            "capacity": 6,
+            "fairness": 3,
+            "quality": 2
+          },
+          "ruleVersion": "v3",
+          "assignedBy": "R. Menon",
+          "assignedByRole": "Operations",
+          "assignedAt": "2026-08-08T10:40:00+05:30",
+          "deliveryStatus": "delivered",
+          "deliveredAt": "2026-08-08T10:40:00+05:30",
+          "overrideReason": null,
+          "supersededAt": "2026-08-10T09:05:00+05:30",
+          "closedReason": "Business declined the enquiry"
+        },
+        {
+          "assignmentId": "as-0036-2",
+          "businessId": "bz-004",
+          "businessName": "Casa Vista Design",
+          "candidateRank": 2,
+          "candidateScore": 74,
+          "eligibleCount": 2,
+          "factorSnapshot": {
+            "category": 30,
+            "location": 14,
+            "segment": 12,
+            "keywords": 5,
+            "capacity": 8,
+            "fairness": 4,
+            "quality": 1
+          },
+          "ruleVersion": "v3",
+          "assignedBy": "R. Menon",
+          "assignedByRole": "Operations",
+          "assignedAt": "2026-08-10T09:05:00+05:30",
+          "deliveryStatus": "delivered",
+          "deliveredAt": "2026-08-10T09:05:00+05:30",
+          "overrideReason": null,
+          "supersededAt": null
+        }
+      ],
+      "outcome": {
+        "assignmentId": "as-0036-2",
+        "acknowledgedAt": "2026-08-10T12:44:00+05:30",
+        "firstContactAt": "2026-08-10T18:02:00+05:30",
+        "status": "closed",
+        "outcome": "not_converted",
+        "reason": "Timeline did not suit",
+        "notes": "Customer is a year out. Asked to be contacted in Q1.",
+        "updatedBy": "Casa Vista Design",
+        "updatedAt": "2026-08-14T11:30:00+05:30"
+      },
+      "sla": {
+        "ackHours": 24,
+        "dueAt": "2026-08-11T09:05:00+05:30",
+        "breached": false,
+        "breachedAt": null
+      },
+      "events": [
+        {
+          "eventId": "ev-0036-8",
+          "type": "OUTCOME",
+          "actor": "Casa Vista Design",
+          "actorRole": "Business",
+          "at": "2026-08-14T11:30:00+05:30",
+          "note": "Not Converted · Timeline did not suit · capacity released"
+        },
+        {
+          "eventId": "ev-0036-7",
+          "type": "ACKNOWLEDGED",
+          "actor": "Casa Vista Design",
+          "actorRole": "Business",
+          "at": "2026-08-10T12:44:00+05:30",
+          "note": "Acknowledged 3h 39m after delivery"
+        },
+        {
+          "eventId": "ev-0036-6",
+          "type": "DELIVERED",
+          "actor": "System",
+          "actorRole": "system",
+          "at": "2026-08-10T09:05:00+05:30",
+          "note": "Published to Casa Vista Design · notification sent"
+        },
+        {
+          "eventId": "ev-0036-5",
+          "type": "ASSIGNED",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "at": "2026-08-10T09:05:00+05:30",
+          "note": "Casa Vista Design · rank 2 of 2 eligible · score 74 · rule v3"
+        },
+        {
+          "eventId": "ev-0036-4",
+          "type": "REASSIGNED",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "at": "2026-08-10T09:05:00+05:30",
+          "note": "From Deco Nest Interiors · reason: Business declined the enquiry · previous assignment closed, not deleted"
+        },
+        {
+          "eventId": "ev-0036-3",
+          "type": "ASSIGNED",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "at": "2026-08-08T10:40:00+05:30",
+          "note": "Deco Nest Interiors · rank 1 of 2 eligible · score 79 · rule v3"
+        },
+        {
+          "eventId": "ev-0036-2",
+          "type": "MATCHED",
+          "actor": "System",
+          "actorRole": "system",
+          "at": "2026-08-08T10:16:00+05:30",
+          "note": "10 subscribed → 2 eligible, 8 excluded with reasons · rule v3"
+        },
+        {
+          "eventId": "ev-0036-1",
+          "type": "INTAKE",
+          "actor": "System",
+          "actorRole": "system",
+          "at": "2026-08-08T10:15:00+05:30",
+          "note": "funnel/interior-design-pune · submission_id 9be2…ee · not a duplicate"
+        }
+      ],
+      "tags": [
+        "contact-made"
+      ],
+      "contactLog": [
+        {
+          "logId": "cl-0036-1",
+          "channel": "call",
+          "direction": "outbound",
+          "at": "2026-08-08T10:15:00+05:30",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "outcome": "connected",
+          "response": "Nothing urgent — we are planning for next year, just want to understand what it costs and how long it takes.",
+          "note": "Confirmed the requirement as submitted.",
+          "followUpAt": null
+        }
+      ],
+      "owner": {
+        "id": "u-101",
+        "name": "R. Menon"
+      },
+      "followUpAt": null,
+      "remarks": []
+    },
+    {
+      "enquiryId": "IB-BE-2026-0035",
+      "submissionId": "0aa4b6d1-9c22-4e88-83fa-3300ff",
+      "source": {
+        "kind": "funnel",
+        "page": "funnel/interior-design-delhi",
+        "label": "Interior Design · Delhi",
+        "createdBy": null,
+        "via": null
+      },
+      "customer": {
+        "name": "asdf asdf",
+        "phone": "+91 90•••••••11",
+        "email": null
+      },
+      "requirement": {
+        "category": null,
+        "service": null,
+        "city": null,
+        "state": null,
+        "locality": null,
+        "pincode": null,
+        "projectType": null,
+        "intent": null,
+        "text": "asdf asdf"
+      },
+      "qualification": {
+        "contactVerified": false,
+        "verifiedVia": null,
+        "genuineness": "failed",
+        "genuinenessNote": "Trivial-name check failed at intake",
+        "urgency": null,
+        "requirementSummary": null,
+        "version": null,
+        "frozenAt": null,
+        "checklist": {
+          "reachable": false,
+          "requirement": false,
+          "genuine": false,
+          "urgency": false
+        },
+        "qualifiedBy": null,
+        "qualifiedByRole": null
+      },
+      "status": "invalid",
+      "tier": "E",
+      "createdAt": "2026-08-08T03:41:00+05:30",
+      "activeAssignmentId": null,
+      "assignments": [],
+      "outcome": null,
+      "invalidation": {
+        "reason": "Name trivial / gibberish",
+        "detectedBy": "System",
+        "detectedAt": "2026-08-08T03:41:00+05:30",
+        "note": "Detected at intake. Matching never ran — an invalid enquiry is not scored."
+      },
+      "sla": {
+        "ackHours": 24,
+        "dueAt": null,
+        "breached": false,
+        "breachedAt": null
+      },
+      "events": [
+        {
+          "eventId": "ev-0035-2",
+          "type": "INVALIDATED",
+          "actor": "System",
+          "actorRole": "system",
+          "at": "2026-08-08T03:41:00+05:30",
+          "note": "Name trivial / gibberish · 400 validation_failed · matching never ran"
+        },
+        {
+          "eventId": "ev-0035-1",
+          "type": "INTAKE",
+          "actor": "System",
+          "actorRole": "system",
+          "at": "2026-08-08T03:41:00+05:30",
+          "note": "funnel/interior-design-delhi · submission_id 0aa4…ff · raw payload retained"
+        }
+      ],
+      "tags": [
+        "spam-suspected"
+      ],
+      "contactLog": [],
+      "owner": {
+        "id": "u-101",
+        "name": "R. Menon"
+      },
+      "followUpAt": null,
+      "remarks": []
+    }
+  ]
+}

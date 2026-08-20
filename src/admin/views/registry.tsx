@@ -23,6 +23,7 @@ import Roles from "./Roles";
 import Deals from "./Deals";
 import Quotations from "./Quotations";
 import Invoices from "./Invoices";
+import BusinessEnquiries from "./BusinessEnquiries";
 
 /** route key → the component that owns that workspace. */
 export const VIEWS: Record<string, ComponentType> = {
@@ -33,6 +34,11 @@ export const VIEWS: Record<string, ComponentType> = {
   deals: Deals,
   quotations: Quotations,
   invoices: Invoices,
+  /* Frontend-first: no endpoint behind it yet, so its module row is appended
+     client-side in shell/modules.ts rather than arriving from the server.
+     See PROTO_MODULES in auth/session.ts for the whole arrangement, and
+     src/proto/v-2.2.0.0/BACKEND-INTEGRATION.md for what has to land. */
+  "business-enquiries": BusinessEnquiries,
 };
 
 export function ViewHost() {

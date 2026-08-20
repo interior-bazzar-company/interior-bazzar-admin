@@ -38,3 +38,11 @@ AIDOCS/
 # stay tracked — git ignores untracked files only — but any NEW json, a new locale file
 # included, has to be forced in with `git add -f` or it will silently never be committed.
 *.json
+
+# ...except the mock-API content, which is SOURCE, not config or build output.
+# src/content/<module>/*.json stands in for endpoints that do not exist yet (see
+# src/proto/v-2.2.0.0/BACKEND-INTEGRATION.md). Those files are the only thing
+# some screens render from — ignored, the module builds and shows nothing for
+# anyone who clones. The blanket rule above was silently swallowing the whole
+# directory, and `git add -f` every time is a rule somebody forgets once.
+!src/content/**/*.json

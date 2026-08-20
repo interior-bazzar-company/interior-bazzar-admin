@@ -44,6 +44,24 @@ let unreachable = false;
  *  be a cycle. */
 export const HIDDEN_MODULES = new Set(["design", "payments"]);
 
+/** The mirror image of HIDDEN_MODULES: modules this panel shows that the server
+ *  does not send yet, because they are being built frontend-first on the
+ *  proto-v-2.2.0.0 branch (see src/proto/v-2.2.0.0/CHANGELOG.md).
+ *
+ *    business-enquiries  Module 4 — funnel and portal enquiries routed to a
+ *                        subscribed business. Reads only static JSON from
+ *                        src/content/business-enquiries/ and writes only to
+ *                        memory in this tab; there is no endpoint behind it.
+ *
+ *  `can()` returns true for these, which is a REAL hole and is worth being
+ *  plain about: it is safe today only because a proto module has no server data
+ *  to leak and no server write to authorise. The moment the API lands, a Module
+ *  row is created for the key, the key comes out of this set, and the module is
+ *  governed by the same matrix as everything else. Removing the row from here
+ *  is part of the endpoint work-list in BACKEND-INTEGRATION.md, not an
+ *  afterthought. */
+export const PROTO_MODULES = new Set(["business-enquiries"]);
+
 export function getSession(): MePermissions | null {
   return session;
 }
@@ -102,6 +120,9 @@ export function isZeroAccess(s: MePermissions): boolean {
 
 export function can(moduleKey: string, action?: string): boolean {
   if (!session) return false;
+  /* A frontend-first module the server has no Module row for. See
+     PROTO_MODULES above for why this is allowed and when it stops being. */
+  if (PROTO_MODULES.has(moduleKey)) return true;
   if (session.isFullAccess) return true;
   const held = session.modules.find((m) => m.key === moduleKey)?.actions || [];
   /* `view` is the gate: without it the module is not this session's at all, so

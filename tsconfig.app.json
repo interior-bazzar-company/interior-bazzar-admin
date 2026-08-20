@@ -13,6 +13,10 @@
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
+    /* src/content/**.json — the prototype stand-in for endpoints that do not
+       exist yet (see src/proto/v-2.2.0.0). Vite already bundles JSON imports;
+       this only tells tsc the same thing. */
+    "resolveJsonModule": true,
     "noEmit": true,
     "jsx": "react-jsx",
 

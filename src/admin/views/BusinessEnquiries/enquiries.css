@@ -1,0 +1,866 @@
+/* =============================================================================
+   Business Enquiries — the module's own stylesheet.
+   -----------------------------------------------------------------------------
+   Imported by the view, not by main.tsx, the same way admin/auth owns
+   admin-auth.css. Everything here is prefixed `.be-` and every value is a theme
+   token — no literal colours, so the module inherits light, dark and the
+   density switch for free, and a token change reaches this file too.
+
+   The one unprefixed rule is `.tb-stat.ro.bad`, at the bottom, and it is
+   commented where it sits.
+
+   BREAKPOINTS ARE CONTAINER QUERIES, NOT MEDIA QUERIES, and that is not a
+   stylistic preference. This module renders inside a 248px sidebar plus 64px of
+   page padding, so a viewport of 1280px leaves the content about 968px — every
+   viewport breakpoint written here was roughly 310px wrong, and the two-column
+   record collapsed or squeezed at exactly the wrong widths. `@container` asks
+   the only question that matters: how much room does this element actually
+   have.
+   ========================================================================== */
+
+/* ------------------------------------------------------------ the list --- */
+/* Eight columns, two of them prose. Without a floor the browser squeezes the
+   response column to a word a line long before it ever offers a scrollbar. */
+.be-list .be-tbl { width: 100%; min-width: 1160px }
+.be-list .be-tbl th { background: var(--bg) }
+.be-list .be-tbl td { height: auto; padding: var(--space-2) var(--space-3) }
+.be-list .be-tbl td.rail { width: 3px; padding: 0 }
+.be-list .be-tbl td.rail i {
+  display: block; width: 3px; height: 42px; border-radius: 0 2px 2px 0; background: transparent;
+}
+/* The rail is the only place a row shouts. Breached is red because someone has
+   to act; "no eligible business" is amber because it is a supply gap, not a
+   failure; Ready is neutral-strong because it is simply next. */
+.be-list .be-tbl tr.be-r-bad td.rail i { background: var(--bad) }
+.be-list .be-tbl tr.be-r-warn td.rail i { background: var(--warn) }
+.be-list .be-tbl tr.be-r-rd td.rail i { background: var(--line-strong) }
+/* Fourteen cells do not fit a laptop, and the shared strip scrolls
+   horizontally — which put Converted and Invalid permanently off the right
+   edge, invisible unless you knew to drag. Wrapping keeps every count on
+   screen and costs one row only when it has to. */
+/* The strip and its disclosure sit on one line, sharing the band's rules and
+   its left edge. */
+.be-attn {
+  display: flex; align-items: stretch; flex: 0 0 auto;
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+}
+.be-attn > .dls-attn { flex: 1 1 auto; border: 0 }
+.be-list .dls-attn { flex-wrap: wrap; overflow-x: visible; row-gap: 0 }
+/* Quiet: it reveals counts rather than filtering anything, so it must not read
+   as a fifteenth cell. */
+.be-attn-more {
+  flex: 0 0 auto; padding: 0 var(--page-pad) 0 var(--space-3);
+  border: 0; background: none; cursor: pointer; white-space: nowrap;
+  font-size: var(--text-sm); color: var(--text-3);
+}
+.be-attn-more:hover:not(:disabled) { color: var(--brand-text) }
+.be-attn-more:disabled { cursor: default; opacity: .55 }
+/* Every band on this page starts at the same x: the actions, the filter grid,
+   the strip, the chips and the table. They were four different insets, which is
+   what "align content" was pointing at. */
+.be-list > .chiprow { padding: 0 var(--page-pad); margin: var(--space-2) 0 var(--space-3) }
+.be-list .dls-attn .dls-sep { align-self: stretch }
+
+.be-late { color: var(--bad); font-weight: var(--weight-medium) }
+
+/* Owner, and the absence of one. Unowned is styled as a state rather than a
+   dash: with a team working the same queue, nobody-owns-this is the condition
+   that produces two people ringing one customer. */
+.be-owner { display: inline-flex; align-items: center; gap: 5px; font-size: var(--text-md) }
+.be-owner.none { color: var(--bad) }
+.be-owner .av {
+  display: grid; place-items: center; width: 20px; height: 20px; flex: 0 0 20px;
+  border-radius: var(--radius-full); background: var(--bg-active);
+  font-size: var(--text-2xs); font-weight: var(--weight-semibold); color: var(--text-2);
+}
+
+/* A promised callback. Overdue is the loudest thing in the module, above a
+   breached SLA — that one is a business failing to answer us, this one is us
+   failing a customer we personally promised to ring. */
+.be-due { font-size: var(--text-sm); white-space: nowrap; color: var(--text-2) }
+.be-due.over { color: var(--bad); font-weight: var(--weight-semibold) }
+.be-due.none { color: var(--text-3) }
+
+/* The prototype banner. Deliberately loud: a demo that looks live and is not
+   is worse than no demo. */
+.be-proto {
+  display: flex; align-items: center; gap: var(--space-2);
+  margin: var(--space-3) var(--page-pad) 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--warn-line); border-radius: var(--radius-md);
+  background: var(--warn-bg); color: var(--warn);
+  font-size: var(--text-sm); line-height: var(--lh-sm);
+}
+.be-proto { flex-wrap: wrap; row-gap: var(--space-2) }
+.be-proto .ic { flex: 0 0 auto }
+.be-proto span { flex: 1 1 auto; min-width: 240px }
+/* Both scaffolding buttons stay together at the end when the banner wraps,
+   rather than each taking a line of its own. */
+.be-proto .btn { flex: 0 0 auto }
+.be-detail .be-proto { margin-inline: 0 }
+
+/* ---------------------------------------------------------- the record --- */
+.be-detail {
+  padding: var(--space-5) var(--page-pad) var(--space-10); max-width: var(--page-max-wide);
+  container-type: inline-size; container-name: rec;
+}
+
+/* `gap` covers both axes, so a wrapped id bar keeps its lines apart. Without
+   the row half of it, chips on a second line sat hard against the heading
+   above them. */
+.be-idbar { display: flex; align-items: center; gap: var(--space-2) var(--space-2); flex-wrap: wrap }
+.be-idbar > h2 { margin-right: var(--space-1) }
+/* Nothing in this bar may grow to fill the line. That is what the tier badge
+   did, and a chip row where one item can expand is a row that reflows
+   differently for every record. */
+.be-idbar > * { flex: 0 0 auto }
+.be-idbar > .spacer { flex: 1 1 auto }
+.be-idbar h2 { font-size: var(--text-2xl); line-height: var(--lh-2xl); font-weight: var(--weight-semibold) }
+.be-subline {
+  margin-top: var(--space-2); font-size: var(--text-md); color: var(--text-3);
+  display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+}
+
+/* The owner sits at the head of the subline rather than in a card of its own.
+   It is one fact and one action, and it needs to be the first thing read on a
+   record somebody is deciding whether to pick up. */
+.be-ownerbar { display: inline-flex; align-items: center; gap: var(--space-2) }
+.be-ownersel {
+  height: var(--control-xs); max-width: 150px; padding: 0 var(--space-1);
+  border: 1px solid var(--line-2); border-radius: var(--radius-sm);
+  background: var(--bg); color: var(--text-2); font-size: var(--text-sm);
+}
+.be-ownersel:hover { border-color: var(--line-control) }
+
+/* `.be-tier-h` and the `.be-idbar .be-tier` width override lived here. Together
+   they turned the tier badge in the record header into a full-width black bar
+   with its help text spilling out underneath — see TierBadge in bits.tsx for
+   the mechanism. Both are gone; the badge is a 20px square everywhere. */
+
+/* The callback line inside a logged contact entry. */
+.be-log-i .be-due { margin-top: 5px; display: flex; align-items: center; gap: 4px }
+
+/* THE LIFECYCLE RAIL. Nine states read as one line, so it fits above the tabs
+   instead of taking a card of its own. Steps behind you are filled, the one you
+   are on is ringed, the ones ahead are outlines — which is the whole legend. */
+/* The rail used to own a row of its own, which made four bands of chrome —
+   id bar, subline, rail, tabs — before any content. On an 800px-tall laptop
+   the work started at the fold. It shares the tab row now: same information,
+   one row back. */
+.be-chrome {
+  display: flex; align-items: flex-end; gap: var(--space-4); flex-wrap: wrap;
+  margin-top: var(--space-4);
+}
+.be-chrome .tabs { flex: 1 1 auto; margin: 0 }
+.be-rail {
+  display: flex; align-items: center; gap: var(--space-1); flex: 0 1 auto;
+  overflow-x: auto; padding-bottom: var(--space-2);
+}
+.be-step { display: flex; align-items: center; gap: 6px; white-space: nowrap; flex: 0 0 auto }
+.be-step + .be-step::before {
+  content: ""; width: 18px; height: 1px; background: var(--line-2); margin-right: 6px;
+}
+.be-step i {
+  width: 9px; height: 9px; border-radius: var(--radius-full);
+  border: 1.5px solid var(--line-3); background: var(--bg); flex: 0 0 9px;
+}
+.be-step b { font-size: var(--text-xs); font-weight: var(--weight-normal); color: var(--text-3) }
+.be-step.done i { background: var(--line-3); border-color: var(--line-3) }
+.be-step.done b { color: var(--text-3) }
+.be-step.on i { background: var(--brand); border-color: var(--brand); box-shadow: 0 0 0 3px var(--bg-selected) }
+.be-step.on b { color: var(--text); font-weight: var(--weight-semibold) }
+.be-step.end.on i { background: var(--ok-solid); border-color: var(--ok-solid) }
+
+/* ------------------------------------------------------------ the pane --- */
+/* Requirement left, suggestions right. Below 1240px the panel drops under the
+   requirement rather than squeezing: a ranked list at 240px wide stops being
+   readable, and a suggestion nobody can read is not a suggestion. */
+/* 400px of panel + 16px gap + 560px of readable record = 976. Below that the
+   panel drops underneath rather than squeezing: a ranked list at 260px wide
+   stops being a ranked list, and a requirement form at 300px stops being
+   fillable. */
+.be-pane { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: var(--space-4); align-items: start }
+@container rec (max-width: 980px) {
+  .be-pane { grid-template-columns: minmax(0, 1fr) }
+  /* Stacked, the panel is just another block — pinning it would strand the
+     record above it off-screen. */
+  .be-sp { position: static; max-height: none }
+}
+.be-single { max-width: 940px }
+
+.be-blk {
+  background: var(--surface-raised); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); padding: var(--space-4);
+  margin-bottom: var(--space-3);
+  /* So the form inside can ask how wide IT is, not how wide the window is. */
+  container-type: inline-size; container-name: blk;
+}
+.be-blk.bad { border-color: var(--bad-line) }
+.be-blk.quiet { background: var(--bg-shell) }
+.be-blk > h4 {
+  font-size: var(--text-2xs); line-height: var(--lh-2xs); letter-spacing: .11em;
+  text-transform: uppercase; color: var(--text-3); font-weight: var(--weight-semibold);
+  margin-bottom: var(--space-3);
+}
+.be-blk.bad > h4 { color: var(--bad) }
+
+/* The customer's own words, kept as their own words. */
+.be-quote {
+  margin-top: var(--space-3); padding: var(--space-2) 0 var(--space-2) var(--space-3);
+  border-left: 3px solid var(--line-2); font-style: italic; color: var(--text-2);
+  font-size: var(--text-base); line-height: var(--lh-base);
+}
+
+/* The frozen bar — wherever a snapshot is shown, this says what frozen means
+   there. Absence of an Edit button is a decision; a decision nobody can see
+   reads as an oversight. */
+.be-frozen {
+  display: flex; align-items: flex-start; gap: var(--space-2);
+  margin-top: var(--space-3); padding: var(--space-2) var(--space-3);
+  background: var(--bg-inset); border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--text-2);
+}
+.be-frozen .ic { flex: 0 0 auto; margin-top: 1px; color: var(--text-3) }
+
+.be-note {
+  margin-top: var(--space-3); font-size: var(--text-sm); line-height: var(--lh-base);
+  color: var(--text-3);
+}
+.be-fail { color: var(--bad); font-weight: var(--weight-medium) }
+.be-terminal { font-size: var(--text-sm) }
+
+/* ------------------------------------------------- badges and chips ------ */
+.be-tier {
+  display: inline-grid; place-items: center; width: 20px; height: 20px;
+  border: 1px solid var(--line-2); border-radius: var(--radius-sm);
+  font-size: var(--text-xs); font-weight: var(--weight-semibold); color: var(--text-2);
+  background: var(--bg);
+}
+/* Tier A is the only one that inverts. Five shades of grey for five tiers reads
+   as a gradient nobody can decode; one filled square reads as "this one". */
+.be-tier.tA { background: var(--text); color: var(--text-inverse); border-color: var(--text) }
+.be-tier.tB { background: var(--bg-active) }
+
+.be-urg {
+  display: inline-flex; align-items: center; height: 20px; padding: 0 var(--space-2);
+  border: 1px solid var(--line-2); border-radius: var(--radius-full);
+  font-size: var(--text-xs); color: var(--text-2); background: var(--bg);
+  white-space: nowrap;
+}
+.be-urg.hot { border-color: var(--bad-line); color: var(--bad); background: var(--bad-bg) }
+
+/* --------------------------------------------- the suggestions panel ----- */
+/* THE PANEL PINS, ITS BODY SCROLLS, ITS FOOTER STAYS PUT.
+   It used to be a plain sticky box with no height limit. Both panels are taller
+   than a laptop viewport — the qualification one especially — and a sticky
+   element taller than the viewport stops moving once its top edge reaches the
+   offset, which left the bottom of it permanently below the fold. That bottom
+   is where "Mark qualified" and the assign actions live: the primary action of
+   both core screens was unreachable. Three rules fix it, and the middle one is
+   the whole trick — a flex column with a scrolling body cannot outgrow its
+   own max-height. */
+.be-sp {
+  background: var(--surface-raised); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); overflow: hidden;
+  position: sticky; top: var(--space-3);
+  max-height: calc(100vh - var(--top-h) - var(--space-8));
+  display: flex; flex-direction: column;
+}
+.be-sp > .be-sp-h, .be-sp > .be-sp-f, .be-sp > .be-qp-foot { flex: 0 0 auto }
+.be-sp-scroll {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  /* Reaching the end of the panel must not start scrolling the page behind it. */
+  overscroll-behavior: contain;
+}
+.be-sp-h { padding: var(--space-3); border-bottom: 1px solid var(--line); background: var(--bg-shell) }
+.be-sp-h b { font-size: var(--text-base) }
+.be-sp-h .r { margin-top: 2px; font-size: var(--text-sm); color: var(--text-3) }
+.be-sp-f {
+  padding: var(--space-3); background: var(--bg-shell);
+  font-size: var(--text-sm); line-height: var(--lh-base); color: var(--text-3);
+}
+.be-sp-empty {
+  padding: var(--space-8) var(--space-4); text-align: center;
+  font-size: var(--text-md); color: var(--text-3);
+}
+.be-sp-empty .g {
+  width: 40px; height: 40px; margin: 0 auto var(--space-3);
+  border: 2px dashed var(--line-2); border-radius: var(--radius-lg);
+}
+.be-sp-link {
+  display: flex; align-items: center; gap: 4px; width: 100%;
+  padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--line);
+  font-size: var(--text-sm); color: var(--brand-text); background: none;
+  border-left: 0; border-right: 0; border-top: 0; cursor: pointer; text-align: left;
+}
+.be-sp-link:hover { background: var(--bg-hover) }
+
+.be-sugg { padding: var(--space-3); border-bottom: 1px solid var(--line) }
+.be-sugg.top { background: var(--ok-bg) }
+.be-sugg-r1 { display: flex; align-items: center; gap: var(--space-2) }
+.be-sugg-nm { min-width: 0; flex: 1 1 auto }
+.be-sugg-nm .nm { font-size: var(--text-base); font-weight: var(--weight-semibold) }
+.be-sugg-nm .band {
+  font-size: var(--text-2xs); letter-spacing: .1em; text-transform: uppercase; color: var(--text-3);
+}
+.be-sugg.top .be-sugg-nm .band { color: var(--ok) }
+.be-rank {
+  display: grid; place-items: center; width: 22px; height: 22px; flex: 0 0 22px;
+  border-radius: var(--radius-full); background: var(--bg-active); color: var(--text-2);
+  font-size: var(--text-xs); font-weight: var(--weight-semibold);
+}
+.be-sugg.top .be-rank { background: var(--ok-solid); color: var(--text-inverse) }
+.be-score { font-size: var(--text-lg); font-weight: var(--weight-semibold) }
+
+/* The bar IS the score — 0–100, normalised — so it needs no axis and no
+   legend. */
+.be-bar { height: 5px; border-radius: 3px; background: var(--bg-active); overflow: hidden; margin-top: 7px }
+.be-bar i { display: block; height: 100%; background: var(--line-strong) }
+.be-bar i.top { background: var(--ok-solid) }
+
+.be-why { margin-top: 6px; font-size: var(--text-sm); line-height: var(--lh-base); color: var(--text-2) }
+.be-sugg-a { display: flex; gap: var(--space-2); margin-top: var(--space-2) }
+.be-sugg-x { margin-top: var(--space-3); border-top: 1px solid var(--line); padding-top: var(--space-3) }
+
+/* --------------------------------------------- the factor breakdown ------ */
+.be-ftbl td, .be-ftbl th { padding: var(--space-2) var(--space-2) }
+.be-ftbl { font-size: var(--text-sm) }
+.be-ftot td { border-top: 1px solid var(--line-2) }
+.be-fb { height: 6px; border-radius: 3px; background: var(--bg-active); overflow: hidden; min-width: 80px }
+.be-fb i { display: block; height: 100%; background: var(--line-strong) }
+.be-fb.full i { background: var(--ok-solid) }
+.be-fb.low i { background: var(--warn-solid) }
+
+/* ------------------------------------------------- the exclusion list ---- */
+.be-excl { border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden;
+           background: var(--surface-raised); margin-bottom: var(--space-3) }
+.be-excl.inline { border: 0; border-radius: 0; border-bottom: 1px solid var(--line); margin: 0 }
+.be-exc {
+  display: flex; align-items: flex-start; gap: var(--space-3);
+  padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--line);
+}
+.be-exc:last-of-type { border-bottom: 0 }
+.be-exc > div { min-width: 0; flex: 1 1 auto }
+.be-exc .x {
+  display: grid; place-items: center; width: 18px; height: 18px; flex: 0 0 18px; margin-top: 2px;
+  border: 1.5px solid var(--bad-line); border-radius: var(--radius-full); color: var(--bad);
+}
+.be-exc .nm { font-size: var(--text-md); font-weight: var(--weight-semibold) }
+.be-exc .rs { font-size: var(--text-sm); color: var(--text-3); margin-top: 1px }
+.be-exc .stg {
+  flex: 0 0 auto; font-size: var(--text-2xs); letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text-3); border: 1px solid var(--line-2); border-radius: var(--radius-xs);
+  padding: 1px 6px; white-space: nowrap;
+}
+.be-exc-f {
+  padding: var(--space-2) var(--space-3); background: var(--bg-shell);
+  font-size: var(--text-sm); line-height: var(--lh-base); color: var(--text-3);
+}
+
+/* --------------------------------------------------- the event log ------- */
+.be-ev {
+  display: flex; align-items: flex-start; gap: var(--space-3);
+  padding: var(--space-2) 0; border-bottom: 1px solid var(--line);
+  font-size: var(--text-md); line-height: var(--lh-base);
+}
+.be-ev:last-child { border-bottom: 0 }
+.be-ev > div { flex: 1 1 auto; min-width: 0 }
+.be-ev .ty {
+  flex: 0 0 auto; font-family: var(--font-mono); font-size: var(--text-2xs);
+  letter-spacing: .04em; padding: 2px 6px; border-radius: var(--radius-xs);
+  background: var(--bg-active); color: var(--text-2); align-self: flex-start;
+}
+.be-ev .ty.sys { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn-line) }
+.be-ev .ty.biz { background: var(--info-bg); color: var(--info); border: 1px solid var(--info-line) }
+.be-ev .w { flex: 0 0 auto; font-size: var(--text-xs); color: var(--text-3); white-space: nowrap }
+
+/* ---------------------------------------------------- the action bar ----- */
+.be-abar {
+  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+  margin-top: var(--space-4); padding: var(--space-3);
+  background: var(--surface-raised); border: 1px solid var(--line); border-radius: var(--radius-lg);
+}
+/* Actions that belong to the CLIENT BUSINESS, sitting in an Operations bar
+   because this panel has no business-side surface yet. The modal behind each
+   one says the real system must not offer it — but by then you have clicked.
+   Fenced off and labelled, so the warning arrives before the press. */
+.be-abar-biz {
+  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
+  border: 1px dashed var(--warn-line); border-radius: var(--radius-md);
+  background: var(--warn-bg);
+}
+.be-abar-biz > .lbl {
+  font-size: var(--text-2xs); letter-spacing: .09em; text-transform: uppercase;
+  color: var(--warn); font-weight: var(--weight-semibold);
+}
+
+/* Previous / next through the filtered queue. Someone qualifying twenty
+   enquiries should not return to the list twenty times. */
+.be-stepnav { display: inline-flex; align-items: center; gap: 2px }
+.be-stepnav .ct { font-size: var(--text-sm); color: var(--text-3); padding: 0 var(--space-1) }
+
+/* ------------------------------------------------------- the dialogs ----- */
+/* The revalidation checklist. Green ticks are the rules that pass; a red mark
+   is the one that would refuse, and it is shown even when it does not block —
+   an operator should be able to see what a dialog is about to record. */
+.be-chk {
+  display: flex; align-items: flex-start; gap: var(--space-2);
+  padding: var(--space-1) 0; font-size: var(--text-md); line-height: var(--lh-base);
+}
+.be-chk .m { flex: 0 0 18px; display: grid; place-items: center; margin-top: 1px }
+.be-chk.ok .m { color: var(--ok) }
+.be-chk.bad .m { color: var(--bad) }
+
+.be-pick { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2) }
+.be-pick-b {
+  display: block; text-align: left; padding: var(--space-3);
+  border: 1px solid var(--line-control); border-radius: var(--radius-md);
+  background: var(--bg); cursor: pointer;
+}
+.be-pick-b:hover { background: var(--bg-hover) }
+.be-pick-b.on { border-color: var(--brand); background: var(--bg-selected); box-shadow: var(--ring) }
+.be-pick-b b { display: block; font-size: var(--text-base) }
+.be-pick-b span { display: block; margin-top: 2px; font-size: var(--text-sm); color: var(--text-3) }
+
+/* ---------------------------------------------------------------- topbar --
+   The theme gives .tb-stat.ro a warn and an ok tone; this module needs a bad
+   one for the breached count, which is the number that means someone must act.
+   Unprefixed because the topbar is rendered by the shell, outside this view's
+   tree — the alternative was a second class name for the same idea. */
+.tb-stat.ro.bad .v { color: var(--bad) }
+
+/* ==========================================================================
+   THE QUALIFICATION WORKSTREAM
+   --------------------------------------------------------------------------
+   Everything below belongs to a Generated enquiry — the editable record, the
+   checklist, the tags, the contact log and the freeze. It occupies the same
+   two columns as the assignment screen on purpose: the layout is a constant,
+   what the right-hand column is FOR is the variable.
+   ====================================================================== */
+
+/* ---------------------------------------------------- the editable form --- */
+/* Two columns of fields down to 900px, then one. A form that reflows to a
+   single column is easier to fill on a laptop beside a phone call than one
+   that keeps two and shrinks every control. */
+.be-form { display: grid; grid-template-columns: 1fr 1fr; gap: 0 var(--space-3) }
+@container blk (max-width: 520px) { .be-form { grid-template-columns: 1fr } }
+.be-form .fg { margin-bottom: var(--space-3) }
+.be-form-f {
+  display: flex; align-items: center; gap: var(--space-2);
+  margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--line);
+  font-size: var(--text-sm);
+}
+
+/* ------------------------------------------------------------- the tags --- */
+.be-tags { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center }
+.be-list .be-tbl .be-tags { margin-top: 4px }
+.be-tag {
+  display: inline-flex; align-items: center; gap: 4px; height: 18px; padding: 0 7px;
+  border: 1px solid var(--line-2); border-radius: var(--radius-full);
+  font-size: var(--text-2xs); line-height: 1; color: var(--text-2); background: var(--bg);
+  white-space: nowrap;
+}
+.be-tag.ok   { border-color: var(--ok-line);   color: var(--ok);   background: var(--ok-bg) }
+.be-tag.warn { border-color: var(--warn-line); color: var(--warn); background: var(--warn-bg) }
+.be-tag.bad  { border-color: var(--bad-line);  color: var(--bad);  background: var(--bad-bg) }
+.be-tag.more { color: var(--text-3); border-style: dashed }
+/* The dotted leader marks a tag the system owns. An operator needs to know
+   which of their tags the next logged call is about to recompute. */
+.be-tag .auto {
+  width: 5px; height: 5px; border-radius: var(--radius-full);
+  border: 1px dotted currentColor; flex: 0 0 5px;
+}
+.be-tag.pick { height: 24px; padding: 0 9px; font-size: var(--text-xs); cursor: pointer }
+.be-tag.pick:hover:not(:disabled) { border-color: var(--line-control) }
+.be-tag.pick:disabled { opacity: .5; cursor: not-allowed }
+.be-tag.pick.on { border-color: currentColor; box-shadow: inset 0 0 0 1px currentColor }
+.be-tag.pick.on:not(.ok):not(.warn):not(.bad) { background: var(--bg-active); color: var(--text) }
+.be-tagpick { display: flex; flex-wrap: wrap; gap: 5px }
+
+/* ---------------------------------------------------------- the panel ----- */
+.be-qp .be-sp-h { position: relative; padding-bottom: var(--space-3) }
+.be-qp-bar {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--bg-active);
+}
+.be-qp-bar i {
+  display: block; height: 100%; background: var(--ok-solid);
+  transition: width var(--duration) var(--ease);
+}
+.be-qp-sec { padding: var(--space-3); border-bottom: 1px solid var(--line) }
+.be-qp-h {
+  font-size: var(--text-2xs); letter-spacing: .11em; text-transform: uppercase;
+  color: var(--text-3); font-weight: var(--weight-semibold); margin-bottom: var(--space-2);
+}
+.be-qp-help {
+  margin-top: var(--space-2); font-size: var(--text-sm); line-height: var(--lh-base);
+  color: var(--text-3);
+}
+.be-qp-empty {
+  padding: var(--space-4) 0; text-align: center;
+  font-size: var(--text-sm); color: var(--text-3);
+}
+
+/* -------------------------------------------------------- the checklist --- */
+/* A row, not a checkbox in a list: the help text under each label is the point.
+   "Requirement confirmed" means nothing on its own — "confirmed WITH the
+   customer, not just as the form received them" is the whole rule. */
+.be-check {
+  display: flex; align-items: flex-start; gap: var(--space-2); width: 100%;
+  padding: var(--space-2); border: 1px solid transparent; border-radius: var(--radius-md);
+  background: none; text-align: left; cursor: pointer;
+}
+.be-check:hover:not(:disabled) { background: var(--bg-hover) }
+.be-check:disabled { cursor: not-allowed; opacity: .7 }
+.be-check .bx {
+  display: grid; place-items: center; width: 17px; height: 17px; flex: 0 0 17px; margin-top: 1px;
+  border: 1.5px solid var(--line-control); border-radius: var(--radius-xs);
+  background: var(--bg);
+}
+.be-check.on .bx { background: var(--ok-solid); border-color: var(--ok-solid); color: var(--text-inverse) }
+.be-check .t { min-width: 0 }
+.be-check .t b { display: block; font-size: var(--text-md); font-weight: var(--weight-medium) }
+.be-check.on .t b { color: var(--text) }
+.be-check .t em {
+  display: block; margin-top: 1px; font-style: normal;
+  font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--text-3);
+}
+
+/* The same four, read only, inside the frozen snapshot. */
+.be-checkread { display: inline-flex; flex-wrap: wrap; gap: 4px 10px }
+.be-checkread span {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: var(--text-sm); color: var(--text-3);
+}
+.be-checkread span.on { color: var(--ok) }
+
+/* --------------------------------------------------------- the composer --- */
+.be-compose { background: var(--bg-shell) }
+.be-compose-r {
+  display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); margin-bottom: var(--space-3);
+}
+.be-compose-r select:first-child { grid-column: 1 / -1 }
+.be-compose .inp.sm { height: var(--control-md); font-size: var(--text-md) }
+.be-compose .fg { margin-bottom: var(--space-2) }
+
+/* ------------------------------------------------------------- remarks --- */
+/* Plainer than the contact log next to it, on purpose: a remark has no channel,
+   no outcome and no callback, and dressing it to match would suggest the two
+   are the same kind of record. */
+.be-rm-new { margin-bottom: var(--space-3) }
+.be-rm-new .inp { min-height: 56px }
+.be-rm-f {
+  display: flex; align-items: center; gap: var(--space-2);
+  margin-top: var(--space-2); font-size: var(--text-sm);
+}
+.be-rm-list { display: flex; flex-direction: column; gap: var(--space-2) }
+.be-rm {
+  padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--line-2); background: var(--bg-shell);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+.be-rm p {
+  margin: 0; font-size: var(--text-base); line-height: var(--lh-base); color: var(--text);
+  white-space: pre-wrap;
+}
+.be-rm .by { margin-top: 4px; font-size: var(--text-xs); color: var(--text-3) }
+.be-rm-empty { font-size: var(--text-sm); color: var(--text-3) }
+
+/* The list marker: that notes exist, not what they say. */
+.be-rmk {
+  display: inline-flex; align-items: center; gap: 3px; margin-top: 4px; margin-left: 4px;
+  font-size: var(--text-2xs); color: var(--text-3); vertical-align: 1px;
+}
+.be-rmk .ic { width: 11px; height: 11px; flex-basis: 11px }
+
+/* ------------------------------------------------------- the contact log --- */
+.be-log { display: flex; flex-direction: column; gap: var(--space-2) }
+.be-log-i {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line); border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+.be-log-i.last { border-color: var(--ok-line); background: var(--ok-bg) }
+.be-log-i .r1 { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-md) }
+.be-log-i .w { font-size: var(--text-xs); color: var(--text-3); white-space: nowrap }
+.be-lastmark {
+  font-size: var(--text-2xs); letter-spacing: .08em; text-transform: uppercase; color: var(--ok);
+}
+/* THE CUSTOMER'S OWN WORDS. Given the quote treatment everywhere they appear,
+   so they never read as one more operator note — this is the only text in the
+   module that can be repeated to a business verbatim. */
+.be-log-i .resp {
+  margin-top: 6px; padding-left: var(--space-2); border-left: 2px solid var(--line-2);
+  font-size: var(--text-base); line-height: var(--lh-base); color: var(--text);
+}
+.be-log-i .resp.none { color: var(--text-3); font-style: italic; border-left-style: dotted }
+.be-log-i .nt { margin-top: 5px; font-size: var(--text-sm); color: var(--text-2) }
+.be-log-i .by { margin-top: 5px; font-size: var(--text-xs); color: var(--text-3) }
+
+/* ---------------------------------------------------------- the freeze ---- */
+.be-qp-foot { padding: var(--space-3); background: var(--bg-shell) }
+.be-qp-foot .btn.lg { height: var(--control-lg) }
+.be-qp-block {
+  margin-top: var(--space-2); padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line-2); border-radius: var(--radius-md); background: var(--bg);
+  font-size: var(--text-sm); line-height: var(--lh-base); color: var(--text-2);
+}
+.be-qp-block ul { margin: var(--space-1) 0 0; padding-left: var(--space-4) }
+.be-qp-block li { margin-bottom: 2px }
+.be-qp-hint { display: block; margin-top: var(--space-2); color: var(--bad) }
+
+/* ------------------------------------------- the list's response column ---- */
+/* Two lines, then ellipsis. The full text is the title attribute — an operator
+   scanning the queue needs the gist, and the record is one click away. */
+.be-list .be-resp-c { max-width: 280px }
+.be-resp {
+  display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden; font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--text-2);
+}
+.be-resp.none { color: var(--text-3); font-style: italic }
+.be-resp.untouched { color: var(--bad); font-style: italic }
+
+/* ==========================================================================
+   PROVENANCE, THE OVERFLOW MENU, AND ADDING ONE BY HAND
+   ====================================================================== */
+
+/* WHERE IT CAME FROM. Quiet by default — on most rows it is confirming the
+   expected thing — and marked only when a person typed it, because that is the
+   one case where the next question is "who?". */
+.be-src {
+  display: inline-flex; align-items: center; gap: 4px; height: 19px; padding: 0 7px;
+  border: 1px solid var(--line-2); border-radius: var(--radius-sm);
+  font-size: var(--text-2xs); letter-spacing: .04em; text-transform: uppercase;
+  color: var(--text-3); background: var(--bg); white-space: nowrap;
+}
+.be-src em { font-style: normal; text-transform: none; letter-spacing: 0; opacity: .85 }
+.be-src.info { border-color: var(--info-line); color: var(--info); background: var(--info-bg) }
+.be-src.warn { border-color: var(--warn-line); color: var(--warn); background: var(--warn-bg) }
+.be-src.manual { text-transform: none; letter-spacing: 0; font-size: var(--text-xs) }
+.be-src .ic { width: 11px; height: 11px; flex-basis: 11px }
+
+/* --------------------------------------------------------- the overflow --- */
+.pop-sep { height: 1px; background: var(--line); margin: var(--space-1) 0 }
+.pop-note {
+  padding: var(--space-2) var(--space-3); margin-top: var(--space-1);
+  border-top: 1px solid var(--line); background: var(--bg-shell);
+  font-size: var(--text-sm); line-height: var(--lh-base); color: var(--text-3);
+}
+
+/* ---------------------------------------------------- the source chips --- */
+/* Three chips on one line, and the descriptions behind an (i). They were four
+   cards carrying a sentence each — a paragraph of reading before the first
+   field, every time, for a choice that is usually obvious from the fact that
+   you are typing the enquiry yourself. The explanation still exists for the
+   once it is not. */
+.be-srcchips { display: flex; gap: var(--space-2); flex-wrap: wrap }
+.be-srcchip {
+  display: inline-flex; align-items: center; gap: 5px; height: var(--control-md);
+  padding: 0 var(--control-pad-md);
+  border: 1px solid var(--line-control); border-radius: var(--radius-md);
+  background: var(--bg); color: var(--text); font-size: var(--text-md);
+  font-weight: var(--weight-medium); cursor: pointer;
+}
+.be-srcchip:hover { background: var(--bg-hover) }
+.be-srcchip.on { border-color: var(--brand); background: var(--bg-selected); color: var(--brand-text);
+                 box-shadow: inset 0 0 0 1px var(--brand) }
+.be-srcchip.warn.on { border-color: var(--warn-solid); background: var(--warn-bg); color: var(--warn);
+                      box-shadow: inset 0 0 0 1px var(--warn-solid) }
+.be-srcchip .ic { color: currentColor }
+
+/* THE (i). One affordance for every explanation in the module — on a block
+   heading, on a field label, or inside a notice. Small, quiet, and always in
+   the same place relative to the thing it explains, so it stops being a control
+   you have to notice and becomes one you know is there. */
+.be-i {
+  display: inline-grid; place-items: center; width: 16px; height: 16px; margin-left: 5px;
+  border: 1px solid var(--line-3); border-radius: var(--radius-full);
+  background: var(--bg); color: var(--text-3);
+  font-size: 10px; font-style: italic; font-weight: var(--weight-semibold);
+  line-height: 1; cursor: pointer; vertical-align: -2px;
+}
+.be-i:hover { border-color: var(--brand); color: var(--brand-text) }
+.be-i[aria-expanded="true"] { background: var(--brand); border-color: var(--brand); color: var(--brand-ink) }
+
+.be-srchelp {
+  margin: var(--space-2) 0 0; padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--bg-shell);
+  font-size: var(--text-sm); line-height: var(--lh-base);
+}
+.be-srchelp > div { display: grid; grid-template-columns: 108px 1fr; gap: var(--space-2) }
+.be-srchelp > div + div { margin-top: var(--space-2) }
+.be-srchelp dt { font-weight: var(--weight-semibold); color: var(--text-2) }
+.be-srchelp dd { margin: 0; color: var(--text-3) }
+
+/* --------------------------------------------------------- the dupe warn --- */
+.be-dupes {
+  margin: var(--space-3) 0; padding: var(--space-3);
+  border: 1px solid var(--bad-line); border-radius: var(--radius-lg); background: var(--bad-bg);
+}
+.be-dupes .notice { margin: 0 0 var(--space-2) }
+.be-dupe {
+  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+  padding: var(--space-2); margin-bottom: var(--space-1);
+  border: 1px solid var(--line); border-radius: var(--radius-md);
+  background: var(--surface-raised); font-size: var(--text-md);
+}
+.be-ackline {
+  display: flex; align-items: flex-start; gap: var(--space-2);
+  margin-top: var(--space-2); font-size: var(--text-md); line-height: var(--lh-base);
+  cursor: pointer;
+}
+.be-ackline input { margin-top: 3px; flex: 0 0 auto }
+
+/* The add form reuses the record form's two-column grid, inside a modal that is
+   not a .be-blk — so it needs its own container to measure against. Scoped to
+   this wrapper rather than to `.md-b`: that would put layout containment on
+   every modal in the panel, and containment makes an element a containing block
+   for absolutely positioned descendants. Other modules' dialogs are not mine to
+   change from this file. */
+.be-fields { container-type: inline-size; container-name: blk }
+
+/* ==========================================================================
+   THE COMMAND ROW, THE FILTER PANEL AND EXPORT
+   --------------------------------------------------------------------------
+   Three parts and no more: find it, narrow it, act on it. The row used to hold
+   nine selects, which wrapped on a laptop and moved Export somewhere different
+   depending on the window width — the worst property a button that writes a
+   file full of customer data can have.
+   ====================================================================== */
+/* ============================================================================
+   THE COMMAND AREA — one action band, one filter grid.
+   ----------------------------------------------------------------------------
+   THE PROBLEM WAS NEVER WHERE THE FILTERS LIVED. They were a flex row that
+   wrapped raggedly, so they went into a popover, which hid them, and then into
+   the table header, which gave the page a second search box. Each move treated
+   the symptom.
+
+   A ragged wrap has no alignment to read: eleven controls of eleven different
+   widths break at eleven different places, and the second line starts wherever
+   the first happened to run out. Equal cells on a grid wrap into COLUMNS
+   instead — the fourth control sits under the first whatever the window is
+   doing — so a second line reads as a deliberate second row rather than as
+   overflow. The filters are back beside the search where they belong, and the
+   grid is what makes that survivable.
+   ========================================================================== */
+.be-actions {
+  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+  padding: var(--space-3) var(--page-pad) var(--space-2);
+  flex: 0 0 auto;
+}
+/* The search takes whatever room is going: it is the fastest route to one
+   record, and every other control on this screen narrows a set instead. */
+.be-actions .field { flex: 1 1 280px; max-width: 560px }
+
+.be-filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
+  gap: var(--space-2);
+  padding: 0 var(--page-pad) var(--space-3);
+  flex: 0 0 auto;
+}
+/* Equal width AND equal height, or a wrapped grid lines up in one axis only.
+   The theme's .selectbox sizes to its content by default, which is exactly
+   what made the old flex row ragged. */
+.be-filters-grid > .selectbox { width: 100% }
+.be-filters-grid > .selectbox select { width: 100%; height: var(--control-md) }
+.be-date {
+  width: 100%; height: var(--control-md); padding: 0 var(--space-2);
+  border: 1px solid var(--line-control); border-radius: var(--radius-md);
+  background: var(--bg); color: var(--text); font: inherit; font-size: var(--text-md);
+}
+.be-date:hover { border-color: var(--line-3) }
+.be-date:focus { border-color: var(--brand); box-shadow: var(--ring); outline: none }
+
+.be-exportbtn .ct {
+  display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px;
+  margin-left: 2px; border-radius: var(--radius-full);
+  font-size: var(--text-2xs); font-weight: var(--weight-semibold);
+  background: var(--bg-active); color: var(--text-2);
+}
+
+/* EXPORT IS THE LOUD ONE HERE, and deliberately louder than its old plain
+   button: it is the only control on this screen that produces a file of
+   customer data, and it is the one whose scope silently depends on filters set
+   somewhere else. It carries the row count for that reason — "Export" is a
+   button you press to find out what happens, "Export 7" has already answered
+   the question. Amber, not brand: it is prominent, not the primary action.
+   Add enquiry is. */
+.be-exportbtn {
+  border-color: var(--warn-line); color: var(--warn); background: var(--warn-bg);
+  font-weight: var(--weight-semibold);
+}
+.be-exportbtn:hover { border-color: var(--warn-solid); background: var(--warn-bg) }
+.be-exportbtn .ic { color: currentColor }
+.be-exportbtn .ct { background: var(--warn-solid); color: var(--text-inverse) }
+/* Narrowed by a filter — the count is a subset, and the button says so rather
+   than looking identical to an export of everything. */
+.be-exportbtn.narrowed { border-style: dashed }
+
+/* ------------------------------------------------------- the export dialog --- */
+/* The scope leads, at a size that cannot be skimmed past. The number and the
+   sentence are the two things somebody has to read before pressing a button
+   that writes contact data to disk. */
+.be-xscope {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3); margin-bottom: var(--space-3);
+  border: 1px solid var(--line); border-radius: var(--radius-lg); background: var(--bg-shell);
+}
+.be-xscope .n {
+  font-size: var(--text-3xl); line-height: 1; font-weight: var(--weight-semibold);
+  color: var(--brand-text); flex: 0 0 auto;
+}
+.be-xscope b { font-size: var(--text-base); font-weight: var(--weight-medium) }
+.be-xfile { margin-top: 3px; font-size: var(--text-sm); color: var(--text-3); word-break: break-all }
+
+.be-xh {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: var(--text-2xs); letter-spacing: .11em; text-transform: uppercase;
+  color: var(--text-3); font-weight: var(--weight-semibold);
+}
+.be-xgroups { display: flex; flex-direction: column; gap: var(--space-1) }
+.be-xgroup {
+  display: flex; align-items: flex-start; gap: var(--space-2); width: 100%; text-align: left;
+  padding: var(--space-2); border: 1px solid transparent; border-radius: var(--radius-md);
+  background: none; cursor: pointer;
+}
+.be-xgroup:hover:not(:disabled) { background: var(--bg-hover) }
+.be-xgroup:disabled { cursor: default }
+.be-xgroup .bx {
+  display: grid; place-items: center; width: 17px; height: 17px; flex: 0 0 17px; margin-top: 1px;
+  border: 1.5px solid var(--line-control); border-radius: var(--radius-xs); background: var(--bg);
+}
+.be-xgroup.on .bx { background: var(--ok-solid); border-color: var(--ok-solid); color: var(--text-inverse) }
+.be-xgroup.locked .bx { background: var(--line-3); border-color: var(--line-3); color: var(--text-inverse) }
+/* The sensitive group looks different whether or not it is ticked. Its cost is
+   a property of the group, not of the current state of the checkbox. */
+.be-xgroup.sens { border-color: var(--bad-line); background: var(--bad-bg) }
+/* Internal-only, which is a different cost from sensitive: not "this is
+   personal data" but "this must not reach the party it describes". */
+.be-xgroup.intl { border-color: var(--warn-line); background: var(--warn-bg) }
+.be-xgroup.intl.on .bx { background: var(--warn-solid); border-color: var(--warn-solid) }
+.be-xgroup.intl .t b { color: var(--warn) }
+.be-xgroup.sens.on .bx { background: var(--bad-solid); border-color: var(--bad-solid) }
+.be-xgroup.sens .t b { color: var(--bad) }
+.be-xgroup .t { min-width: 0 }
+.be-xgroup .t b { display: block; font-size: var(--text-md); font-weight: var(--weight-medium) }
+.be-xgroup .t .ct {
+  font-size: var(--text-2xs); color: var(--text-3); font-weight: var(--weight-normal);
+  border: 1px solid var(--line-2); border-radius: var(--radius-full); padding: 0 5px; margin-left: 4px;
+}
+.be-xgroup .t em {
+  display: block; margin-top: 1px; font-style: normal;
+  font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--text-3);
+}
+
+.be-xprev {
+  border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden;
+  font-size: var(--text-sm);
+}
+.be-xprev > div {
+  display: flex; gap: var(--space-3); align-items: baseline;
+  padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--line);
+}
+.be-xprev > div:last-child { border-bottom: 0 }
+.be-xprev em { font-style: italic; color: var(--text-3) }

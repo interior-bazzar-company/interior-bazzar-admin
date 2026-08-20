@@ -1,0 +1,30 @@
+{
+  "$comment": "Stands in for GET /api/v1/business-enquiries/matching-rules. The active rule version. Every candidate snapshot and every assignment is stamped with `ruleVersion`, which is what makes a past ranking reproducible after the weights move.",
+  "ruleVersion": "v3",
+  "effectiveFrom": "2026-05-04T00:00:00+05:30",
+  "createdBy": "R. Menon",
+  "status": "active",
+  "overrideThreshold": 10,
+  "overrideThresholdNote": "Assigning a business this many points or more below rank 1 requires a stored reason. Threshold is BE-OD-08, still open.",
+  "eligibility": [
+    { "key": "subscription", "label": "Active subscription", "rule": "subscription.status = active", "stage": "Subscription" },
+    { "key": "status", "label": "Account active", "rule": "business.status = active AND NOT suspended", "stage": "Status" },
+    { "key": "category", "label": "Category / service declared", "rule": "enquiry.category IN business.categories", "stage": "Category" },
+    { "key": "location", "label": "Serviceable location", "rule": "enquiry.city IN business.serviceArea", "stage": "Location", "open": "BE-OD-04 — city, PIN, radius or zone is unconfirmed. Today's data carries a coarse region string only." },
+    { "key": "capacity", "label": "Capacity available", "rule": "capacity.activeAssignments < capacity.configured", "stage": "Capacity", "open": "BE-OD-05 — per day, week, month or category is unconfirmed." }
+  ],
+  "factors": [
+    { "key": "category", "label": "Category / service match", "weight": 30, "note": "Primary requirement fit." },
+    { "key": "location", "label": "Location / serviceability", "weight": 25, "note": "City, zone, radius or configured service area." },
+    { "key": "segment", "label": "Project / segment fit", "weight": 15, "note": "Residential, commercial, project type or service segment." },
+    { "key": "keywords", "label": "Service keywords", "weight": 10, "note": "Fine-grained capability match." },
+    { "key": "capacity", "label": "Capacity / availability", "weight": 10, "note": "Avoids assigning beyond configured capacity." },
+    { "key": "fairness", "label": "Assignment fairness", "weight": 5, "note": "Balances recent opportunity distribution." },
+    { "key": "quality", "label": "Responsiveness / quality", "weight": 5, "note": "Historical operational signal. Carries a compounding-advantage risk — BE-OD-07." }
+  ],
+  "bands": [
+    { "key": "best", "label": "Best match", "from": 85 },
+    { "key": "strong", "label": "Strong match", "from": 78 },
+    { "key": "eligible", "label": "Eligible", "from": 0 }
+  ]
+}
