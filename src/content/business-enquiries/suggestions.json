@@ -1,354 +1,2623 @@
 {
-  "$comment": "Stands in for GET /api/v1/business-enquiries/{id}/business-suggestions. One candidate snapshot per matching run, keyed by enquiry. Excluded businesses are STORED with their reasons, not discarded — diagnostics are only possible if the exclusions survive the run. `factors` sum to `score`; the weights they are scored against live in matching-rules.json.",
-  "runs": {
-    "IB-BE-2026-0047": {
-      "enquiryId": "IB-BE-2026-0047",
-      "ruleVersion": "v3",
-      "calculatedAt": "2026-08-18T09:15:00+05:30",
-      "subscribedCount": 10,
-      "eligible": [
-        {
-          "businessId": "bz-001", "name": "Studio Aangan", "rank": 1, "score": 91, "band": "Best match",
-          "capacity": { "active": 4, "configured": 12 },
-          "factors": { "category": 30, "location": 25, "segment": 12, "keywords": 8, "capacity": 10, "fairness": 3, "quality": 3 },
-          "why": "Full Interior Design match · serves South Delhi · 4 of 12 slots open",
-          "from": {
-            "category": "Interior Design is a declared primary category",
-            "location": "South Delhi is inside the declared service zone",
-            "segment": "Residential yes · 3BHK band partial",
-            "keywords": "\"full home interiors\" matched · \"turnkey\" not declared",
-            "capacity": "4 of 12 active slots open this month",
-            "fairness": "3 assignments in the last 30 days — above team median",
-            "quality": "Acknowledges in 4h on average · 2 of 3 converted"
-          }
-        },
-        {
-          "businessId": "bz-002", "name": "Deco Nest Interiors", "rank": 2, "score": 83, "band": "Strong match",
-          "capacity": { "active": 7, "configured": 12 },
-          "factors": { "category": 30, "location": 18, "segment": 15, "keywords": 6, "capacity": 8, "fairness": 4, "quality": 2 },
-          "why": "Full category match · adjacent zone · strongest 3BHK residential record",
-          "from": {
-            "category": "Interior Design is a declared primary category",
-            "location": "Delhi NCR declared — Vasant Kunj is adjacent, not central to the zone",
-            "segment": "Residential 3BHK is their strongest recorded segment",
-            "keywords": "\"full home interiors\" partial",
-            "capacity": "5 of 12 active slots open this month",
-            "fairness": "1 assignment in the last 30 days — below team median",
-            "quality": "Acknowledges in 6h on average · 3 of 6 converted"
-          }
-        },
-        {
-          "businessId": "bz-003", "name": "Ambient Works", "rank": 3, "score": 80, "band": "Strong match",
-          "capacity": { "active": 2, "configured": 10 },
-          "factors": { "category": 24, "location": 25, "segment": 9, "keywords": 10, "capacity": 6, "fairness": 2, "quality": 4 },
-          "why": "Same zone · every service keyword matched · partial category overlap",
-          "from": {
-            "category": "Interior Design declared as secondary to Furniture",
-            "location": "South Delhi is inside the declared service zone",
-            "segment": "Residential yes · 3BHK band not recorded",
-            "keywords": "Every declared keyword matched",
-            "capacity": "8 of 10 active slots open this month",
-            "fairness": "4 assignments in the last 30 days — highest in the pool",
-            "quality": "Acknowledges in 9h on average · 4 of 9 converted"
-          }
-        },
-        {
-          "businessId": "bz-004", "name": "Casa Vista Design", "rank": 4, "score": 76, "band": "Eligible",
-          "capacity": { "active": 1, "configured": 10 },
-          "factors": { "category": 30, "location": 12, "segment": 12, "keywords": 4, "capacity": 10, "fairness": 5, "quality": 3 },
-          "why": "Full category match · outer zone · fewest recent assignments",
-          "from": {
-            "category": "Interior Design is a declared primary category",
-            "location": "Delhi NCR declared — Vasant Kunj sits at the outer edge",
-            "segment": "Residential yes · 3BHK band partial",
-            "keywords": "One of four declared keywords matched",
-            "capacity": "9 of 10 active slots open this month",
-            "fairness": "0 assignments in the last 30 days — lowest in the pool",
-            "quality": "Acknowledges in 12h on average · 1 of 4 converted"
-          }
-        }
-      ],
-      "excluded": [
-        { "businessId": "bz-005", "name": "Urban Loom Studio", "stage": "Subscription", "reason": "Subscription expired 14 Mar 2026" },
-        { "businessId": "bz-006", "name": "Nook & Co", "stage": "Category", "reason": "Serves Modular Kitchen only — no Interior Design category" },
-        { "businessId": "bz-007", "name": "Terra Interiors", "stage": "Location", "reason": "Service area is Bengaluru — request is South Delhi" },
-        { "businessId": "bz-008", "name": "Habitat Studio", "stage": "Capacity", "reason": "At capacity — 12 of 12 active assignments this month" },
-        { "businessId": "bz-009", "name": "Vaastu Living", "stage": "Status", "reason": "Account suspended by Operations, 02 Apr 2026" },
-        { "businessId": "bz-010", "name": "Kitchen Craft HYD", "stage": "Category", "reason": "Serves Modular Kitchen only — and service area is Hyderabad" }
-      ]
+ "$comment": "Stands in for GET /api/v1/business-enquiries/{id}/business-suggestions. One candidate snapshot per matching run, keyed by enquiry. Excluded businesses are STORED with their reasons, not discarded — diagnostics are only possible if the exclusions survive the run. `factors` sum to `score`; the weights they are scored against live in matching-rules.json. Regenerated from the live business directory: 25 subscribed businesses, rule v3. Every businessId here exists in GET /api/v1/admin/business-enquiries/businesses/.",
+ "runs": {
+  "IB-BE-2026-0047": {
+   "enquiryId": "IB-BE-2026-0047",
+   "ruleVersion": "v3",
+   "calculatedAt": "2026-08-18T09:15:00+05:30",
+   "subscribedCount": 25,
+   "eligible": [
+    {
+     "businessId": "57",
+     "name": "Griha Atelier",
+     "rank": 1,
+     "score": 89,
+     "band": "Best match",
+     "capacity": {
+      "active": 0,
+      "configured": 4
+     },
+     "factors": {
+      "category": 24,
+      "location": 25,
+      "segment": 15,
+      "keywords": 8,
+      "capacity": 10,
+      "fairness": 5,
+      "quality": 2
+     },
+     "why": "Interior Designers declared · serves New Delhi · 4 of 4 slots open",
+     "from": {
+      "category": "Interior Designers is declared alongside 2 other categories",
+      "location": "New Delhi is inside the declared service zone",
+      "segment": "3 declared categories",
+      "keywords": "\"Full home interiors\" matched against the declared categories",
+      "capacity": "4 of 4 slots open this month",
+      "fairness": "0 live assignments in the period",
+      "quality": "No acknowledgement time recorded yet"
+     }
     },
-    "IB-BE-2026-0052": {
-      "enquiryId": "IB-BE-2026-0052",
-      "ruleVersion": "v3",
-      "calculatedAt": "2026-08-19T22:06:00+05:30",
-      "subscribedCount": 10,
-      "eligible": [],
-      "excluded": [
-        { "businessId": "bz-010", "name": "Kitchen Craft HYD", "stage": "Subscription", "reason": "Right city, right category — subscription lapsed 08 Jun 2026" },
-        { "businessId": "bz-006", "name": "Nook & Co", "stage": "Location", "reason": "Serves Modular Kitchen — but service area is Delhi NCR only" },
-        { "businessId": "bz-001", "name": "Studio Aangan", "stage": "Category", "reason": "Modular Kitchen not a declared category" },
-        { "businessId": "bz-002", "name": "Deco Nest Interiors", "stage": "Category", "reason": "Modular Kitchen not a declared category" },
-        { "businessId": "bz-003", "name": "Ambient Works", "stage": "Category", "reason": "Modular Kitchen not a declared category" },
-        { "businessId": "bz-004", "name": "Casa Vista Design", "stage": "Category", "reason": "Modular Kitchen not a declared category" },
-        { "businessId": "bz-005", "name": "Urban Loom Studio", "stage": "Subscription", "reason": "Subscription expired 14 Mar 2026" },
-        { "businessId": "bz-007", "name": "Terra Interiors", "stage": "Category", "reason": "Modular Kitchen not a declared category" },
-        { "businessId": "bz-008", "name": "Habitat Studio", "stage": "Category", "reason": "Modular Kitchen not a declared category" },
-        { "businessId": "bz-009", "name": "Vaastu Living", "stage": "Status", "reason": "Account suspended by Operations, 02 Apr 2026" }
-      ]
+    {
+     "businessId": "58",
+     "name": "Studio Nirvaan Dezign",
+     "rank": 2,
+     "score": 89,
+     "band": "Best match",
+     "capacity": {
+      "active": 0,
+      "configured": 4
+     },
+     "factors": {
+      "category": 24,
+      "location": 25,
+      "segment": 15,
+      "keywords": 8,
+      "capacity": 10,
+      "fairness": 5,
+      "quality": 2
+     },
+     "why": "Interior Designers declared · serves New Delhi · 4 of 4 slots open",
+     "from": {
+      "category": "Interior Designers is declared alongside 2 other categories",
+      "location": "New Delhi is inside the declared service zone",
+      "segment": "3 declared categories",
+      "keywords": "\"Full home interiors\" matched against the declared categories",
+      "capacity": "4 of 4 slots open this month",
+      "fairness": "0 live assignments in the period",
+      "quality": "No acknowledgement time recorded yet"
+     }
     },
-    "IB-BE-2026-0031": {
-      "enquiryId": "IB-BE-2026-0031",
-      "ruleVersion": "v3",
-      "calculatedAt": "2026-08-20T07:31:00+05:30",
-      "subscribedCount": 10,
-      "eligible": [
-        {
-          "businessId": "bz-001", "name": "Studio Aangan", "rank": 1, "score": 89, "band": "Best match",
-          "capacity": { "active": 4, "configured": 12 },
-          "factors": { "category": 30, "location": 25, "segment": 11, "keywords": 7, "capacity": 10, "fairness": 3, "quality": 3 },
-          "why": "Full Interior Design match · Saket is inside the declared zone · 4 of 12 slots open",
-          "from": {
-            "category": "Interior Design is a declared primary category",
-            "location": "Saket is inside the declared service zone",
-            "segment": "Residential yes · 2BHK partial-scope band partial",
-            "keywords": "\"living\" and \"dining\" matched · \"refresh\" not declared",
-            "capacity": "8 of 12 active slots open this month",
-            "fairness": "3 assignments in the last 30 days",
-            "quality": "Acknowledges in 4h on average"
-          }
-        },
-        {
-          "businessId": "bz-004", "name": "Casa Vista Design", "rank": 2, "score": 78, "band": "Strong match",
-          "capacity": { "active": 1, "configured": 10 },
-          "factors": { "category": 30, "location": 16, "segment": 12, "keywords": 4, "capacity": 10, "fairness": 5, "quality": 1 },
-          "why": "Full category match · outer zone · fewest recent assignments",
-          "from": {
-            "category": "Interior Design is a declared primary category",
-            "location": "Delhi NCR declared — Saket sits mid-zone",
-            "segment": "Residential yes",
-            "keywords": "One declared keyword matched",
-            "capacity": "9 of 10 active slots open this month",
-            "fairness": "0 assignments in the last 30 days",
-            "quality": "Acknowledges in 12h on average"
-          }
-        },
-        {
-          "businessId": "bz-003", "name": "Ambient Works", "rank": 3, "score": 75, "band": "Eligible",
-          "capacity": { "active": 2, "configured": 10 },
-          "factors": { "category": 24, "location": 25, "segment": 8, "keywords": 6, "capacity": 8, "fairness": 2, "quality": 2 },
-          "why": "Same zone · partial category overlap",
-          "from": {
-            "category": "Interior Design declared as secondary to Furniture",
-            "location": "Saket is inside the declared service zone",
-            "segment": "Residential yes",
-            "keywords": "Two declared keywords matched",
-            "capacity": "8 of 10 active slots open this month",
-            "fairness": "4 assignments in the last 30 days",
-            "quality": "Acknowledges in 9h on average"
-          }
-        },
-        {
-          "businessId": "bz-002", "name": "Deco Nest Interiors", "rank": 4, "score": 72, "band": "Eligible",
-          "capacity": { "active": 7, "configured": 12 },
-          "factors": { "category": 30, "location": 16, "segment": 10, "keywords": 5, "capacity": 5, "fairness": 4, "quality": 2 },
-          "why": "Full category match · adjacent zone · 5 of 12 slots open",
-          "from": {
-            "category": "Interior Design is a declared primary category",
-            "location": "Delhi NCR declared",
-            "segment": "Residential yes",
-            "keywords": "One declared keyword matched",
-            "capacity": "5 of 12 active slots open this month",
-            "fairness": "1 assignment in the last 30 days",
-            "quality": "Acknowledges in 6h on average"
-          }
-        }
-      ],
-      "excluded": [
-        { "businessId": "bz-005", "name": "Urban Loom Studio", "stage": "Subscription", "reason": "Subscription expired 14 Mar 2026" },
-        { "businessId": "bz-006", "name": "Nook & Co", "stage": "Category", "reason": "Serves Modular Kitchen only" },
-        { "businessId": "bz-007", "name": "Terra Interiors", "stage": "Location", "reason": "Service area is Bengaluru — request is New Delhi" },
-        { "businessId": "bz-008", "name": "Habitat Studio", "stage": "Capacity", "reason": "At capacity — 12 of 12 active assignments this month" },
-        { "businessId": "bz-009", "name": "Vaastu Living", "stage": "Status", "reason": "Account suspended by Operations, 02 Apr 2026" },
-        { "businessId": "bz-010", "name": "Kitchen Craft HYD", "stage": "Category", "reason": "Serves Modular Kitchen only — and service area is Hyderabad" }
-      ]
+    {
+     "businessId": "25",
+     "name": "Interior Bazzar",
+     "rank": 3,
+     "score": 87,
+     "band": "Best match",
+     "capacity": {
+      "active": 0,
+      "configured": 4
+     },
+     "factors": {
+      "category": 30,
+      "location": 25,
+      "segment": 9,
+      "keywords": 6,
+      "capacity": 10,
+      "fairness": 5,
+      "quality": 2
+     },
+     "why": "Interior Designers declared · serves New Delhi · 4 of 4 slots open",
+     "from": {
+      "category": "Interior Designers is a declared primary category",
+      "location": "New Delhi is inside the declared service zone",
+      "segment": "1 declared category",
+      "keywords": "\"Full home interiors\" is not reflected in the declared categories",
+      "capacity": "4 of 4 slots open this month",
+      "fairness": "0 live assignments in the period",
+      "quality": "No acknowledgement time recorded yet"
+     }
     },
-    "IB-BE-2026-0044": {
-      "enquiryId": "IB-BE-2026-0044",
-      "ruleVersion": "v3",
-      "calculatedAt": "2026-08-17T22:13:00+05:30",
-      "subscribedCount": 10,
-      "eligible": [
-        {
-          "businessId": "bz-007", "name": "Terra Interiors", "rank": 1, "score": 84, "band": "Strong match",
-          "capacity": { "active": 3, "configured": 8 },
-          "factors": { "category": 30, "location": 25, "segment": 12, "keywords": 6, "capacity": 6, "fairness": 3, "quality": 2 },
-          "why": "Full Interior Design match · only business serving Bengaluru · 5 of 8 slots open",
-          "from": {
-            "category": "Interior Design is a declared primary category",
-            "location": "Bengaluru is the declared service area",
-            "segment": "Residential yes · villa band partial",
-            "keywords": "\"villa\" matched",
-            "capacity": "5 of 8 active slots open this month",
-            "fairness": "2 assignments in the last 30 days",
-            "quality": "Acknowledges in 21h on average · 1 of 6 converted"
-          }
-        },
-        {
-          "businessId": "bz-003", "name": "Ambient Works", "rank": 2, "score": 61, "band": "Eligible",
-          "capacity": { "active": 2, "configured": 10 },
-          "factors": { "category": 24, "location": 10, "segment": 8, "keywords": 5, "capacity": 8, "fairness": 3, "quality": 3 },
-          "why": "Partial category overlap · Hyderabad zone, not Bengaluru — passed on a coarse region string",
-          "from": {
-            "category": "Interior Design declared as secondary to Furniture",
-            "location": "Declared \"South India\" — passes today's coarse region test, which is exactly what BE-OD-04 has to fix",
-            "segment": "Residential yes · villa band not recorded",
-            "keywords": "One declared keyword matched",
-            "capacity": "8 of 10 active slots open this month",
-            "fairness": "4 assignments in the last 30 days",
-            "quality": "Acknowledges in 9h on average"
-          }
-        }
-      ],
-      "excluded": [
-        { "businessId": "bz-001", "name": "Studio Aangan", "stage": "Location", "reason": "Service area is South Delhi — request is Bengaluru" },
-        { "businessId": "bz-002", "name": "Deco Nest Interiors", "stage": "Location", "reason": "Service area is Delhi NCR and Mumbai — request is Bengaluru" },
-        { "businessId": "bz-004", "name": "Casa Vista Design", "stage": "Location", "reason": "Service area is Delhi NCR — request is Bengaluru" },
-        { "businessId": "bz-005", "name": "Urban Loom Studio", "stage": "Subscription", "reason": "Subscription expired 14 Mar 2026" },
-        { "businessId": "bz-006", "name": "Nook & Co", "stage": "Category", "reason": "Serves Modular Kitchen only" },
-        { "businessId": "bz-008", "name": "Habitat Studio", "stage": "Location", "reason": "Service area is South Delhi — request is Bengaluru" },
-        { "businessId": "bz-009", "name": "Vaastu Living", "stage": "Status", "reason": "Account suspended by Operations, 02 Apr 2026" },
-        { "businessId": "bz-010", "name": "Kitchen Craft HYD", "stage": "Category", "reason": "Serves Modular Kitchen only" }
-      ]
+    {
+     "businessId": "61",
+     "name": "Space Antara Design Co.",
+     "rank": 4,
+     "score": 87,
+     "band": "Best match",
+     "capacity": {
+      "active": 0,
+      "configured": 4
+     },
+     "factors": {
+      "category": 24,
+      "location": 25,
+      "segment": 15,
+      "keywords": 6,
+      "capacity": 10,
+      "fairness": 5,
+      "quality": 2
+     },
+     "why": "Interior Designers declared · serves New Delhi · 4 of 4 slots open",
+     "from": {
+      "category": "Interior Designers is declared alongside 2 other categories",
+      "location": "New Delhi is inside the declared service zone",
+      "segment": "3 declared categories",
+      "keywords": "\"Full home interiors\" is not reflected in the declared categories",
+      "capacity": "4 of 4 slots open this month",
+      "fairness": "0 live assignments in the period",
+      "quality": "No acknowledgement time recorded yet"
+     }
     },
-    "IB-BE-2026-0041": {
-      "enquiryId": "IB-BE-2026-0041",
-      "ruleVersion": "v3",
-      "calculatedAt": "2026-08-16T11:21:00+05:30",
-      "subscribedCount": 10,
-      "eligible": [
-        {
-          "businessId": "bz-002", "name": "Deco Nest Interiors", "rank": 1, "score": 86, "band": "Best match",
-          "capacity": { "active": 7, "configured": 12 },
-          "factors": { "category": 30, "location": 22, "segment": 15, "keywords": 8, "capacity": 6, "fairness": 3, "quality": 2 },
-          "why": "Full category match · Mumbai is a declared service area · strongest 2BHK renovation record",
-          "from": {
-            "category": "Interior Design is a declared primary category",
-            "location": "Mumbai is a declared service area · Powai mid-zone",
-            "segment": "Residential 2BHK renovation is their strongest recorded segment",
-            "keywords": "\"renovation\" matched",
-            "capacity": "5 of 12 active slots open this month",
-            "fairness": "1 assignment in the last 30 days",
-            "quality": "Acknowledges in 6h on average"
-          }
-        },
-        {
-          "businessId": "bz-003", "name": "Ambient Works", "rank": 2, "score": 58, "band": "Eligible",
-          "capacity": { "active": 2, "configured": 10 },
-          "factors": { "category": 24, "location": 8, "segment": 8, "keywords": 4, "capacity": 8, "fairness": 3, "quality": 3 },
-          "why": "Partial category overlap · outer-zone location on a coarse region string",
-          "from": {
-            "category": "Interior Design declared as secondary to Furniture",
-            "location": "Coarse region match only — BE-OD-04",
-            "segment": "Residential yes",
-            "keywords": "One declared keyword matched",
-            "capacity": "8 of 10 active slots open this month",
-            "fairness": "4 assignments in the last 30 days",
-            "quality": "Acknowledges in 9h on average"
-          }
-        }
-      ],
-      "excluded": [
-        { "businessId": "bz-001", "name": "Studio Aangan", "stage": "Location", "reason": "Service area is South Delhi — request is Mumbai" },
-        { "businessId": "bz-004", "name": "Casa Vista Design", "stage": "Location", "reason": "Service area is Delhi NCR — request is Mumbai" },
-        { "businessId": "bz-005", "name": "Urban Loom Studio", "stage": "Subscription", "reason": "Subscription expired 14 Mar 2026" },
-        { "businessId": "bz-006", "name": "Nook & Co", "stage": "Category", "reason": "Serves Modular Kitchen only" },
-        { "businessId": "bz-007", "name": "Terra Interiors", "stage": "Location", "reason": "Service area is Bengaluru — request is Mumbai" },
-        { "businessId": "bz-008", "name": "Habitat Studio", "stage": "Location", "reason": "Service area is South Delhi — request is Mumbai" },
-        { "businessId": "bz-009", "name": "Vaastu Living", "stage": "Status", "reason": "Account suspended by Operations, 02 Apr 2026" },
-        { "businessId": "bz-010", "name": "Kitchen Craft HYD", "stage": "Category", "reason": "Serves Modular Kitchen only" }
-      ]
-    },
-    "IB-BE-2026-0038": {
-      "enquiryId": "IB-BE-2026-0038",
-      "ruleVersion": "v3",
-      "calculatedAt": "2026-08-11T13:03:00+05:30",
-      "subscribedCount": 10,
-      "eligible": [
-        {
-          "businessId": "bz-003", "name": "Ambient Works", "rank": 1, "score": 81, "band": "Strong match",
-          "capacity": { "active": 2, "configured": 10 },
-          "factors": { "category": 30, "location": 25, "segment": 9, "keywords": 6, "capacity": 8, "fairness": 2, "quality": 1 },
-          "why": "Only subscribed business declaring Furniture · serves Hyderabad · 8 of 10 slots open",
-          "from": {
-            "category": "Furniture is a declared primary category",
-            "location": "Hyderabad is a declared service area",
-            "segment": "Individual pieces — segment band partial",
-            "keywords": "\"dining\" matched",
-            "capacity": "8 of 10 active slots open this month",
-            "fairness": "4 assignments in the last 30 days — highest in the pool",
-            "quality": "Acknowledges in 9h on average"
-          }
-        }
-      ],
-      "excluded": [
-        { "businessId": "bz-001", "name": "Studio Aangan", "stage": "Category", "reason": "Furniture not a declared category" },
-        { "businessId": "bz-002", "name": "Deco Nest Interiors", "stage": "Category", "reason": "Furniture not a declared category" },
-        { "businessId": "bz-004", "name": "Casa Vista Design", "stage": "Category", "reason": "Furniture not a declared category" },
-        { "businessId": "bz-005", "name": "Urban Loom Studio", "stage": "Subscription", "reason": "Subscription expired 14 Mar 2026" },
-        { "businessId": "bz-006", "name": "Nook & Co", "stage": "Category", "reason": "Furniture not a declared category" },
-        { "businessId": "bz-007", "name": "Terra Interiors", "stage": "Category", "reason": "Furniture not a declared category" },
-        { "businessId": "bz-008", "name": "Habitat Studio", "stage": "Capacity", "reason": "At capacity — 12 of 12 active assignments this month" },
-        { "businessId": "bz-009", "name": "Vaastu Living", "stage": "Status", "reason": "Account suspended by Operations, 02 Apr 2026" },
-        { "businessId": "bz-010", "name": "Kitchen Craft HYD", "stage": "Category", "reason": "Furniture not a declared category" }
-      ]
-    },
-    "IB-BE-2026-0036": {
-      "enquiryId": "IB-BE-2026-0036",
-      "ruleVersion": "v3",
-      "calculatedAt": "2026-08-08T10:16:00+05:30",
-      "subscribedCount": 10,
-      "eligible": [
-        {
-          "businessId": "bz-002", "name": "Deco Nest Interiors", "rank": 1, "score": 79, "band": "Strong match",
-          "capacity": { "active": 7, "configured": 12 },
-          "factors": { "category": 30, "location": 18, "segment": 13, "keywords": 7, "capacity": 6, "fairness": 3, "quality": 2 },
-          "why": "Full category match · Pune served from the Mumbai zone · 5 of 12 slots open",
-          "from": {
-            "category": "Interior Design is a declared primary category",
-            "location": "Pune served from the declared Mumbai zone — coarse region match, BE-OD-04",
-            "segment": "Residential 3BHK full-scope recorded",
-            "keywords": "\"full home interiors\" matched",
-            "capacity": "5 of 12 active slots open this month",
-            "fairness": "1 assignment in the last 30 days",
-            "quality": "Acknowledges in 6h on average"
-          }
-        },
-        {
-          "businessId": "bz-004", "name": "Casa Vista Design", "rank": 2, "score": 74, "band": "Eligible",
-          "capacity": { "active": 1, "configured": 10 },
-          "factors": { "category": 30, "location": 14, "segment": 12, "keywords": 5, "capacity": 8, "fairness": 4, "quality": 1 },
-          "why": "Full category match · outer zone · fewest recent assignments",
-          "from": {
-            "category": "Interior Design is a declared primary category",
-            "location": "Coarse region match only — BE-OD-04",
-            "segment": "Residential 3BHK partial",
-            "keywords": "One declared keyword matched",
-            "capacity": "9 of 10 active slots open this month",
-            "fairness": "0 assignments in the last 30 days",
-            "quality": "Acknowledges in 12h on average"
-          }
-        }
-      ],
-      "excluded": [
-        { "businessId": "bz-001", "name": "Studio Aangan", "stage": "Location", "reason": "Service area is South Delhi — request is Pune" },
-        { "businessId": "bz-003", "name": "Ambient Works", "stage": "Location", "reason": "Service area is South Delhi and Hyderabad — request is Pune" },
-        { "businessId": "bz-005", "name": "Urban Loom Studio", "stage": "Subscription", "reason": "Subscription expired 14 Mar 2026" },
-        { "businessId": "bz-006", "name": "Nook & Co", "stage": "Category", "reason": "Serves Modular Kitchen only" },
-        { "businessId": "bz-007", "name": "Terra Interiors", "stage": "Location", "reason": "Service area is Bengaluru — request is Pune" },
-        { "businessId": "bz-008", "name": "Habitat Studio", "stage": "Location", "reason": "Service area is South Delhi — request is Pune" },
-        { "businessId": "bz-009", "name": "Vaastu Living", "stage": "Status", "reason": "Account suspended by Operations, 02 Apr 2026" },
-        { "businessId": "bz-010", "name": "Kitchen Craft HYD", "stage": "Category", "reason": "Serves Modular Kitchen only" }
-      ]
+    {
+     "businessId": "60",
+     "name": "Sukhmani Design Works",
+     "rank": 5,
+     "score": 87,
+     "band": "Best match",
+     "capacity": {
+      "active": 0,
+      "configured": 4
+     },
+     "factors": {
+      "category": 24,
+      "location": 25,
+      "segment": 15,
+      "keywords": 6,
+      "capacity": 10,
+      "fairness": 5,
+      "quality": 2
+     },
+     "why": "Interior Designers declared · serves New Delhi · 4 of 4 slots open",
+     "from": {
+      "category": "Interior Designers is declared alongside 3 other categories",
+      "location": "New Delhi is inside the declared service zone",
+      "segment": "4 declared categories",
+      "keywords": "\"Full home interiors\" is not reflected in the declared categories",
+      "capacity": "4 of 4 slots open this month",
+      "fairness": "0 live assignments in the period",
+      "quality": "No acknowledgement time recorded yet"
+     }
     }
+   ],
+   "excluded": [
+    {
+     "businessId": "19",
+     "name": "Studio PS home",
+     "stage": "Location",
+     "reason": "Service area is noida — request is New Delhi"
+    },
+    {
+     "businessId": "26",
+     "name": "Serenus Architects",
+     "stage": "Location",
+     "reason": "Service area is Bangalore — request is New Delhi"
+    },
+    {
+     "businessId": "27",
+     "name": "Woodler Interior ",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residencial — not Interior Designers"
+    },
+    {
+     "businessId": "28",
+     "name": "Woodworks",
+     "stage": "Category",
+     "reason": "Serves office making, post civill — not Interior Designers"
+    },
+    {
+     "businessId": "32",
+     "name": "creative luxury projects LLP",
+     "stage": "Category",
+     "reason": "Serves interior work, JEWLLERS STORE — not Interior Designers"
+    },
+    {
+     "businessId": "33",
+     "name": "Spruha Interiors",
+     "stage": "Location",
+     "reason": "Service area is Thane — request is New Delhi"
+    },
+    {
+     "businessId": "34",
+     "name": "door2door experts",
+     "stage": "Category",
+     "reason": "Serves Commercial Interior Design, Residential Interior Design — not Interior Designers"
+    },
+    {
+     "businessId": "35",
+     "name": "Divya interior",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Interior Designers"
+    },
+    {
+     "businessId": "36",
+     "name": "Ruksha Furniture ",
+     "stage": "Category",
+     "reason": "Serves Home Interior — not Interior Designers"
+    },
+    {
+     "businessId": "39",
+     "name": "Sleekvera Interiors",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Interior Designers"
+    },
+    {
+     "businessId": "40",
+     "name": "Swastik interiors",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Interior Designers"
+    },
+    {
+     "businessId": "41",
+     "name": "Hashmi infrabuild",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Interior Designers"
+    },
+    {
+     "businessId": "42",
+     "name": "Rupkaar Designs",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "43",
+     "name": "V.S Group",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "44",
+     "name": "Fine Mart The Design ",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "45",
+     "name": "Axiora Design",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "54",
+     "name": "The Panel Bazaar",
+     "stage": "Category",
+     "reason": "Serves Furniture Retail, Modular Kitchens — not Interior Designers"
+    },
+    {
+     "businessId": "55",
+     "name": "Jal Kunj Sanitaryware",
+     "stage": "Category",
+     "reason": "Serves Bathroom Accessories, CP Fittings Manufacturers — not Interior Designers"
+    },
+    {
+     "businessId": "56",
+     "name": "Lakkad Kreations",
+     "stage": "Category",
+     "reason": "Serves Carpentry & Joinery, Furniture Retail — not Interior Designers"
+    },
+    {
+     "businessId": "59",
+     "name": "Aarambh Interiors",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    }
+   ]
+  },
+  "IB-BE-2026-0052": {
+   "enquiryId": "IB-BE-2026-0052",
+   "ruleVersion": "v3",
+   "calculatedAt": "2026-08-19T22:06:00+05:30",
+   "subscribedCount": 25,
+   "eligible": [
+    {
+     "businessId": "54",
+     "name": "The Panel Bazaar",
+     "rank": 1,
+     "score": 89,
+     "band": "Best match",
+     "capacity": {
+      "active": 0,
+      "configured": 4
+     },
+     "factors": {
+      "category": 24,
+      "location": 25,
+      "segment": 15,
+      "keywords": 8,
+      "capacity": 10,
+      "fairness": 5,
+      "quality": 2
+     },
+     "why": "Modular Kitchens declared · serves New Delhi · 4 of 4 slots open",
+     "from": {
+      "category": "Modular Kitchens is declared alongside 2 other categories",
+      "location": "New Delhi is inside the declared service zone",
+      "segment": "3 declared categories",
+      "keywords": "\"L-shaped modular kitchen\" matched against the declared categories",
+      "capacity": "4 of 4 slots open this month",
+      "fairness": "0 live assignments in the period",
+      "quality": "No acknowledgement time recorded yet"
+     }
+    }
+   ],
+   "excluded": [
+    {
+     "businessId": "19",
+     "name": "Studio PS home",
+     "stage": "Location",
+     "reason": "Service area is noida — request is New Delhi"
+    },
+    {
+     "businessId": "25",
+     "name": "Interior Bazzar",
+     "stage": "Category",
+     "reason": "Serves Interior Designers — not Modular Kitchens"
+    },
+    {
+     "businessId": "26",
+     "name": "Serenus Architects",
+     "stage": "Category",
+     "reason": "Serves Home Interior, Interior Designers — not Modular Kitchens"
+    },
+    {
+     "businessId": "27",
+     "name": "Woodler Interior ",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residencial — not Modular Kitchens"
+    },
+    {
+     "businessId": "28",
+     "name": "Woodworks",
+     "stage": "Category",
+     "reason": "Serves office making, post civill — not Modular Kitchens"
+    },
+    {
+     "businessId": "32",
+     "name": "creative luxury projects LLP",
+     "stage": "Category",
+     "reason": "Serves interior work, JEWLLERS STORE — not Modular Kitchens"
+    },
+    {
+     "businessId": "33",
+     "name": "Spruha Interiors",
+     "stage": "Category",
+     "reason": "Serves Interior Designers — not Modular Kitchens"
+    },
+    {
+     "businessId": "34",
+     "name": "door2door experts",
+     "stage": "Category",
+     "reason": "Serves Commercial Interior Design, Residential Interior Design — not Modular Kitchens"
+    },
+    {
+     "businessId": "35",
+     "name": "Divya interior",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Modular Kitchens"
+    },
+    {
+     "businessId": "36",
+     "name": "Ruksha Furniture ",
+     "stage": "Category",
+     "reason": "Serves Home Interior — not Modular Kitchens"
+    },
+    {
+     "businessId": "39",
+     "name": "Sleekvera Interiors",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Modular Kitchens"
+    },
+    {
+     "businessId": "40",
+     "name": "Swastik interiors",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Modular Kitchens"
+    },
+    {
+     "businessId": "41",
+     "name": "Hashmi infrabuild",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Modular Kitchens"
+    },
+    {
+     "businessId": "42",
+     "name": "Rupkaar Designs",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "43",
+     "name": "V.S Group",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "44",
+     "name": "Fine Mart The Design ",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "45",
+     "name": "Axiora Design",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "55",
+     "name": "Jal Kunj Sanitaryware",
+     "stage": "Category",
+     "reason": "Serves Bathroom Accessories, CP Fittings Manufacturers — not Modular Kitchens"
+    },
+    {
+     "businessId": "56",
+     "name": "Lakkad Kreations",
+     "stage": "Category",
+     "reason": "Serves Carpentry & Joinery, Furniture Retail — not Modular Kitchens"
+    },
+    {
+     "businessId": "57",
+     "name": "Griha Atelier",
+     "stage": "Category",
+     "reason": "Serves Home Interior, Interior Designers — not Modular Kitchens"
+    },
+    {
+     "businessId": "58",
+     "name": "Studio Nirvaan Dezign",
+     "stage": "Category",
+     "reason": "Serves Home Decor & Accessories, Home Interior — not Modular Kitchens"
+    },
+    {
+     "businessId": "59",
+     "name": "Aarambh Interiors",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "60",
+     "name": "Sukhmani Design Works",
+     "stage": "Category",
+     "reason": "Serves Commercial Interior Design, Furniture Retail — not Modular Kitchens"
+    },
+    {
+     "businessId": "61",
+     "name": "Space Antara Design Co.",
+     "stage": "Category",
+     "reason": "Serves Architecture, Commercial Interior Design — not Modular Kitchens"
+    }
+   ]
+  },
+  "IB-BE-2026-0031": {
+   "enquiryId": "IB-BE-2026-0031",
+   "ruleVersion": "v3",
+   "calculatedAt": "2026-08-20T07:31:00+05:30",
+   "subscribedCount": 25,
+   "eligible": [
+    {
+     "businessId": "57",
+     "name": "Griha Atelier",
+     "rank": 1,
+     "score": 93,
+     "band": "Best match",
+     "capacity": {
+      "active": 0,
+      "configured": 4
+     },
+     "factors": {
+      "category": 30,
+      "location": 25,
+      "segment": 15,
+      "keywords": 6,
+      "capacity": 10,
+      "fairness": 5,
+      "quality": 2
+     },
+     "why": "Home Interior declared · serves New Delhi · 4 of 4 slots open",
+     "from": {
+      "category": "Home Interior is a declared primary category",
+      "location": "New Delhi is inside the declared service zone",
+      "segment": "3 declared categories",
+      "keywords": "\"Living + dining refresh\" is not reflected in the declared categories",
+      "capacity": "4 of 4 slots open this month",
+      "fairness": "0 live assignments in the period",
+      "quality": "No acknowledgement time recorded yet"
+     }
+    },
+    {
+     "businessId": "58",
+     "name": "Studio Nirvaan Dezign",
+     "rank": 2,
+     "score": 87,
+     "band": "Best match",
+     "capacity": {
+      "active": 0,
+      "configured": 4
+     },
+     "factors": {
+      "category": 24,
+      "location": 25,
+      "segment": 15,
+      "keywords": 6,
+      "capacity": 10,
+      "fairness": 5,
+      "quality": 2
+     },
+     "why": "Home Interior declared · serves New Delhi · 4 of 4 slots open",
+     "from": {
+      "category": "Home Interior is declared alongside 2 other categories",
+      "location": "New Delhi is inside the declared service zone",
+      "segment": "3 declared categories",
+      "keywords": "\"Living + dining refresh\" is not reflected in the declared categories",
+      "capacity": "4 of 4 slots open this month",
+      "fairness": "0 live assignments in the period",
+      "quality": "No acknowledgement time recorded yet"
+     }
+    }
+   ],
+   "excluded": [
+    {
+     "businessId": "19",
+     "name": "Studio PS home",
+     "stage": "Category",
+     "reason": "Serves Interior Designers, Modular Kitchens — not Home Interior"
+    },
+    {
+     "businessId": "25",
+     "name": "Interior Bazzar",
+     "stage": "Category",
+     "reason": "Serves Interior Designers — not Home Interior"
+    },
+    {
+     "businessId": "26",
+     "name": "Serenus Architects",
+     "stage": "Location",
+     "reason": "Service area is Bangalore — request is New Delhi"
+    },
+    {
+     "businessId": "27",
+     "name": "Woodler Interior ",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residencial — not Home Interior"
+    },
+    {
+     "businessId": "28",
+     "name": "Woodworks",
+     "stage": "Category",
+     "reason": "Serves office making, post civill — not Home Interior"
+    },
+    {
+     "businessId": "32",
+     "name": "creative luxury projects LLP",
+     "stage": "Category",
+     "reason": "Serves interior work, JEWLLERS STORE — not Home Interior"
+    },
+    {
+     "businessId": "33",
+     "name": "Spruha Interiors",
+     "stage": "Category",
+     "reason": "Serves Interior Designers — not Home Interior"
+    },
+    {
+     "businessId": "34",
+     "name": "door2door experts",
+     "stage": "Category",
+     "reason": "Serves Commercial Interior Design, Residential Interior Design — not Home Interior"
+    },
+    {
+     "businessId": "35",
+     "name": "Divya interior",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Home Interior"
+    },
+    {
+     "businessId": "36",
+     "name": "Ruksha Furniture ",
+     "stage": "Location",
+     "reason": "Service area is Martin para — request is New Delhi"
+    },
+    {
+     "businessId": "39",
+     "name": "Sleekvera Interiors",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Home Interior"
+    },
+    {
+     "businessId": "40",
+     "name": "Swastik interiors",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Home Interior"
+    },
+    {
+     "businessId": "41",
+     "name": "Hashmi infrabuild",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Home Interior"
+    },
+    {
+     "businessId": "42",
+     "name": "Rupkaar Designs",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "43",
+     "name": "V.S Group",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "44",
+     "name": "Fine Mart The Design ",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "45",
+     "name": "Axiora Design",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "54",
+     "name": "The Panel Bazaar",
+     "stage": "Category",
+     "reason": "Serves Furniture Retail, Modular Kitchens — not Home Interior"
+    },
+    {
+     "businessId": "55",
+     "name": "Jal Kunj Sanitaryware",
+     "stage": "Category",
+     "reason": "Serves Bathroom Accessories, CP Fittings Manufacturers — not Home Interior"
+    },
+    {
+     "businessId": "56",
+     "name": "Lakkad Kreations",
+     "stage": "Category",
+     "reason": "Serves Carpentry & Joinery, Furniture Retail — not Home Interior"
+    },
+    {
+     "businessId": "59",
+     "name": "Aarambh Interiors",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "60",
+     "name": "Sukhmani Design Works",
+     "stage": "Category",
+     "reason": "Serves Commercial Interior Design, Furniture Retail — not Home Interior"
+    },
+    {
+     "businessId": "61",
+     "name": "Space Antara Design Co.",
+     "stage": "Category",
+     "reason": "Serves Architecture, Commercial Interior Design — not Home Interior"
+    }
+   ]
+  },
+  "IB-BE-2026-0044": {
+   "enquiryId": "IB-BE-2026-0044",
+   "ruleVersion": "v3",
+   "calculatedAt": "2026-08-17T22:13:00+05:30",
+   "subscribedCount": 25,
+   "eligible": [
+    {
+     "businessId": "26",
+     "name": "Serenus Architects",
+     "rank": 1,
+     "score": 88,
+     "band": "Best match",
+     "capacity": {
+      "active": 0,
+      "configured": 4
+     },
+     "factors": {
+      "category": 24,
+      "location": 25,
+      "segment": 15,
+      "keywords": 6,
+      "capacity": 10,
+      "fairness": 5,
+      "quality": 3
+     },
+     "why": "Interior Designers declared · serves Bangalore · 4 of 4 slots open",
+     "from": {
+      "category": "Interior Designers is declared alongside 2 other categories",
+      "location": "Bangalore is inside the declared service zone",
+      "segment": "3 declared categories",
+      "keywords": "\"Villa interiors\" is not reflected in the declared categories",
+      "capacity": "4 of 4 slots open this month",
+      "fairness": "0 live assignments in the period",
+      "quality": "Acknowledges in 140.2h on average"
+     }
+    },
+    {
+     "businessId": "61",
+     "name": "Space Antara Design Co.",
+     "rank": 2,
+     "score": 82,
+     "band": "Strong match",
+     "capacity": {
+      "active": 0,
+      "configured": 4
+     },
+     "factors": {
+      "category": 24,
+      "location": 20,
+      "segment": 15,
+      "keywords": 6,
+      "capacity": 10,
+      "fairness": 5,
+      "quality": 2
+     },
+     "why": "Interior Designers declared · serves Bangalore · 4 of 4 slots open",
+     "from": {
+      "category": "Interior Designers is declared alongside 2 other categories",
+      "location": "Karnataka is served; Bangalore is not named separately",
+      "segment": "3 declared categories",
+      "keywords": "\"Villa interiors\" is not reflected in the declared categories",
+      "capacity": "4 of 4 slots open this month",
+      "fairness": "0 live assignments in the period",
+      "quality": "No acknowledgement time recorded yet"
+     }
+    }
+   ],
+   "excluded": [
+    {
+     "businessId": "19",
+     "name": "Studio PS home",
+     "stage": "Location",
+     "reason": "Service area is noida — request is Bangalore"
+    },
+    {
+     "businessId": "25",
+     "name": "Interior Bazzar",
+     "stage": "Location",
+     "reason": "Service area is new Delhi — request is Bangalore"
+    },
+    {
+     "businessId": "27",
+     "name": "Woodler Interior ",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residencial — not Interior Designers"
+    },
+    {
+     "businessId": "28",
+     "name": "Woodworks",
+     "stage": "Category",
+     "reason": "Serves office making, post civill — not Interior Designers"
+    },
+    {
+     "businessId": "32",
+     "name": "creative luxury projects LLP",
+     "stage": "Category",
+     "reason": "Serves interior work, JEWLLERS STORE — not Interior Designers"
+    },
+    {
+     "businessId": "33",
+     "name": "Spruha Interiors",
+     "stage": "Location",
+     "reason": "Service area is Thane — request is Bangalore"
+    },
+    {
+     "businessId": "34",
+     "name": "door2door experts",
+     "stage": "Category",
+     "reason": "Serves Commercial Interior Design, Residential Interior Design — not Interior Designers"
+    },
+    {
+     "businessId": "35",
+     "name": "Divya interior",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Interior Designers"
+    },
+    {
+     "businessId": "36",
+     "name": "Ruksha Furniture ",
+     "stage": "Category",
+     "reason": "Serves Home Interior — not Interior Designers"
+    },
+    {
+     "businessId": "39",
+     "name": "Sleekvera Interiors",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Interior Designers"
+    },
+    {
+     "businessId": "40",
+     "name": "Swastik interiors",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Interior Designers"
+    },
+    {
+     "businessId": "41",
+     "name": "Hashmi infrabuild",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Interior Designers"
+    },
+    {
+     "businessId": "42",
+     "name": "Rupkaar Designs",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "43",
+     "name": "V.S Group",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "44",
+     "name": "Fine Mart The Design ",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "45",
+     "name": "Axiora Design",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "54",
+     "name": "The Panel Bazaar",
+     "stage": "Category",
+     "reason": "Serves Furniture Retail, Modular Kitchens — not Interior Designers"
+    },
+    {
+     "businessId": "55",
+     "name": "Jal Kunj Sanitaryware",
+     "stage": "Category",
+     "reason": "Serves Bathroom Accessories, CP Fittings Manufacturers — not Interior Designers"
+    },
+    {
+     "businessId": "56",
+     "name": "Lakkad Kreations",
+     "stage": "Category",
+     "reason": "Serves Carpentry & Joinery, Furniture Retail — not Interior Designers"
+    },
+    {
+     "businessId": "57",
+     "name": "Griha Atelier",
+     "stage": "Location",
+     "reason": "Service area is Delhi, Haryana — request is Bangalore"
+    },
+    {
+     "businessId": "58",
+     "name": "Studio Nirvaan Dezign",
+     "stage": "Location",
+     "reason": "Service area is Delhi, New Delhi — request is Bangalore"
+    },
+    {
+     "businessId": "59",
+     "name": "Aarambh Interiors",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "60",
+     "name": "Sukhmani Design Works",
+     "stage": "Location",
+     "reason": "Service area is Delhi, Haryana — request is Bangalore"
+    }
+   ]
+  },
+  "IB-BE-2026-0041": {
+   "enquiryId": "IB-BE-2026-0041",
+   "ruleVersion": "v3",
+   "calculatedAt": "2026-08-16T11:21:00+05:30",
+   "subscribedCount": 25,
+   "eligible": [
+    {
+     "businessId": "35",
+     "name": "Divya interior",
+     "rank": 1,
+     "score": 87,
+     "band": "Best match",
+     "capacity": {
+      "active": 0,
+      "configured": 4
+     },
+     "factors": {
+      "category": 24,
+      "location": 25,
+      "segment": 15,
+      "keywords": 6,
+      "capacity": 10,
+      "fairness": 5,
+      "quality": 2
+     },
+     "why": "Residential declared · serves Mumbai · 4 of 4 slots open",
+     "from": {
+      "category": "Residential is declared alongside 2 other categories",
+      "location": "Mumbai is inside the declared service zone",
+      "segment": "3 declared categories",
+      "keywords": "\"2BHK renovation\" is not reflected in the declared categories",
+      "capacity": "4 of 4 slots open this month",
+      "fairness": "0 live assignments in the period",
+      "quality": "No acknowledgement time recorded yet"
+     }
+    }
+   ],
+   "excluded": [
+    {
+     "businessId": "19",
+     "name": "Studio PS home",
+     "stage": "Category",
+     "reason": "Serves Interior Designers, Modular Kitchens — not Residential"
+    },
+    {
+     "businessId": "25",
+     "name": "Interior Bazzar",
+     "stage": "Category",
+     "reason": "Serves Interior Designers — not Residential"
+    },
+    {
+     "businessId": "26",
+     "name": "Serenus Architects",
+     "stage": "Category",
+     "reason": "Serves Home Interior, Interior Designers — not Residential"
+    },
+    {
+     "businessId": "27",
+     "name": "Woodler Interior ",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residencial — not Residential"
+    },
+    {
+     "businessId": "28",
+     "name": "Woodworks",
+     "stage": "Category",
+     "reason": "Serves office making, post civill — not Residential"
+    },
+    {
+     "businessId": "32",
+     "name": "creative luxury projects LLP",
+     "stage": "Category",
+     "reason": "Serves interior work, JEWLLERS STORE — not Residential"
+    },
+    {
+     "businessId": "33",
+     "name": "Spruha Interiors",
+     "stage": "Category",
+     "reason": "Serves Interior Designers — not Residential"
+    },
+    {
+     "businessId": "34",
+     "name": "door2door experts",
+     "stage": "Category",
+     "reason": "Serves Commercial Interior Design, Residential Interior Design — not Residential"
+    },
+    {
+     "businessId": "36",
+     "name": "Ruksha Furniture ",
+     "stage": "Category",
+     "reason": "Serves Home Interior — not Residential"
+    },
+    {
+     "businessId": "39",
+     "name": "Sleekvera Interiors",
+     "stage": "Location",
+     "reason": "Service area is Panipat — request is Mumbai"
+    },
+    {
+     "businessId": "40",
+     "name": "Swastik interiors",
+     "stage": "Location",
+     "reason": "No service area declared on the profile"
+    },
+    {
+     "businessId": "41",
+     "name": "Hashmi infrabuild",
+     "stage": "Location",
+     "reason": "Service area is muzaffarpur — request is Mumbai"
+    },
+    {
+     "businessId": "42",
+     "name": "Rupkaar Designs",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "43",
+     "name": "V.S Group",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "44",
+     "name": "Fine Mart The Design ",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "45",
+     "name": "Axiora Design",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "54",
+     "name": "The Panel Bazaar",
+     "stage": "Category",
+     "reason": "Serves Furniture Retail, Modular Kitchens — not Residential"
+    },
+    {
+     "businessId": "55",
+     "name": "Jal Kunj Sanitaryware",
+     "stage": "Category",
+     "reason": "Serves Bathroom Accessories, CP Fittings Manufacturers — not Residential"
+    },
+    {
+     "businessId": "56",
+     "name": "Lakkad Kreations",
+     "stage": "Category",
+     "reason": "Serves Carpentry & Joinery, Furniture Retail — not Residential"
+    },
+    {
+     "businessId": "57",
+     "name": "Griha Atelier",
+     "stage": "Category",
+     "reason": "Serves Home Interior, Interior Designers — not Residential"
+    },
+    {
+     "businessId": "58",
+     "name": "Studio Nirvaan Dezign",
+     "stage": "Category",
+     "reason": "Serves Home Decor & Accessories, Home Interior — not Residential"
+    },
+    {
+     "businessId": "59",
+     "name": "Aarambh Interiors",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "60",
+     "name": "Sukhmani Design Works",
+     "stage": "Category",
+     "reason": "Serves Commercial Interior Design, Furniture Retail — not Residential"
+    },
+    {
+     "businessId": "61",
+     "name": "Space Antara Design Co.",
+     "stage": "Category",
+     "reason": "Serves Architecture, Commercial Interior Design — not Residential"
+    }
+   ]
+  },
+  "IB-BE-2026-0038": {
+   "enquiryId": "IB-BE-2026-0038",
+   "ruleVersion": "v3",
+   "calculatedAt": "2026-08-11T13:03:00+05:30",
+   "subscribedCount": 25,
+   "eligible": [
+    {
+     "businessId": "54",
+     "name": "The Panel Bazaar",
+     "rank": 1,
+     "score": 93,
+     "band": "Best match",
+     "capacity": {
+      "active": 0,
+      "configured": 4
+     },
+     "factors": {
+      "category": 30,
+      "location": 25,
+      "segment": 15,
+      "keywords": 6,
+      "capacity": 10,
+      "fairness": 5,
+      "quality": 2
+     },
+     "why": "Furniture Retail declared · serves New Delhi · 4 of 4 slots open",
+     "from": {
+      "category": "Furniture Retail is a declared primary category",
+      "location": "New Delhi is inside the declared service zone",
+      "segment": "3 declared categories",
+      "keywords": "\"Dining sets\" is not reflected in the declared categories",
+      "capacity": "4 of 4 slots open this month",
+      "fairness": "0 live assignments in the period",
+      "quality": "No acknowledgement time recorded yet"
+     }
+    },
+    {
+     "businessId": "56",
+     "name": "Lakkad Kreations",
+     "rank": 2,
+     "score": 87,
+     "band": "Best match",
+     "capacity": {
+      "active": 0,
+      "configured": 4
+     },
+     "factors": {
+      "category": 24,
+      "location": 25,
+      "segment": 15,
+      "keywords": 6,
+      "capacity": 10,
+      "fairness": 5,
+      "quality": 2
+     },
+     "why": "Furniture Retail declared · serves New Delhi · 4 of 4 slots open",
+     "from": {
+      "category": "Furniture Retail is declared alongside 2 other categories",
+      "location": "New Delhi is inside the declared service zone",
+      "segment": "3 declared categories",
+      "keywords": "\"Dining sets\" is not reflected in the declared categories",
+      "capacity": "4 of 4 slots open this month",
+      "fairness": "0 live assignments in the period",
+      "quality": "No acknowledgement time recorded yet"
+     }
+    },
+    {
+     "businessId": "60",
+     "name": "Sukhmani Design Works",
+     "rank": 3,
+     "score": 87,
+     "band": "Best match",
+     "capacity": {
+      "active": 0,
+      "configured": 4
+     },
+     "factors": {
+      "category": 24,
+      "location": 25,
+      "segment": 15,
+      "keywords": 6,
+      "capacity": 10,
+      "fairness": 5,
+      "quality": 2
+     },
+     "why": "Furniture Retail declared · serves New Delhi · 4 of 4 slots open",
+     "from": {
+      "category": "Furniture Retail is declared alongside 3 other categories",
+      "location": "New Delhi is inside the declared service zone",
+      "segment": "4 declared categories",
+      "keywords": "\"Dining sets\" is not reflected in the declared categories",
+      "capacity": "4 of 4 slots open this month",
+      "fairness": "0 live assignments in the period",
+      "quality": "No acknowledgement time recorded yet"
+     }
+    }
+   ],
+   "excluded": [
+    {
+     "businessId": "19",
+     "name": "Studio PS home",
+     "stage": "Category",
+     "reason": "Serves Interior Designers, Modular Kitchens — not Furniture Retail"
+    },
+    {
+     "businessId": "25",
+     "name": "Interior Bazzar",
+     "stage": "Category",
+     "reason": "Serves Interior Designers — not Furniture Retail"
+    },
+    {
+     "businessId": "26",
+     "name": "Serenus Architects",
+     "stage": "Category",
+     "reason": "Serves Home Interior, Interior Designers — not Furniture Retail"
+    },
+    {
+     "businessId": "27",
+     "name": "Woodler Interior ",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residencial — not Furniture Retail"
+    },
+    {
+     "businessId": "28",
+     "name": "Woodworks",
+     "stage": "Category",
+     "reason": "Serves office making, post civill — not Furniture Retail"
+    },
+    {
+     "businessId": "32",
+     "name": "creative luxury projects LLP",
+     "stage": "Category",
+     "reason": "Serves interior work, JEWLLERS STORE — not Furniture Retail"
+    },
+    {
+     "businessId": "33",
+     "name": "Spruha Interiors",
+     "stage": "Category",
+     "reason": "Serves Interior Designers — not Furniture Retail"
+    },
+    {
+     "businessId": "34",
+     "name": "door2door experts",
+     "stage": "Category",
+     "reason": "Serves Commercial Interior Design, Residential Interior Design — not Furniture Retail"
+    },
+    {
+     "businessId": "35",
+     "name": "Divya interior",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Furniture Retail"
+    },
+    {
+     "businessId": "36",
+     "name": "Ruksha Furniture ",
+     "stage": "Category",
+     "reason": "Serves Home Interior — not Furniture Retail"
+    },
+    {
+     "businessId": "39",
+     "name": "Sleekvera Interiors",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Furniture Retail"
+    },
+    {
+     "businessId": "40",
+     "name": "Swastik interiors",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Furniture Retail"
+    },
+    {
+     "businessId": "41",
+     "name": "Hashmi infrabuild",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Furniture Retail"
+    },
+    {
+     "businessId": "42",
+     "name": "Rupkaar Designs",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "43",
+     "name": "V.S Group",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "44",
+     "name": "Fine Mart The Design ",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "45",
+     "name": "Axiora Design",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "55",
+     "name": "Jal Kunj Sanitaryware",
+     "stage": "Category",
+     "reason": "Serves Bathroom Accessories, CP Fittings Manufacturers — not Furniture Retail"
+    },
+    {
+     "businessId": "57",
+     "name": "Griha Atelier",
+     "stage": "Category",
+     "reason": "Serves Home Interior, Interior Designers — not Furniture Retail"
+    },
+    {
+     "businessId": "58",
+     "name": "Studio Nirvaan Dezign",
+     "stage": "Category",
+     "reason": "Serves Home Decor & Accessories, Home Interior — not Furniture Retail"
+    },
+    {
+     "businessId": "59",
+     "name": "Aarambh Interiors",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "61",
+     "name": "Space Antara Design Co.",
+     "stage": "Category",
+     "reason": "Serves Architecture, Commercial Interior Design — not Furniture Retail"
+    }
+   ]
+  },
+  "IB-BE-2026-0036": {
+   "enquiryId": "IB-BE-2026-0036",
+   "ruleVersion": "v3",
+   "calculatedAt": "2026-08-08T10:16:00+05:30",
+   "subscribedCount": 25,
+   "eligible": [
+    {
+     "businessId": "57",
+     "name": "Griha Atelier",
+     "rank": 1,
+     "score": 89,
+     "band": "Best match",
+     "capacity": {
+      "active": 0,
+      "configured": 4
+     },
+     "factors": {
+      "category": 24,
+      "location": 25,
+      "segment": 15,
+      "keywords": 8,
+      "capacity": 10,
+      "fairness": 5,
+      "quality": 2
+     },
+     "why": "Interior Designers declared · serves New Delhi · 4 of 4 slots open",
+     "from": {
+      "category": "Interior Designers is declared alongside 2 other categories",
+      "location": "New Delhi is inside the declared service zone",
+      "segment": "3 declared categories",
+      "keywords": "\"Full home interiors\" matched against the declared categories",
+      "capacity": "4 of 4 slots open this month",
+      "fairness": "0 live assignments in the period",
+      "quality": "No acknowledgement time recorded yet"
+     }
+    },
+    {
+     "businessId": "58",
+     "name": "Studio Nirvaan Dezign",
+     "rank": 2,
+     "score": 89,
+     "band": "Best match",
+     "capacity": {
+      "active": 0,
+      "configured": 4
+     },
+     "factors": {
+      "category": 24,
+      "location": 25,
+      "segment": 15,
+      "keywords": 8,
+      "capacity": 10,
+      "fairness": 5,
+      "quality": 2
+     },
+     "why": "Interior Designers declared · serves New Delhi · 4 of 4 slots open",
+     "from": {
+      "category": "Interior Designers is declared alongside 2 other categories",
+      "location": "New Delhi is inside the declared service zone",
+      "segment": "3 declared categories",
+      "keywords": "\"Full home interiors\" matched against the declared categories",
+      "capacity": "4 of 4 slots open this month",
+      "fairness": "0 live assignments in the period",
+      "quality": "No acknowledgement time recorded yet"
+     }
+    },
+    {
+     "businessId": "25",
+     "name": "Interior Bazzar",
+     "rank": 3,
+     "score": 87,
+     "band": "Best match",
+     "capacity": {
+      "active": 0,
+      "configured": 4
+     },
+     "factors": {
+      "category": 30,
+      "location": 25,
+      "segment": 9,
+      "keywords": 6,
+      "capacity": 10,
+      "fairness": 5,
+      "quality": 2
+     },
+     "why": "Interior Designers declared · serves New Delhi · 4 of 4 slots open",
+     "from": {
+      "category": "Interior Designers is a declared primary category",
+      "location": "New Delhi is inside the declared service zone",
+      "segment": "1 declared category",
+      "keywords": "\"Full home interiors\" is not reflected in the declared categories",
+      "capacity": "4 of 4 slots open this month",
+      "fairness": "0 live assignments in the period",
+      "quality": "No acknowledgement time recorded yet"
+     }
+    },
+    {
+     "businessId": "61",
+     "name": "Space Antara Design Co.",
+     "rank": 4,
+     "score": 87,
+     "band": "Best match",
+     "capacity": {
+      "active": 0,
+      "configured": 4
+     },
+     "factors": {
+      "category": 24,
+      "location": 25,
+      "segment": 15,
+      "keywords": 6,
+      "capacity": 10,
+      "fairness": 5,
+      "quality": 2
+     },
+     "why": "Interior Designers declared · serves New Delhi · 4 of 4 slots open",
+     "from": {
+      "category": "Interior Designers is declared alongside 2 other categories",
+      "location": "New Delhi is inside the declared service zone",
+      "segment": "3 declared categories",
+      "keywords": "\"Full home interiors\" is not reflected in the declared categories",
+      "capacity": "4 of 4 slots open this month",
+      "fairness": "0 live assignments in the period",
+      "quality": "No acknowledgement time recorded yet"
+     }
+    },
+    {
+     "businessId": "60",
+     "name": "Sukhmani Design Works",
+     "rank": 5,
+     "score": 87,
+     "band": "Best match",
+     "capacity": {
+      "active": 0,
+      "configured": 4
+     },
+     "factors": {
+      "category": 24,
+      "location": 25,
+      "segment": 15,
+      "keywords": 6,
+      "capacity": 10,
+      "fairness": 5,
+      "quality": 2
+     },
+     "why": "Interior Designers declared · serves New Delhi · 4 of 4 slots open",
+     "from": {
+      "category": "Interior Designers is declared alongside 3 other categories",
+      "location": "New Delhi is inside the declared service zone",
+      "segment": "4 declared categories",
+      "keywords": "\"Full home interiors\" is not reflected in the declared categories",
+      "capacity": "4 of 4 slots open this month",
+      "fairness": "0 live assignments in the period",
+      "quality": "No acknowledgement time recorded yet"
+     }
+    }
+   ],
+   "excluded": [
+    {
+     "businessId": "19",
+     "name": "Studio PS home",
+     "stage": "Location",
+     "reason": "Service area is noida — request is New Delhi"
+    },
+    {
+     "businessId": "26",
+     "name": "Serenus Architects",
+     "stage": "Location",
+     "reason": "Service area is Bangalore — request is New Delhi"
+    },
+    {
+     "businessId": "27",
+     "name": "Woodler Interior ",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residencial — not Interior Designers"
+    },
+    {
+     "businessId": "28",
+     "name": "Woodworks",
+     "stage": "Category",
+     "reason": "Serves office making, post civill — not Interior Designers"
+    },
+    {
+     "businessId": "32",
+     "name": "creative luxury projects LLP",
+     "stage": "Category",
+     "reason": "Serves interior work, JEWLLERS STORE — not Interior Designers"
+    },
+    {
+     "businessId": "33",
+     "name": "Spruha Interiors",
+     "stage": "Location",
+     "reason": "Service area is Thane — request is New Delhi"
+    },
+    {
+     "businessId": "34",
+     "name": "door2door experts",
+     "stage": "Category",
+     "reason": "Serves Commercial Interior Design, Residential Interior Design — not Interior Designers"
+    },
+    {
+     "businessId": "35",
+     "name": "Divya interior",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Interior Designers"
+    },
+    {
+     "businessId": "36",
+     "name": "Ruksha Furniture ",
+     "stage": "Category",
+     "reason": "Serves Home Interior — not Interior Designers"
+    },
+    {
+     "businessId": "39",
+     "name": "Sleekvera Interiors",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Interior Designers"
+    },
+    {
+     "businessId": "40",
+     "name": "Swastik interiors",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Interior Designers"
+    },
+    {
+     "businessId": "41",
+     "name": "Hashmi infrabuild",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Interior Designers"
+    },
+    {
+     "businessId": "42",
+     "name": "Rupkaar Designs",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "43",
+     "name": "V.S Group",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "44",
+     "name": "Fine Mart The Design ",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "45",
+     "name": "Axiora Design",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "54",
+     "name": "The Panel Bazaar",
+     "stage": "Category",
+     "reason": "Serves Furniture Retail, Modular Kitchens — not Interior Designers"
+    },
+    {
+     "businessId": "55",
+     "name": "Jal Kunj Sanitaryware",
+     "stage": "Category",
+     "reason": "Serves Bathroom Accessories, CP Fittings Manufacturers — not Interior Designers"
+    },
+    {
+     "businessId": "56",
+     "name": "Lakkad Kreations",
+     "stage": "Category",
+     "reason": "Serves Carpentry & Joinery, Furniture Retail — not Interior Designers"
+    },
+    {
+     "businessId": "59",
+     "name": "Aarambh Interiors",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    }
+   ]
   }
+ },
+ "pending": {
+  "IB-BE-2026-0064": {
+   "enquiryId": "IB-BE-2026-0064",
+   "ruleVersion": "v3",
+   "calculatedAt": "2026-08-20T09:00:00+05:30",
+   "subscribedCount": 25,
+   "eligible": [
+    {
+     "businessId": "55",
+     "name": "Jal Kunj Sanitaryware",
+     "rank": 1,
+     "score": 95,
+     "band": "Best match",
+     "capacity": {
+      "active": 0,
+      "configured": 4
+     },
+     "factors": {
+      "category": 30,
+      "location": 25,
+      "segment": 15,
+      "keywords": 8,
+      "capacity": 10,
+      "fairness": 5,
+      "quality": 2
+     },
+     "why": "Bathroom Accessories declared · serves New Delhi · 4 of 4 slots open",
+     "from": {
+      "category": "Bathroom Accessories is a declared primary category",
+      "location": "New Delhi is inside the declared service zone",
+      "segment": "3 declared categories",
+      "keywords": "\"Bathroom renovation\" matched against the declared categories",
+      "capacity": "4 of 4 slots open this month",
+      "fairness": "0 live assignments in the period",
+      "quality": "No acknowledgement time recorded yet"
+     }
+    }
+   ],
+   "excluded": [
+    {
+     "businessId": "19",
+     "name": "Studio PS home",
+     "stage": "Category",
+     "reason": "Serves Interior Designers, Modular Kitchens — not Bathroom Accessories"
+    },
+    {
+     "businessId": "25",
+     "name": "Interior Bazzar",
+     "stage": "Category",
+     "reason": "Serves Interior Designers — not Bathroom Accessories"
+    },
+    {
+     "businessId": "26",
+     "name": "Serenus Architects",
+     "stage": "Category",
+     "reason": "Serves Home Interior, Interior Designers — not Bathroom Accessories"
+    },
+    {
+     "businessId": "27",
+     "name": "Woodler Interior ",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residencial — not Bathroom Accessories"
+    },
+    {
+     "businessId": "28",
+     "name": "Woodworks",
+     "stage": "Category",
+     "reason": "Serves office making, post civill — not Bathroom Accessories"
+    },
+    {
+     "businessId": "32",
+     "name": "creative luxury projects LLP",
+     "stage": "Category",
+     "reason": "Serves interior work, JEWLLERS STORE — not Bathroom Accessories"
+    },
+    {
+     "businessId": "33",
+     "name": "Spruha Interiors",
+     "stage": "Category",
+     "reason": "Serves Interior Designers — not Bathroom Accessories"
+    },
+    {
+     "businessId": "34",
+     "name": "door2door experts",
+     "stage": "Category",
+     "reason": "Serves Commercial Interior Design, Residential Interior Design — not Bathroom Accessories"
+    },
+    {
+     "businessId": "35",
+     "name": "Divya interior",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Bathroom Accessories"
+    },
+    {
+     "businessId": "36",
+     "name": "Ruksha Furniture ",
+     "stage": "Category",
+     "reason": "Serves Home Interior — not Bathroom Accessories"
+    },
+    {
+     "businessId": "39",
+     "name": "Sleekvera Interiors",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Bathroom Accessories"
+    },
+    {
+     "businessId": "40",
+     "name": "Swastik interiors",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Bathroom Accessories"
+    },
+    {
+     "businessId": "41",
+     "name": "Hashmi infrabuild",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Bathroom Accessories"
+    },
+    {
+     "businessId": "42",
+     "name": "Rupkaar Designs",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "43",
+     "name": "V.S Group",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "44",
+     "name": "Fine Mart The Design ",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "45",
+     "name": "Axiora Design",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "54",
+     "name": "The Panel Bazaar",
+     "stage": "Category",
+     "reason": "Serves Furniture Retail, Modular Kitchens — not Bathroom Accessories"
+    },
+    {
+     "businessId": "56",
+     "name": "Lakkad Kreations",
+     "stage": "Category",
+     "reason": "Serves Carpentry & Joinery, Furniture Retail — not Bathroom Accessories"
+    },
+    {
+     "businessId": "57",
+     "name": "Griha Atelier",
+     "stage": "Category",
+     "reason": "Serves Home Interior, Interior Designers — not Bathroom Accessories"
+    },
+    {
+     "businessId": "58",
+     "name": "Studio Nirvaan Dezign",
+     "stage": "Category",
+     "reason": "Serves Home Decor & Accessories, Home Interior — not Bathroom Accessories"
+    },
+    {
+     "businessId": "59",
+     "name": "Aarambh Interiors",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "60",
+     "name": "Sukhmani Design Works",
+     "stage": "Category",
+     "reason": "Serves Commercial Interior Design, Furniture Retail — not Bathroom Accessories"
+    },
+    {
+     "businessId": "61",
+     "name": "Space Antara Design Co.",
+     "stage": "Category",
+     "reason": "Serves Architecture, Commercial Interior Design — not Bathroom Accessories"
+    }
+   ]
+  },
+  "IB-BE-2026-0061": {
+   "enquiryId": "IB-BE-2026-0061",
+   "ruleVersion": "v3",
+   "calculatedAt": "2026-08-20T09:00:00+05:30",
+   "subscribedCount": 25,
+   "eligible": [
+    {
+     "businessId": "57",
+     "name": "Griha Atelier",
+     "rank": 1,
+     "score": 89,
+     "band": "Best match",
+     "capacity": {
+      "active": 0,
+      "configured": 4
+     },
+     "factors": {
+      "category": 24,
+      "location": 25,
+      "segment": 15,
+      "keywords": 8,
+      "capacity": 10,
+      "fairness": 5,
+      "quality": 2
+     },
+     "why": "Interior Designers declared · serves New Delhi · 4 of 4 slots open",
+     "from": {
+      "category": "Interior Designers is declared alongside 2 other categories",
+      "location": "New Delhi is inside the declared service zone",
+      "segment": "3 declared categories",
+      "keywords": "\"Full home interiors\" matched against the declared categories",
+      "capacity": "4 of 4 slots open this month",
+      "fairness": "0 live assignments in the period",
+      "quality": "No acknowledgement time recorded yet"
+     }
+    },
+    {
+     "businessId": "58",
+     "name": "Studio Nirvaan Dezign",
+     "rank": 2,
+     "score": 89,
+     "band": "Best match",
+     "capacity": {
+      "active": 0,
+      "configured": 4
+     },
+     "factors": {
+      "category": 24,
+      "location": 25,
+      "segment": 15,
+      "keywords": 8,
+      "capacity": 10,
+      "fairness": 5,
+      "quality": 2
+     },
+     "why": "Interior Designers declared · serves New Delhi · 4 of 4 slots open",
+     "from": {
+      "category": "Interior Designers is declared alongside 2 other categories",
+      "location": "New Delhi is inside the declared service zone",
+      "segment": "3 declared categories",
+      "keywords": "\"Full home interiors\" matched against the declared categories",
+      "capacity": "4 of 4 slots open this month",
+      "fairness": "0 live assignments in the period",
+      "quality": "No acknowledgement time recorded yet"
+     }
+    },
+    {
+     "businessId": "25",
+     "name": "Interior Bazzar",
+     "rank": 3,
+     "score": 87,
+     "band": "Best match",
+     "capacity": {
+      "active": 0,
+      "configured": 4
+     },
+     "factors": {
+      "category": 30,
+      "location": 25,
+      "segment": 9,
+      "keywords": 6,
+      "capacity": 10,
+      "fairness": 5,
+      "quality": 2
+     },
+     "why": "Interior Designers declared · serves New Delhi · 4 of 4 slots open",
+     "from": {
+      "category": "Interior Designers is a declared primary category",
+      "location": "New Delhi is inside the declared service zone",
+      "segment": "1 declared category",
+      "keywords": "\"Full home interiors\" is not reflected in the declared categories",
+      "capacity": "4 of 4 slots open this month",
+      "fairness": "0 live assignments in the period",
+      "quality": "No acknowledgement time recorded yet"
+     }
+    },
+    {
+     "businessId": "61",
+     "name": "Space Antara Design Co.",
+     "rank": 4,
+     "score": 87,
+     "band": "Best match",
+     "capacity": {
+      "active": 0,
+      "configured": 4
+     },
+     "factors": {
+      "category": 24,
+      "location": 25,
+      "segment": 15,
+      "keywords": 6,
+      "capacity": 10,
+      "fairness": 5,
+      "quality": 2
+     },
+     "why": "Interior Designers declared · serves New Delhi · 4 of 4 slots open",
+     "from": {
+      "category": "Interior Designers is declared alongside 2 other categories",
+      "location": "New Delhi is inside the declared service zone",
+      "segment": "3 declared categories",
+      "keywords": "\"Full home interiors\" is not reflected in the declared categories",
+      "capacity": "4 of 4 slots open this month",
+      "fairness": "0 live assignments in the period",
+      "quality": "No acknowledgement time recorded yet"
+     }
+    },
+    {
+     "businessId": "60",
+     "name": "Sukhmani Design Works",
+     "rank": 5,
+     "score": 87,
+     "band": "Best match",
+     "capacity": {
+      "active": 0,
+      "configured": 4
+     },
+     "factors": {
+      "category": 24,
+      "location": 25,
+      "segment": 15,
+      "keywords": 6,
+      "capacity": 10,
+      "fairness": 5,
+      "quality": 2
+     },
+     "why": "Interior Designers declared · serves New Delhi · 4 of 4 slots open",
+     "from": {
+      "category": "Interior Designers is declared alongside 3 other categories",
+      "location": "New Delhi is inside the declared service zone",
+      "segment": "4 declared categories",
+      "keywords": "\"Full home interiors\" is not reflected in the declared categories",
+      "capacity": "4 of 4 slots open this month",
+      "fairness": "0 live assignments in the period",
+      "quality": "No acknowledgement time recorded yet"
+     }
+    }
+   ],
+   "excluded": [
+    {
+     "businessId": "19",
+     "name": "Studio PS home",
+     "stage": "Location",
+     "reason": "Service area is noida — request is New Delhi"
+    },
+    {
+     "businessId": "26",
+     "name": "Serenus Architects",
+     "stage": "Location",
+     "reason": "Service area is Bangalore — request is New Delhi"
+    },
+    {
+     "businessId": "27",
+     "name": "Woodler Interior ",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residencial — not Interior Designers"
+    },
+    {
+     "businessId": "28",
+     "name": "Woodworks",
+     "stage": "Category",
+     "reason": "Serves office making, post civill — not Interior Designers"
+    },
+    {
+     "businessId": "32",
+     "name": "creative luxury projects LLP",
+     "stage": "Category",
+     "reason": "Serves interior work, JEWLLERS STORE — not Interior Designers"
+    },
+    {
+     "businessId": "33",
+     "name": "Spruha Interiors",
+     "stage": "Location",
+     "reason": "Service area is Thane — request is New Delhi"
+    },
+    {
+     "businessId": "34",
+     "name": "door2door experts",
+     "stage": "Category",
+     "reason": "Serves Commercial Interior Design, Residential Interior Design — not Interior Designers"
+    },
+    {
+     "businessId": "35",
+     "name": "Divya interior",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Interior Designers"
+    },
+    {
+     "businessId": "36",
+     "name": "Ruksha Furniture ",
+     "stage": "Category",
+     "reason": "Serves Home Interior — not Interior Designers"
+    },
+    {
+     "businessId": "39",
+     "name": "Sleekvera Interiors",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Interior Designers"
+    },
+    {
+     "businessId": "40",
+     "name": "Swastik interiors",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Interior Designers"
+    },
+    {
+     "businessId": "41",
+     "name": "Hashmi infrabuild",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Interior Designers"
+    },
+    {
+     "businessId": "42",
+     "name": "Rupkaar Designs",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "43",
+     "name": "V.S Group",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "44",
+     "name": "Fine Mart The Design ",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "45",
+     "name": "Axiora Design",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "54",
+     "name": "The Panel Bazaar",
+     "stage": "Category",
+     "reason": "Serves Furniture Retail, Modular Kitchens — not Interior Designers"
+    },
+    {
+     "businessId": "55",
+     "name": "Jal Kunj Sanitaryware",
+     "stage": "Category",
+     "reason": "Serves Bathroom Accessories, CP Fittings Manufacturers — not Interior Designers"
+    },
+    {
+     "businessId": "56",
+     "name": "Lakkad Kreations",
+     "stage": "Category",
+     "reason": "Serves Carpentry & Joinery, Furniture Retail — not Interior Designers"
+    },
+    {
+     "businessId": "59",
+     "name": "Aarambh Interiors",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    }
+   ]
+  },
+  "IB-BE-2026-0062": {
+   "enquiryId": "IB-BE-2026-0062",
+   "ruleVersion": "v3",
+   "calculatedAt": "2026-08-20T09:00:00+05:30",
+   "subscribedCount": 25,
+   "eligible": [
+    {
+     "businessId": "54",
+     "name": "The Panel Bazaar",
+     "rank": 1,
+     "score": 87,
+     "band": "Best match",
+     "capacity": {
+      "active": 0,
+      "configured": 4
+     },
+     "factors": {
+      "category": 24,
+      "location": 25,
+      "segment": 15,
+      "keywords": 6,
+      "capacity": 10,
+      "fairness": 5,
+      "quality": 2
+     },
+     "why": "Modular Kitchens declared · serves New Delhi · 4 of 4 slots open",
+     "from": {
+      "category": "Modular Kitchens is declared alongside 2 other categories",
+      "location": "New Delhi is inside the declared service zone",
+      "segment": "3 declared categories",
+      "keywords": "\"\" is not reflected in the declared categories",
+      "capacity": "4 of 4 slots open this month",
+      "fairness": "0 live assignments in the period",
+      "quality": "No acknowledgement time recorded yet"
+     }
+    }
+   ],
+   "excluded": [
+    {
+     "businessId": "19",
+     "name": "Studio PS home",
+     "stage": "Location",
+     "reason": "Service area is noida — request is New Delhi"
+    },
+    {
+     "businessId": "25",
+     "name": "Interior Bazzar",
+     "stage": "Category",
+     "reason": "Serves Interior Designers — not Modular Kitchens"
+    },
+    {
+     "businessId": "26",
+     "name": "Serenus Architects",
+     "stage": "Category",
+     "reason": "Serves Home Interior, Interior Designers — not Modular Kitchens"
+    },
+    {
+     "businessId": "27",
+     "name": "Woodler Interior ",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residencial — not Modular Kitchens"
+    },
+    {
+     "businessId": "28",
+     "name": "Woodworks",
+     "stage": "Category",
+     "reason": "Serves office making, post civill — not Modular Kitchens"
+    },
+    {
+     "businessId": "32",
+     "name": "creative luxury projects LLP",
+     "stage": "Category",
+     "reason": "Serves interior work, JEWLLERS STORE — not Modular Kitchens"
+    },
+    {
+     "businessId": "33",
+     "name": "Spruha Interiors",
+     "stage": "Category",
+     "reason": "Serves Interior Designers — not Modular Kitchens"
+    },
+    {
+     "businessId": "34",
+     "name": "door2door experts",
+     "stage": "Category",
+     "reason": "Serves Commercial Interior Design, Residential Interior Design — not Modular Kitchens"
+    },
+    {
+     "businessId": "35",
+     "name": "Divya interior",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Modular Kitchens"
+    },
+    {
+     "businessId": "36",
+     "name": "Ruksha Furniture ",
+     "stage": "Category",
+     "reason": "Serves Home Interior — not Modular Kitchens"
+    },
+    {
+     "businessId": "39",
+     "name": "Sleekvera Interiors",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Modular Kitchens"
+    },
+    {
+     "businessId": "40",
+     "name": "Swastik interiors",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Modular Kitchens"
+    },
+    {
+     "businessId": "41",
+     "name": "Hashmi infrabuild",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Modular Kitchens"
+    },
+    {
+     "businessId": "42",
+     "name": "Rupkaar Designs",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "43",
+     "name": "V.S Group",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "44",
+     "name": "Fine Mart The Design ",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "45",
+     "name": "Axiora Design",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "55",
+     "name": "Jal Kunj Sanitaryware",
+     "stage": "Category",
+     "reason": "Serves Bathroom Accessories, CP Fittings Manufacturers — not Modular Kitchens"
+    },
+    {
+     "businessId": "56",
+     "name": "Lakkad Kreations",
+     "stage": "Category",
+     "reason": "Serves Carpentry & Joinery, Furniture Retail — not Modular Kitchens"
+    },
+    {
+     "businessId": "57",
+     "name": "Griha Atelier",
+     "stage": "Category",
+     "reason": "Serves Home Interior, Interior Designers — not Modular Kitchens"
+    },
+    {
+     "businessId": "58",
+     "name": "Studio Nirvaan Dezign",
+     "stage": "Category",
+     "reason": "Serves Home Decor & Accessories, Home Interior — not Modular Kitchens"
+    },
+    {
+     "businessId": "59",
+     "name": "Aarambh Interiors",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "60",
+     "name": "Sukhmani Design Works",
+     "stage": "Category",
+     "reason": "Serves Commercial Interior Design, Furniture Retail — not Modular Kitchens"
+    },
+    {
+     "businessId": "61",
+     "name": "Space Antara Design Co.",
+     "stage": "Category",
+     "reason": "Serves Architecture, Commercial Interior Design — not Modular Kitchens"
+    }
+   ]
+  },
+  "IB-BE-2026-0063": {
+   "enquiryId": "IB-BE-2026-0063",
+   "ruleVersion": "v3",
+   "calculatedAt": "2026-08-20T09:00:00+05:30",
+   "subscribedCount": 25,
+   "eligible": [
+    {
+     "businessId": "26",
+     "name": "Serenus Architects",
+     "rank": 1,
+     "score": 88,
+     "band": "Best match",
+     "capacity": {
+      "active": 0,
+      "configured": 4
+     },
+     "factors": {
+      "category": 24,
+      "location": 25,
+      "segment": 15,
+      "keywords": 6,
+      "capacity": 10,
+      "fairness": 5,
+      "quality": 3
+     },
+     "why": "Interior Designers declared · serves Bangalore · 4 of 4 slots open",
+     "from": {
+      "category": "Interior Designers is declared alongside 2 other categories",
+      "location": "Bangalore is inside the declared service zone",
+      "segment": "3 declared categories",
+      "keywords": "\"Living room\" is not reflected in the declared categories",
+      "capacity": "4 of 4 slots open this month",
+      "fairness": "0 live assignments in the period",
+      "quality": "Acknowledges in 140.2h on average"
+     }
+    },
+    {
+     "businessId": "61",
+     "name": "Space Antara Design Co.",
+     "rank": 2,
+     "score": 82,
+     "band": "Strong match",
+     "capacity": {
+      "active": 0,
+      "configured": 4
+     },
+     "factors": {
+      "category": 24,
+      "location": 20,
+      "segment": 15,
+      "keywords": 6,
+      "capacity": 10,
+      "fairness": 5,
+      "quality": 2
+     },
+     "why": "Interior Designers declared · serves Bangalore · 4 of 4 slots open",
+     "from": {
+      "category": "Interior Designers is declared alongside 2 other categories",
+      "location": "Karnataka is served; Bangalore is not named separately",
+      "segment": "3 declared categories",
+      "keywords": "\"Living room\" is not reflected in the declared categories",
+      "capacity": "4 of 4 slots open this month",
+      "fairness": "0 live assignments in the period",
+      "quality": "No acknowledgement time recorded yet"
+     }
+    }
+   ],
+   "excluded": [
+    {
+     "businessId": "19",
+     "name": "Studio PS home",
+     "stage": "Location",
+     "reason": "Service area is noida — request is Bangalore"
+    },
+    {
+     "businessId": "25",
+     "name": "Interior Bazzar",
+     "stage": "Location",
+     "reason": "Service area is new Delhi — request is Bangalore"
+    },
+    {
+     "businessId": "27",
+     "name": "Woodler Interior ",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residencial — not Interior Designers"
+    },
+    {
+     "businessId": "28",
+     "name": "Woodworks",
+     "stage": "Category",
+     "reason": "Serves office making, post civill — not Interior Designers"
+    },
+    {
+     "businessId": "32",
+     "name": "creative luxury projects LLP",
+     "stage": "Category",
+     "reason": "Serves interior work, JEWLLERS STORE — not Interior Designers"
+    },
+    {
+     "businessId": "33",
+     "name": "Spruha Interiors",
+     "stage": "Location",
+     "reason": "Service area is Thane — request is Bangalore"
+    },
+    {
+     "businessId": "34",
+     "name": "door2door experts",
+     "stage": "Category",
+     "reason": "Serves Commercial Interior Design, Residential Interior Design — not Interior Designers"
+    },
+    {
+     "businessId": "35",
+     "name": "Divya interior",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Interior Designers"
+    },
+    {
+     "businessId": "36",
+     "name": "Ruksha Furniture ",
+     "stage": "Category",
+     "reason": "Serves Home Interior — not Interior Designers"
+    },
+    {
+     "businessId": "39",
+     "name": "Sleekvera Interiors",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Interior Designers"
+    },
+    {
+     "businessId": "40",
+     "name": "Swastik interiors",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Interior Designers"
+    },
+    {
+     "businessId": "41",
+     "name": "Hashmi infrabuild",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Interior Designers"
+    },
+    {
+     "businessId": "42",
+     "name": "Rupkaar Designs",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "43",
+     "name": "V.S Group",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "44",
+     "name": "Fine Mart The Design ",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "45",
+     "name": "Axiora Design",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "54",
+     "name": "The Panel Bazaar",
+     "stage": "Category",
+     "reason": "Serves Furniture Retail, Modular Kitchens — not Interior Designers"
+    },
+    {
+     "businessId": "55",
+     "name": "Jal Kunj Sanitaryware",
+     "stage": "Category",
+     "reason": "Serves Bathroom Accessories, CP Fittings Manufacturers — not Interior Designers"
+    },
+    {
+     "businessId": "56",
+     "name": "Lakkad Kreations",
+     "stage": "Category",
+     "reason": "Serves Carpentry & Joinery, Furniture Retail — not Interior Designers"
+    },
+    {
+     "businessId": "57",
+     "name": "Griha Atelier",
+     "stage": "Location",
+     "reason": "Service area is Delhi, Haryana — request is Bangalore"
+    },
+    {
+     "businessId": "58",
+     "name": "Studio Nirvaan Dezign",
+     "stage": "Location",
+     "reason": "Service area is Delhi, New Delhi — request is Bangalore"
+    },
+    {
+     "businessId": "59",
+     "name": "Aarambh Interiors",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "60",
+     "name": "Sukhmani Design Works",
+     "stage": "Location",
+     "reason": "Service area is Delhi, Haryana — request is Bangalore"
+    }
+   ]
+  },
+  "IB-BE-2026-0055": {
+   "enquiryId": "IB-BE-2026-0055",
+   "ruleVersion": "v3",
+   "calculatedAt": "2026-08-20T09:00:00+05:30",
+   "subscribedCount": 25,
+   "eligible": [
+    {
+     "businessId": "56",
+     "name": "Lakkad Kreations",
+     "rank": 1,
+     "score": 87,
+     "band": "Best match",
+     "capacity": {
+      "active": 0,
+      "configured": 4
+     },
+     "factors": {
+      "category": 24,
+      "location": 25,
+      "segment": 15,
+      "keywords": 6,
+      "capacity": 10,
+      "fairness": 5,
+      "quality": 2
+     },
+     "why": "Wardrobes & Storage declared · serves New Delhi · 4 of 4 slots open",
+     "from": {
+      "category": "Wardrobes & Storage is declared alongside 2 other categories",
+      "location": "New Delhi is inside the declared service zone",
+      "segment": "3 declared categories",
+      "keywords": "\"Kitchen + wardrobe\" is not reflected in the declared categories",
+      "capacity": "4 of 4 slots open this month",
+      "fairness": "0 live assignments in the period",
+      "quality": "No acknowledgement time recorded yet"
+     }
+    }
+   ],
+   "excluded": [
+    {
+     "businessId": "19",
+     "name": "Studio PS home",
+     "stage": "Category",
+     "reason": "Serves Interior Designers, Modular Kitchens — not Wardrobes & Storage"
+    },
+    {
+     "businessId": "25",
+     "name": "Interior Bazzar",
+     "stage": "Category",
+     "reason": "Serves Interior Designers — not Wardrobes & Storage"
+    },
+    {
+     "businessId": "26",
+     "name": "Serenus Architects",
+     "stage": "Category",
+     "reason": "Serves Home Interior, Interior Designers — not Wardrobes & Storage"
+    },
+    {
+     "businessId": "27",
+     "name": "Woodler Interior ",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residencial — not Wardrobes & Storage"
+    },
+    {
+     "businessId": "28",
+     "name": "Woodworks",
+     "stage": "Category",
+     "reason": "Serves office making, post civill — not Wardrobes & Storage"
+    },
+    {
+     "businessId": "32",
+     "name": "creative luxury projects LLP",
+     "stage": "Category",
+     "reason": "Serves interior work, JEWLLERS STORE — not Wardrobes & Storage"
+    },
+    {
+     "businessId": "33",
+     "name": "Spruha Interiors",
+     "stage": "Category",
+     "reason": "Serves Interior Designers — not Wardrobes & Storage"
+    },
+    {
+     "businessId": "34",
+     "name": "door2door experts",
+     "stage": "Category",
+     "reason": "Serves Commercial Interior Design, Residential Interior Design — not Wardrobes & Storage"
+    },
+    {
+     "businessId": "35",
+     "name": "Divya interior",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Wardrobes & Storage"
+    },
+    {
+     "businessId": "36",
+     "name": "Ruksha Furniture ",
+     "stage": "Category",
+     "reason": "Serves Home Interior — not Wardrobes & Storage"
+    },
+    {
+     "businessId": "39",
+     "name": "Sleekvera Interiors",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Wardrobes & Storage"
+    },
+    {
+     "businessId": "40",
+     "name": "Swastik interiors",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Wardrobes & Storage"
+    },
+    {
+     "businessId": "41",
+     "name": "Hashmi infrabuild",
+     "stage": "Category",
+     "reason": "Serves * Commercial, Residential — not Wardrobes & Storage"
+    },
+    {
+     "businessId": "42",
+     "name": "Rupkaar Designs",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "43",
+     "name": "V.S Group",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "44",
+     "name": "Fine Mart The Design ",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "45",
+     "name": "Axiora Design",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "54",
+     "name": "The Panel Bazaar",
+     "stage": "Category",
+     "reason": "Serves Furniture Retail, Modular Kitchens — not Wardrobes & Storage"
+    },
+    {
+     "businessId": "55",
+     "name": "Jal Kunj Sanitaryware",
+     "stage": "Category",
+     "reason": "Serves Bathroom Accessories, CP Fittings Manufacturers — not Wardrobes & Storage"
+    },
+    {
+     "businessId": "57",
+     "name": "Griha Atelier",
+     "stage": "Category",
+     "reason": "Serves Home Interior, Interior Designers — not Wardrobes & Storage"
+    },
+    {
+     "businessId": "58",
+     "name": "Studio Nirvaan Dezign",
+     "stage": "Category",
+     "reason": "Serves Home Decor & Accessories, Home Interior — not Wardrobes & Storage"
+    },
+    {
+     "businessId": "59",
+     "name": "Aarambh Interiors",
+     "stage": "Category",
+     "reason": "No category declared on the profile"
+    },
+    {
+     "businessId": "60",
+     "name": "Sukhmani Design Works",
+     "stage": "Category",
+     "reason": "Serves Commercial Interior Design, Furniture Retail — not Wardrobes & Storage"
+    },
+    {
+     "businessId": "61",
+     "name": "Space Antara Design Co.",
+     "stage": "Category",
+     "reason": "Serves Architecture, Commercial Interior Design — not Wardrobes & Storage"
+    }
+   ]
+  }
+ }
 }

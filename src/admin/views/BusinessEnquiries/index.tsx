@@ -30,17 +30,49 @@ import { qs } from "../../ui";
 import List, { enquiryHash, listHash, merge, omit } from "./List";
 import Detail from "./Detail";
 import NewEnquiryModal from "./NewEnquiry";
-import { countsOf, filterEnquiries, sortEnquiries, useEnquiries } from "./store";
+import {
+  bootBusinessEnquiries, countsFromServer, countsOf, queryFromParams, useBoot, useEnquiryPage,
+} from "./store";
 import type { Params } from "./store";
 import "./enquiries.css";
 
-export default function BusinessEnquiries() {
+/* The vocabulary, the matching rules and the business directory come from the
+   API and every screen below reads them synchronously, so the module waits for
+   them here rather than threading a loading state through twelve files.
+
+   A failure is PRINTED, not papered over. There is no bundled copy of this data
+   any more: if this block is on screen the backend is not answering, and that is
+   exactly what it should look like. */
+function BootGate() {
+  const boot = useBoot();
+  if (boot.error) {
+    return (
+      <div className="pad" style={{ padding: 24 }}>
+        <h2>Business Enquiries could not load.</h2>
+        <p>
+          The panel reads its vocabulary, matching rules and business directory from{" "}
+          <code>/api/v1/admin/business-enquiries/</code>. That request failed, so there is
+          nothing to show — this module keeps no local copy of them on purpose.
+        </p>
+        <p><b>{boot.error}</b></p>
+        <button className="btn pri" onClick={() => void bootBusinessEnquiries(true)}>
+          Retry
+        </button>
+      </div>
+    );
+  }
+  if (!boot.ready) return <div className="pad" style={{ padding: 24 }}>Loading…</div>;
+  return <BusinessEnquiriesRoute />;
+}
+
+export default BootGate;
+
+function BusinessEnquiriesRoute() {
   const raw = useParams().id;
   const id = raw ? decodeURIComponent(raw) : null;
   const [sp] = useSearchParams();
   const navigate = useNavigate();
   const { toast, modal, closeLayer } = useShell();
-  const all = useEnquiries();
 
   const p = useMemo(() => {
     const o: Params = {};
@@ -48,11 +80,23 @@ export default function BusinessEnquiries() {
     return o;
   }, [sp]);
 
+  /* THE PAGE, from the server, keyed on the filters in the URL. `page` is part
+     of the URL like every other filter, so a link to page 3 of the breached
+     queue is a link somebody can send. */
+  const pageNo = Math.max(1, Number(p.page) || 1);
+  const query = useMemo(() => queryFromParams(omit(p, ["tab", "page"]), pageNo),
+    [p, pageNo]);
+  const page = useEnquiryPage(query);
+  const all = page.rows;
+
   /* ------------------------------------------------------------ topbar ---
      The counts sit beside the title rather than only in the strip, because the
      one number an operator wants without scrolling is how many are waiting on
      a decision — and on the detail page the strip is not on screen at all. */
-  const m = countsOf(all);
+  /* Counted over the WHOLE filtered queue by the server, not over this page —
+     the topbar numbers would otherwise never exceed the page size. Zeros until
+     the first read lands, which is a truer thing to show than a stale count. */
+  const m = page.counts ? countsFromServer(page.counts) : countsOf([]);
   const crumbs = useMemo(() => (
     <>
       <span className="tb-title">Business Enquiries</span>
@@ -70,7 +114,10 @@ export default function BusinessEnquiries() {
 
   /* Where "up" is. From a record, the list it was opened from — filters and
      all, so Back is a return and not a reset. */
-  usePageChrome({ crumbs, right: null, parent: id ? listHash(omit(p, ["tab"])) : null });
+  /* Keyed on the counts: they come from the server after the first render, and
+     without the key the topbar would keep the zeros it mounted with. */
+  usePageChrome({ crumbs, right: null, parent: id ? listHash(omit(p, ["tab"])) : null },
+    `${m.ready}/${m.live}/${m.breached}`);
 
   /* ----------------------------------------------------------- filters ---
      Same debounce Deals uses for search: typing must not push a history entry
@@ -83,13 +130,16 @@ export default function BusinessEnquiries() {
   const goFilter = useCallback((hash: string) => {
     navigate(hashToPath(hash), { replace: true });
   }, [navigate]);
+  /* EVERY FILTER CHANGE GOES BACK TO PAGE 1. Page 7 of the unfiltered queue is
+     usually past the end of a filtered one, and the empty table that follows
+     reads as "nothing matches" when the answer is "not on page 7". */
   const onFilter = useCallback((name: string, value: string) => {
-    goFilter(listHash(merge(omit(p, ["tab"]), { [name]: value })));
+    goFilter(listHash(merge(omit(p, ["tab", "page"]), { [name]: value })));
   }, [p, goFilter]);
   const onSearch = useCallback((name: string, value: string) => {
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(
-      () => goFilter(listHash(merge(omit(p, ["tab"]), { [name]: value }))), 220);
+      () => goFilter(listHash(merge(omit(p, ["tab", "page"]), { [name]: value }))), 220);
   }, [p, goFilter]);
   const onUnfilter = useCallback((k: string) => {
     /* A key may carry its dependants, joined by "+": removing the received
@@ -100,18 +150,19 @@ export default function BusinessEnquiries() {
   }, [p, goFilter]);
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
-  /* A record that no longer matches the filters it was opened under is still a
-     real record — the detail reads the store directly and never the filtered
-     page, so marking an enquiry invalid while filtered to Ready does not blank
-     the screen you are standing on. */
-  /* THE QUEUE, AS THE RECORD SEES IT. Computed here rather than in Detail
-     because it must be the SAME filtered and sorted list the operator was
-     looking at — stepping to "next" has to mean next in what they were
-     reading, not next by id. */
-  const queue = sortEnquiries(filterEnquiries(all, omit(p, ["tab"])), p.sort);
+  /* THE QUEUE, AS THE RECORD SEES IT — the page the operator was looking at,
+     in the order they were looking at it, so "next" means next in what they
+     were reading rather than next by id. A record opened from a link and not on
+     that page still renders: Detail reads it by id, and it simply has no
+     position and no neighbours, which is the truth about it.
+     ponytail: prev/next stop at the page edge rather than loading the next
+     page. Stepping off the end of fifty rows is rare; a silent extra fetch
+     every time somebody holds the key down is not. */
+  const queue = all;
   const at = id ? queue.findIndex((x) => x.enquiryId === id) : -1;
   const hashOf = (n: number) =>
     queue[n] ? enquiryHash(queue[n].enquiryId, omit(p, ["tab"])) : null;
+  const offset = (page.pageNo - 1) * page.pageSize;
 
   if (id) {
     return (
@@ -121,7 +172,7 @@ export default function BusinessEnquiries() {
         /* No position when the record is not in the current filter — a record
            opened from a link, or one whose status just changed under a filter
            it no longer matches. Showing "0 of 9" there would be a lie. */
-        pos={at >= 0 ? { i: at + 1, of: queue.length } : null} />
+        pos={at >= 0 ? { i: offset + at + 1, of: page.total } : null} />
     );
   }
 
@@ -140,7 +191,8 @@ export default function BusinessEnquiries() {
   );
 
   return (
-    <List all={all} p={p} sel={null}
+    <List all={all} page={page} p={p} sel={null}
+      onPage={(n) => goFilter(listHash(merge(omit(p, ["tab"]), { page: String(n) })))}
       onFilter={onFilter} onSearch={onSearch} onUnfilter={onUnfilter} toast={toast}
       onCreate={onCreate} />
   );

@@ -23,6 +23,22 @@ const seed = require(path.join(__dirname, '..', 'src/content/business-enquiries/
 const fails = [];
 const ok = (c, m) => { if (!c) fails.push(m); };
 
+/* The window MATHS is pure and needs nothing. The chip LABEL reads the
+   vocabulary, which now arrives from the API instead of a bundled file — so
+   plant one here rather than stand up a server for a date-arithmetic check.
+   Same call the boot makes, so a rename in the payload breaks this too. */
+S.applyVocabulary({
+  receivedRanges: [
+    { key: 'today', label: 'Today' },
+    { key: '24h', label: 'Last 24 hours' },
+    { key: '7d', label: 'Last 7 days' },
+    { key: '30d', label: 'Last 30 days' },
+    { key: 'month', label: 'This month' },
+    { key: 'older', label: 'Older than 30 days' },
+    { key: 'custom', label: 'Custom range…' },
+  ],
+});
+
 /* Pinned, and deliberately mid-afternoon: a "now" at midnight would make the
    day-boundary assertions pass for the wrong reason. */
 const NOW = new Date('2026-08-20T14:00:00+05:30');

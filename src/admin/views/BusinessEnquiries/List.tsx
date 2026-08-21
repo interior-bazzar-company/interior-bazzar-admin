@@ -33,10 +33,11 @@ import {
 } from "./bits";
 import {
   RECEIVED_RANGES, SOURCES, STATES, TAGS, TEAM, TIERS, VOCAB, ageLabel, assignedName,
-  checklistMissing, countsOf, everReached, filterEnquiries, followUpOverdue, lastResponse, place,
-  receivedLabel, resetStore, runSlaSweep, sortEnquiries, statusOf,
+  businessDirectory, checklistMissing, countsFromServer, everReached, fetchAllMatching,
+  followUpOverdue, lastResponse, place,
+  receivedLabel, resetStore, runSlaSweep, statusOf,
 } from "./store";
-import type { Enquiry, Params } from "./store";
+import type { Counts, Enquiry, PageState, Params } from "./store";
 
 const ROUTE = "#/business-enquiries";
 
@@ -89,8 +90,7 @@ export const enquiryHash = (id: string, p: Params) =>
    delete" — and the row expands automatically when one of the hidden filters is
    active, because a filter you cannot see is a filter you cannot clear.
    ============================================================================= */
-export function AttnStrip({ list, p }: { list: Enquiry[]; p: Params }) {
-  const m = countsOf(list);
+export function AttnStrip({ m, p }: { m: Counts; p: Params }) {
   const [open, setOpen] = useState(false);
 
   const statusRoute = (s: string) =>
@@ -173,8 +173,10 @@ export function AttnStrip({ list, p }: { list: Enquiry[]; p: Params }) {
   );
 }
 
-export default function List({ all, p, sel, onFilter, onSearch, onUnfilter, toast, onCreate }: {
+export default function List({ all, page, onPage, p, sel, onFilter, onSearch, onUnfilter, toast, onCreate }: {
   all: Enquiry[];
+  page: PageState;
+  onPage: (n: number) => void;
   p: Params;
   sel: string | null;
   onFilter: (name: string, value: string) => void;
@@ -184,20 +186,32 @@ export default function List({ all, p, sel, onFilter, onSearch, onUnfilter, toas
   onCreate: () => void;
 }) {
   const shell = useShell();
-  if (!all.length) return <ListSkeleton />;
+  /* The skeleton is for the FIRST read only. Once a query has answered, an
+     empty result is a real answer — "nothing matches these filters" — and
+     showing a skeleton for it would read as still loading, forever. */
+  if (page.loading && !all.length) return <ListSkeleton />;
 
-  const rows = sortEnquiries(filterEnquiries(all, p), p.sort);
-  const businesses = Array.from(new Set(all.map(assignedName).filter(Boolean))).sort();
-  const activeFilters = Object.keys(omit(p, ["sort", "tab"])).filter((k) => p[k]).length;
+  /* Filtered, ordered and cut server-side. Doing any of it again here would be
+     a second implementation of the same rules over one page of the answer. */
+  const rows = all;
+  /* From the business DIRECTORY, not from the rows on screen: with a page, the
+     dropdown would otherwise offer only the businesses this page happens to
+     mention and silently lose the filter you wanted. */
+  const businesses = Array.from(
+    new Set(businessDirectory().map((b) => b.name).filter(Boolean))).sort();
+  const activeFilters = Object.keys(omit(p, ["sort", "tab", "page"])).filter((k) => p[k]).length;
   const filtered = activeFilters > 0;
   /* Whether the export would differ from "everything" — the button says so, and
      the dialog leads with it. */
-  const narrowed = rows.length !== all.length;
+  const narrowed = filtered;
+  const pages = Math.max(1, Math.ceil(page.total / (page.pageSize || 1)));
+  const firstOnPage = page.total ? (page.pageNo - 1) * page.pageSize + 1 : 0;
+  const lastOnPage = (page.pageNo - 1) * page.pageSize + rows.length;
 
   return (
     <div className="dls be-list">
       <ProtoBar
-        onReset={() => { resetStore(); toast("Seed data restored."); }}
+        onReset={() => { resetStore(); toast("Simulated writes discarded."); }}
         onSweep={() => {
           const n = runSlaSweep();
           toast(n ? n + " enquiry flagged as breached." : "Nothing past its acknowledgement threshold.");
@@ -222,15 +236,25 @@ export default function List({ all, p, sel, onFilter, onSearch, onUnfilter, toas
         <button className={"btn be-exportbtn" + (narrowed ? " narrowed" : "")}
           data-act="be-export"
           title={narrowed
-            ? "Export the " + rows.length + " enquiries these filters match"
-            : "Export all " + all.length + " enquiries"}
-          onClick={() => shell.modal(
-            <ExportModal filtered={rows} all={all} p={p}
-              onClose={shell.closeLayer}
-              onDone={(msg, tone) => { shell.closeLayer(); toast(msg, tone); }} />,
-            "wide")}>
+            ? "Export the " + page.total + " enquiries these filters match"
+            : "Export all " + page.total + " enquiries"}
+          /* FETCHES EVERY MATCHING ROW FIRST, not the page on screen. An export
+             that quietly held fifty of two hundred is the exact failure this
+             dialog exists to prevent, and it would look like a complete file. */
+          onClick={async () => {
+            try {
+              const everything = await fetchAllMatching(p);
+              shell.modal(
+                <ExportModal filtered={everything} all={everything} p={p}
+                  onClose={shell.closeLayer}
+                  onDone={(msg, tone) => { shell.closeLayer(); toast(msg, tone); }} />,
+                "wide");
+            } catch {
+              toast("Could not read the full set to export.", "bad");
+            }
+          }}>
           <Icon name="download" />Export
-          <span className="ct tnum">{rows.length}</span>
+          <span className="ct tnum">{page.total}</span>
         </button>
         {can("business-enquiries", "create")
           ? <button className="btn pri" data-act="be-create" onClick={onCreate}>
@@ -266,8 +290,15 @@ export default function List({ all, p, sel, onFilter, onSearch, onUnfilter, toas
           options={businesses.map((b) => ({ v: b, l: b }))} />
         <Select name="received" label="Received" value={p.received} onFilter={onFilter}
           options={RECEIVED_RANGES.map((r) => ({ v: r.key, l: r.label }))} />
-        <Select name="sort" label="Sort: Needs attention" value={p.sort} onFilter={onFilter}
+        {/* The default is the empty value: unassigned first, then newest. It
+            answers "what still needs doing" — a lead nobody has been given, and
+            the one somebody just typed and is looking for. Needs attention is
+            still here and still the right choice for working a backlog; it just
+            stopped being what the queue opens on, because it sorted every
+            breached row above the enquiry you added thirty seconds ago. */}
+        <Select name="sort" label="Sort: Unassigned, newest" value={p.sort} onFilter={onFilter}
           options={[
+            { v: "attention", l: "Needs attention" },
             { v: "touch", l: "Least worked first" },
             { v: "followup", l: "Callback soonest" },
             { v: "age", l: "Oldest first" },
@@ -287,14 +318,17 @@ export default function List({ all, p, sel, onFilter, onSearch, onUnfilter, toas
         ) : null}
       </div>
 
-      <AttnStrip list={all} p={p} />
+      {page.counts ? <AttnStrip m={countsFromServer(page.counts)} p={p} /> : null}
 
       {/* `from`/`to` are folded into the range chip — three chips for one
           date window reads as three filters, and removing one of them leaves a
           half-set range nobody asked for. */}
       <FilterChips
         params={{
-          ...omit(p, ["sort", "tab", "received", "from", "to"]),
+          /* `page` is in the URL like a filter but is not one — a chip reading
+             "page: 2" invites somebody to clear it as if it were narrowing the
+             results, and the pager already says where they are. */
+          ...omit(p, ["sort", "tab", "page", "received", "from", "to"]),
           ...(p.received ? { received: receivedLabel(p) } : {}),
         }}
         onUnfilter={(k) => onUnfilter(k === "received" ? "received+from+to" : k)}
@@ -318,6 +352,31 @@ export default function List({ all, p, sel, onFilter, onSearch, onUnfilter, toas
                   ? <button className="btn pri" onClick={onCreate}><Icon name="plus" />Add enquiry</button>
                   : null} />}
       </div>
+
+      {/* THE PAGER. Inline styles, like the audit log's — this is one row of
+          controls and adding a stylesheet rule for it would be the only thing
+          in the file that needed one. */}
+      {page.total > page.pageSize ? (
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "12px 2px" }}>
+          <button className="btn" data-act="be-prev"
+            disabled={page.pageNo <= 1 || page.loading}
+            onClick={() => onPage(page.pageNo - 1)}>Previous</button>
+          <button className="btn" data-act="be-next"
+            disabled={page.pageNo >= pages || page.loading}
+            onClick={() => onPage(page.pageNo + 1)}>Next</button>
+          <span className="faint" style={{ fontSize: "var(--text-sm)" }}>
+            {page.loading ? "Loading…" : <>
+              Showing <b className="tnum">{firstOnPage}</b>–<b className="tnum">{lastOnPage}</b>
+              {" of "}<b className="tnum">{page.total}</b>
+              {" · page "}<b className="tnum">{page.pageNo}</b> of <b className="tnum">{pages}</b>
+            </>}
+          </span>
+        </div>
+      ) : null}
+
+      {page.error
+        ? <div className="help bad" style={{ padding: "12px 2px" }}>{page.error}</div>
+        : null}
 
       <InfoNote ico="alert" short={<><b>An enquiry is not a deal.</b></>}>
         This module routes a customer opportunity to a subscribed business; Deals is Interior bazzar

@@ -1,24 +1,71 @@
 /* =============================================================================
    Business Enquiries — seed invariants.   `npm run check:enquiries`
    -----------------------------------------------------------------------------
-   The module has no API and therefore no integration test. This is the next
-   best thing: an executable statement of the rules the SCREENS assume, run
-   against the content files that stand in for the endpoints.
+   An executable statement of the rules the SCREENS assume, and the shortest
+   description of the contract the backend has to honour.
 
-   It is also the shortest description of the contract a backend engineer has to
-   honour. Every assertion below is a thing the API must guarantee too — if the
-   real GET /business-enquiries can return a record that fails one of these, the
-   panel will render something incoherent for it.
+   THE VOCABULARY NOW COMES FROM THE API, not from a file — vocabularies.json is
+   gone, and there is no bundled copy to fall back to. So this check is now a
+   real integration test of one endpoint: it fails if the server is down, if the
+   vocabulary row is broken, or if the two remaining stand-in files have drifted
+   away from what the server actually serves. That is a feature. A check that
+   passes against bundled data cannot tell you whether the backend is wired up.
+
+   Needs a running backend and an admin token:
+
+       IB_API_BASE=http://localhost:8000/api  IB_ADMIN_TOKEN=<jwt> \
+         npm run check:enquiries
+
+   enquiries.json and suggestions.json are the last two stand-ins. When their
+   endpoints land, this script and both files go with them.
    ========================================================================== */
 const path = require('path');
 const here = (f) => path.join(__dirname, '..', 'src/content/business-enquiries', f);
 
 const enq = require(here('enquiries.json'));
-const voc = require(here('vocabularies.json'));
 const sug = require(here('suggestions.json'));
+
+const API = (process.env.IB_API_BASE || 'http://localhost:8000/api').replace(/\/$/, '');
+const TOKEN = process.env.IB_ADMIN_TOKEN || '';
 
 const fail = [];
 const ok = (cond, msg) => { if (!cond) fail.push(msg); };
+
+async function vocabulary() {
+  const url = `${API}/v1/admin/business-enquiries/vocabularies/`;
+  let res;
+  try {
+    res = await fetch(url, {
+      headers: TOKEN ? { Authorization: `Bearer ${TOKEN}` } : {},
+    });
+  } catch (e) {
+    die(`cannot reach ${url}\n    ${e.message}\n` +
+        '    Start the backend, or set IB_API_BASE to where it runs.');
+  }
+  if (!res.ok) {
+    die(`${url} answered ${res.status}\n` +
+        (res.status === 401 || res.status === 403
+          ? '    Set IB_ADMIN_TOKEN to an admin access token.'
+          : '    The vocabulary endpoint is not serving.'));
+  }
+  const body = await res.json();
+  // These routes answer HTTP 200 always and put a refusal in `response:false`.
+  if (body.response === false) die(`${url} refused: ${body.message || 'no reason given'}`);
+  const doc = body.data || body;
+  if (!doc || !Array.isArray(doc.statuses)) {
+    die(`${url} returned no vocabulary — the panel would render blank chips.`);
+  }
+  return doc;
+}
+
+function die(msg) {
+  console.error('FAIL\n  · ' + msg);
+  process.exit(1);
+}
+
+main();
+async function main() {
+const voc = await vocabulary();
 
 const tagSlugs = new Set(voc.tags.map(t => t.slug));
 const channels = new Set(voc.contactChannels.map(c => c.key));
@@ -160,4 +207,6 @@ ok(!/budget/i.test(blob), 'a budget field has appeared in the content');
 
 if (fail.length) { console.error('FAIL\n' + fail.map(f => '  · ' + f).join('\n')); process.exit(1); }
 console.log('seed ok —', enq.enquiries.length, 'enquiries,',
-  enq.enquiries.filter(e => e.status === 'generated').length, 'in qualification');
+  enq.enquiries.filter(e => e.status === 'generated').length, 'in qualification',
+  '· vocabulary served by', API);
+}

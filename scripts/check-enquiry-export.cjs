@@ -23,6 +23,39 @@ const seed = require(path.join(__dirname, '..', 'src/content/business-enquiries/
 const fails = [];
 const ok = (c, m) => { if (!c) fails.push(m); };
 
+/* The CSV prints vocabulary labels (status, urgency, source, via), and the
+   vocabulary now comes from the API. What this check is actually about is which
+   COLUMNS exist, so plant a minimal one rather than stand up a server. Same call
+   the boot makes: a rename in the payload breaks this too. */
+X.applyVocabulary({
+  statuses: seed.enquiries.map((e) => ({ key: e.status, label: e.status })),
+  urgency: [
+    { key: 'within_30d', label: 'Within 30 days' },
+    { key: '30_90d', label: '30–90 days' },
+    { key: '90_plus', label: '90+ days' },
+    { key: 'browsing', label: 'Browsing' },
+  ],
+  sources: [
+    { key: 'funnel', label: 'Funnel page', short: 'Funnel' },
+    { key: 'portal', label: 'Portal', short: 'Portal' },
+    { key: 'own', label: 'Added by us', short: 'Own' },
+  ],
+  manualVia: [
+    { key: 'phone', label: 'Phone call' },
+    { key: 'whatsapp', label: 'WhatsApp' },
+    { key: 'walk_in', label: 'Walk-in' },
+    { key: 'referral', label: 'Referral' },
+    { key: 'email', label: 'Email' },
+    { key: 'event', label: 'Event or exhibition' },
+  ],
+  qualificationChecklist: [
+    { key: 'reachable', label: 'Contact reachable' },
+    { key: 'requirement', label: 'Requirement confirmed' },
+    { key: 'genuine', label: 'Genuine enquiry' },
+    { key: 'urgency', label: 'Urgency confirmed' },
+  ],
+});
+
 const rows = seed.enquiries;
 const all = ['core', 'requirement', 'handling', 'assignment'];
 

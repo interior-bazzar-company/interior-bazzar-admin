@@ -68,7 +68,12 @@ const ChromeCtx = createContext<(c: Chrome) => void>(() => {});
     topbar must change without the URL changing would not update here; none does,
     because the prototype keeps view-mode in the query string for exactly this
     kind of reason. */
-export function usePageChrome(c: Chrome) {
+/** `key` is for chrome whose CONTENTS arrive after the page does — a module
+ *  that prints server counts beside its title publishes zeros on mount and the
+ *  real numbers a moment later, and republishing once per location would leave
+ *  the zeros on screen. Callers with static chrome pass nothing and behave
+ *  exactly as before. */
+export function usePageChrome(c: Chrome, key?: string) {
   const set = useContext(ChromeCtx);
   const location = useLocation();
   const here = location.pathname + location.search;
@@ -77,7 +82,7 @@ export function usePageChrome(c: Chrome) {
   useEffect(() => {
     set(latest.current);
     return () => set({});
-  }, [set, here]);
+  }, [set, here, key]);
 }
 
 /* -------------------------------------------------------------- navigation */

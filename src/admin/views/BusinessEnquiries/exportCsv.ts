@@ -31,6 +31,14 @@ import {
 } from "./store";
 import type { Enquiry } from "./store";
 
+/* Every label this file prints — status, urgency, source, via — is looked up in
+   the vocabulary the store holds, and that now arrives from the API rather than
+   a bundled file. `npm run check:export` bundles THIS module as its entry, so
+   the store instance it ends up with is reachable only through here; re-exported
+   so the check can plant a vocabulary before asking for a CSV, instead of
+   standing up a server to assert that a phone number stays out of a column. */
+export { applyVocabulary } from "./store";
+
 export type ColGroup = {
   key: string;
   label: string;

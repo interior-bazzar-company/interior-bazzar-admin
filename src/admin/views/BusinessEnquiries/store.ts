@@ -1,13 +1,25 @@
 /* =============================================================================
    Business Enquiries — the data layer.
    -----------------------------------------------------------------------------
-   THERE IS NO API FOR THIS MODULE YET. Every other view in this panel reads
-   AdminOpsService; this one reads five JSON files under
-   `src/content/business-enquiries/`, each shaped like the endpoint that will
-   replace it. The map from file → endpoint is in
+   THE ENQUIRIES ARE REAL. `GET v1/admin/business-enquiries/` serves the queue —
+   a projection of LeadQuery, the table the site's own forms have been writing to
+   all along — alongside the vocabulary, the rule set and the business directory.
+   The one remaining stand-in is `suggestions.json`, which holds the candidate
+   runs the matching endpoint will produce; it is local-only and ships nowhere.
+   The rest of the map from file → endpoint is in
    `src/proto/v-2.2.0.0/BACKEND-INTEGRATION.md`, and it is the backend work-list.
 
-   Writes are SIMULATED IN MEMORY, for this browser tab, for this session. That
+   WHAT THE PROJECTION CANNOT ANSWER ARRIVES EMPTY, never guessed: contact log,
+   remarks beyond the one stored on the lead, the qualification freeze, the event
+   timeline, the owner, and the rank/score on an assignment (those carry rule
+   version `legacy`, which is what says the zeros are a missing record and not a
+   bad score). A blank contact log means nobody logged a call.
+
+   ONE WRITE IS REAL: createEnquiry() posts, and the server answers with its own
+   projection of the row it wrote. Every other write is still SIMULATED IN
+   MEMORY, for this browser tab, for this session — and they simulate on top of
+   live records, so a reload discards them and re-fetches rather than restoring
+   a fixture. That
    is a deliberate choice and not a hidden one — every screen that can write
    says so on the screen, and a reload puts the seed back. The alternative was
    a read-only prototype, which cannot show the thing this module is actually
@@ -28,11 +40,13 @@
    fire so the API contract stays visible.
    ============================================================================= */
 import { useEffect, useState } from "react";
-import enquiriesJson from "../../../content/business-enquiries/enquiries.json";
 import suggestionsJson from "../../../content/business-enquiries/suggestions.json";
-import rulesJson from "../../../content/business-enquiries/matching-rules.json";
-import businessesJson from "../../../content/business-enquiries/businesses.json";
-import vocabJson from "../../../content/business-enquiries/vocabularies.json";
+import BusinessEnquiriesService from "../../../api/modules/businessEnquiries";
+import type {
+  BusinessesResponse, CreateEnquiryResponse, EnquiriesResponse, EnquiryQuery,
+  MatchingRulesResponse, VocabulariesResponse,
+} from "../../../api/modules/businessEnquiries";
+import { call } from "../../../api/modules/adminOps";
 import { currentActor } from "../../auth/session";
 
 /* ============================================================ THE SHAPES === */
@@ -201,10 +215,16 @@ export type MatchRun = {
 
 export type Business = {
   businessId: string; name: string; categories: string[]; serviceArea: string[];
-  plan: string; subscription: string; renewsAt: string; status: string;
+  plan: string; subscription: string; renewsAt: string | null; status: string;
   suspendedAt?: string;
   capacity: { configured: number; active: number; period: string };
-  quality: { avgAckHours: number; convertedOfLast: string };
+  /* Both NULLABLE, because the server refuses to invent an operational record:
+     a business nobody has measured reports no acknowledgement time rather than
+     0 hours, and one with no decided lead reports no ratio rather than "0 of 0".
+     Nothing renders these today — the suggestion card prints the engine's own
+     `from.quality` sentence — so this is the type telling the truth about the
+     payload, not a display change. */
+  quality: { avgAckHours: number | null; convertedOfLast: string | null };
 };
 
 export type StatusRow = {
@@ -213,14 +233,23 @@ export type StatusRow = {
 };
 
 /* ======================================================= THE STATIC READS ===
-   Rules, businesses and vocabularies never change inside a session — they are
-   read straight off the module. Only the enquiries are cloned into a mutable
-   store below, because they are the only thing this panel writes to. */
+   Rules, businesses and vocabularies come from the API and do not change inside
+   a session. They are fetched once by `bootBusinessEnquiries()` below and then
+   read straight off the module, exactly as they were when they were bundled
+   JSON — every consumer below and in the views is unchanged.
 
-export const RULES = rulesJson;
-export const VOCAB = vocabJson;
-export const STATUSES = vocabJson.statuses as StatusRow[];
-export const SUBSCRIBED_COUNT = businessesJson.subscribedCount;
+   `let`, not `const`, so the assignment at boot is visible through the ES live
+   bindings the views import. Nothing reads these at module scope; every use is
+   inside a render or a callback, which happens after the boot gate opens.
+
+   THERE IS NO SEED VALUE AND NO FALLBACK. If the fetch fails these stay empty
+   and the route renders its failure instead of a screen — a panel that silently
+   falls back to bundled data cannot tell you whether the backend is wired up. */
+
+export let RULES = {} as MatchingRulesResponse;
+export let VOCAB = {} as VocabulariesResponse;
+export let STATUSES: StatusRow[] = [];
+export let SUBSCRIBED_COUNT = 0;
 
 export const statusOf = (k: string): StatusRow =>
   STATUSES.filter((s) => s.key === k)[0] ||
@@ -240,14 +269,14 @@ export type SourceRow = {
   key: string; label: string; short: string; tone: string; manual: boolean; help: string;
 };
 
-export const TAGS = VOCAB.tags as TagRow[];
-export const CHECKLIST = VOCAB.qualificationChecklist as ChecklistRow[];
-export const CHANNELS = VOCAB.contactChannels;
-export const CONTACT_OUTCOMES = VOCAB.contactOutcomes as OutcomeRow[];
-export const TIERS = VOCAB.tiers as TierRow[];
-export const SOURCES = VOCAB.sources as SourceRow[];
-export const STATES = VOCAB.states as string[];
-export const RECEIVED_RANGES = VOCAB.receivedRanges as { key: string; label: string }[];
+export let TAGS: TagRow[] = [];
+export let CHECKLIST: ChecklistRow[] = [];
+export let CHANNELS: { key: string; label: string; verb: string }[] = [];
+export let CONTACT_OUTCOMES: OutcomeRow[] = [];
+export let TIERS: TierRow[] = [];
+export let SOURCES: SourceRow[] = [];
+export let STATES: string[] = [];
+export let RECEIVED_RANGES: { key: string; label: string }[] = [];
 
 /* CATEGORY AND CITY ARE TYPED, SO THE VOCABULARY IS A SUGGESTION LIST AND NOT A
    GATE. An operator on a call hears whatever the customer says; a dropdown that
@@ -263,7 +292,7 @@ export const knownCategory = (v: string | null): boolean =>
   !v || VOCAB.categories.indexOf(v) >= 0;
 export const knownCity = (v: string | null): boolean =>
   !v || VOCAB.cities.indexOf(v) >= 0;
-export const MANUAL_VIA = VOCAB.manualVia;
+export let MANUAL_VIA: { key: string; label: string }[] = [];
 
 export const sourceOf = (key: string): SourceRow =>
   SOURCES.filter((x) => x.key === key)[0] ||
@@ -271,7 +300,7 @@ export const sourceOf = (key: string): SourceRow =>
 
 export const viaLabel = (key: string | null): string =>
   (key && MANUAL_VIA.filter((m) => m.key === key)[0]?.label) || "";
-export const TEAM = VOCAB.team as (Owner & { role: string })[];
+export let TEAM: (Owner & { role: string })[] = [];
 
 export const tierOf = (key: string): TierRow =>
   TIERS.filter((t) => t.key === key)[0] || ({ key, label: "Tier " + key, help: "" });
@@ -302,10 +331,36 @@ export const isTerminal = (k: string) => !!statusOf(k).terminal;
 
 type Store = { enquiries: Enquiry[]; runs: Record<string, MatchRun>; businesses: Business[] };
 
+/* Both arrive from the API and are planted by the boot below, so they survive
+   resetStore() — they are reads of the server, not something this panel writes.
+   resetStore() therefore means "discard my simulated writes", which is exactly
+   what it says on the banner. Runs are the one remaining stand-in. */
+let fetchedBusinesses: Business[] = [];
+let fetchedEnquiries: Enquiry[] = [];
+
+/* THE SUGGESTION SEED IS LOCAL ONLY. `import.meta.env.DEV` is true for `vite dev`
+   and false for every build, including `build:dev` — so suggestions.json is
+   tree-shaken out of the bundle that ships to dev, stage and prod. It is keyed by
+   the ids of the old fixture enquiries, which no longer exist, so it produces
+   nothing against live records either: the matching screens stay empty until
+   `POST /business-enquiries/{id}/match` lands, which is the honest state. */
+const LOCAL_SEED = import.meta.env.DEV;
+
+/* Candidate snapshots for enquiries that have NOT been matched yet, so running
+   matching on one produces the ranked list the real endpoint would. Kept out of
+   `store.runs` because that holds runs that already happened. */
+const pendingRuns: Record<string, MatchRun> = LOCAL_SEED
+  ? ((suggestionsJson as { pending?: Record<string, MatchRun> }).pending || {})
+  : {};
+
 const seed = (): Store => ({
-  enquiries: JSON.parse(JSON.stringify(enquiriesJson.enquiries)) as Enquiry[],
-  runs: JSON.parse(JSON.stringify(suggestionsJson.runs)) as Record<string, MatchRun>,
-  businesses: JSON.parse(JSON.stringify(businessesJson.businesses)) as Business[],
+  /* A COPY, so a simulated write cannot edit the fetched rows and survive a
+     resetStore() that is supposed to throw it away. */
+  enquiries: JSON.parse(JSON.stringify(fetchedEnquiries)) as Enquiry[],
+  runs: LOCAL_SEED
+    ? (JSON.parse(JSON.stringify(suggestionsJson.runs)) as Record<string, MatchRun>)
+    : {},
+  businesses: fetchedBusinesses,
 });
 
 let store: Store = seed();
@@ -317,6 +372,93 @@ const bump = () => { version += 1; listeners.forEach((fn) => fn()); };
  *  twice without a page reload. */
 export function resetStore() { store = seed(); bump(); }
 
+/* ============================================================== THE BOOT ===
+   Three reads, once per mount of the module, before anything renders.
+
+   The views read VOCAB / RULES / TAGS / TEAM synchronously — they always did,
+   when these were bundled JSON — so the swap to an API keeps that contract by
+   fetching first and rendering second, rather than by threading a loading state
+   through twelve files. The route component holds the gate; nothing else in the
+   module knows this changed.
+
+   ON FAILURE IT STAYS FAILED. No retry loop, no cached copy, no defaults: the
+   error is stored and the route prints it, naming the call that broke. The
+   whole point of deleting the JSON files was that a wrong or missing backend
+   has to be visible, and a panel that renders fine on bundled data cannot tell
+   you which one you are looking at. */
+
+export type BootState = { ready: boolean; error: string | null };
+
+let boot: BootState = { ready: false, error: null };
+let bootStarted = false;
+
+export function bootState(): BootState { return boot; }
+
+/** Plants a fetched vocabulary across the module bindings the views read.
+ *  Split out of the boot because it is the whole of what "the vocabulary
+ *  arrived" means, and because the offline checks (check:clock) need to state
+ *  the same thing without standing up a server. */
+export function applyVocabulary(vocab: VocabulariesResponse): void {
+  VOCAB = vocab;
+  STATUSES = (vocab.statuses || []) as StatusRow[];
+  TAGS = (vocab.tags || []) as TagRow[];
+  CHECKLIST = (vocab.qualificationChecklist || []) as ChecklistRow[];
+  CHANNELS = vocab.contactChannels || [];
+  CONTACT_OUTCOMES = (vocab.contactOutcomes || []) as OutcomeRow[];
+  TIERS = (vocab.tiers || []) as TierRow[];
+  SOURCES = (vocab.sources || []) as SourceRow[];
+  STATES = vocab.states || [];
+  RECEIVED_RANGES = vocab.receivedRanges || [];
+  MANUAL_VIA = vocab.manualVia || [];
+  TEAM = (vocab.team || []) as (Owner & { role: string })[];
+}
+
+/** Re-runs the three reads. The route calls this on mount; the failure screen
+ *  offers it as Retry. */
+export async function bootBusinessEnquiries(force = false): Promise<void> {
+  if (bootStarted && !force) return;
+  bootStarted = true;
+  boot = { ready: false, error: null };
+  bump();
+
+  try {
+    /* THREE READS, and the enquiries are no longer one of them. The queue is
+       paged now and its query changes with every filter, so the rows are
+       fetched by useEnquiryPage below rather than once at boot — what stays
+       here is the reference data that does not change inside a session. */
+    const [vocab, rules, businesses] = await Promise.all([
+      call<VocabulariesResponse>(BusinessEnquiriesService.vocabularies()),
+      call<MatchingRulesResponse>(BusinessEnquiriesService.matchingRules()),
+      call<BusinessesResponse>(BusinessEnquiriesService.businesses()),
+    ]);
+
+    applyVocabulary(vocab);
+    RULES = rules;
+
+    SUBSCRIBED_COUNT = businesses.subscribedCount;
+    fetchedBusinesses = businesses.businesses || [];
+    store.businesses = fetchedBusinesses;
+
+    /* A re-boot is a re-read: anything simulated in this tab goes with it, and
+       the page reloads itself from the server on the next render. */
+    pageKey = "";
+    boot = { ready: true, error: null };
+  } catch (e) {
+    boot = {
+      ready: false,
+      error: e instanceof Error ? e.message : "Business Enquiries data did not load.",
+    };
+  }
+  bump();
+}
+
+/** Subscribes a component to the boot, and starts it on first mount. */
+export function useBoot(): BootState {
+  useVersion();
+  useEffect(() => { void bootBusinessEnquiries(); }, []);
+  return boot;
+}
+
 function useVersion() {
   const [, setV] = useState(version);
   useEffect(() => {
@@ -326,15 +468,131 @@ function useVersion() {
   }, []);
 }
 
+/* ============================================================== THE PAGE ===
+   The queue is one page of a server-side query now, and the three things that
+   used to happen in the browser — filter, sort, cut — all happen before it
+   arrives, in that order. Doing them here meant fetching every enquiry to show
+   fifty, and it meant a page cut after a filter that ran in the tab, which is
+   page 2 of the unfiltered queue with most of it missing.
+
+   `store.enquiries` still holds exactly what is on screen, so every simulated
+   write below keeps working unchanged — they all look the row up by id in that
+   array and none of them ever cared how it got there. */
+
+export const PAGE_SIZE = 50;
+
+export type ServerCounts = EnquiriesResponse<Enquiry>["counts"];
+
+export type PageState = {
+  rows: Enquiry[];
+  total: number;
+  pageNo: number;
+  pageSize: number;
+  /** Over the WHOLE filtered set, never the page. Null until the first read
+   *  lands — the strip renders nothing rather than zeros, because a zero is a
+   *  number and "we do not know yet" is not. */
+  counts: ServerCounts | null;
+  loading: boolean;
+  error: string | null;
+};
+
+let page: PageState = {
+  rows: [], total: 0, pageNo: 1, pageSize: PAGE_SIZE,
+  counts: null, loading: true, error: null,
+};
+/* The query the current `page` answers. Compared as a string so a re-render
+   with the same filters does not re-fetch, and any change to any filter does. */
+let pageKey = "";
+
+/** The panel's URL params, as the server's query. ONE PLACE that knows the two
+ *  names differ (`from`/`to` are the URL's, `dateFrom`/`dateTo` are the API's),
+ *  because the day they disagree the received filter silently stops applying
+ *  and the queue just looks wrong. */
+export function queryFromParams(p: Params, pageNo = 1): EnquiryQuery {
+  return {
+    pageNo, pageSize: PAGE_SIZE,
+    status: p.status, category: p.category, city: p.city, state: p.state,
+    urgency: p.urgency, tier: p.tier, tag: p.tag, source: p.source,
+    business: p.business, owner: p.owner, flag: p.flag,
+    received: p.received, dateFrom: p.from, dateTo: p.to,
+    q: p.q, sort: p.sort,
+  };
+}
+
+export async function loadPage(query: EnquiryQuery, force = false): Promise<void> {
+  const key = JSON.stringify(query);
+  if (key === pageKey && !force) return;
+  pageKey = key;
+  page = { ...page, loading: true, error: null };
+  bump();
+  try {
+    const got = await call<EnquiriesResponse<Enquiry>>(
+      BusinessEnquiriesService.enquiries<Enquiry>(query));
+    /* Ignore a response whose query is no longer the current one: filters are
+       typed, so two reads can be in flight and the slower one must not land
+       last and repaint the table with the wrong rows. */
+    if (key !== pageKey) return;
+    page = {
+      rows: got.enquiries || [], total: got.total, pageNo: got.pageNo,
+      pageSize: got.pageSize, counts: got.counts, loading: false, error: null,
+    };
+    fetchedEnquiries = page.rows;
+    store.enquiries = page.rows.slice();
+  } catch (e) {
+    if (key !== pageKey) return;
+    page = {
+      ...page, rows: [], loading: false,
+      error: e instanceof Error ? e.message : "The queue did not load.",
+    };
+    fetchedEnquiries = [];
+    store.enquiries = [];
+  }
+  bump();
+}
+
+export function useEnquiryPage(query: EnquiryQuery): PageState {
+  useVersion();
+  const key = JSON.stringify(query);
+  useEffect(() => { void loadPage(query); }, [key]);  // eslint-disable-line react-hooks/exhaustive-deps
+  return page;
+}
+
+/** What is on screen. Unchanged for every caller — it is the page now. */
 export function useEnquiries(): Enquiry[] {
   useVersion();
   return store.enquiries;
 }
 
+/* One record that is NOT on the current page — a deep link, a bookmark, or an
+   enquiry whose status changed under a filter it no longer matches. Kept beside
+   the page rather than merged into it: the page is what the table shows and the
+   pager counts, and quietly adding a row to it would put an enquiry on screen
+   that the filter excludes. */
+const detailCache: Record<string, Enquiry> = {};
+let detailPending = "";
+
 export function useEnquiry(id: string | null): Enquiry | null {
   useVersion();
+  useEffect(() => {
+    if (!id || store.enquiries.some((e) => e.enquiryId === id) || detailCache[id]) return;
+    if (detailPending === id) return;
+    detailPending = id;
+    void (async () => {
+      try {
+        const got = await call<{ enquiry: Enquiry }>(
+          BusinessEnquiriesService.enquiry<Enquiry>(id));
+        if (got?.enquiry) detailCache[id] = got.enquiry;
+      } catch {
+        /* Left absent. The record screen already renders "not found" for an id
+           that is not there, and a half-record would be worse than none. */
+      } finally {
+        detailPending = "";
+        bump();
+      }
+    })();
+  }, [id]);
   if (!id) return null;
-  return store.enquiries.filter((e) => e.enquiryId === id)[0] || null;
+  return store.enquiries.filter((e) => e.enquiryId === id)[0] || detailCache[id] || null;
 }
 
 export function useMatchRun(id: string | null): MatchRun | null {
@@ -342,6 +600,13 @@ export function useMatchRun(id: string | null): MatchRun | null {
   if (!id) return null;
   return store.runs[id] || null;
 }
+
+/** The business DIRECTORY, whole. Read straight off the module rather than
+ *  through a hook: it is planted once at boot and never changes inside a
+ *  session. The list's Business filter is built from this and not from the rows
+ *  on screen — with a page, those name only the businesses this page happens to
+ *  mention, and the filter you wanted would not be in the dropdown. */
+export const businessDirectory = (): Business[] => store.businesses;
 
 export const businessById = (id: string) =>
   store.businesses.filter((b) => b.businessId === id)[0] || null;
@@ -461,6 +726,50 @@ export type Counts = {
   converted: number;
   invalid: number;
 };
+
+/** The server's counts, in the shape the strip already reads.
+ *
+ *  The four sums it does not send — `ready`, `live`, `converted`, `invalid` —
+ *  are added here, from `byStatus`, because they are arithmetic over status keys
+ *  and those keys are what the chips are LABELLED from. Sending them too would
+ *  put the same sum in two places. Everything else has to come from the server:
+ *  it is counted over the whole filtered queue, and this page is fifty rows. */
+export function countsFromServer(c: ServerCounts): Counts {
+  const by = c.byStatus || {};
+  return {
+    total: c.total,
+    byStatus: by,
+    qualifying: c.qualifying,
+    untouched: c.untouched,
+    unowned: c.unowned,
+    mine: c.mine,
+    callbackDue: c.callbackDue,
+    callbackOverdue: c.callbackOverdue,
+    ready: (by.ready || 0) + (by.qualified || 0),
+    live: (by.assigned || 0) + (by.delivered || 0) + (by.acknowledged || 0),
+    breached: c.breached,
+    noEligible: c.noEligible,
+    converted: by.converted || 0,
+    invalid: by.invalid || 0,
+  };
+}
+
+/** EVERY row the current filters match, not just the page. One caller: Export,
+ *  which is the one place a whole-set read is the point rather than a cost — an
+ *  export that quietly held only the page somebody was looking at is precisely
+ *  the failure the dialog exists to prevent.
+ *  ponytail: pages through at 200 a time; it wants a streaming CSV endpoint
+ *  before anybody exports a queue of 50,000. */
+export async function fetchAllMatching(p: Params): Promise<Enquiry[]> {
+  const size = 200;
+  const out: Enquiry[] = [];
+  for (let pageNo = 1; ; pageNo += 1) {
+    const got = await call<EnquiriesResponse<Enquiry>>(BusinessEnquiriesService.enquiries<Enquiry>(
+      { ...queryFromParams(p, pageNo), pageSize: size }));
+    out.push(...(got.enquiries || []));
+    if (out.length >= got.total || !got.enquiries?.length) return out;
+  }
+}
 
 export function countsOf(list: Enquiry[]): Counts {
   const byStatus: Record<string, number> = {};
@@ -633,14 +942,13 @@ export const phoneKey = (phone: string): string => {
   return digits.slice(-10);
 };
 
-/** Enquiries that look like the same customer. Used by the manual-add form to
- *  warn BEFORE creating, which is the whole reason a Create button is safe to
- *  offer: the guarantee was never "no manual records", it was "no silent
- *  duplicates". BE-OD-01 still decides what officially counts as one — phone
- *  alone is the widest sensible reading and is deliberately noisy rather than
- *  quiet, because a false warning costs a glance and a missed duplicate costs
- *  a business two assignments for one customer. */
-export function findDuplicates(phone: string, excludeId?: string): Enquiry[] {
+/** EVERY ENQUIRY THIS NUMBER HAS RAISED BEFORE — history, not a duplicate check.
+ *  One customer enquires more than once, for different work, at different
+ *  addresses, months apart, and each of those is a real enquiry. So this is
+ *  context for the person on the call ("we did her kitchen in March"), never a
+ *  reason to refuse or to tag. Deciding two records are the same job is
+ *  BE-OD-01, and it stays a person's call — `duplicate-suspected` is hand-set. */
+export function findEarlierFrom(phone: string, excludeId?: string): Enquiry[] {
   const key = phoneKey(phone);
   if (key.length < 10) return [];
   return store.enquiries.filter((e) =>
@@ -706,108 +1014,37 @@ function moveCapacity(businessId: string, delta: number) {
  *    · it lands in `generated` and must be qualified by a person like every
  *      other enquiry — a manual record buys no shortcut past the gate
  *  And it records one thing an inbound enquiry cannot: who typed it. */
-export function createEnquiry(input: {
+export async function createEnquiry(input: {
   source: string; via: string | null;
   name: string; phone: string; email: string;
   category: string; service: string; city: string; state: string; locality: string; pincode: string;
   projectType: string; intent: string; urgency: string;
   text: string;
-  duplicateAcknowledged?: boolean;
-}): string {
-  const me = actorName();
-  const at = nowIso();
+}): Promise<string> {
+  /* THE ONLY WRITE IN THIS MODULE THAT REACHES THE SERVER. Everything below it
+     still simulates in the tab; this one posts, and what comes back is the
+     server's own projection of the row it wrote — not this function's idea of
+     what it should look like. That distinction is the point: the reference, the
+     submission id, the tier, the tags and the intake event are all decided
+     server-side, so the record on screen is the record in the database rather
+     than a hopeful copy that drifts on the next reload.
 
-  /* Next in the existing series rather than a random id: the reference is read
-     aloud on calls and typed into search, and a uuid is neither. */
-  const nums = store.enquiries
-    .map((e) => Number(String(e.enquiryId).split("-").pop()))
-    .filter((n) => !isNaN(n));
-  const prefix = String(store.enquiries[0]?.enquiryId || "IB-BE-2026-0000")
-    .split("-").slice(0, 3).join("-");
-  const nextNum = String(Math.max(0, ...nums) + 1).padStart(4, "0");
-  const enquiryId = prefix + "-" + nextNum;
+     A MATCHING PHONE NUMBER IS NOT A DUPLICATE and does not gate this. The
+     server records how many earlier enquiries that number has raised, as a
+     count on the intake event, and sends them back as context — it never
+     refuses and never tags. See findEarlierFrom above. */
+  const body = input;
+  const created = await call<CreateEnquiryResponse<Enquiry>>(
+    BusinessEnquiriesService.create<Enquiry>(body));
 
-  const src = sourceOf(input.source);
-  const dupes = findDuplicates(input.phone);
-
-  const e: Enquiry = {
-    enquiryId,
-    submissionId: "man-" + (globalThis.crypto?.randomUUID?.() || String(Math.abs(Date.now()))),
-    source: {
-      kind: src.key,
-      page: src.manual ? "manual/" + (input.via || "other") : src.key,
-      label: src.manual ? src.label + " · " + (viaLabel(input.via) || "Other") : src.label,
-      createdBy: src.manual ? me : null,
-      via: src.manual ? input.via : null,
-    },
-    customer: { name: input.name.trim(), phone: input.phone.trim(), email: input.email.trim() || null },
-    requirement: {
-      category: input.category.trim() || null,
-      service: input.service.trim() || null,
-      city: input.city.trim() || null,
-      state: input.state.trim() || null,
-      locality: input.locality.trim() || null,
-      pincode: input.pincode.trim() || null,
-      projectType: input.projectType.trim() || null,
-      intent: input.intent || null,
-      text: input.text.trim(),
-    },
-    qualification: {
-      contactVerified: false, verifiedVia: null,
-      genuineness: "unconfirmed", genuinenessNote: "Not yet established by a person",
-      urgency: input.urgency || null,
-      requirementSummary: null,
-      version: null, frozenAt: null,
-      checklist: { reachable: false, requirement: false, genuine: false, urgency: false },
-      qualifiedBy: null, qualifiedByRole: null,
-    },
-    status: "generated",
-    /* Tier is an INTAKE signal — what the submission itself told us — so it is
-       computed from what was filled in, not chosen. A manual enquiry is not
-       automatically a good one. */
-    tier: tierFromCompleteness(input),
-    createdAt: at,
-    activeAssignmentId: null,
-    assignments: [],
-    outcome: null,
-    /* Whoever typed it owns it. They have just spoken to this customer; leaving
-       it unclaimed would put it back in the pile they took it out of. */
-    owner: { id: String(currentActor().id), name: me },
-    followUpAt: null,
-    tags: dupes.length ? ["new-enquiry", "duplicate-suspected"] : ["new-enquiry"],
-    contactLog: [],
-    remarks: [],
-    sla: { ackHours: 24, dueAt: null, breached: false, breachedAt: null },
-    events: [],
-  };
-
-  e.events = [{
-    eventId: "ev-live-created-" + enquiryId,
-    type: "INTAKE",
-    actor: me,
-    actorRole: "Operations",
-    at,
-    note: e.source.label + " · submission_id " + e.submissionId.slice(0, 12) + "… · created by " + me +
-      (dupes.length
-        ? " · " + dupes.length + " possible duplicate" + (dupes.length === 1 ? "" : "s") +
-          " acknowledged (" + dupes.map((x) => x.enquiryId).join(", ") + ")"
-        : " · not a duplicate"),
-  }];
-
-  store.enquiries = [e].concat(store.enquiries);
+  /* Straight onto the top of the page. It belongs there under the default
+     order — unassigned first, then newest — and re-fetching to prove it would
+     make the operator watch the table blink for a row they just typed. */
+  store.enquiries = [created.enquiry].concat(store.enquiries);
+  fetchedEnquiries = [created.enquiry].concat(fetchedEnquiries);
+  page = { ...page, rows: fetchedEnquiries, total: page.total + 1 };
   bump();
-  return enquiryId;
-}
-
-/** The intake signal, from the submission itself. Same idea as the funnel's
- *  own tiering: how much did this arrive knowing. Deliberately not a judgement
- *  of the customer — see the tier vocabulary. */
-function tierFromCompleteness(i: { category: string; city: string; urgency: string; service: string; text: string; locality: string }): string {
-  const filled = [i.category, i.city, i.urgency, i.service, i.locality, i.text.trim()].filter(Boolean).length;
-  if (filled >= 6) return "B";      // A is reserved for verified contact, which manual entry has not done
-  if (filled >= 4) return "C";
-  if (filled >= 2) return "D";
-  return "E";
+  return created.enquiry.enquiryId;
 }
 
 /* ------------------------------------------ THE QUALIFICATION WORKSTREAM ---
@@ -1026,7 +1263,15 @@ export function runMatching(id: string) {
        filled in while skimming — and then freeze that ranking onto an
        assignment as if it were established fact. */
     if (e.status !== "qualified" && e.status !== "ready") return;
-    const run = store.runs[e.enquiryId];
+    /* An enquiry that has never been matched has no run yet — which is the
+       point: `runs` holds runs that HAPPENED, and one cannot exist before
+       qualification. The seed keeps the not-yet-matched candidates in
+       `pending`, and running matching is what moves one across, the same way
+       the real POST /match computes a run and persists it. Without this the
+       prototype answered "no eligible business" for every enquiry the operator
+       actually qualified — a supply gap that was really just a missing seed. */
+    const run = store.runs[e.enquiryId] || pendingRuns[e.enquiryId];
+    if (run) store.runs[e.enquiryId] = run;
     const eligible = run ? run.eligible.length : 0;
     const excluded = run ? run.excluded.length : SUBSCRIBED_COUNT;
     e.status = "ready";

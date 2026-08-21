@@ -243,22 +243,45 @@ export function AgeCell({ e }: { e: Enquiry }) {
    a cron job nobody presses. A prototype-only button sitting in the command row
    beside Export and Add enquiry teaches the wrong toolbar; sitting inside the
    banner that says "none of this is real", it teaches the right one. */
+/* OFF WHILE THE WRITES ARE BEING WIRED UP. The bar said "most writes are
+   simulated", which was true and is on its way to not being true — the enquiry
+   list, Add enquiry and the record read are on the API now and the rest are
+   following. Flipped to `false` rather than deleted, because the sentence is
+   still accurate for assign / qualify / log-a-contact and has to come back if
+   they are still simulated when this ships. It also carries the two local-only
+   scaffolding buttons, which go quiet with it.
+
+   `boolean` and not the literal, so the JSX below stays type-checked rather than
+   becoming unreachable code the compiler stops reading. */
+const SHOW_PROTO_BAR: boolean = false;
+
 export function ProtoBar({ onReset, onSweep }: { onReset?: () => void; onSweep?: () => void }) {
+  /* THE BANNER RENDERS EVERYWHERE, the two buttons do not. The records are real
+     now — the enquiry list is served by the API on dev, stage and prod alike —
+     but every WRITE is still simulated in the tab, and that is exactly the state
+     a deployed panel must not keep quiet about: somebody assigns an enquiry,
+     sees it move, and nobody is ever sent it. Reset and Run SLA sweep are
+     scaffolding rather than product (the sweep is a cron job on the real thing),
+     so those stay local. */
+  const local = import.meta.env.DEV;
+  if (!SHOW_PROTO_BAR) return null;
   return (
     <div className="be-proto">
       <Icon name="alert" size="sm" />
       <span>
-        <b>Prototype data.</b> This module has no API yet — every record here is read from{" "}
-        <span className="mono">src/content/business-enquiries/</span>, and every action writes to this
-        browser tab only. A reload restores the seed.
+        <b>Most writes are simulated.</b> The enquiries, vocabulary, matching rules and
+        business directory are live from the API, and <b>Add enquiry</b> really creates one —
+        but assigning, qualifying, logging a contact and every other action writes to this
+        browser tab only. A reload re-fetches and discards them. Match runs are still read
+        from <span className="mono">src/content/business-enquiries/</span> and never ship.
       </span>
-      {onSweep
+      {onSweep && local
         ? <button className="btn sm" onClick={onSweep}
             title="Flag delivered enquiries past their acknowledgement threshold. A nightly cron job on the real thing.">
             <Icon name="clock" size="sm" />Run SLA sweep
           </button>
         : null}
-      {onReset ? <button className="btn sm" onClick={onReset}>Reset data</button> : null}
+      {onReset && local ? <button className="btn sm" onClick={onReset}>Re-fetch</button> : null}
     </div>
   );
 }

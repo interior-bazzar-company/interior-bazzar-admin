@@ -15,9 +15,13 @@
 
    So the form exists and the guarantees are kept instead:
 
-     · a submission id, prefixed `man-` so the origin is legible in the id
-     · the SAME duplicate check every inbound enquiry gets — run as you type the
-       phone number, shown before the record exists rather than reported after
+     · a submission id, and a real row — this posts to the API and the record
+       that comes back is the one in the database, not a hopeful local copy
+     · the customer's HISTORY, looked up as the number is typed — what this
+       person has enquired about before, so the operator has it on the call. It
+       is context and not a gate: one customer enquires more than once, for
+       different work at different addresses months apart, and every one of
+       those is a real enquiry a business should get
      · it lands in Generated and must be qualified by a person like any other.
        Typing it yourself buys no shortcut past the gate; the checklist starts
        empty even though you have just had the conversation
@@ -32,7 +36,7 @@ import { useMemo, useState } from "react";
 import { Icon, Notice } from "../../ui";
 import { InfoNote, VocabInput } from "./bits";
 import {
-  MANUAL_VIA, SOURCES, STATES, VOCAB, createEnquiry, findDuplicates, knownCategory, knownCity,
+  MANUAL_VIA, SOURCES, STATES, VOCAB, createEnquiry, findEarlierFrom, knownCategory, knownCity,
   place, sourceOf, statusOf,
 } from "./store";
 
@@ -47,29 +51,39 @@ export default function NewEnquiryModal({ onClose, onDone }: {
     category: "", service: "", city: "", state: "", locality: "", pincode: "",
     projectType: "", intent: "", urgency: "", text: "",
   });
-  const [ack, setAck] = useState(false);
   const [touched, setTouched] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
 
   const set = (k: keyof typeof f) => (v: string) => setF({ ...f, [k]: v });
   const src = sourceOf(source);
 
-  /* Live, as the number is typed — the whole point is to catch it before the
-     record exists rather than to report it afterwards. */
-  const dupes = useMemo(() => findDuplicates(f.phone), [f.phone]);
+  /* Live, as the number is typed — so the operator has this person's history in
+     front of them while they are still on the call, which is when it is worth
+     something. It does not block anything. */
+  const earlier = useMemo(() => findEarlierFrom(f.phone), [f.phone]);
 
   const needsName = !f.name.trim();
   const needsPhone = f.phone.replace(/[^0-9]/g, "").length < 10;
-  const needsAck = dupes.length > 0 && !ack;
-  const blocked = needsName || needsPhone || needsAck;
+  const blocked = needsName || needsPhone;
 
-  const submit = () => {
-    if (blocked) { setTouched(true); return; }
-    const id = createEnquiry({
-      source, via: src.manual ? via : null, ...f,
-      duplicateAcknowledged: ack,
-    });
-    onDone(id, "Enquiry " + id + " created — it is yours, and it still needs qualifying.");
+  /* THIS ONE REACHES THE SERVER, which is why it has a busy state and a failure
+     state and none of the other actions in this module do. A create that
+     silently did nothing would leave the operator believing a customer is on
+     record when nobody is, and a second click while the first is in flight is
+     how you get the duplicate this form is built to prevent. */
+  const submit = async () => {
+    if (blocked || busy) { setTouched(true); return; }
+    setBusy(true);
+    setErr("");
+    try {
+      const id = await createEnquiry({ source, via: src.manual ? via : null, ...f });
+      onDone(id, "Enquiry " + id + " created — it is yours, and it still needs qualifying.");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "The enquiry was not created.");
+      setBusy(false);
+    }
   };
 
   return (
@@ -204,15 +218,25 @@ export default function NewEnquiryModal({ onClose, onDone }: {
           </div>
         </div>
 
-        {/* --------------------------------------------------- duplicates --- */}
-        {dupes.length ? (
-          <div className="be-dupes">
-            <Notice tone="bad" ico="alert" text={<>
-              <b>{dupes.length} existing enquir{dupes.length === 1 ? "y has" : "ies have"} this phone number.</b>{" "}
-              Creating another does not merge them — it makes a second record for one customer, and a
-              business can then be assigned the same person twice.
+        {/* ------------------------------------------------ their history --- */}
+        {/* NOT A DUPLICATE WARNING. A customer who comes back is the best kind
+            there is, and a second enquiry from one number is usually a second
+            piece of work — a bathroom after a kitchen, a parent's flat after
+            their own. This is here so the person on the call knows that, not so
+            they hesitate before recording it. If it really is the same job
+            typed twice, they can say so with the Duplicate suspected tag. */}
+        {earlier.length ? (
+          /* `be-blk quiet`, not `be-dupes` — that wrapper is painted in the
+             alarm colours (--bad-bg / --bad-line), and a red panel around
+             "this customer has come back" says the opposite of the words in
+             it. Both classes already exist; nothing in the stylesheet changed. */
+          <div className="be-blk quiet">
+            <Notice tone="" ico="info" text={<>
+              <b>This customer has enquired {earlier.length === 1 ? "once" : earlier.length + " times"} before.</b>{" "}
+              Worth knowing on the call. Recording this one is still right — a second enquiry is
+              usually a second job, and it goes through qualification like any other.
             </>} />
-            {dupes.map((x) => (
+            {earlier.map((x) => (
               <div className="be-dupe" key={x.enquiryId}>
                 <span className="mono">{x.enquiryId}</span>
                 <span>{x.customer.name} · {x.requirement.category || "—"} · {place(x)}</span>
@@ -220,16 +244,6 @@ export default function NewEnquiryModal({ onClose, onDone }: {
                 <span className="faint">{statusOf(x.status).label}</span>
               </div>
             ))}
-            <label className="be-ackline">
-              <input type="checkbox" checked={ack} onChange={(ev) => setAck(ev.target.checked)} />
-              <span>
-                I have checked, and this is a <b>separate</b> enquiry from the same customer.
-                It will be tagged <b>Duplicate suspected</b> either way.
-              </span>
-            </label>
-            {touched && needsAck
-              ? <div className="help bad">Tick the box, or close this and open the existing enquiry instead.</div>
-              : null}
           </div>
         ) : null}
 
@@ -242,10 +256,11 @@ export default function NewEnquiryModal({ onClose, onDone }: {
       </div>
 
       <div className="md-f">
+        {err ? <Notice tone="bad" ico="alert" text={err} /> : null}
         <span className="spacer" />
-        <button className="btn" data-close="1" onClick={onClose}>Cancel</button>
-        <button className="btn pri" data-act="be-create-go" onClick={submit}>
-          <Icon name="plus" />Create enquiry
+        <button className="btn" data-close="1" onClick={onClose} disabled={busy}>Cancel</button>
+        <button className="btn pri" data-act="be-create-go" onClick={submit} disabled={busy}>
+          <Icon name="plus" />{busy ? "Creating…" : "Create enquiry"}
         </button>
       </div>
     </>
