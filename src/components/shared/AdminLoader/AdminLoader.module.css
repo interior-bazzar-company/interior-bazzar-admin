@@ -5,7 +5,29 @@
   height: 100vh;
   background-color: #f9f9f9;
 }
-.image {
+
+/* The box is reserved whether or not the animation has arrived, so the spinner
+   sits where the character will and nothing jumps when it swaps in. */
+.box {
+  position: relative;
+  display: grid;
+  place-items: center;
   width: 250px;
   height: 250px;
+}
+.anim { width: 100%; height: 100% }
+.fallback { position: absolute; inset: 0; margin: auto }
+
+/* The animation is decorative — `aria-hidden` on the host, and the status text
+   lives here instead, where a screen reader can reach it and nobody sees it. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }

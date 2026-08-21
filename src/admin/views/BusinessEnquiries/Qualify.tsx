@@ -3,7 +3,7 @@
    -----------------------------------------------------------------------------
    What a person does between "a form arrived" and "this is worth a business's
    time". It replaces the Business Suggestions panel while the enquiry is
-   Generated, and it is deliberately the same shape: one column of record, one
+   still being worked, and it is deliberately the same shape: one column of record, one
    column of decision. The decision here is not which business gets it — it is
    whether anyone should.
 
@@ -271,7 +271,6 @@ export function QualifyPanel({ e, onQualified }: { e: Enquiry; onQualified: (msg
    about the same entry. */
 export function ContactEntryRow({ entry, isLast }: { entry: ContactEntry; isLast?: boolean }) {
   const o = contactOutcomeOf(entry.outcome);
-  const overdue = !!entry.followUpAt && new Date(entry.followUpAt).getTime() < Date.now();
   return (
     <div className={"be-log-i" + (isLast ? " last" : "")}>
       <div className="r1">
@@ -281,12 +280,6 @@ export function ContactEntryRow({ entry, isLast }: { entry: ContactEntry; isLast
         <span className="spacer" />
         <span className="w">{dateTimeLabel(entry.at)}</span>
       </div>
-      {entry.followUpAt ? (
-        <div className={"be-due" + (overdue ? " over" : "")}>
-          <Icon name="clock" size="sm" />{" "}
-          Callback {overdue ? "was due" : "due"} {dateTimeLabel(entry.followUpAt)}
-        </div>
-      ) : null}
       {entry.response
         ? <div className="resp">“{entry.response}”</div>
         : <div className="resp none">No response — nothing was said to record.</div>}
@@ -303,24 +296,16 @@ function ContactComposer({ e }: { e: Enquiry }) {
   const [direction, setDirection] = useState<"outbound" | "inbound">("outbound");
   const [response, setResponse] = useState("");
   const [note, setNote] = useState("");
-  const [followUp, setFollowUp] = useState("");
-  const [touched, setTouched] = useState(false);
 
   const o = contactOutcomeOf(outcome);
   /* A "no answer" has nothing to record, so the response box is not asked for.
      Demanding one would train people to type "n/a" into the field that is
      supposed to hold the customer's words. */
   const wantsResponse = o.reached;
-  const wantsFollowUp = !!o.requiresFollowUp;
-  const blocked = wantsFollowUp && !followUp;
 
   const submit = () => {
-    if (blocked) { setTouched(true); return; }
-    logContact(e.enquiryId, {
-      channel, direction, outcome, response, note,
-      followUpAt: followUp ? new Date(followUp).toISOString() : null,
-    });
-    setResponse(""); setNote(""); setFollowUp(""); setTouched(false);
+    logContact(e.enquiryId, { channel, direction, outcome, response, note });
+    setResponse(""); setNote("");
   };
 
   return (
@@ -353,21 +338,6 @@ function ContactComposer({ e }: { e: Enquiry }) {
           <textarea id="be-c-resp" className="inp" rows={3} value={response}
             placeholder="Their words, as close as you can. This is the part a business can be told."
             onChange={(ev) => setResponse(ev.target.value)} />
-        </div>
-      ) : null}
-
-      {/* A callback with no time on it is a promise nobody can keep — so the
-          time is required, not optional, and the queue can sort on it. */}
-      {wantsFollowUp ? (
-        <div className="fg">
-          <label htmlFor="be-c-due">Call back at <span className="req">*</span></label>
-          <input id="be-c-due" type="datetime-local" className={"inp" + (touched && !followUp ? " bad" : "")}
-            value={followUp} onChange={(ev) => setFollowUp(ev.target.value)} />
-          <div className={"help" + (touched && !followUp ? " bad" : " warn")}>
-            {touched && !followUp
-              ? "Required. Without a time this is not a callback, it is a note."
-              : "The queue sorts on this, and an overdue one outranks everything else on the list."}
-          </div>
         </div>
       ) : null}
 
@@ -448,7 +418,7 @@ function QualifyFoot({ e, ready, missing, writes, onQualified }: {
           {e.contactLog.length > 0 && !everReached(e)
             ? <span className="be-qp-hint">
                 Attempted {e.contactLog.length} time{e.contactLog.length === 1 ? "" : "s"}, never reached.
-                If this stays true, the honest end is <b>Invalid</b> with a reason — not a qualification
+                If this stays true, the honest end is <b>Rejected</b> with a reason — not a qualification
                 nobody can stand behind.
               </span>
             : null}

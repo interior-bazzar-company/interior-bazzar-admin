@@ -5,57 +5,50 @@
   "statuses": [
     {
       "key": "generated",
-      "label": "Generated",
+      "label": "New",
       "tone": "warn",
       "step": 1,
-      "meaning": "Submission accepted. Nobody has spoken to the customer yet.",
-      "advance": "A person works the enquiry and marks it Qualified."
+      "meaning": "Submission accepted. Nobody has contacted the customer yet.",
+      "advance": "The first contact attempt is logged."
+    },
+    {
+      "key": "processing",
+      "label": "Processing",
+      "tone": "warn",
+      "step": 2,
+      "meaning": "Being qualified: contact attempts, the checklist, and edits to the requirement.",
+      "advance": "A person confirms the requirement and marks it Qualified."
     },
     {
       "key": "qualified",
       "label": "Qualified",
       "tone": "",
-      "step": 2,
-      "meaning": "A person confirmed the requirement and froze the snapshot.",
-      "advance": "Matching completed."
+      "step": 3,
+      "meaning": "Requirement confirmed and the snapshot frozen. Matching runs here — the ranked businesses are part of working a Qualified enquiry, not a state of their own.",
+      "advance": "A business is assigned."
     },
     {
-      "key": "ready",
-      "label": "Ready to Assign",
+      "key": "no_match",
+      "label": "No match yet",
       "tone": "warn",
-      "step": 3,
-      "meaning": "Eligible businesses ranked.",
-      "advance": "Authorised assignment."
+      "step": 4,
+      "offRamp": true,
+      "meaning": "Qualified, but a matching run found no eligible business — a supply gap, not a bad enquiry. The requirement is confirmed and the snapshot is frozen.",
+      "advance": "Matching is run again and finds an eligible business, which returns it to Qualified. Reached by a run that found nobody, or marked by hand."
     },
     {
       "key": "assigned",
       "label": "Assigned",
       "tone": "info",
-      "step": 4,
+      "step": 5,
       "meaning": "Business selected, match context frozen.",
       "advance": "Delivery succeeds."
-    },
-    {
-      "key": "delivered",
-      "label": "Delivered",
-      "tone": "info",
-      "step": 5,
-      "meaning": "Visible to the assigned business.",
-      "advance": "Business acknowledgement."
-    },
-    {
-      "key": "acknowledged",
-      "label": "Acknowledged",
-      "tone": "ok",
-      "step": 6,
-      "meaning": "Business confirmed receipt.",
-      "advance": "Outcome reported."
     },
     {
       "key": "converted",
       "label": "Converted",
       "tone": "ok",
-      "step": 7,
+      "step": 6,
       "meaning": "The business won the work.",
       "advance": "Terminal.",
       "terminal": true
@@ -64,17 +57,17 @@
       "key": "not_converted",
       "label": "Not Converted",
       "tone": "",
-      "step": 7,
+      "step": 6,
       "meaning": "Contacted, did not win.",
       "advance": "Terminal.",
       "terminal": true
     },
     {
       "key": "invalid",
-      "label": "Invalid",
+      "label": "Rejected",
       "tone": "bad",
-      "step": 7,
-      "meaning": "Unusable, with a stored reason.",
+      "step": 6,
+      "meaning": "Rejected, with a stored reason. Unusable as an enquiry.",
       "advance": "Terminal.",
       "terminal": true
     }
@@ -83,51 +76,45 @@
     {
       "from": "generated",
       "to": [
+        "processing",
+        "invalid"
+      ],
+      "guard": "A contact attempt is logged, or a rejection reason is supplied. There is no direct route to Qualified: qualifying requires at least one logged attempt, so the record must pass through Processing."
+    },
+    {
+      "from": "processing",
+      "to": [
         "qualified",
         "invalid"
       ],
-      "guard": "Every qualification check passes and at least one contact attempt is logged, or an invalid reason is supplied."
+      "guard": "Every qualification check passes and at least one contact attempt is logged, or a rejection reason is supplied."
     },
     {
       "from": "qualified",
       "to": [
-        "ready",
-        "invalid"
-      ],
-      "guard": "A matching run completes, or an invalid reason is supplied."
-    },
-    {
-      "from": "ready",
-      "to": [
+        "no_match",
         "assigned",
         "invalid"
       ],
-      "guard": "The selected business passes hard eligibility and capacity at confirmation time."
+      "guard": "A matching run produces at least one eligible business and one is assigned; a run that finds none moves it to No match yet; or a rejection reason is supplied."
+    },
+    {
+      "from": "no_match",
+      "to": [
+        "qualified",
+        "invalid"
+      ],
+      "guard": "Matching is run again and finds an eligible business, or a rejection reason is supplied. There is no direct route to Assigned: assignment needs a ranked candidate, and the run that produces one returns the enquiry to Qualified first."
     },
     {
       "from": "assigned",
       "to": [
-        "delivered",
-        "ready"
-      ],
-      "guard": "Delivery succeeds; a return to Ready to Assign requires a stored reassignment reason."
-    },
-    {
-      "from": "delivered",
-      "to": [
-        "acknowledged",
-        "ready"
-      ],
-      "guard": "Acknowledgement by the assigned business, or a controlled reassignment with reason."
-    },
-    {
-      "from": "acknowledged",
-      "to": [
         "converted",
         "not_converted",
-        "invalid"
+        "invalid",
+        "qualified"
       ],
-      "guard": "An outcome status and reason are supplied."
+      "guard": "The business reports an outcome, or Operations reassigns. Assignment publishes to the business, so there is no delivery or acknowledgement step to pass through first."
     },
     {
       "from": "converted",
@@ -191,7 +178,7 @@
     {
       "key": "E",
       "label": "Tier E",
-      "help": "Failed an intake check. Usually heading for Invalid."
+      "help": "Failed an intake check. Usually heading for rejection."
     }
   ],
   "categories": [
@@ -241,7 +228,7 @@
     "Customer withdrew before assignment"
   ],
   "reassignReasons": [
-    "No acknowledgement within SLA",
+    "Business never responded",
     "Business declined the enquiry",
     "Business at capacity",
     "Customer requested a different business",
@@ -355,9 +342,7 @@
       "key": "callback_requested",
       "label": "Callback requested",
       "tone": "warn",
-      "reached": true,
-      "autoTag": "callback-due",
-      "requiresFollowUp": true
+      "reached": true
     },
     {
       "key": "no_answer",
@@ -395,7 +380,7 @@
       "autoTag": "bad-contact"
     }
   ],
-  "$comment_checklist": "The gate on Generated → Qualified. All four must pass. They are deliberately about what a PERSON established, not what the form said — a submitted category is a claim, a confirmed one is a fact, and only the second is safe to match on.",
+  "$comment_checklist": "The gate on Processing → Qualified. All four must pass. They are deliberately about what a PERSON established, not what the form said — a submitted category is a claim, a confirmed one is a fact, and only the second is safe to match on.",
   "qualificationChecklist": [
     {
       "key": "reachable",
@@ -421,13 +406,6 @@
   "$comment_tags": "Operational tags, set by a person or by the system. They describe how the WORK is going, never what the customer is worth — there is no tag for spend, size or value, for the same reason there is no budget field. `auto: true` means the system applies and removes it; a person can still add one by hand.",
   "tags": [
     {
-      "slug": "new-enquiry",
-      "label": "New enquiry",
-      "tone": "warn",
-      "auto": true,
-      "help": "Applied at intake, removed the moment the first contact attempt is logged. This is the untouched pile."
-    },
-    {
       "slug": "contact-made",
       "label": "Contact made",
       "tone": "ok",
@@ -435,18 +413,11 @@
       "help": "The customer has answered at least once."
     },
     {
-      "slug": "callback-due",
-      "label": "Callback due",
-      "tone": "warn",
-      "auto": true,
-      "help": "The customer asked to be called back."
-    },
-    {
       "slug": "unreachable",
       "label": "Unreachable",
       "tone": "",
       "auto": true,
-      "help": "Attempted, never answered. Three of these is usually an Invalid, with a reason."
+      "help": "Attempted, never answered. Three of these usually ends in a rejection, with a reason."
     },
     {
       "slug": "bad-contact",
@@ -488,7 +459,7 @@
       "label": "Spam suspected",
       "tone": "bad",
       "auto": false,
-      "help": "Heading for Invalid, but not proven yet."
+      "help": "Heading for rejection, but not proven yet."
     }
   ],
   "$comment_tiers": "Intake signal quality, computed at intake from form completeness, contact verification and the source page. It ranks how much the SUBMISSION tells us, never how much the customer is worth, and it carries no weight in matching — it is a triage hint for whoever picks the next call.",
@@ -510,7 +481,7 @@
       "role": "Operations lead"
     }
   ],
-  "$comment_contactOutcomes": "`reached` decides whether the response field is asked for and whether the 'contact reachable' check can be satisfied. `autoTag` is what the server's own re-tagging must agree with. `requiresFollowUp` makes the follow-up time mandatory on the log entry — a callback without a time is a promise nobody can keep, and it is the difference between a queue that sorts itself and one somebody has to read.",
+  "$comment_contactOutcomes": "`reached` decides whether the response field is asked for and whether the 'contact reachable' check can be satisfied. `autoTag` is what the server's own re-tagging must agree with. Callbacks were removed from the module on 2026-08-21: `callback_requested` survives as a description of what happened on the call, but nothing is scheduled from it and no time is asked for.",
   "$comment_sources": "Where the enquiry came from. Three channels and no more: a form we published, the signed-in portal, or a person typing it. Every enquiry has one and it is never blank — provenance is the first thing anyone asks about a record that turns out to be wrong. `manual: true` means a person typed it, which is why those carry `createdBy` and `via`: an enquiry we entered ourselves must say who entered it and how it reached us, or it is the one record on the list nobody can account for.",
   "sources": [
     {
@@ -607,6 +578,49 @@
     {
       "key": "custom",
       "label": "Custom range…"
+    }
+  ],
+  "$comment_attentionCells": "Stands in for the help text behind the attention strip on the list page. `key` matches the cell key rendered by AttnStrip in List.tsx. `counts` states the exact rule the number comes from and must stay true to countsOf() in store.ts; `does` says what pressing the cell filters to and must stay true to filterEnquiries(). The two are shown together in the cell's hover tooltip. Kept here rather than inline in the component because it is product vocabulary like statuses and tiers, and the API will serve it eventually. check:wiring asserts every rendered cell has an entry AND that each cell's count equals the row count of the filter it applies — that second test was written because `callback due` read 0 while clicking it returned one row.",
+  "attentionCells": [
+    {
+      "key": "total",
+      "counts": "Every enquiry in the panel, in every state — converted and rejected included. This strip always counts the whole set, never what the filters have narrowed the table to.",
+      "does": "Clears status, flag and tag. The search box and the remaining filters are left alone."
+    },
+    {
+      "key": "New",
+      "counts": "Status New: the submission arrived and nobody has tried to reach the customer yet — not one contact attempt logged. This is the number that should be zero by lunchtime.",
+      "does": "Filters to status New."
+    },
+    {
+      "key": "qualified",
+      "counts": "Status Qualified: a person confirmed the requirement and froze the snapshot, so it is ready to go to a business. Matching runs inside this state — being Qualified IS being ready to assign, which is why there is no separate state for it.",
+      "does": "Filters to status Qualified."
+    },
+    {
+      "key": "no match yet",
+      "counts": "Status No match yet: qualified, but a matching run found no eligible business — no subscribed business covers this category and city, or every one that does is at capacity. A supply gap, not a bad enquiry, and the only number here that is business development’s problem rather than operations’.",
+      "does": "Filters to status No match yet."
+    },
+    {
+      "key": "processing",
+      "counts": "Status Processing: somebody has started working it — at least one contact attempt is logged, and the requirement, checklist and tags are all still editable. It leaves this state when a person marks it Qualified.",
+      "does": "Filters to status Processing."
+    },
+    {
+      "key": "assigned",
+      "counts": "Routed to exactly one business and published to them — assigning delivers, there is no separate Delivered state and no acknowledgement to wait for. The only live state.",
+      "does": "Filters to status Assigned."
+    },
+    {
+      "key": "converted",
+      "counts": "The business reported that the customer bought. No amount is recorded anywhere in this module — Interior bazzar's revenue is the subscription, which lives in Plans.",
+      "does": "Filters to status Converted."
+    },
+    {
+      "key": "rejected",
+      "counts": "Rejected — a test submission, spam, a duplicate, or the customer withdrew before assignment. Kept and auditable, never deleted.",
+      "does": "Filters to status Rejected."
     }
   ]
 }

@@ -225,7 +225,6 @@ export function enquirySheetHtml(e: Enquiry): string {
     <h2>Handling</h2>
     <table>
       ${row("Status", statusOf(e.status).label)}
-      ${row("Owner", e.owner ? e.owner.name : "Unclaimed")}
       ${row("Source", src.label + (e.source.createdBy ? " · added by " + e.source.createdBy : ""))}
       ${row("Submission", e.submissionId)}
       ${a ? row("Assigned to", a.businessName + " · " + dateTimeLabel(a.assignedAt)) : ""}

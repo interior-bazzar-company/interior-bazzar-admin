@@ -30,7 +30,7 @@ import { qs } from "../../ui";
 import List, { enquiryHash, listHash, merge, omit } from "./List";
 import Detail from "./Detail";
 import NewEnquiryModal from "./NewEnquiry";
-import { countsOf, filterEnquiries, sortEnquiries, useEnquiries } from "./store";
+import { filterEnquiries, sortEnquiries, useEnquiries } from "./store";
 import type { Params } from "./store";
 import "./enquiries.css";
 
@@ -52,21 +52,29 @@ export default function BusinessEnquiries() {
      The counts sit beside the title rather than only in the strip, because the
      one number an operator wants without scrolling is how many are waiting on
      a decision — and on the detail page the strip is not on screen at all. */
-  const m = countsOf(all);
+  /* Resolved through the same window code the Received filter uses, so "today"
+     means one thing on this page and not two. */
+  const today = filterEnquiries(all, { received: "today" }).length;
+  const week = filterEnquiries(all, { received: "7d" }).length;
   const crumbs = useMemo(() => (
     <>
       <span className="tb-title">Business Enquiries</span>
+      {/* INTAKE, not lifecycle. The strip below already counts every state and
+          counts them better — repeating two of them in the topbar said nothing
+          the page was not already saying louder. What the topbar can say that
+          the strip cannot is how much is COMING IN, which is the number you
+          want before you look at the queue at all. */}
       <span className="tb-stats">
-        <span className="tb-stat ro"><span className="v tnum">{m.ready}</span><span className="k">ready</span></span>
-        <span className="tb-stat ro"><span className="v tnum">{m.live}</span><span className="k">live</span></span>
-        {m.breached
-          ? <span className="tb-stat ro bad"><span className="v tnum">{m.breached}</span><span className="k">breached</span></span>
-          : null}
+        {/* Label first, then the figure. "0 today" reads as a sentence
+            fragment you have to finish; "today 0" reads as a labelled value,
+            which is what it is. */}
+        <span className="tb-stat ro"><span className="k">today</span><span className="v tnum">{today}</span></span>
+        <span className="tb-stat ro"><span className="k">last 7 days</span><span className="v tnum">{week}</span></span>
       </span>
     </>
     /* usePageChrome republishes once per LOCATION, not per render, so this
        memo only has to be right for the counts it prints. */
-  ), [m.ready, m.live, m.breached]);
+  ), [today, week]);
 
   /* Where "up" is. From a record, the list it was opened from — filters and
      all, so Back is a return and not a reset. */
@@ -102,7 +110,7 @@ export default function BusinessEnquiries() {
 
   /* A record that no longer matches the filters it was opened under is still a
      real record — the detail reads the store directly and never the filtered
-     page, so marking an enquiry invalid while filtered to Ready does not blank
+     page, so rejecting an enquiry while filtered to Qualified does not blank
      the screen you are standing on. */
   /* THE QUEUE, AS THE RECORD SEES IT. Computed here rather than in Detail
      because it must be the SAME filtered and sorted list the operator was

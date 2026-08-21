@@ -13,9 +13,7 @@ import GREENTICK from "../../assets/images/greenTick.png";
 import REDTICK from "../../assets/images/redTick.png";
 import FORMBG from "./../../assets/images/form-bg.png";
 import UPLOADICON from "../../assets/images/upload-icon.png";
-import LOADINGGIF from "../../assets/images/gif.gif";
 export const STATIC_IMAGES = {
-  LOADINGGIF,
   FORMBG,
   REDTICK,
   VERIFIED,

@@ -1,5 +1,5 @@
 {
-  "$comment": "Stands in for GET /api/v1/business-enquiries and GET /api/v1/business-enquiries/{id}. One auditable record per valid funnel or portal submission. `owner` is who is working it — null means nobody has claimed it. `requirement` is EDITABLE while the enquiry is Generated and frozen the moment a person marks it Qualified; `qualification.frozenAt` is null until then. `contactLog[]` is the qualification workstream and `remarks[]` is the internal note thread — the log holds what the CUSTOMER said, remarks hold what WE think, and neither is ever exported, copied, printed or imaged and `followUpAt` is when a promised callback is due. `assignments[]` is history and is never overwritten; `activeAssignmentId` is the single nullable pointer that enforces one active assignment. `events[]` is append-only. There is no budget field anywhere in this file, on purpose.",
+  "$comment": "Stands in for GET /api/v1/business-enquiries and GET /api/v1/business-enquiries/{id}. One auditable record per valid funnel or portal submission. `requirement` is EDITABLE while the enquiry is New and frozen the moment a person marks it Qualified; `qualification.frozenAt` is null until then. `contactLog[]` is the qualification workstream and `remarks[]` is the internal note thread — the log holds what the CUSTOMER said, remarks hold what WE think, and neither is ever exported, copied, printed or imaged. `assignments[]` is history and is never overwritten; `activeAssignmentId` is the single nullable pointer that enforces one active assignment. `events[]` is append-only. There is no budget field anywhere in this file, on purpose. Phone numbers and email addresses are FICTIONAL but complete — they were previously stored masked (\"+91 98•••••••27\"), which made them useless as test data: `phoneKey()` takes the last ten digits to dedupe on, and a masked number only has six, so the duplicate check was comparing country codes.",
   "generatedAt": "2026-08-20T09:00:00+05:30",
   "enquiries": [
     {
@@ -14,7 +14,7 @@
       },
       "customer": {
         "name": "Ganesh R.",
-        "phone": "+91 98•••••••27",
+        "phone": "+91 98100 00027",
         "email": null
       },
       "requirement": {
@@ -46,17 +46,12 @@
         "qualifiedBy": null,
         "qualifiedByRole": null
       },
-      "status": "generated",
+      "status": "processing",
       "tier": "C",
       "createdAt": "2026-08-20T09:42:00+05:30",
       "activeAssignmentId": null,
       "assignments": [],
       "outcome": null,
-      "owner": {
-        "id": "u-103",
-        "name": "D. Kapoor"
-      },
-      "followUpAt": null,
       "tags": [
         "contact-made"
       ],
@@ -70,16 +65,9 @@
           "actorRole": "Operations lead",
           "outcome": "connected",
           "response": "Two bathrooms in Andheri West, wants to start once the rains are over. Found us through a neighbour who used the platform last year.",
-          "note": "Rang the office line. Typed the enquiry up straight after the call.",
-          "followUpAt": null
+          "note": "Rang the office line. Typed the enquiry up straight after the call."
         }
       ],
-      "sla": {
-        "ackHours": 24,
-        "dueAt": null,
-        "breached": false,
-        "breachedAt": null
-      },
       "events": [
         {
           "eventId": "ev-0064-1",
@@ -112,7 +100,7 @@
       },
       "customer": {
         "name": "Ritu B.",
-        "phone": "+91 98•••••••06",
+        "phone": "+91 98942 68706",
         "email": null
       },
       "requirement": {
@@ -144,7 +132,7 @@
         "qualifiedBy": null,
         "qualifiedByRole": null
       },
-      "status": "generated",
+      "status": "processing",
       "tier": "B",
       "createdAt": "2026-08-20T08:05:00+05:30",
       "activeAssignmentId": null,
@@ -152,7 +140,6 @@
       "outcome": null,
       "tags": [
         "contact-made",
-        "callback-due",
         "requirement-unclear"
       ],
       "contactLog": [
@@ -165,8 +152,7 @@
           "actorRole": "Operations",
           "outcome": "callback_requested",
           "response": "In a meeting — asked us to call back after 4pm today.",
-          "note": "Second attempt. Sounds genuine, just busy.",
-          "followUpAt": "2026-08-20T16:00:00+05:30"
+          "note": "Second attempt. Sounds genuine, just busy."
         },
         {
           "logId": "cl-0061-1",
@@ -177,24 +163,41 @@
           "actorRole": "Operations",
           "outcome": "connected",
           "response": "Confirmed she submitted it. Says 4BHK in GK but is not sure yet whether it is the full flat or only the two bedrooms.",
-          "note": "Scope is genuinely undecided — cannot confirm the requirement on this call.",
-          "followUpAt": null
+          "note": "Scope is genuinely undecided — cannot confirm the requirement on this call."
         }
       ],
-      "sla": {
-        "ackHours": 24,
-        "dueAt": null,
-        "breached": false,
-        "breachedAt": null
-      },
       "events": [
+        {
+          "eventId": "ev-0061-rm1",
+          "type": "REMARK",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "at": "2026-08-20T08:55:00+05:30",
+          "note": "Internal note added · 20 words"
+        },
         {
           "eventId": "ev-0061-3",
           "type": "CONTACT",
           "actor": "R. Menon",
           "actorRole": "Operations",
           "at": "2026-08-20T08:52:00+05:30",
-          "note": "Call · Callback requested · due 20 Aug 16:00 · tagged callback-due"
+          "note": "Call · Callback requested"
+        },
+        {
+          "eventId": "ev-0061-tg-requir",
+          "type": "TAGGED",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "at": "2026-08-20T08:52:00+05:30",
+          "note": "Added Requirement unclear"
+        },
+        {
+          "eventId": "ev-0061-rm2",
+          "type": "REMARK",
+          "actor": "D. Kapoor",
+          "actorRole": "Operations lead",
+          "at": "2026-08-20T08:30:00+05:30",
+          "note": "Internal note added · 14 words"
         },
         {
           "eventId": "ev-0061-2",
@@ -213,11 +216,6 @@
           "note": "funnel/interior-design-delhi · submission_id e41a…aa · not a duplicate · tagged new-enquiry"
         }
       ],
-      "owner": {
-        "id": "u-101",
-        "name": "R. Menon"
-      },
-      "followUpAt": "2026-08-20T16:00:00+05:30",
       "remarks": [
         {
           "remarkId": "rm-0061-2",
@@ -247,8 +245,8 @@
       },
       "customer": {
         "name": "Arjun V.",
-        "phone": "+91 99•••••••58",
-        "email": "a•••••@gmail.com"
+        "phone": "+91 99885 37458",
+        "email": "arjun.v@gmail.com"
       },
       "requirement": {
         "category": "Modular Kitchen",
@@ -279,7 +277,7 @@
         "qualifiedBy": null,
         "qualifiedByRole": null
       },
-      "status": "generated",
+      "status": "processing",
       "tier": "D",
       "createdAt": "2026-08-19T18:30:00+05:30",
       "activeAssignmentId": null,
@@ -298,8 +296,7 @@
           "actorRole": "Operations",
           "outcome": "no_answer",
           "response": null,
-          "note": "Second attempt, morning. No answer.",
-          "followUpAt": null
+          "note": "Second attempt, morning. No answer."
         },
         {
           "logId": "cl-0062-1",
@@ -310,16 +307,9 @@
           "actorRole": "Operations",
           "outcome": "no_answer",
           "response": null,
-          "note": "First attempt, same evening.",
-          "followUpAt": null
+          "note": "First attempt, same evening."
         }
       ],
-      "sla": {
-        "ackHours": 24,
-        "dueAt": null,
-        "breached": false,
-        "breachedAt": null
-      },
       "events": [
         {
           "eventId": "ev-0062-3",
@@ -346,11 +336,6 @@
           "note": "portal/enquire · submission_id 77c2…cc · not a duplicate · tagged new-enquiry"
         }
       ],
-      "owner": {
-        "id": "u-102",
-        "name": "S. Iyer"
-      },
-      "followUpAt": null,
       "remarks": []
     },
     {
@@ -365,7 +350,7 @@
       },
       "customer": {
         "name": "Sneha P.",
-        "phone": "+91 97•••••••34",
+        "phone": "+91 97828 06134",
         "email": null
       },
       "requirement": {
@@ -403,16 +388,8 @@
       "activeAssignmentId": null,
       "assignments": [],
       "outcome": null,
-      "tags": [
-        "new-enquiry"
-      ],
+      "tags": [],
       "contactLog": [],
-      "sla": {
-        "ackHours": 24,
-        "dueAt": null,
-        "breached": false,
-        "breachedAt": null
-      },
       "events": [
         {
           "eventId": "ev-0063-1",
@@ -423,8 +400,6 @@
           "note": "funnel/interior-design-bengaluru · submission_id 1d8f…dd · not a duplicate · tagged new-enquiry"
         }
       ],
-      "owner": null,
-      "followUpAt": null,
       "remarks": []
     },
     {
@@ -439,8 +414,8 @@
       },
       "customer": {
         "name": "Priya M.",
-        "phone": "+91 98•••••••42",
-        "email": "p•••••@gmail.com"
+        "phone": "+91 98770 74842",
+        "email": "priya.m@gmail.com"
       },
       "requirement": {
         "category": "Interior Design",
@@ -471,18 +446,12 @@
         "qualifiedBy": "R. Menon",
         "qualifiedByRole": "Operations"
       },
-      "status": "ready",
+      "status": "qualified",
       "tier": "B",
       "createdAt": "2026-08-18T09:14:00+05:30",
       "activeAssignmentId": null,
       "assignments": [],
       "outcome": null,
-      "sla": {
-        "ackHours": 24,
-        "dueAt": null,
-        "breached": false,
-        "breachedAt": null
-      },
       "events": [
         {
           "eventId": "ev-0047-3",
@@ -507,6 +476,14 @@
           "actorRole": "system",
           "at": "2026-08-18T09:14:00+05:30",
           "note": "funnel/interior-design-delhi · submission_id 8f3a…c2 · not a duplicate"
+        },
+        {
+          "eventId": "ev-0047-tg-hot",
+          "type": "TAGGED",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "at": "2026-08-18T09:14:00+05:30",
+          "note": "Added Hot"
         }
       ],
       "tags": [
@@ -523,8 +500,7 @@
           "actorRole": "Operations",
           "outcome": "connected",
           "response": "Confirmed 3BHK in Vasant Kunj, full interiors including false ceiling and wardrobes. Wants work to start by month-end — possession is done, family moves in October.",
-          "note": "Confirmed category and locality against the form. Marked urgent.",
-          "followUpAt": null
+          "note": "Confirmed category and locality against the form. Marked urgent."
         },
         {
           "logId": "cl-0047-1",
@@ -535,15 +511,9 @@
           "actorRole": "Operations",
           "outcome": "replied",
           "response": "Yes this is Priya, I filled the form last night.",
-          "note": "Opened on WhatsApp first — she replied inside two minutes.",
-          "followUpAt": null
+          "note": "Opened on WhatsApp first — she replied inside two minutes."
         }
       ],
-      "owner": {
-        "id": "u-101",
-        "name": "R. Menon"
-      },
-      "followUpAt": null,
       "remarks": []
     },
     {
@@ -558,7 +528,7 @@
       },
       "customer": {
         "name": "Suresh K.",
-        "phone": "+91 97•••••••18",
+        "phone": "+91 97713 43518",
         "email": null
       },
       "requirement": {
@@ -590,7 +560,7 @@
         "qualifiedBy": "R. Menon",
         "qualifiedByRole": "Operations"
       },
-      "status": "ready",
+      "status": "no_match",
       "tier": "C",
       "createdAt": "2026-08-19T22:05:00+05:30",
       "activeAssignmentId": null,
@@ -598,13 +568,7 @@
       "outcome": null,
       "exception": {
         "code": "no_eligible_business",
-        "note": "All 10 subscribed businesses were excluded before scoring. Held at Ready to Assign — this is a supply gap, not an invalid enquiry."
-      },
-      "sla": {
-        "ackHours": 24,
-        "dueAt": null,
-        "breached": false,
-        "breachedAt": null
+        "note": "All 10 subscribed businesses were excluded before scoring. Held at Qualified — this is a supply gap, not an invalid enquiry."
       },
       "events": [
         {
@@ -645,15 +609,9 @@
           "actorRole": "Operations",
           "outcome": "connected",
           "response": "L-shaped kitchen for a 2BHK in Gachibowli. Not urgent, wants it done before Diwali.",
-          "note": "Confirmed. Flagged that we may have nobody covering Hyderabad for kitchens.",
-          "followUpAt": null
+          "note": "Confirmed. Flagged that we may have nobody covering Hyderabad for kitchens."
         }
       ],
-      "owner": {
-        "id": "u-101",
-        "name": "R. Menon"
-      },
-      "followUpAt": null,
       "remarks": []
     },
     {
@@ -668,7 +626,7 @@
       },
       "customer": {
         "name": "Kavya N.",
-        "phone": "+91 90•••••••73",
+        "phone": "+91 90656 12273",
         "email": null
       },
       "requirement": {
@@ -706,12 +664,6 @@
       "activeAssignmentId": null,
       "assignments": [],
       "outcome": null,
-      "sla": {
-        "ackHours": 24,
-        "dueAt": null,
-        "breached": false,
-        "breachedAt": null
-      },
       "events": [
         {
           "eventId": "ev-0055-2",
@@ -743,15 +695,9 @@
           "actorRole": "Operations",
           "outcome": "replied",
           "response": "Kitchen plus two wardrobes. Handover is in October, so no rush.",
-          "note": "Confirmed on chat, no call needed.",
-          "followUpAt": null
+          "note": "Confirmed on chat, no call needed."
         }
       ],
-      "owner": {
-        "id": "u-101",
-        "name": "R. Menon"
-      },
-      "followUpAt": null,
       "remarks": []
     },
     {
@@ -766,8 +712,8 @@
       },
       "customer": {
         "name": "Nikhil A.",
-        "phone": "+91 99•••••••81",
-        "email": "n•••••@outlook.com"
+        "phone": "+91 99598 80981",
+        "email": "nikhil.a@outlook.com"
       },
       "requirement": {
         "category": "Interior Design",
@@ -830,12 +776,6 @@
         }
       ],
       "outcome": null,
-      "sla": {
-        "ackHours": 24,
-        "dueAt": null,
-        "breached": false,
-        "breachedAt": null
-      },
       "events": [
         {
           "eventId": "ev-0031-4",
@@ -883,15 +823,9 @@
           "actorRole": "Operations",
           "outcome": "connected",
           "response": "Just the living and dining — kitchen was done two years ago and we are happy with it. Want it looking done before Diwali.",
-          "note": "Confirmed the requirement as submitted.",
-          "followUpAt": null
+          "note": "Confirmed the requirement as submitted."
         }
       ],
-      "owner": {
-        "id": "u-101",
-        "name": "R. Menon"
-      },
-      "followUpAt": null,
       "remarks": []
     },
     {
@@ -906,8 +840,8 @@
       },
       "customer": {
         "name": "Anjali R.",
-        "phone": "+91 99•••••••07",
-        "email": "a•••••@gmail.com"
+        "phone": "+91 99541 49607",
+        "email": "anjali.r@gmail.com"
       },
       "requirement": {
         "category": "Interior Design",
@@ -938,7 +872,7 @@
         "qualifiedBy": "R. Menon",
         "qualifiedByRole": "Operations"
       },
-      "status": "delivered",
+      "status": "assigned",
       "tier": "A",
       "createdAt": "2026-08-17T22:12:00+05:30",
       "activeAssignmentId": "as-0044-1",
@@ -970,20 +904,14 @@
         }
       ],
       "outcome": null,
-      "sla": {
-        "ackHours": 24,
-        "dueAt": "2026-08-18T22:14:00+05:30",
-        "breached": true,
-        "breachedAt": "2026-08-19T00:20:00+05:30"
-      },
       "events": [
         {
-          "eventId": "ev-0044-5",
-          "type": "SLA_BREACH",
-          "actor": "System",
-          "actorRole": "system",
-          "at": "2026-08-19T00:20:00+05:30",
-          "note": "Nightly sweep · status = Delivered AND acknowledgedAt IS NULL AND now > deliveredAt + 24h"
+          "eventId": "ev-0044-rm1",
+          "type": "REMARK",
+          "actor": "D. Kapoor",
+          "actorRole": "Operations lead",
+          "at": "2026-08-19T09:10:00+05:30",
+          "note": "Internal note added · 25 words"
         },
         {
           "eventId": "ev-0044-4",
@@ -1031,19 +959,13 @@
           "actorRole": "Operations",
           "outcome": "connected",
           "response": "Villa in Whitefield, four bedrooms. We get possession on the 12th and I would like work starting the week after.",
-          "note": "Confirmed the requirement as submitted.",
-          "followUpAt": null
+          "note": "Confirmed the requirement as submitted."
         }
       ],
-      "owner": {
-        "id": "u-101",
-        "name": "R. Menon"
-      },
-      "followUpAt": null,
       "remarks": [
         {
           "remarkId": "rm-0044-1",
-          "text": "Terra have gone quiet on the last two as well. If this one breaches too, it is a pattern and not a bad week.",
+          "text": "Terra have gone quiet on the last two as well. If this one goes unanswered too, it is a pattern and not a bad week.",
           "actor": "D. Kapoor",
           "actorRole": "Operations lead",
           "at": "2026-08-19T09:10:00+05:30"
@@ -1062,7 +984,7 @@
       },
       "customer": {
         "name": "Mohit S.",
-        "phone": "+91 98•••••••63",
+        "phone": "+91 98484 18363",
         "email": null
       },
       "requirement": {
@@ -1094,7 +1016,7 @@
         "qualifiedBy": "R. Menon",
         "qualifiedByRole": "Operations"
       },
-      "status": "acknowledged",
+      "status": "assigned",
       "tier": "B",
       "createdAt": "2026-08-16T11:20:00+05:30",
       "activeAssignmentId": "as-0041-1",
@@ -1127,7 +1049,6 @@
       ],
       "outcome": {
         "assignmentId": "as-0041-1",
-        "acknowledgedAt": "2026-08-16T15:00:00+05:30",
         "firstContactAt": "2026-08-16T16:12:00+05:30",
         "status": "in_progress",
         "outcome": null,
@@ -1136,21 +1057,7 @@
         "updatedBy": "Deco Nest Interiors",
         "updatedAt": "2026-08-16T16:12:00+05:30"
       },
-      "sla": {
-        "ackHours": 24,
-        "dueAt": "2026-08-17T11:22:00+05:30",
-        "breached": false,
-        "breachedAt": null
-      },
       "events": [
-        {
-          "eventId": "ev-0041-5",
-          "type": "ACKNOWLEDGED",
-          "actor": "Deco Nest Interiors",
-          "actorRole": "Business",
-          "at": "2026-08-16T15:00:00+05:30",
-          "note": "Acknowledged 3h 38m after delivery · within SLA"
-        },
         {
           "eventId": "ev-0041-4",
           "type": "DELIVERED",
@@ -1197,8 +1104,7 @@
           "actorRole": "Operations",
           "outcome": "connected",
           "response": "2BHK in Powai, renovation not a fresh fit-out. Timeline is open — sometime in the next two to three months.",
-          "note": "Corrected the form: it came in as 'full home interiors', it is a renovation.",
-          "followUpAt": null
+          "note": "Corrected the form: it came in as 'full home interiors', it is a renovation."
         },
         {
           "logId": "cl-0041-1",
@@ -1209,15 +1115,9 @@
           "actorRole": "Operations",
           "outcome": "no_answer",
           "response": null,
-          "note": "Rang out.",
-          "followUpAt": null
+          "note": "Rang out."
         }
       ],
-      "owner": {
-        "id": "u-101",
-        "name": "R. Menon"
-      },
-      "followUpAt": null,
       "remarks": []
     },
     {
@@ -1232,7 +1132,7 @@
       },
       "customer": {
         "name": "Fatima Z.",
-        "phone": "+91 96•••••••55",
+        "phone": "+91 96426 87055",
         "email": null
       },
       "requirement": {
@@ -1297,7 +1197,6 @@
       ],
       "outcome": {
         "assignmentId": "as-0038-1",
-        "acknowledgedAt": "2026-08-11T15:10:00+05:30",
         "firstContactAt": "2026-08-12T10:40:00+05:30",
         "status": "closed",
         "outcome": "converted",
@@ -1305,12 +1204,6 @@
         "notes": "Dining set plus two accent chairs.",
         "updatedBy": "Ambient Works",
         "updatedAt": "2026-08-19T17:26:00+05:30"
-      },
-      "sla": {
-        "ackHours": 24,
-        "dueAt": "2026-08-12T13:40:00+05:30",
-        "breached": false,
-        "breachedAt": null
       },
       "events": [
         {
@@ -1320,14 +1213,6 @@
           "actorRole": "Business",
           "at": "2026-08-19T17:26:00+05:30",
           "note": "Converted · Order placed · capacity released, Ambient Works 2→1"
-        },
-        {
-          "eventId": "ev-0038-5",
-          "type": "ACKNOWLEDGED",
-          "actor": "Ambient Works",
-          "actorRole": "Business",
-          "at": "2026-08-11T15:10:00+05:30",
-          "note": "Acknowledged 1h 30m after delivery"
         },
         {
           "eventId": "ev-0038-4",
@@ -1375,15 +1260,9 @@
           "actorRole": "Operations",
           "outcome": "connected",
           "response": "Mainly a dining set, six seater. Might add a couple of chairs for the living room if I like them.",
-          "note": "Confirmed the requirement as submitted.",
-          "followUpAt": null
+          "note": "Confirmed the requirement as submitted."
         }
       ],
-      "owner": {
-        "id": "u-101",
-        "name": "R. Menon"
-      },
-      "followUpAt": null,
       "remarks": []
     },
     {
@@ -1398,7 +1277,7 @@
       },
       "customer": {
         "name": "Rahul T.",
-        "phone": "+91 91•••••••20",
+        "phone": "+91 91369 55720",
         "email": null
       },
       "requirement": {
@@ -1489,7 +1368,6 @@
       ],
       "outcome": {
         "assignmentId": "as-0036-2",
-        "acknowledgedAt": "2026-08-10T12:44:00+05:30",
         "firstContactAt": "2026-08-10T18:02:00+05:30",
         "status": "closed",
         "outcome": "not_converted",
@@ -1497,12 +1375,6 @@
         "notes": "Customer is a year out. Asked to be contacted in Q1.",
         "updatedBy": "Casa Vista Design",
         "updatedAt": "2026-08-14T11:30:00+05:30"
-      },
-      "sla": {
-        "ackHours": 24,
-        "dueAt": "2026-08-11T09:05:00+05:30",
-        "breached": false,
-        "breachedAt": null
       },
       "events": [
         {
@@ -1512,14 +1384,6 @@
           "actorRole": "Business",
           "at": "2026-08-14T11:30:00+05:30",
           "note": "Not Converted · Timeline did not suit · capacity released"
-        },
-        {
-          "eventId": "ev-0036-7",
-          "type": "ACKNOWLEDGED",
-          "actor": "Casa Vista Design",
-          "actorRole": "Business",
-          "at": "2026-08-10T12:44:00+05:30",
-          "note": "Acknowledged 3h 39m after delivery"
         },
         {
           "eventId": "ev-0036-6",
@@ -1583,15 +1447,9 @@
           "actorRole": "Operations",
           "outcome": "connected",
           "response": "Nothing urgent — we are planning for next year, just want to understand what it costs and how long it takes.",
-          "note": "Confirmed the requirement as submitted.",
-          "followUpAt": null
+          "note": "Confirmed the requirement as submitted."
         }
       ],
-      "owner": {
-        "id": "u-101",
-        "name": "R. Menon"
-      },
-      "followUpAt": null,
       "remarks": []
     },
     {
@@ -1606,7 +1464,7 @@
       },
       "customer": {
         "name": "asdf asdf",
-        "phone": "+91 90•••••••11",
+        "phone": "+91 90312 24411",
         "email": null
       },
       "requirement": {
@@ -1650,12 +1508,6 @@
         "detectedAt": "2026-08-08T03:41:00+05:30",
         "note": "Detected at intake. Matching never ran — an invalid enquiry is not scored."
       },
-      "sla": {
-        "ackHours": 24,
-        "dueAt": null,
-        "breached": false,
-        "breachedAt": null
-      },
       "events": [
         {
           "eventId": "ev-0035-2",
@@ -1672,17 +1524,20 @@
           "actorRole": "system",
           "at": "2026-08-08T03:41:00+05:30",
           "note": "funnel/interior-design-delhi · submission_id 0aa4…ff · raw payload retained"
+        },
+        {
+          "eventId": "ev-0035-tg-spam-s",
+          "type": "TAGGED",
+          "actor": "R. Menon",
+          "actorRole": "Operations",
+          "at": "2026-08-08T03:41:00+05:30",
+          "note": "Added Spam suspected"
         }
       ],
       "tags": [
         "spam-suspected"
       ],
       "contactLog": [],
-      "owner": {
-        "id": "u-101",
-        "name": "R. Menon"
-      },
-      "followUpAt": null,
       "remarks": []
     }
   ]

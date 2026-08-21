@@ -82,9 +82,8 @@ export const GROUPS: ColGroup[] = [
   {
     key: "handling",
     label: "How it is being worked",
-    note: "Owner, tags, qualification progress. Counts only — no contact-log text and no remark text, ever.",
+    note: "Tags and qualification progress. Counts only — no contact-log text and no remark text, ever.",
     cols: [
-      { head: "owner", get: (e) => (e.owner ? e.owner.name : "unclaimed") },
       { head: "tags", get: (e) => e.tags.join(" ") },
       { head: "checks_confirmed", get: (e) => 4 - checklistMissing(e).length },
       { head: "contact_attempts", get: (e) => e.contactLog.length },
@@ -93,7 +92,6 @@ export const GROUPS: ColGroup[] = [
       { head: "remark_count", get: (e) => e.remarks.length },
       { head: "ever_reached", get: (e) => (everReached(e) ? "yes" : "no") },
       { head: "last_contact_at", get: (e) => txt(e.contactLog[0]?.at) },
-      { head: "callback_due_at", get: (e) => txt(e.followUpAt) },
       { head: "qualified_by", get: (e) => txt(e.qualification.qualifiedBy) },
       { head: "qualified_at", get: (e) => txt(e.qualification.frozenAt) },
     ],
@@ -106,8 +104,6 @@ export const GROUPS: ColGroup[] = [
       { head: "assigned_business", get: (e) => txt(activeAssignment(e)?.businessName) },
       { head: "assigned_at", get: (e) => txt(activeAssignment(e)?.assignedAt) },
       { head: "assigned_by", get: (e) => txt(activeAssignment(e)?.assignedBy) },
-      { head: "sla_breached", get: (e) => (e.sla.breached ? "yes" : "no") },
-      { head: "acknowledged_at", get: (e) => txt(e.outcome?.acknowledgedAt) },
       { head: "outcome", get: (e) => txt(e.outcome?.outcome) },
       { head: "outcome_reason", get: (e) => txt(e.outcome?.reason) },
     ],
@@ -179,8 +175,6 @@ export function fileNameFor(p: Record<string, string | undefined>, count: number
   if (p.category) bits.push(p.category.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
   if (p.city) bits.push(p.city.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
   if (p.source) bits.push(p.source);
-  if (p.owner) bits.push("owner-" + p.owner.replace(/^__/, "").toLowerCase().replace(/[^a-z0-9]+/g, "-"));
-  if (p.flag) bits.push(p.flag);
   bits.push(String(count));
   bits.push(new Date().toISOString().slice(0, 10));
   return bits.join("_") + ".csv";
@@ -213,11 +207,7 @@ export function scopeSentence(p: Record<string, string | undefined>, count: numb
   if (p.category) parts.push("in " + p.category);
   if (p.city) parts.push("in " + p.city);
   if (p.source) parts.push("from " + sourceOf(p.source).label);
-  if (p.owner === "__none") parts.push("unclaimed");
-  else if (p.owner === "__mine") parts.push("owned by you");
-  else if (p.owner) parts.push("owned by " + p.owner);
   if (p.tag) parts.push("tagged " + p.tag);
-  if (p.flag) parts.push(p.flag === "overdue" ? "with an overdue callback" : p.flag.replace(/_/g, " "));
   if (p.q) parts.push('matching "' + p.q + '"');
   return count + " of " + total + " enquiries" +
     (parts.length ? " — " + parts.join(", ") : "") + ".";

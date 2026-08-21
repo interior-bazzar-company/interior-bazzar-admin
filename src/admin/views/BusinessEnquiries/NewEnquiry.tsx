@@ -18,7 +18,7 @@
      · a submission id, prefixed `man-` so the origin is legible in the id
      · the SAME duplicate check every inbound enquiry gets — run as you type the
        phone number, shown before the record exists rather than reported after
-     · it lands in Generated and must be qualified by a person like any other.
+     · it lands in New and must be qualified by a person like any other.
        Typing it yourself buys no shortcut past the gate; the checklist starts
        empty even though you have just had the conversation
      · and one thing an inbound enquiry cannot record: who typed it
@@ -234,7 +234,7 @@ export default function NewEnquiryModal({ onClose, onDone }: {
         ) : null}
 
         <InfoNote ico="shield"
-          short={<><b>It still has to be qualified.</b> This lands in <b>Generated</b> with an empty checklist.</>}>
+          short={<><b>It still has to be qualified.</b> This lands in <b>New</b> with an empty checklist.</>}>
           No snapshot, exactly like a funnel submission — even though you have just spoken to the
           customer. Typing it yourself buys no shortcut past the gate, because the gate is what a
           business is trusting when it accepts the enquiry.

@@ -7,7 +7,7 @@
 
    The old routing queue held unassigned enquiries and REMOVED them on assign —
    one audit line was all that survived. This list holds an enquiry for its
-   whole life: Ready → Assigned → Delivered → Acknowledged → outcome.
+   whole life: New → Processing → Qualified → Assigned → outcome.
    Assignment is a transition, not a deletion, which is why the table has a
    State column and an Assigned-to column that keep working after the routing
    decision is made.
@@ -20,22 +20,22 @@
    qualification gate) are kept by the FORM rather than by the button not
    existing, which is what they always needed to be.
    ============================================================================= */
-import { useState } from "react";
-import { EmptyState, FilterChips, Icon, ListSkeleton, SearchField, Select, StatStrip, qs } from "../../ui";
+import { EmptyState, FilterChips, Icon, ListSkeleton, SearchField, StatStrip, qs } from "../../ui";
 import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import { useShell } from "../../shell/ShellContext";
 import ExportModal from "./ExportModal";
 import { can } from "../../shell/AdminShell";
 import {
-  AgeCell, FollowUpCell, InfoNote, OwnerCell, ProtoBar, SourceChip, StatusPill, TagChips,
+  AgeCell, InfoNote, ProtoBar, SourceChip, StatusPill, TagChips,
   TierBadge, UrgencyChip,
 } from "./bits";
 import {
-  RECEIVED_RANGES, SOURCES, STATES, TAGS, TEAM, TIERS, VOCAB, ageLabel, assignedName,
-  checklistMissing, countsOf, everReached, filterEnquiries, followUpOverdue, lastResponse, place,
-  receivedLabel, resetStore, runSlaSweep, sortEnquiries, statusOf,
+  RECEIVED_RANGES, SOURCES, STATES, TAGS, TIERS, VOCAB, assignedName,
+  checklistMissing, countsOf, everReached, filterEnquiries, isWorking, lastResponse, place,
+  receivedLabel, resetStore, sortEnquiries, statusOf,
 } from "./store";
+import { FilterSelect } from "./FilterSelect";
 import type { Enquiry, Params } from "./store";
 
 const ROUTE = "#/business-enquiries";
@@ -58,29 +58,31 @@ export const enquiryHash = (id: string, p: Params) =>
    THE ATTENTION STRIP — what needs a human, and nothing else.
    -----------------------------------------------------------------------------
    It had grown to fifteen cells: every lifecycle state, both ownership
-   questions, and every flag. At that size it had stopped being an attention
+   questions, and every flag. (Ownership and callbacks have since been removed
+   from the module outright — see the 2026-08-21 changelog.) At that size it had stopped being an attention
    surface and become a second copy of the Status dropdown, printed permanently
    across the top of the page. A row where everything is highlighted highlights
    nothing.
 
-   FIVE CELLS SURVIVE, and the test each one passes is the same: somebody has to
+   FOUR CELLS SURVIVE, and the test each one passes is the same: somebody has to
    DO something about this number today.
 
-     untouched     nobody has contacted this customer at all
-     overdue       we promised to ring back and did not
-     ready         qualified, matched, and waiting on a routing decision
-     SLA breached  a business has had it for a day and not answered
-     no eligible   matching found nobody — a supply gap, not a bad enquiry
+     New             nobody has contacted this customer at all
+     qualified       confirmed and frozen, waiting on the routing decision
+     no match yet    matching found no business — a supply gap, not a bad enquiry
 
-   Each is a different KIND of failure — ours, ours, ours-pending,
-   theirs, nobody's — which is why five is the number rather than three.
+   Each is a different KIND of thing to do — ours-now, ours-pending, nobody's
+   fault — which is why three is the number rather than one.
+
+   There was a fifth, "SLA breached", and it was the only cell measuring a
+   BUSINESS rather than us. It went with the SLA logic on 2026-08-21, and with
+   it went the strip's ability to show a hand-off going quiet. Nothing replaced
+   it; see that day's changelog entry.
 
    What went, and where it went instead. Nothing lost a filter:
 
-     in qualification, assigned, delivered,     → the Status filter
-     acknowledged, converted, invalid
-     mine, unclaimed                            → the Owner filter
-     callback due (scheduled, not yet late)     → the "Callback soonest" sort
+     processing, assigned, converted,           → the Status filter
+     rejected
 
    Those are states you look things up BY, not work waiting to be done, and they
    already have a control each. The strip is for the second kind.
@@ -89,86 +91,57 @@ export const enquiryHash = (id: string, p: Params) =>
    delete" — and the row expands automatically when one of the hidden filters is
    active, because a filter you cannot see is a filter you cannot clear.
    ============================================================================= */
+/* THE TOOLTIP TEXT, from content rather than from here. Each cell says what its
+   number counts and what pressing it filters to — the second half matters most,
+   because a count and the filter behind it can drift apart and the number IS the
+   control. `check:wiring` asserts they agree.
+
+   Two elements rather than one string with a blank line in it, because the two
+   halves answer different questions and the stylesheet rules the second one off
+   and quietens it. That is also why this is a `tip` and no longer a `title`: the
+   native tooltip cannot draw a rule, cannot be themed, truncates, waits about a
+   second, and never opens on keyboard focus — so the help was unreachable
+   without a mouse. A read-on-hover popover would be worse still: fourteen small
+   targets in a row, each leaving something that has to be dismissed. */
+const CELL_HELP: Record<string, { counts: string; does: string }> = {};
+VOCAB.attentionCells.forEach((c) => { CELL_HELP[c.key] = c; });
+const helpFor = (k: string) => {
+  const h = CELL_HELP[k];
+  return h ? <><span className="t">{h.counts}</span><span className="d">{h.does}</span></> : undefined;
+};
+
 export function AttnStrip({ list, p }: { list: Enquiry[]; p: Params }) {
   const m = countsOf(list);
-  const [open, setOpen] = useState(false);
 
   const statusRoute = (s: string) =>
-    listHash(merge(omit(p, ["flag", "tag"]), { status: p.status === s ? "" : s }));
-  const flagRoute = (f: string) =>
-    listHash(merge(omit(p, ["status", "tag"]), { flag: p.flag === f ? "" : f }));
-  const tagRoute = (t: string) =>
-    listHash(merge(omit(p, ["status", "flag"]), { tag: p.tag === t ? "" : t }));
-  const ownerRoute = (o: string) =>
-    listHash(merge(omit(p, ["flag"]), { owner: p.owner === o ? "" : o }));
+    listHash(merge(omit(p, ["tag"]), { status: p.status === s ? "" : s }));
 
-  /* A hidden cell that is CURRENTLY the active filter has to be visible, or the
-     only way back to the full list is the chip row and a guess. */
-  const secondaryOn =
-    p.owner === "__mine" || p.owner === "__none" || p.flag === "followup" ||
-    ["generated", "assigned", "delivered", "acknowledged", "converted", "invalid"]
-      .indexOf(p.status || "") >= 0;
-  const showAll = open || secondaryOn;
-  /* Expanded by a filter rather than by a press — the distinction the button
-     label depends on. */
-  const heldOpen = secondaryOn && !open;
-
-  const primary: (StatCell | "sep")[] = [
-    { k: "total", v: m.total,
-      to: listHash(omit(p, ["status", "flag", "tag", "owner"])),
-      on: !p.status && !p.flag && !p.tag && !p.owner },
+  const cells: (StatCell | "sep")[] = [
+    { k: "total", v: m.total, tip: helpFor("total"),
+      to: listHash(omit(p, ["status", "tag"])),
+      on: !p.status && !p.tag },
     "sep",
-    /* Ours, and the worst of the five: nobody has spoken to this customer. */
-    { k: "untouched", v: m.untouched, to: tagRoute("new-enquiry"),
-      on: p.tag === "new-enquiry", tone: m.untouched ? "bad" : "" },
-    /* Also ours, and worse in kind — we said we would ring and did not. */
-    { k: "overdue", v: m.callbackOverdue, to: flagRoute("overdue"),
-      on: p.flag === "overdue", tone: m.callbackOverdue ? "bad" : "" },
-    /* Ours, pending: the routing decision this module exists to make. */
-    { k: "ready", v: m.byStatus.ready || 0, to: statusRoute("ready"),
-      on: p.status === "ready", tone: (m.byStatus.ready || 0) ? "warn" : "" },
+    { k: "New", v: m.byStatus.generated || 0, to: statusRoute("generated"), tip: helpFor("New"),
+      on: p.status === "generated", tone: (m.byStatus.generated || 0) ? "bad" : "" },
+    { k: "processing", v: m.byStatus.processing || 0, to: statusRoute("processing"),
+      on: p.status === "processing", tip: helpFor("processing") },
+    { k: "qualified", v: m.byStatus.qualified || 0, to: statusRoute("qualified"), tip: helpFor("qualified"),
+      on: p.status === "qualified", tone: (m.byStatus.qualified || 0) ? "warn" : "" },
+    { k: "no match yet", v: m.noEligible, to: statusRoute("no_match"), tip: helpFor("no match yet"),
+      on: p.status === "no_match", tone: m.noEligible ? "warn" : "" },
     "sep",
-    /* Theirs: a business has had it for a day and said nothing. */
-    { k: "SLA breached", v: m.breached, to: flagRoute("breached"),
-      on: p.flag === "breached", tone: m.breached ? "bad" : "" },
-    /* Nobody's fault — a coverage gap, and the only cell here that is a
-       business-development worklist rather than an operations one. */
-    { k: "no eligible", v: m.noEligible, to: flagRoute("no_eligible"),
-      on: p.flag === "no_eligible", tone: m.noEligible ? "warn" : "" },
+    { k: "assigned", v: m.byStatus.assigned || 0, to: statusRoute("assigned"),
+      on: p.status === "assigned", tip: helpFor("assigned") },
+    "sep",
+    { k: "converted", v: m.converted, to: statusRoute("converted"), on: p.status === "converted",
+      tone: "ok", tip: helpFor("converted") },
+    { k: "rejected", v: m.invalid, to: statusRoute("invalid"), on: p.status === "invalid",
+      tip: helpFor("rejected") },
   ];
-
-  const secondary: (StatCell | "sep")[] = [
-    "sep",
-    { k: "mine", v: m.mine, to: ownerRoute("__mine"), on: p.owner === "__mine" },
-    { k: "unclaimed", v: m.unowned, to: ownerRoute("__none"), on: p.owner === "__none" },
-    { k: "in qualification", v: m.qualifying, to: statusRoute("generated"), on: p.status === "generated" },
-    { k: "callback due", v: m.callbackDue - m.callbackOverdue, to: flagRoute("followup"), on: p.flag === "followup" },
-    "sep",
-    { k: "assigned", v: m.byStatus.assigned || 0, to: statusRoute("assigned"), on: p.status === "assigned" },
-    { k: "delivered", v: m.byStatus.delivered || 0, to: statusRoute("delivered"), on: p.status === "delivered" },
-    { k: "acknowledged", v: m.byStatus.acknowledged || 0, to: statusRoute("acknowledged"), on: p.status === "acknowledged" },
-    "sep",
-    { k: "converted", v: m.converted, to: statusRoute("converted"), on: p.status === "converted", tone: "ok" },
-    { k: "invalid", v: m.invalid, to: statusRoute("invalid"), on: p.status === "invalid" },
-  ];
-
-  const hidden = secondary.filter((c) => c !== "sep").length;
 
   return (
     <div className="be-attn">
-      <StatStrip cells={showAll ? primary.concat(secondary) : primary} />
-      {/* Held open, not merely expanded, while one of the hidden filters is
-          active: the row is only showing because of that filter, so the control
-          says so instead of offering a "Fewer" that cannot work. A disabled
-          button labelled with the thing it will not do reads as broken. */}
-      <button className="be-attn-more" aria-expanded={showAll}
-        disabled={heldOpen}
-        title={heldOpen
-          ? "One of these counts is the active filter — clear it to collapse the row"
-          : undefined}
-        onClick={() => setOpen(!open)}>
-        {heldOpen ? "Filtered" : showAll ? "Fewer" : "+" + hidden + " more"}
-      </button>
+      <StatStrip cells={cells} />
     </div>
   );
 }
@@ -198,10 +171,7 @@ export default function List({ all, p, sel, onFilter, onSearch, onUnfilter, toas
     <div className="dls be-list">
       <ProtoBar
         onReset={() => { resetStore(); toast("Seed data restored."); }}
-        onSweep={() => {
-          const n = runSlaSweep();
-          toast(n ? n + " enquiry flagged as breached." : "Nothing past its acknowledgement threshold.");
-        }} />
+ />
 
       {/* ============================================================ COMMANDS ===
           Two bands, and the split is by KIND rather than by how much fits on a
@@ -239,52 +209,65 @@ export default function List({ all, p, sel, onFilter, onSearch, onUnfilter, toas
           : null}
       </div>
 
-      <div className="be-filters-grid">
-        <Select name="status" label="Status" value={p.status} onFilter={onFilter}
-          options={VOCAB.statuses.map((x) => ({ v: x.key, l: x.label }))} />
-        <Select name="owner" label="Owner" value={p.owner} onFilter={onFilter}
-          options={[{ v: "__mine", l: "Mine" }, { v: "__none", l: "Unclaimed" }]
-            .concat(TEAM.map((t) => ({ v: t.name, l: t.name })))} />
-        <Select name="category" label="Category" value={p.category} onFilter={onFilter}
-          options={VOCAB.categories.map((x) => ({ v: x, l: x }))} />
-        <Select name="city" label="City" value={p.city} onFilter={onFilter}
-          options={VOCAB.cities.map((x) => ({ v: x, l: x }))} />
-        <Select name="state" label="State" value={p.state} onFilter={onFilter}
-          options={STATES.map((x) => ({ v: x, l: x }))} />
-        <Select name="urgency" label="Urgency" value={p.urgency} onFilter={onFilter}
-          options={VOCAB.urgency.map((u) => ({ v: u.key, l: u.label }))} />
-        <Select name="tier" label="Tier" value={p.tier} onFilter={onFilter}
-          options={TIERS.map((t) => ({ v: t.key, l: t.label }))} />
-        <Select name="source" label="From" value={p.source} onFilter={onFilter}
-          options={SOURCES.map((x) => ({ v: x.key, l: x.label }))} />
-        <Select name="tag" label="Tag" value={p.tag} onFilter={onFilter}
-          options={TAGS.map((t) => ({ v: t.slug, l: t.label }))} />
-        {/* Business is a filter and never a column you can sort a leaderboard
-            by: it answers "what have we given them lately?", which is a
-            fairness question, and fairness is a scoring factor. */}
-        <Select name="business" label="Business" value={p.business} onFilter={onFilter}
-          options={businesses.map((b) => ({ v: b, l: b }))} />
-        <Select name="received" label="Received" value={p.received} onFilter={onFilter}
-          options={RECEIVED_RANGES.map((r) => ({ v: r.key, l: r.label }))} />
-        <Select name="sort" label="Sort: Needs attention" value={p.sort} onFilter={onFilter}
-          options={[
-            { v: "touch", l: "Least worked first" },
-            { v: "followup", l: "Callback soonest" },
-            { v: "age", l: "Oldest first" },
-            { v: "step", l: "Lifecycle step" },
-            { v: "tier", l: "Tier" },
-          ]} />
-        {/* The two ends of a custom window appear only when one is asked for,
-            and take a full grid cell each so they line up with the selects
-            rather than squeezing in beside one. */}
-        {p.received === "custom" ? (
-          <>
-            <input type="date" className="be-date" value={p.from || ""} aria-label="Received from"
-              onChange={(ev) => onFilter("from", ev.target.value)} />
-            <input type="date" className="be-date" value={p.to || ""} aria-label="Received up to"
-              onChange={(ev) => onFilter("to", ev.target.value)} />
-          </>
-        ) : null}
+      {/* SORT IS NOT A FILTER, and sharing a grid cell with ten of them said
+          it was. It also did not fit: "Sort: Needs attention" is wider than a
+          158px cell, so the control shipped reading "Sort: Needs attentio". It
+          now sits in its own slot at the end of the band, ruled off, at whatever
+          width its longest label needs. */}
+      <div className="be-filterbar">
+        <div className="be-filters-grid">
+          {/* A status carries its own tone, so the list can be scanned by
+              colour — and it is the same dot the rows use. */}
+          <FilterSelect name="status" label="Status" value={p.status} onFilter={onFilter}
+            options={VOCAB.statuses.map((x) => ({ v: x.key, l: x.label, dot: "s-" + x.key }))} />
+          <FilterSelect name="category" label="Category" value={p.category} onFilter={onFilter}
+            options={VOCAB.categories.map((x) => ({ v: x, l: x }))} />
+          <FilterSelect name="city" label="City" value={p.city} onFilter={onFilter}
+            options={VOCAB.cities.map((x) => ({ v: x, l: x }))} />
+          <FilterSelect name="state" label="State" value={p.state} onFilter={onFilter}
+            options={STATES.map((x) => ({ v: x, l: x }))} />
+          {/* A ramp, not four arbitrary colours: the sooner they want to start,
+              the hotter the dot, and "browsing" is hollow because it is not a
+              date at all. Ordinal data should look ordinal. */}
+          <FilterSelect name="urgency" label="Urgency" value={p.urgency} onFilter={onFilter}
+            options={VOCAB.urgency.map((u) => ({ v: u.key, l: u.label, dot: "u-" + u.key }))} />
+          <FilterSelect name="tier" label="Tier" value={p.tier} onFilter={onFilter}
+            options={TIERS.map((t) => ({ v: t.key, l: t.label, badge: t.key }))} />
+          <FilterSelect name="source" label="From" value={p.source} onFilter={onFilter}
+            options={SOURCES.map((x) => ({ v: x.key, l: x.label }))} />
+          {/* Tags are chips everywhere else in the module; a list of plain
+              words would have been the one place they are not. */}
+          <FilterSelect name="tag" label="Tag" value={p.tag} onFilter={onFilter}
+            options={TAGS.map((t) => ({ v: t.slug, l: t.label, chip: { tone: t.tone, auto: t.auto } }))} />
+          {/* Business is a filter and never a column you can sort a leaderboard
+              by: it answers "what have we given them lately?", which is a
+              fairness question, and fairness is a scoring factor. */}
+          <FilterSelect name="business" label="Business" value={p.business} onFilter={onFilter}
+            options={businesses.map((b) => ({ v: b, l: b }))} />
+          <FilterSelect name="received" label="Received" value={p.received} onFilter={onFilter}
+            options={RECEIVED_RANGES.map((r) => ({ v: r.key, l: r.label }))} />
+          {/* The two ends of a custom window appear only when one is asked for,
+              and take a full grid cell each so they line up with the selects
+              rather than squeezing in beside one. */}
+          {p.received === "custom" ? (
+            <>
+              <input type="date" className="be-date" value={p.from || ""} aria-label="Received from"
+                onChange={(ev) => onFilter("from", ev.target.value)} />
+              <input type="date" className="be-date" value={p.to || ""} aria-label="Received up to"
+                onChange={(ev) => onFilter("to", ev.target.value)} />
+            </>
+          ) : null}
+        </div>
+
+        <div className="be-sortslot">
+          <FilterSelect name="sort" label="Sort: Needs attention" value={p.sort} onFilter={onFilter}
+            options={[
+              { v: "touch", l: "Least worked first" },
+              { v: "age", l: "Oldest first" },
+              { v: "step", l: "Lifecycle step" },
+              { v: "tier", l: "Tier" },
+            ]} />
+        </div>
       </div>
 
       <AttnStrip list={all} p={p} />
@@ -300,13 +283,13 @@ export default function List({ all, p, sel, onFilter, onSearch, onUnfilter, toas
         onUnfilter={(k) => onUnfilter(k === "received" ? "received+from+to" : k)}
         labels={{
           q: "Search", status: "Status", category: "Category", city: "City",
-          urgency: "Urgency", tier: "Tier", business: "Business", flag: "Flag", tag: "Tag",
-          owner: "Owner", source: "From", received: "Received", state: "State",
+          urgency: "Urgency", tier: "Tier", business: "Business", tag: "Tag",
+          source: "From", received: "Received", state: "State",
         }} />
 
       <div className="dls-body">
         {rows.length
-          ? <Rows rows={rows} p={p} sel={sel} />
+          ? <Rows rows={rows} p={p} sel={sel} load={businessLoad(all)} />
           : <EmptyState icon="inbox"
               title={filtered ? "No enquiries match these filters" : "No enquiries yet"}
               body={filtered
@@ -345,7 +328,25 @@ function LastResponseCell({ e }: { e: Enquiry }) {
   return <span className="be-resp untouched">Not contacted</span>;
 }
 
-function Rows({ rows, p, sel }: { rows: Enquiry[]; p: Params; sel: string | null }) {
+/* HOW MANY LIVE ENQUIRIES EACH BUSINESS IS HOLDING.
+   Counted from the whole set and never from the filtered rows: the badge means
+   "this business currently has N", and a number that shrank because somebody
+   filtered by city would be answering a different question with the same mark.
+   Live only — `assigned` is the one state where a business owes us something,
+   so a business that converted forty last quarter does not read as buried. */
+function businessLoad(all: Enquiry[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  all.forEach((e) => {
+    if (e.status !== "assigned") return;
+    const n = assignedName(e);
+    if (n) out[n] = (out[n] || 0) + 1;
+  });
+  return out;
+}
+
+function Rows({ rows, p, sel, load }: {
+  rows: Enquiry[]; p: Params; sel: string | null; load: Record<string, number>;
+}) {
   return (
     <table className="tbl be-tbl">
       <thead>
@@ -356,8 +357,6 @@ function Rows({ rows, p, sel }: { rows: Enquiry[]; p: Params; sel: string | null
           <th>From</th>
           <th>Category · location</th>
           <th>Urgency</th>
-          <th>Owner</th>
-          <th>Callback</th>
           <th>Status</th>
           <th>Last response</th>
           <th>Assigned to</th>
@@ -367,11 +366,10 @@ function Rows({ rows, p, sel }: { rows: Enquiry[]; p: Params; sel: string | null
       <tbody>
         {rows.map((e) => {
           const to = enquiryHash(e.enquiryId, p);
-          /* Ordered by who is waiting on whom: a customer we promised to ring
-             back, then a business we are waiting on, then a supply gap. */
-          const rail = followUpOverdue(e) || e.sla.breached ? "bad"
-            : e.exception ? "warn"
-            : e.status === "ready" ? "rd" : "";
+          /* One rail state left: a supply gap, which is the only condition a
+             row can be in that somebody has to act on from the list itself. */
+          const rail = e.status === "no_match" ? "warn"
+            : e.status === "qualified" ? "rd" : "";
           const dim = statusOf(e.status).terminal;
           return (
             <tr key={e.enquiryId}
@@ -382,9 +380,15 @@ function Rows({ rows, p, sel }: { rows: Enquiry[]; p: Params; sel: string | null
               <td>
                 <div className="cell-1">
                   {e.customer.name}
-                  {e.exception ? <> <span className="pill warn xs">No eligible business</span></> : null}
                 </div>
-                <div className="cell-2 mono">{e.enquiryId} · {e.customer.phone}</div>
+                <div className="cell-2 mono">
+                  {e.enquiryId}{" · "}
+                  {/* The number wraps as ONE unit. Unmasking it made the line
+                      long enough to break, and a phone split across two lines
+                      ("+91" / "98100 00027") is a number nobody can read or
+                      copy at a glance. */}
+                  <span className="nowrap">{e.customer.phone}</span>
+                </div>
                 <TagChips tags={e.tags} max={3} />
                 {/* THAT there are internal notes, never what they say. Somebody
                     scanning the queue should know a colleague has already
@@ -403,16 +407,11 @@ function Rows({ rows, p, sel }: { rows: Enquiry[]; p: Params; sel: string | null
                 <div className="cell-2">{place(e)}</div>
               </td>
               <td><UrgencyChip urgency={e.qualification.urgency} /></td>
-              <td><OwnerCell owner={e.owner} /></td>
-              <td><FollowUpCell e={e} /></td>
               <td>
                 <StatusPill status={e.status} />
-                {e.sla.breached && e.sla.dueAt
-                  ? <div className="cell-2 be-late">SLA +{ageLabel(e.sla.dueAt)}</div>
-                  : null}
-                {/* For an enquiry still being qualified, the useful second line
-                    is not an SLA — it is how far through the checklist it is. */}
-                {e.status === "generated"
+                {/* For an enquiry still being qualified, the useful second
+                    line is how far through the checklist it is. */}
+                {isWorking(e.status)
                   ? <div className="cell-2">{4 - checklistMissing(e).length} of 4 confirmed</div>
                   : null}
               </td>
@@ -421,7 +420,17 @@ function Rows({ rows, p, sel }: { rows: Enquiry[]; p: Params; sel: string | null
                   never the same, and it is what tells an operator which one to
                   open. Truncated by CSS, in full on hover. */}
               <td className="be-resp-c">{<LastResponseCell e={e} />}</td>
-              <td>{assignedName(e) || <span className="faint">—</span>}</td>
+              <td>{assignedName(e)
+                ? <span className="be-biz">
+                    <span className="nm">{assignedName(e)}</span>
+                    <span className={"ct tnum" + (load[assignedName(e)] ? "" : " zero")}
+                      title={assignedName(e) + " is holding " + (load[assignedName(e)] || 0)
+                        + " live enquir" + ((load[assignedName(e)] || 0) === 1 ? "y" : "ies")
+                        + " right now, across the whole queue — not just the rows in view."}>
+                      {load[assignedName(e)] || 0}
+                    </span>
+                  </span>
+                : <span className="faint">—</span>}</td>
               <td className="n"><AgeCell e={e} /></td>
             </tr>
           );

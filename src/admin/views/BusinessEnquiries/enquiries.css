@@ -21,21 +21,27 @@
 /* ------------------------------------------------------------ the list --- */
 /* Eight columns, two of them prose. Without a floor the browser squeezes the
    response column to a word a line long before it ever offers a scrollbar. */
-.be-list .be-tbl { width: 100%; min-width: 1160px }
+/* The floor exists so ten columns cannot crush into unreadable slivers; it is
+   NOT a target width. It was 1160px, set when the table had twelve columns, and
+   survived the removal of Owner and Callback — which left it 200px wider than
+   the table needs and forced a horizontal scrollbar on a 1280px laptop for no
+   reason. 960px is the measured natural width of the ten columns that remain. */
+.be-list .be-tbl { width: 100%; min-width: 960px }
 .be-list .be-tbl th { background: var(--bg) }
 .be-list .be-tbl td { height: auto; padding: var(--space-2) var(--space-3) }
 .be-list .be-tbl td.rail { width: 3px; padding: 0 }
 .be-list .be-tbl td.rail i {
   display: block; width: 3px; height: 42px; border-radius: 0 2px 2px 0; background: transparent;
 }
-/* The rail is the only place a row shouts. Breached is red because someone has
-   to act; "no eligible business" is amber because it is a supply gap, not a
-   failure; Ready is neutral-strong because it is simply next. */
-.be-list .be-tbl tr.be-r-bad td.rail i { background: var(--bad) }
+/* The rail is the only place a row shouts, and after ownership, callbacks and
+   the SLA were removed it has two states rather than four: "no match yet" is
+   amber because it is a supply gap and not a failure, and Qualified is
+   neutral-strong because it is simply next. There is no red left — nothing in
+   the module is late any more, because nothing is owed by a time. */
 .be-list .be-tbl tr.be-r-warn td.rail i { background: var(--warn) }
 .be-list .be-tbl tr.be-r-rd td.rail i { background: var(--line-strong) }
 /* Fourteen cells do not fit a laptop, and the shared strip scrolls
-   horizontally — which put Converted and Invalid permanently off the right
+   horizontally — which put Converted and Rejected permanently off the right
    edge, invisible unless you knew to drag. Wrapping keeps every count on
    screen and costs one row only when it has to. */
 /* The strip and its disclosure sit on one line, sharing the band's rules and
@@ -45,41 +51,10 @@
   border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
 }
 .be-attn > .dls-attn { flex: 1 1 auto; border: 0 }
+/* Visible, not the theme's default `auto`, for two reasons that both matter:
+   a wrapped strip must not become a scroller, and an `auto` band would clip its
+   own cell tooltips, which hang below it. */
 .be-list .dls-attn { flex-wrap: wrap; overflow-x: visible; row-gap: 0 }
-/* Quiet: it reveals counts rather than filtering anything, so it must not read
-   as a fifteenth cell. */
-.be-attn-more {
-  flex: 0 0 auto; padding: 0 var(--page-pad) 0 var(--space-3);
-  border: 0; background: none; cursor: pointer; white-space: nowrap;
-  font-size: var(--text-sm); color: var(--text-3);
-}
-.be-attn-more:hover:not(:disabled) { color: var(--brand-text) }
-.be-attn-more:disabled { cursor: default; opacity: .55 }
-/* Every band on this page starts at the same x: the actions, the filter grid,
-   the strip, the chips and the table. They were four different insets, which is
-   what "align content" was pointing at. */
-.be-list > .chiprow { padding: 0 var(--page-pad); margin: var(--space-2) 0 var(--space-3) }
-.be-list .dls-attn .dls-sep { align-self: stretch }
-
-.be-late { color: var(--bad); font-weight: var(--weight-medium) }
-
-/* Owner, and the absence of one. Unowned is styled as a state rather than a
-   dash: with a team working the same queue, nobody-owns-this is the condition
-   that produces two people ringing one customer. */
-.be-owner { display: inline-flex; align-items: center; gap: 5px; font-size: var(--text-md) }
-.be-owner.none { color: var(--bad) }
-.be-owner .av {
-  display: grid; place-items: center; width: 20px; height: 20px; flex: 0 0 20px;
-  border-radius: var(--radius-full); background: var(--bg-active);
-  font-size: var(--text-2xs); font-weight: var(--weight-semibold); color: var(--text-2);
-}
-
-/* A promised callback. Overdue is the loudest thing in the module, above a
-   breached SLA — that one is a business failing to answer us, this one is us
-   failing a customer we personally promised to ring. */
-.be-due { font-size: var(--text-sm); white-space: nowrap; color: var(--text-2) }
-.be-due.over { color: var(--bad); font-weight: var(--weight-semibold) }
-.be-due.none { color: var(--text-3) }
 
 /* The prototype banner. Deliberately loud: a demo that looks live and is not
    is worse than no demo. */
@@ -121,24 +96,10 @@
   display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
 }
 
-/* The owner sits at the head of the subline rather than in a card of its own.
-   It is one fact and one action, and it needs to be the first thing read on a
-   record somebody is deciding whether to pick up. */
-.be-ownerbar { display: inline-flex; align-items: center; gap: var(--space-2) }
-.be-ownersel {
-  height: var(--control-xs); max-width: 150px; padding: 0 var(--space-1);
-  border: 1px solid var(--line-2); border-radius: var(--radius-sm);
-  background: var(--bg); color: var(--text-2); font-size: var(--text-sm);
-}
-.be-ownersel:hover { border-color: var(--line-control) }
-
 /* `.be-tier-h` and the `.be-idbar .be-tier` width override lived here. Together
    they turned the tier badge in the record header into a full-width black bar
    with its help text spilling out underneath — see TierBadge in bits.tsx for
    the mechanism. Both are gone; the badge is a 20px square everywhere. */
-
-/* The callback line inside a logged contact entry. */
-.be-log-i .be-due { margin-top: 5px; display: flex; align-items: center; gap: 4px }
 
 /* THE LIFECYCLE RAIL. Nine states read as one line, so it fits above the tabs
    instead of taking a card of its own. Steps behind you are filled, the one you
@@ -170,6 +131,21 @@
 .be-step.on i { background: var(--brand); border-color: var(--brand); box-shadow: 0 0 0 3px var(--bg-selected) }
 .be-step.on b { color: var(--text); font-weight: var(--weight-semibold) }
 .be-step.end.on i { background: var(--ok-solid); border-color: var(--ok-solid) }
+
+/* AN OFF-RAMP THIS RECORD DID NOT TAKE. Present, not travelled — dashed leaders
+   on both sides so it reads as a branch off the line rather than a stop on it,
+   a hollow dashed dot, and a label at the same weight as an unreached stage.
+
+   The two connector rules carry an extra class each so they beat
+   `.be-step + .be-step::before`, which is the same (0,2,1) specificity. Tying on
+   specificity and winning on file order is how a rule becomes somebody else's
+   bug the day the bundler reorders two stylesheets. */
+.be-step.off b { color: var(--text-3) }
+.be-step.off i { border-style: dashed; border-color: var(--line-3); background: none }
+.be-step + .be-step.off::before,
+.be-step.off + .be-step::before {
+  background: none; height: 0; border-top: 1px dashed var(--line-3);
+}
 
 /* ------------------------------------------------------------ the pane --- */
 /* Requirement left, suggestions right. Below 1240px the panel drops under the
@@ -381,20 +357,6 @@
   margin-top: var(--space-4); padding: var(--space-3);
   background: var(--surface-raised); border: 1px solid var(--line); border-radius: var(--radius-lg);
 }
-/* Actions that belong to the CLIENT BUSINESS, sitting in an Operations bar
-   because this panel has no business-side surface yet. The modal behind each
-   one says the real system must not offer it — but by then you have clicked.
-   Fenced off and labelled, so the warning arrives before the press. */
-.be-abar-biz {
-  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
-  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-3);
-  border: 1px dashed var(--warn-line); border-radius: var(--radius-md);
-  background: var(--warn-bg);
-}
-.be-abar-biz > .lbl {
-  font-size: var(--text-2xs); letter-spacing: .09em; text-transform: uppercase;
-  color: var(--warn); font-weight: var(--weight-semibold);
-}
 
 /* Previous / next through the filtered queue. Someone qualifying twenty
    enquiries should not return to the list twenty times. */
@@ -424,17 +386,11 @@
 .be-pick-b b { display: block; font-size: var(--text-base) }
 .be-pick-b span { display: block; margin-top: 2px; font-size: var(--text-sm); color: var(--text-3) }
 
-/* ---------------------------------------------------------------- topbar --
-   The theme gives .tb-stat.ro a warn and an ok tone; this module needs a bad
-   one for the breached count, which is the number that means someone must act.
-   Unprefixed because the topbar is rendered by the shell, outside this view's
-   tree — the alternative was a second class name for the same idea. */
-.tb-stat.ro.bad .v { color: var(--bad) }
 
 /* ==========================================================================
    THE QUALIFICATION WORKSTREAM
    --------------------------------------------------------------------------
-   Everything below belongs to a Generated enquiry — the editable record, the
+   Everything below belongs to an enquiry still being worked — the editable record, the
    checklist, the tags, the contact log and the freeze. It occupies the same
    two columns as the assignment screen on purpose: the layout is a constant,
    what the right-hand column is FOR is the variable.
@@ -456,6 +412,9 @@
 /* ------------------------------------------------------------- the tags --- */
 .be-tags { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center }
 .be-list .be-tbl .be-tags { margin-top: 4px }
+/* Kept whole so a wrapped reference line breaks BETWEEN the id and the number,
+   never inside the number. */
+.be-list .be-tbl .cell-2 .nowrap { white-space: nowrap }
 .be-tag {
   display: inline-flex; align-items: center; gap: 4px; height: 18px; padding: 0 7px;
   border: 1px solid var(--line-2); border-radius: var(--radius-full);
@@ -546,7 +505,7 @@
 
 /* ------------------------------------------------------------- remarks --- */
 /* Plainer than the contact log next to it, on purpose: a remark has no channel,
-   no outcome and no callback, and dressing it to match would suggest the two
+   no outcome and no channel, and dressing it to match would suggest the two
    are the same kind of record. */
 .be-rm-new { margin-bottom: var(--space-3) }
 .be-rm-new .inp { min-height: 56px }
@@ -753,25 +712,194 @@
    record, and every other control on this screen narrows a set instead. */
 .be-actions .field { flex: 1 1 280px; max-width: 560px }
 
-.be-filters-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(158px, 1fr));
-  gap: var(--space-2);
+/* THE FILTER BAND: ten narrowing controls, then how the result is ordered.
+   They are different questions and now look it — the grid takes the room it
+   needs, sort takes what its label needs, and a rule separates them. */
+.be-filterbar {
+  display: flex; align-items: flex-start; flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
   padding: 0 var(--page-pad) var(--space-3);
   flex: 0 0 auto;
+  /* Its own container, because the question "is sort still beside the filters?"
+     is about THIS band's width and nothing else. `rec` is the record view's
+     container and does not exist on the list — a query against it here would
+     never match and the rule would be quietly dead. */
+  container-type: inline-size; container-name: fbar;
+  /* A rung above the other bands, because this one opens PANELS. `container-type`
+     already makes it a stacking context, so without a z-index its listboxes were
+     trapped below the attention strip at `--z-band` and the strip drew straight
+     through an open list. */
+  position: relative; z-index: var(--z-bandpop);
 }
-/* Equal width AND equal height, or a wrapped grid lines up in one axis only.
-   The theme's .selectbox sizes to its content by default, which is exactly
-   what made the old flex row ragged. */
-.be-filters-grid > .selectbox { width: 100% }
-.be-filters-grid > .selectbox select { width: 100%; height: var(--control-md) }
-.be-date {
-  width: 100%; height: var(--control-md); padding: 0 var(--space-2);
-  border: 1px solid var(--line-control); border-radius: var(--radius-md);
-  background: var(--bg); color: var(--text); font: inherit; font-size: var(--text-md);
+.be-filterbar > .be-filters-grid { flex: 1 1 620px; padding: 0 }
+
+.be-filters-grid {
+  display: grid;
+  /* 140, not 158. At 158 a wide window fitted nine columns and left the tenth
+     stranded on a line of its own beside a metre of white space; 140 fits ten,
+     and narrower windows break into halves rather than 9 + 1. */
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-2);
+  flex: 0 0 auto;
 }
-.be-date:hover { border-color: var(--line-3) }
-.be-date:focus { border-color: var(--brand); box-shadow: var(--ring); outline: none }
+
+/* Sort sits at the end, ruled off, sized to its own longest option rather than
+   to a grid cell. The rule disappears when the band wraps, because a border
+   hanging off the left of a new line points at nothing. */
+.be-sortslot { display: flex; align-items: center; flex: 0 0 auto }
+@container fbar (min-width: 900px) {
+  .be-sortslot { padding-left: var(--space-3); border-left: 1px solid var(--line) }
+}
+.be-sortslot .selectbox select { width: 100% }
+
+/* ============================================================================
+   THE FILTER LISTBOX
+   ----------------------------------------------------------------------------
+   Replaces the native <select> in the filter band. Everything below styles a
+   control the browser used to draw for us — the price of being able to style
+   the OPEN list at all, which no amount of CSS on a <select> can do.
+   ========================================================================== */
+.be-fsel { position: relative; display: block }
+
+/* THE CLOSED CONTROL. At rest it is a well with a hairline, because ten of them
+   at full contrast is a form to fill in rather than a set of optional
+   narrowings. Set, it takes the brand fill and carries the contrast alone. */
+.be-fsel-t {
+  display: flex; align-items: center; gap: var(--space-2);
+  width: 100%; height: var(--control-md);
+  padding: 0 var(--space-2) 0 var(--space-3);
+  border: 1px solid var(--line-2); border-radius: var(--radius-md);
+  background: var(--bg-inset); color: var(--text-2);
+  font: inherit; font-size: var(--text-md); text-align: left; cursor: pointer;
+  transition: border-color var(--duration) var(--ease), background var(--duration) var(--ease);
+}
+.be-fsel-t > .l { flex: 1 1 auto; min-width: 0; overflow: hidden;
+                  text-overflow: ellipsis; white-space: nowrap }
+.be-fsel-t:hover { border-color: var(--line-control); background: var(--bg); color: var(--text) }
+.be-fsel-t:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px }
+.be-fsel.on > .be-fsel-t {
+  border-color: var(--brand); background: var(--brand-tint);
+  color: var(--brand-text); font-weight: var(--weight-medium);
+}
+.be-fsel-caret { flex: 0 0 auto; opacity: .55; transition: transform var(--duration) var(--ease) }
+.be-fsel.open .be-fsel-caret { transform: rotate(180deg) }
+
+/* THE BUSINESS LOAD BALL. A notification-style count beside the business a row
+   went to: how many live enquiries that business is holding right now.
+
+   It repeats on every row for the same business, and that is the point — the
+   number you want is not "this row" but "how buried are they", and it should be
+   readable from whichever row you happen to be looking at. Counted across the
+   whole queue rather than the filtered rows, or filtering by city would quietly
+   change what the mark means. */
+.be-biz { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0 }
+.be-biz > .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.be-biz > .ct {
+  flex: 0 0 auto; display: grid; place-items: center;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  border-radius: var(--radius-full);
+  background: var(--indigo-9); color: var(--sand-1);
+  font-size: var(--text-2xs); font-weight: var(--weight-semibold); line-height: 1;
+}
+/* Nothing live. It stays on the row rather than disappearing — "this business
+   is free" is worth knowing when you are deciding where the next one goes — but
+   it is hollow, because a notification ball reading zero as loudly as one
+   reading three is not a notification, it is decoration. */
+.be-biz > .ct.zero {
+  background: transparent; color: var(--text-3);
+  box-shadow: inset 0 0 0 1px var(--line-2); font-weight: var(--weight-normal);
+}
+
+/* ============================================================================
+   THE IDENTITY DOT
+   ----------------------------------------------------------------------------
+   One mark per status, and per urgency band — used by the filter list AND by the
+   status pill on every row, so the colour is worth learning.
+
+   It replaced four SEMANTIC tones (ok / warn / bad / info) shared across eight
+   statuses, which put three amber dots and two grey ones in one list. A legend
+   with duplicates is not a legend.
+
+   TWO AXES, because eight distinct hues would be eight things to memorise and
+   the palette has five:
+
+     HUE  says which part of the pipeline    sand → amber → indigo → green/rust
+     FILL says whose move it is              solid = ours · ring = theirs, or ended
+
+   So Assigned is a hollow indigo of the same hue as Qualified — the same work,
+   now sitting with somebody else — and No match yet is a hollow rust rather
+   than a solid one, because it is blocked, not killed. Rejected is the solid
+   rust: that one we did on purpose. */
+.be-dot {
+  flex: 0 0 auto; width: 8px; height: 8px; border-radius: var(--radius-full);
+  background: var(--sand-9);
+}
+/* ours to move */
+.be-dot.s-generated  { background: var(--sand-9) }
+.be-dot.s-processing { background: var(--amber-9) }
+.be-dot.s-qualified  { background: var(--indigo-9) }
+/* waiting on somebody else, or blocked */
+.be-dot.s-assigned   { background: transparent; box-shadow: inset 0 0 0 2px var(--indigo-9) }
+.be-dot.s-no_match   { background: transparent; box-shadow: inset 0 0 0 2px var(--rust-9) }
+/* ended */
+.be-dot.s-converted     { background: var(--green-9) }
+.be-dot.s-not_converted { background: transparent; box-shadow: inset 0 0 0 2px var(--sand-9) }
+.be-dot.s-invalid       { background: var(--rust-9) }
+
+/* URGENCY IS ORDINAL, so it looks ordinal: a heat ramp from soonest to latest.
+   "Browsing" is hollow because it is not a date — it is the absence of one. */
+.be-dot.u-within_30d { background: var(--rust-9) }
+.be-dot.u-30_90d     { background: var(--amber-9) }
+.be-dot.u-90_plus    { background: var(--indigo-9) }
+.be-dot.u-browsing   { background: transparent; box-shadow: inset 0 0 0 2px var(--sand-8) }
+
+/* On a pill the dot sits inside a tinted background, so it needs to hold its
+   own edge against it. */
+.pill .be-dot { margin-right: 1px }
+.be-fsel-badge {
+  flex: 0 0 auto; display: grid; place-items: center;
+  width: 17px; height: 17px; border-radius: var(--radius-sm);
+  border: 1px solid var(--line-2); background: var(--bg);
+  font-size: var(--text-2xs); font-weight: var(--weight-semibold); color: var(--text-2);
+}
+
+/* THE OPEN LIST. Anchored to the control, above the band's own stacking rung so
+   it clears the table, and capped so a long list scrolls instead of running off
+   the fold. */
+.be-fsel-list {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 2;
+  min-width: 100%; width: max-content; max-width: 280px;
+  max-height: 320px; overflow-y: auto;
+  padding: var(--space-1);
+  background: var(--surface-raised); border: 1px solid var(--line);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+}
+.be-fsel-o {
+  display: flex; align-items: center; gap: var(--space-2);
+  width: 100%; padding: var(--space-2) var(--space-2);
+  border: 0; border-radius: var(--radius-md); background: none;
+  font: inherit; font-size: var(--text-md); color: var(--text);
+  text-align: left; cursor: pointer;
+}
+.be-fsel-o > .l { flex: 1 1 auto; min-width: 0 }
+/* A chip option carries its own shape, so it takes the row's flexible space in
+   place of the text span it replaces. */
+.be-fsel-o > .be-tag, .be-fsel-t > .be-tag { flex: 0 1 auto; min-width: 0 }
+.be-fsel-t > .be-tag { margin-right: auto }
+.be-fsel-o:hover { background: var(--bg-hover) }
+/* Focus is how the keyboard shows position here, so it must read as strongly as
+   hover does — a focus ring alone on a list this dense is easy to lose. */
+.be-fsel-o:focus-visible { outline: none; background: var(--bg-active);
+                           box-shadow: inset 0 0 0 2px var(--brand) }
+.be-fsel-o.sel { color: var(--brand-text); font-weight: var(--weight-medium) }
+.be-fsel-o.sel .ic { color: var(--brand) }
+/* "any" is the clear, and sits apart from the values it clears. */
+.be-fsel-o.any { color: var(--text-3) }
+.be-fsel-o.any + .be-fsel-o { margin-top: var(--space-1); position: relative }
+.be-fsel-o.any + .be-fsel-o::before {
+  content: ""; position: absolute; left: var(--space-2); right: var(--space-2);
+  top: calc(var(--space-1) * -0.5); height: 1px; background: var(--line-2);
+}
 
 .be-exportbtn .ct {
   display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px;

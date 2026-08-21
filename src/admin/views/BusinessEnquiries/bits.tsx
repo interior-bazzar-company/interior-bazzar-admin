@@ -7,15 +7,23 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { Icon, Pill } from "../../ui";
-import { RULES, STATUSES, ageLabel, dateTimeLabel, followUpOverdue, initialsOf, sourceOf, statusOf, tagOf, tierOf, urgencyOf, viaLabel } from "./store";
-import type { Candidate, Enquiry, Owner } from "./store";
+import { RULES, STATUSES, ageLabel, dateTimeLabel, sourceOf, statusOf, tagOf, tierOf, urgencyOf, viaLabel } from "./store";
+import type { Candidate, Enquiry } from "./store";
 
 /* The one place a status becomes a coloured word. Every table cell, drawer
    header and timeline row goes through it, so a status added to
    vocabularies.json renders everywhere with no second edit. */
+/* The pill carries the status's IDENTITY dot as well as its semantic tone.
+   The tone says how to feel about it — four of them, shared across the module.
+   The dot says which state it is — eight of them, one per status, and the same
+   mark the Status filter shows. Without it the filter taught a colour code the
+   rows never repeated, which is a code nobody learns. */
 export function StatusPill({ status, lg }: { status: string; lg?: boolean }) {
   const s = statusOf(status);
-  return <Pill text={s.label} tone={s.tone} lg={lg} title={s.meaning} />;
+  return (
+    <Pill tone={s.tone} lg={lg} title={s.meaning}
+      text={<><span className={"be-dot s-" + status} />{s.label}</>} />
+  );
 }
 
 /* Urgency is the customer's timeline, not ours, and it is the column an
@@ -44,38 +52,6 @@ export function TierBadge({ tier }: { tier: string }) {
   return (
     <span className={"be-tier t" + tier} title={t.label + " — " + t.help}
       aria-label={t.label + ". " + t.help}>{tier}</span>
-  );
-}
-
-/* Who is working this, or nobody. The empty case is styled as a state rather
-   than a dash: unowned is the condition that produces two people ringing the
-   same customer, and it should look like something to fix. */
-export function OwnerCell({ owner }: { owner: Owner | null }) {
-  if (!owner) {
-    return (
-      <span className="be-owner none" title="Nobody has claimed this enquiry">
-        <span className="av" aria-hidden="true">?</span>Unclaimed
-      </span>
-    );
-  }
-  return (
-    <span className="be-owner" title={"Owned by " + owner.name}>
-      <span className="av" aria-hidden="true">{initialsOf(owner.name)}</span>{owner.name}
-    </span>
-  );
-}
-
-/* A promised callback. Overdue is the loudest state in the module, deliberately
-   above a breached SLA — that one is a business failing to answer us; this one
-   is us failing a customer we personally told we would ring. */
-export function FollowUpCell({ e }: { e: Enquiry }) {
-  if (!e.followUpAt) return <span className="be-due none">—</span>;
-  const over = followUpOverdue(e);
-  return (
-    <span className={"be-due" + (over ? " over" : "")}
-      title={(over ? "Callback was due " : "Callback due ") + dateTimeLabel(e.followUpAt)}>
-      {over ? "Overdue · " : ""}{dateTimeLabel(e.followUpAt)}
-    </span>
   );
 }
 
@@ -188,20 +164,36 @@ export function FactorTable({ c }: { c: Candidate }) {
 /* The nine states as a rail, with the enquiry's own position on it. Reads as
    one line so it can sit in a drawer header; the terminal three collapse into
    the seventh step because they are one position, not three. */
+/* THE RAIL SHOWS EVERY STAGE, INCLUDING THE ONES MOST RECORDS SKIP.
+   No match yet sits between Qualified and Assigned and is always drawn: the
+   pipeline has a shape, and hiding part of it makes the shape a secret.
+
+   AN OFF-RAMP IS NEVER "DONE", and that is the whole reason it needs its own
+   state. It has step 4 and Assigned has 5, so the ordinary rule — anything
+   behind you is filled — would mark it complete on every assigned record and
+   the rail would claim an enquiry passed through a stage it never entered.
+   `off` is drawn dashed and muted instead: the stage exists, this record did
+   not use it. */
 export function LifecycleRail({ status }: { status: string }) {
   const here = statusOf(status).step;
-  const steps = STATUSES.filter((s) => s.step <= 6);
+  const steps = STATUSES.filter((s) => !s.terminal);
   const terminal = statusOf(status).terminal;
   return (
     <div className="be-rail" aria-label={"Lifecycle — currently " + statusOf(status).label}>
-      {steps.map((s) => (
-        <span key={s.key} className={"be-step" + (s.step < here ? " done" : s.step === here ? " on" : "")}
-          title={s.label + " — " + s.meaning}>
+      {steps.map((s) => {
+        const state = s.key === status ? " on"
+          : s.offRamp ? " off"
+            : s.step < here ? " done" : "";
+        return (
+        <span key={s.key} className={"be-step" + state}
+          title={s.label + " — " + s.meaning
+            + (s.offRamp && s.key !== status ? " (not taken by this enquiry)" : "")}>
           <i />
           <b>{s.label}</b>
         </span>
-      ))}
-      <span className={"be-step" + (terminal ? " on end" : " end")} title="Converted · Not Converted · Invalid">
+        );
+      })}
+      <span className={"be-step" + (terminal ? " on end" : " end")} title="Converted · Not Converted · Rejected">
         <i />
         <b>{terminal ? statusOf(status).label : "Outcome"}</b>
       </span>
@@ -222,9 +214,9 @@ export function FrozenBar({ at, children }: { at: string; children?: ReactNode }
 }
 
 /* Age since intake — how long this enquiry has been Interior bazzar's problem,
-   which is the number that keeps meaning something after it is routed. The
-   post-delivery clock is a different measure and lives with the SLA, on the
-   record, where the threshold it is measured against is also on screen. */
+   which is the number that keeps meaning something after it is routed. Time
+   since DELIVERY is a different measure and is shown on the record itself,
+   where the assignment it belongs to is also on screen. */
 export function AgeCell({ e }: { e: Enquiry }) {
   return (
     <span className="tnum" title={"Created " + dateTimeLabel(e.createdAt)}>
@@ -238,12 +230,12 @@ export function AgeCell({ e }: { e: Enquiry }) {
    demo that looks live and is not is worse than no demo.
 
    IT ALSO HOLDS THE SCAFFOLDING CONTROLS, and that is the point of putting them
-   here rather than in the toolbar. "Reset data" and "Run the SLA sweep" are not
-   product features — on the real thing the seed does not exist and the sweep is
-   a cron job nobody presses. A prototype-only button sitting in the command row
-   beside Export and Add enquiry teaches the wrong toolbar; sitting inside the
-   banner that says "none of this is real", it teaches the right one. */
-export function ProtoBar({ onReset, onSweep }: { onReset?: () => void; onSweep?: () => void }) {
+   here rather than in the toolbar. "Reset data" is not a product feature — on
+   the real thing the seed does not exist. A prototype-only button sitting in
+   the command row beside Export and Add enquiry teaches the wrong toolbar;
+   sitting inside the banner that says "none of this is real", it teaches the
+   right one. */
+export function ProtoBar({ onReset }: { onReset?: () => void }) {
   return (
     <div className="be-proto">
       <Icon name="alert" size="sm" />
@@ -252,12 +244,6 @@ export function ProtoBar({ onReset, onSweep }: { onReset?: () => void; onSweep?:
         <span className="mono">src/content/business-enquiries/</span>, and every action writes to this
         browser tab only. A reload restores the seed.
       </span>
-      {onSweep
-        ? <button className="btn sm" onClick={onSweep}
-            title="Flag delivered enquiries past their acknowledgement threshold. A nightly cron job on the real thing.">
-            <Icon name="clock" size="sm" />Run SLA sweep
-          </button>
-        : null}
       {onReset ? <button className="btn sm" onClick={onReset}>Reset data</button> : null}
     </div>
   );
