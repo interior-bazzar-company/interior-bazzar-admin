@@ -80,8 +80,8 @@ export function SuggestionsPanel({ e, run, onAssign }: {
         <div className="be-sp-f">
           <InfoNote tone="warn" ico="alert" short={<>This enquiry <b>holds</b> here — it is not invalid.</>}>
             Nothing passed hard eligibility. The customer did nothing wrong and the enquiry is real,
-            qualified and wanted; what is missing is <b>supply</b>. Marking it Invalid would hide a
-            coverage gap inside an invalid-rate metric where nobody will look for it.
+            qualified and wanted; what is missing is <b>supply</b>. Rejecting it would hide a
+            coverage gap inside a rejection-rate metric where nobody will look for it.
           </InfoNote>
         </div>
       </div>

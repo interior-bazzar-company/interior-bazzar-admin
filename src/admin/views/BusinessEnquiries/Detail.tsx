@@ -19,22 +19,23 @@
    ============================================================================= */
 import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { EmptyState, Icon, KvList, Pill, SectionHead, Tabs } from "../../ui";
+import { EmptyState, Icon, KvList, SectionHead, Tabs } from "../../ui";
 import { can, useNav } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import {
-  BlockHead, FrozenBar, InfoNote, LifecycleRail, OwnerCell, SourceChip, StatusPill, TagChips,
+  BlockHead, FrozenBar, InfoNote, LifecycleRail, SourceChip, StatusPill, TagChips,
   TierBadge, UrgencyChip,
 } from "./bits";
 import { RecordMenu } from "./menus";
 import { ContactEntryRow, QualifyPanel, RequirementForm } from "./Qualify";
 import { ExclusionList, MatchSnapshot, SuggestionsPanel } from "./Suggestions";
 import {
-  AcknowledgeModal, AssignModal, InvalidateModal, OutcomeModal, ReassignModal,
+  AssignModal, InvalidateModal, OutcomeModal, ReassignModal,
 } from "./Modals";
 import {
-  CHECKLIST, TEAM, activeAssignment, addRemark, businessById, claim, dateTimeLabel, durationLabel, tierOf,
-  isMine, isTerminal, lastResponse, pastAssignments, place, runMatching, setOwner, statusOf,
+  CHECKLIST, activeAssignment, addRemark, businessById, dateTimeLabel, durationLabel, isWorking,
+  markNoMatch, tierOf,
+  isTerminal, lastResponse, pastAssignments, place, runMatching, statusOf,
   transitionOf, useEnquiry, useMatchRun,
 } from "./store";
 import type { Candidate, Enquiry, MatchRun } from "./store";
@@ -91,8 +92,6 @@ export default function Detail({ id, listHash, prev, next, pos }: {
         <StatusPill status={e.status} lg />
         <TierBadge tier={e.tier} />
         <UrgencyChip urgency={e.qualification.urgency} />
-        {e.sla.breached ? <Pill text="SLA breached" tone="bad" /> : null}
-        {e.exception ? <Pill text="No eligible business" tone="warn" /> : null}
         <TagChips tags={e.tags} />
         <span className="spacer" />
         {/* Step through the queue without going back to it. The count says
@@ -142,7 +141,6 @@ export default function Detail({ id, listHash, prev, next, pos }: {
       </div>
 
       <div className="be-subline">
-        <OwnerRow e={e} />
         {e.customer.name} · <span className="mono">{e.customer.phone}</span>
         {e.customer.email ? <> · <span className="mono">{e.customer.email}</span></> : null}
         {" · "}<SourceChip source={e.source} full />
@@ -165,27 +163,33 @@ export default function Detail({ id, listHash, prev, next, pos }: {
 
       {writes ? (
         <div className="be-abar">
-          {/* Generated has no action in this bar on purpose: everything that
-              moves a Generated enquiry lives in the Qualification panel beside
-              the record it acts on, not in a bar underneath it. */}
-          {e.status === "qualified"
+          {/* New and Processing have no action in this bar on purpose:
+              everything that moves an enquiry through qualification lives in
+              the Qualification panel beside the record it acts on, not in a bar
+              underneath it. */}
+          {/* Reachable from No match yet too — re-running is that state's
+              only way out, and the label says which of the two you are in
+              because by then you have already pressed it once. */}
+          {e.status === "qualified" || e.status === "no_match"
             ? <button className="btn pri" onClick={() => { runMatching(e.enquiryId); toast("Matching run complete."); }}>
-                <Icon name="sparkle" />Run matching
+                <Icon name="sparkle" />
+                {e.status === "no_match" ? "Try matching again" : "Run matching"}
               </button>
             : null}
-          {/* Acknowledge belongs to the CLIENT BUSINESS. It sat in this bar
-              looking like an Operations action, with the warning only inside
-              the modal — which arrives after the click. Fenced and labelled
-              instead, so the warning is what you read first. */}
-          {e.status === "delivered" || (e.status === "assigned" && a)
-            ? <span className="be-abar-biz">
-                <span className="lbl">Business side · no surface yet</span>
-                <button className="btn sm" onClick={() => modal(<AcknowledgeModal e={e} onClose={closeLayer} onDone={done} />)}>
-                  Acknowledge
-                </button>
-              </span>
+          {/* The manual route to the same state, for the operator who already
+              knows the answer — the one business covering that pincode just
+              suspended. Not `dgr`: this is not a rejection and it is not
+              terminal, it says the supply is missing and the enquiry is fine. */}
+          {e.status === "qualified"
+            ? <button className="btn" title="No subscribed business can take this one — reversible, re-run matching to clear it"
+                onClick={() => { markNoMatch(e.enquiryId); toast("Marked No match yet."); }}>
+                No match yet
+              </button>
             : null}
-          {e.status === "acknowledged"
+          {/* Assigned is now the only live state, so the outcome is recorded
+              straight from it. There is no acknowledgement step to wait on and
+              no Delivered state to pass through — assigning publishes. */}
+          {e.status === "assigned" && a
             ? <button className="btn pri" onClick={() => modal(<OutcomeModal e={e} onClose={closeLayer} onDone={done} />)}>
                 Record outcome
               </button>
@@ -198,47 +202,17 @@ export default function Detail({ id, listHash, prev, next, pos }: {
           <span className="spacer" />
           {!isTerminal(e.status)
             ? <button className="btn dgr" onClick={() => modal(<InvalidateModal e={e} onClose={closeLayer} onDone={done} />)}>
-                Mark invalid
+                Reject
               </button>
             : <span className="faint be-terminal">
-                Terminal — {statusOf(e.status).label}. {transitionOf(e.status).guard}
+                {/* The guard's own first sentence is the word "Terminal", so
+                    printing the label and the whole guard said it twice. */}
+                Terminal — {statusOf(e.status).label}.{" "}
+                {transitionOf(e.status).guard.replace(/^Terminal\.\s*/, "")}
               </span>}
         </div>
       ) : null}
     </div>
-  );
-}
-
-/* THE OWNER. The write that makes a team possible — without it "the untouched
-   pile" is a number nobody is answerable for, and two qualifiers ring the same
-   customer inside an hour. Unclaimed is rendered as a state to fix, not as a
-   dash, because that is exactly what it is. */
-function OwnerRow({ e }: { e: Enquiry }) {
-  const writes = can("business-enquiries", "edit");
-  const mine = isMine(e);
-
-  if (!writes) {
-    return <span className="be-ownerbar"><OwnerCell owner={e.owner} /> · </span>;
-  }
-  return (
-    <span className="be-ownerbar">
-      <OwnerCell owner={e.owner} />
-      {!e.owner
-        ? <button className="btn xs pri" onClick={() => claim(e.enquiryId)}>Claim</button>
-        : mine
-          ? <button className="btn xs" onClick={() => setOwner(e.enquiryId, null)}>Release</button>
-          : <button className="btn xs" onClick={() => claim(e.enquiryId)}>Take over</button>}
-      <select className="be-ownersel" aria-label="Hand over to"
-        value={e.owner?.id || ""}
-        onChange={(ev) => {
-          const m = TEAM.filter((t) => t.id === ev.target.value)[0];
-          setOwner(e.enquiryId, m ? { id: m.id, name: m.name } : null);
-        }}>
-        <option value="">— unassigned —</option>
-        {TEAM.map((m) => <option key={m.id} value={m.id}>{m.name} · {m.role}</option>)}
-      </select>
-      {" · "}
-    </span>
   );
 }
 
@@ -249,13 +223,13 @@ function EnquiryTab({ e, run, onAssign, onQualified }: {
   onQualified: (msg: string) => void;
 }) {
   /* THE ONE BRANCH IN THIS MODULE THAT CHANGES WHAT THE SCREEN IS FOR.
-     While an enquiry is Generated it is a piece of work: the record is editable
+     While an enquiry is New or Processing it is a piece of work: the record is editable
      and the right-hand column is the qualification panel. Once a person has
      marked it Qualified it becomes a piece of evidence: the record is frozen
      and the right-hand column is the ranked businesses. Same layout, same two
      columns, opposite jobs — which is why the branch is here and not two
      separate routes. */
-  const working = e.status === "generated";
+  const working = isWorking(e.status);
 
   return (
     <div className="be-pane">
@@ -271,7 +245,7 @@ function EnquiryTab({ e, run, onAssign, onQualified }: {
 
         {e.exception ? (
           <InfoNote tone="warn" ico="alert"
-            short={<><b>No eligible business.</b> {e.exception.note}</>}>
+            short={<><b>No match yet.</b> {e.exception.note}</>}>
             <span className="mono">422 no_eligible_business</span> is an exception, not an error the
             customer caused. If a lapsed subscription renews tomorrow this becomes assignable with
             nobody re-entering anything — the snapshot is intact and stage 1 simply passes.
@@ -306,7 +280,7 @@ function EnquiryTab({ e, run, onAssign, onQualified }: {
    useful note about a customer arrives whenever somebody notices.
 
    Deliberately plainer than the contact log beside it. A remark has no channel,
-   no outcome and no callback — it is a sentence and a name, and dressing it up
+   no outcome and no channel — it is a sentence and a name, and dressing it up
    to match the log would suggest the two are the same kind of record. */
 function RemarksBlock({ e }: { e: Enquiry }) {
   const writes = can("business-enquiries", "edit");
@@ -435,7 +409,7 @@ function SnapshotBlock({ e }: { e: Enquiry }) {
         </FrozenBar>
       ) : (
         <InfoNote tone="bad" ico="alert" short={<><b>Never frozen</b> — this record was never qualified.</>}>
-          There is no snapshot to stand behind. That is correct for an Invalid record and would be a
+          There is no snapshot to stand behind. That is correct for a Rejectid record and would be a
           defect for any other.
         </InfoNote>
       )}
@@ -546,12 +520,7 @@ function AssignmentTab({ e }: { e: Enquiry }) {
             <div className="be-blk">
               <BlockHead title="Response and outcome" />
               <KvList pairs={[
-                ["Delivered", dateTimeLabel(a.deliveredAt)],
-                ["Acknowledged", e.outcome.acknowledgedAt
-                  ? <><b>{dateTimeLabel(e.outcome.acknowledgedAt)}</b>{a.deliveredAt
-                      ? <span className="faint"> · {durationLabel(a.deliveredAt, e.outcome.acknowledgedAt)} after delivery</span>
-                      : null}</>
-                  : null],
+                ["Published", dateTimeLabel(a.deliveredAt)],
                 ["First contact", dateTimeLabel(e.outcome.firstContactAt)],
                 ["Outcome", e.outcome.outcome
                   ? <StatusPill status={e.outcome.outcome} />
@@ -572,11 +541,15 @@ function AssignmentTab({ e }: { e: Enquiry }) {
             </div>
           ) : (
             <InfoNote ico="clock" short={<>
-              <b>Awaiting acknowledgement.</b> SLA {e.sla.ackHours}h from delivery
-              {e.sla.dueAt ? <> — due {dateTimeLabel(e.sla.dueAt)}</> : null}.
+              <b>With the business, no outcome yet.</b>{a.deliveredAt
+                ? <> Published {durationLabel(a.deliveredAt, new Date().toISOString())} ago.</>
+                : <> Not published yet.</>}
             </>}>
-              The threshold is BE-OD-09 and is still open — {e.sla.ackHours}h is an assumption on this
-              screen, not a decision anyone has taken.
+              How long it has been, and nothing more. Assigning publishes to the business, so there
+              is no delivery step to clear and no receipt to wait on — the next thing that moves
+              this record is the outcome. Nothing here is late, because nothing is owed by a time:
+              chasing a quiet business is a judgement someone makes by reading this, not a flag
+              raised for them.
             </InfoNote>
           )}
         </>

@@ -21,6 +21,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
+import IB_ICON from "../../assets/images/IB_Icon.png";
 import { Icon } from "../ui";
 import { go as uiGo, setGo } from "../ui/nav";
 import config from "../../config";
@@ -298,7 +299,7 @@ export default function AdminShell() {
           <aside className="sidebar" aria-label="Modules">
             <div className="sb-top">
               <button className="sb-brand" data-go={"#/" + HOME_ROUTE} title="Interior bazzar Admin" onClick={() => go("#/" + HOME_ROUTE)}>
-                <span className="sb-mark">ib</span>
+                <img className="sb-mark" src={IB_ICON} alt="" />
                 <span className="sb-name rail-hide">
                   Interior bazzar<small>Admin</small>
                 </span>
@@ -309,7 +310,6 @@ export default function AdminShell() {
               <button className="sb-search" data-act="search" onClick={() => setPaletteOpen(true)}>
                 <Icon name="search" />
                 <span className="rail-hide">Search</span>
-                <span className="kbd rail-hide">⌘K</span>
               </button>
             </div>
 
@@ -386,7 +386,6 @@ export default function AdminShell() {
                   />
                 </svg>
                 <span className="lb rail-hide">{railed ? "Expand" : "Collapse"}</span>
-                <span className="kbd rail-hide">[</span>
               </button>
             </div>
           </aside>

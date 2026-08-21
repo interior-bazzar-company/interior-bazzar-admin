@@ -500,6 +500,11 @@ export interface StatCell {
   tone?: string;
   on?: boolean;
   title?: string;
+  /** Rich hover/focus help, rendered as a styled tooltip instead of the native
+   *  `title` — which cannot be styled, waits about a second, truncates long
+   *  text, and (the reason this exists) never appears on keyboard focus at all.
+   *  Set `tip` OR `title`, never both, or two tooltips fight over the cursor. */
+  tip?: ReactNode;
   to?: string;
 }
 export function StatStrip({ cells }: { cells: (StatCell | "sep")[] }) {
@@ -514,9 +519,29 @@ export function StatStrip({ cells }: { cells: (StatCell | "sep")[] }) {
           </>
         );
         const cls = "dls-stat" + (c.tone ? " " + c.tone : "") + (c.on ? " on" : "");
-        return c.to
-          ? <button key={i} className={cls} data-go={c.to} title={c.title} onClick={() => go(c.to as string)}>{body}</button>
-          : <div key={i} className={cls + " ro"} title={c.title}>{body}</div>;
+        /* THE TOOLTIP IS A SIBLING OF THE CELL, not a child, and that is the
+           whole trick. Inside the button its text would join the accessible
+           NAME: the cell would announce as "1 untouched In qualification, with
+           not one contact attempt logged against it…" instead of "1 untouched".
+           As a sibling reached by `aria-describedby` it stays a DESCRIPTION,
+           which is what it is, and CSS reaches it with an adjacent-sibling
+           selector. Absolutely positioned, so it is not a flex item either. */
+        const tipId = c.tip ? "stat-tip-" + i : undefined;
+        /* A cell that sets both loses the native one rather than showing two
+           tooltips over one target. Enforced here instead of trusted to the
+           doc comment on StatCell, because the failure is silent and looks
+           like a browser bug from the outside. */
+        const nativeTitle = c.tip ? undefined : c.title;
+        const cell = c.to
+          ? <button key={i} className={cls} data-go={c.to} title={nativeTitle}
+              aria-describedby={tipId} onClick={() => go(c.to as string)}>{body}</button>
+          : <div key={i} className={cls + " ro"} title={nativeTitle} aria-describedby={tipId}>{body}</div>;
+        return c.tip
+          ? <Fragment key={i}>
+              {cell}
+              <span className="dls-tip" role="tooltip" id={tipId}>{c.tip}</span>
+            </Fragment>
+          : cell;
       })}
       <span className="spacer"></span>
     </div>
@@ -579,15 +604,25 @@ export function FilterChips({ params, labels, onUnfilter }: {
   const keys = Object.keys(params).filter((k) => params[k] && k !== "tab");
   if (!keys.length) return null;
   return (
-    <div className="chiprow" style={{ margin: "-4px 0 14px" }}>
+    /* The key and the value are two elements, not one string. They answer
+       different questions — the key is context you already have once you have
+       read the value, so it carries less weight. As one text node they were the
+       same colour and the eye had to read both at full attention.
+
+       "Clear all" leaves the pill shape entirely: it is an ACTION, and dressed
+       as a chip it read as one more filter that happened to be switched off. */
+    <div className="chiprow filters">
       {keys.map((k) => (
         <span key={k} className="chip on">
-          {(labels && labels[k]) || k}: {params[k]}
-          <button className="x" data-unfilter={k} aria-label="Remove filter"
+          <span className="k">{(labels && labels[k]) || k}</span>
+          <span className="v">{params[k]}</span>
+          <button className="x" data-unfilter={k}
+            aria-label={"Remove the " + ((labels && labels[k]) || k) + " filter"}
             onClick={() => onUnfilter && onUnfilter(k)}><Icon name="x" size="sm" /></button>
         </span>
       ))}
-      <button className="chip" data-unfilter="*" onClick={() => onUnfilter && onUnfilter("*")}>Clear all</button>
+      <button className="chip-clear" data-unfilter="*"
+        onClick={() => onUnfilter && onUnfilter("*")}>Clear all</button>
     </div>
   );
 }

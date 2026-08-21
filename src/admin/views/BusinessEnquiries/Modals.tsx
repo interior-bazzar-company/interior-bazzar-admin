@@ -18,7 +18,7 @@ import type { ReactNode } from "react";
 import { Icon, Notice } from "../../ui";
 import { InfoNote } from "./bits";
 import {
-  RULES, VOCAB, acknowledge, assign, businessById, invalidate, needsOverrideReason,
+  RULES, VOCAB, assign, businessById, invalidate, needsOverrideReason,
   reassign, recordOutcome, statusOf,
 } from "./store";
 import type { Candidate, Enquiry, MatchRun } from "./store";
@@ -82,7 +82,7 @@ export function AssignModal({ e, run, c, onClose, onDone }: {
           onClick={() => {
             if (blocked) { setTouched(true); return; }
             assign(e.enquiryId, c.businessId, needsReason ? reason.trim() : null);
-            onDone("Assigned to " + c.name + " — delivered, awaiting acknowledgement.");
+            onDone("Assigned to " + c.name + " — published to them.");
           }}>
           {needsReason ? "Confirm with reason" : "Confirm assignment"}
         </button>
@@ -113,8 +113,9 @@ export function AssignModal({ e, run, c, onClose, onDone }: {
             </div>
           </div>
           <div className="fg">
-            <label>Rank 1 was</label>
-            <input className="inp" readOnly value={top ? top.name + " · " + top.score + " · " + top.band : "—"} />
+            <label htmlFor="be-rs-top">Rank 1 was</label>
+            <input id="be-rs-top" className="inp" readOnly
+              value={top ? top.name + " · " + top.score + " · " + top.band : "—"} />
             <div className="help">Recorded alongside the choice, so the gap is auditable.</div>
           </div>
           {touched && !reason.trim()
@@ -138,7 +139,7 @@ export function AssignModal({ e, run, c, onClose, onDone }: {
 
 /* ============================================================ REASSIGN === */
 /* BE-T04. Closes one assignment and opens another; it deletes nothing. The
-   enquiry returns to Ready to Assign and walks forward again — the state
+   enquiry returns to Qualified and walks forward again — the state
    machine has one path and reassignment uses it. */
 export function ReassignModal({ e, run, onClose, onDone }: {
   e: Enquiry; run: MatchRun | null; onClose: () => void; onDone: (msg: string) => void;
@@ -205,7 +206,7 @@ export function ReassignModal({ e, run, onClose, onDone }: {
       <div className="fg">
         <label htmlFor="be-rn">What happened <span className="req">*</span></label>
         <textarea id="be-rn" className={"inp" + (touched && !note.trim() ? " bad" : "")} rows={3}
-          placeholder="No acknowledgement after 26 hours and two reminders…"
+          placeholder="Went quiet after two reminders and a call…"
           value={note} onChange={(ev) => setNote(ev.target.value)} />
         <div className="help warn">
           Mandatory. A reassignment with no recorded reason is indistinguishable from a mistake six
@@ -286,7 +287,7 @@ export function OutcomeModal({ e, onClose, onDone }: {
 /* ============================================================ INVALID === */
 /* Terminal with a stored reason. This state is what lets a separate quarantine
    queue not exist — a rejected submission has somewhere to live and a reason
-   beside it, instead of a bare Discard that made the invalid rate impossible
+   beside it, instead of a bare Discard that made the rejection rate impossible
    to read. */
 export function InvalidateModal({ e, onClose, onDone }: {
   e: Enquiry; onClose: () => void; onDone: (msg: string) => void;
@@ -297,22 +298,22 @@ export function InvalidateModal({ e, onClose, onDone }: {
 
   return (
     <Frame
-      heading="Mark invalid"
+      heading="Reject this enquiry"
       sub={<>{e.enquiryId} · {e.customer.name}</>}
       onClose={onClose}
       footer={<>
         <button className="btn" data-close="1" onClick={onClose}>Cancel</button>
         <button className="btn dgr" data-act="be-invalid-go"
           onClick={() => { invalidate(e.enquiryId, reason, note.trim()); onDone("Marked invalid, with a stored reason."); }}>
-          Mark invalid
+          Reject
         </button>
       </>}
     >
       {hasException ? (
         <Notice tone="bad" ico="alert" text={<>
-          <b>This enquiry is an exception, not an invalid one.</b> Nothing passed hard eligibility —
+          <b>This enquiry is an exception, not a rejection.</b> Nothing passed hard eligibility —
           the customer did nothing wrong and the enquiry is real, qualified and wanted. What is missing
-          is <b>supply</b>. Marking it invalid hides a coverage gap inside an invalid-rate metric where
+          is <b>supply</b>. Rejecting it hides a coverage gap inside an invalid-rate metric where
           nobody will look for it.
         </>} />
       ) : null}
@@ -324,7 +325,7 @@ export function InvalidateModal({ e, onClose, onDone }: {
         </select>
         <div className="help warn">
           Mandatory. "Discarded by ops" is not a reason — it is the absence of one, and it makes the
-          invalid rate uninterpretable.
+          rejection rate uninterpretable.
         </div>
       </div>
       <div className="fg">
@@ -336,41 +337,6 @@ export function InvalidateModal({ e, onClose, onDone }: {
       <InfoNote ico="lock" short={<><b>Terminal.</b> There is no way back from this in v1.</>}>
         Reopening needs a controlled admin policy that does not exist yet. The record, its snapshot
         and its whole event timeline stay exactly as they are — nothing is deleted.
-      </InfoNote>
-    </Frame>
-  );
-}
-
-/* ======================================================= ACKNOWLEDGE === */
-/* Only the assigned business can acknowledge — scoped by business_id at query
-   level, 403 out_of_scope for anyone else. It is exposed from this screen only
-   because there is no business-side surface in this panel yet, and the dialog
-   says so rather than pretending otherwise. */
-export function AcknowledgeModal({ e, onClose, onDone }: {
-  e: Enquiry; onClose: () => void; onDone: (msg: string) => void;
-}) {
-  const a = e.assignments.filter((x) => x.assignmentId === e.activeAssignmentId)[0] || null;
-  return (
-    <Frame
-      heading="Acknowledge on the business's behalf"
-      sub={a ? <>{a.businessName} · {e.enquiryId}</> : undefined}
-      onClose={onClose}
-      footer={<>
-        <button className="btn" data-close="1" onClick={onClose}>Cancel</button>
-        <button className="btn pri" data-act="be-ack-go"
-          onClick={() => { acknowledge(e.enquiryId); onDone("Acknowledged."); }}>Acknowledge</button>
-      </>}
-    >
-      <InfoNote tone="warn" ico="alert"
-        short={<><b>The real system must not offer this button.</b> It exists only because this panel has no business-side surface yet.</>}>
-        If Operations can acknowledge for a business, the acknowledgement metric measures Operations'
-        diligence instead of the business's responsiveness, and the SLA stops meaning anything. The
-        missing surface is itself a gap: there is no business-user role in the permission matrix at
-        all.
-        <br /><br />
-        What acknowledgement is FOR: it converts <b>silence into a measurable state</b>. Without it an
-        unworked enquiry and a worked one look identical from Operations, and the customer finds out
-        first.
       </InfoNote>
     </Frame>
   );

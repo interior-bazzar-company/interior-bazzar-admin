@@ -31,7 +31,7 @@ import List, { enquiryHash, listHash, merge, omit } from "./List";
 import Detail from "./Detail";
 import NewEnquiryModal from "./NewEnquiry";
 import {
-  bootBusinessEnquiries, countsFromServer, countsOf, queryFromParams, useBoot, useEnquiryPage,
+  bootBusinessEnquiries, queryFromParams, useBoot, useEnquiryPage, useIntakeCounts,
 } from "./store";
 import type { Params } from "./store";
 import "./enquiries.css";
@@ -93,31 +93,37 @@ function BusinessEnquiriesRoute() {
      The counts sit beside the title rather than only in the strip, because the
      one number an operator wants without scrolling is how many are waiting on
      a decision — and on the detail page the strip is not on screen at all. */
-  /* Counted over the WHOLE filtered queue by the server, not over this page —
-     the topbar numbers would otherwise never exceed the page size. Zeros until
-     the first read lands, which is a truer thing to show than a stale count. */
-  const m = page.counts ? countsFromServer(page.counts) : countsOf([]);
+  /* Counted by the SERVER over the whole queue, not over this page — the
+     topbar numbers would otherwise never exceed the page size, and they are
+     unfiltered on purpose: how much is coming in must not change meaning
+     because somebody narrowed the list. */
+  const { today, week } = useIntakeCounts();
   const crumbs = useMemo(() => (
     <>
       <span className="tb-title">Business Enquiries</span>
+      {/* INTAKE, not lifecycle. The strip below already counts every state and
+          counts them better — repeating two of them in the topbar said nothing
+          the page was not already saying louder. What the topbar can say that
+          the strip cannot is how much is COMING IN, which is the number you
+          want before you look at the queue at all. */}
       <span className="tb-stats">
-        <span className="tb-stat ro"><span className="v tnum">{m.ready}</span><span className="k">ready</span></span>
-        <span className="tb-stat ro"><span className="v tnum">{m.live}</span><span className="k">live</span></span>
-        {m.breached
-          ? <span className="tb-stat ro bad"><span className="v tnum">{m.breached}</span><span className="k">breached</span></span>
-          : null}
+        {/* Label first, then the figure. "0 today" reads as a sentence
+            fragment you have to finish; "today 0" reads as a labelled value,
+            which is what it is. */}
+        <span className="tb-stat ro"><span className="k">today</span><span className="v tnum">{today}</span></span>
+        <span className="tb-stat ro"><span className="k">last 7 days</span><span className="v tnum">{week}</span></span>
       </span>
     </>
     /* usePageChrome republishes once per LOCATION, not per render, so this
        memo only has to be right for the counts it prints. */
-  ), [m.ready, m.live, m.breached]);
+  ), [today, week]);
 
   /* Where "up" is. From a record, the list it was opened from — filters and
      all, so Back is a return and not a reset. */
   /* Keyed on the counts: they come from the server after the first render, and
      without the key the topbar would keep the zeros it mounted with. */
   usePageChrome({ crumbs, right: null, parent: id ? listHash(omit(p, ["tab"])) : null },
-    `${m.ready}/${m.live}/${m.breached}`);
+    `${today}/${week}`);
 
   /* ----------------------------------------------------------- filters ---
      Same debounce Deals uses for search: typing must not push a history entry

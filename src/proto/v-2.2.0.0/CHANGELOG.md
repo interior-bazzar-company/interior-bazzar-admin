@@ -6,6 +6,1257 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-21
 
+### "No match found" → "No match yet"
+
+**Area:** whole module · **Files:** `vocabularies.json`, `List.tsx`, `Detail.tsx`,
+`bits.tsx`, `store.ts`, `enquiries.css`, `check-enquiry-wiring.cjs`,
+`check-enquiry-export.cjs`
+
+Label only, in all ten places that carried it: the status label, the strip cell
+and its help text, the transition guard, the record's info note, the manual
+button, the `NO_MATCH` event note, and two check-suite assertions.
+
+**`no_match` stays the key**, as does `no_eligible_business` — the same line held
+for every label that moved today. A key renamed to match a label is a migration
+wearing a rename's clothes.
+
+**The button reads "No match yet", not "Match not yet".** The literal transform
+is not English, and an action that sets a state should name that state — the
+button and the stage it produces now say the same words.
+
+**"Yet" is a better word than "found", incidentally.** The state is reversible
+and re-runnable: a business renews, a category gets its first provider, and the
+enquiry walks back to Qualified. "Found" reported a search result; "yet" says
+the door is still open, which is what the state actually means.
+
+**The dated records are left alone** — `OPERATION-2026-08-21-no-match-status.md`
+and the earlier changelog entries say "No match found" because that is what it
+was called when they were written. Editing them would be rewriting history to
+match the present, which is the one thing a log must not do.
+
+**Verified:** rendered the rail in three states, the full pill set and the
+button — all read "No match yet", and the off-ramp still draws dashed on
+`qualified` and `assigned` and solid on `no_match`.
+
+**For the API:** `statuses[].label` for `no_match` is now "No match yet"; nothing
+else moves.
+
+## 2026-08-21
+
+### The rail shows No match found always — and never claims you went through it
+
+**Area:** `#/business-enquiries/:id` — lifecycle rail
+**Files:** `bits.tsx`, `enquiries.css`
+
+Supersedes this morning's decision to draw the off-ramp only while a record was
+on it. The stage is now always in the line, between Qualified and Assigned,
+which is where it was asked for.
+
+**The bug that made it more than a one-line change**
+
+`no_match` is step 4 and `assigned` is step 5. The rail's ordinary rule is
+*anything behind you is filled* — so every assigned record would have shown **No
+match found as completed**, and the rail would have said an enquiry passed
+through a stage it never entered. Same for every terminal record.
+
+So an off-ramp gets its own state and is **never "done"**:
+
+```
+on    it is the current status
+off   an off-ramp that is not current — dashed, hollow, muted
+done  ordinary stages behind you
+```
+
+Dashed leaders on both sides so it reads as a branch off the line rather than a
+stop on it, and the tooltip says *"(not taken by this enquiry)"* for the case the
+dashes are too quiet to carry alone.
+
+**Why always-on is the better answer anyway:** the pipeline has a shape, and
+hiding a stage until it happens makes the shape a secret. Somebody looking at a
+Qualified record should be able to see that No match found is where it can go
+next — that is the point of a rail.
+
+**A specificity note, because this bit twice today.** The two connector rules
+carry an extra class each so they beat `.be-step + .be-step::before`, which is
+the same `(0,2,1)`. Tying on specificity and winning on file order is how a rule
+becomes somebody else's bug the day the bundler reorders two stylesheets.
+
+**Verified:** rendered all six states. On `assigned` and `converted` the off-ramp
+stays dashed while everything genuinely behind is filled; on `no_match` it is lit
+and Qualified reads done.
+
+**For the API:** nothing. Presentation only.
+
+## 2026-08-21
+
+### "Match not found" by hand, and it becomes a stage on the rail
+
+**Area:** `#/business-enquiries/:id` — action bar and lifecycle rail
+**Files:** `store.ts`, `bits.tsx`, `Detail.tsx`, `vocabularies.json`, `BACKEND-INTEGRATION.md`
+
+**1 · The manual route into No match found**
+
+`no_match` could only be reached by a matching run that returned nothing. But the
+operator sometimes knows the answer before the run does — the one business
+covering that pincode suspended this morning, or the category is one nobody
+serves yet. Making them run a match to discover what they already know is
+theatre.
+
+`markNoMatch()` sets it directly from **Qualified**, stores the same
+`no_eligible_business` exception with a note naming who did it, and appends a new
+**`NO_MATCH`** event so a later automatic run does not look like it contradicted
+itself.
+
+The button is a plain `btn`, deliberately — **not `dgr`**. This is not a
+rejection and it is not terminal: it says the supply is missing and the enquiry
+is fine. "Try matching again" is the way back out.
+
+**2 · It is now a stage after Qualified**
+
+`no_match` had shared step 3 with Qualified while it was invisible to the rail.
+The moment it is drawn, sharing a number lights **two stages at once** — so it
+takes step 4 and everything after shifts: assigned 5, terminals 6.
+
+**The rail draws it only while the record is on it.** A rail that always showed
+it would promise a detour most enquiries never take; this way it appears exactly
+where it belongs, between Qualified and Assigned, exactly when it is true. That
+is one predicate away from being permanent if the other reading was intended:
+
+```
+qualified   New — Processing — [Qualified] — Assigned — Outcome
+no_match    New — Processing — Qualified — [No match found] — Assigned — Outcome
+```
+
+**Verified end to end**, not inferred: rendered both rails, then clicked the real
+button against the real store — `IB-BE-2026-0047` flipped to No match found, the
+timeline gained `NO_MATCH — Marked No match found by hand · Vasant Kunj, New
+Delhi · Interior Design`, the exception was set, and the rail for that record
+redrew with the off-ramp.
+
+**For the API**
+
+- **`NO_MATCH` joins the event union.**
+- **BE-T02b · `POST …/{id}/no-match`** — from `qualified` only, **no body**. It
+  records a judgement, not a reason code, and the judgement is always the same
+  one. Reversible: BE-T02 clears it.
+- `statuses[].step` renumbered: `no_match` 4, `assigned` 5, terminals 6.
+
+## 2026-08-21
+
+### Full-page loader: the Lottie replaces the GIF, loaded out of band
+
+**Area:** shell — `RequireSession`'s loading screen
+**Files:** `AdminLoader/index.tsx`, `AdminLoader.module.css`, `utils/constants/image.ts`,
+`package.json` · **removed:** `assets/images/gif.gif`
+
+**The weights, because they decided the shape of this**
+
+| | raw | gzip |
+|---|---|---|
+| `gif.gif` (removed) | 4.2 KB | — |
+| `loading-spinner.json` | 188 KB | **31.8 KB** |
+| `lottie_light` renderer | 164 KB | **48.3 KB** |
+
+**A loading screen that has to be loaded is a joke at the user's expense**, so
+neither goes in the entry bundle:
+
+- **`lottie_light` via dynamic `import()`** — its own chunk, confirmed in the
+  build output. `light` is the SVG-only build, 164 KB against the full player's
+  299 KB, and this file is all shape layers, which is exactly what it renders.
+- **the JSON via `?url`** — Vite emits it as a file to fetch rather than inlining
+  188 KB of vectors into JavaScript.
+
+Until both arrive, the CSS `.spinner` holds the screen — three lines that were
+already there, so the loader is never itself blank. The box is reserved at full
+size and the spinner sits **inside** it; as a sibling it would have shifted the
+layout the moment the animation swapped in.
+
+**Reduced motion gets the spinner and nothing else.** The animation is a looping
+character at a desk — precisely the continuous movement that setting exists to
+switch off.
+
+**Two failure modes handled, because this component's whole job is a wait:**
+the session can resolve while the chunk is still in flight, so the effect guards
+against rendering into a detached node (an animation nothing would ever stop);
+and a chunk that fails to load is caught silently, because the spinner is already
+on screen and still says the true thing.
+
+**Accessibility:** the animation is decorative (`aria-hidden`), with the status
+text in a visually-hidden span under `role="status"` — so it announces "Loading…"
+rather than nothing, or a pug.
+
+**Also:** the file arrived as `loading spinner.json`. Renamed to
+`loading-spinner.json` — a space in an import path works right up until it does
+not.
+
+**Verified:** built assets served over HTTP and rendered headless — SVG present,
+163 paths, 90 frames, 512×512, playing.
+
+**For the API:** nothing.
+
+## 2026-08-21
+
+### Sidebar: real logo, flush-left brand, no key hints, Client Ops moved up
+
+**Area:** shell (sidebar, topbar) + Business Enquiries topbar
+**Files:** `AdminShell.tsx`, `admin-theme.css`, `modules.ts`, `BusinessEnquiries/index.tsx`
+
+**1 · The mark is the real one.** The green tile with "ib" set in it was
+generated in CSS. `src/assets/images/IB_Icon.png` is a self-contained tile —
+dark ground, its own yellow accent — so the rule now carries no background of
+ours and does not tint it. (`Logo.png` was the wrong asset here: it is
+white-on-transparent, built for a dark ground, and would have vanished on this
+sidebar.)
+
+**2 · "ADMIN" was indented by 24px, and the old comment explained the wrong
+cause.** `.sb-brand` is a `<button>`, and a button centres its text — so the
+subtitle sat centred under the title. The rule that used to sit there said:
+
+> *measured with a canvas/DOM comparison, both boxes already start at the same x*
+
+True, and irrelevant. **The box was full width in both cases; only the text
+inside it moved.** Measuring the element shows no difference at all — you have to
+measure a Range over the text node to see it. I made the same mistake first time
+and got "no change" until I looked at the render.
+
+`text-align:left` on `.sb-brand` fixes the cause, and the `-2px` "optical
+correction" is gone with it — it had been compensating for the centring, not for
+letter tracking, so once the cause was fixed it overcorrected 2px the other way.
+Measured on the text: **before 50/74, after 50/50.**
+
+**3 · The key hints are gone** — `⌘K` beside Search and `[` beside Collapse. Both
+shortcuts still work; only the badges went. `.kbd` stays in the theme, still used
+in five other places.
+
+**4 · Client Ops sits under Sales.** Groups had been appearing in whatever order
+the server's modules arrived, with proto rows appended last — which put Client
+Ops below Settings purely because it is the newest thing here. `GROUP_ORDER`
+states it instead. A group not named there keeps its arrival order *after* the
+named ones, so a new server group appears rather than silently vanishing.
+
+**5 · Topbar figures read label-first** — `today 0`, `last 7 days 10`. "0 today"
+reads as a sentence fragment you have to finish; "today 0" reads as a labelled
+value, which is what it is.
+
+**For the API:** nothing.
+
+## 2026-08-21
+
+### Business load ball on Assigned to · complete phone numbers
+
+**Area:** `#/business-enquiries` — list rows, seed data
+**Files:** `List.tsx`, `enquiries.css`, `enquiries.json`, `check-enquiry-seed.cjs`
+
+**1 · How buried is this business?**
+
+The Assigned-to cell now carries a notification-style ball: **how many live
+enquiries that business is holding right now.**
+
+- **Counted from the whole set, never the filtered rows.** The ball means "this
+  business currently has N" — a number that shrank because somebody filtered by
+  city would be answering a different question with the same mark.
+- **Live only** (`status = assigned`). A business that converted forty last
+  quarter should not read as buried.
+- **Zero is hollow, not solid.** It stays on the row — *"this business is free"*
+  is worth knowing when deciding where the next one goes — but a ball reading
+  zero as loudly as one reading three is decoration, not a notification.
+
+It repeats on every row for the same business, and that is deliberate: the
+question is not "this row" but "how loaded are they", and it should be readable
+from whichever row you are looking at.
+
+**2 · The phone numbers were masked in the seed, and that broke more than looks**
+
+They were stored as `+91 98•••••••27` — so `phoneKey()`, which takes the **last
+ten digits** to dedupe on, was working with six, and those six included the
+country code. **The duplicate check had never run on a realistic number.**
+
+All 13 records now carry complete, fictional Indian mobiles (and real-shaped
+email addresses built from the customer's own name). Each keeps its original
+first and last two digits so anything that quoted a number before still matches.
+Verified: every key is 10 digits, all 13 unique.
+
+`check:seed` now asserts it — a phone must yield ≥12 digits, start 6–9, and no
+two records may share a key — so re-masking cannot silently break dedupe again.
+Confirmed the guard fires: re-masking one number reports
+*"phone … has 6 digits — masked?"*.
+
+**A regression the render caught.** A complete number is longer than a masked
+one, so the reference line started breaking mid-phone: `+91` on one line,
+`98100 00027` on the next. The number is now one unwrappable unit, so the line
+breaks between the reference and the phone or not at all.
+
+**For the API:** nothing structural. The seed's `$comment` records that contact
+details are fictional but complete, and why masked ones were useless as test
+data.
+
+## 2026-08-21
+
+### Filter marks: an identity dot per status, a heat ramp for urgency, real chips for tags
+
+**Area:** `#/business-enquiries` — filter listboxes and row status pills
+**Files:** `FilterSelect.tsx`, `bits.tsx`, `List.tsx`, `enquiries.css`
+
+**The status dots were not distinct, and the reason was structural.** They were
+painted from the semantic `tone` — four values shared across eight statuses — so
+the list showed **three amber dots and two grey ones**. A legend with duplicates
+is not a legend.
+
+They now use an **identity** class, `.be-dot.s-<key>`, on two axes rather than
+eight memorised hues (the palette has five):
+
+| | |
+|---|---|
+| **hue** | which part of the pipeline — sand → amber → indigo → green / rust |
+| **fill** | whose move it is — **solid = ours**, **ring = theirs, or ended** |
+
+```
+New          sand solid      ours, untouched
+Processing   amber solid     ours, in hand
+Qualified    indigo solid    ours, ready to route
+Assigned     indigo RING     same work, now sitting with somebody else
+No match     rust RING       blocked, not killed
+Converted    green solid     won
+Not Converted sand RING      ended, no result
+Rejected     rust solid      that one we did on purpose
+```
+
+Assigned being a hollow Qualified is the point: same hue, same work, different
+hands. No match found is a hollow Rejected for the same reason.
+
+**The row pill carries the same dot.** Without that the filter taught a colour
+code the rows never repeated — a code nobody learns. `StatusPill` now renders the
+identity dot alongside the semantic tone: the tone says how to feel about it, the
+dot says which state it is.
+
+**Urgency is ordinal, so it looks ordinal** — a heat ramp from soonest to latest
+(rust → amber → indigo) with "Browsing" hollow, because it is not a date but the
+absence of one. The previous rule marked only "hot" and left three identical
+grey dots.
+
+**Tags render as the chip the rows use**, tone and dotted auto-marker included.
+A tag is a chip everywhere else in the module; the filter list was the one place
+it was a plain word.
+
+Everything else stays plain. A city has no tone, and inventing one is noise.
+
+**For the API:** nothing. Presentation only — the marks derive from `statuses[].key`
+and `tags[].tone`, both already in the vocabulary.
+
+## 2026-08-21
+
+### A real listbox for the filters · the whole strip · intake in the header
+
+**Area:** `#/business-enquiries` — command area, strip, topbar
+**Files:** `FilterSelect.tsx` (new), `List.tsx`, `index.tsx`, `enquiries.css`,
+`admin-theme.css`, `check-enquiry-wiring.cjs`
+
+**1 · The dropdown had to stop being a `<select>`**
+
+The open menu in the report was **the operating system's**, not ours — a
+rectangle of system blue at the end of a filter row. There is no CSS fix for
+that: a native `<select>` takes styling on the closed control and draws the list
+itself. Making it look like the panel means not using one.
+
+`FilterSelect` is a button and a listbox, both ours. What that buys beyond paint
+is the thing a native control could never do — **an option can carry a mark**:
+
+| filter | mark | why |
+|---|---|---|
+| Status | tone dot | eight statuses are quicker to find by colour than to read, and it is the same dot the rows carry |
+| Urgency | one red dot on "hot" | four colours would be a legend to learn; one is a fact |
+| Tier | lettered square | the badge the rows already use |
+| everything else | none | a city has no tone and inventing one is noise |
+
+Keyboard is rebuilt because replacing a native control means replacing what it
+did: Enter/Space/↓ open, arrows and Home/End move, Enter picks, Escape closes and
+returns focus to the button, Tab closes. **Focus opens on the current value**,
+not the top — which is what makes "change it by one" a single keypress.
+
+Deliberately absent: search-inside-the-list, multi-select, tags. Ten filters over
+a queue this size do not need them, and each is another thing to learn.
+
+**2 · The strip shows everything**
+
+The `+N more` disclosure hid four of eight cells, so half the queue's shape was
+behind a press — the one thing a strip exists to avoid. All eight are shown, in
+**lifecycle order** (New → Processing → Qualified → No match → Assigned →
+Converted · Rejected) rather than the old primary/secondary split, so the row
+reads as the pipeline it describes. The disclosure, its held-open state and its
+CSS are gone.
+
+**3 · The header counts intake, not lifecycle**
+
+`qualified` and `live` repeated two numbers the strip below already showed, and
+showed better. Replaced with **today** and **last 7 days** — what the topbar can
+say that the strip cannot is how much is *coming in*. Both resolve through the
+same `receivedWindow` code the Received filter uses, so "today" means one thing
+on this page rather than two.
+
+*On the seed, `today` reads 0 — the newest records are dated the day before the
+seed's `generatedAt`. Correct behaviour, not an empty state.*
+
+**Two bugs found by doing this**
+
+- **The open list painted under the attention strip.** `container-type` on the
+  filter band already made it a stacking context, so its listboxes were trapped
+  below the strip at `--z-band` and the strip drew straight through an open menu.
+  The ladder gains a spaced rung — `--z-bandpop: 12` — for a band that opens a
+  panel and has to clear the other bands, not just the rows.
+- **`check:wiring` failed on the new component, correctly by its letter and
+  wrongly by its intent.** Its rule is about the *shell's* popover, whose
+  document listener closes on any click without `data-act`. `FilterSelect` runs
+  its own outside-click listener, so the attribute would have been cargo — added
+  to satisfy a test, read by nothing. The check is now scoped to files that call
+  `openPop`, and was re-verified to still catch the real bug it was written for.
+
+**For the API:** nothing. Presentation only.
+
+## 2026-08-21
+
+### "No match found" becomes a status, not a footnote
+
+**Area:** whole module · **Operation doc:** `OPERATION-2026-08-21-no-match-status.md`
+
+A matching run that found nobody was recorded as a **side-note** — an `exception`
+object hung off a record whose status stayed `Qualified`. So the queue said
+*"qualified, ready to go to a business"* about an enquiry with nowhere to go.
+Same contradiction as Ready-to-Assign, same answer: make it a state.
+
+```
+New → Processing → Qualified ─── assign ──→ Assigned → outcome
+                        │  ▲
+                 no eligible │ re-run finds one
+                        ▼  │
+                   No match found
+```
+
+**It is an off-ramp, not a step, and two things say so**
+
+- **It shares step 3 with Qualified.** It *is* qualified — requirement confirmed,
+  snapshot frozen. What is missing is supply. Sorting by lifecycle step treats
+  them as the same distance along, and the rail highlights **Qualified** while
+  the record sits in `no_match`, which is the truth.
+- **`offRamp: true`**, a new status flag the rail uses to leave it out of the
+  linear track. Without it the rail would read *New → Processing → Qualified →
+  No match found → Assigned* and imply every enquiry visits it.
+
+**There is deliberately no `no_match → assigned`.** Assignment needs a ranked
+candidate, and the only thing that produces one is another run — which returns
+the record to Qualified first. The route exists; it just goes through the state
+that earns it.
+
+**The logic.** `runMatching()` now runs from `qualified` **or** `no_match` —
+retrying is that state's only escape, so the old guard would have trapped the
+record in it — and sets the status both ways. The `exception` object stays: the
+status says *what* the record is, the exception says *why*, the same division as
+`invalidation` on a Rejected record.
+
+**The button** offers matching from both states and reads **"Try matching
+again"** in `no_match`, because by then you have already pressed it once.
+
+**Two duplicate badges removed.** The record header and the list's customer cell
+each painted a "No match found" pill beside a status pill that now says the same
+word.
+
+**`flag` is gone from the module entirely.** With this cell moved to a status
+filter, no strip cell used a flag any more — `flagRoute` was dead, and nothing in
+`filterEnquiries` read `p.flag`. A stale `?flag=x` URL would still have rendered
+a chip that filtered nothing: a silent lie of exactly the kind that produced the
+count-vs-filter bug earlier today. Removed from the routes, the chip labels and
+the export filename and scope sentence.
+
+**The export check caught a stale fixture.** It asserted the scope sentence
+mentioned `flag: 'overdue'` — and passed only because the sentence echoed
+`p.flag` verbatim. The fixture now uses three filters that exist, and adds the
+negative: a removed param must **not** appear in the sentence.
+
+**Seed:** `IB-BE-2026-0052` → `no_match`. Qualified drops 3 → 2.
+
+**For the API**
+
+- **New status `no_match`**, label "No match found", step 3, non-terminal.
+- `POST …/{id}/match` **sets the status in both directions.** This **supersedes**
+  the note added earlier today that it must not touch the status — that held
+  while "no eligible" was only a field.
+- `flag=no_eligible` is withdrawn; use `status=no_match`. The `exception` object
+  is unchanged.
+
+## 2026-08-21
+
+### Filter band: sort leaves the grid, resting controls stop shouting
+
+**Area:** `#/business-enquiries` — the command area
+**Files:** `List.tsx`, `enquiries.css`
+
+**A shipped visual defect.** "Sort: Needs attention" is wider than a 158px grid
+cell, so the control was rendering as **"Sort: Needs attentio"**. It had been
+sharing the filter grid with ten narrowing controls — which also said, wrongly,
+that sorting is a kind of filtering. It now has its own slot at the end of the
+band, ruled off, sized to its own longest label.
+
+**Eleven identical bordered boxes read as a form to fill in**, not as a set of
+optional narrowings — and at rest they all compete for the same attention the
+one *active* filter needs. Resting controls now sit in a well with a hairline;
+active ones keep the theme's brand fill and carry all the contrast in the band.
+
+**Grid cells 158px → 140px.** At 158 a wide window fitted nine columns and left
+the tenth stranded on a line of its own; 140 fits more per row. It was **not**
+pushed lower: at ~130px an active value like "Modular Kitchen" starts to
+truncate, which is the defect this entry opens with.
+
+**Two things that would have been quietly dead**
+
+- `:not(.on)` on the resting rule is load-bearing. `.selectbox.on select` in the
+  theme is `(0,2,1)` and so is `.be-filters-grid > .selectbox select` — without
+  the `:not`, which one won would have depended on the order the bundler emitted
+  the two stylesheets in. Third time today this has come up; it is written down
+  at each site now.
+- The separator rule was first written as `@container rec (min-width: 900px)`.
+  **`rec` is the record view's container and does not exist on the list**, so the
+  query could never match. `.be-filterbar` is now its own container (`fbar`), and
+  the rule asks the only width that matters — the band's own.
+
+**For the API:** nothing. Presentation only.
+
+## 2026-08-21
+
+### Filter chips redesigned · "Invalid" becomes "Rejected"
+
+**Area:** `admin/ui` (shared) + Business Enquiries
+**Files:** `ui/index.tsx`, `admin-theme.css`, `enquiries.css`, `vocabularies.json`,
+`Detail.tsx`, `Modals.tsx`, `Qualify.tsx`, `Suggestions.tsx`, `List.tsx`,
+`bits.tsx`, `index.tsx`, `check-enquiry-wiring.cjs`
+
+**The chips — three measured problems**
+
+| | Was | Now |
+|---|---|---|
+| key vs value | one text node, one weight: `Status: Processing` | two elements — key at 400/72% opacity, value at 500 |
+| close button | **15×15px**, measured | 16px glyph, **28px target** via a `::after` inset, plus a focus ring |
+| "Clear all" | a `.chip` — same pill as the filters, just untinted | a text action, ruled off from the set it clears |
+
+The key and the value answer different questions. Once you have read
+"Processing" you already know it is a status, so making them one string at one
+weight charged two reads for one piece of news. A row of eight chips is now
+scannable by value alone.
+
+"Clear all" wearing the chip shape was the worse of the three: sitting inline at
+the end of the row it read as **a ninth filter that happened to be switched
+off**. It is a verb, so it looks like one.
+
+**A latent specificity bug found on the way.** `FilterChips` carried an inline
+`style={{margin}}`, which silently beat every stylesheet — including
+`.be-list > .chiprow` in this module, which had been trying to align the chip row
+with the other bands and never could. With the inline gone, that rule and the
+theme's new `.chiprow.filters` were both `(0,2,0)` and the winner would have
+depended on **which stylesheet the bundler emitted last**. The module rule is now
+`.be-list > .chiprow.filters` — the module's intent wins on purpose rather than
+by luck.
+
+**Blast radius:** `FilterChips` is used by 8 modules and every one gets the same
+improvement. `.chip` is also used bare in `AdminShell` and `AdminAuth` for
+permission chips — those have a single text child, so `.k`/`.v` never match and
+nothing about them changes.
+
+**Invalid → Rejected**
+
+Label only. **`invalid` stays the status key**, and so do `invalidReasons`, the
+`INVALIDATED` event, the `invalidation` block, `invalidate()` and the
+`invalid_transition` 422 code — the same line held every time a label has moved
+today, because renaming a key to match a label turns a rename into a migration.
+
+Renamed where a person reads it: the status label, the strip cell, the action
+(**"Mark invalid" → "Reject"**), the modal heading, and eleven pieces of prose —
+including the transition guards ("or a rejection reason is supplied"), the tier
+and contact-outcome help text, and the exclusion note in Suggestions, which now
+says *"Rejecting it would hide a coverage gap inside a rejection-rate metric"*.
+
+**For the API:** `statuses[].label` for `invalid` is now **"Rejected"**; the key
+is unchanged, so no payload, filter or error code moves.
+
+**Verified headless:** chips render key-quiet / value-bold with a separated
+"Clear all", and the status pills read New · Processing · Qualified · Assigned ·
+Converted · Not Converted · **Rejected**.
+
+## 2026-08-21
+
+### Module audit — eight fixes, three false alarms, one honest limit
+
+**Area:** whole module · **Operation doc:** `OPERATION-2026-08-21-module-audit.md`
+
+A systematic sweep after a day of large removals (SLA, ownership, callbacks,
+Delivered, Acknowledged, Ready to Assign). Removals leave debris; this is the
+clean-up. Findings were **measured**, not eyeballed: a static audit script over
+dead CSS / unused exports / unconsumed vocabulary / state-machine completeness /
+event coverage / filter–sort parity, plus a headless render to measure the table.
+
+**Fixed**
+
+| # | Kind | What |
+|---|---|---|
+| 1 | layout | `.be-tbl` floor `1160px → 960px` — sized for 12 columns, the table has 10 |
+| 2 | dead CSS | `.be-abar-biz`, orphaned with the Acknowledge fence |
+| 3 | dead code | `TEAM` and `lastAttempt` exports, no consumers anywhere |
+| 4 | copy | terminal footer said *"Terminal — Converted. **Terminal.** Reopening…"* |
+| 5 | a11y | `<label>Rank 1 was</label>` in ReassignModal had no `htmlFor` |
+| 6 | UX | attention strip had **3 separators for 4 cells** — every cell its own group |
+| 7 | redundancy | `new-enquiry` auto tag duplicated `status=generated` exactly |
+| 8 | seed | 2 records had remarks with no `REMARK` event; 3 had manual tags with no `TAGGED` event |
+
+**The lifecycle audited clean** — every status has a transition row, none points
+at an unknown status, none is unreachable, the seed uses no status outside the
+vocabulary, every sort key offered is handled and every filter offered is
+honoured.
+
+**Three false positives, verified away rather than "fixed"**
+
+Worth recording, because *the audit said so* is not evidence:
+
+- `.be-r-warn` / `.be-r-rd` looked dead — they are built as `"be-r-" + rail`,
+  which no literal grep finds.
+- `.be-tier-h` looked dead — the only match was a comment saying it had already
+  been removed.
+- The last-response cell looked unclamped, ballooning rows to ~250px. That was
+  **my probe's** markup missing `.be-resp-c`; the real table clamps to two lines.
+
+**One honest limit on fix #1.** Narrowing the floor removes ~200px of artificial
+overflow but **not the scrollbar**. The ten columns' own minimum widths total
+959px against 942px available, so 17px is intrinsic — the table cannot compress
+below its content. Capping the response column was measured as a candidate fix
+and **rejected**: at minimum width that column is already 116px, so caps of
+260 / 240 / 220 / 200 / 180 all left the total at 959. The last 17px needs a
+column dropped or cell padding tightened, which is a design decision and is not
+being taken quietly inside a bug sweep.
+
+**The team vocabulary was re-anchored rather than deleted.** Removing the `TEAM`
+export left `voc.team` with no consumer. Instead of dropping it, `check:seed` now
+asserts that **every Operations-authored event and every `qualifiedBy` names a
+real team member** — an event by somebody nobody can look up is either a typo or
+a fiction. It caught a defect on its first run: the `TAGGED` events added under
+fix #8 were attributed to "System", when a manual tag is a person's judgement.
+Reattributed to whoever qualified the record.
+
+**Deliberately not done:** `CHECK` and `UPDATED` events are still missing from the
+seed — a qualified record should carry four `CHECK` events, and adding them means
+~28 fabricated rows. Recorded as a known simplification rather than invented,
+because a stand-in that fabricates detail it cannot justify is *worse* as an API
+reference. Bulk actions remain the largest missing feature; that is new work, not
+a defect.
+
+**For the API:** `new-enquiry` leaves the tag vocabulary — "nobody has contacted
+them" is `status=generated`, and the server must not re-add the tag. Everything
+else here is presentation, dead code or seed data.
+
+## 2026-08-21
+
+### Removed: Ready to Assign — matching happens inside Qualified
+
+**Area:** whole module · **Operation doc:** `OPERATION-2026-08-21-remove-ready-to-assign.md`
+
+```
+before   New → Processing → Qualified → Ready to Assign → Assigned → outcome
+after    New → Processing → Qualified → Assigned → outcome
+```
+
+**The contradiction was real**
+
+Qualified meant "a person confirmed the requirement and froze the snapshot" — at
+which point the enquiry *is* ready to be assigned. The only thing `ready`
+actually encoded was **"a matching run has been done"**, which is a fact about the
+work, not a stage of the enquiry's life.
+
+**It was never load-bearing.** Nothing gated on it:
+
+- **`assign()` never checked the status.** It requires a match run with an
+  eligible candidate and nothing else.
+- **The suggestions panel** switches on `isWorking(status)`. A Qualified enquiry
+  already showed the ranked businesses.
+- **`runMatching()` already accepted both** `qualified` and `ready`, because
+  re-running was allowed. Its only other job was setting `status = "ready"`.
+
+So it was a label the queue carried and the screens ignored. Removing it changed
+no gate, no permission and no branch — only names and counts.
+
+**What changed**
+
+- `ready` leaves `statuses[]` and `transitions[]`; steps renumber 1–5.
+- **`runMatching()` no longer sets a status.** It appends `MATCHED` and sets or
+  clears the `no_eligible_business` exception exactly as before — the enquiry
+  stays Qualified either way.
+- `reassign()` returns the enquiry to **Qualified**.
+- `qualified → assigned | invalid`; `assigned → converted | not_converted |
+  invalid | qualified`.
+- The strip cell and toolbar stat are relabelled **qualified**.
+
+**A field whose name had started lying.** `Counts.ready` was
+`qualified + ready`; with `ready` gone it holds the Qualified count, so it was
+renamed `Counts.qualified` rather than left as a name that describes a state
+which no longer exists.
+
+**What replaces the distinction it drew**
+
+Whether a matching run exists — what `ready` really meant — is still visible and
+in a better place: the record shows ranked businesses once a run has been done,
+and the `no eligible business` exception when the run found nobody. Both are
+properties of the record, and the strip still surfaces the second as its own cell.
+
+**The one thing genuinely lost:** the list can no longer tell *"qualified, nobody
+has run matching yet"* from *"qualified and ranked"* at a glance. If that matters,
+it belongs as a **flag** — the same shape as `flag=no_eligible` — not as a
+lifecycle state, because it is re-runnable and reversible and states are not.
+
+**Seed:** 2 records at `ready` → `qualified`, giving 3 Qualified.
+
+**For the API**
+
+- Status `ready` **withdrawn**.
+- `POST …/{id}/match` (BE-T02) **must not change the status** — it appends
+  `MATCHED` and sets/clears the exception. Noted on the BE-T02 row.
+- Reassignment returns the enquiry to `qualified`.
+
+**Verified headless:** strip reads `13 total · 1 New · 3 qualified · 1 no match
+found · 3 processing · 3 assigned · 1 converted · 1 invalid`, and the transition
+table renders `qualified → assigned | invalid`.
+
+## 2026-08-21
+
+### A Processing state, and the qualification flow it completes
+
+**Area:** whole module · **Operation doc:** `OPERATION-2026-08-21-processing-state.md`
+
+```
+New  →  Processing  →  Qualified  →  Ready to Assign  →  Assigned  →  outcome
+```
+
+**The reading, and why it is an addition rather than a rename**
+
+The request read two ways — rename `qualified`→Processing and `ready`→Qualified,
+or **add** `processing` between New and Qualified. Both land on the same
+lifecycle. The second is implemented, because the first silently changes what
+every stored record means: four seed records saved as `qualified` would begin
+displaying "Processing", and `ready` would display "Qualified". That is a data
+migration wearing a rename's clothes — the same trap flagged this morning when
+`generated` kept its key while its label became "New". This adds one state and
+changes no stored meaning.
+
+**What it fixes**
+
+`generated` was doing two jobs — *just arrived* and *somebody is working it* —
+and the module had already papered over the gap with an `untouched` count derived
+from an empty contact log, a `new-enquiry` auto tag, and a strip cell filtering on
+that tag rather than on a state.
+
+| | before | after |
+|---|---|---|
+| New | `status=generated` **and** empty log, surfaced via a tag | `status=generated` |
+| Being worked | the same status, told apart by a tag | `status=processing` |
+
+It also **dissolves the label collision** recorded in the previous entry: "New"
+and "in qualification" no longer name overlapping sets, because they are now two
+different states. The strip cell `in qualification` becomes **`processing`**, and
+`New` filters a status instead of a tag. Every cell is one status filter again.
+
+**The transition in: the first logged contact attempt**
+
+"The team started qualifying" and "somebody tried to reach them" are the same
+event, so it needs no new control — `logContact()` flips `generated → processing`
+on the first entry. It is recorded in that attempt's own CONTACT note rather than
+as a separate event type: one act that prints twice is how a timeline stops being
+readable.
+
+**`generated → qualified` is deliberately not a transition.** `canQualify()`
+already required at least one logged attempt, so qualifying without contacting
+was impossible — the transition table now says so instead of leaving it to a
+guard.
+
+**One predicate instead of five copies**
+
+Requirement edits, contact logging, checklist ticks and the qualify gate were all
+`status !== "generated"` — which would have frozen a record the moment it started
+being worked. They now go through `isWorking(k)`, so the next state added before
+Qualified is one edit and not a hunt.
+
+**Also caught and fixed**
+
+- **The seed check was right to fail.** It treated anything past `generated` as
+  "must be frozen", but the freeze is at **Qualified**. It now checks
+  `New | Processing` together for the absence of a snapshot, *and* asserts the
+  one thing that separates them in both directions — New must have no logged
+  attempt, Processing must have one — so a migration cannot leave a record in the
+  wrong state silently.
+- **`LifecycleRail`** picked up the new step on its own, because the magic
+  `step <= 6` was replaced with `!terminal` in the previous change.
+- **Stale `followUpAt` prose in `BACKEND-INTEGRATION.md`** — a leftover from the
+  callback removal earlier today that would have told the API team to build a
+  removed feature. Gone.
+
+**Numbers:** 8 statuses, steps 1–6. Seed: 3 of the 4 `generated` records have
+contact logged → `processing`; `IB-BE-2026-0063` (no attempts) stays New.
+
+**Left alone, worth a later look:** the **`new-enquiry` auto tag** now duplicates
+`status=generated` exactly — status, tag and empty log all encode one fact. It is
+redundancy of the kind that produced the count-vs-filter bug earlier today, but
+removing vocabulary that was not asked about is not this operation's business.
+
+**For the API**
+
+- **New status `processing`**, step 2. `statuses[]` and `transitions[]` updated:
+  `generated → processing | invalid`, `processing → qualified | invalid`.
+- `POST …/{id}/contacts` **must** transition `generated → processing` on the
+  first entry, server-side.
+- Edits, checklist and tag writes accept **both** `generated` and `processing`,
+  and refuse from Qualified onward — unchanged in spirit, wider by one state.
+
+**Verified headless:** strip reads `13 total · 1 New · 2 ready · 1 no match found
+· 3 processing · 3 assigned · 1 converted · 1 invalid`, and the table shows the
+rule working — the three records with 1, 2 and 2 logged attempts render
+**Processing**, the one with 0 renders **New**.
+
+## 2026-08-21
+
+### Lifecycle: Delivered and Acknowledged collapse into Assigned
+
+**Area:** whole module · **Operation doc:** `OPERATION-2026-08-21-collapse-delivery-and-acknowledgement.md`
+
+```
+before   New → Qualified → Ready → Assigned → Delivered → Acknowledged → Converted / Not Converted / Invalid
+after    New → Qualified → Ready → Assigned → Converted / Not Converted / Invalid
+```
+
+Nine states become seven. Steps renumber 1–5, terminals sharing 5.
+
+**Delivered was nearly free, because it was never a decision**
+
+`assign()` already called `deliver()` on its last line. Delivery was the tail of
+assigning, not a step anyone took; the only thing it contributed to the queue was
+a `delivered` status to carry. So the mechanics stay and the state goes:
+
+- **Kept:** `assignments[].deliveryStatus` and `deliveredAt`, and the `DELIVERED`
+  timeline event. *When* it was published, and whether the send **failed**, are
+  facts about the assignment — the record still renders *"Failed — the assignment
+  stands; Operations is alerted"*, and that case needs somewhere to live.
+- **Gone:** the `delivered` status, its strip cell, and `deliver()` as a separate
+  export.
+
+An assigned enquiry is now assigned-and-published, which is what it always was.
+
+**Acknowledged, and what came with it**
+
+`acknowledge()`, the `ACKNOWLEDGED` event, `outcome.acknowledgedAt` (type,
+`recordOutcome()`, 3 seed records), the **AcknowledgeModal**, and the "Business
+side · no surface yet" fence in the action bar that existed only so a prototype
+could walk the chain.
+
+**Record outcome now hangs off Assigned.** The outcome record is created once,
+when it closes, rather than opened at acknowledgement and closed later —
+`status: "in_progress"` no longer occurs.
+
+**Kept:** `outcome.firstContactAt`. Nothing sets it yet, but "when the business
+first rang the customer" is a different fact from "the business confirmed
+receipt", and it was not what was asked to go.
+
+**Renamed, and a collision taken on purpose**
+
+The strip cell `untouched` is now **New**. It already collides: `generated` was
+renamed to "New" this morning, and the strip carries an **in qualification** cell
+filtering `status=generated`. So the row reads *… New … in qualification …*,
+where **New is the subset of in qualification that nobody has rung yet**. The
+tooltips say exactly that and `check:wiring` proves each number matches its own
+filter — but two labels that do not distinguish themselves is a real readability
+cost, taken deliberately rather than by accident. **Worth revisiting.**
+
+**Prose that named removed steps** — the reassign reason ("Business never
+acknowledged it" → "Business never responded"), the assign toast, a reassign
+placeholder, and 15 `suggestions.json` quality labels ("Acknowledges in 4h" →
+"Responds in 4h" — the `avgAckHours` signal survives as *responsiveness*, so only
+its label was wrong).
+
+**Also fixed on the way past:** `LifecycleRail` selected non-terminal steps with
+`step <= 6`, a magic number that only held for the nine-state lifecycle. It now
+asks the data — `STATUSES.filter(s => !s.terminal)` — so the rail follows the
+vocabulary instead of a count somebody has to remember to update.
+
+**Numbers:** strip **10 → 8** cells. CSV **38 → 37** columns. Seed: 2 records
+migrated to `assigned`, 3 `ACKNOWLEDGED` events and 3 `acknowledgedAt` removed.
+
+**For the API**
+
+- Statuses `delivered` and `acknowledged` **withdrawn**. `transitions[]` becomes
+  `assigned → converted | not_converted | invalid | ready`.
+- `POST …/{id}/acknowledge` withdrawn. Delivery is **not** a separate endpoint —
+  assignment publishes.
+- `ACKNOWLEDGED` leaves the event union; **`DELIVERED` stays**.
+- `outcome.acknowledgedAt` leaves the payload;
+  `assignments[].deliveryStatus`/`deliveredAt` remain.
+
+**Verified headless** against the real component and seed: the strip reads
+`13 total · 1 New · 2 ready · 1 no match found · 4 in qualification · 3 assigned ·
+1 converted · 1 invalid` — the **3 assigned** confirms the two migrated records
+folded in — with status pills rendering **New** and **Ready to Assign**.
+
+## 2026-08-21
+
+### Stacking: the z-index ladder gets tokens and gaps
+
+**Area:** design system · **Files:** `admin-theme.css`
+
+**What was wrong, and it was not what was reported**
+
+The report was "still a tooltip z-index bug". I could not reproduce it. The strip
+tooltip was rendered headless three times against the real component, the real
+seed and the real vocabulary, in a faithful copy of the list page — the actions
+band, the twelve-cell filter grid, the attention strip, the chip row and the real
+`.be-tbl` (min-width 1160px) inside the scrolling `.dls-body`, all wrapped in
+`main.content`. Sampled at five points across its own area, at 1180px and 1400px,
+collapsed and expanded: **on top at every point, every time.**
+
+So rather than keep guessing at the symptom, the underlying fragility is fixed.
+
+**The fragility**
+
+`.dls-attn` was `z-index: 3` and `.tbl th` was `z-index: 2` — two bare numbers,
+one apart, each written in the middle of a component, in a theme where every
+other layer is a named token (`--z-nav`, `--z-topbar`, `--z-pop`, `--z-layer`,
+`--z-toast`). One apart is not a decision, it is a coincidence. It had already
+broken once: a cell tooltip picked 2 as well, tied with the sticky header, and
+lost on document order alone.
+
+Both rungs are now named, with a gap between them:
+
+```
+--z-stick: 2    the sticky table header
+--z-band: 10    a command band, and anything hanging out of it
+```
+
+and the whole ladder — content, stick, band, topbar/nav, pop/layer, toast — is
+documented in one place at the top of the file.
+
+**`--z-stick` is pinned to its original 2 deliberately.** Raising it to sit
+mid-gap looked tidier and would have been a regression: `.tgr-pop`, the colour
+dropdown in Tags, is `z-index: 3` and hangs over rows. Lifting the header above
+it would have pushed that dropdown behind the header it currently covers. The
+comment in the token block says so, so nobody "tidies" it later.
+
+Net effect: nothing moves except the band, 3 → 10, which is what needed headroom.
+Verified in the built CSS and re-rendered: `.dls-attn z=10`, `.be-tbl th z=2`,
+tip on top at all five sample points.
+
+**For the API:** nothing. Presentation only.
+
+## 2026-08-21
+
+### Removed: ownership and callbacks · renamed two labels
+
+**Area:** whole module · **Operation doc:** `OPERATION-2026-08-21-remove-ownership-and-callbacks.md`
+
+Six requested changes: two label renames, and four removals that turned out to be
+two whole features. The removal depth was confirmed before any code moved —
+"remove mine logic" can mean "hide the cell" or "delete the concept", and those
+are very different amounts of work.
+
+**Renamed**
+
+| Was | Now | Scope |
+|---|---|---|
+| status label `Generated` | **New** | label only — `generated` is still the key |
+| `no eligible` / `No eligible business` | **No match found** | strip cell, row pill, record pill and note |
+
+**Deliberately not renamed:** `generated` stays the status **key** (it is in every
+seed record, every event, `transitions[]`, and `?status=generated`);
+`flag=no_eligible` stays the URL value; `no_eligible_business` stays the **422
+error code**, which is a published contract rather than vocabulary.
+
+**Removed: callbacks**
+
+`followUpAt` off the enquiry and off every contact-log entry. With it went
+`followUpDue`/`followUpOverdue`, the `callbackDue`/`callbackOverdue` counts, the
+**overdue** and **callback due** strip cells, `flag=followup` and `flag=overdue`,
+the **Follow-up column**, the **"Callback soonest" sort** and the overdue
+tiebreaker in the default sort, the red row rail, the **datetime field** in the
+contact composer and the `requiresFollowUp` gate that made it mandatory, the
+`callback-due` auto tag, and the `callback_due_at` CSV column.
+
+**Kept:** the `callback_requested` **outcome**. "They asked us to ring back" is
+still a true thing to record about a call — it simply no longer schedules
+anything.
+
+**Removed: ownership**
+
+`owner` off the enquiry and all 13 seed records. With it went the `Owner` type,
+`isMine()`, the `mine`/`unowned` counts, the **mine** and **unclaimed** strip
+cells, `owner=__mine`/`owner=__none`, the **Owner column** and **Owner filter**,
+the **Claim / Release / Take over** controls and hand-over select on the record,
+**`setOwner()` and `claim()` (BE-T10)**, the `OWNER` event, the `owner` CSV column
+and the Owner row on the printed sheet.
+
+**Kept:** `VOCAB.team` and `currentActor()`. The team is still who *acts* —
+named on every event, on `qualifiedBy`, on every remark. Only *assigning an
+enquiry to a person* went.
+
+**Numbers:** attention strip **14 → 10** cells. CSV **40 → 38** columns. Table
+loses two columns.
+
+**Method:** types first. `owner` and `followUpAt` came off the `Enquiry` type
+before anything else, so `tsc` enumerated all 31 call sites across 7 files
+instead of grep. Three pieces of code died only as a consequence and were caught
+the same way: `initialsOf()` (no callers), the `.be-r-bad` row rail (unreachable
+— nothing in the module is late any more), and the `touched`/`setTouched` state
+in the contact composer.
+
+**The consequence, stated plainly**
+
+Two guards come off and nothing replaces either. **Nobody is named against an
+enquiry** — the collision this prevented was two qualifiers ringing one customer
+within the hour, and `unclaimed` was the number that surfaced it. **Nothing
+tracks a promised call-back** — "we'll ring you Tuesday" is now a note and
+nothing more.
+
+Together with the SLA removal earlier today, **every time-based obligation in
+this module is gone**: nothing watches the business after delivery, nothing
+watches us before qualification. It is now a queue and a router, and chasing is
+something people do by reading it. Coherent, and worth re-reading the day
+somebody asks why an enquiry sat for a week.
+
+**For the API**
+
+- **BE-T10 (owner) withdrawn** — struck through in `BACKEND-INTEGRATION.md`
+  beside BE-T06, not deleted.
+- `owner` and `followUpAt` leave the enquiry payload; `followUpAt` leaves each
+  contact-log entry.
+- `flag=` loses `followup` and `overdue`; `owner=` goes entirely; `sort=followup`
+  goes; `OWNER` leaves the event union.
+- CSV loses `owner` and `callback_due_at`.
+- `statuses[].label` for `generated` is now **"New"**; the key is unchanged.
+- `attentionCells[]` is down to 10 entries.
+
+**Verified in a browser this time** — the strip was rendered headless from the
+real `AttnStrip`, the real seed and the real vocabulary: four primary cells
+(`13 total · 1 untouched · 2 ready · 1 no match found`) plus six behind "+6
+more", tooltips intact, status rendering as **New**.
+
+## 2026-08-21
+
+### Fix: the cell tooltip painted behind the table header
+
+**Area:** `#/business-enquiries` — the attention strip
+**Files:** `admin-theme.css`
+
+**What happened**
+
+`.tbl th` is `position:sticky; top:0; z-index:2`. The tooltip was also `z-index:2`.
+A tie in z-index breaks on document order, and the table comes after the strip —
+so the sticky header painted straight over the tooltip hanging down into it.
+
+**What was changed, and what was not**
+
+Raising the tooltip to `3` would have fixed today and broken again the next time
+somebody picked a number for a sticky header. The z-index went on **the band**
+instead — `.dls-attn{ position:relative; z-index:3 }` — which gives it a stacking
+context above the scrolling body and states the real rule once: *the command
+bands sit above `.dls-body`, and anything inside them inherits that.* The
+tooltip's own z-index dropped to `1`, now only local ordering among the band's
+children.
+
+`.dls-body` is `overflow:auto`, which does **not** create a stacking context on
+its own, so the sticky header and the band compete directly at the root — 3 beats
+2 and the tie is gone.
+
+**Blast radius:** visually inert everywhere else. The band and the body never
+overlap in normal flow, so raising it changes nothing that was visible before,
+and `3` is far below `--z-topbar` (15) and `--z-nav` (20) — everything meant to
+cover the band still does. Checked every remaining z-index in the theme and this
+module: only `.tbl th` sits inside `.dls-body`, and `.tgr-pop` / `.pop-why` are
+in unrelated stacking contexts.
+
+**For the API:** nothing. Presentation only.
+
+## 2026-08-21
+
+### Attention strip: a real tooltip, replacing the native one
+
+**Area:** `#/business-enquiries` — the attention strip
+**Files:** `ui/index.tsx`, `admin-theme.css`, `List.tsx`, `enquiries.css`
+
+**Why the native one had to go**
+
+`title` was the wrong instrument for fourteen cells of two-part help. It cannot
+be styled or themed, waits about a second, truncates, renders as one grey blob —
+and **never appears on keyboard focus at all**, so the help added earlier today
+was unreachable without a mouse. The replacement answers to `:focus-visible` as
+well as `:hover`, which makes this an accessibility fix as much as a visual one.
+
+**Three decisions worth recording**
+
+**It is a sibling of the cell, not a child.** Inside the button its text would
+join the accessible *name* — the cell would announce as *"1 untouched In
+qualification, with not one contact attempt logged against it…"*. As a sibling
+reached by `aria-describedby` it stays a *description*, which is what it is, and
+CSS reaches it with an adjacent-sibling selector.
+
+**It is anchored to the band, not to the cell.** Anchored to the cell, the last
+of fourteen cells would push a 520px panel off the right edge — and `.dls` is
+`overflow:hidden`, so it would be clipped rather than merely ugly. Fixing that
+properly needs measurement, which is what `openPop` is for, and a popover you
+must dismiss is the wrong weight for read-on-hover help. Band-anchored it cannot
+overflow at any width and always appears in the same place, so the eye learns
+where to look while scanning. **The cost is real and not hidden: the tip for the
+rightmost cell is not under the cursor.**
+
+**It fades with opacity, not `visibility` or `display`.** Both of those remove
+the element from the accessibility tree, and `aria-describedby` cannot reach what
+is not there. `pointer-events:none` stops the invisible panel eating clicks meant
+for the table underneath. A 0.3s delay in, none out, so sweeping the row does not
+strobe — shorter than the native ~1s because the row is meant to read at a glance.
+
+**Shape**
+
+The two halves are now two elements rather than one string with a blank line in
+it: what the number counts, then a hairline rule, then what pressing it filters
+to, quieter. They answer different questions and now look like it.
+
+**Blast radius**
+
+`tip` is **opt-in** on `StatCell`. Eight other modules use `StatStrip` — Deals,
+Invoices, Quotations, Plans, Roles, Team, Audit — and none sets it, so none
+renders a `.dls-tip` and none of the new CSS applies to them. The one global
+change is `.dls-attn{position:relative}`; checked that no module has an
+absolutely-positioned descendant inside a strip, so it is inert. A cell that sets
+both `tip` and `title` now silently drops the native one **in the component**
+rather than being warned against in a comment — two tooltips over one target is a
+silent failure that looks like a browser bug from outside.
+
+**One constraint inherited with it:** a band using tips must not keep the theme's
+default `overflow-x:auto`, or it clips its own tooltips. This module already set
+it visible for wrapping; the second reason is now recorded next to the first so
+neither gets deleted as redundant.
+
+**For the API:** nothing. Presentation only.
+
+**Not verified in a browser** — standing reason, and it bites hardest here:
+hover, focus, the delay and the band anchoring are all things only a browser can
+confirm.
+
+## 2026-08-21
+
+### Attention strip: hover help on every cell — and a count that was lying
+
+**Area:** `#/business-enquiries` — the attention strip
+**Files:** `List.tsx`, `store.ts`, `vocabularies.json`, `check-enquiry-wiring.cjs`, `package.json`
+
+**The bug found while writing the help text**
+
+Every cell is a number *and* the control that filters to it, so the two must be
+the same set. **`callback due` was not.** It counted
+`callbackDue - callbackOverdue` — scheduled but not yet late, because overdue has
+its own cell beside it — while `flag=followup` filtered on `followUpDue()`, which
+is merely "has a callback set" and therefore *includes* the late ones.
+
+The cell read **0**. Pressing it returned **1 row**.
+
+That is worse than either half being wrong alone: the number is the control, so
+once one cell lies the whole row is untrustworthy. Fixed in `filterEnquiries()` —
+`flag=followup` now excludes overdue, matching the label and its neighbour.
+
+**Hover help, from content**
+
+All 14 cells carry a `title`. Each says two things: what the number counts, and
+what pressing it filters to. The second half is the one that matters, because
+that is the half that can drift.
+
+The text lives in `vocabularies.json` as `attentionCells[]` (`key`, `counts`,
+`does`) — product vocabulary alongside statuses and tiers, not strings buried in
+a component, and the API will serve it eventually. A native `title` rather than a
+popover: fourteen read-on-hover sentences on a row of small targets would
+otherwise be fourteen things that can be left open.
+
+**The guard**
+
+`check:wiring` now bundles the store and asserts, for all 14 cells:
+
+- the count **equals the row count of the filter it applies** — run against the
+  real `countsOf()` and `filterEnquiries()`, not a re-implementation
+- help text exists, with both halves present and non-trivial
+- no orphaned help for a cell that no longer exists
+
+Verified to fail on the original defect before the fix was restored.
+
+**For the API:** `attentionCells[]` joins the vocabulary payload. `flag=followup`
+must mean **due AND NOT overdue** server-side — the previous meaning is the bug.
+
+**Not verified in a browser** — standing reason.
+
+## 2026-08-21
+
+### Removed: the SLA logic
+
+**Area:** whole module · **Operation doc:** `OPERATION-2026-08-21-remove-sla.md`
+**Files:** `store.ts`, `List.tsx`, `Detail.tsx`, `index.tsx`, `bits.tsx`,
+`Modals.tsx`, `exportCsv.ts`, `enquiries.css`, `enquiries.json`,
+`vocabularies.json`, `BACKEND-INTEGRATION.md`
+
+**What went**
+
+The acknowledgement deadline and everything built on it:
+
+| | |
+|---|---|
+| The clock | `sla.ackHours` (24), `sla.dueAt` stamped at delivery |
+| The verdict | `sla.breached`, `sla.breachedAt`, the `SLA_BREACH` event type |
+| The sweep | `runSlaSweep()` — BE-T06 — and its prototype button |
+| The surfacing | breach pill, attention cell, toolbar stat, `SLA +Xh` list line, `flag=breached`, the sort tiebreaker, the `sla_breached` CSV column |
+
+`sla` is off the `Enquiry` type and off all 13 seed records. The type went
+**first**, deliberately: every remaining read became a compile error, so the
+sixteen call sites were found by `tsc` rather than by grep. The attention strip
+is five cells. The CSV is 40 columns, was 41.
+
+**What deliberately stayed**
+
+- **`outcome.acknowledgedAt` and the `ACKNOWLEDGED` event.** *Whether* a business
+  acknowledged is the lifecycle. Only *late* stopped existing.
+- **`businesses.quality.avgAckHours`.** A historical responsiveness signal behind
+  the `quality` match weight — it ranks who *should* receive an enquiry. An input
+  to matching, not a deadline on a delivered row.
+- **The reassign reason**, reworded from "No acknowledgement within SLA" to
+  **"Business never acknowledged it"**. It is the commonest real reason to
+  reassign; the reason survives, the vocabulary does not.
+
+Two seed strings were reworded for the same reason — an operator remark that
+said "if this one breaches too" and an event note ending "· within SLA". Both
+described a mechanism that no longer exists.
+
+**The consequence, stated plainly**
+
+**Nothing now tracks a business sitting on a delivered enquiry.** That was the
+only mechanism watching the hand-off; after this, noticing is a human reading the
+list. The customer side is still covered — `followUpAt` and overdue callbacks are
+untouched — and the record still says how long ago it was delivered. Neither
+replaces it.
+
+It is a defensible trade rather than a free one. The threshold was **BE-OD-09, an
+open decision**, so the module was enforcing a number nobody had agreed to, with
+no notification infrastructure behind it. Enforcing an invented deadline is
+arguably worse than enforcing none. Worth re-opening once BE-OD-09 is decided.
+
+**Migration note.** A bookmarked `#/business-enquiries?flag=breached` no longer
+filters. It does not error — the branch is gone, so the value is ignored and the
+full list is shown with a clearable "Flag: breached" chip.
+
+**For the API**
+
+**BE-T06 is withdrawn — do not build the nightly job.** It is struck through in
+`BACKEND-INTEGRATION.md` rather than deleted, so nobody rebuilds it from memory.
+`sla` leaves the enquiry payload; `flag=` loses `breached`; `SLA_BREACH` leaves
+the event union; the CSV contract loses `sla_breached`. `quality.avgAckHours`
+stays on the business payload.
+
+**Not verified in a browser** — standing reason: no backend for `me/permissions/`,
+so `RequireSession` holds before the router reaches any module. `tsc`, `eslint`,
+`vite build` and all five check suites pass.
+
+## 2026-08-21
+
 ### Fix: the three-dot menu opened and closed inside one click
 
 **Area:** `#/business-enquiries/:id` — record header

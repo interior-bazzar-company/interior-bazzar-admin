@@ -59,6 +59,9 @@ export interface VocabulariesResponse {
   sources: { key: string; label: string; short: string; tone: string; manual: boolean; help: string }[];
   manualVia: { key: string; label: string }[];
   receivedRanges: { key: string; label: string }[];
+  /** One entry per attention-strip cell: what the number counts, and what
+   *  pressing it filters to. `check:wiring` asserts the two agree. */
+  attentionCells: { key: string; counts: string; does: string }[];
 }
 
 /** The ACTIVE rule version. Past runs stay reproducible because every

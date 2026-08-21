@@ -16,7 +16,7 @@
     "check:export": "esbuild src/admin/views/BusinessEnquiries/exportCsv.ts --bundle --platform=node --format=cjs --define:import.meta.env={} --log-level=error --outfile=node_modules/.tmp/enquiry-export.cjs && node scripts/check-enquiry-export.cjs",
     "check:clock": "esbuild src/admin/views/BusinessEnquiries/store.ts --bundle --platform=node --format=cjs --define:import.meta.env={} --external:react --log-level=error --outfile=node_modules/.tmp/enquiry-store.cjs && node scripts/check-enquiry-clock.cjs",
     "check:share": "node scripts/check-enquiry-share.cjs",
-    "check:wiring": "node scripts/check-enquiry-wiring.cjs",
+    "check:wiring": "esbuild src/admin/views/BusinessEnquiries/store.ts --bundle --platform=node --format=cjs --define:import.meta.env={} --external:react --log-level=error --outfile=node_modules/.tmp/enquiry-store.cjs && node scripts/check-enquiry-wiring.cjs",
     "check": "npm run check:enquiries && npm run check:export && npm run check:clock && npm run check:share && npm run check:wiring",
     "preview": "vite preview"
   },
@@ -25,6 +25,7 @@
     "@tailwindcss/vite": "^4.1.12",
     "@types/react-redux": "^7.1.34",
     "html-react-parser": "^5.2.6",
+    "lottie-web": "^5.13.0",
     "quill": "^2.0.3",
     "react": "^18.0.0",
     "react-cropper": "^2.3.3",

@@ -61,6 +61,16 @@ const Q_OF: Record<string, string> = {
   team: "team",
 };
 
+/* THE SIDEBAR'S GROUP ORDER.
+   Groups used to appear in whatever order the server's modules arrived in, with
+   the proto rows appended last — which is why Client Ops sat at the bottom,
+   below Settings, purely because it is the newest thing here. Ordering is a
+   product decision, so it is stated rather than inherited from a response.
+
+   A group not named here keeps its arrival order, after the named ones: a new
+   server group appears rather than silently vanishing. */
+const GROUP_ORDER = ["Sales", "Client Ops", "Catalogue", "Settings"];
+
 export function getModules(): ModuleGroup[] {
   const s = getSession();
   const mods = s
@@ -93,7 +103,14 @@ export function getModules(): ModuleGroup[] {
       if (!seen.has(r.key) && PROTO_MODULES.has(r.key)) put(r.key, r.label, r.group);
     });
   }
-  return groups;
+  const rank = (g: string) => {
+    const i = GROUP_ORDER.indexOf(g);
+    return i < 0 ? GROUP_ORDER.length : i;
+  };
+  return groups
+    .map((g, i) => ({ g, i }))
+    .sort((a, b) => rank(a.g.group) - rank(b.g.group) || a.i - b.i)
+    .map((x) => x.g);
 }
 
 export function getItems(): Record<string, ModuleItem> {

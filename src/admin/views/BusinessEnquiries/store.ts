@@ -23,7 +23,7 @@
    is a deliberate choice and not a hidden one — every screen that can write
    says so on the screen, and a reload puts the seed back. The alternative was
    a read-only prototype, which cannot show the thing this module is actually
-   for: the assign → deliver → acknowledge → outcome chain, and what each step
+   for: the qualify → match → assign → outcome chain, and what each step
    freezes on the way past.
 
    What the simulation DOES honour, because these are the rules the API has to
@@ -52,8 +52,8 @@ import { currentActor } from "../../auth/session";
 /* ============================================================ THE SHAPES === */
 
 export type StatusKey =
-  | "generated" | "qualified" | "ready" | "assigned" | "delivered"
-  | "acknowledged" | "converted" | "not_converted" | "invalid";
+  | "generated" | "processing" | "qualified" | "no_match" | "assigned"
+  | "converted" | "not_converted" | "invalid";
 
 export type Assignment = {
   assignmentId: string;
@@ -104,14 +104,7 @@ export type ContactEntry = {
   outcome: string;
   response: string | null;
   note: string | null;
-  /** When a promised callback is due. Set only on an outcome the vocabulary
-   *  marks `requiresFollowUp`. A callback with no time on it is a promise
-   *  nobody can keep — and it is the difference between a queue that sorts
-   *  itself and one somebody has to read end to end every morning. */
-  followUpAt: string | null;
 };
-
-export type Owner = { id: string; name: string };
 
 /* AN INTERNAL NOTE, and deliberately not a contact-log entry.
 
@@ -171,13 +164,6 @@ export type Enquiry = {
     checklist: Checklist;
     qualifiedBy: string | null; qualifiedByRole: string | null;
   };
-  /** Who is working this. Null means nobody has claimed it, which is a state
-   *  worth seeing rather than a blank: with a team of qualifiers, an unowned
-   *  enquiry is one two people are about to ring simultaneously. */
-  owner: Owner | null;
-  /** The next promised callback, lifted off the contact log so the list can
-   *  sort and the strip can count overdue ones without walking every entry. */
-  followUpAt: string | null;
   tags: string[];
   contactLog: ContactEntry[];
   /** Internal notes. Never exported, copied, printed or drawn. See `Remark`. */
@@ -188,13 +174,12 @@ export type Enquiry = {
   activeAssignmentId: string | null;
   assignments: Assignment[];
   outcome: {
-    assignmentId: string; acknowledgedAt: string | null; firstContactAt: string | null;
+    assignmentId: string; firstContactAt: string | null;
     status: string; outcome: string | null; reason: string | null;
     notes: string | null; updatedBy: string; updatedAt: string;
   } | null;
   exception?: { code: string; note: string };
   invalidation?: { reason: string; detectedBy: string; detectedAt: string; note: string };
-  sla: { ackHours: number; dueAt: string | null; breached: boolean; breachedAt: string | null };
   events: EnquiryEvent[];
 };
 
@@ -230,6 +215,9 @@ export type Business = {
 export type StatusRow = {
   key: StatusKey; label: string; tone: string; step: number;
   meaning: string; advance: string; terminal?: boolean;
+  /* An exceptional state that is NOT a step on the way anywhere — the lifecycle
+     rail leaves it out rather than implying every enquiry passes through it. */
+  offRamp?: boolean;
 };
 
 /* ======================================================= THE STATIC READS ===
@@ -262,7 +250,6 @@ export type TagRow = { slug: string; label: string; tone: string; auto: boolean;
 export type ChecklistRow = { key: keyof Checklist; label: string; help: string };
 export type OutcomeRow = {
   key: string; label: string; tone: string; reached: boolean; autoTag: string;
-  requiresFollowUp?: boolean;
 };
 export type TierRow = { key: string; label: string; help: string };
 export type SourceRow = {
@@ -300,7 +287,7 @@ export const sourceOf = (key: string): SourceRow =>
 
 export const viaLabel = (key: string | null): string =>
   (key && MANUAL_VIA.filter((m) => m.key === key)[0]?.label) || "";
-export let TEAM: (Owner & { role: string })[] = [];
+
 
 export const tierOf = (key: string): TierRow =>
   TIERS.filter((t) => t.key === key)[0] || ({ key, label: "Tier " + key, help: "" });
@@ -410,7 +397,6 @@ export function applyVocabulary(vocab: VocabulariesResponse): void {
   STATES = vocab.states || [];
   RECEIVED_RANGES = vocab.receivedRanges || [];
   MANUAL_VIA = vocab.manualVia || [];
-  TEAM = (vocab.team || []) as (Owner & { role: string })[];
 }
 
 /** Re-runs the three reads. The route calls this on mount; the failure screen
@@ -550,6 +536,37 @@ export async function loadPage(query: EnquiryQuery, force = false): Promise<void
   bump();
 }
 
+/** THE TWO INTAKE NUMBERS IN THE TOPBAR, counted by the server over the whole
+ *  queue rather than over the fifty rows on screen. Two `pageSize: 1` reads:
+ *  nothing but `total` is wanted, and `total` is counted before the page is cut.
+ *  Deliberately NOT derived from `page.counts` — those are counted over the
+ *  CURRENT FILTERS, and "how much came in today" has to mean the same thing
+ *  whatever the operator has narrowed the list to.
+ *  ponytail: two requests on mount. One endpoint returning both windows would
+ *  be better; it is not worth a backend change for two integers. */
+export function useIntakeCounts(): { today: number; week: number } {
+  const [n, setN] = useState({ today: 0, week: 0 });
+  useEffect(() => {
+    let live = true;
+    const count = async (received: string) => {
+      const got = await call<EnquiriesResponse<Enquiry>>(
+        BusinessEnquiriesService.enquiries<Enquiry>({ pageNo: 1, pageSize: 1, received }));
+      return got.total;
+    };
+    void (async () => {
+      try {
+        const [today, week] = await Promise.all([count("today"), count("7d")]);
+        if (live) setN({ today, week });
+      } catch {
+        /* A topbar figure is not worth a failure screen; the boot gate already
+           says when the backend is unreachable. Zeros stand. */
+      }
+    })();
+    return () => { live = false; };
+  }, []);
+  return n;
+}
+
 export function useEnquiryPage(query: EnquiryQuery): PageState {
   useVersion();
   const key = JSON.stringify(query);
@@ -626,8 +643,8 @@ export const assignedName = (e: Enquiry): string => {
   return a ? a.businessName : "";
 };
 
-/** Hours between two instants, rounded down. Used for age and for the SLA
- *  read-out, which is a count of hours in every place it appears. */
+/** Hours between two instants, rounded down. Every elapsed time this module
+ *  prints is built on it. */
 export function hoursBetween(a: string, b: string): number {
   return Math.floor((new Date(b).getTime() - new Date(a).getTime()) / 3600000);
 }
@@ -665,37 +682,32 @@ export const lastResponse = (e: Enquiry): ContactEntry | null =>
 
 /** The newest attempt of any kind — what the list shows as "last touched", and
  *  what the "attempted N times, never reached" read-out counts from. */
-export const lastAttempt = (e: Enquiry): ContactEntry | null => e.contactLog[0] || null;
 
 export const everReached = (e: Enquiry): boolean =>
   e.contactLog.some((c) => contactOutcomeOf(c.outcome).reached);
 
-/** A promised callback whose time has passed. The single most actionable state
- *  in the module: somebody told a customer we would ring, and we have not. */
-export const followUpOverdue = (e: Enquiry, now = Date.now()): boolean =>
-  !!e.followUpAt && new Date(e.followUpAt).getTime() < now;
-
-export const followUpDue = (e: Enquiry): boolean => !!e.followUpAt;
-
-/** Two letters for an owner chip. Shared so the list, the record and any future
- *  team surface cannot disagree about how a name is abbreviated. */
-export const initialsOf = (name: string): string =>
-  name.split(/[\s.]+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?";
-
-export const isMine = (e: Enquiry): boolean => {
-  const me = currentActor();
-  return !!e.owner && (String(e.owner.id) === String(me.id) || e.owner.name === me.name);
-};
-
 export const checklistMissing = (e: Enquiry): ChecklistRow[] =>
   CHECKLIST.filter((row) => !e.qualification.checklist[row.key]);
 
-/** The gate on Generated → Qualified. Two conditions, and the second is the one
- *  worth arguing about: every check ticked AND at least one logged attempt.
+/** The gate on Processing → Qualified. Two conditions, and the second is the
+ *  one worth arguing about: every check ticked AND at least one logged attempt.
  *  Without the second, a member could tick four boxes on an enquiry nobody ever
- *  rang, and the checklist would be a formality rather than a record. */
+ *  rang, and the checklist would be a formality rather than a record.
+ *
+ *  The attempt requirement is also why New has no direct route to Qualified —
+ *  logging that first attempt is what makes the record Processing. */
 export const canQualify = (e: Enquiry): boolean =>
-  e.status === "generated" && !checklistMissing(e).length && e.contactLog.length > 0;
+  isWorking(e.status) && !checklistMissing(e).length && e.contactLog.length > 0;
+
+/** THE TWO STATES WHERE THE RECORD IS STILL BEING WORKED. New is "nobody has
+ *  tried yet", Processing is "somebody has". Both accept requirement edits,
+ *  contact attempts, checklist ticks and tag changes; everything from Qualified
+ *  onward refuses them, because that is the freeze.
+ *
+ *  A predicate rather than the disjunction written out at each call site: this
+ *  is five guards, and the next state added before Qualified should be one edit
+ *  here and not a hunt through the writes. */
+export const isWorking = (k: string): boolean => k === "generated" || k === "processing";
 
 export const place = (e: Enquiry): string =>
   [e.requirement.locality, e.requirement.city].filter(Boolean).join(", ") || "—";
@@ -715,13 +727,8 @@ export type Counts = {
   byStatus: Record<string, number>;
   qualifying: number;
   untouched: number;
-  unowned: number;
-  mine: number;
-  callbackDue: number;
-  callbackOverdue: number;
-  ready: number;
+  qualified: number;
   live: number;
-  breached: number;
   noEligible: number;
   converted: number;
   invalid: number;
@@ -741,13 +748,8 @@ export function countsFromServer(c: ServerCounts): Counts {
     byStatus: by,
     qualifying: c.qualifying,
     untouched: c.untouched,
-    unowned: c.unowned,
-    mine: c.mine,
-    callbackDue: c.callbackDue,
-    callbackOverdue: c.callbackOverdue,
-    ready: (by.ready || 0) + (by.qualified || 0),
-    live: (by.assigned || 0) + (by.delivered || 0) + (by.acknowledged || 0),
-    breached: c.breached,
+    qualified: by.qualified || 0,
+    live: by.assigned || 0,
     noEligible: c.noEligible,
     converted: by.converted || 0,
     invalid: by.invalid || 0,
@@ -777,23 +779,14 @@ export function countsOf(list: Enquiry[]): Counts {
   return {
     total: list.length,
     byStatus,
-    /* Generated is now a WORKED pile, so it gets its own three numbers: how
-       many are in qualification at all, how many nobody has touched, and how
-       many are owed a callback today. The middle one is the number that should
-       be zero by lunchtime; the last is the one that makes someone late. */
-    qualifying: byStatus.generated || 0,
-    untouched: list.filter((e) => e.status === "generated" && !e.contactLog.length).length,
-    /* Unowned is the collision risk — two people about to ring one customer.
-       Overdue callbacks are the promise already broken. Both are counted from
-       the record, not from a tag, so a hand-removed tag cannot hide either. */
-    unowned: list.filter((e) => e.status === "generated" && !e.owner).length,
-    mine: list.filter((e) => e.status === "generated" && isMine(e)).length,
-    callbackDue: list.filter(followUpDue).length,
-    callbackOverdue: list.filter((e) => followUpOverdue(e)).length,
-    ready: (byStatus.ready || 0) + (byStatus.qualified || 0),
-    live: (byStatus.assigned || 0) + (byStatus.delivered || 0) + (byStatus.acknowledged || 0),
-    breached: list.filter((e) => e.sla.breached).length,
-    noEligible: list.filter((e) => !!e.exception).length,
+    /* The qualification pile gets two numbers: how many are in it at all,
+       and how many nobody has touched. The second is the one that should
+       be zero by lunchtime. */
+    qualifying: (byStatus.generated || 0) + (byStatus.processing || 0),
+    untouched: byStatus.generated || 0,
+    qualified: byStatus.qualified || 0,
+    live: byStatus.assigned || 0,
+    noEligible: byStatus.no_match || 0,
     converted: byStatus.converted || 0,
     invalid: byStatus.invalid || 0,
   };
@@ -873,15 +866,8 @@ export function filterEnquiries(list: Enquiry[], p: Params): Enquiry[] {
     if (p.tag && e.tags.indexOf(p.tag) < 0) return false;
     if (p.source && e.source.kind !== p.source) return false;
     if (p.state && e.requirement.state !== p.state) return false;
-    if (p.owner === "__none" && e.owner) return false;
-    if (p.owner === "__mine" && !isMine(e)) return false;
-    if (p.owner && p.owner !== "__none" && p.owner !== "__mine" && e.owner?.name !== p.owner) return false;
-    if (p.flag === "followup" && !followUpDue(e)) return false;
-    if (p.flag === "overdue" && !followUpOverdue(e)) return false;
     if (p.tier && e.tier !== p.tier) return false;
     if (p.business && assignedName(e) !== p.business) return false;
-    if (p.flag === "breached" && !e.sla.breached) return false;
-    if (p.flag === "no_eligible" && !e.exception) return false;
     if (!q) return true;
     return [
       e.enquiryId, e.customer.name, e.customer.phone, e.requirement.category,
@@ -905,30 +891,16 @@ export function sortEnquiries(list: Enquiry[], key?: string): Enquiry[] {
   /* Least worked first: nobody has called it, then attempted-but-never-reached,
      then everything else. The sort an operator picks when they are about to
      spend an hour on the phone. */
-  /* Soonest promised callback first, and an overdue one sorts above a future
-     one by construction — the time is in the past. */
-  if (key === "followup") {
-    return out.sort((a, b) => {
-      const av = a.followUpAt ? new Date(a.followUpAt).getTime() : Infinity;
-      const bv = b.followUpAt ? new Date(b.followUpAt).getTime() : Infinity;
-      return av - bv || created(b) - created(a);
-    });
-  }
   if (key === "touch") {
     const touch = (e: Enquiry) =>
-      e.status !== "generated" ? 3 : !e.contactLog.length ? 0 : !everReached(e) ? 1 : 2;
+      !isWorking(e.status) ? 3 : !e.contactLog.length ? 0 : !everReached(e) ? 1 : 2;
     return out.sort((a, b) => touch(a) - touch(b) || created(a) - created(b));
   }
-  /* Default: what needs a human first. A breached SLA is somebody waiting on us
-     now; an untouched enquiry is somebody who has not heard from us at all,
-     which is worse the longer it is true. Then urgency, then newest. */
-  const untouched = (e: Enquiry) => (e.status === "generated" && !e.contactLog.length ? 0 : 1);
-  /* An overdue callback outranks even a breached SLA: the SLA is a business
-     failing to answer us, an overdue callback is US failing a customer we
-     personally promised to ring back. */
+  /* Default: what needs a human first. An untouched enquiry leads — nobody
+     has heard from us at all, which is worse the longer it stays true. Then
+     urgency, then newest. */
+  const untouched = (e: Enquiry) => (e.status === "generated" ? 0 : 1);
   return out.sort((a, b) =>
-    Number(followUpOverdue(b)) - Number(followUpOverdue(a)) ||
-    Number(b.sla.breached) - Number(a.sla.breached) ||
     untouched(a) - untouched(b) ||
     hot(a) - hot(b) || created(b) - created(a));
 }
@@ -969,8 +941,8 @@ function append(e: Enquiry, type: string, note: string, role = "Operations") {
   evSeq += 1;
   e.events = [{
     eventId: "ev-live-" + evSeq, type,
-    actor: type === "SLA_BREACH" || type === "DELIVERED" ? "System" : actorName(),
-    actorRole: type === "SLA_BREACH" || type === "DELIVERED" ? "system" : role,
+    actor: type === "DELIVERED" ? "System" : actorName(),
+    actorRole: type === "DELIVERED" ? "system" : role,
     at: nowIso(), note,
   }, ...e.events];
 }
@@ -1050,7 +1022,7 @@ export async function createEnquiry(input: {
 /* ------------------------------------------ THE QUALIFICATION WORKSTREAM ---
    Everything between "a form arrived" and "somebody stands behind this". These
    four are the only writes in the module that touch an enquiry BEFORE it is
-   frozen, and all four refuse once it is — the guard is `status === "generated"`
+   frozen, and all four refuse once it is — the guard is `isWorking(status)`
    on each, not a rule stated once and trusted afterwards. */
 
 /** Keeps the automatic tags honest after every logged contact. A person can add
@@ -1061,21 +1033,22 @@ function retagFromLog(e: Enquiry) {
   const auto = new Set(TAGS.filter((t) => t.auto).map((t) => t.slug));
   const kept = e.tags.filter((t) => !auto.has(t));
   const next = new Set<string>();
-  if (!e.contactLog.length) {
-    next.add("new-enquiry");
-  } else {
+  /* Nothing to add when the log is empty: "nobody has contacted them" is the
+     New STATUS now, and a tag that repeats a status is a second copy of one
+     fact that can drift from the first. */
+  if (e.contactLog.length) {
     const newest = e.contactLog[0];
     if (everReached(e)) next.add("contact-made");
     else next.add("unreachable");
     const o = contactOutcomeOf(newest.outcome);
-    /* The NEWEST outcome decides the two states that are about what happens
-       next — a callback logged and then completed must stop being due. */
-    if (o.autoTag === "callback-due" || o.autoTag === "bad-contact") next.add(o.autoTag);
+    /* The NEWEST outcome decides this one, not the history: a number that
+       was bad and has since been corrected must stop being flagged. */
+    if (o.autoTag === "bad-contact") next.add(o.autoTag);
   }
   e.tags = kept.concat(Array.from(next));
 }
 
-/** BE-T07 · Edit the enquiry while it is being qualified. Generated only.
+/** BE-T07 · Edit the enquiry while it is being qualified. New or Processing only.
  *  The form is a customer's first attempt at describing what they want, taken
  *  through a funnel they were skimming; the operator on the phone is the one
  *  who finds out it is a renovation and not a fit-out. Every change is listed
@@ -1085,7 +1058,7 @@ export function updateEnquiry(
   patch: { requirement?: Partial<Enquiry["requirement"]>; customer?: Partial<Enquiry["customer"]>; urgency?: string | null },
 ) {
   withEnquiry(id, (e) => {
-    if (e.status !== "generated") return;
+    if (!isWorking(e.status)) return;
     const changed: string[] = [];
     const note = (field: string, from: unknown, to: unknown) => {
       if (String(from ?? "") !== String(to ?? "")) changed.push(field + ": " + (from || "—") + " → " + (to || "—"));
@@ -1113,26 +1086,6 @@ export function updateEnquiry(
   });
 }
 
-/** BE-T10 · Claim, hand over, or release. The write that makes a team possible:
- *  without it "the untouched pile" is a number nobody is answerable for and two
- *  qualifiers ring the same customer inside an hour. Allowed at any status —
- *  a delivered enquiry still has an operator watching its SLA. */
-export function setOwner(id: string, owner: Owner | null) {
-  withEnquiry(id, (e) => {
-    const before = e.owner?.name || null;
-    if ((before || null) === (owner?.name || null)) return;
-    e.owner = owner;
-    append(e, "OWNER", owner
-      ? (before ? "Handed from " + before + " to " + owner.name : "Claimed by " + owner.name)
-      : "Released by " + before);
-  });
-}
-
-export function claim(id: string) {
-  const me = currentActor();
-  setOwner(id, { id: String(me.id), name: me.name || "Operations" });
-}
-
 /** BE-T12 · Add an internal remark. Allowed at ANY status, unlike almost
  *  everything else here — the useful note about a business going quiet arrives
  *  after delivery, and the useful note about a customer arrives whenever
@@ -1156,7 +1109,7 @@ export function addRemark(id: string, text: string) {
   });
 }
 
-/** BE-T08 · Log a contact attempt. Generated only — after qualification the
+/** BE-T08 · Log a contact attempt. New or Processing only — after qualification the
  *  conversation belongs to the assigned business, not to us.
  *
  *  Logging is what moves the tags, and it can also satisfy a check: an outcome
@@ -1165,11 +1118,18 @@ export function addRemark(id: string, text: string) {
  *  is how checklists become theatre. */
 export function logContact(id: string, entry: {
   channel: string; direction: "outbound" | "inbound"; outcome: string;
-  response: string; note: string; followUpAt?: string | null;
+  response: string; note: string;
 }) {
   withEnquiry(id, (e) => {
-    if (e.status !== "generated") return;
+    if (!isWorking(e.status)) return;
     const o = contactOutcomeOf(entry.outcome);
+    /* THE FIRST ATTEMPT IS WHAT STARTS QUALIFICATION. "The team has started
+       working it" and "somebody tried to reach them" are the same event, so it
+       needs no separate control — and it is recorded in this attempt's own
+       CONTACT note rather than as a second timeline row, because one act that
+       prints twice is how a timeline stops being readable. */
+    const started = e.status === "generated";
+    if (started) e.status = "processing";
     e.contactLog = [{
       logId: "cl-live-" + (e.contactLog.length + 1) + "-" + e.enquiryId.slice(-4),
       channel: entry.channel,
@@ -1180,28 +1140,23 @@ export function logContact(id: string, entry: {
       outcome: entry.outcome,
       response: entry.response.trim() || null,
       note: entry.note.trim() || null,
-      followUpAt: o.requiresFollowUp ? (entry.followUpAt || null) : null,
     }, ...e.contactLog];
-    /* The enquiry-level follow-up is REPLACED by the newest attempt, never
-       accumulated: a callback that has since been made must stop being due, and
-       one promised twice is one promise, at the later time. */
-    e.followUpAt = o.requiresFollowUp ? (entry.followUpAt || null) : null;
     if (o.reached) e.qualification.checklist.reachable = true;
     retagFromLog(e);
     append(e, "CONTACT",
       channelOf(entry.channel).label + " · " + o.label +
-      (e.followUpAt ? " · due " + dateTimeLabel(e.followUpAt) : "") +
+      (started ? " · first attempt, now Processing" : "") +
       (entry.response.trim() ? " · response recorded" : "") +
       " · tags now " + (e.tags.length ? e.tags.join(", ") : "none"));
   });
 }
 
-/** Tick or untick one qualification check. Generated only. Recorded as an event
+/** Tick or untick one qualification check. New or Processing only. Recorded as an event
  *  because "who decided this enquiry was genuine" is a question that gets asked
  *  after a business complains, not before. */
 export function setCheck(id: string, key: keyof Checklist, value: boolean) {
   withEnquiry(id, (e) => {
-    if (e.status !== "generated") return;
+    if (!isWorking(e.status)) return;
     if (e.qualification.checklist[key] === value) return;
     e.qualification.checklist[key] = value;
     const row = CHECKLIST.filter((c) => c.key === key)[0];
@@ -1244,14 +1199,16 @@ export function markQualified(id: string, summary: string) {
     e.qualification.qualifiedBy = actorName();
     e.qualification.qualifiedByRole = "Operations";
     e.status = "qualified";
-    e.followUpAt = null;
     append(e, "QUALIFIED",
       "Snapshot frozen · " + e.qualification.version + " · all four checks confirmed over " +
       e.contactLog.length + " contact attempt" + (e.contactLog.length === 1 ? "" : "s"));
   });
 }
 
-/** BE-T02 · Matching run. Qualified → Ready to Assign. Loads the active rule
+/** BE-T02 · Matching run. It does NOT change the status, and that is the whole
+ *  point of there no longer being a Ready to Assign: being Qualified IS being
+ *  ready to assign, and whether anyone has ranked businesses yet is a fact about
+ *  the work rather than a stage of the enquiry's life. Loads the active rule
  *  version, filters, scores, persists the candidate snapshot, appends MATCHED.
  *  In the prototype the "run" is whatever suggestions.json holds for this
  *  enquiry; the real one computes it. What is honest either way is the shape:
@@ -1262,7 +1219,10 @@ export function runMatching(id: string) {
        nobody has confirmed would rank businesses against a form the customer
        filled in while skimming — and then freeze that ranking onto an
        assignment as if it were established fact. */
-    if (e.status !== "qualified" && e.status !== "ready") return;
+    /* Both ways in: a first run from Qualified, and a RETRY from No match
+       found — which is the only escape that state has, so locking the guard to
+       `qualified` would have trapped the record in it. */
+    if (e.status !== "qualified" && e.status !== "no_match") return;
     /* An enquiry that has never been matched has no run yet — which is the
        point: `runs` holds runs that HAPPENED, and one cannot exist before
        qualification. The seed keeps the not-yet-matched candidates in
@@ -1274,13 +1234,17 @@ export function runMatching(id: string) {
     if (run) store.runs[e.enquiryId] = run;
     const eligible = run ? run.eligible.length : 0;
     const excluded = run ? run.excluded.length : SUBSCRIBED_COUNT;
-    e.status = "ready";
+    /* THE RUN IS WHAT MOVES THE RECORD, in both directions. Finding nobody is a
+       state the queue has to be able to show and filter, not a footnote hung off
+       a record still claiming to be ready to assign. */
     if (!eligible) {
+      e.status = "no_match";
       e.exception = {
         code: "no_eligible_business",
-        note: "All " + SUBSCRIBED_COUNT + " subscribed businesses were excluded before scoring. Held at Ready to Assign — a supply gap, not an invalid enquiry.",
+        note: "All " + SUBSCRIBED_COUNT + " subscribed businesses were excluded before scoring. Held at Qualified — a supply gap, not an invalid enquiry.",
       };
     } else {
+      if (e.status === "no_match") e.status = "qualified";
       delete e.exception;
     }
     append(e, "MATCHED",
@@ -1329,30 +1293,23 @@ export function assign(id: string, businessId: string, overrideReason: string | 
       c.name + " · rank " + c.rank + " of " + a.eligibleCount + " eligible · score " + c.score +
       " · rule " + a.ruleVersion + " · factors frozen · capacity " + before + "→" + (before + 1) +
       (overrideReason ? " · override reason stored" : ""));
-    /* Delivery is enqueued, not awaited. A failed send never erases an
-       assignment — it records DELIVERY_FAILED and alerts Operations. */
-    deliver(e.enquiryId);
-  });
-}
-
-/** The outbox side of BE-T03. Separate because it is a separate commit: the
- *  assignment stands whatever this does. */
-export function deliver(id: string) {
-  withEnquiry(id, (e) => {
-    const a = activeAssignment(e);
-    if (!a || a.deliveryStatus === "delivered") return;
+    /* PUBLISHING IS PART OF ASSIGNING, not a state after it. It always was
+       — `assign()` called `deliver()` on this line — and the only thing the
+       separate step contributed was a `delivered` status the queue had to
+       carry. The assignment still records when it went out, and a failed send
+       still never erases an assignment: `deliveryStatus` holds that. */
     a.deliveryStatus = "delivered";
     a.deliveredAt = nowIso();
-    e.status = "delivered";
-    e.sla.dueAt = new Date(Date.now() + e.sla.ackHours * 3600000).toISOString();
     append(e, "DELIVERED",
       "Published to " + a.businessName + " · notification sent · contact released", "system");
   });
 }
 
+/** The outbox side of BE-T03. Separate because it is a separate commit: the
+ *  assignment stands whatever this does. */
 /** BE-T04 · Reassignment. Lock → CLOSE the current assignment (supersededAt,
  *  never a delete) → capacity-- → run BE-T03 in full for the new business.
- *  The enquiry walks back through Ready to Assign; it does not jump. */
+ *  The enquiry walks back to Qualified; it does not jump. */
 export function reassign(id: string, businessId: string, reason: string) {
   withEnquiry(id, (e) => {
     const cur = activeAssignment(e);
@@ -1362,10 +1319,7 @@ export function reassign(id: string, businessId: string, reason: string) {
       moveCapacity(cur.businessId, -1);
     }
     e.activeAssignmentId = null;
-    e.status = "ready";
-    e.sla.breached = false;
-    e.sla.breachedAt = null;
-    e.sla.dueAt = null;
+    e.status = "qualified";
     append(e, "REASSIGNED",
       (cur ? "From " + cur.businessName + " · " : "") + "reason: " + reason +
       " · previous assignment closed, not deleted");
@@ -1373,29 +1327,10 @@ export function reassign(id: string, businessId: string, reason: string) {
   assign(id, businessId, null);
 }
 
-/** BE-T05 · Acknowledgement, then outcome. Both are the BUSINESS acting on its
- *  own assignment — Operations cannot acknowledge on a business's behalf, or
- *  the metric measures Operations' diligence instead of the business's
- *  responsiveness. The prototype exposes them from the Operations screen only
- *  so the chain is walkable; the notice on that screen says so. */
-export function acknowledge(id: string) {
-  withEnquiry(id, (e) => {
-    const a = activeAssignment(e);
-    if (!a) return;
-    const at = nowIso();
-    e.status = "acknowledged";
-    e.sla.breached = false;
-    e.outcome = {
-      assignmentId: a.assignmentId, acknowledgedAt: at, firstContactAt: null,
-      status: "in_progress", outcome: null, reason: null, notes: null,
-      updatedBy: a.businessName, updatedAt: at,
-    };
-    append(e, "ACKNOWLEDGED",
-      a.businessName + " · acknowledged " +
-      durationLabel(a.deliveredAt || a.assignedAt, at) + " after delivery", "Business");
-  });
-}
-
+/** BE-T05 · The outcome. The BUSINESS acting on its own assignment — recorded
+ *  from the Operations screen only because there is no business-side surface
+ *  yet, and the notice on that screen says so. Reachable straight from
+ *  Assigned: assigning publishes, and there is no acknowledgement step. */
 export function recordOutcome(id: string, outcome: "converted" | "not_converted", reason: string, notes: string) {
   withEnquiry(id, (e) => {
     const a = activeAssignment(e);
@@ -1404,7 +1339,6 @@ export function recordOutcome(id: string, outcome: "converted" | "not_converted"
     e.status = outcome;
     e.outcome = {
       assignmentId: a.assignmentId,
-      acknowledgedAt: e.outcome?.acknowledgedAt || at,
       firstContactAt: e.outcome?.firstContactAt || null,
       status: "closed", outcome, reason, notes: notes || null,
       updatedBy: a.businessName, updatedAt: at,
@@ -1420,6 +1354,31 @@ export function recordOutcome(id: string, outcome: "converted" | "not_converted"
 /** Terminal with a reason, at any point before an outcome. This is what lets a
  *  separate Quarantine queue not exist: a rejected submission has a state to
  *  sit in and a reason stored beside it. */
+/** Mark a Qualified enquiry as having no business to go to, BY HAND.
+ *
+ *  The automatic route is a matching run that returns nothing; this is the
+ *  operator who already knows the run will return nothing — the one business
+ *  covering that pincode just suspended, the category is one nobody serves yet.
+ *  Making them run a match they know the answer to, purely so the system can
+ *  discover it, is theatre.
+ *
+ *  It is NOT terminal and it is not a rejection: the enquiry is good and the
+ *  supply is missing. Re-running matching is the way back, and the note says a
+ *  person put it here so a later run does not look like it contradicted itself. */
+export function markNoMatch(id: string) {
+  withEnquiry(id, (e) => {
+    if (e.status !== "qualified") return;
+    e.status = "no_match";
+    e.exception = {
+      code: "no_eligible_business",
+      note: "Marked by hand by " + actorName() + " — no subscribed business can take this "
+        + "one today. Run matching again to re-check.",
+    };
+    append(e, "NO_MATCH",
+      "Marked No match yet by hand · " + place(e) + " · " + e.requirement.category);
+  });
+}
+
 export function invalidate(id: string, reason: string, note: string) {
   withEnquiry(id, (e) => {
     const a = activeAssignment(e);
@@ -1431,21 +1390,3 @@ export function invalidate(id: string, reason: string, note: string) {
   });
 }
 
-/** BE-T06 · the SLA sweep, on demand. Scheduled nightly on the real thing;
- *  the button is for when you want the flags right now. Idempotent per row —
- *  a row already breached is skipped rather than re-flagged and re-notified. */
-export function runSlaSweep(): number {
-  let n = 0;
-  store.enquiries.forEach((e) => {
-    if (e.status !== "delivered" || e.sla.breached || !e.sla.dueAt) return;
-    if (new Date(e.sla.dueAt).getTime() > Date.now()) return;
-    e.sla.breached = true;
-    e.sla.breachedAt = nowIso();
-    append(e, "SLA_BREACH",
-      "Sweep · status = Delivered AND acknowledgedAt IS NULL AND now > deliveredAt + " +
-      e.sla.ackHours + "h", "system");
-    n += 1;
-  });
-  if (n) bump();
-  return n;
-}

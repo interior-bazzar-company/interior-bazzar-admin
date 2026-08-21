@@ -29,6 +29,7 @@ const API = (process.env.IB_API_BASE || 'http://localhost:8000/api').replace(/\/
 const TOKEN = process.env.IB_ADMIN_TOKEN || '';
 
 const fail = [];
+const phoneKeys = [];
 const ok = (cond, msg) => { if (!cond) fail.push(msg); };
 
 async function vocabulary() {
@@ -74,8 +75,11 @@ const statuses = new Set(voc.statuses.map(s => s.key));
 const urgencies = new Set(voc.urgency.map(u => u.key));
 const checkKeys = voc.qualificationChecklist.map(c => c.key);
 const tierKeys = new Set(voc.tiers.map(t => t.key));
-const teamIds = new Set(voc.team.map(m => m.id));
-const followUpOutcomes = new Set(voc.contactOutcomes.filter(o => o.requiresFollowUp).map(o => o.key));
+// The team vocabulary lost its last runtime consumer when ownership was
+// removed. Rather than let it rot as decoration, it anchors actor names:
+// an Operations event written by somebody who is not on the team is either
+// a typo or a person nobody can look up later.
+const teamNames = new Set(voc.team.map(m => m.name));
 const sources = new Map(voc.sources.map(x => [x.key, x]));
 ok(voc.sources.length === 3, 'expected exactly three channels, got ' + voc.sources.length);
 const stateNames = new Set(voc.states);
@@ -125,32 +129,42 @@ for (const e of enq.enquiries) {
     ok(stateNames.has(e.requirement.state), `${id}: unknown state "${e.requirement.state}"`);
   }
   ok(!('priority' in e), `${id}: priority is back — it renders nowhere`);
-  // Owner: null is a real state (unclaimed), but a named one must be real.
-  ok(e.owner === null || (e.owner && teamIds.has(e.owner.id)),
-    `${id}: owner is not a known team member`);
   e.contactLog.forEach(c => {
     ok(channels.has(c.channel), `${id}: unknown channel "${c.channel}"`);
     ok(outcomes.has(c.outcome), `${id}: unknown outcome "${c.outcome}"`);
     ok(c.direction === 'inbound' || c.direction === 'outbound', `${id}: bad direction`);
     ok('response' in c && 'note' in c, `${id}: log entry missing response/note`);
-    // A callback with no time on it is a promise nobody can keep, and a time
-    // on an outcome that is not a callback is a due date nothing will clear.
-    ok('followUpAt' in c, `${id}: log entry missing followUpAt`);
-    if (followUpOutcomes.has(c.outcome)) {
-      ok(!!c.followUpAt, `${id}: ${c.outcome} logged with no callback time`);
-    } else {
-      ok(!c.followUpAt, `${id}: followUpAt set on outcome "${c.outcome}"`);
-    }
   });
   // newest first — the UI reads [0] as "latest"
   for (let i = 1; i < e.contactLog.length; i++) {
     ok(new Date(e.contactLog[i - 1].at) >= new Date(e.contactLog[i].at),
       `${id}: contactLog is not newest-first`);
   }
+  for (const ev of e.events) {
+    if (ev.actorRole && ev.actorRole.toLowerCase().startsWith('operations'))
+      ok(teamNames.has(ev.actor),
+        `${id}: event ${ev.eventId} is by "${ev.actor}", who is not on the team`);
+  }
+  if (e.qualification.qualifiedBy)
+    ok(teamNames.has(e.qualification.qualifiedBy),
+      `${id}: qualified by "${e.qualification.qualifiedBy}", who is not on the team`);
+
   for (let i = 1; i < e.events.length; i++) {
     ok(new Date(e.events[i - 1].at) >= new Date(e.events[i].at),
       `${id}: events are not newest-first`);
   }
+
+  // A phone the dedupe cannot key on is not test data. `phoneKey()` takes the
+  // LAST TEN digits; the seed once stored masked numbers ("+91 98xxxxxxx27"),
+  // which leave only six - so the duplicate check was comparing country codes
+  // and had never been exercised on a realistic number.
+  const digits = String(e.customer.phone || '').replace(/[^0-9]/g, '');
+  ok(digits.length >= 12, `${id}: phone "${e.customer.phone}" has ${digits.length} digits - masked?`);
+  ok(/^[6-9]/.test(digits.slice(-10)), `${id}: "${e.customer.phone}" is not an Indian mobile`);
+  phoneKeys.push(digits.slice(-10));
+  if (e.customer.email)
+    ok(/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(e.customer.email),
+      `${id}: email "${e.customer.email}" is not a usable address`);
 
   const cl = e.qualification.checklist;
   ok(cl && checkKeys.every(k => typeof cl[k] === 'boolean'), `${id}: checklist incomplete`);
@@ -160,19 +174,27 @@ for (const e of enq.enquiries) {
   // The enquiry-level follow-up must be the newest log entry's, never a stale
   // one left behind by a later call — that is what makes the overdue count
   // trustworthy enough to sort the whole queue on.
-  ok(e.followUpAt === (e.contactLog[0] ? e.contactLog[0].followUpAt : null),
-    `${id}: followUpAt disagrees with the newest contact-log entry`);
 
   const frozen = !!e.qualification.frozenAt;
-  if (e.status === 'generated') {
-    ok(!frozen, `${id}: Generated but already frozen`);
-    ok(!e.qualification.qualifiedBy, `${id}: Generated but has qualifiedBy`);
-    ok(!e.activeAssignmentId, `${id}: Generated but assigned`);
+  // THE FREEZE IS AT QUALIFIED, not at leaving New. New and Processing are both
+  // still being WORKED - the difference between them is only whether anyone has
+  // tried to reach the customer yet - so neither may carry a snapshot, and
+  // everything from Qualified onward must.
+  const working = e.status === 'generated' || e.status === 'processing';
+  if (working) {
+    ok(!frozen, `${id}: ${e.status} but already frozen`);
+    ok(!e.qualification.qualifiedBy, `${id}: ${e.status} but has qualifiedBy`);
+    ok(!e.activeAssignmentId, `${id}: ${e.status} but assigned`);
+    // The one thing that separates the two states, asserted in both directions
+    // so a migration cannot leave a record in the wrong one.
+    if (e.status === 'generated')
+      ok(e.contactLog.length === 0, `${id}: New but a contact attempt is logged - should be Processing`);
+    else
+      ok(e.contactLog.length > 0, `${id}: Processing but no contact attempt logged - should be New`);
   } else if (e.status === 'invalid') {
     // may or may not have been qualified before it failed
   } else {
-    ok(!e.followUpAt, `${id}: past Generated with a callback still outstanding`);
-    ok(frozen, `${id}: past Generated but never frozen`);
+    ok(frozen, `${id}: past Processing but never frozen`);
     ok(!!e.qualification.qualifiedBy, `${id}: frozen with nobody answerable for it`);
     ok(checkKeys.every(k => cl[k]), `${id}: qualified with an unchecked box`);
     ok(e.contactLog.length > 0, `${id}: qualified with no contact ever logged`);
@@ -205,8 +227,17 @@ const strip = (v) => JSON.stringify(v, (k, val) => (k.startsWith('$comment') ? u
 const blob = strip(enq) + strip(voc) + strip(sug);
 ok(!/budget/i.test(blob), 'a budget field has appeared in the content');
 
+// Two customers sharing a phone key would make the intake dedupe reject a real
+// enquiry as a duplicate of the wrong one.
+{
+  const seen = new Set(), dupes = [];
+  for (const k of phoneKeys) { if (seen.has(k)) dupes.push(k); seen.add(k); }
+  ok(!dupes.length, 'two seed records share a phone key: ' + dupes.join(', '));
+}
+
 if (fail.length) { console.error('FAIL\n' + fail.map(f => '  · ' + f).join('\n')); process.exit(1); }
+const by = (k) => enq.enquiries.filter(e => e.status === k).length;
 console.log('seed ok —', enq.enquiries.length, 'enquiries,',
-  enq.enquiries.filter(e => e.status === 'generated').length, 'in qualification',
+  by('generated'), 'New,', by('processing'), 'Processing',
   '· vocabulary served by', API);
 }

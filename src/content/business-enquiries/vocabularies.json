@@ -1,0 +1,626 @@
+{
+  "$comment": "Stands in for GET /api/v1/business-enquiries/vocabularies. Labels, tones, the allowed transition matrix, and the vocabularies the qualification workstream is built on. The panel reads all of this rather than hard-coding it, so a status, a tag, a contact channel or a checklist item added server-side renders with no code edit.",
+  "qualificationVersion": "qualification v4",
+  "$comment_qualificationVersion": "The question set the snapshot was frozen against. Stamped onto every enquiry at Mark qualified, so a later funnel redesign cannot silently reinterpret old data.",
+  "statuses": [
+    {
+      "key": "generated",
+      "label": "New",
+      "tone": "warn",
+      "step": 1,
+      "meaning": "Submission accepted. Nobody has contacted the customer yet.",
+      "advance": "The first contact attempt is logged."
+    },
+    {
+      "key": "processing",
+      "label": "Processing",
+      "tone": "warn",
+      "step": 2,
+      "meaning": "Being qualified: contact attempts, the checklist, and edits to the requirement.",
+      "advance": "A person confirms the requirement and marks it Qualified."
+    },
+    {
+      "key": "qualified",
+      "label": "Qualified",
+      "tone": "",
+      "step": 3,
+      "meaning": "Requirement confirmed and the snapshot frozen. Matching runs here — the ranked businesses are part of working a Qualified enquiry, not a state of their own.",
+      "advance": "A business is assigned."
+    },
+    {
+      "key": "no_match",
+      "label": "No match yet",
+      "tone": "warn",
+      "step": 4,
+      "offRamp": true,
+      "meaning": "Qualified, but a matching run found no eligible business — a supply gap, not a bad enquiry. The requirement is confirmed and the snapshot is frozen.",
+      "advance": "Matching is run again and finds an eligible business, which returns it to Qualified. Reached by a run that found nobody, or marked by hand."
+    },
+    {
+      "key": "assigned",
+      "label": "Assigned",
+      "tone": "info",
+      "step": 5,
+      "meaning": "Business selected, match context frozen.",
+      "advance": "Delivery succeeds."
+    },
+    {
+      "key": "converted",
+      "label": "Converted",
+      "tone": "ok",
+      "step": 6,
+      "meaning": "The business won the work.",
+      "advance": "Terminal.",
+      "terminal": true
+    },
+    {
+      "key": "not_converted",
+      "label": "Not Converted",
+      "tone": "",
+      "step": 6,
+      "meaning": "Contacted, did not win.",
+      "advance": "Terminal.",
+      "terminal": true
+    },
+    {
+      "key": "invalid",
+      "label": "Rejected",
+      "tone": "bad",
+      "step": 6,
+      "meaning": "Rejected, with a stored reason. Unusable as an enquiry.",
+      "advance": "Terminal.",
+      "terminal": true
+    }
+  ],
+  "transitions": [
+    {
+      "from": "generated",
+      "to": [
+        "processing",
+        "invalid"
+      ],
+      "guard": "A contact attempt is logged, or a rejection reason is supplied. There is no direct route to Qualified: qualifying requires at least one logged attempt, so the record must pass through Processing."
+    },
+    {
+      "from": "processing",
+      "to": [
+        "qualified",
+        "invalid"
+      ],
+      "guard": "Every qualification check passes and at least one contact attempt is logged, or a rejection reason is supplied."
+    },
+    {
+      "from": "qualified",
+      "to": [
+        "no_match",
+        "assigned",
+        "invalid"
+      ],
+      "guard": "A matching run produces at least one eligible business and one is assigned; a run that finds none moves it to No match yet; or a rejection reason is supplied."
+    },
+    {
+      "from": "no_match",
+      "to": [
+        "qualified",
+        "invalid"
+      ],
+      "guard": "Matching is run again and finds an eligible business, or a rejection reason is supplied. There is no direct route to Assigned: assignment needs a ranked candidate, and the run that produces one returns the enquiry to Qualified first."
+    },
+    {
+      "from": "assigned",
+      "to": [
+        "converted",
+        "not_converted",
+        "invalid",
+        "qualified"
+      ],
+      "guard": "The business reports an outcome, or Operations reassigns. Assignment publishes to the business, so there is no delivery or acknowledgement step to pass through first."
+    },
+    {
+      "from": "converted",
+      "to": [],
+      "guard": "Terminal. Reopening needs an admin policy that does not exist in v1."
+    },
+    {
+      "from": "not_converted",
+      "to": [],
+      "guard": "Terminal. Reopening needs an admin policy that does not exist in v1."
+    },
+    {
+      "from": "invalid",
+      "to": [],
+      "guard": "Terminal. Reopening needs an admin policy that does not exist in v1."
+    }
+  ],
+  "urgency": [
+    {
+      "key": "within_30d",
+      "label": "Within 30 days",
+      "hot": true
+    },
+    {
+      "key": "30_90d",
+      "label": "30–90 days",
+      "hot": false
+    },
+    {
+      "key": "90_plus",
+      "label": "90+ days",
+      "hot": false
+    },
+    {
+      "key": "browsing",
+      "label": "Browsing",
+      "hot": false
+    }
+  ],
+  "tiers": [
+    {
+      "key": "A",
+      "label": "Tier A",
+      "help": "Complete form, contact verified, high-intent source. Everything needed to make the call is already here."
+    },
+    {
+      "key": "B",
+      "label": "Tier B",
+      "help": "Contact verified, one or two requirement fields missing."
+    },
+    {
+      "key": "C",
+      "label": "Tier C",
+      "help": "Contact verified, requirement thin — expect to establish most of it on the call."
+    },
+    {
+      "key": "D",
+      "label": "Tier D",
+      "help": "Contact unverified or the form is largely empty."
+    },
+    {
+      "key": "E",
+      "label": "Tier E",
+      "help": "Failed an intake check. Usually heading for rejection."
+    }
+  ],
+  "categories": [
+    "Interior Design",
+    "Modular Kitchen",
+    "Furniture",
+    "Civil & Renovation"
+  ],
+  "cities": [
+    "New Delhi",
+    "Bengaluru",
+    "Mumbai",
+    "Hyderabad",
+    "Pune"
+  ],
+  "exclusionStages": [
+    "Subscription",
+    "Status",
+    "Category",
+    "Location",
+    "Capacity"
+  ],
+  "outcomeReasons": {
+    "$comment": "BE-OD-10 — the final list, and who may correct a business-reported outcome, is still open.",
+    "converted": [
+      "Order placed",
+      "Advance received",
+      "Site work started",
+      "Contract signed"
+    ],
+    "not_converted": [
+      "Quoted too high",
+      "Customer went silent",
+      "Chose another vendor",
+      "Outside our area after all",
+      "Timeline did not suit",
+      "Scope too small"
+    ]
+  },
+  "invalidReasons": [
+    "Name trivial / gibberish",
+    "Unreachable after 3 attempts",
+    "Wrong number",
+    "Test or internal submission",
+    "Abusive or spam content",
+    "Duplicate of an existing enquiry",
+    "Customer withdrew before assignment"
+  ],
+  "reassignReasons": [
+    "Business never responded",
+    "Business declined the enquiry",
+    "Business at capacity",
+    "Customer requested a different business",
+    "Wrong category or location on the first match"
+  ],
+  "errorContract": [
+    {
+      "http": 400,
+      "code": "validation_failed",
+      "meaning": "A required funnel or enquiry field is missing or malformed."
+    },
+    {
+      "http": 403,
+      "code": "out_of_scope",
+      "meaning": "The actor cannot access this enquiry or business record."
+    },
+    {
+      "http": 403,
+      "code": "admin_required",
+      "meaning": "A restricted matching or assignment action requires authority."
+    },
+    {
+      "http": 404,
+      "code": "enquiry_not_found",
+      "meaning": "Enquiry identifier not found."
+    },
+    {
+      "http": 409,
+      "code": "duplicate_submission",
+      "meaning": "The submission identifier has already been processed."
+    },
+    {
+      "http": 409,
+      "code": "assignment_conflict",
+      "meaning": "A concurrent assignment or reassignment won the lock."
+    },
+    {
+      "http": 422,
+      "code": "no_eligible_business",
+      "meaning": "Matching produced no assignable candidate."
+    },
+    {
+      "http": 422,
+      "code": "business_not_eligible",
+      "meaning": "The selected business fails hard eligibility at confirmation."
+    },
+    {
+      "http": 422,
+      "code": "invalid_transition",
+      "meaning": "The requested lifecycle move is not on the matrix."
+    },
+    {
+      "http": 422,
+      "code": "override_reason_required",
+      "meaning": "A configured override or reassignment requires a reason."
+    },
+    {
+      "http": 429,
+      "code": "rate_limited",
+      "meaning": "The funnel intake threshold has been exceeded."
+    }
+  ],
+  "contactChannels": [
+    {
+      "key": "call",
+      "label": "Call",
+      "verb": "Called"
+    },
+    {
+      "key": "whatsapp",
+      "label": "WhatsApp",
+      "verb": "Messaged on WhatsApp"
+    },
+    {
+      "key": "chat",
+      "label": "Chat",
+      "verb": "Chatted"
+    },
+    {
+      "key": "email",
+      "label": "Email",
+      "verb": "Emailed"
+    },
+    {
+      "key": "sms",
+      "label": "SMS",
+      "verb": "Texted"
+    },
+    {
+      "key": "site_visit",
+      "label": "Site visit",
+      "verb": "Visited"
+    }
+  ],
+  "contactOutcomes": [
+    {
+      "key": "connected",
+      "label": "Connected",
+      "tone": "ok",
+      "reached": true,
+      "autoTag": "contact-made"
+    },
+    {
+      "key": "replied",
+      "label": "Replied",
+      "tone": "ok",
+      "reached": true,
+      "autoTag": "contact-made"
+    },
+    {
+      "key": "callback_requested",
+      "label": "Callback requested",
+      "tone": "warn",
+      "reached": true
+    },
+    {
+      "key": "no_answer",
+      "label": "No answer",
+      "tone": "",
+      "reached": false,
+      "autoTag": "unreachable"
+    },
+    {
+      "key": "busy",
+      "label": "Busy / cut the call",
+      "tone": "",
+      "reached": false,
+      "autoTag": "unreachable"
+    },
+    {
+      "key": "no_reply",
+      "label": "No reply",
+      "tone": "",
+      "reached": false,
+      "autoTag": "unreachable"
+    },
+    {
+      "key": "wrong_number",
+      "label": "Wrong number",
+      "tone": "bad",
+      "reached": false,
+      "autoTag": "bad-contact"
+    },
+    {
+      "key": "not_interested",
+      "label": "Not interested",
+      "tone": "bad",
+      "reached": true,
+      "autoTag": "bad-contact"
+    }
+  ],
+  "$comment_checklist": "The gate on Processing → Qualified. All four must pass. They are deliberately about what a PERSON established, not what the form said — a submitted category is a claim, a confirmed one is a fact, and only the second is safe to match on.",
+  "qualificationChecklist": [
+    {
+      "key": "reachable",
+      "label": "Contact reachable",
+      "help": "Spoke to the customer, or they replied on a channel. A number that has never answered cannot be handed to a business."
+    },
+    {
+      "key": "requirement",
+      "label": "Requirement confirmed",
+      "help": "Category, service and location confirmed WITH the customer — not just as the form received them."
+    },
+    {
+      "key": "genuine",
+      "label": "Genuine enquiry",
+      "help": "Not a test, not spam, not someone else's number, not an existing customer of ours submitting twice."
+    },
+    {
+      "key": "urgency",
+      "label": "Urgency confirmed",
+      "help": "When they actually want to start. Urgency drives the queue order, so a guess here misorders everyone else's work."
+    }
+  ],
+  "$comment_tags": "Operational tags, set by a person or by the system. They describe how the WORK is going, never what the customer is worth — there is no tag for spend, size or value, for the same reason there is no budget field. `auto: true` means the system applies and removes it; a person can still add one by hand.",
+  "tags": [
+    {
+      "slug": "contact-made",
+      "label": "Contact made",
+      "tone": "ok",
+      "auto": true,
+      "help": "The customer has answered at least once."
+    },
+    {
+      "slug": "unreachable",
+      "label": "Unreachable",
+      "tone": "",
+      "auto": true,
+      "help": "Attempted, never answered. Three of these usually ends in a rejection, with a reason."
+    },
+    {
+      "slug": "bad-contact",
+      "label": "Bad contact",
+      "tone": "bad",
+      "auto": true,
+      "help": "Wrong number, or the person says they never enquired."
+    },
+    {
+      "slug": "hot",
+      "label": "Hot",
+      "tone": "bad",
+      "auto": false,
+      "help": "Wants to start now. Set by hand — the urgency band is the customer's answer, this is the operator's read."
+    },
+    {
+      "slug": "requirement-unclear",
+      "label": "Requirement unclear",
+      "tone": "",
+      "auto": false,
+      "help": "Cannot confirm category or scope yet. Blocks the requirement check."
+    },
+    {
+      "slug": "site-visit-booked",
+      "label": "Site visit booked",
+      "tone": "ok",
+      "auto": false,
+      "help": "A visit is scheduled before qualification completes."
+    },
+    {
+      "slug": "duplicate-suspected",
+      "label": "Duplicate suspected",
+      "tone": "",
+      "auto": false,
+      "help": "Looks like an existing enquiry. BE-OD-01 decides what actually counts as one."
+    },
+    {
+      "slug": "spam-suspected",
+      "label": "Spam suspected",
+      "tone": "bad",
+      "auto": false,
+      "help": "Heading for rejection, but not proven yet."
+    }
+  ],
+  "$comment_tiers": "Intake signal quality, computed at intake from form completeness, contact verification and the source page. It ranks how much the SUBMISSION tells us, never how much the customer is worth, and it carries no weight in matching — it is a triage hint for whoever picks the next call.",
+  "$comment_team": "Stand-in for a read of the existing Team module (AdminOpsService team list), filtered to members holding business-enquiries write access. This module never owns the team list.",
+  "team": [
+    {
+      "id": "u-101",
+      "name": "R. Menon",
+      "role": "Operations"
+    },
+    {
+      "id": "u-102",
+      "name": "S. Iyer",
+      "role": "Operations"
+    },
+    {
+      "id": "u-103",
+      "name": "D. Kapoor",
+      "role": "Operations lead"
+    }
+  ],
+  "$comment_contactOutcomes": "`reached` decides whether the response field is asked for and whether the 'contact reachable' check can be satisfied. `autoTag` is what the server's own re-tagging must agree with. Callbacks were removed from the module on 2026-08-21: `callback_requested` survives as a description of what happened on the call, but nothing is scheduled from it and no time is asked for.",
+  "$comment_sources": "Where the enquiry came from. Three channels and no more: a form we published, the signed-in portal, or a person typing it. Every enquiry has one and it is never blank — provenance is the first thing anyone asks about a record that turns out to be wrong. `manual: true` means a person typed it, which is why those carry `createdBy` and `via`: an enquiry we entered ourselves must say who entered it and how it reached us, or it is the one record on the list nobody can account for.",
+  "sources": [
+    {
+      "key": "funnel",
+      "label": "Funnel page",
+      "short": "Funnel",
+      "tone": "",
+      "manual": false,
+      "help": "A form on a page we published — a funnel, a landing page or the website enquiry form. The exact page is recorded on the enquiry."
+    },
+    {
+      "key": "portal",
+      "label": "Portal",
+      "short": "Portal",
+      "tone": "info",
+      "manual": false,
+      "help": "The signed-in customer portal. Contact is already verified by the account, so the first call starts further along."
+    },
+    {
+      "key": "own",
+      "label": "Added by us",
+      "short": "Own",
+      "tone": "warn",
+      "manual": true,
+      "help": "Typed in by the team — a call, a walk-in, a referral. Same submission id, duplicate check and qualification gate as any other, and it additionally records who created it."
+    }
+  ],
+  "$comment_manualVia": "How a manually added enquiry actually reached us. Required on an `own` enquiry: 'added by us' on its own is not provenance, it is the absence of it.",
+  "manualVia": [
+    {
+      "key": "phone",
+      "label": "Phone call"
+    },
+    {
+      "key": "whatsapp",
+      "label": "WhatsApp"
+    },
+    {
+      "key": "walk_in",
+      "label": "Walk-in"
+    },
+    {
+      "key": "referral",
+      "label": "Referral"
+    },
+    {
+      "key": "email",
+      "label": "Email"
+    },
+    {
+      "key": "event",
+      "label": "Event or exhibition"
+    }
+  ],
+  "$comment_categories": "Suggestions, not a closed set. Category and city are typed on this screen because an operator on a call hears whatever the customer says — a dropdown that cannot hold it forces a wrong pick or a blank, and both are worse than an unfamiliar value the panel flags.",
+  "states": [
+    "Delhi",
+    "Karnataka",
+    "Maharashtra",
+    "Telangana",
+    "Tamil Nadu",
+    "Gujarat",
+    "Uttar Pradesh",
+    "Haryana",
+    "West Bengal",
+    "Rajasthan"
+  ],
+  "$comment_receivedRanges": "Relative windows over `createdAt`, resolved when the filter runs rather than when it was set — a stored absolute range silently stops meaning 'today' tomorrow. `custom` reads the `from` and `to` params instead.",
+  "receivedRanges": [
+    {
+      "key": "today",
+      "label": "Today"
+    },
+    {
+      "key": "24h",
+      "label": "Last 24 hours"
+    },
+    {
+      "key": "7d",
+      "label": "Last 7 days"
+    },
+    {
+      "key": "30d",
+      "label": "Last 30 days"
+    },
+    {
+      "key": "month",
+      "label": "This month"
+    },
+    {
+      "key": "older",
+      "label": "Older than 30 days"
+    },
+    {
+      "key": "custom",
+      "label": "Custom range…"
+    }
+  ],
+  "$comment_attentionCells": "Stands in for the help text behind the attention strip on the list page. `key` matches the cell key rendered by AttnStrip in List.tsx. `counts` states the exact rule the number comes from and must stay true to countsOf() in store.ts; `does` says what pressing the cell filters to and must stay true to filterEnquiries(). The two are shown together in the cell's hover tooltip. Kept here rather than inline in the component because it is product vocabulary like statuses and tiers, and the API will serve it eventually. check:wiring asserts every rendered cell has an entry AND that each cell's count equals the row count of the filter it applies — that second test was written because `callback due` read 0 while clicking it returned one row.",
+  "attentionCells": [
+    {
+      "key": "total",
+      "counts": "Every enquiry in the panel, in every state — converted and rejected included. This strip always counts the whole set, never what the filters have narrowed the table to.",
+      "does": "Clears status, flag and tag. The search box and the remaining filters are left alone."
+    },
+    {
+      "key": "New",
+      "counts": "Status New: the submission arrived and nobody has tried to reach the customer yet — not one contact attempt logged. This is the number that should be zero by lunchtime.",
+      "does": "Filters to status New."
+    },
+    {
+      "key": "qualified",
+      "counts": "Status Qualified: a person confirmed the requirement and froze the snapshot, so it is ready to go to a business. Matching runs inside this state — being Qualified IS being ready to assign, which is why there is no separate state for it.",
+      "does": "Filters to status Qualified."
+    },
+    {
+      "key": "no match yet",
+      "counts": "Status No match yet: qualified, but a matching run found no eligible business — no subscribed business covers this category and city, or every one that does is at capacity. A supply gap, not a bad enquiry, and the only number here that is business development’s problem rather than operations’.",
+      "does": "Filters to status No match yet."
+    },
+    {
+      "key": "processing",
+      "counts": "Status Processing: somebody has started working it — at least one contact attempt is logged, and the requirement, checklist and tags are all still editable. It leaves this state when a person marks it Qualified.",
+      "does": "Filters to status Processing."
+    },
+    {
+      "key": "assigned",
+      "counts": "Routed to exactly one business and published to them — assigning delivers, there is no separate Delivered state and no acknowledgement to wait for. The only live state.",
+      "does": "Filters to status Assigned."
+    },
+    {
+      "key": "converted",
+      "counts": "The business reported that the customer bought. No amount is recorded anywhere in this module — Interior bazzar's revenue is the subscription, which lives in Plans.",
+      "does": "Filters to status Converted."
+    },
+    {
+      "key": "rejected",
+      "counts": "Rejected — a test submission, spam, a duplicate, or the customer withdrew before assignment. Kept and auditable, never deleted.",
+      "does": "Filters to status Rejected."
+    }
+  ]
+}

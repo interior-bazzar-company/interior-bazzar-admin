@@ -19,6 +19,7 @@
 const path = require('path');
 const X = require(path.join(__dirname, '..', 'node_modules', '.tmp', 'enquiry-export.cjs'));
 const seed = require(path.join(__dirname, '..', 'src/content/business-enquiries/enquiries.json'));
+const voc = require(path.join(__dirname, '..', 'src/content/business-enquiries/vocabularies.json'));
 
 const fails = [];
 const ok = (c, m) => { if (!c) fails.push(m); };
@@ -28,7 +29,10 @@ const ok = (c, m) => { if (!c) fails.push(m); };
    COLUMNS exist, so plant a minimal one rather than stand up a server. Same call
    the boot makes: a rename in the payload breaks this too. */
 X.applyVocabulary({
-  statuses: seed.enquiries.map((e) => ({ key: e.status, label: e.status })),
+  /* The real labels, not the keys echoed back: the CSV prints what a person
+     reads, so a check planting `label: key` would pass on a file that shipped
+     `no_match` in a column headed Status. */
+  statuses: voc.statuses,
   urgency: [
     { key: 'within_30d', label: 'Within 30 days' },
     { key: '30_90d', label: '30–90 days' },
@@ -124,18 +128,26 @@ ok(one.indexOf('""3BHK, full""') > 0, 'embedded quotes not doubled');
 ok(one.split('\r\n').length === 2, 'an embedded newline broke the row into two');
 
 /* ---- 5. the filename says what the file is ------------------------------ */
-const fn = X.fileNameFor({ business: 'Studio Aangan', status: 'delivered' }, 4);
+const fn = X.fileNameFor({ business: 'Studio Aangan', status: 'assigned' }, 4);
 ok(fn.indexOf('studio-aangan') > 0, 'business missing from filename: ' + fn);
-ok(fn.indexOf('delivered') > 0, 'status missing from filename: ' + fn);
+ok(fn.indexOf('assigned') > 0, 'status missing from filename: ' + fn);
 ok(/_4_\d{4}-\d{2}-\d{2}\.csv$/.test(fn), 'count/date suffix wrong: ' + fn);
 ok(X.fileNameFor({}, 13) === 'enquiries_13_' + new Date().toISOString().slice(0, 10) + '.csv',
   'unfiltered filename wrong: ' + X.fileNameFor({}, 13));
 
 /* ---- 6. the scope sentence cannot describe a different set -------------- */
 ok(X.scopeSentence({}, 13, 13).indexOf('No filters') > 0, 'unfiltered sentence wrong');
-const sc = X.scopeSentence({ business: 'Terra Interiors', flag: 'overdue' }, 2, 13);
+// The fixture used `flag: 'overdue'` and passed only because the sentence
+// echoed `p.flag` verbatim — the flag param itself is gone now, and so is the
+// callback state it named. Two filters that exist, and one that does not, so a
+// filter silently dropped from the sentence still fails this.
+const sc = X.scopeSentence({ business: 'Terra Interiors', status: 'no_match', city: 'New Delhi' }, 2, 13);
 ok(sc.indexOf('2 of 13') === 0, 'count missing from scope sentence: ' + sc);
-ok(sc.indexOf('Terra Interiors') > 0 && sc.indexOf('overdue') > 0, 'scope sentence lost a filter: ' + sc);
+ok(sc.indexOf('Terra Interiors') > 0, 'scope sentence lost the business: ' + sc);
+ok(sc.indexOf('No match yet') > 0, 'scope sentence lost the status: ' + sc);
+ok(sc.indexOf('New Delhi') > 0, 'scope sentence lost the city: ' + sc);
+ok(X.scopeSentence({ flag: 'overdue' }, 2, 13).indexOf('overdue') < 0,
+  'scope sentence still echoes the removed flag param');
 
 if (fails.length) { console.error('FAIL\n' + fails.map((f) => '  · ' + f).join('\n')); process.exit(1); }
 console.log('export ok — ' + rows.length + ' rows, ' + headCount + ' columns at full tick,');
