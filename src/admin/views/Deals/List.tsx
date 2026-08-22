@@ -8,8 +8,8 @@ import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import { can } from "../../shell/AdminShell";
 import {
-  ALL_STAGES, D, STAGE, STRIP_STAGES, daysFrom, dealHash, head, inr, localSort, merge, omit,
-  place, urgency, useDealCounts, useFilters
+  ALL_STAGES, D, STAGE, STRIP_STAGES, daysFrom, dealHash, fullAccess, hasFilters, head, inr,
+  localSort, merge, omit, place, urgency, useDealCounts, useFilters
 } from "./useDeals";
 import type { Counts, DealsApiState, Params } from "./useDeals";
 import { legacyPriorityInt, legacyStageInt } from "./adapter";
@@ -162,7 +162,12 @@ export function DealsList({ id, p, api }: {
         <SearchField ph="Search name, business, email, phone, city or deal ref…" val={p.q} onFilter={onSearch} />
         <Select name="stage" label="Stage" value={p.stage} onFilter={onFilter}
           options={stageOptions(api.stages)} />
-        {head()
+        {/* FULL ACCESS, not head(): `deals.close` still authorises reassign and
+            export, but it no longer means you receive other people's deals —
+            so for a scoped session this picker collapses to their own name and
+            filters nothing. Absent, not greyed, like every other locked
+            control here. */}
+        {fullAccess()
           ? <Select name="owner" label="Owner" value={p.owner} onFilter={onFilter}
               options={api.owners.map((o) => ({ v: String(o.id), l: o.name }))} />
           : null}
@@ -215,14 +220,19 @@ export function DealsList({ id, p, api }: {
 function DealsTable({ list, sel, p, onCreate, onClearFilters }: {
   list: any[]; sel: string | null; p: Params; onCreate: () => void; onClearFilters: () => void;
 }) {
-  const filtered = !!(p.q || p.stage || p.owner || p.priority || p.next || p.stalled);
+  const filtered = hasFilters(p);
   const canCreate = can("deals", "create");
+  /* A scoped session is only ever sent the deals it owns or co-owns, so "No
+     deals yet" would be a claim about a pipeline this viewer cannot see — and
+     the usual reason the list is empty for them is that nothing is theirs, not
+     that nothing exists. Full access keeps the literal reading. */
+  const mine = !fullAccess();
   if (!list.length) return (
     <EmptyState icon="deal"
-      title={filtered ? "No deals match these filters" : "No deals yet"}
+      title={filtered ? "No deals match these filters" : mine ? "No deals assigned to you" : "No deals yet"}
       body={filtered
         ? "Nothing in the pipeline matches. Clear a filter to widen the search."
-        : "Nothing in the pipeline yet." +
+        : (mine ? "Deals you own or co-own appear here." : "Nothing in the pipeline yet.") +
           (canCreate ? " Create one for an inbound call, a walk-in or a referral." : "")}
       action={filtered
         ? <button className="btn" data-unfilter="*" onClick={onClearFilters}>Clear all filters</button>

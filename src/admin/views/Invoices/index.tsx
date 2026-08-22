@@ -120,6 +120,17 @@ function InvoicesList() {
      ponytail: reads zero even in that repair case, because the list row
      carries no ledger figure. Add `receivedPaise` to _invoice_dict and sum it
      here if the stuck case ever has to be visible from the list. */
+  /* And EVERY figure here is counted over what the API actually returned, which
+     for anything short of full access is only the deals this session owns or
+     co-owns. A sales session's strip therefore states ITS OWN invoicing, not
+     the company's, and two people would otherwise read different money off
+     identically-worded cells. The labels carry the scope: `mine` marks the
+     money cells, `only` ends the tooltips, and both are empty for a full-access
+     viewer — whose wording is unchanged. Same pattern as Quotations. */
+  const mine = head ? "" : " · yours";
+  const only = head ? "" : " — yours only";
+  const yrs = head ? "" : " yours";
+
   const byStatus: Record<string, number> = {};
   let invoiced = 0, received = 0, overdue = 0;
   all.forEach((inv) => {
@@ -138,22 +149,30 @@ function InvoicesList() {
      takes its place, because that is the number that gets worse while nobody
      looks at it. */
   const cells: (StatCell | "sep")[] = [
-    { k: "total", v: all.length, to: route("status", ""), on: !p.status },
+    { k: "total" + mine, v: all.length, to: route("status", ""), on: !p.status,
+      title: "Invoices" + only },
     "sep",
-    { k: "draft", v: byStatus.draft || 0, dot: "", to: route("status", "draft"), on: p.status === "draft" },
-    { k: "paid", v: byStatus.issued || 0, dot: "ok", to: route("status", "issued"), on: p.status === "issued" },
+    { k: "draft", v: byStatus.draft || 0, dot: "", to: route("status", "draft"), on: p.status === "draft",
+      title: "Draft invoices" + only },
+    { k: "paid", v: byStatus.issued || 0, dot: "ok", to: route("status", "issued"), on: p.status === "issued",
+      title: "Issued invoices, their payment already on the ledger" + only },
     "sep",
     { k: "overdue", v: overdue, dot: overdue ? "bad" : "", tone: overdue ? "bad" : "",
       to: route("status", "overdue"), on: p.status === "overdue",
-      title: "Past its due date with the money still not logged" },
+      title: "Past its due date with the money still not logged" + only },
     "sep",
-    { k: "invoiced", v: inr(invoiced, { compact: true }), title: "Issued and not cancelled" },
+    { k: "invoiced" + mine, v: inr(invoiced, { compact: true }), title: "Issued and not cancelled" + only },
     "sep",
-    { k: "received", v: inr(received, { compact: true }), tone: "ok",
-      title: "Written to the deal ledger by Issue itself, in the same transaction -- not recomputed here" },
+    { k: "received" + mine, v: inr(received, { compact: true }), tone: "ok",
+      title: "Written to the deal ledger by Issue itself, in the same transaction -- not recomputed here" + only },
     "sep",
-    { k: "outstanding", v: inr(outstanding, { compact: true }), tone: outstanding ? "bad" : "",
-      title: "Stuck after Issue -- needs Log payment on the deal" },
+    /* An ALARM, and a scoped one: it can only ever ring about invoices this
+       session can see, so an invoice stuck on somebody else's deal is invisible
+       to everyone but its owner and a full-access admin. The label says whose
+       books it covers rather than implying nothing is stuck anywhere. */
+    { k: "outstanding" + mine, v: inr(outstanding, { compact: true }), tone: outstanding ? "bad" : "",
+      title: "Stuck after Issue -- needs Log payment on the deal"
+        + (head ? "" : " — covers YOUR invoices only; one stuck on a deal that is not yours is not counted here") },
   ];
 
   const chips = Object.keys(params).filter((k) => params[k]).length > 0;
@@ -182,8 +201,8 @@ function InvoicesList() {
       <div className="dls-cmd">
         <SearchField ph="Search invoice no, deal, quote or customer…" val={p.q} onFilter={onSearch} />
         <Select key={"status" + p.status} name="status" label="Status" value={p.status} onFilter={onFilter}
-          options={STATUSES.map((s) => ({ v: s, l: STATUS_LABEL[s] + " (" + (byStatus[s] || 0) + ")" }))
-            .concat([{ v: "overdue", l: "Overdue (" + overdue + ")" }])} />
+          options={STATUSES.map((s) => ({ v: s, l: STATUS_LABEL[s] + " (" + (byStatus[s] || 0) + yrs + ")" }))
+            .concat([{ v: "overdue", l: "Overdue (" + overdue + yrs + ")" }])} />
         {head
           ? <Select key={"owner" + p.owner} name="owner" label="Owner" value={p.owner}
               onFilter={onFilter} options={owners} />

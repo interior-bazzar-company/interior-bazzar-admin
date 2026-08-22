@@ -22,7 +22,7 @@ import { fmtDate, inr as inrFmt } from "../../ui/format";
 import { go } from "../../ui/nav";
 import { can } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
-import { currentActor } from "../../auth/session";
+import { currentActor, getSession } from "../../auth/session";
 import AdminOpsService from "../../../api/modules/adminOps";
 import type {
   DealPersonRef, DealPriorityVocab, DealStageVocab, DealTagVocab, InvoiceRow, QuotationRow
@@ -80,9 +80,27 @@ export function paramsOf(sp: URLSearchParams): Params {
 export const actor = currentActor;
 /* "Head" used to be a string comparison against the local engine's own role
    names. It is a PERMISSION now: `deals.close` is the module's level-3 verb,
-   which is exactly the tier the head-only controls (owner filter, reassign,
-   export) were guarding. One source of truth, and the server re-checks it. */
+   which is exactly the tier the head-only ACTIONS (reassign, the stall sweep,
+   export) were guarding. One source of truth, and the server re-checks it.
+   The owner FILTER used to hang off this too and no longer does — see
+   fullAccess() below for why the two questions came apart. */
 export function head() { return can("deals", "close"); }
+/* SEES THE WHOLE PIPELINE — which is no longer the same question as head().
+   The API scopes Deals to owner/co-owner now, so a sales lead holding
+   `deals.close` still only receives their own rows. The head-level ACTIONS
+   (reassign, the stall sweep, export) stay on head(); anything that FILTERS or
+   DESCRIBES the whole pipeline has to ask this instead, or it offers an Owner
+   picker with one entry in it and calls an empty scope an empty company.
+   The same signal Quotations and Invoices gate their Owner filter on. */
+export function fullAccess() { const s = getSession(); return !!(s && s.isFullAccess); }
+/* THE one definition of "this list is narrowed". List's table and both of
+   Chat's empty states branch on it, and while each kept its own copy they
+   drifted: the table's forgot `tag`, so filtering by a List that matched
+   nothing announced "No deals yet". `sort` is deliberately not in it — it
+   reorders the list, it never removes a row. */
+export function hasFilters(p: Params) {
+  return !!(p.q || p.stage || p.tag || p.owner || p.priority || p.next || p.stalled);
+}
 /* PORTED FAITHFULLY, INCLUDING THE SWALLOWED ARGUMENT.
 
    The prototype's wrapper is `function inr(p) { return D.inr(p); }` — one
@@ -381,8 +399,19 @@ function apiOk<T>(res: { response: boolean; code: number; data: T }): { ok: true
    `subs`: that one is a dependency of the fetch effect, so notifying through
    it here would re-fire the request that just produced these numbers. */
 export type Counts = { total: number; byStage: Record<number, number>; collected: number; outstanding: number };
-let LAST_COUNTS: Counts = { total: 0, byStage: {}, collected: 0, outstanding: 0 };
+const zeroCounts = (): Counts => ({ total: 0, byStage: {}, collected: 0, outstanding: 0 });
+let LAST_COUNTS: Counts = zeroCounts();
 const countSubs = new Set<() => void>();
+/* The ONLY writer of LAST_COUNTS, and it has to be called on the FAILURE paths
+   too. The topbar strip reads this store rather than the fetch's state, so a
+   refused or failed load used to leave the previous fetch's totals — two of
+   them money — painted over an empty list, and they outlived both the unmount
+   and the navigation that emptied it. Zero is not a guess here: it is the only
+   thing a failed fetch actually knows. */
+function publishCounts(c: Counts) {
+  LAST_COUNTS = c;
+  countSubs.forEach((f) => f());
+}
 export function useDealCounts(): Counts {
   const [, force] = useReducer((n: number) => n + 1, 0);
   useEffect(() => { countSubs.add(force); return () => { countSubs.delete(force); }; }, []);
@@ -402,7 +431,7 @@ export interface DealsApiState {
 }
 const DEALS_API_IDLE: DealsApiState = {
   loading: true, forbidden: false, error: null, list: [],
-  counts: { total: 0, byStage: {}, collected: 0, outstanding: 0 },
+  counts: zeroCounts(),
   stages: [], priorities: [], tags: [], owners: [],
 };
 
@@ -437,6 +466,7 @@ export function useDealsApi(p: Params): DealsApiState {
       if (cancelled) return;
       const r = apiOk(res);
       if (!r.ok) {
+        publishCounts(zeroCounts());
         setState({ ...DEALS_API_IDLE, loading: false, forbidden: r.forbidden,
           error: r.forbidden ? null : "Could not load deals." });
         return;
@@ -450,8 +480,7 @@ export function useDealsApi(p: Params): DealsApiState {
         collected: data.counts.collectedPaise || 0,
         outstanding: data.counts.outstandingPaise || 0,
       };
-      LAST_COUNTS = counts;
-      countSubs.forEach((f) => f());
+      publishCounts(counts);
       setState({
         loading: false, forbidden: false, error: null,
         list: data.deals.map(adaptDeal),
@@ -461,6 +490,7 @@ export function useDealsApi(p: Params): DealsApiState {
       });
     }).catch(() => {
       if (cancelled) return;
+      publishCounts(zeroCounts());
       setState({ ...DEALS_API_IDLE, loading: false, error: "Could not load deals." });
     });
     return () => { cancelled = true; };

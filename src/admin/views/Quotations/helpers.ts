@@ -96,7 +96,11 @@ export function expiringSoon(q: QuotationRow): boolean {
 
 /** The strip's seven numbers, counted over the WHOLE page — never over the
  *  narrowed rows, or every cell but the one you picked reads 0. `awaiting` and
- *  `agreed` are sums of real per-quotation grand totals, nothing estimated. */
+ *  `agreed` are sums of real per-quotation grand totals, nothing estimated.
+ *  "Whole page" is now as much as the CALLER WAS GIVEN, though: the API hands a
+ *  scoped session only the quotations on its own deals, so these are that
+ *  viewer's totals rather than the company's. The strip labels the difference
+ *  (index.tsx) — anything else rendering these has to do the same. */
 export function summarize(all: QuotationRow[]) {
   const byStatus: Record<string, number> = {};
   let awaitingPaise = 0, agreedPaise = 0, expiring = 0;

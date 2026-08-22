@@ -99,6 +99,18 @@ function QuotationsList() {
     return Array.from(m, ([v, l]) => ({ v: String(v), l }));
   }, [all]);
 
+  /* EVERY figure below is counted over what the API actually returned, and the
+     API returns only the deals this session owns or co-owns unless it has full
+     access. So a sales session's strip is a statement about ITS OWN
+     quotations, not the company's — and two people reading identically-worded
+     cells would see different money with nothing on screen saying why. The
+     labels carry the scope instead: `mine` marks the money cells, `only` ends
+     the tooltips. Both are empty for a full-access viewer, which leaves that
+     wording exactly as it was. */
+  const mine = head ? "" : " · yours";
+  const only = head ? "" : " — yours only";
+  const yrs = head ? "" : " yours";
+
   const { byStatus, expiring, awaitingPaise, agreedPaise } = summarize(all);
   function route(k: string, v: string) {
     const q2: Record<string, string> = { ...params };
@@ -111,21 +123,25 @@ function QuotationsList() {
      cancelled are where a quotation LEAVES the funnel, not a position in it —
      each is one pick away in the Status control instead. */
   const cells: (StatCell | "sep")[] = [
-    { k: "total", v: all.length, to: route("status", ""), on: !p.status },
+    { k: "total" + mine, v: all.length, to: route("status", ""), on: !p.status,
+      title: "Quotations" + only },
     "sep",
-    { k: "draft", v: byStatus.draft || 0, dot: "", to: route("status", "draft"), on: p.status === "draft" },
-    { k: "issued", v: byStatus.issued || 0, dot: "info", to: route("status", "issued"), on: p.status === "issued" },
-    { k: "accepted", v: byStatus.accepted || 0, dot: "ok", to: route("status", "accepted"), on: p.status === "accepted" },
+    { k: "draft", v: byStatus.draft || 0, dot: "", to: route("status", "draft"), on: p.status === "draft",
+      title: "Draft quotations" + only },
+    { k: "issued", v: byStatus.issued || 0, dot: "info", to: route("status", "issued"), on: p.status === "issued",
+      title: "Issued quotations" + only },
+    { k: "accepted", v: byStatus.accepted || 0, dot: "ok", to: route("status", "accepted"), on: p.status === "accepted",
+      title: "Accepted quotations" + only },
     "sep",
     { k: "expiring", v: expiring, dot: expiring ? "bad" : "", tone: expiring ? "bad" : "",
       to: route("status", "expiring"), on: p.status === "expiring",
-      title: "Issued quotations within 3 days of lapsing" },
+      title: "Issued quotations within 3 days of lapsing" + only },
     "sep",
-    { k: "awaiting", v: inr(awaitingPaise, { compact: true }), tone: "warn",
-      title: "Value of quotations issued and not yet answered" },
+    { k: "awaiting" + mine, v: inr(awaitingPaise, { compact: true }), tone: "warn",
+      title: "Value of quotations issued and not yet answered" + only },
     "sep",
-    { k: "agreed", v: inr(agreedPaise, { compact: true }), tone: "ok",
-      title: "Value of accepted quotations — the agreed value written back to the deals" },
+    { k: "agreed" + mine, v: inr(agreedPaise, { compact: true }), tone: "ok",
+      title: "Value of accepted quotations — the agreed value written back to the deals" + only },
   ];
 
   const chips = Object.keys(params).filter((k) => params[k]).length > 0;
@@ -155,8 +171,8 @@ function QuotationsList() {
       <div className="dls-cmd">
         <SearchField ph="Search quotation no, deal ref or customer…" val={p.q} onFilter={onSearch} />
         <Select key={"status" + p.status} name="status" label="Status" value={p.status} onFilter={onFilter}
-          options={STATUSES.map((s) => ({ v: s, l: STATUS_LABEL[s] + " (" + (byStatus[s] || 0) + ")" }))
-            .concat([{ v: "expiring", l: "Expiring ≤3 days (" + expiring + ")" }])} />
+          options={STATUSES.map((s) => ({ v: s, l: STATUS_LABEL[s] + " (" + (byStatus[s] || 0) + yrs + ")" }))
+            .concat([{ v: "expiring", l: "Expiring ≤3 days (" + expiring + yrs + ")" }])} />
         {head
           ? <Select key={"owner" + p.owner} name="owner" label="Owner" value={p.owner}
               onFilter={onFilter} options={owners} />

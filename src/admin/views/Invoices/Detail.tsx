@@ -52,7 +52,8 @@ export default function InvoiceDetail({ id, tab, params }: {
   if (notFound || !invoice) return (
     <div className="page wide">
       <EmptyState icon="invoice" title="Invoice not found"
-        body={"Invoice " + id + " is not in the API's set."}
+        body={"Invoice " + id + " could not be opened. It may have been deleted, or it "
+          + "belongs to a deal outside your access."}
         action={<button className="btn" onClick={() => go("#/invoices")}>Back to invoices</button>} />
     </div>
   );

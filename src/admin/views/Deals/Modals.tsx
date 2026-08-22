@@ -188,6 +188,31 @@ function Loading() {
   return <div className="md-b"><div className="faint">Loading…</div></div>;
 }
 
+/* THE DEAL IS NOT THERE. useDealApi() reports both "no such deal" and "not in
+   your scope" as `deal: null` — the API answers an out-of-scope read with
+   not-found, so the dialog cannot tell them apart and does not pretend to.
+   Every modal below used to `return null` for it, which left the shell's modal
+   layer up over a completely blank dialog: no title, no message, no close
+   button. That is reachable any time the list is a few seconds stale, which
+   scoping made the ordinary case — a deal reassigned away between the render
+   and the click. Same shell as every other dialog, so it closes the same way. */
+function Gone({ title, dealRef, onClose }: { title: string; dealRef: string; onClose: () => void }) {
+  return (
+    <>
+      <div className="md-h"><h3>{title}</h3><p className="mono">{dealRef}</p><MdX onClose={onClose} /></div>
+      <div className="md-b">
+        <Notice tone="bad" text={<>
+          <b>This deal is no longer available.</b> It may have been deleted, or reassigned to
+          somebody else since this list was loaded. Close this and reload the list.
+        </>} />
+      </div>
+      <div className="md-f"><span className="spacer"></span>
+        <button className="btn" data-close="1" onClick={onClose}>Close</button>
+      </div>
+    </>
+  );
+}
+
 /* ==========================================================================
    NEW DEAL
    ====================================================================== */
@@ -343,7 +368,7 @@ function EditModal({ dealRef, onClose, done }: {
   }, [loading]);
 
   if (loading) return <><div className="md-h"><h3>Edit deal</h3><p className="mono">{dealRef}</p><MdX onClose={onClose} /></div><Loading /></>;
-  if (!dl) return null;
+  if (!dl) return <Gone title="Edit deal" dealRef={dealRef} onClose={onClose} />;
   const prioNow = prio === null ? String(dl.priority) : prio;
   const closed = dl.stage >= STAGE.WON;
 
@@ -570,7 +595,7 @@ function ValueModal({ dealRef, onClose, done }: {
   const [err, setErr] = useState<Refusal | null>(null);
   const [busy, setBusy] = useState(false);
   if (loading) return <><div className="md-h"><h3>Set deal value</h3><p>{dealRef}</p><MdX onClose={onClose} /></div><Loading /></>;
-  if (!dl) return null;
+  if (!dl) return <Gone title="Set deal value" dealRef={dealRef} onClose={onClose} />;
   const save = () => {
     const typed = val("vAmt").trim();
     setErr(null); setBusy(true);
@@ -608,7 +633,7 @@ function CloseModal({ dealRef, onClose, done }: {
   const [err, setErr] = useState<Refusal | null>(null);
   const [busy, setBusy] = useState(false);
   if (loading) return <><div className="md-h"><h3>Close deal</h3><p>{dealRef}</p><MdX onClose={onClose} /></div><Loading /></>;
-  if (!dl) return null;
+  if (!dl) return <Gone title="Close deal" dealRef={dealRef} onClose={onClose} />;
 
   const commit = () => {
     const picked = document.querySelector('input[name="closeAs"]:checked') as HTMLInputElement | null;
@@ -682,6 +707,9 @@ function ReassignModal({ dealRef, onClose, done }: {
   const [err, setErr] = useState<Refusal | null>(null);
   const [busy, setBusy] = useState(false);
   const [people, setPeople] = useState<{ id: number; name: string }[] | null>(null);
+  /* Kept apart from `err`, which belongs to the SAVE. The roster failing is not
+     a failed reassignment, it just means there is nothing to pick from. */
+  const [teamErr, setTeamErr] = useState<Refusal | null>(null);
 
   /* The team list, from the admin user endpoint — the same roster Settings →
      Team shows. The deals list only knows the owners who happen to appear on
@@ -690,12 +718,16 @@ function ReassignModal({ dealRef, onClose, done }: {
     let cancelled = false;
     call(AdminOpsService.users())
       .then((rows) => { if (!cancelled) setPeople(rows.map((u) => ({ id: u.id, name: u.name || u.username }))); })
-      .catch(() => { if (!cancelled) setPeople([]); });
+      /* Reassign is gated on `deals.close`, NOT on team-module access, so a
+         sales head whose role has no /users/ grant lands here every time. It
+         used to fail silently: the "Loading the team…" line vanished and left
+         two selects holding nothing but "— leave as it is —". Say so. */
+      .catch((e: unknown) => { if (!cancelled) { setPeople([]); setTeamErr(refusalOf(e)); } });
     return () => { cancelled = true; };
   }, []);
 
   if (loading) return <><div className="md-h"><h3>Reassign</h3><p>{dealRef}</p><MdX onClose={onClose} /></div><Loading /></>;
-  if (!dl) return null;
+  if (!dl) return <Gone title="Reassign" dealRef={dealRef} onClose={onClose} />;
 
   const commit = () => {
     const owner = val("raOwner"), co = val("raCo");
@@ -716,6 +748,13 @@ function ReassignModal({ dealRef, onClose, done }: {
       <div className="md-b">
         <ErrSlot err={err} />
         {people === null ? <div className="faint">Loading the team…</div> : null}
+        {teamErr
+          ? <Notice tone="bad" text={<>
+              <b>The team list could not be loaded.</b> This dialog reads the same roster as
+              Settings → Team, which your role may not include — there is nobody to pick from
+              until an Admin grants it. <span className="mono">{teamErr.detail}</span>
+            </>} />
+          : null}
         <Field id="raOwner" label="Owner" type="select" options={[{ v: "", l: "— leave as it is —" }].concat(opts)}
           help="Everyone with an admin account. A deal always has exactly one owner." />
         <Field id="raCo" label="Co-owner" type="select"

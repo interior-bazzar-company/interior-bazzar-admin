@@ -7,11 +7,22 @@
    invoice, not a question asked about the list you were reading.
 
    Both halves show only what CreateDraft will actually accept — a deal with
-   an accepted quotation and something still uninvoiced — rather than
-   offering a row and then refusing the click. Outstanding is the server's
-   own cap, `_outstanding_for`: deal.valuePaise less every LIVE
-   (non-cancelled) invoice already raised on it. The server checks remain
-   the authority.
+   an accepted quotation and money still uncollected — rather than offering a
+   row and then refusing the click. The server checks remain the authority.
+
+   THE MONEY ON THIS PAGE COMES FROM THE DEAL, NOT FROM THE INVOICE LIST.
+   It used to be computed here as deal.valuePaise less every live invoice this
+   page could see, which mirrored the server's `_outstanding_for` cap — right
+   up until the API started scoping invoices per user. A co-owner whose deal
+   was invoiced by its primary owner cannot see those invoices, so that
+   subtraction under-counted what was billed and printed a number TOO HIGH, on
+   the screen where somebody decides how much to bill next. `outstandingPaise`
+   is the server's own sum over the whole ledger (agreed value less payments
+   received, floored at zero) and does not move with who is looking, so it is
+   the figure both columns show now. It is not the create cap: a deal already
+   covered by DRAFT invoices still reads uncollected, and CreateDraft refuses
+   it. Over-offering a row the server then refuses is the safe direction —
+   over-stating money is not.
    ===================================================================== */
 import { useEffect, useMemo, useRef, useState } from "react";
 import AdminOpsService from "../../../api/modules/adminOps";
@@ -25,17 +36,21 @@ import { STATUS_LABEL as Q_LABEL, STATUS_TONE as Q_TONE } from "../Quotations/ap
 import { lineNet, planItemOf } from "../Quotations/helpers";
 import { call } from "./api";
 
-/** Live (non-cancelled) invoices already raised: money per deal — which is
- *  what the cap is measured in — and a count per quotation, which is how many
- *  installments have been billed. */
-type Billed = { byDeal: Record<string, { n: number; paise: number }>; byQuote: Record<number, number> };
+/** Live (non-cancelled) invoices already raised: a count per deal and a count
+ *  per quotation — the latter is how many installments have been billed. COUNTS
+ *  ONLY. No money is derived from this list; see the header. */
+type Billed = { byDeal: Record<string, { n: number }>; byQuote: Record<number, number> };
 const NO_BILLED: Billed = { byDeal: {}, byQuote: {} };
 
-/** Every live invoice, in one read. Both steps need it and neither can change
- *  it while the page is open.
- *  ponytail: one page (200 is the server's max). Overflow can only
- *  under-count what is already billed, and the create refusal still catches
- *  it. */
+/** Every live invoice this session can see, in one read. Both steps need it and
+ *  neither can change it while the page is open.
+ *  ponytail: one page (200 is the server's max), AND the list is scoped — a
+ *  sales session gets invoices on its own deals only. Both make these counts a
+ *  FLOOR, never a total: "2 of 3 already invoiced" can under-report when a
+ *  co-owner raised the others. Kept because they are counts next to a create
+ *  button the server can refuse, not figures anyone banks on; the moment one
+ *  has to be exact, ask the API for it (a `billedCount` on the deal payload,
+ *  the way `outstandingPaise` already carries the money). */
 function useBilled(): Billed {
   const [billed, setBilled] = useState<Billed>(NO_BILLED);
   useEffect(() => {
@@ -44,8 +59,8 @@ function useBilled(): Billed {
         const b: Billed = { byDeal: {}, byQuote: {} };
         (d.invoices || []).forEach((inv) => {
           if (inv.status === "cancelled") return;
-          const c = b.byDeal[inv.dealRef] || (b.byDeal[inv.dealRef] = { n: 0, paise: 0 });
-          c.n += 1; c.paise += inv.grandTotalPaise;
+          const c = b.byDeal[inv.dealRef] || (b.byDeal[inv.dealRef] = { n: 0 });
+          c.n += 1;
           b.byQuote[inv.quotationId] = (b.byQuote[inv.quotationId] || 0) + 1;
         });
         setBilled(b);
@@ -128,13 +143,12 @@ function DealStep() {
 
   /* Applied at render, not in the fetch: the three requests race, and the
      deals usually land first. Lost is the only stage closed to billing — a won
-     deal with every rupee invoiced is stopped by the cap below, not by its
-     stage (InvoicesController.CreateDraft). */
-  const list = hits && hits.filter((d) => {
-    if (d.stageKey === "lost" || !accepted[d.ref]) return false;
-    const b = billed.byDeal[d.ref];
-    return (d.valuePaise || 0) - (b ? b.paise : 0) > 0;
-  });
+     deal with every rupee invoiced is stopped by the server's cap, not by its
+     stage (InvoicesController.CreateDraft). The billable test is the deal's own
+     `outstandingPaise` rather than a subtraction over the invoices this session
+     happens to see, so it reads the same for the owner and the co-owner. */
+  const list = hits && hits.filter((d) =>
+    d.stageKey !== "lost" && !!accepted[d.ref] && d.outstandingPaise > 0);
 
   return (
     <>
@@ -145,13 +159,13 @@ function DealStep() {
 
       <Table
         cols={[{ label: "Customer" }, { label: "Deal" }, { label: "Deal value", cls: "n" },
-          { label: "Outstanding", cls: "n" }, { label: "Installments", cls: "c" },
+          { label: "Uncollected", cls: "n" }, { label: "Installments", cls: "c" },
           { label: "Invoices", cls: "c" }, { label: "", cls: "c" }]}
         empty={list === null
           ? { icon: "deal", title: "Searching…", body: "" }
           : { icon: "deal", title: "No billable deals in your scope",
               body: "A deal becomes billable when its quotation is accepted and some of its value is "
-                + "still uninvoiced." }}
+                + "still uncollected." }}
         rows={(list || []).map((d) => {
           const acc = accepted[d.ref];
           const b = billed.byDeal[d.ref];
@@ -167,7 +181,8 @@ function DealStep() {
               </td>
               <td className="mono">{d.ref}</td>
               <td className="n tnum">{inr(d.valuePaise)}</td>
-              <td className="n tnum">{inr((d.valuePaise || 0) - (b ? b.paise : 0))}</td>
+              <td className="n tnum" title="Agreed value less the payments on the deal's ledger">
+                {inr(d.outstandingPaise)}</td>
               <td className="c">{total
                 ? done + " of " + total + (done >= total ? " · done" : "")
                 : <span className="faint">Full amount</span>}</td>
@@ -209,8 +224,9 @@ function QuotationStep({ dealRef }: { dealRef: string }) {
   }, [dealRef]);
 
   const acc = useMemo(() => (quotes || []).find((x) => x.status === "accepted") || null, [quotes]);
-  const b = billed.byDeal[dealRef];
-  const remaining = Math.max(0, (deal && deal.valuePaise ? deal.valuePaise : 0) - (b ? b.paise : 0));
+  /* The deal's own figure, already floored at zero server-side — not this
+     page's arithmetic over a scoped invoice list. See the header. */
+  const uncollected = deal ? deal.outstandingPaise : 0;
 
   const create = () => {
     if (!chosen) return;
@@ -265,7 +281,8 @@ function QuotationStep({ dealRef }: { dealRef: string }) {
       </div></div>
 
       {acc ? <>
-        <SectionHead title="What the quotation brings in" desc="this is the cap the invoice must respect" />
+        <SectionHead title="What the quotation brings in"
+          desc="the server caps the invoice at what is still uninvoiced on the deal" />
         <div className="card"><div className="card-b">
           <KvList cls="wide" pairs={([
             ["Plan", plan ? <b>{plan.name}</b> : "—"],
@@ -275,7 +292,10 @@ function QuotationStep({ dealRef }: { dealRef: string }) {
                 applied once</span>
             </>],
             total ? ["Installments", done + " of " + total + " already invoiced"] : null,
-            [<b>Remaining</b>, <b>{inr(remaining)}</b>],
+            [<b>Uncollected on the deal</b>, <>
+              <b>{inr(uncollected)}</b>{" "}
+              <span className="faint">— agreed value less the payments on its ledger</span>
+            </>],
           ].filter(Boolean)) as [React.ReactNode, React.ReactNode][]} />
         </div></div>
       </> : null}

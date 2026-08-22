@@ -24,8 +24,8 @@ import { go } from "../../ui/nav";
 import { can } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import {
-  D, STAGE, chanOf, daysFrom, head, inr, place, prioTone, refusalOf, relativeDate, render,
-  setChan, urgency, useDealApi, useDealDocs, usePop
+  D, STAGE, chanOf, daysFrom, fullAccess, hasFilters, head, inr, place, prioTone, refusalOf,
+  relativeDate, render, setChan, urgency, useDealApi, useDealDocs, usePop
 } from "./useDeals";
 import type { DealDocsState } from "./useDeals";
 import AdminOpsService from "../../../api/modules/adminOps";
@@ -55,12 +55,16 @@ export function ChatWorkspace({ id, p, api }: {
      an empty state would hide the very controls you need to widen the search,
      and claim the pipeline is empty when it is not. The full-page state is for
      the one case it is true: no filters, no deals. */
-  const filtered = !!(p.q || p.stage || p.tag || p.owner || p.priority || p.next || p.stalled);
+  const filtered = hasFilters(p);
+  /* Scope-aware, for the same reason the table's is: a non-full-access session
+     receives only the deals it owns or co-owns, so an empty scope is "none are
+     yours", not "the pipeline is empty". */
+  const mine = !fullAccess();
 
   if (!ref && !filtered) return (
     <div className="dws"><div className="dws-panes" style={{ gridTemplateColumns: "1fr" }}>
-      <EmptyState icon="deal" title="No deals yet"
-        body={"Nothing in the pipeline yet." +
+      <EmptyState icon="deal" title={mine ? "No deals assigned to you" : "No deals yet"}
+        body={(mine ? "Deals you own or co-own appear here." : "Nothing in the pipeline yet.") +
           (canCreate ? " Create one for an inbound call, a walk-in or a referral." : " Once one exists, its chat opens here.")}
         action={canCreate
           ? <button className="btn pri" data-act="dl-create" onClick={() => acts.create()}>Create deal</button>
@@ -127,13 +131,15 @@ function DetailPanes({ dealRef, p }: { dealRef: string; p: Params }) {
     );
   }
 
-  /* The ref genuinely is not in the API's deal set (a stale link, or an
-     account that never had it) — the panel's own not-found state, never a
-     silent fall-back onto an unrelated deal. */
+  /* The ref is not in THIS session's deal set — the panel's own not-found
+     state, never a silent fall-back onto an unrelated deal. Out-of-scope reads
+     come back as not-found rather than forbidden, so "gone" and "never yours"
+     are genuinely indistinguishable from here; the copy names both rather than
+     picking one, and says neither in API vocabulary. */
   if (!detail.deal) return (
     <section className="dws-chat">
       <EmptyState icon="deal" title="Deal not found"
-        body={"\u201c" + dealRef + "\u201d is not in the API's deal set."} />
+        body={"\u201c" + dealRef + "\u201d could not be opened \u2014 it may have been deleted, or it may belong to someone else now."} />
     </section>
   );
 
@@ -214,7 +220,10 @@ function ListPane({ list, activeRef, p, api }: { list: any[]; activeRef: string;
           <Chip name="stage" p={p} api={api} />
           <Chip name="tag" p={p} api={api} />
           <Chip name="priority" p={p} api={api} />
-          {head() ? <Chip name="owner" p={p} api={api} /> : null}
+          {/* Full access only — see fullAccess() in useDeals.ts: a scoped
+              session's own deals are all it can be shown, so this chip would
+              filter nothing. */}
+          {fullAccess() ? <Chip name="owner" p={p} api={api} /> : null}
           <Chip name="sort" p={p} api={api} />
         </div>
       </div>
@@ -222,7 +231,12 @@ function ListPane({ list, activeRef, p, api }: { list: any[]; activeRef: string;
         {list.length
           ? list.map((d: any) => <Row key={d.deal_id} d={d} activeRef={activeRef} p={p} />)
           : <div className="faint" style={{ fontSize: "var(--text-md)", padding: "16px 10px" }}>
-              No deals match these filters.</div>}
+              {/* The same three readings as the full-page state above. This
+                  pane also renders with NO filters set — a deal ref in the URL
+                  keeps the workspace mounted over an empty scope — so it
+                  cannot blame the filters unconditionally. */}
+              {hasFilters(p) ? "No deals match these filters."
+                : fullAccess() ? "No deals yet." : "No deals assigned to you."}</div>}
       </div>
     </aside>
   );

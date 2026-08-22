@@ -57,10 +57,22 @@ export function ChainStrip({ dealRef, here, quotation }: {
   const { deal, invoices, payments, loading } = useChain(dealRef);
   const cells: Cell[] = [];
 
-  cells.push({
-    k: "Deal", v: dealRef, route: "#/deals/" + dealRef, state: "done",
-    meta: deal ? <Pill text={deal.stageLabel} tone={deal.stageTone} /> : null,
-  });
+  /* A DEAL THAT DID NOT COME BACK IS NOT A FINISHED STEP. The fetch above
+     falls back to null on any failure, and since the pipeline became per-user
+     the commonest cause is no longer a network blip — it is a deal on somebody
+     else's desk, reached from a quotation or invoice that IS on yours. Drawing
+     that as "done" with a live link gave a green tick and a dead end; `locked`
+     with the reason is the same information the Quotation and Invoice cells
+     below already give when their record is missing. Still loading is neither
+     — it has no route and no claim until the answer arrives. */
+  cells.push(
+    loading
+      ? { k: "Deal", v: dealRef, state: "locked" }
+      : deal
+        ? { k: "Deal", v: dealRef, route: "#/deals/" + dealRef, state: "done",
+            meta: <Pill text={deal.stageLabel} tone={deal.stageTone} /> }
+        : { k: "Deal", v: dealRef, state: "locked",
+            why: "This deal is not one you can open — it belongs to another owner." });
 
   const qStatus = quotation ? quotation.status : "";
   if (!quotation) {

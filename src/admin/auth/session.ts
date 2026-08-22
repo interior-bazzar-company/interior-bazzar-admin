@@ -106,6 +106,18 @@ export function clearSession() {
   session = null;
   inflight = null;
   TokenService.clearTokens();
+  /* THE RECENTS LIST IS RECORD REFERENCES, NOT A PREFERENCE. `ib_admin_recents`
+     holds the last twelve deal/quotation/invoice ids opened on this browser, and
+     leaving it behind survives sign-out: the next person to sign in on a shared
+     machine reads the previous one's deal refs straight out of the command
+     palette. It matters more now the pipeline is per-user — those refs are
+     exactly what that person is not allowed to see. Tokens were already
+     cleared here; the references are the same kind of thing. */
+  try {
+    window.localStorage.removeItem("ib_admin_recents");
+  } catch {
+    /* Private mode, or storage disabled. Nothing to clear and nothing to say. */
+  }
 }
 
 /** role: null, or every module at level 0 — a successful sign-in that implies

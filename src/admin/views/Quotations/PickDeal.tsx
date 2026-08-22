@@ -17,6 +17,7 @@ import { inr } from "../../ui/format";
 import { errMessage } from "../../../api/apiService";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
+import { getSession } from "../../auth/session";
 import { call } from "./api";
 
 type DealHit = {
@@ -41,8 +42,12 @@ export default function PickDeal() {
 
   /* Read ONCE: the set cannot change while this page is open, so it does not
      belong in the search effect.
-     ponytail: one page (200 is the server's max). Overflow puts a quoted deal
-     back in the list, where the create refusal still catches it. */
+     ponytail: one page (200 is the server's max), AND the list is scoped — a
+     sales session sees quotations on its own deals only, so a deal quoted by
+     its other owner arrives here looking unquoted. Both failures point the
+     same, safe way: a quoted deal stays in the list and CreateDraft refuses
+     the click. The count is therefore a floor, which is why the column says
+     whose. Ask the API for a per-deal count if it ever has to be exact. */
   useEffect(() => {
     AdminOpsService.quotations({ pageSize: 200 }).then((r) => {
       if (r.response === false) return;
@@ -77,6 +82,8 @@ export default function PickDeal() {
   /* Applied at render, not in the fetch: the two requests race, and the deals
      usually land first. */
   const list = hits && hits.filter((d) => !(chains[d.ref] && chains[d.ref].live));
+  const session = getSession();
+  const head = !!(session && session.isFullAccess);
 
   const pick = (ref: string) => {
     setErr(null); setBusy(ref);
@@ -116,7 +123,8 @@ export default function PickDeal() {
 
       <Table
         cols={[{ label: "Customer" }, { label: "Deal" }, { label: "Stage" },
-          { label: "Deal value", cls: "n" }, { label: "Quotations", cls: "c" }, { label: "", cls: "c" }]}
+          { label: "Deal value", cls: "n" },
+          { label: head ? "Quotations" : "Quotations · yours", cls: "c" }, { label: "", cls: "c" }]}
         empty={list === null
           ? { icon: "deal", title: "Searching…", body: "" }
           : { icon: "deal", title: "No open deals match",

@@ -30,7 +30,8 @@ export default function QuotationBuilder({ id, params }: {
   if (notFound || !quotation) return (
     <div className="page wide">
       <EmptyState icon="quote" title="Quotation not found"
-        body={"Quotation " + id + " is not in the API's set."}
+        body={"Quotation " + id + " could not be opened. It may have been deleted, or it "
+          + "belongs to a deal outside your access."}
         action={<button className="btn" onClick={() => go("#/quotations")}>Back to quotations</button>} />
     </div>
   );
