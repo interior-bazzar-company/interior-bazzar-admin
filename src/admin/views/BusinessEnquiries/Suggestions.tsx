@@ -157,6 +157,16 @@ export function SuggestionsPanel({ e, run, onAssign }: {
           <Icon name={showExcluded ? "chev" : "chevr"} size="sm" />
         </button>
         {showExcluded ? <ExclusionList run={run} inline /> : null}
+
+        {/* HERE TOO, not only when the run found nothing. A run that ranked
+            five businesses has not established that one of them should get the
+            work — the commercial reason for holding an enquiry back from the
+            top match, or for sending it somewhere the rules never considered,
+            is not a fact the engine has. Offering the directory only on an
+            empty run made a found match the one case a person could not
+            overrule, which is backwards. Same component, same dialog, same
+            revalidation, same required reason. */}
+        <ManualPick e={e} onAssign={onAssign} />
       </div>
 
       <div className="be-sp-f">

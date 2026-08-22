@@ -1255,22 +1255,32 @@ export function logContact(id: string, entry: {
   return write(id, BusinessEnquiriesService.contact<Enquiry>(id, body), whole);
 }
 
-/** Tick or untick one qualification check.
+/** Tick or untick one qualification check. ALL FOUR ARE TICKABLE.
  *
- *  THREE OF THE FOUR HAVE NOTHING TO SET, and that is not a gap. `reachable` is
- *  a read of the contact log, `requirement` of the stored requirement and
- *  `urgency` of the customer's own answer — each ticks itself the moment the
- *  work behind it is done, and ticking one by hand would be the exact claim the
- *  checklist exists to prevent (a reachable number nobody has reached). Only
- *  `genuine` is a DECLARATION — nothing in a record proves it is not a test
- *  submission — so only that one has a column, and it is a field on the record
- *  patch rather than a check endpoint of its own. */
+ *  They are not stored the same way, and that is the whole shape of this
+ *  function. `genuine` is a DECLARATION with a column of its own — nothing in a
+ *  record proves a submission is not a test — so it writes a genuineness STATE
+ *  whose word other blocks render. The other three still DERIVE server-side
+ *  (`reachable` from the contact log, `requirement` from the stored
+ *  requirement, `urgency` from the customer's own answer), so what a tick
+ *  stores for them is an OVERRIDE laid over that read, not the answer itself.
+ *  An untouched check therefore stays in step with the record, and a hand-set
+ *  one can be handed back to it.
+ *
+ *  A TICK HERE CAN OUTRUN THE EVIDENCE — "contact reachable" on a number nobody
+ *  has answered is the claim the checklist was built to prevent — and the
+ *  server's answer to that is an event naming the check, the direction and who
+ *  did it. Nothing is silently discarded any more: the buttons all look
+ *  identical, so a click that did nothing read as a broken panel. */
 export function setCheck(id: string, key: keyof Checklist, value: boolean): Promise<void> {
-  if (key !== "genuine") return Promise.resolve();
-  const state = value
-    ? (VOCAB.genuinenessStates || []).filter((g) => g.passed)[0]?.key || "passed"
-    : (VOCAB.genuinenessStates || [])[0]?.key || "unconfirmed";
-  return write<EnquiryPatchResult>(id, BusinessEnquiriesService.update(id, { genuineness: state }),
+  const patch: EnquiryPatchInput = key === "genuine"
+    ? {
+      genuineness: value
+        ? (VOCAB.genuinenessStates || []).filter((g) => g.passed)[0]?.key || "passed"
+        : (VOCAB.genuinenessStates || [])[0]?.key || "unconfirmed",
+    }
+    : { checks: { [key]: value } };
+  return write<EnquiryPatchResult>(id, BusinessEnquiriesService.update(id, patch),
     (e, got) => ({
       ...e,
       qualification: got.qualification as Enquiry["qualification"],

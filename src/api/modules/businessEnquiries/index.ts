@@ -182,14 +182,19 @@ export interface CreateEnquiryResponse<T> {
  *
  *  A key ABSENT is untouched and a key present and empty CLEARS the column, so
  *  the two blocks are partials rather than whole objects. `genuineness` is the
- *  one qualification check a person DECLARES — the other three are read from
- *  stored evidence server-side (a logged call, a filled column) and there is
- *  nothing to set, which is why there is no endpoint that ticks them. */
+ *  qualification check with a column of its own — a declared STATE whose word
+ *  other blocks render — which is why it is not folded into `checks`.
+ *
+ *  `checks` ticks the rest by hand. Each one still DERIVES from stored evidence
+ *  (a logged call, a filled column) while nobody has touched it; a key sent here
+ *  overrules that read, and `null` drops the override and hands the check back
+ *  to the record. Every change lands on the timeline naming the check. */
 export interface EnquiryPatchInput {
   customer?: Partial<{ name: string; phone: string; email: string | null }>;
   requirement?: Partial<Record<string, string | null>>;
   urgency?: string | null;
   genuineness?: string;
+  checks?: Record<string, boolean | null>;
 }
 
 /** One attempt to reach the customer. `response` is the customer's own words
