@@ -48,19 +48,17 @@ export const HIDDEN_MODULES = new Set(["design", "payments"]);
  *  does not send yet, because they are being built frontend-first on the
  *  proto-v-2.2.0.0 branch (see src/proto/v-2.2.0.0/CHANGELOG.md).
  *
- *    business-enquiries  Module 4 — funnel and portal enquiries routed to a
- *                        subscribed business. Reads only static JSON from
- *                        src/content/business-enquiries/ and writes only to
- *                        memory in this tab; there is no endpoint behind it.
+ *  EMPTY, and that is the finished state, not a stub. `business-enquiries` was
+ *  the last entry and came out when the API landed: backend migration 0024
+ *  seeds its Module row and BusinessEnquiriesViews moved off the legacy
+ *  full-access-only gate onto @requires. The hole this set used to open —
+ *  `can()` answering true unconditionally — is closed with it, which is the
+ *  whole reason a normal admin can now be given enquiries and nothing else.
  *
- *  `can()` returns true for these, which is a REAL hole and is worth being
- *  plain about: it is safe today only because a proto module has no server data
- *  to leak and no server write to authorise. The moment the API lands, a Module
- *  row is created for the key, the key comes out of this set, and the module is
- *  governed by the same matrix as everything else. Removing the row from here
- *  is part of the endpoint work-list in BACKEND-INTEGRATION.md, not an
- *  afterthought. */
-export const PROTO_MODULES = new Set(["business-enquiries"]);
+ *  Adding a key back re-opens that hole for the key. It is only ever safe while
+ *  the module has no server data to leak and no server write to authorise, and
+ *  it has to come out on the commit that gives it either. */
+export const PROTO_MODULES = new Set<string>([]);
 
 export function getSession(): MePermissions | null {
   return session;

@@ -51,7 +51,11 @@ const ICON_OF: Record<string, string> = {
    `group` matches an existing server group label so the module lands in the
    sidebar where it belongs rather than in a section of one. */
 const PROTO_ROWS: { key: string; label: string; group: string }[] = [
-  { key: "business-enquiries", label: "Business Enquiries", group: "Client Ops" },
+  /* business-enquiries removed: the server sends its own Module row now
+     (backend migration 0024), so the stand-in would never have been reached —
+     PROTO_MODULES no longer holds the key, which is the second half of the
+     condition below. Kept as an empty list because the mechanism is still the
+     right one for the next frontend-first module. */
 ];
 /** Sidebar queue-count keys, from IBData.derive.badges(). A module with no
  * entry here shows no badge, which is correct for anything the prototype
