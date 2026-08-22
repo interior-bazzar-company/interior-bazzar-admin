@@ -742,9 +742,22 @@ function ReassignModal({ dealRef, onClose, done }: {
   };
 
   const opts = (people || []).map((m) => ({ v: String(m.id), l: m.name }));
+  /* WHO HOLDS IT NOW, ON THE ROWS THAT DECIDE IT. Both selects default to a
+     keep-option, and "— leave as it is —" does not say what it is leaving: the
+     person adding a co-owner could not see whose deal they were adding
+     themselves to without closing the dialog. Worse when the roster fails to
+     load, which is the state a sales head is permanently in — every option is
+     gone and the two selects say nothing at all.
+
+     Read off the deal, never off `people`: the deal is already loaded by the
+     time this renders, so the current owner and co-owner are legible even when
+     the roster call was refused outright. */
+  const ownerNow = dl.owner_id || "unassigned";
+  const coOwnerNow = dl.co_owner_id || "none";
   return (
     <>
-      <div className="md-h"><h3>Reassign</h3><p>{dealRef} · currently {dl.owner_id || "unassigned"}</p><MdX onClose={onClose} /></div>
+      <div className="md-h"><h3>Reassign</h3>
+        <p>{dealRef} · owner {ownerNow} · co-owner {coOwnerNow}</p><MdX onClose={onClose} /></div>
       <div className="md-b">
         <ErrSlot err={err} />
         {people === null ? <div className="faint">Loading the team…</div> : null}
@@ -755,10 +768,11 @@ function ReassignModal({ dealRef, onClose, done }: {
               until an Admin grants it. <span className="mono">{teamErr.detail}</span>
             </>} />
           : null}
-        <Field id="raOwner" label="Owner" type="select" options={[{ v: "", l: "— leave as it is —" }].concat(opts)}
+        <Field id="raOwner" label="Owner" type="select"
+          options={[{ v: "", l: "— leave as it is (" + ownerNow + ") —" }].concat(opts)}
           help="Everyone with an admin account. A deal always has exactly one owner." />
         <Field id="raCo" label="Co-owner" type="select"
-          options={([{ v: "__keep", l: "— leave as it is —" }, { v: "", l: "None" }] as { v: string; l: string }[]).concat(opts)}
+          options={([{ v: "__keep", l: "— leave as it is (" + coOwnerNow + ") —" }, { v: "", l: "None" }] as { v: string; l: string }[]).concat(opts)}
           help="A second pair of hands. Optional, and it never removes the owner." />
         <Field id="raReason" label="Reason" req type="textarea"
           ph="Owner on extended leave; customer needs a response this week."
