@@ -10,6 +10,16 @@ Base path throughout: `/api/v1`.
 
 ## Module 4 · Business Enquiries
 
+> **The five-stage lifecycle is LIVE on the API** (2026-08-21). `ready`, `delivered` and
+> `acknowledged` are withdrawn; `processing` and `no_match` are served. `generated` is
+> labelled "New". The `sla` object, `owner`, `followUpAt` and `outcome.acknowledgedAt`
+> have left the payload; `owner=` and `flag=` have left the query (`flag=no_eligible`
+> is `status=no_match` now). `new-enquiry` has left the tag vocabulary, and
+> `attentionCells[]` was added for the strip's tooltips. A pre-chain lead with a
+> contact attempt and no assignee derives as `processing`; both old delivery states
+> derive as `assigned`. Migration `0015_lifecycle_five_stages` re-seeds the stored
+> vocabulary document.
+
 Route `#/business-enquiries`. Consumer for all five files is
 `src/admin/views/BusinessEnquiries/store.ts` — no view imports JSON directly, so
 this is a one-file swap.

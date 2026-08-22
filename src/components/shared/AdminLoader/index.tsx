@@ -28,7 +28,21 @@
    ========================================================================== */
 import { useEffect, useRef, useState } from "react";
 import styles from "./AdminLoader.module.css";
-import animationUrl from "../../../assets/images/loading-spinner.json?url";
+
+/* RESOLVED AS A GLOB, not a static import, because the animation is OPTIONAL.
+   A plain `import … from "…/loading-spinner.json?url"` is resolved at build
+   time and fails the whole module when the file is not there — which is what it
+   did: the asset is not in the repo, and one missing decoration took down the
+   dev server for the entire panel. `import.meta.glob` matches nothing and
+   yields `{}` instead, so the loader falls back to the CSS spinner exactly as
+   it already does when the fetch or the chunk fails.
+
+   Drop `loading-spinner.json` into `src/assets/images/` and it starts playing
+   again with no code change. */
+const animationUrl = Object.values(
+  import.meta.glob("../../../assets/images/loading-spinner.json",
+    { query: "?url", import: "default", eager: true }) as Record<string, string>
+)[0];
 
 const AdminLoader = () => {
   const host = useRef<HTMLDivElement>(null);
@@ -36,6 +50,9 @@ const AdminLoader = () => {
 
   useEffect(() => {
     if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    /* No asset, no animation — and no 164 KB renderer fetched to play nothing.
+       The spinner below is already on screen and still says the true thing. */
+    if (!animationUrl) return;
 
     let anim: { destroy: () => void } | null = null;
     let dead = false;

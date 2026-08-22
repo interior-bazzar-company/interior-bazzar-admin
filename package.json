@@ -17,7 +17,8 @@
     "check:clock": "esbuild src/admin/views/BusinessEnquiries/store.ts --bundle --platform=node --format=cjs --define:import.meta.env={} --external:react --log-level=error --outfile=node_modules/.tmp/enquiry-store.cjs && node scripts/check-enquiry-clock.cjs",
     "check:share": "node scripts/check-enquiry-share.cjs",
     "check:wiring": "esbuild src/admin/views/BusinessEnquiries/store.ts --bundle --platform=node --format=cjs --define:import.meta.env={} --external:react --log-level=error --outfile=node_modules/.tmp/enquiry-store.cjs && node scripts/check-enquiry-wiring.cjs",
-    "check": "npm run check:enquiries && npm run check:export && npm run check:clock && npm run check:share && npm run check:wiring",
+    "check:match": "esbuild src/admin/views/BusinessEnquiries/store.ts --bundle --platform=node --format=cjs --define:import.meta.env={} --external:react --log-level=error --outfile=node_modules/.tmp/enquiry-store.cjs && node scripts/check-enquiry-match.cjs",
+    "check": "npm run check:enquiries && npm run check:export && npm run check:clock && npm run check:share && npm run check:wiring && npm run check:match",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -16,11 +16,12 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { Icon, Notice } from "../../ui";
-import { InfoNote } from "./bits";
+import { BusinessSearch, InfoNote } from "./bits";
 import {
   RULES, VOCAB, assign, businessById, invalidate, needsOverrideReason,
   reassign, recordOutcome, statusOf,
 } from "./store";
+
 import type { Candidate, Enquiry, MatchRun } from "./store";
 
 /* ------------------------------------------------------------ the frame --- */
@@ -55,14 +56,23 @@ function Check({ ok, children }: { ok: boolean; children: ReactNode }) {
    / score / factors / rule_version, increment capacity, append ASSIGNED and
    enqueue delivery. */
 export function AssignModal({ e, run, c, onClose, onDone }: {
-  e: Enquiry; run: MatchRun; c: Candidate; onClose: () => void; onDone: (msg: string) => void;
+  e: Enquiry; run: MatchRun | null; c: Candidate; onClose: () => void; onDone: (msg: string) => void;
 }) {
   const b = businessById(c.businessId);
   const [reason, setReason] = useState("");
   const [touched, setTouched] = useState(false);
 
-  const needsReason = needsOverrideReason(run, c.businessId);
-  const top = run.eligible[0];
+  /* NOTHING RANKED THIS ONE. Either matching has not run, or it ran and this
+     business was not in the pool — an operator picked it by hand out of the
+     directory. The five revalidation checks below are unchanged and matter
+     more here, not less: a manual pick skips the ranking, never the gates. */
+  const manual = !run || !run.eligible.some((x) => x.businessId === c.businessId);
+  /* And a reason is MANDATORY on one. The reason field exists to record what
+     the operator knows that the weight table does not, and a pick the weight
+     table never saw at all is the case that most needs the answer written
+     down. */
+  const needsReason = manual || needsOverrideReason(run, c.businessId);
+  const top = run ? run.eligible[0] : null;
   const gap = top ? top.score - c.score : 0;
   const blocked = needsReason && !reason.trim();
 
@@ -74,7 +84,9 @@ export function AssignModal({ e, run, c, onClose, onDone }: {
   return (
     <Frame
       heading={"Assign to " + c.name}
-      sub={<>Rank {c.rank} · score {c.score} · rule {run.ruleVersion}</>}
+      sub={manual
+        ? <>Picked by hand · <b>not ranked</b> — no matching run put this business in the pool</>
+        : <>Rank {c.rank} · score {c.score} · rule {run!.ruleVersion}</>}
       onClose={onClose}
       footer={<>
         <button className="btn" data-close="1" onClick={onClose}>Cancel</button>
@@ -95,9 +107,12 @@ export function AssignModal({ e, run, c, onClose, onDone }: {
       </Check>
       <Check ok={noActive}>No active assignment exists on this enquiry</Check>
       <Check ok={!needsReason}>
-        {needsReason
-          ? <>Rank {c.rank}, <b>{gap} points below</b> the top recommendation — a reason is required</>
-          : <>Top-ranked selection — <b>no override reason needed</b></>}
+        {manual
+          ? <>Nothing ranked this business — <b>a reason is required</b>, and it is the only record
+              of why this one</>
+          : needsReason
+            ? <>Rank {c.rank}, <b>{gap} points below</b> the top recommendation — a reason is required</>
+            : <>Top-ranked selection — <b>no override reason needed</b></>}
       </Check>
 
       {needsReason ? (
@@ -124,10 +139,15 @@ export function AssignModal({ e, run, c, onClose, onDone }: {
         </>
       ) : null}
 
-      <InfoNote ico="shield" short={<>
-        Score <b>{c.score}</b>, rank <b>{c.rank}</b> and rule <span className="mono">{run.ruleVersion}</span>{" "}
-        are frozen onto the assignment.
-      </>}>
+      <InfoNote ico="shield" short={manual
+        ? <>No score and no rank are frozen onto this assignment.</>
+        : <>
+            Score <b>{c.score}</b>, rank <b>{c.rank}</b> and rule{" "}
+            <span className="mono">{run!.ruleVersion}</span> are frozen onto the assignment.
+          </>}>
+        {manual ? <>Nothing ranked it, so the assignment stores rank and score as <b>absent</b>{" "}
+          rather than as zero — a zero would read as a business that scored nothing rather than one
+          no run ever looked at. Your reason is what stands in their place.<br /><br /></> : null}
         This routes to exactly <b>one</b> business — never a broadcast, never a shortlist, never a
         race. The score, the rank and the full factor breakdown are <b>copied</b> rather than
         referenced, so a later profile edit or weight change cannot rewrite why this went where it
@@ -150,10 +170,19 @@ export function ReassignModal({ e, run, onClose, onDone }: {
   const [reason, setReason] = useState(VOCAB.reassignReasons[0]);
   const [note, setNote] = useState("");
   const [touched, setTouched] = useState(false);
+  /* Open by itself when the run left nothing to choose from — which is the
+     common case and used to be a dead end. With candidates present it is a way
+     out for the operator who knows the business the run could not see. */
+  const [searching, setSearching] = useState(!options.length);
 
-  const chosen = options.filter((c) => c.businessId === pick)[0] || null;
+  /* THE NAME COMES FROM THE DIRECTORY, not from the candidate list, because the
+     pick may not be in the candidate list at all. `businessById` covers every
+     business this panel loaded, which is the same set the search offers and a
+     superset of anything a run produced. */
+  const chosenName = options.filter((c) => c.businessId === pick)[0]?.name
+    || businessById(pick)?.name || "";
   const full = (reason + (note.trim() ? " — " + note.trim() : "")).trim();
-  const blocked = !chosen || !note.trim();
+  const blocked = !pick || !note.trim();
 
   return (
     <Frame
@@ -166,13 +195,17 @@ export function ReassignModal({ e, run, onClose, onDone }: {
           onClick={() => {
             if (blocked) { setTouched(true); return; }
             reassign(e.enquiryId, pick, full);
-            onDone("Reassigned to " + chosen!.name + " — the previous assignment is closed, not deleted.");
+            onDone("Reassigned to " + chosenName + " — the previous assignment is closed, not deleted.");
           }}>Reassign</button>
       </>}
     >
       <Check ok>The current assignment is <b>closed, not deleted</b>.</Check>
       <Check ok><b>{current?.businessName}'s capacity is released</b> and the new business's is taken.</Check>
-      <Check ok><b>Matching runs again, now.</b></Check>
+      <Check ok={!!run}>
+        {run
+          ? <>The last run's candidate list is what this offers.</>
+          : <>No matching run on this enquiry — there is no candidate list, only the search.</>}
+      </Check>
       <Check ok={false}>The customer is not notified, and the first delivery is not undone.</Check>
       <InfoNote ico="lock" short={<>Nothing is overwritten.</>}>
         The closed assignment keeps its rank, score, factors and rule version, and gains{" "}
@@ -187,15 +220,55 @@ export function ReassignModal({ e, run, onClose, onDone }: {
           <select id="be-rb" className="inp" value={pick} onChange={(ev) => setPick(ev.target.value)}>
             {options.map((c) => (
               <option key={c.businessId} value={c.businessId}>
-                {c.name} — rank {c.rank} · score {c.score} · {c.band}
+                {c.name}{run?.ranked
+                  ? " — rank " + c.rank + " · score " + c.score + " · " + c.band
+                  : " — eligible, not ranked"}
               </option>
             ))}
           </select>
-          <div className="help">Eligible candidates only. A business that fails a hard rule is absent from this list at any score.</div>
+          <div className="help">
+            Everything the last run found eligible. A business that fails a hard rule is absent from
+            this list — search below if you need one anyway.
+          </div>
         </div>
       ) : (
-        <Notice tone="bad" ico="alert" text={<><b>No other eligible business.</b> Reassignment has nowhere to go — this is a supply gap, and the exclusion diagnostics are the worklist for it.</>} />
+        /* NOT A DEAD END ANY MORE. This used to be a red notice and nothing
+           else, which was accurate about the run and useless to the person
+           holding an enquiry a business has gone quiet on: the enquiry still
+           has to move, and refusing to let it just means it moves in a
+           notebook. The supply gap is still stated — it is real, and the
+           exclusion diagnostics are still the worklist for it — but the search
+           below is the way through it today. */
+        <Notice tone="warn" ico="alert" text={<><b>No other eligible business.</b> The last run
+          found nobody else — a supply gap, and the exclusion diagnostics are the worklist for it.
+          You can still move this enquiry by hand.</>} />
       )}
+
+      {/* THE MANUAL ROUTE, and it is the same search the suggestions panel
+          offers, deliberately: reassigning to a business the run could not see
+          is the same act as assigning to one, with an assignment closed first.
+          Every hard gate is still rechecked server-side at the moment you
+          confirm — what this skips is the ranking, not a rule. */}
+      <div className="fg" style={{ marginTop: "12px" }}>
+        {options.length ? (
+          <button className="be-sp-link" aria-expanded={searching}
+            onClick={() => setSearching(!searching)}>
+            …or pick any business by hand
+            <Icon name={searching ? "chev" : "chevr"} size="sm" />
+          </button>
+        ) : null}
+        {searching ? (
+          <BusinessSearch action="Choose" picked={pick}
+            excludeId={current?.businessId}
+            onPick={(b) => setPick(b.businessId)} />
+        ) : null}
+      </div>
+
+      {pick && !options.some((c) => c.businessId === pick) ? (
+        <Notice tone="warn" ico="alert" text={<>Reassigning to <b>{chosenName}</b>, which the last
+          run did not list. The assignment will store <b>no rank and no score</b> — your reason
+          below is the only record of why this one.</>} />
+      ) : null}
 
       <div className="fg">
         <label htmlFor="be-rr">Reason <span className="req">*</span></label>

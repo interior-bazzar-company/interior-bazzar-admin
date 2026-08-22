@@ -1,53 +1,52 @@
 /* =============================================================================
    Business Enquiries — the data layer.
    -----------------------------------------------------------------------------
-   THE ENQUIRIES ARE REAL. `GET v1/admin/business-enquiries/` serves the queue —
-   a projection of LeadQuery, the table the site's own forms have been writing to
-   all along — alongside the vocabulary, the rule set and the business directory.
-   The one remaining stand-in is `suggestions.json`, which holds the candidate
-   runs the matching endpoint will produce; it is local-only and ships nowhere.
-   The rest of the map from file → endpoint is in
-   `src/proto/v-2.2.0.0/BACKEND-INTEGRATION.md`, and it is the backend work-list.
+   THE ENQUIRIES ARE REAL, AND SO IS EVERY WRITE. `GET
+   v1/admin/business-enquiries/` serves the queue — a projection of LeadQuery,
+   the table the site's own forms have been writing to all along — alongside the
+   vocabulary, the rule set and the business directory. `suggestions.json` was
+   the last stand-in and is gone: matching is computed and frozen server-side
+   now, so there was nothing left for a bundled copy of a run to stand in for.
 
    WHAT THE PROJECTION CANNOT ANSWER ARRIVES EMPTY, never guessed: contact log,
    remarks beyond the one stored on the lead, the qualification freeze, the event
-   timeline, the owner, and the rank/score on an assignment (those carry rule
-   version `legacy`, which is what says the zeros are a missing record and not a
-   bad score). A blank contact log means nobody logged a call.
+   timeline, the owner, and the rank/score on an assignment (a pre-module one
+   carries rule version `legacy`, which is what says the zeros are a missing
+   record and not a bad score). A blank contact log means nobody logged a call.
 
-   ONE WRITE IS REAL: createEnquiry() posts, and the server answers with its own
-   projection of the row it wrote. Every other write is still SIMULATED IN
-   MEMORY, for this browser tab, for this session — and they simulate on top of
-   live records, so a reload discards them and re-fetches rather than restoring
-   a fixture. That
-   is a deliberate choice and not a hidden one — every screen that can write
-   says so on the screen, and a reload puts the seed back. The alternative was
-   a read-only prototype, which cannot show the thing this module is actually
-   for: the qualify → match → assign → outcome chain, and what each step
-   freezes on the way past.
+   NOTHING HERE SIMULATES ANY MORE. Every write posts, and every one answers
+   with the server's own record — so an event on screen has the database's id,
+   timestamp and actor, and a status is the one the server decided rather than
+   this file's idea of what it should now be. The two things that used to make
+   that impossible are gone with it: `append()`, which minted event ids in the
+   tab, and the `runs` map, which held a matching run nothing had performed.
 
-   What the simulation DOES honour, because these are the rules the API has to
-   enforce and they are cheap to model here:
-     · one active assignment per enquiry, via `activeAssignmentId`
+   That matters most where the module is least forgiving. These are enforced on
+   the server, not modelled here, and this file could not enforce them if it
+   wanted to:
+     · one active assignment per enquiry
      · reassignment CLOSES the current assignment (`supersededAt`) — never
        deletes it
-     · capacity moves with the assignment, and is released on outcome
-     · the score, rank, factor breakdown and rule version are COPIED onto the
-       assignment, not referenced
+     · capacity is COUNTED from the leads a business holds, so it moves on its
+       own and no client adjusts it
+     · rank, score, factor breakdown and rule version are COPIED onto the
+       assignment, not referenced — and are ABSENT rather than zero when nothing
+       ranked it
      · every write appends an event; nothing edits or removes one
-   What it does NOT honour, and cannot: row locks, concurrency, the 409/422
-   refusals. Those are server facts. The screens name them where they would
-   fire so the API contract stays visible.
+     · a lead may be matched once per `matchCooldownHours`, refused off the
+       stored run rather than off a disabled button
+   What is left in this file is the shape of the payloads, the filters the URL
+   carries, and the derives the screens read. Not the rules.
    ============================================================================= */
 import { useEffect, useState } from "react";
-import suggestionsJson from "../../../content/business-enquiries/suggestions.json";
 import BusinessEnquiriesService from "../../../api/modules/businessEnquiries";
 import type {
-  BusinessesResponse, CreateEnquiryResponse, EnquiriesResponse, EnquiryQuery,
-  MatchingRulesResponse, VocabulariesResponse,
+  BusinessesResponse, ContactInput, CreateEnquiryResponse, EnquiriesResponse, EnquiryQuery,
+  EnquiryPatchInput, EnquiryPatchResult, MatchingRulesResponse, RemarkResult, StatusMoveInput,
+  VocabulariesResponse,
 } from "../../../api/modules/businessEnquiries";
 import { call } from "../../../api/modules/adminOps";
-import { currentActor } from "../../auth/session";
+import type { ApiResponseType } from "../../../types/reqResType";
 
 /* ============================================================ THE SHAPES === */
 
@@ -181,6 +180,12 @@ export type Enquiry = {
   exception?: { code: string; note: string };
   invalidation?: { reason: string; detectedBy: string; detectedAt: string; note: string };
   events: EnquiryEvent[];
+  /** THE NEWEST MATCHING RUN, frozen when it ran — or null when this enquiry
+   *  has never been matched, which is a state the screen shows rather than a
+   *  gap to fill with an empty run. It rides on the record because a run is not
+   *  reproducible from its inputs a day later: the directory it was computed
+   *  against moves. */
+  matchRun: MatchRun | null;
 };
 
 export type Candidate = {
@@ -194,7 +199,20 @@ export type Candidate = {
 export type Exclusion = { businessId: string; name: string; stage: string; reason: string };
 
 export type MatchRun = {
-  enquiryId: string; ruleVersion: string; calculatedAt: string; subscribedCount: number;
+  enquiryId: string; runId: string;
+  ruleVersion: string; calculatedAt: string; subscribedCount: number;
+  /** WHETHER A SCORE MEANS ANYTHING. False today: the server answers stage 1
+   *  only — who CAN take this enquiry and why each of the others cannot — and
+   *  deliberately does not rank, because the seven factor weights in the rule
+   *  set have never been validated against an outcome and a number between 0
+   *  and 100 beside a business's name would read as though they had. Stored on
+   *  the run rather than computed, so a run performed today still reads as
+   *  unranked after ranking lands. */
+  ranked: boolean;
+  /** Gates that were NOT applied — the enquiry had nothing to test them
+   *  against, or the rule set declares one nothing implements. Carried so a run
+   *  can never read as "all gates passed" off gates nobody ran. */
+  notApplied: { key: string; label: string; reason: string }[];
   eligible: Candidate[]; excluded: Exclusion[];
 };
 
@@ -264,6 +282,8 @@ export let TIERS: TierRow[] = [];
 export let SOURCES: SourceRow[] = [];
 export let STATES: string[] = [];
 export let RECEIVED_RANGES: { key: string; label: string }[] = [];
+/** The Sort control, from the vocabulary. First row is the default order. */
+export let SORT_OPTIONS: { key: string; label: string }[] = [];
 
 /* CATEGORY AND CITY ARE TYPED, SO THE VOCABULARY IS A SUGGESTION LIST AND NOT A
    GATE. An operator on a call hears whatever the customer says; a dropdown that
@@ -316,37 +336,32 @@ export const isTerminal = (k: string) => !!statusOf(k).terminal;
    Not Redux and not context: every write here is a whole-record replacement,
    and there is one writer. */
 
-type Store = { enquiries: Enquiry[]; runs: Record<string, MatchRun>; businesses: Business[] };
+/* NO `runs` MAP ANY MORE. A matching run is a server record now, frozen into
+   LeadMatchRun and carried on the enquiry it belongs to — so the one place it
+   can be read from is the record, and there is no second copy in this tab to
+   go stale or to survive a reload that the server would contradict. */
+type Store = { enquiries: Enquiry[]; businesses: Business[] };
 
 /* Both arrive from the API and are planted by the boot below, so they survive
    resetStore() — they are reads of the server, not something this panel writes.
-   resetStore() therefore means "discard my simulated writes", which is exactly
-   what it says on the banner. Runs are the one remaining stand-in. */
+   THE WRITES ARE READS OF THE SERVER TOO NOW: every one of them replaces the
+   record with what came back, so resetStore() re-reads rather than discards,
+   and the only thing it throws away is a simulated matching run — the one
+   stand-in left, because there is no matching endpoint yet. */
 let fetchedBusinesses: Business[] = [];
 let fetchedEnquiries: Enquiry[] = [];
 
-/* THE SUGGESTION SEED IS LOCAL ONLY. `import.meta.env.DEV` is true for `vite dev`
-   and false for every build, including `build:dev` — so suggestions.json is
-   tree-shaken out of the bundle that ships to dev, stage and prod. It is keyed by
-   the ids of the old fixture enquiries, which no longer exist, so it produces
-   nothing against live records either: the matching screens stay empty until
-   `POST /business-enquiries/{id}/match` lands, which is the honest state. */
-const LOCAL_SEED = import.meta.env.DEV;
-
-/* Candidate snapshots for enquiries that have NOT been matched yet, so running
-   matching on one produces the ranked list the real endpoint would. Kept out of
-   `store.runs` because that holds runs that already happened. */
-const pendingRuns: Record<string, MatchRun> = LOCAL_SEED
-  ? ((suggestionsJson as { pending?: Record<string, MatchRun> }).pending || {})
-  : {};
+/* `suggestions.json` IS GONE, and with it the last stand-in in this module.
+   It seeded candidate lists for enquiry ids that stopped existing, so on live
+   data it produced nothing and "Run matching" silently meant "mark no match".
+   Matching is `POST /business-enquiries/{id}/match/` now — stage 1, computed
+   and frozen server-side against the same business directory this panel
+   reads. */
 
 const seed = (): Store => ({
-  /* A COPY, so a simulated write cannot edit the fetched rows and survive a
+  /* A COPY, so nothing written here can edit the fetched rows and survive a
      resetStore() that is supposed to throw it away. */
   enquiries: JSON.parse(JSON.stringify(fetchedEnquiries)) as Enquiry[],
-  runs: LOCAL_SEED
-    ? (JSON.parse(JSON.stringify(suggestionsJson.runs)) as Record<string, MatchRun>)
-    : {},
   businesses: fetchedBusinesses,
 });
 
@@ -396,7 +411,16 @@ export function applyVocabulary(vocab: VocabulariesResponse): void {
   SOURCES = (vocab.sources || []) as SourceRow[];
   STATES = vocab.states || [];
   RECEIVED_RANGES = vocab.receivedRanges || [];
+  SORT_OPTIONS = vocab.sortOptions || [];
   MANUAL_VIA = vocab.manualVia || [];
+}
+
+/** The rules half of the same idea. Its own function for the same reason
+ *  `applyVocabulary` is: the offline checks need to state what "the rules
+ *  arrived" means without standing up a server, and a check that plants the
+ *  payload through the real setter breaks when the payload is renamed. */
+export function applyRules(rules: MatchingRulesResponse): void {
+  RULES = rules;
 }
 
 /** Re-runs the three reads. The route calls this on mount; the failure screen
@@ -419,7 +443,7 @@ export async function bootBusinessEnquiries(force = false): Promise<void> {
     ]);
 
     applyVocabulary(vocab);
-    RULES = rules;
+    applyRules(rules);
 
     SUBSCRIBED_COUNT = businesses.subscribedCount;
     fetchedBusinesses = businesses.businesses || [];
@@ -499,7 +523,7 @@ export function queryFromParams(p: Params, pageNo = 1): EnquiryQuery {
     pageNo, pageSize: PAGE_SIZE,
     status: p.status, category: p.category, city: p.city, state: p.state,
     urgency: p.urgency, tier: p.tier, tag: p.tag, source: p.source,
-    business: p.business, owner: p.owner, flag: p.flag,
+    business: p.business,
     received: p.received, dateFrom: p.from, dateTo: p.to,
     q: p.q, sort: p.sort,
   };
@@ -612,10 +636,14 @@ export function useEnquiry(id: string | null): Enquiry | null {
   return store.enquiries.filter((e) => e.enquiryId === id)[0] || detailCache[id] || null;
 }
 
+/** The enquiry's own run. Read off the record rather than a map beside it: the
+ *  run is frozen server-side and arrives with the enquiry, so there is exactly
+ *  one copy and it cannot disagree with itself. */
 export function useMatchRun(id: string | null): MatchRun | null {
   useVersion();
   if (!id) return null;
-  return store.runs[id] || null;
+  const e = store.enquiries.filter((x) => x.enquiryId === id)[0] || detailCache[id];
+  return e?.matchRun || null;
 }
 
 /** The business DIRECTORY, whole. Read straight off the module rather than
@@ -627,6 +655,48 @@ export const businessDirectory = (): Business[] => store.businesses;
 
 export const businessById = (id: string) =>
   store.businesses.filter((b) => b.businessId === id)[0] || null;
+
+/** THE MANUAL PICK, for when matching has produced nothing to choose from.
+ *
+ *  A matching run finding nobody is a supply gap, not a dead end: the operator
+ *  often knows the one business that would take it — it just failed a hard gate
+ *  the rules apply bluntly (a service area typed as "Gurgaon" when the enquiry
+ *  says "Gurugram", a category the profile never listed). Making them wait for
+ *  a rule change to route an enquiry they already know the answer for is how
+ *  work leaves this module and continues in a notebook.
+ *
+ *  A REQUEST, AND ONLY ONCE SOMETHING IS TYPED. It used to filter the directory
+ *  this tab already held, which meant the picker opened onto a list of every
+ *  business — a list nobody asked for, presented as if it were a suggestion.
+ *  Now nothing is shown until there is a query, and the query goes to the
+ *  server: the filter runs before the capacity aggregates there, so a search
+ *  costs the matches rather than the whole table.
+ *
+ *  An empty query makes NO request and returns nothing — the caller shows
+ *  "type to search", which is the honest state and not an empty result. */
+export async function findBusinesses(q: string, limit = 12): Promise<Business[]> {
+  const needle = q.trim();
+  if (!needle) return [];
+  const got = await call<BusinessesResponse>(
+    BusinessEnquiriesService.searchBusinesses(needle, limit));
+  /* `subscribedCount` on this response counts the MATCHES. Deliberately not
+     planted over SUBSCRIBED_COUNT, which is the directory figure the "of N
+     subscribed" sentence reads — a search must not shrink it. */
+  return got.businesses || [];
+}
+
+/** A business in the shape the assign dialog reads, for a pick nothing ranked.
+ *
+ *  Rank and score are ZERO here and the dialog does not print them — it prints
+ *  "not ranked", because 0 would read as a business that scored nothing rather
+ *  than one no run ever looked at. The server stores them as NULL for the same
+ *  reason, and `capacity` is the real figure so the dialog's capacity check is
+ *  a real check. */
+export const manualCandidate = (b: Business): Candidate => ({
+  businessId: b.businessId, name: b.name, rank: 0, score: 0, band: "",
+  capacity: { active: b.capacity.active, configured: b.capacity.configured },
+  factors: {}, why: "", from: {},
+});
 
 /* ========================================================== THE DERIVES === */
 
@@ -714,6 +784,46 @@ export const place = (e: Enquiry): string =>
 
 /** Only rank-1 is free. Anything materially below it captures a reason —
  *  the threshold is the rule version's, not a constant in this file. */
+/** WHEN THIS ENQUIRY MAY BE MATCHED AGAIN, and why not yet.
+ *
+ *  Both inputs to a run are slow-moving — the qualification snapshot is FROZEN,
+ *  and a business joining, renewing or widening its service area is a thing
+ *  that happens over days. So a second run inside the window returns the same
+ *  answer for the same cost. It is worth guarding precisely because re-running
+ *  is the ONLY way out of No match yet: the operator has nothing else to press,
+ *  and a button that does nothing invites being pressed again.
+ *
+ *  READ OFF THE TIMELINE, not off a new column. Every run already leaves an
+ *  event, so the record of when one last happened exists and is append-only;
+ *  a `lastMatchedAt` column would be a second copy of it that a replayed
+ *  timeline could contradict. The window itself is `RULES.matchCooldownHours`,
+ *  a versioned server value — retuning it is a row edit.
+ *
+ *  ponytail: enforced HERE only, because matching itself still runs in this tab
+ *  — there is no endpoint to guard. When one lands it must re-check the same
+ *  window server-side off the same events; the number is already in the rules
+ *  payload it will be reading anyway. Until then a reload clears any run that
+ *  was not also a server write. */
+export function matchCooldown(e: Enquiry, now = new Date()): {
+  blocked: boolean; lastAt: string | null; readyAt: string | null;
+} {
+  const hours = RULES.matchCooldownHours ?? 0;
+  /* The run itself, not an event about one: LeadMatchRun is a row with its own
+     timestamp, and it is the same row the SERVER enforces this against. Reading
+     anything else here would let the button and the endpoint disagree about
+     when the window closes. */
+  const last = e.matchRun;
+  if (!hours || !last) {
+    return { blocked: false, lastAt: last?.calculatedAt || null, readyAt: null };
+  }
+  const readyAt = new Date(new Date(last.calculatedAt).getTime() + hours * 3600_000);
+  return {
+    blocked: readyAt.getTime() > now.getTime(),
+    lastAt: last.calculatedAt,
+    readyAt: readyAt.toISOString(),
+  };
+}
+
 export const needsOverrideReason = (run: MatchRun | null, businessId: string): boolean => {
   if (!run || !run.eligible.length) return false;
   const top = run.eligible[0];
@@ -929,42 +1039,92 @@ export function findEarlierFrom(phone: string, excludeId?: string): Enquiry[] {
 
 /* ============================================================ THE WRITES ===
    Each one is the transaction it stands in for, named with the same ID the
-   architecture note uses (BE-T01…BE-T06), so the endpoint that replaces it has
-   somewhere obvious to land. Every one appends an event; none edits or deletes
-   one, and none touches a frozen snapshot. */
+   architecture note uses (BE-T01…BE-T12).
 
-const nowIso = () => new Date().toISOString();
-let evSeq = 0;
-const actorName = () => currentActor().name || "Operations";
+   THEY ALL REACH THE SERVER NOW, and every one of them answers with the
+   server's own projection of the row it wrote rather than an acknowledgement.
+   That is the whole reason this file no longer simulates: half an enquiry is
+   DERIVED — the qualification checklist, the automatic tags, the status of a
+   lead that predates the enquiry chain, the assignment a legacy row implies —
+   and a local copy patched in the tab drifts from the database the moment one
+   of those derivations disagrees with it. So nothing here computes a status,
+   recomputes a tag or invents an id: the record is replaced whole with what
+   came back.
 
-function append(e: Enquiry, type: string, note: string, role = "Operations") {
-  evSeq += 1;
-  e.events = [{
-    eventId: "ev-live-" + evSeq, type,
-    actor: type === "DELIVERED" ? "System" : actorName(),
-    actorRole: type === "DELIVERED" ? "system" : role,
-    at: nowIso(), note,
-  }, ...e.events];
-}
+   `runMatching` is the one that still simulates, because there is no matching
+   endpoint yet. It says so where it stands.
 
-function withEnquiry(id: string, fn: (e: Enquiry) => void) {
-  const e = store.enquiries.filter((x) => x.enquiryId === id)[0];
-  if (!e) return;
-  fn(e);
+   ponytail: a rejected write refetches the record so the screen tells the
+   truth, and logs. Saying so ON SCREEN needs a catch in the four .tsx callers
+   that fire these without awaiting — deliberately not done here. */
+
+/** The record, as the server now holds it, into every place the panel reads
+ *  from. One function because there are four: the page the table renders, the
+ *  copy `store.enquiries` hands out, the fetched rows a resetStore() falls back
+ *  to, and the detail cache a deep link is served from. Missing one of them is
+ *  how a saved edit reappears un-saved on the way back from the list. */
+function replace(next: Enquiry) {
+  const swap = (list: Enquiry[]) =>
+    list.map((row) => (row.enquiryId === next.enquiryId ? next : row));
+  store.enquiries = swap(store.enquiries);
+  fetchedEnquiries = swap(fetchedEnquiries);
+  page = { ...page, rows: swap(page.rows) };
+  if (detailCache[next.enquiryId]) detailCache[next.enquiryId] = next;
   bump();
 }
 
-function moveCapacity(businessId: string, delta: number) {
-  const b = store.businesses.filter((x) => x.businessId === businessId)[0];
-  if (!b) return;
-  b.capacity.active = Math.max(0, b.capacity.active + delta);
-  const run = store.runs;
-  Object.keys(run).forEach((k) => {
-    run[k].eligible.forEach((c) => {
-      if (c.businessId === businessId) c.capacity.active = b.capacity.active;
-    });
-  });
+/** Send one write and fold the answer in. ONE REQUEST: what comes back IS the
+ *  new state — no write here is followed by a read, because a follow-up GET
+ *  would only be a slower way to learn what has already arrived.
+ *
+ *  `merge` is what makes the two response sizes one code path. A patch and a
+ *  remark answer with a DELTA, because neither moves anything derived and
+ *  re-reading the enquiry and its five child tables to report one is nine
+ *  server queries for three objects. The other three answer with the whole
+ *  record, because a logged contact moves the status, the tags, the checklist
+ *  and the log at once, and there the projection IS the delta.
+ *
+ *  A FAILURE NEEDS NO RE-READ EITHER, and that is a property of not being
+ *  optimistic: nothing here touches the record before the server confirms it,
+ *  so a rejected write leaves the store already holding the last thing the
+ *  server said. It rethrows and changes nothing. */
+async function write<D>(id: string, send: Promise<ApiResponseType<D>>,
+                        merge: (current: Enquiry, got: D) => Enquiry): Promise<void> {
+  const got = await call<D>(send);
+  const current = store.enquiries.filter((e) => e.enquiryId === id)[0] || detailCache[id];
+  /* Nothing on screen to fold into — the write still landed, and the next read
+     of this enquiry gets it from the server like any other. */
+  if (current) replace(merge(current, got));
 }
+
+/** The merge for the three writes that answer with the whole record. */
+const whole = (_current: Enquiry, got: { enquiry: Enquiry }) => got.enquiry;
+
+/** Capacity is the SERVER'S number — `active` is counted from the leads a
+ *  business currently holds — so an assignment or an outcome moves it and
+ *  nothing in this tab may adjust it by hand. Re-read instead of guessing.
+ *  Fire-and-forget: a stale figure beside the business name is worth far less
+ *  than the write that just succeeded. */
+function refreshBusinesses(): void {
+  void (async () => {
+    try {
+      const got = await call<BusinessesResponse>(BusinessEnquiriesService.businesses());
+      SUBSCRIBED_COUNT = got.subscribedCount;
+      fetchedBusinesses = got.businesses || [];
+      store.businesses = fetchedBusinesses;
+      bump();
+    } catch {
+      /* Leave the figures as they were. */
+    }
+  })();
+}
+
+/* THE LAST OF THE SIMULATION IS GONE. `append()` minted event ids in the tab
+   and `withEnquiry()` mutated a record in place; both existed so a write could
+   look like it had happened before anything had. Every write reaches the server
+   now and every one answers with what the server wrote, so an event on screen
+   is an event in the database with the database's own id, timestamp and actor
+   — there is nothing left here to invent one with. */
 
 /** BE-T11 · Create by hand.
  *
@@ -1021,372 +1181,199 @@ export async function createEnquiry(input: {
 
 /* ------------------------------------------ THE QUALIFICATION WORKSTREAM ---
    Everything between "a form arrived" and "somebody stands behind this". These
-   four are the only writes in the module that touch an enquiry BEFORE it is
-   frozen, and all four refuse once it is — the guard is `isWorking(status)`
-   on each, not a rule stated once and trusted afterwards. */
+   refuse once the snapshot is frozen — and the refusal is the SERVER'S, not a
+   guard restated here: `isWorking()` still hides the controls, but what decides
+   whether an edit is allowed is three stored facts on the record (a frozen
+   snapshot, an assignee, a terminal status) and only the server can read them
+   without guessing. */
 
-/** Keeps the automatic tags honest after every logged contact. A person can add
- *  and remove any tag by hand; these four are the system's own read of the log
- *  and are recomputed rather than accumulated, so an enquiry that was
- *  unreachable and then answered does not keep wearing both. */
-function retagFromLog(e: Enquiry) {
-  const auto = new Set(TAGS.filter((t) => t.auto).map((t) => t.slug));
-  const kept = e.tags.filter((t) => !auto.has(t));
-  const next = new Set<string>();
-  /* Nothing to add when the log is empty: "nobody has contacted them" is the
-     New STATUS now, and a tag that repeats a status is a second copy of one
-     fact that can drift from the first. */
-  if (e.contactLog.length) {
-    const newest = e.contactLog[0];
-    if (everReached(e)) next.add("contact-made");
-    else next.add("unreachable");
-    const o = contactOutcomeOf(newest.outcome);
-    /* The NEWEST outcome decides this one, not the history: a number that
-       was bad and has since been corrected must stop being flagged. */
-    if (o.autoTag === "bad-contact") next.add(o.autoTag);
-  }
-  e.tags = kept.concat(Array.from(next));
-}
-
-/** BE-T07 · Edit the enquiry while it is being qualified. New or Processing only.
- *  The form is a customer's first attempt at describing what they want, taken
+/** BE-T07 · Edit the enquiry while it is being qualified.
+ *
+ *  The form is a customer's first attempt at describing what they want, typed
  *  through a funnel they were skimming; the operator on the phone is the one
  *  who finds out it is a renovation and not a fit-out. Every change is listed
- *  in the event so the correction is visible, not silent. */
+ *  field by field in the timeline, so a correction is visible rather than
+ *  silent — and the server writes that list, from the values it actually had,
+ *  which is the only place the "before" is reliable. */
 export function updateEnquiry(
   id: string,
   patch: { requirement?: Partial<Enquiry["requirement"]>; customer?: Partial<Enquiry["customer"]>; urgency?: string | null },
-) {
-  withEnquiry(id, (e) => {
-    if (!isWorking(e.status)) return;
-    const changed: string[] = [];
-    const note = (field: string, from: unknown, to: unknown) => {
-      if (String(from ?? "") !== String(to ?? "")) changed.push(field + ": " + (from || "—") + " → " + (to || "—"));
-    };
-    if (patch.requirement) {
-      Object.keys(patch.requirement).forEach((k) => {
-        const key = k as keyof Enquiry["requirement"];
-        note(key, e.requirement[key], patch.requirement![key]);
-      });
-      e.requirement = { ...e.requirement, ...patch.requirement };
-    }
-    if (patch.customer) {
-      Object.keys(patch.customer).forEach((k) => {
-        const key = k as keyof Enquiry["customer"];
-        note(key, e.customer[key], patch.customer![key]);
-      });
-      e.customer = { ...e.customer, ...patch.customer };
-    }
-    if (patch.urgency !== undefined) {
-      note("urgency", e.qualification.urgency, patch.urgency);
-      e.qualification.urgency = patch.urgency;
-    }
-    if (!changed.length) return;
-    append(e, "UPDATED", changed.join(" · "));
-  });
+): Promise<void> {
+  const body: EnquiryPatchInput = {};
+  if (patch.requirement) body.requirement = patch.requirement as Record<string, string | null>;
+  if (patch.customer) body.customer = patch.customer;
+  if (patch.urgency !== undefined) body.urgency = patch.urgency;
+  return write<EnquiryPatchResult>(id, BusinessEnquiriesService.update(id, body), (e, got) => ({
+    ...e,
+    customer: got.customer as Enquiry["customer"],
+    requirement: got.requirement as Enquiry["requirement"],
+    /* The checklist comes with it: three of its four checks are a read of the
+       columns this just patched, so recomputing them here would be a second
+       implementation of enquiry_derive maintained by hand. */
+    qualification: got.qualification as Enquiry["qualification"],
+    events: got.event ? [got.event as Enquiry["events"][0], ...e.events] : e.events,
+  }));
 }
 
 /** BE-T12 · Add an internal remark. Allowed at ANY status, unlike almost
  *  everything else here — the useful note about a business going quiet arrives
  *  after delivery, and the useful note about a customer arrives whenever
  *  somebody notices. Append-only: there is no edit and no delete, because a
- *  note somebody later softened is worth less than one nobody can change. */
-export function addRemark(id: string, text: string) {
+ *  note somebody later softened is worth less than one nobody can change. The
+ *  timeline records THAT one was added and by whom, never its text. */
+export function addRemark(id: string, text: string): Promise<void> {
   const body = text.trim();
-  if (!body) return;
-  withEnquiry(id, (e) => {
-    e.remarks = [{
-      remarkId: "rm-live-" + (e.remarks.length + 1) + "-" + e.enquiryId.slice(-4),
-      text: body,
-      actor: actorName(),
-      actorRole: "Operations",
-      at: nowIso(),
-    }].concat(e.remarks);
-    /* The timeline records THAT a remark was added and by whom, never its text.
-       The timeline is the one surface a business-scoped read could one day
-       reach, and a remark must not ride into it. */
-    append(e, "REMARK", "Internal remark added");
-  });
+  if (!body) return Promise.resolve();
+  return write<RemarkResult>(id, BusinessEnquiriesService.remark(id, body), (e, got) => ({
+    ...e,
+    /* Both lists are newest-first, on the model and on screen, so both go on
+       the front. Nothing else on the record moved: a remark has no channel, no
+       outcome and no attempt, so it touches no tag and no check. */
+    remarks: [got.remark as Enquiry["remarks"][0], ...e.remarks],
+    events: [got.event as Enquiry["events"][0], ...e.events],
+  }));
 }
 
-/** BE-T08 · Log a contact attempt. New or Processing only — after qualification the
- *  conversation belongs to the assigned business, not to us.
+/** BE-T08 · Log a contact attempt.
  *
- *  Logging is what moves the tags, and it can also satisfy a check: an outcome
- *  the vocabulary marks as `reached` ticks "Contact reachable", because that
- *  box is a fact the log already proves and asking a person to confirm it twice
- *  is how checklists become theatre. */
+ *  THE FIRST ATTEMPT IS WHAT STARTS QUALIFICATION. "The team has started
+ *  working it" and "somebody tried to reach them" are the same event, so it
+ *  needs no separate control — the server advances the status on this write and
+ *  says so in this attempt's own note.
+ *
+ *  NOTHING IS RETAGGED HERE. The automatic tags are the server's read of this
+ *  log, recomputed on every request; the client used to recompute them too and
+ *  the two agreeing was a coincidence maintained by hand. */
 export function logContact(id: string, entry: {
   channel: string; direction: "outbound" | "inbound"; outcome: string;
   response: string; note: string;
-}) {
-  withEnquiry(id, (e) => {
-    if (!isWorking(e.status)) return;
-    const o = contactOutcomeOf(entry.outcome);
-    /* THE FIRST ATTEMPT IS WHAT STARTS QUALIFICATION. "The team has started
-       working it" and "somebody tried to reach them" are the same event, so it
-       needs no separate control — and it is recorded in this attempt's own
-       CONTACT note rather than as a second timeline row, because one act that
-       prints twice is how a timeline stops being readable. */
-    const started = e.status === "generated";
-    if (started) e.status = "processing";
-    e.contactLog = [{
-      logId: "cl-live-" + (e.contactLog.length + 1) + "-" + e.enquiryId.slice(-4),
-      channel: entry.channel,
-      direction: entry.direction,
-      at: nowIso(),
-      actor: actorName(),
-      actorRole: "Operations",
-      outcome: entry.outcome,
-      response: entry.response.trim() || null,
-      note: entry.note.trim() || null,
-    }, ...e.contactLog];
-    if (o.reached) e.qualification.checklist.reachable = true;
-    retagFromLog(e);
-    append(e, "CONTACT",
-      channelOf(entry.channel).label + " · " + o.label +
-      (started ? " · first attempt, now Processing" : "") +
-      (entry.response.trim() ? " · response recorded" : "") +
-      " · tags now " + (e.tags.length ? e.tags.join(", ") : "none"));
-  });
+}): Promise<void> {
+  const body: ContactInput = {
+    channel: entry.channel, direction: entry.direction, outcome: entry.outcome,
+    response: entry.response.trim(), note: entry.note.trim(),
+  };
+  return write(id, BusinessEnquiriesService.contact<Enquiry>(id, body), whole);
 }
 
-/** Tick or untick one qualification check. New or Processing only. Recorded as an event
- *  because "who decided this enquiry was genuine" is a question that gets asked
- *  after a business complains, not before. */
-export function setCheck(id: string, key: keyof Checklist, value: boolean) {
-  withEnquiry(id, (e) => {
-    if (!isWorking(e.status)) return;
-    if (e.qualification.checklist[key] === value) return;
-    e.qualification.checklist[key] = value;
-    const row = CHECKLIST.filter((c) => c.key === key)[0];
-    append(e, "CHECK", (value ? "Confirmed" : "Un-confirmed") + ": " + (row ? row.label : key));
-  });
+/** Tick or untick one qualification check.
+ *
+ *  THREE OF THE FOUR HAVE NOTHING TO SET, and that is not a gap. `reachable` is
+ *  a read of the contact log, `requirement` of the stored requirement and
+ *  `urgency` of the customer's own answer — each ticks itself the moment the
+ *  work behind it is done, and ticking one by hand would be the exact claim the
+ *  checklist exists to prevent (a reachable number nobody has reached). Only
+ *  `genuine` is a DECLARATION — nothing in a record proves it is not a test
+ *  submission — so only that one has a column, and it is a field on the record
+ *  patch rather than a check endpoint of its own. */
+export function setCheck(id: string, key: keyof Checklist, value: boolean): Promise<void> {
+  if (key !== "genuine") return Promise.resolve();
+  const state = value
+    ? (VOCAB.genuinenessStates || []).filter((g) => g.passed)[0]?.key || "passed"
+    : (VOCAB.genuinenessStates || [])[0]?.key || "unconfirmed";
+  return write<EnquiryPatchResult>(id, BusinessEnquiriesService.update(id, { genuineness: state }),
+    (e, got) => ({
+      ...e,
+      qualification: got.qualification as Enquiry["qualification"],
+      events: got.event ? [got.event as Enquiry["events"][0], ...e.events] : e.events,
+    }));
 }
 
-/** Add or remove a tag by hand. Automatic tags can be removed too — a person
- *  who has just spoken to the customer knows more than the log does — but the
- *  next logged contact recomputes them, and that is the right precedence. */
-export function toggleTag(id: string, slug: string) {
-  withEnquiry(id, (e) => {
-    const on = e.tags.indexOf(slug) >= 0;
-    e.tags = on ? e.tags.filter((t) => t !== slug) : e.tags.concat([slug]);
-    append(e, "TAGGED", (on ? "Removed " : "Added ") + tagOf(slug).label);
-  });
+/** Add or remove a tag by hand. The automatic ones are refused server-side:
+ *  they are recomputed from the contact log on every read, so a hand override
+ *  would be undone by the response to the very request that set it. */
+export function toggleTag(id: string, slug: string): Promise<void> {
+  const on = store.enquiries.filter((e) => e.enquiryId === id)[0]?.tags.indexOf(slug) ?? -1;
+  const has = on >= 0 || (detailCache[id]?.tags || []).indexOf(slug) >= 0;
+  return write(id, BusinessEnquiriesService.tag<Enquiry>(id, slug, !has), whole);
 }
+
+/* ---------------------------------------------------------- THE LIFECYCLE ---
+   Six moves, one endpoint. They all mean "put this enquiry in status X with the
+   things X needs", and they share the guard that matters — the vocabulary's own
+   transition matrix, enforced server-side. Six endpoints would be six copies of
+   that matrix, and the sixth is the one that drifts. */
+
+const move = (id: string, body: StatusMoveInput) =>
+  write(id, BusinessEnquiriesService.move<Enquiry>(id, body), whole);
 
 /** BE-T01c · Mark qualified. THE FREEZE.
  *
- *  This is the moment the snapshot becomes immutable and the moment a named
- *  person becomes answerable for it. It stamps `qualifiedBy`, `frozenAt` and
- *  the qualification version, writes the requirement summary from the last
- *  thing the customer actually said, and hands the enquiry to matching.
+ *  The moment the snapshot becomes immutable and a named person becomes
+ *  answerable for it. `canQualify()` still hides the button, but the rule is
+ *  the server's: it refuses an incomplete checklist with
+ *  `qualification_incomplete` and names which check is missing. */
+export function markQualified(id: string, summary: string): Promise<void> {
+  return move(id, { to: "qualified", summary: summary.trim() });
+}
+
+/** BE-T02 · Matching run. A SERVER CALL, like every other write here.
  *
- *  It refuses unless `canQualify()` — the UI hides the button in that state
- *  too, but the check lives here because the button is a convenience and this
- *  is the rule. On the server it is `422 qualification_incomplete`. */
-export function markQualified(id: string, summary: string) {
-  withEnquiry(id, (e) => {
-    if (!canQualify(e)) return;
-    const at = nowIso();
-    const last = lastResponse(e);
-    e.qualification.requirementSummary = summary.trim() || last?.response || e.requirement.text;
-    e.qualification.genuineness = "passed";
-    e.qualification.genuinenessNote = "Confirmed by " + actorName() + " over " + e.contactLog.length +
-      " contact attempt" + (e.contactLog.length === 1 ? "" : "s");
-    e.qualification.version = VOCAB.qualificationVersion || "qualification v4";
-    e.qualification.frozenAt = at;
-    e.qualification.qualifiedBy = actorName();
-    e.qualification.qualifiedByRole = "Operations";
-    e.status = "qualified";
-    append(e, "QUALIFIED",
-      "Snapshot frozen · " + e.qualification.version + " · all four checks confirmed over " +
-      e.contactLog.length + " contact attempt" + (e.contactLog.length === 1 ? "" : "s"));
-  });
-}
-
-/** BE-T02 · Matching run. It does NOT change the status, and that is the whole
- *  point of there no longer being a Ready to Assign: being Qualified IS being
- *  ready to assign, and whether anyone has ranked businesses yet is a fact about
- *  the work rather than a stage of the enquiry's life. Loads the active rule
- *  version, filters, scores, persists the candidate snapshot, appends MATCHED.
- *  In the prototype the "run" is whatever suggestions.json holds for this
- *  enquiry; the real one computes it. What is honest either way is the shape:
- *  a run that finds nobody does NOT fail the enquiry, it holds it. */
-export function runMatching(id: string) {
-  withEnquiry(id, (e) => {
-    /* Qualified is the entry condition, not a suggestion. Matching an enquiry
-       nobody has confirmed would rank businesses against a form the customer
-       filled in while skimming — and then freeze that ranking onto an
-       assignment as if it were established fact. */
-    /* Both ways in: a first run from Qualified, and a RETRY from No match
-       found — which is the only escape that state has, so locking the guard to
-       `qualified` would have trapped the record in it. */
-    if (e.status !== "qualified" && e.status !== "no_match") return;
-    /* An enquiry that has never been matched has no run yet — which is the
-       point: `runs` holds runs that HAPPENED, and one cannot exist before
-       qualification. The seed keeps the not-yet-matched candidates in
-       `pending`, and running matching is what moves one across, the same way
-       the real POST /match computes a run and persists it. Without this the
-       prototype answered "no eligible business" for every enquiry the operator
-       actually qualified — a supply gap that was really just a missing seed. */
-    const run = store.runs[e.enquiryId] || pendingRuns[e.enquiryId];
-    if (run) store.runs[e.enquiryId] = run;
-    const eligible = run ? run.eligible.length : 0;
-    const excluded = run ? run.excluded.length : SUBSCRIBED_COUNT;
-    /* THE RUN IS WHAT MOVES THE RECORD, in both directions. Finding nobody is a
-       state the queue has to be able to show and filter, not a footnote hung off
-       a record still claiming to be ready to assign. */
-    if (!eligible) {
-      e.status = "no_match";
-      e.exception = {
-        code: "no_eligible_business",
-        note: "All " + SUBSCRIBED_COUNT + " subscribed businesses were excluded before scoring. Held at Qualified — a supply gap, not an invalid enquiry.",
-      };
-    } else {
-      if (e.status === "no_match") e.status = "qualified";
-      delete e.exception;
-    }
-    append(e, "MATCHED",
-      SUBSCRIBED_COUNT + " subscribed → " + eligible + " eligible, " + excluded +
-      " excluded with reasons · rule " + RULES.ruleVersion, "System");
-  });
-}
-
-/** BE-T03 · Assignment. Lock → revalidate hard eligibility and capacity →
- *  create the assignment → FREEZE rank, score, factors and rule version →
- *  capacity++ → append ASSIGNED → enqueue delivery. All of it or none of it.
+ *  It used to simulate, off a bundled fixture keyed by enquiry ids that no
+ *  longer existed — so on live data it found nothing and "Run matching" quietly
+ *  meant "mark no match". It computes for real now: stage 1, against the same
+ *  business directory this panel reads, frozen into a row so it survives a
+ *  reload.
  *
- *  `factorSnapshot` is a COPY, not a reference to the candidate row. A
- *  reference would let a later recalculation rewrite the answer to "why did
- *  this go there?" — which is the one question this module exists to answer. */
-export function assign(id: string, businessId: string, overrideReason: string | null) {
-  withEnquiry(id, (e) => {
-    const run = store.runs[e.enquiryId];
-    const c = run ? run.eligible.filter((x) => x.businessId === businessId)[0] : null;
-    const b = businessById(businessId);
-    if (!c || !b) return;
-    const a: Assignment = {
-      assignmentId: "as-live-" + (e.assignments.length + 1) + "-" + e.enquiryId.slice(-4),
-      businessId: c.businessId,
-      businessName: c.name,
-      candidateRank: c.rank,
-      candidateScore: c.score,
-      eligibleCount: run ? run.eligible.length : 0,
-      factorSnapshot: { ...c.factors },
-      ruleVersion: run ? run.ruleVersion : RULES.ruleVersion,
-      assignedBy: actorName(),
-      assignedByRole: "Operations",
-      assignedAt: nowIso(),
-      deliveryStatus: "pending",
-      deliveredAt: null,
-      overrideReason: overrideReason || null,
-      supersededAt: null,
-    };
-    e.assignments = e.assignments.concat([a]);
-    e.activeAssignmentId = a.assignmentId;
-    e.status = "assigned";
-    delete e.exception;
-    const before = b.capacity.active;
-    moveCapacity(businessId, +1);
-    append(e, "ASSIGNED",
-      c.name + " · rank " + c.rank + " of " + a.eligibleCount + " eligible · score " + c.score +
-      " · rule " + a.ruleVersion + " · factors frozen · capacity " + before + "→" + (before + 1) +
-      (overrideReason ? " · override reason stored" : ""));
-    /* PUBLISHING IS PART OF ASSIGNING, not a state after it. It always was
-       — `assign()` called `deliver()` on this line — and the only thing the
-       separate step contributed was a `delivered` status the queue had to
-       carry. The assignment still records when it went out, and a failed send
-       still never erases an assignment: `deliveryStatus` holds that. */
-    a.deliveryStatus = "delivered";
-    a.deliveredAt = nowIso();
-    append(e, "DELIVERED",
-      "Published to " + a.businessName + " · notification sent · contact released", "system");
-  });
+ *  IT DOES NOT RANK, and the run says so. Whoever the run finds comes back
+ *  unscored — see `MatchRun.ranked`.
+ *
+ *  ONCE PER WINDOW, AND THE SERVER IS WHAT ENFORCES IT: inside the window the
+ *  endpoint refuses `rate_limited` whatever this tab believes, so a reload or a
+ *  second tab cannot get around it. The check below and the disabled button are
+ *  the courtesy — they save a request and explain the wait; they are not the
+ *  rule.
+ *
+ *  It does NOT change the status when it finds somebody — being Qualified IS
+ *  being ready to assign. Finding nobody holds the enquiry at No match yet, and
+ *  a later run that finds somebody walks it back without re-freezing the
+ *  snapshot. All of that happens in the one server transaction. */
+export function runMatching(id: string): Promise<void> {
+  const e = store.enquiries.filter((x) => x.enquiryId === id)[0] || detailCache[id];
+  if (e && matchCooldown(e).blocked) return Promise.resolve();
+  return write(id, BusinessEnquiriesService.match<Enquiry>(id), whole);
 }
 
-/** The outbox side of BE-T03. Separate because it is a separate commit: the
- *  assignment stands whatever this does. */
-/** BE-T04 · Reassignment. Lock → CLOSE the current assignment (supersededAt,
- *  never a delete) → capacity-- → run BE-T03 in full for the new business.
- *  The enquiry walks back to Qualified; it does not jump. */
-export function reassign(id: string, businessId: string, reason: string) {
-  withEnquiry(id, (e) => {
-    const cur = activeAssignment(e);
-    if (cur) {
-      cur.supersededAt = nowIso();
-      cur.closedReason = reason;
-      moveCapacity(cur.businessId, -1);
-    }
-    e.activeAssignmentId = null;
-    e.status = "qualified";
-    append(e, "REASSIGNED",
-      (cur ? "From " + cur.businessName + " · " : "") + "reason: " + reason +
-      " · previous assignment closed, not deleted");
-  });
-  assign(id, businessId, null);
+/** BE-T03 · Assignment. Revalidate the business → create the assignment →
+ *  FREEZE the match context onto it → append ASSIGNED → publish. All of it or
+ *  none of it, in one server transaction.
+ *
+ *  RANK AND SCORE COME BACK ABSENT, not zero, and that is honest: nothing
+ *  ranked this enquiry, because there is no matching endpoint yet. The panel
+ *  must never post them — a rank the client supplies is a rank the client could
+ *  have made up, and that row is the evidence for "why did this go there?". */
+export function assign(id: string, businessId: string, overrideReason: string | null): Promise<void> {
+  return move(id, { to: "assigned", businessId, overrideReason: overrideReason || "" })
+    .then(refreshBusinesses);
+}
+
+/** BE-T04 · Reassignment. The same endpoint and no verb of its own: it is a
+ *  move to the status the enquiry is already in, with a new business and a
+ *  reason. The server CLOSES the current assignment (supersededAt, never a
+ *  delete) and opens the new one in one transaction. */
+export function reassign(id: string, businessId: string, reason: string): Promise<void> {
+  return move(id, { to: "assigned", businessId, reason }).then(refreshBusinesses);
 }
 
 /** BE-T05 · The outcome. The BUSINESS acting on its own assignment — recorded
  *  from the Operations screen only because there is no business-side surface
- *  yet, and the notice on that screen says so. Reachable straight from
- *  Assigned: assigning publishes, and there is no acknowledgement step. */
-export function recordOutcome(id: string, outcome: "converted" | "not_converted", reason: string, notes: string) {
-  withEnquiry(id, (e) => {
-    const a = activeAssignment(e);
-    if (!a) return;
-    const at = nowIso();
-    e.status = outcome;
-    e.outcome = {
-      assignmentId: a.assignmentId,
-      firstContactAt: e.outcome?.firstContactAt || null,
-      status: "closed", outcome, reason, notes: notes || null,
-      updatedBy: a.businessName, updatedAt: at,
-    };
-    const before = businessById(a.businessId)?.capacity.active ?? 0;
-    moveCapacity(a.businessId, -1);
-    append(e, "OUTCOME",
-      statusOf(outcome).label + " · " + reason + " · capacity released, " + a.businessName +
-      " " + before + "→" + Math.max(0, before - 1), "Business");
-  });
+ *  yet, and the notice on that screen says so. */
+export function recordOutcome(id: string, outcome: "converted" | "not_converted", reason: string, notes: string): Promise<void> {
+  return move(id, { to: outcome, reason, note: notes }).then(refreshBusinesses);
 }
 
-/** Terminal with a reason, at any point before an outcome. This is what lets a
- *  separate Quarantine queue not exist: a rejected submission has a state to
- *  sit in and a reason stored beside it. */
 /** Mark a Qualified enquiry as having no business to go to, BY HAND.
  *
  *  The automatic route is a matching run that returns nothing; this is the
- *  operator who already knows the run will return nothing — the one business
- *  covering that pincode just suspended, the category is one nobody serves yet.
- *  Making them run a match they know the answer to, purely so the system can
- *  discover it, is theatre.
- *
- *  It is NOT terminal and it is not a rejection: the enquiry is good and the
- *  supply is missing. Re-running matching is the way back, and the note says a
- *  person put it here so a later run does not look like it contradicted itself. */
-export function markNoMatch(id: string) {
-  withEnquiry(id, (e) => {
-    if (e.status !== "qualified") return;
-    e.status = "no_match";
-    e.exception = {
-      code: "no_eligible_business",
-      note: "Marked by hand by " + actorName() + " — no subscribed business can take this "
-        + "one today. Run matching again to re-check.",
-    };
-    append(e, "NO_MATCH",
-      "Marked No match yet by hand · " + place(e) + " · " + e.requirement.category);
-  });
+ *  operator who already knows it will — the one business covering that pincode
+ *  just suspended, the category is one nobody serves yet. NOT terminal and not
+ *  a rejection: the enquiry is good and the supply is missing, and re-running
+ *  matching is the way back. */
+export function markNoMatch(id: string): Promise<void> {
+  return move(id, { to: "no_match" });
 }
 
-export function invalidate(id: string, reason: string, note: string) {
-  withEnquiry(id, (e) => {
-    const a = activeAssignment(e);
-    if (a) { moveCapacity(a.businessId, -1); a.supersededAt = nowIso(); a.closedReason = "Enquiry invalidated"; }
-    e.activeAssignmentId = null;
-    e.status = "invalid";
-    e.invalidation = { reason, detectedBy: actorName(), detectedAt: nowIso(), note };
-    append(e, "INVALIDATED", reason + (note ? " · " + note : ""));
-  });
+/** Terminal with a stored reason, at any point before an outcome. This is what
+ *  lets a separate quarantine queue not exist. */
+export function invalidate(id: string, reason: string, note: string): Promise<void> {
+  return move(id, { to: "invalid", reason, note }).then(refreshBusinesses);
 }
-

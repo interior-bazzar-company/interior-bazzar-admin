@@ -43,6 +43,10 @@ export interface VocabulariesResponse {
   transitions: { from: string; to: string[]; guard: string }[];
   urgency: { key: string; label: string; hot: boolean }[];
   tiers: { key: string; label: string; help: string }[];
+  /** The genuineness states a person may declare. `passed` marks the one that
+   *  counts as a pass; anything else renders as a failure showing its own word,
+   *  so a state added server-side is legible with no frontend change. */
+  genuinenessStates: { key: string; label: string; tone: string; passed: boolean }[];
   categories: string[];
   cities: string[];
   states: string[];
@@ -62,6 +66,11 @@ export interface VocabulariesResponse {
   /** One entry per attention-strip cell: what the number counts, and what
    *  pressing it filters to. `check:wiring` asserts the two agree. */
   attentionCells: { key: string; counts: string; does: string }[];
+  /** How the queue may be ordered. THE FIRST ROW IS THE DEFAULT and carries
+   *  the empty key — the Sort control takes its own label from it and offers
+   *  the rest. Keys are a contract with the server's own sorter, so an order
+   *  offered here is one it implements. */
+  sortOptions: { key: string; label: string }[];
 }
 
 /** The ACTIVE rule version. Past runs stay reproducible because every
@@ -74,6 +83,10 @@ export interface MatchingRulesResponse {
   status: string;
   overrideThreshold: number;
   overrideThresholdNote: string;
+  /** Hours a lead must wait between matching runs. Versioned with the weights
+   *  beside it, because the cadence is a matching policy like any other. 0
+   *  disables the wait. */
+  matchCooldownHours: number;
   eligibility: { key: string; label: string; rule: string; stage: string; open?: string }[];
   factors: { key: string; label: string; weight: number; note: string }[];
   bands: { key: string; label: string; from: number }[];
@@ -113,7 +126,7 @@ export interface EnquiryQuery {
   pageSize?: number;
   status?: string; category?: string; city?: string; state?: string;
   urgency?: string; tier?: string; tag?: string; source?: string;
-  business?: string; owner?: string; flag?: string;
+  business?: string;
   received?: string; dateFrom?: string; dateTo?: string;
   q?: string; sort?: string;
 }
@@ -165,6 +178,73 @@ export interface CreateEnquiryResponse<T> {
   earlier: { enquiryId: string; name: string; createdAt: string | null }[];
 }
 
+/** What the panel PATCHes back onto a record it is still working.
+ *
+ *  A key ABSENT is untouched and a key present and empty CLEARS the column, so
+ *  the two blocks are partials rather than whole objects. `genuineness` is the
+ *  one qualification check a person DECLARES — the other three are read from
+ *  stored evidence server-side (a logged call, a filled column) and there is
+ *  nothing to set, which is why there is no endpoint that ticks them. */
+export interface EnquiryPatchInput {
+  customer?: Partial<{ name: string; phone: string; email: string | null }>;
+  requirement?: Partial<Record<string, string | null>>;
+  urgency?: string | null;
+  genuineness?: string;
+}
+
+/** One attempt to reach the customer. `response` is the customer's own words
+ *  and `note` is our read of them; only the first may be quoted to a business,
+ *  which is why they are two fields and not one. */
+export interface ContactInput {
+  channel: string;
+  direction: "outbound" | "inbound";
+  outcome: string;
+  response?: string;
+  note?: string;
+  /** ISO instant. Only meaningful on an outcome the vocabulary marks
+   *  `requiresFollowUp`. */
+  followUpAt?: string | null;
+}
+
+/** EVERY LIFECYCLE MOVE, through one endpoint: qualify, assign, reassign, mark
+ *  no-match, record the outcome, invalidate. They share the guard that matters
+ *  — the vocabulary's own transition matrix — and six endpoints would be six
+ *  copies of it, of which the sixth is the one that drifts.
+ *
+ *  A REASSIGNMENT has no verb of its own: it is `to` the status the enquiry is
+ *  already in, with a new `businessId` and a `reason`. The server recognises it
+ *  by the active assignment, closes that one rather than deleting it, and opens
+ *  the new one in the same transaction. */
+export interface StatusMoveInput {
+  to: string;
+  reason?: string;
+  note?: string;
+  summary?: string;
+  businessId?: string;
+  overrideReason?: string;
+}
+
+/** What a PATCH answers with: the two blocks it can change, the qualification
+ *  read of them, and the one timeline line. Deliberately NOT the enquiry — see
+ *  the note above `update` below.
+ *
+ *  The block types are left open because the store owns the `Enquiry` shape and
+ *  a second copy of `requirement` here is a second copy to drift. */
+export interface EnquiryPatchResult {
+  customer: Record<string, unknown>;
+  requirement: Record<string, unknown>;
+  qualification: Record<string, unknown>;
+  /** Null when the body changed nothing — there is no event for a no-op. */
+  event: Record<string, unknown> | null;
+}
+
+/** What a remark answers with. The remark, and the line saying one was added —
+ *  never its text. */
+export interface RemarkResult {
+  remark: Record<string, unknown>;
+  event: Record<string, unknown>;
+}
+
 export class BusinessEnquiriesService {
   static enquiries<T>(query: EnquiryQuery = {}) {
     return apiService.getGetApiResponse<EnquiriesResponse<T>>(
@@ -179,14 +259,76 @@ export class BusinessEnquiriesService {
   static create<T>(input: CreateEnquiryInput) {
     return apiService.getPostApiResponse<CreateEnquiryResponse<T>>(`${base}/`, input);
   }
+  /* ── the writes ──────────────────────────────────────────────────────────
+     EVERY ONE ANSWERS WITH DATA rather than an acknowledgement, because half
+     this record is DERIVED — the qualification checklist, the automatic tags,
+     the status of a lead that predates the enquiry chain — and a panel
+     computing the new state itself would drift from the database the moment a
+     derivation disagreed with it.
+
+     HOW MUCH data is decided by how much the write actually moves. A patch
+     changes two blocks and the qualification read of them; a remark adds a
+     remark and a timeline line and touches nothing derived. Sending the whole
+     enquiry back for either is nine server queries to deliver three objects the
+     panel already holds the rest of, so those two answer with a DELTA and the
+     store splices it in. The other three genuinely change most of the record —
+     status, tags, checklist, assignments — and there the whole projection IS
+     the delta. */
+
+  /** BE-T07 · correct the record. Refused once the snapshot is frozen, the
+   *  enquiry is out with a business, or it is terminal. `event` is null when
+   *  the body changed nothing. */
+  static update(id: string, patch: EnquiryPatchInput) {
+    return apiService.getPatchApiResponse<EnquiryPatchResult>(`${base}/${id}/`, patch);
+  }
+  /** BE-T12 · an internal remark. Any status; append-only. */
+  static remark(id: string, text: string) {
+    return apiService.getPostApiResponse<RemarkResult>(`${base}/${id}/remarks/`, { text });
+  }
+  /** BE-T08 · log a contact attempt. The FIRST one is what starts
+   *  qualification, and the server advances the status on the write itself. */
+  static contact<T>(id: string, entry: ContactInput) {
+    return apiService.getPostApiResponse<{ enquiry: T }>(`${base}/${id}/contacts/`, entry);
+  }
+  /** A hand-set tag on or off. The tags marked `auto` are recomputed from the
+   *  contact log on every read and are refused here — storing one would be a
+   *  tag that flips back on the next refresh. */
+  static tag<T>(id: string, slug: string, apply: boolean) {
+    return apiService.getPostApiResponse<{ enquiry: T }>(`${base}/${id}/tags/`, { slug, apply });
+  }
+  static move<T>(id: string, body: StatusMoveInput) {
+    return apiService.getPostApiResponse<{ enquiry: T }>(`${base}/${id}/status/`, body);
+  }
+  /** BE-T02 · run matching. RATE-LIMITED SERVER-SIDE — inside the window it
+   *  refuses `rate_limited` and names when the next run is available, so a
+   *  reload or a second tab cannot get around the rule the way a disabled
+   *  button can. Answers with the record; its `matchRun` is the frozen run. */
+  static match<T>(id: string) {
+    return apiService.getPostApiResponse<{ enquiry: T }>(`${base}/${id}/match/`, {});
+  }
+
   static vocabularies() {
     return apiService.getGetApiResponse<VocabulariesResponse>(`${base}/vocabularies/`);
   }
   static matchingRules() {
     return apiService.getGetApiResponse<MatchingRulesResponse>(`${base}/matching-rules/`);
   }
+  /** The whole directory. Read ONCE at boot: the business filter on the queue
+   *  is built from it, and the assign dialog names a business from it. */
   static businesses() {
     return apiService.getGetApiResponse<BusinessesResponse>(`${base}/businesses/`);
+  }
+  /** The same endpoint as a SEARCH — name, category or city, capped. The filter
+   *  runs before the capacity aggregates server-side, so a typed query costs
+   *  the matches and their leads rather than the whole table; that is what
+   *  makes it safe to call as somebody types.
+   *
+   *  `subscribedCount` on this response counts the MATCHES, not the directory.
+   *  Callers must not let it overwrite the boot figure the "of N subscribed"
+   *  sentence reads. */
+  static searchBusinesses(q: string, limit = 12) {
+    return apiService.getGetApiResponse<BusinessesResponse>(
+      `${base}/businesses/${qs({ q, limit })}`);
   }
 }
 

@@ -31,7 +31,7 @@ import {
   TierBadge, UrgencyChip,
 } from "./bits";
 import {
-  RECEIVED_RANGES, SOURCES, STATES, TAGS, TIERS, VOCAB, assignedName,
+  RECEIVED_RANGES, SORT_OPTIONS, SOURCES, STATES, TAGS, TIERS, VOCAB, assignedName,
   businessDirectory, checklistMissing, countsFromServer, everReached, fetchAllMatching,
   isWorking,
   lastResponse, place, receivedLabel, resetStore, statusOf,
@@ -104,10 +104,19 @@ export const enquiryHash = (id: string, p: Params) =>
    second, and never opens on keyboard focus — so the help was unreachable
    without a mouse. A read-on-hover popover would be worse still: fourteen small
    targets in a row, each leaving something that has to be dismissed. */
-const CELL_HELP: Record<string, { counts: string; does: string }> = {};
-VOCAB.attentionCells.forEach((c) => { CELL_HELP[c.key] = c; });
+/* LOOKED UP WHEN THE CELL RENDERS, never at module scope. `VOCAB` is `{}` until
+   bootBusinessEnquiries() has answered — that is the whole design of the boot
+   gate — so a module-level `VOCAB.attentionCells.forEach(...)` reads `undefined`
+   the instant this file is imported and throws before React mounts anything. It
+   took the entire panel down, not just this module: every route imports through
+   the registry, so one throw at import time left `#root` empty on every page,
+   including the login screen.
+
+   `|| []` for the same reason the rest of the module guards its vocabulary
+   reads: a document served without this key loses its tooltips, which is a
+   missing nicety, not a blank console. */
 const helpFor = (k: string) => {
-  const h = CELL_HELP[k];
+  const h = (VOCAB.attentionCells || []).filter((c) => c.key === k)[0];
   return h ? <><span className="t">{h.counts}</span><span className="d">{h.does}</span></> : undefined;
 };
 
@@ -289,14 +298,14 @@ export default function List({ all, page, onPage, p, sel, onFilter, onSearch, on
             choice for working a backlog; it just stopped being what the queue
             opens on. */}
         <div className="be-sortslot">
-          <FilterSelect name="sort" label="Sort: Unassigned, newest" value={p.sort} onFilter={onFilter}
-            options={[
-              { v: "attention", l: "Needs attention" },
-              { v: "touch", l: "Least worked first" },
-              { v: "age", l: "Oldest first" },
-              { v: "step", l: "Lifecycle step" },
-              { v: "tier", l: "Tier" },
-            ]} />
+          {/* FROM THE VOCABULARY, like every other control in this row. The
+              keys are what the server's sorter implements — offering one it does
+              not would be a menu entry that silently does nothing — and the
+              first row is the default order, which is where the closed control
+              gets its own label. */}
+          <FilterSelect name="sort" label={"Sort: " + (SORT_OPTIONS[0]?.label || "")}
+            value={p.sort} onFilter={onFilter}
+            options={SORT_OPTIONS.slice(1).map((o) => ({ v: o.key, l: o.label }))} />
         </div>
       </div>
 

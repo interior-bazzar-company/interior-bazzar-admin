@@ -34,7 +34,7 @@ import {
 } from "./Modals";
 import {
   CHECKLIST, activeAssignment, addRemark, businessById, dateTimeLabel, durationLabel, isWorking,
-  markNoMatch, tierOf,
+  markNoMatch, matchCooldown, tierOf,
   isTerminal, lastResponse, pastAssignments, place, runMatching, statusOf,
   transitionOf, useEnquiry, useMatchRun,
 } from "./store";
@@ -83,7 +83,7 @@ export default function Detail({ id, listHash, prev, next, pos }: {
   const done = (msg: string) => { closeLayer(); toast(msg); };
 
   const onAssign = (c: Candidate) =>
-    modal(<AssignModal e={e} run={run!} c={c} onClose={closeLayer} onDone={done} />, "wide");
+    modal(<AssignModal e={e} run={run} c={c} onClose={closeLayer} onDone={done} />, "wide");
 
   return (
     <div className="be-detail">
@@ -170,11 +170,28 @@ export default function Detail({ id, listHash, prev, next, pos }: {
           {/* Reachable from No match yet too — re-running is that state's
               only way out, and the label says which of the two you are in
               because by then you have already pressed it once. */}
+          {/* ONE RUN PER WINDOW. Disabled rather than hidden, and the title says
+              when it comes back — an operator who cannot see why the only
+              control on this state is missing will look for a bug that is not
+              there. The rule itself lives in the store; this is the courtesy. */}
           {e.status === "qualified" || e.status === "no_match"
-            ? <button className="btn pri" onClick={() => { runMatching(e.enquiryId); toast("Matching run complete."); }}>
-                <Icon name="sparkle" />
-                {e.status === "no_match" ? "Try matching again" : "Run matching"}
-              </button>
+            ? (() => {
+                const cool = matchCooldown(e);
+                return (
+                  <button className="btn pri" disabled={cool.blocked}
+                    title={cool.blocked
+                      ? "Last run " + dateTimeLabel(cool.lastAt) + ". Neither the frozen snapshot "
+                        + "nor the business directory moves fast enough for another run to answer "
+                        + "differently — next one from " + dateTimeLabel(cool.readyAt) + "."
+                      : "Reads the qualification snapshot and the active rule version"}
+                    onClick={() => { runMatching(e.enquiryId); toast("Matching run complete."); }}>
+                    <Icon name="sparkle" />
+                    {cool.blocked
+                      ? "Matched " + durationLabel(cool.lastAt!, new Date().toISOString()) + " ago"
+                      : e.status === "no_match" ? "Try matching again" : "Run matching"}
+                  </button>
+                );
+              })()
             : null}
           {/* The manual route to the same state, for the operator who already
               knows the answer — the one business covering that pincode just

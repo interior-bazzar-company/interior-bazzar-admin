@@ -16,14 +16,15 @@
        IB_API_BASE=http://localhost:8000/api  IB_ADMIN_TOKEN=<jwt> \
          npm run check:enquiries
 
-   enquiries.json and suggestions.json are the last two stand-ins. When their
-   endpoints land, this script and both files go with them.
+   enquiries.json is the LAST stand-in. suggestions.json went when matching
+   became `POST business-enquiries/<id>/match/` — the run is computed and frozen
+   server-side now, so a bundled copy of one had nothing left to stand in for.
+   When the queue's own fixture goes the same way, this script goes with it.
    ========================================================================== */
 const path = require('path');
 const here = (f) => path.join(__dirname, '..', 'src/content/business-enquiries', f);
 
 const enq = require(here('enquiries.json'));
-const sug = require(here('suggestions.json'));
 
 const API = (process.env.IB_API_BASE || 'http://localhost:8000/api').replace(/\/$/, '');
 const TOKEN = process.env.IB_ADMIN_TOKEN || '';
@@ -208,23 +209,19 @@ for (const e of enq.enquiries) {
     const active = e.assignments.filter(a => !a.supersededAt);
     ok(active.length === 1, `${id}: ${active.length} assignments are open, expected 1`);
   }
-
-  // a matching run only exists for something that has been qualified
-  if (sug.runs[id]) ok(e.status !== 'generated', `${id}: Generated but has a match run`);
 }
 
-// candidate factors must sum to the score, or the breakdown lies
-for (const key of Object.keys(sug.runs)) {
-  for (const c of sug.runs[key].eligible) {
-    const sum = Object.values(c.factors).reduce((a, b) => a + b, 0);
-    ok(sum === c.score, `${key}/${c.name}: factors sum to ${sum}, score says ${c.score}`);
-  }
-}
+// The two assertions that lived here — a run only exists on something
+// qualified, and a candidate's factors sum to its score — moved to where they
+// can be enforced rather than merely observed. The first is the server's entry
+// condition on POST match/ (an unqualified enquiry is refused
+// `invalid_transition`); the second has nothing to check yet, because the run
+// deliberately does not score. See interior_leads/enquiry_match.py.
 
 // The thing that must never come back. Skips $comment keys — the files SAY
 // there is no budget field, and that sentence is not a budget field.
 const strip = (v) => JSON.stringify(v, (k, val) => (k.startsWith('$comment') ? undefined : val));
-const blob = strip(enq) + strip(voc) + strip(sug);
+const blob = strip(enq) + strip(voc);
 ok(!/budget/i.test(blob), 'a budget field has appeared in the content');
 
 // Two customers sharing a phone key would make the intake dedupe reject a real

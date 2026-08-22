@@ -4,11 +4,130 @@
    status pill that reads the module's own vocabulary, a score bar that only
    means anything beside a candidate, a lifecycle rail with nine fixed steps.
    ============================================================================= */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Icon, Pill } from "../../ui";
-import { RULES, STATUSES, ageLabel, dateTimeLabel, sourceOf, statusOf, tagOf, tierOf, urgencyOf, viaLabel } from "./store";
-import type { Candidate, Enquiry } from "./store";
+import {
+  RULES, STATUSES, ageLabel, dateTimeLabel, findBusinesses, sourceOf, statusOf, tagOf,
+  tierOf, urgencyOf, viaLabel,
+} from "./store";
+import type { Business, Candidate, Enquiry } from "./store";
+
+/* ---------------------------------------------------------- the search --- */
+/* FINDING A BUSINESS BY HAND, for the two places the engine can leave you with
+   nothing to pick from: assigning an enquiry no run could rank, and reassigning
+   one where the only other candidate was the business you are moving away from.
+   Both are the same situation — real work, a business that can obviously take
+   it, and no list offering it — and both used to dead-end in a red notice.
+
+   ONE COMPONENT because they are one question. The alternative was a second
+   copy in Modals.tsx, and the copy is where the two would start disagreeing
+   about what "eligible" means on screen.
+
+   A LOCAL FILTER, not a request: the directory is already in the tab, one of
+   the three reads the module boots with. And it is a SEARCH, not a ranking —
+   alphabetical, no score, and the only claims made about a business are what
+   its own profile says. Anything more would be a matching engine written in a
+   dialog, which is the one thing this module refuses to have. */
+export function BusinessSearch({ excludeId, action, onPick, picked }: {
+  /** The business this cannot offer — the one already holding the enquiry.
+   *  Reassigning to the current holder is not a reassignment. */
+  excludeId?: string | null;
+  /** What the button on each row says. The two callers do different things
+   *  with the pick: one opens the assign dialog, one selects into a form. */
+  action: string;
+  onPick: (b: Business) => void;
+  /** Highlighted as chosen, for the caller that selects rather than acts. */
+  picked?: string | null;
+}) {
+  const [q, setQ] = useState("");
+  const [hits, setHits] = useState<Business[]>([]);
+  const [state, setState] = useState<"idle" | "loading" | "done" | "error">("idle");
+
+  /* NOTHING IS FETCHED UNTIL SOMETHING IS TYPED, and the wait is what makes
+     that true rather than nearly true: a request per keystroke would ask the
+     server about "s", "sh", "sha" and "shah" to answer one question. The timer
+     is cleared on every change, so only the query somebody stopped typing is
+     ever sent.
+
+     `live` guards the ORDER, not the count. Two searches can be in flight and
+     the slower one must not land last and repaint the list with results for a
+     query nobody is looking at any more. */
+  useEffect(() => {
+    const needle = q.trim();
+    if (!needle) { setHits([]); setState("idle"); return; }
+    let live = true;
+    setState("loading");
+    const timer = window.setTimeout(() => {
+      findBusinesses(needle)
+        .then((rows) => { if (live) { setHits(rows); setState("done"); } })
+        .catch(() => { if (live) { setHits([]); setState("error"); } });
+    }, 250);
+    return () => { live = false; window.clearTimeout(timer); };
+  }, [q]);
+
+  const rows = hits.filter((b) => b.businessId !== excludeId);
+
+  return (
+    <>
+      <div className="fg">
+        <label htmlFor={"be-bsearch-" + action}>Find a business</label>
+        <input id={"be-bsearch-" + action} className="inp" value={q} autoComplete="off"
+          placeholder="Name, category or city…"
+          onChange={(ev) => setQ(ev.target.value)} />
+        <div className="help">
+          Searched on the server as you type. No ranking and no score — alphabetical, and the only
+          claims made about a business are what its own profile says.
+        </div>
+      </div>
+
+      {rows.map((b) => (
+        <div className={"be-sugg" + (picked === b.businessId ? " top" : "")} key={b.businessId}>
+          <div className="be-sugg-r1">
+            <div className="be-sugg-nm">
+              <div className="nm">{b.name}</div>
+              <div className="band">
+                {b.plan || "no plan"} · {b.subscription}
+                {b.serviceArea.length ? " · " + b.serviceArea.join(", ") : ""}
+              </div>
+            </div>
+          </div>
+          <div className="be-why">
+            {b.categories.length
+              ? b.categories.join(", ")
+              : "No categories on this profile — matching could never have found it."}
+          </div>
+          <div className="be-sugg-a">
+            {/* The same figure the assign dialog rechecks at confirmation — and
+                the server rechecks again on the write. Shown here so an
+                obviously full business is visible before you commit to it,
+                never instead of the check. */}
+            <span className="faint">
+              {b.capacity.active} of {b.capacity.configured} this {b.capacity.period}
+            </span>
+            <span className="spacer" />
+            <button className="btn sm" onClick={() => onPick(b)}>
+              {picked === b.businessId ? "Chosen" : action}
+            </button>
+          </div>
+        </div>
+      ))}
+
+      {/* Four states, and they are four different things. "Type to search" is
+          not an empty result, and an empty result is not a failed request. */}
+      {state === "idle" ? (
+        <div className="be-qp-empty">Type a name, a category or a city to search.</div>
+      ) : null}
+      {state === "loading" ? <div className="be-qp-empty">Searching…</div> : null}
+      {state === "done" && !rows.length ? (
+        <div className="be-qp-empty">No business matches “{q.trim()}”.</div>
+      ) : null}
+      {state === "error" ? (
+        <div className="be-qp-empty">The search did not reach the server. Try again.</div>
+      ) : null}
+    </>
+  );
+}
 
 /* The one place a status becomes a coloured word. Every table cell, drawer
    header and timeline row goes through it, so a status added to
