@@ -18,7 +18,9 @@
     "check:share": "node scripts/check-enquiry-share.cjs",
     "check:wiring": "esbuild src/admin/views/BusinessEnquiries/store.ts --bundle --platform=node --format=cjs --define:import.meta.env={} --external:react --log-level=error --outfile=node_modules/.tmp/enquiry-store.cjs && node scripts/check-enquiry-wiring.cjs",
     "check:match": "esbuild src/admin/views/BusinessEnquiries/store.ts --bundle --platform=node --format=cjs --define:import.meta.env={} --external:react --log-level=error --outfile=node_modules/.tmp/enquiry-store.cjs && node scripts/check-enquiry-match.cjs",
-    "check": "npm run check:enquiries && npm run check:export && npm run check:clock && npm run check:share && npm run check:wiring && npm run check:match",
+    "check:users": "esbuild src/admin/views/Users/store.ts --bundle --platform=node --format=cjs --define:import.meta.env={} --external:react --log-level=error --outfile=node_modules/.tmp/users-store.cjs && node scripts/check-users-derivation.cjs",
+    "check:users-render": "node scripts/build-um-smoke.cjs && node node_modules/.tmp/um-smoke.cjs",
+    "check": "npm run check:enquiries && npm run check:export && npm run check:clock && npm run check:share && npm run check:wiring && npm run check:match && npm run check:users && npm run check:users-render",
     "preview": "vite preview"
   },
   "dependencies": {

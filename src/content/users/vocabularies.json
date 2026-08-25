@@ -1,0 +1,817 @@
+{
+  "$comment": "Stands in for GET /api/v1/admin/users/vocabularies. Labels, tones, the allowed membership transition matrix, the profile schema, the metric definitions and the open decisions this module renders on screen. The panel reads ALL of this rather than hard-coding it, so a membership status, an activation source, a profile field or a metric caution added server-side renders with no code edit. Static copy (labels, help text, cautions) is permanent; nothing in this file is a placeholder record.",
+  "profileSchemaVersion": "profile v1",
+  "$comment_profileSchemaVersion": "The field set completeness_pct is computed against. Stamped onto the user_profile row so a later schema change cannot silently re-grade an old profile as incomplete.",
+  "classifications": [
+    {
+      "key": "normal",
+      "label": "Normal User",
+      "tone": "",
+      "derivedFrom": "no membership record has ever been active",
+      "meaning": "Registered on the platform with no current active membership entitlement.",
+      "value": "The conversion opportunity pool."
+    },
+    {
+      "key": "active_member",
+      "label": "Active Member",
+      "tone": "ok",
+      "derivedFrom": "current membership is Active and today is inside its entitlement period",
+      "meaning": "Receiving membership entitlements right now.",
+      "value": "The current paying and entitled base."
+    },
+    {
+      "key": "paused_member",
+      "label": "Paused Member",
+      "tone": "warn",
+      "derivedFrom": "current membership status is Paused",
+      "meaning": "Membership temporarily paused under policy. Entitlement behaviour follows the pause rule.",
+      "value": "Still a customer, temporarily not consuming."
+    },
+    {
+      "key": "suspended_member",
+      "label": "Suspended Member",
+      "tone": "bad",
+      "derivedFrom": "current membership status is Suspended",
+      "meaning": "Entitlements administratively withheld for a policy, risk or operational reason.",
+      "value": "Needs an authorised reactivation decision."
+    },
+    {
+      "key": "former_member",
+      "label": "Former Member",
+      "tone": "",
+      "derivedFrom": "membership history exists and none of it is currently entitling",
+      "meaning": "Held a membership at some point; holds none now.",
+      "value": "The win-back pool."
+    },
+    {
+      "key": "deactivated",
+      "label": "Deactivated",
+      "tone": "dead",
+      "derivedFrom": "platform_user.user_status",
+      "meaning": "The ACCOUNT is administratively disabled. This is not a membership classification and is never merged with one.",
+      "value": "Excluded from every active-base count, present in every history."
+    }
+  ],
+  "membershipStatuses": [
+    {
+      "key": "pending",
+      "label": "Pending Activation",
+      "tone": "warn",
+      "step": 1,
+      "meaning": "The membership record exists; the entitlement is not live.",
+      "advance": "An approved activation source is verified and the entitlement snapshot is taken."
+    },
+    {
+      "key": "active",
+      "label": "Active",
+      "tone": "ok",
+      "step": 2,
+      "meaning": "The member is receiving entitlements against a frozen plan-version snapshot.",
+      "advance": "Paused, Suspended, Cancelled, Expired, or renewed into a new term."
+    },
+    {
+      "key": "paused",
+      "label": "Paused",
+      "tone": "warn",
+      "step": 3,
+      "meaning": "Temporary and resumable. The end date freezes, extends or continues according to the pause policy.",
+      "advance": "Resumed back to Active, or Suspended or Cancelled from here."
+    },
+    {
+      "key": "suspended",
+      "label": "Suspended",
+      "tone": "bad",
+      "step": 3,
+      "meaning": "Administrative restriction. Access is withheld; history stays intact.",
+      "advance": "Reactivated by an authorised decision, or Cancelled or Expired."
+    },
+    {
+      "key": "expired",
+      "label": "Expired",
+      "tone": "",
+      "step": 4,
+      "terminal": true,
+      "meaning": "The entitlement term reached its end without a renewal.",
+      "advance": "Terminal for this term. A renewal is a NEW record referencing this one."
+    },
+    {
+      "key": "cancelled",
+      "label": "Cancelled",
+      "tone": "dead",
+      "step": 4,
+      "terminal": true,
+      "meaning": "Intentionally terminated before the term would have ended.",
+      "advance": "Terminal for this term. A later membership is a new record."
+    }
+  ],
+  "transitions": [
+    {
+      "from": "pending",
+      "to": [
+        "active",
+        "cancelled"
+      ],
+      "guard": "Activation needs an approved source AND a successful entitlement snapshot. A snapshot failure aborts activation rather than producing an Active membership whose access nobody can enumerate."
+    },
+    {
+      "from": "active",
+      "to": [
+        "paused",
+        "suspended",
+        "cancelled",
+        "expired"
+      ],
+      "guard": "Every lifecycle action needs the matching authority and a stated reason. Expiry is reached by the scheduled sweep, not by a person."
+    },
+    {
+      "from": "paused",
+      "to": [
+        "active",
+        "suspended",
+        "cancelled",
+        "expired"
+      ],
+      "guard": "Resume recalculates the entitlement dates ONLY according to the configured pause policy — UM-OD-04, open. The system does not guess."
+    },
+    {
+      "from": "suspended",
+      "to": [
+        "active",
+        "cancelled",
+        "expired"
+      ],
+      "guard": "Reactivation needs restricted authority and a recorded reason."
+    },
+    {
+      "from": "expired",
+      "to": [],
+      "guard": "Terminal. A renewal creates a new term carrying previous_membership_id; this record is never rewritten."
+    },
+    {
+      "from": "cancelled",
+      "to": [],
+      "guard": "Terminal. A new membership may be created later; this one stays visible and unchanged."
+    }
+  ],
+  "lifecycleActions": [
+    {
+      "key": "activate",
+      "label": "Activate",
+      "from": [
+        "pending"
+      ],
+      "to": "active",
+      "permission": "restricted",
+      "requiresReason": false,
+      "requiresSource": true,
+      "tone": "pri",
+      "help": "Verifies the activation source, freezes the entitlement snapshot from the plan version in force, and sets the term live. Refuses if the snapshot cannot be taken."
+    },
+    {
+      "key": "pause",
+      "label": "Pause",
+      "from": [
+        "active"
+      ],
+      "to": "paused",
+      "permission": "restricted",
+      "requiresReason": true,
+      "tone": "",
+      "help": "Temporary and resumable. What the end date does while paused is UM-OD-04 and is not decided — this screen states which rule it is applying rather than assuming one."
+    },
+    {
+      "key": "resume",
+      "label": "Resume",
+      "from": [
+        "paused"
+      ],
+      "to": "active",
+      "permission": "restricted",
+      "requiresReason": false,
+      "tone": "pri",
+      "help": "Puts entitlements back. Dates move only if the configured pause policy says they move."
+    },
+    {
+      "key": "suspend",
+      "label": "Suspend",
+      "from": [
+        "active",
+        "paused"
+      ],
+      "to": "suspended",
+      "permission": "restricted",
+      "requiresReason": true,
+      "tone": "dgr",
+      "help": "An administrative restriction, not a pause. Needs restricted authority — profile-edit permission is not enough — and a reason that goes into the audit trail."
+    },
+    {
+      "key": "reactivate",
+      "label": "Reactivate",
+      "from": [
+        "suspended"
+      ],
+      "to": "active",
+      "permission": "restricted",
+      "requiresReason": true,
+      "tone": "pri",
+      "help": "Lifts the restriction. The reason is recorded because who decided this was safe again is asked after the fact, not before."
+    },
+    {
+      "key": "cancel",
+      "label": "Cancel",
+      "from": [
+        "active",
+        "paused",
+        "suspended",
+        "pending"
+      ],
+      "to": "cancelled",
+      "permission": "restricted",
+      "requiresReason": true,
+      "tone": "dgr",
+      "help": "Terminates the term. Refund handling belongs to Finance — cancelling here writes no money anywhere."
+    },
+    {
+      "key": "renew",
+      "label": "Renew",
+      "from": [
+        "active",
+        "expired",
+        "cancelled"
+      ],
+      "to": "active",
+      "permission": "authorised",
+      "requiresReason": false,
+      "requiresSource": true,
+      "tone": "pri",
+      "help": "Creates a NEW term referencing this one. The previous record is never rewritten, and a renewal is never counted as a new member."
+    }
+  ],
+  "activationSources": [
+    {
+      "key": "new_sale",
+      "label": "New sale",
+      "requiresReference": true,
+      "referenceLabel": "Payment, invoice or deal reference",
+      "requiresReason": false,
+      "help": "Somebody bought this for the first time. The reference points at the record in Deals, Invoicing or Finance that took the money — this module stores the pointer and never the amount."
+    },
+    {
+      "key": "renewal",
+      "label": "Renewal",
+      "requiresReference": true,
+      "referenceLabel": "Payment, invoice or deal reference",
+      "requiresReason": false,
+      "help": "An existing member bought another term. It is a NEW record linked to the one before it; the previous term is never extended or rewritten."
+    },
+    {
+      "key": "complimentary",
+      "label": "Complimentary",
+      "requiresReference": false,
+      "referenceLabel": "Approved by",
+      "requiresReason": true,
+      "help": "Granted without payment. Needs the membership-lifecycle permission and a stated reason — a grant with no recorded authority is the misuse this rule exists to prevent (UM-BR-05). It creates entitlement and no revenue."
+    }
+  ],
+  "userStatuses": [
+    {
+      "key": "active",
+      "label": "Active",
+      "tone": ""
+    },
+    {
+      "key": "deactivated",
+      "label": "Deactivated",
+      "tone": "dead",
+      "help": "Soft. The user keeps their profile, membership history, commercial links and audit trail — hard deletion is a governed privacy process and is not a button here (UM-BR-16)."
+    }
+  ],
+  "registrationSources": [
+    {
+      "key": "web",
+      "label": "Website signup"
+    },
+    {
+      "key": "portal",
+      "label": "Business portal"
+    },
+    {
+      "key": "funnel",
+      "label": "Campaign funnel"
+    },
+    {
+      "key": "referral",
+      "label": "Referral"
+    },
+    {
+      "key": "admin",
+      "label": "Added by us"
+    }
+  ],
+  "profileFields": [
+    {
+      "key": "displayName",
+      "label": "Display name",
+      "group": "basic",
+      "required": true,
+      "editable": true,
+      "public": true
+    },
+    {
+      "key": "city",
+      "label": "City",
+      "group": "basic",
+      "required": true,
+      "editable": true,
+      "public": true
+    },
+    {
+      "key": "locality",
+      "label": "Locality",
+      "group": "basic",
+      "required": false,
+      "editable": true,
+      "public": false
+    },
+    {
+      "key": "about",
+      "label": "About",
+      "group": "basic",
+      "required": false,
+      "editable": true,
+      "public": true
+    },
+    {
+      "key": "businessName",
+      "label": "Business name",
+      "group": "business",
+      "required": true,
+      "editable": true,
+      "public": true
+    },
+    {
+      "key": "category",
+      "label": "Category",
+      "group": "business",
+      "required": true,
+      "editable": true,
+      "public": true
+    },
+    {
+      "key": "services",
+      "label": "Services",
+      "group": "business",
+      "required": true,
+      "editable": true,
+      "public": true
+    },
+    {
+      "key": "portfolioUrl",
+      "label": "Portfolio link",
+      "group": "business",
+      "required": false,
+      "editable": true,
+      "public": true
+    },
+    {
+      "key": "addressLine",
+      "label": "Contact address",
+      "group": "contact",
+      "required": false,
+      "editable": true,
+      "public": false
+    },
+    {
+      "key": "pincode",
+      "label": "Pincode",
+      "group": "contact",
+      "required": true,
+      "editable": true,
+      "public": false
+    }
+  ],
+  "profileStatuses": [
+    {
+      "key": "incomplete",
+      "label": "Incomplete",
+      "tone": "warn"
+    },
+    {
+      "key": "published",
+      "label": "Published",
+      "tone": "ok"
+    },
+    {
+      "key": "hidden",
+      "label": "Hidden",
+      "tone": ""
+    }
+  ],
+  "tags": [
+    {
+      "slug": "high-intent",
+      "label": "High intent",
+      "tone": "tag-violet",
+      "help": "Told us on a call they want to buy. Internal only."
+    },
+    {
+      "slug": "onboarding",
+      "label": "Onboarding",
+      "tone": "tag-cyan",
+      "help": "Being walked through profile setup."
+    },
+    {
+      "slug": "win-back",
+      "label": "Win-back",
+      "tone": "tag-amber",
+      "help": "Former member worth calling again."
+    },
+    {
+      "slug": "payment-risk",
+      "label": "Payment risk",
+      "tone": "tag-red",
+      "help": "Finance flagged a dispute or a reversal."
+    },
+    {
+      "slug": "vip",
+      "label": "VIP",
+      "tone": "tag-green",
+      "help": "Handled by the founder personally."
+    },
+    {
+      "slug": "profile-chase",
+      "label": "Profile chase",
+      "tone": "tag-slate",
+      "help": "Registered, never finished the profile."
+    }
+  ],
+  "pauseReasons": [
+    "Member requested a break",
+    "Seasonal shutdown",
+    "Awaiting profile correction",
+    "Operational hold"
+  ],
+  "suspendReasons": [
+    "Payment dispute under review by Finance",
+    "Policy breach reported",
+    "Suspected fraudulent listing",
+    "Quality complaint under investigation"
+  ],
+  "cancelReasons": [
+    "Member cancelled",
+    "Switched provider",
+    "Business closed",
+    "Cancelled by us — policy",
+    "Created in error"
+  ],
+  "deactivateReasons": [
+    "Member asked to close the account",
+    "Duplicate account",
+    "Internal / demo account",
+    "Abuse — permanent"
+  ],
+  "cities": [
+    "Bengaluru",
+    "Mumbai",
+    "Pune",
+    "Delhi",
+    "Hyderabad",
+    "Chennai",
+    "Jaipur",
+    "Kochi"
+  ],
+  "states": [
+    "Karnataka",
+    "Maharashtra",
+    "Delhi",
+    "Telangana",
+    "Tamil Nadu",
+    "Rajasthan",
+    "Kerala"
+  ],
+  "categories": [
+    "Interior Design Studio",
+    "Modular Kitchens",
+    "Carpentry & Woodwork",
+    "Civil & Renovation",
+    "Furnishings & Decor",
+    "False Ceiling & Lighting",
+    "Ply & Hardware"
+  ],
+  "registeredRanges": [
+    {
+      "key": "today",
+      "label": "Today"
+    },
+    {
+      "key": "7d",
+      "label": "Last 7 days"
+    },
+    {
+      "key": "30d",
+      "label": "Last 30 days"
+    },
+    {
+      "key": "90d",
+      "label": "Last 90 days"
+    },
+    {
+      "key": "year",
+      "label": "This year"
+    },
+    {
+      "key": "custom",
+      "label": "Custom range"
+    }
+  ],
+  "sortOptions": [
+    {
+      "key": "",
+      "label": "Needs action first"
+    },
+    {
+      "key": "recent",
+      "label": "Recently registered"
+    },
+    {
+      "key": "activity",
+      "label": "Last activity"
+    },
+    {
+      "key": "ending",
+      "label": "Ending soonest"
+    },
+    {
+      "key": "name",
+      "label": "Name A to Z"
+    }
+  ],
+  "renewalWindowDays": 60,
+  "$comment_renewalWindowDays": "Drives expiring-soon AND the renewal-rate denominator. It is a placeholder until UM-OD-11 fixes the window and the grace period — the screens say so rather than presenting it as settled.",
+  "graceDays": null,
+  "metricDefinitions": [
+    {
+      "key": "totalUsers",
+      "label": "Total registered",
+      "unit": "unique users",
+      "formula": "Distinct platform_user rows retained as of the period end.",
+      "caution": "Includes Normal Users, members and former members. Excludes deactivated accounts from the ACTIVE base but never from history."
+    },
+    {
+      "key": "newRegistrations",
+      "label": "New registrations",
+      "unit": "unique users",
+      "formula": "Distinct users whose registered_at falls in the period.",
+      "caution": "Failed and partial registrations are excluded at intake, not here."
+    },
+    {
+      "key": "normalUsers",
+      "label": "Normal Users",
+      "unit": "unique users",
+      "formula": "Registered users with no currently entitling membership.",
+      "caution": "Derived at read time from membership state — there is no stored flag to drift."
+    },
+    {
+      "key": "activeMembers",
+      "label": "Active Members",
+      "unit": "unique users",
+      "formula": "Distinct users whose current membership is Active and inside its entitlement period.",
+      "caution": "Paused and Suspended members are customers but are NOT counted here — they are not entitled today."
+    },
+    {
+      "key": "newMembers",
+      "label": "New members",
+      "unit": "unique users",
+      "formula": "Users whose FIRST-EVER membership activation happened in the period.",
+      "caution": "A renewal is never counted here. That is the single most common way this figure gets inflated."
+    },
+    {
+      "key": "conversion",
+      "label": "Registration to Member",
+      "unit": "users / users",
+      "formula": "First-time activations divided by the eligible registration cohort in the window.",
+      "caution": "Cohort conversion, not a period ratio. Dividing this period's first-timers by this period's registrations compares two different populations."
+    },
+    {
+      "key": "renewalRate",
+      "label": "Renewal rate",
+      "unit": "memberships / memberships",
+      "formula": "Renewed terms divided by terms actually eligible to renew in the window.",
+      "caution": "Never divide by all registered users. The denominator is memberships, and the window is UM-OD-11."
+    },
+    {
+      "key": "churn",
+      "label": "Membership churn",
+      "unit": "memberships / memberships",
+      "formula": "Eligible terms ending without renewal divided by the eligible ending cohort.",
+      "caution": "Membership churn is not account deactivation. The two are counted separately and must never be added together."
+    },
+    {
+      "key": "expiringSoon",
+      "label": "Expiring soon",
+      "unit": "memberships",
+      "formula": "Active terms whose end date falls inside the configured renewal window.",
+      "caution": "Moves the moment the window in UM-OD-11 is fixed. So does the churn denominator."
+    },
+    {
+      "key": "arpm",
+      "label": "Revenue per active member",
+      "unit": "currency / users",
+      "formula": "Membership-linked collected revenue READ FROM FINANCE divided by the defined active-member denominator.",
+      "caution": "Contextual. This module never calculates revenue and never holds a ledger. The scope of what counts is UM-OD-12."
+    },
+    {
+      "key": "profileCompletion",
+      "label": "Profile completion",
+      "unit": "unique users",
+      "formula": "Users meeting the configured completion threshold for profile v1.",
+      "caution": "Re-graded when the profile schema versions. Old rows keep the version they were graded against."
+    },
+    {
+      "key": "engagement",
+      "label": "Active users / MAU",
+      "unit": "unique users",
+      "formula": "Distinct users with at least one qualifying platform event in the window.",
+      "caution": "UNAVAILABLE until UM-OD-10 defines the qualifying-event taxonomy. Shown as unavailable, never as zero."
+    }
+  ],
+  "eventTypes": [
+    {
+      "key": "REGISTERED",
+      "label": "Registered",
+      "tone": "sys"
+    },
+    {
+      "key": "PROFILE_UPDATED",
+      "label": "Profile updated",
+      "tone": ""
+    },
+    {
+      "key": "TAGGED",
+      "label": "Tagged",
+      "tone": ""
+    },
+    {
+      "key": "NOTE",
+      "label": "Internal note",
+      "tone": ""
+    },
+    {
+      "key": "MEMBERSHIP_ASSIGNED",
+      "label": "Membership assigned",
+      "tone": ""
+    },
+    {
+      "key": "MEMBERSHIP_ACTIVATED",
+      "label": "Membership activated",
+      "tone": "ok"
+    },
+    {
+      "key": "MEMBERSHIP_PAUSED",
+      "label": "Membership paused",
+      "tone": "warn"
+    },
+    {
+      "key": "MEMBERSHIP_RESUMED",
+      "label": "Membership resumed",
+      "tone": "ok"
+    },
+    {
+      "key": "MEMBERSHIP_SUSPENDED",
+      "label": "Membership suspended",
+      "tone": "stop"
+    },
+    {
+      "key": "MEMBERSHIP_REACTIVATED",
+      "label": "Membership reactivated",
+      "tone": "ok"
+    },
+    {
+      "key": "MEMBERSHIP_CANCELLED",
+      "label": "Membership cancelled",
+      "tone": "stop"
+    },
+    {
+      "key": "MEMBERSHIP_EXPIRED",
+      "label": "Membership expired",
+      "tone": "sys"
+    },
+    {
+      "key": "MEMBERSHIP_RENEWED",
+      "label": "Renewed",
+      "tone": "ok"
+    },
+    {
+      "key": "USER_DEACTIVATED",
+      "label": "Account deactivated",
+      "tone": "stop"
+    },
+    {
+      "key": "USER_REACTIVATED",
+      "label": "Account reactivated",
+      "tone": "ok"
+    }
+  ],
+  "openDecisions": [
+    {
+      "id": "UM-OD-01",
+      "title": "Membership plan ownership",
+      "position": "This panel CONSUMES the existing Plans catalogue rather than defining one. Whether the plan tables live in Users Management is a schema decision and is unconfirmed.",
+      "blocks": "Schema freeze"
+    },
+    {
+      "id": "UM-OD-02",
+      "title": "Activation trigger",
+      "position": "Which commercial event automatically activates a membership is undefined. Every automatic activation on these screens is stated as an assumption.",
+      "blocks": "Membership build"
+    },
+    {
+      "id": "UM-OD-03",
+      "title": "Complimentary memberships",
+      "position": "Offered here behind an explicit source and a mandatory reason. Whether they are permitted at all is undecided.",
+      "blocks": "Nothing yet"
+    },
+    {
+      "id": "UM-OD-04",
+      "title": "Pause policy",
+      "position": "The pause modal states which rule it is applying and does not guess. Freeze, extend or continue changes the renewal queue and the churn denominator.",
+      "blocks": "Lifecycle and KPI build"
+    },
+    {
+      "id": "UM-OD-05",
+      "title": "Suspension effect",
+      "position": "Which customer surfaces stay available while suspended is undefined, so the suspend modal promises nothing specific.",
+      "blocks": "Entitlement API"
+    },
+    {
+      "id": "UM-OD-06",
+      "title": "Refund consequence",
+      "position": "A refund does not automatically move a membership here. Finance stays authoritative and the consequence is an explicit lifecycle event.",
+      "blocks": "Commercial seam"
+    },
+    {
+      "id": "UM-OD-09",
+      "title": "Profile schema",
+      "position": "profile v1 is the field set on these screens. Which fields are public and which are admin-editable is unconfirmed.",
+      "blocks": "Profile build"
+    },
+    {
+      "id": "UM-OD-10",
+      "title": "Engagement taxonomy",
+      "position": "No qualifying-event taxonomy exists, so DAU/WAU/MAU render as unavailable rather than as zero.",
+      "blocks": "Engagement analytics"
+    },
+    {
+      "id": "UM-OD-11",
+      "title": "Churn definition",
+      "position": "A 60-day renewal window and no grace period are assumed and labelled as assumed everywhere they are used.",
+      "blocks": "Analytics freeze"
+    },
+    {
+      "id": "UM-OD-12",
+      "title": "Membership revenue KPI",
+      "position": "One contextual figure, labelled as read from Finance. Which products count is undefined.",
+      "blocks": "Nothing yet"
+    },
+    {
+      "id": "UM-OD-13",
+      "title": "Entitlement keys",
+      "position": "The keys on these screens are illustrative. The snapshot contract with the customer platform cannot be written without the real ones.",
+      "blocks": "Entitlement API"
+    },
+    {
+      "id": "UM-OD-15",
+      "title": "Concurrent memberships",
+      "position": "Overlapping active terms for the same product are refused. Whether different concurrent products will exist is unconfirmed.",
+      "blocks": "Nothing yet"
+    }
+  ],
+  "team": [
+    {
+      "id": "u-founder",
+      "name": "V. Shakya",
+      "role": "Founder"
+    },
+    {
+      "id": "u-ops-1",
+      "name": "D. Kapoor",
+      "role": "Operations"
+    },
+    {
+      "id": "u-ops-2",
+      "name": "N. Pillai",
+      "role": "Operations"
+    },
+    {
+      "id": "u-fin-1",
+      "name": "S. Raghavan",
+      "role": "Finance Admin"
+    },
+    {
+      "id": "u-sales-1",
+      "name": "A. Sharma",
+      "role": "Sales Head"
+    }
+  ],
+  "$comment_activationSources": "THREE, and the list is deliberately short. It used to carry payment / invoice / deal / manual / legacy, which mixed two different questions: WHY the term exists (a first sale, a renewal, a grant) and WHERE the money is recorded (a deal, an invoice, a payment row). The second is not a source — it is a reference, and it is one free-text field on the form. Somebody choosing between five near-synonyms picks inconsistently, and the analytics built on that choice inherit the inconsistency."
+}

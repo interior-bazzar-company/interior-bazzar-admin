@@ -4,6 +4,457 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ---
 
+## 2026-08-25
+
+### Analytics gets cards, a two-up grid, and a range picker that actually re-cuts the numbers
+
+**Area:** `#/users?view=analytics`
+**Files:** `analytics.json`, `store.ts`, `Analytics.tsx`, `Frame.tsx`,
+`DateRange.tsx` (new), `blocks.css` (new), `index.tsx`, `scripts/um-smoke.tsx`,
+`BACKEND-INTEGRATION.md`
+
+**What changed**
+
+**Thirteen loose sections became thirteen cards in a two-up grid.** The page was
+one column of heading-plus-chart pairs, which at that length reads as an
+undifferentiated scroll: nothing marks where an idea starts, and every figure
+looks equally important because none has an edge. Each figure is now a `card`
+with a title, a subtitle saying what it counts, and a footer carrying the
+caveat — what it does not say, what it must not be added to, which decision it
+assumes. The grid is `auto-fit` with a 430px minimum, so it is one column on a
+laptop half-screen and two on a monitor without a breakpoint to maintain; the
+column chart, cohort grid, KPI row and definitions table opt out with `wide`.
+
+**`analytics.json` is now month-keyed, and that is the whole reason the date
+picker means anything.** It shipped pre-summed `periods: {30d, 90d}`, which can
+only ever answer the two windows somebody thought of — a range control over that
+shape is decoration. It now carries twelve `months[]` rows, each with its own
+**numerators and denominators**: `cohortEligible` for conversion,
+`renewalEligible` for renewal rate, `churnEligible` + `churnLost` for churn,
+plus `bySource` and `byPlan` breakdowns that sum exactly to the month's totals.
+`rangeTotals()` sums the span and **recomputes every rate from its own pair** —
+no stored percentage, because a percentage cannot be re-aggregated over a
+different span without lying. `activeAtEnd` is a level and is read from the last
+month rather than summed.
+
+**The picker is a month grid, not a day calendar.** The series is monthly, so a
+day-precision control would promise a resolution the data does not have — the
+figure would not move when you dragged the end a week and would jump when you
+moved it a day. Two clicks, hover-preview of the span, presets that set the same
+two months the grid does, and **which preset is lit is derived from the range**,
+so a hand-picked span that happens to equal six months lights that chip and
+there is never a preset disagreeing with the dates beside it.
+
+**Two cards say the range does not apply to them**, rather than quietly
+pretending it does: cohort retention is cohort-keyed by nature, and revenue is
+settled by Finance on its own calendar and is labelled with the window it
+actually covers.
+
+**Everything from "Registered to member" down was rebuilt.** Conversion,
+retention, cohorts, status, sources, plans, revenue, engagement, queues, recent
+activity and definitions are all cards now, all range-driven where the range
+applies, each with its denominator stated on the tile and its caveat in the
+footer.
+
+**Temp data**
+
+`src/content/users/analytics.json` — **replaced.** `periods`, `growth`, `funnel`,
+`acquisition` and `planPerformance` are gone, folded into twelve `months[]` rows
+carrying numerators, denominators and both breakdowns. `cohorts`,
+`revenueContext` and `engagement: null` are unchanged. Every per-month sum was
+generated and verified exact (`bySource` to registrations and first-time
+members; `byPlan` to first-time members, renewals and expiries).
+
+**Backend needed**
+
+`GET /admin/users/analytics` — the contract changed shape and
+[BACKEND-INTEGRATION.md](BACKEND-INTEGRATION.md) is updated: month rows with
+numerator/denominator pairs, **never a stored rate**, breakdowns that sum to the
+row, `activeAtEnd` marked as a level. Everything else is unchanged.
+
+**Open decisions**
+
+None new. `UM-OD-11` sits on the cohort card and `UM-OD-12` on revenue, where
+they bite.
+
+**Verified**
+
+`tsc -b` clean from cold; `eslint` clean on the module and `scripts/`;
+`vite build` succeeds at 851.24 kB (up 7.7 kB from the last pass for the picker
+and the extra nine months of seed; still below the 859.34 kB this module's UI
+work started at). `npm run check:users` — 112 assertions, unchanged.
+
+`check:users-render` grew 60 → 72. Six render the analytics page at different
+spans; six assert the layout and the control. Four of those are the ones worth
+having, because a range control that renders and changes nothing is worse than
+none — it invites a decision on a figure that never re-cut:
+
+- a 3-month and a 12-month range must not render identically;
+- a **reversed** range (`start` after `end`) must normalise to the same markup as
+  the forward one rather than being refused;
+- an **out-of-bounds** range must clamp to the series rather than render empty;
+- the **oldest** span must say it has no prior span to compare against, instead
+  of showing a delta against nothing.
+
+One collision was caught while wiring it: the range params were `from`/`to`,
+which the users list already owns for its custom registration window — and
+switching faces carries filters across, so one click from a narrowed list would
+have handed the picker two ISO dates and meant something entirely different by
+them. They are `start`/`end` now.
+
+**Still not verified:** no browser. The assertions prove the range re-cuts the
+figures, the marks are sized correctly and the cards are there; they prove
+nothing about how the two-up grid actually wraps, whether the calendar popover
+is positioned sensibly near the right edge, dark mode, or keyboard and
+screen-reader behaviour.
+
+## 2026-08-25
+
+### Analytics absorbs Overview, and gets real charts
+
+**Area:** `#/users` · the view band, and `?view=analytics`
+**Files:** `charts.tsx` (new), `charts.css` (new), `Analytics.tsx`, `Frame.tsx`,
+`index.tsx`, `List.tsx`, `bits.tsx`, `users.css`, `Overview.tsx` (deleted),
+`scripts/um-smoke.tsx`
+
+**What changed**
+
+**Four faces, not five.** Overview and Analytics were two dashboards over one
+population — the same headline counts with different windows, agreeing only
+because both called the same derivation. Overview is deleted and its content is
+in Analytics: the base tiles, the operational queues, the recent-activity feed
+and the engagement-unavailable block all moved. **Directory is now Users**, and
+it is the default face: `#/users` carries no `view` param and opens on the list,
+which is what the address reads like and what somebody arriving at a user
+directory usually wants.
+
+**Six charts, each picked by the data's job rather than by what looked good.**
+
+| Chart | Form | Colour job |
+| --- | --- | --- |
+| Registrations vs first-time members vs renewals | grouped columns | categorical, 3 slots |
+| Registered → member | horizontal stages | ordinal ramp |
+| Membership status mix | horizontal bars | **reserved status tokens** |
+| Cohort retention | heatmap, 3 buckets | sequential |
+| By acquisition source | horizontal bars | one hue |
+| By plan | horizontal bars | ordinal ramp |
+
+Grouped and not stacked, because stacking would imply the three quantities sum
+to something — and the one thing this module has to keep straight is that
+renewals are not part of first-time members. Plans take an **ordinal** ramp
+because Starter→Growth→Pro is a sequence and the colour should carry it; sources
+take **one hue** because they are names, and shading them by size would say the
+bar length twice. Membership states wear the **reserved status tokens** and
+never a categorical slot, because they mean something.
+
+**The palette was computed, not chosen.** Every set was run through the data-viz
+validator against this panel's own ramps and its own surfaces, in both modes,
+before any chart code existed — the results and the failures are recorded at the
+top of `charts.css`. Light categorical clears worst-adjacent CVD ΔE 9.5 and
+normal-vision 16.9 at ≥3:1 contrast; dark clears 12.9 / 16.4. Four obvious picks
+failed and are written down so nobody re-picks them: `green-9 #0c6b57` is below
+the chroma floor and reads gray; `#61d195` and `#d99b20` sit above the dark
+lightness band; `#264070` misses the light-end contrast floor as a dark ramp
+anchor. **The dark steps are a selection, not a flip.**
+
+**No chart library.** `recharts` is a declared dependency that nothing imported
+and that was not in the bundle; pulling it in for six simple forms would have
+added roughly a hundred kilobytes gzipped to a bundle already past the size
+warning, and it themes badly against CSS custom properties that swap with the
+viewer's theme. The kit is CSS, so it is responsive without viewBox arithmetic
+and dark mode is a token swap. The bundle went **down** — 859.34 kB before this
+module's UI work, 843.52 kB now, charts included.
+
+**Temp data**
+
+Unchanged. `analytics.json` already carried `growth.months[]`,
+`funnel.stages[]`, `acquisition.sources[]`, `cohorts` and `planPerformance`;
+nothing was added for the charts, which is the point of having shaped that file
+like the endpoint rather than like a component.
+
+**Backend needed**
+
+Unchanged. One doc correction: `#/users?view=directory` is `#/users`, and
+"the directory filter" now reads "the users list filter" in
+[BACKEND-INTEGRATION.md](BACKEND-INTEGRATION.md).
+
+**Open decisions**
+
+None new. `UM-OD-10` (engagement) and `UM-OD-11` (churn window) still render as
+markers on the sections they gate; `UM-OD-12` sits under revenue context.
+
+**Verified**
+
+`tsc -b` clean from cold; `eslint` clean on the module and `scripts/`;
+`vite build` succeeds. `npm run check:users` — 112 assertions, unchanged.
+
+`npm run check:users-render` grew from 43 to 60 assertions. Thirteen assert each
+chart form reached the DOM **on the right kind of colour token** — the class is
+the assertion because it encodes the colour's job (`s1..s3` categorical,
+`o1..o3` ordinal, `st-*` reserved status), and a chart that quietly switched
+jobs would still render and still be wrong. Four are geometric, standing in for
+the eyeball pass there is no browser here to do: every mark's percentage stays
+inside 0–100, something reaches full width (so the scale is tight), the tick
+count equals the gridline count, and the x-labels equal the column groups.
+
+Two layout faults were found and fixed by writing those:
+
+- The y-axis ticks could not sit on their gridlines. Both were distributed with
+  `space-between` in separate flex columns, but the label boxes have height and
+  the rules do not — only the middle label ever landed on its rule. Ticks and
+  rules are now positioned from one list at the same percentages.
+- Direct-labelling all three columns of the final group would have collided:
+  three ~20px numbers in a group that is ~70px wide at container widths this
+  panel actually hits. A label that will not fit must not be placed, so one
+  series is labelled — the tallest, which anchors the scale — and the three
+  tiles under the chart carry the current period at a size that cannot collide.
+
+**Still not verified:** no browser. Server-rendered markup and the geometry
+assertions prove the marks are sized and counted correctly; they prove nothing
+about rendered type metrics, the tooltips actually appearing on hover, the
+heatmap at narrow widths, dark mode, or keyboard and screen-reader behaviour.
+The palette is validated arithmetic, not an observation.
+
+## 2026-08-25
+
+### Users Management moves onto the panel's own furniture
+
+**Area:** `#/users` · all five faces and the record
+**Files:** `Frame.tsx`, `Overview.tsx`, `List.tsx`, `RenewalQueue.tsx`, `Analytics.tsx`,
+`Detail.tsx`, `bits.tsx`, `AssignMembership.tsx`, `EditProfile.tsx`,
+`LifecycleModal.tsx`, `Modals.tsx`, `users.css`, `index.tsx`,
+`scripts/um-smoke.tsx`, `scripts/build-um-smoke.cjs`,
+`scripts/um-smoke-shell-stub.tsx`, `eslint.config.js`, `package.json`
+
+**What changed**
+
+The module had quietly reimplemented about half the design system under `um-`
+names — its own tiles, cards, tables, section heads, notices and page header —
+and the result looked *almost* like the rest of the admin, which is worse than
+looking different. All of it now comes from `admin-theme.css` and `ui/`:
+`.dls`/`.dls-cmd`/`.dls-attn`/`.dls-chips`/`.dls-body`, `Tiles`/`Tile`, `.card`,
+`.tbl`, `SectionHead`, `Notice`, `KvList`, `Tabs`. Fourteen local blocks went
+with them — `um-head`, `um-metric`, `um-tip`, `um-note`, `um-sec`, `um-h`,
+`um-h3`, `um-card`, `um-card-h`, `um-card-r`, `um-rec-h`, `um-comp-row`,
+`um-reflist`, `um-frozen` — and the module now inherits every future change to
+the primitives that replaced them.
+
+**The page title is gone, on all five faces.** The panel's rule is written into
+the theme — *".dls-head is gone: title and scope live in the topbar, and the page
+opens on its controls"* — and this module was shipping an `<h1>Users
+Management</h1>` plus a three-line paragraph above the fold on every screen,
+repeating the topbar and pushing the actual work down. The scope moved into the
+topbar's stat slots (users · members · ending soon), where Deals and Business
+Enquiries keep theirs, and it is counted unfiltered so it cannot change meaning
+when somebody narrows the list beneath it.
+
+**Descriptions came off the headings.** Section heads used to carry an `<i>`
+explainer sentence; they now carry the `SectionHead` `desc` slot with two to
+five words, and it is the counting unit wherever there is one — "memberships,
+not users", "unique users per month". The per-tile formula tooltip is gone with
+the tiles that carried it: the unit sits on the tile, and the definitions table
+at the foot of Analytics is the single home for formula and caution. Long
+`Notice` blocks were cut to one per screen at most, and roughly 40 explanatory
+paragraphs went entirely.
+
+**Two real UI faults came out of it.** A read-only "Money written by this form —
+None, ever" box sat in the assignment dialog beside the reference input: a
+control that takes no input and reads as a disabled field. The point it was
+making is real and now lives in the dialog's closing notice, which is where a
+statement about consequences belongs. And the row-level **Assign** button had
+been given `.rowact`, the house class that fades a row action in on hover —
+right for a secondary verb on a busy table, wrong for the one conversion action
+the module exists to make easy, and unreachable on touch. It is always visible.
+
+**Temp data**
+
+Unchanged. No content file was touched.
+
+**Backend needed**
+
+Unchanged — see
+[BACKEND-INTEGRATION.md](BACKEND-INTEGRATION.md#module-5--business-ops--users-management).
+
+**Open decisions**
+
+None new. The twelve `UM-OD-nn` markers survive as compact one-line blocks
+rather than paragraphs; the register is still `vocabularies.json →
+openDecisions[]`.
+
+**Verified**
+
+`npx tsc -b` clean from cold; `npx eslint` clean on the module and `scripts/`
+(the 195 errors elsewhere in the repo are pre-existing and untouched);
+`npx vite build --mode dev` succeeds; `npm run check:users` still passes all 112
+assertions.
+
+New: **`npm run check:users-render`**, wired into `npm run check`. It renders all
+27 URLs and all 17 dialog states through `renderToStaticMarkup` and fails on any
+throw — which is the class of bug `tsc` cannot see and the previous pass had no
+answer for. Getting it to run took a DOM stub and an esbuild plugin that swaps
+`ShellContext` for a no-op (the real provider portals into `document.body`, and
+there is no jsdom in this repo); both are in `scripts/` and neither is reachable
+from the app.
+
+It earned its keep immediately: an assertion about the assignment dialog failed,
+and the failure was correct behaviour — a member holding a live **Pro** term
+sees no clash while the form sits on Starter, because the rule is one
+entitlement *per product*. But the operator had no way to know they were about
+to give a paying member a second plan until they happened to pick the colliding
+one. The dialog now always lists what is already live on the account, and keeps
+the blocking refusal for the selected plan. Those are two different questions
+and it was only answering the second.
+
+**Still not verified:** nothing has been exercised in a browser. Server-rendered
+markup proves the components run and produce the right classes; it proves
+nothing about layout, the sticky table header inside `.dls-body`, the stat-strip
+tooltips (`.um .dls-attn` now sets `overflow-x: visible` so they are not clipped
+— reasoned, not observed), dark mode, or keyboard and screen-reader behaviour.
+
+## 2026-08-25
+
+### Business Ops · Users Management — the whole module, frontend-first
+
+**Area:** sidebar → **Business Ops** (new group) → Users Management ·
+`#/users`, `#/users/:id`
+**Files:** `src/content/users/{users,memberships,membership-plans,vocabularies,analytics,audit}.json`,
+`src/admin/views/Users/{index,Frame,Overview,List,RenewalQueue,Analytics,Detail,AssignMembership,LifecycleModal,EditProfile,Modals,bits}.tsx`,
+`src/admin/views/Users/{store.ts,users.css}`,
+`src/admin/views/registry.tsx`, `src/admin/shell/modules.ts`,
+`src/admin/auth/session.ts`, `scripts/check-users-derivation.cjs`, `package.json`
+
+**What changed**
+
+Eleven surfaces that did not exist: a founder overview, the registered-user
+directory, a members view, the renewal queue, analytics, and a six-tab record
+workspace carrying the current term, the profile, the commercial links, the full
+membership history with a per-term detail, internal notes and tags, and an
+append-only timeline. Plus three decision dialogs — membership assignment,
+one guarded lifecycle modal covering all seven transitions, and profile editing.
+
+**The one structural decision worth remembering: there is no stored
+classification.** Normal User, Active Member, Paused, Suspended, Former Member
+and Deactivated are derived at read time from membership state by `classify()`
+in `store.ts`, and the directory filter, the members view, the overview tiles,
+the queue and every analytics denominator call that one function. `users.json`
+has no `is_member` column and must never grow one. A manually editable member
+flag would drift from reality inside a week, and every screen reading it would
+drift with it.
+
+**Five faces on one route, not five routes.** The wireframe put Overview,
+Directory, Members, Renewal Queue and Analytics in the sidebar as five nav rows.
+They are five readings of one population, and five routes would have meant five
+module rows in the permission matrix for a single access decision, and a Back
+button that leaves the module when you meant to widen the question. As one route
+with a view band above the title they share the filters, the derivation and the
+URL — narrowing the directory and switching to Members keeps what you narrowed.
+
+**Every write is simulated and every screen says so**, in the same words the
+banner says it: users, memberships, plans and analytics are read from
+`src/content/users/`, and assign, activate, pause, resume, suspend, reactivate,
+cancel, renew, edit-profile, note, tag and deactivate all write to the browser
+tab only. A reload restores the seed.
+
+**Three smaller decisions that are load-bearing rather than cosmetic.** Every
+figure prints its counting unit on the tile and its formula and caution in a
+tooltip, read from `vocabularies.json → metricDefinitions[]` — the discipline is
+that the same metric means the same thing in March and in September, and writing
+the definition beside the figure is the only defence that survives contact with
+a dashboard. Every unresolved product question renders as a dashed `UM-OD-nn`
+block on the screen it affects, naming the assumption. And engagement renders as
+an explicit unavailable state with the blocker named, never as zero — a zero
+there is indistinguishable from a platform nobody opens.
+
+**Temp data**
+
+`src/content/users/users.json` → `users[]` — **placeholder records.** 20 users
+covering every classification, both account statuses, all five registration
+sources and complete/incomplete profiles.
+`src/content/users/memberships.json` → `memberships[]` — **placeholder records.**
+18 terms including three renewal chains, a cancel-then-return, two suspensions,
+one pause, one Pending Activation with no snapshot, and terms on superseded plan
+versions so the freeze is demonstrable rather than asserted.
+`src/content/users/membership-plans.json` — **placeholder records**, and not ours
+to own (UM-OD-01): a read of the commercial catalogue, version-first.
+`src/content/users/analytics.json` — **placeholder records** for trend, cohorts,
+acquisition and the Finance-read revenue context. Deliberately does *not* carry
+the headline counts; those are counted client-side from the two files above by
+the same derivation the directory filters on, so a tile and the list it drills
+into cannot disagree.
+`src/content/users/audit.json` → `events[]` — **placeholder records.**
+`src/content/users/vocabularies.json` — **static copy, permanent.** Labels, the
+transition matrix, the lifecycle action table, the profile schema, the metric
+definitions and the open-decision register. Nothing in it becomes backend work
+beyond serving it.
+
+**Backend needed**
+
+- `GET /api/v1/admin/users` → the filtered, ordered, paged directory with counts
+  over the whole filtered set → replaces `users.json`
+- `GET /api/v1/admin/users/{id}` → the workspace payload → replaces one element
+- `GET /api/v1/admin/users/{id}/memberships` → every term including terminal ones
+  → replaces `memberships.json`
+- `GET /api/v1/admin/memberships/{id}` and `/events` → one term and its
+  append-only lifecycle log
+- `GET /api/v1/admin/membership-plans` → a read of the commercial catalogue →
+  replaces `membership-plans.json`
+- `GET /api/v1/admin/users/vocabularies` → replaces `vocabularies.json`
+- `GET /api/v1/admin/users/analytics/{overview,membership,cohorts}` → replaces
+  `analytics.json`
+- `GET /api/v1/admin/users/{id}/timeline` → replaces `audit.json`
+- `POST/PATCH` for UM-T01 … UM-T12 — the twelve transactions, with sequences and
+  failure modes, in
+  [BACKEND-INTEGRATION.md](BACKEND-INTEGRATION.md#module-5--business-ops--users-management)
+- A `Module` row for `users` in group **Business Ops**, with membership lifecycle
+  as a **separate sensitive action** rather than riding on `edit`. Until it
+  exists, `users` sits in `PROTO_MODULES` and `can("users")` returns true for
+  everyone — safe only because there is no server data behind it and no server
+  write to authorise.
+
+**Open decisions**
+
+Twelve, all assumed on screen rather than silently: `UM-OD-01` plan ownership
+(catalogue consumed, never defined), `UM-OD-02` activation trigger (nothing
+activates automatically — a person does), `UM-OD-03` complimentary grants
+(offered, behind an explicit source and a mandatory reason), `UM-OD-04` pause
+policy (`continue` — the end date runs on), `UM-OD-05` suspension effect (the
+dialog promises nothing specific), `UM-OD-06` refund consequence (a refund moves
+nothing by itself), `UM-OD-09` profile schema (`profile v1`, public/internal
+marked per field), `UM-OD-10` engagement taxonomy (rendered unavailable),
+`UM-OD-11` churn window (60 days, no grace, labelled everywhere it is used),
+`UM-OD-12` revenue scope (one figure, read from Finance), `UM-OD-13` entitlement
+keys (illustrative), `UM-OD-15` concurrent products (overlapping live terms on
+the same product refused). The register is
+`vocabularies.json → openDecisions[]`, and the `Assumed` component reads it by
+id so the code and the spec point at each other rather than describing each
+other.
+
+**Verified**
+
+`npx tsc -b` clean from a cold build; `npx eslint` clean on the new module and
+the four wiring files; `npx vite build --mode dev` succeeds.
+
+`npm run check:users` — a new suite, wired into `npm run check` — asserts the
+derivation and the write simulation against the seed through the same exported
+functions the screens call, not a reimplementation: the classification of all 20
+users individually, the six classifications summing to the population, every
+filter returning exactly the count the strip advertises for it, phone search
+matching across four formattings of one number, the transition matrix refusing
+what it should, renewal creating a new row while the previous term's status,
+dates and snapshot stay byte-identical, activation freezing the snapshot from
+the version the term names and the classification following it, and every event
+type the client writes existing in the vocabulary. That last one caught a real
+bug before it shipped: deriving the event name from the action produced
+`MEMBERSHIP_CANCELED` with one L, which matches nothing in `eventTypes[]`, so
+the row would have rendered with no label and no tone. It is a spelt-out map
+now, with a comment saying why.
+
+**Not verified:** nothing was exercised in a browser — no click-through, no
+responsive check at real breakpoints, no dark-mode pass, and no screen-reader
+pass. Every colour, space and radius is a theme token and there is no literal
+hex in `users.css`, which is the reason dark mode is *expected* to work rather
+than the evidence that it does.
+
 ## 2026-08-21
 
 ### "No match found" → "No match yet"

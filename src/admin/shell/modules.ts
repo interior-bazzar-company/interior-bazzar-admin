@@ -39,6 +39,7 @@ const ICON_OF: Record<string, string> = {
   roles: "shield",
   audit: "history",
   "business-enquiries": "route",
+  users: "users",
 };
 
 /* ---------------------------------------------------------- proto rows ---
@@ -54,8 +55,16 @@ const PROTO_ROWS: { key: string; label: string; group: string }[] = [
   /* business-enquiries removed: the server sends its own Module row now
      (backend migration 0024), so the stand-in would never have been reached —
      PROTO_MODULES no longer holds the key, which is the second half of the
-     condition below. Kept as an empty list because the mechanism is still the
-     right one for the next frontend-first module. */
+     condition below. Kept as a comment because the mechanism is still the right
+     one for the next frontend-first module, and `users` is that module. */
+
+  /* Business Ops · Users Management. A NEW GROUP, not a row inside Sales: the
+     registered-user base and the membership lifecycle are neither a sales
+     pipeline nor a setting, and filing them under either would have been a
+     filing decision pretending to be a product one. The group is empty apart
+     from this until the rest of Business Ops lands, and a group of one is the
+     honest state of that rather than a reason to hide it somewhere else. */
+  { key: "users", label: "Users Management", group: "Business Ops" },
 ];
 /** Sidebar queue-count keys, from IBData.derive.badges(). A module with no
  * entry here shows no badge, which is correct for anything the prototype
@@ -73,7 +82,7 @@ const Q_OF: Record<string, string> = {
 
    A group not named here keeps its arrival order, after the named ones: a new
    server group appears rather than silently vanishing. */
-const GROUP_ORDER = ["Sales", "Client Ops", "Catalogue", "Settings"];
+const GROUP_ORDER = ["Sales", "Client Ops", "Business Ops", "Catalogue", "Settings"];
 
 export function getModules(): ModuleGroup[] {
   const s = getSession();

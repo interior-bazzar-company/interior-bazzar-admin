@@ -1,0 +1,85 @@
+{
+  "$comment": "Stands in for GET /api/v1/admin/users/{id}/timeline (the record's audit tab) and the Users slice of the shared admin audit log. APPEND-ONLY: there is no edit and no delete path anywhere in this module for a row in here or for a membership_event (UM-FR-021). It holds ONLY the non-membership user events — registration, profile administration, tagging, notes and account status. Membership lifecycle events live on the membership they belong to, in memberships.json, and store.ts merges the two streams into one timeline rather than duplicating either. `note` records WHAT changed, never the content of an internal note: that a servicing note exists is an operational fact worth logging; what it says is not, and must never reach a timeline a business-scoped read could one day see (UM-BR-17).",
+  "generatedAt": "2026-08-25T09:00:00+05:30",
+
+  "events": [
+    { "eventId": "AU-9001", "userId": "IB-U-1041", "type": "REGISTERED", "actor": "System", "actorRole": "System", "at": "2026-08-06T11:40:00+05:30", "note": "Website signup. Classified Normal User because no membership exists." },
+    { "eventId": "AU-9002", "userId": "IB-U-1041", "type": "PROFILE_UPDATED", "actor": "Priya Nair", "actorRole": "Member", "at": "2026-08-07T09:15:00+05:30", "note": "Self-service: businessName, category, services, about, portfolioUrl." },
+    { "eventId": "AU-9003", "userId": "IB-U-1041", "type": "TAGGED", "actor": "D. Kapoor", "actorRole": "Operations", "at": "2026-08-20T12:10:00+05:30", "note": "Added high-intent." },
+    { "eventId": "AU-9004", "userId": "IB-U-1041", "type": "NOTE", "actor": "D. Kapoor", "actorRole": "Operations", "at": "2026-08-20T12:12:00+05:30", "note": "Internal note added. Text is deliberately not logged." },
+
+    { "eventId": "AU-9010", "userId": "IB-U-1038", "type": "REGISTERED", "actor": "System", "actorRole": "System", "at": "2026-08-05T18:02:00+05:30", "note": "Campaign funnel. Classified Normal User." },
+    { "eventId": "AU-9011", "userId": "IB-U-1038", "type": "PROFILE_UPDATED", "actor": "Arjun Bhat", "actorRole": "Member", "at": "2026-08-05T18:20:00+05:30", "note": "Self-service: displayName, city, businessName, category." },
+    { "eventId": "AU-9012", "userId": "IB-U-1038", "type": "TAGGED", "actor": "N. Pillai", "actorRole": "Operations", "at": "2026-08-18T10:00:00+05:30", "note": "Added profile-chase." },
+
+    { "eventId": "AU-9020", "userId": "IB-U-1029", "type": "REGISTERED", "actor": "System", "actorRole": "System", "at": "2026-08-02T08:55:00+05:30", "note": "Website signup." },
+    { "eventId": "AU-9021", "userId": "IB-U-1029", "type": "TAGGED", "actor": "N. Pillai", "actorRole": "Operations", "at": "2026-08-14T11:30:00+05:30", "note": "Added profile-chase." },
+
+    { "eventId": "AU-9030", "userId": "IB-U-1012", "type": "REGISTERED", "actor": "System", "actorRole": "System", "at": "2026-07-28T16:12:00+05:30", "note": "Referral from IB-U-0880." },
+    { "eventId": "AU-9031", "userId": "IB-U-1012", "type": "PROFILE_UPDATED", "actor": "Rohit Desai", "actorRole": "Member", "at": "2026-08-12T13:44:00+05:30", "note": "Self-service: about, services, addressLine, pincode." },
+    { "eventId": "AU-9032", "userId": "IB-U-1012", "type": "TAGGED", "actor": "A. Sharma", "actorRole": "Sales Head", "at": "2026-08-22T15:20:00+05:30", "note": "Added high-intent." },
+
+    { "eventId": "AU-9040", "userId": "IB-U-0975", "type": "REGISTERED", "actor": "System", "actorRole": "System", "at": "2025-09-20T10:30:00+05:30", "note": "Business portal signup." },
+    { "eventId": "AU-9041", "userId": "IB-U-0975", "type": "PROFILE_UPDATED", "actor": "D. Kapoor", "actorRole": "Operations", "at": "2026-07-02T17:10:00+05:30", "note": "Admin edit: about, services. Reason recorded on the request." },
+    { "eventId": "AU-9042", "userId": "IB-U-0975", "type": "NOTE", "actor": "V. Shakya", "actorRole": "Founder", "at": "2026-08-14T18:30:00+05:30", "note": "Internal note added." },
+
+    { "eventId": "AU-9050", "userId": "IB-U-0958", "type": "REGISTERED", "actor": "System", "actorRole": "System", "at": "2026-08-12T12:00:00+05:30", "note": "Business portal signup." },
+    { "eventId": "AU-9051", "userId": "IB-U-0958", "type": "PROFILE_UPDATED", "actor": "N. Pillai", "actorRole": "Operations", "at": "2026-08-18T10:25:00+05:30", "note": "Admin edit: category, services, addressLine, pincode." },
+    { "eventId": "AU-9052", "userId": "IB-U-0958", "type": "TAGGED", "actor": "N. Pillai", "actorRole": "Operations", "at": "2026-08-18T10:26:00+05:30", "note": "Added onboarding." },
+
+    { "eventId": "AU-9060", "userId": "IB-U-0944", "type": "REGISTERED", "actor": "System", "actorRole": "System", "at": "2025-11-04T09:10:00+05:30", "note": "Website signup." },
+    { "eventId": "AU-9061", "userId": "IB-U-0944", "type": "PROFILE_UPDATED", "actor": "Tara Design Collective", "actorRole": "Member", "at": "2026-05-30T15:00:00+05:30", "note": "Self-service: about, services, portfolioUrl." },
+
+    { "eventId": "AU-9070", "userId": "IB-U-0921", "type": "REGISTERED", "actor": "System", "actorRole": "System", "at": "2025-06-18T14:25:00+05:30", "note": "Business portal signup." },
+    { "eventId": "AU-9071", "userId": "IB-U-0921", "type": "PROFILE_UPDATED", "actor": "D. Kapoor", "actorRole": "Operations", "at": "2026-03-19T11:05:00+05:30", "note": "Admin edit: services, addressLine." },
+    { "eventId": "AU-9072", "userId": "IB-U-0921", "type": "TAGGED", "actor": "A. Sharma", "actorRole": "Sales Head", "at": "2026-07-20T09:30:00+05:30", "note": "Added win-back after the term expired." },
+
+    { "eventId": "AU-9080", "userId": "IB-U-0912", "type": "REGISTERED", "actor": "System", "actorRole": "System", "at": "2024-06-14T10:22:00+05:30", "note": "Website signup. Classified Normal User for thirteen minutes, until the Starter term activated." },
+    { "eventId": "AU-9081", "userId": "IB-U-0912", "type": "TAGGED", "actor": "V. Shakya", "actorRole": "Founder", "at": "2025-08-01T10:00:00+05:30", "note": "Added vip." },
+    { "eventId": "AU-9082", "userId": "IB-U-0912", "type": "PROFILE_UPDATED", "actor": "D. Kapoor", "actorRole": "Operations", "at": "2026-08-22T14:02:00+05:30", "note": "Admin edit: about, services, addressLine. Authentication fields were not touched — they are not editable here." },
+    { "eventId": "AU-9083", "userId": "IB-U-0912", "type": "NOTE", "actor": "V. Shakya", "actorRole": "Founder", "at": "2026-06-14T12:00:00+05:30", "note": "Internal note added." },
+
+    { "eventId": "AU-9090", "userId": "IB-U-0899", "type": "REGISTERED", "actor": "System", "actorRole": "System", "at": "2025-11-28T13:45:00+05:30", "note": "Campaign funnel." },
+    { "eventId": "AU-9091", "userId": "IB-U-0899", "type": "PROFILE_UPDATED", "actor": "Lokesh Interiors", "actorRole": "Member", "at": "2026-01-08T18:12:00+05:30", "note": "Self-service: about, addressLine, pincode." },
+
+    { "eventId": "AU-9100", "userId": "IB-U-0880", "type": "REGISTERED", "actor": "System", "actorRole": "System", "at": "2024-08-30T11:00:00+05:30", "note": "Business portal signup." },
+    { "eventId": "AU-9101", "userId": "IB-U-0880", "type": "PROFILE_UPDATED", "actor": "D. Kapoor", "actorRole": "Operations", "at": "2026-08-22T11:18:00+05:30", "note": "Admin edit: services, portfolioUrl." },
+    { "eventId": "AU-9102", "userId": "IB-U-0880", "type": "NOTE", "actor": "D. Kapoor", "actorRole": "Operations", "at": "2026-08-19T09:20:00+05:30", "note": "Internal note added." },
+
+    { "eventId": "AU-9110", "userId": "IB-U-0867", "type": "REGISTERED", "actor": "System", "actorRole": "System", "at": "2025-09-05T15:30:00+05:30", "note": "Website signup." },
+    { "eventId": "AU-9111", "userId": "IB-U-0867", "type": "PROFILE_UPDATED", "actor": "Zenith Ceilings", "actorRole": "Member", "at": "2026-04-14T12:00:00+05:30", "note": "Self-service: services, about." },
+
+    { "eventId": "AU-9120", "userId": "IB-U-0834", "type": "REGISTERED", "actor": "System", "actorRole": "System", "at": "2025-04-11T10:05:00+05:30", "note": "Referral." },
+    { "eventId": "AU-9121", "userId": "IB-U-0834", "type": "PROFILE_UPDATED", "actor": "Sharma Interiors", "actorRole": "Member", "at": "2026-02-02T14:40:00+05:30", "note": "Self-service: about, services." },
+    { "eventId": "AU-9122", "userId": "IB-U-0834", "type": "NOTE", "actor": "N. Pillai", "actorRole": "Operations", "at": "2026-08-22T09:05:00+05:30", "note": "Internal note added alongside the pause." },
+
+    { "eventId": "AU-9130", "userId": "IB-U-0812", "type": "REGISTERED", "actor": "System", "actorRole": "System", "at": "2026-06-30T19:20:00+05:30", "note": "Website signup." },
+    { "eventId": "AU-9131", "userId": "IB-U-0812", "type": "PROFILE_UPDATED", "actor": "Anaya Verma", "actorRole": "Member", "at": "2026-07-04T10:15:00+05:30", "note": "Self-service: full business profile." },
+    { "eventId": "AU-9132", "userId": "IB-U-0812", "type": "TAGGED", "actor": "D. Kapoor", "actorRole": "Operations", "at": "2026-08-24T09:00:00+05:30", "note": "Added high-intent." },
+
+    { "eventId": "AU-9140", "userId": "IB-U-0790", "type": "REGISTERED", "actor": "System", "actorRole": "System", "at": "2025-03-22T09:15:00+05:30", "note": "Business portal signup." },
+    { "eventId": "AU-9141", "userId": "IB-U-0790", "type": "PROFILE_UPDATED", "actor": "D. Kapoor", "actorRole": "Operations", "at": "2026-06-11T16:20:00+05:30", "note": "Admin edit: about, services." },
+    { "eventId": "AU-9142", "userId": "IB-U-0790", "type": "NOTE", "actor": "D. Kapoor", "actorRole": "Operations", "at": "2026-08-16T13:30:00+05:30", "note": "Internal note added alongside the suspension." },
+
+    { "eventId": "AU-9150", "userId": "IB-U-0745", "type": "REGISTERED", "actor": "System", "actorRole": "System", "at": "2025-02-14T11:50:00+05:30", "note": "Business portal signup." },
+    { "eventId": "AU-9151", "userId": "IB-U-0745", "type": "PROFILE_UPDATED", "actor": "D. Kapoor", "actorRole": "Operations", "at": "2026-05-02T09:30:00+05:30", "note": "Admin edit: services." },
+    { "eventId": "AU-9152", "userId": "IB-U-0745", "type": "TAGGED", "actor": "S. Raghavan", "actorRole": "Finance Admin", "at": "2026-08-05T15:00:00+05:30", "note": "Added payment-risk." },
+    { "eventId": "AU-9153", "userId": "IB-U-0745", "type": "NOTE", "actor": "S. Raghavan", "actorRole": "Finance Admin", "at": "2026-08-05T15:04:00+05:30", "note": "Internal note added." },
+
+    { "eventId": "AU-9160", "userId": "IB-U-0702", "type": "REGISTERED", "actor": "System", "actorRole": "System", "at": "2025-01-11T08:40:00+05:30", "note": "Campaign funnel." },
+    { "eventId": "AU-9161", "userId": "IB-U-0702", "type": "PROFILE_UPDATED", "actor": "Fernandes Interiors", "actorRole": "Member", "at": "2025-12-01T10:00:00+05:30", "note": "Self-service: about, addressLine." },
+    { "eventId": "AU-9162", "userId": "IB-U-0702", "type": "TAGGED", "actor": "A. Sharma", "actorRole": "Sales Head", "at": "2026-07-20T09:35:00+05:30", "note": "Added win-back after the term expired." },
+
+    { "eventId": "AU-9170", "userId": "IB-U-0688", "type": "REGISTERED", "actor": "System", "actorRole": "System", "at": "2024-12-02T17:00:00+05:30", "note": "Website signup." },
+    { "eventId": "AU-9171", "userId": "IB-U-0688", "type": "PROFILE_UPDATED", "actor": "Saloni Interiors", "actorRole": "Member", "at": "2026-03-01T11:20:00+05:30", "note": "Self-service: about, services." },
+    { "eventId": "AU-9172", "userId": "IB-U-0688", "type": "NOTE", "actor": "D. Kapoor", "actorRole": "Operations", "at": "2026-03-01T11:30:00+05:30", "note": "Internal note added." },
+
+    { "eventId": "AU-9180", "userId": "IB-U-0655", "type": "REGISTERED", "actor": "System", "actorRole": "System", "at": "2024-12-02T09:30:00+05:30", "note": "Referral." },
+    { "eventId": "AU-9181", "userId": "IB-U-0655", "type": "PROFILE_UPDATED", "actor": "Kulkarni & Sons", "actorRole": "Member", "at": "2025-11-10T13:00:00+05:30", "note": "Self-service: about, services." },
+    { "eventId": "AU-9182", "userId": "IB-U-0655", "type": "TAGGED", "actor": "A. Sharma", "actorRole": "Sales Head", "at": "2026-06-01T10:00:00+05:30", "note": "Added win-back." },
+
+    { "eventId": "AU-9190", "userId": "IB-U-0601", "type": "REGISTERED", "actor": "V. Shakya", "actorRole": "Founder", "at": "2024-01-01T00:00:00+05:30", "note": "Created by hand for walkthroughs." },
+    { "eventId": "AU-9191", "userId": "IB-U-0601", "type": "USER_DEACTIVATED", "actor": "V. Shakya", "actorRole": "Founder", "at": "2026-04-27T10:00:00+05:30", "note": "Reason: Internal / demo account. Soft — profile, history and audit are all retained. This is an ACCOUNT status and is not a membership classification." },
+    { "eventId": "AU-9192", "userId": "IB-U-0601", "type": "NOTE", "actor": "V. Shakya", "actorRole": "Founder", "at": "2026-04-27T10:01:00+05:30", "note": "Internal note added." }
+  ]
+}

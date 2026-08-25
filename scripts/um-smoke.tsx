@@ -1,0 +1,267 @@
+/* Render every Users Management surface to a string and fail on any throw. */
+
+/* A DOM stub, not a DOM. The shell reads the stored theme and density off
+   `document.documentElement` while it renders, and there is no jsdom in this
+   repo — the six calls it makes are all the shell needs to get through a render
+   pass, and the assertion is that the MODULE renders, not that the shell's
+   appearance plumbing works headless. */
+const el = () => ({
+  getAttribute: () => null,
+  setAttribute: () => {},
+  removeAttribute: () => {},
+  classList: { add: () => {}, remove: () => {}, toggle: () => {}, contains: () => false },
+  style: { setProperty: () => {} },
+  appendChild: () => {}, removeChild: () => {}, contains: () => false,
+  addEventListener: () => {}, removeEventListener: () => {},
+  focus: () => {}, querySelector: () => null, querySelectorAll: () => [],
+});
+const g = globalThis as unknown as Record<string, unknown>;
+const doc = { ...el(), documentElement: el(), body: el(), createElement: el, activeElement: null };
+g.document = doc;
+g.window = {
+  document: doc,
+  addEventListener: () => {}, removeEventListener: () => {},
+  matchMedia: () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }),
+  localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+  getComputedStyle: () => ({ getPropertyValue: () => "" }),
+  setTimeout, clearTimeout, requestAnimationFrame: (f: () => void) => setTimeout(f, 0),
+};
+g.localStorage = (g.window as Record<string, unknown>).localStorage;
+g.matchMedia = (g.window as Record<string, unknown>).matchMedia;
+
+import { renderToStaticMarkup } from "react-dom/server";
+import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { ShellProvider } from "../src/admin/shell/ShellContext";
+import Users from "../src/admin/views/Users";
+import AssignMembership from "../src/admin/views/Users/AssignMembership";
+import LifecycleModal from "../src/admin/views/Users/LifecycleModal";
+import EditProfile from "../src/admin/views/Users/EditProfile";
+import { NoteModal, TagsModal, DeactivateModal } from "../src/admin/views/Users/Modals";
+import { toRow, readUsers, readMemberships } from "../src/admin/views/Users/store";
+import type { LifecycleAction } from "../src/admin/views/Users/store";
+
+/* ShellProvider calls useNavigate itself, so the Router has to be OUTSIDE it —
+   the same order AdminShell mounts them in. */
+const at = (url: string) => renderToStaticMarkup(
+  <MemoryRouter initialEntries={[url]}>
+    <ShellProvider>
+      <Routes>
+        <Route path="/users" element={<Users />} />
+        <Route path="/users/:id" element={<Users />} />
+      </Routes>
+    </ShellProvider>
+  </MemoryRouter>
+);
+
+const modal = (node: React.ReactNode) => renderToStaticMarkup(
+  <MemoryRouter><ShellProvider>{node}</ShellProvider></MemoryRouter>
+);
+
+const rowOf = (id: string) => {
+  const u = readUsers().filter((x) => x.userId === id)[0];
+  return toRow(u, readMemberships());
+};
+
+const URLS: [string, string][] = [
+  ["users (default)", "/users"],
+  ["users filtered", "/users?cls=normal&city=Mumbai&flag=incomplete"],
+  ["users page 2", "/users?page=2"],
+  ["users empty", "/users?q=zzzznothing"],
+  ["users custom range", "/users?registered=custom&from=2026-01-01&to=2026-08-01"],
+  ["members", "/users?view=members"],
+  ["members filtered", "/users?view=members&cls=former_member"],
+  ["renewals", "/users?view=renewals"],
+  ["renewals ended", "/users?view=renewals&flag=ended"],
+  ["analytics (default 6m)", "/users?view=analytics"],
+  ["analytics · 3-month range", "/users?view=analytics&start=2026-06&end=2026-08"],
+  ["analytics · 12-month range", "/users?view=analytics&start=2025-09&end=2026-08"],
+  ["analytics · single month", "/users?view=analytics&start=2026-08&end=2026-08"],
+  ["analytics · reversed range", "/users?view=analytics&start=2026-08&end=2026-03"],
+  ["analytics · out-of-bounds range", "/users?view=analytics&start=2019-01&end=2099-12"],
+  ["analytics · oldest span, no prior", "/users?view=analytics&start=2025-09&end=2025-11"],
+  ["record · membership (active)", "/users/IB-U-0912"],
+  ["record · membership (pending)", "/users/IB-U-0958"],
+  ["record · membership (paused)", "/users/IB-U-0834"],
+  ["record · membership (suspended)", "/users/IB-U-0790"],
+  ["record · no membership", "/users/IB-U-1041"],
+  ["record · deactivated", "/users/IB-U-0601"],
+  ["record · profile", "/users/IB-U-0912?tab=profile"],
+  ["record · commercial", "/users/IB-U-0912?tab=commercial"],
+  ["record · history", "/users/IB-U-0912?tab=history"],
+  ["record · term detail", "/users/IB-U-0912?tab=history&term=IB-MB-0912-2"],
+  ["record · pending term detail", "/users/IB-U-0958?tab=history&term=IB-MB-0958-1"],
+  ["record · notes", "/users/IB-U-0912?tab=notes"],
+  ["record · notes (empty)", "/users/IB-U-0944?tab=notes"],
+  ["record · audit", "/users/IB-U-0912?tab=audit"],
+  ["record · missing", "/users/IB-U-NOPE"],
+];
+
+let failed = 0;
+const noop = () => {};
+const check = (label: string, fn: () => string) => {
+  try {
+    const html = fn();
+    if (!html || html.length < 40) throw new Error("rendered almost nothing (" + html.length + " chars)");
+    console.log("  ok   " + label + "  (" + html.length + " chars)");
+  } catch (e) {
+    failed++;
+    console.log("  FAIL " + label + "\n         " + (e as Error).message);
+  }
+};
+
+console.log("\nsurfaces");
+URLS.forEach(([label, url]) => check(label, () => at(url)));
+
+/* The charts are the reason Analytics exists. Asserting each form actually
+   reached the DOM — and on the right kind of colour token — is the difference
+   between "the page loaded" and "the page has its content". The token classes
+   are the assertion because they encode the colour JOB: `s1..s3` categorical,
+   `o1..o3` ordinal, `st-*` reserved status. A chart that silently switched to
+   the wrong job would still render, and would still be wrong. */
+console.log("\ncharts on the analytics page");
+{
+  const html = at("/users?view=analytics");
+  const must: [string, string][] = [
+    ["grouped columns", "um-col s1"],
+    ["...all three series", "um-col s3"],
+    ["...its legend", "um-legend2"],
+    ["...axis ticks", "um-yaxis"],
+    ["...hover and focus tooltip", "um-tip"],
+    ["funnel on the ordinal ramp", "fill o1"],
+    ["status bars on reserved status tokens", "fill st-ok"],
+    ["source bars on one hue, not a value ramp", "fill s1"],
+    ["plan bars on the tier ramp", "fill o3"],
+    ["cohort heatmap", "um-cell h"],
+    ["...with its scale stated", "um-heatkey"],
+    ["...and not-yet cells that are not zeros", "um-cell none"],
+  ];
+  must.forEach(([label, needle]) =>
+    check(label, () => {
+      if (html.indexOf(needle) < 0) throw new Error("missing " + needle);
+      return html;
+    }));
+  check("no chart library in the tree", () => {
+    if (html.indexOf("recharts") >= 0) throw new Error("recharts leaked into the render");
+    return html;
+  });
+
+  /* GEOMETRY. The palette validator checks colour and says nothing about
+     layout, and there is no browser here to look at — so the one geometric
+     property that can be checked from the markup is: every mark is sized as a
+     percentage of its own track, and no percentage may leave 0..100. A bar
+     wider than its track is the failure that looks like a rendering bug, and it
+     is exactly what an off-by-one in the scale produces. */
+  const pcts = (html.match(/(?:width|height|top):\s*([\d.]+)%/g) || [])
+    .map((m) => parseFloat(m.replace(/[^\d.]/g, "")));
+  check("every mark fits its track (0-100%)", () => {
+    const bad = pcts.filter((v) => v < 0 || v > 100);
+    if (bad.length) throw new Error(bad.length + " out of range, e.g. " + bad[0] + "%");
+    return html;
+  });
+  check("something actually reached full width", () => {
+    if (!pcts.some((v) => v > 95)) throw new Error("no mark near 100% — the scale is not tight");
+    return html;
+  });
+  check("exactly one direct label on the column chart", () => {
+    const n = (html.match(/class="um-col s\d" style="[^"]*"><em/g) || []).length;
+    if (n !== 1) throw new Error("expected 1 direct label, found " + n);
+    return html;
+  });
+  check("axis ticks and gridlines are the same count", () => {
+    const ticks = (html.match(/class="tnum" style="top:/g) || []).length;
+    const rules = (html.match(/class="um-rule"/g) || []).length;
+    if (!ticks || ticks !== rules) throw new Error(ticks + " ticks vs " + rules + " rules");
+    return html;
+  });
+  check("every figure is in a card", () => {
+    const n = (html.match(/class="card um-block/g) || []).length;
+    if (n < 10) throw new Error("only " + n + " blocks — the page is still a loose stack");
+    return html;
+  });
+  check("the grid pairs them up", () => {
+    if (html.indexOf("um-blocks") < 0) throw new Error("no two-up grid");
+    const wide = (html.match(/um-block wide/g) || []).length;
+    if (!wide) throw new Error("nothing opted out of the two-up grid");
+    return html;
+  });
+  check("the range picker is on the command row", () => {
+    if (html.indexOf("um-daterange") < 0) throw new Error("no range control");
+    return html;
+  });
+
+  /* THE RANGE HAS TO ACTUALLY MOVE THE NUMBERS. A control that renders and
+     changes nothing is worse than no control — it invites a decision on a
+     figure that never re-cut. */
+  check("a different range produces different figures", () => {
+    const three = at("/users?view=analytics&start=2026-06&end=2026-08");
+    const twelve = at("/users?view=analytics&start=2025-09&end=2026-08");
+    if (three === twelve) throw new Error("3-month and 12-month ranges render identically");
+    return three;
+  });
+  check("a reversed range is corrected, not refused", () => {
+    const fwd = at("/users?view=analytics&start=2026-03&end=2026-08");
+    const rev = at("/users?view=analytics&start=2026-08&end=2026-03");
+    if (fwd !== rev) throw new Error("reversed range did not normalise to the same span");
+    return rev;
+  });
+  check("an out-of-bounds range clamps to the series", () => {
+    const wild = at("/users?view=analytics&start=2019-01&end=2099-12");
+    const full = at("/users?view=analytics&start=2025-09&end=2026-08");
+    if (wild !== full) throw new Error("out-of-bounds range did not clamp to the full series");
+    return wild;
+  });
+  check("the oldest span says it has nothing to compare against", () => {
+    const oldest = at("/users?view=analytics&start=2025-09&end=2025-11");
+    if (oldest.indexOf("no prior span") < 0) throw new Error("missing the no-comparison notice");
+    return oldest;
+  });
+
+  check("x labels match the column groups", () => {
+    const groups = (html.match(/class="um-group"/g) || []).length;
+    const labels = (html.match(/class="um-xband"[\s\S]*?<\/div>/) || [""])[0]
+      .split("<span").length - 1;
+    if (groups !== labels) throw new Error(groups + " groups vs " + labels + " labels");
+    return html;
+  });
+}
+
+console.log("\ndialogs");
+check("assign membership", () => modal(
+  <AssignMembership row={rowOf("IB-U-1041")} onClose={noop} onDone={noop} />));
+/* Lokesh holds a live STARTER term and the form opens on Starter, so the
+   refusal is on screen before anything is typed. */
+check("assign · clash refused for the selected plan", () => {
+  const html = modal(<AssignMembership row={rowOf("IB-U-0899")} onClose={noop} onDone={noop} />);
+  if (html.indexOf("already a live") < 0) throw new Error("clash warning did not render");
+  return html;
+});
+/* Meera holds a live PRO term while the form opens on Starter. There is no
+   clash — a different product is allowed — but the live term is still stated,
+   which is the difference between "no warning" and "no information". */
+check("assign · live term shown even without a clash", () => {
+  const html = modal(<AssignMembership row={rowOf("IB-U-0912")} onClose={noop} onDone={noop} />);
+  if (html.indexOf("Already live on this account") < 0) throw new Error("live terms not listed");
+  if (html.indexOf("already a live") >= 0) throw new Error("clash claimed where there is none");
+  return html;
+});
+check("edit profile", () => modal(
+  <EditProfile row={rowOf("IB-U-0912")} onClose={noop} onDone={noop} />));
+check("edit profile · incomplete", () => modal(
+  <EditProfile row={rowOf("IB-U-1029")} onClose={noop} onDone={noop} />));
+check("note", () => modal(<NoteModal row={rowOf("IB-U-0912")} onClose={noop} onDone={noop} />));
+check("tags", () => modal(<TagsModal row={rowOf("IB-U-0912")} onClose={noop} onDone={noop} />));
+check("deactivate", () => modal(
+  <DeactivateModal row={rowOf("IB-U-0912")} onClose={noop} onDone={noop} />));
+check("reactivate", () => modal(
+  <DeactivateModal row={rowOf("IB-U-0601")} onClose={noop} onDone={noop} />));
+
+(["activate", "pause", "resume", "suspend", "reactivate", "cancel", "renew"] as LifecycleAction[])
+  .forEach((a) => {
+    const r = rowOf(a === "activate" ? "IB-U-0958" : a === "resume" ? "IB-U-0834"
+      : a === "reactivate" ? "IB-U-0790" : "IB-U-0912");
+    check("lifecycle · " + a, () => modal(
+      <LifecycleModal m={r.current!} row={r} action={a} onClose={noop} onDone={noop} />));
+  });
+
+console.log(failed ? "\n" + failed + " FAILED\n" : "\nevery surface rendered\n");
+process.exit(failed ? 1 : 0);

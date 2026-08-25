@@ -1,0 +1,145 @@
+{
+  "$comment": "Stands in for GET /api/v1/admin/users/analytics. MONTH-KEYED, not period-keyed, and that is the whole shape decision: a payload that ships pre-summed 30-day and 90-day blocks can only ever answer the two windows somebody thought of, so a date-range control over it is decoration. Every range-dependent figure here is a MONTHLY row with its own numerators AND denominators, so any span of months resolves to real arithmetic client-side — see rangeTotals() in views/Users/store.ts. Rates are never stored: they are numerator/denominator pairs, because a stored percentage cannot be re-aggregated over a different span without lying. IT STILL DOES NOT CARRY THE HEADLINE COUNTS. Total registered, Normal Users, Active Members, expiring soon and the status mix are counted client-side from users.json + memberships.json by the same derivation the list filters on, so a tile and the list it drills into cannot disagree. `revenueContext` is read from Finance and is NOT range-scoped — it is labelled as covering its own window rather than silently re-cut. `engagement` is null on purpose: UM-OD-10 has no event taxonomy, and an unavailable metric renders as unavailable, never as zero.",
+  "generatedAt": "2026-08-25T09:00:00+05:30",
+  "currency": "INR",
+  "granularity": "month",
+  "$comment_granularity": "The series is monthly, so the range control snaps to whole months and says so. A day-precision picker over a monthly series would promise a resolution the data does not have.",
+
+  "months": [
+    {
+      "month": "2025-09", "label": "Sep 2025", "short": "Sep",
+      "registrations": 128, "firstTimeMembers": 28, "renewals": 44,
+      "expiries": 8, "cancellations": 3, "profileCompleted": 68,
+      "cohortEligible": 127, "renewalEligible": 54, "churnEligible": 53, "churnLost": 5,
+      "bySource": { "web": [52, 10], "funnel": [37, 8], "portal": [21, 7], "referral": [14, 3], "admin": [4, 0] },
+      "byPlan": { "starter": [10, 12, 4], "growth": [13, 24, 3], "pro": [5, 8, 1] },
+      "activeAtEnd": { "starter": 196, "growth": 218, "pro": 82 }
+    },
+    {
+      "month": "2025-10", "label": "Oct 2025", "short": "Oct",
+      "registrations": 134, "firstTimeMembers": 30, "renewals": 47,
+      "expiries": 9, "cancellations": 2, "profileCompleted": 71,
+      "cohortEligible": 133, "renewalEligible": 57, "churnEligible": 57, "churnLost": 5,
+      "bySource": { "web": [55, 11], "funnel": [39, 8], "portal": [21, 7], "referral": [15, 4], "admin": [4, 0] },
+      "byPlan": { "starter": [11, 13, 4], "growth": [14, 26, 4], "pro": [5, 8, 1] },
+      "activeAtEnd": { "starter": 203, "growth": 228, "pro": 86 }
+    },
+    {
+      "month": "2025-11", "label": "Nov 2025", "short": "Nov",
+      "registrations": 142, "firstTimeMembers": 33, "renewals": 51,
+      "expiries": 9, "cancellations": 4, "profileCompleted": 75,
+      "cohortEligible": 141, "renewalEligible": 62, "churnEligible": 61, "churnLost": 6,
+      "bySource": { "web": [58, 12], "funnel": [41, 9], "portal": [23, 8], "referral": [16, 4], "admin": [4, 0] },
+      "byPlan": { "starter": [12, 14, 4], "growth": [15, 28, 4], "pro": [6, 9, 1] },
+      "activeAtEnd": { "starter": 211, "growth": 239, "pro": 91 }
+    },
+    {
+      "month": "2025-12", "label": "Dec 2025", "short": "Dec",
+      "registrations": 150, "firstTimeMembers": 35, "renewals": 54,
+      "expiries": 11, "cancellations": 3, "profileCompleted": 80,
+      "cohortEligible": 149, "renewalEligible": 66, "churnEligible": 65, "churnLost": 6,
+      "bySource": { "web": [61, 13], "funnel": [44, 10], "portal": [24, 8], "referral": [17, 4], "admin": [4, 0] },
+      "byPlan": { "starter": [12, 15, 5], "growth": [17, 30, 4], "pro": [6, 9, 2] },
+      "activeAtEnd": { "starter": 218, "growth": 252, "pro": 95 }
+    },
+    {
+      "month": "2026-01", "label": "Jan 2026", "short": "Jan",
+      "registrations": 156, "firstTimeMembers": 38, "renewals": 58,
+      "expiries": 10, "cancellations": 5, "profileCompleted": 83,
+      "cohortEligible": 154, "renewalEligible": 71, "churnEligible": 70, "churnLost": 7,
+      "bySource": { "web": [64, 14], "funnel": [45, 10], "portal": [25, 9], "referral": [17, 5], "admin": [5, 0] },
+      "byPlan": { "starter": [13, 16, 5], "growth": [18, 32, 4], "pro": [7, 10, 1] },
+      "activeAtEnd": { "starter": 226, "growth": 266, "pro": 101 }
+    },
+    {
+      "month": "2026-02", "label": "Feb 2026", "short": "Feb",
+      "registrations": 149, "firstTimeMembers": 36, "renewals": 55,
+      "expiries": 12, "cancellations": 3, "profileCompleted": 79,
+      "cohortEligible": 148, "renewalEligible": 67, "churnEligible": 66, "churnLost": 6,
+      "bySource": { "web": [61, 13], "funnel": [43, 10], "portal": [24, 9], "referral": [16, 4], "admin": [5, 0] },
+      "byPlan": { "starter": [13, 16, 5], "growth": [17, 30, 5], "pro": [6, 9, 2] },
+      "activeAtEnd": { "starter": 234, "growth": 278, "pro": 105 }
+    },
+    {
+      "month": "2026-03", "label": "Mar 2026", "short": "Mar",
+      "registrations": 158, "firstTimeMembers": 40, "renewals": 59,
+      "expiries": 11, "cancellations": 4, "profileCompleted": 84,
+      "cohortEligible": 156, "renewalEligible": 72, "churnEligible": 71, "churnLost": 7,
+      "bySource": { "web": [65, 15], "funnel": [46, 11], "portal": [25, 9], "referral": [17, 5], "admin": [5, 0] },
+      "byPlan": { "starter": [14, 17, 5], "growth": [19, 32, 4], "pro": [7, 10, 2] },
+      "activeAtEnd": { "starter": 243, "growth": 293, "pro": 110 }
+    },
+    {
+      "month": "2026-04", "label": "Apr 2026", "short": "Apr",
+      "registrations": 164, "firstTimeMembers": 43, "renewals": 62,
+      "expiries": 13, "cancellations": 5, "profileCompleted": 87,
+      "cohortEligible": 162, "renewalEligible": 76, "churnEligible": 75, "churnLost": 7,
+      "bySource": { "web": [67, 16], "funnel": [48, 12], "portal": [26, 10], "referral": [18, 5], "admin": [5, 0] },
+      "byPlan": { "starter": [15, 17, 6], "growth": [20, 34, 5], "pro": [8, 11, 2] },
+      "activeAtEnd": { "starter": 252, "growth": 308, "pro": 116 }
+    },
+    {
+      "month": "2026-05", "label": "May 2026", "short": "May",
+      "registrations": 170, "firstTimeMembers": 40, "renewals": 62,
+      "expiries": 12, "cancellations": 4, "profileCompleted": 90,
+      "cohortEligible": 168, "renewalEligible": 76, "churnEligible": 75, "churnLost": 7,
+      "bySource": { "web": [70, 15], "funnel": [49, 11], "portal": [27, 9], "referral": [19, 5], "admin": [5, 0] },
+      "byPlan": { "starter": [14, 17, 5], "growth": [19, 34, 5], "pro": [7, 11, 2] },
+      "activeAtEnd": { "starter": 261, "growth": 322, "pro": 121 }
+    },
+    {
+      "month": "2026-06", "label": "Jun 2026", "short": "Jun",
+      "registrations": 164, "firstTimeMembers": 43, "renewals": 66,
+      "expiries": 14, "cancellations": 6, "profileCompleted": 87,
+      "cohortEligible": 162, "renewalEligible": 80, "churnEligible": 80, "churnLost": 8,
+      "bySource": { "web": [67, 16], "funnel": [48, 12], "portal": [26, 10], "referral": [18, 5], "admin": [5, 0] },
+      "byPlan": { "starter": [15, 19, 6], "growth": [20, 36, 6], "pro": [8, 11, 2] },
+      "activeAtEnd": { "starter": 270, "growth": 336, "pro": 127 }
+    },
+    {
+      "month": "2026-07", "label": "Jul 2026", "short": "Jul",
+      "registrations": 168, "firstTimeMembers": 44, "renewals": 66,
+      "expiries": 13, "cancellations": 4, "profileCompleted": 89,
+      "cohortEligible": 166, "renewalEligible": 80, "churnEligible": 80, "churnLost": 8,
+      "bySource": { "web": [69, 16], "funnel": [49, 12], "portal": [27, 11], "referral": [18, 5], "admin": [5, 0] },
+      "byPlan": { "starter": [15, 19, 6], "growth": [21, 36, 5], "pro": [8, 11, 2] },
+      "activeAtEnd": { "starter": 279, "growth": 352, "pro": 133 }
+    },
+    {
+      "month": "2026-08", "label": "Aug 2026", "short": "Aug",
+      "registrations": 180, "firstTimeMembers": 51, "renewals": 74,
+      "expiries": 19, "cancellations": 6, "profileCompleted": 95,
+      "cohortEligible": 178, "renewalEligible": 90, "churnEligible": 89, "churnLost": 8,
+      "bySource": { "web": [74, 19], "funnel": [52, 14], "portal": [29, 12], "referral": [20, 6], "admin": [5, 0] },
+      "byPlan": { "starter": [18, 21, 8], "growth": [24, 41, 8], "pro": [9, 12, 3] },
+      "activeAtEnd": { "starter": 289, "growth": 368, "pro": 139 }
+    }
+  ],
+
+  "$comment_months": "Per row: registrations, firstTimeMembers (FIRST-EVER activation, never a renewal), renewals, expiries, cancellations. profileCompleted is the funnel's middle stage. The three *Eligible fields are the denominators — cohortEligible for conversion, renewalEligible for renewal rate, churnEligible with churnLost for churn — and they are separate numbers rather than assumed equal to registrations, because renewal rate divided by all registered users is the single most common way this figure gets flattered. bySource is [registrations, firstTimeMembers] per channel and sums exactly to the month's totals. byPlan is [new, renewed, expired] and sums exactly to the month's firstTimeMembers, renewals and expiries. activeAtEnd is an end-of-month snapshot per plan, which is a level and not a flow — it is never summed across months.",
+
+  "cohorts": {
+    "basis": "first-membership month",
+    "$comment": "Retention by FIRST-MEMBERSHIP month, not registration month — the question is whether members stay, and a registration cohort mixes people who never bought anything into the denominator, which measures marketing and calls it retention. Cohorts are inherently cohort-keyed and are NOT re-cut by the range control; the control filters which cohorts are shown, never their contents. retained[] is the share still holding an entitling membership n months later; null means the month has not happened yet for that cohort.",
+    "rows": [
+      { "cohort": "2025-09", "label": "Sep 2025", "size": 28, "retained": [1, 0.97, 0.95, 0.92, 0.89, 0.87, 0.84, 0.84, 0.82, 0.79, 0.79, 0.76] },
+      { "cohort": "2025-12", "label": "Dec 2025", "size": 35, "retained": [1, 0.98, 0.95, 0.93, 0.9, 0.88, 0.85, 0.83, 0.83, null, null, null] },
+      { "cohort": "2026-03", "label": "Mar 2026", "size": 40, "retained": [1, 0.96, 0.94, 0.91, 0.89, 0.87, null, null, null, null, null, null] },
+      { "cohort": "2026-06", "label": "Jun 2026", "size": 43, "retained": [1, 0.98, 0.95, null, null, null, null, null, null, null, null, null] }
+    ]
+  },
+
+  "revenueContext": {
+    "$comment": "READ FROM FINANCE. Users Management does not compute, hold or reconcile any of this — it displays it, labelled, so an active-member count has an economic figure beside it. NOT range-scoped: Finance settles on its own calendar, and re-cutting a collected figure to an arbitrary span here would be this module inventing revenue arithmetic, which is the one thing it must never do. Which products count and how refunds and taxes are treated is UM-OD-12.",
+    "source": "Finance · collected, membership-linked",
+    "asOf": "2026-08-25T06:00:00+05:30",
+    "window": "Last 30 days",
+    "collected": { "amount": 1842600, "currency": "INR" },
+    "previous": { "amount": 1690400, "currency": "INR" },
+    "arpm": { "amount": 3061, "currency": "INR", "denominator": 602, "denominatorLabel": "average active members over the window" },
+    "caveat": "Contextual, not financial truth. Refunds and reversals appear only once Finance has settled them."
+  },
+
+  "engagement": null,
+  "$comment_engagement": "null, not zero, and not an empty object. UM-OD-10 has not defined the qualifying-activity taxonomy, so DAU, WAU, MAU and member engagement rate cannot be computed. When it lands this becomes { dau, wau, mau, memberEngagementRate, taxonomyVersion }."
+}

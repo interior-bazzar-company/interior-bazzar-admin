@@ -121,6 +121,143 @@ something incoherent for it — the script is the shortest statement of the cont
 
 ---
 
+## Module 5 · Business Ops → Users Management
+
+> **Nothing here is live.** Every record on these screens is a fixture and every
+> write lands in the browser tab. The module is `users`, route `#/users`,
+> sidebar group **Business Ops** (a new group — see the bottom of this section).
+> Consumer for all six files is `src/admin/views/Users/store.ts`; no view imports
+> JSON and no view fetches, so this is a one-file swap.
+
+The module's own rule, before the table: **there is no stored classification.**
+Normal User, Active Member, Paused, Suspended, Former Member and Deactivated are
+all derived at read time from membership state by `classify()` in `store.ts`, and
+the users list filter, the members view, the renewal queue and
+every analytics denominator call that one function. **The API must not add an
+`is_member` column, a `classification` field or a `member_since` flag.** If it
+sends one, two definitions exist and they will disagree within a week — which is
+the failure the whole module is shaped to avoid.
+
+### Reads
+
+| Content file | Status | Endpoint it stands in for | Must return |
+| --- | --- | --- | --- |
+| `users.json` → `users[]` | stand-in | `GET /admin/users` | The directory page. Filters that must be server-side: `q` (user id, name, email, **phone matched on the last ten digits so formatting cannot defeat it**, business name, city, locality, and deal/invoice reference), `cls` (the derived classification — **derived server-side by the same rule, not stored**), `ms` (raw membership status), `plan`, `city`, `src` (registration source), `tag`, `status` (account status), `registered` + `from`/`to` (the six windows, **resolved server-side at request time**), and the four operational flags `expiring`/`ended`/`pending`/`incomplete`. Row needs: identity, profile city + completeness, registration source and date, `lastActivityAt`, internal tags, **and the current term with its plan, version, status and end date** — the last is not optional, because the queue is unreadable without knowing when a term ends. Plus `counts` over the **whole filtered set**, not the page. |
+| `users.json` → one element | stand-in | `GET /admin/users/{id}` | The workspace. Everything above plus the full `profile{}`, `identity{}` (from Auth, read-only), `tags[]`, `notes[]` (**operations scope only — never on a customer-scoped read**), `commercial{}` references and `authUserId`. |
+| `memberships.json` → `memberships[]` | stand-in | `GET /admin/users/{id}/memberships` | Every term ever held, newest first, **including terminal ones**. Each row: plan, `versionId` + `planVersion`, `previousMembershipId`, `source{kind,reference,label,note}`, dates, status, the five lifecycle timestamps, and the **frozen `entitlements[]` snapshot**. A pending term returns `entitlements: []` — it has none, and the screen says so rather than previewing the plan. |
+| `memberships.json` → one element | stand-in | `GET /admin/memberships/{id}` | One term, as above, plus its `events[]`. |
+| `memberships.json` → `events[]` | stand-in | `GET /admin/memberships/{id}/events` | Append-only, newest first: `eventId, type, fromStatus, toStatus, actor, actorRole, reason, effectiveAt, note`. **Every `type` must exist in `vocabularies.json → eventTypes[]`** — a type the vocabulary does not know renders with no label and no tone. `npm run check:users` asserts this for every type the client writes. |
+| `membership-plans.json` | stand-in | `GET /admin/membership-plans` | **NOT OURS — UM-OD-01.** A read of the commercial plan catalogue (the same rows the Plans module writes). Version-first: `plans[] → versions[]` with `durationRule`, `price`, `effectiveFrom/To` and `entitlements[]`. This module never writes here. If Plans exposes no suitable read, it should serve a projection rather than this panel querying two shapes of the same thing. |
+| `vocabularies.json` | stand-in | `GET /admin/users/vocabularies` | `classifications[]`, `membershipStatuses[]`, `transitions[]`, `lifecycleActions[]` (with `from[]`, `to`, `permission`, `requiresReason`), `activationSources[]` (with `requiresReference`, `requiresReason`), `userStatuses[]`, `registrationSources[]`, `profileFields[]` (with `required`, `editable`, `public`), `profileStatuses[]`, `tags[]`, the four reason lists, `cities[]`, `states[]`, `categories[]`, `registeredRanges[]`, `sortOptions[]`, `renewalWindowDays`, `graceDays`, **`metricDefinitions[]`**, `eventTypes[]`, `openDecisions[]`, `team[]`. The panel renders from this rather than hard-coding, so a status, source, profile field or metric caution added server-side needs no code edit. **`metricDefinitions[]` is load-bearing**: every figure prints its `unit` on the tile and its `formula`/`caution` in the tooltip, which is the only defence against the same metric meaning two things six months apart. |
+| `analytics.json` | stand-in | `GET /admin/users/analytics` | **MONTH-KEYED, not period-keyed.** A payload that ships pre-summed 30/90-day blocks can only answer the two windows somebody thought of, so a date-range control over it is decoration — the panel resolves any span of months client-side via `rangeTotals()`. Return `months[]`, newest last, each row carrying its own **numerators AND denominators**: `registrations, firstTimeMembers` (FIRST-EVER activation, never a renewal), `renewals, expiries, cancellations, profileCompleted`, plus `cohortEligible` (conversion denominator), `renewalEligible`, `churnEligible` + `churnLost`. **Never return a stored rate** — a percentage cannot be re-aggregated over a different span without lying. Also per row: `bySource{channel:[registrations, firstTimeMembers]}` and `byPlan{plan:[new, renewed, expired]}`, both summing exactly to that month's totals, and `activeAtEnd{plan:n}` — a LEVEL, never summed across months. Plus `cohorts` (keyed by first-membership month, **not** re-cut by the range), `revenueContext` read from Finance with the window it actually covers named, and `engagement: null`. **It still does not carry the headline counts**: total, Normal Users, Active Members, expiring soon and the status mix are counted client-side from the two files above by the same derivation the users list filters on, so a tile and the list it drills into cannot disagree. |
+| `audit.json` → `events[]` | stand-in | `GET /admin/users/{id}/timeline` | Append-only, newest first. **Non-membership events only** — registration, profile administration, tagging, notes, account status. Lifecycle events live on the term and the client merges the two streams; a third table holding copies is a third thing that can disagree. `note` records **that** a note was added and never its text. |
+
+### Writes
+
+None of these exist. Each is named for the transaction it has to be, and the UI
+that calls it already assumes the transaction is atomic — `store.ts` performs the
+same sequence in the same order, so the endpoint has a worked example rather than
+a guess.
+
+| Transaction | Endpoint | Sequence, and what fails together |
+| --- | --- | --- |
+| **UM-T01 · Identity link** | `POST /admin/users/events/registration` (system) | Verify → check the idempotency key → create or link exactly one `platform_user` → append `REGISTERED`. Idempotent on the auth identity → `409 duplicate_user_link`. On failure no user exists and the event is retriable under the same key. **Never creates a second user because the commercial relationship changed.** |
+| **UM-T02 · Assignment** | `POST /admin/users/{id}/memberships` | Verify membership authority → validate plan **version**, dates, source and reason → **check for an overlapping live term on the same product** → create at `pending` → append `MEMBERSHIP_ASSIGNED`. Refusals: `403 membership_admin_required`, `422 reason_required` (manual/complimentary), `422 validation_failed` (missing source reference), `409 active_membership_conflict`. Creates **no** entitlement snapshot — that is T03. |
+| **UM-T03 · Activation** | `POST /admin/memberships/{id}/activate` | Lock the term → verify the activation source → **snapshot the entitlements from the plan version the term names** → set `active` → recompute the classification → append `MEMBERSHIP_ACTIVATED`. **A snapshot failure aborts the whole transaction**: the term stays `pending` rather than becoming Active with access nobody can enumerate. Refusals: `422 invalid_membership_transition`, `422 activation_source_required`. |
+| **UM-T04 · Lifecycle action** | `POST /admin/memberships/{id}/{pause,resume,suspend,reactivate,cancel}` | Lock → validate against the transition matrix → apply the configured policy → append the event **with actor and reason** → recompute effective entitlement and classification. Off-matrix → `422 invalid_membership_transition` with **no state mutation and no partial write**. Missing reason where the matrix demands one → `422 reason_required`. Suspend and cancel need restricted authority; profile-edit permission must not be enough. |
+| **UM-T05 · Expiry sweep** | scheduled job, not a client call | Select terms past `end_at` still `active` or `paused` → set `expired` → append `MEMBERSHIP_EXPIRED` → recompute the classification → **commit per row**. Idempotent per membership: a rerun after a partial failure completes the remainder and never double-processes. **Expiry ends a membership, not an account** — the user stays registered and becomes a Former Member. |
+| **UM-T06 · Renewal** | `POST /admin/memberships/{id}/renew` | Locate the previous term → **create a NEW row** carrying `previous_membership_id` → snapshot the plan's **current** version → activate → recompute → append `MEMBERSHIP_RENEWED`. **The previous term is not modified** — not its status, not its dates, not its snapshot. On failure the previous term is untouched and no new term exists. A renewal must never be counted as a new member. |
+| **UM-T07 · Profile update** | `PATCH /admin/users/{id}/profile` | Validate the permitted fields → apply → recompute completeness → append `PROFILE_UPDATED` **with the changed field set and not the values**. A validation failure leaves the stored profile **completely** unchanged; a partial profile write must not be a reachable state. Must refuse edits to fields the schema marks non-editable, and must never touch an authentication field. |
+| **UM-T08 · Internal note** | `POST /admin/users/{id}/notes` | Append-only. **No edit, no delete** — a note somebody later softened is worth less than one nobody can change. Appends `NOTE` carrying only the fact and the actor. `GET .../timeline` must not return note text either. |
+| **UM-T09 · Tags** | `PUT /admin/users/{id}/tags` | Replace the set, append `TAGGED` with what was added and removed. Tags are internal and must be absent from every customer-facing profile response **at the contract level**, not by the client omitting them. |
+| **UM-T10 · Account status** | `POST /admin/users/{id}/{deactivate,reactivate}` | Soft only. Sets `user_status`, stamps the reason, appends the event. **Retains the profile, every membership term, the commercial references and the whole audit trail.** Deactivating must not cancel, expire or otherwise touch a membership — they are separate facts. Hard deletion is a governed privacy process and must not be reachable from this module. |
+| **UM-T11 · Commercial event** | `POST /admin/users/events/membership-commercial` (system) | Consume an approved purchase/payment context idempotently → `409 duplicate_source_event` on a repeat. **Which event may activate a membership is UM-OD-02 and is undecided** — until it is, this endpoint should create at `pending` and let a person activate. |
+| **UM-T12 · Entitlements** | `GET /admin/users/{id}/entitlements` | The effective snapshot for downstream feature gating. Read from the **membership snapshot**, never recomputed from the current catalogue, and never inferred from payment data. Returns nothing entitling for a paused, suspended, expired, cancelled or pending term. |
+
+### Error contract
+
+`400 validation_failed` · `403 out_of_scope` · `403 membership_admin_required` ·
+`404 user_not_found` · `404 membership_not_found` · `404 plan_not_found` ·
+`409 duplicate_user_link` · `409 duplicate_source_event` ·
+`409 active_membership_conflict` · `422 invalid_membership_transition` ·
+`422 activation_source_required` · `422 reason_required` · `422 invalid_dates` ·
+`422 immutable_history` · `429 rate_limited`.
+
+The client already renders `invalid_membership_transition`, `reason_required` and
+`active_membership_conflict` in the dialog that tried the action, with the dialog
+left open — so the sentence the refusal contradicts is still on screen.
+
+### Invariants the API has to keep
+
+1. **One registered identity maps to exactly one `platform_user`.** Buying,
+   renewing, expiring, cancelling and deactivating all happen against that row.
+2. **No stored classification.** No `is_member`, no `classification`, no
+   `member_since` flag. It is derived, in one place, at read time.
+3. **A term is never overwritten.** A renewal is a new row referencing the old
+   one; `user_membership` rows are updated only along the transition matrix.
+4. **`membership_event` and `user_admin_audit` are append-only at the grant
+   level** — the application role holds no UPDATE or DELETE on either table, not
+   merely no route.
+5. **Entitlements are snapshotted at activation** from a plan **version**. A
+   catalogue change creates a version; it must never alter a term already
+   activated under an earlier one.
+6. **A failed entitlement snapshot prevents activation entirely.**
+7. **One live entitlement per product** unless plan policy explicitly permits
+   more (UM-OD-15).
+8. **This module writes no money.** No revenue, refund, payment or ledger row,
+   ever. A membership holds a *reference* into Finance and nothing else.
+9. **Customer membership never grants internal RBAC**, and a staff role never
+   creates a membership.
+10. **Internal notes, tags and administrative reasons never reach a
+    customer-facing response**, enforced by the payload and not by the client.
+11. **Analytics state their unit** and never mix users, memberships and events in
+    one figure. A rate with an empty denominator returns `null` with a reason,
+    never `0`.
+12. **Engagement is absent until it is real.** `engagement: null` while UM-OD-10
+    is open — never zeros, which are indistinguishable from a platform nobody
+    opens.
+
+`npm run check:users` asserts 1–8 and 11 against the content files, case by case,
+including the three that are easiest to get wrong: a Pending-only term is a
+**Normal User** and not a former member; an `active` term past its end date is
+**not** entitling; and `deactivated` is an **account** status that wins over every
+membership state without disturbing the terms underneath it. If the real API can
+return a record that fails one of these, the panel will render something
+incoherent for it — the script is the shortest statement of the contract.
+
+### Open decisions this UI had to assume an answer to
+
+Each is rendered on the screen it affects, as a dashed `UM-OD-nn` block naming
+the assumption. `vocabularies.json → openDecisions[]` is the register; the code
+and the spec point at each other by id rather than describing each other.
+
+| ID | Assumed here | What moves when it is decided |
+| --- | --- | --- |
+| **UM-OD-01** | The plan catalogue is **consumed**, never defined. | Where `membership_plan` / `membership_plan_version` live. A schema decision, and moving them after memberships reference them is a migration. |
+| **UM-OD-02** | **Nothing activates automatically.** A commercial event creates a term at Pending and a person activates it. | The activation trigger. This is the single largest gap in the module. |
+| **UM-OD-03** | Complimentary grants are offered, behind an explicit source and a mandatory reason. | Whether they are permitted at all, and which role holds the authority. |
+| **UM-OD-04** | Pause policy `continue` — the end date runs on while paused. | The renewal queue, the expiring-soon count and the churn denominator, all three. |
+| **UM-OD-05** | The suspend dialog **promises nothing specific** about what stays reachable. | What a suspended member can still do. Blocks the entitlement contract. |
+| **UM-OD-06** | A refund does **not** move a membership. Finance stays authoritative and the consequence is an explicit lifecycle event. | Whether a reversal auto-cancels, auto-suspends, or raises a review. |
+| **UM-OD-09** | `profile v1` is the field set; `public`/`internal` is marked per field on the form. | The profile schema, its visibility rules and its field-level edit permissions. |
+| **UM-OD-10** | Engagement renders as **unavailable**, with the blocker named. | DAU/WAU/MAU. Nothing is built until the qualifying-event taxonomy exists. |
+| **UM-OD-11** | A **60-day** renewal window and **no grace period**, labelled as assumed everywhere they are used. | Expiring soon, renewal rate and churn — computed from one constant so they cannot drift apart. |
+| **UM-OD-12** | **One** contextual revenue figure, read from Finance and labelled. | Which products count as membership revenue, and how refunds and taxes are treated. |
+| **UM-OD-13** | The entitlement keys on screen are **illustrative**. | The real feature keys and limits. Blocks the entitlement API. |
+| **UM-OD-15** | Overlapping live terms on the same product are **refused**. | Whether different concurrent products will exist. |
+
+### Not an endpoint — but on this list
+
+| Item | Where | What has to happen |
+| --- | --- | --- |
+| `Module` row for `users` | server | Create it, group label **Business Ops**, with actions `view/create/edit` plus a **separate sensitive action for membership lifecycle** — suspend, cancel and reactivate must not ride on `edit`. Then remove the key from `PROTO_MODULES` in `src/admin/auth/session.ts` and the row from `PROTO_ROWS` in `src/admin/shell/modules.ts`. **Until then `can("users")` returns true for everyone**, which is safe only because there is no server data behind it and no server write to authorise. |
+| The `Business Ops` group | server | A new sidebar group. `GROUP_ORDER` in `src/admin/shell/modules.ts` already places it between Client Ops and Catalogue; the server's `groupLabel` has to match the string exactly or the module lands in a section of one. |
+| Deal / invoice deep links | panel | The commercial tab links to `#/deals/{ref}` and `#/invoices/{ref}` by reference string. Those routes key on the server's own ids; the links are correct in shape and unverified in target until the membership payload carries real ids rather than display references. |
+| Export | `GET /admin/users/export?<list filters>` | Not built. When it is, it must apply **the same filter set and the same order** as `GET /admin/users`, refuse the contact-detail column group server-side unless the actor holds the grant, and **never** include notes, tags or administrative reasons. |
+| Member-facing entitlement read | `GET /users/{id}/entitlements` (customer scope) | The downstream contract. Must return the snapshot and nothing else — no notes, no tags, no reasons, no commercial references, no classification label. |
+
+---
+
 ## Everything else in the panel
 
 No stand-ins. Deals, Plans, Team, Roles, Audit, Quotations and Invoices all read

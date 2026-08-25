@@ -48,17 +48,21 @@ export const HIDDEN_MODULES = new Set(["design", "payments"]);
  *  does not send yet, because they are being built frontend-first on the
  *  proto-v-2.2.0.0 branch (see src/proto/v-2.2.0.0/CHANGELOG.md).
  *
- *  EMPTY, and that is the finished state, not a stub. `business-enquiries` was
- *  the last entry and came out when the API landed: backend migration 0024
- *  seeds its Module row and BusinessEnquiriesViews moved off the legacy
- *  full-access-only gate onto @requires. The hole this set used to open —
- *  `can()` answering true unconditionally — is closed with it, which is the
- *  whole reason a normal admin can now be given enquiries and nothing else.
+ *  `business-enquiries` was here and came out when its API landed: backend
+ *  migration 0024 seeds its Module row and BusinessEnquiriesViews moved onto
+ *  @requires. Adding a key here re-opens a real hole for that key — `can()`
+ *  answers true unconditionally for it — and that is only ever safe while the
+ *  module has no server data to leak and no server write to authorise. It has
+ *  to come out on the commit that gives it either.
  *
- *  Adding a key back re-opens that hole for the key. It is only ever safe while
- *  the module has no server data to leak and no server write to authorise, and
- *  it has to come out on the commit that gives it either. */
-export const PROTO_MODULES = new Set<string>([]);
+ *  `users` (Business Ops · Users Management) qualifies today on both counts and
+ *  on nothing else: every record it renders is a fixture in
+ *  src/content/users/*.json, and every write it performs lands in the browser
+ *  tab and is discarded on reload. The moment `GET /admin/users` exists this
+ *  key comes out, in the same commit — see
+ *  src/proto/v-2.2.0.0/BACKEND-INTEGRATION.md, where it is listed as work
+ *  rather than as design. */
+export const PROTO_MODULES = new Set<string>(["users"]);
 
 export function getSession(): MePermissions | null {
   return session;

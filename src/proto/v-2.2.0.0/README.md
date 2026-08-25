@@ -38,7 +38,24 @@ src/content/business-enquiries/
   matching-rules.json   → GET /business-enquiries/matching-rules
   businesses.json       → a READ of the Business Profile module
   vocabularies.json     → GET /business-enquiries/vocabularies
+
+src/content/users/
+  users.json            → GET /admin/users and /admin/users/{id}
+  memberships.json      → GET /admin/users/{id}/memberships, /admin/memberships/{id}
+  membership-plans.json → a READ of the commercial plan catalogue (UM-OD-01)
+  analytics.json        → GET /admin/users/analytics/{overview,membership,cohorts}
+  audit.json            → GET /admin/users/{id}/timeline
+  vocabularies.json     → GET /admin/users/vocabularies
 ```
+
+`analytics.json` is worth a note as a counter-example to rule 2 below. It does
+**not** carry the headline counts — total users, Normal Users, Active Members,
+expiring soon, the status mix — because the client can derive all of those from
+`users.json` + `memberships.json` using the same derivation the directory
+filters on. Deriving them means a dashboard tile and the list it drills into
+cannot disagree; serving them separately means they eventually will. Shape a
+payload like the endpoint should return, and sometimes the right answer is that
+the endpoint should not return it.
 
 Rules:
 

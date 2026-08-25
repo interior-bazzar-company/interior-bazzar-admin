@@ -37,4 +37,14 @@ export default defineConfig([
       '@typescript-eslint/no-explicit-any': 'warn',
     },
   },
+  {
+    // scripts/ is the check suite: node scripts and the fixtures they bundle,
+    // none of it shipped to a browser. `react-refresh/only-export-components`
+    // is about surviving a Vite HMR update, which is not a thing that can
+    // happen to a file only esbuild ever reads.
+    files: ['scripts/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 ])
