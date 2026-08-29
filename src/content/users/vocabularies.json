@@ -329,15 +329,6 @@
       "type": "handle"
     },
     {
-      "key": "about",
-      "label": "About",
-      "group": "business",
-      "required": false,
-      "editable": true,
-      "public": true,
-      "type": "textarea"
-    },
-    {
       "key": "businessType",
       "label": "Business type",
       "group": "business",
@@ -416,6 +407,15 @@
       "maxCities": 8,
       "maxLength": 40,
       "chip": "tag-teal"
+    },
+    {
+      "key": "about",
+      "label": "About",
+      "group": "about",
+      "required": false,
+      "editable": true,
+      "public": true,
+      "type": "textarea"
     }
   ],
   "profileStatuses": [

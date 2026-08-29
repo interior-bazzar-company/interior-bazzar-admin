@@ -6,6 +6,27 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-29
 
+### About closes the form
+
+**Area:** Edit profile
+**Files:** `vocabularies.json`, `EditProfile.tsx`, `scripts/um-smoke.tsx`
+
+**What changed**
+
+About moves from the Business group to its own group at the bottom, after
+Target areas. It is the one free paragraph on the form, and a paragraph at
+the top is what people write before they have answered the questions
+underneath it — last, it is written knowing what the profile already says.
+
+**Verified**
+
+`check:users-render` 118: the form's order asserted end to end, About
+asserted after Target areas and before the identity summary.
+
+---
+
+## 2026-08-29
+
 ### Display name goes; username and about join the Business group
 
 **Area:** the Edit profile form and the profile schema

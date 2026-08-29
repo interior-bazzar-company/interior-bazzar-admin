@@ -590,9 +590,12 @@ check("edit profile · incomplete", () => modal(
     return full;
   });
   check("one business group: name, address, about lead it; no Display name", () => {
-    const order = [">Business name", ">Username", ">About", ">Business type"].map((t) => full.indexOf(t));
-    if (order.some((i) => i < 0)) throw new Error("a leading field is missing");
-    if (order.some((i, k) => k > 0 && i < order[k - 1])) throw new Error("the business group is out of order");
+    const order = [">Business name", ">Username", ">Business type", ">Target areas", ">About"]
+      .map((t) => full.indexOf(t));
+    if (order.some((i) => i < 0)) throw new Error("a field is missing");
+    if (order.some((i, k) => k > 0 && i < order[k - 1])) throw new Error("the form is out of order");
+    /* About closes the form: nothing but the identity summary follows it. */
+    if (full.indexOf(">About") > full.indexOf(">Identity")) throw new Error("About is not last");
     if (full.indexOf(">Display name") >= 0) throw new Error("Display name survives");
     if (full.indexOf(">Basic profile<") >= 0) throw new Error("an empty Basic profile group renders");
     return full;

@@ -51,9 +51,13 @@ import type { ProfileField, TargetArea, UserProfile, UserRow } from "./store";
 /* Just the names. Each carried a sentence of positioning ("what the
    marketplace matches and ranks on") and the modal read as documentation with
    fields in it — the notes said things the fields already say. */
+/* About closes the form. It is the one free paragraph, and a paragraph at
+   the top is what people write before they have answered the questions
+   underneath it — last, it is written knowing what the profile already says. */
 const GROUPS = [
   { key: "business", label: "Business profile" },
   { key: "contact", label: "Target areas" },
+  { key: "about", label: "About" },
 ];
 
 /** A field holds a list when the schema says so — never because the value
