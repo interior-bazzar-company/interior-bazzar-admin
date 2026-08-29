@@ -6,6 +6,40 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-29
 
+### Firm / Studio joins the business types
+
+**Area:** the Business type dropdown
+**Files:** `vocabularies.json`, `users.json`,
+`scripts/check-users-derivation.cjs`, `scripts/um-smoke.tsx`
+
+**What changed**
+
+**Firm / Studio** — a design practice with a team: studio, consultancy,
+agency — sits between Contractor and Independent professional in the chain.
+It is the grain two earlier entries flagged as missing: a design firm is
+neither a site contractor nor a solo practitioner, and the seed had been
+forcing it into one or the other.
+
+Seven types now, still in chain order: makers, movers, sellers, then who
+builds, who designs as a team, who works alone.
+
+**Temp data**
+
+`users.json` — the seven design firms (Meera Studio, Tara Design
+Collective, Lokesh, Sharma, K. Iyer, Fernandes, Saloni) move to
+`firm_studio`; the six trades that build stay Contractor; the two solo
+practices stay Independent.
+
+**Verified**
+
+`check:users` 270 → 271, `check:users-render` 117. Chain order asserted in
+schema and markup with the new entry in place; the three-way split of the
+seed's service businesses asserted by count and, for Independent, by id.
+
+---
+
+## 2026-08-29
+
 ### The public/internal chips leave the form; Deals in moves under Business type
 
 **Area:** Edit profile

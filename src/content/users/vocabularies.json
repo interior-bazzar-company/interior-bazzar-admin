@@ -1101,6 +1101,11 @@
       "hint": "Executes on site with a crew — civil, carpentry, MEP, finishing — as a firm."
     },
     {
+      "key": "firm_studio",
+      "label": "Firm / Studio",
+      "hint": "A design practice with a team — studio, consultancy, agency."
+    },
+    {
       "key": "independent",
       "label": "Independent professional",
       "hint": "One practitioner rather than a firm — a designer, architect or consultant working alone."

@@ -813,15 +813,20 @@ S.resetStore();
      who moves it, who sells it, then the firm that builds and the practitioner
      who works alone. Alphabetical would be a list; this reads as a supply
      chain, which is what the type axis IS. */
-  ok("six types, in chain order",
+  ok("seven types, in chain order",
     S.BUSINESS_TYPES.map((t) => t.key),
-    ["manufacturer", "dealer", "wholesaler", "retailer", "contractor", "independent"]);
-  ok("a firm with an execution scope is a Contractor, a solo practice is Independent",
-    S.readUsers().filter((u) => u.profile.businessType === "contractor").length, 11);
-  ok("...and Independent means alone: no execution scope on any of them",
-    S.readUsers().filter((u) => u.profile.businessType === "independent"
-      && u.profile.categories.some((c) => ["turnkey", "design_build", "execution_only"].indexOf(c) >= 0))
-      .map((u) => u.userId), []);
+    ["manufacturer", "dealer", "wholesaler", "retailer", "contractor", "firm_studio", "independent"]);
+  /* Firm / Studio is the grain two earlier entries flagged as missing: a
+     design practice with a team is neither a site contractor nor a solo
+     practitioner. The seed's design firms sit there; trades that build stay
+     Contractor; the two solo practices stay Independent. */
+  ok("the design firms are Firm / Studio",
+    S.readUsers().filter((u) => u.profile.businessType === "firm_studio").length, 7);
+  ok("...trades that build are Contractor",
+    S.readUsers().filter((u) => u.profile.businessType === "contractor").length, 6);
+  ok("...and Independent is the two who work alone",
+    S.readUsers().filter((u) => u.profile.businessType === "independent")
+      .map((u) => u.userId).sort(), ["IB-U-0812", "IB-U-1041"]);
 
   const bad = (patch) => S.validateFacets(patch) !== "";
   ok("products alone is fine", bad({ dealsIn: ["products"] }), false);

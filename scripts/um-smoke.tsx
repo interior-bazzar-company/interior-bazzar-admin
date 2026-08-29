@@ -570,7 +570,7 @@ check("edit profile · incomplete", () => modal(
        the schema and the <option>s would silently alphabetise it. */
     const at_ = (t) => full.indexOf(">" + t + "<");
     const order = ["Manufacturer", "Dealer / Distributor", "Wholesaler / Trader",
-      "Retailer / Showroom", "Contractor", "Independent professional"].map(at_);
+      "Retailer / Showroom", "Contractor", "Firm / Studio", "Independent professional"].map(at_);
     if (order.some((i) => i < 0)) throw new Error("a type is missing from the dropdown");
     if (order.some((i, k) => k > 0 && i < order[k - 1]))
       throw new Error("the dropdown is not in chain order");

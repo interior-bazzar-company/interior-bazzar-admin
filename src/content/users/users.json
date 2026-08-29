@@ -477,7 +477,7 @@
         "username": "tara-design-collective",
         "about": "A four-person studio doing heritage-sensitive residential interiors.",
         "businessName": "Tara Design Collective",
-        "businessType": "independent",
+        "businessType": "firm_studio",
         "dealsIn": [
           "services"
         ],
@@ -626,7 +626,7 @@
         "username": "meera-studio-interiors",
         "about": "Full-service interior design studio serving Bengaluru since 2019. Residential and commercial fit-out, in-house carpentry.",
         "businessName": "Meera Studio Interiors LLP",
-        "businessType": "contractor",
+        "businessType": "firm_studio",
         "dealsIn": [
           "services"
         ],
@@ -718,7 +718,7 @@
         "username": "lokesh-interiors",
         "about": "Two-person outfit doing apartment interiors around Infopark.",
         "businessName": "Lokesh Interiors",
-        "businessType": "contractor",
+        "businessType": "firm_studio",
         "dealsIn": [
           "services"
         ],
@@ -929,7 +929,7 @@
         "username": "sharma-interiors",
         "about": "Residential interiors and renovation across west Delhi.",
         "businessName": "Sharma Interiors",
-        "businessType": "contractor",
+        "businessType": "firm_studio",
         "dealsIn": [
           "services"
         ],
@@ -1071,7 +1071,7 @@
         "username": "k-iyer-interior",
         "about": "Residential interiors, twenty years in T. Nagar.",
         "businessName": "K. Iyer Interior Co.",
-        "businessType": "contractor",
+        "businessType": "firm_studio",
         "dealsIn": [
           "services"
         ],
@@ -1223,7 +1223,7 @@
         "username": "fernandes-interiors",
         "about": "Independent designer, residential only.",
         "businessName": "Fernandes Interiors",
-        "businessType": "independent",
+        "businessType": "firm_studio",
         "dealsIn": [
           "services"
         ],
@@ -1292,7 +1292,7 @@
         "username": "saloni-interiors",
         "about": "Apartment interiors and small commercial spaces in central Mumbai.",
         "businessName": "Saloni Interiors",
-        "businessType": "contractor",
+        "businessType": "firm_studio",
         "dealsIn": [
           "services"
         ],
