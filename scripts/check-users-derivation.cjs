@@ -456,6 +456,151 @@ S.resetStore();
 ok("an empty note is refused", S.addNote("IB-U-0912", "   ").indexOf("needs some text") >= 0, true);
 ok("a real note is accepted", S.addNote("IB-U-0912", "Called about the renewal."), "");
 
+/* ===================================================== the business facets ===
+   Business type, Segments and Categories are CLOSED vocabularies and the
+   marketplace filters and ranks on them. One unrecognised key is a profile
+   that quietly stops appearing under anything — a failure with no error
+   message and no visible symptom until somebody asks why a paying member gets
+   no enquiries. So: the vocabularies have to be internally sound, the seed has
+   to be inside them, and the write path has to refuse everything else. */
+console.log("\nthe facet vocabularies are sound");
+S.resetStore();
+{
+  const dupes = (list, k) => {
+    const seen = {};
+    return list.filter((x) => (seen[x[k]] ? true : ((seen[x[k]] = 1), false)));
+  };
+  ok("business types have unique keys", dupes(S.BUSINESS_TYPES, "key").length, 0);
+  ok("segments have unique keys", dupes(S.SEGMENTS, "key").length, 0);
+  ok("categories have unique keys", dupes(S.CATEGORIES, "key").length, 0);
+  /* A category whose group is misspelled renders under no heading, which in a
+     grouped listbox means it does not render at all. */
+  const groupKeys = S.CATEGORY_GROUPS.map((g) => g.key);
+  ok("every category sits in a declared group",
+    S.CATEGORIES.filter((c) => groupKeys.indexOf(c.group) < 0).map((c) => c.key), []);
+  ok("both groups are actually used",
+    groupKeys.filter((g) => !S.CATEGORIES.some((c) => c.group === g)), []);
+  ok("keyword suggestions are unique",
+    S.KEYWORD_SUGGESTIONS.length,
+    S.dedupeKeywords(S.KEYWORD_SUGGESTIONS).length);
+  /* The label is the fallback when a key is missing, so an empty one would
+     render a blank chip that cannot be told from a bug. */
+  ok("nothing is missing a label",
+    S.BUSINESS_TYPES.concat(S.SEGMENTS).concat(S.CATEGORIES)
+      .filter((o) => !o.label).length, 0);
+
+  /* THE OPTION TEXT LIVES HERE because the listbox only exists while it is
+     open, and the render harness has no browser to open it with. These are the
+     same guarantees the picker would be asserted on if it could be: every
+     business type explains itself, and the delivery/sector split is real. */
+  ok("every business type carries the sentence that separates it",
+    S.BUSINESS_TYPES.filter((o) => !o.hint).map((o) => o.key), []);
+  ok("...because Dealer, Retailer and Wholesaler are not self-evident",
+    ["dealer", "retailer", "wholesaler"]
+      .filter((k) => !S.BUSINESS_TYPES.filter((o) => o.key === k)[0].hint), []);
+  ok("categories genuinely span both questions",
+    S.CATEGORY_GROUPS.map((g) => S.CATEGORIES.filter((c) => c.group === g.key).length > 1),
+    [true, true]);
+  /* Turnkey is the one everybody picks and the one most often meant loosely,
+     so it is the one that has to say what it commits you to. */
+  ok("the delivery models say what they commit you to",
+    S.CATEGORIES.filter((c) => c.group === "delivery" && !c.hint).map((c) => c.key), []);
+}
+
+console.log("\nthe seed is inside its own vocabularies");
+{
+  const users = S.readUsers();
+  const known = (list) => list.map((o) => o.key);
+  const bt = known(S.BUSINESS_TYPES), sg = known(S.SEGMENTS), ct = known(S.CATEGORIES);
+  const strayType = users.filter((u) =>
+    u.profile.businessType && bt.indexOf(u.profile.businessType) < 0);
+  const straySeg = users.filter((u) =>
+    u.profile.segments.some((s) => sg.indexOf(s) < 0));
+  const strayCat = users.filter((u) =>
+    u.profile.categories.some((c) => ct.indexOf(c) < 0));
+  ok("no unknown business type", strayType.map((u) => u.userId), []);
+  ok("no unknown segment", straySeg.map((u) => u.userId), []);
+  ok("no unknown category", strayCat.map((u) => u.userId), []);
+  /* THE MIGRATION'S ONE INVARIANT. businessType and segments replaced category
+     and services one for one, both required. If a profile gained or lost one
+     of them, its completeness moved — and a vocabulary change would have
+     silently re-graded people. */
+  ok("business type and segments travel together",
+    users.filter((u) => !!u.profile.businessType !== (u.profile.segments.length > 0))
+      .map((u) => u.userId), []);
+  ok("...and the incomplete count did not move", S.countsOf(all).incompleteProfiles, 3);
+  ok("no profile exceeds the segment cap",
+    users.filter((u) => u.profile.segments.length > 6).map((u) => u.userId), []);
+  ok("no profile exceeds the keyword cap",
+    users.filter((u) => u.profile.searchKeywords.length > 12).map((u) => u.userId), []);
+}
+
+console.log("\nthe closed lists actually close");
+S.resetStore();
+{
+  const bad = (patch) => S.validateFacets(patch) !== "";
+  ok("a real business type is fine", bad({ businessType: "manufacturer" }), false);
+  ok("an invented one is not", bad({ businessType: "wizard" }), true);
+  ok("clearing it is allowed", bad({ businessType: null }), false);
+  ok("real segments are fine", bad({ segments: ["architect", "vastu"] }), false);
+  ok("an invented segment is not", bad({ segments: ["architect", "vibes"] }), true);
+  ok("the same segment twice is refused", bad({ segments: ["architect", "architect"] }), true);
+  ok("seven segments is over the cap of six",
+    bad({ segments: S.SEGMENTS.slice(0, 7).map((s) => s.key) }), true);
+  ok("six is not", bad({ segments: S.SEGMENTS.slice(0, 6).map((s) => s.key) }), false);
+  ok("real categories are fine", bad({ categories: ["turnkey", "residential"] }), false);
+  ok("an invented category is not", bad({ categories: ["spaceship"] }), true);
+
+  /* Keywords are the ONE open facet, and openness is the point: matching is
+     the job where the tail nobody enumerated is what people actually type. */
+  ok("a keyword nobody suggested is accepted",
+    bad({ searchKeywords: ["Jacuzzi installation"] }), false);
+  ok("...but not a forty-one character one",
+    bad({ searchKeywords: ["x".repeat(41)] }), true);
+  ok("...and not thirteen of them",
+    bad({ searchKeywords: Array.from({ length: 13 }, (_, i) => "kw " + i) }), true);
+
+  ok("cleanKeyword collapses the whitespace", S.cleanKeyword("  floor   planning "), "floor planning");
+  /* Case-insensitive, and the FIRST spelling survives — the one already on the
+     profile, not the one somebody just typed underneath it. */
+  ok("dedupe is case-insensitive and keeps the first spelling",
+    S.dedupeKeywords(["Modular kitchen", "modular  kitchen", "Wardrobe design"]),
+    ["Modular kitchen", "Wardrobe design"]);
+}
+
+console.log("\nthe write path refuses what the form refuses");
+S.resetStore();
+{
+  const before = JSON.stringify(S.readUsers().filter((u) => u.userId === "IB-U-0912")[0].profile);
+  const err = S.updateProfile("IB-U-0912", { segments: ["architect", "not_a_segment"] });
+  ok("an unknown segment is refused at the store, not only in the dialog",
+    err.indexOf("unknown") >= 0, true);
+  /* The module's standing promise: a refused write leaves nothing behind. */
+  ok("...and the stored profile is untouched",
+    JSON.stringify(S.readUsers().filter((u) => u.userId === "IB-U-0912")[0].profile), before);
+  ok("a valid facet patch is accepted",
+    S.updateProfile("IB-U-0912", {
+      businessType: "service_provider",
+      segments: ["interior_designer", "architect"],
+      categories: ["turnkey", "commercial"],
+      searchKeywords: ["Office fit-out", "Complete home interiors"],
+    }), "");
+  ok("...and it is what came back",
+    S.readUsers().filter((u) => u.userId === "IB-U-0912")[0].profile.segments,
+    ["interior_designer", "architect"]);
+}
+
+console.log("\nkeys are stored, labels are shown");
+{
+  ok("a known key resolves to its label",
+    S.facetLabel("segments", "visualiser_3d"), "3D visualiser");
+  /* A key the vocabulary has since dropped is still a fact about that profile.
+     It renders as itself rather than as an empty cell, because a blank is
+     indistinguishable from "they never answered". */
+  ok("a dropped key falls back to itself, not to blank",
+    S.facetLabel("segments", "retired_key"), "retired_key");
+}
+
 S.resetStore();
 
 console.log(failed ? "\n" + failed + " FAILED\n" : "\nall checks passed\n");

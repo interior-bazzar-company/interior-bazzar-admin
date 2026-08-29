@@ -6,6 +6,169 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-29
 
+### The business profile gets four facets, and one picker to fill them
+
+**Area:** Edit profile, the profile tab on the record, the profile schema
+**Files:** `FacetPicker.tsx` (new), `EditProfile.tsx`, `Detail.tsx`, `store.ts`,
+`vocabularies.json`, `users.json`, `users.css`, `scripts/um-smoke.tsx`,
+`scripts/check-users-derivation.cjs`, `BACKEND-INTEGRATION.md`
+
+**What changed**
+
+**Four facets replace two fields that were pretending to be four.** The profile
+had `category` — one string, from a seven-item list that mixed design studios
+with plywood shops — and `services`, a comma-separated text box. Neither was
+read by anything: no filter, no export, no analytic. They were a taxonomy in
+name only. They are gone, and in their place:
+
+| Facet | Shape | Answers |
+| --- | --- | --- |
+| **Business type** | one key, closed | What kind of entity is this |
+| **Segments** | up to 6 keys, closed | What do they actually do or deal in |
+| **Categories** | up to 8 keys, closed, grouped | How much of the job do they hold, and for which sector |
+| **Search keywords** | up to 12, **open** | What would a customer type |
+
+**They are orthogonal on purpose, not a hierarchy.** *Manufacturer + Modular
+kitchen* and *Service provider + Modular kitchen* are different businesses and
+it takes both facets to say so — one sells you a kitchen, the other designs the
+room it goes in. A single "category" list cannot express that, which is why the
+old one had to choose between describing trades and describing disciplines, and
+ended up doing neither.
+
+**Three closed, one open, and that split is the whole design.** Business type,
+Segments and Categories refuse anything outside the vocabulary. They are what
+the marketplace filters and ranks on, and free text fragments a facet inside a
+month: "3D Designer", "3d designer" and "3D visualiser" become three buckets
+holding one thing, and every one of them ranks worse than the single bucket
+would have. Search keywords accept anything, because matching is the one job
+where the tail nobody enumerated is the point — "complete home decor" is not a
+taxonomy entry and should not have to be. The split is one flag per field in
+the JSON, so it is a decision rather than a wall.
+
+**Categories is grouped because it is two questions.** Turnkey is a *delivery
+model* and Residential is a *sector*; a flat list containing both makes somebody
+picking "Turnkey" feel they have answered the sector question when they have
+not. The picker renders them under **Delivery model** and **Sector** headings,
+so the shape of the question is visible in the shape of the menu. Both groups
+are asserted non-empty — a category with a typo'd group would render under no
+heading, which in a grouped listbox means it does not render at all.
+
+**The caps are stated, not just enforced.** Six segments, eight categories,
+twelve keywords, each with a live `3/6` counter beside the field. A profile
+claiming every segment is claiming none, and a limit somebody only discovers by
+being refused is a limit they experience as a bug.
+
+**Taxonomy.** Seven business types along the axis that actually matters for a
+portal — where you sit in the chain and what you bill for: Service provider,
+Contractor, Independent professional, Manufacturer, Dealer/Distributor,
+Retailer/Showroom, Wholesaler/Trader. Each carries a sentence, because Dealer
+vs Retailer vs Wholesaler is not self-evident and a native `<select>` has
+nowhere to put the distinction. Twenty segments spanning both service
+disciplines (interior designer, architect, 3D visualiser, MEP, PMC, Vastu) and
+product trades (plywood & laminates, tiles & sanitaryware, furniture) — the
+business type is what says which side of that line somebody is on. Thirteen
+categories in the two groups. Thirty keyword suggestions phrased the way people
+search rather than the way a form gets filled in.
+
+**One control, four behaviours: `FacetPicker`.** Chosen by the field's `type`,
+not built four times — four components drift, and the keyword field grows a
+clear-all the segment field never gets. It follows the WAI-ARIA combobox
+pattern: `role="combobox"` on the input, the popup a `listbox`, the active
+option tracked with `aria-activedescendant` rather than by moving focus,
+Escape closes, Backspace on an empty box takes the last chip back.
+
+**The chips sit ABOVE the control, not inside it.** Chips-in-the-input is the
+more common pattern and it is worse here: the box grows as you pick, the form
+reflows under the cursor, and by the fifth keyword the field you are typing into
+has moved somewhere else on the page. Above it, the answer accumulates in one
+place and the input never moves. Picked options leave the list rather than
+sitting in it greyed out — the list is what you can still do, and a menu mostly
+made of things you have already done is a menu people stop reading.
+
+**Keys are stored; labels are shown.** All three closed facets hold vocabulary
+keys. A key the vocabulary has since dropped renders as itself, flagged, rather
+than vanishing — a chip that silently disappears is a data migration nobody
+finds out about.
+
+**The form no longer knows any field by name.** It used to:
+`if (f.key === "services")`, twice, for the one comma-separated field — which is
+exactly how a data-driven form stops being one. The schema now carries a `type`
+and `EditProfile` dispatches on it, which is why four facets arrived without a
+line in that file mentioning any of them. That property is UM-OD-09's whole
+point and it is one `if` away from being lost again.
+
+**Validation moved to the store.** `validateFacets()` sits beside the
+derivation, not in the dialog, for the reason the plan rules did: a rule the
+form owns is a rule the API does not have, and the moment a second caller
+appears — an import, a bulk edit, the customer's own profile page — it is
+enforced nowhere. `updateProfile()` calls it before touching anything, so a
+refused write still leaves the stored profile byte-identical.
+
+**Temp data**
+
+`vocabularies.json` — `businessTypes`, `segments`, `categories` (rewritten from
+a flat seven-item list into thirteen grouped entries), `categoryGroups` and
+`keywordSuggestions` are new; `profileFields` gained `type`, `vocab`, `groups`,
+`max`, `maxLength` and `hint` on every row.
+
+`users.json` — all twenty profiles migrated. **Completeness does not move.**
+`businessType` and `segments` replace `category` and `services` one for one and
+both stay required, so the required set is still six fields and the incomplete
+count is still 3. Anything else would have silently re-graded nineteen people
+as a side effect of a vocabulary change, and that is asserted rather than
+hoped for.
+
+**Backend needed**
+
+`PATCH /admin/users/{id}/profile` (UM-T07) must enforce the facet rules itself —
+unknown key, over cap, or the same key twice must all be refused, and an unknown
+key must **not** be coerced to the nearest known one, because a value quietly
+rewritten is worse than one that matches nobody. `searchKeywords` is the open
+one: trim, collapse whitespace, de-duplicate case-insensitively keeping the
+first spelling.
+
+`GET /admin/users/{id}` sends the four facets on `profile{}` as **keys, not
+labels**, and `GET /admin/users/vocabularies` gains the four vocabularies plus
+`categoryGroups`. `profileFields[].type` is load-bearing — it is what picks the
+control — so a new facet is a row in that payload, not a code change.
+
+**Open decisions**
+
+**UM-OD-09 widened.** It covered the field set and the visibility rules; it now
+also covers **who owns the facet vocabularies**. Segments and Categories are
+marketplace taxonomy rather than user data — somebody has to be able to add a
+segment without a deploy, and whoever that is needs a screen this module does
+not have.
+
+**Verified**
+
+`tsc -b` clean; `eslint` clean on the module and `scripts/`; `vite build`
+succeeds. `check:users` 144 → 183, `check:users-render` 87 → 97.
+
+The derivation assertions cover the vocabularies (unique keys, no orphan
+groups, nothing missing a label or a hint), the seed being inside them, the
+migration's one invariant (business type and segments travel together, and the
+incomplete count did not move), and every rule the closed lists enforce:
+unknown key, duplicate, over-cap, over-long keyword, and that a refused write
+leaves the stored profile untouched.
+
+The render assertions cover the outcome of the schema-driven rule rather than
+the rule — every schema field reached the form, each got the control its `type`
+asks for, the chips carry resolved labels rather than raw keys, the cap is on
+screen, and exactly one facet is free text.
+
+**Still not verified: the picker has never been opened.** SSR runs no effects
+and the listbox only exists while it is open, so the assertions cover the closed
+state and the option text is checked against the vocabulary instead. Nothing
+here proves keyboard navigation works, that the popup is positioned correctly,
+that it does not run off the bottom of a short modal, or that the sticky group
+headings behave while scrolling. Those need a browser, and no part of this
+module has been in one yet.
+
+---
+
+## 2026-08-29
+
 ### Counts get names: a highlighted total, a stated whole, and one figure per tab
 
 **Area:** the topbar strip, the view band, the stat strip on Users and Members

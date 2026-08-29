@@ -62,8 +62,21 @@ export interface UserProfile {
   pincode: string | null;
   about: string | null;
   businessName: string | null;
-  category: string | null;
-  services: string[];
+  /* THE FOUR BUSINESS FACETS. Deliberately orthogonal rather than one
+     hierarchy: businessType is what kind of entity this is, segments is what
+     it does, categories is how much of the job it holds and for which sector,
+     searchKeywords is the discovery long tail. `Manufacturer + Modular kitchen`
+     and `Service provider + Modular kitchen` are different businesses, and it
+     takes both facets to say so.
+
+     The first three hold VOCABULARY KEYS, never labels — a label is a display
+     concern and gets rewritten; a key is what a filter, a report and a saved
+     search all key on. searchKeywords holds raw text because it is the one
+     facet whose whole job is the tail nobody thought to enumerate. */
+  businessType: string | null;
+  segments: string[];
+  categories: string[];
+  searchKeywords: string[];
   portfolioUrl: string | null;
   addressLine: string | null;
   updatedBy: string | null;
@@ -177,9 +190,147 @@ export const TRANSITIONS = vocabDoc.transitions;
 export const LIFECYCLE_ACTIONS = vocabDoc.lifecycleActions;
 export const ACTIVATION_SOURCES = vocabDoc.activationSources;
 export const REGISTRATION_SOURCES = vocabDoc.registrationSources;
-export const PROFILE_FIELDS = vocabDoc.profileFields;
+/**
+ * One entry of the profile schema. `type` is what decides which control the
+ * form renders, which is why EditProfile no longer knows a single field by
+ * name — add a field to the JSON with `"type": "multi"` and it appears, with
+ * its picker, its cap and its validation, with no code edit. That property is
+ * the reason the schema is data (UM-OD-09) and it is easy to lose by writing
+ * one `if (f.key === …)`.
+ */
+export interface ProfileField {
+  key: string;
+  label: string;
+  group: string;
+  required: boolean;
+  editable: boolean;
+  public: boolean;
+  /** text · textarea · single (one key) · multi (many keys) · tags (free text) */
+  type: string;
+  /** Name of the vocabulary in this file that supplies the options. */
+  vocab?: string;
+  /** Name of the vocabulary that supplies option GROUP headings, if grouped. */
+  groups?: string;
+  /** Most values allowed. A facet with no ceiling is a facet everybody maxes. */
+  max?: number;
+  /** Longest single free-text value, for `tags` only. */
+  maxLength?: number;
+  hint?: string;
+}
+export const PROFILE_FIELDS = vocabDoc.profileFields as unknown as ProfileField[];
+
+export interface FacetOption { key: string; label: string; hint?: string; group?: string }
+export interface FacetGroup { key: string; label: string; note?: string }
+
+/* The vocabularies a field may point at, by the name it uses in the schema.
+   Looked up rather than imported directly so `"vocab": "segments"` in the JSON
+   is the whole wiring. */
+const VOCABS: Record<string, FacetOption[]> = {
+  businessTypes: vocabDoc.businessTypes as FacetOption[],
+  segments: vocabDoc.segments as FacetOption[],
+  categories: vocabDoc.categories as FacetOption[],
+  /* Strings in the file, options here. Keywords are free text: the "key" IS
+     the label, and the list is a suggestion rather than a constraint. */
+  keywordSuggestions: (vocabDoc.keywordSuggestions as string[])
+    .map((k) => ({ key: k, label: k })),
+};
+const VOCAB_GROUPS: Record<string, FacetGroup[]> = {
+  categoryGroups: vocabDoc.categoryGroups as FacetGroup[],
+};
+
+export const optionsFor = (f: ProfileField): FacetOption[] =>
+  (f.vocab && VOCABS[f.vocab]) || [];
+export const groupsFor = (f: ProfileField): FacetGroup[] =>
+  (f.groups && VOCAB_GROUPS[f.groups]) || [];
+
+/** A stored key rendered for a human. Falls back to the key rather than to an
+ *  empty cell: a value the vocabulary has since dropped is still a fact about
+ *  this profile, and blanking it would hide a migration that needs doing. */
+export function facetLabel(vocab: string, key: string): string {
+  const hit = (VOCABS[vocab] || []).filter((o) => o.key === key)[0];
+  return hit ? hit.label : key;
+}
+export const labelsFor = (f: ProfileField, keys: string[]): string[] =>
+  keys.map((k) => (f.vocab ? facetLabel(f.vocab, k) : k));
+
+/* ------------------------------------------------------ facet validation --- */
+
+/** Collapse the whitespace and trim. Not lower-cased: "2BHK interior" and
+ *  "Pooja room design" are shown to people, and case is theirs to choose. */
+export const cleanKeyword = (s: string) => s.replace(/\s+/g, " ").trim();
+
+/** Case-insensitive de-duplication that KEEPS the first spelling. Somebody
+ *  typing "modular kitchen" under an existing "Modular kitchen" means one
+ *  keyword, not two, and the one already there is the one that stays. */
+export function dedupeKeywords(list: string[]): string[] {
+  const seen: Record<string, boolean> = {};
+  const out: string[] = [];
+  list.map(cleanKeyword).filter(Boolean).forEach((k) => {
+    const f = k.toLowerCase();
+    if (seen[f]) return;
+    seen[f] = true;
+    out.push(k);
+  });
+  return out;
+}
+
+/**
+ * Everything the four facets refuse, in one place.
+ *
+ * It lives here rather than in the dialog for the reason the plan rules did:
+ * a rule the form owns is a rule the API does not have, and the moment a
+ * second caller appears — an import, a bulk edit, the customer's own profile
+ * page — it is enforced nowhere. Returns "" when the patch is acceptable.
+ */
+export function validateFacets(patch: Partial<UserProfile>): string {
+  const bad: string[] = [];
+  PROFILE_FIELDS.forEach((f) => {
+    const v = (patch as unknown as Record<string, unknown>)[f.key];
+    if (v === undefined) return;
+
+    if (f.type === "single") {
+      if (v === null || v === "") return;
+      if (!optionsFor(f).some((o) => o.key === v)) {
+        bad.push(f.label + ': "' + String(v) + '" is not one of the allowed values');
+      }
+      return;
+    }
+
+    if (f.type === "multi" || f.type === "tags") {
+      const list = Array.isArray(v) ? (v as string[]) : [];
+      if (f.max && list.length > f.max) {
+        bad.push(f.label + ": at most " + f.max + " (got " + list.length + ")");
+      }
+      if (f.type === "multi") {
+        /* A CLOSED LIST HAS TO ACTUALLY CLOSE. These three facets are what the
+           marketplace filters and ranks on; one unrecognised key is a profile
+           that quietly stops appearing under anything. */
+        const known = optionsFor(f);
+        const strays = list.filter((k) => !known.some((o) => o.key === k));
+        if (strays.length) {
+          bad.push(f.label + ": unknown " + strays.map((s) => '"' + s + '"').join(", "));
+        }
+        if (dedupeKeywords(list).length !== list.length) {
+          bad.push(f.label + ": the same value is in there twice");
+        }
+      } else {
+        const long = list.map(cleanKeyword)
+          .filter((k) => f.maxLength && k.length > f.maxLength);
+        if (long.length) {
+          bad.push(f.label + ": keep each under " + f.maxLength + " characters");
+        }
+      }
+    }
+  });
+  return bad.length ? bad.join(". ") + "." : "";
+}
 export const TAGS = vocabDoc.tags;
 export const CITIES = vocabDoc.cities;
+export const BUSINESS_TYPES = vocabDoc.businessTypes;
+export const SEGMENTS = vocabDoc.segments;
+export const CATEGORIES = vocabDoc.categories;
+export const CATEGORY_GROUPS = vocabDoc.categoryGroups;
+export const KEYWORD_SUGGESTIONS = vocabDoc.keywordSuggestions;
 export const REGISTERED_RANGES = vocabDoc.registeredRanges;
 export const SORT_OPTIONS = vocabDoc.sortOptions;
 export const METRICS = vocabDoc.metricDefinitions;
@@ -663,6 +814,12 @@ function pushMembershipEvent(m: Membership, type: string, from: MembershipStatus
 export function updateProfile(userId: string, patch: Partial<UserProfile>): string {
   const u = findUser(userId);
   if (!u) return "That user no longer exists.";
+  /* BEFORE anything is touched. The form checks the same rules as you type,
+     but the form is not the last line — this function is what an import or a
+     bulk edit would call, and a facet that only the dialog validates is a
+     facet nothing validates. */
+  const invalid = validateFacets(patch);
+  if (invalid) return invalid;
   const changed: string[] = [];
   (Object.keys(patch) as (keyof UserProfile)[]).forEach((k) => {
     const before = JSON.stringify(u.profile[k] ?? null);

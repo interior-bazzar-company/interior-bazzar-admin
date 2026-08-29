@@ -3,7 +3,6 @@
   "generatedAt": "2026-08-25T09:00:00+05:30",
   "asOf": "2026-08-25T09:00:00+05:30",
   "$comment_asOf": "Every derived classification, age and expiring-soon window on these screens is computed against this instant rather than the browser clock, so the seed reads the same tomorrow as it does today. store.ts is the only place that decides that.",
-
   "users": [
     {
       "userId": "IB-U-1041",
@@ -32,14 +31,32 @@
         "pincode": "560038",
         "about": "Independent stylist taking on residential projects across east Bengaluru.",
         "businessName": "Priya Nair Studio",
-        "category": "Interior Design Studio",
-        "services": ["Residential styling", "Space planning"],
+        "businessType": "service_provider",
+        "segments": [
+          "interior_designer",
+          "interior_decorator"
+        ],
+        "categories": [
+          "design_only",
+          "residential"
+        ],
+        "searchKeywords": [
+          "Residential styling",
+          "Space planning",
+          "Home decor"
+        ],
         "portfolioUrl": "https://example.in/priya-nair",
         "addressLine": "12, 100 Feet Road, Indiranagar",
         "updatedBy": "Priya Nair",
         "updatedAt": "2026-08-07T09:15:00+05:30"
       },
-      "tags": [{ "slug": "high-intent", "assignedBy": "D. Kapoor", "assignedAt": "2026-08-20T12:10:00+05:30" }],
+      "tags": [
+        {
+          "slug": "high-intent",
+          "assignedBy": "D. Kapoor",
+          "assignedAt": "2026-08-20T12:10:00+05:30"
+        }
+      ],
       "notes": [
         {
           "noteId": "NT-1041-1",
@@ -49,7 +66,13 @@
           "text": "Called about Starter. Wants to see how many enquiries a month realistically land in Indiranagar before committing. Call back after the 1st."
         }
       ],
-      "commercial": { "salesOwner": "A. Sharma", "dealRefs": ["DL-3310"], "invoiceRefs": [] },
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-3310"
+        ],
+        "invoiceRefs": []
+      },
       "activeMembershipId": null
     },
     {
@@ -79,16 +102,33 @@
         "pincode": null,
         "about": null,
         "businessName": "Bhat Carpentry Works",
-        "category": "Carpentry & Woodwork",
-        "services": [],
+        "businessType": "contractor",
+        "segments": [
+          "carpentry"
+        ],
+        "categories": [
+          "execution_only",
+          "residential"
+        ],
+        "searchKeywords": [],
         "portfolioUrl": null,
         "addressLine": null,
         "updatedBy": "Arjun Bhat",
         "updatedAt": "2026-08-05T18:20:00+05:30"
       },
-      "tags": [{ "slug": "profile-chase", "assignedBy": "N. Pillai", "assignedAt": "2026-08-18T10:00:00+05:30" }],
+      "tags": [
+        {
+          "slug": "profile-chase",
+          "assignedBy": "N. Pillai",
+          "assignedAt": "2026-08-18T10:00:00+05:30"
+        }
+      ],
       "notes": [],
-      "commercial": { "salesOwner": null, "dealRefs": [], "invoiceRefs": [] },
+      "commercial": {
+        "salesOwner": null,
+        "dealRefs": [],
+        "invoiceRefs": []
+      },
       "activeMembershipId": null
     },
     {
@@ -118,16 +158,28 @@
         "pincode": null,
         "about": null,
         "businessName": null,
-        "category": null,
-        "services": [],
+        "businessType": null,
+        "segments": [],
+        "categories": [],
+        "searchKeywords": [],
         "portfolioUrl": null,
         "addressLine": null,
         "updatedBy": "Nikhil Rao",
         "updatedAt": "2026-08-02T09:01:00+05:30"
       },
-      "tags": [{ "slug": "profile-chase", "assignedBy": "N. Pillai", "assignedAt": "2026-08-14T11:30:00+05:30" }],
+      "tags": [
+        {
+          "slug": "profile-chase",
+          "assignedBy": "N. Pillai",
+          "assignedAt": "2026-08-14T11:30:00+05:30"
+        }
+      ],
       "notes": [],
-      "commercial": { "salesOwner": null, "dealRefs": [], "invoiceRefs": [] },
+      "commercial": {
+        "salesOwner": null,
+        "dealRefs": [],
+        "invoiceRefs": []
+      },
       "activeMembershipId": null
     },
     {
@@ -157,14 +209,33 @@
         "pincode": "400057",
         "about": "Turnkey residential fit-out, mostly 2 and 3 BHK redevelopments.",
         "businessName": "Desai Interiors",
-        "category": "Civil & Renovation",
-        "services": ["Turnkey fit-out", "Bathroom renovation"],
+        "businessType": "contractor",
+        "segments": [
+          "civil_contractor",
+          "pmc"
+        ],
+        "categories": [
+          "turnkey",
+          "residential",
+          "commercial"
+        ],
+        "searchKeywords": [
+          "Turnkey interiors",
+          "Bathroom renovation",
+          "Renovation & remodelling"
+        ],
         "portfolioUrl": null,
         "addressLine": "3rd Floor, Nehru Road, Vile Parle East",
         "updatedBy": "Rohit Desai",
         "updatedAt": "2026-08-12T13:44:00+05:30"
       },
-      "tags": [{ "slug": "high-intent", "assignedBy": "A. Sharma", "assignedAt": "2026-08-22T15:20:00+05:30" }],
+      "tags": [
+        {
+          "slug": "high-intent",
+          "assignedBy": "A. Sharma",
+          "assignedAt": "2026-08-22T15:20:00+05:30"
+        }
+      ],
       "notes": [
         {
           "noteId": "NT-1012-1",
@@ -174,7 +245,13 @@
           "text": "Referred by R. Menon. Quoted Growth; waiting on his partner. Do not discount — Menon is on list price."
         }
       ],
-      "commercial": { "salesOwner": "A. Sharma", "dealRefs": ["DL-3287"], "invoiceRefs": [] },
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-3287"
+        ],
+        "invoiceRefs": []
+      },
       "activeMembershipId": null
     },
     {
@@ -204,14 +281,33 @@
         "pincode": "110020",
         "about": "Factory-finished modular kitchens and wardrobes, installed in eleven days.",
         "businessName": "Verve Modular Pvt Ltd",
-        "category": "Modular Kitchens",
-        "services": ["Modular kitchens", "Wardrobes", "Storage"],
+        "businessType": "manufacturer",
+        "segments": [
+          "modular_kitchen",
+          "furniture"
+        ],
+        "categories": [
+          "supply_only",
+          "design_build",
+          "residential"
+        ],
+        "searchKeywords": [
+          "Modular kitchen",
+          "Wardrobe design",
+          "Storage solutions"
+        ],
         "portfolioUrl": "https://example.in/verve",
         "addressLine": "Unit 14, Okhla Industrial Area Phase 2",
         "updatedBy": "D. Kapoor",
         "updatedAt": "2026-07-02T17:10:00+05:30"
       },
-      "tags": [{ "slug": "vip", "assignedBy": "V. Shakya", "assignedAt": "2026-02-11T09:00:00+05:30" }],
+      "tags": [
+        {
+          "slug": "vip",
+          "assignedBy": "V. Shakya",
+          "assignedAt": "2026-02-11T09:00:00+05:30"
+        }
+      ],
       "notes": [
         {
           "noteId": "NT-0975-1",
@@ -221,7 +317,15 @@
           "text": "Renewal conversation is mine, not Sales. They want the Delhi NCR expansion priced before October."
         }
       ],
-      "commercial": { "salesOwner": "V. Shakya", "dealRefs": ["DL-2140"], "invoiceRefs": ["INV-2025-0912"] },
+      "commercial": {
+        "salesOwner": "V. Shakya",
+        "dealRefs": [
+          "DL-2140"
+        ],
+        "invoiceRefs": [
+          "INV-2025-0912"
+        ]
+      },
       "activeMembershipId": "IB-MB-0975-1"
     },
     {
@@ -251,14 +355,33 @@
         "pincode": "600020",
         "about": "Curtains, upholstery and soft furnishing for homes and boutique hotels.",
         "businessName": "Sunlight Furnishings LLP",
-        "category": "Furnishings & Decor",
-        "services": ["Curtains", "Upholstery", "Soft furnishing"],
+        "businessType": "retailer",
+        "segments": [
+          "furnishing",
+          "furniture"
+        ],
+        "categories": [
+          "supply_only",
+          "residential",
+          "hospitality"
+        ],
+        "searchKeywords": [
+          "Curtains & blinds",
+          "Upholstery",
+          "Soft furnishing"
+        ],
         "portfolioUrl": null,
         "addressLine": "22, Sardar Patel Road, Adyar",
         "updatedBy": "N. Pillai",
         "updatedAt": "2026-08-18T10:25:00+05:30"
       },
-      "tags": [{ "slug": "onboarding", "assignedBy": "N. Pillai", "assignedAt": "2026-08-18T10:26:00+05:30" }],
+      "tags": [
+        {
+          "slug": "onboarding",
+          "assignedBy": "N. Pillai",
+          "assignedAt": "2026-08-18T10:26:00+05:30"
+        }
+      ],
       "notes": [
         {
           "noteId": "NT-0958-1",
@@ -268,7 +391,15 @@
           "text": "Growth term is raised and sitting at Pending. Finance has not confirmed the transfer yet, so it stays pending — do not activate on the screenshot they sent."
         }
       ],
-      "commercial": { "salesOwner": "A. Sharma", "dealRefs": ["DL-3301"], "invoiceRefs": ["INV-2026-0511"] },
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-3301"
+        ],
+        "invoiceRefs": [
+          "INV-2026-0511"
+        ]
+      },
       "activeMembershipId": null
     },
     {
@@ -298,8 +429,21 @@
         "pincode": "302001",
         "about": "A four-person studio doing heritage-sensitive residential interiors.",
         "businessName": "Tara Design Collective",
-        "category": "Interior Design Studio",
-        "services": ["Residential", "Heritage restoration", "Furniture design"],
+        "businessType": "service_provider",
+        "segments": [
+          "interior_designer",
+          "architect"
+        ],
+        "categories": [
+          "design_only",
+          "residential",
+          "hospitality"
+        ],
+        "searchKeywords": [
+          "Complete home interiors",
+          "Heritage restoration",
+          "Furniture design"
+        ],
         "portfolioUrl": "https://example.in/tara",
         "addressLine": "9, Ashok Marg, C-Scheme",
         "updatedBy": "Tara Design Collective",
@@ -307,7 +451,15 @@
       },
       "tags": [],
       "notes": [],
-      "commercial": { "salesOwner": "A. Sharma", "dealRefs": ["DL-2588"], "invoiceRefs": ["INV-2026-0122"] },
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-2588"
+        ],
+        "invoiceRefs": [
+          "INV-2026-0122"
+        ]
+      },
       "activeMembershipId": "IB-MB-0944-1"
     },
     {
@@ -337,14 +489,31 @@
         "pincode": "110015",
         "about": "Plywood, laminates and hardware supply to the trade since 1994.",
         "businessName": "Bhatia Ply & Hardware",
-        "category": "Ply & Hardware",
-        "services": ["Plywood", "Laminates", "Hardware"],
+        "businessType": "dealer",
+        "segments": [
+          "ply_hardware",
+          "tiles_sanitary"
+        ],
+        "categories": [
+          "supply_only"
+        ],
+        "searchKeywords": [
+          "Plywood",
+          "Laminates",
+          "Hardware fittings"
+        ],
         "portfolioUrl": null,
         "addressLine": "Shop 41, Kirti Nagar Furniture Market",
         "updatedBy": "D. Kapoor",
         "updatedAt": "2026-03-19T11:05:00+05:30"
       },
-      "tags": [{ "slug": "win-back", "assignedBy": "A. Sharma", "assignedAt": "2026-07-20T09:30:00+05:30" }],
+      "tags": [
+        {
+          "slug": "win-back",
+          "assignedBy": "A. Sharma",
+          "assignedAt": "2026-07-20T09:30:00+05:30"
+        }
+      ],
       "notes": [
         {
           "noteId": "NT-0921-1",
@@ -354,7 +523,15 @@
           "text": "Let Growth lapse on purpose — said the enquiries were retail, not trade. Worth another call once the trade filter ships."
         }
       ],
-      "commercial": { "salesOwner": "A. Sharma", "dealRefs": ["DL-1904"], "invoiceRefs": ["INV-2025-0640"] },
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-1904"
+        ],
+        "invoiceRefs": [
+          "INV-2025-0640"
+        ]
+      },
       "activeMembershipId": null
     },
     {
@@ -384,14 +561,34 @@
         "pincode": "560041",
         "about": "Full-service interior design studio serving Bengaluru since 2019. Residential and commercial fit-out, in-house carpentry.",
         "businessName": "Meera Studio Interiors LLP",
-        "category": "Interior Design Studio",
-        "services": ["Residential", "Commercial fit-out", "Turnkey"],
+        "businessType": "service_provider",
+        "segments": [
+          "interior_designer",
+          "visualiser_3d",
+          "pmc"
+        ],
+        "categories": [
+          "turnkey",
+          "residential",
+          "commercial"
+        ],
+        "searchKeywords": [
+          "Complete home interiors",
+          "Office fit-out",
+          "Turnkey interiors"
+        ],
         "portfolioUrl": "https://example.in/meera-studio",
         "addressLine": "44, 9th Main, Jayanagar 4th Block",
         "updatedBy": "D. Kapoor",
         "updatedAt": "2026-08-22T14:02:00+05:30"
       },
-      "tags": [{ "slug": "vip", "assignedBy": "V. Shakya", "assignedAt": "2025-08-01T10:00:00+05:30" }],
+      "tags": [
+        {
+          "slug": "vip",
+          "assignedBy": "V. Shakya",
+          "assignedAt": "2025-08-01T10:00:00+05:30"
+        }
+      ],
       "notes": [
         {
           "noteId": "NT-0912-2",
@@ -408,7 +605,18 @@
           "text": "Longest-running member. Two renewals, no support tickets, sends us referrals."
         }
       ],
-      "commercial": { "salesOwner": "V. Shakya", "dealRefs": ["DL-1042", "DL-2291", "DL-3102"], "invoiceRefs": ["INV-2024-0210", "INV-2025-0447"] },
+      "commercial": {
+        "salesOwner": "V. Shakya",
+        "dealRefs": [
+          "DL-1042",
+          "DL-2291",
+          "DL-3102"
+        ],
+        "invoiceRefs": [
+          "INV-2024-0210",
+          "INV-2025-0447"
+        ]
+      },
       "activeMembershipId": "IB-MB-0912-3"
     },
     {
@@ -438,8 +646,18 @@
         "pincode": "682030",
         "about": "Two-person outfit doing apartment interiors around Infopark.",
         "businessName": "Lokesh Interiors",
-        "category": "Interior Design Studio",
-        "services": ["Apartment interiors"],
+        "businessType": "service_provider",
+        "segments": [
+          "interior_designer"
+        ],
+        "categories": [
+          "design_build",
+          "residential"
+        ],
+        "searchKeywords": [
+          "2BHK interior",
+          "Apartment interiors"
+        ],
         "portfolioUrl": null,
         "addressLine": "1st Floor, Seaport Airport Road, Kakkanad",
         "updatedBy": "Lokesh Interiors",
@@ -447,7 +665,15 @@
       },
       "tags": [],
       "notes": [],
-      "commercial": { "salesOwner": "A. Sharma", "dealRefs": ["DL-2402"], "invoiceRefs": ["INV-2025-0988"] },
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-2402"
+        ],
+        "invoiceRefs": [
+          "INV-2025-0988"
+        ]
+      },
       "activeMembershipId": "IB-MB-0899-1"
     },
     {
@@ -477,8 +703,20 @@
         "pincode": "682036",
         "about": "Solid-wood furniture and site carpentry. Own workshop, twelve carpenters.",
         "businessName": "R. Menon Woodworks",
-        "category": "Carpentry & Woodwork",
-        "services": ["Site carpentry", "Furniture", "Wardrobes"],
+        "businessType": "contractor",
+        "segments": [
+          "carpentry",
+          "furniture"
+        ],
+        "categories": [
+          "execution_only",
+          "residential"
+        ],
+        "searchKeywords": [
+          "Site carpentry",
+          "Furniture design",
+          "Wardrobe design"
+        ],
         "portfolioUrl": "https://example.in/menon-woodworks",
         "addressLine": "Workshop 6, Panampilly Nagar",
         "updatedBy": "D. Kapoor",
@@ -494,7 +732,17 @@
           "text": "Term ends 01 Sep. He asked to be invoiced in the new financial year rather than auto-renewed — flagged to Finance."
         }
       ],
-      "commercial": { "salesOwner": "A. Sharma", "dealRefs": ["DL-1811", "DL-2291"], "invoiceRefs": ["INV-2024-0388", "INV-2026-0447"] },
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-1811",
+          "DL-2291"
+        ],
+        "invoiceRefs": [
+          "INV-2024-0388",
+          "INV-2026-0447"
+        ]
+      },
       "activeMembershipId": "IB-MB-0880-2"
     },
     {
@@ -524,8 +772,21 @@
         "pincode": "411045",
         "about": "False ceiling, cove lighting and acoustic panelling for offices.",
         "businessName": "Zenith Ceilings",
-        "category": "False Ceiling & Lighting",
-        "services": ["False ceiling", "Cove lighting", "Acoustic panels"],
+        "businessType": "contractor",
+        "segments": [
+          "false_ceiling",
+          "mep"
+        ],
+        "categories": [
+          "execution_only",
+          "commercial",
+          "retail"
+        ],
+        "searchKeywords": [
+          "False ceiling",
+          "Cove lighting",
+          "Acoustic panels"
+        ],
         "portfolioUrl": null,
         "addressLine": "Office 12, Baner Road",
         "updatedBy": "Zenith Ceilings",
@@ -533,7 +794,15 @@
       },
       "tags": [],
       "notes": [],
-      "commercial": { "salesOwner": "A. Sharma", "dealRefs": ["DL-2210"], "invoiceRefs": ["INV-2025-0870"] },
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-2210"
+        ],
+        "invoiceRefs": [
+          "INV-2025-0870"
+        ]
+      },
       "activeMembershipId": "IB-MB-0867-1"
     },
     {
@@ -563,8 +832,18 @@
         "pincode": "110027",
         "about": "Residential interiors and renovation across west Delhi.",
         "businessName": "Sharma Interiors",
-        "category": "Civil & Renovation",
-        "services": ["Renovation", "Residential interiors"],
+        "businessType": "contractor",
+        "segments": [
+          "civil_contractor"
+        ],
+        "categories": [
+          "design_build",
+          "residential"
+        ],
+        "searchKeywords": [
+          "Renovation & remodelling",
+          "Complete home interiors"
+        ],
         "portfolioUrl": null,
         "addressLine": null,
         "updatedBy": "Sharma Interiors",
@@ -580,7 +859,15 @@
           "text": "Asked for a two-month pause — family bereavement, workshop shut. Paused rather than cancelled so the term and the history survive."
         }
       ],
-      "commercial": { "salesOwner": "A. Sharma", "dealRefs": ["DL-2050"], "invoiceRefs": ["INV-2025-0322"] },
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-2050"
+        ],
+        "invoiceRefs": [
+          "INV-2025-0322"
+        ]
+      },
       "activeMembershipId": "IB-MB-0834-1"
     },
     {
@@ -610,16 +897,38 @@
         "pincode": "400050",
         "about": "Small studio, mostly rental-friendly interiors for young couples.",
         "businessName": "Anaya Verma Design",
-        "category": "Interior Design Studio",
-        "services": ["Residential styling", "Rental interiors"],
+        "businessType": "service_provider",
+        "segments": [
+          "interior_designer",
+          "interior_decorator"
+        ],
+        "categories": [
+          "consultation",
+          "design_only",
+          "residential"
+        ],
+        "searchKeywords": [
+          "Residential styling",
+          "Rental interiors"
+        ],
         "portfolioUrl": "https://example.in/anaya-verma",
         "addressLine": "402, Hill Road, Bandra West",
         "updatedBy": "Anaya Verma",
         "updatedAt": "2026-07-04T10:15:00+05:30"
       },
-      "tags": [{ "slug": "high-intent", "assignedBy": "D. Kapoor", "assignedAt": "2026-08-24T09:00:00+05:30" }],
+      "tags": [
+        {
+          "slug": "high-intent",
+          "assignedBy": "D. Kapoor",
+          "assignedAt": "2026-08-24T09:00:00+05:30"
+        }
+      ],
       "notes": [],
-      "commercial": { "salesOwner": "A. Sharma", "dealRefs": [], "invoiceRefs": [] },
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [],
+        "invoiceRefs": []
+      },
       "activeMembershipId": null
     },
     {
@@ -649,8 +958,18 @@
         "pincode": "600017",
         "about": "Residential interiors, twenty years in T. Nagar.",
         "businessName": "K. Iyer Interior Co.",
-        "category": "Interior Design Studio",
-        "services": ["Residential", "Renovation"],
+        "businessType": "service_provider",
+        "segments": [
+          "interior_designer"
+        ],
+        "categories": [
+          "design_build",
+          "residential"
+        ],
+        "searchKeywords": [
+          "Complete home interiors",
+          "Renovation & remodelling"
+        ],
         "portfolioUrl": null,
         "addressLine": "18, Usman Road, T. Nagar",
         "updatedBy": "D. Kapoor",
@@ -666,7 +985,15 @@
           "text": "Two customers said the listed workshop photos are not theirs. Suspended while we check. Account itself is untouched — they can still sign in."
         }
       ],
-      "commercial": { "salesOwner": "A. Sharma", "dealRefs": ["DL-1755"], "invoiceRefs": ["INV-2025-0201"] },
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-1755"
+        ],
+        "invoiceRefs": [
+          "INV-2025-0201"
+        ]
+      },
       "activeMembershipId": "IB-MB-0790-1"
     },
     {
@@ -696,14 +1023,31 @@
         "pincode": "560058",
         "about": "Contract carpentry for builders and design studios.",
         "businessName": "Craftline Carpentry",
-        "category": "Carpentry & Woodwork",
-        "services": ["Contract carpentry", "Modular installation"],
+        "businessType": "contractor",
+        "segments": [
+          "carpentry",
+          "modular_kitchen"
+        ],
+        "categories": [
+          "execution_only",
+          "residential"
+        ],
+        "searchKeywords": [
+          "Contract carpentry",
+          "Modular kitchen"
+        ],
         "portfolioUrl": null,
         "addressLine": "Shed 3, Peenya Industrial Area",
         "updatedBy": "D. Kapoor",
         "updatedAt": "2026-05-02T09:30:00+05:30"
       },
-      "tags": [{ "slug": "payment-risk", "assignedBy": "S. Raghavan", "assignedAt": "2026-08-05T15:00:00+05:30" }],
+      "tags": [
+        {
+          "slug": "payment-risk",
+          "assignedBy": "S. Raghavan",
+          "assignedAt": "2026-08-05T15:00:00+05:30"
+        }
+      ],
       "notes": [
         {
           "noteId": "NT-0745-1",
@@ -713,7 +1057,15 @@
           "text": "Bank reversed the Growth payment. Finance holds the ledger truth — this is a note, not a refund. Membership suspended by Operations while it is resolved."
         }
       ],
-      "commercial": { "salesOwner": "A. Sharma", "dealRefs": ["DL-1620"], "invoiceRefs": ["INV-2025-0104"] },
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-1620"
+        ],
+        "invoiceRefs": [
+          "INV-2025-0104"
+        ]
+      },
       "activeMembershipId": "IB-MB-0745-1"
     },
     {
@@ -743,16 +1095,39 @@
         "pincode": "411001",
         "about": "Independent designer, residential only.",
         "businessName": "Fernandes Interiors",
-        "category": "Interior Design Studio",
-        "services": ["Residential"],
+        "businessType": "service_provider",
+        "segments": [
+          "interior_designer"
+        ],
+        "categories": [
+          "design_only",
+          "residential"
+        ],
+        "searchKeywords": [
+          "Complete home interiors"
+        ],
         "portfolioUrl": null,
         "addressLine": "8, Lane 5, Koregaon Park",
         "updatedBy": "Fernandes Interiors",
         "updatedAt": "2025-12-01T10:00:00+05:30"
       },
-      "tags": [{ "slug": "win-back", "assignedBy": "A. Sharma", "assignedAt": "2026-07-20T09:35:00+05:30" }],
+      "tags": [
+        {
+          "slug": "win-back",
+          "assignedBy": "A. Sharma",
+          "assignedAt": "2026-07-20T09:35:00+05:30"
+        }
+      ],
       "notes": [],
-      "commercial": { "salesOwner": "A. Sharma", "dealRefs": ["DL-1503"], "invoiceRefs": ["INV-2025-0055"] },
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-1503"
+        ],
+        "invoiceRefs": [
+          "INV-2025-0055"
+        ]
+      },
       "activeMembershipId": null
     },
     {
@@ -782,8 +1157,19 @@
         "pincode": "400076",
         "about": "Apartment interiors and small commercial spaces in central Mumbai.",
         "businessName": "Saloni Interiors",
-        "category": "Interior Design Studio",
-        "services": ["Apartment interiors", "Small commercial"],
+        "businessType": "service_provider",
+        "segments": [
+          "interior_designer"
+        ],
+        "categories": [
+          "design_build",
+          "residential",
+          "commercial"
+        ],
+        "searchKeywords": [
+          "Apartment interiors",
+          "Office fit-out"
+        ],
         "portfolioUrl": null,
         "addressLine": "B-704, Hiranandani Gardens, Powai",
         "updatedBy": "Saloni Interiors",
@@ -799,7 +1185,17 @@
           "text": "Cancelled Growth in January, came back on Starter in March. Two separate terms on purpose — the cancelled one still shows in her history and in the churn cohort for January."
         }
       ],
-      "commercial": { "salesOwner": "A. Sharma", "dealRefs": ["DL-1488", "DL-2901"], "invoiceRefs": ["INV-2024-0501", "INV-2026-0233"] },
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-1488",
+          "DL-2901"
+        ],
+        "invoiceRefs": [
+          "INV-2024-0501",
+          "INV-2026-0233"
+        ]
+      },
       "activeMembershipId": "IB-MB-0688-2"
     },
     {
@@ -829,16 +1225,41 @@
         "pincode": "411038",
         "about": "Family furniture business, three generations in Kothrud.",
         "businessName": "Kulkarni & Sons",
-        "category": "Carpentry & Woodwork",
-        "services": ["Furniture", "Wardrobes"],
+        "businessType": "contractor",
+        "segments": [
+          "carpentry",
+          "furniture"
+        ],
+        "categories": [
+          "execution_only",
+          "residential"
+        ],
+        "searchKeywords": [
+          "Furniture design",
+          "Wardrobe design"
+        ],
         "portfolioUrl": null,
         "addressLine": "121, Paud Road, Kothrud",
         "updatedBy": "Kulkarni & Sons",
         "updatedAt": "2025-11-10T13:00:00+05:30"
       },
-      "tags": [{ "slug": "win-back", "assignedBy": "A. Sharma", "assignedAt": "2026-06-01T10:00:00+05:30" }],
+      "tags": [
+        {
+          "slug": "win-back",
+          "assignedBy": "A. Sharma",
+          "assignedAt": "2026-06-01T10:00:00+05:30"
+        }
+      ],
       "notes": [],
-      "commercial": { "salesOwner": "A. Sharma", "dealRefs": ["DL-1477"], "invoiceRefs": ["INV-2024-0498"] },
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-1477"
+        ],
+        "invoiceRefs": [
+          "INV-2024-0498"
+        ]
+      },
       "activeMembershipId": null
     },
     {
@@ -868,8 +1289,10 @@
         "pincode": null,
         "about": "Internal account used for walkthroughs. Not a customer.",
         "businessName": null,
-        "category": null,
-        "services": [],
+        "businessType": null,
+        "segments": [],
+        "categories": [],
+        "searchKeywords": [],
         "portfolioUrl": null,
         "addressLine": null,
         "updatedBy": "V. Shakya",
@@ -885,7 +1308,11 @@
           "text": "Deactivated rather than deleted. It appears in last year's registration counts and deleting it would change a number we have already reported."
         }
       ],
-      "commercial": { "salesOwner": null, "dealRefs": [], "invoiceRefs": [] },
+      "commercial": {
+        "salesOwner": null,
+        "dealRefs": [],
+        "invoiceRefs": []
+      },
       "activeMembershipId": null
     }
   ]

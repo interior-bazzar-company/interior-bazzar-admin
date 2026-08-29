@@ -37,7 +37,7 @@ import AssignMembership from "../src/admin/views/Users/AssignMembership";
 import LifecycleModal from "../src/admin/views/Users/LifecycleModal";
 import EditProfile from "../src/admin/views/Users/EditProfile";
 import { NoteModal, TagsModal, DeactivateModal } from "../src/admin/views/Users/Modals";
-import { toRow, readUsers, readMemberships } from "../src/admin/views/Users/store";
+import { PROFILE_FIELDS, toRow, readUsers, readMemberships } from "../src/admin/views/Users/store";
 import { __setPlansMode } from "../src/admin/views/Plans/api";
 import type { LifecycleAction } from "../src/admin/views/Users/store";
 
@@ -385,6 +385,96 @@ check("edit profile", () => modal(
   <EditProfile row={rowOf("IB-U-0912")} onClose={noop} onDone={noop} />));
 check("edit profile · incomplete", () => modal(
   <EditProfile row={rowOf("IB-U-1029")} onClose={noop} onDone={noop} />));
+
+/* THE FOUR BUSINESS FACETS.
+   The form is meant to be built FROM the schema — that is the module's own
+   rule (UM-OD-09) and the reason a field is data rather than JSX. It is also
+   the property that quietly dies the first time somebody writes
+   `if (f.key === "segments")`. These assert the outcome of that rule rather
+   than the rule itself: every schema field reached the form, each got the
+   control its `type` asks for, and the closed ones are closed. */
+{
+  const full = modal(<EditProfile row={rowOf("IB-U-0912")} onClose={noop} onDone={noop} />);
+  const empty = modal(<EditProfile row={rowOf("IB-U-1029")} onClose={noop} onDone={noop} />);
+
+  check("facets · every schema field reached the form", () => {
+    const missing = PROFILE_FIELDS.filter((f) => full.indexOf(">" + f.label) < 0);
+    if (missing.length) throw new Error("absent: " + missing.map((f) => f.label).join(", "));
+    return full;
+  });
+  check("facets · each picker rendered its combobox", () => {
+    const pickers = (full.match(/role="combobox"/g) || []).length;
+    const expect = PROFILE_FIELDS.filter((f) =>
+      ["single", "multi", "tags"].indexOf(f.type) >= 0).length;
+    /* A single facet already answered collapses to its chip plus Change, so
+       the empty profile is where all four comboboxes are on screen at once. */
+    const onEmpty = (empty.match(/role="combobox"/g) || []).length;
+    if (onEmpty !== expect) throw new Error(onEmpty + " comboboxes, expected " + expect);
+    if (pickers < expect - 1) throw new Error("only " + pickers + " on the filled profile");
+    return full;
+  });
+  check("facets · the answer sits above the control, as chips", () => {
+    if (full.indexOf("um-chips") < 0) throw new Error("no chip row");
+    /* Keys are stored; labels are shown. A chip reading `interior_designer` is
+       the bug this catches. */
+    if (full.indexOf("interior_designer") >= 0) throw new Error("a raw key is on screen");
+    if (full.indexOf("Interior designer") < 0) throw new Error("no resolved label");
+    return full;
+  });
+  check("facets · chips are removable", () => {
+    if (full.indexOf("Remove Interior designer") < 0) throw new Error("no labelled remove control");
+    return full;
+  });
+  check("facets · the cap is stated, not just enforced", () => {
+    /* Read from the profile rather than written down here: a hard-coded 3/6
+       would break the day somebody edits the seed, which is a test failing for
+       a reason that is not a bug. A cap somebody only ever meets by being
+       refused is a cap they experience as a bug. */
+    const segs = rowOf("IB-U-0912").user.profile.segments.length;
+    const want = ">" + segs + "/6<";
+    if (full.indexOf(want) < 0) throw new Error("no counter reading " + want);
+    return full;
+  });
+  check("facets · a single facet shows one chip and a way to change it", () => {
+    if (full.indexOf("Service provider") < 0) throw new Error("business type not shown");
+    if (full.indexOf(">Change<") < 0) throw new Error("no way to change it");
+    return full;
+  });
+  /* The listbox exists only while it is open, and there is no browser here to
+     open it — so what the OPTIONS look like (their hints, their group
+     headings) is asserted in check:users against the vocabulary they are built
+     from. What is assertable here is that a closed picker is genuinely closed:
+     a listbox left in the tree would sit over the field below it. */
+  check("facets · a closed picker leaves no listbox in the tree", () => {
+    if (empty.indexOf('role="listbox"') >= 0)
+      throw new Error("a closed picker still rendered its options");
+    return empty;
+  });
+  check("facets · but the field still says what it wants", () => {
+    /* The hint and the placeholder are the only guidance visible before
+       anybody opens anything, so they are the ones that must survive. */
+    if (empty.indexOf("Type a phrase, or pick a suggestion") < 0)
+      throw new Error("the keyword field lost its placeholder");
+    if (empty.indexOf("phrases a customer would type") < 0)
+      throw new Error("the keyword field lost its hint");
+    return empty;
+  });
+  check("facets · only the keyword field offers free text", () => {
+    /* Two open facets would be one too many: the three closed ones are what
+       the marketplace filters on. */
+    const open = PROFILE_FIELDS.filter((f) => f.type === "tags");
+    if (open.length !== 1) throw new Error(open.length + " free-text facets");
+    if (open[0].key !== "searchKeywords") throw new Error("the open one is " + open[0].key);
+    return empty;
+  });
+  check("facets · the record shows them as chips too, not as a comma list", () => {
+    const rec = at("/users/IB-U-0912?tab=profile");
+    if (rec.indexOf("um-chips ro") < 0) throw new Error("record fell back to text");
+    if (rec.indexOf("interior_designer") >= 0) throw new Error("a raw key is on the record");
+    if (rec.indexOf("Turnkey project") < 0) throw new Error("categories missing from the record");
+    return rec;
+  });
+}
 check("note", () => modal(<NoteModal row={rowOf("IB-U-0912")} onClose={noop} onDone={noop} />));
 check("tags", () => modal(<TagsModal row={rowOf("IB-U-0912")} onClose={noop} onDone={noop} />));
 check("deactivate", () => modal(

@@ -31,7 +31,8 @@ import EditProfile from "./EditProfile";
 import { DeactivateModal, NoteModal, TagsModal } from "./Modals";
 import {
   PROFILE_FIELDS, PROFILE_SCHEMA_VERSION, RENEWAL_WINDOW_DAYS, VOCAB,
-  ago, allowedActions, fmtDate, fmtDateTime, money, resetStore, sourceMeta, useTimeline,
+  ago, allowedActions, facetLabel, fmtDate, fmtDateTime, labelsFor, money, resetStore,
+  sourceMeta, useTimeline,
 } from "./store";
 import type { LifecycleAction, Membership, Params, UserRow } from "./store";
 
@@ -241,11 +242,26 @@ export default function Detail({ id, p, rows, onFilter }: {
             <div className="card-b">
               <KvList pairs={PROFILE_FIELDS.map((f) => {
                 const v = (u.profile as unknown as Record<string, unknown>)[f.key];
-                const text = Array.isArray(v) ? v.join(", ") : (v as string | null);
+                /* A facet renders as the chips it is, not as a comma-joined
+                   string. Six segments run together read as one long phrase,
+                   and the count — which is the thing you actually check on a
+                   profile — cannot be seen at all. Keys become labels here;
+                   what is stored is never what is shown. */
+                const val = Array.isArray(v)
+                  ? (v.length
+                    ? <span className="um-chips ro">
+                        {labelsFor(f, v as string[]).map((l, i) => (
+                          <span className="pill um-chip" key={i}>{l}</span>
+                        ))}
+                      </span>
+                    : "")
+                  : f.type === "single" && v
+                    ? <span className="pill um-chip">{facetLabel(f.vocab || "", String(v))}</span>
+                    : ((v as string | null) || "");
                 return [
                   <>{f.label}<em className={"um-vis " + (f.public ? "pub" : "int")}>
                     {f.public ? "public" : "internal"}</em></>,
-                  text || "",
+                  val,
                 ] as [React.ReactNode, React.ReactNode];
               })} />
             </div>

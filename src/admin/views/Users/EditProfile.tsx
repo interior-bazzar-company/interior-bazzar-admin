@@ -7,6 +7,12 @@
    the schema is data: the fields, their visibility and their edit permissions
    are UM-OD-09 and will move at least once before launch.
 
+   THIS FILE KNOWS NO FIELD BY NAME. It used to — `if (f.key === "services")`
+   twice, for the one comma-separated field — and that is exactly how a
+   data-driven form stops being one. The schema now carries a `type` and this
+   file dispatches on it, so the four business facets arrived without a line
+   here that mentions any of them.
+
    Two things are visible on the form and are not editable on it:
 
      Identity  — the verified email and mobile belong to Authentication. They
@@ -26,8 +32,11 @@
 import { useState } from "react";
 import { Icon, Notice } from "../../ui";
 import { Completeness } from "./bits";
-import { PROFILE_FIELDS, PROFILE_SCHEMA_VERSION, completenessOf, updateProfile } from "./store";
-import type { UserProfile, UserRow } from "./store";
+import FacetPicker from "./FacetPicker";
+import {
+  PROFILE_FIELDS, PROFILE_SCHEMA_VERSION, completenessOf, updateProfile, validateFacets,
+} from "./store";
+import type { ProfileField, UserProfile, UserRow } from "./store";
 
 const GROUPS = [
   { key: "basic", label: "Basic profile", note: "What a customer sees first." },
@@ -35,15 +44,35 @@ const GROUPS = [
   { key: "contact", label: "Address and contact", note: "Mostly internal. Visibility is per field." },
 ];
 
-type Draft = Record<string, string>;
+/** A field holds a list when the schema says so — never because the value
+ *  happens to be an array today. */
+const isList = (f: ProfileField) => f.type === "multi" || f.type === "tags";
+
+type Draft = Record<string, string | string[]>;
 
 const toDraft = (p: UserProfile): Draft => {
   const d: Draft = {};
   PROFILE_FIELDS.forEach((f) => {
     const v = (p as unknown as Record<string, unknown>)[f.key];
-    d[f.key] = Array.isArray(v) ? v.join(", ") : v === null || v === undefined ? "" : String(v);
+    d[f.key] = isList(f)
+      ? (Array.isArray(v) ? (v as string[]).slice() : [])
+      : v === null || v === undefined ? "" : String(v);
   });
   return d;
+};
+
+/** Draft → the shape the store stores. One function, used by the live
+ *  completeness readout and by the save, so the number on the form cannot
+ *  disagree with what saving would actually produce. */
+const toPatch = (draft: Draft): Partial<UserProfile> => {
+  const patch: Record<string, unknown> = {};
+  PROFILE_FIELDS.forEach((f) => {
+    const raw = draft[f.key];
+    if (isList(f)) patch[f.key] = Array.isArray(raw) ? raw : [];
+    else if (f.type === "single") patch[f.key] = String(raw || "").trim() || null;
+    else patch[f.key] = String(raw || "").trim() || null;
+  });
+  return patch as Partial<UserProfile>;
 };
 
 export default function EditProfile({ row, onClose, onDone }: {
@@ -55,25 +84,26 @@ export default function EditProfile({ row, onClose, onDone }: {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const set = (k: string, v: string) => setDraft((d) => ({ ...d, [k]: v }));
+  const set = (k: string, v: string | string[]) => setDraft((d) => ({ ...d, [k]: v }));
 
   /* Completeness recomputes as you type, against the same required-field set
      the directory grades on — so the number on the form and the number on the
      row are one calculation, not two that agree today. */
-  const live = completenessOf({
-    ...row.user.profile,
-    ...(Object.keys(draft).reduce((o, k) => {
-      o[k] = k === "services"
-        ? draft[k].split(",").map((s) => s.trim()).filter(Boolean)
-        : draft[k].trim() || null;
-      return o;
-    }, {} as Record<string, unknown>) as Partial<UserProfile>),
-  } as UserProfile);
+  const live = completenessOf({ ...row.user.profile, ...toPatch(draft) } as UserProfile);
+
+  /* The facet rules run as you type as well as on save. Shown as a warning
+     rather than blocking every keystroke: you are told the moment it is wrong,
+     and the save is what refuses. */
+  const facetErr = validateFacets(toPatch(draft));
 
   const submit = () => {
     setErr(null);
     const missingRequired = PROFILE_FIELDS
-      .filter((f) => f.required && f.editable && !draft[f.key]?.trim())
+      .filter((f) => f.required && f.editable)
+      .filter((f) => {
+        const v = draft[f.key];
+        return Array.isArray(v) ? v.length === 0 : !String(v || "").trim();
+      })
       .map((f) => f.label);
     if (missingRequired.length) {
       /* NOTHING IS WRITTEN. Not the valid fields, not partially — the stored
@@ -83,19 +113,41 @@ export default function EditProfile({ row, onClose, onDone }: {
       return;
     }
     setBusy(true);
-    const patch: Partial<UserProfile> = {};
-    PROFILE_FIELDS.forEach((f) => {
-      const raw = draft[f.key];
-      if (f.key === "services") {
-        (patch as Record<string, unknown>)[f.key] =
-          raw.split(",").map((s) => s.trim()).filter(Boolean);
-      } else {
-        (patch as Record<string, unknown>)[f.key] = raw.trim() || null;
-      }
-    });
-    const e = updateProfile(row.user.userId, patch);
+    const e = updateProfile(row.user.userId, toPatch(draft));
     if (e) { setErr(e); setBusy(false); return; }
     onDone("Profile saved. The changed field set is in the audit trail; the values are not.", "ok");
+  };
+
+  const control = (f: ProfileField) => {
+    if (f.type === "textarea") {
+      return (
+        <textarea className="inp" rows={3} value={String(draft[f.key] || "")}
+          disabled={!f.editable}
+          onChange={(e) => set(f.key, e.target.value)} />
+      );
+    }
+    if (f.type === "single") {
+      /* A single facet is still a picker rather than a <select>: the options
+         carry a sentence saying what each one means, and a native option list
+         has nowhere to put it. Choosing "Dealer" over "Retailer" is a
+         distinction somebody needs told, not one they should have to know. */
+      return (
+        <FacetPicker f={f} disabled={!f.editable}
+          values={draft[f.key] ? [String(draft[f.key])] : []}
+          onChange={(next) => set(f.key, next[0] || "")} />
+      );
+    }
+    if (isList(f)) {
+      return (
+        <FacetPicker f={f} disabled={!f.editable}
+          values={(draft[f.key] as string[]) || []}
+          onChange={(next) => set(f.key, next)} />
+      );
+    }
+    return (
+      <input className="inp" value={String(draft[f.key] || "")} disabled={!f.editable}
+        onChange={(e) => set(f.key, e.target.value)} />
+    );
   };
 
   return (
@@ -111,6 +163,7 @@ export default function EditProfile({ row, onClose, onDone }: {
 
       <div className="md-b um-form">
         {err ? <Notice tone="bad" text={<b>{err}</b>} /> : null}
+        {!err && facetErr ? <Notice tone="warn" text={facetErr} /> : null}
 
         <div className="um-livecomp">
           <span className="l">Completeness as you type</span>
@@ -125,7 +178,12 @@ export default function EditProfile({ row, onClose, onDone }: {
               <legend>{g.label}<i>{g.note}</i></legend>
               <div className="um-f2">
                 {fields.map((f) => (
-                  <label className="fg" key={f.key}>
+                  /* A picker is not a <label>'s control — it is a composite
+                     with its own labelled input — so those render as a div
+                     with the caption beside it instead. Wrapping one in a
+                     <label> makes clicking a chip focus the search box. */
+                  <div className={"fg" + (isList(f) || f.type === "single" ? " um-fg-wide" : "")}
+                    key={f.key}>
                     <span className="fg-lb">
                       {f.label}
                       {f.required ? <span className="req"> *</span> : null}
@@ -133,16 +191,8 @@ export default function EditProfile({ row, onClose, onDone }: {
                         {f.public ? "public" : "internal"}
                       </em>
                     </span>
-                    {f.key === "about" ? (
-                      <textarea className="inp" rows={3} value={draft[f.key]}
-                        disabled={!f.editable}
-                        onChange={(e) => set(f.key, e.target.value)} />
-                    ) : (
-                      <input className="inp" value={draft[f.key]} disabled={!f.editable}
-                        placeholder={f.key === "services" ? "Comma separated" : ""}
-                        onChange={(e) => set(f.key, e.target.value)} />
-                    )}
-                  </label>
+                    {control(f)}
+                  </div>
                 ))}
               </div>
             </fieldset>
@@ -190,7 +240,7 @@ export default function EditProfile({ row, onClose, onDone }: {
       <div className="md-f">
         <span className="spacer" />
         <button className="btn" data-close="1" onClick={onClose}>Cancel</button>
-        <button className="btn pri" disabled={busy} onClick={submit}>
+        <button className="btn pri" disabled={busy || !!facetErr} onClick={submit}>
           {busy ? "Saving…" : "Save changes"}
         </button>
       </div>

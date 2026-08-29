@@ -378,6 +378,67 @@
 .um-tag.pick.on { box-shadow: inset 0 0 0 1px currentColor }
 .um-tag.pick em { font-style: normal; font-size: var(--text-sm); opacity: .85 }
 
+/* ------------------------------------------------- the facet picker --- */
+/* Business type, Segments, Categories and Search keywords all render through
+   one control. The selection sits ABOVE the input rather than inside it: chips
+   inside a box grow the box, which reflows the form under the cursor and moves
+   the very field you are typing into. Above it, the answer accumulates in one
+   place and the box never moves. */
+
+/* A picker needs the full row. Two of them side by side put a twenty-item
+   listbox over the field next door. */
+.um-form .fg.um-fg-wide { grid-column: 1 / -1 }
+
+.um-facet { position: relative }
+.um-facet-in { position: relative; display: flex; align-items: center }
+.um-facet-in > svg { position: absolute; left: var(--space-3); pointer-events: none;
+                     color: var(--text-3) }
+.um-facet-in .inp { padding-left: calc(var(--space-3) * 2 + 14px); padding-right: var(--control-xs) }
+.um-facet-x { position: absolute; right: var(--space-2); display: grid; place-items: center;
+              width: 22px; height: 22px; border: none; border-radius: var(--radius-sm);
+              background: none; color: var(--text-3); cursor: pointer }
+.um-facet-x:hover { background: var(--bg-hover); color: var(--text) }
+.um-facet-re { margin-top: var(--space-1) }
+
+/* chips ------------------------------------------------------------------ */
+.um-chip { padding-right: 3px }
+.um-chips.ro .um-chip { padding-right: var(--space-2) }
+.um-chip-x { display: grid; place-items: center; width: 16px; height: 16px; margin-left: 1px;
+             border: none; border-radius: var(--radius-sm); background: none;
+             color: currentColor; opacity: .6; cursor: pointer }
+.um-chip-x:hover { opacity: 1; background: var(--bg-hover) }
+.um-chip-x:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; opacity: 1 }
+
+/* the listbox ------------------------------------------------------------ */
+.um-opts { position: absolute; z-index: 40; left: 0; right: 0; top: 100%; margin-top: 4px;
+           max-height: 280px; overflow-y: auto; padding: var(--space-1);
+           list-style: none; background: var(--surface-raised); border: 1px solid var(--line-2);
+           border-radius: var(--radius-lg); box-shadow: var(--shadow-lg) }
+.um-opt { display: flex; flex-direction: column; gap: 1px; padding: var(--space-2) var(--space-3);
+          border-radius: var(--radius-md); cursor: pointer; font-size: var(--text-md) }
+/* Hover and keyboard share ONE highlight. Two of them — a hover colour and a
+   separate "active descendant" colour — and the list shows two current rows at
+   once, which is worse than showing none. */
+.um-opt.on { background: var(--brand-tint); color: var(--brand-text) }
+.um-opt em { font-style: normal; font-size: var(--text-sm); color: var(--text-3); line-height: 1.35 }
+.um-opt.on em { color: var(--brand-text); opacity: .8 }
+.um-opt.add { flex-direction: row; align-items: center; gap: var(--space-2) }
+.um-opt.none { color: var(--text-3); font-size: var(--text-sm); cursor: default; padding: var(--space-3) }
+.um-optg { position: sticky; top: 0; z-index: 1; display: flex; align-items: baseline; gap: var(--space-2);
+           padding: var(--space-2) var(--space-3) var(--space-1); background: var(--surface-raised);
+           font-size: var(--text-2xs); letter-spacing: .08em; text-transform: uppercase;
+           font-weight: var(--weight-semibold); color: var(--text-3) }
+.um-optg em { font-style: normal; letter-spacing: 0; text-transform: none;
+              font-weight: var(--weight-normal); font-size: var(--text-sm) }
+
+/* the hint line ---------------------------------------------------------- */
+.um-facet-fine { display: flex; align-items: baseline; gap: var(--space-3); margin: 4px 0 0;
+                 font-size: var(--text-sm); color: var(--text-3) }
+.um-facet-fine span { flex: 1 1 auto }
+.um-facet-fine b { flex: 0 0 auto; font-variant-numeric: tabular-nums;
+                   font-weight: var(--weight-medium) }
+.um-facet-fine b.warn { color: var(--warn) }
+
 @media print {
   .um-views, .um-proto, .um-actions, .um-idbar .btn { display: none }
   .card, .um-queue { break-inside: avoid }
