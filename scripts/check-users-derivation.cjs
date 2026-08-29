@@ -850,7 +850,7 @@ S.resetStore();
   ok("the incomplete set did not move again", S.countsOf(all).incompleteProfiles, 2);
 }
 
-console.log("\npositioning: up to two of a closed three");
+console.log("\npositioning: up to two of a closed four");
 {
   const bad = (patch) => S.validateFacets(patch) !== "";
   ok("one is fine", bad({ positioning: ["luxury"] }), false);
@@ -863,7 +863,7 @@ console.log("\npositioning: up to two of a closed three");
     S.readUsers().filter((u) => u.profile.positioning.length > 2).map((u) => u.userId), []);
   ok("...or names a value outside the five",
     S.readUsers().filter((u) => u.profile.positioning.some((k) =>
-      ["luxury", "eco_friendly", "custom"].indexOf(k) < 0)).map((u) => u.userId), []);
+      ["luxury", "budget_friendly", "eco_friendly", "custom"].indexOf(k) < 0)).map((u) => u.userId), []);
   ok("optional means the incomplete set did not move", S.countsOf(all).incompleteProfiles, 2);
 }
 

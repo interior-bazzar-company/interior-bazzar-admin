@@ -6,6 +6,28 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-29
 
+### Positioning: four tiles on one row, Budget-friendly added
+
+**Area:** the Positioning segment
+**Files:** `vocabularies.json`, `users.json`,
+`scripts/check-users-derivation.cjs`, `scripts/um-smoke.tsx`
+
+**What changed**
+
+Budget-friendly joins — Luxury · Budget-friendly · Eco-friendly · Custom,
+still up to two — and the field takes the full row (`wide` in the schema)
+so the four tiles sit on one line instead of wrapping in a half-width
+column. Four seeded profiles carry Budget-friendly where Value used to be.
+
+**Verified**
+
+`check:users` 281, `check:users-render` 119 — four tiles, full width, two
+quiet at the cap.
+
+---
+
+## 2026-08-29
+
 ### Positioning drops Premium and Value
 
 **Area:** the Positioning segment

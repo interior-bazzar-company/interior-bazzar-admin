@@ -418,7 +418,8 @@
       "type": "checks",
       "vocab": "positioning",
       "max": 2,
-      "chip": "tag-orange"
+      "chip": "tag-orange",
+      "wide": true
     },
     {
       "key": "about",
@@ -1507,6 +1508,10 @@
     {
       "key": "luxury",
       "label": "Luxury"
+    },
+    {
+      "key": "budget_friendly",
+      "label": "Budget-friendly"
     },
     {
       "key": "eco_friendly",
