@@ -402,52 +402,16 @@
     {
       "key": "targetAreas",
       "label": "Target areas",
-      "group": "business",
-      "required": false,
-      "editable": true,
-      "public": true,
-      "type": "multi",
-      "vocab": "areaSuggestions",
-      "open": true,
-      "max": 10,
-      "maxLength": 48,
-      "showWhen": "member",
-      "hint": "Where they take work, which is not the same as where they sit. A state, a city, or a locality inside one — \"Uttam Nagar, Delhi\".",
-      "chip": "tag-teal"
-    },
-    {
-      "key": "state",
-      "label": "State",
       "group": "contact",
       "required": true,
       "editable": true,
       "public": true,
-      "type": "single",
-      "vocab": "states",
-      "hint": "Where the business is registered.",
-      "chip": "tag-slate"
-    },
-    {
-      "key": "city",
-      "label": "City",
-      "group": "contact",
-      "required": true,
-      "editable": true,
-      "public": true,
-      "type": "single",
-      "vocab": "cities",
-      "open": true,
-      "hint": "Pick one or type it — the list is the cities the platform sees most, not a limit.",
-      "chip": "tag-slate"
-    },
-    {
-      "key": "pincode",
-      "label": "Pincode",
-      "group": "contact",
-      "required": true,
-      "editable": true,
-      "public": false,
-      "type": "text"
+      "type": "areas",
+      "maxRows": 5,
+      "maxCities": 8,
+      "maxLength": 40,
+      "chip": "tag-teal",
+      "hint": "Where they take work. Add a state, then the cities — or localities — inside it. The city list is a suggestion; type what is missing."
     }
   ],
   "profileStatuses": [
@@ -592,6 +556,22 @@
     {
       "key": "Kerala",
       "label": "Kerala"
+    },
+    {
+      "key": "Uttar Pradesh",
+      "label": "Uttar Pradesh"
+    },
+    {
+      "key": "Haryana",
+      "label": "Haryana"
+    },
+    {
+      "key": "Gujarat",
+      "label": "Gujarat"
+    },
+    {
+      "key": "West Bengal",
+      "label": "West Bengal"
     }
   ],
   "categories": [
@@ -1153,48 +1133,6 @@
     "Painting & polishing",
     "Curtains & blinds"
   ],
-  "areaSuggestions": [
-    "Delhi NCR",
-    "Mumbai",
-    "Bengaluru",
-    "Pune",
-    "Hyderabad",
-    "Chennai",
-    "Jaipur",
-    "Kochi",
-    "Ahmedabad",
-    "Kolkata",
-    "Lucknow",
-    "Chandigarh",
-    "Uttam Nagar, Delhi",
-    "Dwarka, Delhi",
-    "Rohini, Delhi",
-    "Saket, Delhi",
-    "Andheri, Mumbai",
-    "Bandra, Mumbai",
-    "Thane, Mumbai",
-    "Navi Mumbai",
-    "Whitefield, Bengaluru",
-    "Indiranagar, Bengaluru",
-    "Koramangala, Bengaluru",
-    "Hinjewadi, Pune",
-    "Baner, Pune",
-    "Gachibowli, Hyderabad",
-    "Varanasi, Uttar Pradesh",
-    "Noida, Uttar Pradesh",
-    "Gurugram, Haryana",
-    "Karnataka",
-    "Maharashtra",
-    "Delhi",
-    "Tamil Nadu",
-    "Telangana",
-    "Rajasthan",
-    "Kerala",
-    "Uttar Pradesh",
-    "Gujarat",
-    "West Bengal",
-    "Haryana"
-  ],
   "reservedUsernames": [
     "admin",
     "administrator",
@@ -1238,5 +1176,87 @@
     "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$",
     "help": "Lower-case letters, numbers and hyphens. It is the public address of this profile, so it is permanent in practice — changing it breaks every link anybody has already shared.",
     "path": "/pro/"
+  },
+  "stateCities": {
+    "Karnataka": [
+      "Bengaluru",
+      "Mysuru",
+      "Mangaluru",
+      "Hubballi",
+      "Belagavi",
+      "Indiranagar",
+      "Whitefield",
+      "Koramangala"
+    ],
+    "Maharashtra": [
+      "Mumbai",
+      "Pune",
+      "Thane",
+      "Navi Mumbai",
+      "Nagpur",
+      "Nashik",
+      "Andheri",
+      "Bandra",
+      "Baner",
+      "Hinjewadi"
+    ],
+    "Delhi": [
+      "New Delhi",
+      "Dwarka",
+      "Rohini",
+      "Saket",
+      "Uttam Nagar",
+      "Karol Bagh",
+      "Janakpuri",
+      "Pitampura"
+    ],
+    "Telangana": [
+      "Hyderabad",
+      "Secunderabad",
+      "Gachibowli",
+      "Warangal"
+    ],
+    "Tamil Nadu": [
+      "Chennai",
+      "Coimbatore",
+      "Madurai",
+      "Tiruchirappalli"
+    ],
+    "Rajasthan": [
+      "Jaipur",
+      "Jodhpur",
+      "Udaipur",
+      "Kota"
+    ],
+    "Kerala": [
+      "Kochi",
+      "Thiruvananthapuram",
+      "Kozhikode",
+      "Thrissur"
+    ],
+    "Uttar Pradesh": [
+      "Noida",
+      "Ghaziabad",
+      "Lucknow",
+      "Varanasi",
+      "Kanpur",
+      "Agra"
+    ],
+    "Haryana": [
+      "Gurugram",
+      "Faridabad",
+      "Panipat"
+    ],
+    "Gujarat": [
+      "Ahmedabad",
+      "Surat",
+      "Vadodara",
+      "Rajkot"
+    ],
+    "West Bengal": [
+      "Kolkata",
+      "Howrah",
+      "Siliguri"
+    ]
   }
 }

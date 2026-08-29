@@ -13,7 +13,9 @@
 import type { ReactNode } from "react";
 import { Icon, Notice } from "../../ui";
 import { go } from "../../ui/nav";
-import { ago, classificationMeta, decision, fmtDate, membershipMeta, tagMeta } from "./store";
+import {
+  ago, classificationMeta, decision, fmtDate, membershipMeta, primaryCityOf, tagMeta,
+} from "./store";
 import type { Classification, Membership, UserRow } from "./store";
 
 /* ------------------------------------------------------------- banner --- */
@@ -127,7 +129,7 @@ export function WhoCell({ r }: { r: UserRow }) {
       <div className="cell-1">{u.identity.name}</div>
       <div className="cell-2">
         <span className="mono">{u.userId}</span>
-        {u.profile.city ? <> · {u.profile.city}</> : null}
+        {primaryCityOf(u.profile) ? <> · {primaryCityOf(u.profile)}</> : null}
         {u.identity.email ? <> · {u.identity.email}</> : null}
       </div>
       <TagChips slugs={u.tags.map((t) => t.slug)} />

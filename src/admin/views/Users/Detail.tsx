@@ -32,7 +32,7 @@ import { DeactivateModal, NoteModal, TagsModal } from "./Modals";
 import {
   PROFILE_SCHEMA_VERSION, RENEWAL_WINDOW_DAYS, VOCAB,
   ago, allowedActions, facetLabel, fieldsFor, fmtDate, fmtDateTime, labelsFor, money,
-  profileUrl, resetStore, sourceMeta, useTimeline,
+  primaryCityOf, profileUrl, resetStore, sourceMeta, useTimeline,
 } from "./store";
 import type { LifecycleAction, Membership, Params, UserRow } from "./store";
 
@@ -121,7 +121,7 @@ export default function Detail({ id, p, rows, onFilter }: {
         <span className="mono">{u.userId}</span>
         {u.identity.email ? <> · <span className="mono">{u.identity.email}</span></> : null}
         {u.identity.phone ? <> · <span className="mono">{u.identity.phone}</span></> : null}
-        {u.profile.city ? <> · {u.profile.city}</> : null}
+        {primaryCityOf(u.profile) ? <> · {primaryCityOf(u.profile)}</> : null}
         {" · registered "}{fmtDate(u.registeredAt)}
       </div>
 
@@ -257,6 +257,21 @@ export default function Detail({ id, p, rows, onFilter }: {
                         <span className="mono">{String(v)}</span>
                         <Icon name="ext" size="sm" />
                       </a>
+                    : "")
+                  : f.type === "areas"
+                  ? ((v as { state: string; cities: string[] }[]).length
+                    ? <span className="um-areas-ro">
+                        {(v as { state: string; cities: string[] }[]).map((t, i) => (
+                          /* One line per row, the state leading its cities —
+                             the same closed/open halves the editor shows. */
+                          <span className="um-chips ro" key={i}>
+                            <span className="pill um-chip tag-slate">{t.state}</span>
+                            {t.cities.map((c, j) => (
+                              <span className={"pill um-chip " + (f.chip || "")} key={j}>{c}</span>
+                            ))}
+                          </span>
+                        ))}
+                      </span>
                     : "")
                   : Array.isArray(v)
                   ? (v.length

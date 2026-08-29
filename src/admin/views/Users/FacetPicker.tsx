@@ -46,14 +46,15 @@ import type { FacetOption, ProfileField } from "./store";
 
 /** The chips. Above the control on purpose — see the file header. Exported
  *  for the render harness, which asserts the stale branch displaces the tone. */
-export function Chips({ f, values, onRemove, disabled }: {
+export function Chips({ f, values, onRemove, disabled, options: given }: {
   f: ProfileField;
   values: string[];
   onRemove: (k: string) => void;
   disabled?: boolean;
+  options?: FacetOption[];
 }) {
   if (!values.length) return null;
-  const opts = optionsFor(f);
+  const opts = given || optionsFor(f);
   return (
     <div className="um-chips" role="list">
       {values.map((v) => {
@@ -81,11 +82,15 @@ export function Chips({ f, values, onRemove, disabled }: {
   );
 }
 
-export default function FacetPicker({ f, values, onChange, disabled }: {
+export default function FacetPicker({ f, values, onChange, disabled, options: given }: {
   f: ProfileField;
   values: string[];
   onChange: (next: string[]) => void;
   disabled?: boolean;
+  /** Override the schema-resolved options. For DEPENDENT vocabularies — a
+   *  target-area row's city list depends on which state that row picked, and
+   *  the schema registry cannot know that. */
+  options?: FacetOption[];
 }) {
   const single = f.type === "single";
   /* OPENNESS IS A FLAG, NOT A TYPE. It started as `type === "tags"`, which
@@ -101,7 +106,7 @@ export default function FacetPicker({ f, values, onChange, disabled }: {
   const box = useRef<HTMLDivElement | null>(null);
   const input = useRef<HTMLInputElement | null>(null);
 
-  const options = optionsFor(f);
+  const options = given || optionsFor(f);
   const groups = groupsFor(f);
   const full = values.length >= max;
 
@@ -249,7 +254,7 @@ export default function FacetPicker({ f, values, onChange, disabled }: {
 
   return (
     <div className={"um-facet" + (open ? " open" : "")} ref={box}>
-      <Chips f={f} values={values} onRemove={remove} disabled={disabled} />
+      <Chips f={f} values={values} onRemove={remove} disabled={disabled} options={given} />
 
       {single && values.length && !open && !free ? null : (
         <div className="um-facet-in">

@@ -314,19 +314,12 @@
                   color: var(--text-3); font-size: var(--text-sm) }
 .um-fs legend .req { color: var(--bad) }
 .um-f2 { display: grid; gap: var(--space-4) var(--space-3); grid-template-columns: repeat(2, 1fr) }
-/* Three equal columns for a group that is three short answers to one question
-   — State, City, Pincode read as one row, one thought. */
-.um-f3 { display: grid; gap: var(--space-4) var(--space-3); grid-template-columns: repeat(3, 1fr) }
 /* These queries need a CONTAINER to fire against, and nothing ever declared
    one — they had been dead rules since the day they were written, and the
    two-column grid simply never collapsed. The form body is the right scope:
    it is what actually narrows when the modal does. */
 .um-form { container-type: inline-size }
-@container (max-width: 620px) {
-  .um-f2 { grid-template-columns: 1fr }
-  .um-f3 { grid-template-columns: repeat(2, 1fr) }
-}
-@container (max-width: 430px) { .um-f3 { grid-template-columns: 1fr } }
+@container (max-width: 620px) { .um-f2 { grid-template-columns: 1fr } }
 /* The visibility marker sits at the ROW EDGE, not wherever the label happens
    to end — so every public/internal badge in a group lines up in one column
    and can be scanned as one, which is the only way "which of these is public"
@@ -588,6 +581,36 @@
 .um-profile-link { display: inline-flex; align-items: center; gap: 5px;
                    color: var(--brand-text); text-decoration: none }
 .um-profile-link:hover { text-decoration: underline }
+
+/* ------------------------------------------------ target areas as rows --- */
+/* One TILE per state. The row is the unit of meaning — a state and the cities
+   inside it — so it gets a visible boundary of its own instead of two loose
+   pickers, and removing it removes a visibly single thing. */
+.um-areas { display: flex; flex-direction: column; gap: var(--space-3) }
+.um-area {
+  display: grid; grid-template-columns: minmax(150px, 1fr) 2fr auto;
+  gap: var(--space-3); align-items: start;
+  padding: var(--space-3);
+  background: var(--surface-raised); border: 1px solid var(--line-2);
+  border-radius: var(--radius-lg);
+}
+@container (max-width: 620px) { .um-area { grid-template-columns: 1fr; } }
+/* The row sits on the raised tile, so its own inputs go back to the inset
+   ground — the third layer inverts again, or nothing reads as an edge. */
+.um-area .inp { background: var(--bg); }
+.um-area-wait { margin: 0; align-self: center; font-size: var(--text-sm); color: var(--text-3) }
+.um-area-x {
+  display: grid; place-items: center; width: 26px; height: 26px; margin-top: 3px;
+  border: none; border-radius: var(--radius-sm); background: none;
+  color: var(--text-3); cursor: pointer;
+}
+.um-area-x:hover { background: var(--bad-bg); color: var(--bad) }
+.um-areas-none { margin: 0; font-size: var(--text-sm); color: var(--text-3) }
+.um-areas-foot { display: flex; align-items: center; gap: var(--space-3) }
+.um-areas-count { font-size: var(--text-sm); color: var(--text-3) }
+/* The record's read-only rows: one line per state, wrapped, quiet. */
+.um-areas-ro { display: flex; flex-direction: column; gap: var(--space-2) }
+.um-areas-ro .um-chips { margin-bottom: 0 }
 
 @media print {
   .um-views, .um-proto, .um-actions, .um-idbar .btn { display: none }

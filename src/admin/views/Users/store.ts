@@ -61,9 +61,6 @@ export interface UserProfile {
    *  platform, and permanent in practice — changing it breaks every link
    *  anybody has already shared. */
   username: string | null;
-  city: string | null;
-  state: string | null;
-  pincode: string | null;
   about: string | null;
   businessName: string | null;
   /* THE FOUR BUSINESS FACETS. Deliberately orthogonal rather than one
@@ -81,14 +78,19 @@ export interface UserProfile {
   segments: string[];
   categories: string[];
   searchKeywords: string[];
-  /** WHERE THEY WILL TRAVEL TO WORK, which is a different question from where
-   *  they are registered — a Noida studio taking Gurugram jobs is the normal
-   *  case. Free text with suggestions, because "Uttam Nagar, Delhi" is a real
-   *  service area and no closed list holds every locality in the country. */
-  targetAreas: string[];
+  /** WHERE THEY TAKE WORK, as structured rows rather than the flat strings
+   *  and the separate registered-location trio they replace. The state is a
+   *  CLOSED key so rows aggregate — every profile claiming Karnataka spells it
+   *  one way — and the cities inside a row are OPEN, because "Uttam Nagar" is
+   *  a real service area and no list holds every locality. This is also the
+   *  module's only location fact now: the business's own city is its first
+   *  row, which is the honest minimum for a business that never said more. */
+  targetAreas: TargetArea[];
   updatedBy: string | null;
   updatedAt: string | null;
 }
+
+export interface TargetArea { state: string; cities: string[] }
 
 export interface UserTag { slug: string; assignedBy: string; assignedAt: string }
 export interface UserNote {
@@ -229,6 +231,9 @@ export interface ProfileField {
   max?: number;
   /** Longest single free-text value, for `tags` only. */
   maxLength?: number;
+  /** `areas` only: most state rows, and most cities inside one row. */
+  maxRows?: number;
+  maxCities?: number;
   /** The chip tone for this facet, one of the theme's `tag-*` classes.
    *  COLOUR-BY-FACET: every chip of one facet shares one colour, on the form
    *  and on the record, so the colour answers "which question is this the
@@ -253,11 +258,14 @@ const VOCABS: Record<string, FacetOption[]> = {
      the label, and the list is a suggestion rather than a constraint. */
   keywordSuggestions: (vocabDoc.keywordSuggestions as string[])
     .map((k) => ({ key: k, label: k })),
-  areaSuggestions: (vocabDoc.areaSuggestions as string[])
-    .map((k) => ({ key: k, label: k })),
   states: vocabDoc.states as FacetOption[],
   cities: vocabDoc.cities as FacetOption[],
 };
+
+/** The city SUGGESTIONS for one state's row. Open — the picker offers these
+ *  and accepts anything typed. */
+export const citySuggestionsOf = (state: string): FacetOption[] =>
+  (STATE_CITIES[state] || []).map((k) => ({ key: k, label: k }));
 const VOCAB_GROUPS: Record<string, FacetGroup[]> = {
   categoryGroups: vocabDoc.categoryGroups as FacetGroup[],
 };
@@ -405,6 +413,43 @@ export function validateFacets(patch: Partial<UserProfile>): string {
       return;
     }
 
+    if (f.type === "areas") {
+      const rows = Array.isArray(v) ? (v as TargetArea[]) : [];
+      if (f.maxRows && rows.length > f.maxRows) {
+        bad.push(f.label + ": at most " + f.maxRows + " states");
+      }
+      /* THE STATE IS THE CLOSED HALF. One unrecognised state key is a profile
+         no state filter will ever surface — same failure as a stray segment. */
+      const strays = rows.filter((r) => !optionsFor({ ...f, vocab: "states" } as ProfileField)
+        .some((o) => o.key === r.state));
+      if (strays.length) {
+        bad.push(f.label + ": unknown state " + strays.map((r) => '"' + r.state + '"').join(", "));
+      }
+      const states = rows.map((r) => r.state);
+      if (new Set(states).size !== states.length) {
+        bad.push(f.label + ": the same state is in there twice — add its cities to the one row");
+      }
+      rows.forEach((r) => {
+        /* A row with a state and no city says nothing a filter can use — it
+           is a half-given answer, and half answers do not save. */
+        if (!r.cities.length) {
+          bad.push(f.label + ": " + r.state + " needs at least one city");
+        }
+        if (f.maxCities && r.cities.length > f.maxCities) {
+          bad.push(f.label + ": at most " + f.maxCities + " cities in " + r.state);
+        }
+        if (dedupeKeywords(r.cities).length !== r.cities.length) {
+          bad.push(f.label + ": " + r.state + " lists the same city twice");
+        }
+        const long = r.cities.map(cleanKeyword)
+          .filter((c) => f.maxLength && c.length > f.maxLength);
+        if (long.length) {
+          bad.push(f.label + ": keep each city under " + f.maxLength + " characters");
+        }
+      });
+      return;
+    }
+
     if (f.type === "handle") {
       if (v === null || v === "") return;
       const e = usernameError(String(v));
@@ -450,7 +495,8 @@ export const SEGMENTS = vocabDoc.segments;
 export const CATEGORIES = vocabDoc.categories;
 export const CATEGORY_GROUPS = vocabDoc.categoryGroups;
 export const KEYWORD_SUGGESTIONS = vocabDoc.keywordSuggestions;
-export const AREA_SUGGESTIONS = vocabDoc.areaSuggestions;
+export const STATE_CITIES = vocabDoc.stateCities as Record<string, string[]>;
+export const STATES = vocabDoc.states as { key: string; label: string }[];
 export const USERNAME_RULES = vocabDoc.usernameRules;
 export const RESERVED_USERNAMES = vocabDoc.reservedUsernames as string[];
 export const REGISTERED_RANGES = vocabDoc.registeredRanges;
@@ -658,6 +704,14 @@ export function recentlyEnded(r: UserRow): boolean {
 const norm = (s: unknown) => String(s ?? "").toLowerCase();
 const digits = (s: unknown) => String(s ?? "").replace(/\D/g, "");
 
+/** The one city the compact surfaces print — the first city of the first
+ *  row. The profile stores no registered location any more, so coverage IS
+ *  the location fact, and the first row is the primary one by convention. */
+export function primaryCityOf(p: UserProfile): string | null {
+  const r = p.targetAreas[0];
+  return r ? (r.cities[0] || r.state) : null;
+}
+
 function matchesSearch(r: UserRow, q: string): boolean {
   const needle = q.trim().toLowerCase();
   if (!needle) return true;
@@ -665,12 +719,13 @@ function matchesSearch(r: UserRow, q: string): boolean {
   const u = r.user;
   const hay = [
     u.userId, u.identity.name, u.identity.email, u.profile.displayName,
-    u.profile.businessName, u.profile.city, u.profile.state,
+    u.profile.businessName,
     /* The username is an address people are handed, so it is a thing somebody
        arrives holding — "a member emailed about /pro/meera-studio" has to be
-       findable by pasting that in. Target areas are searchable for the same
-       reason the city is: "who covers Gurugram" is a real question. */
-    u.profile.username, ...u.profile.targetAreas,
+       findable by pasting that in. Every state and city in the coverage rows
+       is searchable because "who covers Gurugram" is a real question. */
+    u.profile.username,
+    ...u.profile.targetAreas.flatMap((t) => [t.state, ...t.cities]),
     r.current ? r.current.membershipId : "", r.current ? r.current.planName : "",
     ...u.commercial.dealRefs, ...u.commercial.invoiceRefs,
   ].map(norm).join(" ");
@@ -700,7 +755,12 @@ export function applyFilters(rows: UserRow[], p: Params): UserRow[] {
     if (p.cls && r.classification !== p.cls) return false;
     if (p.ms && (!r.current || r.current.status !== p.ms)) return false;
     if (p.plan && (!r.current || r.current.planCode !== p.plan)) return false;
-    if (p.city && r.user.profile.city !== p.city) return false;
+    /* The City filter reads COVERAGE now — any row that names the city, or a
+       Delhi-style row where the state is the city's name. That is the question
+       the filter was always answering badly: "who works in Mumbai", not "whose
+       registered address says Mumbai". */
+    if (p.city && !r.user.profile.targetAreas.some((t) =>
+      t.state === p.city || t.cities.indexOf(p.city as string) >= 0)) return false;
     if (p.src && r.user.registrationSource !== p.src) return false;
     if (p.tag && !r.user.tags.some((t) => t.slug === p.tag)) return false;
     if (p.status && r.user.userStatus !== p.status) return false;

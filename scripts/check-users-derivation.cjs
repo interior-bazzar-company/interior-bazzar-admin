@@ -547,7 +547,9 @@ console.log("\nthe seed is inside its own vocabularies");
   ok("business type and segments travel together",
     users.filter((u) => !!u.profile.businessType !== (u.profile.segments.length > 0))
       .map((u) => u.userId), []);
-  ok("...and the incomplete count did not move", S.countsOf(all).incompleteProfiles, 3);
+  /* This figure moved 3 → 2 when Pincode was later removed — deliberately;
+     the re-grade block below owns the full story. */
+  ok("...and the incomplete count matches the re-grade block", S.countsOf(all).incompleteProfiles, 2);
   ok("no profile exceeds the segment cap",
     users.filter((u) => u.profile.segments.length > 6).map((u) => u.userId), []);
   ok("no profile exceeds the keyword cap",
@@ -658,64 +660,95 @@ S.resetStore();
     S.profileUrl("meera-studio").indexOf("/pro/meera-studio") > 0, true);
 }
 
-console.log("\nthe conditional field applies to exactly who it says");
+console.log("\nnothing is conditional any more, and the machinery still gates");
 {
-  const target = S.PROFILE_FIELDS.filter((f) => f.key === "targetAreas")[0];
-  ok("target areas is conditional at all", target.showWhen, "member");
-  const applies = all.filter((r) => S.fieldApplies(target, r)).map((r) => r.classification);
-  ok("...to members, paused, suspended and PAST members",
-    Array.from(new Set(applies)).sort(),
-    ["active_member", "former_member", "paused_member", "suspended_member"]);
-  /* Narrower than this and a lapsed member's stored areas would be invisible
-     and uneditable — data going out of reach rather than a field tidied away. */
-  ok("...and to nobody else",
-    all.filter((r) => S.fieldApplies(target, r) && S.MEMBER_CLASSES.indexOf(r.classification) < 0).length, 0);
-  ok("a field with no condition applies to everybody",
-    all.filter((r) => !S.fieldApplies(S.PROFILE_FIELDS.filter((f) => f.key === "city")[0], r)).length, 0);
-  ok("fieldsFor drops it for a plain user",
-    S.fieldsFor(all.filter((r) => r.classification === "normal")[0])
-      .some((f) => f.key === "targetAreas"), false);
+  /* Target areas WAS member-only while it was a marketing extra beside a
+     registered address. It is the profile's only location now, so it applies
+     to everyone — a plain user with no coverage row is invisible to every
+     location filter, which is exactly what Incomplete should surface. */
+  ok("no field carries a showWhen",
+    S.PROFILE_FIELDS.filter((f) => f.showWhen).map((f) => f.key), []);
+  ok("so every user gets the whole schema",
+    all.filter((r) => S.fieldsFor(r).length !== S.PROFILE_FIELDS.length).length, 0);
+  /* The gate itself outlives its last user — asserted with a synthetic field
+     so the day a conditional field returns, the machinery is known-good. */
+  const fake = { key: "x", label: "X", group: "basic", required: false,
+    editable: true, public: true, type: "text", showWhen: "member" };
+  ok("fieldApplies still gates a member-only field",
+    all.filter((r) => S.fieldApplies(fake, r)).length,
+    all.filter((r) => S.MEMBER_CLASSES.indexOf(r.classification) >= 0).length);
 }
 
-console.log("\nthe schema change did not re-grade anybody");
+console.log("\nthe re-grade is exactly the one that was asked for");
 {
   const users = S.readUsers();
-  /* THE SAME INVARIANT AS THE FACET MIGRATION. state and city became required
-     and every profile already had both; username became required and NOBODY
-     had one, so it is seeded for exactly the profiles that satisfy the other
-     business fields. The incomplete SET must be untouched. */
-  ok("still exactly three incomplete profiles", S.countsOf(all).incompleteProfiles, 3);
-  ok("...and the same three",
+  /* THIS migration DOES move completeness, once, on purpose: Pincode was
+     removed at the user's request, and IB-U-1038's only gap was its pincode.
+     Two incomplete profiles now — the two with no business profile at all —
+     and the assertion names them so an accidental second re-grade cannot
+     hide behind the deliberate one. */
+  ok("exactly two incomplete profiles remain", S.countsOf(all).incompleteProfiles, 2);
+  ok("...and they are the two with no business profile",
     all.filter((r) => r.completeness < 100).map((r) => r.user.userId).sort(),
-    ["IB-U-0601", "IB-U-1029", "IB-U-1038"]);
+    ["IB-U-0601", "IB-U-1029"]);
+  ok("IB-U-1038 is the one deliberate promotion — pincode was its only gap",
+    byId["IB-U-1038"].completeness, 100);
   ok("a username exists wherever a business name does",
     users.filter((u) => !!u.profile.businessName !== !!u.profile.username).map((u) => u.userId), []);
-  ok("every profile has a state", users.filter((u) => !u.profile.state).length, 0);
-  ok("every profile has a city", users.filter((u) => !u.profile.city).length, 0);
-  /* The three removed fields must be gone from the DATA too, not just the
-     form — a stored value nothing renders is a field that comes back. */
-  ["portfolioUrl", "locality", "addressLine"].forEach((k) => {
+  /* The removed fields must be gone from the DATA too, not just the form —
+     a stored value nothing renders is a field that comes back. */
+  ["portfolioUrl", "locality", "addressLine", "state", "city", "pincode"].forEach((k) => {
     ok("`" + k + "` is gone from the seed",
       users.filter((u) => k in u.profile).length, 0);
   });
-  ok("no profile is over the target-area cap",
-    users.filter((u) => (u.profile.targetAreas || []).length > 10).map((u) => u.userId), []);
+  /* The structured rows are sound in the seed: every business profile states
+     coverage, every state is a real key, no state repeats, no half rows. */
+  ok("every business profile has at least one coverage row",
+    users.filter((u) => u.profile.businessName && !u.profile.targetAreas.length)
+      .map((u) => u.userId), []);
+  const stateKeys = S.STATES.map((x) => x.key);
+  ok("every row's state is a vocabulary key",
+    users.filter((u) => u.profile.targetAreas.some((t) => stateKeys.indexOf(t.state) < 0))
+      .map((u) => u.userId), []);
+  ok("no profile claims one state twice",
+    users.filter((u) => new Set(u.profile.targetAreas.map((t) => t.state)).size
+      !== u.profile.targetAreas.length).map((u) => u.userId), []);
+  ok("no row is a state with no cities",
+    users.filter((u) => u.profile.targetAreas.some((t) => !t.cities.length))
+      .map((u) => u.userId), []);
+  ok("every seeded state has city suggestions to offer",
+    stateKeys.filter((k) => !S.citySuggestionsOf(k).length), []);
+  ok("primaryCityOf reads the first row's first city",
+    S.primaryCityOf(byId["IB-U-0912"].user.profile), "Bengaluru");
+  ok("...and null where there is no coverage",
+    S.primaryCityOf(byId["IB-U-1029"].user.profile), null);
 }
 
 console.log("\nan open facet takes what a closed one would refuse");
 S.resetStore();
 {
   const bad = (patch) => S.validateFacets(patch) !== "";
-  /* City is a single that accepts anything: there are eight cities in the
-     suggestion list and several thousand in the country. */
-  ok("a city nobody listed is accepted", bad({ city: "Guwahati" }), false);
-  ok("a state nobody listed is not", bad({ state: "Atlantis" }), true);
-  ok("a real state is", bad({ state: "Karnataka" }), false);
-  ok("a locality target area is accepted", bad({ targetAreas: ["Uttam Nagar, Delhi"] }), false);
-  ok("...eleven of them are not",
-    bad({ targetAreas: Array.from({ length: 11 }, (_, i) => "Area " + i) }), true);
-  ok("...and neither is the same one twice",
-    bad({ targetAreas: ["Mumbai", "mumbai"] }), true);
+  const row = (state, cities) => ({ state, cities });
+  /* HALF CLOSED, HALF OPEN, per row. The state must be a vocabulary key so
+     rows aggregate; the cities take anything, because "Uttam Nagar" is a real
+     service area and no list holds every locality. */
+  ok("a sound row is accepted", bad({ targetAreas: [row("Karnataka", ["Bengaluru"])] }), false);
+  ok("a city nobody suggested is accepted",
+    bad({ targetAreas: [row("Karnataka", ["Chikkaballapur"])] }), false);
+  ok("an invented state is not", bad({ targetAreas: [row("Atlantis", ["Somewhere"])] }), true);
+  ok("a state with no cities is a half answer, refused",
+    bad({ targetAreas: [row("Karnataka", [])] }), true);
+  ok("the same state twice is refused",
+    bad({ targetAreas: [row("Delhi", ["Dwarka"]), row("Delhi", ["Saket"])] }), true);
+  ok("the same city twice in one row is refused",
+    bad({ targetAreas: [row("Delhi", ["Dwarka", "dwarka"])] }), true);
+  ok("six states is over the cap of five",
+    bad({ targetAreas: ["Karnataka", "Maharashtra", "Delhi", "Kerala", "Telangana", "Haryana"]
+      .map((st) => row(st, ["X"])) }), true);
+  ok("nine cities in one row is over the cap of eight",
+    bad({ targetAreas: [row("Delhi", Array.from({ length: 9 }, (_, i) => "Area " + i))] }), true);
+  ok("an empty list is not an ERROR here — required-ness is the form's check",
+    bad({ targetAreas: [] }), false);
   ok("a malformed username is refused by validateFacets", bad({ username: "Bad_Name" }), true);
   /* Uniqueness is NOT a field rule — it needs the whole table, so it lives in
      updateProfile and this is where that seam is pinned down. */

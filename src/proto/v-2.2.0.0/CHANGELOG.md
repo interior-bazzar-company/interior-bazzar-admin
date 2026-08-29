@@ -6,6 +6,98 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-29
 
+### Target areas become the location: state rows with open city lists
+
+**Area:** the profile's location model, the Edit profile contact group
+**Files:** `AreaRows.tsx` (new), `EditProfile.tsx`, `FacetPicker.tsx`,
+`Detail.tsx`, `bits.tsx`, `store.ts`, `vocabularies.json`, `users.json`,
+`users.css`, `scripts/um-smoke.tsx`, `scripts/check-users-derivation.cjs`,
+`BACKEND-INTEGRATION.md`
+
+**What changed**
+
+**One location concept instead of two half ones.** The profile carried a
+registered address (State · City · Pincode) and, separately, a member-only
+chip list of free-text "target areas". Neither answered the marketplace's
+actual question: nobody hires by registered address, and the free strings —
+"Delhi", "delhi ncr", "Dwarka, Delhi" — were three spellings of one claim
+that no filter could read. Both are gone. The contact group is now **Target
+areas**, structured:
+
+    [{ state, cities[] }]   ·   at most 5 states, 8 cities per row
+
+**One row per state, added and removed as a tile.** Add state appends a row;
+picking its state reveals its city picker; the remove control says it takes
+the cities with it. States another row already holds leave the state list —
+a duplicate row is impossible to express rather than refused after the fact.
+Changing a row's state clears its cities, because city lists are per-state
+and kept cities under a changed state are wrong quietly. Add is disabled
+while the last row is half-filled: the button must not offer what the save
+will refuse.
+
+**Half closed, half open, per row — the module's standing split applied
+inside one field.** The state is a closed key, which is what makes rows
+aggregate. The cities are open with per-state suggestions (`stateCities` in
+the vocabulary), because "Uttam Nagar" is a real service area and no list
+holds every locality. Delhi's suggestions are its localities, because
+locality IS the useful grain in a city-state.
+
+**The old chip field and Pincode are removed**, with the pieces they leaned
+on: `areaSuggestions` gave way to `stateCities`, the member-only `showWhen`
+came off (coverage is everyone's location now — the gate machinery stays,
+asserted with a synthetic field), and the seed's flat strings were folded
+into rows: "Uttam Nagar, Delhi" the string became Delhi → Uttam Nagar the
+row. Same claim, now in a shape a filter can read.
+
+**What follows from "this is the location now":** the list's City filter
+means coverage (any row naming the city, or a Delhi-style state match); the
+search haystack indexes every state and city in the rows; and the compact
+surfaces — the directory cell, the record subline — print the first row's
+first city via one `primaryCityOf()`.
+
+**Temp data**
+
+`vocabularies.json` — `stateCities{}` per-state suggestions, states grown to
+eleven, `areaSuggestions` deleted, the schema down to nine fields.
+`users.json` — every profile's strings folded into rows; state/city/pincode
+keys deleted.
+
+**THE RE-GRADE IS DELIBERATE THIS TIME.** Removing Pincode promoted
+IB-U-1038, whose only gap it was: the incomplete count is 3 → 2, and the two
+that remain are the two with no business profile at all. The check suite
+names all of this explicitly, so an accidental second re-grade cannot hide
+behind the deliberate one.
+
+**Backend needed**
+
+`PATCH /admin/users/{id}/profile` enforces the row rules — unknown state,
+duplicate state, empty cities, over-cap all refuse the whole write. The
+list's `city` filter is a coverage query server-side too. The doc carries
+the shape and the caps.
+
+**Open decisions**
+
+None new; UM-OD-09 already covers who owns the vocabularies, and
+`stateCities` joins that question.
+
+**Verified**
+
+`tsc -b`, `eslint`, `vite build` green. `check:users` 234 → 243,
+`check:users-render` 113 stays 113 (six rewritten, three added, five retired with the old shape). The seed's rows are proven sound (every
+state a real key, no duplicates, no half rows, every seeded state has
+suggestions to offer), the validator's nine row rules are asserted case by
+case, and the render suite covers the tiles, the named remove control, the
+everyone-is-asked change and the locality's survival under its state.
+
+**Still not verified:** the row interaction — add, pick, remove, the state
+change clearing cities — is exactly the kind of stateful behaviour SSR
+cannot exercise. The tiles render; whether they behave is a browser
+question, and the module's standing caveat applies with extra force here.
+
+---
+
+## 2026-08-29
+
 ### Colour-by-facet chips, and the alignment pass the modal was owed
 
 **Area:** the Edit profile modal, the profile tab's chips

@@ -39,7 +39,7 @@ import LifecycleModal from "../src/admin/views/Users/LifecycleModal";
 import EditProfile from "../src/admin/views/Users/EditProfile";
 import { NoteModal, TagsModal, DeactivateModal } from "../src/admin/views/Users/Modals";
 import {
-  fieldsFor, toRow, readUsers, readMemberships, usernameTaken,
+  fieldsFor, toRow, readUsers, readMemberships, usernameTaken, validateFacets,
 } from "../src/admin/views/Users/store";
 import { __setPlansMode } from "../src/admin/views/Plans/api";
 import type { LifecycleAction } from "../src/admin/views/Users/store";
@@ -459,22 +459,19 @@ check("edit profile · incomplete", () => modal(
     /* Counting comboboxes is the wrong assertion — a CLOSED single that is
        already answered collapses to its chip plus Change and has no combobox
        at all. What must hold is that every picker-typed field rendered the
-       picker shell. */
+       picker shell — plus TWO per target-area row, because each row is a
+       state picker and a city picker of its own. */
     const shells = (full.match(/class="um-facet"/g) || []).length;
     const expect = fieldsFor(memberRow)
-      .filter((f) => ["single", "multi", "tags"].indexOf(f.type) >= 0).length;
+      .filter((f) => ["single", "multi", "tags"].indexOf(f.type) >= 0).length
+      + memberRow.user.profile.targetAreas.length * 2;
     if (shells !== expect) throw new Error(shells + " pickers, expected " + expect);
     return full;
   });
-  check("facets · an answered closed single collapses; an open one does not", () => {
-    /* State is closed and answered, so it shows a chip and a Change button.
-       City is open and answered, and must keep its box — otherwise there is
-       no way to type a city the suggestion list has never heard of. */
-    if (full.indexOf(">Change<") < 0) throw new Error("the closed single did not collapse");
-    const boxes = (full.match(/role="combobox"/g) || []).length;
-    const openSingles = fieldsFor(memberRow).filter((f) => f.type === "single" && f.open).length;
-    if (openSingles < 1) throw new Error("no open single in the schema to check");
-    if (boxes < openSingles) throw new Error("an open single collapsed like a closed one");
+  check("facets · an answered closed single collapses to chip + Change", () => {
+    /* Business type on the profile, and every row's state, are answered
+       closed singles — a chip and a way back, no combobox held open. */
+    if (full.indexOf(">Change<") < 0) throw new Error("no closed single collapsed");
     return full;
   });
   check("facets · the answer sits above the control, as chips", () => {
@@ -534,12 +531,19 @@ check("edit profile · incomplete", () => modal(
       if (!f) throw new Error("no field " + k);
       return f.type === "tags" || f.open === true;
     };
-    ["businessType", "segments", "categories", "state"].forEach((k) => {
+    ["businessType", "segments", "categories"].forEach((k) => {
       if (isOpen(k)) throw new Error(k + " has been opened up");
     });
-    ["searchKeywords", "targetAreas", "city"].forEach((k) => {
+    ["searchKeywords"].forEach((k) => {
       if (!isOpen(k)) throw new Error(k + " has been closed off");
     });
+    /* Target areas holds the split WITHIN itself now: a closed state half and
+       an open city half per row. Asserted against validateFacets because the
+       schema field's own `open` flag no longer tells that story. */
+    if (validateFacets({ targetAreas: [{ state: "Atlantis", cities: ["X"] }] } as never) === "")
+      throw new Error("the state half of a row has been opened up");
+    if (validateFacets({ targetAreas: [{ state: "Karnataka", cities: ["Chikkaballapur"] }] } as never) !== "")
+      throw new Error("the city half of a row has been closed off");
     return empty;
   });
   /* ------------------------------------------- the username and the URL --- */
@@ -580,27 +584,31 @@ check("edit profile · incomplete", () => modal(
   });
 
   /* -------------------------------------------- conditional and removed --- */
-  check("target areas · members are asked, plain users are not", () => {
+  check("target areas · everyone is asked, because it is the location now", () => {
+    /* It was member-only while it sat beside a registered address. The
+       address is gone; a plain user with no coverage row is invisible to
+       every location filter, and the form is where that gets fixed. */
     if (full.indexOf("Target areas") < 0) throw new Error("a member was not asked");
-    if (empty.indexOf("Target areas") >= 0) throw new Error("a plain user was asked");
+    if (empty.indexOf("Target areas") < 0) throw new Error("a plain user was not asked");
+    if (empty.indexOf("No coverage stated yet") < 0)
+      throw new Error("an empty coverage list does not say what it costs");
     return full;
   });
-  check("target areas · they take a locality, not just a city", () => {
-    /* "Uttam Nagar, Delhi" is the case the field exists for: a closed city
-       list cannot express it, which is why this one is open. */
-    const rec = at("/users/IB-U-0921?tab=profile");
-    if (rec.indexOf("Uttam Nagar, Delhi") < 0) throw new Error("a locality area did not survive");
-    return rec;
+  check("target areas · a row is a tile: closed state, open cities, removable", () => {
+    if (full.indexOf("um-area") < 0) throw new Error("no row tiles");
+    /* The remove control names what it takes with it — a bare × on a
+       two-picker tile does not say the cities go too. */
+    if (full.indexOf("and its cities") < 0) throw new Error("the remove control does not say its scope");
+    if (full.indexOf("Add state") < 0) throw new Error("no way to add a row");
+    return full;
   });
-  check("target areas · a past member keeps theirs reachable", () => {
-    /* Narrower than MEMBER_CLASSES and a lapsed member's stored areas would
-       be invisible and uneditable — data going out of reach, not a field
-       being tidied away. */
-    const past = readUsers().map((u) => toRow(u, readMemberships()))
-      .filter((r) => r.classification === "former_member")[0];
-    const html = modal(<EditProfile row={past} onClose={noop} onDone={noop} />);
-    if (html.indexOf("Target areas") < 0) throw new Error("a past member cannot see their own areas");
-    return html;
+  check("target areas · a locality survives as a city under its state", () => {
+    /* "Uttam Nagar, Delhi" the string became Delhi → Uttam Nagar the row —
+       same claim, now in a shape a filter can read. */
+    const rec = at("/users/IB-U-0921?tab=profile");
+    if (rec.indexOf("Uttam Nagar") < 0) throw new Error("the locality did not survive");
+    if (rec.indexOf("Delhi") < 0) throw new Error("its state is not beside it");
+    return rec;
   });
   check("the removed fields are gone from every surface", () => {
     const rec = at("/users/IB-U-0912?tab=profile");
@@ -610,10 +618,11 @@ check("edit profile · incomplete", () => modal(
     });
     return full;
   });
-  check("...and State, City, Pincode read as one group, in that order", () => {
+  check("...and the contact group is exactly the coverage field", () => {
     const contact = fieldsFor(memberRow).filter((f) => f.group === "contact").map((f) => f.key);
-    if (contact.join(",") !== "state,city,pincode")
+    if (contact.join(",") !== "targetAreas")
       throw new Error("the contact group reads " + contact.join(", "));
+    if (full.indexOf(">Pincode") >= 0) throw new Error("Pincode survives on the form");
     return full;
   });
 

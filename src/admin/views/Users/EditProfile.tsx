@@ -32,19 +32,19 @@
 import { useMemo, useState } from "react";
 import { Icon, Notice } from "../../ui";
 import { Completeness } from "./bits";
+import AreaRows from "./AreaRows";
 import FacetPicker from "./FacetPicker";
 import HandleField from "./HandleField";
 import {
   PROFILE_SCHEMA_VERSION, completenessOf, fieldsFor, updateProfile, usernameTaken, validateFacets,
 } from "./store";
-import type { ProfileField, UserProfile, UserRow } from "./store";
+import type { ProfileField, TargetArea, UserProfile, UserRow } from "./store";
 
 const GROUPS = [
   { key: "basic", label: "Basic profile", note: "What a customer sees first." },
   { key: "business", label: "Business profile", note: "What the marketplace matches and ranks on." },
-  /* Three columns, because the group IS three short answers to one question —
-     "where" — and stacking them made three rows out of one thought. */
-  { key: "contact", label: "Where they are", note: "The pincode is internal.", cols: 3 },
+  { key: "contact", label: "Target areas",
+    note: "Where they take work — a state, then its cities. This is the profile's location now." },
 ];
 
 /** A field holds a list when the schema says so — never because the value
@@ -56,17 +56,19 @@ const isList = (f: ProfileField) => f.type === "multi" || f.type === "tags";
  *  row is what made State, City and Pincode read as three separate thoughts.
  *  Textareas and chip-bearing fields genuinely use the width. */
 const isWide = (f: ProfileField) =>
-  isList(f) || f.type === "handle" || f.type === "textarea";
+  isList(f) || f.type === "handle" || f.type === "textarea" || f.type === "areas";
 
-type Draft = Record<string, string | string[]>;
+type Draft = Record<string, string | string[] | TargetArea[]>;
 
 const toDraft = (p: UserProfile, fields: ProfileField[]): Draft => {
   const d: Draft = {};
   fields.forEach((f) => {
     const v = (p as unknown as Record<string, unknown>)[f.key];
-    d[f.key] = isList(f)
-      ? (Array.isArray(v) ? (v as string[]).slice() : [])
-      : v === null || v === undefined ? "" : String(v);
+    d[f.key] = f.type === "areas"
+      ? (Array.isArray(v) ? (v as TargetArea[]).map((r) => ({ ...r, cities: r.cities.slice() })) : [])
+      : isList(f)
+        ? (Array.isArray(v) ? (v as string[]).slice() : [])
+        : v === null || v === undefined ? "" : String(v);
   });
   return d;
 };
@@ -78,7 +80,7 @@ const toPatch = (draft: Draft, fields: ProfileField[]): Partial<UserProfile> => 
   const patch: Record<string, unknown> = {};
   fields.forEach((f) => {
     const raw = draft[f.key];
-    if (isList(f)) patch[f.key] = Array.isArray(raw) ? raw : [];
+    if (f.type === "areas" || isList(f)) patch[f.key] = Array.isArray(raw) ? raw : [];
     else if (f.type === "single") patch[f.key] = String(raw || "").trim() || null;
     else patch[f.key] = String(raw || "").trim() || null;
   });
@@ -100,7 +102,8 @@ export default function EditProfile({ row, onClose, onDone }: {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const set = (k: string, v: string | string[]) => setDraft((d) => ({ ...d, [k]: v }));
+  const set = (k: string, v: string | string[] | TargetArea[]) =>
+    setDraft((d) => ({ ...d, [k]: v }));
 
   /* Completeness recomputes as you type, against the same required-field set
      the directory grades on — so the number on the form and the number on the
@@ -139,6 +142,13 @@ export default function EditProfile({ row, onClose, onDone }: {
   };
 
   const control = (f: ProfileField) => {
+    if (f.type === "areas") {
+      return (
+        <AreaRows f={f} disabled={!f.editable}
+          value={(draft[f.key] as TargetArea[]) || []}
+          onChange={(next) => set(f.key, next)} />
+      );
+    }
     if (f.type === "handle") {
       return (
         <HandleField value={String(draft[f.key] || "")} saved={row.user.profile.username}
@@ -206,7 +216,7 @@ export default function EditProfile({ row, onClose, onDone }: {
           return (
             <fieldset className="um-fs" key={g.key}>
               <legend>{g.label}<i>{g.note}</i></legend>
-              <div className={g.cols === 3 ? "um-f3" : "um-f2"}>
+              <div className="um-f2">
                 {mine.map((f) => (
                   /* A picker is not a <label>'s control — it is a composite
                      with its own labelled input — so those render as a div

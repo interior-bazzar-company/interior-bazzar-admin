@@ -26,9 +26,6 @@
         "profileStatus": "published",
         "displayName": "Priya Nair",
         "username": "priya-nair-studio",
-        "city": "Bengaluru",
-        "state": "Karnataka",
-        "pincode": "560038",
         "about": "Independent stylist taking on residential projects across east Bengaluru.",
         "businessName": "Priya Nair Studio",
         "businessType": "service_provider",
@@ -46,9 +43,14 @@
           "Home decor"
         ],
         "targetAreas": [
-          "Indiranagar, Bengaluru",
-          "Whitefield, Bengaluru",
-          "Bengaluru"
+          {
+            "state": "Karnataka",
+            "cities": [
+              "Indiranagar",
+              "Whitefield",
+              "Bengaluru"
+            ]
+          }
         ],
         "updatedBy": "Priya Nair",
         "updatedAt": "2026-08-07T09:15:00+05:30"
@@ -100,9 +102,6 @@
         "profileStatus": "incomplete",
         "displayName": "Arjun Bhat",
         "username": "bhat-carpentry-works",
-        "city": "Pune",
-        "state": "Maharashtra",
-        "pincode": null,
         "about": null,
         "businessName": "Bhat Carpentry Works",
         "businessType": "contractor",
@@ -115,7 +114,12 @@
         ],
         "searchKeywords": [],
         "targetAreas": [
-          "Bengaluru"
+          {
+            "state": "Karnataka",
+            "cities": [
+              "Bengaluru"
+            ]
+          }
         ],
         "updatedBy": "Arjun Bhat",
         "updatedAt": "2026-08-05T18:20:00+05:30"
@@ -157,9 +161,6 @@
         "profileStatus": "incomplete",
         "displayName": "Nikhil Rao",
         "username": null,
-        "city": "Hyderabad",
-        "state": "Telangana",
-        "pincode": null,
         "about": null,
         "businessName": null,
         "businessType": null,
@@ -207,9 +208,6 @@
         "profileStatus": "published",
         "displayName": "Desai Interiors",
         "username": "desai-interiors",
-        "city": "Mumbai",
-        "state": "Maharashtra",
-        "pincode": "400057",
         "about": "Turnkey residential fit-out, mostly 2 and 3 BHK redevelopments.",
         "businessName": "Desai Interiors",
         "businessType": "contractor",
@@ -228,9 +226,14 @@
           "Renovation & remodelling"
         ],
         "targetAreas": [
-          "Mumbai",
-          "Thane, Mumbai",
-          "Navi Mumbai"
+          {
+            "state": "Maharashtra",
+            "cities": [
+              "Mumbai",
+              "Thane",
+              "Navi Mumbai"
+            ]
+          }
         ],
         "updatedBy": "Rohit Desai",
         "updatedAt": "2026-08-12T13:44:00+05:30"
@@ -282,9 +285,6 @@
         "profileStatus": "published",
         "displayName": "Verve Modular Kitchens",
         "username": "verve-modular",
-        "city": "Delhi",
-        "state": "Delhi",
-        "pincode": "110020",
         "about": "Factory-finished modular kitchens and wardrobes, installed in eleven days.",
         "businessName": "Verve Modular Pvt Ltd",
         "businessType": "manufacturer",
@@ -303,9 +303,24 @@
           "Storage solutions"
         ],
         "targetAreas": [
-          "Delhi NCR",
-          "Noida, Uttar Pradesh",
-          "Gurugram, Haryana"
+          {
+            "state": "Delhi",
+            "cities": [
+              "New Delhi"
+            ]
+          },
+          {
+            "state": "Uttar Pradesh",
+            "cities": [
+              "Noida"
+            ]
+          },
+          {
+            "state": "Haryana",
+            "cities": [
+              "Gurugram"
+            ]
+          }
         ],
         "updatedBy": "D. Kapoor",
         "updatedAt": "2026-07-02T17:10:00+05:30"
@@ -359,9 +374,6 @@
         "profileStatus": "published",
         "displayName": "Sunlight Furnishings",
         "username": "sunlight-furnishings",
-        "city": "Chennai",
-        "state": "Tamil Nadu",
-        "pincode": "600020",
         "about": "Curtains, upholstery and soft furnishing for homes and boutique hotels.",
         "businessName": "Sunlight Furnishings LLP",
         "businessType": "retailer",
@@ -380,8 +392,13 @@
           "Soft furnishing"
         ],
         "targetAreas": [
-          "Mumbai",
-          "Pune"
+          {
+            "state": "Maharashtra",
+            "cities": [
+              "Mumbai",
+              "Pune"
+            ]
+          }
         ],
         "updatedBy": "N. Pillai",
         "updatedAt": "2026-08-18T10:25:00+05:30"
@@ -435,9 +452,6 @@
         "profileStatus": "published",
         "displayName": "Tara Design Collective",
         "username": "tara-design-collective",
-        "city": "Jaipur",
-        "state": "Rajasthan",
-        "pincode": "302001",
         "about": "A four-person studio doing heritage-sensitive residential interiors.",
         "businessName": "Tara Design Collective",
         "businessType": "service_provider",
@@ -456,8 +470,12 @@
           "Furniture design"
         ],
         "targetAreas": [
-          "Jaipur",
-          "Rajasthan"
+          {
+            "state": "Rajasthan",
+            "cities": [
+              "Jaipur"
+            ]
+          }
         ],
         "updatedBy": "Tara Design Collective",
         "updatedAt": "2026-05-30T15:00:00+05:30"
@@ -497,9 +515,6 @@
         "profileStatus": "published",
         "displayName": "Bhatia Ply & Hardware",
         "username": "bhatia-ply-and-hardware",
-        "city": "Delhi",
-        "state": "Delhi",
-        "pincode": "110015",
         "about": "Plywood, laminates and hardware supply to the trade since 1994.",
         "businessName": "Bhatia Ply & Hardware",
         "businessType": "dealer",
@@ -516,9 +531,13 @@
           "Hardware fittings"
         ],
         "targetAreas": [
-          "Uttam Nagar, Delhi",
-          "Dwarka, Delhi",
-          "Delhi"
+          {
+            "state": "Delhi",
+            "cities": [
+              "Uttam Nagar",
+              "Dwarka"
+            ]
+          }
         ],
         "updatedBy": "D. Kapoor",
         "updatedAt": "2026-03-19T11:05:00+05:30"
@@ -572,9 +591,6 @@
         "profileStatus": "published",
         "displayName": "Meera Studio Interiors",
         "username": "meera-studio-interiors",
-        "city": "Bengaluru",
-        "state": "Karnataka",
-        "pincode": "560041",
         "about": "Full-service interior design studio serving Bengaluru since 2019. Residential and commercial fit-out, in-house carpentry.",
         "businessName": "Meera Studio Interiors LLP",
         "businessType": "service_provider",
@@ -594,9 +610,13 @@
           "Turnkey interiors"
         ],
         "targetAreas": [
-          "Bengaluru",
-          "Koramangala, Bengaluru",
-          "Karnataka"
+          {
+            "state": "Karnataka",
+            "cities": [
+              "Bengaluru",
+              "Koramangala"
+            ]
+          }
         ],
         "updatedBy": "D. Kapoor",
         "updatedAt": "2026-08-22T14:02:00+05:30"
@@ -660,9 +680,6 @@
         "profileStatus": "published",
         "displayName": "Lokesh Interiors",
         "username": "lokesh-interiors",
-        "city": "Kochi",
-        "state": "Kerala",
-        "pincode": "682030",
         "about": "Two-person outfit doing apartment interiors around Infopark.",
         "businessName": "Lokesh Interiors",
         "businessType": "service_provider",
@@ -678,8 +695,13 @@
           "Apartment interiors"
         ],
         "targetAreas": [
-          "Pune",
-          "Hinjewadi, Pune"
+          {
+            "state": "Maharashtra",
+            "cities": [
+              "Pune",
+              "Hinjewadi"
+            ]
+          }
         ],
         "updatedBy": "Lokesh Interiors",
         "updatedAt": "2026-01-08T18:12:00+05:30"
@@ -719,9 +741,6 @@
         "profileStatus": "published",
         "displayName": "R. Menon Woodworks",
         "username": "r-menon-woodworks",
-        "city": "Kochi",
-        "state": "Kerala",
-        "pincode": "682036",
         "about": "Solid-wood furniture and site carpentry. Own workshop, twelve carpenters.",
         "businessName": "R. Menon Woodworks",
         "businessType": "contractor",
@@ -739,8 +758,12 @@
           "Wardrobe design"
         ],
         "targetAreas": [
-          "Kochi",
-          "Kerala"
+          {
+            "state": "Kerala",
+            "cities": [
+              "Kochi"
+            ]
+          }
         ],
         "updatedBy": "D. Kapoor",
         "updatedAt": "2026-08-22T11:18:00+05:30"
@@ -790,9 +813,6 @@
         "profileStatus": "published",
         "displayName": "Zenith Ceilings",
         "username": "zenith-ceilings",
-        "city": "Pune",
-        "state": "Maharashtra",
-        "pincode": "411045",
         "about": "False ceiling, cove lighting and acoustic panelling for offices.",
         "businessName": "Zenith Ceilings",
         "businessType": "contractor",
@@ -811,8 +831,13 @@
           "Acoustic panels"
         ],
         "targetAreas": [
-          "Hyderabad",
-          "Gachibowli, Hyderabad"
+          {
+            "state": "Telangana",
+            "cities": [
+              "Hyderabad",
+              "Gachibowli"
+            ]
+          }
         ],
         "updatedBy": "Zenith Ceilings",
         "updatedAt": "2026-04-14T12:00:00+05:30"
@@ -852,9 +877,6 @@
         "profileStatus": "published",
         "displayName": "Sharma Interiors",
         "username": "sharma-interiors",
-        "city": "Delhi",
-        "state": "Delhi",
-        "pincode": "110027",
         "about": "Residential interiors and renovation across west Delhi.",
         "businessName": "Sharma Interiors",
         "businessType": "contractor",
@@ -870,8 +892,13 @@
           "Complete home interiors"
         ],
         "targetAreas": [
-          "Delhi NCR",
-          "Rohini, Delhi"
+          {
+            "state": "Delhi",
+            "cities": [
+              "New Delhi",
+              "Rohini"
+            ]
+          }
         ],
         "updatedBy": "Sharma Interiors",
         "updatedAt": "2026-02-02T14:40:00+05:30"
@@ -919,9 +946,6 @@
         "profileStatus": "published",
         "displayName": "Anaya Verma Design",
         "username": "anaya-verma-design",
-        "city": "Mumbai",
-        "state": "Maharashtra",
-        "pincode": "400050",
         "about": "Small studio, mostly rental-friendly interiors for young couples.",
         "businessName": "Anaya Verma Design",
         "businessType": "service_provider",
@@ -939,9 +963,14 @@
           "Rental interiors"
         ],
         "targetAreas": [
-          "Mumbai",
-          "Andheri, Mumbai",
-          "Bandra, Mumbai"
+          {
+            "state": "Maharashtra",
+            "cities": [
+              "Mumbai",
+              "Andheri",
+              "Bandra"
+            ]
+          }
         ],
         "updatedBy": "Anaya Verma",
         "updatedAt": "2026-07-04T10:15:00+05:30"
@@ -983,9 +1012,6 @@
         "profileStatus": "published",
         "displayName": "K. Iyer Interior Co.",
         "username": "k-iyer-interior",
-        "city": "Chennai",
-        "state": "Tamil Nadu",
-        "pincode": "600017",
         "about": "Residential interiors, twenty years in T. Nagar.",
         "businessName": "K. Iyer Interior Co.",
         "businessType": "service_provider",
@@ -1001,8 +1027,12 @@
           "Renovation & remodelling"
         ],
         "targetAreas": [
-          "Chennai",
-          "Tamil Nadu"
+          {
+            "state": "Tamil Nadu",
+            "cities": [
+              "Chennai"
+            ]
+          }
         ],
         "updatedBy": "D. Kapoor",
         "updatedAt": "2026-06-11T16:20:00+05:30"
@@ -1050,9 +1080,6 @@
         "profileStatus": "published",
         "displayName": "Craftline Carpentry",
         "username": "craftline-carpentry",
-        "city": "Bengaluru",
-        "state": "Karnataka",
-        "pincode": "560058",
         "about": "Contract carpentry for builders and design studios.",
         "businessName": "Craftline Carpentry",
         "businessType": "contractor",
@@ -1069,7 +1096,12 @@
           "Modular kitchen"
         ],
         "targetAreas": [
-          "Bengaluru"
+          {
+            "state": "Karnataka",
+            "cities": [
+              "Bengaluru"
+            ]
+          }
         ],
         "updatedBy": "D. Kapoor",
         "updatedAt": "2026-05-02T09:30:00+05:30"
@@ -1123,9 +1155,6 @@
         "profileStatus": "published",
         "displayName": "Fernandes Interiors",
         "username": "fernandes-interiors",
-        "city": "Pune",
-        "state": "Maharashtra",
-        "pincode": "411001",
         "about": "Independent designer, residential only.",
         "businessName": "Fernandes Interiors",
         "businessType": "service_provider",
@@ -1140,8 +1169,13 @@
           "Complete home interiors"
         ],
         "targetAreas": [
-          "Pune",
-          "Baner, Pune"
+          {
+            "state": "Maharashtra",
+            "cities": [
+              "Pune",
+              "Baner"
+            ]
+          }
         ],
         "updatedBy": "Fernandes Interiors",
         "updatedAt": "2025-12-01T10:00:00+05:30"
@@ -1187,9 +1221,6 @@
         "profileStatus": "published",
         "displayName": "Saloni Interiors",
         "username": "saloni-interiors",
-        "city": "Mumbai",
-        "state": "Maharashtra",
-        "pincode": "400076",
         "about": "Apartment interiors and small commercial spaces in central Mumbai.",
         "businessName": "Saloni Interiors",
         "businessType": "service_provider",
@@ -1206,8 +1237,13 @@
           "Office fit-out"
         ],
         "targetAreas": [
-          "Delhi NCR",
-          "Saket, Delhi"
+          {
+            "state": "Delhi",
+            "cities": [
+              "New Delhi",
+              "Saket"
+            ]
+          }
         ],
         "updatedBy": "Saloni Interiors",
         "updatedAt": "2026-03-01T11:20:00+05:30"
@@ -1257,9 +1293,6 @@
         "profileStatus": "published",
         "displayName": "Kulkarni & Sons",
         "username": "kulkarni-and-sons",
-        "city": "Pune",
-        "state": "Maharashtra",
-        "pincode": "411038",
         "about": "Family furniture business, three generations in Kothrud.",
         "businessName": "Kulkarni & Sons",
         "businessType": "contractor",
@@ -1276,8 +1309,12 @@
           "Wardrobe design"
         ],
         "targetAreas": [
-          "Pune",
-          "Maharashtra"
+          {
+            "state": "Maharashtra",
+            "cities": [
+              "Pune"
+            ]
+          }
         ],
         "updatedBy": "Kulkarni & Sons",
         "updatedAt": "2025-11-10T13:00:00+05:30"
@@ -1323,9 +1360,6 @@
         "profileStatus": "hidden",
         "displayName": "Founder demo account",
         "username": null,
-        "city": "Bengaluru",
-        "state": "Karnataka",
-        "pincode": null,
         "about": "Internal account used for walkthroughs. Not a customer.",
         "businessName": null,
         "businessType": null,
