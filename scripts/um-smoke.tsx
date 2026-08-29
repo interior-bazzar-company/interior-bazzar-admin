@@ -463,7 +463,7 @@ check("edit profile · incomplete", () => modal(
        state picker and a city picker of its own. */
     const shells = (full.match(/class="um-facet"/g) || []).length;
     const expect = fieldsFor(memberRow)
-      .filter((f) => ["single", "multi", "tags"].indexOf(f.type) >= 0).length
+      .filter((f) => ["single", "multi", "tags"].indexOf(f.type) >= 0 && !f.simple).length
       + memberRow.user.profile.targetAreas.length * 2;
     if (shells !== expect) throw new Error(shells + " pickers, expected " + expect);
     return full;
@@ -496,9 +496,12 @@ check("edit profile · incomplete", () => modal(
     if (full.indexOf(want) < 0) throw new Error("no counter reading " + want);
     return full;
   });
-  check("facets · a single facet shows one chip and a way to change it", () => {
-    if (full.indexOf("Service provider") < 0) throw new Error("business type not shown");
-    if (full.indexOf(">Change<") < 0) throw new Error("no way to change it");
+  check("facets · a stored single arrives selected, or as a chip with Change", () => {
+    /* Business type is a plain select now — its stored answer arrives as the
+       selected option. The picker-rendered singles (each area row's state)
+       still collapse to a chip plus Change. */
+    if (full.indexOf('selected=""') < 0) throw new Error("the stored type is not selected");
+    if (full.indexOf(">Change<") < 0) throw new Error("no collapsed single offers Change");
     return full;
   });
   /* The listbox exists only while it is open, and there is no browser here to
@@ -546,6 +549,32 @@ check("edit profile · incomplete", () => modal(
       throw new Error("the city half of a row has been closed off");
     return empty;
   });
+  check("business type · a plain dropdown, its meanings behind the i", () => {
+    /* The hint sentence left the field and the option rows — that is the
+       simplification — and the i button is where it went. Absence asserted
+       on the flow, presence on the vocabulary (check:users) and the button. */
+    if (full.indexOf("What kind of business this is") >= 0)
+      throw new Error("the field hint is still under the control");
+    if (full.indexOf("Authorised to sell named brands") >= 0)
+      throw new Error("option hints are still inline in the flow");
+    if (full.indexOf(">Manufacturer<") < 0)
+      throw new Error("the dropdown lost its options");
+    if (full.indexOf(">Service provider<") >= 0)
+      throw new Error("Service provider is still on offer");
+    const infos = (full.match(/class="um-info-b"/g) || []).length;
+    if (infos < 2) throw new Error("expected an i button on Business type AND Categories, found " + infos);
+    return full;
+  });
+  check("deals in · two checkboxes, one or both", () => {
+    const boxes = (full.match(/type="checkbox"/g) || []).length;
+    if (boxes !== 2) throw new Error(boxes + " checkboxes, expected exactly 2");
+    if (full.indexOf(">Products<") < 0 || full.indexOf(">Services<") < 0)
+      throw new Error("the two options are not Products and Services");
+    /* IB-U-0912 deals in services — the seeded answer must arrive checked. */
+    if (full.indexOf('checked=""') < 0) throw new Error("the stored answer is not checked");
+    return full;
+  });
+
   /* ------------------------------------------- the username and the URL --- */
   check("username · the field is an address, not a text box", () => {
     /* The host is in the control, the URL is spelled out under it, and the
@@ -626,16 +655,20 @@ check("edit profile · incomplete", () => modal(
     return full;
   });
 
-  check("chips · each facet wears its declared tone, on the form and the record", () => {
+  check("chips · each facet wears its declared tone wherever chips render", () => {
     /* The colour is information — "which question is this the answer to" —
-       so it has to be the SAME colour in both places, and it has to actually
-       reach the markup: a tone the component forgets to append falls back to
-       brand tint with no error anywhere. */
+       and it has to actually reach the markup: a tone the component forgets
+       to append falls back to brand tint with no error anywhere. The record
+       always renders chips; the form only where the control IS a chip
+       control — a simple select and a checkbox pair show their value as
+       themselves. */
     const rec = at("/users/IB-U-0912?tab=profile");
     fieldsFor(memberRow).filter((f) => f.chip).forEach((f) => {
       const want = "um-chip " + f.chip;
-      if (full.indexOf(want) < 0) throw new Error(f.key + " chips lost " + f.chip + " on the form");
       if (rec.indexOf(want) < 0) throw new Error(f.key + " chips lost " + f.chip + " on the record");
+      const formChips = ["multi", "tags", "areas"].indexOf(f.type) >= 0;
+      if (formChips && full.indexOf(want) < 0)
+        throw new Error(f.key + " chips lost " + f.chip + " on the form");
     });
     return full;
   });

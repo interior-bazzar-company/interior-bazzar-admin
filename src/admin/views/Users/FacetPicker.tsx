@@ -226,7 +226,9 @@ export default function FacetPicker({ f, values, onChange, disabled, options: gi
           onMouseEnter={() => setActive(i)} onMouseDown={(e) => e.preventDefault()}
           onClick={() => commit(r.key)}>
           <span className="l">{r.label}</span>
-          {r.hint ? <em>{r.hint}</em> : null}
+          {/* A field with an i button keeps its dropdown simple — the
+              sentences live in the info panel, not on every row. */}
+          {r.hint && !f.info ? <em>{r.hint}</em> : null}
         </li>
       );
     };

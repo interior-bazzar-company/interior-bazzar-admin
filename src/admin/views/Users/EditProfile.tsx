@@ -34,9 +34,11 @@ import { Icon, Notice } from "../../ui";
 import { Completeness } from "./bits";
 import AreaRows from "./AreaRows";
 import FacetPicker from "./FacetPicker";
+import InfoTip from "./InfoTip";
 import HandleField from "./HandleField";
 import {
-  PROFILE_SCHEMA_VERSION, completenessOf, fieldsFor, updateProfile, usernameTaken, validateFacets,
+  PROFILE_SCHEMA_VERSION, completenessOf, fieldsFor, optionsFor, updateProfile, usernameTaken,
+  validateFacets,
 } from "./store";
 import type { ProfileField, TargetArea, UserProfile, UserRow } from "./store";
 
@@ -49,14 +51,16 @@ const GROUPS = [
 
 /** A field holds a list when the schema says so — never because the value
  *  happens to be an array today. */
-const isList = (f: ProfileField) => f.type === "multi" || f.type === "tags";
+const isList = (f: ProfileField) =>
+  f.type === "multi" || f.type === "tags" || f.type === "checks";
 /** Fields that take the full row. A SINGLE facet is deliberately not one of
  *  them any more: its popup is absolutely positioned, so it overlays the
  *  neighbour instead of needing the width — and giving every single a full
  *  row is what made State, City and Pincode read as three separate thoughts.
  *  Textareas and chip-bearing fields genuinely use the width. */
 const isWide = (f: ProfileField) =>
-  isList(f) || f.type === "handle" || f.type === "textarea" || f.type === "areas";
+  (isList(f) && f.type !== "checks")
+  || f.type === "handle" || f.type === "textarea" || f.type === "areas";
 
 type Draft = Record<string, string | string[] | TargetArea[]>;
 
@@ -163,11 +167,46 @@ export default function EditProfile({ row, onClose, onDone }: {
           onChange={(e) => set(f.key, e.target.value)} />
       );
     }
+    if (f.type === "checks") {
+      /* One or both, never a dropdown: two options that can combine are two
+         checkboxes, and hiding them behind a picker adds a press to see what
+         was never worth hiding. */
+      const vals = (draft[f.key] as string[]) || [];
+      return (
+        <div className="um-checks" role="group" aria-label={f.label}>
+          {optionsFor(f).map((o) => {
+            const on = vals.indexOf(o.key) >= 0;
+            return (
+              <label key={o.key} className={"um-check" + (on ? " on" : "")}>
+                <input type="checkbox" checked={on} disabled={!f.editable}
+                  onChange={() => set(f.key,
+                    on ? vals.filter((v) => v !== o.key) : vals.concat([o.key]))} />
+                <span>{o.label}</span>
+              </label>
+            );
+          })}
+        </div>
+      );
+    }
+    if (f.type === "single" && f.simple) {
+      /* A plain dropdown. The option meanings moved behind the i button next
+         to the label, so the rows do not need a search box or hint lines —
+         six words pick faster than six sentences. */
+      const v = String(draft[f.key] || "");
+      return (
+        <div className={"selectbox" + (v ? " on" : "")}>
+          <select value={v} disabled={!f.editable}
+            aria-label={f.label}
+            onChange={(e) => set(f.key, e.target.value)}>
+            <option value="">Choose…</option>
+            {optionsFor(f).map((o) => (
+              <option key={o.key} value={o.key}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+      );
+    }
     if (f.type === "single") {
-      /* A single facet is still a picker rather than a <select>: the options
-         carry a sentence saying what each one means, and a native option list
-         has nowhere to put it. Choosing "Dealer" over "Retailer" is a
-         distinction somebody needs told, not one they should have to know. */
       return (
         <FacetPicker f={f} disabled={!f.editable}
           values={draft[f.key] ? [String(draft[f.key])] : []}
@@ -226,6 +265,7 @@ export default function EditProfile({ row, onClose, onDone }: {
                     <span className="fg-lb">
                       {f.label}
                       {f.required ? <span className="req"> *</span> : null}
+                      {f.info ? <InfoTip f={f} /> : null}
                       <em className={"um-vis " + (f.public ? "pub" : "int")}>
                         {f.public ? "public" : "internal"}
                       </em>

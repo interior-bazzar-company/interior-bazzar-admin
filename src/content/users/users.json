@@ -28,7 +28,10 @@
         "username": "priya-nair-studio",
         "about": "Independent stylist taking on residential projects across east Bengaluru.",
         "businessName": "Priya Nair Studio",
-        "businessType": "service_provider",
+        "businessType": "independent",
+        "dealsIn": [
+          "services"
+        ],
         "segments": [
           "interior_designer",
           "interior_decorator"
@@ -105,6 +108,9 @@
         "about": null,
         "businessName": "Bhat Carpentry Works",
         "businessType": "contractor",
+        "dealsIn": [
+          "services"
+        ],
         "segments": [
           "carpentry"
         ],
@@ -164,6 +170,7 @@
         "about": null,
         "businessName": null,
         "businessType": null,
+        "dealsIn": [],
         "segments": [],
         "categories": [],
         "searchKeywords": [],
@@ -211,6 +218,9 @@
         "about": "Turnkey residential fit-out, mostly 2 and 3 BHK redevelopments.",
         "businessName": "Desai Interiors",
         "businessType": "contractor",
+        "dealsIn": [
+          "services"
+        ],
         "segments": [
           "civil_contractor",
           "pmc"
@@ -288,6 +298,10 @@
         "about": "Factory-finished modular kitchens and wardrobes, installed in eleven days.",
         "businessName": "Verve Modular Pvt Ltd",
         "businessType": "manufacturer",
+        "dealsIn": [
+          "products",
+          "services"
+        ],
         "segments": [
           "modular_kitchen",
           "furniture"
@@ -377,6 +391,9 @@
         "about": "Curtains, upholstery and soft furnishing for homes and boutique hotels.",
         "businessName": "Sunlight Furnishings LLP",
         "businessType": "retailer",
+        "dealsIn": [
+          "products"
+        ],
         "segments": [
           "furnishing",
           "furniture"
@@ -454,7 +471,10 @@
         "username": "tara-design-collective",
         "about": "A four-person studio doing heritage-sensitive residential interiors.",
         "businessName": "Tara Design Collective",
-        "businessType": "service_provider",
+        "businessType": "independent",
+        "dealsIn": [
+          "services"
+        ],
         "segments": [
           "interior_designer",
           "architect"
@@ -518,6 +538,9 @@
         "about": "Plywood, laminates and hardware supply to the trade since 1994.",
         "businessName": "Bhatia Ply & Hardware",
         "businessType": "dealer",
+        "dealsIn": [
+          "products"
+        ],
         "segments": [
           "ply_hardware",
           "tiles_sanitary"
@@ -593,7 +616,10 @@
         "username": "meera-studio-interiors",
         "about": "Full-service interior design studio serving Bengaluru since 2019. Residential and commercial fit-out, in-house carpentry.",
         "businessName": "Meera Studio Interiors LLP",
-        "businessType": "service_provider",
+        "businessType": "contractor",
+        "dealsIn": [
+          "services"
+        ],
         "segments": [
           "interior_designer",
           "visualiser_3d",
@@ -682,7 +708,10 @@
         "username": "lokesh-interiors",
         "about": "Two-person outfit doing apartment interiors around Infopark.",
         "businessName": "Lokesh Interiors",
-        "businessType": "service_provider",
+        "businessType": "contractor",
+        "dealsIn": [
+          "services"
+        ],
         "segments": [
           "interior_designer"
         ],
@@ -744,6 +773,9 @@
         "about": "Solid-wood furniture and site carpentry. Own workshop, twelve carpenters.",
         "businessName": "R. Menon Woodworks",
         "businessType": "contractor",
+        "dealsIn": [
+          "services"
+        ],
         "segments": [
           "carpentry",
           "furniture"
@@ -816,6 +848,9 @@
         "about": "False ceiling, cove lighting and acoustic panelling for offices.",
         "businessName": "Zenith Ceilings",
         "businessType": "contractor",
+        "dealsIn": [
+          "services"
+        ],
         "segments": [
           "false_ceiling",
           "mep"
@@ -880,6 +915,9 @@
         "about": "Residential interiors and renovation across west Delhi.",
         "businessName": "Sharma Interiors",
         "businessType": "contractor",
+        "dealsIn": [
+          "services"
+        ],
         "segments": [
           "civil_contractor"
         ],
@@ -948,7 +986,10 @@
         "username": "anaya-verma-design",
         "about": "Small studio, mostly rental-friendly interiors for young couples.",
         "businessName": "Anaya Verma Design",
-        "businessType": "service_provider",
+        "businessType": "independent",
+        "dealsIn": [
+          "services"
+        ],
         "segments": [
           "interior_designer",
           "interior_decorator"
@@ -1014,7 +1055,10 @@
         "username": "k-iyer-interior",
         "about": "Residential interiors, twenty years in T. Nagar.",
         "businessName": "K. Iyer Interior Co.",
-        "businessType": "service_provider",
+        "businessType": "contractor",
+        "dealsIn": [
+          "services"
+        ],
         "segments": [
           "interior_designer"
         ],
@@ -1083,6 +1127,9 @@
         "about": "Contract carpentry for builders and design studios.",
         "businessName": "Craftline Carpentry",
         "businessType": "contractor",
+        "dealsIn": [
+          "services"
+        ],
         "segments": [
           "carpentry",
           "modular_kitchen"
@@ -1157,7 +1204,10 @@
         "username": "fernandes-interiors",
         "about": "Independent designer, residential only.",
         "businessName": "Fernandes Interiors",
-        "businessType": "service_provider",
+        "businessType": "independent",
+        "dealsIn": [
+          "services"
+        ],
         "segments": [
           "interior_designer"
         ],
@@ -1223,7 +1273,10 @@
         "username": "saloni-interiors",
         "about": "Apartment interiors and small commercial spaces in central Mumbai.",
         "businessName": "Saloni Interiors",
-        "businessType": "service_provider",
+        "businessType": "contractor",
+        "dealsIn": [
+          "services"
+        ],
         "segments": [
           "interior_designer"
         ],
@@ -1296,6 +1349,9 @@
         "about": "Family furniture business, three generations in Kothrud.",
         "businessName": "Kulkarni & Sons",
         "businessType": "contractor",
+        "dealsIn": [
+          "services"
+        ],
         "segments": [
           "carpentry",
           "furniture"
@@ -1363,6 +1419,7 @@
         "about": "Internal account used for walkthroughs. Not a customer.",
         "businessName": null,
         "businessType": null,
+        "dealsIn": [],
         "segments": [],
         "categories": [],
         "searchKeywords": [],

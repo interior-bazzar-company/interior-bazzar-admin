@@ -6,6 +6,80 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-29
 
+### Business type simplifies to a dropdown; Deals in takes over "what do you sell"
+
+**Area:** the Business profile group in Edit profile
+**Files:** `InfoTip.tsx` (new), `EditProfile.tsx`, `FacetPicker.tsx`,
+`store.ts`, `vocabularies.json`, `users.json`, `users.css`,
+`scripts/um-smoke.tsx`, `scripts/check-users-derivation.cjs`,
+`BACKEND-INTEGRATION.md`
+
+**What changed**
+
+**Service provider is removed, and `dealsIn` is the axis that replaced it.**
+"What kind of entity is this" and "what do you sell" were tangled in one list:
+a design-build firm typed as *Service provider* says nothing that
+*Contractor + services* does not say better, and a type that repeats another
+facet's answer gets picked instead of the real one. Six types remain —
+Contractor, Independent professional, Manufacturer, Dealer, Retailer,
+Wholesaler — and the selling question is its own field:
+
+**Deals in: Products / Services — checkboxes, one or both, never neither.**
+Two options that can combine are two checkboxes; a dropdown would hide what
+was never worth hiding. Required with the rest of the business profile,
+closed to exactly those two keys, refusing duplicates.
+
+**Business type is a plain dropdown now, and the meanings moved behind an
+i button.** The field hint under the control and the sentence on every
+option row were the right information at the wrong volume — always on
+screen, mostly already known. `InfoTip` puts them one press away, exactly
+when somebody is unsure: a BUTTON with a dropdown panel rather than a hover
+tooltip, because this is reference text and hover tips vanish mid-read, skip
+touch, and skip keyboard focus half the time. Categories got the same
+treatment — hint line removed, i button added, its option rows cleaned of
+inline sentences (the grouped panel shows them, group headings intact).
+
+All of it is schema-driven, three new field flags: `simple` (plain dropdown),
+`info` (i button), and the `checks` type — so the next field that wants any
+of this is a JSON row, not a component.
+
+**Temp data**
+
+`vocabularies.json` — `service_provider` deleted, `dealsIn[]` added, three
+flags on two fields. `users.json` — the eight `service_provider` profiles
+remapped: `contractor` where the profile holds an execution scope (turnkey /
+design & build / execution only), `independent` otherwise; `dealsIn` seeded
+from the type, with both values where a maker also executes (Verve Modular).
+**The incomplete set did not move** — dealsIn was seeded wherever the other
+required business fields already were, and the suite asserts it.
+
+**Backend needed**
+
+`dealsIn[]` on the profile payload and in the vocabularies; UM-T07 refuses an
+unknown kind, an empty list on a business profile, and duplicates. The
+`service_provider` key must not be accepted from old clients — refuse, do not
+coerce.
+
+**Open decisions**
+
+None new.
+
+**Verified**
+
+`tsc -b`, `eslint`, `vite build` green. `check:users` 243 → 255,
+`check:users-render` 113 → 115. Asserted: the type is gone from the
+vocabulary AND the seed, the six that remain are named, all five dealsIn
+rules, the seeded checkbox arriving checked, the hint sentences absent from
+the form flow, no Service provider option on offer, and two i buttons.
+
+**Still not verified:** the i panel opens on press, closes on Escape and
+outside click — stateful behaviour SSR cannot exercise. The checkbox tiles
+and the panel's position over the form below it are browser judgements.
+
+---
+
+## 2026-08-29
+
 ### Target areas become the location: state rows with open city lists
 
 **Area:** the profile's location model, the Edit profile contact group

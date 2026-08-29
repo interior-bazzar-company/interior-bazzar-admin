@@ -511,7 +511,7 @@ S.resetStore();
      stylesheet knows, and every facet that renders chips declares one. A tone
      the CSS does not restate silently falls back to brand tint — wrong colour,
      no error. */
-  const KNOWN_TONES = ["tag-violet", "tag-green", "tag-blue", "tag-amber", "tag-teal", "tag-slate"];
+  const KNOWN_TONES = ["tag-violet", "tag-green", "tag-blue", "tag-amber", "tag-teal", "tag-slate", "tag-pink"];
   const chipped = S.PROFILE_FIELDS.filter((f) => f.chip);
   ok("every declared chip tone is one the stylesheet restates",
     chipped.filter((f) => KNOWN_TONES.indexOf(f.chip) < 0).map((f) => f.key), []);
@@ -601,7 +601,8 @@ S.resetStore();
     JSON.stringify(S.readUsers().filter((u) => u.userId === "IB-U-0912")[0].profile), before);
   ok("a valid facet patch is accepted",
     S.updateProfile("IB-U-0912", {
-      businessType: "service_provider",
+      businessType: "contractor",
+      dealsIn: ["services"],
       segments: ["interior_designer", "architect"],
       categories: ["turnkey", "commercial"],
       searchKeywords: ["Office fit-out", "Complete home interiors"],
@@ -758,6 +759,44 @@ S.resetStore();
       .indexOf("belongs to another profile") >= 0, true);
   ok("...and a free one goes through",
     S.updateProfile("IB-U-1041", { username: "priya-nair-design" }), "");
+}
+
+console.log("\nService provider is gone, and dealsIn is the axis that replaced it");
+S.resetStore();
+{
+  /* "What do you sell" is dealsIn's question now. A type that repeats another
+     facet's answer gets picked instead of the real one — a design-build firm
+     typed as "Service provider" says nothing "Contractor + services" does not
+     say better. */
+  ok("service_provider is not a business type",
+    S.BUSINESS_TYPES.some((t) => t.key === "service_provider"), false);
+  ok("...and no seeded profile still carries it",
+    S.readUsers().filter((u) => u.profile.businessType === "service_provider")
+      .map((u) => u.userId), []);
+  ok("six types remain",
+    S.BUSINESS_TYPES.map((t) => t.key),
+    ["contractor", "independent", "manufacturer", "dealer", "retailer", "wholesaler"]);
+
+  const bad = (patch) => S.validateFacets(patch) !== "";
+  ok("products alone is fine", bad({ dealsIn: ["products"] }), false);
+  ok("services alone is fine", bad({ dealsIn: ["services"] }), false);
+  ok("both together is fine", bad({ dealsIn: ["products", "services"] }), false);
+  ok("an invented deal kind is not", bad({ dealsIn: ["dreams"] }), true);
+  ok("the same one twice is not", bad({ dealsIn: ["products", "products"] }), true);
+
+  const users = S.readUsers();
+  ok("dealsIn travels with the business profile, like the other required facets",
+    users.filter((u) => !!u.profile.businessName !== (u.profile.dealsIn.length > 0))
+      .map((u) => u.userId), []);
+  ok("...and every value in the seed is one of the two",
+    users.filter((u) => u.profile.dealsIn.some((k) => ["products", "services"].indexOf(k) < 0))
+      .map((u) => u.userId), []);
+  ok("the maker who also installs deals in both",
+    S.readUsers().filter((u) => u.userId === "IB-U-0975")[0].profile.dealsIn,
+    ["products", "services"]);
+  /* Still exactly two incomplete — dealsIn was seeded wherever the other
+     required business fields already were, so nobody moved. */
+  ok("the incomplete set did not move again", S.countsOf(all).incompleteProfiles, 2);
 }
 
 console.log("\nkeys are stored, labels are shown");

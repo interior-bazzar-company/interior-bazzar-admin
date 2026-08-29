@@ -532,6 +532,7 @@
 .um-chip.pill.tag-amber  { background: var(--tag-amber-bg);  color: var(--tag-amber);  border-color: var(--tag-amber-line) }
 .um-chip.pill.tag-teal   { background: var(--tag-teal-bg);   color: var(--tag-teal);   border-color: var(--tag-teal-line) }
 .um-chip.pill.tag-slate  { background: var(--tag-slate-bg);  color: var(--tag-slate);  border-color: var(--tag-slate-line) }
+.um-chip.pill.tag-pink   { background: var(--tag-pink-bg);   color: var(--tag-pink);   border-color: var(--tag-pink-line) }
 /* The stale case keeps its warning colours, and it comes LAST so it wins over
    every tone — a value the vocabulary dropped must not wear the colours of a
    value it still has. */
@@ -611,6 +612,55 @@
 /* The record's read-only rows: one line per state, wrapped, quiet. */
 .um-areas-ro { display: flex; flex-direction: column; gap: var(--space-2) }
 .um-areas-ro .um-chips { margin-bottom: 0 }
+
+/* --------------------------------------------- the i button and panel --- */
+/* A button with a dropdown, not a hover tooltip: this is reference text, and
+   hover tips vanish mid-read, skip touch, and skip keyboard half the time. */
+.um-info { position: relative; display: inline-flex }
+.um-info-b {
+  display: grid; place-items: center; width: 16px; height: 16px;
+  border: 1px solid var(--line-2); border-radius: var(--radius-full);
+  background: var(--bg); color: var(--text-3); cursor: pointer;
+  font-size: 10px; font-style: italic; font-weight: var(--weight-semibold);
+  font-family: Georgia, serif; line-height: 1;
+}
+.um-info-b:hover, .um-info-b[aria-expanded="true"] {
+  border-color: var(--brand-line); background: var(--brand-tint); color: var(--brand-text);
+}
+.um-info-pop {
+  position: absolute; z-index: 45; top: calc(100% + 6px); left: -8px;
+  width: min(340px, 70vw); max-height: 300px; overflow-y: auto;
+  padding: var(--space-3);
+  background: var(--surface-raised); border: 1px solid var(--line-2);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+  font-weight: var(--weight-normal); text-transform: none; letter-spacing: 0;
+}
+.um-info-g {
+  font-size: var(--text-2xs); letter-spacing: .08em; text-transform: uppercase;
+  font-weight: var(--weight-semibold); color: var(--text-3);
+  margin: var(--space-2) 0 var(--space-1);
+}
+.um-info-pop > div:first-child .um-info-g { margin-top: 0 }
+.um-info-row { display: flex; flex-direction: column; gap: 1px; padding: var(--space-1) 0 }
+.um-info-row b { font-size: var(--text-md); font-weight: var(--weight-medium); color: var(--text) }
+.um-info-row span { font-size: var(--text-sm); line-height: var(--lh-md); color: var(--text-2) }
+
+/* ---------------------------------------------------- deals-in checks --- */
+/* Two options that can combine are two checkboxes — a picker would hide what
+   was never worth hiding. Tiles, so the pressed state has somewhere to go. */
+.um-checks { display: flex; gap: var(--space-2) }
+.um-check {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  height: var(--control-lg); padding: 0 var(--space-3);
+  background: var(--surface-raised); border: 1px solid var(--line-2);
+  border-radius: var(--radius-md); cursor: pointer;
+  font-size: var(--text-base);
+}
+.um-check:hover { border-color: var(--line-control) }
+.um-check.on { background: var(--brand-tint); border-color: var(--brand-line);
+               color: var(--brand-text) }
+.um-check input { accent-color: var(--brand); margin: 0 }
+.um-check input:disabled { cursor: default }
 
 @media print {
   .um-views, .um-proto, .um-actions, .um-idbar .btn { display: none }

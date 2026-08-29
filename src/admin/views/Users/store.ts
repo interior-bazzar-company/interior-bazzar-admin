@@ -234,6 +234,14 @@ export interface ProfileField {
   /** `areas` only: most state rows, and most cities inside one row. */
   maxRows?: number;
   maxCities?: number;
+  /** `single` only: render a plain dropdown instead of the picker. For a
+   *  short closed list whose options explain themselves — or explain
+   *  themselves behind `info` — the picker's search box is ceremony. */
+  simple?: boolean;
+  /** Put an i button beside the label that drops down the option meanings.
+   *  This is where hints GO when a control is made simple: the sentences
+   *  leave the flow, they do not leave the product. */
+  info?: boolean;
   /** The chip tone for this facet, one of the theme's `tag-*` classes.
    *  COLOUR-BY-FACET: every chip of one facet shares one colour, on the form
    *  and on the record, so the colour answers "which question is this the
@@ -260,6 +268,7 @@ const VOCABS: Record<string, FacetOption[]> = {
     .map((k) => ({ key: k, label: k })),
   states: vocabDoc.states as FacetOption[],
   cities: vocabDoc.cities as FacetOption[],
+  dealsIn: vocabDoc.dealsIn as FacetOption[],
 };
 
 /** The city SUGGESTIONS for one state's row. Open — the picker offers these
@@ -457,12 +466,12 @@ export function validateFacets(patch: Partial<UserProfile>): string {
       return;
     }
 
-    if (f.type === "multi" || f.type === "tags") {
+    if (f.type === "multi" || f.type === "tags" || f.type === "checks") {
       const list = Array.isArray(v) ? (v as string[]) : [];
       if (f.max && list.length > f.max) {
         bad.push(f.label + ": at most " + f.max + " (got " + list.length + ")");
       }
-      if (f.type === "multi" && !f.open) {
+      if ((f.type === "multi" || f.type === "checks") && !f.open) {
         /* A CLOSED LIST HAS TO ACTUALLY CLOSE. These facets are what the
            marketplace filters and ranks on; one unrecognised key is a profile
            that quietly stops appearing under anything. */
