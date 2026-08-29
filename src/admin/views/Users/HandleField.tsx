@@ -15,9 +15,10 @@
      free        say so, out loud, because the absence of an error is not
                  the same as confirmation and people re-check silence
 
-   The URL is shown even while the handle is invalid, greyed. Seeing the
-   address form up as you type is what makes it obvious that this field is the
-   address — a validation message under a text box teaches nobody that.
+   The host sits INSIDE the box as prefix text, so the field reads as the
+   address it is. It used to also print the full URL underneath — the same
+   string a second time, one line lower — and that was the clutter the host
+   prefix had already made unnecessary.
 
    COPY IS NOT AVAILABLE UNTIL THE HANDLE IS SAVED AND FREE. A copy button that
    hands somebody a link to a profile that does not exist yet is worse than no
@@ -53,7 +54,6 @@ export default function HandleField({ value, saved, userId, suggestFrom, disable
   /* Live only once it is the STORED value. Typing a valid handle does not put
      a page on the internet. */
   const live = !!saved && saved === v;
-  const url = profileUrl(v || "your-business");
 
   const suggestion = !v && suggestFrom ? slugify(suggestFrom) : "";
 
@@ -122,10 +122,6 @@ export default function HandleField({ value, saved, userId, suggestFrom, disable
         )}
       </p>
 
-      <p className={"um-handle-url" + (free ? "" : " off")}>
-        <Icon name="ext" size="sm" />
-        <span className="mono">{url}</span>
-      </p>
     </div>
   );
 }

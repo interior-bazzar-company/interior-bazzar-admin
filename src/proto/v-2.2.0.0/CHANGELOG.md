@@ -6,6 +6,28 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-29
 
+### The username field stops printing its URL twice
+
+**Area:** the Username field
+**Files:** `HandleField.tsx`, `users.css`
+
+**What changed**
+
+The full profile URL printed under the username box is gone. The host
+already sits inside the box as prefix text, so the line underneath was the
+same string a second time, one row lower — clutter the prefix had made
+unnecessary the day it arrived. Copy link still copies the full URL; the
+availability verdict still reads under the box.
+
+**Verified**
+
+`tsc`, `eslint`, both suites, `vite build` green; nothing asserted on that
+line, nothing to change.
+
+---
+
+## 2026-08-29
+
 ### Contractor returns, and the business types read as a chain
 
 **Area:** the Business type dropdown
