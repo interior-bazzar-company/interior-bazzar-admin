@@ -535,10 +535,12 @@ check("edit profile · incomplete", () => modal(
       if (!f) throw new Error("no field " + k);
       return f.type === "tags" || f.open === true;
     };
-    ["businessType", "segments", "categories"].forEach((k) => {
+    ["businessType", "segments"].forEach((k) => {
       if (isOpen(k)) throw new Error(k + " has been opened up");
     });
-    ["searchKeywords"].forEach((k) => {
+    /* Categories moved to the open side by request — industries are a set
+       nobody can finish enumerating either. */
+    ["searchKeywords", "categories"].forEach((k) => {
       if (!isOpen(k)) throw new Error(k + " has been closed off");
     });
     /* Target areas holds the split WITHIN itself now: a closed state half and
@@ -580,7 +582,7 @@ check("edit profile · incomplete", () => modal(
     if (full.indexOf("What kind of business this is") >= 0)
       throw new Error("the description is back in the flow");
     const infos = (full.match(/class="um-info-b"/g) || []).length;
-    if (infos < 2) throw new Error("expected an i button on Business type AND Categories, found " + infos);
+    if (infos < 1) throw new Error("no i button on Business type");
     return full;
   });
   check("deals in · two checkboxes, one or both", () => {
@@ -708,7 +710,7 @@ check("edit profile · incomplete", () => modal(
     const rec = at("/users/IB-U-0912?tab=profile");
     if (rec.indexOf("um-chips ro") < 0) throw new Error("record fell back to text");
     if (rec.indexOf("interior_designer") >= 0) throw new Error("a raw key is on the record");
-    if (rec.indexOf("Turnkey project") < 0) throw new Error("categories missing from the record");
+    if (rec.indexOf("Home decor") < 0) throw new Error("categories missing from the record");
     return rec;
   });
 }

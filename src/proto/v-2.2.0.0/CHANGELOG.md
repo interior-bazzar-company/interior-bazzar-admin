@@ -6,6 +6,58 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-29
 
+### Categories become industries, and open
+
+**Area:** the Categories field
+**Files:** `vocabularies.json`, `users.json`,
+`scripts/check-users-derivation.cjs`, `scripts/um-smoke.tsx`,
+`BACKEND-INTEGRATION.md`
+
+**What changed**
+
+**Delivery model is gone** — Turnkey / Design & build / Design only /
+Execution only / Consultation / Supply only. It was a third axis the form
+was carrying under a heading that did not say so, and with Deals in
+carrying "sells work", it had stopped earning its space.
+
+**Categories are industries now**, twenty-six of them: sanitaryware & bath
+fittings, home security & CCTV, lighting, flooring & tiles, marble & stone,
+kitchen & appliances, wardrobes, furniture, mattresses, paints, wallpaper,
+curtains, decor, false ceiling, doors & windows, glass & aluminium, plywood
+& laminates, hardware, electricals, plumbing, HVAC, smart home, solar, water
+treatment, fire safety, landscaping — under an **Industry** heading, with
+the seven **Sector** entries (Residential, Commercial …) kept beneath.
+
+**And the list is open.** Type an industry nobody listed, press Enter, it
+is a category — stored as typed, shown as typed, never coerced. Industries
+are a set nobody finishes enumerating; the list is a suggestion. Cap raised
+to ten. The i button came off, since industries name themselves.
+
+**Temp data**
+
+`users.json` — delivery keys removed from every profile; industries derived
+from the segments each profile already claims (modular kitchen → kitchen,
+wardrobes; MEP → electricals, plumbing, HVAC …) so the seed keeps saying the
+same thing in the new vocabulary rather than going blank.
+
+**Backend needed**
+
+`categories[]` accepts values outside `categories[]` — accept, trim,
+de-duplicate case-insensitively, do not coerce. The doc is updated.
+
+**Verified**
+
+`check:users` 265 → 267, `check:users-render` 116. No delivery key
+survives, sanitaryware and home security are present, a typed category is
+accepted and a duplicate refused, and the open/closed split assertion now
+lists categories on the open side.
+
+**Still not verified:** typing-then-Enter is the browser's to confirm.
+
+---
+
+## 2026-08-29
+
 ### The username field stops printing its URL twice
 
 **Area:** the Username field

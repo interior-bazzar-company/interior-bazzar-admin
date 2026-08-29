@@ -391,9 +391,10 @@
       "type": "multi",
       "vocab": "categories",
       "groups": "categoryGroups",
-      "max": 8,
+      "max": 10,
       "chip": "tag-blue",
-      "info": true
+      "open": true,
+      "maxLength": 40
     },
     {
       "key": "searchKeywords",
@@ -584,40 +585,134 @@
   ],
   "categories": [
     {
-      "key": "turnkey",
-      "label": "Turnkey project",
-      "group": "delivery",
-      "hint": "Design, supply and execution under one contract, handed over ready to use. One accountable party."
+      "key": "sanitaryware",
+      "label": "Sanitaryware & bath fittings",
+      "group": "industry"
     },
     {
-      "key": "design_build",
-      "label": "Design & build",
-      "group": "delivery",
-      "hint": "Design and execution together, but supply may sit with the customer."
+      "key": "home_security",
+      "label": "Home security & CCTV",
+      "group": "industry"
     },
     {
-      "key": "design_only",
-      "label": "Design only",
-      "group": "delivery",
-      "hint": "Drawings, specification and selection. Somebody else builds it."
+      "key": "lighting",
+      "label": "Lighting",
+      "group": "industry"
     },
     {
-      "key": "execution_only",
-      "label": "Execution only",
-      "group": "delivery",
-      "hint": "Builds to a design the customer already holds."
+      "key": "flooring_tiles",
+      "label": "Flooring & tiles",
+      "group": "industry"
     },
     {
-      "key": "consultation",
-      "label": "Consultation",
-      "group": "delivery",
-      "hint": "Advice, audits and site visits sold by the session or the report."
+      "key": "stone_marble",
+      "label": "Marble, granite & stone",
+      "group": "industry"
     },
     {
-      "key": "supply_only",
-      "label": "Supply only",
-      "group": "delivery",
-      "hint": "Material or product against an order. No site scope."
+      "key": "kitchen",
+      "label": "Kitchen & appliances",
+      "group": "industry"
+    },
+    {
+      "key": "wardrobes_storage",
+      "label": "Wardrobes & storage",
+      "group": "industry"
+    },
+    {
+      "key": "furniture",
+      "label": "Furniture",
+      "group": "industry"
+    },
+    {
+      "key": "mattresses",
+      "label": "Mattresses & bedding",
+      "group": "industry"
+    },
+    {
+      "key": "paints",
+      "label": "Paints & wall finishes",
+      "group": "industry"
+    },
+    {
+      "key": "wallpaper",
+      "label": "Wallpaper & wall panels",
+      "group": "industry"
+    },
+    {
+      "key": "curtains_blinds",
+      "label": "Curtains & blinds",
+      "group": "industry"
+    },
+    {
+      "key": "decor",
+      "label": "Home decor & accessories",
+      "group": "industry"
+    },
+    {
+      "key": "false_ceiling",
+      "label": "False ceiling & gypsum",
+      "group": "industry"
+    },
+    {
+      "key": "doors_windows",
+      "label": "Doors & windows",
+      "group": "industry"
+    },
+    {
+      "key": "glass_aluminium",
+      "label": "Glass & aluminium",
+      "group": "industry"
+    },
+    {
+      "key": "plywood_laminates",
+      "label": "Plywood & laminates",
+      "group": "industry"
+    },
+    {
+      "key": "hardware",
+      "label": "Hardware & fittings",
+      "group": "industry"
+    },
+    {
+      "key": "electricals",
+      "label": "Electricals & switches",
+      "group": "industry"
+    },
+    {
+      "key": "plumbing",
+      "label": "Plumbing",
+      "group": "industry"
+    },
+    {
+      "key": "hvac",
+      "label": "Air conditioning & HVAC",
+      "group": "industry"
+    },
+    {
+      "key": "smart_home",
+      "label": "Smart home & automation",
+      "group": "industry"
+    },
+    {
+      "key": "solar",
+      "label": "Solar & energy",
+      "group": "industry"
+    },
+    {
+      "key": "water",
+      "label": "Water purifiers & treatment",
+      "group": "industry"
+    },
+    {
+      "key": "fire_safety",
+      "label": "Fire safety",
+      "group": "industry"
+    },
+    {
+      "key": "landscaping",
+      "label": "Garden & landscaping",
+      "group": "industry"
     },
     {
       "key": "residential",
@@ -1094,14 +1189,14 @@
   ],
   "categoryGroups": [
     {
-      "key": "delivery",
-      "label": "Delivery model",
-      "note": "How much of the job you hold."
+      "key": "industry",
+      "label": "Industry",
+      "note": "What they sell or work in."
     },
     {
       "key": "sector",
       "label": "Sector",
-      "note": "What kind of space you work on."
+      "note": "What kind of space."
     }
   ],
   "keywordSuggestions": [

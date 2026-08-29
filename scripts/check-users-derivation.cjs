@@ -501,10 +501,14 @@ S.resetStore();
   ok("categories genuinely span both questions",
     S.CATEGORY_GROUPS.map((g) => S.CATEGORIES.filter((c) => c.group === g.key).length > 1),
     [true, true]);
-  /* Turnkey is the one everybody picks and the one most often meant loosely,
-     so it is the one that has to say what it commits you to. */
-  ok("the delivery models say what they commit you to",
-    S.CATEGORIES.filter((c) => c.group === "delivery" && !c.hint).map((c) => c.key), []);
+  /* Delivery model is gone: Turnkey / Design & build / Execution only were a
+     third axis nobody asked the form to carry. Categories are INDUSTRIES now,
+     plus the sector — and the list is open, so a category nobody listed is a
+     thing somebody types, not a thing the form refuses. */
+  ok("no delivery-model category survives",
+    S.CATEGORIES.filter((c) => c.group === "delivery").map((c) => c.key), []);
+  ok("the industries the request named are there",
+    ["sanitaryware", "home_security"].filter((k) => !S.CATEGORIES.some((c) => c.key === k)), []);
 
   /* COLOUR-BY-FACET. The chip tone is declared per FIELD and the CSS restates
      each used tone by name, so the contract is: every declared tone is one the
@@ -569,8 +573,13 @@ S.resetStore();
   ok("seven segments is over the cap of six",
     bad({ segments: S.SEGMENTS.slice(0, 7).map((s) => s.key) }), true);
   ok("six is not", bad({ segments: S.SEGMENTS.slice(0, 6).map((s) => s.key) }), false);
-  ok("real categories are fine", bad({ categories: ["turnkey", "residential"] }), false);
-  ok("an invented category is not", bad({ categories: ["spaceship"] }), true);
+  ok("real categories are fine", bad({ categories: ["sanitaryware", "residential"] }), false);
+  /* OPEN, by request: type it, press Enter, it is a category. The list is a
+     suggestion. What is still refused is the same value twice and a value
+     longer than a label. */
+  ok("a category nobody listed is accepted", bad({ categories: ["Pergola kits"] }), false);
+  ok("...but not twice", bad({ categories: ["Pergola kits", "pergola kits"] }), true);
+  ok("...and not at forty-one characters", bad({ categories: ["x".repeat(41)] }), true);
 
   /* Keywords are the ONE open facet, and openness is the point: matching is
      the job where the tail nobody enumerated is what people actually type. */
@@ -604,7 +613,7 @@ S.resetStore();
       businessType: "independent",
       dealsIn: ["services"],
       segments: ["interior_designer", "architect"],
-      categories: ["turnkey", "commercial"],
+      categories: ["lighting", "commercial"],
       searchKeywords: ["Office fit-out", "Complete home interiors"],
     }), "");
   ok("...and it is what came back",

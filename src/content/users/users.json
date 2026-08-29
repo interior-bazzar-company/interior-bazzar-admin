@@ -37,7 +37,8 @@
           "interior_decorator"
         ],
         "categories": [
-          "design_only",
+          "decor",
+          "curtains_blinds",
           "residential"
         ],
         "searchKeywords": [
@@ -115,7 +116,8 @@
           "carpentry"
         ],
         "categories": [
-          "execution_only",
+          "furniture",
+          "doors_windows",
           "residential"
         ],
         "searchKeywords": [],
@@ -226,7 +228,8 @@
           "pmc"
         ],
         "categories": [
-          "turnkey",
+          "stone_marble",
+          "false_ceiling",
           "residential",
           "commercial"
         ],
@@ -307,8 +310,9 @@
           "furniture"
         ],
         "categories": [
-          "supply_only",
-          "design_build",
+          "kitchen",
+          "wardrobes_storage",
+          "furniture",
           "residential"
         ],
         "searchKeywords": [
@@ -399,7 +403,9 @@
           "furniture"
         ],
         "categories": [
-          "supply_only",
+          "curtains_blinds",
+          "decor",
+          "furniture",
           "residential",
           "hospitality"
         ],
@@ -480,7 +486,8 @@
           "architect"
         ],
         "categories": [
-          "design_only",
+          "decor",
+          "doors_windows",
           "residential",
           "hospitality"
         ],
@@ -546,7 +553,10 @@
           "tiles_sanitary"
         ],
         "categories": [
-          "supply_only"
+          "plywood_laminates",
+          "hardware",
+          "flooring_tiles",
+          "sanitaryware"
         ],
         "searchKeywords": [
           "Plywood",
@@ -626,7 +636,7 @@
           "pmc"
         ],
         "categories": [
-          "turnkey",
+          "decor",
           "residential",
           "commercial"
         ],
@@ -716,7 +726,7 @@
           "interior_designer"
         ],
         "categories": [
-          "design_build",
+          "decor",
           "residential"
         ],
         "searchKeywords": [
@@ -781,7 +791,8 @@
           "furniture"
         ],
         "categories": [
-          "execution_only",
+          "furniture",
+          "doors_windows",
           "residential"
         ],
         "searchKeywords": [
@@ -856,7 +867,11 @@
           "mep"
         ],
         "categories": [
-          "execution_only",
+          "false_ceiling",
+          "lighting",
+          "electricals",
+          "plumbing",
+          "hvac",
           "commercial",
           "retail"
         ],
@@ -922,7 +937,8 @@
           "civil_contractor"
         ],
         "categories": [
-          "design_build",
+          "stone_marble",
+          "false_ceiling",
           "residential"
         ],
         "searchKeywords": [
@@ -995,8 +1011,8 @@
           "interior_decorator"
         ],
         "categories": [
-          "consultation",
-          "design_only",
+          "decor",
+          "curtains_blinds",
           "residential"
         ],
         "searchKeywords": [
@@ -1063,7 +1079,7 @@
           "interior_designer"
         ],
         "categories": [
-          "design_build",
+          "decor",
           "residential"
         ],
         "searchKeywords": [
@@ -1135,7 +1151,10 @@
           "modular_kitchen"
         ],
         "categories": [
-          "execution_only",
+          "furniture",
+          "doors_windows",
+          "kitchen",
+          "wardrobes_storage",
           "residential"
         ],
         "searchKeywords": [
@@ -1212,7 +1231,7 @@
           "interior_designer"
         ],
         "categories": [
-          "design_only",
+          "decor",
           "residential"
         ],
         "searchKeywords": [
@@ -1281,7 +1300,7 @@
           "interior_designer"
         ],
         "categories": [
-          "design_build",
+          "decor",
           "residential",
           "commercial"
         ],
@@ -1357,7 +1376,8 @@
           "furniture"
         ],
         "categories": [
-          "execution_only",
+          "furniture",
+          "doors_windows",
           "residential"
         ],
         "searchKeywords": [
