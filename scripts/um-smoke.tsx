@@ -589,6 +589,14 @@ check("edit profile · incomplete", () => modal(
     if (infos < 1) throw new Error("no i button on Business type");
     return full;
   });
+  check("one business group: name, address, about lead it; no Display name", () => {
+    const order = [">Business name", ">Username", ">About", ">Business type"].map((t) => full.indexOf(t));
+    if (order.some((i) => i < 0)) throw new Error("a leading field is missing");
+    if (order.some((i, k) => k > 0 && i < order[k - 1])) throw new Error("the business group is out of order");
+    if (full.indexOf(">Display name") >= 0) throw new Error("Display name survives");
+    if (full.indexOf(">Basic profile<") >= 0) throw new Error("an empty Basic profile group renders");
+    return full;
+  });
   check("business name takes the row, so Business type sits beneath it", () => {
     const i = full.indexOf(">Business name");
     const fg = full.lastIndexOf('<div class="fg', i);

@@ -6,6 +6,38 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-29
 
+### Display name goes; username and about join the Business group
+
+**Area:** the Edit profile form and the profile schema
+**Files:** `vocabularies.json`, `users.json`, `store.ts`, `EditProfile.tsx`,
+`scripts/check-users-derivation.cjs`, `scripts/um-smoke.tsx`
+
+**What changed**
+
+**Display name is removed** — from the form, the schema, the type, the
+search haystack and the seed. The identity's name is what every surface
+prints; a second, editable name beside it was a field waiting to disagree
+with the first.
+
+**Username and About move into Business profile**, which leaves Basic
+profile empty and gone. One business group now, reading top to bottom:
+Business name → Username → About → Business type → Deals in → Segments →
+Categories → Search keywords; then Target areas. The username sits under
+the business name it is suggested from.
+
+The incomplete set does not move: both profiles that lacked a business
+still lack one.
+
+**Verified**
+
+`check:users` 271, `check:users-render` 117 → 118. Order of the leading
+four asserted, Display name and an empty Basic group asserted absent, the
+value asserted gone from the seed.
+
+---
+
+## 2026-08-29
+
 ### Firm / Studio joins the business types
 
 **Area:** the Business type dropdown

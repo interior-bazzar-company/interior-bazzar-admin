@@ -52,7 +52,6 @@ import type { ProfileField, TargetArea, UserProfile, UserRow } from "./store";
    marketplace matches and ranks on") and the modal read as documentation with
    fields in it — the notes said things the fields already say. */
 const GROUPS = [
-  { key: "basic", label: "Basic profile" },
   { key: "business", label: "Business profile" },
   { key: "contact", label: "Target areas" },
 ];

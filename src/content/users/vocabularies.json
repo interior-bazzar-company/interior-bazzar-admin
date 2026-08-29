@@ -310,33 +310,6 @@
   ],
   "profileFields": [
     {
-      "key": "displayName",
-      "label": "Display name",
-      "group": "basic",
-      "required": true,
-      "editable": true,
-      "public": true,
-      "type": "text"
-    },
-    {
-      "key": "username",
-      "label": "Username",
-      "group": "basic",
-      "required": true,
-      "editable": true,
-      "public": true,
-      "type": "handle"
-    },
-    {
-      "key": "about",
-      "label": "About",
-      "group": "basic",
-      "required": false,
-      "editable": true,
-      "public": true,
-      "type": "textarea"
-    },
-    {
       "key": "businessName",
       "label": "Business name",
       "group": "business",
@@ -345,6 +318,24 @@
       "public": true,
       "type": "text",
       "wide": true
+    },
+    {
+      "key": "username",
+      "label": "Username",
+      "group": "business",
+      "required": true,
+      "editable": true,
+      "public": true,
+      "type": "handle"
+    },
+    {
+      "key": "about",
+      "label": "About",
+      "group": "business",
+      "required": false,
+      "editable": true,
+      "public": true,
+      "type": "textarea"
     },
     {
       "key": "businessType",

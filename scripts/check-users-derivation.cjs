@@ -438,7 +438,7 @@ S.resetStore();
 console.log("\na profile save with a required field empty writes nothing");
 S.resetStore();
 {
-  const err = S.updateProfile("IB-U-0912", { displayName: "Changed", city: "Bengaluru" });
+  const err = S.updateProfile("IB-U-0912", { about: "Changed", businessName: "Meera Studio" });
   ok("a valid patch is accepted", err, "");
   ok("an unknown user is refused", S.updateProfile("IB-U-NOPE", { city: "X" })
     .indexOf("no longer exists") >= 0, true);
@@ -690,7 +690,7 @@ console.log("\nnothing is conditional any more, and the machinery still gates");
     all.filter((r) => S.fieldsFor(r).length !== S.PROFILE_FIELDS.length).length, 0);
   /* The gate itself outlives its last user — asserted with a synthetic field
      so the day a conditional field returns, the machinery is known-good. */
-  const fake = { key: "x", label: "X", group: "basic", required: false,
+  const fake = { key: "x", label: "X", group: "business", required: false,
     editable: true, public: true, type: "text", showWhen: "member" };
   ok("fieldApplies still gates a member-only field",
     all.filter((r) => S.fieldApplies(fake, r)).length,
@@ -715,7 +715,7 @@ console.log("\nthe re-grade is exactly the one that was asked for");
     users.filter((u) => !!u.profile.businessName !== !!u.profile.username).map((u) => u.userId), []);
   /* The removed fields must be gone from the DATA too, not just the form —
      a stored value nothing renders is a field that comes back. */
-  ["portfolioUrl", "locality", "addressLine", "state", "city", "pincode"].forEach((k) => {
+  ["portfolioUrl", "locality", "addressLine", "state", "city", "pincode", "displayName"].forEach((k) => {
     ok("`" + k + "` is gone from the seed",
       users.filter((u) => k in u.profile).length, 0);
   });

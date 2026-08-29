@@ -56,7 +56,6 @@ export interface UserProfile {
   profileId: string;
   schemaVersion: string;
   profileStatus: string;
-  displayName: string | null;
   /** The public address of this profile. Lower-case, unique across the
    *  platform, and permanent in practice — changing it breaks every link
    *  anybody has already shared. */
@@ -751,7 +750,7 @@ function matchesSearch(r: UserRow, q: string): boolean {
   const d = digits(needle);
   const u = r.user;
   const hay = [
-    u.userId, u.identity.name, u.identity.email, u.profile.displayName,
+    u.userId, u.identity.name, u.identity.email,
     u.profile.businessName,
     /* The username is an address people are handed, so it is a thing somebody
        arrives holding — "a member emailed about /pro/meera-studio" has to be
