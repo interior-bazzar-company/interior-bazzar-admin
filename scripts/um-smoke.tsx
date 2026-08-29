@@ -586,6 +586,13 @@ check("edit profile · incomplete", () => modal(
     if (infos < 1) throw new Error("no i button on Business type");
     return full;
   });
+  check("business name takes the row, so Business type sits beneath it", () => {
+    const i = full.indexOf(">Business name");
+    const fg = full.lastIndexOf('<div class="fg', i);
+    if (full.slice(fg, i).indexOf("um-fg-wide") < 0) throw new Error("Business name is half-width");
+    if (full.indexOf(">Business type") < i) throw new Error("Business type is not after Business name");
+    return full;
+  });
   check("deals in · two checkboxes, one or both", () => {
     const boxes = (full.match(/type="checkbox"/g) || []).length;
     if (boxes !== 2) throw new Error(boxes + " checkboxes, expected exactly 2");

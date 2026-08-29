@@ -234,6 +234,9 @@ export interface ProfileField {
   /** `areas` only: most state rows, and most cities inside one row. */
   maxRows?: number;
   maxCities?: number;
+  /** Take the full row regardless of type. Layout is schema too: which
+   *  field sits beside which is a decision about the form, not about React. */
+  wide?: boolean;
   /** `single` only: render a plain dropdown instead of the picker. For a
    *  short closed list whose options explain themselves — or explain
    *  themselves behind `info` — the picker's search box is ceremony. */

@@ -6,6 +6,28 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-29
 
+### Business type moves under Business name
+
+**Area:** the Business profile group
+**Files:** `vocabularies.json`, `store.ts`, `EditProfile.tsx`,
+`scripts/um-smoke.tsx`
+
+**What changed**
+
+Business name takes the full row, so Business type sits beneath it (beside
+Deals in) instead of beside it. Done as a schema flag — `wide: true` on the
+field — because which field sits next to which is a decision about the
+form, not about React, and the form still knows no field by name.
+
+**Verified**
+
+`check:users-render` 116 → 117: Business name asserted full-width and
+Business type asserted after it.
+
+---
+
+## 2026-08-29
+
 ### Segments open up, and their explainers shrink to keywords
 
 **Area:** the Segments field

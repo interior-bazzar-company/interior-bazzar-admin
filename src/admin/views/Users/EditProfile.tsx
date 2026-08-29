@@ -67,7 +67,8 @@ const isList = (f: ProfileField) =>
  *  row is what made State, City and Pincode read as three separate thoughts.
  *  Textareas and chip-bearing fields genuinely use the width. */
 const isWide = (f: ProfileField) =>
-  (isList(f) && f.type !== "checks")
+  f.wide === true
+  || (isList(f) && f.type !== "checks")
   || f.type === "handle" || f.type === "textarea" || f.type === "areas";
 
 type Draft = Record<string, string | string[] | TargetArea[]>;

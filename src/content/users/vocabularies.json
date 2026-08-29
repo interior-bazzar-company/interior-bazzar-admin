@@ -343,7 +343,8 @@
       "required": true,
       "editable": true,
       "public": true,
-      "type": "text"
+      "type": "text",
+      "wide": true
     },
     {
       "key": "businessType",
