@@ -7,8 +7,8 @@ import { bootAppearance } from "./admin/shell/ShellContext";
 // Two attributes on <html> drive the whole design system. Set before the first
 // render so the panel never flashes the wrong theme, the way the prototype's
 // inline <head> script did it.
-bootAppearance();
 
+bootAppearance();
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <App />
