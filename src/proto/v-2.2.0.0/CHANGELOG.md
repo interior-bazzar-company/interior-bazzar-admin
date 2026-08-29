@@ -6,6 +6,71 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-29
 
+### First browser contact: the floated legend broke the form, and the fix is one clear
+
+**Area:** the Edit profile panels
+**Files:** `users.css`
+
+**What changed**
+
+The first time this module was ever opened in a browser, the profile form was
+broken: every panel rendered empty, all the fields hung in a sliver off the
+modal's right edge, and the dialog grew a horizontal scrollbar.
+
+**The cause was the panel legend's float, missing its clear.** `float: left;
+width: 100%` is the only way to make a `<legend>` lay out as normal content —
+but the `.um-f2` grid that follows it establishes its own formatting context,
+and a box like that is not allowed to flow under a float: it is placed BESIDE
+it, in whatever width remains. Beside a 100%-wide float that is zero, so the
+grid collapsed to its min-content width and hung off the panel's right edge.
+Bootstrap's reset ships `legend + * { clear: both }` next to the float for
+exactly this reason; this module now does too.
+
+Two more UA quirks got their guards while the file was open, both of the same
+species — default minimums that refuse to shrink:
+
+- **fieldsets carry a UA `min-width: min-content`** no other element has, which
+  is what would hand the whole dialog a horizontal scrollbar on a narrow pane;
+  `min-width: 0` on the panel turns it off.
+- **grid items default to `min-width: auto`**, so a picker placeholder or the
+  handle's host prefix could re-create the overflow one level down;
+  `.um-f2 > * { min-width: 0 }` floors them.
+
+The handle field's flex was also over-constrained — the base `.inp` says
+`width: 100%`, which fights the flexbox it now sits in. The input takes
+`flex: 1` with `width: auto`, the host prefix takes `flex: 0 1 auto` with a
+clip, so when the pane is too narrow it is the HOST that gives way and never
+the handle being typed.
+
+**Temp data**
+
+None touched.
+
+**Backend needed**
+
+Nothing — CSS only.
+
+**Open decisions**
+
+None new.
+
+**Verified**
+
+`tsc -b`, `eslint`, both suites and `vite build` all green — but note what that
+list is worth here: every one of them was green while the form was broken,
+which is the point. This bug was invisible to the entire harness, because the
+harness renders strings and this was geometry. It is the module's standing
+"never opened in a browser" caveat collecting its first debt, and the reason
+that caveat keeps appearing at the bottom of these entries.
+
+**Still not verified:** the fix itself, in a browser, by the person who saw the
+break — the reasoning is solid and the pattern is Bootstrap's, but the proof is
+the same screenshot taken again.
+
+---
+
+## 2026-08-29
+
 ### A username with an address, target areas for members, and a form you can see the groups in
 
 **Area:** the profile schema, Edit profile, the profile tab, the form's contrast

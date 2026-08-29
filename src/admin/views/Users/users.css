@@ -454,12 +454,32 @@
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   margin-bottom: var(--space-4);
+  /* Fieldsets carry a UA `min-width: min-content` no other element has, which
+     is the one that stops them shrinking with the modal and hands the whole
+     dialog a horizontal scrollbar instead. */
+  min-width: 0;
 }
 .um-form .um-fs legend {
   float: left; width: 100%; margin: 0 0 var(--space-3);
   padding: 0 0 var(--space-2);
   border-bottom: 1px solid var(--line);
 }
+/* THE CLEAR IS NOT OPTIONAL, and shipping without it is what broke the form
+   on first browser contact. The float is the only way to make a legend lay
+   out as normal content — but the grid that follows it establishes its own
+   formatting context, and a box like that does not flow under a float, it is
+   placed BESIDE it in whatever width remains. Beside a 100%-wide float that
+   is zero, so the grid collapsed to min-content and hung off the right edge
+   of the panel: empty panels, every field in a sliver past the modal's edge,
+   and a horizontal scrollbar. Bootstrap's reset carries this exact pair of
+   rules for this exact reason. */
+.um-form .um-fs legend + * { clear: both }
+/* Grid items refuse to shrink below their content by default (`min-width:
+   auto`), and a picker's placeholder or the handle's host prefix is enough
+   content to re-create the overflow one level down. */
+.um-form .um-f2 > * { min-width: 0 }
+.um-handle-in { min-width: 0 }
+.um-handle-in .inp { min-width: 0 }
 /* Inputs on the panel invert the usual relationship: the well is the panel
    now, so the CONTROL is the raised thing. Without this they vanish into the
    ground they sit on. */
@@ -502,11 +522,18 @@
 .um-handle.bad .um-handle-in { border-color: var(--bad-line) }
 /* The host sits INSIDE the box, as unselectable prefix text, so the field
    reads as one address rather than as a text box near a label. */
-.um-handle-pre { flex: 0 0 auto; align-self: stretch; display: flex; align-items: center;
+.um-handle-pre { flex: 0 1 auto; align-self: stretch; display: flex; align-items: center;
+                 min-width: 0; overflow: hidden;
                  padding: 0 var(--space-2) 0 var(--space-3);
                  background: var(--bg-inset); border-right: 1px solid var(--line);
                  font-size: var(--text-sm); color: var(--text-3); white-space: nowrap }
-.um-handle-in .inp { border: none; border-radius: 0; background: none;
+/* When the pane is too narrow for host + handle, the HOST gives way and the
+   handle being edited never does — `flex: 0 1 auto` on the prefix against
+   `flex: 1` on the input is that priority, stated once. */
+/* `flex: 1` against the prefix's `0 1 auto`: the input takes whatever the host
+   leaves, and it is the host that shrinks first when the pane is narrow. The
+   base `.inp` width:100% would fight the flexbox — width comes off. */
+.um-handle-in .inp { flex: 1 1 0; width: auto; border: none; border-radius: 0; background: none;
                      font-family: var(--font-mono, monospace); font-size: var(--text-md) }
 .um-handle-copy { flex: 0 0 auto; display: flex; align-items: center; gap: 5px;
                   align-self: stretch; padding: 0 var(--space-3); border: none;
