@@ -1224,6 +1224,101 @@
       "key": "waterproofing",
       "label": "Waterproofing",
       "hint": "Terrace, bathroom, basement"
+    },
+    {
+      "key": "renovation",
+      "label": "Renovation & remodelling",
+      "hint": "Full-home makeovers"
+    },
+    {
+      "key": "bathroom_remodel",
+      "label": "Bathroom remodelling",
+      "hint": "Complete bathroom makeover"
+    },
+    {
+      "key": "countertops",
+      "label": "Countertops & kitchen tops",
+      "hint": "Quartz, granite, solid surface"
+    },
+    {
+      "key": "wallpaper",
+      "label": "Wallpaper & wall panels",
+      "hint": "Wallpaper, PVC, wood panels"
+    },
+    {
+      "key": "upholstery",
+      "label": "Upholstery & sofa repair",
+      "hint": "Re-fabric, foam, sofa repair"
+    },
+    {
+      "key": "carpets_rugs",
+      "label": "Carpets & rugs",
+      "hint": "Carpets, rugs, runners, mats"
+    },
+    {
+      "key": "doors_windows",
+      "label": "Doors & windows",
+      "hint": "uPVC, aluminium, wooden"
+    },
+    {
+      "key": "metal_railings",
+      "label": "Metal fabrication & railings",
+      "hint": "SS, MS railings, grills, gates"
+    },
+    {
+      "key": "home_theatre",
+      "label": "Home theatre & AV",
+      "hint": "Speakers, projectors, acoustics"
+    },
+    {
+      "key": "acoustics",
+      "label": "Acoustic & soundproofing",
+      "hint": "Panels, studio, noise control"
+    },
+    {
+      "key": "kitchen_appliances",
+      "label": "Kitchen appliances",
+      "hint": "Chimney, hob, built-in ovens"
+    },
+    {
+      "key": "solar",
+      "label": "Solar & energy",
+      "hint": "Rooftop solar, inverters"
+    },
+    {
+      "key": "home_lifts",
+      "label": "Home lifts & elevators",
+      "hint": "Residential lifts, stairlifts"
+    },
+    {
+      "key": "structural_engineer",
+      "label": "Structural engineer",
+      "hint": "RCC, load, stability checks"
+    },
+    {
+      "key": "home_staging",
+      "label": "Home staging",
+      "hint": "Furnish to sell or rent"
+    },
+    {
+      "key": "art_decor",
+      "label": "Art & decor accessories",
+      "hint": "Paintings, sculptures, planters"
+    },
+    {
+      "key": "roofing",
+      "label": "Roofing & sheds",
+      "hint": "Metal sheets, polycarbonate"
+    },
+    {
+      "key": "pest_control",
+      "label": "Pest control",
+      "hint": "Termite, anti-termite treatment"
+    },
+    {
+      "key": "deep_cleaning",
+      "label": "Deep cleaning",
+      "hint": "Post-construction, sofa, tank"
     }
   ],
   "categoryGroups": [

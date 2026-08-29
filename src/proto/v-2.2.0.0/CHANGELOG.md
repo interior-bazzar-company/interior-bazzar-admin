@@ -6,6 +6,37 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-29
 
+### Segments grow to the well-known ones
+
+**Area:** the Segments dropdown
+**Files:** `vocabularies.json`
+
+**What changed**
+
+Nineteen segments added, taken from the categories the big directories
+already agree on — Google Business Profile, Houzz's professional
+directory, and the Indian home-services platforms — and not already here:
+
+Renovation & remodelling · Bathroom remodelling · Countertops & kitchen
+tops · Wallpaper & wall panels · Upholstery & sofa repair · Carpets & rugs
+· Doors & windows · Metal fabrication & railings · Home theatre & AV ·
+Acoustic & soundproofing · Kitchen appliances · Solar & energy · Home
+lifts & elevators · Structural engineer · Home staging · Art & decor
+accessories · Roofing & sheds · Pest control · Deep cleaning.
+
+Forty-one segments. Each carries its three-keyword explainer inside the
+32-character rule; the list stays open, so anything still missing is
+typed, not refused.
+
+**Verified**
+
+`check:users` 280, `check:users-render` 119 — the unique-key and explainer
+length rules cover every new row.
+
+---
+
+## 2026-08-29
+
 ### Target, Location, and a Positioning segment
 
 **Area:** the lower half of Edit profile
