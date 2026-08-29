@@ -6,6 +6,34 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-29
 
+### Segment explainers sharpened, two trades added
+
+**Area:** the Segments dropdown
+**Files:** `vocabularies.json`
+
+**What changed**
+
+Every explainer re-cut in buyer language — the words somebody searches,
+three per row, each row separating itself from its neighbour: designer
+*Concept, drawings, execution* against decorator *Decor, soft furnishing,
+styling*; carpentry *Site carpentry, joinery, doors* against modular
+*Modular kitchen, wardrobes*; flooring *Tiles, wooden, vinyl, epoxy*
+against *Tiles, marble, sanitaryware*. All inside the 32-character cap the
+suite enforces.
+
+Two trades that are searched for and were missing: **Lighting** (fixtures,
+LED profiles, decor) and **Waterproofing** (terrace, bathroom, basement).
+Twenty-two segments.
+
+**Verified**
+
+`check:users` 271, `check:users-render` 118 — the length rule and the
+unique-key rule cover the new rows.
+
+---
+
+## 2026-08-29
+
 ### The business types read from the practitioner up
 
 **Area:** the Business type dropdown

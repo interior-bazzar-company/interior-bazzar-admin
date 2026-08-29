@@ -1106,102 +1106,112 @@
     {
       "key": "interior_designer",
       "label": "Interior designer",
-      "hint": "Space, layout, full design"
+      "hint": "Concept, drawings, execution"
     },
     {
       "key": "interior_decorator",
       "label": "Interior decorator",
-      "hint": "Styling & finishes only"
+      "hint": "Decor, soft furnishing, styling"
     },
     {
       "key": "architect",
       "label": "Architect",
-      "hint": "Structure, plans, approvals"
+      "hint": "Plans, elevations, approvals"
     },
     {
       "key": "visualiser_3d",
       "label": "3D visualiser",
-      "hint": "Renders & walkthroughs"
+      "hint": "3D renders, walkthroughs, VR"
     },
     {
       "key": "civil_contractor",
       "label": "Civil contractor",
-      "hint": "Masonry, plaster, structure"
+      "hint": "Demolition, masonry, plaster"
     },
     {
       "key": "modular_kitchen",
       "label": "Modular kitchen & wardrobe",
-      "hint": "Kitchens, wardrobes, storage"
+      "hint": "Modular kitchen, wardrobes"
     },
     {
       "key": "carpentry",
       "label": "Carpentry & joinery",
-      "hint": "Woodwork, joinery, fit-out"
+      "hint": "Site carpentry, joinery, doors"
     },
     {
       "key": "false_ceiling",
       "label": "False ceiling & lighting",
-      "hint": "Gypsum, POP, cove lighting"
+      "hint": "Gypsum, POP, grid ceilings"
     },
     {
       "key": "flooring",
       "label": "Flooring & tiling",
-      "hint": "Tiles, wood, vinyl, stone"
+      "hint": "Tiles, wooden, vinyl, epoxy"
     },
     {
       "key": "painting",
       "label": "Painting & wall finishes",
-      "hint": "Paint, texture, polish"
+      "hint": "Paint, texture, wood polish"
     },
     {
       "key": "furnishing",
       "label": "Furnishing & soft decor",
-      "hint": "Curtains, upholstery, linen"
+      "hint": "Curtains, blinds, upholstery"
     },
     {
       "key": "furniture",
       "label": "Furniture — modular & loose",
-      "hint": "Loose & modular pieces"
+      "hint": "Sofas, beds, tables, modular"
     },
     {
       "key": "mep",
       "label": "MEP — electrical, plumbing, HVAC",
-      "hint": "Electrical, plumbing, AC"
+      "hint": "Wiring, plumbing, AC ducting"
     },
     {
       "key": "glass_facade",
       "label": "Glass, aluminium & façade",
-      "hint": "Glass, ACP, aluminium"
+      "hint": "Toughened glass, ACP, railings"
     },
     {
       "key": "landscape",
       "label": "Landscape & outdoor",
-      "hint": "Gardens, terraces, outdoor"
+      "hint": "Gardens, terraces, balconies"
     },
     {
       "key": "automation",
       "label": "Smart home & automation",
-      "hint": "Smart controls, CCTV"
+      "hint": "Smart lighting, locks, CCTV"
     },
     {
       "key": "vastu",
       "label": "Vastu consultant",
-      "hint": "Direction & layout advice"
+      "hint": "Vastu-compliant layouts"
     },
     {
       "key": "pmc",
       "label": "Project management consultant",
-      "hint": "Runs site & vendors"
+      "hint": "Site supervision & vendors"
     },
     {
       "key": "ply_hardware",
       "label": "Plywood, laminates & hardware",
-      "hint": "Ply, laminate, fittings"
+      "hint": "Plywood, laminates, hardware"
     },
     {
       "key": "tiles_sanitary",
       "label": "Tiles, stone & sanitaryware",
-      "hint": "Tiles, stone, bath fittings"
+      "hint": "Tiles, marble, sanitaryware"
+    },
+    {
+      "key": "lighting",
+      "label": "Lighting",
+      "hint": "Fixtures, LED profiles, decor"
+    },
+    {
+      "key": "waterproofing",
+      "label": "Waterproofing",
+      "hint": "Terrace, bathroom, basement"
     }
   ],
   "categoryGroups": [
