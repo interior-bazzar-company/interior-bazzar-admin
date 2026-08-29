@@ -107,7 +107,7 @@
         "username": "bhat-carpentry-works",
         "about": null,
         "businessName": "Bhat Carpentry Works",
-        "businessType": "independent",
+        "businessType": "contractor",
         "dealsIn": [
           "services"
         ],
@@ -217,7 +217,7 @@
         "username": "desai-interiors",
         "about": "Turnkey residential fit-out, mostly 2 and 3 BHK redevelopments.",
         "businessName": "Desai Interiors",
-        "businessType": "independent",
+        "businessType": "contractor",
         "dealsIn": [
           "services"
         ],
@@ -616,7 +616,7 @@
         "username": "meera-studio-interiors",
         "about": "Full-service interior design studio serving Bengaluru since 2019. Residential and commercial fit-out, in-house carpentry.",
         "businessName": "Meera Studio Interiors LLP",
-        "businessType": "independent",
+        "businessType": "contractor",
         "dealsIn": [
           "services"
         ],
@@ -708,7 +708,7 @@
         "username": "lokesh-interiors",
         "about": "Two-person outfit doing apartment interiors around Infopark.",
         "businessName": "Lokesh Interiors",
-        "businessType": "independent",
+        "businessType": "contractor",
         "dealsIn": [
           "services"
         ],
@@ -772,7 +772,7 @@
         "username": "r-menon-woodworks",
         "about": "Solid-wood furniture and site carpentry. Own workshop, twelve carpenters.",
         "businessName": "R. Menon Woodworks",
-        "businessType": "independent",
+        "businessType": "contractor",
         "dealsIn": [
           "services"
         ],
@@ -847,7 +847,7 @@
         "username": "zenith-ceilings",
         "about": "False ceiling, cove lighting and acoustic panelling for offices.",
         "businessName": "Zenith Ceilings",
-        "businessType": "independent",
+        "businessType": "contractor",
         "dealsIn": [
           "services"
         ],
@@ -914,7 +914,7 @@
         "username": "sharma-interiors",
         "about": "Residential interiors and renovation across west Delhi.",
         "businessName": "Sharma Interiors",
-        "businessType": "independent",
+        "businessType": "contractor",
         "dealsIn": [
           "services"
         ],
@@ -1055,7 +1055,7 @@
         "username": "k-iyer-interior",
         "about": "Residential interiors, twenty years in T. Nagar.",
         "businessName": "K. Iyer Interior Co.",
-        "businessType": "independent",
+        "businessType": "contractor",
         "dealsIn": [
           "services"
         ],
@@ -1126,7 +1126,7 @@
         "username": "craftline-carpentry",
         "about": "Contract carpentry for builders and design studios.",
         "businessName": "Craftline Carpentry",
-        "businessType": "independent",
+        "businessType": "contractor",
         "dealsIn": [
           "services"
         ],
@@ -1273,7 +1273,7 @@
         "username": "saloni-interiors",
         "about": "Apartment interiors and small commercial spaces in central Mumbai.",
         "businessName": "Saloni Interiors",
-        "businessType": "independent",
+        "businessType": "contractor",
         "dealsIn": [
           "services"
         ],
@@ -1348,7 +1348,7 @@
         "username": "kulkarni-and-sons",
         "about": "Family furniture business, three generations in Kothrud.",
         "businessName": "Kulkarni & Sons",
-        "businessType": "independent",
+        "businessType": "contractor",
         "dealsIn": [
           "services"
         ],

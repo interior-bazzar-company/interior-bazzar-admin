@@ -789,24 +789,22 @@ S.resetStore();
   ok("...and no seeded profile still carries it",
     S.readUsers().filter((u) => u.profile.businessType === "service_provider")
       .map((u) => u.userId), []);
-  /* Contractor went the same way as Service provider, one turn later: with
-     dealsIn carrying "sells work", the type axis is WHERE IN THE CHAIN you
-     sit — and every seller of work sits in one place on it. */
-  ok("contractor is not a business type either",
-    S.BUSINESS_TYPES.some((t) => t.key === "contractor"), false);
-  ok("...and no seeded profile still carries it",
-    S.readUsers().filter((u) => u.profile.businessType === "contractor")
-      .map((u) => u.userId), []);
   ok("the Business type panel opens with the field's own sentence",
     S.PROFILE_FIELDS.filter((f) => f.key === "businessType")[0].info,
     "What kind of business this is. It decides how the marketplace treats them, so it is one answer, not several.");
-  ok("five types remain",
+  /* ORDERED ALONG THE CHAIN, and the order is the assertion: who makes it,
+     who moves it, who sells it, then the firm that builds and the practitioner
+     who works alone. Alphabetical would be a list; this reads as a supply
+     chain, which is what the type axis IS. */
+  ok("six types, in chain order",
     S.BUSINESS_TYPES.map((t) => t.key),
-    ["independent", "manufacturer", "dealer", "retailer", "wholesaler"]);
-  ok("every seller of work is Independent now",
-    S.readUsers().filter((u) => u.profile.dealsIn.indexOf("services") >= 0
-      && u.profile.dealsIn.indexOf("products") < 0
-      && u.profile.businessType !== "independent").map((u) => u.userId), []);
+    ["manufacturer", "dealer", "wholesaler", "retailer", "contractor", "independent"]);
+  ok("a firm with an execution scope is a Contractor, a solo practice is Independent",
+    S.readUsers().filter((u) => u.profile.businessType === "contractor").length, 11);
+  ok("...and Independent means alone: no execution scope on any of them",
+    S.readUsers().filter((u) => u.profile.businessType === "independent"
+      && u.profile.categories.some((c) => ["turnkey", "design_build", "execution_only"].indexOf(c) >= 0))
+      .map((u) => u.userId), []);
 
   const bad = (patch) => S.validateFacets(patch) !== "";
   ok("products alone is fine", bad({ dealsIn: ["products"] }), false);

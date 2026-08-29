@@ -6,6 +6,48 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-29
 
+### Contractor returns, and the business types read as a chain
+
+**Area:** the Business type dropdown
+**Files:** `vocabularies.json`, `users.json`,
+`scripts/check-users-derivation.cjs`, `scripts/um-smoke.tsx`
+
+**What changed**
+
+**Contractor is back** — the previous entry's judgement note was right: a
+carpentry works or a ceilings firm as *Independent professional* was the
+wrong grain. Independent narrows back to what its name says (one
+practitioner, working alone) and Contractor takes the firms that execute
+on site with a crew. The eleven profiles that hold an execution scope
+return to it; the four solo practices stay Independent.
+
+**The six types are ordered along the chain**, not alphabetically:
+
+    Manufacturer → Dealer / Distributor → Wholesaler / Trader → Retailer / Showroom
+    → Contractor → Independent professional
+
+Who makes it, who moves it, who sells it, then the firm that builds and the
+practitioner who works alone. A dropdown in this order reads as a supply
+chain — which is what the type axis IS — where alphabetical read as a list.
+The order is asserted on the rendered `<option>`s, because a `sort()`
+anywhere between the schema and the markup would silently alphabetise it.
+
+**Temp data**
+
+`vocabularies.json` — `contractor` restored, list reordered, two hints
+re-cut. `users.json` — eleven profiles back to `contractor` by the same
+rule as before. The incomplete set does not move.
+
+**Verified**
+
+`check:users` 266 → 267, `check:users-render` 116. Chain order asserted in
+the schema and in the markup; the Contractor/Independent split asserted on
+the seed both ways.
+
+---
+
+## 2026-08-29
+
 ### The i sits right of the label, and opens with the field's own sentence
 
 **Area:** the Business type field
