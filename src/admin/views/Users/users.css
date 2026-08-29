@@ -313,6 +313,8 @@
 .um-fs legend i { font-style: normal; font-weight: var(--weight-normal);
                   color: var(--text-3); font-size: var(--text-sm) }
 .um-fs legend .req { color: var(--bad) }
+/* The i on a solo group's legend sits where it does on a label row. */
+.um-fs legend .um-info { margin-left: 2px }
 .um-f2 { display: grid; gap: var(--space-4) var(--space-3); grid-template-columns: repeat(2, 1fr) }
 /* These queries need a CONTAINER to fire against, and nothing ever declared
    one — they had been dead rules since the day they were written, and the

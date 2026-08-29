@@ -237,6 +237,10 @@ export interface ProfileField {
   /** `areas` only: most state rows, and most cities inside one row. */
   maxRows?: number;
   maxCities?: number;
+  /** The picker's empty-box text. One generic line ("Type a phrase, or pick
+   *  a suggestion") was serving segments, categories, cities and keywords
+   *  alike, and "phrase" fits exactly one of them. */
+  placeholder?: string;
   /** Take the full row regardless of type. Layout is schema too: which
    *  field sits beside which is a decision about the form, not about React. */
   wide?: boolean;

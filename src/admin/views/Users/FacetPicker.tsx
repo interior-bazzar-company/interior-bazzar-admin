@@ -276,8 +276,8 @@ export default function FacetPicker({ f, values, onChange, disabled, options: gi
             placeholder={
               full && !single
                 ? max + " of " + max + " picked"
-                : free ? "Type a phrase, or pick a suggestion"
-                  : single ? "Choose one" : "Search and pick"
+                : f.placeholder || (free ? "Search or type your own"
+                  : single ? "Choose one" : "Search and pick")
             }
             value={q}
             onChange={(e) => { setQ(e.target.value); setOpen(true); }}
@@ -306,12 +306,16 @@ export default function FacetPicker({ f, values, onChange, disabled, options: gi
         </ul>
       ) : null}
 
-      <p className="um-facet-fine">
-        {f.hint ? <span>{f.hint}</span> : null}
-        {f.max && !single
-          ? <b className={full ? "warn" : ""}>{values.length}/{f.max}</b>
-          : null}
-      </p>
+      {/* Only when there is something to say. An empty line under every
+          state picker was a margin with nothing in it. */}
+      {f.hint || (f.max && !single) ? (
+        <p className="um-facet-fine">
+          {f.hint ? <span>{f.hint}</span> : null}
+          {f.max && !single
+            ? <b className={full ? "warn" : ""}>{values.length}/{f.max}</b>
+            : null}
+        </p>
+      ) : null}
     </div>
   );
 }

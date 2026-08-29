@@ -451,7 +451,13 @@ check("edit profile · incomplete", () => modal(
     /* `fieldsFor` rather than the whole schema: Target areas only applies to
        somebody who holds a term or held one, and asserting against the full
        list would demand a field the form is right to be hiding. */
-    const missing = fieldsFor(memberRow).filter((f) => full.indexOf(">" + f.label) < 0);
+    /* A field alone in its group is named by the group's legend, not by a
+       label of its own — so for those the control is what must be present. */
+    const all = fieldsFor(memberRow);
+    const solo = (f: typeof all[number]) => all.filter((x) => x.group === f.group).length === 1;
+    const missing = all.filter((f) => solo(f)
+      ? full.indexOf('aria-label="' + f.label + '"') < 0
+      : full.indexOf(">" + f.label) < 0);
     if (missing.length) throw new Error("absent: " + missing.map((f) => f.label).join(", "));
     return full;
   });
@@ -517,8 +523,11 @@ check("edit profile · incomplete", () => modal(
   check("facets · guidance is placeholders and counters, not paragraphs", () => {
     /* The declutter pass: placeholders and the n/max counters carry the
        guidance now, and no field-level hint sentence renders at all. */
-    if (empty.indexOf("Type a phrase, or pick a suggestion") < 0)
+    if (empty.indexOf("Type a keyword, press Enter") < 0)
       throw new Error("the keyword field lost its placeholder");
+    /* One placeholder per field, not one for all: "phrase" fit keywords only. */
+    if (empty.indexOf("Type a phrase") >= 0) throw new Error("the generic placeholder is back");
+    if (empty.indexOf("Search or type a segment") < 0) throw new Error("segments placeholder missing");
     const withHints = fieldsFor(memberRow).filter((f) => f.hint).map((f) => f.key);
     if (withHints.length)
       throw new Error("hint sentences crept back onto: " + withHints.join(", "));
@@ -591,12 +600,17 @@ check("edit profile · incomplete", () => modal(
     return full;
   });
   check("one business group: name, address, about lead it; no Display name", () => {
-    const order = [">Business name", ">Username", ">Business type", ">Location", ">Positioning", ">About"]
+    const order = [">Business name", ">Username", ">Business type", ">Target<", ">Positioning segment", ">About<"]
       .map((t) => full.indexOf(t));
     if (order.some((i) => i < 0)) throw new Error("a field is missing");
     if (order.some((i, k) => k > 0 && i < order[k - 1])) throw new Error("the form is out of order");
     /* About closes the form: nothing but the identity summary follows it. */
-    if (full.indexOf(">About") > full.indexOf(">Identity")) throw new Error("About is not last");
+    if (full.indexOf(">About<") > full.indexOf(">Identity")) throw new Error("About is not last");
+    /* A group of one is its field: no second label under the legend. */
+    ["Location", "Positioning<", "About<"].forEach((l) => {
+      const n = (full.match(new RegExp(">" + l.replace("<", "") + "<", "g")) || []).length;
+      if (l === "Location" ? n > 0 : n > 1) throw new Error(l + " is labelled twice");
+    });
     if (full.indexOf(">Display name") >= 0) throw new Error("Display name survives");
     if (full.indexOf(">Basic profile<") >= 0) throw new Error("an empty Basic profile group renders");
     return full;
@@ -628,13 +642,15 @@ check("edit profile · incomplete", () => modal(
       if (full.indexOf(">" + t + "<") < 0) throw new Error("missing " + t);
     });
     if (full.indexOf("Select up to 2.") < 0) throw new Error("the cap is not stated");
+    /* No empty fine-print line anywhere: it renders only with content. */
+    if (full.indexOf('<p class="um-facet-fine"></p>') >= 0) throw new Error("an empty fine line renders");
     /* IB-U-0912 holds two, so the third renders disabled: the cap is
        enforced by what can still be pressed. */
     const off = (full.match(/um-check off/g) || []).length;
     if (off !== 1) throw new Error(off + " tiles went quiet at the cap, expected 1");
     if (full.indexOf(">Eco-friendly<") >= 0) throw new Error("a removed tile is still on offer");
     /* One row: the field takes the full width, so four tiles never wrap. */
-    const pos = full.indexOf(">Positioning");
+    const pos = full.indexOf(">Positioning segment");
     const fg = full.lastIndexOf('<div class="fg', pos);
     if (full.slice(fg, pos).indexOf("um-fg-wide") < 0) throw new Error("positioning is half-width");
     if (full.indexOf(">Premium<") >= 0 || full.indexOf(">Value<") >= 0)
@@ -684,8 +700,8 @@ check("edit profile · incomplete", () => modal(
     /* It was member-only while it sat beside a registered address. The
        address is gone; a plain user with no coverage row is invisible to
        every location filter, and the form is where that gets fixed. */
-    if (full.indexOf(">Location") < 0) throw new Error("a member was not asked");
-    if (empty.indexOf(">Location") < 0) throw new Error("a plain user was not asked");
+    if (full.indexOf("um-areas") < 0) throw new Error("a member was not asked");
+    if (empty.indexOf("um-areas") < 0) throw new Error("a plain user was not asked");
     if (full.indexOf(">Target<") < 0) throw new Error("the group is not called Target");
     if (empty.indexOf("No areas yet") < 0)
       throw new Error("an empty coverage list says nothing");

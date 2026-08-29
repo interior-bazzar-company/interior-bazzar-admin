@@ -179,7 +179,7 @@ export default function EditProfile({ row, onClose, onDone }: {
     if (f.type === "textarea") {
       return (
         <textarea className="inp" rows={3} value={String(draft[f.key] || "")}
-          disabled={!f.editable}
+          disabled={!f.editable} aria-label={f.label}
           onChange={(e) => set(f.key, e.target.value)} />
       );
     }
@@ -241,7 +241,7 @@ export default function EditProfile({ row, onClose, onDone }: {
     }
     return (
       <input className="inp" value={String(draft[f.key] || "")} disabled={!f.editable}
-        onChange={(e) => set(f.key, e.target.value)} />
+        aria-label={f.label} onChange={(e) => set(f.key, e.target.value)} />
     );
   };
 
@@ -268,9 +268,20 @@ export default function EditProfile({ row, onClose, onDone }: {
         {GROUPS.map((g) => {
           const mine = fields.filter((f) => f.group === g.key);
           if (!mine.length) return null;
+          /* A GROUP OF ONE IS ITS FIELD. "Positioning segment" over
+             "Positioning", "About" over "About", "Target" over "Location":
+             the legend already names the thing, so the field's own label
+             row goes and the legend carries the asterisk and the i instead.
+             The control keeps its accessible name through aria-label. */
+          const solo = mine.length === 1 ? mine[0] : null;
           return (
             <fieldset className="um-fs" key={g.key}>
-              <legend>{g.label}{g.note ? <i>{g.note}</i> : null}</legend>
+              <legend>
+                {g.label}
+                {solo && solo.required ? <span className="req"> *</span> : null}
+                {solo && solo.info ? <InfoTip f={solo} /> : null}
+                {g.note ? <i>{g.note}</i> : null}
+              </legend>
               <div className="um-f2">
                 {mine.map((f) => (
                   /* A picker is not a <label>'s control — it is a composite
@@ -278,13 +289,15 @@ export default function EditProfile({ row, onClose, onDone }: {
                      with the caption beside it instead. Wrapping one in a
                      <label> makes clicking a chip focus the search box. */
                   <div className={"fg" + (isWide(f) ? " um-fg-wide" : "")} key={f.key}>
-                    <span className="fg-lb">
-                      {f.label}
-                      {f.required ? <span className="req"> *</span> : null}
-                      {/* Right of the label, for every field that has one —
-                          one place to look, whatever the control below is. */}
-                      {f.info ? <InfoTip f={f} /> : null}
-                    </span>
+                    {solo ? null : (
+                      <span className="fg-lb">
+                        {f.label}
+                        {f.required ? <span className="req"> *</span> : null}
+                        {/* Right of the label, for every field that has one —
+                            one place to look, whatever the control below is. */}
+                        {f.info ? <InfoTip f={f} /> : null}
+                      </span>
+                    )}
                     {control(f)}
                   </div>
                 ))}

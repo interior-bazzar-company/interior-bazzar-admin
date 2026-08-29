@@ -351,7 +351,8 @@
       "public": true,
       "type": "checks",
       "vocab": "dealsIn",
-      "chip": "tag-pink"
+      "chip": "tag-pink",
+      "wide": true
     },
     {
       "key": "segments",
@@ -365,7 +366,8 @@
       "max": 6,
       "chip": "tag-green",
       "open": true,
-      "maxLength": 40
+      "maxLength": 40,
+      "placeholder": "Search or type a segment"
     },
     {
       "key": "categories",
@@ -380,7 +382,8 @@
       "max": 10,
       "chip": "tag-blue",
       "open": true,
-      "maxLength": 40
+      "maxLength": 40,
+      "placeholder": "Search or type a category"
     },
     {
       "key": "searchKeywords",
@@ -393,7 +396,8 @@
       "vocab": "keywordSuggestions",
       "max": 12,
       "maxLength": 40,
-      "chip": "tag-amber"
+      "chip": "tag-amber",
+      "placeholder": "Type a keyword, press Enter"
     },
     {
       "key": "targetAreas",

@@ -33,12 +33,13 @@ import type { ProfileField, TargetArea } from "./store";
 const ROW_STATE: ProfileField = {
   key: "area-state", label: "State", group: "contact",
   required: true, editable: true, public: true,
-  type: "single", vocab: "states", chip: "tag-slate",
+  type: "single", vocab: "states", chip: "tag-slate", placeholder: "Choose a state",
 };
 const ROW_CITIES: ProfileField = {
   key: "area-cities", label: "Cities", group: "contact",
   required: true, editable: true, public: true,
   type: "multi", open: true, max: 8, maxLength: 40, chip: "tag-teal",
+  placeholder: "Search or type a city",
 };
 
 export default function AreaRows({ f, value, onChange, disabled }: {
@@ -62,7 +63,10 @@ export default function AreaRows({ f, value, onChange, disabled }: {
     && (!value[value.length - 1].state || !value[value.length - 1].cities.length);
 
   return (
-    <div className="um-areas">
+    /* Named as a group: the rows inside carry their own picker labels, but
+       the composite itself had no name — and now that the field's label row
+       is gone (the legend names it), this is the only name it has. */
+    <div className="um-areas" role="group" aria-label={f.label}>
       {value.length === 0 ? (
         <p className="um-areas-none">No areas yet — add the state they work in.</p>
       ) : null}

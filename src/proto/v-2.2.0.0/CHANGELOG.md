@@ -6,6 +6,47 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-29
 
+### The modal, read as a whole: five fixes
+
+**Area:** Edit profile — content and style
+**Files:** `EditProfile.tsx`, `FacetPicker.tsx`, `AreaRows.tsx`, `store.ts`,
+`vocabularies.json`, `users.css`, `scripts/um-smoke.tsx`
+
+**What changed**
+
+The modal was rendered to markup and read top to bottom as a reviewer
+would. Five things came out of it:
+
+1. **A group of one is its field.** "Positioning segment" sat over
+   "Positioning", "About" over "About", "Target" over "Location" — the
+   legend already named the thing. For a single-field group the field's
+   own label row goes; the legend carries the asterisk and the i instead.
+   Every control keeps its accessible name through `aria-label` — which
+   turned up that the Location composite never had one at all.
+2. **No empty fine-print line.** The state picker rendered an empty
+   `<p>` under itself — a margin with nothing in it — on every row.
+   The line renders only with content.
+3. **One placeholder per field**, not one for all. "Type a phrase, or
+   pick a suggestion" was serving segments, categories, cities and
+   keywords, and "phrase" fit exactly one. Now: *Search or type a
+   segment / a category / a city*, *Choose a state*, *Type a keyword,
+   press Enter*. A schema `placeholder`, so the next field names its own.
+4. **Deals in takes the full row** — it was a lone half-width row
+   between two full-width neighbours.
+5. Bare inputs and textareas carry `aria-label`, so nothing on the form
+   is nameless.
+
+**Verified**
+
+`check:users-render` 119: the duplicate-label rule, the empty-line rule
+and the per-field placeholders each asserted; the field-presence check
+learned that a solo field's name is its legend and its control's
+`aria-label`.
+
+---
+
+## 2026-08-29
+
 ### Positioning drops Eco-friendly
 
 **Area:** the Positioning segment
