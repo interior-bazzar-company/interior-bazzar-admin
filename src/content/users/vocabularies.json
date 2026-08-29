@@ -1514,10 +1514,6 @@
       "label": "Budget-friendly"
     },
     {
-      "key": "eco_friendly",
-      "label": "Eco-friendly"
-    },
-    {
       "key": "custom",
       "label": "Custom"
     }

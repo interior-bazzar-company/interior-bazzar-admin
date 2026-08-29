@@ -850,20 +850,21 @@ S.resetStore();
   ok("the incomplete set did not move again", S.countsOf(all).incompleteProfiles, 2);
 }
 
-console.log("\npositioning: up to two of a closed four");
+console.log("\npositioning: up to two of a closed three");
 {
   const bad = (patch) => S.validateFacets(patch) !== "";
   ok("one is fine", bad({ positioning: ["luxury"] }), false);
   ok("two is fine", bad({ positioning: ["luxury", "custom"] }), false);
-  ok("three is over the cap", bad({ positioning: ["luxury", "eco_friendly", "custom"] }), true);
-  ok("premium and value are gone", bad({ positioning: ["premium"] }) && bad({ positioning: ["value"] }), true);
+  ok("three is over the cap", bad({ positioning: ["luxury", "budget_friendly", "custom"] }), true);
+  ok("premium, value and eco-friendly are gone",
+    bad({ positioning: ["premium"] }) && bad({ positioning: ["value"] }) && bad({ positioning: ["eco_friendly"] }), true);
   ok("an invented one is refused", bad({ positioning: ["bespoke"] }), true);
   ok("optional: an empty list passes", bad({ positioning: [] }), false);
   ok("no seeded profile exceeds two",
     S.readUsers().filter((u) => u.profile.positioning.length > 2).map((u) => u.userId), []);
   ok("...or names a value outside the five",
     S.readUsers().filter((u) => u.profile.positioning.some((k) =>
-      ["luxury", "budget_friendly", "eco_friendly", "custom"].indexOf(k) < 0)).map((u) => u.userId), []);
+      ["luxury", "budget_friendly", "custom"].indexOf(k) < 0)).map((u) => u.userId), []);
   ok("optional means the incomplete set did not move", S.countsOf(all).incompleteProfiles, 2);
 }
 

@@ -6,6 +6,22 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-29
 
+### Positioning drops Eco-friendly
+
+**Area:** the Positioning segment
+**Files:** `vocabularies.json`, `users.json`,
+`scripts/check-users-derivation.cjs`, `scripts/um-smoke.tsx`
+
+**What changed**
+
+Three tiles — Luxury · Budget-friendly · Custom — still up to two. The key
+is stripped from the seed and asserted refused alongside the two removed
+earlier.
+
+---
+
+## 2026-08-29
+
 ### Positioning: four tiles on one row, Budget-friendly added
 
 **Area:** the Positioning segment
