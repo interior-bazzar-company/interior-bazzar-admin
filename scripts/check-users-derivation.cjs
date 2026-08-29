@@ -797,6 +797,9 @@ S.resetStore();
   ok("...and no seeded profile still carries it",
     S.readUsers().filter((u) => u.profile.businessType === "contractor")
       .map((u) => u.userId), []);
+  ok("the Business type panel opens with the field's own sentence",
+    S.PROFILE_FIELDS.filter((f) => f.key === "businessType")[0].info,
+    "What kind of business this is. It decides how the marketplace treats them, so it is one answer, not several.");
   ok("five types remain",
     S.BUSINESS_TYPES.map((t) => t.key),
     ["independent", "manufacturer", "dealer", "retailer", "wholesaler"]);

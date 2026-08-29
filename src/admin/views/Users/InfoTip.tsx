@@ -51,6 +51,9 @@ export default function InfoTip({ f }: { f: ProfileField }) {
         onClick={() => setOpen(!open)}>i</button>
       {open ? (
         <div className="um-info-pop" role="note">
+          {/* The field's own sentence first, when the schema gives one — what
+              the question IS, before what each answer means. */}
+          {typeof f.info === "string" ? <p className="um-info-intro">{f.info}</p> : null}
           {groups.length
             ? groups.map((g) => (
                 <div key={g.key}>

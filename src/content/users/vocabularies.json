@@ -356,7 +356,7 @@
       "vocab": "businessTypes",
       "chip": "tag-violet",
       "simple": true,
-      "info": true
+      "info": "What kind of business this is. It decides how the marketplace treats them, so it is one answer, not several."
     },
     {
       "key": "dealsIn",

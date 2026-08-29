@@ -564,8 +564,14 @@ check("edit profile · incomplete", () => modal(
       throw new Error("Service provider is still on offer");
     if (full.indexOf(">Contractor<") >= 0)
       throw new Error("Contractor is still on offer");
-    /* The i sits beside the select, inside the same wrapper. */
-    if (full.indexOf("um-select-i") < 0) throw new Error("the i is not on the dropdown");
+    /* The i sits in the label row, right of the label, before the marker. */
+    const lb = full.indexOf(">Business type");
+    const iAt = full.indexOf('class="um-info-b"', lb);
+    const vis = full.indexOf('class="um-vis', lb);
+    if (lb < 0 || iAt < 0 || iAt > vis) throw new Error("the i is not right of the Business type label");
+    /* And the panel's opening sentence is in the schema, not the flow. */
+    if (full.indexOf("What kind of business this is") >= 0)
+      throw new Error("the description is back in the flow");
     const infos = (full.match(/class="um-info-b"/g) || []).length;
     if (infos < 2) throw new Error("expected an i button on Business type AND Categories, found " + infos);
     return full;

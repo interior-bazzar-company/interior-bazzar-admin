@@ -635,6 +635,9 @@
   border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
   font-weight: var(--weight-normal); text-transform: none; letter-spacing: 0;
 }
+.um-info-intro { margin: 0 0 var(--space-2); padding-bottom: var(--space-2);
+                 border-bottom: 1px solid var(--line);
+                 font-size: var(--text-sm); line-height: var(--lh-md); color: var(--text-2) }
 .um-info-g {
   font-size: var(--text-2xs); letter-spacing: .08em; text-transform: uppercase;
   font-weight: var(--weight-semibold); color: var(--text-3);
@@ -644,12 +647,6 @@
 .um-info-row { display: flex; flex-direction: column; gap: 1px; padding: var(--space-1) 0 }
 .um-info-row b { font-size: var(--text-md); font-weight: var(--weight-medium); color: var(--text) }
 .um-info-row span { font-size: var(--text-sm); line-height: var(--lh-md); color: var(--text-2) }
-
-/* A dropdown with its i beside it: the select keeps the width, the button
-   keeps its size, and the two read as one control. */
-.um-select-i { display: flex; align-items: center; gap: var(--space-2) }
-.um-select-i .selectbox { flex: 1 1 auto; min-width: 0 }
-.um-select-i .um-info { flex: 0 0 auto }
 
 /* ---------------------------------------------------- deals-in checks --- */
 /* Two options that can combine are two checkboxes — a picker would hide what

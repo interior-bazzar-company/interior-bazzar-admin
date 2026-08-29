@@ -6,6 +6,45 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-29
 
+### The i sits right of the label, and opens with the field's own sentence
+
+**Area:** the Business type field
+**Files:** `EditProfile.tsx`, `InfoTip.tsx`, `store.ts`, `users.css`,
+`vocabularies.json`, `scripts/um-smoke.tsx`,
+`scripts/check-users-derivation.cjs`
+
+**What changed**
+
+The i button returns to the label row — immediately right of the label,
+before the public/internal marker — for every field that has one. One place
+to look, whatever the control below it is; the previous turn's "on the
+dropdown" placement made Business type the only field whose i lived
+somewhere else.
+
+**The panel now opens with the field's own description**, above the option
+meanings: *"What kind of business this is. It decides how the marketplace
+treats them, so it is one answer, not several."* The sentence that was
+removed from under the field in the declutter pass is back — one press
+away, not in the flow. `info` in the schema grew from a flag into that
+sentence: a string is the panel's opening line, `true` means options only.
+
+Not `hint`: that key renders under the field, and the render suite asserts
+no field has one. This text is FOR the panel.
+
+**Temp data**
+
+`vocabularies.json` — `businessType.info` is the sentence.
+
+**Verified**
+
+`check:users` 265 → 266, `check:users-render` 116. The i is asserted to sit
+between the Business type label and its marker, the sentence asserted in
+the schema and asserted absent from the form's flow.
+
+---
+
+## 2026-08-29
+
 ### Contractor leaves the business types; the i moves onto the dropdown
 
 **Area:** the Business type field

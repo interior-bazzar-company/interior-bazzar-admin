@@ -239,9 +239,11 @@ export interface ProfileField {
    *  themselves behind `info` — the picker's search box is ceremony. */
   simple?: boolean;
   /** Put an i button beside the label that drops down the option meanings.
-   *  This is where hints GO when a control is made simple: the sentences
-   *  leave the flow, they do not leave the product. */
-  info?: boolean;
+   *  A string is the panel's opening sentence — the field's own description,
+   *  above the per-option lines. This is where hints GO when a control is
+   *  made simple: the sentences leave the flow, they do not leave the
+   *  product. */
+  info?: boolean | string;
   /** The chip tone for this facet, one of the theme's `tag-*` classes.
    *  COLOUR-BY-FACET: every chip of one facet shares one colour, on the form
    *  and on the record, so the colour answers "which question is this the
