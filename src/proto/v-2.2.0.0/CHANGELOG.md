@@ -4,6 +4,107 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ---
 
+## 2026-08-29
+
+### Counts get names: a highlighted total, a stated whole, and one figure per tab
+
+**Area:** the topbar strip, the view band, the stat strip on Users and Members
+**Files:** `index.tsx`, `List.tsx`, `store.ts`, `Analytics.tsx`,
+`RenewalQueue.tsx`, `admin-theme.css`, `vocabularies.json`,
+`scripts/um-smoke.tsx`, `scripts/check-users-derivation.cjs`
+
+**What changed**
+
+**The topbar names its figures and highlights one.** `users · members · ending
+soon` became **Total users · Active Membership · Expiring soon**, and Total
+users carries a brand tint. Three equal grey figures make you read all three to
+find out which one the page is about; one highlighted figure with two beside it
+says the module is a population and the other two are qualifications of it.
+
+The tint is a new `.tb-stat.hi` rather than the existing `.on`. `.on` means
+*this filter is applied* everywhere else in the panel, and these three chips are
+read-outs that filter nothing — a chip claiming a state it cannot have is the
+kind of borrowed class that later gets "fixed" by making it clickable. The rule
+carries a companion `.tb-stat.ro.hi:hover`, which is not redundant:
+`.tb-stat.ro:hover` is the more specific selector, so without it the tint drops
+out from under the cursor on a cell that does not react to the cursor at all.
+
+**The stat strip states its whole.** Both scopes now lead with **Total**,
+followed by a separator, the way Deals and Business Enquiries already do.
+Without it the strip is a row of parts with no stated sum and nobody can tell
+whether they are meant to add up — on Users they do (20 = 6 + 7 + 1 + 2 + 3 + 1),
+on Members they do not, because Pending, Incomplete and Deactivated cut across
+the classification rather than partitioning it. Total clears the breakdown
+filters only. A search or a city is the scope somebody chose, and a cell called
+Total should not quietly throw that away.
+
+**`normal` is off the screen.** It was internal vocabulary — the key behind
+`classify()` — printed as a label. The cell is now **Users**, and every other
+cell is sentence case: Total, Users, Active members, Paused, Suspended, Former,
+Pending, Incomplete, Deactivated. This diverges from Deals and Business
+Enquiries, which are lower-case throughout; the divergence is deliberate here
+and the two older modules are the ones now out of step.
+
+**One name for one thing.** "Ending soon" and "Expiring soon" were the same
+figure under two names across the topbar, the strip and two analytics blocks,
+plus an "Ending soonest" sort option. All now read *expiring*. Two names for
+one number is how two definitions of it start.
+
+**The view band counts every tab, and counts them once.** Users and Members
+carry a figure beside their label as Renewals already did. The number came from
+somewhere different on each face — the queue counted renewals off the *filtered*
+set, analytics off the whole set, and the lists did not count at all — so one
+chip could show two different numbers depending on which face you were standing
+on. `bandCounts(rows)` in `store.ts` is now the only way any face computes them,
+and every face passes the same argument: the whole row set, never its own scoped
+or filtered population. The band is navigation. A tab whose figure moves while
+you type in the search box is reporting on the search rather than on the tab.
+
+`MEMBER_CLASSES` moved from `List.tsx` into `store.ts` for the same reason —
+the band prints the size of the Members face on a tab, and a tab that disagreed
+with the page it opens would be worse than no tab figure at all. One array, read
+by both.
+
+**Temp data**
+
+`vocabularies.json` — one sort label, "Ending soonest" → "Expiring soonest". No
+records touched.
+
+**Backend needed**
+
+None. Every figure here is derived client-side from `users.json` +
+`memberships.json` by the same `classify()` the filters use, which is what stops
+a tab and the list behind it disagreeing. Nothing new to serve.
+
+**Open decisions**
+
+None new.
+
+**Verified**
+
+`tsc -b` clean; `eslint` clean on the module and `scripts/`; `vite build`
+succeeds. `check:users` 137 → 144, `check:users-render` 79 → 87.
+
+The seven derivation assertions pin the band to the faces it points at: Users
+equals every row, Members equals the Members face's own population computed from
+`MEMBER_CLASSES`, Renewals equals pending plus expiring, and a search that
+demonstrably narrows the list moves none of them.
+
+The eight render assertions cover the labels: Total is present on both scopes
+and does **not** follow a filter down, `normal` is absent, "Users" and "Active
+members" are present, no strip cell begins lower-case, "ending soon" is gone
+from Members, and the three band figures are identical across all four faces and
+unchanged by a search.
+
+**Still not verified: the three topbar chips, including the highlight.** They
+reach the shell through `usePageChrome`, which sets them in a `useEffect`, and
+`renderToStaticMarkup` does not run effects — the topbar is empty in the harness
+by construction, not by oversight. The tint, its contrast in both themes and
+whether it survives the topbar's overflow scroll all need a browser. Nothing in
+this module has been opened in one yet.
+
+---
+
 ## 2026-08-25
 
 ### Assignment reads the real plan catalogue; three sources; Term becomes Duration

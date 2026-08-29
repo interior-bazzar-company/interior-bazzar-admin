@@ -763,6 +763,16 @@ button.tb-stat:hover{ background:var(--bg-hover) }
 .tb-stat.ro:hover{ background:none }
 .tb-stat.ro.warn .v{ color:var(--warn) }
 .tb-stat.ro.ok .v{ color:var(--ok) }
+/* EMPHASIS, not state. `.on` is "this filter is applied" everywhere else in
+   the panel, so a read-out that borrowed it would be claiming to filter. `.hi`
+   marks the one figure a topbar strip is a breakdown OF, so the rest read as
+   qualifications of it rather than as four equal numbers. One per strip: two
+   highlights is no highlight. The last rule is not redundant — `.tb-stat.ro:hover`
+   above is more specific than `.tb-stat.hi`, so without it the tint would drop
+   out from under the cursor on a cell that does not even react to the cursor. */
+.tb-stat.hi{ background:var(--brand-tint) }
+.tb-stat.hi .v,.tb-stat.hi .k{ color:var(--brand-text) }
+.tb-stat.ro.hi:hover{ background:var(--brand-tint) }
 /* Follows the stage counts directly, so Won and the money Won produced are one
    run rather than opposite ends of the bar. Its leading hairline is the same
    rule .tb-stats draws before itself — one divider style for the whole strip —

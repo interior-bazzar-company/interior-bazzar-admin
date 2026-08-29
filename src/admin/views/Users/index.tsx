@@ -85,9 +85,14 @@ export default function Users() {
     <>
       <span className="tb-title">Users Management</span>
       <span className="tb-stats">
-        <span className="tb-stat ro"><span className="k">users</span><span className="v tnum">{c.total}</span></span>
-        <span className="tb-stat ro"><span className="k">members</span><span className="v tnum">{c.activeMembers}</span></span>
-        <span className="tb-stat ro"><span className="k">ending soon</span><span className="v tnum">{c.expiringSoon}</span></span>
+        {/* `hi` is emphasis, not state. Total users is the figure this whole
+            module is a breakdown of, so it carries the tint and the other two
+            read as qualifications of it. `on` would have been the wrong class:
+            it means "this filter is applied" everywhere else in the panel and
+            these three chips filter nothing. */}
+        <span className="tb-stat ro hi"><span className="k">Total users</span><span className="v tnum">{c.total}</span></span>
+        <span className="tb-stat ro"><span className="k">Active Membership</span><span className="v tnum">{c.activeMembers}</span></span>
+        <span className="tb-stat ro"><span className="k">Expiring soon</span><span className="v tnum">{c.expiringSoon}</span></span>
       </span>
     </>
   ), [c.total, c.activeMembers, c.expiringSoon]);

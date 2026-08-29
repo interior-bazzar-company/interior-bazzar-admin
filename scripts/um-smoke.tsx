@@ -113,6 +113,77 @@ const check = (label: string, fn: () => string) => {
 console.log("\nsurfaces");
 URLS.forEach(([label, url]) => check(label, () => at(url)));
 
+/* LABELS AND THE VIEW BAND.
+   Worth asserting because both are the kind of thing that rots silently: a
+   renamed cell still renders, a tab count computed off the wrong set still
+   shows a number, and neither breaks a build. `normal` in particular was
+   internal vocabulary that had leaked onto a screen.
+
+   NOT COVERED HERE: the three topbar chips. They reach the shell through
+   usePageChrome, which sets them in a useEffect, and renderToStaticMarkup does
+   not run effects — so the topbar is empty in this harness by construction,
+   not by oversight. Those three need a browser. */
+console.log("\nstrip labels and the view band");
+{
+  const users = at("/users");
+  const members = at("/users?view=members");
+  const lbl = (h: string, k: string) => h.indexOf('class="k">' + k + "<") >= 0;
+
+  check("the strip leads with a Total", () => {
+    if (!lbl(users, "Total")) throw new Error("no Total cell on Users");
+    if (!lbl(members, "Total")) throw new Error("no Total cell on Members");
+    return users;
+  });
+  check("...and Total states the whole population, not the filtered one", () => {
+    const narrowed = at("/users?cls=normal");
+    /* 20 is every row; the filter leaves 6. The cell is a stated whole and
+       must not follow the filter down, or it stops being one. */
+    if (narrowed.indexOf(">20<") < 0) throw new Error("Total followed the filter");
+    return narrowed;
+  });
+  check("classification cells read as labels, not as internal keys", () => {
+    if (lbl(users, "normal")) throw new Error("`normal` is still on screen");
+    if (!lbl(users, "Users")) throw new Error("no Users cell");
+    if (!lbl(users, "Active members")) throw new Error("no Active members cell");
+    return users;
+  });
+  check("every strip cell is sentence case", () => {
+    const keys = (users.match(/class="k">([^<]+)</g) || [])
+      .map((m) => m.replace('class="k">', "").replace("<", ""));
+    const bad = keys.filter((k) => /^[a-z]/.test(k));
+    if (bad.length) throw new Error("lower-case: " + bad.join(", "));
+    return users;
+  });
+  check("one name for one thing: expiring, never ending", () => {
+    if (members.indexOf("nding soon") >= 0) throw new Error("`ending soon` survives on Members");
+    if (!lbl(members, "Expiring soon")) throw new Error("no Expiring soon cell");
+    return members;
+  });
+
+  /* The band figure is a promise about the page behind the tab. Asserting the
+     NUMBER rather than just its presence is the point — a count wired to the
+     wrong set still renders a tab that looks fine. */
+  const band = (h: string) => (h.match(/<i class="tnum">(\d+)<\/i>/g) || [])
+    .map((m) => m.replace(/\D/g, ""));
+  check("Users, Members and Renewals all carry a figure", () => {
+    const n = band(users);
+    if (n.length < 3) throw new Error("only " + n.length + " tabs counted");
+    return users;
+  });
+  check("...the same figures on every face", () => {
+    const a = band(users).join(",");
+    ["/users?view=members", "/users?view=renewals", "/users?view=analytics"].forEach((u) => {
+      if (band(at(u)).join(",") !== a) throw new Error("the band disagrees on " + u);
+    });
+    return users;
+  });
+  check("...and a search does not move them", () => {
+    if (band(at("/users?q=sharma")).join(",") !== band(users).join(","))
+      throw new Error("the band followed the search box");
+    return users;
+  });
+}
+
 /* The charts are the reason Analytics exists. Asserting each form actually
    reached the DOM — and on the right kind of colour token — is the difference
    between "the page loaded" and "the page has its content". The token classes

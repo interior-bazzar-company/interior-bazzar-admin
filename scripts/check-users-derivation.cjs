@@ -195,6 +195,28 @@ ok("...and the deactivated account is out of the denominator, not the history",
 ok("an empty population returns null, not 0%", S.countsOf([]).conversion, null);
 ok("pct() prints n/a for null rather than 0.0%", S.pct(null), "n/a");
 
+/* THE TAB FIGURE AND THE PAGE IT OPENS. Each is a promise: press Members and
+   you get exactly this many rows. The band used to be counted three different
+   ways — off the filtered set on the renewal queue, off the whole set on
+   analytics, and not at all on the lists — so one chip could show two numbers
+   depending on which face you were standing on. bandCounts() is now the only
+   way any face computes them, and these lines are what keep it that way. */
+console.log("\nthe view band agrees with the faces it points at");
+const band = S.bandCounts(all);
+ok("Users carries the whole population", band.users, all.length);
+ok("...which is every row, filtered or not", band.users, 20);
+ok("Members counts anyone who holds a term or ever did", band.members, 13);
+ok("...and that is exactly the Members face's own population",
+  band.members,
+  all.filter((r) => S.MEMBER_CLASSES.indexOf(r.classification) >= 0).length);
+ok("Renewals is pending plus expiring soon", band.renewals, c.pending + c.expiringSoon);
+/* The band is navigation, not a readout of the current search. Counting it off
+   a narrowed set would make the tabs argue with each other the moment somebody
+   typed a name into the box. */
+const narrowedRows = S.applyFilters(all, { q: "sharma" });
+ok("a search narrows the list", narrowedRows.length < all.length, true);
+ok("...and does not move the band", S.bandCounts(all).users, band.users);
+
 console.log("\nplan mix counts only entitling terms");
 const growth = c.byPlan.find((p) => p.code === "growth");
 ok("growth active terms", growth.n, 3);

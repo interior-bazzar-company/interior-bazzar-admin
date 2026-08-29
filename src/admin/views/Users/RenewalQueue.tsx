@@ -18,8 +18,8 @@ import type { FaceProps } from "./Frame";
 import { Assumed, PlanChip, StatusPill, WhoCell } from "./bits";
 import LifecycleModal from "./LifecycleModal";
 import {
-  CITIES, RENEWAL_WINDOW_DAYS, ago, allowedActions, applyFilters, fmtDate, recentlyEnded,
-  usePlansInUse,
+  CITIES, RENEWAL_WINDOW_DAYS, ago, allowedActions, applyFilters, bandCounts, fmtDate,
+  recentlyEnded, usePlansInUse,
 } from "./store";
 import type { LifecycleAction, UserRow } from "./store";
 
@@ -57,7 +57,7 @@ export default function RenewalQueue({ rows, p, onView, onFilter, onSearch }: Fa
 
   return (
     <Frame view="renewals" onView={onView} toast={toast}
-      counts={{ renewals: pending.length + expiring.length }}
+      counts={bandCounts(rows)}
       cmd={<>
         <SearchField ph="Name, email, phone or business…" val={p.q} onFilter={onSearch} />
         <Select name="plan" label="Plan" value={p.plan} onFilter={onFilter}

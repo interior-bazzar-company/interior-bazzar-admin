@@ -537,6 +537,34 @@ export function countsOf(rows: UserRow[]): Counts {
   };
 }
 
+/** The Members face's population: anyone who holds a term or ever did. Lives
+ *  here rather than in List.tsx because the view band prints its size on a
+ *  tab, and a tab whose figure disagreed with the page it opens would be
+ *  worse than no figure at all. */
+export const MEMBER_CLASSES: string[] =
+  ["active_member", "paused_member", "suspended_member", "former_member"];
+
+/**
+ * The figures on the view band, counted off the WHOLE row set.
+ *
+ * Every face passes `rows`, never its own scoped or filtered population. The
+ * band is navigation, and a tab whose number moves while you type in the
+ * search box is reporting on the search rather than on the tab — the same
+ * reasoning as the topbar counts. Renewals was previously counted off the
+ * filtered set on the queue and off the whole set on analytics, so one chip
+ * showed two different numbers depending on which face you were standing on.
+ * One function, called with the same argument everywhere, is what stops that
+ * coming back.
+ */
+export function bandCounts(rows: UserRow[]): Record<string, number> {
+  const c = countsOf(rows);
+  return {
+    users: c.total,
+    members: rows.filter((r) => MEMBER_CLASSES.indexOf(r.classification) >= 0).length,
+    renewals: c.pending + c.expiringSoon,
+  };
+}
+
 /* ============================================================== hooks === */
 
 function useVersion() { return useSyncExternalStore(subscribe, getVersion, getVersion); }

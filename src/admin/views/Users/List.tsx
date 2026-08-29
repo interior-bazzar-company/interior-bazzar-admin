@@ -24,12 +24,12 @@ import { ClassPill, Completeness, TermCell, WhoCell } from "./bits";
 import AssignMembership from "./AssignMembership";
 import {
   CITIES, CLASSIFICATIONS, FILTER_LABELS, MEMBERSHIP_STATUSES, REGISTERED_RANGES,
-  REGISTRATION_SOURCES, SORT_OPTIONS, TAGS, ago, applyFilters, applySort, countsOf,
+  MEMBER_CLASSES, REGISTRATION_SOURCES, SORT_OPTIONS, TAGS, ago, applyFilters, applySort,
+  bandCounts, countsOf,
   filterValueLabel, fmtDate, paginate, usePlansInUse,
 } from "./store";
 import type { UserRow } from "./store";
 
-const MEMBER_CLASSES = ["active_member", "paused_member", "suspended_member", "former_member"];
 
 export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, onPage, scope }:
   FaceProps & { scope: "users" | "members" }) {
@@ -52,46 +52,64 @@ export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, 
   const narrowed = Object.keys(p).some((k) => p[k] && ["view", "sort", "page"].indexOf(k) < 0);
 
   const off = (k: string, v: string) => (p[k] === v ? undefined : v);
+  /* The strip leads with the figure the rest of it divides up, the way Deals
+     and Business Enquiries do. Without it the cells are a set of parts with no
+     stated whole, and nobody can tell whether they are meant to add up. It
+     clears the breakdown filters rather than every filter: a search or a city
+     is the scope you chose, and a cell called Total should not silently throw
+     that away. */
+  const totalCell: StatCell = {
+    k: "Total", v: c.total,
+    on: !p.cls && !p.flag && !p.status,
+    to: hash(p, { cls: undefined, flag: undefined, status: undefined }),
+    tip: members
+      ? <>Everyone who holds a term or ever held one. The breakdown beside it splits this number and nothing overlaps.</>
+      : <>Every registered user in scope, members and non-members alike. The cells beside it are its parts.</>,
+  };
   const cells: (StatCell | "sep")[] = members
     ? [
-        { k: "active", v: c.activeMembers, dot: "ok", on: p.cls === "active_member",
+        totalCell,
+        "sep",
+        { k: "Active", v: c.activeMembers, dot: "ok", on: p.cls === "active_member",
           to: hash(p, { cls: off("cls", "active_member") }),
           tip: <>Entitled right now: an Active term inside its own dates. Paused and suspended members are customers too and are counted beside this, never inside it.</> },
-        { k: "paused", v: c.paused, dot: "warn", on: p.cls === "paused_member",
+        { k: "Paused", v: c.paused, dot: "warn", on: p.cls === "paused_member",
           to: hash(p, { cls: off("cls", "paused_member") }),
           tip: <>Temporary and resumable. The term survives and this is not churn.</> },
-        { k: "suspended", v: c.suspended, dot: "bad", on: p.cls === "suspended_member",
+        { k: "Suspended", v: c.suspended, dot: "bad", on: p.cls === "suspended_member",
           to: hash(p, { cls: off("cls", "suspended_member") }),
           tip: <>Entitlements administratively withheld. The account itself still works.</> },
         "sep",
-        { k: "former", v: c.formerMembers, on: p.cls === "former_member",
+        { k: "Former", v: c.formerMembers, on: p.cls === "former_member",
           to: hash(p, { cls: off("cls", "former_member") }),
           tip: <>Held a term once, holds none now. The win-back pool — a reading of history rather than a state anybody set.</> },
-        { k: "ending soon", v: c.expiringSoon, dot: "warn", on: p.flag === "expiring",
+        { k: "Expiring soon", v: c.expiringSoon, dot: "warn", on: p.flag === "expiring",
           to: hash(p, { flag: off("flag", "expiring") }),
           tip: <>Active terms inside the renewal window. The window is an assumption — UM-OD-11.</> },
       ]
     : [
-        { k: "normal", v: c.normal, on: p.cls === "normal",
+        totalCell,
+        "sep",
+        { k: "Users", v: c.normal, on: p.cls === "normal",
           to: hash(p, { cls: off("cls", "normal") }),
           tip: <>Registered, with no term that has ever entitled them. A user whose only term is Pending Activation is here, not in Former Members — nothing has been granted yet.</> },
-        { k: "active members", v: c.activeMembers, dot: "ok", on: p.cls === "active_member",
+        { k: "Active members", v: c.activeMembers, dot: "ok", on: p.cls === "active_member",
           to: hash(p, { cls: off("cls", "active_member") }),
           tip: <>Derived from membership state at read time. There is no stored flag behind this number.</> },
-        { k: "paused", v: c.paused, dot: "warn", on: p.cls === "paused_member",
+        { k: "Paused", v: c.paused, dot: "warn", on: p.cls === "paused_member",
           to: hash(p, { cls: off("cls", "paused_member") }) },
-        { k: "suspended", v: c.suspended, dot: "bad", on: p.cls === "suspended_member",
+        { k: "Suspended", v: c.suspended, dot: "bad", on: p.cls === "suspended_member",
           to: hash(p, { cls: off("cls", "suspended_member") }) },
-        { k: "former", v: c.formerMembers, on: p.cls === "former_member",
+        { k: "Former", v: c.formerMembers, on: p.cls === "former_member",
           to: hash(p, { cls: off("cls", "former_member") }) },
         "sep",
-        { k: "pending", v: c.pending, dot: "warn", on: p.flag === "pending",
+        { k: "Pending", v: c.pending, dot: "warn", on: p.flag === "pending",
           to: hash(p, { flag: off("flag", "pending") }),
           tip: <>A term exists and grants nothing. No entitlement snapshot is taken until somebody activates it.</> },
-        { k: "incomplete", v: c.incompleteProfiles, dot: "warn", on: p.flag === "incomplete",
+        { k: "Incomplete", v: c.incompleteProfiles, dot: "warn", on: p.flag === "incomplete",
           to: hash(p, { flag: off("flag", "incomplete") }),
           tip: <>Missing at least one field the current profile schema requires. Graded against profile v1.</> },
-        { k: "deactivated", v: c.deactivated, on: p.status === "deactivated",
+        { k: "Deactivated", v: c.deactivated, on: p.status === "deactivated",
           to: hash(p, { status: off("status", "deactivated") }),
           tip: <>An account status, not a membership classification. Their profile, terms and audit trail are all still here.</> },
       ];
@@ -102,6 +120,7 @@ export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, 
 
   return (
     <Frame view={scope} onView={onView} toast={toast}
+      counts={bandCounts(rows)}
       cmd={<>
         <SearchField ph="Name, email, phone, user ID, business or reference…"
           val={p.q} onFilter={onSearch} />

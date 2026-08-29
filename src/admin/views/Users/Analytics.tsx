@@ -28,7 +28,8 @@ import type { BarRow, Series } from "./charts";
 import DateRange from "./DateRange";
 import {
   ANALYTICS, LAST_MONTH, MEMBERSHIP_STATUSES, METRICS, RENEWAL_WINDOW_DAYS, VOCAB,
-  clampRange, countsOf, delta, money, pct, presetRange, rangeTotals, useRecentActivity,
+  bandCounts, clampRange, countsOf, delta, money, pct, presetRange, rangeTotals,
+  useRecentActivity,
 } from "./store";
 
 const dir = (extra: Record<string, string>) =>
@@ -114,7 +115,7 @@ export default function Analytics({ rows, p, onView, onParams }: FaceProps) {
 
   return (
     <Frame view="analytics" onView={onView} toast={toast}
-      counts={{ renewals: c.pending + c.expiringSoon }}
+      counts={bandCounts(rows)}
       cmd={<>
         <DateRange from={range.from} to={range.to} onPick={onRange} />
         <span className="um-against">
@@ -202,7 +203,7 @@ export default function Analytics({ rows, p, onView, onParams }: FaceProps) {
               s: t.churn.num + " of " + t.churn.den + " ending" },
             { k: "Ended in range", v: t.expiries + t.cancellations,
               s: t.expiries + " expired · " + t.cancellations + " cancelled" },
-            { k: "Ending soon", v: c.expiringSoon, tone: c.expiringSoon ? "warn" : undefined,
+            { k: "Expiring soon", v: c.expiringSoon, tone: c.expiringSoon ? "warn" : undefined,
               s: RENEWAL_WINDOW_DAYS + "-day window", to: "#/users?view=renewals" },
           ]} />
         </Block>
@@ -276,7 +277,7 @@ export default function Analytics({ rows, p, onView, onParams }: FaceProps) {
           <Tiles cols={2} list={[
             { k: "Pending activation", v: c.pending, s: "grants nothing yet",
               tone: c.pending ? "warn" : undefined, to: dir({ flag: "pending" }) },
-            { k: "Ending soon", v: c.expiringSoon, s: RENEWAL_WINDOW_DAYS + " days",
+            { k: "Expiring soon", v: c.expiringSoon, s: RENEWAL_WINDOW_DAYS + " days",
               tone: c.expiringSoon ? "warn" : undefined, to: "#/users?view=renewals" },
             { k: "Ended recently", v: c.recentlyEnded, s: "no renewal",
               to: "#/users?view=renewals&flag=ended" },
