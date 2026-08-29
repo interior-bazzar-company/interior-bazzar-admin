@@ -57,10 +57,13 @@ export function StatusPill({ k, lg }: { k: string | null | undefined; lg?: boole
   );
 }
 
-export function PlanChip({ code, name, version }: { code: string; name: string; version?: number }) {
+/** The plan and the duration bought, from the term's own frozen fields. The
+ *  catalogue is not consulted — that is what makes a term render correctly
+ *  after its plan is repriced, renamed, archived or unreachable. */
+export function PlanChip({ code, name, months }: { code: string; name: string; months?: number }) {
   return (
     <span className={"um-plan p-" + code}>
-      {name}{version ? <span className="v">v{version}</span> : null}
+      {name}{months ? <span className="v">{months}m</span> : null}
     </span>
   );
 }
@@ -141,7 +144,7 @@ export function TermCell({ r }: { r: UserRow }) {
   return (
     <div>
       <div className="um-termtop">
-        <PlanChip code={m.planCode} name={m.planName} version={m.planVersion} />
+        <PlanChip code={m.planCode} name={m.planName} months={m.cycle.months} />
         <StatusPill k={m.status} />
       </div>
       <div className="cell-2">

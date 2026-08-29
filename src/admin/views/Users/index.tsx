@@ -40,6 +40,7 @@ import Detail from "./Detail";
 import "./users.css";
 import "./charts.css";
 import "./blocks.css";
+import "./assign.css";
 
 const ROUTE = "#/users";
 

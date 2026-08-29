@@ -42,11 +42,16 @@ src/content/business-enquiries/
 src/content/users/
   users.json            → GET /admin/users and /admin/users/{id}
   memberships.json      → GET /admin/users/{id}/memberships, /admin/memberships/{id}
-  membership-plans.json → a READ of the commercial plan catalogue (UM-OD-01)
-  analytics.json        → GET /admin/users/analytics/{overview,membership,cohorts}
+  analytics.json        → GET /admin/users/analytics  (month-keyed)
   audit.json            → GET /admin/users/{id}/timeline
   vocabularies.json     → GET /admin/users/vocabularies
 ```
+
+`membership-plans.json` was here and is **deleted** — a counter-example to the
+whole convention. A stand-in is for an endpoint that does not exist yet;
+`GET /admin/plans/` already did, so seeding a second catalogue beside it was not
+a stand-in but a second source of truth for one price. If a file would shadow a
+live endpoint, the answer is to read the endpoint.
 
 `analytics.json` is worth a note as a counter-example to rule 2 below. It does
 **not** carry the headline counts — total users, Normal Users, Active Members,

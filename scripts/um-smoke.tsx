@@ -38,6 +38,7 @@ import LifecycleModal from "../src/admin/views/Users/LifecycleModal";
 import EditProfile from "../src/admin/views/Users/EditProfile";
 import { NoteModal, TagsModal, DeactivateModal } from "../src/admin/views/Users/Modals";
 import { toRow, readUsers, readMemberships } from "../src/admin/views/Users/store";
+import { __setPlansMode } from "../src/admin/views/Plans/api";
 import type { LifecycleAction } from "../src/admin/views/Users/store";
 
 /* ShellProvider calls useNavigate itself, so the Router has to be OUTSIDE it —
@@ -228,20 +229,85 @@ console.log("\ncharts on the analytics page");
 console.log("\ndialogs");
 check("assign membership", () => modal(
   <AssignMembership row={rowOf("IB-U-1041")} onClose={noop} onDone={noop} />));
-/* Lokesh holds a live STARTER term and the form opens on Starter, so the
-   refusal is on screen before anything is typed. */
-check("assign · clash refused for the selected plan", () => {
-  const html = modal(<AssignMembership row={rowOf("IB-U-0899")} onClose={noop} onDone={noop} />);
-  if (html.indexOf("already a live") < 0) throw new Error("clash warning did not render");
+
+/* THE CATALOGUE IS LIVE NOW, so the form has four states rather than one and
+   three of them are somebody else's service failing. A form that renders only
+   the happy path is a form that will show a blank list the first time the
+   plans endpoint is slow. */
+check("assign · lists only sellable plans", () => {
+  __setPlansMode("ok");
+  const html = modal(<AssignMembership row={rowOf("IB-U-1041")} onClose={noop} onDone={noop} />);
+  ["Starter", "Growth", "Pro"].forEach((t) => {
+    if (html.indexOf(t) < 0) throw new Error("missing " + t);
+  });
+  /* Off sale, archived, and on-sale-with-no-active-cycle must all be filtered
+     out — a plan with no cycle has no duration and no price. */
+  ["Legacy Bronze", "Archived Silver", "No Cycle"].forEach((t) => {
+    if (html.indexOf(t) >= 0) throw new Error("offered an unsellable plan: " + t);
+  });
   return html;
 });
-/* Meera holds a live PRO term while the form opens on Starter. There is no
-   clash — a different product is allowed — but the live term is still stated,
-   which is the difference between "no warning" and "no information". */
-check("assign · live term shown even without a clash", () => {
+check("assign · the catalogue being unreachable is stated, not hidden", () => {
+  __setPlansMode("error");
+  const html = modal(<AssignMembership row={rowOf("IB-U-1041")} onClose={noop} onDone={noop} />);
+  if (html.indexOf("could not be read") < 0) throw new Error("no failure message");
+  if (html.indexOf("Starter") >= 0) throw new Error("invented a catalogue from nowhere");
+  return html;
+});
+check("assign · an empty catalogue says what is missing", () => {
+  __setPlansMode("empty");
+  const html = modal(<AssignMembership row={rowOf("IB-U-1041")} onClose={noop} onDone={noop} />);
+  if (html.indexOf("No plan is on sale") < 0) throw new Error("no empty state");
+  return html;
+});
+check("assign · loading says so", () => {
+  __setPlansMode("loading");
+  const html = modal(<AssignMembership row={rowOf("IB-U-1041")} onClose={noop} onDone={noop} />);
+  if (html.indexOf("Reading the plan catalogue") < 0) throw new Error("no loading state");
+  __setPlansMode("ok");
+  return html;
+});
+check("assign · exactly three sources, and they are the right three", () => {
+  __setPlansMode("ok");
+  const html = modal(<AssignMembership row={rowOf("IB-U-1041")} onClose={noop} onDone={noop} />);
+  ["New sale", "Renewal", "Complimentary"].forEach((t) => {
+    if (html.indexOf(t) < 0) throw new Error("missing source " + t);
+  });
+  ["Verified payment", "Invoice paid", "Deal payment", "Manual", "Legacy"].forEach((t) => {
+    if (html.indexOf(t) >= 0) throw new Error("a removed source is still offered: " + t);
+  });
+  return html;
+});
+/* PROGRESSIVE DISCLOSURE, and it is deliberate: no plan is preselected, so
+   there is no duration to fill in and no clash to check yet. Nothing here can
+   be clicked from a server render, so what is asserted is the SHAPE — the
+   duration step is absent until a plan is chosen and the submit cannot fire.
+   The rules behind it (the default cycle, the clash, the plan code) are
+   unit-tested directly in check:users, where they need no browser. */
+check("assign · no plan preselected, so no duration step yet", () => {
+  const html = modal(<AssignMembership row={rowOf("IB-U-1041")} onClose={noop} onDone={noop} />);
+  if (html.indexOf("1 · Plan") < 0) throw new Error("no plan step");
+  if (html.indexOf("2 · Duration") >= 0) throw new Error("duration shown before a plan is chosen");
+  if (html.indexOf("disabled") < 0) throw new Error("submit is not disabled on an empty form");
+  return html;
+});
+check("assign · nothing is labelled Term any more", () => {
+  const html = modal(<AssignMembership row={rowOf("IB-U-1041")} onClose={noop} onDone={noop} />);
+  if (html.indexOf("· Term") >= 0) throw new Error("a step is still labelled Term");
+  return html;
+});
+/* No plan is chosen yet, so no clash can be claimed — but what the account
+   already holds is context and is stated regardless. That is the difference
+   between "no warning" and "no information". */
+check("assign · live terms are stated before anything is chosen", () => {
   const html = modal(<AssignMembership row={rowOf("IB-U-0912")} onClose={noop} onDone={noop} />);
   if (html.indexOf("Already live on this account") < 0) throw new Error("live terms not listed");
-  if (html.indexOf("already a live") >= 0) throw new Error("clash claimed where there is none");
+  if (html.indexOf("already holds a live") >= 0) throw new Error("clash claimed before a plan was picked");
+  return html;
+});
+check("assign · a user with nothing live gets no such notice", () => {
+  const html = modal(<AssignMembership row={rowOf("IB-U-1041")} onClose={noop} onDone={noop} />);
+  if (html.indexOf("Already live on this account") >= 0) throw new Error("claimed a live term that does not exist");
   return html;
 });
 check("edit profile", () => modal(

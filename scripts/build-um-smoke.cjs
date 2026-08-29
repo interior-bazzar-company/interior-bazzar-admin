@@ -14,6 +14,11 @@ esbuild.build({
     setup(build) {
       build.onResolve({ filter: /ShellContext$/ }, () =>
         ({ path: path.join(__dirname, "um-smoke-shell-stub.tsx") }));
+      /* The assignment form reads the LIVE plan catalogue through the Plans
+         module. There is no backend here, so the stub answers instead — and
+         switchably, so every state the form has to handle gets rendered. */
+      build.onResolve({ filter: /Plans\/api$/ }, () =>
+        ({ path: path.join(__dirname, "um-smoke-plans-stub.tsx") }));
     },
   }],
 }).catch(() => process.exit(1));

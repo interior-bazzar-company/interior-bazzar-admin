@@ -94,16 +94,80 @@ ok("history is newest term first",
 ok("the current term is the live one, not the newest terminal one",
   byId["IB-U-0912"].current.membershipId, "IB-MB-0912-3");
 
-console.log("\nentitlement snapshots are frozen, not looked up");
+/* THE SNAPSHOT IS SELF-SUFFICIENT. The plan catalogue belongs to the Plans
+   module and is read live from `v1/admin/plans/`; a term stores what it bought
+   so it renders correctly after the plan is repriced, renamed, archived — or
+   when the catalogue simply cannot be reached. Nothing below touches a
+   catalogue, and that IS the assertion. */
+console.log("\nevery term carries its own snapshot, and needs no catalogue");
 const menon = byId["IB-U-0880"].current;
-const growthV4 = require("../src/content/users/membership-plans.json")
-  .plans.find((p) => p.planCode === "growth")
-  .versions.find((v) => v.version === 4);
-ok("Menon's active term is on Growth v3", menon.planVersion, 3);
-ok("...and its listing cap is v3's, not v4's",
+ok("a term names its plan without looking it up", menon.planName, "Growth");
+ok("...carries the duration it bought", menon.cycle.months, 12);
+ok("...and the price it bought at", menon.cycle.price, 24900);
+ok("...with its entitlements frozen on the term",
   menon.entitlements.find((e) => e.key === "listings.max").display, "Up to 50 listings");
-ok("...while v4 in the catalogue says something else",
-  growthV4.entitlements.find((e) => e.key === "listings.max").display, "Up to 60 listings");
+ok("no term references a plan version any more",
+  JSON.stringify(all).indexOf("planVersion") < 0, true);
+ok("the module ships no plan catalogue of its own",
+  require("fs").existsSync("src/content/users/membership-plans.json"), false);
+ok("every source is one of the three that remain",
+  Array.from(new Set(memberships.map((m) => m.source.kind))).sort(),
+  ["new_sale", "renewal"]);
+ok("...and the vocabulary offers exactly those three plus complimentary",
+  require("../src/content/users/vocabularies.json").activationSources.map((x) => x.key),
+  ["new_sale", "renewal", "complimentary"]);
+ok("plansInUse reads the plans people actually hold",
+  S.plansInUse(memberships).map((p) => p.code).sort(), ["growth", "pro", "starter"]);
+
+/* THE PLAN RULES. They live in the store rather than inside the dialog, which
+   is what lets them be checked here with no browser and no catalogue. The
+   shapes below are what the live Plans endpoint returns. */
+console.log("\nthe plan rules the assignment form applies");
+{
+  const cyc = (id, months, price, active = true) =>
+    ({ id, months, price, oldPrice: 0, badge: "", active });
+  const pl = (id, family, title, cycles, extra = {}) =>
+    Object.assign({ id, family, title, active: true, archived: false, cycles }, extra);
+
+  ok("a plan on sale with an active cycle is sellable",
+    S.isSellable(pl(1, "growth", "Growth", [cyc(1, 12, 29500)])), true);
+  ok("...off sale is not",
+    S.isSellable(pl(2, "x", "X", [cyc(2, 12, 1)], { active: false })), false);
+  ok("...archived is not",
+    S.isSellable(pl(3, "x", "X", [cyc(3, 12, 1)], { archived: true })), false);
+  /* No cycle means no duration and no price. A plan you cannot put a number
+     against is not a plan you can sell. */
+  ok("...and on sale with no ACTIVE cycle is not",
+    S.isSellable(pl(4, "x", "X", [cyc(4, 12, 1, false)])), false);
+
+  const growth = pl(5, "growth", "Growth",
+    [cyc(50, 12, 29500), cyc(51, 6, 16500), cyc(52, 24, 53000)]);
+  ok("the duration fills in with the CHEAPEST active cycle",
+    S.defaultCycleOf(growth).months, 6);
+  ok("...and an inactive cycle is never the default",
+    S.defaultCycleOf(pl(6, "g", "G", [cyc(60, 6, 100, false), cyc(61, 12, 200)])).months, 12);
+  ok("a plan with nothing active has no default", S.defaultCycleOf(pl(7, "g", "G", [])), null);
+
+  /* The stable grouping key. The catalogue has no planCode and its numeric id
+     moves with migrations, so terms carry this instead. */
+  ok("planCode comes from the family", S.planCodeOf(growth), "growth");
+  ok("...and falls back to the title when the family is the generic one",
+    S.planCodeOf(pl(8, "business", "Pro Plus", [])), "pro-plus");
+  ok("...slugged, so it is safe in a URL",
+    S.planCodeOf(pl(9, "business", "Growth & Scale!", [])), "growth-scale");
+
+  /* THE FORM AND THE STORE CALL THE SAME FUNCTION. They disagreed for one
+     commit — the dialog warned on planCode while the write refused on planId —
+     which means the warning could show with the save going through. */
+  const meera = S.historyOf("IB-U-0912", memberships);
+  ok("a live term of the same plan is a clash",
+    S.clashFor(meera, "pro").membershipId, "IB-MB-0912-3");
+  ok("...a different plan is not", S.clashFor(meera, "starter"), null);
+  ok("...and an expired term of the same plan is not",
+    S.clashFor(S.historyOf("IB-U-0702", memberships), "starter"), null);
+  ok("liveTermsOf excludes pending, which grants nothing",
+    S.liveTermsOf(S.historyOf("IB-U-0958", memberships)).length, 0);
+}
 
 console.log("\ncounts, and the queues that read them");
 const c = S.countsOf(all);
@@ -207,13 +271,14 @@ S.resetStore();
   ok("the new term links back to the old one", !!fresh, true);
   ok("...is Active", fresh.status, "active");
   ok("...carries the next term number", fresh.termNo, before.termNo + 1);
-  /* The renewing member moves onto TODAY'S version rather than carrying the
-     old one forward silently. Menon was on Growth v3; v4 is current. */
-  ok("...snapshots the plan's CURRENT version, not the old one", fresh.planVersion, 4);
-  ok("...so its listing cap is v4's",
-    fresh.entitlements.find((e) => e.key === "listings.max").display, "Up to 60 listings");
-  ok("...while the old term still says v3's",
-    after.entitlements.find((e) => e.key === "listings.max").display, "Up to 50 listings");
+  /* SAME PLAN, SAME DURATION, carried forward. Renew used to re-read the
+     catalogue and move the member onto the current price — a commercial
+     decision this button must not take on somebody's behalf, and not one this
+     module can take at all now the catalogue is the Plans module's. */
+  ok("...carries the same plan forward", fresh.planName, before.planName);
+  ok("...and the same duration", fresh.cycle.months, before.cycle.months);
+  ok("...and the same frozen entitlements",
+    JSON.stringify(fresh.entitlements), snapshotBefore);
   ok("the renewal appended a RENEWED event and nothing else moved",
     fresh.events.map((e) => e.type), ["MEMBERSHIP_RENEWED"]);
 }
@@ -233,13 +298,25 @@ S.resetStore();
 {
   const pending = S.readMembership("IB-MB-0958-1");
   ok("a pending term starts with no entitlements", pending.entitlements.length, 0);
-  ok("activation is accepted", S.lifecycle("IB-MB-0958-1", "activate", ""), "");
+  /* A term raised before this change has nothing parked on it, so activation
+     must REFUSE rather than go live with access nobody can enumerate. */
+  ok("...and activation refuses when there is nothing to freeze",
+    S.lifecycle("IB-MB-0958-1", "activate", "").indexOf("nothing to freeze") >= 0, true);
+  ok("...leaving it Pending", S.readMembership("IB-MB-0958-1").status, "pending");
+
+  /* Give it something to freeze the way the form does, then activate. */
+  const pendingFeatures = [
+    { key: "feature.0", label: "Up to 60 listings", display: "Included" },
+    { key: "feature.1", label: "2 rotation slots", display: "Included" },
+  ];
+  S.readMembership("IB-MB-0958-1").pendingFeatures = pendingFeatures;
+  ok("activation is accepted once it has", S.lifecycle("IB-MB-0958-1", "activate", ""), "");
   const live = S.readMembership("IB-MB-0958-1");
   ok("...the status moved", live.status, "active");
   ok("...the snapshot was taken", live.entitlements.length > 0, true);
-  ok("...from the version the term names, Growth v4", live.planVersion, 4);
-  ok("...which is v4's listing cap",
-    live.entitlements.find((e) => e.key === "listings.max").display, "Up to 60 listings");
+  ok("...from what was captured when the term was raised",
+    live.entitlements.length, pendingFeatures.length);
+  ok("...and the parked copy is consumed, not left behind", live.pendingFeatures, undefined);
   /* The classification is DERIVED, so it changes because the term changed —
      nothing set it, here or anywhere. */
   const row = S.toRow(S.readUser("IB-U-0958"), S.readMemberships());
@@ -283,8 +360,11 @@ console.log("\nassignment refuses a second live term on the same product");
 S.resetStore();
 {
   const res = S.assignMembership("IB-U-0912", {
-    planId: "PL-PRO", versionId: "PLV-PRO-2", source: "payment", reference: "PAY-X",
-    reason: "", startAt: "2026-09-01T00:00:00+05:30", endAt: "2027-08-31T23:59:59+05:30",
+    planId: "9", planCode: "pro", planName: "Pro",
+    cycle: { months: 12, price: 29500, currency: "INR" },
+    features: [{ key: "feature.0", label: "Everything in the plan", display: "Included" }],
+    source: "new_sale", reference: "PAY-X", reason: "",
+    startAt: "2026-09-01T00:00:00+05:30", endAt: "2027-08-31T23:59:59+05:30",
     activateNow: false,
   });
   ok("a duplicate Pro term is refused", res.error.indexOf("already a live") >= 0, true);
@@ -295,28 +375,42 @@ console.log("\nassignment demands what its source demands");
 S.resetStore();
 {
   const noRef = S.assignMembership("IB-U-1041", {
-    planId: "PL-STARTER", versionId: "PLV-STARTER-4", source: "invoice", reference: "  ",
-    reason: "", startAt: "2026-09-01T00:00:00+05:30", endAt: "2027-08-31T23:59:59+05:30",
+    planId: "7", planCode: "starter", planName: "Starter",
+    cycle: { months: 12, price: 29500, currency: "INR" },
+    features: [{ key: "feature.0", label: "Everything in the plan", display: "Included" }],
+    source: "new_sale", reference: "  ", reason: "",
+    startAt: "2026-09-01T00:00:00+05:30", endAt: "2027-08-31T23:59:59+05:30",
     activateNow: false,
   });
-  ok("invoice source with no invoice number is refused",
-    noRef.error.indexOf("required for this source") >= 0, true);
+  ok("a new sale with no payment reference is refused",
+    noRef.error.indexOf("is required for a new sale") >= 0, true);
 
   const noReason = S.assignMembership("IB-U-1041", {
-    planId: "PL-STARTER", versionId: "PLV-STARTER-4", source: "complimentary", reference: "",
-    reason: "   ", startAt: "2026-09-01T00:00:00+05:30", endAt: "2027-08-31T23:59:59+05:30",
+    planId: "7", planCode: "starter", planName: "Starter",
+    cycle: { months: 12, price: 29500, currency: "INR" },
+    features: [{ key: "feature.0", label: "Everything in the plan", display: "Included" }],
+    source: "complimentary", reference: "", reason: "   ",
+    startAt: "2026-09-01T00:00:00+05:30", endAt: "2027-08-31T23:59:59+05:30",
     activateNow: false,
   });
   ok("a complimentary grant with no reason is refused",
-    noReason.error.indexOf("reason is required") >= 0, true);
+    noReason.error.indexOf("needs a stated reason") >= 0, true);
 
   const good = S.assignMembership("IB-U-1041", {
-    planId: "PL-STARTER", versionId: "PLV-STARTER-4", source: "complimentary", reference: "",
-    reason: "Founder approved on a call.", startAt: "2026-09-01T00:00:00+05:30",
-    endAt: "2027-08-31T23:59:59+05:30", activateNow: false,
+    planId: "7", planCode: "starter", planName: "Starter",
+    cycle: { months: 12, price: 29500, currency: "INR" },
+    features: [{ key: "feature.0", label: "Everything in the plan", display: "Included" }],
+    source: "complimentary", reference: "", reason: "Founder approved on a call.",
+    startAt: "2026-09-01T00:00:00+05:30", endAt: "2027-08-31T23:59:59+05:30",
+    activateNow: false,
   });
   ok("...and is accepted once it has one", good.error, "");
   ok("...raised at Pending, not Active", !!good.membershipId, true);
+  const raised = S.readMembership(good.membershipId);
+  ok("...with the duration it was sold frozen on it", raised.cycle.months, 12);
+  ok("...nothing entitled yet", raised.entitlements.length, 0);
+  ok("...but what to freeze is parked, ready for activation",
+    raised.pendingFeatures.length, 1);
 }
 
 console.log("\na profile save with a required field empty writes nothing");

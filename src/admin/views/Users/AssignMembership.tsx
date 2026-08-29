@@ -29,25 +29,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { Icon, Notice } from "../../ui";
 import { usePlans, rangeOf } from "../Plans/api";
-import type { Cycle, Plan } from "../Plans/api";
-import { ACTIVATION_SOURCES, assignMembership, fmtDate, money, sourceMeta } from "./store";
+
+import {
+  ACTIVATION_SOURCES, assignMembership, clashFor, defaultCycleOf, fmtDate, isSellable,
+  liveTermsOf, money, planCodeOf, sourceMeta,
+} from "./store";
 import type { Entitlement, UserRow } from "./store";
 import { Assumed, ClassPill } from "./bits";
 
 const iso = (d: Date) => d.toISOString().slice(0, 10);
-
-/** The plan's default duration: its cheapest ACTIVE cycle. Cheapest rather
- *  than longest, because that is the one a buyer lands on and the one this
- *  form should not talk somebody out of by accident. */
-const defaultCycle = (p: Plan): Cycle | null => {
-  const on = p.cycles.filter((c) => c.active);
-  return on.slice().sort((a, b) => a.price - b.price)[0] || null;
-};
-
-/** A plan is offerable when it is on sale, not archived, and has at least one
- *  active cycle — because without a cycle there is no duration and no price,
- *  and a plan you cannot put a number against is not a plan you can sell. */
-const sellable = (p: Plan) => p.active && !p.archived && p.cycles.some((c) => c.active);
 
 export default function AssignMembership({ row, onClose, onDone }: {
   row: UserRow;
@@ -56,7 +46,7 @@ export default function AssignMembership({ row, onClose, onDone }: {
 }) {
   const [tick, setTick] = useState(0);
   const { loading, plans, error } = usePlans(tick);
-  const catalogue = useMemo(() => plans.filter(sellable), [plans]);
+  const catalogue = useMemo(() => plans.filter(isSellable), [plans]);
 
   const [planId, setPlanId] = useState<number | null>(null);
   const [cycleId, setCycleId] = useState<number | null>(null);
@@ -80,7 +70,7 @@ export default function AssignMembership({ row, onClose, onDone }: {
   useEffect(() => {
     if (!plan) return;
     if (cycle && cycle.active && plan.cycles.some((c) => c.id === cycle.id)) return;
-    const d = defaultCycle(plan);
+    const d = defaultCycleOf(plan);
     setCycleId(d ? d.id : null);
   }, [plan, cycle]);
 
@@ -99,9 +89,8 @@ export default function AssignMembership({ row, onClose, onDone }: {
      would CLASH with the plan selected right now. Two different questions: the
      live terms are context and are always shown, the clash is a refusal and
      appears only when it applies. */
-  const live = row.history.filter((m) =>
-    ["active", "paused", "suspended"].indexOf(m.status) >= 0);
-  const clash = plan ? live.filter((m) => m.planCode === planCode(plan))[0] || null : null;
+  const live = liveTermsOf(row.history);
+  const clash = plan ? clashFor(row.history, planCodeOf(plan)) : null;
 
   const submit = () => {
     if (!plan || !cycle) { setErr("Pick a plan and a duration."); return; }
@@ -109,7 +98,7 @@ export default function AssignMembership({ row, onClose, onDone }: {
     setBusy(true);
     const res = assignMembership(row.user.userId, {
       planId: String(plan.id),
-      planCode: planCode(plan),
+      planCode: planCodeOf(plan),
       planName: plan.title,
       cycle: { months: cycle.months, price: cycle.price, currency: "INR" },
       /* Captured NOW, from the live catalogue, and frozen at activation. The
@@ -202,7 +191,7 @@ export default function AssignMembership({ row, onClose, onDone }: {
           ) : (
             <div className="um-choices">
               {catalogue.map((pl) => {
-                const d = defaultCycle(pl);
+                const d = defaultCycleOf(pl);
                 const r = rangeOf(pl);
                 return (
                   <button key={pl.id} type="button"
@@ -381,13 +370,4 @@ export default function AssignMembership({ row, onClose, onDone }: {
       </div>
     </>
   );
-}
-
-/* The live catalogue has no `planCode`; the terms this module writes need a
-   stable, readable key to group and filter by. The family is that key where the
-   plan has one, falling back to a slug of the title — derived once, here, so
-   every term this form writes groups the same way. */
-function planCode(p: Plan): string {
-  const base = (p.family && p.family !== "business" ? p.family : p.title) || p.title;
-  return base.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }

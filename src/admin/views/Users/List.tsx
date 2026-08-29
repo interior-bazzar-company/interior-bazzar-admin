@@ -23,9 +23,9 @@ import type { FaceProps } from "./Frame";
 import { ClassPill, Completeness, TermCell, WhoCell } from "./bits";
 import AssignMembership from "./AssignMembership";
 import {
-  CITIES, CLASSIFICATIONS, FILTER_LABELS, MEMBERSHIP_STATUSES, PLANS, REGISTERED_RANGES,
+  CITIES, CLASSIFICATIONS, FILTER_LABELS, MEMBERSHIP_STATUSES, REGISTERED_RANGES,
   REGISTRATION_SOURCES, SORT_OPTIONS, TAGS, ago, applyFilters, applySort, countsOf,
-  filterValueLabel, fmtDate, paginate,
+  filterValueLabel, fmtDate, paginate, usePlansInUse,
 } from "./store";
 import type { UserRow } from "./store";
 
@@ -35,6 +35,10 @@ export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, 
   FaceProps & { scope: "users" | "members" }) {
   const { toast, modal, closeLayer } = useShell();
   const members = scope === "members";
+  /* The plans people actually hold, not a catalogue this module does not own.
+     A filter that offers a plan nobody has is a filter with a guaranteed empty
+     result in it. */
+  const plans = usePlansInUse();
 
   /* The scope narrows the POPULATION before any filter runs, so every count in
      the strip is a count of what this screen is about. */
@@ -108,7 +112,7 @@ export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, 
         <Select name="ms" label="Membership" value={p.ms} onFilter={onFilter}
           options={MEMBERSHIP_STATUSES.map((x) => ({ v: x.key, l: x.label }))} />
         <Select name="plan" label="Plan" value={p.plan} onFilter={onFilter}
-          options={PLANS.map((x) => ({ v: x.planCode, l: x.name }))} />
+          options={plans.map((x) => ({ v: x.code, l: x.name }))} />
         <Select name="city" label="City" value={p.city} onFilter={onFilter}
           options={CITIES.map((x) => ({ v: x, l: x }))} />
         <Select name="src" label="Via" value={p.src} onFilter={onFilter}

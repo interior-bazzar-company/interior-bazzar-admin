@@ -1,11 +1,20 @@
 /* =============================================================================
    Users Management — the data module.
    -----------------------------------------------------------------------------
-   THE ONLY FILE IN THIS MODULE THAT KNOWS WHERE RECORDS COME FROM. Every view
-   imports from here; no view imports JSON and no view fetches. When the API
-   lands, the five imports below become AdminOpsService calls and the write
-   simulation underneath comes out — the views, the CSS and the URL scheme do
-   not move. See src/proto/v-2.2.0.0/BACKEND-INTEGRATION.md.
+   THE ONLY FILE IN THIS MODULE THAT KNOWS WHERE ITS OWN RECORDS COME FROM.
+   Every view imports from here; no view imports JSON. When the API lands, the
+   five imports below become AdminOpsService calls and the write simulation
+   underneath comes out — the views, the CSS and the URL scheme do not move.
+   See src/proto/v-2.2.0.0/BACKEND-INTEGRATION.md.
+
+   ONE VIEW FETCHES, AND IT IS DELIBERATE. The assignment dialog reads the plan
+   catalogue live through the Plans module (`views/Plans/api`), because the
+   catalogue is not this module's data — it is another module's, already served,
+   and copying it here would be two sources of truth for one price. It does not
+   route through this file for the same reason: this file owns the seed that
+   becomes an endpoint, not somebody else's endpoint that already exists.
+   Nothing else in the module reads it; a term freezes what it bought, so every
+   list, record and chart renders with the catalogue unreachable.
 
    THE ONE RULE THIS FILE EXISTS TO ENFORCE
    ----------------------------------------
@@ -179,6 +188,12 @@ export const RENEWAL_WINDOW_DAYS = vocabDoc.renewalWindowDays;
 export const PROFILE_SCHEMA_VERSION = vocabDoc.profileSchemaVersion;
 export const ANALYTICS = analyticsDoc;
 export const PAUSE_POLICY = membershipsDoc.pausePolicy;
+/* Plan display names for the ANALYTICS series only, and they travel with that
+   payload rather than being looked up in the catalogue. Analytics is a
+   historical series: a plan renamed or archived last quarter still has months
+   attributed to it, and a lookup would leave those months labelled with a raw
+   key or nothing at all. */
+export const PLAN_LABELS = ANALYTICS.planLabels as Record<string, string>;
 
 export const classificationMeta = (k: Classification) =>
   CLASSIFICATIONS.filter((c) => c.key === k)[0] || CLASSIFICATIONS[0];
@@ -727,11 +742,21 @@ export function assignMembership(userId: string, input: AssignInput): { error: s
     return { error: "The end date has to be after the start date.", membershipId: null };
 
   const history = historyOf(userId, snap.memberships);
-  const clash = history.filter((m) =>
-    m.planId === input.planId && LIVE.indexOf(m.status) >= 0 && m.status !== "pending");
+  /* MATCHED ON planCode, NOT planId, and the two are not interchangeable.
+     `planId` is the catalogue's own key and moves with it — a term raised
+     before a migration, or against a plan that has since been replaced, holds
+     an id nothing will match again. `planCode` is derived from the plan's
+     family or title and is what this module groups, filters and reports by,
+     so it is what "one entitlement per product" has to mean.
+
+     It is also what the FORM checks. They disagreed for one commit: the dialog
+     warned on planCode while this refused on planId, so the warning could show
+     with the save going through, or the save could be refused with nothing on
+     screen explaining why. One key, both places. */
+  const clash = clashFor(history, input.planCode) ? [clashFor(history, input.planCode)] : [];
   if (clash.length)
     return {
-      error: "There is already a live " + input.planName + " term (" + clash[0].membershipId
+      error: "There is already a live " + input.planName + " term (" + clash[0]!.membershipId
         + "). One active entitlement per product — end that one first.",
       membershipId: null,
     };
@@ -1014,7 +1039,7 @@ export function rangeTotals(fromMonth: string, toMonth: string): RangeTotals {
     })),
     byPlan: planKeys.map((k) => ({
       code: k,
-      label: planByCode(k)?.name || k,
+      label: PLAN_LABELS[k] || k,
       newTerms: sum(rows, (m) => m.byPlan[k][0]),
       renewals: sum(rows, (m) => m.byPlan[k][1]),
       expired: sum(rows, (m) => m.byPlan[k][2]),
@@ -1029,6 +1054,61 @@ export function rangeTotals(fromMonth: string, toMonth: string): RangeTotals {
     } : null,
   };
 }
+
+/* ==================================================== the plan rules ===
+   The catalogue is the Plans module's, but the RULES about what may be sold
+   and what a term freezes are this module's — so they live here, beside the
+   derivation, rather than inside a dialog. That is also what makes them
+   testable: `check:users` calls these directly, with no browser and no
+   catalogue.
+
+   Typed structurally rather than against the Plans module, so this file has no
+   import from it. What matters is the shape: a plan with billing cycles. */
+
+export interface CycleLike { id: number; months: number; price: number; active: boolean }
+export interface PlanLike {
+  id: number; title: string; family: string; active: boolean; archived: boolean;
+  cycles: CycleLike[];
+}
+
+/** Offerable: on sale, not archived, and with at least one active cycle.
+ *  Without a cycle there is no duration and no price, and a plan you cannot put
+ *  a number against is not a plan you can sell. */
+export const isSellable = (p: PlanLike) =>
+  p.active && !p.archived && p.cycles.some((c) => c.active);
+
+/** The plan default the duration field fills itself in with: the cheapest
+ *  ACTIVE cycle. Cheapest rather than longest, because that is where a buyer
+ *  lands and this form should not talk somebody into a longer commitment by
+ *  defaulting them into one. */
+export function defaultCycleOf(p: PlanLike): CycleLike | null {
+  const on = p.cycles.filter((c) => c.active);
+  return on.slice().sort((a, b) => a.price - b.price)[0] || null;
+}
+
+/** The stable grouping key for a plan. The live catalogue has no `planCode` and
+ *  its numeric id moves with migrations, so terms carry a key derived from the
+ *  family (or the title where the family is the generic one). Everything this
+ *  module groups, filters, reports and refuses duplicates by uses this. */
+export function planCodeOf(p: PlanLike): string {
+  const base = (p.family && p.family !== "business" ? p.family : p.title) || p.title;
+  return base.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+/** The term that would collide with `planCode`, or null. One live entitlement
+ *  per product — the client half of 409 active_membership_conflict, so the
+ *  operator is told before they fill the form in rather than after they submit
+ *  it. The dialog and `assignMembership()` both call this, so they cannot
+ *  disagree about what a clash is. */
+export function clashFor(history: Membership[], planCode: string): Membership | null {
+  return history.filter((m) =>
+    m.planCode === planCode && LIVE.indexOf(m.status) >= 0 && m.status !== "pending")[0] || null;
+}
+
+/** Every term currently entitling, pausing or suspending — context for the
+ *  assignment dialog. A different plan is fine; the same one is not. */
+export const liveTermsOf = (history: Membership[]) =>
+  history.filter((m) => LIVE.indexOf(m.status) >= 0 && m.status !== "pending");
 
 /** Presets, expressed as a month count back from the newest month. `custom` is
  *  whatever the calendar last set. */
@@ -1123,7 +1203,9 @@ export const FILTER_LABELS: Record<string, string> = {
 export function filterValueLabel(key: string, value: string): string {
   if (key === "cls") return classificationMeta(value as Classification).label;
   if (key === "ms") return membershipMeta(value)?.label || value;
-  if (key === "plan") return planByCode(value)?.name || value;
+  /* The label comes from a term that holds the plan, because the catalogue is
+     not ours to read here. No term, no label — the raw code is honest. */
+  if (key === "plan") return plansInUse(snap.memberships).filter((p) => p.code === value)[0]?.name || value;
   if (key === "src") return REGISTRATION_SOURCES.filter((s) => s.key === value)[0]?.label || value;
   if (key === "tag") return tagMeta(value)?.label || value;
   if (key === "registered") return REGISTERED_RANGES.filter((r) => r.key === value)[0]?.label || value;

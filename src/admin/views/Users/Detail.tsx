@@ -31,7 +31,7 @@ import EditProfile from "./EditProfile";
 import { DeactivateModal, NoteModal, TagsModal } from "./Modals";
 import {
   PROFILE_FIELDS, PROFILE_SCHEMA_VERSION, RENEWAL_WINDOW_DAYS, VOCAB,
-  ago, allowedActions, fmtDate, fmtDateTime, resetStore, sourceMeta, useTimeline, versionOf,
+  ago, allowedActions, fmtDate, fmtDateTime, money, resetStore, sourceMeta, useTimeline,
 } from "./store";
 import type { LifecycleAction, Membership, Params, UserRow } from "./store";
 
@@ -140,7 +140,7 @@ export default function Detail({ id, p, rows, onFilter }: {
                 <h3>Current term</h3>
                 <span className="d mono">{term.membershipId}</span>
                 <span className="r">
-                  <PlanChip code={term.planCode} name={term.planName} version={term.planVersion} />
+                  <PlanChip code={term.planCode} name={term.planName} months={term.cycle.months} />
                   <StatusPill k={term.status} />
                 </span>
               </div>
@@ -159,11 +159,12 @@ export default function Detail({ id, p, rows, onFilter }: {
                   </>],
                   ["Raised by", <>{term.createdBy} · {fmtDateTime(term.createdAt)}</>],
                   ["Activated", term.activatedAt ? fmtDateTime(term.activatedAt) : "not yet"],
-                  ["Plan version", <>
-                    {term.planName} v{term.planVersion}
-                    {versionOf(term.planId, term.versionId)?.effectiveTo
-                      ? <em className="faint"> — superseded since; this term keeps it</em>
-                      : null}
+                  ["Plan and duration", <>
+                    {term.planName} · {term.cycle.months} months · {money(term.cycle.price)}
+                    <div className="um-fine">
+                      Frozen on the term. The catalogue can be repriced, renamed or archived
+                      without moving this.
+                    </div>
                   </>],
                   ...(term.source.note ? [["Reason", term.source.note] as [string, string]] : []),
                 ]} />
@@ -475,7 +476,7 @@ function History({ row, p, onFilter, onAct, writable }: {
             <span className="d mono">{selected.membershipId}</span>
             <span className="r">
               <PlanChip code={selected.planCode} name={selected.planName}
-                version={selected.planVersion} />
+                months={selected.cycle.months} />
               <StatusPill k={selected.status} />
               <button className="btn sm" onClick={() => onFilter("term", "")}>
                 <Icon name="x" size="sm" />Close
@@ -485,8 +486,8 @@ function History({ row, p, onFilter, onAct, writable }: {
           <div className="card-b">
             <KvList pairs={[
               ["Entitlement period", <>{fmtDate(selected.startAt)} — {fmtDate(selected.endAt)}</>],
-              ["Plan snapshot", <>{selected.planName} v{selected.planVersion}{" "}
-                <span className="mono faint">{selected.versionId}</span></>],
+              ["Plan snapshot", <>{selected.planName} · {selected.cycle.months} months ·{" "}
+                {money(selected.cycle.price)}</>],
               ["Source", <>{selected.source.label}
                 {selected.source.reference
                   ? <> · <span className="mono">{selected.source.reference}</span></> : null}</>],
@@ -559,7 +560,7 @@ function History({ row, p, onFilter, onAct, writable }: {
                     <div className="cell-1">#{m.termNo}</div>
                     <div className="cell-2 mono">{m.membershipId}</div>
                   </td>
-                  <td><PlanChip code={m.planCode} name={m.planName} version={m.planVersion} /></td>
+                  <td><PlanChip code={m.planCode} name={m.planName} months={m.cycle.months} /></td>
                   <td>
                     <div className="cell-1">{m.source.label}</div>
                     <div className="cell-2">

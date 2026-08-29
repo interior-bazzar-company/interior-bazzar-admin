@@ -107,7 +107,7 @@ const COPY: Record<LifecycleAction, {
     consequences: [
       <>Creates a <b>new membership record</b> carrying <span className="mono">previousMembershipId</span> back to this one.</>,
       <>This term is <b>not modified</b> — not its status, not its dates, not its snapshot. That is what makes renewal rate and lifetime value reconstructable at all.</>,
-      <>The new term snapshots the plan's <b>current</b> version, so a renewing member moves onto today's terms rather than carrying old ones forward silently.</>,
+      <>The new term carries this one's <b>plan and duration</b> forward. Moving somebody to a different plan or a different length is an assignment, not a renewal — this button must not reprice a member on their behalf.</>,
       <>A renewal is <b>never counted as a new member</b>. It appears beside first-time members on every chart, never inside them.</>,
     ],
     after: "A new term, with the old one untouched beside it.",
@@ -140,7 +140,7 @@ export default function LifecycleModal({ m, row, action, onClose, onDone }: {
       <div className="md-h">
         <h3>{copy.heading}</h3>
         <p>
-          {row.user.identity.name} · <PlanChip code={m.planCode} name={m.planName} version={m.planVersion} />{" "}
+          {row.user.identity.name} · <PlanChip code={m.planCode} name={m.planName} months={m.cycle.months} />{" "}
           <StatusPill k={m.status} /> · <span className="mono">{m.membershipId}</span>
         </p>
         <button className="md-x" data-close="1" onClick={onClose}><Icon name="x" /></button>
@@ -185,7 +185,7 @@ export default function LifecycleModal({ m, row, action, onClose, onDone }: {
           <div className="um-renewpreview">
             <b>This term stays exactly as it is</b>
             <span>
-              {m.planName} v{m.planVersion} · {fmtDate(m.startAt)} to {fmtDate(m.endAt)} ·{" "}
+              {m.planName} · {m.cycle.months} months · {fmtDate(m.startAt)} to {fmtDate(m.endAt)} ·{" "}
               {membershipMeta(m.status)?.label}
             </span>
             <em>The new term starts where this one ends and references it.</em>

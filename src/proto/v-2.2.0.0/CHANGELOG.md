@@ -6,6 +6,122 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-25
 
+### Assignment reads the real plan catalogue; three sources; Term becomes Duration
+
+**Area:** the Assign membership dialog, and everything that touched the old catalogue
+**Files:** `AssignMembership.tsx`, `store.ts`, `memberships.json`,
+`vocabularies.json`, `analytics.json`, `membership-plans.json` (deleted),
+`assign.css` (new), `bits.tsx`, `Detail.tsx`, `LifecycleModal.tsx`, `List.tsx`,
+`RenewalQueue.tsx`, `index.tsx`, `scripts/um-smoke-plans-stub.tsx` (new),
+`scripts/um-smoke.tsx`, `scripts/build-um-smoke.cjs`,
+`scripts/check-users-derivation.cjs`, `BACKEND-INTEGRATION.md`
+
+**What changed**
+
+**The plans are the real ones, and `membership-plans.json` is deleted.** This
+module shipped its own catalogue, which is two sources of truth for one price:
+reprice Growth in the Plans module and this form would have carried on selling
+the old number until a member queried an invoice. The dialog now reads
+`v1/admin/plans/` through the Plans module's own `usePlans()` — the same
+Subscription and PlanBillingCycle rows the public plans page charges from.
+**UM-OD-01 is closed**, and the answer is consume, never define.
+
+**The billing cycle IS the duration.** The real catalogue has no "plan
+versions"; it has a plan with cycles, each a number of months and a price.
+That is what a member buys, so it is what the form picks and what the term
+freezes. Choosing a plan fills the duration in with that plan's **cheapest
+active cycle** — cheapest rather than longest, because that is where a buyer
+lands and this form should not default somebody into a longer commitment — and
+only the chosen one is carried onto the term. The step is called **Duration**;
+nothing is called Term any more.
+
+**Three sources, not five.** `new_sale`, `renewal`, `complimentary`. The old
+list mixed two different questions — WHY the term exists and WHERE the money is
+recorded — and the second is not a source, it is a reference, which is one
+field below. Five near-synonyms get picked inconsistently and every analytic
+built on the choice inherits the inconsistency. The seed's eighteen terms were
+migrated: anything with a `previousMembershipId` is a renewal, the rest are new
+sales.
+
+**A term is now self-sufficient.** `versionId`/`planVersion` are gone, replaced
+by `cycle{months,price,currency}` alongside the frozen `planName` and
+`entitlements[]`. Nothing on a record, a list or the analytics reads the
+catalogue — which is what lets a term render correctly after its plan is
+repriced, renamed or archived, and render **at all** when the catalogue is
+unreachable. Only assignment and renewal need it live.
+
+**Renewal stopped repricing people.** It used to re-read the catalogue and move
+the member onto the current version silently. It now carries the same plan and
+the same duration forward: moving somebody to a different plan or length is an
+assignment, and repricing a member on their behalf is a commercial decision a
+Renew button must not take — and not one this module can take at all now the
+catalogue belongs to Plans.
+
+**Clearer form.** Six numbered steps whose shape matches the question: plans and
+durations are cards you press, the source is a radio list with its consequence
+written beside each option, and the last block is a summary restating the sale
+in the member's terms — plan, months, price, dates, source — because a form
+whose effect you must reconstruct from six scattered controls is one people
+submit without reading. No plan is preselected, so the duration step does not
+appear until there is a plan to have a duration of.
+
+**Temp data**
+
+`membership-plans.json` — **deleted**, not replaced. `memberships.json` —
+migrated: `versionId`/`planVersion` out, `cycle{months,price,currency}` in,
+source kinds remapped, and the event notes that named plan versions rewritten.
+`vocabularies.json` — `activationSources` reduced to three.
+`analytics.json` — gained `planLabels`, because the analytics series is
+historical and a plan renamed last quarter still has months attributed to it;
+a catalogue lookup would leave those months labelled with a raw key.
+
+**Backend needed**
+
+`GET /admin/plans/` — **already live**, now a dependency of this module.
+`GET /admin/users/{id}/memberships` — the row shape changed and
+[BACKEND-INTEGRATION.md](BACKEND-INTEGRATION.md) is updated: `cycle` replaces
+the version fields, **the row must be self-sufficient** (no field may need a
+catalogue lookup to render), and `planCode` is the stable grouping key rather
+than `planId`. UM-T02 resolves the plan and cycle against the live catalogue
+and refuses one that is off sale, archived or has no active cycle; UM-T06
+carries the previous term's plan and cycle forward.
+
+**Open decisions**
+
+**UM-OD-01 closed.** UM-OD-03 (complimentary) narrowed to one of three sources
+with a mandatory reason. No new ones.
+
+**Verified**
+
+`tsc -b` clean from cold; `eslint` clean on the module and `scripts/`;
+`vite build` succeeds at 848.60 kB. `check:users` grew 112 → 137;
+`check:users-render` 72 → 79.
+
+The render harness gained a **switchable Plans stub**, because the catalogue is
+somebody else's service now and the form has four states rather than one — three
+of them that service failing. All four are asserted: the populated catalogue
+(and that off-sale, archived and no-active-cycle plans are filtered out of it),
+the unreachable case (stated, and no invented fallback), the empty case, and
+loading.
+
+The plan rules moved out of the dialog into `store.ts` — `isSellable`,
+`defaultCycleOf`, `planCodeOf`, `clashFor`, `liveTermsOf` — which is where the
+derivation lives and, more usefully, where they can be unit-tested with no
+browser and no catalogue. Twelve new assertions cover them directly.
+
+**That move caught a real bug.** The dialog computed its duplicate warning on
+`planCode` while `assignMembership()` refused on `planId` — so the warning could
+appear while the save went through, or the save could be refused with nothing on
+screen explaining why. Both call `clashFor()` now. `planId` was the wrong key
+regardless: it is the catalogue's own, and it moves with migrations.
+
+**Still not verified:** no browser. Nothing here proves the form is usable —
+only that it renders every state, applies the right rules, and refuses what it
+should. The plan cards, the duration cards and the summary block have not been
+looked at, in either theme.
+
+## 2026-08-25
+
 ### Analytics gets cards, a two-up grid, and a range picker that actually re-cuts the numbers
 
 **Area:** `#/users?view=analytics`

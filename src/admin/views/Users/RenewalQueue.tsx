@@ -18,7 +18,8 @@ import type { FaceProps } from "./Frame";
 import { Assumed, PlanChip, StatusPill, WhoCell } from "./bits";
 import LifecycleModal from "./LifecycleModal";
 import {
-  CITIES, PLANS, RENEWAL_WINDOW_DAYS, ago, allowedActions, applyFilters, fmtDate, recentlyEnded,
+  CITIES, RENEWAL_WINDOW_DAYS, ago, allowedActions, applyFilters, fmtDate, recentlyEnded,
+  usePlansInUse,
 } from "./store";
 import type { LifecycleAction, UserRow } from "./store";
 
@@ -32,6 +33,7 @@ const BANDS = [
 
 export default function RenewalQueue({ rows, p, onView, onFilter, onSearch }: FaceProps) {
   const { toast, modal, closeLayer } = useShell();
+  const plans = usePlansInUse();
 
   /* The shared filters still apply — a queue you cannot narrow to one city is
      a queue two people cannot split between them. */
@@ -59,7 +61,7 @@ export default function RenewalQueue({ rows, p, onView, onFilter, onSearch }: Fa
       cmd={<>
         <SearchField ph="Name, email, phone or business…" val={p.q} onFilter={onSearch} />
         <Select name="plan" label="Plan" value={p.plan} onFilter={onFilter}
-          options={PLANS.map((x) => ({ v: x.planCode, l: x.name }))} />
+          options={plans.map((x) => ({ v: x.code, l: x.name }))} />
         <Select name="city" label="City" value={p.city} onFilter={onFilter}
           options={CITIES.map((x) => ({ v: x, l: x }))} />
         <span className="spacer" />
