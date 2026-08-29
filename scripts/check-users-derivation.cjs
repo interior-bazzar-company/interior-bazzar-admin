@@ -505,6 +505,25 @@ S.resetStore();
      so it is the one that has to say what it commits you to. */
   ok("the delivery models say what they commit you to",
     S.CATEGORIES.filter((c) => c.group === "delivery" && !c.hint).map((c) => c.key), []);
+
+  /* COLOUR-BY-FACET. The chip tone is declared per FIELD and the CSS restates
+     each used tone by name, so the contract is: every declared tone is one the
+     stylesheet knows, and every facet that renders chips declares one. A tone
+     the CSS does not restate silently falls back to brand tint — wrong colour,
+     no error. */
+  const KNOWN_TONES = ["tag-violet", "tag-green", "tag-blue", "tag-amber", "tag-teal", "tag-slate"];
+  const chipped = S.PROFILE_FIELDS.filter((f) => f.chip);
+  ok("every declared chip tone is one the stylesheet restates",
+    chipped.filter((f) => KNOWN_TONES.indexOf(f.chip) < 0).map((f) => f.key), []);
+  ok("every chip-rendering facet declares a tone",
+    S.PROFILE_FIELDS
+      .filter((f) => ["single", "multi", "tags"].indexOf(f.type) >= 0 && !f.chip)
+      .map((f) => f.key), []);
+  /* One colour answers one question. The two location singles SHARE slate on
+     purpose — they are halves of the same answer — but no marketplace facet
+     may share a tone with another, or the colour stops meaning anything. */
+  const market = chipped.filter((f) => f.chip !== "tag-slate").map((f) => f.chip);
+  ok("no two marketplace facets share a colour", market.length, new Set(market).size);
 }
 
 console.log("\nthe seed is inside its own vocabularies");

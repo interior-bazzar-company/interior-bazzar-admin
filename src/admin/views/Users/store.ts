@@ -229,6 +229,12 @@ export interface ProfileField {
   max?: number;
   /** Longest single free-text value, for `tags` only. */
   maxLength?: number;
+  /** The chip tone for this facet, one of the theme's `tag-*` classes.
+   *  COLOUR-BY-FACET: every chip of one facet shares one colour, on the form
+   *  and on the record, so the colour answers "which question is this the
+   *  answer to" at a glance. It is never per-value — a palette rotating per
+   *  chip would be decoration pretending to be information. */
+  chip?: string;
   hint?: string;
 }
 export const PROFILE_FIELDS = vocabDoc.profileFields as unknown as ProfileField[];

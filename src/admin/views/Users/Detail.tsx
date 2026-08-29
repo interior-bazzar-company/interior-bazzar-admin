@@ -262,12 +262,14 @@ export default function Detail({ id, p, rows, onFilter }: {
                   ? (v.length
                     ? <span className="um-chips ro">
                         {labelsFor(f, v as string[]).map((l, i) => (
-                          <span className="pill um-chip" key={i}>{l}</span>
+                          <span className={"pill um-chip " + (f.chip || "")} key={i}>{l}</span>
                         ))}
                       </span>
                     : "")
                   : f.type === "single" && v
-                    ? <span className="pill um-chip">{facetLabel(f.vocab || "", String(v))}</span>
+                    ? <span className={"pill um-chip " + (f.chip || "")}>
+                        {facetLabel(f.vocab || "", String(v))}
+                      </span>
                     : ((v as string | null) || "");
                 return [
                   <>{f.label}<em className={"um-vis " + (f.public ? "pub" : "int")}>

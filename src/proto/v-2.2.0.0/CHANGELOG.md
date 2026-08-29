@@ -6,6 +6,88 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-29
 
+### Colour-by-facet chips, and the alignment pass the modal was owed
+
+**Area:** the Edit profile modal, the profile tab's chips
+**Files:** `users.css`, `EditProfile.tsx`, `FacetPicker.tsx`, `Detail.tsx`,
+`store.ts`, `vocabularies.json`, `scripts/um-smoke.tsx`,
+`scripts/check-users-derivation.cjs`
+
+**What changed**
+
+**The chips are multi-colour now, and the colour is information.** One tone per
+FACET, never per value: Business type wears violet, Segments green, Categories
+blue, Search keywords amber, Target areas teal, and the two location singles
+share slate on purpose — they are halves of one answer. The tone is declared on
+the field in `vocabularies.json` and worn identically on the form and the
+record, so the colour answers "which question is this the answer to" before the
+label is read. A palette rotating per chip would have been decoration
+pretending to be information, which is the same rule the charts follow. All six
+tones come from the theme's existing tag palette — nothing new to validate in
+either mode. A stale chip still displaces its tone for warn: a value the
+vocabulary dropped must not wear the colours of one it still has.
+
+The tones are restated in `users.css` at higher specificity because the brand
+default would silently beat the theme's two-class `tag-*` rules — and that
+"silently" is covered: the check suite asserts every declared tone is one the
+stylesheet restates, every chip-rendering facet declares one, and no two
+marketplace facets share a colour.
+
+**Alignment.** Three fixes, one cause each:
+
+- **State · City · Pincode are one row again.** Every single-pick facet had
+  been given the full width on the theory its listbox needed the room — but
+  the listbox is absolutely positioned and overlays the neighbour anyway, so
+  the width bought nothing and cost the layout: three short answers to one
+  question ("where") stacked as three separate thoughts. Singles are
+  half-width now, and the contact group is a three-column row. Textareas
+  gained the full width instead, which they genuinely use.
+- **Business name and Business type pair up** on one row for the same reason,
+  and About stretches.
+- **The public/internal markers align in a column.** They sat wherever each
+  label happened to end, so "which of these is public" meant reading every
+  row. The marker sits at the row edge now — one scannable column per group.
+
+**And a dead-rule find:** the module's `@container` fallbacks — the ones meant
+to collapse the two-column grid on a narrow pane — had never fired, because
+nothing anywhere declared a container to fire against. They were dead the day
+they were written. `.um-form` now declares `container-type: inline-size`, the
+grids genuinely collapse (3 → 2 → 1 for the new row), and the row-gap grew to
+give labels their breathing room.
+
+**Temp data**
+
+`vocabularies.json` — a `chip` tone on seven `profileFields` entries. No
+records touched.
+
+**Backend needed**
+
+Nothing new — `chip` rides the same `profileFields[]` payload the form is
+already built from, so the tone is server-adjustable like everything else
+about a field.
+
+**Open decisions**
+
+None new.
+
+**Verified**
+
+`tsc -b`, `eslint`, `vite build` green. `check:users` 231 → 234,
+`check:users-render` 111 → 113. The tone contract is asserted end to end:
+declared tones are known tones, every facet has one, no two marketplace facets
+share one, the markup actually carries them on both surfaces, and the stale
+branch still displaces them.
+
+**Still not verified:** the colours themselves, in a browser, in both themes —
+the tag palette is the theme's own, but whether six tones on one form read as
+organisation or as carnival is a judgement a string cannot make. The three-way
+grid collapse needs a narrow window; the container fix makes the queries fire,
+and no browser has confirmed they fire at the right widths.
+
+---
+
+## 2026-08-29
+
 ### First browser contact: the floated legend broke the form, and the fix is one clear
 
 **Area:** the Edit profile panels

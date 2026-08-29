@@ -44,8 +44,9 @@ import { Icon } from "../../ui";
 import { cleanKeyword, groupsFor, optionsFor } from "./store";
 import type { FacetOption, ProfileField } from "./store";
 
-/** The chips. Above the control on purpose — see the file header. */
-function Chips({ f, values, onRemove, disabled }: {
+/** The chips. Above the control on purpose — see the file header. Exported
+ *  for the render harness, which asserts the stale branch displaces the tone. */
+export function Chips({ f, values, onRemove, disabled }: {
   f: ProfileField;
   values: string[];
   onRemove: (k: string) => void;
@@ -62,7 +63,9 @@ function Chips({ f, values, onRemove, disabled }: {
            dropped chip is a data migration nobody finds out about. */
         const stale = !f.open && f.type !== "tags" && !hit;
         return (
-          <span className={"pill um-chip" + (stale ? " warn" : "")} role="listitem" key={v}
+          /* The tone comes off when a chip is stale: a value the vocabulary
+             dropped must not wear the colours of one it still has. */
+          <span className={"pill um-chip " + (stale ? "warn" : (f.chip || ""))} role="listitem" key={v}
             title={stale ? "Not in the current vocabulary — saved before it changed." : undefined}>
             {hit ? hit.label : v}
             {disabled ? null : (

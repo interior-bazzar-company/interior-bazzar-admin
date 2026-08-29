@@ -42,15 +42,21 @@ import type { ProfileField, UserProfile, UserRow } from "./store";
 const GROUPS = [
   { key: "basic", label: "Basic profile", note: "What a customer sees first." },
   { key: "business", label: "Business profile", note: "What the marketplace matches and ranks on." },
-  { key: "contact", label: "Where they are", note: "State, city and pincode. The pincode is internal." },
+  /* Three columns, because the group IS three short answers to one question —
+     "where" — and stacking them made three rows out of one thought. */
+  { key: "contact", label: "Where they are", note: "The pincode is internal.", cols: 3 },
 ];
 
 /** A field holds a list when the schema says so — never because the value
  *  happens to be an array today. */
 const isList = (f: ProfileField) => f.type === "multi" || f.type === "tags";
-/** Fields that render as a composite rather than as one labelled input. */
-const isRich = (f: ProfileField) =>
-  isList(f) || f.type === "single" || f.type === "handle";
+/** Fields that take the full row. A SINGLE facet is deliberately not one of
+ *  them any more: its popup is absolutely positioned, so it overlays the
+ *  neighbour instead of needing the width — and giving every single a full
+ *  row is what made State, City and Pincode read as three separate thoughts.
+ *  Textareas and chip-bearing fields genuinely use the width. */
+const isWide = (f: ProfileField) =>
+  isList(f) || f.type === "handle" || f.type === "textarea";
 
 type Draft = Record<string, string | string[]>;
 
@@ -200,13 +206,13 @@ export default function EditProfile({ row, onClose, onDone }: {
           return (
             <fieldset className="um-fs" key={g.key}>
               <legend>{g.label}<i>{g.note}</i></legend>
-              <div className="um-f2">
+              <div className={g.cols === 3 ? "um-f3" : "um-f2"}>
                 {mine.map((f) => (
                   /* A picker is not a <label>'s control — it is a composite
                      with its own labelled input — so those render as a div
                      with the caption beside it instead. Wrapping one in a
                      <label> makes clicking a chip focus the search box. */
-                  <div className={"fg" + (isRich(f) ? " um-fg-wide" : "")} key={f.key}>
+                  <div className={"fg" + (isWide(f) ? " um-fg-wide" : "")} key={f.key}>
                     <span className="fg-lb">
                       {f.label}
                       {f.required ? <span className="req"> *</span> : null}

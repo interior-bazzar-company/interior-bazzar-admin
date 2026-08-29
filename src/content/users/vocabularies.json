@@ -355,7 +355,8 @@
       "public": true,
       "type": "single",
       "vocab": "businessTypes",
-      "hint": "What kind of business this is. It decides how the marketplace treats them, so it is one answer, not several."
+      "hint": "What kind of business this is. It decides how the marketplace treats them, so it is one answer, not several.",
+      "chip": "tag-violet"
     },
     {
       "key": "segments",
@@ -367,7 +368,8 @@
       "type": "multi",
       "vocab": "segments",
       "max": 6,
-      "hint": "What they actually do or deal in. Six at most — a profile claiming everything ranks for nothing."
+      "hint": "What they actually do or deal in. Six at most — a profile claiming everything ranks for nothing.",
+      "chip": "tag-green"
     },
     {
       "key": "categories",
@@ -380,7 +382,8 @@
       "vocab": "categories",
       "groups": "categoryGroups",
       "max": 8,
-      "hint": "How much of the job they hold, and for which kind of space."
+      "hint": "How much of the job they hold, and for which kind of space.",
+      "chip": "tag-blue"
     },
     {
       "key": "searchKeywords",
@@ -393,7 +396,8 @@
       "vocab": "keywordSuggestions",
       "max": 12,
       "maxLength": 40,
-      "hint": "The phrases a customer would type. Anything goes here — pick a suggestion or write your own."
+      "hint": "The phrases a customer would type. Anything goes here — pick a suggestion or write your own.",
+      "chip": "tag-amber"
     },
     {
       "key": "targetAreas",
@@ -408,7 +412,8 @@
       "max": 10,
       "maxLength": 48,
       "showWhen": "member",
-      "hint": "Where they take work, which is not the same as where they sit. A state, a city, or a locality inside one — \"Uttam Nagar, Delhi\"."
+      "hint": "Where they take work, which is not the same as where they sit. A state, a city, or a locality inside one — \"Uttam Nagar, Delhi\".",
+      "chip": "tag-teal"
     },
     {
       "key": "state",
@@ -419,7 +424,8 @@
       "public": true,
       "type": "single",
       "vocab": "states",
-      "hint": "Where the business is registered."
+      "hint": "Where the business is registered.",
+      "chip": "tag-slate"
     },
     {
       "key": "city",
@@ -431,7 +437,8 @@
       "type": "single",
       "vocab": "cities",
       "open": true,
-      "hint": "Pick one or type it — the list is the cities the platform sees most, not a limit."
+      "hint": "Pick one or type it — the list is the cities the platform sees most, not a limit.",
+      "chip": "tag-slate"
     },
     {
       "key": "pincode",

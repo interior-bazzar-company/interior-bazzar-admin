@@ -34,6 +34,7 @@ import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { ShellProvider } from "../src/admin/shell/ShellContext";
 import Users from "../src/admin/views/Users";
 import AssignMembership from "../src/admin/views/Users/AssignMembership";
+import { Chips } from "../src/admin/views/Users/FacetPicker";
 import LifecycleModal from "../src/admin/views/Users/LifecycleModal";
 import EditProfile from "../src/admin/views/Users/EditProfile";
 import { NoteModal, TagsModal, DeactivateModal } from "../src/admin/views/Users/Modals";
@@ -613,6 +614,28 @@ check("edit profile · incomplete", () => modal(
     const contact = fieldsFor(memberRow).filter((f) => f.group === "contact").map((f) => f.key);
     if (contact.join(",") !== "state,city,pincode")
       throw new Error("the contact group reads " + contact.join(", "));
+    return full;
+  });
+
+  check("chips · each facet wears its declared tone, on the form and the record", () => {
+    /* The colour is information — "which question is this the answer to" —
+       so it has to be the SAME colour in both places, and it has to actually
+       reach the markup: a tone the component forgets to append falls back to
+       brand tint with no error anywhere. */
+    const rec = at("/users/IB-U-0912?tab=profile");
+    fieldsFor(memberRow).filter((f) => f.chip).forEach((f) => {
+      const want = "um-chip " + f.chip;
+      if (full.indexOf(want) < 0) throw new Error(f.key + " chips lost " + f.chip + " on the form");
+      if (rec.indexOf(want) < 0) throw new Error(f.key + " chips lost " + f.chip + " on the record");
+    });
+    return full;
+  });
+  check("chips · a stale value wears warn, never a facet's tone", () => {
+    /* The Chips component swaps the tone out entirely when a value is stale —
+       asserted at the source since no seed row carries a dropped key. */
+    const src = String(Chips);
+    if (src.indexOf('stale ? "warn"') < 0)
+      throw new Error("the stale branch no longer displaces the tone");
     return full;
   });
 
