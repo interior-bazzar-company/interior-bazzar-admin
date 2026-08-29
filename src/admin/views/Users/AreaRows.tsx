@@ -39,7 +39,6 @@ const ROW_CITIES: ProfileField = {
   key: "area-cities", label: "Cities", group: "contact",
   required: true, editable: true, public: true,
   type: "multi", open: true, max: 8, maxLength: 40, chip: "tag-teal",
-  hint: "Cities or localities inside this state. The list is a suggestion — type what is missing.",
 };
 
 export default function AreaRows({ f, value, onChange, disabled }: {
@@ -65,10 +64,7 @@ export default function AreaRows({ f, value, onChange, disabled }: {
   return (
     <div className="um-areas">
       {value.length === 0 ? (
-        <p className="um-areas-none">
-          No coverage stated yet. A business with no target area appears in no
-          location filter — start with the state they actually work in.
-        </p>
+        <p className="um-areas-none">No areas yet — add the state they work in.</p>
       ) : null}
 
       {value.map((row, i) => (
@@ -95,7 +91,7 @@ export default function AreaRows({ f, value, onChange, disabled }: {
                 options={citySuggestionsOf(row.state)}
                 onChange={(cities) => patchRow(i, { cities })} />
             ) : (
-              <p className="um-area-wait">Pick the state first — the city list depends on it.</p>
+              <p className="um-area-wait">Pick the state first.</p>
             )}
           </div>
           {disabled ? null : (

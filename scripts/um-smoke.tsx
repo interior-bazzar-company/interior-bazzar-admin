@@ -514,13 +514,14 @@ check("edit profile · incomplete", () => modal(
       throw new Error("a closed picker still rendered its options");
     return empty;
   });
-  check("facets · but the field still says what it wants", () => {
-    /* The hint and the placeholder are the only guidance visible before
-       anybody opens anything, so they are the ones that must survive. */
+  check("facets · guidance is placeholders and counters, not paragraphs", () => {
+    /* The declutter pass: placeholders and the n/max counters carry the
+       guidance now, and no field-level hint sentence renders at all. */
     if (empty.indexOf("Type a phrase, or pick a suggestion") < 0)
       throw new Error("the keyword field lost its placeholder");
-    if (empty.indexOf("phrases a customer would type") < 0)
-      throw new Error("the keyword field lost its hint");
+    const withHints = fieldsFor(memberRow).filter((f) => f.hint).map((f) => f.key);
+    if (withHints.length)
+      throw new Error("hint sentences crept back onto: " + withHints.join(", "));
     return empty;
   });
   check("facets · the open/closed split is exactly where it was decided", () => {
@@ -619,8 +620,8 @@ check("edit profile · incomplete", () => modal(
        every location filter, and the form is where that gets fixed. */
     if (full.indexOf("Target areas") < 0) throw new Error("a member was not asked");
     if (empty.indexOf("Target areas") < 0) throw new Error("a plain user was not asked");
-    if (empty.indexOf("No coverage stated yet") < 0)
-      throw new Error("an empty coverage list does not say what it costs");
+    if (empty.indexOf("No areas yet") < 0)
+      throw new Error("an empty coverage list says nothing");
     return full;
   });
   check("target areas · a row is a tile: closed state, open cities, removable", () => {

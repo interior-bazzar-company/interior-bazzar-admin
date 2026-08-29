@@ -28,6 +28,13 @@
    A validation failure leaves the STORED profile completely unchanged. There
    is no partial write and no half-saved state — the save is one transaction
    (UM-T07) and the audit records the changed field set, never the values.
+
+   THE MODAL STOPPED SAYING ALL OF THIS. It used to: a note under every group
+   title, a sentence under half the fields, a shield notice about transactional
+   writes, "graded against profile v1" in the header. All of it true, none of
+   it operable, and together it made the form read as documentation with
+   fields in it. The guarantees live here and in the check suite; the screen
+   carries what somebody filling it in can act on.
    ============================================================================= */
 import { useMemo, useState } from "react";
 import { Icon, Notice } from "../../ui";
@@ -37,16 +44,17 @@ import FacetPicker from "./FacetPicker";
 import InfoTip from "./InfoTip";
 import HandleField from "./HandleField";
 import {
-  PROFILE_SCHEMA_VERSION, completenessOf, fieldsFor, optionsFor, updateProfile, usernameTaken,
-  validateFacets,
+  completenessOf, fieldsFor, optionsFor, updateProfile, usernameTaken, validateFacets,
 } from "./store";
 import type { ProfileField, TargetArea, UserProfile, UserRow } from "./store";
 
+/* Just the names. Each carried a sentence of positioning ("what the
+   marketplace matches and ranks on") and the modal read as documentation with
+   fields in it — the notes said things the fields already say. */
 const GROUPS = [
-  { key: "basic", label: "Basic profile", note: "What a customer sees first." },
-  { key: "business", label: "Business profile", note: "What the marketplace matches and ranks on." },
-  { key: "contact", label: "Target areas",
-    note: "Where they take work — a state, then its cities. This is the profile's location now." },
+  { key: "basic", label: "Basic profile" },
+  { key: "business", label: "Business profile" },
+  { key: "contact", label: "Target areas" },
 ];
 
 /** A field holds a list when the schema says so — never because the value
@@ -230,10 +238,7 @@ export default function EditProfile({ row, onClose, onDone }: {
     <>
       <div className="md-h">
         <h3>Edit profile</h3>
-        <p>
-          {row.user.identity.name} · <span className="mono">{row.user.userId}</span> · graded
-          against <span className="mono">{PROFILE_SCHEMA_VERSION}</span>
-        </p>
+        <p>{row.user.identity.name} · <span className="mono">{row.user.userId}</span></p>
         <button className="md-x" data-close="1" onClick={onClose}><Icon name="x" /></button>
       </div>
 
@@ -245,7 +250,7 @@ export default function EditProfile({ row, onClose, onDone }: {
           : null}
 
         <div className="um-livecomp">
-          <span className="l">Completeness as you type</span>
+          <span className="l">Completeness</span>
           <Completeness pct={live.pct} missing={live.missing} />
         </div>
 
@@ -254,7 +259,7 @@ export default function EditProfile({ row, onClose, onDone }: {
           if (!mine.length) return null;
           return (
             <fieldset className="um-fs" key={g.key}>
-              <legend>{g.label}<i>{g.note}</i></legend>
+              <legend>{g.label}</legend>
               <div className="um-f2">
                 {mine.map((f) => (
                   /* A picker is not a <label>'s control — it is a composite
@@ -280,10 +285,7 @@ export default function EditProfile({ row, onClose, onDone }: {
 
         {/* ------------------------------------------------------- identity */}
         <fieldset className="um-fs">
-          <legend>
-            Identity summary
-            <i>from Authentication · read-only here, on purpose</i>
-          </legend>
+          <legend>Identity<i>read-only</i></legend>
           <div className="um-f2">
             <div className="fg">
               <span className="fg-lb">Verified email</span>
@@ -304,16 +306,7 @@ export default function EditProfile({ row, onClose, onDone }: {
               </div>
             </div>
           </div>
-          <p className="um-fine">
-            Credentials and verification live in Authentication. A sensitive identity change goes
-            through that module's workflow, not a text box here.
-          </p>
         </fieldset>
-
-        <Notice tone="bad" ico="shield" text={<>
-          <b>A partial write is not a reachable state.</b> The save validates, applies, recomputes
-          completeness and audits the changed field set — or does none of it.
-        </>} />
       </div>
 
       <div className="md-f">

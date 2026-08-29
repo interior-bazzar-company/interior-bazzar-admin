@@ -325,8 +325,7 @@
       "required": true,
       "editable": true,
       "public": true,
-      "type": "handle",
-      "hint": "The public address of this profile. Lower-case letters, numbers and hyphens."
+      "type": "handle"
     },
     {
       "key": "about",
@@ -380,7 +379,6 @@
       "type": "multi",
       "vocab": "segments",
       "max": 6,
-      "hint": "What they actually do or deal in. Six at most — a profile claiming everything ranks for nothing.",
       "chip": "tag-green"
     },
     {
@@ -408,7 +406,6 @@
       "vocab": "keywordSuggestions",
       "max": 12,
       "maxLength": 40,
-      "hint": "The phrases a customer would type. Anything goes here — pick a suggestion or write your own.",
       "chip": "tag-amber"
     },
     {
@@ -422,8 +419,7 @@
       "maxRows": 5,
       "maxCities": 8,
       "maxLength": 40,
-      "chip": "tag-teal",
-      "hint": "Where they take work. Add a state, then the cities — or localities — inside it. The city list is a suggestion; type what is missing."
+      "chip": "tag-teal"
     }
   ],
   "profileStatuses": [
@@ -1181,7 +1177,7 @@
     "min": 3,
     "max": 30,
     "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$",
-    "help": "Lower-case letters, numbers and hyphens. It is the public address of this profile, so it is permanent in practice — changing it breaks every link anybody has already shared.",
+    "help": "Lower-case letters, numbers and hyphens.",
     "path": "/pro/"
   },
   "stateCities": {

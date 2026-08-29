@@ -6,6 +6,65 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-29
 
+### The modal stops explaining itself
+
+**Area:** Edit profile — every piece of prose on it
+**Files:** `EditProfile.tsx`, `AreaRows.tsx`, `vocabularies.json`,
+`scripts/um-smoke.tsx`
+
+**What changed**
+
+The form had grown a note under every group title, a sentence under half its
+fields, a shield notice about transactional writes, and "graded against
+profile v1" in its own header. Each one earned its place in some earlier
+entry; together they made the modal read as documentation with fields in it,
+and the actual controls were the quietest thing on it. All of it is gone:
+
+- **Group legends are just names** — Basic profile, Business profile, Target
+  areas. "What the marketplace matches and ranks on" said things the fields
+  already say.
+- **No field-level hint sentences render at all**, and the render suite now
+  asserts that as a rule rather than field by field — placeholders and the
+  n/max counters carry the guidance. The i buttons keep the option meanings
+  one press away; the vocabulary keeps every hint for them.
+- **The header drops the schema version**, the completeness label is one
+  word, the identity legend is "Identity · read-only" without its paragraph,
+  and the shield notice is deleted — the all-or-nothing write is a guarantee
+  for the check suite and the file header, not furniture for every save.
+- The empty-areas text and the pick-state prompt each lost their subordinate
+  clause. Username's idle help is one line.
+
+Nothing behavioural moved. The guarantees the prose described did not stop
+being true — they stopped being on screen.
+
+**Temp data**
+
+`vocabularies.json` — `hint` deleted from every `profileFields` row (option
+hints stay; they feed the i panels); `usernameRules.help` shortened.
+
+**Backend needed**
+
+Nothing.
+
+**Open decisions**
+
+None new.
+
+**Verified**
+
+`tsc -b`, `eslint`, `vite build` green; `check:users` 255,
+`check:users-render` 115, with the hint test inverted: it used to assert a
+particular hint was present, it now asserts NO field-level hint renders —
+which is the assertion that stops the clutter growing back one helpful
+sentence at a time.
+
+**Still not verified:** whether the stripped form now reads as spare or as
+bare is exactly the judgement a browser view exists for.
+
+---
+
+## 2026-08-29
+
 ### Business type simplifies to a dropdown; Deals in takes over "what do you sell"
 
 **Area:** the Business profile group in Edit profile
