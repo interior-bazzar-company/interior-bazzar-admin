@@ -568,7 +568,13 @@ S.resetStore();
   ok("an invented one is not", bad({ businessType: "wizard" }), true);
   ok("clearing it is allowed", bad({ businessType: null }), false);
   ok("real segments are fine", bad({ segments: ["architect", "vastu"] }), false);
-  ok("an invented segment is not", bad({ segments: ["architect", "vibes"] }), true);
+  /* Open now, like categories: a trade nobody listed is typed, not refused. */
+  ok("a segment nobody listed is accepted", bad({ segments: ["architect", "Pergola work"] }), false);
+  ok("...but not at forty-one characters", bad({ segments: ["x".repeat(41)] }), true);
+  /* The explainers are KEYWORDS, not sentences — asserted by length, which is
+     the only thing that stops a row growing back into a paragraph. */
+  ok("every segment has a short explainer",
+    S.SEGMENTS.filter((o) => !o.hint || o.hint.length > 32).map((o) => o.key), []);
   ok("the same segment twice is refused", bad({ segments: ["architect", "architect"] }), true);
   ok("seven segments is over the cap of six",
     bad({ segments: S.SEGMENTS.slice(0, 7).map((s) => s.key) }), true);
@@ -602,9 +608,11 @@ console.log("\nthe write path refuses what the form refuses");
 S.resetStore();
 {
   const before = JSON.stringify(S.readUsers().filter((u) => u.userId === "IB-U-0912")[0].profile);
-  const err = S.updateProfile("IB-U-0912", { segments: ["architect", "not_a_segment"] });
-  ok("an unknown segment is refused at the store, not only in the dialog",
-    err.indexOf("unknown") >= 0, true);
+  /* Segments are open now, so the probe uses a rule that still closes:
+     Business type is one answer from a chain of six, and nothing else. */
+  const err = S.updateProfile("IB-U-0912", { businessType: "not_a_type" });
+  ok("an unknown business type is refused at the store, not only in the dialog",
+    err.indexOf("not one of the allowed") >= 0, true);
   /* The module's standing promise: a refused write leaves nothing behind. */
   ok("...and the stored profile is untouched",
     JSON.stringify(S.readUsers().filter((u) => u.userId === "IB-U-0912")[0].profile), before);

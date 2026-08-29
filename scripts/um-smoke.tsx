@@ -535,12 +535,13 @@ check("edit profile · incomplete", () => modal(
       if (!f) throw new Error("no field " + k);
       return f.type === "tags" || f.open === true;
     };
-    ["businessType", "segments"].forEach((k) => {
+    ["businessType"].forEach((k) => {
       if (isOpen(k)) throw new Error(k + " has been opened up");
     });
-    /* Categories moved to the open side by request — industries are a set
-       nobody can finish enumerating either. */
-    ["searchKeywords", "categories"].forEach((k) => {
+    /* Segments and Categories moved to the open side by request — trades
+       and industries are sets nobody can finish enumerating either. Business
+       type stays closed: it is one answer from a chain of six. */
+    ["searchKeywords", "categories", "segments"].forEach((k) => {
       if (!isOpen(k)) throw new Error(k + " has been closed off");
     });
     /* Target areas holds the split WITHIN itself now: a closed state half and

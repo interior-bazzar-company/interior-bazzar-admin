@@ -379,7 +379,9 @@
       "type": "multi",
       "vocab": "segments",
       "max": 6,
-      "chip": "tag-green"
+      "chip": "tag-green",
+      "open": true,
+      "maxLength": 40
     },
     {
       "key": "categories",
@@ -1105,86 +1107,103 @@
   "segments": [
     {
       "key": "interior_designer",
-      "label": "Interior designer"
+      "label": "Interior designer",
+      "hint": "Space, layout, full design"
     },
     {
       "key": "interior_decorator",
       "label": "Interior decorator",
-      "hint": "Styling and finishes on an existing shell. No structural or services scope — that is the line against Interior designer."
+      "hint": "Styling & finishes only"
     },
     {
       "key": "architect",
-      "label": "Architect"
+      "label": "Architect",
+      "hint": "Structure, plans, approvals"
     },
     {
       "key": "visualiser_3d",
       "label": "3D visualiser",
-      "hint": "Renders and walkthroughs, usually to somebody else's design. Sold as a deliverable in its own right."
+      "hint": "Renders & walkthroughs"
     },
     {
       "key": "civil_contractor",
-      "label": "Civil contractor"
+      "label": "Civil contractor",
+      "hint": "Masonry, plaster, structure"
     },
     {
       "key": "modular_kitchen",
-      "label": "Modular kitchen & wardrobe"
+      "label": "Modular kitchen & wardrobe",
+      "hint": "Kitchens, wardrobes, storage"
     },
     {
       "key": "carpentry",
-      "label": "Carpentry & joinery"
+      "label": "Carpentry & joinery",
+      "hint": "Woodwork, joinery, fit-out"
     },
     {
       "key": "false_ceiling",
-      "label": "False ceiling & lighting"
+      "label": "False ceiling & lighting",
+      "hint": "Gypsum, POP, cove lighting"
     },
     {
       "key": "flooring",
-      "label": "Flooring & tiling"
+      "label": "Flooring & tiling",
+      "hint": "Tiles, wood, vinyl, stone"
     },
     {
       "key": "painting",
-      "label": "Painting & wall finishes"
+      "label": "Painting & wall finishes",
+      "hint": "Paint, texture, polish"
     },
     {
       "key": "furnishing",
-      "label": "Furnishing & soft decor"
+      "label": "Furnishing & soft decor",
+      "hint": "Curtains, upholstery, linen"
     },
     {
       "key": "furniture",
-      "label": "Furniture — modular & loose"
+      "label": "Furniture — modular & loose",
+      "hint": "Loose & modular pieces"
     },
     {
       "key": "mep",
-      "label": "MEP — electrical, plumbing, HVAC"
+      "label": "MEP — electrical, plumbing, HVAC",
+      "hint": "Electrical, plumbing, AC"
     },
     {
       "key": "glass_facade",
-      "label": "Glass, aluminium & façade"
+      "label": "Glass, aluminium & façade",
+      "hint": "Glass, ACP, aluminium"
     },
     {
       "key": "landscape",
-      "label": "Landscape & outdoor"
+      "label": "Landscape & outdoor",
+      "hint": "Gardens, terraces, outdoor"
     },
     {
       "key": "automation",
-      "label": "Smart home & automation"
+      "label": "Smart home & automation",
+      "hint": "Smart controls, CCTV"
     },
     {
       "key": "vastu",
-      "label": "Vastu consultant"
+      "label": "Vastu consultant",
+      "hint": "Direction & layout advice"
     },
     {
       "key": "pmc",
       "label": "Project management consultant",
-      "hint": "Runs the site and the vendors on the customer's behalf. Does not hold the design or the execution scope."
+      "hint": "Runs site & vendors"
     },
     {
       "key": "ply_hardware",
-      "label": "Plywood, laminates & hardware"
+      "label": "Plywood, laminates & hardware",
+      "hint": "Ply, laminate, fittings"
     },
     {
       "key": "tiles_sanitary",
-      "label": "Tiles, stone & sanitaryware"
+      "label": "Tiles, stone & sanitaryware",
+      "hint": "Tiles, stone, bath fittings"
     }
   ],
   "categoryGroups": [

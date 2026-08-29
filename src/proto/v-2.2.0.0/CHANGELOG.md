@@ -6,6 +6,48 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-29
 
+### Segments open up, and their explainers shrink to keywords
+
+**Area:** the Segments field
+**Files:** `vocabularies.json`, `scripts/check-users-derivation.cjs`,
+`scripts/um-smoke.tsx`
+
+**What changed**
+
+**Segments are open now**, the same way Categories became open: type a
+trade nobody listed, press Enter, it is a segment — stored as typed, never
+coerced. Trades are a set nobody finishes enumerating either. Business type
+is now the only closed facet on the form, and that is right: it is one
+answer from a chain of six.
+
+**The long option descriptions are gone**, replaced by a short keyword
+explainer on every one of the twenty — two to four words that separate a
+row from its neighbour ("Styling & finishes only", "Renders & walkthroughs",
+"Runs site & vendors", "Electrical, plumbing, AC") rather than a sentence
+that describes it. A dropdown row is read in the time it takes to scroll
+past it. The suite asserts them by length, which is the only thing that
+stops a row growing back into a paragraph.
+
+**Temp data**
+
+`vocabularies.json` — `open: true` and `maxLength` on the field; twenty
+short hints.
+
+**Backend needed**
+
+`segments[]` accepts values outside the list — same contract as categories.
+
+**Verified**
+
+`check:users` 268 → 270, `check:users-render` 116. The write-path probe that
+proved "the store refuses what the dialog refuses" had used an unknown
+segment; segments no longer refuse, so it now uses an unknown business
+type — the purpose survives, on a rule that still closes.
+
+---
+
+## 2026-08-29
+
 ### Categories become industries, and open
 
 **Area:** the Categories field
