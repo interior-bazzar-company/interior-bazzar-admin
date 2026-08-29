@@ -1509,14 +1509,6 @@
       "label": "Luxury"
     },
     {
-      "key": "premium",
-      "label": "Premium"
-    },
-    {
-      "key": "value",
-      "label": "Value"
-    },
-    {
       "key": "eco_friendly",
       "label": "Eco-friendly"
     },

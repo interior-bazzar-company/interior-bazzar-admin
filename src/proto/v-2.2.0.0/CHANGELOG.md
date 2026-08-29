@@ -6,6 +6,25 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-29
 
+### Positioning drops Premium and Value
+
+**Area:** the Positioning segment
+**Files:** `vocabularies.json`, `users.json`,
+`scripts/check-users-derivation.cjs`, `scripts/um-smoke.tsx`
+
+**What changed**
+
+Three tiles now — Luxury, Eco-friendly, Custom — still up to two. The two
+removed keys are stripped from every seeded profile and asserted refused.
+
+**Verified**
+
+`check:users` 280 → 281, `check:users-render` 119.
+
+---
+
+## 2026-08-29
+
 ### Segments grow to the well-known ones
 
 **Area:** the Segments dropdown

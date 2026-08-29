@@ -615,7 +615,7 @@ check("edit profile · incomplete", () => modal(
   });
   check("deals in · two checkboxes, one or both", () => {
     const boxes = (full.match(/type="checkbox"/g) || []).length;
-    if (boxes !== 7) throw new Error(boxes + " checkboxes, expected 2 deals + 5 positioning");
+    if (boxes !== 5) throw new Error(boxes + " checkboxes, expected 2 deals + 3 positioning");
     if (full.indexOf(">Products<") < 0 || full.indexOf(">Services<") < 0)
       throw new Error("the two options are not Products and Services");
     /* IB-U-0912 deals in services — the seeded answer must arrive checked. */
@@ -623,15 +623,17 @@ check("edit profile · incomplete", () => modal(
     return full;
   });
 
-  check("positioning: five tiles, the note stating the cap, two ticked at most", () => {
-    ["Luxury", "Premium", "Value", "Eco-friendly", "Custom"].forEach((t) => {
+  check("positioning: three tiles, the note stating the cap, two ticked at most", () => {
+    ["Luxury", "Eco-friendly", "Custom"].forEach((t) => {
       if (full.indexOf(">" + t + "<") < 0) throw new Error("missing " + t);
     });
     if (full.indexOf("Select up to 2.") < 0) throw new Error("the cap is not stated");
-    /* IB-U-0912 holds two, so the other three render disabled: the cap is
+    /* IB-U-0912 holds two, so the third renders disabled: the cap is
        enforced by what can still be pressed. */
     const off = (full.match(/um-check off/g) || []).length;
-    if (off !== 3) throw new Error(off + " tiles went quiet at the cap, expected 3");
+    if (off !== 1) throw new Error(off + " tiles went quiet at the cap, expected 1");
+    if (full.indexOf(">Premium<") >= 0 || full.indexOf(">Value<") >= 0)
+      throw new Error("a removed tile is still on offer");
     return full;
   });
 
