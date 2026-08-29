@@ -55,6 +55,9 @@
             ]
           }
         ],
+        "positioning": [
+          "value"
+        ],
         "updatedBy": "Priya Nair",
         "updatedAt": "2026-08-07T09:15:00+05:30"
       },
@@ -127,6 +130,7 @@
             ]
           }
         ],
+        "positioning": [],
         "updatedBy": "Arjun Bhat",
         "updatedAt": "2026-08-05T18:20:00+05:30"
       },
@@ -174,6 +178,7 @@
         "categories": [],
         "searchKeywords": [],
         "targetAreas": [],
+        "positioning": [],
         "updatedBy": "Nikhil Rao",
         "updatedAt": "2026-08-02T09:01:00+05:30"
       },
@@ -243,6 +248,10 @@
               "Navi Mumbai"
             ]
           }
+        ],
+        "positioning": [
+          "value",
+          "custom"
         ],
         "updatedBy": "Rohit Desai",
         "updatedAt": "2026-08-12T13:44:00+05:30"
@@ -335,6 +344,9 @@
             ]
           }
         ],
+        "positioning": [
+          "premium"
+        ],
         "updatedBy": "D. Kapoor",
         "updatedAt": "2026-07-02T17:10:00+05:30"
       },
@@ -417,6 +429,9 @@
             ]
           }
         ],
+        "positioning": [
+          "premium"
+        ],
         "updatedBy": "N. Pillai",
         "updatedAt": "2026-08-18T10:25:00+05:30"
       },
@@ -497,6 +512,10 @@
             ]
           }
         ],
+        "positioning": [
+          "luxury",
+          "eco_friendly"
+        ],
         "updatedBy": "Tara Design Collective",
         "updatedAt": "2026-05-30T15:00:00+05:30"
       },
@@ -563,6 +582,9 @@
               "Dwarka"
             ]
           }
+        ],
+        "positioning": [
+          "value"
         ],
         "updatedBy": "D. Kapoor",
         "updatedAt": "2026-03-19T11:05:00+05:30"
@@ -644,6 +666,10 @@
               "Koramangala"
             ]
           }
+        ],
+        "positioning": [
+          "premium",
+          "custom"
         ],
         "updatedBy": "D. Kapoor",
         "updatedAt": "2026-08-22T14:02:00+05:30"
@@ -732,6 +758,7 @@
             ]
           }
         ],
+        "positioning": [],
         "updatedBy": "Lokesh Interiors",
         "updatedAt": "2026-01-08T18:12:00+05:30"
       },
@@ -796,6 +823,9 @@
               "Kochi"
             ]
           }
+        ],
+        "positioning": [
+          "custom"
         ],
         "updatedBy": "D. Kapoor",
         "updatedAt": "2026-08-22T11:18:00+05:30"
@@ -877,6 +907,9 @@
             ]
           }
         ],
+        "positioning": [
+          "value"
+        ],
         "updatedBy": "Zenith Ceilings",
         "updatedAt": "2026-04-14T12:00:00+05:30"
       },
@@ -941,6 +974,7 @@
             ]
           }
         ],
+        "positioning": [],
         "updatedBy": "Sharma Interiors",
         "updatedAt": "2026-02-02T14:40:00+05:30"
       },
@@ -1015,6 +1049,9 @@
             ]
           }
         ],
+        "positioning": [
+          "custom"
+        ],
         "updatedBy": "Anaya Verma",
         "updatedAt": "2026-07-04T10:15:00+05:30"
       },
@@ -1078,6 +1115,9 @@
               "Chennai"
             ]
           }
+        ],
+        "positioning": [
+          "luxury"
         ],
         "updatedBy": "D. Kapoor",
         "updatedAt": "2026-06-11T16:20:00+05:30"
@@ -1153,6 +1193,7 @@
             ]
           }
         ],
+        "positioning": [],
         "updatedBy": "D. Kapoor",
         "updatedAt": "2026-05-02T09:30:00+05:30"
       },
@@ -1229,6 +1270,7 @@
             ]
           }
         ],
+        "positioning": [],
         "updatedBy": "Fernandes Interiors",
         "updatedAt": "2025-12-01T10:00:00+05:30"
       },
@@ -1298,6 +1340,10 @@
               "Saket"
             ]
           }
+        ],
+        "positioning": [
+          "premium",
+          "custom"
         ],
         "updatedBy": "Saloni Interiors",
         "updatedAt": "2026-03-01T11:20:00+05:30"
@@ -1373,6 +1419,7 @@
             ]
           }
         ],
+        "positioning": [],
         "updatedBy": "Kulkarni & Sons",
         "updatedAt": "2025-11-10T13:00:00+05:30"
       },
@@ -1424,6 +1471,7 @@
         "categories": [],
         "searchKeywords": [],
         "targetAreas": [],
+        "positioning": [],
         "updatedBy": "V. Shakya",
         "updatedAt": "2026-04-27T10:00:00+05:30"
       },

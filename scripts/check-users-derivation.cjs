@@ -515,7 +515,7 @@ S.resetStore();
      stylesheet knows, and every facet that renders chips declares one. A tone
      the CSS does not restate silently falls back to brand tint — wrong colour,
      no error. */
-  const KNOWN_TONES = ["tag-violet", "tag-green", "tag-blue", "tag-amber", "tag-teal", "tag-slate", "tag-pink"];
+  const KNOWN_TONES = ["tag-violet", "tag-green", "tag-blue", "tag-amber", "tag-teal", "tag-slate", "tag-pink", "tag-orange"];
   const chipped = S.PROFILE_FIELDS.filter((f) => f.chip);
   ok("every declared chip tone is one the stylesheet restates",
     chipped.filter((f) => KNOWN_TONES.indexOf(f.chip) < 0).map((f) => f.key), []);
@@ -848,6 +848,22 @@ S.resetStore();
   /* Still exactly two incomplete — dealsIn was seeded wherever the other
      required business fields already were, so nobody moved. */
   ok("the incomplete set did not move again", S.countsOf(all).incompleteProfiles, 2);
+}
+
+console.log("\npositioning: up to two of a closed five");
+{
+  const bad = (patch) => S.validateFacets(patch) !== "";
+  ok("one is fine", bad({ positioning: ["luxury"] }), false);
+  ok("two is fine", bad({ positioning: ["premium", "custom"] }), false);
+  ok("three is over the cap", bad({ positioning: ["luxury", "premium", "value"] }), true);
+  ok("an invented one is refused", bad({ positioning: ["bespoke"] }), true);
+  ok("optional: an empty list passes", bad({ positioning: [] }), false);
+  ok("no seeded profile exceeds two",
+    S.readUsers().filter((u) => u.profile.positioning.length > 2).map((u) => u.userId), []);
+  ok("...or names a value outside the five",
+    S.readUsers().filter((u) => u.profile.positioning.some((k) =>
+      ["luxury", "premium", "value", "eco_friendly", "custom"].indexOf(k) < 0)).map((u) => u.userId), []);
+  ok("optional means the incomplete set did not move", S.countsOf(all).incompleteProfiles, 2);
 }
 
 console.log("\nkeys are stored, labels are shown");

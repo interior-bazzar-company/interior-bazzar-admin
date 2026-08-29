@@ -54,9 +54,13 @@ import type { ProfileField, TargetArea, UserProfile, UserRow } from "./store";
 /* About closes the form. It is the one free paragraph, and a paragraph at
    the top is what people write before they have answered the questions
    underneath it — last, it is written knowing what the profile already says. */
-const GROUPS = [
+const GROUPS: { key: string; label: string; note?: string }[] = [
   { key: "business", label: "Business profile" },
-  { key: "contact", label: "Target areas" },
+  { key: "contact", label: "Target" },
+  /* The one group that keeps a note, because the note IS the instruction:
+     the cap, and why the field exists at all. */
+  { key: "positioning", label: "Positioning segment",
+    note: "Select up to 2. This is how the business positions its own work \u2014 it keeps expectations aligned before a connection is made." },
   { key: "about", label: "About" },
 ];
 
@@ -184,13 +188,16 @@ export default function EditProfile({ row, onClose, onDone }: {
          checkboxes, and hiding them behind a picker adds a press to see what
          was never worth hiding. */
       const vals = (draft[f.key] as string[]) || [];
+      /* At the cap, the boxes not yet ticked go quiet rather than refusing on
+         click: "up to 2" is enforced by what can still be pressed. */
+      const atMax = !!f.max && vals.length >= f.max;
       return (
         <div className="um-checks" role="group" aria-label={f.label}>
           {optionsFor(f).map((o) => {
             const on = vals.indexOf(o.key) >= 0;
             return (
-              <label key={o.key} className={"um-check" + (on ? " on" : "")}>
-                <input type="checkbox" checked={on} disabled={!f.editable}
+              <label key={o.key} className={"um-check" + (on ? " on" : "") + (!on && atMax ? " off" : "")}>
+                <input type="checkbox" checked={on} disabled={!f.editable || (!on && atMax)}
                   onChange={() => set(f.key,
                     on ? vals.filter((v) => v !== o.key) : vals.concat([o.key]))} />
                 <span>{o.label}</span>
@@ -263,7 +270,7 @@ export default function EditProfile({ row, onClose, onDone }: {
           if (!mine.length) return null;
           return (
             <fieldset className="um-fs" key={g.key}>
-              <legend>{g.label}</legend>
+              <legend>{g.label}{g.note ? <i>{g.note}</i> : null}</legend>
               <div className="um-f2">
                 {mine.map((f) => (
                   /* A picker is not a <label>'s control — it is a composite

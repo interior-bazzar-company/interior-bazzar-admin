@@ -591,7 +591,7 @@ check("edit profile · incomplete", () => modal(
     return full;
   });
   check("one business group: name, address, about lead it; no Display name", () => {
-    const order = [">Business name", ">Username", ">Business type", ">Target areas", ">About"]
+    const order = [">Business name", ">Username", ">Business type", ">Location", ">Positioning", ">About"]
       .map((t) => full.indexOf(t));
     if (order.some((i) => i < 0)) throw new Error("a field is missing");
     if (order.some((i, k) => k > 0 && i < order[k - 1])) throw new Error("the form is out of order");
@@ -615,11 +615,23 @@ check("edit profile · incomplete", () => modal(
   });
   check("deals in · two checkboxes, one or both", () => {
     const boxes = (full.match(/type="checkbox"/g) || []).length;
-    if (boxes !== 2) throw new Error(boxes + " checkboxes, expected exactly 2");
+    if (boxes !== 7) throw new Error(boxes + " checkboxes, expected 2 deals + 5 positioning");
     if (full.indexOf(">Products<") < 0 || full.indexOf(">Services<") < 0)
       throw new Error("the two options are not Products and Services");
     /* IB-U-0912 deals in services — the seeded answer must arrive checked. */
     if (full.indexOf('checked=""') < 0) throw new Error("the stored answer is not checked");
+    return full;
+  });
+
+  check("positioning: five tiles, the note stating the cap, two ticked at most", () => {
+    ["Luxury", "Premium", "Value", "Eco-friendly", "Custom"].forEach((t) => {
+      if (full.indexOf(">" + t + "<") < 0) throw new Error("missing " + t);
+    });
+    if (full.indexOf("Select up to 2.") < 0) throw new Error("the cap is not stated");
+    /* IB-U-0912 holds two, so the other three render disabled: the cap is
+       enforced by what can still be pressed. */
+    const off = (full.match(/um-check off/g) || []).length;
+    if (off !== 3) throw new Error(off + " tiles went quiet at the cap, expected 3");
     return full;
   });
 
@@ -665,8 +677,9 @@ check("edit profile · incomplete", () => modal(
     /* It was member-only while it sat beside a registered address. The
        address is gone; a plain user with no coverage row is invisible to
        every location filter, and the form is where that gets fixed. */
-    if (full.indexOf("Target areas") < 0) throw new Error("a member was not asked");
-    if (empty.indexOf("Target areas") < 0) throw new Error("a plain user was not asked");
+    if (full.indexOf(">Location") < 0) throw new Error("a member was not asked");
+    if (empty.indexOf(">Location") < 0) throw new Error("a plain user was not asked");
+    if (full.indexOf(">Target<") < 0) throw new Error("the group is not called Target");
     if (empty.indexOf("No areas yet") < 0)
       throw new Error("an empty coverage list says nothing");
     return full;

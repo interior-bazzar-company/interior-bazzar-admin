@@ -397,7 +397,7 @@
     },
     {
       "key": "targetAreas",
-      "label": "Target areas",
+      "label": "Location",
       "group": "contact",
       "required": true,
       "editable": true,
@@ -407,6 +407,18 @@
       "maxCities": 8,
       "maxLength": 40,
       "chip": "tag-teal"
+    },
+    {
+      "key": "positioning",
+      "label": "Positioning",
+      "group": "positioning",
+      "required": false,
+      "editable": true,
+      "public": true,
+      "type": "checks",
+      "vocab": "positioning",
+      "max": 2,
+      "chip": "tag-orange"
     },
     {
       "key": "about",
@@ -1394,6 +1406,28 @@
       "key": "services",
       "label": "Services",
       "hint": "Sells work — design, execution, consulting, installation."
+    }
+  ],
+  "positioning": [
+    {
+      "key": "luxury",
+      "label": "Luxury"
+    },
+    {
+      "key": "premium",
+      "label": "Premium"
+    },
+    {
+      "key": "value",
+      "label": "Value"
+    },
+    {
+      "key": "eco_friendly",
+      "label": "Eco-friendly"
+    },
+    {
+      "key": "custom",
+      "label": "Custom"
     }
   ]
 }

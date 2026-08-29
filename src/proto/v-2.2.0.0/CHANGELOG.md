@@ -6,6 +6,47 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-29
 
+### Target, Location, and a Positioning segment
+
+**Area:** the lower half of Edit profile
+**Files:** `vocabularies.json`, `users.json`, `store.ts`, `EditProfile.tsx`,
+`users.css`, `scripts/check-users-derivation.cjs`, `scripts/um-smoke.tsx`,
+`BACKEND-INTEGRATION.md`
+
+**What changed**
+
+The coverage group is **Target**, and its field is **Location** — the
+group names the question, the field names the answer.
+
+**Positioning segment** is a new group between Target and About: five
+checkbox tiles — Luxury, Premium, Value, Eco-friendly, Custom — of which
+up to two may be ticked. The group keeps its note, because the note is
+the instruction: *"Select up to 2. This is how the business positions its
+own work — it keeps expectations aligned before a connection is made."* At
+the cap the unticked tiles go quiet rather than refusing on click; the
+limit is enforced by what can still be pressed. Optional, so the
+incomplete set does not move; orange chips on the record.
+
+**Temp data**
+
+`positioning[]` vocabulary; the field on the schema; twelve seeded
+profiles carry one or two values.
+
+**Backend needed**
+
+`positioning[]` on the profile — optional, closed to the five keys, at most
+two. The doc is updated.
+
+**Verified**
+
+`check:users` 271 → 279, `check:users-render` 118 → 119. The cap and the
+closed list asserted in the store; the five tiles, the stated cap and
+exactly three quiet tiles on a two-value profile asserted in the render.
+
+---
+
+## 2026-08-29
+
 ### Segment explainers sharpened, two trades added
 
 **Area:** the Segments dropdown

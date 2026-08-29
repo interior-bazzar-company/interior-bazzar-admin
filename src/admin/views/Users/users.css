@@ -533,6 +533,7 @@
 .um-chip.pill.tag-teal   { background: var(--tag-teal-bg);   color: var(--tag-teal);   border-color: var(--tag-teal-line) }
 .um-chip.pill.tag-slate  { background: var(--tag-slate-bg);  color: var(--tag-slate);  border-color: var(--tag-slate-line) }
 .um-chip.pill.tag-pink   { background: var(--tag-pink-bg);   color: var(--tag-pink);   border-color: var(--tag-pink-line) }
+.um-chip.pill.tag-orange { background: var(--tag-orange-bg); color: var(--tag-orange); border-color: var(--tag-orange-line) }
 /* The stale case keeps its warning colours, and it comes LAST so it wins over
    every tone — a value the vocabulary dropped must not wear the colours of a
    value it still has. */
@@ -661,6 +662,8 @@
                color: var(--brand-text) }
 .um-check input { accent-color: var(--brand); margin: 0 }
 .um-check input:disabled { cursor: default }
+.um-check.off { opacity: .45; cursor: default }
+.um-checks { flex-wrap: wrap }
 
 @media print {
   .um-views, .um-proto, .um-actions, .um-idbar .btn { display: none }

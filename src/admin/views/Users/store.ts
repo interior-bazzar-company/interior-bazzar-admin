@@ -85,6 +85,10 @@ export interface UserProfile {
    *  module's only location fact now: the business's own city is its first
    *  row, which is the honest minimum for a business that never said more. */
   targetAreas: TargetArea[];
+  /** How the business positions its own work — up to two of a closed five.
+   *  Self-declared, and shown before a connection is made so expectations
+   *  are aligned on both sides first. */
+  positioning: string[];
   updatedBy: string | null;
   updatedAt: string | null;
 }
@@ -273,6 +277,7 @@ const VOCABS: Record<string, FacetOption[]> = {
   states: vocabDoc.states as FacetOption[],
   cities: vocabDoc.cities as FacetOption[],
   dealsIn: vocabDoc.dealsIn as FacetOption[],
+  positioning: vocabDoc.positioning as FacetOption[],
 };
 
 /** Whole-state coverage, as one entry in the row's city list. A SENTINEL
