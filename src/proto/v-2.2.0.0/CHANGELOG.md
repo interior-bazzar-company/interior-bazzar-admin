@@ -39,7 +39,7 @@ two. The doc is updated.
 
 **Verified**
 
-`check:users` 271 → 279, `check:users-render` 118 → 119. The cap and the
+`check:users` 271 → 280, `check:users-render` 118 → 119. The cap and the
 closed list asserted in the store; the five tiles, the stated cap and
 exactly three quiet tiles on a two-value profile asserted in the render.
 
