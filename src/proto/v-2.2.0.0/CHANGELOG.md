@@ -47,7 +47,7 @@ de-duplicate case-insensitively, do not coerce. The doc is updated.
 
 **Verified**
 
-`check:users` 265 → 267, `check:users-render` 116. No delivery key
+`check:users` 265 → 268, `check:users-render` 116. No delivery key
 survives, sanitaryware and home security are present, a typed category is
 accepted and a duplicate refused, and the open/closed split assertion now
 lists categories on the open side.
