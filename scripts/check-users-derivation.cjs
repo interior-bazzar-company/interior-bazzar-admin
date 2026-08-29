@@ -809,13 +809,13 @@ S.resetStore();
   ok("the Business type panel opens with the field's own sentence",
     S.PROFILE_FIELDS.filter((f) => f.key === "businessType")[0].info,
     "What kind of business this is. It decides how the marketplace treats them, so it is one answer, not several.");
-  /* ORDERED ALONG THE CHAIN, and the order is the assertion: who makes it,
-     who moves it, who sells it, then the firm that builds and the practitioner
-     who works alone. Alphabetical would be a list; this reads as a supply
-     chain, which is what the type axis IS. */
-  ok("seven types, in chain order",
+  /* ORDERED ALONG THE CHAIN, read from the portal's end: the people who use
+     it most come first — who works alone, who designs as a team, who builds —
+     then who sells, who moves, who makes. Still a chain, not a list; the
+     direction is the one that puts the common answer at the top. */
+  ok("seven types, in chain order from the practitioner up",
     S.BUSINESS_TYPES.map((t) => t.key),
-    ["manufacturer", "dealer", "wholesaler", "retailer", "contractor", "firm_studio", "independent"]);
+    ["independent", "firm_studio", "contractor", "retailer", "wholesaler", "dealer", "manufacturer"]);
   /* Firm / Studio is the grain two earlier entries flagged as missing: a
      design practice with a team is neither a site contractor nor a solo
      practitioner. The seed's design firms sit there; trades that build stay

@@ -1067,29 +1067,9 @@
   "$comment_businessFacets": "FOUR FACETS, NOT ONE HIERARCHY. businessType says what kind of entity this is, segments says what it does, categories says how it engages and for which sector, and searchKeywords is the discovery long tail. They are deliberately orthogonal: 'Manufacturer + Modular kitchen' and 'Service provider + Modular kitchen' are different businesses and the pair is what says so. The first three are CLOSED lists because the marketplace filters and ranks on them and free text fragments a facet within a month ('3D Designer' / '3d designer' / '3D visualiser' are three buckets holding one thing). searchKeywords is open because matching is the one job where the long tail is the point.",
   "businessTypes": [
     {
-      "key": "manufacturer",
-      "label": "Manufacturer",
-      "hint": "Makes what it sells, in its own factory or workshop."
-    },
-    {
-      "key": "dealer",
-      "label": "Dealer / Distributor",
-      "hint": "Authorised to sell named brands across a territory. Does not make the goods."
-    },
-    {
-      "key": "wholesaler",
-      "label": "Wholesaler / Trader",
-      "hint": "Supplies the trade in bulk. Not an end-customer counter."
-    },
-    {
-      "key": "retailer",
-      "label": "Retailer / Showroom",
-      "hint": "Sells to the end customer from a showroom floor or a counter."
-    },
-    {
-      "key": "contractor",
-      "label": "Contractor",
-      "hint": "Executes on site with a crew — civil, carpentry, MEP, finishing — as a firm."
+      "key": "independent",
+      "label": "Independent professional",
+      "hint": "One practitioner rather than a firm — a designer, architect or consultant working alone."
     },
     {
       "key": "firm_studio",
@@ -1097,9 +1077,29 @@
       "hint": "A design practice with a team — studio, consultancy, agency."
     },
     {
-      "key": "independent",
-      "label": "Independent professional",
-      "hint": "One practitioner rather than a firm — a designer, architect or consultant working alone."
+      "key": "contractor",
+      "label": "Contractor",
+      "hint": "Executes on site with a crew — civil, carpentry, MEP, finishing — as a firm."
+    },
+    {
+      "key": "retailer",
+      "label": "Retailer / Showroom",
+      "hint": "Sells to the end customer from a showroom floor or a counter."
+    },
+    {
+      "key": "wholesaler",
+      "label": "Wholesaler / Trader",
+      "hint": "Supplies the trade in bulk. Not an end-customer counter."
+    },
+    {
+      "key": "dealer",
+      "label": "Dealer / Distributor",
+      "hint": "Authorised to sell named brands across a territory. Does not make the goods."
+    },
+    {
+      "key": "manufacturer",
+      "label": "Manufacturer",
+      "hint": "Makes what it sells, in its own factory or workshop."
     }
   ],
   "segments": [

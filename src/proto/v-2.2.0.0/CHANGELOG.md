@@ -6,6 +6,27 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-29
 
+### The business types read from the practitioner up
+
+**Area:** the Business type dropdown
+**Files:** `vocabularies.json`, `scripts/check-users-derivation.cjs`,
+`scripts/um-smoke.tsx`
+
+**What changed**
+
+The chain is reversed: Independent professional → Firm / Studio →
+Contractor → Retailer → Wholesaler → Dealer → Manufacturer. Still a chain,
+not a list — the direction now puts the portal's most common answer at the
+top, and reads from who works alone up to who makes the goods.
+
+**Verified**
+
+Order asserted in schema and in the rendered options.
+
+---
+
+## 2026-08-29
+
 ### About closes the form
 
 **Area:** Edit profile

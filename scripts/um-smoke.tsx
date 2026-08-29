@@ -565,12 +565,13 @@ check("edit profile · incomplete", () => modal(
       throw new Error("the dropdown lost its options");
     if (full.indexOf(">Service provider<") >= 0)
       throw new Error("Service provider is still on offer");
-    /* The dropdown keeps the vocabulary's chain order: makers before sellers
-       before builders. Asserted on the markup, since a sort() anywhere between
-       the schema and the <option>s would silently alphabetise it. */
+    /* The dropdown keeps the vocabulary's chain order, practitioner first:
+       who works alone, designs, builds, then sells, moves, makes. Asserted on
+       the markup, since a sort() anywhere between the schema and the
+       <option>s would silently alphabetise it. */
     const at_ = (t) => full.indexOf(">" + t + "<");
-    const order = ["Manufacturer", "Dealer / Distributor", "Wholesaler / Trader",
-      "Retailer / Showroom", "Contractor", "Firm / Studio", "Independent professional"].map(at_);
+    const order = ["Independent professional", "Firm / Studio", "Contractor",
+      "Retailer / Showroom", "Wholesaler / Trader", "Dealer / Distributor", "Manufacturer"].map(at_);
     if (order.some((i) => i < 0)) throw new Error("a type is missing from the dropdown");
     if (order.some((i, k) => k > 0 && i < order[k - 1]))
       throw new Error("the dropdown is not in chain order");
