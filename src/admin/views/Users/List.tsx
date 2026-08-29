@@ -133,7 +133,7 @@ export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, 
         <Select name="plan" label="Plan" value={p.plan} onFilter={onFilter}
           options={plans.map((x) => ({ v: x.code, l: x.name }))} />
         <Select name="city" label="City" value={p.city} onFilter={onFilter}
-          options={CITIES.map((x) => ({ v: x, l: x }))} />
+          options={CITIES.map((x) => ({ v: x.key, l: x.label }))} />
         <Select name="src" label="Via" value={p.src} onFilter={onFilter}
           options={REGISTRATION_SOURCES.map((x) => ({ v: x.key, l: x.label }))} />
         <Select name="tag" label="Tag" value={p.tag} onFilter={onFilter}

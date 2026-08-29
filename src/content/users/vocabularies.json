@@ -319,22 +319,14 @@
       "type": "text"
     },
     {
-      "key": "city",
-      "label": "City",
+      "key": "username",
+      "label": "Username",
       "group": "basic",
       "required": true,
       "editable": true,
       "public": true,
-      "type": "text"
-    },
-    {
-      "key": "locality",
-      "label": "Locality",
-      "group": "basic",
-      "required": false,
-      "editable": true,
-      "public": false,
-      "type": "text"
+      "type": "handle",
+      "hint": "The public address of this profile. Lower-case letters, numbers and hyphens."
     },
     {
       "key": "about",
@@ -404,22 +396,42 @@
       "hint": "The phrases a customer would type. Anything goes here — pick a suggestion or write your own."
     },
     {
-      "key": "portfolioUrl",
-      "label": "Portfolio link",
+      "key": "targetAreas",
+      "label": "Target areas",
       "group": "business",
       "required": false,
       "editable": true,
       "public": true,
-      "type": "text"
+      "type": "multi",
+      "vocab": "areaSuggestions",
+      "open": true,
+      "max": 10,
+      "maxLength": 48,
+      "showWhen": "member",
+      "hint": "Where they take work, which is not the same as where they sit. A state, a city, or a locality inside one — \"Uttam Nagar, Delhi\"."
     },
     {
-      "key": "addressLine",
-      "label": "Contact address",
+      "key": "state",
+      "label": "State",
       "group": "contact",
-      "required": false,
+      "required": true,
       "editable": true,
-      "public": false,
-      "type": "text"
+      "public": true,
+      "type": "single",
+      "vocab": "states",
+      "hint": "Where the business is registered."
+    },
+    {
+      "key": "city",
+      "label": "City",
+      "group": "contact",
+      "required": true,
+      "editable": true,
+      "public": true,
+      "type": "single",
+      "vocab": "cities",
+      "open": true,
+      "hint": "Pick one or type it — the list is the cities the platform sees most, not a limit."
     },
     {
       "key": "pincode",
@@ -512,23 +524,68 @@
     "Abuse — permanent"
   ],
   "cities": [
-    "Bengaluru",
-    "Mumbai",
-    "Pune",
-    "Delhi",
-    "Hyderabad",
-    "Chennai",
-    "Jaipur",
-    "Kochi"
+    {
+      "key": "Bengaluru",
+      "label": "Bengaluru"
+    },
+    {
+      "key": "Mumbai",
+      "label": "Mumbai"
+    },
+    {
+      "key": "Pune",
+      "label": "Pune"
+    },
+    {
+      "key": "Delhi",
+      "label": "Delhi"
+    },
+    {
+      "key": "Hyderabad",
+      "label": "Hyderabad"
+    },
+    {
+      "key": "Chennai",
+      "label": "Chennai"
+    },
+    {
+      "key": "Jaipur",
+      "label": "Jaipur"
+    },
+    {
+      "key": "Kochi",
+      "label": "Kochi"
+    }
   ],
   "states": [
-    "Karnataka",
-    "Maharashtra",
-    "Delhi",
-    "Telangana",
-    "Tamil Nadu",
-    "Rajasthan",
-    "Kerala"
+    {
+      "key": "Karnataka",
+      "label": "Karnataka"
+    },
+    {
+      "key": "Maharashtra",
+      "label": "Maharashtra"
+    },
+    {
+      "key": "Delhi",
+      "label": "Delhi"
+    },
+    {
+      "key": "Telangana",
+      "label": "Telangana"
+    },
+    {
+      "key": "Tamil Nadu",
+      "label": "Tamil Nadu"
+    },
+    {
+      "key": "Rajasthan",
+      "label": "Rajasthan"
+    },
+    {
+      "key": "Kerala",
+      "label": "Kerala"
+    }
   ],
   "categories": [
     {
@@ -1088,5 +1145,91 @@
     "Renovation & remodelling",
     "Painting & polishing",
     "Curtains & blinds"
-  ]
+  ],
+  "areaSuggestions": [
+    "Delhi NCR",
+    "Mumbai",
+    "Bengaluru",
+    "Pune",
+    "Hyderabad",
+    "Chennai",
+    "Jaipur",
+    "Kochi",
+    "Ahmedabad",
+    "Kolkata",
+    "Lucknow",
+    "Chandigarh",
+    "Uttam Nagar, Delhi",
+    "Dwarka, Delhi",
+    "Rohini, Delhi",
+    "Saket, Delhi",
+    "Andheri, Mumbai",
+    "Bandra, Mumbai",
+    "Thane, Mumbai",
+    "Navi Mumbai",
+    "Whitefield, Bengaluru",
+    "Indiranagar, Bengaluru",
+    "Koramangala, Bengaluru",
+    "Hinjewadi, Pune",
+    "Baner, Pune",
+    "Gachibowli, Hyderabad",
+    "Varanasi, Uttar Pradesh",
+    "Noida, Uttar Pradesh",
+    "Gurugram, Haryana",
+    "Karnataka",
+    "Maharashtra",
+    "Delhi",
+    "Tamil Nadu",
+    "Telangana",
+    "Rajasthan",
+    "Kerala",
+    "Uttar Pradesh",
+    "Gujarat",
+    "West Bengal",
+    "Haryana"
+  ],
+  "reservedUsernames": [
+    "admin",
+    "administrator",
+    "api",
+    "app",
+    "auth",
+    "about",
+    "account",
+    "blog",
+    "business",
+    "contact",
+    "dashboard",
+    "help",
+    "home",
+    "interiorbazzar",
+    "login",
+    "logout",
+    "me",
+    "new",
+    "pricing",
+    "plans",
+    "privacy",
+    "profile",
+    "register",
+    "root",
+    "search",
+    "settings",
+    "signup",
+    "support",
+    "system",
+    "terms",
+    "test",
+    "u",
+    "user",
+    "users",
+    "www"
+  ],
+  "usernameRules": {
+    "min": 3,
+    "max": 30,
+    "pattern": "^[a-z0-9][a-z0-9-]*[a-z0-9]$",
+    "help": "Lower-case letters, numbers and hyphens. It is the public address of this profile, so it is permanent in practice — changing it breaks every link anybody has already shared.",
+    "path": "/pro/"
+  }
 }

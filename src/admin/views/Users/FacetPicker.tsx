@@ -1,16 +1,21 @@
 /* =============================================================================
-   FacetPicker — the control behind Business type, Segments, Categories and
-   Search keywords.
+   FacetPicker — the control behind Business type, Segments, Categories,
+   Search keywords, Target areas, State and City.
    -----------------------------------------------------------------------------
-   ONE component, four behaviours, chosen by the field's `type` in the profile
-   schema. Not four components, because they would drift: the keyword field
-   would grow a clear-all the segment field never got, and two of them would
-   handle Escape differently.
+   ONE component, chosen by the field's `type` and `open` in the profile
+   schema. Not one component per field, because they would drift: the keyword
+   field would grow a clear-all the segment field never got, and two of them
+   would handle Escape differently.
 
-     single   pick one key. Picking again replaces.
-     multi    pick many keys from a closed list, capped.
-     tags     the same, but anything you type is a value. The list is a
-              SUGGESTION, not a constraint.
+     single   pick one value. Picking again replaces.
+     multi    pick many values, capped.
+     tags     shorthand for multi + open.
+
+   `open` crosses both: it says the vocabulary is a SUGGESTION rather than a
+   constraint, so `single + open` is City (one value, type your own) and
+   `multi + open` is Target areas (a list, type your own). Segments and
+   Categories are closed, and that is the whole reason the flag exists
+   separately from the type.
 
    THE SELECTION SITS ABOVE THE CONTROL, not inside it. Chips-inside-the-input
    is the more common pattern and it is worse here: the input grows as you pick,
@@ -18,14 +23,16 @@
    box you are typing into has moved somewhere else on the page. Above the
    control, the answer stays in one place and the box you type into never moves.
 
-   WHY THE CLOSED LISTS ARE CLOSED. Business type, Segments and Categories
-   refuse anything not in the vocabulary; only keywords accept free text. These
-   three are what the marketplace filters and ranks on, and free text fragments
-   a facet inside a month — "3D Designer", "3d designer" and "3D visualiser"
-   become three buckets holding one thing, and every one of them ranks worse
-   than the single bucket would have. Keywords are open because matching is the
-   one job where the tail nobody enumerated is the point. That split is one
-   flag per field in the JSON, so it is a decision, not a wall.
+   WHY THE CLOSED LISTS ARE CLOSED. Business type, Segments, Categories and
+   State refuse anything not in the vocabulary. They are what the marketplace
+   filters and ranks on, and free text fragments a facet inside a month —
+   "3D Designer", "3d designer" and "3D visualiser" become three buckets
+   holding one thing, and every one ranks worse than the single bucket would
+   have. City, Search keywords and Target areas are open, because each is a
+   set nobody can enumerate: there are thousands of cities, "complete home
+   decor" is not a taxonomy entry, and "Uttam Nagar, Delhi" is a real service
+   area. That split is one flag per field in the JSON, so it is a decision,
+   not a wall.
 
    Accessibility follows the WAI-ARIA combobox pattern: the input owns
    `role="combobox"`, the popup is a `listbox`, the active option is tracked
@@ -53,7 +60,7 @@ function Chips({ f, values, onRemove, disabled }: {
         /* A value the vocabulary no longer has is still a fact about this
            profile. It renders, flagged, rather than vanishing — a silently
            dropped chip is a data migration nobody finds out about. */
-        const stale = f.type !== "tags" && !hit;
+        const stale = !f.open && f.type !== "tags" && !hit;
         return (
           <span className={"pill um-chip" + (stale ? " warn" : "")} role="listitem" key={v}
             title={stale ? "Not in the current vocabulary — saved before it changed." : undefined}>
@@ -78,7 +85,11 @@ export default function FacetPicker({ f, values, onChange, disabled }: {
   disabled?: boolean;
 }) {
   const single = f.type === "single";
-  const free = f.type === "tags";
+  /* OPENNESS IS A FLAG, NOT A TYPE. It started as `type === "tags"`, which
+     made "accepts free text" and "holds a list" the same decision — and they
+     are not: City is one value that accepts anything, Target areas is a list
+     that does, Segments is a list that does not. */
+  const free = f.type === "tags" || f.open === true;
   const max = single ? 1 : f.max || 99;
 
   const [open, setOpen] = useState(false);
@@ -101,8 +112,8 @@ export default function FacetPicker({ f, values, onChange, disabled }: {
       && (!needle || o.label.toLowerCase().indexOf(needle) >= 0));
   }, [options, values, q]);
 
-  /* The typed value, offered as itself. Only for `tags`, only when it is not
-     already a suggestion and not already picked. */
+  /* The typed value, offered as itself. Only on an open field, and only when
+     it is not already a suggestion and not already picked. */
   const typed = cleanKeyword(q);
   const canAddTyped = free && !!typed
     && !matches.some((o) => o.label.toLowerCase() === typed.toLowerCase())
@@ -237,7 +248,7 @@ export default function FacetPicker({ f, values, onChange, disabled }: {
     <div className={"um-facet" + (open ? " open" : "")} ref={box}>
       <Chips f={f} values={values} onRemove={remove} disabled={disabled} />
 
-      {single && values.length && !open ? null : (
+      {single && values.length && !open && !free ? null : (
         <div className="um-facet-in">
           <Icon name="search" size="sm" />
           <input
@@ -273,7 +284,7 @@ export default function FacetPicker({ f, values, onChange, disabled }: {
         </div>
       )}
 
-      {single && values.length && !open ? (
+      {single && values.length && !open && !free ? (
         <button type="button" className="btn sm um-facet-re" disabled={disabled}
           onClick={() => setOpen(true)}>Change</button>
       ) : null}

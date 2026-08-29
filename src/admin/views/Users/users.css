@@ -439,6 +439,95 @@
                    font-weight: var(--weight-medium) }
 .um-facet-fine b.warn { color: var(--warn) }
 
+/* ----------------------------------------- contrast: the form is groups --- */
+/* THE PROBLEM THIS SOLVES. The profile form is twelve fields in three groups,
+   and the groups were separated by nothing but a bold legend and some air. On
+   a white modal over a white page that is not a boundary — it reads as one
+   long column, and "where they are" and "what they sell" blur into each other
+   while you are trying to answer one of them.
+
+   Each group is now a panel with its own ground and a hairline. Cheap, and it
+   turns a scroll into three things you can be in the middle of. */
+.um-form fieldset.um-fs {
+  padding: var(--space-4);
+  background: var(--bg-inset);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-4);
+}
+.um-form .um-fs legend {
+  float: left; width: 100%; margin: 0 0 var(--space-3);
+  padding: 0 0 var(--space-2);
+  border-bottom: 1px solid var(--line);
+}
+/* Inputs on the panel invert the usual relationship: the well is the panel
+   now, so the CONTROL is the raised thing. Without this they vanish into the
+   ground they sit on. */
+.um-form .um-fs .inp {
+  background: var(--surface-raised);
+  border-color: var(--line-2);
+}
+.um-form .um-fs .inp.ro { background: var(--bg); }
+.um-form .um-opts { background: var(--surface-raised); border-color: var(--line-2) }
+.um-form .um-optg { background: var(--surface-raised) }
+
+/* ------------------------------------------------- chips, made to read --- */
+/* A chip IS the answer to its field — the picker below it is only how you got
+   there — so it should be the loudest thing in the block, not the quietest.
+   The neutral `.pill` ground was a grey on a grey and lost every time. Brand
+   tint, a real border, and the height of a control rather than a label. */
+.um-chips { gap: var(--space-2); margin-bottom: var(--space-3) }
+.um-chip.pill {
+  height: var(--control-sm);
+  padding: 0 var(--space-1) 0 var(--space-3);
+  background: var(--brand-tint);
+  color: var(--brand-text);
+  border-color: var(--brand-line);
+  font-weight: var(--weight-medium);
+}
+.um-chips.ro .um-chip.pill { padding-right: var(--space-3) }
+/* The stale case keeps its warning colours — a value the vocabulary dropped
+   must not read like a value it has. */
+.um-chip.pill.warn {
+  background: var(--warn-bg); color: var(--warn); border-color: var(--warn-line);
+}
+.um-chip-x { width: 20px; height: 20px; opacity: .55 }
+.um-chip-x:hover { opacity: 1; background: var(--brand-line) }
+
+/* --------------------------------------------------- the handle field --- */
+.um-handle-in { position: relative; display: flex; align-items: center;
+                background: var(--surface-raised); border: 1px solid var(--line-2);
+                border-radius: var(--radius-md); overflow: hidden }
+.um-handle.ok .um-handle-in { border-color: var(--ok-line) }
+.um-handle.bad .um-handle-in { border-color: var(--bad-line) }
+/* The host sits INSIDE the box, as unselectable prefix text, so the field
+   reads as one address rather than as a text box near a label. */
+.um-handle-pre { flex: 0 0 auto; align-self: stretch; display: flex; align-items: center;
+                 padding: 0 var(--space-2) 0 var(--space-3);
+                 background: var(--bg-inset); border-right: 1px solid var(--line);
+                 font-size: var(--text-sm); color: var(--text-3); white-space: nowrap }
+.um-handle-in .inp { border: none; border-radius: 0; background: none;
+                     font-family: var(--font-mono, monospace); font-size: var(--text-md) }
+.um-handle-copy { flex: 0 0 auto; display: flex; align-items: center; gap: 5px;
+                  align-self: stretch; padding: 0 var(--space-3); border: none;
+                  border-left: 1px solid var(--line); background: var(--bg-inset);
+                  font-size: var(--text-sm); font-weight: var(--weight-medium);
+                  color: var(--text-2); cursor: pointer; white-space: nowrap }
+.um-handle-copy:hover { background: var(--bg-hover); color: var(--text) }
+.um-handle-note { display: flex; align-items: center; gap: var(--space-2);
+                  margin: var(--space-2) 0 0; font-size: var(--text-sm); color: var(--text-3) }
+.um-handle-note .ok { display: flex; align-items: center; gap: 5px; color: var(--ok) }
+.um-handle-note .bad { display: flex; align-items: center; gap: 5px; color: var(--bad) }
+.um-handle-sug { border: none; background: none; padding: 0; cursor: pointer;
+                 font: inherit; color: var(--brand-text); text-decoration: underline }
+.um-handle-url { display: flex; align-items: center; gap: var(--space-2);
+                 margin: var(--space-1) 0 0; font-size: var(--text-sm); color: var(--text-2) }
+.um-handle-url.off { color: var(--text-3); opacity: .6 }
+
+.um-profile-link { display: inline-flex; align-items: center; gap: 5px;
+                   color: var(--brand-text); text-decoration: none }
+.um-profile-link:hover { text-decoration: underline }
+
 @media print {
   .um-views, .um-proto, .um-actions, .um-idbar .btn { display: none }
   .card, .um-queue { break-inside: avoid }

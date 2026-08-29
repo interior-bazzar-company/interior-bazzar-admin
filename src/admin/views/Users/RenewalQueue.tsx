@@ -63,7 +63,7 @@ export default function RenewalQueue({ rows, p, onView, onFilter, onSearch }: Fa
         <Select name="plan" label="Plan" value={p.plan} onFilter={onFilter}
           options={plans.map((x) => ({ v: x.code, l: x.name }))} />
         <Select name="city" label="City" value={p.city} onFilter={onFilter}
-          options={CITIES.map((x) => ({ v: x, l: x }))} />
+          options={CITIES.map((x) => ({ v: x.key, l: x.label }))} />
         <span className="spacer" />
         <span className="chiprow">
           {BANDS.map((f) => (

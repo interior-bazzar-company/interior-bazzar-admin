@@ -30,9 +30,9 @@ import LifecycleModal from "./LifecycleModal";
 import EditProfile from "./EditProfile";
 import { DeactivateModal, NoteModal, TagsModal } from "./Modals";
 import {
-  PROFILE_FIELDS, PROFILE_SCHEMA_VERSION, RENEWAL_WINDOW_DAYS, VOCAB,
-  ago, allowedActions, facetLabel, fmtDate, fmtDateTime, labelsFor, money, resetStore,
-  sourceMeta, useTimeline,
+  PROFILE_SCHEMA_VERSION, RENEWAL_WINDOW_DAYS, VOCAB,
+  ago, allowedActions, facetLabel, fieldsFor, fmtDate, fmtDateTime, labelsFor, money,
+  profileUrl, resetStore, sourceMeta, useTimeline,
 } from "./store";
 import type { LifecycleAction, Membership, Params, UserRow } from "./store";
 
@@ -240,14 +240,25 @@ export default function Detail({ id, p, rows, onFilter }: {
               </span>
             </div>
             <div className="card-b">
-              <KvList pairs={PROFILE_FIELDS.map((f) => {
+              <KvList pairs={fieldsFor(row).map((f) => {
                 const v = (u.profile as unknown as Record<string, unknown>)[f.key];
                 /* A facet renders as the chips it is, not as a comma-joined
                    string. Six segments run together read as one long phrase,
                    and the count — which is the thing you actually check on a
                    profile — cannot be seen at all. Keys become labels here;
                    what is stored is never what is shown. */
-                const val = Array.isArray(v)
+                /* The username is an ADDRESS, so on the record it is the
+                   thing itself — a link somebody can open or copy — not the
+                   string it is made of. */
+                const val = f.type === "handle"
+                  ? (v
+                    ? <a className="um-profile-link" href={profileUrl(String(v))}
+                        target="_blank" rel="noreferrer">
+                        <span className="mono">{String(v)}</span>
+                        <Icon name="ext" size="sm" />
+                      </a>
+                    : "")
+                  : Array.isArray(v)
                   ? (v.length
                     ? <span className="um-chips ro">
                         {labelsFor(f, v as string[]).map((l, i) => (

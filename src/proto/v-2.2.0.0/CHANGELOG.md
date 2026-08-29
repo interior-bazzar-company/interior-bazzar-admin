@@ -6,6 +6,161 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-29
 
+### A username with an address, target areas for members, and a form you can see the groups in
+
+**Area:** the profile schema, Edit profile, the profile tab, the form's contrast
+**Files:** `HandleField.tsx` (new), `FacetPicker.tsx`, `EditProfile.tsx`,
+`Detail.tsx`, `store.ts`, `List.tsx`, `RenewalQueue.tsx`, `vocabularies.json`,
+`users.json`, `users.css`, `scripts/um-smoke.tsx`,
+`scripts/check-users-derivation.cjs`, `BACKEND-INTEGRATION.md`
+
+**What changed**
+
+**Portfolio link is gone**, along with `locality` and `addressLine`. The
+contact group is now **State · City · Pincode**, in that order, and it is
+called *Where they are* rather than *Address and contact*, which is what it now
+holds.
+
+State is a closed list; **City is open**. That asymmetry is the point: there
+are 28 states and a few thousand cities, and the eight in the suggestion list
+are the ones the platform sees most, not a limit. A closed city field would
+make the form unable to record where somebody actually is.
+
+**Username, and it is an address rather than a text field.** A handle is what
+the profile is reachable at, what gets shared, and the one value on this form
+that another profile can already be holding — so the control shows all three
+at once instead of making somebody press Save to find out:
+
+- the host sits **inside** the box as prefix text, so the field reads as one
+  address rather than a text box near a label
+- the URL spells itself out underneath, greyed while the handle is invalid,
+  because watching the address form up as you type is what teaches that this
+  field *is* the address
+- three verdicts, said differently: **malformed** (your mistake, fixable from
+  the message), **taken** (not your mistake, and re-reading will not fix it,
+  so it offers `-studio` and `-interiors`), **available** — said out loud,
+  because the absence of an error is not confirmation and people re-check
+  silence
+- **Copy link only appears once the handle is saved AND free.** Typing a valid
+  handle does not put a page on the internet, and a button handing somebody a
+  link to a profile that does not exist yet is worse than no button — they will
+  paste it somewhere
+
+Typing is slugified live rather than rejected afterwards: somebody typing
+"Meera Studio" means `meera-studio`, and a form that knows that should not make
+them discover it by failing.
+
+**Target areas, for members only.** Where they will travel to work, which is a
+different question from where they are registered — a Noida studio taking
+Gurugram jobs is the normal case. Free text with suggestions, because
+"Uttam Nagar, Delhi" is a real service area and no closed list holds every
+locality in the country; the suggestions carry the **format** (locality then
+city, or city then state) because a column half "Delhi" and half "delhi ncr
+region" cannot be matched against an enquiry.
+
+"Member" here means **holds a term or ever held one**, not "currently
+entitled". Narrower and a lapsed member's stored areas would go invisible and
+uneditable the day their term expired — that is data going out of reach, not a
+field being tidied away.
+
+**`open` became a flag, and that was overdue.** It was `type === "tags"`, which
+made *accepts free text* and *holds a list* the same decision. They are not:
+City is one value that accepts anything, Target areas is a list that does,
+Segments is a list that does not. The split now sits where it was actually
+decided — **closed**: business type, segments, categories, state (what the
+marketplace filters and ranks on); **open**: city, search keywords, target
+areas (sets nobody can enumerate). There is an assertion whose only job is to
+catch somebody later "fixing" a facet by loosening it.
+
+**The schema is conditional now**, so every read of it goes through
+`fieldsFor(row)` — the patch builder and the required-field check included.
+Two lists would mean the form validating a field it never showed.
+
+**Contrast.** Three groups separated by a bold legend and some air is not a
+boundary on a white modal over a white page; it reads as one long column while
+you are trying to answer one part of it. Each group is now a panel with its own
+ground and a hairline rule. Inputs invert on it — the panel is the well, so the
+control is the raised thing, or they vanish into what they sit on.
+
+**Chips got louder.** A chip *is* the answer to its field; the picker below it
+is only how you got there. On the neutral `.pill` ground they were a grey on a
+grey and lost every time. They now take the brand tint, a real border and a
+control's height rather than a label's. Stale chips keep their warning colours
+— a value the vocabulary has dropped must not read like one it has.
+
+**Temp data**
+
+`vocabularies.json` — `areaSuggestions[]`, `reservedUsernames[]` and
+`usernameRules{}` are new; `states[]` and `cities[]` became `{key,label}` lists
+because the form picks from them now as well as filtering on them;
+`profileFields` rewritten.
+
+`users.json` — usernames seeded from business names (slugified, collisions
+suffixed the way the API will have to), target areas for the eighteen profiles
+that have a business, and `portfolioUrl` / `locality` / `addressLine` deleted.
+
+**Completeness still does not move**, and it is asserted twice. `state` and
+`city` became required and every profile already had both. `username` became
+required and **nobody** had one — so it is seeded for exactly the profiles that
+already satisfy the other business fields, and left null for the two with no
+business at all. Same three incomplete profiles, by id: IB-U-1038, IB-U-1029,
+IB-U-0601.
+
+**Backend needed**
+
+**A new endpoint: `GET /admin/users/username-available?u=…`.** The panel checks
+its own loaded rows, which is a prototype's answer and not a correct one — it
+cannot see a profile outside the page or one created a second ago. It must
+apply the same `usernameRules`, because a handle the client calls well formed
+and the server calls reserved is worse than no check: the failure lands on
+Save. Rate-limit it; it is an enumeration surface even behind an admin session.
+
+`PATCH /admin/users/{id}/profile` gains the handle rules **and a uniqueness
+check that is a real database constraint**, not a read-then-write in
+application code — two people registering at once would otherwise both be told
+they were first.
+
+`GET /admin/users/{id}` sends `username`, `targetAreas[]` and `state`, and no
+longer sends `portfolioUrl`, `locality` or `addressLine`. `city` must accept
+values outside `cities[]` and **must not coerce them** to the nearest known
+one.
+
+**Open decisions**
+
+**UM-OD-09 widens again**: a username is permanent in practice, so who may
+change one, and what happens to the old address when somebody does, is a
+decision this module cannot make on its own. There is no redirect story here.
+
+**Verified**
+
+`tsc -b` clean; `eslint` clean on the module and `scripts/`; `vite build`
+succeeds. `check:users` 183 → 231, `check:users-render` 100 → 111.
+
+The handle rules are asserted case by case — upper case, too short, too long,
+leading and trailing hyphens, double hyphens, spaces, underscores, reserved
+words — plus that `slugify` never emits a handle its own rules would refuse,
+that every seeded handle is well formed, and that no two share one. The seam
+between the two kinds of check is pinned down explicitly: `validateFacets`
+refuses a *malformed* handle and deliberately does **not** refuse a taken one,
+because uniqueness needs the whole table and lives in `updateProfile`.
+
+`fieldApplies` is asserted against every row in the seed rather than against an
+example: target areas applies to exactly active, paused, suspended and past
+members, and to nobody else.
+
+**Still not verified: everything that made this look better.** The panels, the
+chip contrast, the handle field's inline host and its copy button have never
+been rendered by a browser — SSR gives back a string, and a string cannot
+answer whether the contrast is actually stronger, whether the brand tint holds
+up in dark mode, or whether `navigator.clipboard` is reachable on the origin
+this is served from. The clipboard call is wrapped, so it fails quietly rather
+than throwing, which is also untested. Nothing in this module has been opened
+in a browser yet, and this entry is the one where that matters most.
+
+---
+
+## 2026-08-29
+
 ### Two topbar figures, plainer classification names, and a strip that scrolls
 
 **Area:** the topbar, the classification vocabulary, the stat strip

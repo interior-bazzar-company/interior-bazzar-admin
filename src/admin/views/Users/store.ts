@@ -38,6 +38,7 @@ import vocabDoc from "../../../content/users/vocabularies.json";
 import analyticsDoc from "../../../content/users/analytics.json";
 import auditDoc from "../../../content/users/audit.json";
 import { getSession } from "../../auth/session";
+import config from "../../../config";
 
 /* ============================================================== types === */
 
@@ -56,9 +57,12 @@ export interface UserProfile {
   schemaVersion: string;
   profileStatus: string;
   displayName: string | null;
+  /** The public address of this profile. Lower-case, unique across the
+   *  platform, and permanent in practice — changing it breaks every link
+   *  anybody has already shared. */
+  username: string | null;
   city: string | null;
   state: string | null;
-  locality: string | null;
   pincode: string | null;
   about: string | null;
   businessName: string | null;
@@ -77,8 +81,11 @@ export interface UserProfile {
   segments: string[];
   categories: string[];
   searchKeywords: string[];
-  portfolioUrl: string | null;
-  addressLine: string | null;
+  /** WHERE THEY WILL TRAVEL TO WORK, which is a different question from where
+   *  they are registered — a Noida studio taking Gurugram jobs is the normal
+   *  case. Free text with suggestions, because "Uttam Nagar, Delhi" is a real
+   *  service area and no closed list holds every locality in the country. */
+  targetAreas: string[];
   updatedBy: string | null;
   updatedAt: string | null;
 }
@@ -209,6 +216,13 @@ export interface ProfileField {
   type: string;
   /** Name of the vocabulary in this file that supplies the options. */
   vocab?: string;
+  /** Accepts values outside `vocab` — the list becomes a suggestion rather
+   *  than a constraint. City and Target areas are open; the facets the
+   *  marketplace filters and ranks on are not. */
+  open?: boolean;
+  /** Only render this field when the row satisfies the condition. Today the
+   *  one value is "member". */
+  showWhen?: string;
   /** Name of the vocabulary that supplies option GROUP headings, if grouped. */
   groups?: string;
   /** Most values allowed. A facet with no ceiling is a facet everybody maxes. */
@@ -233,6 +247,10 @@ const VOCABS: Record<string, FacetOption[]> = {
      the label, and the list is a suggestion rather than a constraint. */
   keywordSuggestions: (vocabDoc.keywordSuggestions as string[])
     .map((k) => ({ key: k, label: k })),
+  areaSuggestions: (vocabDoc.areaSuggestions as string[])
+    .map((k) => ({ key: k, label: k })),
+  states: vocabDoc.states as FacetOption[],
+  cities: vocabDoc.cities as FacetOption[],
 };
 const VOCAB_GROUPS: Record<string, FacetGroup[]> = {
   categoryGroups: vocabDoc.categoryGroups as FacetGroup[],
@@ -253,7 +271,80 @@ export function facetLabel(vocab: string, key: string): string {
 export const labelsFor = (f: ProfileField, keys: string[]): string[] =>
   keys.map((k) => (f.vocab ? facetLabel(f.vocab, k) : k));
 
+/* ------------------------------------------------------------- username --- */
+
+/** Where a profile lives on the storefront. `FRONTEND_URL` is the public site,
+ *  not the API — and it is genuinely absent in some builds (the render harness
+ *  defines `import.meta.env` as `{}`), so the host degrades to a readable
+ *  placeholder rather than to the string "undefined" in front of a customer. */
+export function profileUrl(username: string): string {
+  const base = String(config.FRONTEND_URL || "").replace(/\/+$/, "");
+  return (base || "https://interiorbazzar.com") + USERNAME_RULES.path + username;
+}
+
+/** Lower-case, hyphens for runs of anything else. What a person typing their
+ *  business name into the box should get without being told the rules first. */
+export const slugify = (s: string) =>
+  s.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, "-")
+    .replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, USERNAME_RULES.max);
+
+/**
+ * Why a username is not allowed, or "" if it is.
+ *
+ * Separate from `usernameTaken` because they are different questions with
+ * different answers: this one is about the string and can be answered offline,
+ * that one is about the platform and cannot. The dialog shows them
+ * differently for the same reason — a malformed handle is your mistake, a
+ * taken one is not.
+ */
+export function usernameError(raw: string): string {
+  const u = raw.trim();
+  if (!u) return "";
+  const { min, max } = USERNAME_RULES;
+  if (u !== u.toLowerCase()) return "Lower-case only.";
+  if (u.length < min) return "At least " + min + " characters.";
+  if (u.length > max) return "At most " + max + " characters.";
+  if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(u)) {
+    return "Letters, numbers and hyphens, starting and ending with a letter or number.";
+  }
+  if (u.indexOf("--") >= 0) return "No double hyphens.";
+  /* A handle that collides with a storefront route would either 404 or, worse,
+     let a profile sit at an address the platform speaks from. */
+  if (RESERVED_USERNAMES.indexOf(u) >= 0) return "That one is reserved by the platform.";
+  return "";
+}
+
+/** Held by somebody else. `exceptUserId` is what stops the dialog telling you
+ *  your own handle is taken the moment you open it. */
+export function usernameTaken(u: string, exceptUserId?: string): boolean {
+  const want = u.trim().toLowerCase();
+  if (!want) return false;
+  return snap.users.some((x) =>
+    x.userId !== exceptUserId
+    && (x.profile.username || "").toLowerCase() === want);
+}
+
+/** Free, correctly formed, and not somebody else's. */
+export const usernameFree = (u: string, exceptUserId?: string) =>
+  !!u.trim() && !usernameError(u) && !usernameTaken(u, exceptUserId);
+
 /* ------------------------------------------------------ facet validation --- */
+
+/** Whether a conditional field applies to this row. A field with no
+ *  `showWhen` always applies.
+ *
+ *  "member" means holds a term OR ever held one — not "currently entitled".
+ *  Narrower than that and a past member's stored target areas would become
+ *  invisible and uneditable the day their term lapsed, which is data quietly
+ *  going out of reach rather than a field being tidied away. */
+export function fieldApplies(f: ProfileField, row?: UserRow | null): boolean {
+  if (!f.showWhen) return true;
+  if (!row) return false;
+  if (f.showWhen === "member") return MEMBER_CLASSES.indexOf(row.classification) >= 0;
+  return true;
+}
+export const fieldsFor = (row?: UserRow | null) =>
+  PROFILE_FIELDS.filter((f) => fieldApplies(f, row));
 
 /** Collapse the whitespace and trim. Not lower-cased: "2BHK interior" and
  *  "Pooja room design" are shown to people, and case is theirs to choose. */
@@ -290,9 +381,28 @@ export function validateFacets(patch: Partial<UserProfile>): string {
 
     if (f.type === "single") {
       if (v === null || v === "") return;
+      /* An OPEN single takes anything inside its length limit — City has a
+         suggestion list of the eight the platform sees most, and there are
+         several thousand more. Closing it would make the form unable to record
+         where somebody actually is. */
+      if (f.open) {
+        const t = cleanKeyword(String(v));
+        if (!t) bad.push(f.label + ": that is only whitespace");
+        else if (f.maxLength && t.length > f.maxLength) {
+          bad.push(f.label + ": keep it under " + f.maxLength + " characters");
+        }
+        return;
+      }
       if (!optionsFor(f).some((o) => o.key === v)) {
         bad.push(f.label + ': "' + String(v) + '" is not one of the allowed values');
       }
+      return;
+    }
+
+    if (f.type === "handle") {
+      if (v === null || v === "") return;
+      const e = usernameError(String(v));
+      if (e) bad.push(f.label + ": " + e);
       return;
     }
 
@@ -301,8 +411,8 @@ export function validateFacets(patch: Partial<UserProfile>): string {
       if (f.max && list.length > f.max) {
         bad.push(f.label + ": at most " + f.max + " (got " + list.length + ")");
       }
-      if (f.type === "multi") {
-        /* A CLOSED LIST HAS TO ACTUALLY CLOSE. These three facets are what the
+      if (f.type === "multi" && !f.open) {
+        /* A CLOSED LIST HAS TO ACTUALLY CLOSE. These facets are what the
            marketplace filters and ranks on; one unrecognised key is a profile
            that quietly stops appearing under anything. */
         const known = optionsFor(f);
@@ -319,6 +429,9 @@ export function validateFacets(patch: Partial<UserProfile>): string {
         if (long.length) {
           bad.push(f.label + ": keep each under " + f.maxLength + " characters");
         }
+        if (dedupeKeywords(list).length !== list.length) {
+          bad.push(f.label + ": the same value is in there twice");
+        }
       }
     }
   });
@@ -331,6 +444,9 @@ export const SEGMENTS = vocabDoc.segments;
 export const CATEGORIES = vocabDoc.categories;
 export const CATEGORY_GROUPS = vocabDoc.categoryGroups;
 export const KEYWORD_SUGGESTIONS = vocabDoc.keywordSuggestions;
+export const AREA_SUGGESTIONS = vocabDoc.areaSuggestions;
+export const USERNAME_RULES = vocabDoc.usernameRules;
+export const RESERVED_USERNAMES = vocabDoc.reservedUsernames as string[];
 export const REGISTERED_RANGES = vocabDoc.registeredRanges;
 export const SORT_OPTIONS = vocabDoc.sortOptions;
 export const METRICS = vocabDoc.metricDefinitions;
@@ -543,7 +659,12 @@ function matchesSearch(r: UserRow, q: string): boolean {
   const u = r.user;
   const hay = [
     u.userId, u.identity.name, u.identity.email, u.profile.displayName,
-    u.profile.businessName, u.profile.city, u.profile.locality,
+    u.profile.businessName, u.profile.city, u.profile.state,
+    /* The username is an address people are handed, so it is a thing somebody
+       arrives holding — "a member emailed about /pro/meera-studio" has to be
+       findable by pasting that in. Target areas are searchable for the same
+       reason the city is: "who covers Gurugram" is a real question. */
+    u.profile.username, ...u.profile.targetAreas,
     r.current ? r.current.membershipId : "", r.current ? r.current.planName : "",
     ...u.commercial.dealRefs, ...u.commercial.invoiceRefs,
   ].map(norm).join(" ");
@@ -820,6 +941,14 @@ export function updateProfile(userId: string, patch: Partial<UserProfile>): stri
      facet nothing validates. */
   const invalid = validateFacets(patch);
   if (invalid) return invalid;
+  /* UNIQUENESS IS NOT A FIELD RULE, so it is not in validateFacets: that
+     function answers "is this value well formed", which needs nothing but the
+     value, and this one needs the whole table. Checked here because the
+     username is a public address — two profiles at one URL is not a
+     validation nicety, it is one of them being unreachable. */
+  if (patch.username && usernameTaken(String(patch.username), userId)) {
+    return "That username belongs to another profile. Nothing has been saved.";
+  }
   const changed: string[] = [];
   (Object.keys(patch) as (keyof UserProfile)[]).forEach((k) => {
     const before = JSON.stringify(u.profile[k] ?? null);

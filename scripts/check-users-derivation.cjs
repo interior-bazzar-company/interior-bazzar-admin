@@ -590,6 +590,124 @@ S.resetStore();
     ["interior_designer", "architect"]);
 }
 
+/* ============================================================ the username ===
+   A username is an ADDRESS, not a text field with a rule on it: it is what the
+   profile is reachable at, and two profiles at one URL means one of them is
+   unreachable. So the rules are asserted here rather than trusted to the
+   dialog — an import or a bulk edit reaches the store without passing the
+   form at all. */
+console.log("\nthe username is an address, and addresses are unique");
+S.resetStore();
+{
+  const bad = (u) => S.usernameError(u) !== "";
+  ok("a normal handle is fine", bad("meera-studio"), false);
+  ok("digits are fine", bad("studio-360"), false);
+  ok("upper case is not", bad("Meera-Studio"), true);
+  ok("two characters is too short", bad("ab"), true);
+  ok("thirty-one is too long", bad("a".repeat(31)), true);
+  ok("a leading hyphen is refused", bad("-meera"), true);
+  ok("a trailing hyphen is refused", bad("meera-"), true);
+  ok("a double hyphen is refused", bad("meera--studio"), true);
+  ok("spaces and dots are refused", bad("meera studio"), true);
+  ok("underscores are refused", bad("meera_studio"), true);
+  /* A handle colliding with a storefront route would either 404 or let a
+     profile sit at an address the platform speaks from. */
+  ok("a reserved word is refused", bad("admin"), true);
+  ok("...and so is `login`", bad("login"), true);
+  ok("an empty handle is not an ERROR, it is just absent", S.usernameError(""), "");
+
+  ok("slugify does what somebody typing a business name means",
+    S.slugify("Meera Studio Interiors LLP"), "meera-studio-interiors-llp");
+  ok("...including the ampersand", S.slugify("Bhatia Ply & Hardware"), "bhatia-ply-and-hardware");
+  ok("...and never emits a handle its own rules refuse",
+    S.usernameError(S.slugify("  ***Meera   Studio!!!  ")), "");
+
+  ok("a seeded handle is taken", S.usernameTaken("meera-studio-interiors"), true);
+  /* The check that stops a dialog telling you your own handle is unavailable
+     the moment you open it. */
+  ok("...but not by its own owner", S.usernameTaken("meera-studio-interiors", "IB-U-0912"), false);
+  ok("an unused handle is free", S.usernameTaken("nobody-has-this"), false);
+  ok("usernameFree wants all three", S.usernameFree("nobody-has-this"), true);
+  ok("...and refuses a reserved one even though nobody holds it",
+    S.usernameFree("admin"), false);
+
+  const names = S.readUsers().map((u) => u.profile.username).filter(Boolean);
+  ok("every seeded handle is well formed",
+    names.filter((n) => S.usernameError(n)), []);
+  ok("...and no two profiles share one", names.length, new Set(names).size);
+  ok("the profile URL is built on the storefront, not the API",
+    S.profileUrl("meera-studio").indexOf("/pro/meera-studio") > 0, true);
+}
+
+console.log("\nthe conditional field applies to exactly who it says");
+{
+  const target = S.PROFILE_FIELDS.filter((f) => f.key === "targetAreas")[0];
+  ok("target areas is conditional at all", target.showWhen, "member");
+  const applies = all.filter((r) => S.fieldApplies(target, r)).map((r) => r.classification);
+  ok("...to members, paused, suspended and PAST members",
+    Array.from(new Set(applies)).sort(),
+    ["active_member", "former_member", "paused_member", "suspended_member"]);
+  /* Narrower than this and a lapsed member's stored areas would be invisible
+     and uneditable — data going out of reach rather than a field tidied away. */
+  ok("...and to nobody else",
+    all.filter((r) => S.fieldApplies(target, r) && S.MEMBER_CLASSES.indexOf(r.classification) < 0).length, 0);
+  ok("a field with no condition applies to everybody",
+    all.filter((r) => !S.fieldApplies(S.PROFILE_FIELDS.filter((f) => f.key === "city")[0], r)).length, 0);
+  ok("fieldsFor drops it for a plain user",
+    S.fieldsFor(all.filter((r) => r.classification === "normal")[0])
+      .some((f) => f.key === "targetAreas"), false);
+}
+
+console.log("\nthe schema change did not re-grade anybody");
+{
+  const users = S.readUsers();
+  /* THE SAME INVARIANT AS THE FACET MIGRATION. state and city became required
+     and every profile already had both; username became required and NOBODY
+     had one, so it is seeded for exactly the profiles that satisfy the other
+     business fields. The incomplete SET must be untouched. */
+  ok("still exactly three incomplete profiles", S.countsOf(all).incompleteProfiles, 3);
+  ok("...and the same three",
+    all.filter((r) => r.completeness < 100).map((r) => r.user.userId).sort(),
+    ["IB-U-0601", "IB-U-1029", "IB-U-1038"]);
+  ok("a username exists wherever a business name does",
+    users.filter((u) => !!u.profile.businessName !== !!u.profile.username).map((u) => u.userId), []);
+  ok("every profile has a state", users.filter((u) => !u.profile.state).length, 0);
+  ok("every profile has a city", users.filter((u) => !u.profile.city).length, 0);
+  /* The three removed fields must be gone from the DATA too, not just the
+     form — a stored value nothing renders is a field that comes back. */
+  ["portfolioUrl", "locality", "addressLine"].forEach((k) => {
+    ok("`" + k + "` is gone from the seed",
+      users.filter((u) => k in u.profile).length, 0);
+  });
+  ok("no profile is over the target-area cap",
+    users.filter((u) => (u.profile.targetAreas || []).length > 10).map((u) => u.userId), []);
+}
+
+console.log("\nan open facet takes what a closed one would refuse");
+S.resetStore();
+{
+  const bad = (patch) => S.validateFacets(patch) !== "";
+  /* City is a single that accepts anything: there are eight cities in the
+     suggestion list and several thousand in the country. */
+  ok("a city nobody listed is accepted", bad({ city: "Guwahati" }), false);
+  ok("a state nobody listed is not", bad({ state: "Atlantis" }), true);
+  ok("a real state is", bad({ state: "Karnataka" }), false);
+  ok("a locality target area is accepted", bad({ targetAreas: ["Uttam Nagar, Delhi"] }), false);
+  ok("...eleven of them are not",
+    bad({ targetAreas: Array.from({ length: 11 }, (_, i) => "Area " + i) }), true);
+  ok("...and neither is the same one twice",
+    bad({ targetAreas: ["Mumbai", "mumbai"] }), true);
+  ok("a malformed username is refused by validateFacets", bad({ username: "Bad_Name" }), true);
+  /* Uniqueness is NOT a field rule — it needs the whole table, so it lives in
+     updateProfile and this is where that seam is pinned down. */
+  ok("...but uniqueness is not its job", bad({ username: "meera-studio-interiors" }), false);
+  ok("the store is what refuses a taken one",
+    S.updateProfile("IB-U-1041", { username: "meera-studio-interiors" })
+      .indexOf("belongs to another profile") >= 0, true);
+  ok("...and a free one goes through",
+    S.updateProfile("IB-U-1041", { username: "priya-nair-design" }), "");
+}
+
 console.log("\nkeys are stored, labels are shown");
 {
   ok("a known key resolves to its label",

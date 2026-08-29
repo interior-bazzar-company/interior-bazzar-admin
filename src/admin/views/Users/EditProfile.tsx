@@ -29,30 +29,34 @@
    is no partial write and no half-saved state — the save is one transaction
    (UM-T07) and the audit records the changed field set, never the values.
    ============================================================================= */
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Icon, Notice } from "../../ui";
 import { Completeness } from "./bits";
 import FacetPicker from "./FacetPicker";
+import HandleField from "./HandleField";
 import {
-  PROFILE_FIELDS, PROFILE_SCHEMA_VERSION, completenessOf, updateProfile, validateFacets,
+  PROFILE_SCHEMA_VERSION, completenessOf, fieldsFor, updateProfile, usernameTaken, validateFacets,
 } from "./store";
 import type { ProfileField, UserProfile, UserRow } from "./store";
 
 const GROUPS = [
   { key: "basic", label: "Basic profile", note: "What a customer sees first." },
   { key: "business", label: "Business profile", note: "What the marketplace matches and ranks on." },
-  { key: "contact", label: "Address and contact", note: "Mostly internal. Visibility is per field." },
+  { key: "contact", label: "Where they are", note: "State, city and pincode. The pincode is internal." },
 ];
 
 /** A field holds a list when the schema says so — never because the value
  *  happens to be an array today. */
 const isList = (f: ProfileField) => f.type === "multi" || f.type === "tags";
+/** Fields that render as a composite rather than as one labelled input. */
+const isRich = (f: ProfileField) =>
+  isList(f) || f.type === "single" || f.type === "handle";
 
 type Draft = Record<string, string | string[]>;
 
-const toDraft = (p: UserProfile): Draft => {
+const toDraft = (p: UserProfile, fields: ProfileField[]): Draft => {
   const d: Draft = {};
-  PROFILE_FIELDS.forEach((f) => {
+  fields.forEach((f) => {
     const v = (p as unknown as Record<string, unknown>)[f.key];
     d[f.key] = isList(f)
       ? (Array.isArray(v) ? (v as string[]).slice() : [])
@@ -64,9 +68,9 @@ const toDraft = (p: UserProfile): Draft => {
 /** Draft → the shape the store stores. One function, used by the live
  *  completeness readout and by the save, so the number on the form cannot
  *  disagree with what saving would actually produce. */
-const toPatch = (draft: Draft): Partial<UserProfile> => {
+const toPatch = (draft: Draft, fields: ProfileField[]): Partial<UserProfile> => {
   const patch: Record<string, unknown> = {};
-  PROFILE_FIELDS.forEach((f) => {
+  fields.forEach((f) => {
     const raw = draft[f.key];
     if (isList(f)) patch[f.key] = Array.isArray(raw) ? raw : [];
     else if (f.type === "single") patch[f.key] = String(raw || "").trim() || null;
@@ -80,7 +84,13 @@ export default function EditProfile({ row, onClose, onDone }: {
   onClose: () => void;
   onDone: (msg: string, tone?: string) => void;
 }) {
-  const [draft, setDraft] = useState<Draft>(() => toDraft(row.user.profile));
+  /* THE SCHEMA IS CONDITIONAL NOW. Target areas only applies to somebody who
+     holds a term or held one, so the field list is a function of the row —
+     and every read of it, including the patch builder and the required check,
+     has to go through the same list or the form would validate a field it
+     never showed. */
+  const fields = useMemo(() => fieldsFor(row), [row]);
+  const [draft, setDraft] = useState<Draft>(() => toDraft(row.user.profile, fields));
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -89,16 +99,20 @@ export default function EditProfile({ row, onClose, onDone }: {
   /* Completeness recomputes as you type, against the same required-field set
      the directory grades on — so the number on the form and the number on the
      row are one calculation, not two that agree today. */
-  const live = completenessOf({ ...row.user.profile, ...toPatch(draft) } as UserProfile);
+  const live = completenessOf({ ...row.user.profile, ...toPatch(draft, fields) } as UserProfile);
 
   /* The facet rules run as you type as well as on save. Shown as a warning
      rather than blocking every keystroke: you are told the moment it is wrong,
      and the save is what refuses. */
-  const facetErr = validateFacets(toPatch(draft));
+  const facetErr = validateFacets(toPatch(draft, fields));
+  /* Uniqueness cannot live in validateFacets — that answers "is this value
+     well formed", which needs only the value. This needs the whole table. */
+  const handle = String(draft.username || "").trim();
+  const handleTaken = !!handle && usernameTaken(handle, row.user.userId);
 
   const submit = () => {
     setErr(null);
-    const missingRequired = PROFILE_FIELDS
+    const missingRequired = fields
       .filter((f) => f.required && f.editable)
       .filter((f) => {
         const v = draft[f.key];
@@ -113,12 +127,19 @@ export default function EditProfile({ row, onClose, onDone }: {
       return;
     }
     setBusy(true);
-    const e = updateProfile(row.user.userId, toPatch(draft));
+    const e = updateProfile(row.user.userId, toPatch(draft, fields));
     if (e) { setErr(e); setBusy(false); return; }
     onDone("Profile saved. The changed field set is in the audit trail; the values are not.", "ok");
   };
 
   const control = (f: ProfileField) => {
+    if (f.type === "handle") {
+      return (
+        <HandleField value={String(draft[f.key] || "")} saved={row.user.profile.username}
+          userId={row.user.userId} suggestFrom={String(draft.businessName || "")}
+          disabled={!f.editable} onChange={(next) => set(f.key, next)} />
+      );
+    }
     if (f.type === "textarea") {
       return (
         <textarea className="inp" rows={3} value={String(draft[f.key] || "")}
@@ -164,6 +185,9 @@ export default function EditProfile({ row, onClose, onDone }: {
       <div className="md-b um-form">
         {err ? <Notice tone="bad" text={<b>{err}</b>} /> : null}
         {!err && facetErr ? <Notice tone="warn" text={facetErr} /> : null}
+        {!err && !facetErr && handleTaken
+          ? <Notice tone="warn" text="That username belongs to another profile." />
+          : null}
 
         <div className="um-livecomp">
           <span className="l">Completeness as you type</span>
@@ -171,19 +195,18 @@ export default function EditProfile({ row, onClose, onDone }: {
         </div>
 
         {GROUPS.map((g) => {
-          const fields = PROFILE_FIELDS.filter((f) => f.group === g.key);
-          if (!fields.length) return null;
+          const mine = fields.filter((f) => f.group === g.key);
+          if (!mine.length) return null;
           return (
             <fieldset className="um-fs" key={g.key}>
               <legend>{g.label}<i>{g.note}</i></legend>
               <div className="um-f2">
-                {fields.map((f) => (
+                {mine.map((f) => (
                   /* A picker is not a <label>'s control — it is a composite
                      with its own labelled input — so those render as a div
                      with the caption beside it instead. Wrapping one in a
                      <label> makes clicking a chip focus the search box. */
-                  <div className={"fg" + (isList(f) || f.type === "single" ? " um-fg-wide" : "")}
-                    key={f.key}>
+                  <div className={"fg" + (isRich(f) ? " um-fg-wide" : "")} key={f.key}>
                     <span className="fg-lb">
                       {f.label}
                       {f.required ? <span className="req"> *</span> : null}
@@ -240,7 +263,7 @@ export default function EditProfile({ row, onClose, onDone }: {
       <div className="md-f">
         <span className="spacer" />
         <button className="btn" data-close="1" onClick={onClose}>Cancel</button>
-        <button className="btn pri" disabled={busy || !!facetErr} onClick={submit}>
+        <button className="btn pri" disabled={busy || !!facetErr || handleTaken} onClick={submit}>
           {busy ? "Saving…" : "Save changes"}
         </button>
       </div>

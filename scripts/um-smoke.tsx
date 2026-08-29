@@ -37,7 +37,9 @@ import AssignMembership from "../src/admin/views/Users/AssignMembership";
 import LifecycleModal from "../src/admin/views/Users/LifecycleModal";
 import EditProfile from "../src/admin/views/Users/EditProfile";
 import { NoteModal, TagsModal, DeactivateModal } from "../src/admin/views/Users/Modals";
-import { PROFILE_FIELDS, toRow, readUsers, readMemberships } from "../src/admin/views/Users/store";
+import {
+  fieldsFor, toRow, readUsers, readMemberships, usernameTaken,
+} from "../src/admin/views/Users/store";
 import { __setPlansMode } from "../src/admin/views/Plans/api";
 import type { LifecycleAction } from "../src/admin/views/Users/store";
 
@@ -439,23 +441,39 @@ check("edit profile · incomplete", () => modal(
    than the rule itself: every schema field reached the form, each got the
    control its `type` asks for, and the closed ones are closed. */
 {
-  const full = modal(<EditProfile row={rowOf("IB-U-0912")} onClose={noop} onDone={noop} />);
-  const empty = modal(<EditProfile row={rowOf("IB-U-1029")} onClose={noop} onDone={noop} />);
+  const memberRow = rowOf("IB-U-0912");
+  const normalRow = rowOf("IB-U-1029");
+  const full = modal(<EditProfile row={memberRow} onClose={noop} onDone={noop} />);
+  const empty = modal(<EditProfile row={normalRow} onClose={noop} onDone={noop} />);
 
-  check("facets · every schema field reached the form", () => {
-    const missing = PROFILE_FIELDS.filter((f) => full.indexOf(">" + f.label) < 0);
+  check("facets · every applicable field reached the form", () => {
+    /* `fieldsFor` rather than the whole schema: Target areas only applies to
+       somebody who holds a term or held one, and asserting against the full
+       list would demand a field the form is right to be hiding. */
+    const missing = fieldsFor(memberRow).filter((f) => full.indexOf(">" + f.label) < 0);
     if (missing.length) throw new Error("absent: " + missing.map((f) => f.label).join(", "));
     return full;
   });
-  check("facets · each picker rendered its combobox", () => {
-    const pickers = (full.match(/role="combobox"/g) || []).length;
-    const expect = PROFILE_FIELDS.filter((f) =>
-      ["single", "multi", "tags"].indexOf(f.type) >= 0).length;
-    /* A single facet already answered collapses to its chip plus Change, so
-       the empty profile is where all four comboboxes are on screen at once. */
-    const onEmpty = (empty.match(/role="combobox"/g) || []).length;
-    if (onEmpty !== expect) throw new Error(onEmpty + " comboboxes, expected " + expect);
-    if (pickers < expect - 1) throw new Error("only " + pickers + " on the filled profile");
+  check("facets · each one rendered a picker, not a bare input", () => {
+    /* Counting comboboxes is the wrong assertion — a CLOSED single that is
+       already answered collapses to its chip plus Change and has no combobox
+       at all. What must hold is that every picker-typed field rendered the
+       picker shell. */
+    const shells = (full.match(/class="um-facet"/g) || []).length;
+    const expect = fieldsFor(memberRow)
+      .filter((f) => ["single", "multi", "tags"].indexOf(f.type) >= 0).length;
+    if (shells !== expect) throw new Error(shells + " pickers, expected " + expect);
+    return full;
+  });
+  check("facets · an answered closed single collapses; an open one does not", () => {
+    /* State is closed and answered, so it shows a chip and a Change button.
+       City is open and answered, and must keep its box — otherwise there is
+       no way to type a city the suggestion list has never heard of. */
+    if (full.indexOf(">Change<") < 0) throw new Error("the closed single did not collapse");
+    const boxes = (full.match(/role="combobox"/g) || []).length;
+    const openSingles = fieldsFor(memberRow).filter((f) => f.type === "single" && f.open).length;
+    if (openSingles < 1) throw new Error("no open single in the schema to check");
+    if (boxes < openSingles) throw new Error("an open single collapsed like a closed one");
     return full;
   });
   check("facets · the answer sits above the control, as chips", () => {
@@ -504,14 +522,100 @@ check("edit profile · incomplete", () => modal(
       throw new Error("the keyword field lost its hint");
     return empty;
   });
-  check("facets · only the keyword field offers free text", () => {
-    /* Two open facets would be one too many: the three closed ones are what
-       the marketplace filters on. */
-    const open = PROFILE_FIELDS.filter((f) => f.type === "tags");
-    if (open.length !== 1) throw new Error(open.length + " free-text facets");
-    if (open[0].key !== "searchKeywords") throw new Error("the open one is " + open[0].key);
+  check("facets · the open/closed split is exactly where it was decided", () => {
+    /* The three the marketplace FILTERS AND RANKS on must stay closed, or the
+       facet fragments. The three that are sets nobody can enumerate must stay
+       open, or the form cannot record the truth. This is the one assertion
+       that would catch somebody "fixing" a facet by loosening it. */
+    const all = fieldsFor(memberRow);
+    const isOpen = (k: string) => {
+      const f = all.filter((x) => x.key === k)[0];
+      if (!f) throw new Error("no field " + k);
+      return f.type === "tags" || f.open === true;
+    };
+    ["businessType", "segments", "categories", "state"].forEach((k) => {
+      if (isOpen(k)) throw new Error(k + " has been opened up");
+    });
+    ["searchKeywords", "targetAreas", "city"].forEach((k) => {
+      if (!isOpen(k)) throw new Error(k + " has been closed off");
+    });
     return empty;
   });
+  /* ------------------------------------------- the username and the URL --- */
+  check("username · the field is an address, not a text box", () => {
+    /* The host is in the control, the URL is spelled out under it, and the
+       rules are stated before anybody trips over them. */
+    if (full.indexOf("um-handle") < 0) throw new Error("no handle control");
+    if (full.indexOf("um-handle-pre") < 0) throw new Error("the host is not in the box");
+    if (full.indexOf("/pro/") < 0) throw new Error("no profile path");
+    if (full.indexOf("meera-studio-interiors") < 0) throw new Error("the seeded handle is missing");
+    return full;
+  });
+  check("username · availability is answered before you press Save", () => {
+    if (full.indexOf("Available") < 0) throw new Error("a free handle says nothing");
+    /* Live only when it is the STORED value — typing a valid handle does not
+       put a page on the internet, and the copy button must not imply it has. */
+    if (full.indexOf("this link is live") < 0) throw new Error("a saved handle is not marked live");
+    if (full.indexOf("Copy link") < 0) throw new Error("no way to copy the link");
+    return full;
+  });
+  check("username · an empty one is offered the business name", () => {
+    /* IB-U-1029 has neither, so the rules show instead of a suggestion. */
+    if (empty.indexOf("Copy link") >= 0)
+      throw new Error("offered a link to a profile that does not exist");
+    return empty;
+  });
+  check("username · a taken handle is refused, and by the store too", () => {
+    if (!usernameTaken("meera-studio-interiors")) throw new Error("uniqueness is not checked");
+    if (usernameTaken("meera-studio-interiors", "IB-U-0912"))
+      throw new Error("a profile is told its own handle is taken");
+    return full;
+  });
+  check("username · the record links to it rather than printing it", () => {
+    const rec = at("/users/IB-U-0912?tab=profile");
+    if (rec.indexOf("um-profile-link") < 0) throw new Error("the record printed a string");
+    if (rec.indexOf("/pro/meera-studio-interiors") < 0) throw new Error("no href to the profile");
+    return rec;
+  });
+
+  /* -------------------------------------------- conditional and removed --- */
+  check("target areas · members are asked, plain users are not", () => {
+    if (full.indexOf("Target areas") < 0) throw new Error("a member was not asked");
+    if (empty.indexOf("Target areas") >= 0) throw new Error("a plain user was asked");
+    return full;
+  });
+  check("target areas · they take a locality, not just a city", () => {
+    /* "Uttam Nagar, Delhi" is the case the field exists for: a closed city
+       list cannot express it, which is why this one is open. */
+    const rec = at("/users/IB-U-0921?tab=profile");
+    if (rec.indexOf("Uttam Nagar, Delhi") < 0) throw new Error("a locality area did not survive");
+    return rec;
+  });
+  check("target areas · a past member keeps theirs reachable", () => {
+    /* Narrower than MEMBER_CLASSES and a lapsed member's stored areas would
+       be invisible and uneditable — data going out of reach, not a field
+       being tidied away. */
+    const past = readUsers().map((u) => toRow(u, readMemberships()))
+      .filter((r) => r.classification === "former_member")[0];
+    const html = modal(<EditProfile row={past} onClose={noop} onDone={noop} />);
+    if (html.indexOf("Target areas") < 0) throw new Error("a past member cannot see their own areas");
+    return html;
+  });
+  check("the removed fields are gone from every surface", () => {
+    const rec = at("/users/IB-U-0912?tab=profile");
+    ["Portfolio link", "Locality", "Contact address"].forEach((label) => {
+      if (full.indexOf(">" + label) >= 0) throw new Error(label + " survives on the form");
+      if (rec.indexOf(">" + label) >= 0) throw new Error(label + " survives on the record");
+    });
+    return full;
+  });
+  check("...and State, City, Pincode read as one group, in that order", () => {
+    const contact = fieldsFor(memberRow).filter((f) => f.group === "contact").map((f) => f.key);
+    if (contact.join(",") !== "state,city,pincode")
+      throw new Error("the contact group reads " + contact.join(", "));
+    return full;
+  });
+
   check("facets · the record shows them as chips too, not as a comma list", () => {
     const rec = at("/users/IB-U-0912?tab=profile");
     if (rec.indexOf("um-chips ro") < 0) throw new Error("record fell back to text");
