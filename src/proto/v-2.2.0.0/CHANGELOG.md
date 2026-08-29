@@ -40,7 +40,7 @@ rule as before. The incomplete set does not move.
 
 **Verified**
 
-`check:users` 266 → 267, `check:users-render` 116. Chain order asserted in
+`check:users` 266 → 265 (five assertions became four), `check:users-render` 116. Chain order asserted in
 the schema and in the markup; the Contractor/Independent split asserted on
 the seed both ways.
 
