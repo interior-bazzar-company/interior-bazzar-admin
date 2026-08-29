@@ -601,7 +601,7 @@ S.resetStore();
     JSON.stringify(S.readUsers().filter((u) => u.userId === "IB-U-0912")[0].profile), before);
   ok("a valid facet patch is accepted",
     S.updateProfile("IB-U-0912", {
-      businessType: "contractor",
+      businessType: "independent",
       dealsIn: ["services"],
       segments: ["interior_designer", "architect"],
       categories: ["turnkey", "commercial"],
@@ -789,9 +789,21 @@ S.resetStore();
   ok("...and no seeded profile still carries it",
     S.readUsers().filter((u) => u.profile.businessType === "service_provider")
       .map((u) => u.userId), []);
-  ok("six types remain",
+  /* Contractor went the same way as Service provider, one turn later: with
+     dealsIn carrying "sells work", the type axis is WHERE IN THE CHAIN you
+     sit — and every seller of work sits in one place on it. */
+  ok("contractor is not a business type either",
+    S.BUSINESS_TYPES.some((t) => t.key === "contractor"), false);
+  ok("...and no seeded profile still carries it",
+    S.readUsers().filter((u) => u.profile.businessType === "contractor")
+      .map((u) => u.userId), []);
+  ok("five types remain",
     S.BUSINESS_TYPES.map((t) => t.key),
-    ["contractor", "independent", "manufacturer", "dealer", "retailer", "wholesaler"]);
+    ["independent", "manufacturer", "dealer", "retailer", "wholesaler"]);
+  ok("every seller of work is Independent now",
+    S.readUsers().filter((u) => u.profile.dealsIn.indexOf("services") >= 0
+      && u.profile.dealsIn.indexOf("products") < 0
+      && u.profile.businessType !== "independent").map((u) => u.userId), []);
 
   const bad = (patch) => S.validateFacets(patch) !== "";
   ok("products alone is fine", bad({ dealsIn: ["products"] }), false);

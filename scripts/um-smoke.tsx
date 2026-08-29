@@ -562,6 +562,10 @@ check("edit profile · incomplete", () => modal(
       throw new Error("the dropdown lost its options");
     if (full.indexOf(">Service provider<") >= 0)
       throw new Error("Service provider is still on offer");
+    if (full.indexOf(">Contractor<") >= 0)
+      throw new Error("Contractor is still on offer");
+    /* The i sits beside the select, inside the same wrapper. */
+    if (full.indexOf("um-select-i") < 0) throw new Error("the i is not on the dropdown");
     const infos = (full.match(/class="um-info-b"/g) || []).length;
     if (infos < 2) throw new Error("expected an i button on Business type AND Categories, found " + infos);
     return full;

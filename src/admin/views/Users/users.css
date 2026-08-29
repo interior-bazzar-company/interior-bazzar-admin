@@ -645,6 +645,12 @@
 .um-info-row b { font-size: var(--text-md); font-weight: var(--weight-medium); color: var(--text) }
 .um-info-row span { font-size: var(--text-sm); line-height: var(--lh-md); color: var(--text-2) }
 
+/* A dropdown with its i beside it: the select keeps the width, the button
+   keeps its size, and the two read as one control. */
+.um-select-i { display: flex; align-items: center; gap: var(--space-2) }
+.um-select-i .selectbox { flex: 1 1 auto; min-width: 0 }
+.um-select-i .um-info { flex: 0 0 auto }
+
 /* ---------------------------------------------------- deals-in checks --- */
 /* Two options that can combine are two checkboxes — a picker would hide what
    was never worth hiding. Tiles, so the pressed state has somewhere to go. */

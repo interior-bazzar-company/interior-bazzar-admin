@@ -977,14 +977,9 @@
   "$comment_businessFacets": "FOUR FACETS, NOT ONE HIERARCHY. businessType says what kind of entity this is, segments says what it does, categories says how it engages and for which sector, and searchKeywords is the discovery long tail. They are deliberately orthogonal: 'Manufacturer + Modular kitchen' and 'Service provider + Modular kitchen' are different businesses and the pair is what says so. The first three are CLOSED lists because the marketplace filters and ranks on them and free text fragments a facet within a month ('3D Designer' / '3d designer' / '3D visualiser' are three buckets holding one thing). searchKeywords is open because matching is the one job where the long tail is the point.",
   "businessTypes": [
     {
-      "key": "contractor",
-      "label": "Contractor",
-      "hint": "Executes to drawings somebody else produced — civil, carpentry, MEP, finishing."
-    },
-    {
       "key": "independent",
       "label": "Independent professional",
-      "hint": "One practitioner rather than a firm. The same work at a different capacity, which is what a customer needs to know before scoping a large site."
+      "hint": "Sells work rather than stock — design, execution or consulting, as a practice or a firm."
     },
     {
       "key": "manufacturer",

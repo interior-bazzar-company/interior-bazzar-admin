@@ -6,6 +6,54 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-29
 
+### Contractor leaves the business types; the i moves onto the dropdown
+
+**Area:** the Business type field
+**Files:** `EditProfile.tsx`, `users.css`, `vocabularies.json`, `users.json`,
+`scripts/check-users-derivation.cjs`, `scripts/um-smoke.tsx`
+
+**What changed**
+
+**Contractor is removed**, one turn after Service provider and for the same
+reason: with `dealsIn` carrying "sells work", the type axis is *where in
+the chain you sit* — and every seller of work sits in one place on it. Five
+types remain: Independent professional, Manufacturer, Dealer, Retailer,
+Wholesaler. Independent's meaning widened to match ("as a practice or a
+firm"), since it is now the one type for everybody who sells work rather
+than stock.
+
+**The i button sits on the dropdown itself**, beside the select, instead of
+up on the label row. The meanings are the dropdown's, and the button should
+be where the question is. Categories keeps its i on the label — it is a
+picker, not a dropdown.
+
+**Temp data**
+
+`vocabularies.json` — `contractor` deleted, Independent's hint widened.
+`users.json` — the eleven contractor profiles remapped to `independent`.
+The incomplete set does not move.
+
+**Backend needed**
+
+`contractor` joins `service_provider` as a key to refuse, not coerce.
+
+**Verified**
+
+`check:users` 262 → 265, `check:users-render` 116. The type is gone from
+vocabulary and seed, the five that remain are named, every services-only
+profile is Independent, and the form offers neither removed option and
+renders the i inside the dropdown's wrapper.
+
+**A judgement to look at:** eleven firms — carpentry works, a ceilings
+contractor, design-build studios — now read as *Independent professional*.
+That is what the five-type list yields. If the seed reads wrong at that
+grain, the answer is a sixth type (Firm / Studio), not the return of
+Contractor.
+
+---
+
+## 2026-08-29
+
 ### "All cities" joins the city dropdown
 
 **Area:** the target-area rows

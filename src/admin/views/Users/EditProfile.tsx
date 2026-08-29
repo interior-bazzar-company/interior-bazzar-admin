@@ -202,15 +202,20 @@ export default function EditProfile({ row, onClose, onDone }: {
          six words pick faster than six sentences. */
       const v = String(draft[f.key] || "");
       return (
-        <div className={"selectbox" + (v ? " on" : "")}>
-          <select value={v} disabled={!f.editable}
-            aria-label={f.label}
-            onChange={(e) => set(f.key, e.target.value)}>
-            <option value="">Choose…</option>
-            {optionsFor(f).map((o) => (
-              <option key={o.key} value={o.key}>{o.label}</option>
-            ))}
-          </select>
+        /* The i sits ON the dropdown, not up on the label: the meanings are
+           the dropdown's, and the button should be where the question is. */
+        <div className="um-select-i">
+          <div className={"selectbox" + (v ? " on" : "")}>
+            <select value={v} disabled={!f.editable}
+              aria-label={f.label}
+              onChange={(e) => set(f.key, e.target.value)}>
+              <option value="">Choose…</option>
+              {optionsFor(f).map((o) => (
+                <option key={o.key} value={o.key}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+          {f.info ? <InfoTip f={f} /> : null}
         </div>
       );
     }
@@ -270,7 +275,7 @@ export default function EditProfile({ row, onClose, onDone }: {
                     <span className="fg-lb">
                       {f.label}
                       {f.required ? <span className="req"> *</span> : null}
-                      {f.info ? <InfoTip f={f} /> : null}
+                      {f.info && !f.simple ? <InfoTip f={f} /> : null}
                       <em className={"um-vis " + (f.public ? "pub" : "int")}>
                         {f.public ? "public" : "internal"}
                       </em>
