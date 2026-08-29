@@ -3,12 +3,12 @@
   "generatedAt": "2026-08-25T09:00:00+05:30",
 
   "events": [
-    { "eventId": "AU-9001", "userId": "IB-U-1041", "type": "REGISTERED", "actor": "System", "actorRole": "System", "at": "2026-08-06T11:40:00+05:30", "note": "Website signup. Classified Normal User because no membership exists." },
+    { "eventId": "AU-9001", "userId": "IB-U-1041", "type": "REGISTERED", "actor": "System", "actorRole": "System", "at": "2026-08-06T11:40:00+05:30", "note": "Website signup. Classified as a User because no membership exists." },
     { "eventId": "AU-9002", "userId": "IB-U-1041", "type": "PROFILE_UPDATED", "actor": "Priya Nair", "actorRole": "Member", "at": "2026-08-07T09:15:00+05:30", "note": "Self-service: businessName, category, services, about, portfolioUrl." },
     { "eventId": "AU-9003", "userId": "IB-U-1041", "type": "TAGGED", "actor": "D. Kapoor", "actorRole": "Operations", "at": "2026-08-20T12:10:00+05:30", "note": "Added high-intent." },
     { "eventId": "AU-9004", "userId": "IB-U-1041", "type": "NOTE", "actor": "D. Kapoor", "actorRole": "Operations", "at": "2026-08-20T12:12:00+05:30", "note": "Internal note added. Text is deliberately not logged." },
 
-    { "eventId": "AU-9010", "userId": "IB-U-1038", "type": "REGISTERED", "actor": "System", "actorRole": "System", "at": "2026-08-05T18:02:00+05:30", "note": "Campaign funnel. Classified Normal User." },
+    { "eventId": "AU-9010", "userId": "IB-U-1038", "type": "REGISTERED", "actor": "System", "actorRole": "System", "at": "2026-08-05T18:02:00+05:30", "note": "Campaign funnel. Classified as a User." },
     { "eventId": "AU-9011", "userId": "IB-U-1038", "type": "PROFILE_UPDATED", "actor": "Arjun Bhat", "actorRole": "Member", "at": "2026-08-05T18:20:00+05:30", "note": "Self-service: displayName, city, businessName, category." },
     { "eventId": "AU-9012", "userId": "IB-U-1038", "type": "TAGGED", "actor": "N. Pillai", "actorRole": "Operations", "at": "2026-08-18T10:00:00+05:30", "note": "Added profile-chase." },
 
@@ -34,7 +34,7 @@
     { "eventId": "AU-9071", "userId": "IB-U-0921", "type": "PROFILE_UPDATED", "actor": "D. Kapoor", "actorRole": "Operations", "at": "2026-03-19T11:05:00+05:30", "note": "Admin edit: services, addressLine." },
     { "eventId": "AU-9072", "userId": "IB-U-0921", "type": "TAGGED", "actor": "A. Sharma", "actorRole": "Sales Head", "at": "2026-07-20T09:30:00+05:30", "note": "Added win-back after the term expired." },
 
-    { "eventId": "AU-9080", "userId": "IB-U-0912", "type": "REGISTERED", "actor": "System", "actorRole": "System", "at": "2024-06-14T10:22:00+05:30", "note": "Website signup. Classified Normal User for thirteen minutes, until the Starter term activated." },
+    { "eventId": "AU-9080", "userId": "IB-U-0912", "type": "REGISTERED", "actor": "System", "actorRole": "System", "at": "2024-06-14T10:22:00+05:30", "note": "Website signup. Classified as a User for thirteen minutes, until the Starter term activated." },
     { "eventId": "AU-9081", "userId": "IB-U-0912", "type": "TAGGED", "actor": "V. Shakya", "actorRole": "Founder", "at": "2025-08-01T10:00:00+05:30", "note": "Added vip." },
     { "eventId": "AU-9082", "userId": "IB-U-0912", "type": "PROFILE_UPDATED", "actor": "D. Kapoor", "actorRole": "Operations", "at": "2026-08-22T14:02:00+05:30", "note": "Admin edit: about, services, addressLine. Authentication fields were not touched — they are not editable here." },
     { "eventId": "AU-9083", "userId": "IB-U-0912", "type": "NOTE", "actor": "V. Shakya", "actorRole": "Founder", "at": "2026-06-14T12:00:00+05:30", "note": "Internal note added." },

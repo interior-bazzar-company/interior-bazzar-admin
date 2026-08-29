@@ -5,7 +5,7 @@
   "classifications": [
     {
       "key": "normal",
-      "label": "Normal User",
+      "label": "User",
       "tone": "",
       "derivedFrom": "no membership record has ever been active",
       "meaning": "Registered on the platform with no current active membership entitlement.",
@@ -37,7 +37,7 @@
     },
     {
       "key": "former_member",
-      "label": "Former Member",
+      "label": "Past Member",
       "tone": "",
       "derivedFrom": "membership history exists and none of it is currently entitling",
       "meaning": "Held a membership at some point; holds none now.",
@@ -663,7 +663,7 @@
       "label": "Total registered",
       "unit": "unique users",
       "formula": "Distinct platform_user rows retained as of the period end.",
-      "caution": "Includes Normal Users, members and former members. Excludes deactivated accounts from the ACTIVE base but never from history."
+      "caution": "Includes users with no term, members and past members. Excludes deactivated accounts from the ACTIVE base but never from history."
     },
     {
       "key": "newRegistrations",
@@ -674,7 +674,7 @@
     },
     {
       "key": "normalUsers",
-      "label": "Normal Users",
+      "label": "Users",
       "unit": "unique users",
       "formula": "Registered users with no currently entitling membership.",
       "caution": "Derived at read time from membership state — there is no stored flag to drift."

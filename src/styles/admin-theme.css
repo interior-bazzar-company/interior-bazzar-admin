@@ -1650,12 +1650,24 @@ a.lk:hover{ border-color:var(--brand); background:var(--brand-tint) }
            border-top:1px solid var(--line); border-bottom:1px solid var(--line) }
 /* One cell of the strip, built like a table cell: same vertical rhythm, ruled
    off from its neighbour, value over label. */
-.dls-stat{ display:flex; align-items:baseline; gap:6px; white-space:nowrap;
+/* `flex:0 0 auto` is what makes the strip SCROLL rather than squash, and it is
+   the half that was missing: .dls-attn already said `overflow-x:auto`, but a
+   flex item shrinks below its content by default, so the cells compressed to
+   fit and the overflow the scroll was waiting for never happened. With
+   `nowrap` on top of that, a narrow strip clipped its own labels instead of
+   letting you reach them. Nine cells is where the Users strip sits today; the
+   fix is not fewer cells, it is a row that admits it is wider than the pane.
+   Same rule .tb-stat already carried in the topbar. */
+.dls-stat{ flex:0 0 auto; display:flex; align-items:baseline; gap:6px; white-space:nowrap;
            padding:var(--space-2) var(--space-3); margin-bottom:-1px;
            border-bottom:2px solid transparent }
 /* Flush at both ends so the row lines up with the page content on the left
-   and the toolbar's last control on the right. */
-.dls-stat:first-child{ padding-left:0 }
+   and the toolbar's last control on the right. The first cell landing on the
+   page gutter is what puts Total directly under the command row above it and
+   the first table column below it — the strip reads as a header for the list,
+   not as a floating band. `scroll-margin` keeps that alignment true after a
+   keyboard focus scrolls the row. */
+.dls-stat:first-child{ padding-left:0; scroll-margin-left:var(--page-pad) }
 .dls-stat:last-child{ padding-right:0 }
 button.dls-stat:hover{ background:var(--bg-hover) }
 .dls-stat .v{ font-size:var(--text-lg); font-weight:var(--weight-semibold) }

@@ -134,12 +134,12 @@ export default function Analytics({ rows, p, onView, onParams }: FaceProps) {
       {/* ======================================================= the base === */}
       <Blocks>
         <Block wide title="The base" desc="unique users · counted now, not over the range"
-          foot={<>Normal User and Active Member are derived from membership state at read
+          foot={<>User and Active Member are derived from membership state at read
             time. There is no stored flag behind either number.</>}>
           <Tiles list={[
             { k: "Total registered", v: c.total, s: c.deactivated + " deactivated, kept in history",
               to: dir({}) },
-            { k: "Normal Users", v: c.normal, tone: "warn", s: "no entitling term",
+            { k: "Users", v: c.normal, tone: "warn", s: "no entitling term",
               to: dir({ cls: "normal" }) },
             { k: "Active Members", v: c.activeMembers, tone: "ok",
               s: c.paused + " paused · " + c.suspended + " suspended, counted apart",
@@ -186,7 +186,7 @@ export default function Analytics({ rows, p, onView, onParams }: FaceProps) {
           <Tiles cols={2} list={[
             { k: "Conversion", v: pct(t.conversion.value),
               s: t.conversion.num + " of " + t.conversion.den + " in cohort" },
-            { k: "Still to convert", v: c.normal, tone: "warn", s: "Normal Users right now",
+            { k: "Still to convert", v: c.normal, tone: "warn", s: "Users with no term right now",
               to: dir({ cls: "normal" }) },
           ]} />
         </Block>

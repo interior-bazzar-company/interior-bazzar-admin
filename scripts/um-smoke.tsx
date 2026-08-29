@@ -119,10 +119,10 @@ URLS.forEach(([label, url]) => check(label, () => at(url)));
    shows a number, and neither breaks a build. `normal` in particular was
    internal vocabulary that had leaked onto a screen.
 
-   NOT COVERED HERE: the three topbar chips. They reach the shell through
+   NOT COVERED HERE: the two topbar chips. They reach the shell through
    usePageChrome, which sets them in a useEffect, and renderToStaticMarkup does
    not run effects — so the topbar is empty in this harness by construction,
-   not by oversight. Those three need a browser. */
+   not by oversight. Those two need a browser. */
 console.log("\nstrip labels and the view band");
 {
   const users = at("/users");
@@ -154,6 +154,51 @@ console.log("\nstrip labels and the view band");
     if (bad.length) throw new Error("lower-case: " + bad.join(", "));
     return users;
   });
+  /* THE VOCABULARY IS ON SCREEN, so renaming a classification is a rename in
+     six places — the pill, the strip cell, the filter dropdown, the empty
+     state, the analytics tile and the seeded audit notes. Any one of them left
+     behind is two names for one thing, which is how two definitions of it
+     start. These assert the absence, which is the half that gets missed. */
+  check("the old classification names are gone everywhere", () => {
+    const rec = at("/users/IB-U-1041?tab=audit");
+    const analytics = at("/users?view=analytics");
+    [["users list", users], ["members", members], ["record + audit", rec],
+      ["analytics", analytics]].forEach(([where, html]) => {
+      if ((html as string).indexOf("Normal User") >= 0)
+        throw new Error("`Normal User` survives on the " + where);
+      if ((html as string).indexOf("Former Member") >= 0)
+        throw new Error("`Former Member` survives on the " + where);
+    });
+    return users;
+  });
+  check("...and the new ones are actually there", () => {
+    if (!lbl(users, "Past Members")) throw new Error("no Past Members cell");
+    /* The pill on a record, not just the strip cell above the list — they are
+       two different renders of one vocabulary entry, and only one of them was
+       ever going to be remembered. The id is derived rather than written down:
+       a hard-coded one breaks when the seed changes, which is a test failing
+       for a reason that is not a bug. */
+    const past = readUsers().map((u) => toRow(u, readMemberships()))
+      .filter((r) => r.classification === "former_member")[0];
+    if (!past) throw new Error("the seed has no past member to render");
+    const rec = at("/users/" + past.user.userId);
+    if (rec.indexOf("Past Member") < 0)
+      throw new Error("the classification pill did not follow the rename");
+    const user = readUsers().map((u) => toRow(u, readMemberships()))
+      .filter((r) => r.classification === "normal")[0];
+    if (at("/users/" + user.user.userId).indexOf("Normal") >= 0)
+      throw new Error("`Normal` survives on a plain user's record");
+    return users;
+  });
+  check("Expiring soon left the topbar but kept both the ways in", () => {
+    /* The topbar itself is not renderable here (usePageChrome sets it in an
+       effect), so what is assertable is that removing it did not quietly
+       remove the figure from the two places that DO open the list it counts. */
+    if (!lbl(members, "Expiring soon")) throw new Error("gone from the Members strip too");
+    if (at("/users?view=renewals").length < 40) throw new Error("the renewals queue broke");
+    return members;
+  });
+
   check("one name for one thing: expiring, never ending", () => {
     if (members.indexOf("nding soon") >= 0) throw new Error("`ending soon` survives on Members");
     if (!lbl(members, "Expiring soon")) throw new Error("no Expiring soon cell");

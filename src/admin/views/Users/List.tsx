@@ -11,7 +11,7 @@
 
    Two columns carry the point of the module. CLASSIFICATION is derived;
    MEMBERSHIP is the raw status underneath it. Side by side, so the difference
-   between a Paused Member and a Normal User is visible rather than asserted.
+   between a Paused Member and a plain User is visible rather than asserted.
    ============================================================================= */
 import { useShell } from "../../shell/ShellContext";
 import { can } from "../../shell/AdminShell";
@@ -80,7 +80,7 @@ export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, 
           to: hash(p, { cls: off("cls", "suspended_member") }),
           tip: <>Entitlements administratively withheld. The account itself still works.</> },
         "sep",
-        { k: "Former", v: c.formerMembers, on: p.cls === "former_member",
+        { k: "Past Members", v: c.formerMembers, on: p.cls === "former_member",
           to: hash(p, { cls: off("cls", "former_member") }),
           tip: <>Held a term once, holds none now. The win-back pool — a reading of history rather than a state anybody set.</> },
         { k: "Expiring soon", v: c.expiringSoon, dot: "warn", on: p.flag === "expiring",
@@ -92,7 +92,7 @@ export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, 
         "sep",
         { k: "Users", v: c.normal, on: p.cls === "normal",
           to: hash(p, { cls: off("cls", "normal") }),
-          tip: <>Registered, with no term that has ever entitled them. A user whose only term is Pending Activation is here, not in Former Members — nothing has been granted yet.</> },
+          tip: <>Registered, with no term that has ever entitled them. A user whose only term is Pending Activation is here, not in Past Members — nothing has been granted yet.</> },
         { k: "Active members", v: c.activeMembers, dot: "ok", on: p.cls === "active_member",
           to: hash(p, { cls: off("cls", "active_member") }),
           tip: <>Derived from membership state at read time. There is no stored flag behind this number.</> },
@@ -100,7 +100,7 @@ export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, 
           to: hash(p, { cls: off("cls", "paused_member") }) },
         { k: "Suspended", v: c.suspended, dot: "bad", on: p.cls === "suspended_member",
           to: hash(p, { cls: off("cls", "suspended_member") }) },
-        { k: "Former", v: c.formerMembers, on: p.cls === "former_member",
+        { k: "Past Members", v: c.formerMembers, on: p.cls === "former_member",
           to: hash(p, { cls: off("cls", "former_member") }) },
         "sep",
         { k: "Pending", v: c.pending, dot: "warn", on: p.flag === "pending",
@@ -198,7 +198,7 @@ export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, 
           body={narrowed
             ? "The counts in the strip above are for this whole view, so one of them has somebody in it."
             : members
-              ? "Members appear the moment a term activates. Until then everyone is a Normal User in the directory."
+              ? "Members appear the moment a term activates. Until then everyone is a User in the directory."
               : "Users arrive from the website, the portal, campaign funnels and referrals. The registration event creates the record; nobody creates one here."}
           action={narrowed
             ? <button className="btn" onClick={() => onUnfilter("*")}>Clear all filters</button>

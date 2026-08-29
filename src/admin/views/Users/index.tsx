@@ -85,23 +85,29 @@ export default function Users() {
     <>
       <span className="tb-title">Users Management</span>
       <span className="tb-stats">
-        {/* `hi` is emphasis, not state. Total users is the figure this whole
-            module is a breakdown of, so it carries the tint and the other two
-            read as qualifications of it. `on` would have been the wrong class:
-            it means "this filter is applied" everywhere else in the panel and
-            these three chips filter nothing. */}
+        {/* TWO figures, and Expiring soon is deliberately not the third. It is
+            an operational queue, it moves on its own every night, and a number
+            that changes while nobody touched anything reads as noise in a bar
+            that is meant to say how big the base is. It has a tab and a strip
+            cell, both of which open the list it counts — which the topbar
+            never could.
+
+            `hi` is emphasis, not state. Total users is the figure this module
+            is a breakdown of, so it carries the tint and Active Membership
+            reads as a qualification of it. `on` would have been the wrong
+            class: it means "this filter is applied" everywhere else in the
+            panel and these chips filter nothing. */}
         <span className="tb-stat ro hi"><span className="k">Total users</span><span className="v tnum">{c.total}</span></span>
         <span className="tb-stat ro"><span className="k">Active Membership</span><span className="v tnum">{c.activeMembers}</span></span>
-        <span className="tb-stat ro"><span className="k">Expiring soon</span><span className="v tnum">{c.expiringSoon}</span></span>
       </span>
     </>
-  ), [c.total, c.activeMembers, c.expiringSoon]);
+  ), [c.total, c.activeMembers]);
 
   /* Where "up" is: the list you opened the record from, filters and all, so
      Back is a return rather than a reset. */
   usePageChrome(
     { crumbs, right: null, parent: id ? listHash(omit(p, ["tab", "term"])) : null },
-    (id ? "rec" : view) + ":" + c.total + "/" + c.activeMembers + "/" + c.expiringSoon,
+    (id ? "rec" : view) + ":" + c.total + "/" + c.activeMembers,
   );
 
   /* ----------------------------------------------------------- filters ---

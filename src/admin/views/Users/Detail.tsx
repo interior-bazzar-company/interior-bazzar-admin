@@ -208,7 +208,7 @@ export default function Detail({ id, p, rows, onFilter }: {
         ) : (
           <EmptyState icon="tag" title="No membership on this account"
             body={<>
-              {u.identity.name} is a Normal User — registered, with a profile, and no term that has
+              {u.identity.name} is a User — registered, with a profile, and no term that has
               ever entitled them.{" "}
               {u.commercial.dealRefs.length
                 ? <>There {u.commercial.dealRefs.length === 1 ? "is" : "are"}{" "}

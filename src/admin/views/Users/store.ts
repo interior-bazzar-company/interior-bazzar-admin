@@ -18,7 +18,7 @@
 
    THE ONE RULE THIS FILE EXISTS TO ENFORCE
    ----------------------------------------
-   Normal User, Active Member, Paused, Suspended and Former Member are NOT
+   User, Active Member, Paused, Suspended and Past Member are NOT
    stored anywhere. There is no is_member column in users.json and there must
    never be one. `classify()` below is the single derivation, and the directory
    filter, the members view, the renewal queue and the analytics KPIs all call

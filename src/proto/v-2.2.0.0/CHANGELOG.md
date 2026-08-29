@@ -6,6 +6,103 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-29
 
+### Two topbar figures, plainer classification names, and a strip that scrolls
+
+**Area:** the topbar, the classification vocabulary, the stat strip
+**Files:** `index.tsx`, `List.tsx`, `Analytics.tsx`, `Detail.tsx`, `store.ts`,
+`vocabularies.json`, `audit.json`, `admin-theme.css`, `scripts/um-smoke.tsx`
+
+**What changed**
+
+**Expiring soon left the topbar.** Two figures there now: Total users and
+Active Membership. It was the wrong kind of number for that bar — an
+operational queue that moves on its own every night, sitting next to two
+figures that describe how big the base is. A number that changes when nobody
+touched anything reads as noise in a strip meant to hold still. It keeps both
+of the places that can actually act on it: the Renewals tab and the strip cell,
+each of which opens the list it counts, which the topbar never could.
+
+The chrome key dropped it too. `usePageChrome` re-renders the topbar when its
+key changes, and a key still naming a figure the topbar no longer shows means
+the bar re-renders for a number nobody can see.
+
+**Plainer names.** `Normal User` → **User**, `Former Member` → **Past Member**.
+"Normal" was answering a question nobody asked — normal as opposed to what? —
+and it read as a judgement about the person rather than a statement about their
+membership. "Former" is accurate and cold; "Past Member" is the same fact
+without the finality, which matters on a list whose entire purpose is winning
+them back.
+
+A classification label is on screen in six places — the pill, the strip cell,
+the filter dropdown, the empty state, an analytics tile and the seeded audit
+notes — so the rename is six renames, and the metric definition and the
+`Still to convert` subtitle went with it. The strip cell reads **Past Members**
+in the plural because it counts people; the pill stays singular because it
+labels one.
+
+**The strip scrolls now, and it did not before.** `.dls-attn` has said
+`overflow-x:auto` since it was written, but `.dls-stat` never said
+`flex:0 0 auto` — and a flex item shrinks below its content by default. So the
+cells compressed to fit instead of overflowing, the overflow the scroll was
+waiting for never happened, and with `white-space:nowrap` on top the row
+clipped its own labels rather than letting you reach them. Nine cells is where
+the Users strip sits; the fix is not fewer cells, it is a row that admits it is
+wider than the pane. `.tb-stat` in the topbar has always carried that rule,
+which is why that strip has always scrolled.
+
+The first cell keeps `padding-left:0` on the page gutter, so Total lines up
+under the command row above and the first table column below — the strip reads
+as a header for the list rather than a floating band — and it gained a
+`scroll-margin-left` so that alignment survives a keyboard focus scrolling the
+row sideways.
+
+This is a fix in `admin-theme.css`, so **every stat strip in the panel gets
+it** — Deals and Business Enquiries included. Both squash today.
+
+**Temp data**
+
+`vocabularies.json` — two classification labels, one metric label and one
+metric caution. `audit.json` — three seeded timeline notes that spelled
+"Classified Normal User" and are read on screen.
+
+**Backend needed**
+
+None. `classifications[]` already ships its labels from
+`GET /admin/users/vocabularies` and the panel has always rendered from it, so
+this is a content change, not a contract change. The **keys** are untouched:
+`normal` and `former_member` are what filters, reports and saved searches key
+on, and renaming those to match the labels would break every stored link for a
+cosmetic gain.
+
+**Open decisions**
+
+None new.
+
+**Verified**
+
+`tsc -b` clean; `eslint` clean on the module and `scripts/`; `vite build`
+succeeds. `check:users` 183, `check:users-render` 97 → 100.
+
+The three new render assertions check the half of a rename that gets missed —
+the **absence**. `Normal User` and `Former Member` appear on no surface: not
+the list, the members view, a record, its audit tab or the analytics page. Then
+the presence, on both renders of the vocabulary entry that are easy to think of
+as one: the strip cell and the pill on a record. The past member's id is
+derived from the seed rather than written down, after the first attempt
+hard-coded a user who turned out to be an active member.
+
+**Still not verified: the topbar, again, and now the scroll.** The topbar is
+set in an effect the SSR harness does not run, so "Expiring soon is gone from
+it" is asserted nowhere — only that removing it did not take the figure out of
+the two places that remain. And `flex:0 0 auto` is a claim about layout, which
+is precisely what a string of HTML cannot answer: whether the strip actually
+scrolls, whether the scrollbar is reachable, and whether the other two modules
+look better or worse for it all need a browser.
+
+---
+
+## 2026-08-29
+
 ### The business profile gets four facets, and one picker to fill them
 
 **Area:** Edit profile, the profile tab on the record, the profile schema
