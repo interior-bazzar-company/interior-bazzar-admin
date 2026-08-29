@@ -20,10 +20,10 @@
                  they are read-only because credentials are not this module's
                  to change. There is no back door here.
 
-     Visibility — each field says whether it is public on the platform or
-                 internal. Editing someone's public bio and editing their
-                 private address are different acts, and a form that looks the
-                 same for both invites the wrong one.
+     Visibility — the record's profile tab marks each field public or
+                 internal. The form used to as well, and the marker came off:
+                 every field on it is public now that the pincode is gone,
+                 and a chip that says the same word twelve times is noise.
 
    A validation failure leaves the STORED profile completely unchanged. There
    is no partial write and no half-saved state — the save is one transaction
@@ -274,9 +274,6 @@ export default function EditProfile({ row, onClose, onDone }: {
                       {/* Right of the label, for every field that has one —
                           one place to look, whatever the control below is. */}
                       {f.info ? <InfoTip f={f} /> : null}
-                      <em className={"um-vis " + (f.public ? "pub" : "int")}>
-                        {f.public ? "public" : "internal"}
-                      </em>
                     </span>
                     {control(f)}
                   </div>

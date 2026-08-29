@@ -6,6 +6,31 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-29
 
+### The public/internal chips leave the form; Deals in moves under Business type
+
+**Area:** Edit profile
+**Files:** `EditProfile.tsx`, `vocabularies.json`, `scripts/um-smoke.tsx`
+
+**What changed**
+
+The public / internal marker is off every input. Every field on the form
+is public now that the pincode is gone, and a chip that says the same word
+twelve times is noise. The record's profile tab still marks each field —
+that is where "what does the customer see" is a question worth answering.
+
+Business type takes its own row (`wide` in the schema), so Deals in sits
+beneath it rather than beside it: name, then type, then what they deal
+in — top to bottom, one thing per row.
+
+**Verified**
+
+`check:users-render` 117: no `um-vis` on the form, Business type
+full-width, Deals in after it.
+
+---
+
+## 2026-08-29
+
 ### Business type moves under Business name
 
 **Area:** the Business profile group

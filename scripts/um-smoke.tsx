@@ -574,11 +574,14 @@ check("edit profile · incomplete", () => modal(
     if (order.some((i) => i < 0)) throw new Error("a type is missing from the dropdown");
     if (order.some((i, k) => k > 0 && i < order[k - 1]))
       throw new Error("the dropdown is not in chain order");
-    /* The i sits in the label row, right of the label, before the marker. */
+    /* The i sits in the label row, right of the label, inside the same span. */
     const lb = full.indexOf(">Business type");
     const iAt = full.indexOf('class="um-info-b"', lb);
-    const vis = full.indexOf('class="um-vis', lb);
-    if (lb < 0 || iAt < 0 || iAt > vis) throw new Error("the i is not right of the Business type label");
+    const ctrl = full.indexOf('class="selectbox', lb);
+    if (lb < 0 || iAt < 0 || iAt > ctrl) throw new Error("the i is not right of the Business type label");
+    /* No visibility chip on any input — the record's profile tab still marks
+       public/internal, the form does not. */
+    if (full.indexOf("um-vis") >= 0) throw new Error("a public/internal chip is still on the form");
     /* And the panel's opening sentence is in the schema, not the flow. */
     if (full.indexOf("What kind of business this is") >= 0)
       throw new Error("the description is back in the flow");
@@ -591,6 +594,11 @@ check("edit profile · incomplete", () => modal(
     const fg = full.lastIndexOf('<div class="fg', i);
     if (full.slice(fg, i).indexOf("um-fg-wide") < 0) throw new Error("Business name is half-width");
     if (full.indexOf(">Business type") < i) throw new Error("Business type is not after Business name");
+    /* And Deals in sits beneath Business type, which takes its own row. */
+    const bt = full.indexOf(">Business type");
+    const btFg = full.lastIndexOf('<div class="fg', bt);
+    if (full.slice(btFg, bt).indexOf("um-fg-wide") < 0) throw new Error("Business type is half-width");
+    if (full.indexOf(">Deals in") < bt) throw new Error("Deals in is not after Business type");
     return full;
   });
   check("deals in · two checkboxes, one or both", () => {
