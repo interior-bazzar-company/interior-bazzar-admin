@@ -6,6 +6,53 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-29
 
+### "All cities" joins the city dropdown
+
+**Area:** the target-area rows
+**Files:** `store.ts`, `AreaRows.tsx`, `users.json`,
+`scripts/check-users-derivation.cjs`, `scripts/um-smoke.tsx`
+
+**What changed**
+
+Every state's city dropdown now leads with **All cities** — whole-state
+coverage as one pick, for the person who was about to type every city in.
+
+It is a SENTINEL VALUE, not a flag on the row, so the picker, the chips, the
+record and the payload all handle it as just another city; only the rules
+around it are special:
+
+- **It stands alone.** Picking it replaces the row's cities; picking a
+  specific city afterwards narrows the claim, so the sentinel comes off. The
+  validator refuses the mixed state, and the UI makes it unreachable rather
+  than merely refused.
+- **The city filter expands it** against the state's own suggestion list — a
+  whole-state Rajasthan row answers for Jaipur. Without that, "All cities"
+  would be weaker than listing three, which is backwards.
+- The compact surfaces print the state for a whole-state row ("All cities"
+  is a claim, not a place), and search ignores the sentinel so the word
+  "all" surfaces nobody.
+
+Seeded once: the Jaipur architecture practice now covers all of Rajasthan.
+
+**Backend needed**
+
+`targetAreas[].cities` may contain the literal `"All cities"`, alone in its
+row; UM-T07 refuses it beside a specific city. The coverage filter expands
+it server-side the same way.
+
+**Verified**
+
+`check:users` 255 → 262, `check:users-render` 115 → 116. The exclusivity
+rule, the leading suggestion, both filter expansions, the compact-city
+fallback and the search exclusion are each asserted.
+
+**Still not verified:** the replace/narrow toggle is click behaviour — the
+browser question, as ever.
+
+---
+
+## 2026-08-29
+
 ### The modal stops explaining itself
 
 **Area:** Edit profile — every piece of prose on it

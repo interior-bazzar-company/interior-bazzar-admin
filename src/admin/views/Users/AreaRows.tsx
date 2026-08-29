@@ -23,7 +23,7 @@
    ============================================================================= */
 import FacetPicker from "./FacetPicker";
 import { Icon } from "../../ui";
-import { STATES, citySuggestionsOf } from "./store";
+import { ALL_CITIES, STATES, citySuggestionsOf } from "./store";
 import type { ProfileField, TargetArea } from "./store";
 
 /* Synthetic schema entries for the two pickers a row is made of. Local
@@ -89,7 +89,21 @@ export default function AreaRows({ f, value, onChange, disabled }: {
               <FacetPicker f={ROW_CITIES} disabled={disabled}
                 values={row.cities}
                 options={citySuggestionsOf(row.state)}
-                onChange={(cities) => patchRow(i, { cities })} />
+                onChange={(cities) => {
+                  /* "All cities" is exclusive both ways: picking it replaces
+                     the list, and picking a specific city afterwards narrows
+                     the claim, so the sentinel comes off. The validator
+                     refuses the mixed state; this is what makes it
+                     unreachable from the UI rather than merely refused. */
+                  const hadAll = row.cities.indexOf(ALL_CITIES) >= 0;
+                  const hasAll = cities.indexOf(ALL_CITIES) >= 0;
+                  patchRow(i, {
+                    cities: hasAll && !hadAll ? [ALL_CITIES]
+                      : hasAll && cities.length > 1
+                        ? cities.filter((c) => c !== ALL_CITIES)
+                        : cities,
+                  });
+                }} />
             ) : (
               <p className="um-area-wait">Pick the state first.</p>
             )}

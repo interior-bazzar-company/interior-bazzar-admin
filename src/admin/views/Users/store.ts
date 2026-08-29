@@ -271,10 +271,20 @@ const VOCABS: Record<string, FacetOption[]> = {
   dealsIn: vocabDoc.dealsIn as FacetOption[],
 };
 
+/** Whole-state coverage, as one entry in the row's city list. A SENTINEL
+ *  VALUE rather than a flag on the row, so the picker, the chips, the record
+ *  and the payload all handle it as just another city — only the rules around
+ *  it are special: it stands alone (it already covers everything a second
+ *  entry could add), and the city filter expands it against the state's own
+ *  suggestion list. */
+export const ALL_CITIES = "All cities";
+
 /** The city SUGGESTIONS for one state's row. Open — the picker offers these
- *  and accepts anything typed. */
+ *  and accepts anything typed. "All cities" leads the list, because the
+ *  person it serves is the one who was about to type every city in. */
 export const citySuggestionsOf = (state: string): FacetOption[] =>
-  (STATE_CITIES[state] || []).map((k) => ({ key: k, label: k }));
+  [{ key: ALL_CITIES, label: ALL_CITIES, hint: "Covers the whole state" } as FacetOption]
+    .concat((STATE_CITIES[state] || []).map((k) => ({ key: k, label: k })));
 const VOCAB_GROUPS: Record<string, FacetGroup[]> = {
   categoryGroups: vocabDoc.categoryGroups as FacetGroup[],
 };
@@ -443,6 +453,12 @@ export function validateFacets(patch: Partial<UserProfile>): string {
            is a half-given answer, and half answers do not save. */
         if (!r.cities.length) {
           bad.push(f.label + ": " + r.state + " needs at least one city");
+        }
+        /* "All cities" stands alone. A specific city beside it adds nothing
+           and reads as though it does — which of the two is the claim? */
+        if (r.cities.indexOf(ALL_CITIES) >= 0 && r.cities.length > 1) {
+          bad.push(f.label + ': "' + ALL_CITIES + '" already covers ' + r.state
+            + " — drop the extra cities");
         }
         if (f.maxCities && r.cities.length > f.maxCities) {
           bad.push(f.label + ": at most " + f.maxCities + " cities in " + r.state);
@@ -718,7 +734,10 @@ const digits = (s: unknown) => String(s ?? "").replace(/\D/g, "");
  *  the location fact, and the first row is the primary one by convention. */
 export function primaryCityOf(p: UserProfile): string | null {
   const r = p.targetAreas[0];
-  return r ? (r.cities[0] || r.state) : null;
+  if (!r) return null;
+  /* A whole-state row's city is the state — "All cities" is a claim, not a
+     place, and a subline reading "· All cities" names nowhere. */
+  return r.cities[0] === ALL_CITIES ? r.state : (r.cities[0] || r.state);
 }
 
 function matchesSearch(r: UserRow, q: string): boolean {
@@ -734,7 +753,10 @@ function matchesSearch(r: UserRow, q: string): boolean {
        findable by pasting that in. Every state and city in the coverage rows
        is searchable because "who covers Gurugram" is a real question. */
     u.profile.username,
-    ...u.profile.targetAreas.flatMap((t) => [t.state, ...t.cities]),
+    /* The sentinel is a claim, not a place — it would make every profile a
+       hit for the word "all". The state is already in the haystack. */
+    ...u.profile.targetAreas.flatMap((t) =>
+      [t.state, ...t.cities.filter((c) => c !== ALL_CITIES)]),
     r.current ? r.current.membershipId : "", r.current ? r.current.planName : "",
     ...u.commercial.dealRefs, ...u.commercial.invoiceRefs,
   ].map(norm).join(" ");
@@ -769,7 +791,13 @@ export function applyFilters(rows: UserRow[], p: Params): UserRow[] {
        the filter was always answering badly: "who works in Mumbai", not "whose
        registered address says Mumbai". */
     if (p.city && !r.user.profile.targetAreas.some((t) =>
-      t.state === p.city || t.cities.indexOf(p.city as string) >= 0)) return false;
+      t.state === p.city
+      || t.cities.indexOf(p.city as string) >= 0
+      /* A whole-state row answers for every city the state is known to hold —
+         that is what the sentinel MEANS, and a filter that could not read it
+         would make "All cities" weaker than listing three. */
+      || (t.cities.indexOf(ALL_CITIES) >= 0
+          && (STATE_CITIES[t.state] || []).indexOf(p.city as string) >= 0))) return false;
     if (p.src && r.user.registrationSource !== p.src) return false;
     if (p.tag && !r.user.tags.some((t) => t.slug === p.tag)) return false;
     if (p.status && r.user.userStatus !== p.status) return false;

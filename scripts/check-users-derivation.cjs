@@ -750,6 +750,22 @@ S.resetStore();
     bad({ targetAreas: [row("Delhi", Array.from({ length: 9 }, (_, i) => "Area " + i))] }), true);
   ok("an empty list is not an ERROR here — required-ness is the form's check",
     bad({ targetAreas: [] }), false);
+
+  /* "All cities" — whole-state coverage as a sentinel value. It stands alone,
+     the suggestions lead with it, and the city filter expands it. */
+  ok("All cities alone is a valid row", bad({ targetAreas: [row("Rajasthan", ["All cities"])] }), false);
+  ok("...but not beside a specific city",
+    bad({ targetAreas: [row("Rajasthan", ["All cities", "Jaipur"])] }), true);
+  ok("every state's suggestions lead with it",
+    S.STATES.filter((x) => S.citySuggestionsOf(x.key)[0].key !== S.ALL_CITIES), []);
+  ok("a whole-state row answers the filter for its cities",
+    S.applyFilters(all, { city: "Jaipur" }).map((r) => r.user.userId), ["IB-U-0944"]);
+  ok("...and for the state itself",
+    S.applyFilters(all, { city: "Rajasthan" }).map((r) => r.user.userId), ["IB-U-0944"]);
+  ok("the compact city for a whole-state row is the state, not the claim",
+    S.primaryCityOf(byId["IB-U-0944"].user.profile), "Rajasthan");
+  ok("searching the word `all` does not surface it",
+    S.applyFilters(all, { q: "all cities" }).length, 0);
   ok("a malformed username is refused by validateFacets", bad({ username: "Bad_Name" }), true);
   /* Uniqueness is NOT a field rule — it needs the whole table, so it lives in
      updateProfile and this is where that seam is pinned down. */

@@ -632,6 +632,11 @@ check("edit profile · incomplete", () => modal(
     if (full.indexOf("Add state") < 0) throw new Error("no way to add a row");
     return full;
   });
+  check("target areas · All cities renders as the row's one chip", () => {
+    const rec = at("/users/IB-U-0944?tab=profile");
+    if (rec.indexOf(">All cities<") < 0) throw new Error("the whole-state claim is not on the record");
+    return rec;
+  });
   check("target areas · a locality survives as a city under its state", () => {
     /* "Uttam Nagar, Delhi" the string became Delhi → Uttam Nagar the row —
        same claim, now in a shape a filter can read. */
