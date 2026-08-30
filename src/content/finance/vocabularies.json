@@ -289,8 +289,8 @@
   "$comment_refundStates": "APPROVAL MOVES NO MONEY. It authorises a transfer a human makes in the bank; the refund is only `paid` when somebody records that transfer with its reference. The gap between `approved` and `paid` is real money owed and not yet sent, and the Overview counts it.",
   "eventTypes": [
     {
-      "key": "SUBSCRIPTION_ACTIVATED",
-      "label": "Subscription activated",
+      "key": "SUBSCRIPTION_RECORDED",
+      "label": "Subscription recorded",
       "tone": "ok"
     },
     {

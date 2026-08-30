@@ -24,11 +24,11 @@ import { Cancel, Dlg, Field, Fs, Pick, RupeeInput, toPaise } from "./dialog";
 import type { Done } from "./dialog";
 import {
   daysInMonth,
-  ACCOUNTS, closeSalaryAccount, fmtMonth, inr, isSuperAdmin, monthOf, openRun, openSalaryRun,
-  recordRunPaid, setLop, superAdminOnly, todayIso, upsertSalaryAccount,
+  ACCOUNTS, closeSalaryAccount, dueOf, fmtMonth, inr, isSuperAdmin, monthOf, openRun,
+  openSalaryRun, paySalary, setLop, superAdminOnly, todayIso, upsertSalaryAccount,
   useRuns, useSalaryRows,
 } from "./store";
-import type { Payslip, SalaryAccount, SalaryComponent, SalaryRun } from "./store";
+import type { Payslip, SalaryAccount, SalaryComponent, SalaryRow, SalaryRun } from "./store";
 
 /* ============================================================== helpers === */
 
@@ -490,8 +490,8 @@ export function LopModal({ slip, onClose, onDone }: {
 
 /* ================================================== FN-T08 · pay the run === */
 
-export function PayRunModal({ run, onClose, onDone }: {
-  run: SalaryRun; onClose: () => void; onDone: Done;
+export function PaySalaryModal({ row, onClose, onDone }: {
+  row: SalaryRow; onClose: () => void; onDone: Done;
 }) {
   const [reference, setReference] = useState("");
   const [accountId, setAccountId] = useState(
@@ -499,45 +499,60 @@ export function PayRunModal({ run, onClose, onDone }: {
   const [err, setErr] = useState<string | null>(null);
   /* "" when this session may do it. Never used to hide the button — a person
      who cannot see the action cannot ask for it either. */
-  const gate = superAdminOnly("Paying a salary run");
+  const gate = superAdminOnly("Paying a salary");
+  const d = dueOf(row);
+  /* Oldest first, because that is the order the write pays them in and a
+     summary that lists them the other way describes a different transfer. */
+  const months = d.unpaid.slice().sort((a, b) => a.month.localeCompare(b.month));
 
   return (
-    <Dlg title={"Mark " + run.runId + " paid"}
-      sub={<>{fmtMonth(run.month)} · {run.slips.length} slip{run.slips.length === 1 ? "" : "s"} · {inr(run.totalNetPaise)} net</>}
+    <Dlg title={"Pay " + row.a.memberName}
+      sub={<>{row.a.designation} · {months.length} month{months.length === 1 ? "" : "s"} outstanding · {inr(d.pendingPaise)} net</>}
       onClose={onClose} err={err}
       footer={<>
         <Cancel onClose={onClose} />
         <button className="btn pri" disabled={!!gate || !reference.trim()} title={gate || undefined}
           onClick={() => {
-            const e = recordRunPaid(run.runId, reference, accountId);
+            const e = paySalary(row.a.salaryAccountId, reference, accountId);
             if (e) return setErr(e);
-            onDone(inr(run.totalNetPaise) + " paid to " + run.slips.length + " people. Every slip is numbered, hashed and frozen — they can be handed over now.", "ok");
+            onDone(inr(d.pendingPaise) + " paid to " + row.a.memberName + " · "
+              + months.length + " month" + (months.length === 1 ? "" : "s")
+              + " numbered, hashed and frozen. The slips can be handed over now.", "ok");
           }}>
-          Record the run paid<Role sa />
+          Record the payment<Role sa />
         </button>
       </>}>
 
       {isSuperAdmin() ? null : (
         <Notice tone="warn" ico="lock" text={<>
-          <b>This one is Super Admin.</b> It sends {inr(run.totalNetPaise)} out of the company and
-          stamps {run.slips.length} documents in the same write. The button stays where it is so it
-          is clear what exists and who to ask.
+          <b>This one is Super Admin.</b> It sends {inr(d.pendingPaise)} out of the company and
+          stamps {months.length} document{months.length === 1 ? "" : "s"} in the same write. The
+          button stays where it is so it is clear what exists and who to ask.
         </>} />
       )}
 
+      {d.arrears.length ? (
+        <Notice tone="warn" ico="alert" text={<>
+          <b>{row.a.memberName} is owed for {d.arrears.length + 1} months, not one.</b>{" "}
+          {inr(d.arrearsPaise)} of that is older than the current month. Everything outstanding is
+          paid in this one transfer, oldest first — paying only the newest would leave the older
+          debt ageing while the newer one clears.
+        </>} />
+      ) : null}
+
       <div className="fin-chks">
         <Check ok>
-          <b>Every slip is stamped and frozen in this one write.</b> All {run.slips.length} take the
-          paid date, the reference and a hash together. A slip issued a minute after its neighbour is
-          a slip somebody has to explain.
+          <b>The slips for these months freeze in this write.</b> Each takes its paid date, its
+          reference and its hash together, and nothing can rewrite one afterwards.
         </Check>
         <Check ok>
-          <b>A run half paid is not a state.</b> There is no partial here. Either the transfers went
-          out and the run is paid, or nothing on this screen has happened.
+          <b>This pays one person.</b> Everybody else's months are untouched — a salary run closes
+          itself once its last slip is paid, and nobody marks it.
         </Check>
         <Check warn>
-          <b>The reference is what ties this to the bank.</b> Each slip carries it with its own
-          two-digit suffix, so one line on the statement resolves to a named person.
+          <b>The reference is what ties this to the bank.</b>{months.length > 1
+            ? " Each month carries it with its own two-digit suffix, so one line on the statement resolves to a named month."
+            : " It must not already exist anywhere in the ledger."}
         </Check>
       </div>
 
@@ -555,17 +570,18 @@ export function PayRunModal({ run, onClose, onDone }: {
       </Fs>
 
       <div className="fin-summary">
-        {run.slips.map((s) => (
+        {months.map((s) => (
           <div className="row" key={s.slipId}>
             <span className="l">
-              {s.memberName}
+              {fmtMonth(s.month)}
               {s.lopDays ? <span className="faint"> · {s.lopDays} day loss of pay</span> : null}
+              {s.month !== months[months.length - 1].month ? <span className="faint"> · arrears</span> : null}
             </span>
             <span className="tnum">{inr(s.netPaise)}</span>
           </div>
         ))}
         <div className="row grand">
-          <span className="l">Leaving the account</span><span className="tnum">{inr(run.totalNetPaise)}</span>
+          <span className="l">Leaving the account</span><span className="tnum">{inr(d.pendingPaise)}</span>
         </div>
       </div>
     </Dlg>

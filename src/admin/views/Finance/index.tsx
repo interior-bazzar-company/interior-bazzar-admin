@@ -30,7 +30,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from "react-rout
 import { hashToPath, usePageChrome } from "../../shell/AdminShell";
 import { qs } from "../../ui";
 import type { Params } from "./store";
-import { useActiveCount } from "./store";
+import { useActiveCount, useSalaryRows } from "./store";
 import { ROUTE_OF, VIEW_OF } from "./Frame";
 import Subscriptions from "./Subscriptions";
 import SubscriptionDetail from "./SubscriptionDetail";
@@ -88,23 +88,44 @@ export default function Finance() {
      How many businesses are subscribed right now is scope rather than
      analysis, and it is the same question on every section. */
   const activeN = useActiveCount();
+  /* People on the payroll — active accounts only. A closed one keeps its slips
+     and is still on the list below, but it is not somebody being paid. */
+  const membersN = useSalaryRows().filter((r) => r.a.active).length;
   const crumbs = useMemo(() => (
     <>
       <span className="tb-title">Finance</span>
+      {/* ONE FIGURE, AND IT FOLLOWS THE SECTION. Which number depends on what
+          is on screen: how many businesses are subscribed is scope on the
+          subscriptions face and noise on the payroll one, where the question
+          is how many people are being paid.
+
+          It is `.tb-stat`, the panel's own topbar figure — the same markup
+          Users renders, so the two sections read as one panel. It used to be
+          `.fin-scope`: a bordered pill, tinted green, with a status dot and
+          the count in a second bordered well, which said its one thing three
+          times and coloured the label, against the theme's own rule that the
+          tone goes on the figure and never on the word beside it. */}
       <span className="tb-stats">
-        <span className="fin-scope ok"
-          title="Subscriptions running right now — a level, read at this moment, not a total for any period.">
-          <i />
-          <span className="k">Active subscriptions</span>
-          <b className="tnum">{activeN}</b>
-        </span>
+        {view === "salaries" ? (
+          <span className="tb-stat ro"
+            title="Salary accounts on the payroll right now. Closed accounts are not counted; their slips stay on the record.">
+            <span className="k">Members</span>
+            <span className="v tnum">{membersN}</span>
+          </span>
+        ) : (
+          <span className="tb-stat ro"
+            title="Subscriptions running right now — a level, read at this moment, not a total for any period.">
+            <span className="k">Active subscriptions</span>
+            <span className="v tnum">{activeN}</span>
+          </span>
+        )}
       </span>
     </>
-  ), [activeN]);
+  ), [view, activeN, membersN]);
 
   usePageChrome(
     { crumbs, right: null, parent: id ? listHash(view) : null },
-    (id ? "rec" : view) + ":" + activeN,
+    (id ? "rec" : view) + ":" + activeN + "/" + membersN,
   );
 
   const timer = useRef<number | undefined>(undefined);

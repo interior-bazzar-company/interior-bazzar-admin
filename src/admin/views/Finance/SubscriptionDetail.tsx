@@ -24,7 +24,7 @@ import { Chain, EventList, FailNote, InstPill, Money, SourceTag, SubPill } from 
 import { CancelSubModal, FailToPayModal, RecordInstallmentModal, ReversePaymentModal } from "./SubModals";
 import {
   COMPANY, accountOf, ago, daysPast, fmtDate, fmtDateTime, inr, inrWordsOf, isSuperAdmin,
-  sourceMeta, superAdminOnly, useSubscription,
+  readInvoice, sourceMeta, superAdminOnly, useSubscription,
 } from "./store";
 import type { Installment, Params, Subscription } from "./store";
 
@@ -103,7 +103,7 @@ export default function SubscriptionDetail({ id, p, onParams }: {
         {s.customer.userId ? <> · <span className="mono">{s.customer.userId}</span></> : null}
         {" · "}{s.planName} · {s.cycleMonths} months
         {" · sold by "}{s.soldBy}
-        {" · activated "}{fmtDateTime(s.activatedAt)}
+        {" · recorded "}{fmtDateTime(s.recordedAt)}
       </div>
 
       <Tabs items={TABS.map((t) => ({
@@ -117,7 +117,7 @@ export default function SubscriptionDetail({ id, p, onParams }: {
       {/* ======================================================= schedule === */}
       {tab === "schedule" ? (
         <>
-          <Chain dealRef={s.customer.dealRef}
+          <Chain dealRef={readInvoice(s.invoiceNumber)?.dealRef || null}
             invoice={(row.next || s.installments[0])?.invoiceNumber || null}
             installment={row.next
               ? "Installment " + row.next.seq + " of " + row.next.of
@@ -149,9 +149,9 @@ export default function SubscriptionDetail({ id, p, onParams }: {
                     <SourceTag k={s.source} />
                     {src?.help ? <div className="fin-fine">{src.help}</div> : null}
                   </>],
-                  ["Sold by", <>{s.soldBy}{s.customer.dealRef
-                    ? <> · on <span className="mono">{s.customer.dealRef}</span></> : null}</>],
-                  ["Activated", <>{fmtDateTime(s.activatedAt)} · {ago(s.activatedAt)}</>],
+                  ["Sold by", s.soldBy],
+                  ["Recorded", <>{fmtDateTime(s.recordedAt)} · {ago(s.recordedAt)}</>],
+                  ["Paid", s.paidInFull ? "In full, on one invoice" : s.installments.length + " installments"],
                 ]} />
               </div>
             </section>
@@ -381,7 +381,6 @@ function ReceiptDoc({ s, i }: { s: Subscription; i: Installment }) {
           <div className="t">Received from</div>
           <div><b>{s.customer.name}</b></div>
           {s.customer.userId ? <div className="mono">{s.customer.userId}</div> : null}
-          {s.customer.dealRef ? <div>Deal <span className="mono">{s.customer.dealRef}</span></div> : null}
         </div>
         <div>
           <div className="t">Against</div>

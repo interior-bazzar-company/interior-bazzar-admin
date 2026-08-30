@@ -476,7 +476,118 @@ S.resetStore();
 }
 
 /* ========================================================================== */
-console.log("\nwrites · activation — each refusal is the contract");
+console.log("\nthe chain — deal → quotation → invoice → subscription");
+S.resetStore();
+{
+  /* THE QUOTATION IS WHERE A SALE'S SHAPE IS AGREED and the invoice is one
+     installment of it. Everything the record dialog fills in comes from here,
+     so if these derivations are wrong the dialog is confidently wrong. */
+
+  ok("every invoice that names a quotation names one that exists",
+    S.readInvoices().filter((i) => i.quotationNumber
+      && !S.readQuotation(i.quotationNumber)).length, 0);
+  ok("...and one raised for the same customer",
+    S.readInvoices().filter((i) => {
+      const q = S.readQuotation(i.quotationNumber);
+      return q && q.party.userId !== i.customer.userId;
+    }).length, 0);
+  ok("every quotation resolves to a registered user",
+    S.readQuotations().filter((q) => !S.readUser(q.party.userId)).length, 0);
+  ok("a quotation's tax adds up to its grand total",
+    S.readQuotations().filter((q) =>
+      q.taxablePaise + q.taxPaise !== q.grandTotalPaise).length, 0);
+  ok("installment counts are all inside the 1–5 the write accepts",
+    S.readQuotations().filter((q) => q.installments < 1 || q.installments > 5).length, 0);
+
+  /* ONE INSTALLMENT IS A COMPLETE PAYMENT. There is no separate flag and there
+     must not be one — two ways to say the same thing eventually disagree. */
+  ok("no quotation carries a paidInFull / oneTime flag beside its count",
+    S.readQuotations().filter((q) => "paidInFull" in q || "oneTime" in q).length, 0);
+
+  /* A REJECTED QUOTATION IS NOT A SALE, so it is never offered. */
+  const rejected = S.readQuotations().filter((q) => q.status !== "accepted")[0];
+  ok("the seed carries a quotation that was not accepted", !!rejected, true);
+  ok("...and it is not offered for its own customer",
+    S.chainsFor(rejected.party.userId)
+      .some((c) => c.quotation.quotationNumber === rejected.quotationNumber), false);
+
+  /* THE WALKABLE PATHS — the whole point of seeding the chain. */
+  const iyer = S.chainsFor("IB-U-1201");
+  ok("Iyer Woodworks has two accepted quotations", iyer.length, 2);
+  ok("...newest first", iyer[0].quotation.quotationNumber, "IB-QT-2026-00153");
+  ok("...the older one is already recorded, and says which subscription",
+    iyer[1].recordedAs, "SUB-0106");
+  ok("...and has nothing left to attach", iyer[1].attachable, null);
+  ok("...the newer one is open, with its invoice waiting",
+    iyer[0].attachable && iyer[0].attachable.invoiceNumber, "IB-INV-2026-00092");
+  ok("...and it is a complete payment, read from the quotation",
+    iyer[0].quotation.installments, 1);
+
+  const desai = S.chainsFor("IB-U-1012");
+  ok("Desai Interiors has an open three-installment quotation",
+    [desai.length, desai[0].quotation.installments], [1, 3]);
+  ok("...with ONE invoice raised of the three", desai[0].invoices.length, 1);
+  ok("...so counting documents would report the wrong plan — the count comes from the quotation",
+    desai[0].invoices.length === desai[0].quotation.installments, false);
+
+  ok("a business with no quotation at all has no chain",
+    S.chainsFor("IB-U-0944").length, 0);
+
+  /* THE TWO DEMOS — what the dialog produces, already in the seed so the
+     finished shape can be read without recording one. */
+  const a = S.readSubscription("SUB-0110");
+  ok("SUB-0110 is a complete payment, recorded from a quotation",
+    [a.paidInFull, a.installments.length, a.installments[0].status], [true, 1, "paid"]);
+  ok("...and its invoice is the one its quotation was billed on",
+    S.readInvoice(a.invoiceNumber).quotationNumber, "IB-QT-2026-00160");
+  ok("...paidInFull agrees with the quotation, not merely with the row count",
+    S.readQuotation("IB-QT-2026-00160").installments, 1);
+  ok("...and the money matches the invoice exactly",
+    a.totalPaise, S.readInvoice(a.invoiceNumber).grandTotalPaise);
+
+  const b = S.readSubscription("SUB-0111");
+  ok("SUB-0111 is a running three-installment plan",
+    [b.paidInFull, b.installments.length], [false, 3]);
+  ok("...one paid, two due", b.installments.map((i) => i.status), ["paid", "due", "due"]);
+  ok("...with TWO invoices for THREE installments — the third is not raised yet",
+    b.installments.filter((i) => i.invoiceNumber).length, 2);
+  ok("...so counting its invoices would report the wrong plan",
+    b.installments.filter((i) => i.invoiceNumber).length === b.installments.length, false);
+  ok("...and the quotation is the one that says three",
+    S.readQuotation("IB-QT-2026-00161").installments, 3);
+  ok("...every installment is one invoice's worth",
+    b.installments.every((i) => i.amountPaise === S.readInvoice(b.invoiceNumber).grandTotalPaise), true);
+  ok("...and they sum to the quotation's agreed total",
+    b.totalPaise, S.readQuotation("IB-QT-2026-00161").grandTotalPaise);
+
+  /* THE COUNT IS THE QUOTATION'S, AND THE STORE ENFORCES IT. The dialog reads
+     it and can never send a mismatch; this is for every other caller. */
+  const base = {
+    userId: "IB-U-1012", source: "sales", planId: "PL-QUOTED", planName: "Growth",
+    cycleMonths: 6, invoiceNumber: "IB-INV-2026-00094", startDate: "2026-08-25",
+  };
+  ok("recording that quotation's own plan is accepted",
+    S.recordSubscription({ ...base, installmentCount: 3 }).error, "");
+  S.resetStore();
+  ok("...but a different count is refused against the quotation that agreed it",
+    has(S.recordSubscription({ ...base, installmentCount: 1 }).error, "plan_mismatch"), true);
+  ok("...and the refusal names both numbers, so it can be acted on",
+    has(S.recordSubscription({ ...base, installmentCount: 1 }).error, "3 installments"), true);
+
+  /* An invoice with NO quotation behind it is the website purchase, and the
+     count is then a real choice rather than a contradiction. */
+  S.resetStore();
+  ok("an invoice with no quotation accepts any count — nothing agreed otherwise",
+    S.recordSubscription({
+      userId: "IB-U-0944", source: "website", planId: "PL-MANUAL", planName: "Starter",
+      cycleMonths: 3, invoiceNumber: "IB-INV-2026-00097", installmentCount: 2,
+      startDate: "2026-08-25",
+    }).error, "");
+  S.resetStore();
+}
+
+/* ========================================================================== */
+console.log("\nwrites · recording a subscription — each refusal is the contract");
 S.resetStore();
 {
   /* A REAL ACCOUNT and a REAL INVOICE. Activation entitles a business to a
@@ -494,28 +605,28 @@ S.resetStore();
     cycleMonths: 12, invoiceNumber: inv.invoiceNumber, installmentCount: 2, startDate: "2026-08-01",
   };
   ok("a customer who is not in the user base is refused",
-    has(S.activateSubscription({ ...base, userId: "IB-U-NOBODY" }).error, "registered account"), true);
-  ok("activation with no invoice is refused — it is what says the customer owes",
-    has(S.activateSubscription({ ...base, invoiceNumber: "" }).error, "Attach the invoice"), true);
+    has(S.recordSubscription({ ...base, userId: "IB-U-NOBODY" }).error, "registered account"), true);
+  ok("recording with no invoice is refused — it is what says the customer owes",
+    has(S.recordSubscription({ ...base, invoiceNumber: "" }).error, "Attach the invoice"), true);
   ok("an invoice that was cancelled cannot entitle anybody",
-    has(S.activateSubscription({ ...base, invoiceNumber: "IB-INV-2026-00087" }).error, "invoice_not_open"), true);
+    has(S.recordSubscription({ ...base, invoiceNumber: "IB-INV-2026-00087" }).error, "invoice_not_open"), true);
   ok("...nor one raised for a different customer",
     (() => {
       const other = S.readInvoices().filter((i) => i.status === "issued" && i.customer.userId !== buyer.userId)[0];
-      return has(S.activateSubscription({ ...base, invoiceNumber: other.invoiceNumber }).error, "customer_mismatch");
+      return has(S.recordSubscription({ ...base, invoiceNumber: other.invoiceNumber }).error, "customer_mismatch");
     })(), true);
   ok("...nor one another subscription already carries",
     (() => {
       const taken = S.readSubscriptions().filter((x) => x.invoiceNumber)[0];
-      return has(S.activateSubscription({ ...base, userId: S.readSubscription(taken.subscriptionId).customer.userId,
+      return has(S.recordSubscription({ ...base, userId: S.readSubscription(taken.subscriptionId).customer.userId,
         invoiceNumber: taken.invoiceNumber }).error, "duplicate_invoice");
     })(), true);
   ok("more than five installments is refused",
-    has(S.activateSubscription({ ...base, installmentCount: 6 }).error, "Between 1 and 5 installments"), true);
+    has(S.recordSubscription({ ...base, installmentCount: 6 }).error, "Between 1 and 5 installments"), true);
   ok("a subscription cannot start in the future — entitlement begins when it begins",
-    has(S.activateSubscription({ ...base, startDate: "2026-12-01" }).error, "cannot be in the future"), true);
+    has(S.recordSubscription({ ...base, startDate: "2026-12-01" }).error, "cannot be in the future"), true);
 
-  const r = S.activateSubscription(base);
+  const r = S.recordSubscription(base);
   ok("a clean activation is accepted", r.error, "");
   const sub = S.readSubscription(r.subscriptionId);
   ok("...the whole schedule exists from day one", sub.installments.length, 2);
@@ -534,14 +645,14 @@ S.resetStore();
     [sub.invoiceNumber, sub.installments[0].invoiceNumber], [inv.invoiceNumber, inv.invoiceNumber]);
   ok("...and the later ones carry none, because they are raised as they fall due",
     sub.installments.slice(1).filter((i) => i.invoiceNumber).length, 0);
-  ok("...it is live, and the timeline says it was ACTIVATED, not filed",
-    [sub.status, sub.events[sub.events.length - 1].type], ["active", "SUBSCRIPTION_ACTIVATED"]);
-  ok("...it records who activated it and when",
-    [sub.activatedBy === sub.soldBy, !!sub.activatedAt], [true, true]);
-  ok("...every installment starts due — activation entitles, it does not collect",
+  ok("...it is live, and the timeline says it was RECORDED, not activated",
+    [sub.status, sub.events[sub.events.length - 1].type], ["active", "SUBSCRIPTION_RECORDED"]);
+  ok("...it records who wrote it down, and when",
+    [sub.recordedBy === sub.soldBy, !!sub.recordedAt], [true, true]);
+  ok("...every installment starts due — recording entitles, it does not collect",
     sub.installments.filter((i) => i.status !== "due").length, 0);
   ok("the invoice cannot then be attached to a second subscription",
-    has(S.activateSubscription({ ...base, installmentCount: 1 }).error, "duplicate_invoice"), true);
+    has(S.recordSubscription({ ...base, installmentCount: 1 }).error, "duplicate_invoice"), true);
 }
 
 console.log("\nwrites · billing an installment — one invoice, one installment");
@@ -575,20 +686,24 @@ S.resetStore();
   /* ONE INVOICE BILLS ONE INSTALLMENT, for what that installment is — an
      invoice for another figure is an invoice for another thing.
 
-     NO FIXTURE FOR THE WRITE-LEVEL CHECK, and it is not worth inventing one:
-     no customer in this seed holds both an unbilled installment and a second
-     issued invoice of a different amount, and adding a record purely so an
-     assertion can fire would put data in the seed that the business never
-     produced. What IS asserted is the same rule where a person meets it — the
-     picker, which never offers a wrong-amount invoice — plus the fact that the
-     guard exists at all. When a seed row eventually makes it reachable, this
-     is the comment to delete. */
-  ok("no customer here can reach the write-level amount check, which is why it is asserted through the picker",
-    S.readSubscriptions().some((x) => x.installments.some((i) => i.status === "due" && !i.invoiceNumber)
-      && S.readInvoices().some((v) => v.status === "issued" && v.customer.userId === x.customer.userId
-        && !x.installments.some((i) => i.invoiceNumber === v.invoiceNumber)
-        && v.grandTotalPaise !== x.installments.filter((i) => i.status === "due" && !i.invoiceNumber)[0].amountPaise)),
-  false);
+     THIS USED TO BE UNREACHABLE. No customer in the seed held both an unbilled
+     installment and a second issued invoice of a different amount, so the rule
+     could only be asserted through the picker. The invoices added on 2026-08-31
+     so the subscription flow could be walked made it reachable, and the note
+     that stood here said this is the comment to delete when they did. The
+     write-level guard is asserted directly, below. */
+  ok("an invoice for a different amount is refused at the WRITE, not only hidden by the picker",
+    (() => {
+      const wrong = S.readInvoices().filter((v) => v.status === "issued"
+        && v.customer.userId === sub.customer.userId
+        && !S.readSubscriptions().some((x) => x.invoiceNumber === v.invoiceNumber
+          || x.installments.some((i) => i.invoiceNumber === v.invoiceNumber))
+        && v.grandTotalPaise !== unbilled.amountPaise)[0];
+      /* Guarded: if a later seed change takes the fixture away again, say so
+         rather than passing on an assertion that never actually ran. */
+      if (!wrong) return "NO FIXTURE — the seed no longer holds a wrong-amount invoice for this customer";
+      return S.recordInstallmentPayment({ ...P, reference: "AT-4", invoiceNumber: wrong.invoiceNumber }).error !== "";
+    })(), true);
   ok("...nor one another installment already carries",
     (() => {
       const taken = S.readSubscriptions().flatMap((x) => x.installments)
@@ -730,6 +845,81 @@ S.resetStore();
     has(S.setLop("SLIP-2026-07-0011", 2), "invalid_state_transition"), true);
 }
 
+/* ========================================================================== */
+console.log("\nwrites · salaries are paid PERSON by person, not run by run");
+S.resetStore();
+{
+  /* THE UNIT CHANGED. A run used to be what somebody paid; a person is now,
+     and a run closes itself once its last slip is paid. What did NOT change is
+     that a slip freezes when it is paid — that moved from the run to the slip,
+     which is where it always belonged. */
+  const acc = S.readSalaryAccount("SAL-AC-0011");
+  const before = S.dueOf(S.toSalaryRow(acc));
+  ok("somebody on the open run is owed the current month", before.state, "unpaid");
+  ok("...and it is one month, not two", before.arrears.length, 0);
+  ok("...so what is due is exactly that month's net", before.pendingPaise, before.currentPaise);
+
+  ok("paying with no reference is refused — it is what ties this to the bank",
+    has(S.paySalary("SAL-AC-0011", "", "ACC-HDFC-4021"), "reference is mandatory"), true);
+  ok("...a reference the ledger already carries is refused",
+    has(S.paySalary("SAL-AC-0011", "NEFT0019AUG2213", "ACC-HDFC-4021"), "duplicate_reference"), true);
+  ok("...and an account that does not exist is refused",
+    has(S.paySalary("SAL-AC-0011", "SALTEST01", "ACC-NOPE"), "Pick the account"), true);
+
+  ok("paying works", S.paySalary("SAL-AC-0011", "SALTEST01", "ACC-HDFC-4021"), "");
+  const after = S.dueOf(S.toSalaryRow(S.readSalaryAccount("SAL-AC-0011")));
+  ok("...nothing is outstanding afterwards", [after.state, after.pendingPaise], ["paid", 0]);
+  ok("...paying again is refused, because there is nothing to pay",
+    has(S.paySalary("SAL-AC-0011", "SALTEST02", "ACC-HDFC-4021"), "nothing_due"), true);
+
+  /* THE FREEZE, which is the guarantee that had to survive the change. */
+  const slip = S.readRun("RUN-2026-08").slips.filter((s) => s.salaryAccountId === "SAL-AC-0011")[0];
+  ok("the slip took its paid date, its reference and its hash in that one write",
+    [!!slip.paidAt, !!slip.sha256, !!slip.issuedAt, slip.reference], [true, true, true, "SALTEST01"]);
+
+  /* AND THE RUN IS A CONSEQUENCE. One person paid does not close it. */
+  ok("the run is still open, because other people on it are not paid",
+    S.readRun("RUN-2026-08").state, "open");
+  ok("...which is a state the old model called impossible — a run half paid",
+    S.readRun("RUN-2026-08").slips.some((s) => s.paidAt)
+    && S.readRun("RUN-2026-08").slips.some((s) => !s.paidAt), true);
+
+  /* Pay everybody else and the run closes itself. */
+  const rest = S.readRun("RUN-2026-08").slips.filter((s) => !s.paidAt);
+  rest.forEach((s, i) => S.paySalary(s.salaryAccountId, "SALREST" + i, "ACC-HDFC-4021"));
+  ok("the run closed itself once its last slip was paid, with nobody marking it",
+    S.readRun("RUN-2026-08").state, "paid");
+  ok("...and it carries the date it closed", !!S.readRun("RUN-2026-08").paidAt, true);
+}
+
+console.log("\nwrites · arrears are paid oldest first");
+S.resetStore();
+{
+  /* Somebody owed two months: the open August run plus a July slip unpaid by
+     hand. Anything else invents a preference nobody expressed and leaves the
+     older debt ageing while the newer one clears. */
+  const july = S.readRun("RUN-2026-07").slips.filter((s) => s.salaryAccountId === "SAL-AC-0014")[0];
+  july.paidAt = null; july.sha256 = null; july.reference = "";
+  S.readRun("RUN-2026-07").state = "open";
+
+  const d = S.dueOf(S.toSalaryRow(S.readSalaryAccount("SAL-AC-0014")));
+  ok("two months are outstanding", d.unpaid.length, 2);
+  ok("...the newest is the current one", d.current.month, "2026-08");
+  ok("...and the older one is arrears, counted separately", d.arrears.map((s) => s.month), ["2026-07"]);
+  ok("...what is due is arrears PLUS the current month, not just one of them",
+    d.pendingPaise, d.arrearsPaise + d.currentPaise);
+
+  ok("one payment settles both", S.paySalary("SAL-AC-0014", "SALARR01", "ACC-HDFC-4021"), "");
+  const j = S.readRun("RUN-2026-07").slips.filter((s) => s.salaryAccountId === "SAL-AC-0014")[0];
+  const a = S.readRun("RUN-2026-08").slips.filter((s) => s.salaryAccountId === "SAL-AC-0014")[0];
+  ok("...both months are paid", [!!j.paidAt, !!a.paidAt], [true, true]);
+  ok("...OLDEST FIRST: July carries suffix 01 and August 02",
+    [j.reference, a.reference], ["SALARR01-01", "SALARR01-02"]);
+  ok("...and nothing is outstanding afterwards",
+    S.dueOf(S.toSalaryRow(S.readSalaryAccount("SAL-AC-0014"))).pendingPaise, 0);
+}
+
+/* ========================================================================== */
 console.log("\nwrites · tags and transactions — one tag, one reference, one row");
 S.resetStore();
 {
@@ -857,7 +1047,12 @@ S.resetStore();
   ok("runway is null, not a number nobody should act on", of("runway").value, null);
   ok("...and it says exactly what is missing", has(of("runway").why, "reconciled cash balance"), true);
 
-  ok("CAC is a number in a month that won four customers", of("cac").value, 737500);
+  /* CAC MOVES WITH THE SEED, by design — it is spend ÷ customers won that
+     month, so every subscription added to August changes it. It was 737500
+     over four customers; the two chain-recorded demos (SUB-0110, SUB-0111)
+     made it six. Asserted as a figure rather than a formula because
+     recomputing it here would just be the store's arithmetic written twice. */
+  ok("CAC is a number in a month that won six customers", of("cac").value, 491667);
   const june = S.kpis("2026-06-01", "2026-06-30");
   ok("...and null in a month that won none — dividing by nothing is not free acquisition",
     of("cac", june).value, null);

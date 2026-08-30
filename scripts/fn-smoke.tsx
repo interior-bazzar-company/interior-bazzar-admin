@@ -38,7 +38,7 @@ import {
   CancelSubModal, FailToPayModal, RecordInstallmentModal, RecordSubModal, ReversePaymentModal,
 } from "../src/admin/views/Finance/SubModals";
 import {
-  CloseAccountModal, LopModal, OpenRunModal, PayRunModal, SalaryAccountModal,
+  CloseAccountModal, LopModal, OpenRunModal, PaySalaryModal, SalaryAccountModal,
 } from "../src/admin/views/Finance/SalaryModals";
 import {
   BillModal, BudgetModal, DeactivateTagModal, ReverseTxnModal, TagModal, TxnModal,
@@ -47,7 +47,7 @@ import {
   DecideRefundModal, ManualRefundModal, RecordTransferModal, RequestRefundModal,
 } from "../src/admin/views/Finance/RefundModals";
 import {
-  readRefund, readRun, readSalaryAccount, readSlip, readSubscription, readTransaction,
+  readRefund, readRun, readSalaryAccount, readSlip, readSubscription, readTransaction, toSalaryRow,
   resetStore, tagOf,
 } from "../src/admin/views/Finance/store";
 import type {
@@ -189,8 +189,14 @@ has(subsEmpty, "counts every subscription in the module, before any filter",
   "...and says the figures above it are not what was filtered away");
 
 const sal = page("salaries · the face", "/finance-salaries");
-has(sal, "Nobody has been paid, nothing is numbered and nothing is hashed",
-  "...an open run states that nothing has gone out");
+/* WHAT IS OWED, ON THE FACE. This used to assert the open run's card said
+   nothing had gone out; the card is gone with the run vocabulary, and the same
+   guarantee is now the table's own: a person who has not been paid says so,
+   and the strip totals it. The word is "Unpaid" and not "pending" — see
+   HELD_AS_A_STATE below, which is why. */
+has(sal, "Outstanding now", "...the face totals what is owed right now");
+has(sal, ">Unpaid<", "...and a person who has not been paid says so on their row");
+has(sal, "In arrears", "...with a month older than the current one called out separately");
 has(sal, "net paid to people", "...payroll says which figure it is, so nobody reads it as cost to company");
 const salEmpty = check("salaries · a filter that matches nothing", () => at("/finance-salaries?q=zzzznothing"));
 has(salEmpty, "Nobody matches those filters", "...an empty payroll says the filter is why");
@@ -279,10 +285,16 @@ has(nowhere, "No subscription at that address", "...a wrong address is a wrong a
 has(nowhere, "nothing in this module is ever", "...and it says why a missing record means a wrong address");
 
 console.log("\nevery dialog");
-const recSub = check("activate a subscription", () => modal(<RecordSubModal onClose={noop} onDone={noop} />));
-has(recSub, "This entitles the business to the plan", "...activation is named as what it does: it entitles a business");
-has(recSub, "Activate subscription", "...and the button activates rather than files");
-has(recSub, "The whole installment schedule is created with it", "...the schedule is created with it");
+const recSub = check("record a subscription", () => modal(<RecordSubModal onClose={noop} onDone={noop} />));
+
+/* SAMPLE TAB — proto only. Delete this block with the tab; see SubSamples.tsx. */
+has(recSub, "use cases", "...the sample tab is reachable from the dialog");
+/* The chain fieldset appears only once a business is picked, so what is
+   asserted here is that the RECORD tab is the one open by default. */
+has(recSub, "Who bought it", "...and the record tab is the one that opens");
+has(recSub, "Writes down a sale that has happened", "...it is named as what it does: it records a sale");
+has(recSub, "Record subscription", "...and the button records rather than activates");
+has(recSub, "the whole schedule is created with it", "...the schedule is created with it");
 has(recSub, "Attach an invoice and the schedule appears here, dated, before anything is written",
   "...and the preview waits on the invoice, because the invoice is what sizes it");
 /* THE CUSTOMER IS AN ACCOUNT, NOT A STRING. A typed name would be a customer
@@ -303,11 +315,11 @@ hasnt(recSub, ">Starter<", "...no hardcoded plan is offered any more");
    owes against, so a figure typed beside it could only ever be a second
    opinion on the same money. */
 has(recSub, "Attach the invoice", "...the money comes from an attached invoice, not a typed figure");
-has(recSub, "Pick the customer first", "...and until a customer is chosen there is nothing to attach");
+has(recSub, "Pick the business first", "...and until a customer is chosen there is nothing to attach");
 hasnt(recSub, "Total paid", "...no typed total is left to disagree with the invoice");
 hasnt(recSub, "fin-rupee", "...and no rupee box at all");
 has(recSub, "every installment is created", "...every installment starts due — the absence of an event");
-has(recSub, "Activating entitles the customer now", "...activation is live, and the notice says so");
+has(recSub, "Recording this entitles the customer now", "...it is live on recording, and the notice says so");
 
 /* The strip's own words after the two figures came off it. */
 hasnt(subs, "1 completed · 2 defaulting", "the Collected tile counts what it collected, nothing else");
@@ -349,10 +361,17 @@ const lop = check("loss of pay", () => modal(
   <LopModal slip={slip("SLIP-2026-08-0011")} onClose={noop} onDone={noop} />));
 has(lop, "Earnings are pro-rated. Deductions are not", "...deductions are not pro-rated");
 has(lop, "does not shrink because somebody was away", "...and it says why a flat levy stays flat");
-const payRun = check("pay a salary run", () => modal(
-  <PayRunModal run={run("RUN-2026-08")} onClose={noop} onDone={noop} />));
-has(payRun, "Every slip is stamped and frozen in this one write", "...every slip is frozen in the same write");
-has(payRun, "A run half paid is not a state", "...and there is no partial run");
+/* PER PERSON NOW, not per run. The freeze guarantee is unchanged and still
+   asserted; what changed is the unit it applies to — one person's outstanding
+   months rather than everybody's at once — and that a run closes itself instead
+   of being marked. SAL-AC-0011 is unpaid on the open August run, so this dialog
+   has something to pay. */
+const paySal = check("pay a salary", () => modal(
+  <PaySalaryModal row={toSalaryRow(account("SAL-AC-0011"))} onClose={noop} onDone={noop} />));
+has(paySal, "freeze in this write", "...the months being paid freeze in the same write");
+has(paySal, "This pays one person", "...and it pays one person, not a run");
+has(paySal, "closes itself once its last slip is paid", "...a run is a consequence now, not a button");
+has(paySal, "The reference is what ties this to the bank", "...the reference is still mandatory");
 
 /* TxnModal takes no seed. It used to, and the money-in branch — the Notice
    naming the three permitted non-revenue credit kinds — now lives behind local

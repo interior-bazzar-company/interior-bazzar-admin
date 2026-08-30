@@ -50,10 +50,15 @@ export interface Account {
   active: boolean;
 }
 
+/** WHO BOUGHT IT, and nothing else. `dealRef` was here and is gone (2026-08-31):
+ *  a subscription is recorded against an INVOICE, and the invoice already
+ *  carries its own `dealRef` back to the deal it came from. Holding a second
+ *  copy on the subscription meant the chain could be read two ways and
+ *  eventually answer differently — and the field was hand-typed here, so the
+ *  copy that disagreed would always be this one. Follow the invoice. */
 export interface Customer {
   name: string;
   userId: string | null;
-  dealRef: string | null;
 }
 
 /** Numbered, frozen and hashed at issue. Never re-rendered: a receipt
@@ -73,7 +78,7 @@ export interface Proof {
 
 /* ===================================================== subscriptions === */
 
-/** How the sale happened. Both are activated the same way; the difference is
+/** How the sale happened. Both are recorded the same way; the difference is
  *  who closed it, and it matters for CAC and for channel analytics. */
 export type SubSource = "sales" | "website";
 
@@ -140,15 +145,23 @@ export interface Subscription {
   status: SubscriptionStatus;
   /** Ordered by `seq`, contiguous from 1, every one carrying the same `of`. */
   installments: Installment[];
-  /** The invoice this was ACTIVATED against. The sales chain raises one
-   *  invoice per installment, so this is the first of them — the document that
-   *  says the customer is now entitled to the plan. Null only on a historical
-   *  row activated before the invoice existed. */
+  /** The invoice this was RECORDED against. The sales chain raises one invoice
+   *  per installment, so this is the first of them — the document that says the
+   *  customer is now entitled to the plan, and the only thing that says what it
+   *  cost. Null only on a historical row recorded before the invoice existed. */
   invoiceNumber: string | null;
+  /** True when the whole term was paid in one go rather than split. It is not
+   *  derivable from `installments.length === 1` after the fact: a schedule can
+   *  be cancelled down to a single surviving row, and that is a different
+   *  story about the same subscription. */
+  paidInFull: boolean;
   soldBy: string;
-  activatedBy: string;
-  /** When the customer became entitled. Not when somebody typed it in. */
-  activatedAt: string;
+  recordedBy: string;
+  /** When this was written down. Renamed from `activatedAt` on 2026-08-31,
+   *  with the rest of the module's vocabulary: Finance records what happened,
+   *  and "activated" implied this screen was the thing that entitled the
+   *  customer. The invoice did that. See FN-AD-01. */
+  recordedAt: string;
   events: FinEvent[];
 }
 
@@ -171,6 +184,13 @@ export interface SalaryAccount {
   memberName: string;
   employeeCode: string;
   designation: string;
+  /** How the person is engaged. `permanent` is on the books; `payroll` is paid
+   *  through payroll without being permanent. The two are NOT a clean
+   *  partition of the world — permanent staff are on payroll too — and the
+   *  split is here because the business asked to filter by it, not because it
+   *  is a taxonomy this module would have invented. It is a vocabulary in
+   *  `vocabularies.json` so a third value is data rather than a code change. */
+  engagement: string;
   joinedAt: string;
   /** Annual cost to company. Presentational — the slip is built from the
    *  monthly components, never by dividing this by twelve. */

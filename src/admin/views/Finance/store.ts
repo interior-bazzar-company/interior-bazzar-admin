@@ -31,6 +31,7 @@ import salariesDoc from "../../../content/finance/salaries.json";
 import txnDoc from "../../../content/finance/transactions.json";
 import refundsDoc from "../../../content/finance/refunds.json";
 import invoicesDoc from "../../../content/finance/invoices.json";
+import quotationsDoc from "../../../content/finance/quotations.json";
 import usersDoc from "../../../content/users/users.json";
 import bankDoc from "../../../content/finance/bank.json";
 import vocabDoc from "../../../content/finance/vocabularies.json";
@@ -131,6 +132,7 @@ interface Snap {
   transactions: CompanyTxn[];
   refunds: Refund[];
   invoices: typeof invoicesDoc.invoices;
+  quotations: typeof quotationsDoc.quotations;
   statements: typeof bankDoc.statements;
   resolutions: Resolution[];
   pendingImport: typeof bankDoc.pendingImport | null;
@@ -148,6 +150,7 @@ function seed(): Snap {
     transactions: clone(txnDoc.transactions) as unknown as CompanyTxn[],
     refunds: clone(refundsDoc.requests) as unknown as Refund[],
     invoices: clone(invoicesDoc.invoices),
+    quotations: clone(quotationsDoc.quotations),
     statements: clone(bankDoc.statements),
     resolutions: [],
     pendingImport: clone(bankDoc.pendingImport || null),
@@ -377,7 +380,6 @@ export function applySubFilters(rows: SubRow[], p: Params): SubRow[] {
     out = out.filter((r) =>
       r.s.subscriptionId.toLowerCase().includes(q)
       || r.s.customer.name.toLowerCase().includes(q)
-      || (r.s.customer.dealRef || "").toLowerCase().includes(q)
       || r.s.planName.toLowerCase().includes(q)
       /* A customer on the phone has a UTR, not a subscription id. */
       || r.s.installments.some((i) => (i.payment?.reference || "").toLowerCase().includes(q)
@@ -428,10 +430,22 @@ export const salaryRows = (): SalaryRow[] =>
     return b.a.monthlyGrossPaise - a.a.monthlyGrossPaise;
   });
 
+/** How people are engaged. A vocabulary rather than a union type, so a third
+ *  value is a data change. See the note on `SalaryAccount.engagement` for why
+ *  these two are not a clean partition. */
+export const ENGAGEMENTS = [
+  { key: "permanent", label: "Permanent" },
+  { key: "payroll", label: "Payroll" },
+];
+export const engagementMeta = (k: string) => ENGAGEMENTS.filter((e) => e.key === k)[0] || null;
+
 export function applySalaryFilters(rows: SalaryRow[], p: Params): SalaryRow[] {
   let out = rows;
   if (p.active === "yes") out = out.filter((r) => r.a.active);
   if (p.active === "no") out = out.filter((r) => !r.a.active);
+  if (p.engagement) out = out.filter((r) => r.a.engagement === p.engagement);
+  if (p.due === "unpaid") out = out.filter((r) => dueOf(r).pendingPaise > 0);
+  if (p.due === "paid") out = out.filter((r) => dueOf(r).pendingPaise === 0 && !!r.lastPaidAt);
   if (p.q) {
     const q = p.q.toLowerCase().trim();
     out = out.filter((r) => r.a.memberName.toLowerCase().includes(q)
@@ -439,6 +453,54 @@ export function applySalaryFilters(rows: SalaryRow[], p: Params): SalaryRow[] {
       || r.a.designation.toLowerCase().includes(q));
   }
   return out;
+}
+
+/* ------------------------------------------------- what somebody is owed ---
+   THE ONE DERIVATION THE SALARY TABLE READS. A person is paid month by month,
+   and the question the table answers is "what do I owe them right now" — which
+   is not one number on one slip. It is every unpaid slip they have.
+
+   ARREARS ARE NOT AN EXTRA FIELD. A slip with no `paidAt` is an unpaid month,
+   whatever month it belongs to; the newest is "this month" and the rest are
+   what somebody forgot. Nothing is stored to say so — the same reason `delayed`
+   is derived in Team and `absent` is derived in Attendance: a stored arrears
+   figure needs a job to keep it true, and there is no queue here to run one. */
+
+export interface SalaryDue {
+  /** Every unpaid slip, newest first. Empty means nothing is owed. */
+  unpaid: Payslip[];
+  /** The newest unpaid month — what the Pay button pays first. */
+  current: Payslip | null;
+  /** Unpaid months BEFORE the newest one. The reason a row can read
+   *  "₹1,08,000 · 2 months" when one month's salary is ₹54,000. */
+  arrears: Payslip[];
+  arrearsPaise: number;
+  currentPaise: number;
+  /** Everything outstanding: arrears plus the current month. */
+  pendingPaise: number;
+  /** `paid` when nothing is outstanding and they have been paid at least once;
+   *  `unpaid` when something is; `none` when no slip has ever been issued.
+   *
+   *  NOT "pending". The module bans that word as the text of a status pill —
+   *  it used to mean "recorded but not yet believed" — and the render suite
+   *  asserts it never returns (`HELD_AS_A_STATE` in fn-smoke.tsx). Money owed
+   *  and not yet sent is a fact, not a doubt, and "unpaid" says the fact. */
+  state: "paid" | "unpaid" | "none";
+}
+
+export function dueOf(r: SalaryRow): SalaryDue {
+  const unpaid = snap.salaryRuns
+    .flatMap((run) => run.slips.filter((s) => s.salaryAccountId === r.a.salaryAccountId && !s.paidAt))
+    .sort((a, b) => b.month.localeCompare(a.month));
+  const current = unpaid[0] || null;
+  const arrears = unpaid.slice(1);
+  const arrearsPaise = arrears.reduce((n, s) => n + s.netPaise, 0);
+  const currentPaise = current ? current.netPaise : 0;
+  return {
+    unpaid, current, arrears, arrearsPaise, currentPaise,
+    pendingPaise: arrearsPaise + currentPaise,
+    state: unpaid.length ? "unpaid" : r.lastPaidAt ? "paid" : "none",
+  };
 }
 
 export const runsNewestFirst = () => snap.salaryRuns.slice().sort((a, b) => b.month.localeCompare(a.month));
@@ -885,27 +947,102 @@ export function plansSeen(): { planId: string; planName: string }[] {
 }
 export function usePlansSeen() { useVersion(); return plansSeen(); }
 
-/** Which invoices may be attached to an activation: issued, belonging to this
+/** Which invoices may be attached when a subscription is recorded: issued, of this
  *  customer, and not already carried by another subscription. Exported because
  *  the dialog offers exactly this list — an offer the write would refuse is a
  *  dialog lying to the person using it. */
-export function attachableInvoices(userId: string) {
+/* ========================================================== the chain ===
+   deal → quotation → invoice → subscription.
+
+   The QUOTATION is where the shape of a sale is agreed: the plan, the term,
+   the total, and how many installments it is paid in. The INVOICE is one
+   installment of it. Recording a subscription reads both instead of asking an
+   operator to retype four numbers that already exist on two documents — and
+   numbers that are read cannot disagree with the paperwork they came from.
+
+   A quotation whose installment count is 1 IS a complete payment. There is no
+   separate flag, because there is nothing a flag would say that the count does
+   not already say.
+
+   COUNT AND DOCUMENTS ARE DIFFERENT QUESTIONS. The chain raises one invoice per
+   installment as each falls due, so a two-installment quotation usually has one
+   invoice. The count comes from the quotation; counting invoices would report
+   the schedule as shorter than it is for as long as it is still running. */
+
+export type FinQuotation = (typeof quotationsDoc.quotations)[number];
+
+export const readQuotations = (): FinQuotation[] => snap.quotations as FinQuotation[];
+export const readQuotation = (n: string | null | undefined): FinQuotation | null =>
+  (n ? (snap.quotations as FinQuotation[]).filter((q) => q.quotationNumber === n)[0] || null : null);
+
+/** Every invoice number any subscription is holding, at either level. */
+function takenInvoiceNumbers(): Set<string> {
   const taken = new Set<string>();
   snap.subscriptions.forEach((s) => {
     if (s.invoiceNumber) taken.add(s.invoiceNumber);
     s.installments.forEach((i) => { if (i.invoiceNumber) taken.add(i.invoiceNumber); });
   });
+  return taken;
+}
+
+/** The invoices raised against one quotation, oldest first — the installments
+ *  of that sale in the order they were billed. Cancelled ones are included:
+ *  they are part of the story, and the caller decides what to do with them. */
+export const invoicesOfQuotation = (n: string) =>
+  snap.invoices.filter((i) => i.quotationNumber === n)
+    .slice().sort((a, b) => a.invoiceDate.localeCompare(b.invoiceDate));
+
+export interface ChainOption {
+  quotation: FinQuotation;
+  invoices: ReturnType<typeof invoicesOfQuotation>;
+  /** The first issued invoice on this quotation that nothing is carrying. Null
+   *  when every one is taken or none has been raised yet — two different
+   *  reasons it cannot be recorded, and the dialog says which. */
+  attachable: ReturnType<typeof invoicesOfQuotation>[number] | null;
+  /** Already carried by a subscription. Named so the dialog can say so rather
+   *  than showing nothing and leaving somebody to wonder. */
+  recordedAs: string | null;
+}
+
+/** THE CHAIN, FOR ONE BUSINESS. Accepted quotations only: a subscription
+ *  cannot be recorded on a sale that did not happen, so a rejected or expired
+ *  quotation is never offered rather than offered and then refused. */
+export function chainsFor(userId: string): ChainOption[] {
+  const taken = takenInvoiceNumbers();
+  return (snap.quotations as FinQuotation[])
+    .filter((q) => q.party.userId === userId && q.status === "accepted")
+    .map((q) => {
+      const invs = invoicesOfQuotation(q.quotationNumber);
+      const sub = snap.subscriptions.filter((x) =>
+        invs.some((i) => x.invoiceNumber === i.invoiceNumber
+          || x.installments.some((n) => n.invoiceNumber === i.invoiceNumber)))[0];
+      return {
+        quotation: q,
+        invoices: invs,
+        attachable: invs.filter((i) => i.status === "issued" && !taken.has(i.invoiceNumber))[0] || null,
+        recordedAs: sub ? sub.subscriptionId : null,
+      };
+    })
+    .sort((a, b) => b.quotation.quotationDate.localeCompare(a.quotation.quotationDate));
+}
+
+export function attachableInvoices(userId: string) {
+  const taken = takenInvoiceNumbers();
   return snap.invoices.filter((i) => i.status === "issued"
     && i.customer.userId === userId
     && !taken.has(i.invoiceNumber));
 }
 
-/** FN-T01 · ACTIVATE a subscription against the invoice raised for it, and
+/** FN-T01 · RECORD a subscription against the invoice raised for it, and
  *  create its whole installment schedule.
  *
- *  ACTIVATION, NOT A NOTE. This is the write that entitles a business to the
- *  plan — the module is managing a live subscription, not filing a memory of
- *  one. It is still a fact and not a claim: it happens when it is done.
+ *  RECORDED, AND STILL LIVE. Renamed from activateSubscription on 2026-08-31.
+ *  This screen was never the thing that entitled anybody — the invoice is —
+ *  and what happens here is writing down a sale that already happened, which
+ *  is what every other face of this module claims to do (FN-AD-01, "Recorded
+ *  is what happened"). Entitlement still follows immediately: recording it
+ *  makes the subscription live from its start date. What changed is the word,
+ *  and the word was overclaiming.
  *
  *  THE INVOICE CARRIES THE MONEY. Nobody types a total. The chain raises one
  *  invoice per installment (FN-OD-14), each for the same amount, so the
@@ -915,26 +1052,29 @@ export function attachableInvoices(userId: string) {
  *
  *  The schedule is created entire: every installment exists from day one with
  *  a due date, because a schedule invented one row at a time is not one. */
-export interface ActivateSubInput {
+export interface RecordSubInput {
   /** The registered user this was sold to. The name is resolved from it, so a
    *  subscription can never name somebody the platform has never heard of. */
   userId: string;
-  dealRef?: string | null;
   source: "sales" | "website";
   planId: string; planName: string; cycleMonths: number;
   /** The invoice raised for this subscription. Its grand total is one
    *  installment; the subscription total is that times the count. */
   invoiceNumber: string;
+  /** 1 = paid in full, and the dialog says so in those words. Above 1 it is a
+   *  schedule. There is no separate "complete payment" count, because one
+   *  installment IS complete payment — offering both would put two options in
+   *  the dropdown that write the identical row. */
   installmentCount: number; startDate: string;
 }
-export function activateSubscription(input: ActivateSubInput): { error: string; subscriptionId: string | null } {
+export function recordSubscription(input: RecordSubInput): { error: string; subscriptionId: string | null } {
   const user = readUser(input.userId);
   if (!user) return { error: "Pick the customer from the user base — a subscription belongs to a registered account, not to a typed name.", subscriptionId: null };
   const invoice = readInvoice(input.invoiceNumber);
-  if (!invoice) return { error: "Attach the invoice this subscription was raised on. Activation is what entitles the customer, and it needs the document that says what they bought.", subscriptionId: null };
-  if (invoice.status !== "issued") return { error: invoice.invoiceNumber + " is " + invoice.status + ". A subscription cannot be activated against an invoice that was never issued or has been cancelled. (invoice_not_open)", subscriptionId: null };
+  if (!invoice) return { error: "Attach the invoice this subscription was raised on. The invoice is what the customer owes against, and it is the only thing here that says how much.", subscriptionId: null };
+  if (invoice.status !== "issued") return { error: invoice.invoiceNumber + " is " + invoice.status + ". A subscription cannot be recorded against an invoice that was never issued or has been cancelled. (invoice_not_open)", subscriptionId: null };
   if (invoice.customer.userId !== user.userId)
-    return { error: invoice.invoiceNumber + " was raised for " + invoice.customer.name + ", not for " + user.name + ". Activating one customer's plan on another's invoice is how the wrong account gets entitled. (customer_mismatch)", subscriptionId: null };
+    return { error: invoice.invoiceNumber + " was raised for " + invoice.customer.name + ", not for " + user.name + ". Recording one customer's plan against another's invoice is how the wrong account gets entitled. (customer_mismatch)", subscriptionId: null };
   if (snap.subscriptions.some((x) => x.invoiceNumber === invoice.invoiceNumber
     || x.installments.some((i) => i.invoiceNumber === invoice.invoiceNumber)))
     return { error: invoice.invoiceNumber + " is already carried by another subscription. One invoice, one thing bought. (duplicate_invoice)", subscriptionId: null };
@@ -942,6 +1082,22 @@ export function activateSubscription(input: ActivateSubInput): { error: string; 
   const n = input.installmentCount;
   if (!Number.isInteger(n) || n < 1 || n > 5)
     return { error: "Between 1 and 5 installments. Beyond five it is a payment plan the sales chain does not raise invoices for.", subscriptionId: null };
+
+  /* THE QUOTATION IS THE AUTHORITY ON THE PAYMENT PLAN. Where the invoice came
+     from an accepted quotation, that quotation already agreed how many
+     installments this is paid in — so a different count here is not a choice,
+     it is a disagreement with the document the customer signed. The dialog
+     reads the count from the quotation and can never send a mismatch; this
+     guard is for every other caller, and for the day somebody adds one. */
+  const quote = readQuotation(invoice.quotationNumber);
+  if (quote && quote.status === "accepted" && quote.installments !== n)
+    return {
+      error: invoice.invoiceNumber + " was raised on " + quote.quotationNumber + ", which agreed "
+        + (quote.installments === 1 ? "a complete payment" : quote.installments + " installments")
+        + " — not " + (n === 1 ? "a complete payment" : n + " installments")
+        + ". Change the quotation if the plan changed. (plan_mismatch)",
+      subscriptionId: null,
+    };
   if (!input.startDate || input.startDate > todayIso())
     return { error: "A subscription starts when it is sold. The start date cannot be in the future.", subscriptionId: null };
 
@@ -958,20 +1114,22 @@ export function activateSubscription(input: ActivateSubInput): { error: string; 
   const end = new Date(start); end.setUTCMonth(end.getUTCMonth() + input.cycleMonths);
   const s: Subscription = {
     subscriptionId: id, source: input.source,
-    customer: { name: user.name, userId: user.userId, dealRef: input.dealRef || null },
+    customer: { name: user.name, userId: user.userId },
     planId: input.planId, planName: input.planName, cycleMonths: input.cycleMonths,
     totalPaise, startDate: input.startDate,
     endDate: end.toISOString().slice(0, 10),
     status: "active", installments,
     invoiceNumber: invoice.invoiceNumber,
-    soldBy: a.name, activatedBy: a.name, activatedAt: stamp(), events: [],
+    paidInFull: n === 1,
+    soldBy: a.name, recordedBy: a.name, recordedAt: stamp(), events: [],
   };
-  /* The invoice that activation ran against is the first installment's. The
+  /* The invoice this was recorded against is the first installment's. The
      rest are raised as they fall due. */
   s.installments[0].invoiceNumber = invoice.invoiceNumber;
-  log(pushEvent(s.events, "SUBSCRIPTION_ACTIVATED",
-    input.planName + " activated on " + invoice.invoiceNumber + " · " + inr(totalPaise) + " in " + n
-    + " installment" + (n === 1 ? "" : "s") + " of " + inr(each) + " · " + (sourceMeta(input.source)?.label || input.source)
+  log(pushEvent(s.events, "SUBSCRIPTION_RECORDED",
+    input.planName + " recorded on " + invoice.invoiceNumber + " · " + inr(totalPaise)
+    + (n === 1 ? " paid in full" : " in " + n + " installments of " + inr(each))
+    + " · " + (sourceMeta(input.source)?.label || input.source)
     + ". The customer is entitled from " + input.startDate + "."),
   id, "subscription");
   snap.subscriptions = [s].concat(snap.subscriptions);
@@ -1146,6 +1304,9 @@ export function cancelSubscription(id: string, reason: string): string {
  *  of their permissions. */
 export interface SalaryAccountInput {
   memberId: number; memberName: string; employeeCode: string; designation: string;
+  /** Defaults to permanent where the form does not ask. A value somebody can
+   *  see and change beats a blank they cannot filter on. */
+  engagement?: string;
   joinedAt: string; ctcPaise: number;
   earnings: SalaryComponent[]; deductions: SalaryComponent[];
   bank: { masked: string; ifsc: string; name: string }; pan: string; uan: string | null;
@@ -1176,7 +1337,8 @@ export function upsertSalaryAccount(input: SalaryAccountInput, id?: string): { e
   }
   const newId = nextId("SAL");
   const acc: SalaryAccount = {
-    salaryAccountId: newId, ...input, monthlyGrossPaise: gross, active: true,
+    salaryAccountId: newId, ...input, engagement: input.engagement || "permanent",
+    monthlyGrossPaise: gross, active: true,
     recordedBy: a.name, recordedAt: stamp(), events: [],
   };
   log(pushEvent(acc.events, "SALARY_ACCOUNT_OPENED",
@@ -1283,8 +1445,77 @@ export function setLop(slipId: string, lopDays: number): string {
   return "";
 }
 
+/** FN-T08b · Pay ONE person. Super Admin.
+ *
+ *  THIS REVERSES THE INVARIANT BELOW, DELIBERATELY. `recordRunPaid` says a run
+ *  half paid is not a state, and while the run was the unit somebody acted on
+ *  that was true. It is not the unit any more: salaries are paid person by
+ *  person, so a run part-paid is the ordinary mid-month state and pretending
+ *  otherwise would mean the screen could not show what is actually happening.
+ *
+ *  WHAT DID NOT CHANGE is the part that matters: a slip still freezes — its
+ *  number, its hash and its amounts are stamped in the write that pays it, and
+ *  nothing can rewrite it afterwards. The freeze moved from the run to the
+ *  slip, which is where it always belonged; a document is frozen when it is
+ *  issued, not when its neighbours are.
+ *
+ *  ARREARS ARE PAID OLDEST FIRST. Somebody owed two months and paid once has
+ *  been paid for the older month — anything else invents a preference nobody
+ *  expressed, and leaves the older debt ageing while the newer one clears. */
+export function paySalary(salaryAccountId: string, reference: string, accountId: string): string {
+  const acc = readSalaryAccount(salaryAccountId);
+  if (!acc) return "That salary account no longer exists.";
+  const row = toSalaryRow(acc);
+  const due = dueOf(row);
+  if (!due.unpaid.length) return acc.memberName + " has nothing outstanding. (nothing_due)";
+  if (!reference.trim()) return "The transfer reference is mandatory — it is what ties this payment to the bank. (validation_failed)";
+  if (dupReference(reference)) return "A record already carries reference " + reference.trim() + ". (duplicate_reference)";
+  if (!accountOf(accountId)) return "Pick the account it was paid from.";
+  const sa = superAdminOnly("Paying a salary"); if (sa) return sa;
+
+  const a = actor();
+  const at = stamp();
+  /* Oldest first, so the debt that has been waiting longest clears first. */
+  const order = due.unpaid.slice().sort((x, y) => x.month.localeCompare(y.month));
+  order.forEach((slip, k) => {
+    slip.paidAt = at;
+    slip.accountId = accountId;
+    slip.reference = reference.trim() + (order.length > 1 ? "-" + String(k + 1).padStart(2, "0") : "");
+    slip.issuedAt = at;
+    slip.sha256 = hex64(slip.netPaise + k);
+  });
+
+  /* A run is paid when its last unpaid slip is. It is not a thing anybody
+     presses any more — it is a consequence of everybody on it being paid. */
+  snap.salaryRuns.forEach((run) => {
+    if (run.state === "paid") return;
+    if (run.slips.length && run.slips.every((s) => s.paidAt)) {
+      run.state = "paid";
+      run.paidAt = at;
+      log(pushEvent(run.events, "RUN_PAID",
+        "Every slip on " + run.runId + " is now paid. The run closed itself; nobody marked it."), run.runId, "run");
+    }
+  });
+
+  const months = order.map((s) => fmtMonth(s.month)).join(", ");
+  log(pushEvent(acc.events, "SALARY_PAID",
+    inr(due.pendingPaise) + " to " + acc.memberName + " from " + (accountOf(accountId)?.masked || accountId)
+    + " · " + reference.trim() + " · " + months
+    + (order.length > 1 ? " (" + order.length + " months, oldest first)" : "") + "."),
+  salaryAccountId, "salary");
+  void a;
+  emit();
+  return "";
+}
+
 /** FN-T08 · Mark the run paid. Super Admin. Every slip is stamped, numbered
- *  and frozen in the same write — a run half paid is not a state. */
+ *  and frozen in the same write — a run half paid is not a state.
+ *
+ *  SUPERSEDED by `paySalary` above and kept only because the check suite still
+ *  asserts its refusals, which are the same refusals the per-person write
+ *  makes. Nothing in the panel calls it: the button that did is gone. Delete
+ *  it and its assertions together, or wire it to a "pay everybody" control if
+ *  one is ever wanted. */
 export function recordRunPaid(runId: string, reference: string, accountId: string): string {
   const run = readRun(runId);
   if (!run) return "That run no longer exists.";

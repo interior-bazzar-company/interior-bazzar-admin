@@ -24,19 +24,32 @@ import { useEffect, useMemo, useState } from "react";
 import AdminOpsService, { call } from "../../../api/modules/adminOps";
 import type { PlanRow } from "../../../api/modules/adminOps";
 import { errMessage } from "../../../api/apiService";
-import { Notice } from "../../ui";
+import { Notice, Tabs } from "../../ui";
 import { Check } from "./bits";
 import { go } from "../../ui/nav";
 import { Cancel, Dlg, Field, Fs, Pick } from "./dialog";
+/* SAMPLE TAB — proto only, deleted at integration. */
+import { SAMPLES_ON, SubSamples } from "./SubSamples";
 import type { Done } from "./dialog";
 import {
   ACCOUNTS, FAILURE_REASONS, MODES,
   cancelSubscription, fmtDate, inr, markFailToPay,
-  useUsers, previewSchedule, activateSubscription, attachableInvoices, attachableForInstallment, readInvoice, recordInstallmentPayment, reversePayment, superAdminOnly, todayIso,
+  useUsers, previewSchedule, recordSubscription, attachableInvoices, chainsFor, attachableForInstallment, readInvoice, recordInstallmentPayment, reversePayment, superAdminOnly, todayIso,
 } from "./store";
 import type { Installment, InstallmentPayment, Subscription } from "./store";
 
-const COUNTS = ["1", "2", "3", "4", "5"];
+/* THE PAYMENT PLAN. "Complete payment" IS one installment — the customer pays
+   the whole thing once — so it is the label on 1 rather than a sixth option
+   beside it. Offering both would put two choices in this dropdown that write
+   the identical row, and the first person to ask which one they should have
+   picked would be right to. */
+const PAYMENT_PLANS = [
+  { v: "1", l: "Complete payment · paid in one go" },
+  { v: "2", l: "2 installments" },
+  { v: "3", l: "3 installments" },
+  { v: "4", l: "4 installments" },
+  { v: "5", l: "5 installments" },
+];
 
 /** The schedule the store WILL create, from the store itself — never a second
  *  then the same day of each following month. Built here only so the person
@@ -69,13 +82,17 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
   const users = useUsers();
   const [userId, setUserId] = useState("");
   const [uq, setUq] = useState("");
-  const [dealRef, setDealRef] = useState("");
   const [source, setSource] = useState<"sales" | "website">("sales");
   const [choiceId, setChoiceId] = useState("");
   const [invoiceNumber, setInvoiceNumber] = useState("");
+  /* The quotation this is being recorded from. Empty means there is no chain
+     behind this sale — a website purchase — and the manual path applies. */
+  const [quotationNumber, setQuotationNumber] = useState("");
   const [count, setCount] = useState("1");
   const [startDate, setStartDate] = useState(todayIso());
   const [err, setErr] = useState<string | null>(null);
+  /* SAMPLE TAB — proto only, deleted at integration. See SubSamples.tsx. */
+  const [tab, setTab] = useState<"record" | "sample">("record");
 
   /* THE CATALOGUE IS LIVE. Plans is a real module with real rows, so the plan
      on a subscription is chosen from what the company actually sells rather
@@ -138,12 +155,38 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
   }, [users, uq]);
   const chosenUser = users.filter((u) => u.userId === userId)[0] || null;
 
-  const n = Number(count);
+  /* ------------------------------------------------------- the chain ---
+     deal → quotation → invoice. Picking the business resolves it, and the
+     quotation then answers every question below: what was sold, for how long,
+     for how much, and in how many installments. Nothing on this dialog is
+     typed once a quotation is chosen, which is the whole point — a figure
+     retyped beside a document is a figure that can disagree with it.
+
+     Only ACCEPTED quotations appear. A rejected one is not offered rather
+     than offered and refused, because a subscription cannot be recorded on a
+     sale that did not happen. */
+  const chains = userId ? chainsFor(userId) : [];
+  const open = chains.filter((c) => !!c.attachable && !c.recordedAs);
+  const chain = chains.filter((c) => c.quotation.quotationNumber === quotationNumber)[0] || null;
+  const quote = chain ? chain.quotation : null;
+
   /* Only invoices that would actually be accepted: issued, this customer's,
      and not already carried by another subscription. Offering one the write
      would refuse is a dialog lying to the person using it. */
   const invoices = userId ? attachableInvoices(userId) : [];
-  const invoice = invoices.filter((i) => i.invoiceNumber === invoiceNumber)[0] || null;
+  /* The chain's invoice wins where there is one. It is not a default the
+     operator can drift away from — it IS the installment this subscription is
+     being recorded on. */
+  const invoice = chain && chain.attachable
+    ? chain.attachable
+    : invoices.filter((i) => i.invoiceNumber === invoiceNumber)[0] || null;
+
+  /* THE COUNT COMES FROM THE QUOTATION, not from the dropdown, whenever one is
+     attached. The chain raises one invoice per installment as each falls due,
+     so counting the documents that exist would report a running schedule as
+     shorter than it is. */
+  const n = quote ? quote.installments : Number(count);
+
   /* One invoice per installment, each for the same amount — so the total is
      the invoice times the count, and nobody types a figure that could disagree
      with the document. */
@@ -154,37 +197,81 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
      the store refuses on. */
   const sched = paise !== null ? previewSchedule(startDate, n, paise) : [];
 
-  const months = chosenPlan ? chosenPlan.months : manualMonths;
-  const planName = chosenPlan ? chosenPlan.planName : manualPlan.trim();
-  const planId = chosenPlan ? chosenPlan.planId : "PL-MANUAL";
+  const months = quote ? quote.termMonths : chosenPlan ? chosenPlan.months : manualMonths;
+  const planName = quote ? quote.planName : chosenPlan ? chosenPlan.planName : manualPlan.trim();
+  /* A quotation names a plan but carries no catalogue id — it is a document,
+     not a catalogue row. Slugged from the name so the id reads like every other
+     one in the module rather than announcing where it came from. */
+  const planId = quote
+    ? "PL-" + quote.planName.toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "")
+    : chosenPlan ? chosenPlan.planId : "PL-MANUAL";
+
+  /* A quotation is what a salesperson closed. Recording one from the chain is
+     a sales sale by definition, so the channel is not a second question. */
+  const effectiveSource = quote ? "sales" : source;
+
+  /* THE ONE PLACE THE QUOTATION AND THE INVOICE CAN DISAGREE, and it is worth
+     saying out loud rather than silently trusting one. The quotation agreed a
+     total; the invoices raised against it are what the customer was actually
+     billed. They differ legitimately — a quotation's installments need not be
+     equal, and 00147 in the seed proves it — so this is a note, never a block. */
+  const quotedVsBilled = quote && paise !== null && quote.grandTotalPaise !== paise
+    ? { quoted: quote.grandTotalPaise, billed: paise }
+    : null;
 
   const submit = () => {
     if (!invoice) {
-      setErr("Attach the invoice this subscription was raised on — activation runs against it, and it is what says how much the customer owes.");
+      setErr("Attach the invoice this subscription was raised on. It is what says how much the customer owes, and nothing here types that figure.");
       return;
     }
-    const r = activateSubscription({
+    const r = recordSubscription({
       userId,
-      dealRef: dealRef.trim() || null,
-      source,
+      source: effectiveSource,
       planId, planName, cycleMonths: months,
-      invoiceNumber, installmentCount: n, startDate,
+      invoiceNumber: invoice.invoiceNumber, installmentCount: n, startDate,
     });
     if (r.error) { setErr(r.error); return; }
     onDone(
-      r.subscriptionId + " activated · " + planName + " · " + inr(paise) + " on " + invoiceNumber
+      r.subscriptionId + " recorded · " + planName + " · " + inr(paise)
+      + (quote ? " from " + quote.quotationNumber : "") + " on " + invoice.invoiceNumber
       + ". " + (chosenUser ? chosenUser.name : "The customer") + " is entitled from "
       + fmtDate(startDate) + ", and the first installment is due "
       + fmtDate(sched[0] ? sched[0].dueDate : startDate) + ".", "ok");
   };
 
   return (
-    <Dlg title="Activate a subscription" err={err} onClose={onClose}
-      sub="This entitles the business to the plan. The whole installment schedule is created with it."
-      footer={<>
-        <Cancel onClose={onClose} />
-        <button className="btn pri" onClick={submit}>Activate subscription</button>
-      </>}>
+    <Dlg title="Record a subscription" err={tab === "record" ? err : null} onClose={onClose}
+      sub="Writes down a sale that has happened. The invoice says what it cost; the whole schedule is created with it."
+      footer={tab === "sample"
+        ? <Cancel onClose={() => setTab("record")} label="Back to the form" />
+        : <>
+          <Cancel onClose={onClose} />
+          <button className="btn pri" onClick={submit}>Record subscription</button>
+        </>}>
+
+      {/* SAMPLE TAB — proto only, deleted at integration. See SubSamples.tsx
+          for the four-step removal list. */}
+      {SAMPLES_ON ? (
+        <Tabs cur={tab} onPick={(k) => setTab(k as "record" | "sample")}
+          items={[
+            { k: "record", label: "Record" },
+            { k: "sample", label: "Sample & use cases" },
+          ]} />
+      ) : null}
+
+      {/* SAMPLE TAB — the whole form is the other branch of this one
+          conditional, so removing the tab is removing this line and its
+          closing brace at the end of the dialog. */}
+      {SAMPLES_ON && tab === "sample" ? (
+        <SubSamples onUse={(u, q) => {
+          setUserId(u);
+          setQuotationNumber(q);
+          setInvoiceNumber("");
+          setErr(null);
+          setTab("record");
+        }} />
+      ) : (<></>)}
+      {tab === "sample" ? null : (<>
 
       {/* WHO, FROM THE USER BASE. Not a typed name: a subscription belongs to a
           registered account, and the account id is what every other module
@@ -200,7 +287,7 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
               {chosenUser.business ? <> · {chosenUser.business}</> : null}
               {chosenUser.status !== "active" ? <> · <b className="warn">{chosenUser.status}</b></> : null}
             </span>
-            <button type="button" className="lnk" onClick={() => { setUserId(""); setUq(""); }}>Change</button>
+            <button type="button" className="lnk" onClick={() => { setUserId(""); setUq(""); setQuotationNumber(""); setInvoiceNumber(""); }}>Change</button>
           </div>
         ) : (
           <>
@@ -208,36 +295,106 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
               onChange={(e) => setUq(e.target.value)} />
             <div className="fin-pick">
               {shownUsers.length ? shownUsers.map((u) => (
-                <button key={u.userId} type="button" onClick={() => setUserId(u.userId)}>
+                <button key={u.userId} type="button"
+                  onClick={() => { setUserId(u.userId); setQuotationNumber(""); setInvoiceNumber(""); }}>
                   <span className="mono">{u.userId}</span>
                   <span className="s">{u.name}{u.business ? " · " + u.business : ""}</span>
                   <span className="a">{u.status === "active" ? "" : u.status}</span>
                 </button>
-              )) : <p className="fin-fine">Nobody in the user base matches that. A subscription cannot be activated for somebody who is not registered.</p>}
+              )) : <p className="fin-fine">Nobody in the user base matches that. A subscription cannot be recorded for somebody who is not registered.</p>}
             </div>
           </>
         )}
-        <Field label="Deal reference"
-          help="A sales close carries one. A website purchase has none, and leaving it empty says so.">
-          <input className="inp mono" value={dealRef} placeholder="DL-0000"
-            onChange={(e) => setDealRef(e.target.value)} />
-        </Field>
       </Fs>
 
-      <Fs legend="How the sale happened" req
-        hint="Both are recorded identically. The difference is who typed it, and it is what channel analytics and CAC read.">
-        <Pick value={source} onChange={setSource} options={[
-          { key: "sales", label: "Sales", help: "A salesperson closed it on a deal and recorded the payment against the invoice." },
-          { key: "website", label: "Website", help: "The customer bought it themselves and paid through the gateway." },
-        ]} />
-      </Fs>
+      {/* THE CHAIN. Everything below this fieldset is read from the quotation
+          and the invoice it was billed on — the plan, the term, the total and
+          the number of installments. It is the difference between recording a
+          sale and re-describing one. */}
+      {userId ? (
+        <Fs legend="The sale it came from"
+          hint="Accepted quotations for this business. Picking one fills in everything below it.">
+          {chain ? (
+            <div className="fin-inv">
+              <div className="h">
+                <span className="mono n">{chain.quotation.quotationNumber}</span>
+                <span className="pill ok">accepted</span>
+                <span className="spacer" />
+                <button type="button" className="lnk"
+                  onClick={() => { setQuotationNumber(""); setInvoiceNumber(""); }}>Change</button>
+              </div>
+              <dl className="kv">
+                <dt>Deal</dt><dd className="mono">{chain.quotation.dealRef}</dd>
+                <dt>Plan</dt><dd>{chain.quotation.planName} · {chain.quotation.termMonths} month{chain.quotation.termMonths === 1 ? "" : "s"}</dd>
+                <dt>Agreed</dt><dd className="tnum">{inr(chain.quotation.grandTotalPaise)}</dd>
+                <dt>Paid as</dt>
+                <dd>{chain.quotation.installments === 1
+                  ? "Complete payment"
+                  : chain.quotation.installments + " installments, " + chain.quotation.installmentGapMonths + " month apart"}</dd>
+                <dt>Invoices raised</dt>
+                <dd>{chain.invoices.length
+                  ? chain.invoices.map((i) => i.invoiceNumber + " · " + inr(i.grandTotalPaise)
+                    + (i.status === "cancelled" ? " (cancelled)" : "")).join("  ·  ")
+                  : "none yet"}</dd>
+              </dl>
+              <p className="fin-fine">
+                The plan, the term and the installment count below come from this quotation and
+                cannot be edited here. Change the quotation if any of them is wrong — a figure
+                retyped beside a document is a figure that can disagree with it.
+              </p>
+            </div>
+          ) : open.length ? (
+            <div className="fin-pick">
+              {open.map((c) => (
+                <button key={c.quotation.quotationNumber} type="button"
+                  onClick={() => { setQuotationNumber(c.quotation.quotationNumber); setInvoiceNumber(""); }}>
+                  <span className="mono">{c.quotation.quotationNumber}</span>
+                  <span className="s">
+                    {c.quotation.planName} · {c.quotation.termMonths}m ·{" "}
+                    {c.quotation.installments === 1 ? "complete payment" : c.quotation.installments + " installments"}
+                    {" · "}{c.quotation.dealRef}
+                  </span>
+                  <span className="a">{inr(c.quotation.grandTotalPaise)}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <Notice ico="doc" text={<>
+              <b>No open quotation for {chosenUser ? chosenUser.name : "this business"}.</b>{" "}
+              {chains.length
+                ? "Every accepted quotation of theirs is already recorded as a subscription, or its invoice has not been raised yet."
+                : "Nothing was quoted to them — a website purchase, or a sale that never went through the chain."}{" "}
+              Record it by hand below instead; the invoice still carries the money.
+            </>} />
+          )}
+        </Fs>
+      ) : null}
+
+      {/* A quotation IS a sales close, so the channel stops being a question
+          the moment one is attached. Asking it anyway invites the answer that
+          contradicts the document. */}
+      {quote ? null : (
+        <Fs legend="How the sale happened" req
+          hint="Both are recorded identically. The difference is who typed it, and it is what channel analytics and CAC read.">
+          <Pick value={source} onChange={setSource} options={[
+            { key: "sales", label: "Sales", help: "A salesperson closed it on a deal and recorded the payment against the invoice." },
+            { key: "website", label: "Website", help: "The customer bought it themselves and paid through the gateway." },
+          ]} />
+        </Fs>
+      )}
 
       {/* WHAT, FROM THE CATALOGUE. One choice carries the plan, the term and
           the price, so there is no second field for the term that could
           disagree with the first. */}
       <Fs legend="What was sold" req
-        hint="From the live plan catalogue. The billing cycle carries both the term and the price.">
-        {plans && plans.length ? (
+        hint={quote
+          ? "Read from " + quote.quotationNumber + " — the quotation is where this was agreed."
+          : "From the live plan catalogue. The billing cycle carries both the term and the price."}>
+        {quote ? (
+          <div className="fin-derived">
+            <b>{quote.planName}</b> · {quote.termMonths} month{quote.termMonths === 1 ? "" : "s"}
+          </div>
+        ) : plans && plans.length ? (
           <Field label="Plan and billing cycle"
             help="Choosing one sets the term and fills the total in below.">
             <div className="selectbox">
@@ -278,9 +435,11 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
           the document the customer owes against, and a figure typed beside it
           could only ever be a second opinion on the same money. */}
       <Fs legend="Attach the invoice" req
-        hint="Activation runs against the invoice raised for this subscription. It is what says how much is owed.">
+        hint={quote
+          ? "The installment invoice raised on " + quote.quotationNumber + ". Not a choice — it is the document this subscription is recorded on."
+          : "The subscription is recorded against the invoice raised for it. That document is what says how much is owed."}>
         {!userId ? (
-          <p className="fin-fine">Pick the customer first — the invoice has to be one of theirs.</p>
+          <p className="fin-fine">Pick the business first — the invoice has to be one of theirs.</p>
         ) : invoice ? (
           <div className="fin-inv">
             <div className="h">
@@ -319,23 +478,60 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
           <Notice tone="warn" ico="alert" text={<>
             <b>{chosenUser ? chosenUser.name : "This customer"} has no invoice to attach.</b> Every issued
             invoice of theirs is already carried by another subscription, or none has been raised. Raise one
-            in Invoices first — activation cannot invent the document it runs against.
+            in Invoices first — recording a subscription cannot invent the document it runs against.
           </>} />
         )}
       </Fs>
 
       <Fs legend="How it is paid" req
-        hint="One invoice per installment, each for the same amount. The schedule divides back exactly because of it.">
+        hint={n === 1
+          ? "One payment for the whole term, against the invoice attached above."
+          : "One invoice per installment, each for the same amount. The schedule divides back exactly because of it."}>
         <div className="fin-f2">
-          <Field label="Installments" help="Between 1 and 5. Beyond five it is a payment plan the sales chain raises no invoices for.">
-            <Pick value={count} onChange={setCount} options={COUNTS.map((c) => ({ key: c, label: c }))} />
+          <Field label="Payment plan"
+            help={quote
+              ? "Agreed on " + quote.quotationNumber + ". The chain raises one invoice per installment as each falls due, so this is the count the quotation agreed — not the number of invoices that exist yet."
+              : "Complete payment, or two to five installments. Beyond five it is a payment plan the sales chain raises no invoices for."}>
+            {quote ? (
+              <div className="fin-derived">
+                {quote.installments === 1
+                  ? <b>Complete payment</b>
+                  : <><b>{quote.installments} installments</b>, {quote.installmentGapMonths} month apart</>}
+              </div>
+            ) : (
+              <div className="selectbox">
+                <select value={count} onChange={(e) => setCount(e.target.value)}>
+                  {PAYMENT_PLANS.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
+                </select>
+              </div>
+            )}
           </Field>
-          <Field label="Subscription total" help="The attached invoice, once per installment. Not typed, so it cannot disagree with the document.">
+          <Field label="Subscription total"
+            help={n === 1
+              ? "The attached invoice. Not typed, so it cannot disagree with the document."
+              : "The attached invoice, once per installment. Not typed, so it cannot disagree with the document."}>
             <div className="fin-derived tnum">
-              {invoice ? <>{inr(invoice.grandTotalPaise)} × {n} = <b>{inr(invoice.grandTotalPaise * n)}</b></> : "attach an invoice"}
+              {invoice
+                ? (n === 1
+                  ? <b>{inr(invoice.grandTotalPaise)}</b>
+                  : <>{inr(invoice.grandTotalPaise)} × {n} = <b>{inr(invoice.grandTotalPaise * n)}</b></>)
+                : "attach an invoice"}
             </div>
           </Field>
         </div>
+
+        {/* THE QUOTATION AND THE INVOICES CAN LEGITIMATELY DIFFER. A quotation
+            agrees a total; the invoices raised against it need not be equal
+            slices of it. So this is stated, never blocked — and the invoice
+            wins, because it is what the customer was actually billed. */}
+        {quotedVsBilled ? (
+          <Notice tone="warn" ico="alert" text={<>
+            <b>The quotation and the invoices do not add up to the same figure.</b>{" "}
+            {quote?.quotationNumber} agreed {inr(quotedVsBilled.quoted)}; this records{" "}
+            {inr(quotedVsBilled.billed)} — {inr(invoice ? invoice.grandTotalPaise : 0)} × {n}.
+            The invoice wins, because it is what was billed. Check it was meant to.
+          </>} />
+        ) : null}
 
         {/* THE SCHEDULE, BEFORE IT EXISTS. Every installment carries a due date
             from day one, so this is the whole record — not a preview of the
@@ -345,7 +541,7 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
             <>
               {sched.map((i) => (
                 <div className="row" key={i.seq}>
-                  <span className="l">Installment {i.seq} of {i.of} · due {fmtDate(i.dueDate)}</span>
+                  <span className="l">{i.of === 1 ? "Paid in full" : "Installment " + i.seq + " of " + i.of} · due {fmtDate(i.dueDate)}</span>
                   <span className="tnum">{inr(i.amountPaise)}</span>
                 </div>
               ))}
@@ -367,10 +563,12 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
       </Fs>
 
       <Notice tone="info" ico="lock" text={<>
-        <b>Activating entitles the customer now.</b> The subscription is live from its start date and
+        <b>Recording this entitles the customer now.</b> The subscription is live from its start date and
         the schedule exists in full — but every installment is created <em>due</em>, the absence of an
-        event. None counts as collected until a payment is recorded against it, one at a time.
+        event. None counts as collected until a payment is recorded against it, one at a time —
+        <em>complete payment</em> included: it is one installment, not a receipt.
       </>} />
+    </>)}
     </Dlg>
   );
 }

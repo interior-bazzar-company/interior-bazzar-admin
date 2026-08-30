@@ -4,6 +4,434 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ---
 
+## 2026-08-31
+
+### Salaries A/C is one table, and salaries are paid person by person
+
+**Area:** `#/finance-salaries` — the whole face, and the topbar above it
+**Files:** `src/admin/views/Finance/{Salaries,SalaryModals,store,types,index}.ts(x)`,
+`src/content/finance/salaries.json`, `scripts/{check-finance-ledger.cjs,fn-smoke.tsx}`
+
+**What changed**
+
+**Three tables became one.** The face carried the open run's slips, the people,
+and the runs behind them — three answers to one question and three places to
+look for a name. What somebody does here is pay people, so the face is now the
+people and what each is owed. The Runs section and the open-run card are gone.
+
+**The unit of payment is a person.** `Mark the run paid` is gone with them;
+each row has a **Pay** button that settles that one person. This reverses an
+invariant the module stated outright — *"a run half paid is not a state"* —
+and it is reversed deliberately, because a run part-paid is the ordinary
+mid-month reality and refusing to model it meant the screen could not show what
+was happening. **What did not change is the freeze:** a slip still takes its
+number, its reference and its hash in the write that pays it. The freeze moved
+from the run to the slip, which is where it always belonged — a document is
+frozen when it is issued, not when its neighbours are. A run now **closes
+itself** once its last slip is paid; nobody marks it.
+
+**Arrears are real and they are paid oldest first.** `dueOf()` is the one
+derivation the table reads: every unpaid slip a person has, newest as "this
+month" and the rest as arrears. A row owed two months shows **arrears + current
+as one figure**, because that is what the transfer will be, with the breakdown
+underneath so the number can be taken apart. Paying settles them oldest first —
+anything else invents a preference nobody expressed and leaves the older debt
+ageing while the newer one clears. Nothing is stored: an arrears field would
+need a job to keep it true, and there is no queue here.
+
+**A filter for how somebody is engaged**, permanent or payroll — a new
+`engagement` field, seeded on all seven accounts, held as a vocabulary so a
+third value is data. ⚠️ **The two are not a clean partition** — permanent staff
+are on payroll too — and this is the business's vocabulary, not one the module
+would have invented. Said in the type, so nobody later mistakes it for a
+taxonomy.
+
+**The topbar figure follows the section:** `Members` on payroll, `Active
+subscriptions` elsewhere. One number either way.
+
+**One word was overruled, and it was a guard doing its job.** The tag was going
+to read *Pending*; the render suite refused it. `HELD_AS_A_STATE` bans
+`pending` as the text of a status pill, because it used to mean "recorded but
+not yet believed" — the exact premise this module was rebuilt to remove. Money
+owed and not yet sent is a fact, so the tag says **Unpaid**, which states the
+fact without implying a judgement is outstanding. The rule was not weakened.
+
+**Temp data**
+`salaries.json` → `engagement` added to all 7 accounts (4 permanent, 3 payroll).
+No new records.
+
+**Backend needed**
+- `POST /admin/finance/salaries/{accountId}/pay` → **FN-T08b**, replacing the
+  run-level pay. Settles every outstanding month for one person, oldest first,
+  freezing each slip in the same write; closes the run when its last slip goes.
+- `SalaryAccount.engagement` on the account payload.
+- `recordRunPaid` (FN-T08) is **not** deleted — nothing calls it and its
+  refusals are still asserted. Delete it with its assertions, or wire it to a
+  "pay everybody" control if one is ever wanted.
+
+**Open decisions**
+FN-OD-06 unchanged — this is still net paid to people, not cost to company. New
+and unresolved: **loss of pay lost its editor** when the open-run card went. It
+belongs on the person's own record, where the figures being changed are on
+screen; it is not there yet, and until it is, LOP can only be set through the
+store.
+
+**Verified**
+`npx tsc -b` clean · `eslint` clean · `vite build` clean · **`check:finance`
+318/318**, up from 296: 22 new assertions over the new write — every refusal
+(no reference, duplicate reference, unknown account, nothing due), the slip
+freezing in one write, **a run half paid being a state now**, the run closing
+itself when its last slip is paid, and arrears settling oldest first with July
+carrying suffix 01 and August 02. `check:finance-render` renders every surface;
+its stale open-run assertion was **re-pointed rather than deleted** — the
+guarantee it protected is now the table's own — and the pay dialog's assertions
+moved from the run to the person. All other suites and both Team checks pass.
+**Not checked:** not opened in a browser. Verified through the store, the render
+harness and a production build.
+
+---
+
+### The Active subscriptions figure stops being a chip and becomes a figure
+
+**Area:** `#/finance` — the topbar, every section
+**Files:** `src/admin/views/Finance/{index.tsx,finance.css}`
+
+**What changed**
+
+`Active subscriptions 6` was a bordered pill, tinted green, carrying a status
+dot, with the count inside a **second** bordered well. Four devices for one
+number — and three of them (the tint, the dot, the green label) all said the
+same thing, which was "fine", about a figure that is not a verdict at all.
+
+It also broke the theme's own rule for that row, written into
+`admin-theme.css` beside `.tb-stat`: *the tone is on the FIGURE, never the
+label*. `.fin-scope` coloured the label, the border and the background.
+
+It is now `.tb-stat.ro` — **the shared topbar figure Users already renders**.
+Label, then count, no border, no fill, no dot, no tone. Finance and Users read
+as one panel instead of two, and this module owns no styling for a row it does
+not own. **39 lines of CSS deleted, 0 added.**
+
+**Temp data**
+`none`.
+
+**Backend needed**
+`none`.
+
+**Open decisions**
+`none`. If a second figure is ever wanted there it gets `.tb-sep` between them
+and still no new class — stated in the comment left where the rules used to be,
+because the next person's instinct will be to add one.
+
+**Verified**
+`npx tsc -b` clean · `eslint` clean · `vite build` clean · `check:finance-render`
+renders every surface with no failures · all nine offline suites and both Team
+checks pass. `.fin-scope` has no live rule and no live class left — the two
+remaining mentions are the comments explaining why it went.
+**Not checked:** not viewed in a browser. This is a markup-and-CSS change, so
+the checks prove it compiles and still renders, not that it looks right — worth
+a glance before you move on.
+
+---
+
+### A Sample tab inside the record dialog — the demo you can actually find
+
+**Area:** `#/finance?face=subscriptions` → Record a subscription → **Sample & use cases**
+**Files:** `src/admin/views/Finance/SubSamples.tsx` (new),
+`src/admin/views/Finance/SubModals.tsx`, `scripts/fn-smoke.tsx`
+
+**What changed**
+
+The demo data existed and nothing surfaced it — you had to know which business
+to pick. The dialog now has **two tabs**, and the second one is a worked example
+of every case the flow supports.
+
+It is **built from the live seed, not written beside it.** Every business name,
+quotation number and amount on the tab is read from the store at render, so it
+cannot drift into describing a flow the module no longer has; if a case's data
+is recorded or removed, that case says so instead of lying. The two walkable
+cases carry a **Use this** button that fills the Record tab in and switches to
+it — which is the point of the tab, because the chain is easier to understand by
+watching a quotation populate four fields than by reading that it will.
+
+Six cases: complete payment from the chain · installments from the chain · no
+quotation at all (the website path) · what a finished one looks like, linking to
+both seeded demos · what gets refused and the code each refusal returns · and
+the one thing that is **not** refused, a quotation whose invoices are
+deliberately unequal slices of its total.
+
+**It comes out in four edits.** The header of `SubSamples.tsx` carries the list,
+and every site is tagged `SAMPLE TAB`, so `grep -rn "SAMPLE TAB" src scripts`
+finds all of them. It is also **already off in a production build** —
+`SAMPLES_ON` is `import.meta.env.MODE !== "prod"` — so shipping it by accident
+is not the risk; leaving it in place after the flow it demonstrates has changed
+is, which is why the removal list is a list and not a suggestion.
+
+No new CSS: the tab strip is the panel's existing `Tabs` primitive and every
+other class already existed.
+
+**Temp data**
+`none` — the tab adds no records. It reads the seeds added earlier today.
+
+**Backend needed**
+`none`. Delete the file at integration.
+
+**Open decisions**
+`none`.
+
+**Verified**
+`npx tsc -b` clean · `eslint` clean · **both builds run and the difference was
+checked, not assumed**: `--mode dev` contains the tab; `--mode prod` does not —
+`SubSamples`, "Sample &", "Complete payment, from the chain" and the rest are
+all absent from the prod bundle, tree-shaken behind the constant-folded flag.
+`check:finance-render` gained 2 assertions (the tab is reachable; the record tab
+is the one that opens) and renders every surface. `check:finance` 296/296 and
+every other suite unchanged and passing.
+**Not checked:** the harness renders statically, so it proves the tab strip is
+there and the Record tab is default — **it does not click through to the Sample
+tab or press Use this.** Those two are unverified until somebody opens it in a
+browser. The proto seeds still ship in a prod bundle, as they do for Users and
+Team; that is the frontend-first arrangement and it ends when the seeds do, not
+with this tab.
+
+---
+
+### Two chain-recorded subscriptions in the seed, so the finished shape can be read
+
+**Area:** `#/finance?face=subscriptions` — the list, and both record screens
+**Files:** `src/content/finance/{subscriptions,quotations,invoices}.json`,
+`src/admin/views/Finance/SubModals.tsx`, `scripts/check-finance-ledger.cjs`
+
+**What changed**
+
+The chain could be walked but its output could not be looked at — every
+subscription in the seed predated it. **SUB-0110 and SUB-0111 are what the
+dialog produces**, already recorded, so the finished shape reads without anybody
+having to record one first. Both are demos: nothing in them was typed, and every
+field traces to a document.
+
+- **SUB-0110 · complete payment.** Bhatia Ply & Hardware, Growth 3 months,
+  ₹28,320, from `IB-QT-2026-00160` on `DL-2481`. One installment, paid,
+  receipted. `paidInFull` is true because the **quotation agreed one
+  installment** — not because one row happens to be in the array.
+- **SUB-0111 · a running plan.** Meera Studio Interiors, Signature 12 months,
+  ₹2,12,400 as three of ₹70,800, from `IB-QT-2026-00161` on `DL-2488`. First
+  paid and receipted, second invoiced and waiting, **third with no invoice at
+  all** — the chain has not raised it. So the subscription has three
+  installments and two invoices, which is the ordinary mid-life state and the
+  one most screens get wrong: anything inferring the plan by counting documents
+  reports it as a two-installment sale.
+
+Three chains are deliberately left **unrecorded** so the dialog still has
+something to walk: Iyer Woodworks and Verve (complete payment), Desai Interiors
+(3 installments).
+
+One code change came with them: a chain-recorded subscription's `planId` was
+`PL-QUOTED`, which announced where it came from rather than naming the plan. It
+is slugged from the quotation's plan name now — `PL-GROWTH`, `PL-SIGNATURE` —
+so it reads like every other id in the module.
+
+**Temp data**
+`subscriptions.json` → 2 new placeholder records (9 → 11), plus its header
+corrected, which still said a subscription is "ACTIVATED, not merely recorded"
+after yesterday's rename. `quotations.json` → 2 new (10 → 12), both marked in
+their `$comment` as already recorded rather than walkable. `invoices.json` → 1
+new (`00102`, installment 2 of 3, carried and therefore not attachable) and two
+existing ones joined to their quotations.
+
+**Backend needed**
+Nothing new. These are records the existing
+`POST /admin/finance/subscriptions` would have written.
+
+**Open decisions**
+None new. Worth restating because the demo depends on it: a subscription's
+installment count comes from its quotation and never from counting invoices.
+
+**Verified**
+`npx tsc -b` clean · `eslint` clean · `vite build` clean · **`check:finance`
+296/296**, up from 285: 11 new assertions over the two demos — `paidInFull`
+agreeing with the quotation rather than the row count, the money matching the
+invoice exactly, three installments against two invoices, and the sum matching
+the quotation's agreed total. **One existing assertion changed and it was not a
+copy edit:** CAC is spend ÷ customers won that month, so two more August
+subscriptions moved it from ₹7,375 over four customers to ₹4,916.67 over six.
+The number was updated and the comment now says it tracks the seed, because the
+next person to add an August row will hit it too. All other suites and both Team
+checks pass.
+**Not checked:** not opened in a browser — verified through the store, the
+render harness and a production build.
+
+---
+
+### Recording a subscription reads the chain: pick the business, the quotation answers the rest
+
+**Area:** `#/finance?face=subscriptions` → Record a subscription
+**Files:** `src/content/finance/quotations.json` (new), `src/content/finance/invoices.json`,
+`src/admin/views/Finance/{store.ts,SubModals.tsx}`,
+`scripts/{check-finance-ledger.cjs,fn-smoke.tsx}`
+
+**What changed**
+
+The dialog used to ask an operator for four things that already existed on two
+documents: the plan, the term, the total and the number of installments.
+**Picking the business now resolves the chain** — deal → quotation → invoice —
+and the quotation answers all four.
+
+The quotation is where a sale's shape is agreed; the invoice is one installment
+of it. So the plan and the term are read from the quotation, the money from the
+invoice, and **the installment count from the quotation** — never from counting
+the invoices that exist, because the chain raises one per installment *as each
+falls due*, and a running three-installment sale usually has one document. The
+seed carries that exact case so the mistake fails the suite rather than looking
+plausible.
+
+**Only accepted quotations are offered.** A rejected one is not shown and then
+refused; it is not shown, because a subscription cannot be recorded on a sale
+that did not happen. Where a business has no quotation at all — a website
+purchase — the manual path is unchanged and the dropdown is a real choice again.
+
+**The store enforces what the dialog derives.** If an invoice came from an
+accepted quotation, a different installment count is refused with
+`plan_mismatch`, naming both numbers. The dialog can never send a mismatch; the
+guard exists for every other caller, and for the day somebody adds one.
+
+Two smaller consequences. **The channel question disappears when a quotation is
+attached** — a quotation is a sales close by definition, and asking anyway
+invites the answer that contradicts the document. And where the quotation's
+agreed total and the invoices actually raised do not match, that is **stated,
+not blocked**: a quotation agrees a total, its installments need not be equal
+slices of it, and the invoice wins because it is what was billed.
+
+**Temp data**
+`quotations.json` → **new, 10 placeholder records.** It shadows an endpoint that
+is already live (`GET /admin/quotations/`), which this convention normally
+forbids — `membership-plans.json` was deleted for exactly that. It is here for
+the same reason `invoices.json` beside it is, and its `$comment` says so
+plainly: Finance is frontend-first, its cross-module reads are seeded together
+so the chain resolves with no backend, and **both files come out in the same
+commit**. Seeding half a chain leaves it broken in the middle, which is worse.
+`invoices.json` → one new record (`00101`) and two existing ones linked to
+quotations. The shape is a projection of the live `QuotationRow`, field names
+identical, so the swap is a mapping and not a redesign.
+Three businesses are now walkable end to end: Iyer Woodworks and Verve
+(complete payment), Desai Interiors (3 installments, 1 invoice raised).
+
+**Backend needed**
+- `GET /admin/quotations/?party=<userId>&status=accepted` → replaces
+  `quotations.json`. Needs the plan line's `planName`, `termMonths`,
+  `installments`, `installmentGapMonths` and the totals — the live
+  `QuotationItemRow` already carries every one.
+- `POST /admin/finance/subscriptions` must apply the **plan_mismatch** guard
+  server-side. The client cannot be the only thing holding it.
+- No new field on the subscription: the quotation is reached **through the
+  invoice**, the same way the deal is. One path to the answer.
+
+**Open decisions**
+FN-OD-14 (one supply, several tax invoices) is unchanged. New and worth stating:
+a quotation's installments are **not** required to be equal — `IB-QT-2026-00147`
+in the seed is three unequal ones — so nothing may divide a total by a count to
+find an installment amount. The invoices say what each one is.
+
+**Verified**
+`npx tsc -b` clean · `eslint src/admin/views/Finance --max-warnings=0` clean ·
+`vite build` clean · **`check:finance` 285/285**, up from 263: 22 new assertions
+covering the chain — every invoice's quotation exists and belongs to the same
+customer, quotation tax adds up, a rejected quotation is not offered, the
+already-recorded quotation names its subscription, the three-installment
+quotation has one invoice and the count still reads 3, and the `plan_mismatch`
+guard fires with both numbers in the message. `check:finance-render` renders
+every surface, its "pick the customer" assertion updated to the new wording.
+All seven other offline suites and both Team checks pass.
+**Not checked:** the dialog has not been opened in a browser — verified through
+the store, the render harness and a production build.
+
+---
+
+### Recording a subscription, not activating one — and eight invoices so the flow can be walked
+
+**Area:** `#/finance?face=subscriptions` — the top-right button, the record dialog,
+the subscription record
+**Files:** `src/admin/views/Finance/{SubModals,Subscriptions,SubscriptionDetail,store,types}.ts(x)`,
+`src/content/finance/{invoices,subscriptions,vocabularies}.json`,
+`scripts/{check-finance-ledger.cjs,fn-smoke.tsx}`
+
+**What changed**
+
+**"Activate a subscription" is "Record a subscription"** — the top-right button, the
+dialog, the submit, the event type and the stored `activatedAt` / `activatedBy`, which
+are `recordedAt` / `recordedBy`. The word was overclaiming: this screen never entitled
+anybody, the **invoice** does, and every other face of this module already says it
+records what happened (FN-AD-01). Entitlement is unchanged — recording a subscription
+still makes it live from its start date.
+
+**Deal reference is gone from the subscription.** It was a hand-typed second copy of
+something the attached invoice already carries, so the deal → invoice → installment
+chain could be read two ways and would eventually answer differently — and the copy
+that disagreed would always have been the typed one. `Chain` now reads the deal from
+the invoice, so the strip still resolves and there is one path to the answer.
+
+**Installments are a dropdown, and "Complete payment" is the top option.** It is the
+label on **one** installment rather than a sixth choice beside it, because one
+installment *is* complete payment — offering both would put two options in the list
+that write the identical row. Picking it drops the "× 1" from the total and prints
+**Paid in full** in the schedule instead of "Installment 1 of 1". `paidInFull` is
+stored rather than derived from `installments.length === 1`, because a schedule can be
+cancelled down to one surviving row and that is a different story about the same
+subscription. The notice is explicit that complete payment is still only an
+installment: it has to be paid before anything counts as collected.
+
+**Eight invoices were added so the module can actually be tested.** Every invoice in
+the seed was already carried by a subscription or belonged to one of seven customers,
+so picking any of the other twenty businesses dead-ended on "this customer has no
+invoice to attach" — a true message in front of an untestable screen. Fourteen
+customers now have one. One of them is intra-state (Delhi → Delhi), so the CGST+SGST
+split renders somewhere rather than only IGST.
+
+**A ninth invoice unlocked a check that could not be written before.** The ledger
+suite carried a note saying no customer held both an unbilled installment and a spare
+issued invoice of a *different* amount, so "one invoice bills one installment, for what
+that installment is" could only be asserted through the picker — and it ended with
+*"when a seed row eventually makes it reachable, this is the comment to delete."*
+`IB-INV-2026-00101` is that row, and the write-level guard is asserted directly now,
+with a fixture check so it fails loudly rather than silently passing if a later seed
+change takes it away again.
+
+**Temp data**
+`invoices.json` → **9 new placeholder records**, all `issued` / `unpaid` and attached to
+nothing, so each is selectable exactly once and recording against one removes it from
+the next list. No `dealRef` on any of them: a website purchase has none, and null says
+so rather than inventing one. `subscriptions.json` → `activatedAt`/`activatedBy`
+renamed, `customer.dealRef` removed from all 9 rows, `paidInFull` backfilled from the
+schedule length. `vocabularies.json` → static copy: `SUBSCRIPTION_ACTIVATED` is
+`SUBSCRIPTION_RECORDED`, labelled "Subscription recorded".
+
+**Backend needed**
+- `POST /admin/finance/subscriptions` → **FN-T01, renamed.** No `dealRef` in the body;
+  the deal is reached through the invoice. `installmentCount: 1` means paid in full and
+  the response should carry `paidInFull` rather than leaving it to be inferred.
+- The stored subscription drops `customer.dealRef` and renames `activatedAt` →
+  `recordedAt`, `activatedBy` → `recordedBy`. Event key `SUBSCRIPTION_RECORDED`.
+- Everything else in Module 6's table is unchanged.
+
+**Open decisions**
+FN-OD-14 (one supply appearing as several tax invoices) is untouched and still open —
+"complete payment" narrows it in practice, since a subscription bought outright raises
+one invoice rather than several, but it does not resolve the question.
+
+**Verified**
+`npx tsc -b` clean · `eslint src/admin/views/Finance --max-warnings=0` clean ·
+`vite build` clean · **`check:finance` 263/263** (up from 260 assertions: two renamed,
+one newly reachable and now asserted at the write) · `check:finance-render` renders
+every surface, with its four copy assertions rewritten to the new wording rather than
+deleted · the other seven offline suites and both Team checks still pass.
+**Not checked:** the dialog has not been opened in a browser — this is verified through
+the store, the render harness and a production build. **Concurrency note:** this module
+was being edited in a second session earlier the same day; its last write was 18:58 and
+these changes were made after it, but they have not been merged with anything that
+session may still be holding.
+
+---
+
 ## 2026-08-30
 
 ### The header pill names what it counts, and Collected opens what it counted

@@ -75,7 +75,7 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter }: Fac
         <span className="spacer" />
         {writable
           ? <button className="btn pri" onClick={onRecord}>
-              <Icon name="plus" size="sm" />Activate a subscription
+              <Icon name="plus" size="sm" />Record a subscription
             </button>
           : null}
       </>}
@@ -181,7 +181,7 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter }: Fac
             ? <button className="btn" onClick={() => onUnfilter("*")}>Clear all filters</button>
             : writable
               ? <button className="btn pri" onClick={onRecord}>
-                  <Icon name="plus" size="sm" />Activate a subscription
+                  <Icon name="plus" size="sm" />Record a subscription
                 </button>
               : null} />
       )}
@@ -246,7 +246,6 @@ function Row({ r, p }: { r: SubRow; p: Params }) {
         <div className="cell-1">{s.customer.name}</div>
         <div className="cell-2">
           <span className="mono">{s.subscriptionId}</span>
-          {s.customer.dealRef ? <> · <span className="mono">{s.customer.dealRef}</span></> : null}
         </div>
       </td>
       <td>

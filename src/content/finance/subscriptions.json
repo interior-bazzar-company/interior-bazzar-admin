@@ -1,5 +1,5 @@
 {
-  "$comment": "PLACEHOLDER RECORDS — a subscription is ACTIVATED, not merely recorded: activation is what entitles the customer to the plan, and it runs against the invoice raised for it.  — subscriptions and the installments that settle them. Replaced by GET /admin/finance/subscriptions and GET /admin/finance/subscriptions/{id}. THE INSTALLMENT IS THE UNIT THAT GETS PAID, not the subscription and not a part of one: one installment, one payment, in full, and Σ of a subscription's installment amounts equals its totalPaise exactly. There is no part-payment field because there is no part-paid installment to record it against. `due` is the absence of an event, not a claim about one; `fail_to_pay` is evidence — a gateway response, or a due date that passed with nothing against it — and it carries that evidence in `failure`. Every payment below is a row that already exists in the money-in ledger, carrying the same paymentId, amount, mode, reference, value date and account; where `bankLineId` names a statement line, the amount and the reference on that line are the same ones written here. `bankLineId: null` means the money is real and the statement covering it has not been imported yet — normal, not a defect. Integer paise throughout. The clock is asOf 2026-08-25T09:00:00+05:30, and the only dates after it are `endDate`, which is where the service term runs to, and the `dueDate` of a `due` installment, which is the whole point of one.",
+  "$comment": "PLACEHOLDER RECORDS — subscriptions and the installments that settle them. A subscription is RECORDED (renamed from activated, 2026-08-31): the INVOICE is what entitles the customer, and recording writes down a sale that already happened. It still goes live immediately. Replaced by GET /admin/finance/subscriptions and GET /admin/finance/subscriptions/{id}. THE INSTALLMENT IS THE UNIT THAT GETS PAID, not the subscription and not a part of one: one installment, one payment, in full, and Σ of a subscription's installment amounts equals its totalPaise exactly. There is no part-payment field because there is no part-paid installment to record it against. `due` is the absence of an event, not a claim about one; `fail_to_pay` is evidence — a gateway response, or a due date that passed with nothing against it — and it carries that evidence in `failure`. Every payment below is a row that already exists in the money-in ledger, carrying the same paymentId, amount, mode, reference, value date and account; where `bankLineId` names a statement line, the amount and the reference on that line are the same ones written here. `bankLineId: null` means the money is real and the statement covering it has not been imported yet — normal, not a defect. Integer paise throughout. The clock is asOf 2026-08-25T09:00:00+05:30, and the only dates after it are `endDate`, which is where the service term runs to, and the `dueDate` of a `due` installment, which is the whole point of one.",
   "generatedAt": "2026-08-25T09:00:00+05:30",
   "subscriptions": [
     {
@@ -7,8 +7,7 @@
       "source": "sales",
       "customer": {
         "name": "Priya Nair",
-        "userId": "IB-U-1041",
-        "dealRef": "DL-3310"
+        "userId": "IB-U-1041"
       },
       "planId": "PL-STARTER",
       "planName": "Starter",
@@ -65,7 +64,7 @@
         },
         {
           "eventId": "SE-0101-1",
-          "type": "SUBSCRIPTION_ACTIVATED",
+          "type": "SUBSCRIPTION_RECORDED",
           "actor": "A. Sharma",
           "actorRole": "Sales",
           "at": "2026-08-11T10:42:00+05:30",
@@ -73,16 +72,16 @@
         }
       ],
       "invoiceNumber": "IB-INV-2026-00081",
-      "activatedBy": "A. Sharma",
-      "activatedAt": "2026-08-11T10:42:00+05:30"
+      "paidInFull": true,
+      "recordedBy": "A. Sharma",
+      "recordedAt": "2026-08-11T10:42:00+05:30"
     },
     {
       "subscriptionId": "SUB-0102",
       "source": "sales",
       "customer": {
         "name": "Sandeep Kulkarni",
-        "userId": "IB-U-1200",
-        "dealRef": "DL-2396"
+        "userId": "IB-U-1200"
       },
       "planId": "PL-GROWTH",
       "planName": "Growth",
@@ -184,7 +183,7 @@
         },
         {
           "eventId": "SE-0102-1",
-          "type": "SUBSCRIPTION_ACTIVATED",
+          "type": "SUBSCRIPTION_RECORDED",
           "actor": "A. Sharma",
           "actorRole": "Sales",
           "at": "2026-08-10T11:15:00+05:30",
@@ -192,16 +191,16 @@
         }
       ],
       "invoiceNumber": "IB-INV-2026-00087",
-      "activatedBy": "R. Menon",
-      "activatedAt": "2026-08-10T11:15:00+05:30"
+      "paidInFull": false,
+      "recordedBy": "R. Menon",
+      "recordedAt": "2026-08-10T11:15:00+05:30"
     },
     {
       "subscriptionId": "SUB-0103",
       "source": "website",
       "customer": {
         "name": "Farah Qureshi",
-        "userId": "IB-U-1118",
-        "dealRef": "DL-2390"
+        "userId": "IB-U-1118"
       },
       "planId": "PL-STARTER",
       "planName": "Starter",
@@ -263,7 +262,7 @@
         },
         {
           "eventId": "SE-0103-1",
-          "type": "SUBSCRIPTION_ACTIVATED",
+          "type": "SUBSCRIPTION_RECORDED",
           "actor": "System",
           "actorRole": "System",
           "at": "2026-08-08T17:44:00+05:30",
@@ -271,16 +270,16 @@
         }
       ],
       "invoiceNumber": "IB-INV-2026-00079",
-      "activatedBy": "Website",
-      "activatedAt": "2026-08-08T17:44:00+05:30"
+      "paidInFull": true,
+      "recordedBy": "Website",
+      "recordedAt": "2026-08-08T17:44:00+05:30"
     },
     {
       "subscriptionId": "SUB-0104",
       "source": "website",
       "customer": {
         "name": "Aarav Pillai",
-        "userId": "IB-U-1173",
-        "dealRef": null
+        "userId": "IB-U-1173"
       },
       "planId": "PL-AUTOGROWTH",
       "planName": "AutoGrowth",
@@ -347,7 +346,7 @@
         },
         {
           "eventId": "SE-0104-1",
-          "type": "SUBSCRIPTION_ACTIVATED",
+          "type": "SUBSCRIPTION_RECORDED",
           "actor": "System",
           "actorRole": "System",
           "at": "2026-08-21T09:02:00+05:30",
@@ -355,16 +354,16 @@
         }
       ],
       "invoiceNumber": null,
-      "activatedBy": "Website",
-      "activatedAt": "2026-08-21T09:02:00+05:30"
+      "paidInFull": false,
+      "recordedBy": "Website",
+      "recordedAt": "2026-08-21T09:02:00+05:30"
     },
     {
       "subscriptionId": "SUB-0105",
       "source": "sales",
       "customer": {
         "name": "Rohan Mehta",
-        "userId": "IB-U-1142",
-        "dealRef": "DL-2402"
+        "userId": "IB-U-1142"
       },
       "planId": "PL-SCALE",
       "planName": "Scale",
@@ -403,7 +402,7 @@
         },
         {
           "eventId": "SE-0105-1",
-          "type": "SUBSCRIPTION_ACTIVATED",
+          "type": "SUBSCRIPTION_RECORDED",
           "actor": "A. Sharma",
           "actorRole": "Sales",
           "at": "2026-07-28T16:20:00+05:30",
@@ -411,16 +410,16 @@
         }
       ],
       "invoiceNumber": "IB-INV-2026-00085",
-      "activatedBy": "A. Sharma",
-      "activatedAt": "2026-07-28T16:20:00+05:30"
+      "paidInFull": true,
+      "recordedBy": "A. Sharma",
+      "recordedAt": "2026-07-28T16:20:00+05:30"
     },
     {
       "subscriptionId": "SUB-0106",
       "source": "sales",
       "customer": {
         "name": "Meera Iyer",
-        "userId": "IB-U-1201",
-        "dealRef": "DL-2291"
+        "userId": "IB-U-1201"
       },
       "planId": "PL-GROWTH",
       "planName": "Growth — 1 month",
@@ -478,7 +477,7 @@
         },
         {
           "eventId": "SE-0106-1",
-          "type": "SUBSCRIPTION_ACTIVATED",
+          "type": "SUBSCRIPTION_RECORDED",
           "actor": "A. Sharma",
           "actorRole": "Sales",
           "at": "2026-07-20T11:30:00+05:30",
@@ -486,16 +485,16 @@
         }
       ],
       "invoiceNumber": "IB-INV-2026-00074",
-      "activatedBy": "R. Menon",
-      "activatedAt": "2026-07-20T11:30:00+05:30"
+      "paidInFull": true,
+      "recordedBy": "R. Menon",
+      "recordedAt": "2026-07-20T11:30:00+05:30"
     },
     {
       "subscriptionId": "SUB-0107",
       "source": "sales",
       "customer": {
         "name": "Vikram Shetty",
-        "userId": "IB-U-1105",
-        "dealRef": "DL-2411"
+        "userId": "IB-U-1105"
       },
       "planId": "PL-GROWTH",
       "planName": "Growth",
@@ -567,7 +566,7 @@
         },
         {
           "eventId": "SE-0107-1",
-          "type": "SUBSCRIPTION_ACTIVATED",
+          "type": "SUBSCRIPTION_RECORDED",
           "actor": "A. Sharma",
           "actorRole": "Sales",
           "at": "2026-08-21T15:10:00+05:30",
@@ -575,16 +574,16 @@
         }
       ],
       "invoiceNumber": "IB-INV-2026-00091",
-      "activatedBy": "A. Sharma",
-      "activatedAt": "2026-08-21T15:10:00+05:30"
+      "paidInFull": false,
+      "recordedBy": "A. Sharma",
+      "recordedAt": "2026-08-21T15:10:00+05:30"
     },
     {
       "subscriptionId": "SUB-0108",
       "source": "website",
       "customer": {
         "name": "Tanvi Bhandari",
-        "userId": "IB-U-1160",
-        "dealRef": null
+        "userId": "IB-U-1160"
       },
       "planId": "PL-STARTER",
       "planName": "Starter",
@@ -646,7 +645,7 @@
         },
         {
           "eventId": "SE-0108-1",
-          "type": "SUBSCRIPTION_ACTIVATED",
+          "type": "SUBSCRIPTION_RECORDED",
           "actor": "System",
           "actorRole": "System",
           "at": "2026-07-30T09:12:00+05:30",
@@ -654,16 +653,16 @@
         }
       ],
       "invoiceNumber": "IB-INV-2026-00071",
-      "activatedBy": "Website",
-      "activatedAt": "2026-07-30T09:12:00+05:30"
+      "paidInFull": true,
+      "recordedBy": "Website",
+      "recordedAt": "2026-07-30T09:12:00+05:30"
     },
     {
       "subscriptionId": "SUB-0109",
       "source": "sales",
       "customer": {
         "name": "Rohan Mehta",
-        "userId": "IB-U-1142",
-        "dealRef": "DL-2402"
+        "userId": "IB-U-1142"
       },
       "planId": "PL-STARTER",
       "planName": "Starter",
@@ -697,7 +696,7 @@
         },
         {
           "eventId": "SE-0109-1",
-          "type": "SUBSCRIPTION_ACTIVATED",
+          "type": "SUBSCRIPTION_RECORDED",
           "actor": "A. Sharma",
           "actorRole": "Sales",
           "at": "2026-07-20T12:00:00+05:30",
@@ -705,8 +704,175 @@
         }
       ],
       "invoiceNumber": null,
-      "activatedBy": "A. Sharma",
-      "activatedAt": "2026-07-20T12:00:00+05:30"
+      "paidInFull": true,
+      "recordedBy": "A. Sharma",
+      "recordedAt": "2026-07-20T12:00:00+05:30"
+    },
+
+    {
+      "$comment": "DEMO · COMPLETE PAYMENT, recorded from the chain. Quotation IB-QT-2026-00160 agreed one payment of ₹28,320 on deal DL-2481; invoice 00098 billed it; the money arrived and the receipt was issued. Every field below came from a document — the plan and the term from the quotation, the money from the invoice — and none of it was typed. It is in the seed so the finished shape can be read without recording one first. `paidInFull` is true because the quotation agreed one installment, NOT because one row happens to be here.",
+      "subscriptionId": "SUB-0110",
+      "source": "sales",
+      "customer": { "name": "Bhatia Ply & Hardware", "userId": "IB-U-0921" },
+      "planId": "PL-GROWTH",
+      "planName": "Growth",
+      "cycleMonths": 3,
+      "totalPaise": 2832000,
+      "startDate": "2026-08-19",
+      "endDate": "2026-11-19",
+      "status": "active",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 1,
+          "dueDate": "2026-08-19",
+          "amountPaise": 2832000,
+          "status": "paid",
+          "invoiceNumber": "IB-INV-2026-00098",
+          "payment": {
+            "paymentId": "PAY-4406",
+            "amountPaise": 2832000,
+            "mode": "NEFT",
+            "reference": "NEFT2026081900418",
+            "valueDate": "2026-08-20",
+            "accountId": "ACC-HDFC-4021",
+            "recordedBy": "A. Sharma",
+            "recordedAt": "2026-08-20T11:15:00+05:30",
+            "receipt": {
+              "number": "IB-RCP-2026-00312",
+              "issuedAt": "2026-08-20T11:16:00+05:30",
+              "sha256": "5c1d7ab390f24e6188c0b5d7ae2f43917cc60e82db4159a7f03e6b2d94711fae"
+            },
+            "bankLineId": null,
+            "proof": null
+          },
+          "failure": null
+        }
+      ],
+      "soldBy": "A. Sharma",
+      "events": [
+        {
+          "eventId": "SE-0110-3",
+          "type": "RECEIPT_ISSUED",
+          "actor": "System",
+          "actorRole": "System",
+          "at": "2026-08-20T11:16:00+05:30",
+          "note": "IB-RCP-2026-00312 generated and frozen against installment 1 of 1."
+        },
+        {
+          "eventId": "SE-0110-2",
+          "type": "INSTALLMENT_PAID",
+          "actor": "A. Sharma",
+          "actorRole": "Sales",
+          "at": "2026-08-20T11:15:00+05:30",
+          "note": "PAY-4406 · ₹28,320 · NEFT2026081900418 · settles IB-INV-2026-00098 in full. Not yet on an imported statement."
+        },
+        {
+          "eventId": "SE-0110-1",
+          "type": "SUBSCRIPTION_RECORDED",
+          "actor": "A. Sharma",
+          "actorRole": "Sales",
+          "at": "2026-08-19T16:40:00+05:30",
+          "note": "Growth recorded on IB-INV-2026-00098 · ₹28,320 paid in full · Sales. Read from IB-QT-2026-00160 on DL-2481. The customer is entitled from 2026-08-19."
+        }
+      ],
+      "invoiceNumber": "IB-INV-2026-00098",
+      "paidInFull": true,
+      "recordedBy": "A. Sharma",
+      "recordedAt": "2026-08-19T16:40:00+05:30"
+    },
+
+    {
+      "$comment": "DEMO · A RUNNING INSTALLMENT PLAN, recorded from the chain, and the state most screens have to get right. Quotation IB-QT-2026-00161 agreed THREE of ₹70,800 on deal DL-2488. Installment 1 is paid and receipted on invoice 00099. Installment 2 has invoice 00102 raised and is waiting. Installment 3 has NO invoice, because the chain raises one as each falls due. So this subscription has three installments and two invoices, and anything that infers the plan by counting documents reports it as a two-installment sale.",
+      "subscriptionId": "SUB-0111",
+      "source": "sales",
+      "customer": { "name": "Meera Studio Interiors", "userId": "IB-U-0912" },
+      "planId": "PL-SIGNATURE",
+      "planName": "Signature",
+      "cycleMonths": 12,
+      "totalPaise": 21240000,
+      "startDate": "2026-08-18",
+      "endDate": "2027-08-18",
+      "status": "active",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 3,
+          "dueDate": "2026-08-18",
+          "amountPaise": 7080000,
+          "status": "paid",
+          "invoiceNumber": "IB-INV-2026-00099",
+          "payment": {
+            "paymentId": "PAY-4407",
+            "amountPaise": 7080000,
+            "mode": "NEFT",
+            "reference": "NEFT2026081900622",
+            "valueDate": "2026-08-19",
+            "accountId": "ACC-HDFC-4021",
+            "recordedBy": "S. Bhat",
+            "recordedAt": "2026-08-19T15:05:00+05:30",
+            "receipt": {
+              "number": "IB-RCP-2026-00313",
+              "issuedAt": "2026-08-19T15:06:00+05:30",
+              "sha256": "9f0a4e21c8b73d5560e1af98274c3b0d6e5a17f4923cb80d1e6f75a2c30b849d"
+            },
+            "bankLineId": null,
+            "proof": null
+          },
+          "failure": null
+        },
+        {
+          "seq": 2,
+          "of": 3,
+          "dueDate": "2026-09-18",
+          "amountPaise": 7080000,
+          "status": "due",
+          "invoiceNumber": "IB-INV-2026-00102",
+          "payment": null,
+          "failure": null
+        },
+        {
+          "seq": 3,
+          "of": 3,
+          "dueDate": "2026-10-18",
+          "amountPaise": 7080000,
+          "status": "due",
+          "invoiceNumber": null,
+          "payment": null,
+          "failure": null
+        }
+      ],
+      "soldBy": "S. Bhat",
+      "events": [
+        {
+          "eventId": "SE-0111-3",
+          "type": "RECEIPT_ISSUED",
+          "actor": "System",
+          "actorRole": "System",
+          "at": "2026-08-19T15:06:00+05:30",
+          "note": "IB-RCP-2026-00313 generated and frozen against installment 1 of 3."
+        },
+        {
+          "eventId": "SE-0111-2",
+          "type": "INSTALLMENT_PAID",
+          "actor": "S. Bhat",
+          "actorRole": "Finance",
+          "at": "2026-08-19T15:05:00+05:30",
+          "note": "PAY-4407 · ₹70,800 · NEFT2026081900622 · settles IB-INV-2026-00099. Two installments remain."
+        },
+        {
+          "eventId": "SE-0111-1",
+          "type": "SUBSCRIPTION_RECORDED",
+          "actor": "S. Bhat",
+          "actorRole": "Finance",
+          "at": "2026-08-18T12:25:00+05:30",
+          "note": "Signature recorded on IB-INV-2026-00099 · ₹2,12,400 in 3 installments of ₹70,800 · Sales. Read from IB-QT-2026-00161 on DL-2488. The customer is entitled from 2026-08-18."
+        }
+      ],
+      "invoiceNumber": "IB-INV-2026-00099",
+      "paidInFull": false,
+      "recordedBy": "S. Bhat",
+      "recordedAt": "2026-08-18T12:25:00+05:30"
     }
   ]
 }

@@ -527,41 +527,17 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
 .fin-derived b { color: var(--text); font-weight: var(--weight-semibold) }
 
 /* ------------------------------------------------ the topbar figure --- */
-/* The one figure the topbar carries, on every section. A COUNT, not money:
-   a rupee total with no formula and no caution beside it, repeated above
-   every page, is a number nobody can check — so money stays on the tiles of
-   the section that computes it, where its i button is.
+/* THERE IS NO CSS HERE ANY MORE, and that is the change.
 
-   Named `.fin-scope` and not `.fin-chip` because `.fin-chips` already
-   exists and means the filter row. One letter apart is how a rule lands on
-   something it was never written for. */
-.fin-scope {
-  display: inline-flex; align-items: center; gap: var(--space-2);
-  height: var(--control-md); padding: 0 4px 0 var(--space-3);
-  border-radius: var(--radius-full); border: 1px solid var(--line-2);
-  background: var(--bg-inset); color: var(--text-2);
-  white-space: nowrap; max-width: 100%;
-}
-/* The status dot, and the label it belongs to. The label is the quiet half:
-   it names the figure, and the figure is what the eye should land on. */
-.fin-scope i { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: var(--text-3) }
-.fin-scope .k {
-  overflow: hidden; text-overflow: ellipsis;
-  font-size: var(--text-sm); font-weight: var(--weight-medium);
-  letter-spacing: .01em;
-}
-/* The count sits in its own well, so it reads as a figure rather than as the
-   last word of the sentence beside it. */
-.fin-scope b {
-  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
-  min-width: 24px; height: 24px; padding: 0 7px; border-radius: var(--radius-full);
-  background: var(--bg); border: 1px solid var(--line-2);
-  font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--text);
-}
-.fin-scope.ok { background: var(--ok-bg); border-color: var(--ok-line); color: var(--ok) }
-.fin-scope.ok i { background: var(--ok-solid) }
-.fin-scope.ok .k { color: var(--ok) }
-.fin-scope.ok b { background: var(--bg); border-color: var(--ok-line); color: var(--ok) }
-/* Narrow topbars drop the words and keep the dot and the figure — the count
-   is the part that cannot be inferred from anything else on screen. */
-@media (max-width: 760px) { .fin-scope .k { display: none } .fin-scope { padding-left: var(--space-2) } }
+   `.fin-scope` was a bordered pill, tinted green, carrying a status dot and
+   the count inside a second bordered well — four devices for one number, and
+   three of them (tint, dot, green label) all saying the same thing. It also
+   broke the theme's own rule for this row: the tone goes on the FIGURE and
+   never on the label.
+
+   Finance now uses `.tb-stat.ro`, the shared topbar figure Users already
+   renders, so the two sections read as one panel and this module owns no
+   styling for a row it does not own. The markup is in index.tsx.
+
+   If a second figure is ever added here, it gets `.tb-sep` between them and
+   still no new class. */
