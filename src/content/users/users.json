@@ -1,8 +1,8 @@
 {
-  "$comment": "Stands in for GET /api/v1/admin/users (the directory page) and GET /api/v1/admin/users/{id} (the workspace). ONE row per registered identity — `authUserId` is the link to Authentication, never a copy of it, and there is deliberately NO is_member / classification column anywhere in this file: Normal User, Active Member, Paused, Suspended, Former Member and Deactivated are all DERIVED at read time from memberships.json by classify() in store.ts (UM-FR-003, UM-AD-02). `userStatus` is the account-level status and is a separate fact from any membership state — a Deactivated user and a Former Member are different things and are never merged. `notes[]` and `tags[]` are INTERNAL: they must never appear on a customer-facing profile response (UM-BR-17), which is why they live beside the profile and not inside it. `commercial` holds READ-ONLY references into Deals / Invoicing / Finance — no amount is stored here, because this module owns no money (UM-BR-06). Names, emails and phone numbers are FICTIONAL but complete and unmasked, so duplicate checks and search have something real to work on.",
+  "$comment": "Stands in for GET /api/v1/admin/users (the directory page) and GET /api/v1/admin/users/{id} (the workspace). ONE row per registered identity — `authUserId` is the link to Authentication, never a copy of it, and there is deliberately NO classification column anywhere in this file: Active and Deactivated are DERIVED at read time from `userStatus` by classify() in store.ts (UM-FR-003, UM-AD-02). This file carries NO membership, plan, term or entitlement field of any kind — what a customer bought is a subscription and that is a Finance record; two modules holding one fact is how they end up disagreeing. `notes[]` and `tags[]` are INTERNAL: they must never appear on a customer-facing profile response (UM-BR-17), which is why they live beside the profile and not inside it. `commercial` holds READ-ONLY references into Deals / Invoicing / Finance — no amount is stored here, because this module owns no money (UM-BR-06). Names, emails and phone numbers are FICTIONAL but complete and unmasked, so duplicate checks and search have something real to work on.",
   "generatedAt": "2026-08-25T09:00:00+05:30",
   "asOf": "2026-08-25T09:00:00+05:30",
-  "$comment_asOf": "Every derived classification, age and expiring-soon window on these screens is computed against this instant rather than the browser clock, so the seed reads the same tomorrow as it does today. store.ts is the only place that decides that.",
+  "$comment_asOf": "Every derived age and registration window on these screens is computed against this instant rather than the browser clock, so the seed reads the same tomorrow as it does today. store.ts is the only place that decides that.",
   "users": [
     {
       "userId": "IB-U-1041",
@@ -83,8 +83,7 @@
           "DL-3310"
         ],
         "invoiceRefs": []
-      },
-      "activeMembershipId": null
+      }
     },
     {
       "userId": "IB-U-1038",
@@ -146,8 +145,7 @@
         "salesOwner": null,
         "dealRefs": [],
         "invoiceRefs": []
-      },
-      "activeMembershipId": null
+      }
     },
     {
       "userId": "IB-U-1029",
@@ -194,8 +192,7 @@
         "salesOwner": null,
         "dealRefs": [],
         "invoiceRefs": []
-      },
-      "activeMembershipId": null
+      }
     },
     {
       "userId": "IB-U-1012",
@@ -278,8 +275,7 @@
           "DL-3287"
         ],
         "invoiceRefs": []
-      },
-      "activeMembershipId": null
+      }
     },
     {
       "userId": "IB-U-0975",
@@ -372,8 +368,7 @@
         "invoiceRefs": [
           "INV-2025-0912"
         ]
-      },
-      "activeMembershipId": "IB-MB-0975-1"
+      }
     },
     {
       "userId": "IB-U-0958",
@@ -455,8 +450,7 @@
         "invoiceRefs": [
           "INV-2026-0511"
         ]
-      },
-      "activeMembershipId": null
+      }
     },
     {
       "userId": "IB-U-0944",
@@ -524,8 +518,7 @@
         "invoiceRefs": [
           "INV-2026-0122"
         ]
-      },
-      "activeMembershipId": "IB-MB-0944-1"
+      }
     },
     {
       "userId": "IB-U-0921",
@@ -608,8 +601,7 @@
         "invoiceRefs": [
           "INV-2025-0640"
         ]
-      },
-      "activeMembershipId": null
+      }
     },
     {
       "userId": "IB-U-0912",
@@ -703,8 +695,7 @@
           "INV-2024-0210",
           "INV-2025-0447"
         ]
-      },
-      "activeMembershipId": "IB-MB-0912-3"
+      }
     },
     {
       "userId": "IB-U-0899",
@@ -767,8 +758,7 @@
         "invoiceRefs": [
           "INV-2025-0988"
         ]
-      },
-      "activeMembershipId": "IB-MB-0899-1"
+      }
     },
     {
       "userId": "IB-U-0880",
@@ -845,8 +835,7 @@
           "INV-2024-0388",
           "INV-2026-0447"
         ]
-      },
-      "activeMembershipId": "IB-MB-0880-2"
+      }
     },
     {
       "userId": "IB-U-0867",
@@ -918,8 +907,7 @@
         "invoiceRefs": [
           "INV-2025-0870"
         ]
-      },
-      "activeMembershipId": "IB-MB-0867-1"
+      }
     },
     {
       "userId": "IB-U-0834",
@@ -991,8 +979,7 @@
         "invoiceRefs": [
           "INV-2025-0322"
         ]
-      },
-      "activeMembershipId": "IB-MB-0834-1"
+      }
     },
     {
       "userId": "IB-U-0812",
@@ -1062,8 +1049,7 @@
         "salesOwner": "A. Sharma",
         "dealRefs": [],
         "invoiceRefs": []
-      },
-      "activeMembershipId": null
+      }
     },
     {
       "userId": "IB-U-0790",
@@ -1135,8 +1121,7 @@
         "invoiceRefs": [
           "INV-2025-0201"
         ]
-      },
-      "activeMembershipId": "IB-MB-0790-1"
+      }
     },
     {
       "userId": "IB-U-0745",
@@ -1216,8 +1201,7 @@
         "invoiceRefs": [
           "INV-2025-0104"
         ]
-      },
-      "activeMembershipId": "IB-MB-0745-1"
+      }
     },
     {
       "userId": "IB-U-0702",
@@ -1285,8 +1269,7 @@
         "invoiceRefs": [
           "INV-2025-0055"
         ]
-      },
-      "activeMembershipId": null
+      }
     },
     {
       "userId": "IB-U-0688",
@@ -1362,8 +1345,7 @@
           "INV-2024-0501",
           "INV-2026-0233"
         ]
-      },
-      "activeMembershipId": "IB-MB-0688-2"
+      }
     },
     {
       "userId": "IB-U-0655",
@@ -1433,8 +1415,7 @@
         "invoiceRefs": [
           "INV-2024-0498"
         ]
-      },
-      "activeMembershipId": null
+      }
     },
     {
       "userId": "IB-U-0601",
@@ -1483,8 +1464,441 @@
         "salesOwner": null,
         "dealRefs": [],
         "invoiceRefs": []
+      }
+    },
+    {
+      "userId": "IB-U-1200",
+      "authUserId": "auth_1200c1200",
+      "registrationSource": "web",
+      "userStatus": "active",
+      "registeredAt": "2025-08-19T10:20:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-24T18:30:00+05:30",
+      "identity": {
+        "name": "Sandeep Kulkarni",
+        "email": "sandeep@sk-interiors-example.in",
+        "emailVerified": true,
+        "phone": "+91 98200 41155",
+        "phoneVerified": true
       },
-      "activeMembershipId": null
+      "profile": {
+        "profileId": "PRF-1200",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "sandeep-kulkarni",
+        "about": "SK Interiors — a Finance customer, registered on the platform like any other.",
+        "businessName": "SK Interiors",
+        "businessType": "firm_studio",
+        "dealsIn": [
+          "services"
+        ],
+        "segments": [
+          "interior_designer"
+        ],
+        "categories": [
+          "residential"
+        ],
+        "searchKeywords": [
+          "Complete home interiors"
+        ],
+        "targetAreas": [
+          {
+            "state": "Maharashtra",
+            "cities": [
+              "Mumbai"
+            ]
+          }
+        ],
+        "positioning": [
+          "premium"
+        ],
+        "updatedBy": "Sandeep Kulkarni",
+        "updatedAt": "2025-08-19T10:20:00+05:30"
+      },
+      "tags": [],
+      "notes": [],
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-2396"
+        ],
+        "invoiceRefs": [
+          "IB-INV-2026-00088",
+          "IB-INV-2026-00089",
+          "IB-INV-2026-00087"
+        ]
+      }
+    },
+    {
+      "userId": "IB-U-1201",
+      "authUserId": "auth_1201c1201",
+      "registrationSource": "web",
+      "userStatus": "active",
+      "registeredAt": "2025-07-02T12:05:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-24T18:30:00+05:30",
+      "identity": {
+        "name": "Meera Iyer",
+        "email": "meera@iyer-woodworks-example.in",
+        "emailVerified": true,
+        "phone": "+91 98400 20931",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-1201",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "meera-iyer",
+        "about": "Iyer Woodworks — a Finance customer, registered on the platform like any other.",
+        "businessName": "Iyer Woodworks",
+        "businessType": "manufacturer",
+        "dealsIn": [
+          "services"
+        ],
+        "segments": [
+          "interior_designer"
+        ],
+        "categories": [
+          "residential"
+        ],
+        "searchKeywords": [
+          "Complete home interiors"
+        ],
+        "targetAreas": [
+          {
+            "state": "Tamil Nadu",
+            "cities": [
+              "Chennai"
+            ]
+          }
+        ],
+        "positioning": [
+          "custom"
+        ],
+        "updatedBy": "Meera Iyer",
+        "updatedAt": "2025-07-02T12:05:00+05:30"
+      },
+      "tags": [],
+      "notes": [],
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-2291"
+        ],
+        "invoiceRefs": [
+          "IB-INV-2026-00092",
+          "IB-INV-2026-00074"
+        ]
+      }
+    },
+    {
+      "userId": "IB-U-1105",
+      "authUserId": "auth_1105c1105",
+      "registrationSource": "web",
+      "userStatus": "active",
+      "registeredAt": "2026-03-11T09:45:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-24T18:30:00+05:30",
+      "identity": {
+        "name": "Vikram Shetty",
+        "email": "vikram@shetty-modulars-example.in",
+        "emailVerified": true,
+        "phone": "+91 98450 77120",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-1105",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "vikram-shetty",
+        "about": "Shetty Modulars — a Finance customer, registered on the platform like any other.",
+        "businessName": "Shetty Modulars",
+        "businessType": "manufacturer",
+        "dealsIn": [
+          "services"
+        ],
+        "segments": [
+          "interior_designer"
+        ],
+        "categories": [
+          "residential"
+        ],
+        "searchKeywords": [
+          "Complete home interiors"
+        ],
+        "targetAreas": [
+          {
+            "state": "Karnataka",
+            "cities": [
+              "Mangaluru"
+            ]
+          }
+        ],
+        "positioning": [
+          "custom"
+        ],
+        "updatedBy": "Vikram Shetty",
+        "updatedAt": "2026-03-11T09:45:00+05:30"
+      },
+      "tags": [],
+      "notes": [],
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-2411"
+        ],
+        "invoiceRefs": [
+          "IB-INV-2026-00091"
+        ]
+      }
+    },
+    {
+      "userId": "IB-U-1118",
+      "authUserId": "auth_1118c1118",
+      "registrationSource": "web",
+      "userStatus": "active",
+      "registeredAt": "2026-04-02T16:30:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-24T18:30:00+05:30",
+      "identity": {
+        "name": "Farah Qureshi",
+        "email": "farah@fq-design-example.in",
+        "emailVerified": true,
+        "phone": "+91 98490 33017",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-1118",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "farah-qureshi",
+        "about": "FQ Design House — a Finance customer, registered on the platform like any other.",
+        "businessName": "FQ Design House",
+        "businessType": "firm_studio",
+        "dealsIn": [
+          "services"
+        ],
+        "segments": [
+          "interior_designer"
+        ],
+        "categories": [
+          "residential"
+        ],
+        "searchKeywords": [
+          "Complete home interiors"
+        ],
+        "targetAreas": [
+          {
+            "state": "Telangana",
+            "cities": [
+              "Hyderabad"
+            ]
+          }
+        ],
+        "positioning": [
+          "premium"
+        ],
+        "updatedBy": "Farah Qureshi",
+        "updatedAt": "2026-04-02T16:30:00+05:30"
+      },
+      "tags": [],
+      "notes": [],
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-2390"
+        ],
+        "invoiceRefs": [
+          "IB-INV-2026-00079",
+          "IB-INV-2026-00080"
+        ]
+      }
+    },
+    {
+      "userId": "IB-U-1142",
+      "authUserId": "auth_1142c1142",
+      "registrationSource": "web",
+      "userStatus": "active",
+      "registeredAt": "2026-06-18T11:15:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-24T18:30:00+05:30",
+      "identity": {
+        "name": "Rohan Mehta",
+        "email": "rohan@mehta-furnishings-example.in",
+        "emailVerified": true,
+        "phone": "+91 98220 61884",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-1142",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "rohan-mehta",
+        "about": "Mehta & Co Furnishings — a Finance customer, registered on the platform like any other.",
+        "businessName": "Mehta & Co Furnishings",
+        "businessType": "dealer",
+        "dealsIn": [
+          "services"
+        ],
+        "segments": [
+          "interior_designer"
+        ],
+        "categories": [
+          "residential"
+        ],
+        "searchKeywords": [
+          "Complete home interiors"
+        ],
+        "targetAreas": [
+          {
+            "state": "Maharashtra",
+            "cities": [
+              "Pune"
+            ]
+          }
+        ],
+        "positioning": [
+          "budget_friendly"
+        ],
+        "updatedBy": "Rohan Mehta",
+        "updatedAt": "2026-06-18T11:15:00+05:30"
+      },
+      "tags": [],
+      "notes": [],
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-2402"
+        ],
+        "invoiceRefs": [
+          "IB-INV-2026-00085"
+        ]
+      }
+    },
+    {
+      "userId": "IB-U-1160",
+      "authUserId": "auth_1160c1160",
+      "registrationSource": "web",
+      "userStatus": "active",
+      "registeredAt": "2026-07-24T14:00:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-24T18:30:00+05:30",
+      "identity": {
+        "name": "Tanvi Bhandari",
+        "email": "tanvi@bhandari-interiors-example.in",
+        "emailVerified": true,
+        "phone": "+91 98221 45590",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-1160",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "tanvi-bhandari",
+        "about": "Bhandari Interiors — a Finance customer, registered on the platform like any other.",
+        "businessName": "Bhandari Interiors",
+        "businessType": "firm_studio",
+        "dealsIn": [
+          "services"
+        ],
+        "segments": [
+          "interior_designer"
+        ],
+        "categories": [
+          "residential"
+        ],
+        "searchKeywords": [
+          "Complete home interiors"
+        ],
+        "targetAreas": [
+          {
+            "state": "Maharashtra",
+            "cities": [
+              "Pune"
+            ]
+          }
+        ],
+        "positioning": [
+          "custom"
+        ],
+        "updatedBy": "Tanvi Bhandari",
+        "updatedAt": "2026-07-24T14:00:00+05:30"
+      },
+      "tags": [],
+      "notes": [],
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-2455"
+        ],
+        "invoiceRefs": [
+          "IB-INV-2026-00071"
+        ]
+      }
+    },
+    {
+      "userId": "IB-U-1173",
+      "authUserId": "auth_1173c1173",
+      "registrationSource": "web",
+      "userStatus": "active",
+      "registeredAt": "2026-08-21T10:05:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-24T18:30:00+05:30",
+      "identity": {
+        "name": "Aarav Pillai",
+        "email": "aarav@pillai-home-example.in",
+        "emailVerified": true,
+        "phone": "+91 98470 12266",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-1173",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "aarav-pillai",
+        "about": "Pillai Home Studio — a Finance customer, registered on the platform like any other.",
+        "businessName": "Pillai Home Studio",
+        "businessType": "firm_studio",
+        "dealsIn": [
+          "services"
+        ],
+        "segments": [
+          "interior_designer"
+        ],
+        "categories": [
+          "residential"
+        ],
+        "searchKeywords": [
+          "Complete home interiors"
+        ],
+        "targetAreas": [
+          {
+            "state": "Kerala",
+            "cities": [
+              "Kochi"
+            ]
+          }
+        ],
+        "positioning": [
+          "budget_friendly"
+        ],
+        "updatedBy": "Aarav Pillai",
+        "updatedAt": "2026-08-21T10:05:00+05:30"
+      },
+      "tags": [],
+      "notes": [],
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [],
+        "invoiceRefs": []
+      }
     }
   ]
 }

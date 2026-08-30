@@ -41,11 +41,32 @@ src/content/business-enquiries/
 
 src/content/users/
   users.json            → GET /admin/users and /admin/users/{id}
-  memberships.json      → GET /admin/users/{id}/memberships, /admin/memberships/{id}
   analytics.json        → GET /admin/users/analytics  (month-keyed)
   audit.json            → GET /admin/users/{id}/timeline
   vocabularies.json     → GET /admin/users/vocabularies
+
+src/content/team/
+  members.json          → GET /admin/team/members  (the team-WIDE read; the live
+                          endpoint returns only self-created members)
+  attendance.json       → GET /admin/team/attendance?date= and …/{id}?from&to
+  work.json             → GET /admin/team/work and /admin/team/work/{id}
+  plans.json            → GET /admin/team/plans?date=
+  reports.json          → GET /admin/team/reports?date=
+  vocabularies.json     → GET /admin/team/vocabularies
 ```
+
+`src/content/team/` is worth reading for rule 6. Most of it is placeholder
+records, but `vocabularies.json` is **static copy that carries a rule**:
+`attendanceStates[].stored` is `false` for `absent` and `unclosed`, and that
+key is the reason neither is ever written. A vocabulary usually holds labels;
+this one holds the distinction between what is recorded and what is computed,
+which is the module's central claim, stated once where both the panel and a
+backend engineer read it.
+
+Two of its seeds also demonstrate the convention's least obvious consequence:
+**an absence is the lack of a row.** No member carries a record saying "absent"
+and no plan carries one saying "none" — the screens derive both from the roster
+minus what exists, so a day view and a roll-up cannot disagree about who was in.
 
 `membership-plans.json` was here and is **deleted** — a counter-example to the
 whole convention. A stand-in is for an endpoint that does not exist yet;
@@ -56,7 +77,7 @@ live endpoint, the answer is to read the endpoint.
 `analytics.json` is worth a note as a counter-example to rule 2 below. It does
 **not** carry the headline counts — total users, Normal Users, Active Members,
 expiring soon, the status mix — because the client can derive all of those from
-`users.json` + `memberships.json` using the same derivation the directory
+`users.json` using the same derivation the directory
 filters on. Deriving them means a dashboard tile and the list it drills into
 cannot disagree; serving them separately means they eventually will. Shape a
 payload like the endpoint should return, and sometimes the right answer is that

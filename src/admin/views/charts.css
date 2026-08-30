@@ -38,113 +38,116 @@
      · status tokens are reserved for state and are never used as "series 4".
    ============================================================================= */
 
-.um-chart { margin: 0 0 var(--space-2) }
+.ch-chart { margin: 0 0 var(--space-2) }
 
 /* Categorical slots, fixed order, never cycled. */
-.um, .um-rec {
-  --s1: #3f63a0; --s2: #1d7145; --s3: #b8770e;
+.um, .um-rec, .fin {
+  --s1: #3f63a0; --s2: #1d7145; --s3: #9a6512;
   --o1: #8fa8d3; --o2: #3f63a0; --o3: #1a3a6e;
   --h1: #75b8a6; --h2: #0e876c; --h3: #095646;
-  --heat-ink: #ffffff;
+  /* Per step: the lightest fill takes dark ink — white on #75b8a6 was 2.3:1. */
+  --heat-ink-1: #04140f; --heat-ink: #ffffff;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .um,
-  :root:not([data-theme="light"]) .um-rec {
-    --s1: #4a7fd0; --s2: #12a594; --s3: #a17c22;
+  :root:not([data-theme="light"]) .um-rec,
+  :root:not([data-theme="light"]) .fin {
+    --s1: #4a7fd0; --s2: #34b39f; --s3: #a17c22;
     --o1: #31548f; --o2: #4a7fd0; --o3: #8fb2ee;
     --h1: #0e876c; --h2: #12a594; --h3: #1fbfa8;
-    --heat-ink: #04140f;
+    --heat-ink-1: #ffffff; --heat-ink: #04140f;
   }
 }
 :root[data-theme="dark"] .um,
-:root[data-theme="dark"] .um-rec {
+:root[data-theme="dark"] .um-rec,
+:root[data-theme="dark"] .fin {
   --s1: #4a7fd0; --s2: #12a594; --s3: #a17c22;
   --o1: #31548f; --o2: #4a7fd0; --o3: #8fb2ee;
   --h1: #0e876c; --h2: #12a594; --h3: #1fbfa8;
   --heat-ink: #04140f;
 }
 
-.um-chart .sw.s1, .um-chart .fill.s1 { background: var(--s1) }
-.um-chart .sw.s2, .um-chart .fill.s2 { background: var(--s2) }
-.um-chart .sw.s3, .um-chart .fill.s3 { background: var(--s3) }
-.um-chart .fill.o1 { background: var(--o1) }
-.um-chart .fill.o2 { background: var(--o2) }
-.um-chart .fill.o3 { background: var(--o3) }
+.ch-chart .sw.s1, .ch-chart .fill.s1 { background: var(--s1) }
+.ch-chart .sw.s2, .ch-chart .fill.s2 { background: var(--s2) }
+.ch-chart .sw.s3, .ch-chart .fill.s3 { background: var(--s3) }
+.ch-chart .fill.o1 { background: var(--o1) }
+.ch-chart .fill.o2 { background: var(--o2) }
+.ch-chart .fill.o3 { background: var(--o3) }
 /* Reserved status steps. A membership state means something; it is not
    "series 4", and every bar wearing one carries its own status pill. */
-.um-chart .fill.st-ok { background: var(--ok-solid) }
-.um-chart .fill.st-warn { background: var(--warn-solid) }
-.um-chart .fill.st-bad { background: var(--bad-solid) }
-.um-chart .fill.st-mute { background: var(--line-3) }
+.ch-chart .fill.st-ok { background: var(--ok-solid) }
+.ch-chart .fill.st-warn { background: var(--warn-solid) }
+.ch-chart .fill.st-bad { background: var(--bad-solid) }
+.ch-chart .fill.st-mute { background: var(--text-3) }
 
-.um-legend2 { display: flex; gap: var(--space-4); flex-wrap: wrap;
+.ch-legend2 { display: flex; gap: var(--space-4); flex-wrap: wrap;
               margin-bottom: var(--space-3); font-size: var(--text-sm); color: var(--text-2) }
-.um-legend2 span { display: inline-flex; align-items: center; gap: var(--space-2) }
-.um-chart .sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex: 0 0 auto }
-.um-unit { font-size: var(--text-sm); color: var(--text-3); margin-top: var(--space-2) }
+.ch-legend2 span { display: inline-flex; align-items: center; gap: var(--space-2) }
+.ch-chart .sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex: 0 0 auto }
+.ch-unit { font-size: var(--text-sm); color: var(--text-3); margin-top: var(--space-2) }
 
 /* ------------------------------------------------------- grouped columns --- */
 /* One relative box; the ticks, the rules and the columns are three layers
    inside it, all measured from the same top edge. The x labels sit in their own
    band below with a matching left gutter, so nothing has to reserve space for
    them inside the plot. */
-.um-chartbody { position: relative; height: 200px; padding-left: 44px }
-.um-yaxis { position: absolute; left: 0; top: 0; bottom: 0; width: 38px;
+.ch-chartbody { position: relative; height: 200px; padding-left: 44px }
+.ch-yaxis { position: absolute; left: 0; top: 0; bottom: 0; width: 38px;
             font-size: var(--text-xs); color: var(--text-3);
             font-variant-numeric: tabular-nums }
-.um-yaxis span { position: absolute; right: 0; transform: translateY(-50%); line-height: 1 }
-.um-plotarea { position: relative; height: 100% }
+.ch-yaxis span { position: absolute; right: 0; transform: translateY(-50%); line-height: 1 }
+.ch-plotarea { position: relative; height: 100% }
 /* Hairline, solid, one step off the surface. Never dashed — a dashed rule adds
    noise and reads as data. */
-.um-rule { position: absolute; left: 0; right: 0; height: 1px; background: var(--line);
+.ch-rule { position: absolute; left: 0; right: 0; height: 1px; background: var(--line);
            transform: translateY(-50%) }
-.um-groups { position: absolute; inset: 0; display: flex; align-items: flex-end;
+.ch-groups { position: absolute; inset: 0; display: flex; align-items: flex-end;
              gap: var(--space-2) }
-.um-group { position: relative; flex: 1 1 0; min-width: 0; height: 100%;
+.ch-group { position: relative; flex: 1 1 0; min-width: 0; height: 100%;
             display: flex; flex-direction: column; justify-content: flex-end }
-.um-group:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px;
+.ch-group:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px;
                           border-radius: var(--radius-sm) }
 /* 2px of surface between touching bars. The gap is the separator; a stroke
    around a mark would add ink that is not data. */
-.um-cols { display: flex; align-items: flex-end; justify-content: center; gap: 2px; height: 100% }
+.ch-cols { display: flex; align-items: flex-end; justify-content: center; gap: 2px; height: 100% }
 /* Capped thin — never fill the slot; the band's leftover is air. */
-.um-col { position: relative; flex: 1 1 auto; max-width: 22px; min-height: 1px;
+.ch-col { position: relative; flex: 1 1 auto; max-width: 22px; min-height: 1px;
           border-radius: 4px 4px 0 0 }
-.um-col em { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+.ch-col em { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
              padding-bottom: 3px; white-space: nowrap; font-style: normal;
              font-size: var(--text-2xs); color: var(--text-2) }
 /* The same left gutter and the same gap as the groups, so every label lands
    under its own group without either side knowing about the other. */
-.um-xband { display: flex; gap: var(--space-2); padding: 5px 0 0 44px }
-.um-xband span { flex: 1 1 0; min-width: 0; text-align: center;
+.ch-xband { display: flex; gap: var(--space-2); padding: 5px 0 0 44px }
+.ch-xband span { flex: 1 1 0; min-width: 0; text-align: center;
                  font-size: var(--text-xs); color: var(--text-3);
                  overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
 
 /* -------------------------------------------------------------- bar rows --- */
-.um-rows { display: flex; flex-direction: column; gap: var(--space-1) }
-.um-row { position: relative; display: grid; align-items: center; gap: var(--space-3);
+.ch-rows { display: flex; flex-direction: column; gap: var(--space-1) }
+.ch-row { position: relative; display: grid; align-items: center; gap: var(--space-3);
           grid-template-columns: minmax(96px, 168px) 1fr 56px minmax(0, 200px);
           padding: var(--space-1) 0 }
-.um-row:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px;
+.ch-row:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px;
                         border-radius: var(--radius-sm) }
-.um-row .lab { display: flex; align-items: center; gap: var(--space-2); min-width: 0;
+.ch-row .lab { display: flex; align-items: center; gap: var(--space-2); min-width: 0;
                font-size: var(--text-sm); color: var(--text-2) }
-.um-row .track { height: 14px; background: var(--bg-inset);
+.ch-row .track { height: 14px; background: var(--bg-inset);
                  border-radius: var(--radius-sm); overflow: hidden }
 /* Rounded at the data end, square at the baseline — the end that means
    something is the end that gets the corner. */
-.um-row .fill { display: block; height: 100%; border-radius: 0 4px 4px 0 }
-.um-row .val { text-align: right; font-size: var(--text-sm);
+.ch-row .fill { display: block; height: 100%; border-radius: 0 4px 4px 0 }
+.ch-row .val { text-align: right; font-size: var(--text-sm);
                font-weight: var(--weight-medium); color: var(--text);
                font-variant-numeric: tabular-nums }
-.um-row .delta { min-width: 0; font-size: var(--text-sm); color: var(--text-3);
+.ch-row .delta { min-width: 0; font-size: var(--text-sm); color: var(--text-3);
                  overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
-.um-rows.funnel .um-row .track { height: 20px }
+.ch-rows.funnel .ch-row .track { height: 20px }
 
 /* --------------------------------------------------------------- tooltip --- */
 /* Hover AND focus. A native `title` waits about a second, cannot be styled, and
    never appears for a keyboard user at all. */
-.um-tip {
+.ch-tip {
   position: absolute; left: 50%; bottom: 100%; z-index: var(--z-pop);
   transform: translate(-50%, -4px); min-width: 176px; margin-bottom: 6px;
   padding: var(--space-2) var(--space-3);
@@ -157,58 +160,53 @@
               transform var(--duration) var(--ease-out),
               visibility var(--duration) var(--ease-out);
 }
-.um-group:hover .um-tip, .um-group:focus-visible .um-tip,
-.um-row:hover .um-tip, .um-row:focus-visible .um-tip {
+.ch-group:hover .ch-tip, .ch-group:focus-visible .ch-tip,
+.ch-row:hover .ch-tip, .ch-row:focus-visible .ch-tip {
   opacity: 1; visibility: visible; transform: translate(-50%, 0);
 }
-.um-tip b { display: block; margin-bottom: 3px; color: var(--text) }
-.um-tip > span { display: flex; align-items: center; gap: var(--space-2); padding: 1px 0 }
-.um-tip em { margin-left: auto; font-style: normal; font-weight: var(--weight-medium);
+.ch-tip b { display: block; margin-bottom: 3px; color: var(--text) }
+.ch-tip > span { display: flex; align-items: center; gap: var(--space-2); padding: 1px 0 }
+.ch-tip em { margin-left: auto; font-style: normal; font-weight: var(--weight-medium);
              color: var(--text); font-variant-numeric: tabular-nums }
-.um-row .um-tip { left: 0; transform: translate(0, -4px); white-space: normal; max-width: 340px }
-.um-row:hover .um-tip, .um-row:focus-visible .um-tip { transform: translate(0, 0) }
+.ch-row .ch-tip { left: 0; transform: translate(0, -4px); white-space: normal; max-width: 340px }
+.ch-row:hover .ch-tip, .ch-row:focus-visible .ch-tip { transform: translate(0, 0) }
 
 /* --------------------------------------------------------------- heatmap --- */
-.um-heatwrap { overflow-x: auto }
-.um-heat { width: 100%; border-collapse: collapse; font-size: var(--text-sm) }
-.um-heat th { padding: var(--space-1) var(--space-2); text-align: left; white-space: nowrap;
+.ch-heatwrap { overflow-x: auto }
+.ch-heat { width: 100%; border-collapse: collapse; font-size: var(--text-sm) }
+.ch-heat th { padding: var(--space-1) var(--space-2); text-align: left; white-space: nowrap;
               font-size: var(--text-2xs); letter-spacing: .08em; text-transform: uppercase;
               color: var(--text-3); font-weight: var(--weight-semibold) }
-.um-heat th[scope="row"] { text-transform: none; letter-spacing: 0;
+.ch-heat th[scope="row"] { text-transform: none; letter-spacing: 0;
                            font-size: var(--text-sm); color: var(--text-2);
                            font-weight: var(--weight-medium) }
-.um-heat th.n, .um-heat td.n { text-align: right }
-.um-heat td { padding: 2px; border: none }
-.um-cell { display: block; padding: 3px 6px; border-radius: var(--radius-xs); text-align: center }
+.ch-heat th.n, .ch-heat td.n { text-align: right }
+.ch-heat td { padding: 2px; border: none }
+.ch-cell { display: block; padding: 3px 6px; border-radius: var(--radius-xs); text-align: center }
 /* The ink is picked by the fill's luminance, so a label inside a coloured cell
    always clears contrast — the one place text may sit on a data colour. */
-.um-cell.h1 { background: var(--h1); color: var(--heat-ink) }
-.um-cell.h2 { background: var(--h2); color: #ffffff }
-.um-cell.h3 { background: var(--h3); color: #ffffff }
-:root[data-theme="dark"] .um-cell.h2, :root[data-theme="dark"] .um-cell.h3 { color: #04140f }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .um-cell.h2,
-  :root:not([data-theme="light"]) .um-cell.h3 { color: #04140f }
-}
-.um-cell.none { background: none; color: var(--text-3) }
-.um-heatkey { display: flex; gap: var(--space-4); flex-wrap: wrap; margin-top: var(--space-3);
+.ch-cell.h1 { background: var(--h1); color: var(--heat-ink-1) }
+.ch-cell.h2 { background: var(--h2); color: var(--heat-ink) }
+.ch-cell.h3 { background: var(--h3); color: var(--heat-ink) }
+.ch-cell.none { background: none; color: var(--text-3) }
+.ch-heatkey { display: flex; gap: var(--space-4); flex-wrap: wrap; margin-top: var(--space-3);
               font-size: var(--text-sm); color: var(--text-3) }
-.um-heatkey span { display: inline-flex; align-items: center; gap: var(--space-2) }
-.um-heatkey .sw.h1 { background: var(--h1) }
-.um-heatkey .sw.h2 { background: var(--h2) }
-.um-heatkey .sw.h3 { background: var(--h3) }
-.um-heatkey .sw.none { background: var(--bg-inset); border: 1px solid var(--line) }
+.ch-heatkey span { display: inline-flex; align-items: center; gap: var(--space-2) }
+.ch-heatkey .sw.h1 { background: var(--h1) }
+.ch-heatkey .sw.h2 { background: var(--h2) }
+.ch-heatkey .sw.h3 { background: var(--h3) }
+.ch-heatkey .sw.none { background: var(--bg-inset); border: 1px solid var(--line) }
 
 /* Narrow: the secondary figure drops to its own line rather than being
    ellipsised into meaninglessness. */
 @container (max-width: 700px) {
-  .um-row { grid-template-columns: minmax(88px, 140px) 1fr 48px }
-  .um-row .delta { grid-column: 2 / -1; white-space: normal }
-  .um-chartbody { height: 170px }
+  .ch-row { grid-template-columns: minmax(88px, 140px) 1fr 48px }
+  .ch-row .delta { grid-column: 2 / -1; white-space: normal }
+  .ch-chartbody { height: 170px }
 }
 
 /* Forced colours: fills collapse to system colours, so marks take a visible
    border and the heat cells fall back to the number they already carry. */
 @media (forced-colors: active) {
-  .um-row .fill, .um-col, .um-cell { border: 1px solid CanvasText }
+  .ch-row .fill, .ch-col, .ch-cell { border: 1px solid CanvasText }
 }

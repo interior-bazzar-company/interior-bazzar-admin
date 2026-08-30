@@ -40,6 +40,34 @@ const ICON_OF: Record<string, string> = {
   audit: "history",
   "business-enquiries": "route",
   users: "users",
+  finance: "cash",
+  "finance-salaries": "team",
+  "finance-transactions": "out",
+  "finance-refunds": "refund",
+  "finance-analytics": "chart",
+  attendance: "clock",
+  work: "check",
+  reports: "inbox",
+};
+
+/* ------------------------------------------------------- group override ---
+   The server sends each module's `groupLabel`, and that is normally the whole
+   answer. `team` and `roles` are the exception: their rows say "Settings",
+   which was right while Team meant "add a staff account and grant it a role" —
+   configuration, done rarely. It stops being right the moment Attendance, Work
+   and Reports sit beside them, because those are the most-visited screens in
+   the panel and Settings is the one group nobody opens daily.
+
+   So the two are re-filed client-side, next to the surfaces they belong with.
+   This is a STAND-IN, not the design: `groupLabel` is the server's field and
+   the fix is a Module-row update, at which point this map empties and the
+   behaviour does not change. Listed as work in BACKEND-INTEGRATION.md.
+
+   Note it re-files rather than renames: a key absent here keeps whatever the
+   server said, so a new server group still appears rather than vanishing. */
+const GROUP_OVERRIDE: Record<string, string> = {
+  team: "Team",
+  roles: "Team",
 };
 
 /* ---------------------------------------------------------- proto rows ---
@@ -59,12 +87,46 @@ const PROTO_ROWS: { key: string; label: string; group: string }[] = [
      one for the next frontend-first module, and `users` is that module. */
 
   /* Business Ops · Users Management. A NEW GROUP, not a row inside Sales: the
-     registered-user base and the membership lifecycle are neither a sales
-     pipeline nor a setting, and filing them under either would have been a
+     registered-user base is neither a sales pipeline nor a setting, and filing
+     it under either would have been a
      filing decision pretending to be a product one. The group is empty apart
      from this until the rest of Business Ops lands, and a group of one is the
      honest state of that rather than a reason to hide it somewhere else. */
   { key: "users", label: "Users Management", group: "Business Ops" },
+  /* Finance · FIVE ROWS, ONE GROUP, because Finance records four different
+     things and reads them back in a fifth place. A single row labelled
+     "Finance" inside a group labelled "Finance" said nothing about what was
+     inside it, and buried the five sections one click deep behind an in-page
+     tab strip nobody could see from the sidebar.
+
+     They are separate KEYS rather than one key with five faces because the
+     grant is genuinely different: payroll is the most sensitive record in the
+     panel, and `finance-salaries` has to be holdable — or withholdable —
+     without touching the subscription ledger. Same argument that made
+     `reports` its own key rather than a face of `work`.
+
+     Order is the order money moves: what was sold, what the team costs,
+     everything else, what went back out, then all four read together. */
+  { key: "finance", label: "Subscriptions", group: "Finance" },
+  { key: "finance-salaries", label: "Salaries A/C", group: "Finance" },
+  { key: "finance-transactions", label: "Other Transaction", group: "Finance" },
+  { key: "finance-refunds", label: "Refunds", group: "Finance" },
+  { key: "finance-analytics", label: "Analytics", group: "Finance" },
+
+  /* Team · the operational half. `Members` and `Roles` are already real server
+     rows and are NOT listed here — they are re-filed into this group by
+     GROUP_OVERRIDE above. These three are the surfaces that do not exist
+     server-side at all yet, so they carry the proto gate like Users and Finance
+     did. Order inside the group is arrival order, and it is the order of a
+     working day: who is here, what they are doing, what they reported.
+
+     `reports` is its own key rather than a face of `work` because the verb it
+     needs is not the same one: reading everybody's daily plans and EOD reports
+     is a manager's grant, and it must be possible to hold it without holding
+     the right to create or reassign anybody's work. */
+  { key: "attendance", label: "Attendance", group: "Team" },
+  { key: "work", label: "Work", group: "Team" },
+  { key: "reports", label: "Reports", group: "Team" },
 ];
 /** Sidebar queue-count keys, from IBData.derive.badges(). A module with no
  * entry here shows no badge, which is correct for anything the prototype
@@ -82,7 +144,19 @@ const Q_OF: Record<string, string> = {
 
    A group not named here keeps its arrival order, after the named ones: a new
    server group appears rather than silently vanishing. */
-const GROUP_ORDER = ["Sales", "Client Ops", "Business Ops", "Catalogue", "Settings"];
+const GROUP_ORDER = [
+  "Sales",
+  "Client Ops",
+  "Business Ops",
+  /* Team sits above Finance and well above Settings because it is opened every
+     day — the clock, the day's work and the day's reports — and Settings is the
+     group nobody opens daily. Same argument that moved Users Management out of
+     Settings into Business Ops. */
+  "Team",
+  "Finance",
+  "Catalogue",
+  "Settings",
+];
 
 export function getModules(): ModuleGroup[] {
   const s = getSession();
@@ -106,7 +180,7 @@ export function getModules(): ModuleGroup[] {
       q: Q_OF[key],
     });
   };
-  mods.forEach((m) => put(m.key, m.label, m.groupLabel || ""));
+  mods.forEach((m) => put(m.key, m.label, GROUP_OVERRIDE[m.key] || m.groupLabel || ""));
   /* Appended last and only if the server did not send the key, so a real
      Module row always takes precedence over the proto stand-in. Also gated on
      a session existing at all: a signed-out browser must see no nav. */

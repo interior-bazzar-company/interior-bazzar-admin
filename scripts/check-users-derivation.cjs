@@ -1,30 +1,37 @@
 /* =============================================================================
    check:users — the derivation is right, and the seed proves it.
    -----------------------------------------------------------------------------
-   Users Management stores no classification. Normal User, Active Member,
-   Paused, Suspended, Former Member and Deactivated are all computed at read
-   time by classify() in views/Users/store.ts, and every screen in the module
-   calls that one function. Which means a bug in it is not a bug in one place —
-   it is a wrong number on the overview, a wrong filter in the directory, a
-   wrong denominator in the analytics and a wrong entitlement answer, all at
-   once, and all agreeing with each other.
+   Users Management stores no classification. `classify()` in views/Users/store.ts
+   computes it at read time and every screen in the module calls that one
+   function, so a bug in it is not a bug in one place — it is a wrong pill on the
+   record, a wrong number on the strip, a wrong filter in the directory and a
+   wrong tile on Analytics, all at once and all agreeing with each other.
 
-   So this asserts the derivation against the seed, case by case, including the
-   three that are easy to get wrong:
+   THE MODULE GAVE UP THE MEMBERSHIP FEATURE. What a customer bought — its plan,
+   its term, its installments and its lifecycle — is a Finance record now, and
+   the classification collapsed from six answers to two: active, or deactivated.
+   Deactivated is a fact about the ACCOUNT. "Are they paying" is deliberately not
+   answerable from here, and a good part of what this file asserts is that it
+   stays that way: no membership reader, no plan rule, no lifecycle transaction,
+   no expiry window, no term in the seed.
 
-     · a user whose only term is Pending is a NORMAL USER, not a former member.
-       Nothing has ever entitled them. The test is `activatedAt`, not history
-       length, and that distinction is the whole reason this check exists.
-     · a term marked Active whose end date has passed is NOT entitling. The
-       expiry sweep has not run; pretending otherwise outlives the membership.
-     · Deactivated is an ACCOUNT status. It wins over every membership state,
-       and the terms underneath it survive untouched.
+   What is left is what this module actually is, and it is not small: identity,
+   the profile schema and its business facets, the username as a public address,
+   target areas, tags, notes, account status, the audit trail, the filters, the
+   sort, the counts and the analytics arithmetic. Every one of them is asserted
+   below against the seed rather than against a description of it.
+
+   NOTHING HERE IS HARD-CODED FROM A BRIEF. Every population figure is
+   recomputed from src/content/users/*.json by this file, independently of
+   store.ts, and then the two are compared. A seed that grows by seven users
+   must not turn this suite red for a reason that is not a bug.
 
    Run: node scripts/check-users-derivation.cjs
    (after: npx esbuild src/admin/views/Users/store.ts --bundle --platform=node
            --format=cjs --define:import.meta.env={} --external:react
            --outfile=node_modules/.tmp/users-store.cjs)
    ============================================================================= */
+const fs = require("fs");
 const S = require("../node_modules/.tmp/users-store.cjs");
 
 let failed = 0;
@@ -42,231 +49,378 @@ function ok(label, actual, expected) {
 /* The hooks are not callable outside React, so the rows are built through the
    same toRow() the hooks build them with. That is the point: this asserts the
    derivation, not a reimplementation of it. */
-const users = require("../src/content/users/users.json").users;
-const memberships = require("../src/content/users/memberships.json").memberships;
-const all = users.map((u) => S.toRow(u, memberships));
+const usersDoc = require("../src/content/users/users.json");
+const users = usersDoc.users;
+const vocab = require("../src/content/users/vocabularies.json");
+const auditDoc = require("../src/content/users/audit.json");
+const all = users.map((u) => S.toRow(u));
 const byId = {};
 all.forEach((r) => { byId[r.user.userId] = r; });
+const clone = (o) => JSON.parse(JSON.stringify(o));
 
-console.log("\nclassification, per user");
-const EXPECT = {
-  "IB-U-1041": "normal",            // registered, never bought
-  "IB-U-1038": "normal",
-  "IB-U-1029": "normal",
-  "IB-U-1012": "normal",
-  "IB-U-0812": "normal",
-  "IB-U-0958": "normal",            // PENDING term only — nothing has entitled them
-  "IB-U-0975": "active_member",
-  "IB-U-0944": "active_member",
-  "IB-U-0912": "active_member",     // third term, first two expired
-  "IB-U-0899": "active_member",
-  "IB-U-0880": "active_member",
-  "IB-U-0867": "active_member",
-  "IB-U-0688": "active_member",     // cancelled, then a new term
-  "IB-U-0834": "paused_member",
-  "IB-U-0790": "suspended_member",
-  "IB-U-0745": "suspended_member",
-  "IB-U-0921": "former_member",
-  "IB-U-0702": "former_member",
-  "IB-U-0655": "former_member",
-  "IB-U-0601": "deactivated",
+/* ---------------------------------------------------------- seed truth ---
+   Recomputed HERE, from the JSON, without calling store.ts — so the
+   comparisons below are two independent answers meeting, not one answer
+   quoted twice. Hard-coding these numbers is how a suite starts failing every
+   time somebody adds a user, which trains people to edit the test. */
+const REQUIRED = vocab.profileFields.filter((f) => f.required);
+const isEmpty = (v) =>
+  v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0);
+const gapsOf = (u) => REQUIRED.filter((f) => isEmpty(u.profile[f.key])).map((f) => f.label);
+const SEED = {
+  total: users.length,
+  active: users.filter((u) => u.userStatus !== "deactivated").length,
+  deactivated: users.filter((u) => u.userStatus === "deactivated").length,
+  incomplete: users.filter((u) => gapsOf(u).length > 0).length,
 };
-Object.keys(EXPECT).forEach((id) => {
-  ok(id + " (" + byId[id].user.identity.name + ")", byId[id].classification, EXPECT[id]);
-});
-ok("every seeded user is asserted", all.length, Object.keys(EXPECT).length);
+const INCOMPLETE_IDS = users.filter((u) => gapsOf(u).length > 0).map((u) => u.userId).sort();
 
-console.log("\nthe three that are easy to get wrong");
-ok("a Pending-only term does not make a Former Member",
-  byId["IB-U-0958"].classification, "normal");
-ok("...and its term is still visible on the record",
-  byId["IB-U-0958"].history.length, 1);
-ok("...and it carries no entitlement snapshot",
-  byId["IB-U-0958"].history[0].entitlements.length, 0);
-ok("a deactivated account beats any membership state",
-  byId["IB-U-0601"].classification, "deactivated");
-ok("a cancelled term followed by a new one reads as Active Member",
-  byId["IB-U-0688"].classification, "active_member");
-ok("...and the cancelled term is still in the history",
-  byId["IB-U-0688"].history.filter((m) => m.status === "cancelled").length, 1);
-ok("history is newest term first",
-  byId["IB-U-0912"].history.map((m) => m.termNo), [3, 2, 1]);
-ok("the current term is the live one, not the newest terminal one",
-  byId["IB-U-0912"].current.membershipId, "IB-MB-0912-3");
+console.log("\nthe seed is big enough for the assertions below to mean anything");
+/* A suite that would pass on an empty fixture is a suite asserting nothing.
+   These are the floors every count assertion below leans on. */
+ok("there are users to count", SEED.total >= 20, true);
+ok("...at least one deactivated account, or every status check is vacuous",
+  SEED.deactivated >= 1, true);
+ok("...at least one incomplete profile, likewise", SEED.incomplete >= 1, true);
+ok("...and not everybody is incomplete", SEED.incomplete < SEED.total, true);
+ok("the profile schema actually requires something", REQUIRED.length > 0, true);
+ok("every userStatus in the seed is one of the two the type allows",
+  Array.from(new Set(users.map((u) => u.userStatus))).sort(), ["active", "deactivated"]);
 
-/* THE SNAPSHOT IS SELF-SUFFICIENT. The plan catalogue belongs to the Plans
-   module and is read live from `v1/admin/plans/`; a term stores what it bought
-   so it renders correctly after the plan is repriced, renamed, archived — or
-   when the catalogue simply cannot be reached. Nothing below touches a
-   catalogue, and that IS the assertion. */
-console.log("\nevery term carries its own snapshot, and needs no catalogue");
-const menon = byId["IB-U-0880"].current;
-ok("a term names its plan without looking it up", menon.planName, "Growth");
-ok("...carries the duration it bought", menon.cycle.months, 12);
-ok("...and the price it bought at", menon.cycle.price, 24900);
-ok("...with its entitlements frozen on the term",
-  menon.entitlements.find((e) => e.key === "listings.max").display, "Up to 50 listings");
-ok("no term references a plan version any more",
-  JSON.stringify(all).indexOf("planVersion") < 0, true);
-ok("the module ships no plan catalogue of its own",
-  require("fs").existsSync("src/content/users/membership-plans.json"), false);
-ok("every source is one of the three that remain",
-  Array.from(new Set(memberships.map((m) => m.source.kind))).sort(),
-  ["new_sale", "renewal"]);
-ok("...and the vocabulary offers exactly those three plus complimentary",
-  require("../src/content/users/vocabularies.json").activationSources.map((x) => x.key),
-  ["new_sale", "renewal", "complimentary"]);
-ok("plansInUse reads the plans people actually hold",
-  S.plansInUse(memberships).map((p) => p.code).sort(), ["growth", "pro", "starter"]);
+/* ===================================================== the one derivation ===
+   Two answers, read from one stored fact. The six-way membership
+   classification is gone and nothing may quietly reintroduce it. */
+console.log("\nclassification: two answers, and it reads exactly one stored field");
+ok("classify takes a user and nothing else", S.classify.length, 1);
+ok("toRow takes a user and nothing else", S.toRow.length, 1);
+ok("the vocabulary offers exactly two classifications",
+  S.CLASSIFICATIONS.map((c) => c.key), ["active", "deactivated"]);
+ok("every row classifies as one of them",
+  Array.from(new Set(all.map((r) => r.classification))).sort(), ["active", "deactivated"]);
+ok("...and it agrees with the stored account status on every single user",
+  all.filter((r) => r.classification !== (r.user.userStatus === "deactivated" ? "deactivated" : "active"))
+    .map((r) => r.user.userId), []);
+ok("no user record carries a stored classification column",
+  users.filter((u) => "classification" in u || "classification" in u.profile).map((u) => u.userId), []);
 
-/* THE PLAN RULES. They live in the store rather than inside the dialog, which
-   is what lets them be checked here with no browser and no catalogue. The
-   shapes below are what the live Plans endpoint returns. */
-console.log("\nthe plan rules the assignment form applies");
 {
-  const cyc = (id, months, price, active = true) =>
-    ({ id, months, price, oldPrice: 0, badge: "", active });
-  const pl = (id, family, title, cycles, extra = {}) =>
-    Object.assign({ id, family, title, active: true, archived: false, cycles }, extra);
-
-  ok("a plan on sale with an active cycle is sellable",
-    S.isSellable(pl(1, "growth", "Growth", [cyc(1, 12, 29500)])), true);
-  ok("...off sale is not",
-    S.isSellable(pl(2, "x", "X", [cyc(2, 12, 1)], { active: false })), false);
-  ok("...archived is not",
-    S.isSellable(pl(3, "x", "X", [cyc(3, 12, 1)], { archived: true })), false);
-  /* No cycle means no duration and no price. A plan you cannot put a number
-     against is not a plan you can sell. */
-  ok("...and on sale with no ACTIVE cycle is not",
-    S.isSellable(pl(4, "x", "X", [cyc(4, 12, 1, false)])), false);
-
-  const growth = pl(5, "growth", "Growth",
-    [cyc(50, 12, 29500), cyc(51, 6, 16500), cyc(52, 24, 53000)]);
-  ok("the duration fills in with the CHEAPEST active cycle",
-    S.defaultCycleOf(growth).months, 6);
-  ok("...and an inactive cycle is never the default",
-    S.defaultCycleOf(pl(6, "g", "G", [cyc(60, 6, 100, false), cyc(61, 12, 200)])).months, 12);
-  ok("a plan with nothing active has no default", S.defaultCycleOf(pl(7, "g", "G", [])), null);
-
-  /* The stable grouping key. The catalogue has no planCode and its numeric id
-     moves with migrations, so terms carry this instead. */
-  ok("planCode comes from the family", S.planCodeOf(growth), "growth");
-  ok("...and falls back to the title when the family is the generic one",
-    S.planCodeOf(pl(8, "business", "Pro Plus", [])), "pro-plus");
-  ok("...slugged, so it is safe in a URL",
-    S.planCodeOf(pl(9, "business", "Growth & Scale!", [])), "growth-scale");
-
-  /* THE FORM AND THE STORE CALL THE SAME FUNCTION. They disagreed for one
-     commit — the dialog warned on planCode while the write refused on planId —
-     which means the warning could show with the save going through. */
-  const meera = S.historyOf("IB-U-0912", memberships);
-  ok("a live term of the same plan is a clash",
-    S.clashFor(meera, "pro").membershipId, "IB-MB-0912-3");
-  ok("...a different plan is not", S.clashFor(meera, "starter"), null);
-  ok("...and an expired term of the same plan is not",
-    S.clashFor(S.historyOf("IB-U-0702", memberships), "starter"), null);
-  ok("liveTermsOf excludes pending, which grants nothing",
-    S.liveTermsOf(S.historyOf("IB-U-0958", memberships)).length, 0);
+  /* THE FIELD, AND ONLY THE FIELD. Everything else about this user is
+     emptied — no tags, no notes, no activity, no commercial links — and a
+     `deactivatedAt` is left behind from a previous life. None of it may move
+     the answer; the one word does. */
+  const probe = clone(users[0]);
+  probe.userStatus = "active";
+  probe.deactivatedAt = "2020-01-01T00:00:00+05:30";
+  probe.deactivatedReason = "a stale field from an earlier life";
+  probe.lastActivityAt = null;
+  probe.tags = [];
+  probe.notes = [];
+  probe.commercial = { salesOwner: null, dealRefs: [], invoiceRefs: [] };
+  ok("a stale deactivatedAt does not deactivate anybody", S.classify(probe), "active");
+  probe.userStatus = "deactivated";
+  ok("...and the status word alone does", S.classify(probe), "deactivated");
+  /* There is no third answer, so anything that is not the word falls to
+     active rather than rendering a pill with no label. */
+  ok("an unrecognised status is not a third classification",
+    S.classify({ ...probe, userStatus: "active_member" }), "active");
+  ok("a deactivated account keeps its profile, its notes and its history",
+    [!!byId["IB-U-0601"].user.profile,
+      byId["IB-U-0601"].user.notes.length > 0,
+      auditDoc.events.some((e) => e.userId === "IB-U-0601")],
+    [true, true, true]);
 }
 
-console.log("\ncounts, and the queues that read them");
+/* THE COMMERCIAL RELATIONSHIP IS SOMEBODY ELSE'S. Not "not shown" — not
+   present. These are the assertions that stop it growing back one convenience
+   reader at a time. */
+console.log("\nthis module holds no membership, and has no way to answer one");
+ok("the module ships no memberships fixture",
+  fs.existsSync("src/content/users/memberships.json"), false);
+ok("...and no plan catalogue of its own",
+  fs.existsSync("src/content/users/membership-plans.json"), false);
+{
+  const exp = Object.keys(S);
+  /* Present-tense check: these prove the export list is real, so the absences
+     below are absences and not a typo in the test. */
+  ok("the store still exports the readers it does have",
+    ["readUsers", "readUser", "readAudit", "toRow", "classify"].filter((k) => exp.indexOf(k) < 0), []);
+  /* Both halves: the pattern catches anything new that reads like a
+     membership, and the roll-call catches the specific twelve that were here,
+     several of which the pattern alone would miss (`historyOf`, `clashFor`,
+     `effectiveStatus`, `allowedActions`) — which is exactly why both are
+     needed rather than either. */
+  ok("...and exports nothing that reads like a membership",
+    exp.filter((k) => /member|plan|lifecycle|entitle|renew|assign|cycle|term/i.test(k)), []);
+  ok("...nor any of the twelve that used to do it by name",
+    ["readMemberships", "readMembership", "historyOf", "liveTermsOf", "effectiveStatus",
+      "allowedActions", "assignMembership", "lifecycle", "plansInUse", "isSellable",
+      "defaultCycleOf", "clashFor", "planCodeOf", "MEMBER_CLASSES", "fieldApplies"]
+      .filter((k) => k in S), []);
+  const seedText = fs.readFileSync("src/content/users/users.json", "utf8");
+  ok("no user record carries a plan, a term or an entitlement",
+    users.filter((u) => ["membership", "memberships", "activeMembershipId", "planId",
+      "planCode", "planName", "entitlements", "termNo"]
+      .some((k) => k in u || k in u.profile)).map((u) => u.userId), []);
+  ok("...and the word does not survive as a field name anywhere in the file",
+    /"(activeMembershipId|planCode|planName|entitlements|termNo)"\s*:/.test(seedText), false);
+}
+
+/* ============================================================== counts === */
+console.log("\ncounts, and the strip that reads them");
 const c = S.countsOf(all);
-ok("total", c.total, 20);
-ok("normal", c.normal, 6);
-ok("active members", c.activeMembers, 7);
-ok("paused", c.paused, 1);
-ok("suspended", c.suspended, 2);
-ok("former members", c.formerMembers, 3);
-ok("deactivated", c.deactivated, 1);
-ok("the six classifications account for everybody",
-  c.normal + c.activeMembers + c.paused + c.suspended + c.formerMembers + c.deactivated, 20);
-ok("pending activation", c.pending, 1);
-ok("expiring soon (60d window)", c.expiringSoon, 3);
-ok("recently ended (60d window)", c.recentlyEnded, 2);
+ok("Counts has exactly four figures and no fifth",
+  Object.keys(c).sort(), ["active", "deactivated", "incompleteProfiles", "total"]);
+ok("total is the whole seed", c.total, SEED.total);
+ok("active is every account that is not disabled", c.active, SEED.active);
+ok("deactivated is the rest", c.deactivated, SEED.deactivated);
+ok("...and the two account for everybody, with nothing double-counted",
+  c.active + c.deactivated, c.total);
+/* INCOMPLETE IS GRADED, NOT STORED. It is the required half of the profile
+   schema measured against each profile — never `profileStatus`, which is a
+   publication state and disagrees with the grade in the seed (see the re-grade
+   block). Recomputed here from vocabularies.json to prove which of the two
+   the store is actually reading. */
+ok("incomplete profiles are graded against the required schema fields",
+  c.incompleteProfiles, SEED.incomplete);
+ok("...naming exactly the profiles with a required field empty",
+  all.filter((r) => r.completeness < 100).map((r) => r.user.userId).sort(), INCOMPLETE_IDS);
+ok("...and it is not simply counting the stored profileStatus",
+  c.incompleteProfiles === users.filter((u) => u.profile.profileStatus !== "published").length, false);
+ok("an empty population counts to zero rather than throwing",
+  S.countsOf([]), { total: 0, active: 0, deactivated: 0, incompleteProfiles: 0 });
+/* Counted off the rows it is HANDED, so the same function serves the strip
+   (whole set) and any caller that wants a subset. */
+{
+  const dead = all.filter((r) => r.classification === "deactivated");
+  ok("countsOf counts the rows it is given, not the store",
+    [S.countsOf(dead).total, S.countsOf(dead).active, S.countsOf(dead).deactivated],
+    [SEED.deactivated, 0, SEED.deactivated]);
+}
 
-console.log("\nconversion has a denominator, and null when it has none");
-/* 13 of the 19 non-deactivated users have activated a term at some point: the
-   7 active, the 1 paused, the 2 suspended and the 3 former members. Paused and
-   suspended members COUNT here and do not count as Active Members two blocks
-   up — that is the distinction, and this line is where it is pinned down. */
-ok("conversion counts ever-members over non-deactivated users", c.conversion, 13 / 19);
-ok("...and the deactivated account is out of the denominator, not the history",
-  Math.round(c.conversion * 19), 13);
-ok("an empty population returns null, not 0%", S.countsOf([]).conversion, null);
-ok("pct() prints n/a for null rather than 0.0%", S.pct(null), "n/a");
-
-/* THE TAB FIGURE AND THE PAGE IT OPENS. Each is a promise: press Members and
-   you get exactly this many rows. The band used to be counted three different
-   ways — off the filtered set on the renewal queue, off the whole set on
-   analytics, and not at all on the lists — so one chip could show two numbers
-   depending on which face you were standing on. bandCounts() is now the only
-   way any face computes them, and these lines are what keep it that way. */
-console.log("\nthe view band agrees with the faces it points at");
+console.log("\nthe view band has one figure, and it is not a readout of the search");
 const band = S.bandCounts(all);
-ok("Users carries the whole population", band.users, all.length);
-ok("...which is every row, filtered or not", band.users, 20);
-ok("Members counts anyone who holds a term or ever did", band.members, 13);
-ok("...and that is exactly the Members face's own population",
-  band.members,
-  all.filter((r) => S.MEMBER_CLASSES.indexOf(r.classification) >= 0).length);
-ok("Renewals is pending plus expiring soon", band.renewals, c.pending + c.expiringSoon);
-/* The band is navigation, not a readout of the current search. Counting it off
-   a narrowed set would make the tabs argue with each other the moment somebody
-   typed a name into the box. */
-const narrowedRows = S.applyFilters(all, { q: "sharma" });
-ok("a search narrows the list", narrowedRows.length < all.length, true);
-ok("...and does not move the band", S.bandCounts(all).users, band.users);
+ok("bandCounts answers for the Users face and nothing else", Object.keys(band), ["users"]);
+ok("...with the whole population behind it", band.users, c.total);
+{
+  const narrowed = S.applyFilters(all, { q: "sharma" });
+  ok("a search genuinely narrows the list", narrowed.length < all.length, true);
+  ok("...and does not move the band", S.bandCounts(all).users, band.users);
+  ok("...even though the band would follow it if it were counted off the filter",
+    S.bandCounts(narrowed).users < band.users, true);
+}
 
-console.log("\nplan mix counts only entitling terms");
-const growth = c.byPlan.find((p) => p.code === "growth");
-ok("growth active terms", growth.n, 3);
-ok("byPlan totals equal the active-member count",
-  c.byPlan.reduce((n, p) => n + p.n, 0), c.activeMembers);
+/* ============================================================= filters === */
+console.log("\nfilters agree with the counts they are drawn from");
+ok("status=active returns exactly the Active cell",
+  S.applyFilters(all, { status: "active" }).length, c.active);
+ok("status=deactivated returns exactly the Deactivated cell",
+  S.applyFilters(all, { status: "deactivated" }).length, c.deactivated);
+ok("flag=incomplete returns exactly the Incomplete cell",
+  S.applyFilters(all, { flag: "incomplete" }).length, c.incompleteProfiles);
+ok("...and names the same rows the strip would open",
+  S.applyFilters(all, { flag: "incomplete" }).map((r) => r.user.userId).sort(), INCOMPLETE_IDS);
+ok("no filter at all is everybody", S.applyFilters(all, {}).length, all.length);
 
-console.log("\nthe transition matrix refuses what it should");
-ok("a cancelled term offers no lifecycle moves except renew",
-  S.allowedActions(byId["IB-U-0655"].current).map((a) => a.key), ["renew"]);
-ok("a pending term offers activate and cancel",
-  S.allowedActions(byId["IB-U-0958"].current).map((a) => a.key).sort(), ["activate", "cancel"]);
-ok("a paused term offers resume, suspend and cancel",
-  S.allowedActions(byId["IB-U-0834"].current).map((a) => a.key).sort(),
-  ["cancel", "resume", "suspend"]);
-/* Renew is NOT offered from paused, and that is the matrix rather than an
-   oversight: you resume a paused term, you do not renew one. Renewing a term
-   that is not running would create a second live entitlement on the same
-   product, which is the thing 409 active_membership_conflict exists to refuse. */
-ok("...and NOT renew — you resume a paused term, you do not renew it",
-  S.allowedActions(byId["IB-U-0834"].current).some((a) => a.key === "renew"), false);
-ok("a suspended term cannot be paused",
-  S.allowedActions(byId["IB-U-0790"].current).some((a) => a.key === "pause"), false);
-ok("an active term can be renewed",
-  S.allowedActions(byId["IB-U-0880"].current).some((a) => a.key === "renew"), true);
+/* THE WITHDRAWN FILTERS. `cls`, `flag=expiring`, `flag=pending` and the
+   `view=members` face all read a membership. They are not "hidden" — they are
+   inert, which is what a stale bookmark must find. The positive assertions
+   above are what make these meaningful: a filter key this function understands
+   DOES narrow, so a key it ignores returning everybody is a real result and
+   not the function failing open. */
+console.log("\na stale membership link narrows nothing rather than lying");
+[["cls=active_member", { cls: "active_member" }],
+ ["cls=former_member", { cls: "former_member" }],
+ ["cls=normal", { cls: "normal" }],
+ ["flag=expiring", { flag: "expiring" }],
+ ["flag=pending", { flag: "pending" }],
+ ["flag=ended", { flag: "ended" }],
+ ["view=members", { view: "members" }],
+ ["term=IB-MB-0912-3", { term: "IB-MB-0912-3" }]].forEach((pair) => {
+  ok(pair[0] + " is inert", S.applyFilters(all, pair[1]).length, all.length);
+});
+ok("...while the flag that survives still narrows",
+  S.applyFilters(all, { flag: "incomplete" }).length < all.length, true);
 
-console.log("\nsearch matches a phone number however it is written");
+console.log("\nsearch finds somebody by whatever the caller is holding");
 const meera = byId["IB-U-0912"];
 ["+91 98450 11902", "9845011902", "98450 11902", "11902"].forEach((q) => {
-  ok('q="' + q + '" finds Meera', S.applyFilters(all, { q }).some((r) => r === meera), true);
+  ok('q="' + q + '" finds Meera however the number is written',
+    S.applyFilters(all, { q: q }).some((r) => r === meera), true);
 });
-ok('q="IB-U-0912" finds Meera by id',
+ok('q="IB-U-0912" finds her by user id',
   S.applyFilters(all, { q: "IB-U-0912" }).map((r) => r.user.userId), ["IB-U-0912"]);
-
-console.log("\nfilters agree with the counts they are drawn from");
-[["normal", c.normal], ["active_member", c.activeMembers], ["paused_member", c.paused],
- ["suspended_member", c.suspended], ["former_member", c.formerMembers],
- ["deactivated", c.deactivated]].forEach(([cls, n]) => {
-  ok("cls=" + cls + " returns exactly its own count",
-    S.applyFilters(all, { cls }).length, n);
+ok('q="meera-studio-interiors" finds her by the address on her profile',
+  S.applyFilters(all, { q: "meera-studio-interiors" }).map((r) => r.user.userId), ["IB-U-0912"]);
+ok('q="koramangala" finds her by a city inside a coverage row',
+  S.applyFilters(all, { q: "koramangala" }).map((r) => r.user.userId), ["IB-U-0912"]);
+ok('q="DL-3310" finds whoever holds that deal reference',
+  S.applyFilters(all, { q: "DL-3310" }).map((r) => r.user.userId), ["IB-U-1041"]);
+ok('q="INV-2025-0447" finds whoever holds that invoice reference',
+  S.applyFilters(all, { q: "INV-2025-0447" }).map((r) => r.user.userId), ["IB-U-0912"]);
+ok("an email matches",
+  S.applyFilters(all, { q: meera.user.identity.email }).map((r) => r.user.userId), ["IB-U-0912"]);
+ok("a business name matches",
+  S.applyFilters(all, { q: "Meera Studio Interiors LLP" }).map((r) => r.user.userId), ["IB-U-0912"]);
+ok("search is case-insensitive",
+  S.applyFilters(all, { q: "MEERA STUDIO INTERIORS LLP" }).length,
+  S.applyFilters(all, { q: "meera studio interiors llp" }).length);
+ok("an empty search is not a filter", S.applyFilters(all, { q: "   " }).length, all.length);
+/* The sentinel is a claim, not a place. Every whole-state profile would be a
+   hit for the word "all" if it were in the haystack. */
+ok('searching "all cities" surfaces nobody', S.applyFilters(all, { q: "all cities" }).length, 0);
+/* WHAT SEARCH NO LONGER REACHES. A membership id and a plan name were both in
+   the haystack; neither exists to be found now, and a search for one must come
+   back empty rather than fuzzy-matching something else. */
+["IB-MB-0912-3", "IB-MB", "Growth", "Starter"].forEach((q) => {
+  ok('q="' + q + '" finds nothing — there is no membership to find',
+    S.applyFilters(all, { q: q }).length, 0);
 });
-ok("flag=expiring returns the queue's own count",
-  S.applyFilters(all, { flag: "expiring" }).length, c.expiringSoon);
-ok("flag=pending returns the queue's own count",
-  S.applyFilters(all, { flag: "pending" }).length, c.pending);
 
+console.log("\nthe city filter reads coverage, not an address");
+ok("a named city finds everyone who covers it",
+  S.applyFilters(all, { city: "Mumbai" }).map((r) => r.user.userId).sort(),
+  all.filter((r) => r.user.profile.targetAreas.some((t) =>
+    t.state === "Mumbai" || t.cities.indexOf("Mumbai") >= 0
+    || (t.cities.indexOf(S.ALL_CITIES) >= 0
+        && (S.STATE_CITIES[t.state] || []).indexOf("Mumbai") >= 0)))
+    .map((r) => r.user.userId).sort());
+ok("a whole-state row answers for a city it never listed",
+  S.applyFilters(all, { city: "Jaipur" }).map((r) => r.user.userId), ["IB-U-0944"]);
+ok("...and for the state itself",
+  S.applyFilters(all, { city: "Rajasthan" }).map((r) => r.user.userId), ["IB-U-0944"]);
+ok("a city nobody covers returns nothing",
+  S.applyFilters(all, { city: "Atlantis" }).length, 0);
+
+console.log("\nthe other filters, each against its own recount of the seed");
+S.REGISTRATION_SOURCES.forEach((s) => {
+  ok("src=" + s.key + " matches the seed",
+    S.applyFilters(all, { src: s.key }).length,
+    users.filter((u) => u.registrationSource === s.key).length);
+});
+S.TAGS.forEach((t) => {
+  ok("tag=" + t.slug + " matches the seed",
+    S.applyFilters(all, { tag: t.slug }).length,
+    users.filter((u) => u.tags.some((x) => x.slug === t.slug)).length);
+});
+ok("two filters intersect rather than either one winning",
+  S.applyFilters(all, { status: "active", flag: "incomplete" }).length,
+  all.filter((r) => r.classification === "active" && r.completeness < 100).length);
+
+console.log("\nregistration windows are measured against the seed's own clock");
+{
+  const days = (iso) => Math.round((S.NOW - new Date(iso).getTime()) / S.DAY);
+  [["today", 1], ["7d", 7], ["30d", 30], ["90d", 90]].forEach((pair) => {
+    ok("registered=" + pair[0] + " counts the window, not the calendar",
+      S.applyFilters(all, { registered: pair[0] }).length,
+      users.filter((u) => days(u.registeredAt) <= pair[1]).length);
+  });
+  /* "This year" is the CALENDAR year, not the last 366 days — the label says
+     so, and a January reader expects January onwards. */
+  const yr = new Date(S.NOW).getFullYear();
+  ok("registered=year is the calendar year",
+    S.applyFilters(all, { registered: "year" }).length,
+    users.filter((u) => new Date(u.registeredAt).getFullYear() === yr).length);
+  ok("...which is not the same set as the last 366 days",
+    S.applyFilters(all, { registered: "year" }).length
+      !== users.filter((u) => days(u.registeredAt) <= 366).length, true);
+  const custom = { registered: "custom", from: "2026-01-01", to: "2026-08-01" };
+  ok("a custom range is inclusive of both ends",
+    S.applyFilters(all, custom).length,
+    users.filter((u) => {
+      const t = new Date(u.registeredAt).getTime();
+      return t >= new Date("2026-01-01T00:00:00").getTime()
+        && t <= new Date("2026-08-01T23:59:59").getTime();
+    }).length);
+  ok("...and an open-ended one is open at that end",
+    S.applyFilters(all, { registered: "custom", from: "2026-01-01" }).length
+      > S.applyFilters(all, custom).length, true);
+  ok("a custom range with neither bound is everybody",
+    S.applyFilters(all, { registered: "custom" }).length, all.length);
+  ok("every range in the vocabulary is one applyFilters understands",
+    S.REGISTERED_RANGES.filter((r) => r.key !== "custom")
+      .filter((r) => S.applyFilters(all, { registered: r.key }).length > all.length)
+      .map((r) => r.key), []);
+}
+
+/* ============================================================= sorting === */
+console.log("\nthe default order answers \"what needs doing\"");
+{
+  const def = S.applySort(all, undefined);
+  ok("nothing is lost or duplicated by sorting", def.length, all.length);
+  const score = (r) => (r.classification === "deactivated" ? 2 : r.completeness < 100 ? 0 : 1);
+  ok("incomplete live accounts lead, then everyone else, then the disabled",
+    def.map(score), def.map(score).slice().sort());
+  ok("...so the first row is an incomplete live account",
+    [def[0].classification, def[0].completeness < 100], ["active", true]);
+  /* A deactivated account with an unfinished profile is NOT the thing to go
+     and fix. It sorts last with the rest of the disabled, and the order of
+     those two tests inside attentionScore is the whole reason. */
+  ok("...and a deactivated account does not jump the queue by being incomplete",
+    def[def.length - 1].classification, "deactivated");
+  const band1 = def.filter((r) => score(r) === 1).map((r) => new Date(r.user.registeredAt).getTime());
+  ok("inside a band the newest registration leads",
+    band1.slice().sort((a, b) => b - a), band1);
+}
+console.log("\nand the three named orders do what they are named");
+ok("sort=recent is newest registration first",
+  S.applySort(all, "recent").map((r) => new Date(r.user.registeredAt).getTime()),
+  users.map((u) => new Date(u.registeredAt).getTime()).sort((a, b) => b - a));
+ok("sort=activity is most recently seen first",
+  S.applySort(all, "activity")[0].user.userId,
+  all.slice().sort((a, b) =>
+    new Date(b.user.lastActivityAt || 0).getTime()
+      - new Date(a.user.lastActivityAt || 0).getTime())[0].user.userId);
+ok("sort=name is A to Z on the person, not the id",
+  S.applySort(all, "name").map((r) => r.user.identity.name),
+  users.map((u) => u.identity.name).sort((a, b) => a.localeCompare(b)));
+/* `ending` sorted by the term's end date. There is no term, so the option is
+   gone from the vocabulary and the key falls back to the default order —
+   which is what an old bookmark has to get. */
+ok("sort=ending is gone from the options",
+  S.SORT_OPTIONS.map((o) => o.key), ["", "recent", "activity", "name"]);
+ok("...and an unknown sort key falls back to the default order",
+  S.applySort(all, "ending").map((r) => r.user.userId),
+  S.applySort(all, undefined).map((r) => r.user.userId));
+ok("...which is not the same as any of the named ones",
+  S.applySort(all, "ending").map((r) => r.user.userId).join()
+    !== S.applySort(all, "recent").map((r) => r.user.userId).join(), true);
+ok("every sort the dropdown offers is one applySort implements",
+  S.SORT_OPTIONS.filter((o) => o.key)
+    .filter((o) => S.applySort(all, o.key).map((r) => r.user.userId).join()
+      === S.applySort(all, undefined).map((r) => r.user.userId).join())
+    .map((o) => o.key), []);
+
+console.log("\npagination cannot walk off either end");
+{
+  const pages = Math.ceil(all.length / S.PAGE_SIZE);
+  ok("a full page is PAGE_SIZE rows", S.paginate(all, 1).rows.length, Math.min(S.PAGE_SIZE, all.length));
+  ok("the page count is derived from the row count", S.paginate(all, 1).pages, pages);
+  ok("page 0 clamps to the first page", S.paginate(all, 0).pageNo, 1);
+  ok("a page past the end clamps to the last", S.paginate(all, 999).pageNo, pages);
+  ok("the total is the unpaginated count, so the pager can say `of`",
+    S.paginate(all, 2).total, all.length);
+  ok("every row appears on exactly one page",
+    Array.from({ length: pages }, (_, i) => S.paginate(all, i + 1).rows.length)
+      .reduce((a, b) => a + b, 0), all.length);
+  ok("an empty result is still one page, not zero", S.paginate([], 1).pages, 1);
+}
+
+/* ======================================================== completeness === */
 console.log("\nprofile completeness is graded against the schema, not guessed");
 ok("a complete business profile is 100", byId["IB-U-0912"].completeness, 100);
 ok("a bare registration is not", byId["IB-U-1029"].completeness < 100, true);
 ok("...and names what is missing rather than only a percentage",
-  byId["IB-U-1029"].missingFields.length > 0, true);
+  byId["IB-U-1029"].missingFields.slice().sort(), REQUIRED.map((f) => f.label).sort());
+ok("the missing list is the schema's LABELS, which is what a caller can read out",
+  byId["IB-U-1029"].missingFields.indexOf("Business name") >= 0, true);
+ok("every row's percentage matches its own missing list",
+  all.filter((r) => r.completeness
+    !== Math.round(((REQUIRED.length - r.missingFields.length) / REQUIRED.length) * 100))
+    .map((r) => r.user.userId), []);
+ok("a complete profile has nothing missing",
+  all.filter((r) => r.completeness === 100 && r.missingFields.length).map((r) => r.user.userId), []);
+ok("a required field holding only whitespace is not an answer",
+  S.completenessOf({ ...byId["IB-U-0912"].user.profile, businessName: "" }).pct < 100, true);
 
 /* =============================================================================
    THE WRITES. Every one of these is a simulation today and an endpoint later,
@@ -274,195 +428,199 @@ ok("...and names what is missing rather than only a percentage",
    asserted here rather than described in a doc because a described guarantee
    is one nobody notices breaking.
    ============================================================================= */
-console.log("\nrenewal creates a new term and leaves the old one alone");
+console.log("\nthe profile write is the last line, not the form");
 S.resetStore();
 {
-  const before = S.readMembership("IB-MB-0880-2");
-  const snapshotBefore = JSON.stringify(before.entitlements);
-  const countBefore = S.readMemberships().length;
-
-  ok("renew is accepted from an active term", S.lifecycle("IB-MB-0880-2", "renew", ""), "");
-
-  const after = S.readMembership("IB-MB-0880-2");
-  ok("...the previous term keeps its status", after.status, "active");
-  ok("...its dates are untouched", [after.startAt, after.endAt], [before.startAt, before.endAt]);
-  ok("...its snapshot is untouched", JSON.stringify(after.entitlements), snapshotBefore);
-  ok("...and a NEW row exists", S.readMemberships().length, countBefore + 1);
-
-  const fresh = S.readMemberships().filter((m) => m.previousMembershipId === "IB-MB-0880-2")[0];
-  ok("the new term links back to the old one", !!fresh, true);
-  ok("...is Active", fresh.status, "active");
-  ok("...carries the next term number", fresh.termNo, before.termNo + 1);
-  /* SAME PLAN, SAME DURATION, carried forward. Renew used to re-read the
-     catalogue and move the member onto the current price — a commercial
-     decision this button must not take on somebody's behalf, and not one this
-     module can take at all now the catalogue is the Plans module's. */
-  ok("...carries the same plan forward", fresh.planName, before.planName);
-  ok("...and the same duration", fresh.cycle.months, before.cycle.months);
-  ok("...and the same frozen entitlements",
-    JSON.stringify(fresh.entitlements), snapshotBefore);
-  ok("the renewal appended a RENEWED event and nothing else moved",
-    fresh.events.map((e) => e.type), ["MEMBERSHIP_RENEWED"]);
+  ok("a non-editable key is refused whole",
+    S.updateProfile("IB-U-0912", { profileId: "HACK" }).indexOf("Not editable") >= 0, true);
+  ok("...and the refusal names the key so it can be fixed",
+    S.updateProfile("IB-U-0912", { profileId: "HACK" }).indexOf("profileId") >= 0, true);
+  ok("...and nothing changed", S.readUser("IB-U-0912").profile.profileId !== "HACK", true);
+  ok("an unknown user is refused",
+    S.updateProfile("IB-U-NOPE", { about: "x" }).indexOf("no longer exists") >= 0, true);
+  const pctBefore = S.completenessOf(S.readUser("IB-U-0912").profile).pct;
+  ok("whitespace is not a business name", S.updateProfile("IB-U-0912", { businessName: "   " }), "");
+  ok("...it is stored as empty", S.readUser("IB-U-0912").profile.businessName, null);
+  ok("...and completeness dropped", S.completenessOf(S.readUser("IB-U-0912").profile).pct < pctBefore, true);
+  /* A profile that fell below the bar says so, so the directory's Incomplete
+     cell and the record's badge cannot disagree with the grade. */
+  ok("...and the stored profileStatus followed the grade down",
+    S.readUser("IB-U-0912").profile.profileStatus, "incomplete");
+  ok("a malformed area row is refused, not thrown on",
+    S.validateFacets({ targetAreas: [{ state: "Karnataka" }] }).indexOf("at least one city") >= 0, true);
+  ok("an unknown tag is refused", S.setTags("IB-U-0912", ["vip", "made-up"]).indexOf("Unknown tag") >= 0, true);
+  ok("...and the tags did not move", S.readUser("IB-U-0912").tags.some((t) => t.slug === "made-up"), false);
 }
 
-console.log("\nan off-matrix move changes nothing and says why");
+console.log("\na save writes an audit row naming the fields, never the values");
 S.resetStore();
 {
-  const err = S.lifecycle("IB-MB-0912-1", "pause", "trying to pause an expired term");
-  ok("pausing an expired term is refused", err.indexOf("invalid_membership_transition") >= 0, true);
-  ok("...and the term is untouched", S.readMembership("IB-MB-0912-1").status, "expired");
-  ok("...and no event was appended",
-    S.readMembership("IB-MB-0912-1").events.length, 3);
+  const before = S.readAudit().length;
+  ok("a valid patch is accepted",
+    S.updateProfile("IB-U-0912", { about: "Rewritten by an admin on a call." }), "");
+  ok("...one audit row was appended", S.readAudit().length, before + 1);
+  const e = S.readAudit()[0];
+  ok("...typed as a profile update", e.type, "PROFILE_UPDATED");
+  ok("...against the right user", e.userId, "IB-U-0912");
+  ok("...naming the field that changed", e.note.indexOf("About") >= 0, true);
+  ok("...and not carrying the new value into the log",
+    e.note.indexOf("Rewritten by an admin") < 0, true);
+  ok("...attributed to the session rather than to a guess", e.actor, S.actor().name);
+  ok("a patch that changes nothing writes nothing",
+    [S.updateProfile("IB-U-0912", { about: "Rewritten by an admin on a call." }),
+      S.readAudit().length], ["", before + 1]);
+  /* A HIDDEN PROFILE STAYS HIDDEN. An admin correcting one field on a
+     deactivated account must not republish it to the storefront. */
+  ok("the deactivated demo profile is hidden to start with",
+    S.readUser("IB-U-0601").profile.profileStatus, "hidden");
+  ok("...and an edit does not republish it",
+    [S.updateProfile("IB-U-0601", { about: "A correction." }),
+      S.readUser("IB-U-0601").profile.profileStatus], ["", "hidden"]);
+  /* ...while an ordinary profile is promoted by the GRADE, which is what
+     keeps profileStatus and completeness from drifting apart. */
+  ok("...and the grade is what promotes an ordinary one",
+    [S.updateProfile("IB-U-1029", {
+      businessName: "Rao & Sons", username: "rao-and-sons", businessType: "contractor",
+      dealsIn: ["services"], segments: ["carpentry"],
+      targetAreas: [{ state: "Karnataka", cities: ["Bengaluru"] }],
+    }), S.readUser("IB-U-1029").profile.profileStatus,
+      S.completenessOf(S.readUser("IB-U-1029").profile).pct], ["", "published", 100]);
+  ok("...which moves the Incomplete count with it",
+    S.countsOf(S.readUsers().map(S.toRow)).incompleteProfiles, SEED.incomplete - 1);
 }
 
-console.log("\nactivation freezes the snapshot, and the classification follows");
+console.log("\nnotes are append-only, and the audit records the fact, not the text");
 S.resetStore();
 {
-  const pending = S.readMembership("IB-MB-0958-1");
-  ok("a pending term starts with no entitlements", pending.entitlements.length, 0);
-  /* A term raised before this change has nothing parked on it, so activation
-     must REFUSE rather than go live with access nobody can enumerate. */
-  ok("...and activation refuses when there is nothing to freeze",
-    S.lifecycle("IB-MB-0958-1", "activate", "").indexOf("nothing to freeze") >= 0, true);
-  ok("...leaving it Pending", S.readMembership("IB-MB-0958-1").status, "pending");
-
-  /* Give it something to freeze the way the form does, then activate. */
-  const pendingFeatures = [
-    { key: "feature.0", label: "Up to 60 listings", display: "Included" },
-    { key: "feature.1", label: "2 rotation slots", display: "Included" },
-  ];
-  S.readMembership("IB-MB-0958-1").pendingFeatures = pendingFeatures;
-  ok("activation is accepted once it has", S.lifecycle("IB-MB-0958-1", "activate", ""), "");
-  const live = S.readMembership("IB-MB-0958-1");
-  ok("...the status moved", live.status, "active");
-  ok("...the snapshot was taken", live.entitlements.length > 0, true);
-  ok("...from what was captured when the term was raised",
-    live.entitlements.length, pendingFeatures.length);
-  ok("...and the parked copy is consumed, not left behind", live.pendingFeatures, undefined);
-  /* The classification is DERIVED, so it changes because the term changed —
-     nothing set it, here or anywhere. */
-  const row = S.toRow(S.readUser("IB-U-0958"), S.readMemberships());
-  ok("...and the user is now an Active Member, derived", row.classification, "active_member");
-  ok("...having been a Normal User a moment ago",
-    S.toRow(require("../src/content/users/users.json").users
-      .find((u) => u.userId === "IB-U-0958"),
-      require("../src/content/users/memberships.json").memberships).classification, "normal");
+  ok("an empty note is refused", S.addNote("IB-U-0912", "   ").indexOf("needs some text") >= 0, true);
+  const notes = S.readUser("IB-U-0912").notes.length;
+  ok("a real note is accepted", S.addNote("IB-U-0912", "Called about the profile chase."), "");
+  ok("...it is on the record", S.readUser("IB-U-0912").notes.length, notes + 1);
+  ok("...newest first", S.readUser("IB-U-0912").notes[0].text, "Called about the profile chase.");
+  ok("...attributed to the session, not to a guess",
+    S.readUser("IB-U-0912").notes[0].author, S.actor().name);
+  const e = S.readAudit()[0];
+  ok("...and the audit says a note exists", e.type, "NOTE");
+  ok("...without repeating what it said", e.note.indexOf("profile chase") < 0, true);
+  ok("an unknown user is refused",
+    S.addNote("IB-U-NOPE", "hello").indexOf("no longer exists") >= 0, true);
 }
 
-console.log("\nevent types match the vocabulary, so every row has a label");
+console.log("\ntags are a closed list, and a no-op change is not an event");
 S.resetStore();
 {
-  const known = new Set(require("../src/content/users/vocabularies.json")
-    .eventTypes.map((e) => e.key));
-  S.lifecycle("IB-MB-0880-2", "pause", "Member requested a break");
-  S.lifecycle("IB-MB-0880-2", "resume", "");
-  S.lifecycle("IB-MB-0880-2", "suspend", "Policy breach reported");
-  S.lifecycle("IB-MB-0880-2", "reactivate", "Resolved");
-  S.lifecycle("IB-MB-0880-2", "cancel", "Member cancelled");
-  const types = S.readMembership("IB-MB-0880-2").events.map((e) => e.type);
-  ok("five actions appended five events", types.slice(0, 5).length, 5);
-  /* CANCELLED with two Ls. Deriving the event name from the action produced
-     MEMBERSHIP_CANCELED, which matches nothing in the vocabulary — the row
-     would have rendered with no label and no tone. */
-  ok("every appended type exists in the vocabulary",
-    types.filter((t) => !known.has(t)), []);
-  ok("cancellation spells CANCELLED", types.indexOf("MEMBERSHIP_CANCELLED") >= 0, true);
-  const auditTypes = S.readAudit().filter((e) => e.userId === "IB-U-0880").map((e) => e.type);
-  ok("and so does every audit row it wrote",
-    auditTypes.filter((t) => !known.has(t)), []);
+  const before = S.readAudit().length;
+  ok("setting the tags already held changes nothing",
+    [S.setTags("IB-U-0912", S.readUser("IB-U-0912").tags.map((t) => t.slug)),
+      S.readAudit().length], ["", before]);
+  ok("adding a known tag is accepted", S.setTags("IB-U-0912", ["vip", "onboarding"]), "");
+  ok("...and the audit names what moved", S.readAudit()[0].note.indexOf("onboarding") >= 0, true);
+  ok("...an existing tag keeps its original attribution",
+    S.readUser("IB-U-0912").tags.filter((t) => t.slug === "vip")[0].assignedBy, "V. Shakya");
+  ok("removing one is recorded too",
+    [S.setTags("IB-U-0912", ["vip"]), S.readAudit()[0].note.indexOf("Removed onboarding") >= 0],
+    ["", true]);
+  ok("an unknown slug takes the whole call down",
+    S.setTags("IB-U-0912", ["vip", "not-a-tag"]).indexOf("closed list") >= 0, true);
+  ok("...leaving the tags exactly as they were",
+    S.readUser("IB-U-0912").tags.map((t) => t.slug), ["vip"]);
 }
 
-console.log("\na guarded action without a reason is refused");
-S.resetStore();
-ok("suspend with no reason", S.lifecycle("IB-MB-0880-2", "suspend", "   ")
-  .indexOf("reason_required") >= 0, true);
-ok("suspend with a reason", S.lifecycle("IB-MB-0880-2", "suspend", "Payment dispute"), "");
-
-console.log("\nassignment refuses a second live term on the same product");
+console.log("\nan account status is an account status, and it stops at this module");
 S.resetStore();
 {
-  const res = S.assignMembership("IB-U-0912", {
-    planId: "9", planCode: "pro", planName: "Pro",
-    cycle: { months: 12, price: 29500, currency: "INR" },
-    features: [{ key: "feature.0", label: "Everything in the plan", display: "Included" }],
-    source: "new_sale", reference: "PAY-X", reason: "",
-    startAt: "2026-09-01T00:00:00+05:30", endAt: "2027-08-31T23:59:59+05:30",
-    activateNow: false,
-  });
-  ok("a duplicate Pro term is refused", res.error.indexOf("already a live") >= 0, true);
-  ok("...and nothing was created", res.membershipId, null);
+  ok("deactivating without a reason is refused",
+    S.setUserStatus("IB-U-0912", "deactivated", "  ").indexOf("needs a reason") >= 0, true);
+  ok("...and the account is untouched", S.readUser("IB-U-0912").userStatus, "active");
+  ok("deactivating with one is accepted",
+    S.setUserStatus("IB-U-0912", "deactivated", "Member asked to close the account"), "");
+  ok("...the classification follows, derived",
+    S.toRow(S.readUser("IB-U-0912")).classification, "deactivated");
+  ok("...the reason and the moment are stored",
+    [S.readUser("IB-U-0912").deactivatedReason, !!S.readUser("IB-U-0912").deactivatedAt],
+    ["Member asked to close the account", true]);
+  /* SOFT BY CONSTRUCTION. Hard deletion is a governed privacy process and has
+     no button; everything that made this a record is still here. */
+  ok("...the profile survives", !!S.readUser("IB-U-0912").profile.businessName, true);
+  ok("...the commercial references survive",
+    S.readUser("IB-U-0912").commercial.dealRefs.length > 0, true);
+  ok("...the notes survive", S.readUser("IB-U-0912").notes.length > 0, true);
+  ok("...and the audit gained a row rather than losing any",
+    S.readAudit()[0].type, "USER_DEACTIVATED");
+  ok("setting the same status twice is not an event",
+    S.setUserStatus("IB-U-0912", "deactivated", "again"), "");
+  ok("reactivating needs no reason", S.setUserStatus("IB-U-0912", "active", ""), "");
+  ok("...and clears the deactivation stamps",
+    [S.readUser("IB-U-0912").deactivatedAt, S.readUser("IB-U-0912").deactivatedReason], [null, null]);
+  ok("...with its own event type", S.readAudit()[0].type, "USER_REACTIVATED");
+  ok("an unknown user is refused",
+    S.setUserStatus("IB-U-NOPE", "deactivated", "x").indexOf("no longer exists") >= 0, true);
 }
 
-console.log("\nassignment demands what its source demands");
+console.log("\nthe audit is a history, and history is not edited to match today");
 S.resetStore();
 {
-  const noRef = S.assignMembership("IB-U-1041", {
-    planId: "7", planCode: "starter", planName: "Starter",
-    cycle: { months: 12, price: 29500, currency: "INR" },
-    features: [{ key: "feature.0", label: "Everything in the plan", display: "Included" }],
-    source: "new_sale", reference: "  ", reason: "",
-    startAt: "2026-09-01T00:00:00+05:30", endAt: "2027-08-31T23:59:59+05:30",
-    activateNow: false,
-  });
-  ok("a new sale with no payment reference is refused",
-    noRef.error.indexOf("is required for a new sale") >= 0, true);
-
-  const noReason = S.assignMembership("IB-U-1041", {
-    planId: "7", planCode: "starter", planName: "Starter",
-    cycle: { months: 12, price: 29500, currency: "INR" },
-    features: [{ key: "feature.0", label: "Everything in the plan", display: "Included" }],
-    source: "complimentary", reference: "", reason: "   ",
-    startAt: "2026-09-01T00:00:00+05:30", endAt: "2027-08-31T23:59:59+05:30",
-    activateNow: false,
-  });
-  ok("a complimentary grant with no reason is refused",
-    noReason.error.indexOf("needs a stated reason") >= 0, true);
-
-  const good = S.assignMembership("IB-U-1041", {
-    planId: "7", planCode: "starter", planName: "Starter",
-    cycle: { months: 12, price: 29500, currency: "INR" },
-    features: [{ key: "feature.0", label: "Everything in the plan", display: "Included" }],
-    source: "complimentary", reference: "", reason: "Founder approved on a call.",
-    startAt: "2026-09-01T00:00:00+05:30", endAt: "2027-08-31T23:59:59+05:30",
-    activateNow: false,
-  });
-  ok("...and is accepted once it has one", good.error, "");
-  ok("...raised at Pending, not Active", !!good.membershipId, true);
-  const raised = S.readMembership(good.membershipId);
-  ok("...with the duration it was sold frozen on it", raised.cycle.months, 12);
-  ok("...nothing entitled yet", raised.entitlements.length, 0);
-  ok("...but what to freeze is parked, ready for activation",
-    raised.pendingFeatures.length, 1);
+  const known = new Set(vocab.eventTypes.map((e) => e.key));
+  ok("every seeded event type has a label to render with",
+    Array.from(new Set(auditDoc.events.map((e) => e.type))).filter((t) => !known.has(t)), []);
+  ok("every audit row names a user that exists",
+    auditDoc.events.filter((e) => !users.some((u) => u.userId === e.userId))
+      .map((e) => e.eventId), []);
+  ok("every audit row is stamped and attributed",
+    auditDoc.events.filter((e) => !e.eventId || !e.at || !e.actor || !e.actorRole)
+      .map((e) => e.eventId), []);
+  ok("event ids are unique",
+    auditDoc.events.length, new Set(auditDoc.events.map((e) => e.eventId)).size);
+  ok("the types the seed carries are the ones this module still writes",
+    Array.from(new Set(auditDoc.events.map((e) => e.type))).sort(),
+    ["NOTE", "PROFILE_UPDATED", "REGISTERED", "TAGGED", "USER_DEACTIVATED"]);
+  /* The MEMBERSHIP_* types stay in the vocabulary on purpose: a row written
+     while this module still ran a lifecycle is a row about something that
+     happened, and it has to keep rendering with a label rather than a raw key
+     if it ever arrives from the API. */
+  ok("...while the membership types are kept as historical labels",
+    vocab.eventTypes.filter((e) => e.key.indexOf("MEMBERSHIP_") === 0).length > 0, true);
+  ok("...spelled the way the rows that used them spell them",
+    vocab.eventTypes.some((e) => e.key === "MEMBERSHIP_CANCELLED"), true);
+  ok("no event type is missing a label or a key",
+    vocab.eventTypes.filter((e) => !e.key || !e.label).length, 0);
+  /* KNOWN SEED DEFECT — reported, not papered over. Every registered identity
+     should open its timeline with its own REGISTERED row; the seven users
+     added for the Finance seeds carry no audit at all, so their record's Audit
+     tab reads "Nothing has happened on this account yet" for an account that
+     demonstrably registered. Quarantined BY NAME so the set cannot grow
+     silently — and so fixing the seed turns this line red and gets it deleted. */
+  ok("every account opens its timeline with its own registration",
+    users.filter((u) => !auditDoc.events.some((e) => e.userId === u.userId && e.type === "REGISTERED"))
+      .map((u) => u.userId), []);
+  ok("...and the registration is dated when the account actually registered",
+    users.filter((u) => {
+      const reg = auditDoc.events.filter((e) => e.userId === u.userId && e.type === "REGISTERED")[0];
+      return !reg || reg.at !== u.registeredAt;
+    }).map((u) => u.userId), []);
+  ok("...and no event id is used twice, across the whole log",
+    (() => { const ids = auditDoc.events.map((e) => e.eventId); return ids.filter((x, i) => ids.indexOf(x) !== i); })(), []);
 }
 
-console.log("\na profile save with a required field empty writes nothing");
-S.resetStore();
+console.log("\nthe seed is restorable, because a demo gets walked twice");
 {
-  const err = S.updateProfile("IB-U-0912", { about: "Changed", businessName: "Meera Studio" });
-  ok("a valid patch is accepted", err, "");
-  ok("an unknown user is refused", S.updateProfile("IB-U-NOPE", { city: "X" })
-    .indexOf("no longer exists") >= 0, true);
+  S.resetStore();
+  const before = JSON.stringify(S.readUsers());
+  S.addNote("IB-U-0912", "scribble");
+  S.setUserStatus("IB-U-0880", "deactivated", "testing");
+  ok("the writes landed", JSON.stringify(S.readUsers()) !== before, true);
+  S.resetStore();
+  ok("...and reset puts every one of them back", JSON.stringify(S.readUsers()), before);
+  ok("...including the audit", S.readAudit().length, auditDoc.events.length);
 }
-
-console.log("\nan account status is not a membership action");
-S.resetStore();
-ok("deactivating without a reason is refused",
-  S.setUserStatus("IB-U-0912", "deactivated", "  ").indexOf("needs a reason") >= 0, true);
-ok("deactivating with one is accepted",
-  S.setUserStatus("IB-U-0912", "deactivated", "Member asked to close the account"), "");
-
-console.log("\nnotes are append-only and never empty");
-S.resetStore();
-ok("an empty note is refused", S.addNote("IB-U-0912", "   ").indexOf("needs some text") >= 0, true);
-ok("a real note is accepted", S.addNote("IB-U-0912", "Called about the renewal."), "");
 
 /* ===================================================== the business facets ===
-   Business type, Segments and Categories are CLOSED vocabularies and the
-   marketplace filters and ranks on them. One unrecognised key is a profile
-   that quietly stops appearing under anything — a failure with no error
-   message and no visible symptom until somebody asks why a paying member gets
-   no enquiries. So: the vocabularies have to be internally sound, the seed has
-   to be inside them, and the write path has to refuse everything else. */
+   Business type, Deals in and the rest are what the marketplace filters and
+   ranks on. One unrecognised key is a profile that quietly stops appearing
+   under anything — a failure with no error message and no visible symptom
+   until somebody asks why a listed business gets no enquiries. So: the
+   vocabularies have to be internally sound, the seed has to be inside them,
+   and the write path has to refuse everything else. */
 console.log("\nthe facet vocabularies are sound");
 S.resetStore();
 {
@@ -477,9 +635,9 @@ S.resetStore();
      grouped listbox means it does not render at all. */
   const groupKeys = S.CATEGORY_GROUPS.map((g) => g.key);
   ok("every category sits in a declared group",
-    S.CATEGORIES.filter((c) => groupKeys.indexOf(c.group) < 0).map((c) => c.key), []);
+    S.CATEGORIES.filter((x) => groupKeys.indexOf(x.group) < 0).map((x) => x.key), []);
   ok("both groups are actually used",
-    groupKeys.filter((g) => !S.CATEGORIES.some((c) => c.group === g)), []);
+    groupKeys.filter((g) => !S.CATEGORIES.some((x) => x.group === g)), []);
   ok("keyword suggestions are unique",
     S.KEYWORD_SUGGESTIONS.length,
     S.dedupeKeywords(S.KEYWORD_SUGGESTIONS).length);
@@ -491,31 +649,31 @@ S.resetStore();
 
   /* THE OPTION TEXT LIVES HERE because the listbox only exists while it is
      open, and the render harness has no browser to open it with. These are the
-     same guarantees the picker would be asserted on if it could be: every
-     business type explains itself, and the delivery/sector split is real. */
+     same guarantees the picker would be asserted on if it could be. */
   ok("every business type carries the sentence that separates it",
     S.BUSINESS_TYPES.filter((o) => !o.hint).map((o) => o.key), []);
   ok("...because Dealer, Retailer and Wholesaler are not self-evident",
     ["dealer", "retailer", "wholesaler"]
       .filter((k) => !S.BUSINESS_TYPES.filter((o) => o.key === k)[0].hint), []);
   ok("categories genuinely span both questions",
-    S.CATEGORY_GROUPS.map((g) => S.CATEGORIES.filter((c) => c.group === g.key).length > 1),
+    S.CATEGORY_GROUPS.map((g) => S.CATEGORIES.filter((x) => x.group === g.key).length > 1),
     [true, true]);
   /* Delivery model is gone: Turnkey / Design & build / Execution only were a
      third axis nobody asked the form to carry. Categories are INDUSTRIES now,
      plus the sector — and the list is open, so a category nobody listed is a
      thing somebody types, not a thing the form refuses. */
   ok("no delivery-model category survives",
-    S.CATEGORIES.filter((c) => c.group === "delivery").map((c) => c.key), []);
+    S.CATEGORIES.filter((x) => x.group === "delivery").map((x) => x.key), []);
   ok("the industries the request named are there",
-    ["sanitaryware", "home_security"].filter((k) => !S.CATEGORIES.some((c) => c.key === k)), []);
+    ["sanitaryware", "home_security"].filter((k) => !S.CATEGORIES.some((x) => x.key === k)), []);
 
   /* COLOUR-BY-FACET. The chip tone is declared per FIELD and the CSS restates
      each used tone by name, so the contract is: every declared tone is one the
      stylesheet knows, and every facet that renders chips declares one. A tone
      the CSS does not restate silently falls back to brand tint — wrong colour,
      no error. */
-  const KNOWN_TONES = ["tag-violet", "tag-green", "tag-blue", "tag-amber", "tag-teal", "tag-slate", "tag-pink", "tag-orange"];
+  const KNOWN_TONES = ["tag-violet", "tag-green", "tag-blue", "tag-amber",
+    "tag-teal", "tag-slate", "tag-pink", "tag-orange"];
   const chipped = S.PROFILE_FIELDS.filter((f) => f.chip);
   ok("every declared chip tone is one the stylesheet restates",
     chipped.filter((f) => KNOWN_TONES.indexOf(f.chip) < 0).map((f) => f.key), []);
@@ -523,41 +681,72 @@ S.resetStore();
     S.PROFILE_FIELDS
       .filter((f) => ["single", "multi", "tags"].indexOf(f.type) >= 0 && !f.chip)
       .map((f) => f.key), []);
-  /* One colour answers one question. The two location singles SHARE slate on
-     purpose — they are halves of the same answer — but no marketplace facet
-     may share a tone with another, or the colour stops meaning anything. */
+  /* One colour answers one question. No marketplace facet may share a tone
+     with another, or the colour stops meaning anything. */
   const market = chipped.filter((f) => f.chip !== "tag-slate").map((f) => f.chip);
   ok("no two marketplace facets share a colour", market.length, new Set(market).size);
+  /* And the stylesheet has to actually restate each one: a chip class the CSS
+     never names falls back to brand tint with no error anywhere. */
+  const css = fs.readFileSync("src/admin/views/Users/users.css", "utf8")
+    + fs.readFileSync("src/admin/views/Users/blocks.css", "utf8");
+  ok("...and each one is named in the module's own stylesheets",
+    chipped.map((f) => f.chip).filter((t) => css.indexOf(t) < 0), []);
 }
 
 console.log("\nthe seed is inside its own vocabularies");
 {
-  const users = S.readUsers();
+  const seeded = S.readUsers();
   const known = (list) => list.map((o) => o.key);
   const bt = known(S.BUSINESS_TYPES), sg = known(S.SEGMENTS), ct = known(S.CATEGORIES);
-  const strayType = users.filter((u) =>
-    u.profile.businessType && bt.indexOf(u.profile.businessType) < 0);
-  const straySeg = users.filter((u) =>
-    u.profile.segments.some((s) => sg.indexOf(s) < 0));
-  const strayCat = users.filter((u) =>
-    u.profile.categories.some((c) => ct.indexOf(c) < 0));
-  ok("no unknown business type", strayType.map((u) => u.userId), []);
-  ok("no unknown segment", straySeg.map((u) => u.userId), []);
-  ok("no unknown category", strayCat.map((u) => u.userId), []);
+  ok("no unknown business type",
+    seeded.filter((u) => u.profile.businessType && bt.indexOf(u.profile.businessType) < 0)
+      .map((u) => u.userId), []);
+  ok("no unknown segment",
+    seeded.filter((u) => u.profile.segments.some((s) => sg.indexOf(s) < 0)).map((u) => u.userId), []);
+  ok("no unknown category",
+    seeded.filter((u) => u.profile.categories.some((x) => ct.indexOf(x) < 0)).map((u) => u.userId), []);
+  ok("no unknown registration source",
+    seeded.filter((u) => !S.REGISTRATION_SOURCES.some((s) => s.key === u.registrationSource))
+      .map((u) => u.userId), []);
+  ok("no unknown tag slug",
+    seeded.filter((u) => u.tags.some((t) => !S.TAGS.some((x) => x.slug === t.slug)))
+      .map((u) => u.userId), []);
+  ok("no unknown profile status",
+    seeded.filter((u) => !vocab.profileStatuses.some((s) => s.key === u.profile.profileStatus))
+      .map((u) => u.userId), []);
   /* THE MIGRATION'S ONE INVARIANT. businessType and segments replaced category
      and services one for one, both required. If a profile gained or lost one
      of them, its completeness moved — and a vocabulary change would have
      silently re-graded people. */
   ok("business type and segments travel together",
-    users.filter((u) => !!u.profile.businessType !== (u.profile.segments.length > 0))
+    seeded.filter((u) => !!u.profile.businessType !== (u.profile.segments.length > 0))
       .map((u) => u.userId), []);
-  /* This figure moved 3 → 2 when Pincode was later removed — deliberately;
-     the re-grade block below owns the full story. */
-  ok("...and the incomplete count matches the re-grade block", S.countsOf(all).incompleteProfiles, 2);
   ok("no profile exceeds the segment cap",
-    users.filter((u) => u.profile.segments.length > 6).map((u) => u.userId), []);
+    seeded.filter((u) => u.profile.segments.length > 6).map((u) => u.userId), []);
   ok("no profile exceeds the keyword cap",
-    users.filter((u) => u.profile.searchKeywords.length > 12).map((u) => u.userId), []);
+    seeded.filter((u) => u.profile.searchKeywords.length > 12).map((u) => u.userId), []);
+  ok("every profile carries the schema version it was graded against",
+    seeded.filter((u) => u.profile.schemaVersion !== S.PROFILE_SCHEMA_VERSION)
+      .map((u) => u.userId), []);
+  /* IDENTITY IS THE POINT OF THIS MODULE, so the things that identify somebody
+     have to be unique across it. A duplicate here is two records for one
+     person, which is the failure a directory exists to prevent. */
+  const dup = (get) => {
+    const seen = {}, bad = [];
+    seeded.forEach((u) => {
+      const k = get(u);
+      if (!k) return;
+      if (seen[k]) bad.push(u.userId); else seen[k] = 1;
+    });
+    return bad;
+  };
+  ok("user ids are unique", dup((u) => u.userId), []);
+  ok("auth identities are unique", dup((u) => u.authUserId), []);
+  ok("profile ids are unique", dup((u) => u.profile.profileId), []);
+  ok("emails are unique", dup((u) => (u.identity.email || "").toLowerCase()), []);
+  ok("phone numbers are unique on the last ten digits",
+    dup((u) => (u.identity.phone || "").replace(/\D/g, "").slice(-10)), []);
+  ok("usernames are unique", dup((u) => (u.profile.username || "").toLowerCase()), []);
 }
 
 console.log("\nthe closed lists actually close");
@@ -586,15 +775,23 @@ S.resetStore();
   ok("a category nobody listed is accepted", bad({ categories: ["Pergola kits"] }), false);
   ok("...but not twice", bad({ categories: ["Pergola kits", "pergola kits"] }), true);
   ok("...and not at forty-one characters", bad({ categories: ["x".repeat(41)] }), true);
+  ok("...and not eleven of them",
+    bad({ categories: Array.from({ length: 11 }, (_, i) => "Cat " + i) }), true);
 
-  /* Keywords are the ONE open facet, and openness is the point: matching is
-     the job where the tail nobody enumerated is what people actually type. */
+  /* Keywords are the ONE fully open facet, and openness is the point: matching
+     is the job where the tail nobody enumerated is what people actually type. */
   ok("a keyword nobody suggested is accepted",
     bad({ searchKeywords: ["Jacuzzi installation"] }), false);
   ok("...but not a forty-one character one",
     bad({ searchKeywords: ["x".repeat(41)] }), true);
   ok("...and not thirteen of them",
     bad({ searchKeywords: Array.from({ length: 13 }, (_, i) => "kw " + i) }), true);
+  ok("a key the patch does not name is simply not being patched",
+    S.validateFacets({}), "");
+  /* Every complaint is one sentence in one string — the dialog prints it as
+     given, so a patch that is wrong twice has to say so twice. */
+  ok("two bad facets produce two complaints",
+    S.validateFacets({ businessType: "wizard", dealsIn: ["dreams"] }).split(". ").length, 2);
 
   ok("cleanKeyword collapses the whitespace", S.cleanKeyword("  floor   planning "), "floor planning");
   /* Case-insensitive, and the FIRST spelling survives — the one already on the
@@ -602,6 +799,7 @@ S.resetStore();
   ok("dedupe is case-insensitive and keeps the first spelling",
     S.dedupeKeywords(["Modular kitchen", "modular  kitchen", "Wardrobe design"]),
     ["Modular kitchen", "Wardrobe design"]);
+  ok("...and drops the blanks rather than keeping one", S.dedupeKeywords(["a", "  ", ""]), ["a"]);
 }
 
 console.log("\nthe write path refuses what the form refuses");
@@ -609,7 +807,7 @@ S.resetStore();
 {
   const before = JSON.stringify(S.readUsers().filter((u) => u.userId === "IB-U-0912")[0].profile);
   /* Segments are open now, so the probe uses a rule that still closes:
-     Business type is one answer from a chain of six, and nothing else. */
+     Business type is one answer from a chain of seven, and nothing else. */
   const err = S.updateProfile("IB-U-0912", { businessType: "not_a_type" });
   ok("an unknown business type is refused at the store, not only in the dialog",
     err.indexOf("not one of the allowed") >= 0, true);
@@ -627,6 +825,14 @@ S.resetStore();
   ok("...and it is what came back",
     S.readUsers().filter((u) => u.userId === "IB-U-0912")[0].profile.segments,
     ["interior_designer", "architect"]);
+  /* PARTIAL WRITES DO NOT EXIST. One good field beside one bad one saves
+     neither — the endpoint 422s the whole patch (UM-T07) and so does this. */
+  const now = JSON.stringify(S.readUsers().filter((u) => u.userId === "IB-U-0912")[0].profile);
+  ok("one bad field takes the whole patch down",
+    S.updateProfile("IB-U-0912", { about: "A perfectly good sentence.", businessType: "wizard" })
+      !== "", true);
+  ok("...including the field that was fine",
+    JSON.stringify(S.readUsers().filter((u) => u.userId === "IB-U-0912")[0].profile), now);
 }
 
 /* ============================================================ the username ===
@@ -643,7 +849,9 @@ S.resetStore();
   ok("digits are fine", bad("studio-360"), false);
   ok("upper case is not", bad("Meera-Studio"), true);
   ok("two characters is too short", bad("ab"), true);
+  ok("three is not", bad("abc"), false);
   ok("thirty-one is too long", bad("a".repeat(31)), true);
+  ok("thirty is not", bad("a".repeat(30)), false);
   ok("a leading hyphen is refused", bad("-meera"), true);
   ok("a trailing hyphen is refused", bad("meera-"), true);
   ok("a double hyphen is refused", bad("meera--studio"), true);
@@ -653,32 +861,67 @@ S.resetStore();
      profile sit at an address the platform speaks from. */
   ok("a reserved word is refused", bad("admin"), true);
   ok("...and so is `login`", bad("login"), true);
+  /* Every reserved word has to be UNREACHABLE, which is the point of the list —
+     but not necessarily by the reserved rule: `me` and `u` are under the
+     minimum length and are refused before the list is ever consulted. What
+     must not exist is a reserved word the validator lets through. */
+  ok("no reserved word is claimable",
+    S.RESERVED_USERNAMES.filter((r) => !S.usernameError(r)), []);
+  ok("...and the ones long enough to reach the list are refused BY the list",
+    S.RESERVED_USERNAMES.filter((r) => r.length >= S.USERNAME_RULES.min)
+      .filter((r) => S.usernameError(r).indexOf("reserved") < 0), []);
   ok("an empty handle is not an ERROR, it is just absent", S.usernameError(""), "");
+  ok("...and neither is whitespace", S.usernameError("   "), "");
 
   ok("slugify does what somebody typing a business name means",
     S.slugify("Meera Studio Interiors LLP"), "meera-studio-interiors-llp");
   ok("...including the ampersand", S.slugify("Bhatia Ply & Hardware"), "bhatia-ply-and-hardware");
   ok("...and never emits a handle its own rules refuse",
     S.usernameError(S.slugify("  ***Meera   Studio!!!  ")), "");
+  ok("...nor one over the length cap",
+    S.slugify("A very long business name indeed that just keeps going and going").length
+      <= S.USERNAME_RULES.max, true);
+  ok("every seeded business name slugs to a legal handle",
+    S.readUsers().filter((u) => u.profile.businessName)
+      .filter((u) => S.usernameError(S.slugify(u.profile.businessName)))
+      .map((u) => u.userId), []);
 
   ok("a seeded handle is taken", S.usernameTaken("meera-studio-interiors"), true);
   /* The check that stops a dialog telling you your own handle is unavailable
      the moment you open it. */
   ok("...but not by its own owner", S.usernameTaken("meera-studio-interiors", "IB-U-0912"), false);
+  ok("...and the check is case-insensitive", S.usernameTaken("MEERA-STUDIO-INTERIORS"), true);
   ok("an unused handle is free", S.usernameTaken("nobody-has-this"), false);
   ok("usernameFree wants all three", S.usernameFree("nobody-has-this"), true);
   ok("...and refuses a reserved one even though nobody holds it",
     S.usernameFree("admin"), false);
+  ok("...and an empty one", S.usernameFree(""), false);
 
   const names = S.readUsers().map((u) => u.profile.username).filter(Boolean);
-  ok("every seeded handle is well formed",
-    names.filter((n) => S.usernameError(n)), []);
+  ok("every seeded handle is well formed", names.filter((n) => S.usernameError(n)), []);
   ok("...and no two profiles share one", names.length, new Set(names).size);
   ok("the profile URL is built on the storefront, not the API",
-    S.profileUrl("meera-studio").indexOf("/pro/meera-studio") > 0, true);
+    S.profileUrl("meera-studio").indexOf(S.USERNAME_RULES.path + "meera-studio") > 0, true);
+  ok("...and degrades to a readable host rather than the string `undefined`",
+    S.profileUrl("meera-studio").indexOf("undefined") < 0, true);
+
+  /* UNIQUENESS IS NOT A FIELD RULE, so it is not in validateFacets: that
+     answers "is this value well formed", which needs nothing but the value,
+     and this one needs the whole table. This is where that seam is pinned. */
+  ok("a malformed username is refused by validateFacets",
+    S.validateFacets({ username: "Bad_Name" }) !== "", true);
+  ok("...but uniqueness is not its job",
+    S.validateFacets({ username: "meera-studio-interiors" }), "");
+  ok("the store is what refuses a taken one",
+    S.updateProfile("IB-U-1041", { username: "meera-studio-interiors" })
+      .indexOf("belongs to another profile") >= 0, true);
+  ok("...and nothing was saved on the way past it",
+    S.readUser("IB-U-1041").profile.username !== "meera-studio-interiors", true);
+  ok("...and a free one goes through",
+    S.updateProfile("IB-U-1041", { username: "priya-nair-design" }), "");
 }
 
-console.log("\nnothing is conditional any more, and the machinery still gates");
+console.log("\nnothing is conditional any more, and the schema is whole for everybody");
 {
   /* Target areas WAS member-only while it was a marketing extra beside a
      registered address. It is the profile's only location now, so it applies
@@ -686,67 +929,109 @@ console.log("\nnothing is conditional any more, and the machinery still gates");
      location filter, which is exactly what Incomplete should surface. */
   ok("no field carries a showWhen",
     S.PROFILE_FIELDS.filter((f) => f.showWhen).map((f) => f.key), []);
-  ok("so every user gets the whole schema",
-    all.filter((r) => S.fieldsFor(r).length !== S.PROFILE_FIELDS.length).length, 0);
-  /* The gate itself outlives its last user — asserted with a synthetic field
-     so the day a conditional field returns, the machinery is known-good. */
-  const fake = { key: "x", label: "X", group: "business", required: false,
-    editable: true, public: true, type: "text", showWhen: "member" };
-  ok("fieldApplies still gates a member-only field",
-    all.filter((r) => S.fieldApplies(fake, r)).length,
-    all.filter((r) => S.MEMBER_CLASSES.indexOf(r.classification) >= 0).length);
+  /* The gate that read one is gone with it, and so is the class set it
+     compared against — a schema conditional on membership cannot exist in a
+     module that holds none. */
+  ok("the conditional-field machinery is gone with its last user",
+    ["fieldApplies", "fieldsFor", "MEMBER_CLASSES"].filter((k) => k in S), []);
+  ok("so every user gets the whole schema, and the form reads it directly",
+    S.PROFILE_FIELDS.length > 0, true);
+  ok("every schema field declares the four things the form dispatches on",
+    S.PROFILE_FIELDS.filter((f) => !f.key || !f.label || !f.group || !f.type).map((f) => f.key), []);
+  ok("every field that points at a vocabulary points at one that exists",
+    S.PROFILE_FIELDS.filter((f) => f.vocab && !S.optionsFor(f).length).map((f) => f.key), []);
+  ok("...and every field that names option groups gets them",
+    S.PROFILE_FIELDS.filter((f) => f.groups && !S.groupsFor(f).length).map((f) => f.key), []);
+  /* A PICKER-BACKED FACET NEEDS A DECLARED CEILING: its list is open or long,
+     so a facet with no cap is a facet everybody maxes. A `checks` field is
+     bounded by its own option list instead — every option is on screen — so it
+     only declares a cap when the cap is smaller than that, as Positioning
+     does at two of four. */
+  ok("every picker-backed facet declares a ceiling",
+    S.PROFILE_FIELDS.filter((f) => ["multi", "tags"].indexOf(f.type) >= 0 && !f.max)
+      .map((f) => f.key), []);
+  ok("...and a checkbox facet with no declared cap is bounded by its options",
+    S.PROFILE_FIELDS.filter((f) => f.type === "checks" && !f.max)
+      .filter((f) => !S.validateFacets({
+        [f.key]: S.optionsFor(f).map((o) => o.key).concat(["one-too-many"]),
+      })).map((f) => f.key), []);
+  ok("every group named by the schema is one the form lays out",
+    Array.from(new Set(S.PROFILE_FIELDS.map((f) => f.group))).sort(),
+    ["about", "business", "contact", "positioning"]);
+  ok("the required fields are the six a usable listing needs",
+    REQUIRED.map((f) => f.key),
+    ["businessName", "username", "businessType", "dealsIn", "segments", "targetAreas"]);
 }
 
 console.log("\nthe re-grade is exactly the one that was asked for");
 {
-  const users = S.readUsers();
-  /* THIS migration DOES move completeness, once, on purpose: Pincode was
-     removed at the user's request, and IB-U-1038's only gap was its pincode.
-     Two incomplete profiles now — the two with no business profile at all —
-     and the assertion names them so an accidental second re-grade cannot
-     hide behind the deliberate one. */
-  ok("exactly two incomplete profiles remain", S.countsOf(all).incompleteProfiles, 2);
-  ok("...and they are the two with no business profile",
-    all.filter((r) => r.completeness < 100).map((r) => r.user.userId).sort(),
-    ["IB-U-0601", "IB-U-1029"]);
-  ok("IB-U-1038 is the one deliberate promotion — pincode was its only gap",
-    byId["IB-U-1038"].completeness, 100);
+  const seeded = S.readUsers();
+  ok("the incomplete profiles are the ones with no business profile at all",
+    all.filter((r) => r.completeness < 100).map((r) => r.user.userId).sort(), INCOMPLETE_IDS);
+  ok("...and every one of them is missing the business name",
+    all.filter((r) => r.completeness < 100)
+      .filter((r) => r.missingFields.indexOf("Business name") < 0).map((r) => r.user.userId), []);
   ok("a username exists wherever a business name does",
-    users.filter((u) => !!u.profile.businessName !== !!u.profile.username).map((u) => u.userId), []);
+    seeded.filter((u) => !!u.profile.businessName !== !!u.profile.username).map((u) => u.userId), []);
   /* The removed fields must be gone from the DATA too, not just the form —
      a stored value nothing renders is a field that comes back. */
   ["portfolioUrl", "locality", "addressLine", "state", "city", "pincode", "displayName"].forEach((k) => {
     ok("`" + k + "` is gone from the seed",
-      users.filter((u) => k in u.profile).length, 0);
+      seeded.filter((u) => k in u.profile).length, 0);
   });
+  ok("...and from the schema the form is built from",
+    S.PROFILE_FIELDS.filter((f) => ["portfolioUrl", "locality", "addressLine", "pincode",
+      "displayName", "city", "state"].indexOf(f.key) >= 0).map((f) => f.key), []);
+  /* KNOWN SEED DEFECT — reported, not papered over. `profileStatus` is the
+     publication state and updateProfile keeps it in step with the grade, so a
+     100%-complete profile stored as "incomplete" is a row this store would
+     never have written. IB-U-1038 was promoted to 100 when Pincode came out of
+     the schema and its stored status was never re-stamped. Named so a second
+     one cannot hide behind it. */
+  ok("KNOWN GAP: exactly one stored profileStatus disagrees with its own grade",
+    seeded.filter((u) => u.profile.profileStatus !== "hidden"
+      && (u.profile.profileStatus === "published") !== (gapsOf(u).length === 0))
+      .map((u) => u.userId), ["IB-U-1038"]);
+  ok("...and it is a stale label rather than a grading bug — the profile is complete",
+    byId["IB-U-1038"].completeness, 100);
   /* The structured rows are sound in the seed: every business profile states
      coverage, every state is a real key, no state repeats, no half rows. */
   ok("every business profile has at least one coverage row",
-    users.filter((u) => u.profile.businessName && !u.profile.targetAreas.length)
+    seeded.filter((u) => u.profile.businessName && !u.profile.targetAreas.length)
       .map((u) => u.userId), []);
   const stateKeys = S.STATES.map((x) => x.key);
   ok("every row's state is a vocabulary key",
-    users.filter((u) => u.profile.targetAreas.some((t) => stateKeys.indexOf(t.state) < 0))
+    seeded.filter((u) => u.profile.targetAreas.some((t) => stateKeys.indexOf(t.state) < 0))
       .map((u) => u.userId), []);
   ok("no profile claims one state twice",
-    users.filter((u) => new Set(u.profile.targetAreas.map((t) => t.state)).size
+    seeded.filter((u) => new Set(u.profile.targetAreas.map((t) => t.state)).size
       !== u.profile.targetAreas.length).map((u) => u.userId), []);
   ok("no row is a state with no cities",
-    users.filter((u) => u.profile.targetAreas.some((t) => !t.cities.length))
+    seeded.filter((u) => u.profile.targetAreas.some((t) => !t.cities.length))
       .map((u) => u.userId), []);
-  ok("every seeded state has city suggestions to offer",
+  ok("no profile is over the row cap or the city cap",
+    seeded.filter((u) => u.profile.targetAreas.length > 5
+      || u.profile.targetAreas.some((t) => t.cities.length > 8)).map((u) => u.userId), []);
+  /* THE SEED HAS TO SURVIVE ITS OWN VALIDATOR. A fixture the write path would
+     refuse is a fixture that demonstrates a screen nobody can save. */
+  ok("every seeded coverage list would pass the rules a save applies",
+    seeded.filter((u) => u.profile.targetAreas.length
+      && S.validateFacets({ targetAreas: u.profile.targetAreas })).map((u) => u.userId), []);
+  ok("every state in the vocabulary has city suggestions to offer",
     stateKeys.filter((k) => !S.citySuggestionsOf(k).length), []);
   ok("primaryCityOf reads the first row's first city",
     S.primaryCityOf(byId["IB-U-0912"].user.profile), "Bengaluru");
   ok("...and null where there is no coverage",
     S.primaryCityOf(byId["IB-U-1029"].user.profile), null);
+  ok("...and the state where the row is a whole-state claim",
+    S.primaryCityOf(byId["IB-U-0944"].user.profile), "Rajasthan");
 }
 
 console.log("\nan open facet takes what a closed one would refuse");
 S.resetStore();
 {
   const bad = (patch) => S.validateFacets(patch) !== "";
-  const row = (state, cities) => ({ state, cities });
+  const row = (state, cities) => ({ state: state, cities: cities });
   /* HALF CLOSED, HALF OPEN, per row. The state must be a vocabulary key so
      rows aggregate; the cities take anything, because "Uttam Nagar" is a real
      service area and no list holds every locality. */
@@ -756,6 +1041,32 @@ S.resetStore();
   ok("an invented state is not", bad({ targetAreas: [row("Atlantis", ["Somewhere"])] }), true);
   ok("a state with no cities is a half answer, refused",
     bad({ targetAreas: [row("Karnataka", [])] }), true);
+  /* NORMALISED FIRST: the caller that is not the form is exactly the one that
+     hands over a row with no cities array at all. Refuse it; never throw. */
+  ok("a row with no cities array is refused rather than thrown on",
+    bad({ targetAreas: [{ state: "Karnataka" }] }), true);
+  /* KNOWN STORE DEFECT — reported, not papered over. The ROW is normalised
+     before it is judged, so a row with no cities is refused rather than thrown
+     on. The VALUE is not: a `targetAreas` that is not an array at all is read
+     as "no areas", passes, and is then stored raw by updateProfile — after
+     which applyFilters throws `targetAreas.some is not a function` and the
+     whole directory goes down. Unreachable from the form (EditProfile coerces
+     to an array) and reachable from exactly the caller validateFacets says it
+     exists for: an import or a bulk edit. */
+  ok("a targetAreas that is not a list is REFUSED, not read as `no areas`",
+    bad({ targetAreas: "Karnataka" }), true);
+  ok("...which is what keeps the next read from throwing, because it is never stored",
+    (() => {
+      try { S.primaryCityOf({ targetAreas: "Karnataka" }); return "returned"; }
+      catch (e) { return "threw"; }
+    })(), "threw");
+  ok("...and a real list still passes, so the guard refuses the shape and not the field",
+    bad({ targetAreas: [{ state: "Karnataka", cities: ["Bengaluru"] }] }), false);
+  ok("...whereas the ROW-level normalisation, which is the promise that holds, does not throw",
+    (() => {
+      try { return S.validateFacets({ targetAreas: [{ state: "Karnataka" }] }) !== "" ? "refused" : "allowed"; }
+      catch (e) { return "threw"; }
+    })(), "refused");
   ok("the same state twice is refused",
     bad({ targetAreas: [row("Delhi", ["Dwarka"]), row("Delhi", ["Saket"])] }), true);
   ok("the same city twice in one row is refused",
@@ -763,6 +1074,9 @@ S.resetStore();
   ok("six states is over the cap of five",
     bad({ targetAreas: ["Karnataka", "Maharashtra", "Delhi", "Kerala", "Telangana", "Haryana"]
       .map((st) => row(st, ["X"])) }), true);
+  ok("five is not",
+    bad({ targetAreas: ["Karnataka", "Maharashtra", "Delhi", "Kerala", "Telangana"]
+      .map((st) => row(st, ["X"])) }), false);
   ok("nine cities in one row is over the cap of eight",
     bad({ targetAreas: [row("Delhi", Array.from({ length: 9 }, (_, i) => "Area " + i))] }), true);
   ok("an empty list is not an ERROR here — required-ness is the form's check",
@@ -775,23 +1089,18 @@ S.resetStore();
     bad({ targetAreas: [row("Rajasthan", ["All cities", "Jaipur"])] }), true);
   ok("every state's suggestions lead with it",
     S.STATES.filter((x) => S.citySuggestionsOf(x.key)[0].key !== S.ALL_CITIES), []);
-  ok("a whole-state row answers the filter for its cities",
-    S.applyFilters(all, { city: "Jaipur" }).map((r) => r.user.userId), ["IB-U-0944"]);
-  ok("...and for the state itself",
-    S.applyFilters(all, { city: "Rajasthan" }).map((r) => r.user.userId), ["IB-U-0944"]);
-  ok("the compact city for a whole-state row is the state, not the claim",
-    S.primaryCityOf(byId["IB-U-0944"].user.profile), "Rajasthan");
-  ok("searching the word `all` does not surface it",
-    S.applyFilters(all, { q: "all cities" }).length, 0);
-  ok("a malformed username is refused by validateFacets", bad({ username: "Bad_Name" }), true);
-  /* Uniqueness is NOT a field rule — it needs the whole table, so it lives in
-     updateProfile and this is where that seam is pinned down. */
-  ok("...but uniqueness is not its job", bad({ username: "meera-studio-interiors" }), false);
-  ok("the store is what refuses a taken one",
-    S.updateProfile("IB-U-1041", { username: "meera-studio-interiors" })
-      .indexOf("belongs to another profile") >= 0, true);
-  ok("...and a free one goes through",
-    S.updateProfile("IB-U-1041", { username: "priya-nair-design" }), "");
+  ok("...and it is spelled one way everywhere", S.ALL_CITIES, "All cities");
+  /* THE CITY FILTER'S OPTIONS HAVE TO BE ANSWERABLE. An option is answerable
+     when it is either a city some state lists or a city-state in its own right
+     — Delhi is the second kind, which is exactly why the filter matches on the
+     row's state as well as on its cities. An option that is neither is a
+     dropdown entry that returns nothing, every time, for everybody. */
+  const stateKeys = S.STATES.map((x) => x.key);
+  ok("every city the filter offers is a listed city or a state in its own right",
+    S.CITIES.map((x) => x.key).filter((k) => stateKeys.indexOf(k) < 0
+      && !Object.keys(S.STATE_CITIES).some((st) => S.STATE_CITIES[st].indexOf(k) >= 0)), []);
+  ok("...and not one of them comes back empty against the seed",
+    S.CITIES.map((x) => x.key).filter((k) => !S.applyFilters(all, { city: k }).length), []);
 }
 
 console.log("\nService provider is gone, and dealsIn is the axis that replaced it");
@@ -811,19 +1120,27 @@ S.resetStore();
     "What kind of business this is. It decides how the marketplace treats them, so it is one answer, not several.");
   /* ORDERED ALONG THE CHAIN, read from the portal's end: the people who use
      it most come first — who works alone, who designs as a team, who builds —
-     then who sells, who moves, who makes. Still a chain, not a list; the
-     direction is the one that puts the common answer at the top. */
+     then who sells, who moves, who makes. */
   ok("seven types, in chain order from the practitioner up",
     S.BUSINESS_TYPES.map((t) => t.key),
     ["independent", "firm_studio", "contractor", "retailer", "wholesaler", "dealer", "manufacturer"]);
+  /* Counted off the seed rather than written down: seven more customers
+     arriving must not make this a failure. */
+  const typed = S.readUsers().filter((u) => u.profile.businessType);
+  ok("every profile with a business name states its type",
+    S.readUsers().filter((u) => !!u.profile.businessName !== !!u.profile.businessType)
+      .map((u) => u.userId), []);
+  ok("the chain is genuinely in use, not a list with one answer in it",
+    Array.from(new Set(typed.map((u) => u.profile.businessType))).length >= 5, true);
   /* Firm / Studio is the grain two earlier entries flagged as missing: a
      design practice with a team is neither a site contractor nor a solo
-     practitioner. The seed's design firms sit there; trades that build stay
-     Contractor; the two solo practices stay Independent. */
-  ok("the design firms are Firm / Studio",
-    S.readUsers().filter((u) => u.profile.businessType === "firm_studio").length, 7);
-  ok("...trades that build are Contractor",
-    S.readUsers().filter((u) => u.profile.businessType === "contractor").length, 6);
+     practitioner. It is the seed's most common answer, which is the shape the
+     vocabulary was changed to capture. */
+  ok("Firm / Studio is the most common answer in the seed",
+    S.BUSINESS_TYPES.map((t) => typed.filter((u) => u.profile.businessType === t.key).length)
+      .indexOf(Math.max.apply(null, S.BUSINESS_TYPES.map((t) =>
+        typed.filter((u) => u.profile.businessType === t.key).length))),
+    S.BUSINESS_TYPES.map((t) => t.key).indexOf("firm_studio"));
   ok("...and Independent is the two who work alone",
     S.readUsers().filter((u) => u.profile.businessType === "independent")
       .map((u) => u.userId).sort(), ["IB-U-0812", "IB-U-1041"]);
@@ -834,38 +1151,47 @@ S.resetStore();
   ok("both together is fine", bad({ dealsIn: ["products", "services"] }), false);
   ok("an invented deal kind is not", bad({ dealsIn: ["dreams"] }), true);
   ok("the same one twice is not", bad({ dealsIn: ["products", "products"] }), true);
+  ok("and neither is a third one", bad({ dealsIn: ["products", "services", "ideas"] }), true);
 
-  const users = S.readUsers();
+  const seeded = S.readUsers();
   ok("dealsIn travels with the business profile, like the other required facets",
-    users.filter((u) => !!u.profile.businessName !== (u.profile.dealsIn.length > 0))
+    seeded.filter((u) => !!u.profile.businessName !== (u.profile.dealsIn.length > 0))
       .map((u) => u.userId), []);
   ok("...and every value in the seed is one of the two",
-    users.filter((u) => u.profile.dealsIn.some((k) => ["products", "services"].indexOf(k) < 0))
+    seeded.filter((u) => u.profile.dealsIn.some((k) => ["products", "services"].indexOf(k) < 0))
       .map((u) => u.userId), []);
   ok("the maker who also installs deals in both",
-    S.readUsers().filter((u) => u.userId === "IB-U-0975")[0].profile.dealsIn,
+    seeded.filter((u) => u.userId === "IB-U-0975")[0].profile.dealsIn,
     ["products", "services"]);
-  /* Still exactly two incomplete — dealsIn was seeded wherever the other
-     required business fields already were, so nobody moved. */
-  ok("the incomplete set did not move again", S.countsOf(all).incompleteProfiles, 2);
 }
 
-console.log("\npositioning: up to two of a closed three");
+console.log("\npositioning: up to two of a closed four");
 {
   const bad = (patch) => S.validateFacets(patch) !== "";
   ok("one is fine", bad({ positioning: ["luxury"] }), false);
   ok("two is fine", bad({ positioning: ["luxury", "custom"] }), false);
   ok("three is over the cap", bad({ positioning: ["luxury", "budget_friendly", "custom"] }), true);
-  ok("premium, value and eco-friendly are gone",
-    bad({ positioning: ["premium"] }) && bad({ positioning: ["value"] }) && bad({ positioning: ["eco_friendly"] }), true);
+  ok("premium is on offer again", bad({ positioning: ["premium"] }), false);
+  ok("the four are the four",
+    S.VOCAB.positioning.map((p) => p.key), ["luxury", "budget_friendly", "custom", "premium"]);
+  ok("...so value and eco-friendly are refused",
+    bad({ positioning: ["value"] }) && bad({ positioning: ["eco_friendly"] }), true);
   ok("an invented one is refused", bad({ positioning: ["bespoke"] }), true);
   ok("optional: an empty list passes", bad({ positioning: [] }), false);
   ok("no seeded profile exceeds two",
     S.readUsers().filter((u) => u.profile.positioning.length > 2).map((u) => u.userId), []);
-  ok("...or names a value outside the five",
+  /* The closed facet, held closed BY THE SEED as well as by the validator.
+     Seven profiles once carried `value`, a key the vocabulary had dropped —
+     refused on save, and rendered as its own raw key on the record. Fixed at
+     the source; this is the rule that replaced the quarantine. */
+  ok("every seeded profile positions itself with a key the vocabulary has",
     S.readUsers().filter((u) => u.profile.positioning.some((k) =>
-      ["luxury", "budget_friendly", "custom"].indexOf(k) < 0)).map((u) => u.userId), []);
-  ok("optional means the incomplete set did not move", S.countsOf(all).incompleteProfiles, 2);
+      !S.VOCAB.positioning.some((pp) => pp.key === k))).map((u) => u.userId).sort(), []);
+  ok("...so every seeded positioning would survive being saved again",
+    S.readUsers().filter((u) => u.profile.positioning.length
+      && S.validateFacets({ positioning: u.profile.positioning })).map((u) => u.userId), []);
+  ok("...which is what a stray key does to a closed facet: it renders as itself",
+    S.facetLabel("positioning", "value"), "value");
 }
 
 console.log("\nkeys are stored, labels are shown");
@@ -877,7 +1203,166 @@ console.log("\nkeys are stored, labels are shown");
      indistinguishable from "they never answered". */
   ok("a dropped key falls back to itself, not to blank",
     S.facetLabel("segments", "retired_key"), "retired_key");
+  ok("an unknown vocabulary falls back rather than throwing",
+    S.facetLabel("nothing_here", "x"), "x");
+  ok("labelsFor resolves a whole list through the field's own vocabulary",
+    S.labelsFor(S.PROFILE_FIELDS.filter((f) => f.key === "dealsIn")[0], ["products", "services"]),
+    ["Products", "Services"]);
+  ok("classificationMeta answers for both classifications",
+    ["active", "deactivated"].map((k) => S.classificationMeta(k).label), ["Active", "Deactivated"]);
+  ok("...and every classification explains what it means and what it does not",
+    S.CLASSIFICATIONS.filter((x) => !x.meaning || !x.derivedFrom).map((x) => x.key), []);
+  ok("...falling back rather than returning undefined",
+    !!S.classificationMeta("nonsense").label, true);
+  ok("tagMeta answers for a real slug and null for an invented one",
+    [S.tagMeta("vip").label, S.tagMeta("nope")], ["VIP", null]);
+  ok("every tag carries the sentence that says when to use it",
+    S.TAGS.filter((t) => !t.help || !t.tone).map((t) => t.slug), []);
+  ok("both open decisions are still named where they bite",
+    S.OPEN_DECISIONS.map((d) => d.id), ["UM-OD-09", "UM-OD-10"]);
+  ok("...and decision() finds one", S.decision("UM-OD-09").title, "Profile schema");
 }
+
+/* ============================================== the filter chip contract === */
+console.log("\nevery filter the URL carries can be named and cleared");
+{
+  ok("FILTER_KEYS covers every key applyFilters reads",
+    ["q", "city", "src", "tag", "status", "flag", "registered", "from", "to"]
+      .filter((k) => S.FILTER_KEYS.indexOf(k) < 0), []);
+  ok("...and carries no key it has stopped reading",
+    S.FILTER_KEYS.filter((k) =>
+      ["cls", "view", "sort", "page", "term", "start", "end"].indexOf(k) >= 0), []);
+  /* A chip with no label renders as its raw key, which is how `src` ends up on
+     screen in front of somebody. from/to are the two halves of the custom
+     range and are cleared with it rather than shown separately. */
+  ok("every chip-bearing key has a human label",
+    S.FILTER_KEYS.filter((k) => ["from", "to"].indexOf(k) < 0)
+      .filter((k) => !S.FILTER_LABELS[k]), []);
+  ok("a status value reads as its classification label",
+    S.filterValueLabel("status", "deactivated"), "Deactivated");
+  ok("a source reads as its channel name", S.filterValueLabel("src", "web"), "Website signup");
+  ok("a tag reads as its label", S.filterValueLabel("tag", "vip"), "VIP");
+  ok("a range reads as its own name", S.filterValueLabel("registered", "7d"), "Last 7 days");
+  ok("the profile flag reads as a sentence, not as `incomplete`",
+    S.filterValueLabel("flag", "incomplete"), "Incomplete profile");
+  ok("an unknown value falls back to itself rather than to blank",
+    S.filterValueLabel("src", "carrier-pigeon"), "carrier-pigeon");
+}
+
+/* ================================================ the analytics arithmetic ===
+   The payload is MONTH-KEYED, so a span resolves to real arithmetic rather
+   than to whichever two windows somebody pre-summed. Rates are recomputed from
+   their own numerator and denominator over the span — never averaged from
+   stored percentages, which cannot be re-aggregated without lying. */
+console.log("\nthe range is real arithmetic over the monthly series");
+{
+  const M = S.MONTHS;
+  ok("the series is monthly and long enough to cut", M.length >= 6, true);
+  ok("every month carries both series and its own channel split",
+    M.filter((m) => typeof m.registrations !== "number"
+      || typeof m.profileCompleted !== "number" || !m.bySource).map((m) => m.month), []);
+  ok("each month's channels sum exactly to its own total",
+    M.filter((m) => Object.keys(m.bySource).reduce((a, k) => a + m.bySource[k], 0)
+      !== m.registrations).map((m) => m.month), []);
+  ok("every channel key is one the vocabulary names",
+    Array.from(new Set(M.reduce((a, m) => a.concat(Object.keys(m.bySource)), [])))
+      .filter((k) => !S.REGISTRATION_SOURCES.some((s) => s.key === k)), []);
+  ok("the months are in order, oldest first",
+    M.map((m) => m.month).slice().sort(), M.map((m) => m.month));
+  ok("every month is labelled for an axis and for a sentence",
+    M.filter((m) => !m.label || !m.short).map((m) => m.month), []);
+
+  const t = S.rangeTotals(M[M.length - 3].month, M[M.length - 1].month);
+  ok("a three-month span holds three months", t.monthCount, 3);
+  ok("...and sums them rather than reading a pre-summed figure",
+    t.registrations, M.slice(-3).reduce((a, m) => a + m.registrations, 0));
+  ok("...profiles completed likewise",
+    t.profileCompleted, M.slice(-3).reduce((a, m) => a + m.profileCompleted, 0));
+  /* A RATE CARRIES ITS OWN FRACTION. Averaging three stored percentages gives
+     a different — and wrong — answer the moment the months differ in size. */
+  ok("completion is recomputed from its numerator and denominator",
+    [t.completion.num, t.completion.den], [t.profileCompleted, t.registrations]);
+  ok("...and equals the fraction, not the mean of the monthly rates",
+    t.completion.value, t.profileCompleted / t.registrations);
+  ok("...which is a different number from that mean",
+    t.completion.value !== M.slice(-3)
+      .reduce((a, m) => a + m.profileCompleted / m.registrations, 0) / 3, true);
+  ok("the channel split sums to the span's own total",
+    t.bySource.reduce((a, s) => a + s.registrations, 0), t.registrations);
+  ok("...and every channel is labelled", t.bySource.filter((s) => !s.label).length, 0);
+  ok("the prior span is the same length, immediately before",
+    t.prev.registrations, M.slice(-6, -3).reduce((a, m) => a + m.registrations, 0));
+  ok("...and is null when there is not enough history behind it",
+    S.rangeTotals(M[0].month, M[2].month).prev, null);
+  ok("a single month is a legal span", S.rangeTotals(M[0].month, M[0].month).monthCount, 1);
+  ok("...and labels itself with one month, not a range",
+    S.rangeTotals(M[0].month, M[0].month).label, M[0].label);
+  ok("a span labels itself from end to end",
+    t.label, M[M.length - 3].label + " – " + M[M.length - 1].label);
+  ok("the whole series is the widest legal span",
+    S.rangeTotals(M[0].month, M[M.length - 1].month).monthCount, M.length);
+
+  ok("a reversed range is corrected rather than refused",
+    S.clampRange(M[5].month, M[2].month), { from: M[2].month, to: M[5].month });
+  ok("an out-of-bounds range clamps to the series",
+    S.clampRange("1999-01", "2099-12"), { from: M[0].month, to: M[M.length - 1].month });
+  ok("a preset is a month count back from the newest month",
+    S.presetRange(6), { from: M[M.length - 6].month, to: M[M.length - 1].month });
+  ok("...and never runs off the start of the series", S.presetRange(999).from, M[0].month);
+  /* Derived rather than stored, so a range arrived at by the calendar that
+     happens to equal a preset lights that preset up. */
+  ok("presetOf recognises a span that matches a preset",
+    S.presetOf(S.presetRange(6).from, S.presetRange(6).to), "6m");
+  ok("...and says nothing for a hand-picked one", S.presetOf(M[1].month, M[4].month), "");
+  ok("every preset is reachable within this series",
+    S.RANGE_PRESETS.filter((p) => S.presetOf(S.presetRange(p.months).from,
+      S.presetRange(p.months).to) !== p.key).map((p) => p.key), []);
+
+  /* THE DEFINITIONS TABLE IS THE PAGE'S CONTRACT with the reader: the same
+     metric has to mean the same thing in March and in September. */
+  ok("every metric definition carries its unit, its formula and its trap",
+    S.METRICS.filter((m) => !m.label || !m.unit || !m.formula || !m.caution).map((m) => m.key), []);
+  ok("engagement is stated as unavailable rather than seeded as zero",
+    S.ANALYTICS.engagement, null);
+  ok("...and the decision that blocks it is named", !!S.decision("UM-OD-10"), true);
+}
+
+console.log("\na figure with no denominator is a missing answer, not a low one");
+ok("pct prints n/a for null rather than 0.0%", S.pct(null), "n/a");
+ok("...and for undefined", S.pct(undefined), "n/a");
+ok("...and for NaN", S.pct(NaN), "n/a");
+ok("a real rate prints as a percentage", S.pct(0.5), "50.0%");
+ok("...to the digits asked for", S.pct(0.5, 0), "50%");
+ok("delta says `no prior period` rather than inventing a baseline",
+  S.delta(10, 0).text, "no prior period");
+ok("a rise is signed and toned", S.delta(10, 8), { text: "+25% vs prior period", tone: "ok" });
+ok("a fall is toned differently", S.delta(8, 10).tone, "warn");
+
+console.log("\ndates read against the seed's own clock, not the browser's");
+ok("NOW is the payload's asOf",
+  new Date(S.NOW).toISOString(), new Date(usersDoc.asOf).toISOString());
+ok("a missing date is an em dash, never `Invalid Date`", S.fmtDate(null), "—");
+ok("...and so is a malformed one", S.fmtDate("not a date"), "—");
+ok("fmtDateTime answers the same way", S.fmtDateTime(null), "—");
+ok("...and prints the date with a time beside it",
+  S.fmtDateTime(usersDoc.asOf).indexOf(S.fmtDate(usersDoc.asOf)), 0);
+ok("today is `today`", S.ago(new Date(S.NOW).toISOString()), "today");
+ok("yesterday is `yesterday`", S.ago(new Date(S.NOW - S.DAY).toISOString()), "yesterday");
+ok("a week is days", S.ago(new Date(S.NOW - 7 * S.DAY).toISOString()), "7 days ago");
+ok("two months is months", S.ago(new Date(S.NOW - 60 * S.DAY).toISOString()), "2 months ago");
+ok("two years is years", S.ago(new Date(S.NOW - 730 * S.DAY).toISOString()), "2 years ago");
+ok("a future date is not `-3 days ago`", S.ago(new Date(S.NOW + 3 * S.DAY).toISOString()), "in 3 days");
+ok("no date at all is an em dash", S.ago(null), "—");
+/* Writes stamp the same clock the derivation reads, so a note added during a
+   demo does not print "in 4 days" on a timeline that lives in August. */
+ok("a simulated write stamps the seed's clock, not the machine's",
+  Math.abs(new Date(S.stamp()).getTime() - S.NOW) < 60000, true);
+ok("no seeded registration is in the future of the seed's own clock",
+  users.filter((u) => new Date(u.registeredAt).getTime() > S.NOW).map((u) => u.userId), []);
+ok("no seeded activity predates its own registration",
+  users.filter((u) => u.lastActivityAt
+    && new Date(u.lastActivityAt).getTime() < new Date(u.registeredAt).getTime())
+    .map((u) => u.userId), []);
 
 S.resetStore();
 

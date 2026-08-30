@@ -1,0 +1,235 @@
+{
+  "$comment": "PLACEHOLDER RECORDS — imported bank statements and the reconciliation state. Replaced by POST /admin/finance/statements (import) and GET /admin/finance/reconciliation. A statement line is the only evidence that counts as cash; everything else in the module is a claim. Auto-match is on AMOUNT + REFERENCE only — name similarity and date proximity are shown to help a person decide and never decide alone. `pendingImport` is the next statement the Import button pulls in, so the demo can be walked. Integer paise.",
+  "generatedAt": "2026-08-25T09:00:00+05:30",
+  "statements": [
+    {
+      "stmtId": "STMT-0722",
+      "accountId": "ACC-HDFC-4021",
+      "from": "2026-07-20",
+      "to": "2026-07-24",
+      "importedAt": "2026-07-25T06:00:00+05:30",
+      "closed": true,
+      "closedBy": "K. Iyer",
+      "closedAt": "2026-07-25T10:00:00+05:30",
+      "lines": [
+        {
+          "lineId": "L-0722-01",
+          "date": "2026-07-22",
+          "dir": "credit",
+          "amountPaise": 29500000,
+          "reference": "RTGS0722JUL1180",
+          "narration": "RTGS/IYER WOODWORKS/GROWTH",
+          "counterparty": "IYER WOODWORKS"
+        }
+      ]
+    },
+    {
+      "stmtId": "STMT-0801",
+      "accountId": "ACC-HDFC-4021",
+      "from": "2026-08-01",
+      "to": "2026-08-05",
+      "importedAt": "2026-08-06T06:00:00+05:30",
+      "closed": true,
+      "closedBy": "K. Iyer",
+      "closedAt": "2026-08-06T09:30:00+05:30",
+      "lines": [
+        {
+          "lineId": "L-0801-01",
+          "date": "2026-08-01",
+          "dir": "debit",
+          "amountPaise": 2200000,
+          "reference": "NEFT0001AUG991",
+          "narration": "NEFT/AHUJA ESTATES/RENT",
+          "counterparty": "AHUJA ESTATES"
+        },
+        {
+          "lineId": "L-0802-01",
+          "date": "2026-08-02",
+          "dir": "credit",
+          "amountPaise": 41200,
+          "reference": "INT-Q1-2026",
+          "narration": "INT.PD 01-04-2026 TO 30-06-2026",
+          "counterparty": "HDFC BANK"
+        }
+      ]
+    },
+    {
+      "stmtId": "STMT-0816",
+      "accountId": "ACC-HDFC-4021",
+      "from": "2026-08-16",
+      "to": "2026-08-19",
+      "importedAt": "2026-08-20T06:00:00+05:30",
+      "closed": true,
+      "closedBy": "K. Iyer",
+      "closedAt": "2026-08-20T09:40:00+05:30",
+      "lines": [
+        {
+          "lineId": "L-0816-01",
+          "date": "2026-08-17",
+          "dir": "credit",
+          "amountPaise": 3540000,
+          "reference": "pay_QK8s21bvC",
+          "narration": "RAZORPAY SETTLEMENT pay_QK8s21bvC",
+          "counterparty": "RAZORPAY"
+        },
+        {
+          "lineId": "L-0816-02",
+          "date": "2026-08-17",
+          "dir": "credit",
+          "amountPaise": 3540000,
+          "reference": "pay_QK8s21bvD",
+          "narration": "RAZORPAY SETTLEMENT pay_QK8s21bvD",
+          "counterparty": "RAZORPAY"
+        },
+        {
+          "lineId": "L-0818-01",
+          "date": "2026-08-18",
+          "dir": "credit",
+          "amountPaise": 5900000,
+          "reference": "421990045512",
+          "narration": "UPI/421990045512/PAYMENT",
+          "counterparty": "SANDEEP KULKARNI"
+        },
+        {
+          "lineId": "L-0818-02",
+          "date": "2026-08-18",
+          "dir": "debit",
+          "amountPaise": 300000,
+          "reference": "424891220071",
+          "narration": "UPI/424891220071/BSES",
+          "counterparty": "BSES RAJDHANI"
+        },
+        {
+          "lineId": "L-0819-01",
+          "date": "2026-08-19",
+          "dir": "credit",
+          "amountPaise": 17700000,
+          "reference": "NEFT0019AUG2213",
+          "narration": "NEFT/PRIYA NAIR/IB-INV-81",
+          "counterparty": "PRIYA NAIR"
+        }
+      ]
+    },
+    {
+      "stmtId": "STMT-0820",
+      "accountId": "ACC-HDFC-4021",
+      "from": "2026-08-20",
+      "to": "2026-08-24",
+      "importedAt": "2026-08-25T06:00:00+05:30",
+      "closed": false,
+      "closedBy": null,
+      "closedAt": null,
+      "lines": [
+        {
+          "lineId": "L-0820-01",
+          "date": "2026-08-20",
+          "dir": "credit",
+          "amountPaise": 24780000,
+          "reference": "NEFT0020AUG4471",
+          "narration": "NEFT/SANDEEP KULKARNI/GROWTH",
+          "counterparty": "SANDEEP KULKARNI"
+        },
+        {
+          "lineId": "L-0820-02",
+          "date": "2026-08-20",
+          "dir": "debit",
+          "amountPaise": 620000,
+          "reference": "aws-aug-2026",
+          "narration": "CARD/AMAZON WEB SERVICES",
+          "counterparty": "AWS"
+        },
+        {
+          "lineId": "L-0821-01",
+          "date": "2026-08-21",
+          "dir": "debit",
+          "amountPaise": 1500000,
+          "reference": "pay_GA26AUG",
+          "narration": "CARD/GOOGLE ADS",
+          "counterparty": "GOOGLE"
+        },
+        {
+          "lineId": "L-0821-02",
+          "date": "2026-08-21",
+          "dir": "debit",
+          "amountPaise": 1000000,
+          "reference": "pay_MA26AUG",
+          "narration": "CARD/META PLATFORMS",
+          "counterparty": "META"
+        },
+        {
+          "lineId": "L-0822-01",
+          "date": "2026-08-22",
+          "dir": "credit",
+          "amountPaise": 9440000,
+          "reference": "424578120033",
+          "narration": "UPI/424578120033/PAYMENT",
+          "counterparty": "S K ENTERPRISES"
+        },
+        {
+          "lineId": "L-0823-01",
+          "date": "2026-08-23",
+          "dir": "debit",
+          "amountPaise": 5900000,
+          "reference": "421990045512",
+          "narration": "UPI RECALL/421990045512/DISPUTE",
+          "counterparty": "SANDEEP KULKARNI"
+        },
+        {
+          "lineId": "L-0824-01",
+          "date": "2026-08-24",
+          "dir": "debit",
+          "amountPaise": 240000,
+          "reference": "figma-aug",
+          "narration": "CARD/FIGMA INC",
+          "counterparty": "FIGMA"
+        },
+        {
+          "lineId": "L-0824-02",
+          "date": "2026-08-24",
+          "dir": "debit",
+          "amountPaise": 11800,
+          "reference": "CHG-AUG-01",
+          "narration": "NEFT CHARGES AUG",
+          "counterparty": "HDFC BANK"
+        }
+      ]
+    }
+  ],
+  "resolutions": [],
+  "$comment_resolutions": "Written off or carried forward lines and ledger rows, appended by a person with a reason: { targetId, kind: 'written_off' | 'carried_forward', reason, by, at }. Empty in the seed; the open statement has two exceptions and one accrual waiting on exactly these.",
+  "pendingImport": {
+    "stmtId": "STMT-0825",
+    "accountId": "ACC-HDFC-4021",
+    "from": "2026-08-25",
+    "to": "2026-08-27",
+    "lines": [
+      {
+        "lineId": "L-0825-01",
+        "date": "2026-08-25",
+        "dir": "credit",
+        "amountPaise": 11800000,
+        "reference": "IMPS422412007",
+        "narration": "IMPS/422412007/VIKRAM SHETTY",
+        "counterparty": "VIKRAM SHETTY"
+      },
+      {
+        "lineId": "L-0826-01",
+        "date": "2026-08-26",
+        "dir": "credit",
+        "amountPaise": 29500000,
+        "reference": "NEFT0026AUG5510",
+        "narration": "NEFT/IYER WOODWORKS/RENEWAL",
+        "counterparty": "IYER WOODWORKS"
+      },
+      {
+        "lineId": "L-0827-01",
+        "date": "2026-08-27",
+        "dir": "debit",
+        "amountPaise": 620000,
+        "reference": "aws-sep-2026",
+        "narration": "CARD/AMAZON WEB SERVICES",
+        "counterparty": "AWS"
+      }
+    ]
+  }
+}

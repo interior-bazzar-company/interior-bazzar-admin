@@ -1,0 +1,712 @@
+{
+  "$comment": "PLACEHOLDER RECORDS — a subscription is ACTIVATED, not merely recorded: activation is what entitles the customer to the plan, and it runs against the invoice raised for it.  — subscriptions and the installments that settle them. Replaced by GET /admin/finance/subscriptions and GET /admin/finance/subscriptions/{id}. THE INSTALLMENT IS THE UNIT THAT GETS PAID, not the subscription and not a part of one: one installment, one payment, in full, and Σ of a subscription's installment amounts equals its totalPaise exactly. There is no part-payment field because there is no part-paid installment to record it against. `due` is the absence of an event, not a claim about one; `fail_to_pay` is evidence — a gateway response, or a due date that passed with nothing against it — and it carries that evidence in `failure`. Every payment below is a row that already exists in the money-in ledger, carrying the same paymentId, amount, mode, reference, value date and account; where `bankLineId` names a statement line, the amount and the reference on that line are the same ones written here. `bankLineId: null` means the money is real and the statement covering it has not been imported yet — normal, not a defect. Integer paise throughout. The clock is asOf 2026-08-25T09:00:00+05:30, and the only dates after it are `endDate`, which is where the service term runs to, and the `dueDate` of a `due` installment, which is the whole point of one.",
+  "generatedAt": "2026-08-25T09:00:00+05:30",
+  "subscriptions": [
+    {
+      "subscriptionId": "SUB-0101",
+      "source": "sales",
+      "customer": {
+        "name": "Priya Nair",
+        "userId": "IB-U-1041",
+        "dealRef": "DL-3310"
+      },
+      "planId": "PL-STARTER",
+      "planName": "Starter",
+      "cycleMonths": 12,
+      "totalPaise": 17700000,
+      "startDate": "2026-08-11",
+      "endDate": "2027-08-10",
+      "status": "active",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 1,
+          "dueDate": "2026-08-18",
+          "amountPaise": 17700000,
+          "status": "paid",
+          "invoiceNumber": "IB-INV-2026-00081",
+          "payment": {
+            "paymentId": "PAY-4404",
+            "amountPaise": 17700000,
+            "mode": "NEFT",
+            "reference": "NEFT0019AUG2213",
+            "valueDate": "2026-08-19",
+            "accountId": "ACC-HDFC-4021",
+            "recordedBy": "A. Sharma",
+            "recordedAt": "2026-08-19T12:05:00+05:30",
+            "receipt": {
+              "number": "IB-RCP-2026-00310",
+              "issuedAt": "2026-08-19T12:06:00+05:30",
+              "sha256": "a01b77c2d4e94b7d0e6c2a8f5319be07d4a1c93f60285ea7b1d4c6082f39a1b2"
+            },
+            "bankLineId": "L-0819-01",
+            "proof": null
+          },
+          "failure": null
+        }
+      ],
+      "soldBy": "A. Sharma",
+      "events": [
+        {
+          "eventId": "SE-0101-3",
+          "type": "RECEIPT_ISSUED",
+          "actor": "System",
+          "actorRole": "System",
+          "at": "2026-08-19T12:06:00+05:30",
+          "note": "IB-RCP-2026-00310 generated and frozen against installment 1 of 1. Sent to the address on DL-3310."
+        },
+        {
+          "eventId": "SE-0101-2",
+          "type": "INSTALLMENT_PAID",
+          "actor": "System",
+          "actorRole": "System",
+          "at": "2026-08-19T12:05:00+05:30",
+          "note": "PAY-4404 · ₹1,77,000 · NEFT0019AUG2213 · against IB-INV-2026-00081. The twelve-month term was agreed as a single installment, so the schedule is finished; the term is not."
+        },
+        {
+          "eventId": "SE-0101-1",
+          "type": "SUBSCRIPTION_ACTIVATED",
+          "actor": "A. Sharma",
+          "actorRole": "Sales",
+          "at": "2026-08-11T10:42:00+05:30",
+          "note": "Starter, 12 months, ₹1,77,000, one installment. Closed on DL-3310 against quotation IB-QT-2026-00139."
+        }
+      ],
+      "invoiceNumber": "IB-INV-2026-00081",
+      "activatedBy": "A. Sharma",
+      "activatedAt": "2026-08-11T10:42:00+05:30"
+    },
+    {
+      "subscriptionId": "SUB-0102",
+      "source": "sales",
+      "customer": {
+        "name": "Sandeep Kulkarni",
+        "userId": "IB-U-1200",
+        "dealRef": "DL-2396"
+      },
+      "planId": "PL-GROWTH",
+      "planName": "Growth",
+      "cycleMonths": 12,
+      "totalPaise": 94400000,
+      "startDate": "2026-08-10",
+      "endDate": "2027-08-09",
+      "status": "active",
+      "$comment_installments": "Three installments: setup, the first four months, the balance of eight. Installment 1 reads `cancelled` and still carries its payment, because both things happened — PAY-4402 arrived on 18 Aug and the remitting bank recalled the UPI credit on the 23rd. The payment row is kept, not blanked, so the money that came and went is still visible on the schedule; the reversal itself lives in the ledger as REV-4402, and IB-INV-2026-00087 was cancelled behind it. The ₹59,000 went back onto DL-2396 unbilled and will be re-invoiced, which is why totalPaise is still ₹9,44,000. Installment 3 is `due`: IB-INV-2026-00089 is raised and falls due on 1 Sep, so nothing has happened to it yet and neither `payment` nor `failure` is written.",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 3,
+          "dueDate": "2026-08-17",
+          "amountPaise": 5900000,
+          "status": "cancelled",
+          "invoiceNumber": "IB-INV-2026-00087",
+          "payment": {
+            "paymentId": "PAY-4402",
+            "amountPaise": 5900000,
+            "mode": "UPI",
+            "reference": "421990045512",
+            "valueDate": "2026-08-18",
+            "accountId": "ACC-HDFC-4021",
+            "recordedBy": "R. Menon",
+            "recordedAt": "2026-08-18T17:22:00+05:30",
+            "receipt": {
+              "number": "IB-RCP-2026-00298",
+              "issuedAt": "2026-08-18T17:23:00+05:30",
+              "sha256": "8c4d0ab1f19a07e5b93c14af6d820c39e715ba4028cfd61739ae5c02b8f47a19"
+            },
+            "bankLineId": "L-0818-01",
+            "proof": null
+          },
+          "failure": null
+        },
+        {
+          "seq": 2,
+          "of": 3,
+          "dueDate": "2026-08-19",
+          "amountPaise": 24780000,
+          "status": "paid",
+          "invoiceNumber": "IB-INV-2026-00088",
+          "payment": {
+            "paymentId": "PAY-4405",
+            "amountPaise": 24780000,
+            "mode": "NEFT",
+            "reference": "NEFT0020AUG4471",
+            "valueDate": "2026-08-20",
+            "accountId": "ACC-HDFC-4021",
+            "recordedBy": "R. Menon",
+            "recordedAt": "2026-08-20T17:22:00+05:30",
+            "receipt": {
+              "number": "IB-RCP-2026-00311",
+              "issuedAt": "2026-08-20T17:23:00+05:30",
+              "sha256": "8c4d17e2f19a9f2c17ab60d34e85c17fa0928bd63e41075cae29f3b8d016c4d7"
+            },
+            "bankLineId": "L-0820-01",
+            "proof": null
+          },
+          "failure": null
+        },
+        {
+          "seq": 3,
+          "of": 3,
+          "dueDate": "2026-09-01",
+          "amountPaise": 63720000,
+          "status": "due",
+          "invoiceNumber": "IB-INV-2026-00089",
+          "payment": null,
+          "failure": null
+        }
+      ],
+      "soldBy": "R. Menon",
+      "events": [
+        {
+          "eventId": "SE-0102-4",
+          "type": "INSTALLMENT_FAILED",
+          "actor": "S. Bhat",
+          "actorRole": "Super Admin",
+          "at": "2026-08-23T14:08:00+05:30",
+          "note": "Installment 1 cancelled. The UPI credit behind PAY-4402 was recalled by the remitting bank on 23 Aug — mandate dispute, confirmed with HDFC. REV-4402 was appended in the ledger and IB-INV-2026-00087 was cancelled behind it. The ₹59,000 setup fee is back on DL-2396 to be re-billed."
+        },
+        {
+          "eventId": "SE-0102-3",
+          "type": "INSTALLMENT_PAID",
+          "actor": "System",
+          "actorRole": "System",
+          "at": "2026-08-20T17:22:00+05:30",
+          "note": "PAY-4405 · ₹2,47,800 · NEFT0020AUG4471 · against IB-INV-2026-00088. Matched to L-0820-01 on the 20–24 Aug statement."
+        },
+        {
+          "eventId": "SE-0102-2",
+          "type": "INSTALLMENT_PAID",
+          "actor": "System",
+          "actorRole": "System",
+          "at": "2026-08-18T17:22:00+05:30",
+          "note": "PAY-4402 · ₹59,000 · UPI 421990045512 · against IB-INV-2026-00087. Held for five days, then recalled."
+        },
+        {
+          "eventId": "SE-0102-1",
+          "type": "SUBSCRIPTION_ACTIVATED",
+          "actor": "A. Sharma",
+          "actorRole": "Sales",
+          "at": "2026-08-10T11:15:00+05:30",
+          "note": "Growth, 12 months plus setup, ₹9,44,000 across three installments — setup, four months, then the balance of eight. Closed on DL-2396 against quotation IB-QT-2026-00147."
+        }
+      ],
+      "invoiceNumber": "IB-INV-2026-00087",
+      "activatedBy": "R. Menon",
+      "activatedAt": "2026-08-10T11:15:00+05:30"
+    },
+    {
+      "subscriptionId": "SUB-0103",
+      "source": "website",
+      "customer": {
+        "name": "Farah Qureshi",
+        "userId": "IB-U-1118",
+        "dealRef": "DL-2390"
+      },
+      "planId": "PL-STARTER",
+      "planName": "Starter",
+      "cycleMonths": 3,
+      "totalPaise": 3540000,
+      "startDate": "2026-08-08",
+      "endDate": "2026-11-07",
+      "status": "active",
+      "$comment_installments": "The duplicate charge is modelled as ONE subscription with ONE installment, not two of either. Farah agreed to pay ₹35,400 once, so the schedule holds one installment; her card was then charged twice inside two minutes on 16 Aug — PAY-4399 (pay_QK8s21bvC, invoice 00079) and PAY-4400 (pay_QK8s21bvD, invoice 00080), same amount, same token. A duplicate charge is two payments, not two subscriptions and not two installments, so the second charge stays where it belongs: a row of its own in the ledger, with RF-0117 raised against PAY-4399 to send one of the two back. The subscription is `active`, not `refunded` — she keeps the plan, and PAY-4400 is the charge that pays for it.",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 1,
+          "dueDate": "2026-08-15",
+          "amountPaise": 3540000,
+          "status": "paid",
+          "invoiceNumber": "IB-INV-2026-00079",
+          "payment": {
+            "paymentId": "PAY-4399",
+            "amountPaise": 3540000,
+            "mode": "Card",
+            "reference": "pay_QK8s21bvC",
+            "valueDate": "2026-08-16",
+            "accountId": "ACC-RZP",
+            "recordedBy": "Farah Qureshi",
+            "recordedAt": "2026-08-16T11:02:00+05:30",
+            "receipt": {
+              "number": "IB-RCP-2026-00305",
+              "issuedAt": "2026-08-16T11:03:00+05:30",
+              "sha256": "e77c02b5a93dc30af71e59b26d048ea1370fc45b98d2e6017a3fb82c94d50e6b"
+            },
+            "bankLineId": "L-0816-01",
+            "proof": {
+              "type": "gateway",
+              "filename": "razorpay-pay_QK8s21bvC.json",
+              "uploadedAt": "2026-08-16T11:02:00+05:30"
+            }
+          },
+          "failure": null
+        }
+      ],
+      "soldBy": "Website",
+      "events": [
+        {
+          "eventId": "SE-0103-3",
+          "type": "RECEIPT_ISSUED",
+          "actor": "System",
+          "actorRole": "System",
+          "at": "2026-08-16T11:03:00+05:30",
+          "note": "IB-RCP-2026-00305 generated and frozen. IB-RCP-2026-00306 was issued a minute later for the duplicate charge; both receipts stand, because both charges happened."
+        },
+        {
+          "eventId": "SE-0103-2",
+          "type": "INSTALLMENT_PAID",
+          "actor": "System",
+          "actorRole": "System",
+          "at": "2026-08-16T11:02:00+05:30",
+          "note": "PAY-4399 · ₹35,400 · card through Razorpay, settled to ACC-RZP and matched to L-0816-01 on the 16–19 Aug statement."
+        },
+        {
+          "eventId": "SE-0103-1",
+          "type": "SUBSCRIPTION_ACTIVATED",
+          "actor": "System",
+          "actorRole": "System",
+          "at": "2026-08-08T17:44:00+05:30",
+          "note": "Starter, 3 months, ₹35,400 in one installment. Bought on the website — no salesperson, and DL-2390 was opened afterwards to hold the paperwork."
+        }
+      ],
+      "invoiceNumber": "IB-INV-2026-00079",
+      "activatedBy": "Website",
+      "activatedAt": "2026-08-08T17:44:00+05:30"
+    },
+    {
+      "subscriptionId": "SUB-0104",
+      "source": "website",
+      "customer": {
+        "name": "Aarav Pillai",
+        "userId": "IB-U-1173",
+        "dealRef": null
+      },
+      "planId": "PL-AUTOGROWTH",
+      "planName": "AutoGrowth",
+      "cycleMonths": 3,
+      "totalPaise": 3540000,
+      "startDate": "2026-08-21",
+      "endDate": "2026-11-20",
+      "status": "defaulting",
+      "$comment_installments": "The gateway decline. AutoGrowth is charged monthly against a card mandate, so the first installment was attempted the moment the mandate was registered and the issuer refused it twice. Nothing was invoiced — the sales chain raises the invoice when the installment is collected, so `invoiceNumber` is null and stays null until a charge succeeds. `failure` carries what the gateway actually returned, not a summary of it. Installments 2 and 3 are `due`: their dates have not arrived, nothing has been attempted against them, and a failed installment 1 says nothing about them.",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 3,
+          "dueDate": "2026-08-21",
+          "amountPaise": 1180000,
+          "status": "fail_to_pay",
+          "invoiceNumber": null,
+          "payment": null,
+          "failure": {
+            "at": "2026-08-23T09:12:00+05:30",
+            "reason": "declined",
+            "attempt": 2,
+            "note": "Razorpay returned BAD_REQUEST_ERROR on both attempts against mandate token pay_mandate_QL3x7fRe: 'Payment failed because the card was declined by the issuing bank' · issuer code 05, do-not-honour · error id pay_QL9f31mnH (21 Aug 09:05) and pay_QLB742pvK (23 Aug 09:12). The mandate is still live and the card has not expired, so the issuer is refusing the charge rather than the instrument. The customer was emailed on the 23rd to update the card; the next automatic retry is set for 26 Aug."
+          }
+        },
+        {
+          "seq": 2,
+          "of": 3,
+          "dueDate": "2026-09-21",
+          "amountPaise": 1180000,
+          "status": "due",
+          "invoiceNumber": null,
+          "payment": null,
+          "failure": null
+        },
+        {
+          "seq": 3,
+          "of": 3,
+          "dueDate": "2026-10-21",
+          "amountPaise": 1180000,
+          "status": "due",
+          "invoiceNumber": null,
+          "payment": null,
+          "failure": null
+        }
+      ],
+      "soldBy": "Website",
+      "events": [
+        {
+          "eventId": "SE-0104-3",
+          "type": "INSTALLMENT_FAILED",
+          "actor": "System",
+          "actorRole": "System",
+          "at": "2026-08-23T09:12:00+05:30",
+          "note": "Attempt 2 declined — issuer code 05, do-not-honour, same as the first. Subscription moved to defaulting and the customer asked to update the card."
+        },
+        {
+          "eventId": "SE-0104-2",
+          "type": "INSTALLMENT_FAILED",
+          "actor": "System",
+          "actorRole": "System",
+          "at": "2026-08-21T09:05:00+05:30",
+          "note": "Attempt 1 declined by the issuing bank three minutes after the mandate was registered. Retry scheduled for the 23rd."
+        },
+        {
+          "eventId": "SE-0104-1",
+          "type": "SUBSCRIPTION_ACTIVATED",
+          "actor": "System",
+          "actorRole": "System",
+          "at": "2026-08-21T09:02:00+05:30",
+          "note": "AutoGrowth, 3 monthly installments of ₹11,800, card mandate registered on the website. Self-serve — no deal, no salesperson."
+        }
+      ],
+      "invoiceNumber": null,
+      "activatedBy": "Website",
+      "activatedAt": "2026-08-21T09:02:00+05:30"
+    },
+    {
+      "subscriptionId": "SUB-0105",
+      "source": "sales",
+      "customer": {
+        "name": "Rohan Mehta",
+        "userId": "IB-U-1142",
+        "dealRef": "DL-2402"
+      },
+      "planId": "PL-SCALE",
+      "planName": "Scale",
+      "cycleMonths": 12,
+      "totalPaise": 32450000,
+      "startDate": "2026-07-28",
+      "endDate": "2027-07-27",
+      "status": "defaulting",
+      "$comment_installments": "The other kind of failure: nothing was attempted and nothing arrived. IB-INV-2026-00085 was raised on 28 Jul and fell due on 4 Aug; twenty-one days later the ledger holds no payment with this invoice against it, so the installment reads `fail_to_pay` with reason `overdue`. `attempt` is 0 on purpose — this is a sales-invoiced subscription with no mandate to charge, so the count of collection attempts is genuinely zero and writing 1 would invent one. IB-INV-2026-00085 carries the label 'Pro' in its description because the catalogue renamed that tier to Scale in June and an invoice is frozen at issue: the document keeps the name it was raised with.",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 1,
+          "dueDate": "2026-08-04",
+          "amountPaise": 32450000,
+          "status": "fail_to_pay",
+          "invoiceNumber": "IB-INV-2026-00085",
+          "payment": null,
+          "failure": {
+            "at": "2026-08-05T00:05:00+05:30",
+            "reason": "overdue",
+            "attempt": 0,
+            "note": "Due date 4 Aug passed with nothing recorded against IB-INV-2026-00085 — ₹3,24,500, raised 28 Jul on DL-2402. Four weeks since the invoice, three since it fell due. Chased by Sales on 7 and 14 Aug; the customer says the release is waiting on their board and has given no date. No charge was attempted because there is no mandate on a sales-invoiced subscription — the failure is the absence of a payment, not a refused one."
+          }
+        }
+      ],
+      "soldBy": "A. Sharma",
+      "events": [
+        {
+          "eventId": "SE-0105-2",
+          "type": "INSTALLMENT_FAILED",
+          "actor": "System",
+          "actorRole": "System",
+          "at": "2026-08-05T00:05:00+05:30",
+          "note": "Installment 1 marked fail_to_pay, reason overdue: the 4 Aug due date passed with no payment against IB-INV-2026-00085. Subscription moved to defaulting."
+        },
+        {
+          "eventId": "SE-0105-1",
+          "type": "SUBSCRIPTION_ACTIVATED",
+          "actor": "A. Sharma",
+          "actorRole": "Sales",
+          "at": "2026-07-28T16:20:00+05:30",
+          "note": "Scale, 12 months, ₹3,24,500 in one installment. Closed on DL-2402 against quotation IB-QT-2026-00142, replacing the Starter term the customer withdrew from the day before (SUB-0109). IB-INV-2026-00085 raised the same day."
+        }
+      ],
+      "invoiceNumber": "IB-INV-2026-00085",
+      "activatedBy": "A. Sharma",
+      "activatedAt": "2026-07-28T16:20:00+05:30"
+    },
+    {
+      "subscriptionId": "SUB-0106",
+      "source": "sales",
+      "customer": {
+        "name": "Meera Iyer",
+        "userId": "IB-U-1201",
+        "dealRef": "DL-2291"
+      },
+      "planId": "PL-GROWTH",
+      "planName": "Growth — 1 month",
+      "cycleMonths": 1,
+      "totalPaise": 29500000,
+      "startDate": "2026-07-20",
+      "endDate": "2026-08-19",
+      "status": "completed",
+      "$comment_installments": "`completed` describes the SCHEDULE, not the term. Every installment on this subscription is collected and there is nothing left to bill; the service itself runs to 19 Jul 2027. Iyer Woodworks renewed early on 24 Aug under IB-INV-2026-00092 — that renewal is its own subscription and no part of this one, which is why nothing here is unpaid.",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 1,
+          "dueDate": "2026-07-27",
+          "amountPaise": 29500000,
+          "status": "paid",
+          "invoiceNumber": "IB-INV-2026-00074",
+          "payment": {
+            "paymentId": "PAY-4390",
+            "amountPaise": 29500000,
+            "mode": "RTGS",
+            "reference": "RTGS0722JUL1180",
+            "valueDate": "2026-07-22",
+            "accountId": "ACC-HDFC-4021",
+            "recordedBy": "R. Menon",
+            "recordedAt": "2026-07-22T15:00:00+05:30",
+            "receipt": {
+              "number": "IB-RCP-2026-00290",
+              "issuedAt": "2026-07-22T15:01:00+05:30",
+              "sha256": "0b1c9d3e7a446b19d3c84e07a2f5910bce46d38f072a5c1e9b40a7d26f83105c"
+            },
+            "bankLineId": "L-0722-01",
+            "proof": null
+          },
+          "failure": null
+        }
+      ],
+      "soldBy": "R. Menon",
+      "events": [
+        {
+          "eventId": "SE-0106-3",
+          "type": "SUBSCRIPTION_COMPLETED",
+          "actor": "System",
+          "actorRole": "System",
+          "at": "2026-07-22T15:02:00+05:30",
+          "note": "Schedule complete — one installment of one, collected in full five days before it fell due. Nothing further to bill on this term."
+        },
+        {
+          "eventId": "SE-0106-2",
+          "type": "INSTALLMENT_PAID",
+          "actor": "System",
+          "actorRole": "System",
+          "at": "2026-07-22T15:00:00+05:30",
+          "note": "PAY-4390 · ₹2,95,000 · RTGS0722JUL1180 · against IB-INV-2026-00074. Matched to L-0722-01 on the 20–24 Jul statement."
+        },
+        {
+          "eventId": "SE-0106-1",
+          "type": "SUBSCRIPTION_ACTIVATED",
+          "actor": "A. Sharma",
+          "actorRole": "Sales",
+          "at": "2026-07-20T11:30:00+05:30",
+          "note": "Growth, 12 months, ₹2,95,000 in one installment. Closed on DL-2291 against quotation IB-QT-2026-00128."
+        }
+      ],
+      "invoiceNumber": "IB-INV-2026-00074",
+      "activatedBy": "R. Menon",
+      "activatedAt": "2026-07-20T11:30:00+05:30"
+    },
+    {
+      "subscriptionId": "SUB-0107",
+      "source": "sales",
+      "customer": {
+        "name": "Vikram Shetty",
+        "userId": "IB-U-1105",
+        "dealRef": "DL-2411"
+      },
+      "planId": "PL-GROWTH",
+      "planName": "Growth",
+      "cycleMonths": 6,
+      "totalPaise": 23600000,
+      "startDate": "2026-08-21",
+      "endDate": "2027-02-20",
+      "status": "active",
+      "$comment_installments": "Half on signing, half thirty days later — the schedule Sales agreed on DL-2411, which is why the two dates here are 21 Aug and 21 Sep. The dates are the deal's, not the invoice's: IB-INV-2026-00091 grants seven days' terms on top of the first one and therefore reads 28 Aug on the document. Installment 2 has no invoice number because the sales chain raises one invoice per installment and has not raised that one yet. PAY-4401 has no bank line: Vikram paid through the business portal on 22 Aug, the 20–24 Aug statement closed on the 24th, and the credit lands on the next import. The money is real; the statement proving it has not arrived.",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 2,
+          "dueDate": "2026-08-21",
+          "amountPaise": 11800000,
+          "status": "paid",
+          "invoiceNumber": "IB-INV-2026-00091",
+          "payment": {
+            "paymentId": "PAY-4401",
+            "amountPaise": 11800000,
+            "mode": "IMPS",
+            "reference": "IMPS422412007",
+            "valueDate": "2026-08-22",
+            "accountId": "ACC-HDFC-4021",
+            "recordedBy": "Vikram Shetty",
+            "recordedAt": "2026-08-22T18:40:00+05:30",
+            "receipt": {
+              "number": "IB-RCP-2026-00307",
+              "issuedAt": "2026-08-22T18:41:00+05:30",
+              "sha256": "b2e91f04a77c1d84f0a7c92e35b6708dc1fa4e93526b0af71c38d605e29b4c8a"
+            },
+            "bankLineId": null,
+            "proof": {
+              "type": "gateway",
+              "filename": "imps-422412007.json",
+              "uploadedAt": "2026-08-22T18:40:00+05:30"
+            }
+          },
+          "failure": null
+        },
+        {
+          "seq": 2,
+          "of": 2,
+          "dueDate": "2026-09-21",
+          "amountPaise": 11800000,
+          "status": "due",
+          "invoiceNumber": null,
+          "payment": null,
+          "failure": null
+        }
+      ],
+      "soldBy": "A. Sharma",
+      "events": [
+        {
+          "eventId": "SE-0107-3",
+          "type": "RECEIPT_ISSUED",
+          "actor": "System",
+          "actorRole": "System",
+          "at": "2026-08-22T18:41:00+05:30",
+          "note": "IB-RCP-2026-00307 generated and frozen against installment 1 of 2."
+        },
+        {
+          "eventId": "SE-0107-2",
+          "type": "INSTALLMENT_PAID",
+          "actor": "System",
+          "actorRole": "System",
+          "at": "2026-08-22T18:40:00+05:30",
+          "note": "PAY-4401 · ₹1,18,000 · IMPS422412007 · paid through the business portal against IB-INV-2026-00091. Not yet on an imported statement."
+        },
+        {
+          "eventId": "SE-0107-1",
+          "type": "SUBSCRIPTION_ACTIVATED",
+          "actor": "A. Sharma",
+          "actorRole": "Sales",
+          "at": "2026-08-21T15:10:00+05:30",
+          "note": "Growth, 6 months, ₹2,36,000 in two installments of ₹1,18,000 — half on signing, half on 21 Sep. Closed on DL-2411 against quotation IB-QT-2026-00151."
+        }
+      ],
+      "invoiceNumber": "IB-INV-2026-00091",
+      "activatedBy": "A. Sharma",
+      "activatedAt": "2026-08-21T15:10:00+05:30"
+    },
+    {
+      "subscriptionId": "SUB-0108",
+      "source": "website",
+      "customer": {
+        "name": "Tanvi Bhandari",
+        "userId": "IB-U-1160",
+        "dealRef": null
+      },
+      "planId": "PL-STARTER",
+      "planName": "Starter",
+      "cycleMonths": 1,
+      "totalPaise": 990000,
+      "startDate": "2026-07-30",
+      "endDate": "2026-08-29",
+      "status": "refunded",
+      "$comment_installments": "Bought on the website on 30 Jul and cancelled the next morning, before the membership was activated. RF-0112 was raised the same day and approved by Super Admin on 1 Aug; the transfer went out that afternoon. The installment reads `cancelled` and keeps PAY-4381 attached, because the charge happened — a refund does not unmake it. The subscription reads `refunded` rather than `cancelled`: the money went back, and that is a stronger statement than the term ending.",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 1,
+          "dueDate": "2026-07-30",
+          "amountPaise": 990000,
+          "status": "cancelled",
+          "invoiceNumber": "IB-INV-2026-00071",
+          "payment": {
+            "paymentId": "PAY-4381",
+            "amountPaise": 990000,
+            "mode": "Card",
+            "reference": "pay_QJ4m18twZ",
+            "valueDate": "2026-07-30",
+            "accountId": "ACC-RZP",
+            "recordedBy": "Tanvi Bhandari",
+            "recordedAt": "2026-07-30T09:14:00+05:30",
+            "receipt": {
+              "number": "IB-RCP-2026-00293",
+              "issuedAt": "2026-07-30T09:15:00+05:30",
+              "sha256": "3f6a08d1c2b5a5027ce6193bf4d80c6a15e97b204df3812ce0b64a9d7f350b28"
+            },
+            "bankLineId": null,
+            "proof": {
+              "type": "gateway",
+              "filename": "razorpay-pay_QJ4m18twZ.json",
+              "uploadedAt": "2026-07-30T09:14:00+05:30"
+            }
+          },
+          "failure": null
+        }
+      ],
+      "soldBy": "Website",
+      "events": [
+        {
+          "eventId": "SE-0108-3",
+          "type": "SUBSCRIPTION_CANCELLED",
+          "actor": "S. Bhat",
+          "actorRole": "Super Admin",
+          "at": "2026-08-01T10:00:00+05:30",
+          "note": "RF-0112 approved — pre-activation cancellation, within a day, ₹9,900 sent back on 1 Aug. IB-INV-2026-00071 cancelled with reason 'refunded'."
+        },
+        {
+          "eventId": "SE-0108-2",
+          "type": "INSTALLMENT_PAID",
+          "actor": "System",
+          "actorRole": "System",
+          "at": "2026-07-30T09:14:00+05:30",
+          "note": "PAY-4381 · ₹9,900 · card through Razorpay, settled to ACC-RZP. The 25–31 Jul window was never imported, so no statement line carries it."
+        },
+        {
+          "eventId": "SE-0108-1",
+          "type": "SUBSCRIPTION_ACTIVATED",
+          "actor": "System",
+          "actorRole": "System",
+          "at": "2026-07-30T09:12:00+05:30",
+          "note": "Starter, 1 month, ₹9,900 in one installment. Self-serve checkout on the website."
+        }
+      ],
+      "invoiceNumber": "IB-INV-2026-00071",
+      "activatedBy": "Website",
+      "activatedAt": "2026-07-30T09:12:00+05:30"
+    },
+    {
+      "subscriptionId": "SUB-0109",
+      "source": "sales",
+      "customer": {
+        "name": "Rohan Mehta",
+        "userId": "IB-U-1142",
+        "dealRef": "DL-2402"
+      },
+      "planId": "PL-STARTER",
+      "planName": "Starter",
+      "cycleMonths": 12,
+      "totalPaise": 17700000,
+      "startDate": "2026-07-20",
+      "endDate": "2027-07-19",
+      "status": "cancelled",
+      "$comment_installments": "Cancelled before anything moved. The installment reads `cancelled` with both `payment` and `failure` null, which is the honest shape here: no invoice was raised, no charge was attempted and no due date was allowed to pass. DL-2402 was rewritten as Scale 12 months the next day and became SUB-0105 — the row stays so the deal's history is not silently shortened.",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 1,
+          "dueDate": "2026-07-27",
+          "amountPaise": 17700000,
+          "status": "cancelled",
+          "invoiceNumber": null,
+          "payment": null,
+          "failure": null
+        }
+      ],
+      "soldBy": "A. Sharma",
+      "events": [
+        {
+          "eventId": "SE-0109-2",
+          "type": "SUBSCRIPTION_CANCELLED",
+          "actor": "A. Sharma",
+          "actorRole": "Sales",
+          "at": "2026-07-27T17:05:00+05:30",
+          "note": "Cancelled at the customer's request before the first installment was invoiced. The requirement had grown past Starter; DL-2402 was requoted as Scale 12 months on 28 Jul (SUB-0105). No money moved on this subscription."
+        },
+        {
+          "eventId": "SE-0109-1",
+          "type": "SUBSCRIPTION_ACTIVATED",
+          "actor": "A. Sharma",
+          "actorRole": "Sales",
+          "at": "2026-07-20T12:00:00+05:30",
+          "note": "Starter, 12 months, ₹1,77,000 in one installment. Closed on DL-2402."
+        }
+      ],
+      "invoiceNumber": null,
+      "activatedBy": "A. Sharma",
+      "activatedAt": "2026-07-20T12:00:00+05:30"
+    }
+  ]
+}

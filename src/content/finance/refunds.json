@@ -1,0 +1,144 @@
+{
+  "$comment": "PLACEHOLDER RECORDS — refund requests. Replaced by GET /admin/finance/refunds and POST /admin/finance/refunds/{id}/{approve,send-back,decline,pay}. A refund is a REAL OBJECT: request, queue, decision, and — once money actually moves — a settlement. Finance requests; only Super Admin decides — one of the very few genuine four-eyes checks in the panel, because a refund is the only routine action that sends money out of the company, and requester and decider are always different people. Two origins: `subscription` ties back to a recorded installment payment; `manual` is raised by hand against its own named payee, for money that never became a subscription payment in the first place — a duplicate bank transfer, a cancelled order taken off-platform, a customer overpayment. On a subscription-origin refund, `subscriptionId` is a convenience denormalisation for display only; `paymentId` is the real link back to the ledger. Approval authorises a transfer a human makes in the bank — it does not move money by itself. A refund reaches `paid` only when someone records that transfer, with its own reference, in `settlement`.",
+  "generatedAt": "2026-08-25T09:00:00+05:30",
+  "requests": [
+    {
+      "refundId": "RF-0119",
+      "origin": "manual",
+      "subscriptionId": null,
+      "paymentId": null,
+      "payee": { "name": "Naveen Rao", "userId": null },
+      "amountPaise": 2200000,
+      "ground": "duplicate",
+      "detail": "An NEFT of ₹22,000 arrived on 23 Aug referencing 'IB DUPLICATE PLS REFUND' — the sender says it was meant for a different vendor and landed with us by mistake. No invoice, deal or subscription in the system matches the name, the amount or the reference; the transfer never became a subscription payment, so there is no ledger row for a policy check to run against. Returning it to the account it came from.",
+      "state": "requested",
+      "policy": null,
+      "$comment": "policy is null here, not an empty pass. There is no original payment on this transfer to check against, and an empty RefundPolicy would read as one that passed four checks it never ran. Manual refunds are never scored.",
+      "requestedBy": "K. Iyer",
+      "requestedAt": "2026-08-25T08:30:00+05:30",
+      "decidedBy": null,
+      "decidedAt": null,
+      "decisionNote": null,
+      "settlement": null,
+      "events": [
+        { "eventId": "RE-0119-1", "type": "REFUND_REQUESTED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-25T08:30:00+05:30", "note": "Manual · unmatched NEFT of ₹22,000, 23 Aug — no deal, invoice or subscription corresponds to it. Returning to sender." }
+      ]
+    },
+    {
+      "refundId": "RF-0117",
+      "origin": "subscription",
+      "subscriptionId": "SUB-0103",
+      "paymentId": "PAY-4399",
+      "payee": { "name": "Farah Qureshi", "userId": null },
+      "amountPaise": 3540000,
+      "ground": "duplicate",
+      "detail": "Customer was charged twice for the same plan on 16 Aug — PAY-4399 and PAY-4400 carry the same amount and the same card token. PAY-4400 is the one to keep.",
+      "state": "requested",
+      "policy": {
+        "groundPermitted": true,
+        "withinWindow": true,
+        "originalRecorded": true,
+        "subscriptionActive": true,
+        "$comment": "Computed at request time and frozen so the approver sees what the requester saw. The check frames the approval: it does not block it. `originalRecorded` asks only whether the money is in the ledger — there is no verification step it could be waiting on."
+      },
+      "requestedBy": "K. Iyer",
+      "requestedAt": "2026-08-24T11:02:00+05:30",
+      "decidedBy": null,
+      "decidedAt": null,
+      "decisionNote": null,
+      "settlement": null,
+      "events": [
+        { "eventId": "RE-0117-1", "type": "REFUND_REQUESTED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-24T11:02:00+05:30", "note": "Duplicate charge · PAY-4400 confirmed present — same amount, same token, 16 Aug." }
+      ]
+    },
+    {
+      "refundId": "RF-0123",
+      "origin": "manual",
+      "subscriptionId": null,
+      "paymentId": null,
+      "payee": { "name": "Rohan Mehta", "userId": null },
+      "amountPaise": 840000,
+      "ground": "overpayment",
+      "detail": "Rohan Mehta's (DL-2402) third installment was due at ₹42,000; the NEFT that arrived on 21 Aug read ₹50,400 — ₹8,400 over. The installment itself is already recorded and settled in full against the correct amount; this is only the excess, and the excess was never applied to any installment or invoice, so it has no ledger row of its own to reverse. Refunding the difference back to him directly.",
+      "state": "sent_back",
+      "policy": null,
+      "requestedBy": "K. Iyer",
+      "requestedAt": "2026-08-23T14:20:00+05:30",
+      "decidedBy": "S. Bhat",
+      "decidedAt": "2026-08-24T09:10:00+05:30",
+      "decisionNote": "Send back — need Rohan's bank account number and IFSC before this can be transferred; the deal file only has a UPI handle on record and NEFT can't go to that. Also check with him whether he'd rather have the ₹8,400 adjusted against installment four instead of paid out.",
+      "settlement": null,
+      "events": [
+        { "eventId": "RE-0123-2", "type": "REFUND_SENT_BACK", "actor": "S. Bhat", "actorRole": "Super Admin", "at": "2026-08-24T09:10:00+05:30", "note": "Sent back to K. Iyer — need bank account + IFSC, and to confirm payout vs. adjustment against installment 4." },
+        { "eventId": "RE-0123-1", "type": "REFUND_REQUESTED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-23T14:20:00+05:30", "note": "Overpayment on DL-2402 installment 3 — ₹8,400 above the amount due, 21 Aug NEFT." }
+      ]
+    },
+    {
+      "refundId": "RF-0125",
+      "origin": "manual",
+      "subscriptionId": null,
+      "paymentId": null,
+      "payee": { "name": "Kavya Menon", "userId": null },
+      "amountPaise": 1500000,
+      "ground": "other",
+      "detail": "Kavya Menon paid ₹15,000 by UPI directly for a site-visit-only engagement in early August, before any deal or invoice was opened on her. She cancelled after the visit and asked for the money back. There was never a subscription or an invoice on our side to record this against — the whole engagement happened off-platform — so this is a manual entry from the start, not a reversal of anything in the ledger.",
+      "state": "approved",
+      "policy": null,
+      "requestedBy": "K. Iyer",
+      "requestedAt": "2026-08-22T10:05:00+05:30",
+      "decidedBy": "S. Bhat",
+      "decidedAt": "2026-08-23T11:30:00+05:30",
+      "decisionNote": "Nothing to cancel on our side since this never touched the platform — approved on the UPI screenshot and her confirmation alone. Transfer not yet made; K. Iyer to send from ACC-HDFC-4021 once her bank details are confirmed and record the reference here.",
+      "settlement": null,
+      "events": [
+        { "eventId": "RE-0125-2", "type": "REFUND_APPROVED", "actor": "S. Bhat", "actorRole": "Super Admin", "at": "2026-08-23T11:30:00+05:30", "note": "Approved on the UPI screenshot alone — no deal or invoice exists to close. Transfer still pending." },
+        { "eventId": "RE-0125-1", "type": "REFUND_REQUESTED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-22T10:05:00+05:30", "note": "Off-platform site visit, paid direct by UPI, cancelled after the visit. No ledger row exists for it." }
+      ]
+    },
+    {
+      "refundId": "RF-0121",
+      "origin": "manual",
+      "subscriptionId": null,
+      "paymentId": null,
+      "payee": { "name": "Rakesh Bhandari", "userId": null },
+      "amountPaise": 800000,
+      "ground": "service_failure",
+      "detail": "Rakesh Bhandari paid ₹8,000 by bank transfer for a one-off design consultation booked outside any subscription plan, and says the session never happened. The consultation was never a subscription payment, so there is nothing in the ledger to point at either way — the claim has to be checked against the designer's own records instead.",
+      "state": "declined",
+      "policy": null,
+      "requestedBy": "K. Iyer",
+      "requestedAt": "2026-08-20T10:15:00+05:30",
+      "decidedBy": "S. Bhat",
+      "decidedAt": "2026-08-21T09:40:00+05:30",
+      "decisionNote": "The designer's calendar and sign-off note both show the consultation delivered on 14 Aug — the date he says nothing happened. Declined; no service failure is evidenced.",
+      "settlement": null,
+      "events": [
+        { "eventId": "RE-0121-2", "type": "REFUND_DECLINED", "actor": "S. Bhat", "actorRole": "Super Admin", "at": "2026-08-21T09:40:00+05:30", "note": "Declined — designer's calendar and sign-off note both show the session delivered on 14 Aug." },
+        { "eventId": "RE-0121-1", "type": "REFUND_REQUESTED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-20T10:15:00+05:30", "note": "Claims the 14 Aug consultation never happened. One-off, paid off-plan by bank transfer." }
+      ]
+    },
+    {
+      "refundId": "RF-0112",
+      "origin": "subscription",
+      "subscriptionId": null,
+      "paymentId": "PAY-4381",
+      "payee": { "name": "Priya Nair", "userId": "IB-U-1041" },
+      "amountPaise": 990000,
+      "ground": "pre_activation",
+      "detail": "Paid for Starter on 30 Jul, asked to cancel on 31 Jul before the membership was activated.",
+      "state": "paid",
+      "policy": { "groundPermitted": true, "withinWindow": true, "originalRecorded": true, "subscriptionActive": false },
+      "requestedBy": "K. Iyer",
+      "requestedAt": "2026-07-31T15:10:00+05:30",
+      "decidedBy": "S. Bhat",
+      "decidedAt": "2026-08-01T10:00:00+05:30",
+      "decisionNote": "Pre-activation, within a day. Approved; transfer made 1 Aug from ACC-HDFC-4021, NEFT reference NEFT0001AUG662.",
+      "settlement": { "paidAt": "2026-08-01T11:45:00+05:30", "mode": "NEFT", "reference": "NEFT0001AUG662", "accountId": "ACC-HDFC-4021", "by": "K. Iyer" },
+      "events": [
+        { "eventId": "RE-0112-3", "type": "REFUND_PAID", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-01T11:45:00+05:30", "note": "Transfer recorded — ₹9,900 via NEFT0001AUG662 from ACC-HDFC-4021 to Priya Nair. RF-0112 closed as paid." },
+        { "eventId": "RE-0112-2", "type": "REFUND_APPROVED", "actor": "S. Bhat", "actorRole": "Super Admin", "at": "2026-08-01T10:00:00+05:30", "note": "Approved. REFUND counter-entry appended to PAY-4381; IB-INV-2026-00071 cancelled, reason 'refunded'." },
+        { "eventId": "RE-0112-1", "type": "REFUND_REQUESTED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-07-31T15:10:00+05:30", "note": "Pre-activation cancellation." }
+      ]
+    }
+  ]
+}

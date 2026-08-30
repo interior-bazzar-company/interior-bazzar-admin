@@ -88,41 +88,41 @@ export function ColumnChart({ series, points, unit, labelSeries }: {
   const at = (i: number) => (ticks.length > 1 ? (i / (ticks.length - 1)) * 100 : 0);
 
   return (
-    <figure className="um-chart" aria-labelledby={id + "-cap"}>
+    <figure className="ch-chart" aria-labelledby={id + "-cap"}>
       <Legend series={series} />
-      <div className="um-chartbody">
+      <div className="ch-chartbody">
         {/* Ticks and gridlines are absolutely positioned on the SAME
             percentages and both centred on their own line. Distributing them
             with two independent `space-between` flex columns looked right and
             was not: the label boxes have height and the rules do not, so only
             the middle label ever landed on its rule. */}
-        <div className="um-yaxis" aria-hidden="true">
+        <div className="ch-yaxis" aria-hidden="true">
           {ticks.map((v, i) => (
             <span key={v} className="tnum" style={{ top: at(i) + "%" }}>
               {v.toLocaleString("en-IN")}
             </span>
           ))}
         </div>
-        <div className="um-plotarea">
-          {ticks.map((v, i) => <i key={v} className="um-rule" style={{ top: at(i) + "%" }} />)}
-          <div className="um-groups">
+        <div className="ch-plotarea">
+          {ticks.map((v, i) => <i key={v} className="ch-rule" style={{ top: at(i) + "%" }} />)}
+          <div className="ch-groups">
             {points.map((p, gi) => (
-              <div className="um-group" key={p.key} tabIndex={0}
+              <div className="ch-group" key={p.key} tabIndex={0}
                 aria-label={p.label + ": " + series.map((s) =>
                   s.label + " " + (p.values[s.key] || 0)).join(", ")}>
-                <div className="um-cols">
+                <div className="ch-cols">
                   {series.map((s) => {
                     const v = p.values[s.key] || 0;
                     const label = labelSeries === s.key && gi === points.length - 1;
                     return (
-                      <span key={s.key} className={"um-col s" + s.slot}
+                      <span key={s.key} className={"ch-col s" + s.slot}
                         style={{ height: pctOf(v, scale.max) + "%" }}>
                         {label ? <em className="tnum">{v.toLocaleString("en-IN")}</em> : null}
                       </span>
                     );
                   })}
                 </div>
-                <span className="um-tip" role="tooltip">
+                <span className="ch-tip" role="tooltip">
                   <b>{p.label}</b>
                   {series.map((s) => (
                     <span key={s.key}>
@@ -137,10 +137,10 @@ export function ColumnChart({ series, points, unit, labelSeries }: {
           </div>
         </div>
       </div>
-      <div className="um-xband" aria-hidden="true">
+      <div className="ch-xband" aria-hidden="true">
         {points.map((p) => <span key={p.key}>{p.label}</span>)}
       </div>
-      <figcaption id={id + "-cap"} className="um-unit">{unit}</figcaption>
+      <figcaption id={id + "-cap"} className="ch-unit">{unit}</figcaption>
     </figure>
   );
 }
@@ -150,7 +150,7 @@ function Legend({ series }: { series: Series[] }) {
      or more series. One series needs none — the section head names it. */
   if (series.length < 2) return null;
   return (
-    <div className="um-legend2">
+    <div className="ch-legend2">
       {series.map((s) => (
         <span key={s.key}><i className={"sw s" + s.slot} />{s.label}</span>
       ))}
@@ -173,10 +173,10 @@ export interface Stage { key: string; label: string; value: number; note?: strin
 export function FunnelChart({ stages, unit }: { stages: Stage[]; unit: string }) {
   const top = Math.max(1, ...stages.map((s) => s.value));
   return (
-    <figure className="um-chart">
-      <div className="um-rows funnel">
+    <figure className="ch-chart">
+      <div className="ch-rows funnel">
         {stages.map((s, i) => (
-          <div className="um-row" key={s.key} tabIndex={0}
+          <div className="ch-row" key={s.key} tabIndex={0}
             aria-label={s.label + ": " + s.value + (i ? ", " + Math.round((s.value / stages[i - 1].value) * 100) + "% of the stage before" : "")}>
             <span className="lab">{s.label}</span>
             <span className="track">
@@ -186,11 +186,11 @@ export function FunnelChart({ stages, unit }: { stages: Stage[]; unit: string })
             <span className="delta">
               {i ? Math.round((s.value / stages[i - 1].value) * 100) + "% of previous" : "—"}
             </span>
-            {s.note ? <span className="um-tip" role="tooltip">{s.note}</span> : null}
+            {s.note ? <span className="ch-tip" role="tooltip">{s.note}</span> : null}
           </div>
         ))}
       </div>
-      <figcaption className="um-unit">{unit}</figcaption>
+      <figcaption className="ch-unit">{unit}</figcaption>
     </figure>
   );
 }
@@ -220,21 +220,21 @@ export interface BarRow {
 export function BarRows({ rows, unit, max }: { rows: BarRow[]; unit?: string; max?: number }) {
   const top = max ?? Math.max(1, ...rows.map((r) => r.value));
   return (
-    <figure className="um-chart">
-      <div className="um-rows">
+    <figure className="ch-chart">
+      <div className="ch-rows">
         {rows.map((r) => (
-          <div className="um-row" key={r.key} tabIndex={r.title ? 0 : undefined}>
+          <div className="ch-row" key={r.key} tabIndex={r.title ? 0 : undefined}>
             <span className="lab">{r.label}</span>
             <span className="track">
               <i className={"fill " + (r.tone || "s1")} style={{ width: pctOf(r.value, top) + "%" }} />
             </span>
             <span className="val tnum">{r.value.toLocaleString("en-IN")}</span>
             {r.hint ? <span className="delta">{r.hint}</span> : null}
-            {r.title ? <span className="um-tip" role="tooltip">{r.title}</span> : null}
+            {r.title ? <span className="ch-tip" role="tooltip">{r.title}</span> : null}
           </div>
         ))}
       </div>
-      {unit ? <figcaption className="um-unit">{unit}</figcaption> : null}
+      {unit ? <figcaption className="ch-unit">{unit}</figcaption> : null}
     </figure>
   );
 }
@@ -252,9 +252,9 @@ const bucket = (v: number) => (v >= 0.95 ? 3 : v >= 0.88 ? 2 : 1);
 export function CohortHeat({ rows }: { rows: CohortRow[] }) {
   const months = rows[0]?.retained.length || 0;
   return (
-    <figure className="um-chart">
-      <div className="um-heatwrap">
-        <table className="um-heat">
+    <figure className="ch-chart">
+      <div className="ch-heatwrap">
+        <table className="ch-heat">
           <thead>
             <tr>
               <th scope="col">Cohort</th>
@@ -272,8 +272,8 @@ export function CohortHeat({ rows }: { rows: CohortRow[] }) {
                 {r.retained.map((v, i) => (
                   <td key={i} className="n">
                     {v === null
-                      ? <span className="um-cell none" title="Not reached yet for this cohort">·</span>
-                      : <span className={"um-cell h" + bucket(v)}
+                      ? <span className="ch-cell none" title="Not reached yet for this cohort">·</span>
+                      : <span className={"ch-cell h" + bucket(v)}
                           title={r.label + " · month " + i + " · " + Math.round(v * 100) + "% still entitled"}>
                           <span className="tnum">{Math.round(v * 100)}</span>
                         </span>}
@@ -286,7 +286,7 @@ export function CohortHeat({ rows }: { rows: CohortRow[] }) {
       </div>
       {/* A sequential fill needs its scale stated; without it the reader is
           guessing what dark means. */}
-      <figcaption className="um-heatkey">
+      <figcaption className="ch-heatkey">
         <span>share still entitled</span>
         <span><i className="sw h1" />under 88%</span>
         <span><i className="sw h2" />88–94%</span>

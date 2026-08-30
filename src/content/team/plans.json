@@ -1,0 +1,91 @@
+{
+  "$comment": "PLACEHOLDER RECORDS — the daily plan, answering 'what am I doing today'. Stands in for GET /api/v1/admin/team/plans?date= and GET/PUT/POST /api/v1/admin/team/plans/{date}. ONE per member per business day, unique on (memberId, businessDate). `submittedAt: null` is a DRAFT and does not count as submitted anywhere. Each line CREATES OR LINKS a work item — `workItemId` is that link, and it is why the plan and the work board can never disagree about what somebody said they would do. After submit the plan is read-only: the day is changed by changing the work items, which is what actually happened. Three fields and a list of lines, deliberately: this form's whole job is to be finished in under a minute, and every field added to it is a field somebody skips.",
+  "generatedAt": "2026-08-28T14:20:00+05:30",
+  "plans": [
+    {
+      "planId": "PLAN-0828-63", "memberId": "63", "businessDate": "2026-08-28",
+      "expectedOutcome": "August backlog at zero and the six unreached leads either reached or closed out.",
+      "blockers": null,
+      "notes": null,
+      "submittedAt": "2026-08-28T09:12:00+05:30",
+      "lines": [
+        { "lineId": "PL-0828-63-1", "ordinal": 1, "title": "Triage the August enquiry backlog", "priority": "high", "workItemId": "W-K01" },
+        { "lineId": "PL-0828-63-2", "ordinal": 2, "title": "Call back the 6 unreached leads", "priority": "medium", "workItemId": "W-K02" },
+        { "lineId": "PL-0828-63-3", "ordinal": 3, "title": "Update the qualification checklist copy", "priority": "low", "workItemId": "W-K03" }
+      ]
+    },
+    {
+      "planId": "PLAN-0828-70", "memberId": "70", "businessDate": "2026-08-28",
+      "expectedOutcome": "Sharma revision out today.",
+      "blockers": "Waiting on the discount floor before I can price the Pune leads.",
+      "notes": null,
+      "submittedAt": "2026-08-28T09:50:00+05:30",
+      "lines": [
+        { "lineId": "PL-0828-70-1", "ordinal": 1, "title": "Send the revised quotation to Sharma Interiors", "priority": "high", "workItemId": "W-K04" },
+        { "lineId": "PL-0828-70-2", "ordinal": 2, "title": "Follow up the three Tuesday leads", "priority": "medium", "workItemId": "W-K05" }
+      ],
+      "$comment": "Line 2 LINKED to an item that already existed and was already overdue, rather than minting a second copy of it. Matching is on exact title and is offered as a suggestion, never applied silently — a plan that quietly forks an existing task is how one piece of work becomes two that each look half-done."
+    },
+    {
+      "planId": "PLAN-0828-74", "memberId": "74", "businessDate": "2026-08-28",
+      "expectedOutcome": "Outreach list past 30 rows.",
+      "blockers": "Pricing sign-off still not through. Second day.",
+      "notes": null,
+      "submittedAt": "2026-08-28T10:14:00+05:30",
+      "lines": [
+        { "lineId": "PL-0828-74-1", "ordinal": 1, "title": "Build the Pune outreach list — 40 businesses", "priority": "medium", "workItemId": "W-K07" },
+        { "lineId": "PL-0828-74-2", "ordinal": 2, "title": "Chase the Pune tier pricing sign-off", "priority": "high", "workItemId": "W-K08" }
+      ]
+    },
+    {
+      "planId": "PLAN-0828-58", "memberId": "58", "businessDate": "2026-08-28",
+      "expectedOutcome": "Runbook draft started and the week's numbers checked.",
+      "blockers": null,
+      "notes": "Half day tomorrow.",
+      "submittedAt": "2026-08-28T09:20:00+05:30",
+      "lines": [
+        { "lineId": "PL-0828-58-1", "ordinal": 1, "title": "Rewrite the no-match runbook", "priority": "low", "workItemId": "W-K10" }
+      ]
+    },
+    {
+      "planId": "PLAN-0828-79", "memberId": "79", "businessDate": "2026-08-28",
+      "expectedOutcome": null,
+      "blockers": null,
+      "notes": null,
+      "submittedAt": null,
+      "lines": [
+        { "lineId": "PL-0828-79-1", "ordinal": 1, "title": "August payout reconciliation", "priority": "high", "workItemId": null }
+      ],
+      "$comment": "A DRAFT — `submittedAt` is null, so it does not count as submitted and its line has minted no work item yet. It exists so the screens have to distinguish 'started and left' from 'never opened', which look identical if a draft is treated as nothing."
+    },
+    {
+      "planId": "PLAN-0827-63", "memberId": "63", "businessDate": "2026-08-27",
+      "expectedOutcome": "Backlog under 20.",
+      "blockers": null, "notes": null,
+      "submittedAt": "2026-08-27T09:18:00+05:30",
+      "lines": [
+        { "lineId": "PL-0827-63-1", "ordinal": 1, "title": "Work the enquiry backlog", "priority": "high", "workItemId": null },
+        { "lineId": "PL-0827-63-2", "ordinal": 2, "title": "Weekly ops numbers for D.", "priority": "medium", "workItemId": null }
+      ]
+    },
+    {
+      "planId": "PLAN-0827-70", "memberId": "70", "businessDate": "2026-08-27",
+      "expectedOutcome": "Site visit done and measurements written up.",
+      "blockers": null, "notes": null,
+      "submittedAt": "2026-08-27T09:44:00+05:30",
+      "lines": [
+        { "lineId": "PL-0827-70-1", "ordinal": 1, "title": "Site visit — Kalyani Nagar", "priority": "high", "workItemId": "W-K06" }
+      ]
+    },
+    {
+      "planId": "PLAN-0827-74", "memberId": "74", "businessDate": "2026-08-27",
+      "expectedOutcome": "Outreach list to 20 rows.",
+      "blockers": "Pricing.", "notes": null,
+      "submittedAt": "2026-08-27T10:08:00+05:30",
+      "lines": [
+        { "lineId": "PL-0827-74-1", "ordinal": 1, "title": "Build the Pune outreach list", "priority": "medium", "workItemId": "W-K07" }
+      ]
+    }
+  ],
+  "$comment_missing": "Members 41, 52 and 86 have NO plan today, and that is the record: a missing plan is the absence of a row, never a row saying 'none'. Two of those three are the Reports band's 'no plan submitted' count — the founder is excluded from that count by the same rule that excludes anybody with no reporting line, because a number that always shows the founder as delinquent is a number people learn to ignore."
+}

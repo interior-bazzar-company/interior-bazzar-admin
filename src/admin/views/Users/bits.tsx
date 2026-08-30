@@ -6,17 +6,14 @@
    earlier pass reimplemented most of them under `um-` names, which is how a
    module ends up looking almost like the panel it lives in.
 
-   What is left here is the vocabulary this module owns: a classification, a
-   membership status, a plan, a term cell, an entitlement snapshot, and one
-   marker for a decision nobody has taken yet.
+   What is left here is the vocabulary this module owns: an account
+   classification, an operational tag, a completeness bar, an audit row, and
+   one marker for a decision nobody has taken yet.
    ============================================================================= */
 import type { ReactNode } from "react";
-import { Icon, Notice } from "../../ui";
-import { go } from "../../ui/nav";
-import {
-  ago, classificationMeta, decision, fmtDate, membershipMeta, primaryCityOf, tagMeta,
-} from "./store";
-import type { Classification, Membership, UserRow } from "./store";
+import { Icon } from "../../ui";
+import { ago, classificationMeta, decision, primaryCityOf, tagMeta } from "./store";
+import type { Classification, UserRow } from "./store";
 
 /* ------------------------------------------------------------- banner --- */
 
@@ -43,29 +40,6 @@ export function ClassPill({ k, lg }: { k: Classification; lg?: boolean }) {
     <span className={"pill um-cls" + (m.tone ? " " + m.tone : "") + (lg ? " lg" : "")}
       title={m.meaning}>
       <span className={"dot c-" + k} />{m.label}
-    </span>
-  );
-}
-
-export function StatusPill({ k, lg }: { k: string | null | undefined; lg?: boolean }) {
-  if (!k) return <span className="faint">—</span>;
-  const m = membershipMeta(k);
-  if (!m) return <span className="faint">{k}</span>;
-  return (
-    <span className={"pill um-ms" + (m.tone ? " " + m.tone : "") + (lg ? " lg" : "")}
-      title={m.meaning}>
-      <span className={"dot m-" + k} />{m.label}
-    </span>
-  );
-}
-
-/** The plan and the duration bought, from the term's own frozen fields. The
- *  catalogue is not consulted — that is what makes a term render correctly
- *  after its plan is repriced, renamed, archived or unreachable. */
-export function PlanChip({ code, name, months }: { code: string; name: string; months?: number }) {
-  return (
-    <span className={"um-plan p-" + code}>
-      {name}{months ? <span className="v">{months}m</span> : null}
     </span>
   );
 }
@@ -137,80 +111,18 @@ export function WhoCell({ r }: { r: UserRow }) {
   );
 }
 
-/** Plan, status, and when it ends — with the urgency in words, because
- *  "01 Sep 2026" does not read as "next week" at a glance. */
-export function TermCell({ r }: { r: UserRow }) {
-  const m = r.current;
-  if (!m) return <span className="faint">—</span>;
-  const running = m.status === "active" || m.status === "paused" || m.status === "suspended";
-  return (
-    <div>
-      <div className="um-termtop">
-        <PlanChip code={m.planCode} name={m.planName} months={m.cycle.months} />
-        <StatusPill k={m.status} />
-      </div>
-      <div className="cell-2">
-        {m.status === "pending"
-          ? <>raised {ago(m.createdAt)}</>
-          : running
-            ? <>
-                {fmtDate(m.endAt)}
-                {r.daysToEnd !== null
-                  ? <em className={r.expiringSoon ? "warn" : ""}>
-                      {r.daysToEnd < 0 ? " · past its end date"
-                        : r.daysToEnd === 0 ? " · ends today" : " · in " + r.daysToEnd + " days"}
-                    </em>
-                  : null}
-              </>
-            : <>{ago(m.expiredAt || m.cancelledAt || m.endAt)}</>}
-      </div>
-    </div>
-  );
-}
-
 /* ------------------------------------------------------------- events --- */
 
-export function EventRow({ type, label, tone, text, who, when, to }: {
+export function EventRow({ type, label, tone, text, who, when }: {
   type: string; label: string; tone?: string; text: ReactNode;
-  who: string; when: string; to?: string | null;
+  who: string; when: string;
 }) {
   return (
     <div className="um-ev">
       <span className={"ty" + (tone ? " " + tone : "")} title={type}>{label}</span>
-      <span className="tx">
-        {text}
-        {to ? <> · <a className="mono" data-go={to} onClick={() => go(to)}>{to.split("=").pop()}</a></> : null}
-      </span>
+      <span className="tx">{text}</span>
       <span className="wh">{who}</span>
       <span className="wn" title={when}>{ago(when)}</span>
     </div>
-  );
-}
-
-/* ------------------------------------------------------- entitlements --- */
-
-/** The frozen snapshot, or an honest statement that there is not one. A
- *  Pending term grants nothing, and previewing the plan as though it did is
- *  the confusion that state exists to prevent. */
-export function Entitlements({ m }: { m: Membership }) {
-  if (!m.entitlements.length) {
-    return (
-      <Notice tone="warn" text={<>
-        <b>No snapshot yet.</b> Entitlements freeze at activation, not when the term is raised —
-        this member has no access from it.
-      </>} />
-    );
-  }
-  return (
-    <ul className="um-ent">
-      {m.entitlements.map((e) => (
-        <li key={e.key}>
-          <Icon name="check" size="sm" />
-          <span className="l">{e.label}</span>
-          <span className="v">{e.display}</span>
-          <span className="k mono">{e.key}</span>
-        </li>
-      ))}
-    </ul>
   );
 }

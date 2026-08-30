@@ -44,7 +44,7 @@ import FacetPicker from "./FacetPicker";
 import InfoTip from "./InfoTip";
 import HandleField from "./HandleField";
 import {
-  completenessOf, fieldsFor, optionsFor, updateProfile, usernameTaken, validateFacets,
+  PROFILE_FIELDS, completenessOf, optionsFor, updateProfile, usernameTaken, validateFacets,
 } from "./store";
 import type { ProfileField, TargetArea, UserProfile, UserRow } from "./store";
 
@@ -57,10 +57,9 @@ import type { ProfileField, TargetArea, UserProfile, UserRow } from "./store";
 const GROUPS: { key: string; label: string; note?: string }[] = [
   { key: "business", label: "Business profile" },
   { key: "contact", label: "Target" },
-  /* The one group that keeps a note, because the note IS the instruction:
-     the cap, and why the field exists at all. */
-  { key: "positioning", label: "Positioning segment",
-    note: "Select up to 2. This is how the business positions its own work \u2014 it keeps expectations aligned before a connection is made." },
+  /* No note here any more: the cap-and-why sentence sits behind the i button
+     beside the legend, where the schema's `info` puts it. */
+  { key: "positioning", label: "Positioning segment" },
   { key: "about", label: "About" },
 ];
 
@@ -112,12 +111,10 @@ export default function EditProfile({ row, onClose, onDone }: {
   onClose: () => void;
   onDone: (msg: string, tone?: string) => void;
 }) {
-  /* THE SCHEMA IS CONDITIONAL NOW. Target areas only applies to somebody who
-     holds a term or held one, so the field list is a function of the row —
-     and every read of it, including the patch builder and the required check,
-     has to go through the same list or the form would validate a field it
+  /* ONE LIST, read by the form, the patch builder and the required check
+     alike. Two reads of the schema is how a form ends up validating a field it
      never showed. */
-  const fields = useMemo(() => fieldsFor(row), [row]);
+  const fields = PROFILE_FIELDS;
   const [draft, setDraft] = useState<Draft>(() => toDraft(row.user.profile, fields));
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -138,27 +135,37 @@ export default function EditProfile({ row, onClose, onDone }: {
      well formed", which needs only the value. This needs the whole table. */
   const handle = String(draft.username || "").trim();
   const handleTaken = !!handle && usernameTaken(handle, row.user.userId);
+  /* REQUIRED FIELDS ARE CHECKED LIVE, like the facet rules — not discovered
+     on submit as one sentence at the top of a form just scrolled to the
+     bottom of. The empty ones are marked, and Save says what it is waiting
+     for. */
+  const missingRequired = fields
+    .filter((f) => f.required && f.editable)
+    .filter((f) => {
+      const v = draft[f.key];
+      return Array.isArray(v) ? v.length === 0 : !String(v || "").trim();
+    });
+  const isMissing = (f: ProfileField) => missingRequired.some((m) => m.key === f.key);
+  const initial = useMemo(() => JSON.stringify(toDraft(row.user.profile, fields)), [row, fields]);
+  const dirty = JSON.stringify(draft) !== initial;
+  const close = () => {
+    if (dirty && !window.confirm("Discard your changes? The stored profile is unchanged.")) return;
+    onClose();
+  };
 
   const submit = () => {
     setErr(null);
-    const missingRequired = fields
-      .filter((f) => f.required && f.editable)
-      .filter((f) => {
-        const v = draft[f.key];
-        return Array.isArray(v) ? v.length === 0 : !String(v || "").trim();
-      })
-      .map((f) => f.label);
     if (missingRequired.length) {
       /* NOTHING IS WRITTEN. Not the valid fields, not partially — the stored
          profile is exactly as it was before this dialog opened. */
-      setErr("Required and empty: " + missingRequired.join(", ")
+      setErr("Required and empty: " + missingRequired.map((f) => f.label).join(", ")
         + ". Nothing has been saved — the stored profile is unchanged.");
       return;
     }
     setBusy(true);
     const e = updateProfile(row.user.userId, toPatch(draft, fields));
     if (e) { setErr(e); setBusy(false); return; }
-    onDone("Profile saved. The changed field set is in the audit trail; the values are not.", "ok");
+    onDone("Profile saved.", "ok");
   };
 
   const control = (f: ProfileField) => {
@@ -250,7 +257,7 @@ export default function EditProfile({ row, onClose, onDone }: {
       <div className="md-h">
         <h3>Edit profile</h3>
         <p>{row.user.identity.name} · <span className="mono">{row.user.userId}</span></p>
-        <button className="md-x" data-close="1" onClick={onClose}><Icon name="x" /></button>
+        <button className="md-x" onClick={close} aria-label="Close"><Icon name="x" /></button>
       </div>
 
       <div className="md-b um-form">
@@ -288,7 +295,8 @@ export default function EditProfile({ row, onClose, onDone }: {
                      with its own labelled input — so those render as a div
                      with the caption beside it instead. Wrapping one in a
                      <label> makes clicking a chip focus the search box. */
-                  <div className={"fg" + (isWide(f) ? " um-fg-wide" : "")} key={f.key}>
+                  <div className={"fg" + (isWide(f) ? " um-fg-wide" : "") + (isMissing(f) ? " um-fg-missing" : "")}
+                    key={f.key} aria-invalid={isMissing(f) || undefined}>
                     {solo ? null : (
                       <span className="fg-lb">
                         {f.label}
@@ -333,9 +341,15 @@ export default function EditProfile({ row, onClose, onDone }: {
       </div>
 
       <div className="md-f">
+        {missingRequired.length ? (
+          <span className="um-foot-note">
+            Required: {missingRequired.map((f) => f.label).join(", ")}
+          </span>
+        ) : null}
         <span className="spacer" />
-        <button className="btn" data-close="1" onClick={onClose}>Cancel</button>
-        <button className="btn pri" disabled={busy || !!facetErr || handleTaken} onClick={submit}>
+        <button className="btn" onClick={close}>Cancel</button>
+        <button className="btn pri" disabled={busy || !!facetErr || handleTaken || missingRequired.length > 0}
+          onClick={submit}>
           {busy ? "Saving…" : "Save changes"}
         </button>
       </div>

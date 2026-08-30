@@ -90,7 +90,9 @@ export default function AreaRows({ f, value, onChange, disabled }: {
           </div>
           <div className="um-area-cities">
             {row.state ? (
-              <FacetPicker f={ROW_CITIES} disabled={disabled}
+              /* Chips under the box, so the city input and the state select
+                 share one baseline across the row. */
+              <FacetPicker f={ROW_CITIES} disabled={disabled} chipsBelow
                 values={row.cities}
                 options={citySuggestionsOf(row.state)}
                 onChange={(cities) => {

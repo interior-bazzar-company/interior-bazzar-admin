@@ -20,8 +20,11 @@
     "check:match": "esbuild src/admin/views/BusinessEnquiries/store.ts --bundle --platform=node --format=cjs --define:import.meta.env={} --external:react --log-level=error --outfile=node_modules/.tmp/enquiry-store.cjs && node scripts/check-enquiry-match.cjs",
     "check:users": "esbuild src/admin/views/Users/store.ts --bundle --platform=node --format=cjs --define:import.meta.env={} --external:react --log-level=error --outfile=node_modules/.tmp/users-store.cjs && node scripts/check-users-derivation.cjs",
     "check:users-render": "node scripts/build-um-smoke.cjs && node node_modules/.tmp/um-smoke.cjs",
-    "check": "npm run check:enquiries && npm run check:export && npm run check:clock && npm run check:share && npm run check:wiring && npm run check:match && npm run check:users && npm run check:users-render",
-    "preview": "vite preview"
+    "check": "npm run check:enquiries && npm run check:export && npm run check:clock && npm run check:share && npm run check:wiring && npm run check:match && npm run check:users && npm run check:users-render && npm run check:finance-nav && npm run check:finance && npm run check:finance-render",
+    "preview": "vite preview",
+    "check:finance": "esbuild src/admin/views/Finance/store.ts --bundle --platform=node --format=cjs --define:import.meta.env={} --external:react --log-level=error --outfile=node_modules/.tmp/finance-store.cjs && node scripts/check-finance-ledger.cjs",
+    "check:finance-render": "node scripts/build-fn-smoke.cjs && node node_modules/.tmp/fn-smoke.cjs",
+    "check:finance-nav": "node scripts/check-finance-nav.cjs"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.8.2",
@@ -29,12 +32,12 @@
     "@types/react-redux": "^7.1.34",
     "html-react-parser": "^5.2.6",
     "lottie-web": "^5.13.0",
-    "quill": "^2.0.3",
+    "quill": "^2.0.2",
     "react": "^18.0.0",
     "react-cropper": "^2.3.3",
     "react-dom": "^18.0.0",
     "react-icons": "^5.5.0",
-    "react-quill": "^2.0.0",
+    "react-quill": "^0.0.2",
     "react-redux": "^9.2.0",
     "react-router-dom": "^7.6.2",
     "recharts": "^3.2.1",

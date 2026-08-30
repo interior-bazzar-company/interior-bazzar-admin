@@ -25,6 +25,10 @@ import Quotations from "./Quotations";
 import Invoices from "./Invoices";
 import BusinessEnquiries from "./BusinessEnquiries";
 import Users from "./Users";
+import Finance from "./Finance";
+import Attendance from "./Team/Attendance";
+import Work from "./Team/Work";
+import TeamReports from "./Team/Reports";
 
 /** route key → the component that owns that workspace. */
 export const VIEWS: Record<string, ComponentType> = {
@@ -46,6 +50,27 @@ export const VIEWS: Record<string, ComponentType> = {
      from src/content/users/*.json through views/Users/store.ts — see
      src/proto/v-2.2.0.0/BACKEND-INTEGRATION.md for the work-list. */
   users: Users,
+  /* Finance · Module 5. Frontend-first like Users: src/content/finance/*.json
+     through views/Finance/store.ts. See BACKEND-INTEGRATION.md. */
+  finance: Finance,
+  /* The same component five times over, on purpose: Finance is ONE module
+     reading ONE store, and the five keys exist so the sidebar can name what
+     is inside it and the server can grant the sections separately. The
+     component reads its own route to know which section it is showing. */
+  "finance-salaries": Finance,
+  "finance-transactions": Finance,
+  "finance-refunds": Finance,
+  "finance-analytics": Finance,
+  /* Team · the operational half, Module 7. `team` and `roles` above are LIVE
+     and unchanged; these three are frontend-first, reading
+     src/content/team/*.json through views/Team/store.ts. They live under
+     views/Team/ rather than in three folders of their own because they share
+     one data module and one stylesheet — three route keys, one module. Their
+     keys sit in PROTO_MODULES until the API ships, and each comes out in the
+     commit that lands its endpoint. See BACKEND-INTEGRATION.md § Module 7. */
+  attendance: Attendance,
+  work: Work,
+  reports: TeamReports,
 };
 
 export function ViewHost() {

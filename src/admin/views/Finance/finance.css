@@ -1,0 +1,567 @@
+/* =============================================================================
+   Finance — module styles. The namespace is `.fin` / `.fin-*`, and it may NOT
+   be `.fn`: that is already the theme's funnel segment (admin-theme.css), so
+   a `.fn` root inherited its `:hover` tint on the whole module and let
+   `.fn .k/.v/.s` style these tiles.
+
+   Only what this module owns; `.tiles`, `.card`, `.tbl`, `.sh`, `.notice`, `.kv`, `.dls-*`, `.tabs`, `.pill` and `.chip` come
+   from admin-theme.css. Every value is a token — a literal hex looks right in
+   light mode and fails silently in dark.
+   ============================================================================= */
+.fin { position: relative }
+
+/* ------------------------------------------------------------- banner --- */
+.fin-proto {
+  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; flex: 0 0 auto;
+  margin: var(--space-3) var(--page-pad) 0; padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--warn-line); border-radius: var(--radius-md);
+  background: var(--warn-bg); color: var(--warn); font-size: var(--text-sm); line-height: var(--lh-sm);
+}
+.fin-proto .ic { flex: 0 0 auto }
+.fin-proto > span { flex: 1 1 auto; min-width: 240px }
+.fin-rec .fin-proto { margin-inline: 0 }
+
+/* ------------------------------------------------------- sub-sections --- */
+/* The five sections are sidebar rows now, so the page carries no navigation
+   of its own and .fin-tabbar is gone with it.
+
+   A switch INSIDE a section. Segmented rather than underlined, so it reads as
+   mistaken for a peer of the tabs above it. */
+.fin-subtabs { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap }
+.fin-subtabs > .r { margin-left: auto; font-size: var(--text-sm); color: var(--text-3) }
+.fin-subtabs .n { margin-left: 5px; font-size: var(--text-xs); color: var(--text-3) }
+
+.fin .dls-attn { flex-wrap: wrap; overflow-x: visible; row-gap: 0 }
+.fin .dls-body > .sh:first-child { margin-top: var(--space-4) }
+.fin-fine { font-size: var(--text-sm); line-height: var(--lh-md); color: var(--text-3); margin: var(--space-2) 0 0 }
+.fin-fine.warn { color: var(--warn) }
+.fin-fine.bad { color: var(--bad) }
+.lnk { background: none; border: none; padding: 0; font: inherit; color: var(--brand-text); cursor: pointer; text-decoration: underline; text-underline-offset: 2px }
+.lnk:hover { color: var(--brand-hover) }
+.fin-count { font-size: var(--text-md); font-weight: var(--weight-semibold); color: var(--text-2) }
+.fin-sum { margin-left: auto; font-size: var(--text-sm); color: var(--text-3) }
+.fin-sum b { color: var(--text) }
+
+/* -------------------------------------------------------- money tiles --- */
+/* Read-outs, not filters: a strip cell with `to` becomes a filter in the
+   theme; the money strip prints figures and drills through its own links. */
+.fin-money-strip {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--space-2);
+  padding: var(--space-3) var(--page-pad) 0;
+}
+.fin-rec .fin-money-strip, .card .fin-money-strip { padding: 0 }
+.fin-mt {
+  display: flex; flex-direction: column; gap: 2px; padding: var(--space-3) var(--space-3);
+  background: var(--surface-raised); border: 1px solid var(--line); border-radius: var(--radius-lg);
+  min-width: 0; text-align: left; font: inherit; color: inherit;
+}
+button.fin-mt { cursor: pointer }
+button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
+.fin-mt.on { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand) }
+.fin-mt .k { display: flex; align-items: center; gap: var(--space-1); font-size: var(--text-2xs); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); font-weight: var(--weight-semibold) }
+.fin-mt .v { font-size: var(--text-xl); line-height: var(--lh-xl); font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.fin-mt .s { font-size: var(--text-sm); color: var(--text-3) }
+.fin-mt.ok .v { color: var(--ok) }
+.fin-mt.warn { border-color: var(--warn-line); background: var(--warn-bg) }
+.fin-mt.warn .v { color: var(--warn) }
+.fin-mt.bad { border-color: var(--bad-line); background: var(--bad-bg) }
+.fin-mt.bad .v { color: var(--bad) }
+.fin-mt.mute .v { color: var(--text-2) }
+
+/* ------------------------------------------------------------- pills --- */
+.fin-st .dot.s-recorded { background: var(--ok-solid) }
+.fin-st .dot.s-unmatched { background: var(--warn-solid) }
+.fin-st .dot.s-reversed, .fin-st .dot.s-refunded { background: var(--bad-solid) }
+.fin-st .dot.s-refund_requested { background: var(--info-solid) }
+.fin-st .dot.s-returned { background: var(--text-3) }
+.fin-path {
+  display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: var(--radius-xs);
+  font-size: var(--text-2xs); letter-spacing: .08em; text-transform: uppercase; font-weight: var(--weight-semibold);
+  border: 1px solid var(--info-line); background: var(--info-bg); color: var(--info); white-space: nowrap;
+}
+.fin-role {
+  display: inline-flex; align-items: center; height: 16px; padding: 0 5px; border-radius: var(--radius-xs);
+  font-size: var(--text-2xs); letter-spacing: .08em; text-transform: uppercase; font-weight: var(--weight-semibold);
+  border: 1px solid var(--warn-line); color: var(--warn); vertical-align: middle; margin-left: var(--space-1);
+}
+.fin-role.sa { border-color: var(--bad-line); color: var(--bad) }
+.btn:disabled .fin-role { opacity: .7 }
+.fin-cat {
+  display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 8px; border-radius: var(--radius-full);
+  font-size: var(--text-xs); color: var(--text-2); background: var(--bg); border: 1px solid var(--line-2); white-space: nowrap;
+}
+.fin-cat i { width: 7px; height: 7px; border-radius: 2px; background: var(--text-3); display: inline-block }
+.fin-cat.big { height: var(--control-md); padding: 0 var(--space-3); font-size: var(--text-md) }
+.fin-cat.tag-blue i { background: var(--tag-blue) } .fin-cat.tag-blue { background: var(--tag-blue-bg); border-color: var(--tag-blue-line) }
+.fin-cat.tag-amber i { background: var(--tag-amber) } .fin-cat.tag-amber { background: var(--tag-amber-bg); border-color: var(--tag-amber-line) }
+.fin-cat.tag-violet i { background: var(--tag-violet) } .fin-cat.tag-violet { background: var(--tag-violet-bg); border-color: var(--tag-violet-line) }
+.fin-cat.tag-teal i { background: var(--tag-teal) } .fin-cat.tag-teal { background: var(--tag-teal-bg); border-color: var(--tag-teal-line) }
+.fin-cat.tag-red i { background: var(--tag-red) } .fin-cat.tag-red { background: var(--tag-red-bg); border-color: var(--tag-red-line) }
+.fin-cat.tag-slate i { background: var(--tag-slate) } .fin-cat.tag-slate { background: var(--tag-slate-bg); border-color: var(--tag-slate-line) }
+.fin-cat.tag-cyan i { background: var(--tag-cyan) } .fin-cat.tag-cyan { background: var(--tag-cyan-bg); border-color: var(--tag-cyan-line) }
+.fin-cat.tag-lime i { background: var(--tag-lime) } .fin-cat.tag-lime { background: var(--tag-lime-bg); border-color: var(--tag-lime-line) }
+.fin-cat.tag-orange i { background: var(--tag-orange) } .fin-cat.tag-orange { background: var(--tag-orange-bg); border-color: var(--tag-orange-line) }
+.fin-cat.tag-pink i { background: var(--tag-pink) } .fin-cat.tag-pink { background: var(--tag-pink-bg); border-color: var(--tag-pink-line) }
+.fin-cat.tag-green i { background: var(--tag-green) } .fin-cat.tag-green { background: var(--tag-green-bg); border-color: var(--tag-green-line) }
+.fin-cat.sel, .fin-cat.big.sel { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand); color: var(--text) }
+.fin-catpick { display: flex; flex-wrap: wrap; gap: var(--space-2) }
+.fin-catpick button { font: inherit; cursor: pointer }
+.fin-dir { display: inline-block; padding: 1px 8px; border-radius: var(--radius-xs); font-size: var(--text-xs); font-weight: var(--weight-semibold); border: 1px solid var(--line-2); background: var(--bg-inset); color: var(--text-2) }
+.fin-dir.out { background: var(--bad-bg); border-color: var(--bad-line); color: var(--bad) }
+.fin-dir.in { background: var(--ok-bg); border-color: var(--ok-line); color: var(--ok) }
+.fin-money.neg { color: var(--bad) }
+.fin-money.pos { color: var(--ok) }
+.fin-money.strong { font-weight: var(--weight-semibold) }
+
+/* ------------------------------------------------------------- tables --- */
+.fin-tbl { min-width: 1020px }
+.fin-tbl th.rail, .fin-tbl td.rail { width: 3px; padding: 0 }
+.fin-tbl td.rail i { display: block; width: 3px; height: 52px; background: transparent; border-radius: 0 2px 2px 0 }
+.fin-tbl td.rail i.warn { background: var(--warn-solid) }
+.fin-tbl td.rail i.bad { background: var(--bad-solid) }
+.fin-tbl td.rail i.ok { background: var(--ok-solid) }
+.fin-tbl td.num, .fin-tbl th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap }
+.fin-tbl tr.dim td { color: var(--text-3) }
+.fin-tbl tr.dim .fin-money { text-decoration: line-through; color: var(--text-3) }
+.fin-pager { display: flex; align-items: center; gap: var(--space-3); justify-content: center; padding: var(--space-4) 0; font-size: var(--text-sm); color: var(--text-3) }
+
+/* -------------------------------------------------------------- record --- */
+.fin-rec { padding: var(--space-4) var(--page-pad) var(--space-12); max-width: var(--page-max-wide); container-type: inline-size }
+.fin-idbar { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-4) }
+.fin-idbar > * { flex: 0 0 auto }
+.fin-idbar > .spacer { flex: 1 1 auto }
+.fin-idbar h2 { font-size: var(--text-2xl); line-height: var(--lh-2xl); font-weight: var(--weight-semibold); margin-right: var(--space-1) }
+.fin-subline { margin: var(--space-2) 0 var(--space-4); font-size: var(--text-md); color: var(--text-3); display: flex; align-items: center; gap: 5px; flex-wrap: wrap }
+.fin-cards { display: flex; flex-direction: column; gap: var(--space-4) }
+.fin-blocks { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: var(--space-4); margin-top: var(--space-4) }
+.fin-block.wide { grid-column: 1 / -1 }
+.fin-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: var(--space-4) }
+.fin-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; margin-top: var(--space-3) }
+.fin-actions .spacer { flex: 1 1 auto }
+.fin-frozen {
+  display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--text-2);
+  background: var(--bg-inset); border: 1px solid var(--line); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); margin-top: var(--space-3);
+}
+.fin-frozen .ic { color: var(--text-3); flex: 0 0 auto }
+
+/* the chain strip */
+.fin-chain {
+  display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap;
+  border: 1px solid var(--line-2); border-radius: var(--radius-lg); padding: var(--space-3) var(--space-4);
+  background: var(--bg-inset); margin-bottom: var(--space-4);
+}
+.fin-chain .seg { display: flex; flex-direction: column; min-width: 0 }
+.fin-chain .seg .k { font-size: var(--text-2xs); letter-spacing: .1em; text-transform: uppercase; color: var(--text-3); font-weight: var(--weight-semibold) }
+.fin-chain .seg .v { font-size: var(--text-md); font-weight: var(--weight-semibold); display: inline-flex; align-items: center; gap: 3px }
+.fin-chain .seg a.v { color: var(--brand-text); cursor: pointer }
+.fin-chain .arw { color: var(--line-3); font-size: var(--text-lg) }
+.fin-chain .seg.cap { margin-left: auto; text-align: right; align-items: flex-end }
+.fin-chain .seg.cap .v { color: var(--ok); font-size: var(--text-lg) }
+
+/* ------------------------------------------------------------- events --- */
+.fin-evlist { display: flex; flex-direction: column }
+.fin-ev { display: grid; grid-template-columns: 140px 1fr auto auto; gap: var(--space-3); align-items: baseline; padding: var(--space-2) 0; border-bottom: 1px solid var(--line); font-size: var(--text-sm); line-height: var(--lh-md) }
+.fin-ev:last-child { border-bottom: none }
+.fin-ev .ty { font-family: var(--font-mono); font-size: var(--text-2xs); line-height: 16px; padding: 0 6px; border-radius: var(--radius-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: var(--bg-inset); color: var(--text-3); border: 1px solid var(--line) }
+.fin-ev .ty.ok { background: var(--ok-bg); color: var(--ok); border-color: var(--ok-line) }
+.fin-ev .ty.warn { background: var(--warn-bg); color: var(--warn); border-color: var(--warn-line) }
+.fin-ev .ty.stop { background: var(--bad-bg); color: var(--bad); border-color: var(--bad-line) }
+.fin-ev .ty.sys { background: var(--info-bg); color: var(--info); border-color: var(--info-line) }
+.fin-ev .tx { color: var(--text-2) }
+.fin-ev .tx a { color: var(--brand-text); cursor: pointer }
+.fin-ev .wh, .fin-ev .wn { color: var(--text-3); white-space: nowrap }
+.fin-ev .wn { min-width: 82px; text-align: right }
+@container (max-width: 760px) { .fin-ev { grid-template-columns: 1fr auto } .fin-ev .ty { grid-column: 1 / -1 } }
+
+/* ------------------------------------------------------------ dialogs --- */
+.fin-form { container-type: inline-size }
+.fin-form .fg { margin-bottom: 0 }
+.fin-form .fg-lb { display: flex; align-items: baseline; gap: var(--space-2) }
+.fin-form textarea.inp { height: auto; padding: var(--space-2) var(--space-3); line-height: var(--lh-base) }
+.fin-form .inp.ro { display: flex; align-items: center; background: var(--bg-inset); color: var(--text-2) }
+.fin-f2 { display: grid; gap: var(--space-4) var(--space-3); grid-template-columns: repeat(2, 1fr) }
+.fin-f2 > * { min-width: 0 }
+@container (max-width: 520px) { .fin-f2 { grid-template-columns: 1fr } }
+.fin-form fieldset.fin-fs { border: 0; margin: 0; padding: var(--space-4) 0 0; min-width: 0 }
+.fin-form fieldset.fin-fs legend { float: left; width: 100%; margin: 0 0 var(--space-3); padding: 0; display: flex; align-items: baseline; gap: var(--space-2);
+  font-size: var(--text-2xs); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); font-weight: var(--weight-semibold) }
+.fin-form fieldset.fin-fs legend i { text-transform: none; letter-spacing: 0; font-style: normal; font-weight: var(--weight-normal); font-size: var(--text-sm) }
+.fin-form fieldset.fin-fs legend .req { color: var(--bad) }
+.fin-form fieldset.fin-fs legend + * { clear: both }
+.fin-form fieldset.fin-fs + fieldset.fin-fs { margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--line-2) }
+.fin-form .fin-fs .inp { background: var(--surface-raised); border-color: var(--line-2) }
+.fin-form .fin-fs .inp.ro { background: var(--bg-inset) }
+.fin-form .selectbox { display: flex; width: 100% }
+.fin-form .selectbox select { width: 100%; height: var(--control-lg); background: var(--surface-raised); border-color: var(--line-2) }
+.fin-chks { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-4) }
+.fin-chk { display: flex; gap: var(--space-2); align-items: flex-start; font-size: var(--text-md); line-height: var(--lh-md); color: var(--text-2) }
+.fin-chk .m { width: 16px; flex: 0 0 16px; font-weight: var(--weight-bold); text-align: center }
+.fin-chk.ok .m { color: var(--ok) } .fin-chk.bad .m { color: var(--bad) } .fin-chk.warn .m { color: var(--warn) }
+.fin-consequences { list-style: none; margin: 0 0 var(--space-4); padding: 0; display: flex; flex-direction: column; gap: var(--space-2) }
+.fin-consequences li { display: flex; gap: var(--space-2); align-items: flex-start; font-size: var(--text-base); line-height: var(--lh-base); color: var(--text-2) }
+.fin-consequences .ic { flex: 0 0 auto; color: var(--text-3); margin-top: 3px }
+.fin-radios { display: flex; flex-direction: column; gap: var(--space-2) }
+.fin-radios label { display: grid; grid-template-columns: auto 1fr; gap: 2px var(--space-3); align-items: start; padding: var(--space-2) var(--space-3); cursor: pointer; border: 1px solid var(--line); border-radius: var(--radius-lg) }
+.fin-radios label.on { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand) }
+.fin-radios input { grid-row: 1 / 3; margin-top: 3px; accent-color: var(--brand) }
+.fin-radios b { font-size: var(--text-md) }
+.fin-radios span { font-size: var(--text-sm); color: var(--text-3); line-height: var(--lh-md) }
+.fin-chips { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-2) }
+.fin-summary { border: 1px solid var(--line-2); border-radius: var(--radius-lg); background: var(--bg-inset); padding: var(--space-3) var(--space-4); margin-top: var(--space-4) }
+.fin-summary .row { display: flex; justify-content: space-between; gap: var(--space-3); padding: 3px 0; font-size: var(--text-md) }
+.fin-summary .row .l { color: var(--text-2) }
+.fin-summary .row.grand { border-top: 1px solid var(--line-2); margin-top: var(--space-2); padding-top: var(--space-2); font-weight: var(--weight-semibold); font-size: var(--text-base) }
+.fin-foot-note { font-size: var(--text-sm); color: var(--warn); align-self: center }
+.fin-pick { display: flex; flex-direction: column; gap: var(--space-2); max-height: 300px; overflow: auto }
+.fin-pick button { display: grid; grid-template-columns: 1fr auto; gap: 2px var(--space-3); text-align: left; padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--surface-raised); font: inherit; color: inherit; cursor: pointer }
+.fin-pick button:hover { border-color: var(--line-3) }
+.fin-pick button.on { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand) }
+.fin-pick button:disabled { opacity: .5; cursor: not-allowed }
+.fin-pick .s { grid-column: 1; font-size: var(--text-sm); color: var(--text-3) }
+.fin-pick .a { grid-column: 2; grid-row: 1 / 3; align-self: center; font-variant-numeric: tabular-nums; font-weight: var(--weight-semibold) }
+
+/* ------------------------------------------------------------ i button --- */
+.fin-info { position: relative; display: inline-flex; vertical-align: middle }
+.fin-info-b { display: grid; place-items: center; width: 16px; height: 16px; border: 1px solid var(--line-2); border-radius: var(--radius-full);
+  background: var(--bg); color: var(--text-3); cursor: pointer; font-size: var(--text-2xs); font-style: italic; font-weight: var(--weight-semibold); font-family: Georgia, serif; line-height: 1 }
+.fin-info-b:hover, .fin-info-b[aria-expanded="true"] { border-color: var(--line-control); background: var(--bg-hover); color: var(--text) }
+.fin-info-pop { position: absolute; z-index: var(--z-pop); top: calc(100% + 6px); left: -8px; width: 320px; max-width: 80vw; padding: var(--space-3);
+  background: var(--surface-raised); border: 1px solid var(--line-2); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+  font-size: var(--text-sm); line-height: var(--lh-md); color: var(--text-2); text-transform: none; letter-spacing: 0; font-weight: var(--weight-normal); text-align: left }
+.fin-info-intro { margin: 0 0 var(--space-2); color: var(--text) }
+.fin-info-row { display: flex; flex-direction: column; gap: 1px; padding: var(--space-1) 0; border-top: 1px solid var(--line) }
+.fin-info-row b { color: var(--text); font-size: var(--text-sm) }
+.fin-mt .fin-info-b, .sh .fin-info-b, .card-h .fin-info-b { margin-left: 2px }
+
+/* ---------------------------------------------------- decisions & gaps --- */
+.fin-assumed { display: flex; gap: var(--space-2); align-items: flex-start; margin: var(--space-3) 0 0; padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--warn-line); border-radius: var(--radius-md); background: var(--warn-bg); color: var(--warn); font-size: var(--text-sm); line-height: var(--lh-md) }
+.fin-assumed .ic { flex: 0 0 auto; margin-top: 1px }
+.fin-unavailable { display: flex; gap: var(--space-4); align-items: flex-start; padding: var(--space-4) var(--space-5); border: 1px dashed var(--line-2); border-radius: var(--radius-lg); background: var(--bg-shell) }
+.fin-unavailable .ic { flex: 0 0 auto; color: var(--text-3) }
+.fin-unavailable b { display: block; font-size: var(--text-base); margin-bottom: var(--space-1) }
+.fin-unavailable p { margin: 0; font-size: var(--text-sm); line-height: var(--lh-md); color: var(--text-2); max-width: 82ch }
+
+/* ------------------------------------------------------------- budget --- */
+.fin-bud-wrap { display: inline-flex; align-items: center; gap: var(--space-2) }
+.fin-bud { width: 110px; height: 8px; border-radius: 4px; background: var(--bg-inset); overflow: hidden; display: inline-block }
+.fin-bud i { display: block; height: 100%; background: var(--text-2) }
+.fin-bud.near i { background: var(--warn-solid) }
+.fin-bud.over i { background: var(--bad-solid) }
+.fin-bud-wrap .warn { color: var(--warn) } .fin-bud-wrap .bad { color: var(--bad) }
+
+/* ------------------------------------------------------ reconciliation --- */
+.fin-recon { display: grid; grid-template-columns: 1fr 36px 1fr; gap: 0; align-items: stretch; margin-top: var(--space-4) }
+@container (max-width: 900px) { .fin-recon { grid-template-columns: 1fr } .fin-recon .mid { display: none } }
+.fin .dls-body { container-type: inline-size }
+.fin-recon .side { border: 1px solid var(--line); background: var(--surface-raised); border-radius: var(--radius-lg); overflow: hidden }
+.fin-recon .mid { display: grid; place-items: center; color: var(--text-3); font-size: var(--text-lg) }
+.fin-mrow { display: grid; grid-template-columns: 1fr auto auto; gap: var(--space-3); align-items: center; padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--line); font-size: var(--text-sm) }
+.fin-mrow:last-child { border-bottom: none }
+.fin-mrow.head { background: var(--bg-inset); font-weight: var(--weight-semibold) }
+.fin-mrow.match { background: var(--ok-bg) }
+.fin-mrow.miss { background: var(--bad-bg) }
+.fin-mrow.resolved { background: var(--warn-bg) }
+.fin-mrow .amt { font-variant-numeric: tabular-nums; font-weight: var(--weight-semibold); white-space: nowrap }
+.fin-mrow .sub { font-size: var(--text-xs); color: var(--text-3) }
+.fin-mrow .act { display: flex; gap: var(--space-1) }
+
+/* ---------------------------------------------------------------- bars --- */
+.fin-bars { display: flex; align-items: flex-end; gap: var(--space-2); height: 140px; padding: 0 2px 22px; position: relative }
+.fin-bars .b { flex: 1; background: var(--line-3); border-radius: 3px 3px 0 0; position: relative; min-height: 2px }
+.fin-bars .b.on { background: var(--brand) }
+.fin-bars .b span { position: absolute; bottom: -20px; left: 0; right: 0; text-align: center; font-size: var(--text-2xs); color: var(--text-3) }
+.fin-bars .b em { position: absolute; top: -18px; left: 0; right: 0; text-align: center; font-size: var(--text-2xs); color: var(--text-2); font-style: normal; white-space: nowrap }
+.fin-srow { display: flex; justify-content: space-between; gap: var(--space-3); padding: 4px 0; font-size: var(--text-md); border-bottom: 1px solid var(--line) }
+.fin-srow:last-child { border-bottom: none }
+.fin-srow .l { color: var(--text-2); display: inline-flex; align-items: center; gap: var(--space-2) }
+.fin-srow.grand { font-weight: var(--weight-semibold); font-size: var(--text-base); border-top: 1px solid var(--line-2); margin-top: var(--space-1) }
+
+/* ------------------------------------------------------------ receipt --- */
+.fin-doc { background: var(--surface-raised); border: 1px solid var(--line-2); border-radius: var(--radius-md); padding: var(--space-6) var(--space-8); max-width: 760px; margin: 0 auto; box-shadow: var(--shadow-sm) }
+.fin-doc .dh { display: flex; justify-content: space-between; gap: var(--space-4); border-bottom: 2px solid var(--text); padding-bottom: var(--space-3); margin-bottom: var(--space-4) }
+.fin-doc .dh h3 { font-size: var(--text-xl); font-weight: var(--weight-semibold); letter-spacing: .04em; margin: 0 }
+.fin-doc .dh .r { text-align: right; font-size: var(--text-sm); color: var(--text-2) }
+.fin-doc .pty { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); margin-bottom: var(--space-4); font-size: var(--text-sm) }
+.fin-doc .pty .t { font-size: var(--text-2xs); letter-spacing: .12em; text-transform: uppercase; color: var(--text-3); margin-bottom: var(--space-1) }
+.fin-doc .tot { width: 290px; margin-left: auto; margin-top: var(--space-3) }
+.fin-doc .terms { margin-top: var(--space-4); font-size: var(--text-xs); color: var(--text-3); border-top: 1px solid var(--line); padding-top: var(--space-3); white-space: pre-line }
+.fin-doc .words { font-size: var(--text-xs); color: var(--text-3); text-align: right; margin-top: var(--space-2); font-style: italic }
+@media (max-width: 640px) { .fin-doc { padding: var(--space-4) } .fin-doc .pty { grid-template-columns: 1fr } }
+
+/* -------------------------------------------------------------- queue --- */
+.fin-queue { display: flex; flex-direction: column; background: var(--surface-raised); border: 1px solid var(--line); border-radius: var(--radius-xl); overflow: hidden }
+.fin-q { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--line); cursor: pointer; transition: background var(--duration-fast) var(--ease) }
+.fin-q:last-child { border-bottom: none }
+.fin-q:hover, .fin-q:focus-visible { background: var(--bg-hover) }
+.fin-q .who { min-width: 220px }
+.fin-q .mid2 { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; min-width: 190px }
+.fin-q .act { margin-left: auto; display: flex; align-items: center; gap: var(--space-3) }
+.fin-q .when { font-size: var(--text-sm); color: var(--text-3); white-space: nowrap }
+.fin-q .when.warn { color: var(--warn); font-weight: var(--weight-medium) }
+.fin-q .when.bad { color: var(--bad); font-weight: var(--weight-medium) }
+
+/* =============================================================================
+   THE REDESIGN — four record types. Everything below serves Subscriptions,
+   Salaries A/C, Other Transaction, Refunds and Analytics. Colour comes from
+   theme tokens only; there is not one literal in this file.
+   ============================================================================= */
+
+/* ------------------------------------------------- installment states --- */
+/* `paid` is settled money, `due` has not happened yet and wears the quiet
+   token, `fail_to_pay` is the one a person has to act on. */
+.fin-st .dot.s-paid, .fin-st .dot.s-completed { background: var(--ok-solid) }
+.fin-st .dot.s-due { background: var(--text-3) }
+.fin-st .dot.s-fail_to_pay, .fin-st .dot.s-defaulting { background: var(--bad-solid) }
+.fin-st .dot.s-cancelled { background: var(--text-3) }
+.fin-st .dot.s-active { background: var(--ok-solid) }
+.fin-st .dot.s-refunded { background: var(--warn-solid) }
+
+/* ------------------------------------------------------ source tags --- */
+.fin-path.p-sales { background: var(--tag-blue-bg); border-color: var(--tag-blue-line); color: var(--tag-blue) }
+.fin-path.p-website { background: var(--tag-teal-bg); border-color: var(--tag-teal-line); color: var(--tag-teal) }
+.fin-path.p-subscription { background: var(--tag-blue-bg); border-color: var(--tag-blue-line); color: var(--tag-blue) }
+.fin-path.p-manual { background: var(--tag-amber-bg); border-color: var(--tag-amber-line); color: var(--tag-amber) }
+
+/* --------------------------------------------------------- tag chips --- */
+/* The chip wears its KIND, not an arbitrary colour: two tags that land in the
+   same place look alike, which is the only thing a reader needs from it. */
+.fin-cat.k-fixed i { background: var(--tag-slate) }
+.fin-cat.k-fixed { background: var(--tag-slate-bg); border-color: var(--tag-slate-line) }
+.fin-cat.k-reinvestment i { background: var(--tag-violet) }
+.fin-cat.k-reinvestment { background: var(--tag-violet-bg); border-color: var(--tag-violet-line) }
+.fin-cat.k-variable i { background: var(--tag-cyan) }
+.fin-cat.k-variable { background: var(--tag-cyan-bg); border-color: var(--tag-cyan-line) }
+.fin-cat.k-excluded i { background: var(--tag-orange) }
+.fin-cat.k-excluded { background: var(--tag-orange-bg); border-color: var(--tag-orange-line) }
+.fin-cat.off { opacity: .6 }
+.fin-cat.off em { font-style: normal; color: var(--text-3); font-size: var(--text-2xs) }
+
+/* -------------------------------------------------- installment strip --- */
+/* The schedule at a glance: one cell per installment, in order, so a row says
+   "two paid, one failed, one to come" without being opened. */
+.fin-strip { display: inline-flex; gap: 3px; align-items: center }
+.fin-strip .c {
+  width: 20px; height: 20px; border-radius: var(--radius-xs); display: inline-flex;
+  align-items: center; justify-content: center; font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums;
+  border: 1px solid var(--line-2); background: var(--bg-inset); color: var(--text-3);
+}
+.fin-strip .c.s-paid { background: var(--ok-bg); border-color: var(--ok-line); color: var(--ok) }
+.fin-strip .c.s-fail_to_pay { background: var(--bad-bg); border-color: var(--bad-line); color: var(--bad) }
+.fin-strip .c.s-cancelled { text-decoration: line-through; opacity: .6 }
+
+/* --------------------------------------------------------- failure --- */
+/* Evidence, never suspicion: the reason and what was actually said, together. */
+.fin-fail {
+  display: grid; grid-template-columns: auto 1fr auto; gap: var(--space-2);
+  align-items: baseline; padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--bad-line); background: var(--bad-bg); border-radius: var(--radius-sm);
+}
+.fin-fail .ty { display: inline-flex; align-items: center; gap: 4px; font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--bad); white-space: nowrap }
+.fin-fail .tx { font-size: var(--text-sm); color: var(--text-2); line-height: var(--lh-md) }
+.fin-fail .wn { font-size: var(--text-xs); color: var(--text-3); white-space: nowrap }
+
+/* ------------------------------------------------------ form controls --- */
+.fin-fl { display: flex; flex-direction: column; gap: 4px }
+.fin-fl > .l { font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--text-2) }
+.fin-rupee { position: relative; display: block }
+.fin-rupee i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-style: normal; color: var(--text-3); pointer-events: none }
+.fin-rupee .inp { padding-left: 24px }
+.fin-seg { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--line-2); border-radius: var(--radius-sm); background: var(--bg-inset); flex-wrap: wrap }
+.fin-seg button {
+  border: none; background: none; cursor: pointer; font: inherit;
+  padding: 5px var(--space-3); border-radius: var(--radius-xs);
+  font-size: var(--text-sm); color: var(--text-2);
+}
+.fin-seg button:hover { color: var(--text) }
+.fin-seg button.on { background: var(--bg); color: var(--text); font-weight: var(--weight-semibold); box-shadow: var(--shadow-xs) }
+
+/* ------------------------------------------------------------ print --- */
+/* Every document in this panel is produced by printing it — there is no PDF
+   library in the bundle and adding one for two documents would not pay for
+   itself. The browser's "Save as PDF" is the export. */
+@media print {
+  .fin-subtabs, .fin-proto, .fin-actions, .fin-idbar .btn { display: none }
+  .card, .fin-queue, .fin-doc, .fin-slip { break-inside: avoid }
+}
+
+/* ------------------------------------------------------- late / due --- */
+/* `.cell-2` carries the size; these carry only the tone, because
+   `.cell-2.warn` and `.cell-2.bad` are unstyled in the theme and were
+   silently inert. */
+.fin-late.warn { color: var(--warn) }
+.fin-late.bad { color: var(--bad) }
+
+/* ------------------------------------------------- a stated absence --- */
+/* A number that does not exist must not look like a number. The tile keeps
+   its frame so the layout holds, goes dashed so the eye reads "nothing here
+   yet", and prints the REASON as prose where the figure would have been.
+   Undefined is not zero — FN-OD-07 is the case this exists for. */
+.fin-mt.na { border-style: dashed; background: var(--bg-shell) }
+.fin-mt.na .k { color: var(--text-3) }
+.fin-na { font-size: var(--text-sm); line-height: var(--lh-md); color: var(--text-2); margin: 2px 0 }
+
+/* --------------------------------------------------- KPI movement --- */
+/* Coloured by the KPI's own `goodDirection`, never by the sign: a falling
+   burn and a falling MRR point the same way and mean opposite things. */
+.fin-kd { font-variant-numeric: tabular-nums; font-weight: var(--weight-medium); font-size: var(--text-sm) }
+.fin-kd.good { color: var(--ok) }
+.fin-kd.poor { color: var(--bad) }
+.fin-kd.flat { color: var(--text-3) }
+
+/* ---------------------------------------------------------- list bands --- */
+/* Three jobs, three bands. `Block` normally lives in the `.fin-blocks` grid;
+   a queue that reads top to bottom wants a plain vertical stack instead. */
+.fin-bands { display: flex; flex-direction: column; gap: var(--space-4); margin-top: var(--space-4) }
+
+/* ------------------------------------------------------------- people --- */
+.fin-who { display: flex; align-items: center; gap: var(--space-2) }
+.fin-who > span { display: flex; flex-direction: column; min-width: 0 }
+
+/* A money table that lives INSIDE a card. Deliberately not `.fin-tbl`, whose
+   1020px min-width is sized for a full-width workspace and would burst one. */
+.fin-stbl { width: 100% }
+.fin-stbl th.num, .fin-stbl td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap }
+
+/* Editable salary components: label, amount, remove. */
+.fin-comprow { display: grid; grid-template-columns: 1fr 160px auto; gap: var(--space-2); align-items: center; margin-bottom: var(--space-2) }
+@container (max-width: 520px) { .fin-comprow { grid-template-columns: 1fr } }
+
+/* =============================================================== slip === */
+/* The payslip. A document a person is handed, so it holds its own rhythm —
+   more air than a receipt, and the net figure has to be findable in a second.
+   Printed, never generated: the browser's Save as PDF is the export, which is
+   why there is no PDF library anywhere in this bundle. */
+.fin-slip { line-height: var(--lh-md) }
+.fin-slip-co { font-size: var(--text-sm); line-height: var(--lh-md); color: var(--text-2) }
+.fin-slip-title { font-size: var(--text-lg); font-weight: var(--weight-semibold); letter-spacing: .04em }
+.fin-slip-stamp {
+  display: inline-block; padding: 2px 8px; border-radius: var(--radius-xs);
+  font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .06em;
+  border: 1px dashed var(--warn-line); background: var(--warn-bg); color: var(--warn);
+}
+.fin-slip-meta {
+  display: flex; flex-wrap: wrap; gap: var(--space-6);
+  padding: var(--space-3) 0; margin: var(--space-4) 0;
+  border-top: 1px solid var(--line-2); border-bottom: 1px solid var(--line-2);
+  background: var(--bg-inset);
+}
+.fin-slip-meta span { display: flex; flex-direction: column; gap: 2px; padding-inline: var(--space-3) }
+.fin-slip-meta i { font-style: normal; font-size: var(--text-2xs); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3) }
+.fin-slip-meta b { font-size: var(--text-md); font-variant-numeric: tabular-nums }
+
+/* Earnings on the left, deductions on the right, one rule between them. */
+.fin-slipt { width: 100%; border-collapse: collapse }
+.fin-slipt td, .fin-slipt th { padding: 5px var(--space-3); font-size: var(--text-sm); vertical-align: baseline }
+.fin-slipt th { text-align: left; font-size: var(--text-2xs); letter-spacing: .06em; text-transform: uppercase; color: var(--text-3); border-bottom: 1px solid var(--line-2) }
+.fin-slipt td.num, .fin-slipt th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap }
+.fin-slipt td:nth-child(3), .fin-slipt th:nth-child(3) { border-left: 1px solid var(--line-2) }
+.fin-slipt tr.tot td, .fin-slipt tr.tot th { border-top: 1px solid var(--line-2); font-weight: var(--weight-semibold) }
+
+/* Net pay. The one number the person receiving this is looking for. */
+.fin-slip-net {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4);
+  margin-top: var(--space-4); padding-top: var(--space-3); border-top: 2px solid var(--text);
+}
+.fin-slip-net .l { font-size: var(--text-md); font-weight: var(--weight-semibold); text-transform: uppercase; letter-spacing: .06em }
+.fin-slip-net .v { font-size: var(--text-2xl); font-weight: var(--weight-semibold); font-variant-numeric: tabular-nums }
+
+/* ------------------------------------------------ a tile of two figures --- */
+/* Two numbers of different kinds in one tile. The second sits on the same
+   baseline but at the label's weight and colour, so the eye reads one
+   headline figure and one piece of context — never a two-part total. */
+.fin-mt.pair .v { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3) }
+.fin-mt-aside {
+  display: inline-flex; align-items: baseline; gap: 4px;
+  font-size: var(--text-sm); font-weight: var(--weight-normal); color: var(--text-3);
+  white-space: nowrap;
+}
+.fin-mt-aside b { font-size: var(--text-md); font-weight: var(--weight-semibold); color: var(--text-2) }
+.fin-mt.ok .fin-mt-aside b { color: var(--text-2) }
+
+/* ------------------------------------------------- the chosen customer --- */
+/* Once a real account is picked the search collapses to the account itself,
+   so the dialog states WHO this is being recorded against rather than leaving
+   a search box that looks like it still wants an answer. */
+.fin-picked {
+  display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--ok-line); background: var(--ok-bg); border-radius: var(--radius-sm);
+}
+.fin-picked .n { font-weight: var(--weight-semibold) }
+.fin-picked .s { font-size: var(--text-sm); color: var(--text-2) }
+.fin-picked .s .warn { color: var(--warn) }
+.fin-picked .lnk { margin-left: auto }
+
+/* ------------------------------------------------- the attached invoice --- */
+/* The invoice instance, shown in full once it is attached. It is the document
+   the money comes from, so the dialog states what it actually says rather than
+   reducing it to a number — a person attaching the wrong invoice should be able
+   to see that it is wrong. */
+.fin-inv {
+  border: 1px solid var(--line-2); border-radius: var(--radius-sm);
+  background: var(--bg-inset); overflow: hidden;
+}
+.fin-inv .h {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--line-2);
+  background: var(--bg);
+}
+.fin-inv .h .spacer { flex: 1 1 auto }
+.fin-inv .h .n { font-weight: var(--weight-semibold) }
+.fin-inv .kv { margin: 0; padding: var(--space-3); display: grid; grid-template-columns: auto 1fr; gap: 4px var(--space-4) }
+.fin-inv .kv dt { font-size: var(--text-sm); color: var(--text-3) }
+.fin-inv .kv dd { margin: 0; font-size: var(--text-sm); color: var(--text) }
+.fin-inv .kv dd.b { font-weight: var(--weight-semibold); font-size: var(--text-md) }
+.fin-inv .notice { margin: 0 var(--space-3) var(--space-3) }
+
+/* A figure the person does not type. It reads as a readout, not a field, so
+   nobody tries to correct it in place. */
+.fin-derived {
+  display: flex; align-items: center; min-height: var(--control-md);
+  padding: 0 var(--space-3); border: 1px dashed var(--line-2);
+  border-radius: var(--radius-sm); background: var(--bg-inset); color: var(--text-2);
+}
+.fin-derived b { color: var(--text); font-weight: var(--weight-semibold) }
+
+/* ------------------------------------------------ the topbar figure --- */
+/* The one figure the topbar carries, on every section. A COUNT, not money:
+   a rupee total with no formula and no caution beside it, repeated above
+   every page, is a number nobody can check — so money stays on the tiles of
+   the section that computes it, where its i button is.
+
+   Named `.fin-scope` and not `.fin-chip` because `.fin-chips` already
+   exists and means the filter row. One letter apart is how a rule lands on
+   something it was never written for. */
+.fin-scope {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  height: var(--control-md); padding: 0 4px 0 var(--space-3);
+  border-radius: var(--radius-full); border: 1px solid var(--line-2);
+  background: var(--bg-inset); color: var(--text-2);
+  white-space: nowrap; max-width: 100%;
+}
+/* The status dot, and the label it belongs to. The label is the quiet half:
+   it names the figure, and the figure is what the eye should land on. */
+.fin-scope i { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: var(--text-3) }
+.fin-scope .k {
+  overflow: hidden; text-overflow: ellipsis;
+  font-size: var(--text-sm); font-weight: var(--weight-medium);
+  letter-spacing: .01em;
+}
+/* The count sits in its own well, so it reads as a figure rather than as the
+   last word of the sentence beside it. */
+.fin-scope b {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  min-width: 24px; height: 24px; padding: 0 7px; border-radius: var(--radius-full);
+  background: var(--bg); border: 1px solid var(--line-2);
+  font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--text);
+}
+.fin-scope.ok { background: var(--ok-bg); border-color: var(--ok-line); color: var(--ok) }
+.fin-scope.ok i { background: var(--ok-solid) }
+.fin-scope.ok .k { color: var(--ok) }
+.fin-scope.ok b { background: var(--bg); border-color: var(--ok-line); color: var(--ok) }
+/* Narrow topbars drop the words and keep the dot and the figure — the count
+   is the part that cannot be inferred from anything else on screen. */
+@media (max-width: 760px) { .fin-scope .k { display: none } .fin-scope { padding-left: var(--space-2) } }

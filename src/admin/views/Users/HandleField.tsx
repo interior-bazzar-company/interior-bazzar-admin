@@ -25,7 +25,7 @@
    button: they will paste it somewhere.
    ============================================================================= */
 import { useEffect, useState } from "react";
-import { Icon } from "../../ui";
+import { Icon, copyToClipboard } from "../../ui";
 import {
   USERNAME_RULES, profileUrl, slugify, usernameError, usernameTaken,
 } from "./store";
@@ -57,16 +57,12 @@ export default function HandleField({ value, saved, userId, suggestFrom, disable
 
   const suggestion = !v && suggestFrom ? slugify(suggestFrom) : "";
 
+  /* Through the shared helper: the async clipboard REJECTS on an insecure
+     origin (the `vite --host` LAN case) rather than throwing, so a sync
+     try/catch reported "Copied" over an empty clipboard. The helper falls
+     back to the legacy copy command and says what actually happened. */
   const copy = () => {
-    try {
-      navigator.clipboard.writeText(profileUrl(v));
-      setCopied(true);
-    } catch {
-      /* Clipboard is permission-gated and throws on an insecure origin. The
-         input below is selectable, so there is still a way through — saying
-         nothing and doing nothing is what would leave somebody stuck. */
-      setCopied(false);
-    }
+    copyToClipboard(profileUrl(v)).then((line) => setCopied(line === "Copied."));
   };
 
   return (

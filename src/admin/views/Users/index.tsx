@@ -1,22 +1,20 @@
 /* =============================================================================
    Users Management — Business Ops · the route component.
    -----------------------------------------------------------------------------
-   ONE route, four faces, one record screen.
+   ONE route, two faces, one record screen.
 
      #/users                        every registered identity — the default
-     #/users?view=members           the member base, narrower question
-     #/users?view=renewals          the operational queue
-     #/users?view=analytics         growth, conversion, retention, revenue
+     #/users?view=analytics         how the base grew and where it came from
      #/users/:id                    one user, whole
-     #/users/:id?tab=…&term=…       which face of the record
+     #/users/:id?tab=…              which face of the record
 
-   WHY ONE ROUTE AND NOT FOUR. The wireframe put these in the sidebar as
+   WHY ONE ROUTE AND NOT TWO. The wireframe put these in the sidebar as
    separate nav rows. They are readings of ONE population, and separate routes
    would have meant several module rows in the permission matrix for a single
    access decision, and a Back button that walks out of the module when you
    meant to widen the question. As one route with a view band they share the
    filters, the derivation and the URL — narrowing the list and then switching
-   to Members keeps what you narrowed.
+   to Analytics keeps what you narrowed.
 
    THERE IS NO OVERVIEW FACE. It and Analytics were two dashboards over one
    population: the same headline counts, different windows, agreeing only
@@ -34,13 +32,11 @@ import { qs } from "../../ui";
 import type { Params } from "./store";
 import { FILTER_KEYS, countsOf, useAllRows } from "./store";
 import List from "./List";
-import RenewalQueue from "./RenewalQueue";
 import Analytics from "./Analytics";
 import Detail from "./Detail";
 import "./users.css";
-import "./charts.css";
+import "../charts.css";
 import "./blocks.css";
-import "./assign.css";
 
 const ROUTE = "#/users";
 
@@ -77,7 +73,7 @@ export default function Users() {
 
   /* ------------------------------------------------------------ topbar ---
      THE SCOPE LIVES HERE, not on the page. Two figures, unfiltered on purpose:
-     how big the base is and how much of it is entitled. They must not change
+     how big the base is and how much of it is live. They must not change
      meaning because somebody narrowed the list below them, which is exactly
      what would happen if they were counted off the filtered set. */
   const c = useMemo(() => countsOf(rows), [rows]);
@@ -85,29 +81,27 @@ export default function Users() {
     <>
       <span className="tb-title">Users Management</span>
       <span className="tb-stats">
-        {/* TWO figures, and Expiring soon is deliberately not the third. It is
-            an operational queue, it moves on its own every night, and a number
-            that changes while nobody touched anything reads as noise in a bar
-            that is meant to say how big the base is. It has a tab and a strip
-            cell, both of which open the list it counts — which the topbar
-            never could.
+        {/* TWO figures, and neither is commercial. How many identities exist
+            and how many of those accounts are live is the whole scope of this
+            module; how many are paying is a Finance figure and reading it here
+            would be this module quoting a number it cannot compute.
 
             `hi` is emphasis, not state. Total users is the figure this module
-            is a breakdown of, so it carries the tint and Active Membership
-            reads as a qualification of it. `on` would have been the wrong
-            class: it means "this filter is applied" everywhere else in the
-            panel and these chips filter nothing. */}
+            is a breakdown of, so it carries the tint and Active accounts reads
+            as a qualification of it. `on` would have been the wrong class: it
+            means "this filter is applied" everywhere else in the panel and
+            these chips filter nothing. */}
         <span className="tb-stat ro hi"><span className="k">Total users</span><span className="v tnum">{c.total}</span></span>
-        <span className="tb-stat ro"><span className="k">Active Membership</span><span className="v tnum">{c.activeMembers}</span></span>
+        <span className="tb-stat ro"><span className="k">Active accounts</span><span className="v tnum">{c.active}</span></span>
       </span>
     </>
-  ), [c.total, c.activeMembers]);
+  ), [c.total, c.active]);
 
   /* Where "up" is: the list you opened the record from, filters and all, so
      Back is a return rather than a reset. */
   usePageChrome(
-    { crumbs, right: null, parent: id ? listHash(omit(p, ["tab", "term"])) : null },
-    (id ? "rec" : view) + ":" + c.total + "/" + c.activeMembers,
+    { crumbs, right: null, parent: id ? listHash(omit(p, ["tab"])) : null },
+    (id ? "rec" : view) + ":" + c.total + "/" + c.active,
   );
 
   /* ----------------------------------------------------------- filters ---
@@ -143,8 +137,9 @@ export default function Users() {
 
   const onView = useCallback((v: string) => {
     /* Switching face keeps the filters and drops the page and the flag: the
-       flag belongs to the queue that set it, and carrying "expiring soon" into
-       Analytics would silently narrow a dashboard nobody asked to narrow. */
+       flag belongs to the list that set it, and carrying "incomplete profile"
+       into Analytics would silently narrow a dashboard nobody asked to
+       narrow. */
     goFilter(listHash(merge(omit(p, ["page", "flag"]), { view: v === "users" ? undefined : v })));
   }, [p, goFilter]);
 
@@ -162,21 +157,19 @@ export default function Users() {
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
   if (id) {
-    /* THE RECORD GETS ITS OWN FILTER HANDLER, and it has to. `onFilter` above
+    /* THE RECORD GETS ITS OWN NAVIGATOR, and it has to. `onFilter` above
        builds `listHash(...)` — `#/users?…` with no record segment — so wiring
        the record's tab strip to it navigated back to the list on every tab
-       click and on every term you opened. `tab` and `term` are parameters OF
-       the record, not filters of a list, and they have to keep the id. */
-    const onRecordFilter = (name: string, value: string) =>
-      goFilter(userHash(id, merge(p, { [name]: value || undefined })));
-    return <Detail id={id} p={p} rows={rows} onFilter={onRecordFilter} />;
+       click. `tab` is a parameter OF the record, not a filter of a list, and
+       it has to keep the id. */
+    const onRecordParams = (patch: Params) =>
+      goFilter(userHash(id, merge(p, patch)));
+    return <Detail id={id} p={p} rows={rows} onParams={onRecordParams} />;
   }
 
   const shared = { p, rows, onView, onFilter, onSearch, onUnfilter, onPage, onParams };
-  if (view === "members") return <List {...shared} scope="members" />;
-  if (view === "renewals") return <RenewalQueue {...shared} />;
   if (view === "analytics") return <Analytics {...shared} />;
-  return <List {...shared} scope="users" />;
+  return <List {...shared} />;
 }
 
 /* Re-exported so the command palette and any cross-module link build the same

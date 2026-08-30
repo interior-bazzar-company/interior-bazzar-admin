@@ -1,276 +1,23 @@
 {
-  "$comment": "Stands in for GET /api/v1/admin/users/vocabularies. Labels, tones, the allowed membership transition matrix, the profile schema, the metric definitions and the open decisions this module renders on screen. The panel reads ALL of this rather than hard-coding it, so a membership status, an activation source, a profile field or a metric caution added server-side renders with no code edit. Static copy (labels, help text, cautions) is permanent; nothing in this file is a placeholder record.",
+  "$comment": "Stands in for GET /api/v1/admin/users/vocabularies. Labels, tones, the profile schema, the metric definitions and the open decisions this module renders on screen. The panel reads ALL of this rather than hard-coding it, so a profile field, a tag, a registration source or a metric caution added server-side renders with no code edit. Static copy (labels, help text, cautions) is permanent; nothing in this file is a placeholder record.",
   "profileSchemaVersion": "profile v1",
   "$comment_profileSchemaVersion": "The field set completeness_pct is computed against. Stamped onto the user_profile row so a later schema change cannot silently re-grade an old profile as incomplete.",
   "classifications": [
     {
-      "key": "normal",
-      "label": "User",
+      "key": "active",
+      "label": "Active",
       "tone": "",
-      "derivedFrom": "no membership record has ever been active",
-      "meaning": "Registered on the platform with no current active membership entitlement.",
-      "value": "The conversion opportunity pool."
-    },
-    {
-      "key": "active_member",
-      "label": "Active Member",
-      "tone": "ok",
-      "derivedFrom": "current membership is Active and today is inside its entitlement period",
-      "meaning": "Receiving membership entitlements right now.",
-      "value": "The current paying and entitled base."
-    },
-    {
-      "key": "paused_member",
-      "label": "Paused Member",
-      "tone": "warn",
-      "derivedFrom": "current membership status is Paused",
-      "meaning": "Membership temporarily paused under policy. Entitlement behaviour follows the pause rule.",
-      "value": "Still a customer, temporarily not consuming."
-    },
-    {
-      "key": "suspended_member",
-      "label": "Suspended Member",
-      "tone": "bad",
-      "derivedFrom": "current membership status is Suspended",
-      "meaning": "Entitlements administratively withheld for a policy, risk or operational reason.",
-      "value": "Needs an authorised reactivation decision."
-    },
-    {
-      "key": "former_member",
-      "label": "Past Member",
-      "tone": "",
-      "derivedFrom": "membership history exists and none of it is currently entitling",
-      "meaning": "Held a membership at some point; holds none now.",
-      "value": "The win-back pool."
+      "derivedFrom": "platform_user.user_status",
+      "meaning": "The account works: the identity exists and is not administratively disabled.",
+      "value": "The live base. It says nothing about whether they are paying — that is a Finance question, asked of the subscription that holds the money."
     },
     {
       "key": "deactivated",
       "label": "Deactivated",
       "tone": "dead",
       "derivedFrom": "platform_user.user_status",
-      "meaning": "The ACCOUNT is administratively disabled. This is not a membership classification and is never merged with one.",
+      "meaning": "The ACCOUNT is administratively disabled. Soft: the profile, the commercial links and the audit trail are all retained.",
       "value": "Excluded from every active-base count, present in every history."
-    }
-  ],
-  "membershipStatuses": [
-    {
-      "key": "pending",
-      "label": "Pending Activation",
-      "tone": "warn",
-      "step": 1,
-      "meaning": "The membership record exists; the entitlement is not live.",
-      "advance": "An approved activation source is verified and the entitlement snapshot is taken."
-    },
-    {
-      "key": "active",
-      "label": "Active",
-      "tone": "ok",
-      "step": 2,
-      "meaning": "The member is receiving entitlements against a frozen plan-version snapshot.",
-      "advance": "Paused, Suspended, Cancelled, Expired, or renewed into a new term."
-    },
-    {
-      "key": "paused",
-      "label": "Paused",
-      "tone": "warn",
-      "step": 3,
-      "meaning": "Temporary and resumable. The end date freezes, extends or continues according to the pause policy.",
-      "advance": "Resumed back to Active, or Suspended or Cancelled from here."
-    },
-    {
-      "key": "suspended",
-      "label": "Suspended",
-      "tone": "bad",
-      "step": 3,
-      "meaning": "Administrative restriction. Access is withheld; history stays intact.",
-      "advance": "Reactivated by an authorised decision, or Cancelled or Expired."
-    },
-    {
-      "key": "expired",
-      "label": "Expired",
-      "tone": "",
-      "step": 4,
-      "terminal": true,
-      "meaning": "The entitlement term reached its end without a renewal.",
-      "advance": "Terminal for this term. A renewal is a NEW record referencing this one."
-    },
-    {
-      "key": "cancelled",
-      "label": "Cancelled",
-      "tone": "dead",
-      "step": 4,
-      "terminal": true,
-      "meaning": "Intentionally terminated before the term would have ended.",
-      "advance": "Terminal for this term. A later membership is a new record."
-    }
-  ],
-  "transitions": [
-    {
-      "from": "pending",
-      "to": [
-        "active",
-        "cancelled"
-      ],
-      "guard": "Activation needs an approved source AND a successful entitlement snapshot. A snapshot failure aborts activation rather than producing an Active membership whose access nobody can enumerate."
-    },
-    {
-      "from": "active",
-      "to": [
-        "paused",
-        "suspended",
-        "cancelled",
-        "expired"
-      ],
-      "guard": "Every lifecycle action needs the matching authority and a stated reason. Expiry is reached by the scheduled sweep, not by a person."
-    },
-    {
-      "from": "paused",
-      "to": [
-        "active",
-        "suspended",
-        "cancelled",
-        "expired"
-      ],
-      "guard": "Resume recalculates the entitlement dates ONLY according to the configured pause policy — UM-OD-04, open. The system does not guess."
-    },
-    {
-      "from": "suspended",
-      "to": [
-        "active",
-        "cancelled",
-        "expired"
-      ],
-      "guard": "Reactivation needs restricted authority and a recorded reason."
-    },
-    {
-      "from": "expired",
-      "to": [],
-      "guard": "Terminal. A renewal creates a new term carrying previous_membership_id; this record is never rewritten."
-    },
-    {
-      "from": "cancelled",
-      "to": [],
-      "guard": "Terminal. A new membership may be created later; this one stays visible and unchanged."
-    }
-  ],
-  "lifecycleActions": [
-    {
-      "key": "activate",
-      "label": "Activate",
-      "from": [
-        "pending"
-      ],
-      "to": "active",
-      "permission": "restricted",
-      "requiresReason": false,
-      "requiresSource": true,
-      "tone": "pri",
-      "help": "Verifies the activation source, freezes the entitlement snapshot from the plan version in force, and sets the term live. Refuses if the snapshot cannot be taken."
-    },
-    {
-      "key": "pause",
-      "label": "Pause",
-      "from": [
-        "active"
-      ],
-      "to": "paused",
-      "permission": "restricted",
-      "requiresReason": true,
-      "tone": "",
-      "help": "Temporary and resumable. What the end date does while paused is UM-OD-04 and is not decided — this screen states which rule it is applying rather than assuming one."
-    },
-    {
-      "key": "resume",
-      "label": "Resume",
-      "from": [
-        "paused"
-      ],
-      "to": "active",
-      "permission": "restricted",
-      "requiresReason": false,
-      "tone": "pri",
-      "help": "Puts entitlements back. Dates move only if the configured pause policy says they move."
-    },
-    {
-      "key": "suspend",
-      "label": "Suspend",
-      "from": [
-        "active",
-        "paused"
-      ],
-      "to": "suspended",
-      "permission": "restricted",
-      "requiresReason": true,
-      "tone": "dgr",
-      "help": "An administrative restriction, not a pause. Needs restricted authority — profile-edit permission is not enough — and a reason that goes into the audit trail."
-    },
-    {
-      "key": "reactivate",
-      "label": "Reactivate",
-      "from": [
-        "suspended"
-      ],
-      "to": "active",
-      "permission": "restricted",
-      "requiresReason": true,
-      "tone": "pri",
-      "help": "Lifts the restriction. The reason is recorded because who decided this was safe again is asked after the fact, not before."
-    },
-    {
-      "key": "cancel",
-      "label": "Cancel",
-      "from": [
-        "active",
-        "paused",
-        "suspended",
-        "pending"
-      ],
-      "to": "cancelled",
-      "permission": "restricted",
-      "requiresReason": true,
-      "tone": "dgr",
-      "help": "Terminates the term. Refund handling belongs to Finance — cancelling here writes no money anywhere."
-    },
-    {
-      "key": "renew",
-      "label": "Renew",
-      "from": [
-        "active",
-        "expired",
-        "cancelled"
-      ],
-      "to": "active",
-      "permission": "authorised",
-      "requiresReason": false,
-      "requiresSource": true,
-      "tone": "pri",
-      "help": "Creates a NEW term referencing this one. The previous record is never rewritten, and a renewal is never counted as a new member."
-    }
-  ],
-  "activationSources": [
-    {
-      "key": "new_sale",
-      "label": "New sale",
-      "requiresReference": true,
-      "referenceLabel": "Payment, invoice or deal reference",
-      "requiresReason": false,
-      "help": "Somebody bought this for the first time. The reference points at the record in Deals, Invoicing or Finance that took the money — this module stores the pointer and never the amount."
-    },
-    {
-      "key": "renewal",
-      "label": "Renewal",
-      "requiresReference": true,
-      "referenceLabel": "Payment, invoice or deal reference",
-      "requiresReason": false,
-      "help": "An existing member bought another term. It is a NEW record linked to the one before it; the previous term is never extended or rewritten."
-    },
-    {
-      "key": "complimentary",
-      "label": "Complimentary",
-      "requiresReference": false,
-      "referenceLabel": "Approved by",
-      "requiresReason": true,
-      "help": "Granted without payment. Needs the membership-lifecycle permission and a stated reason — a grant with no recorded authority is the misuse this rule exists to prevent (UM-BR-05). It creates entitlement and no revenue."
     }
   ],
   "userStatuses": [
@@ -423,7 +170,8 @@
       "vocab": "positioning",
       "max": 2,
       "chip": "tag-orange",
-      "wide": true
+      "wide": true,
+      "info": "Select up to 2. This is how the business positions its own work — it keeps expectations aligned before a connection is made."
     },
     {
       "key": "about",
@@ -489,25 +237,6 @@
       "tone": "tag-slate",
       "help": "Registered, never finished the profile."
     }
-  ],
-  "pauseReasons": [
-    "Member requested a break",
-    "Seasonal shutdown",
-    "Awaiting profile correction",
-    "Operational hold"
-  ],
-  "suspendReasons": [
-    "Payment dispute under review by Finance",
-    "Policy breach reported",
-    "Suspected fraudulent listing",
-    "Quality complaint under investigation"
-  ],
-  "cancelReasons": [
-    "Member cancelled",
-    "Switched provider",
-    "Business closed",
-    "Cancelled by us — policy",
-    "Created in error"
   ],
   "deactivateReasons": [
     "Member asked to close the account",
@@ -597,33 +326,8 @@
   ],
   "categories": [
     {
-      "key": "sanitaryware",
-      "label": "Sanitaryware & bath fittings",
-      "group": "industry"
-    },
-    {
-      "key": "home_security",
-      "label": "Home security & CCTV",
-      "group": "industry"
-    },
-    {
-      "key": "lighting",
-      "label": "Lighting",
-      "group": "industry"
-    },
-    {
-      "key": "flooring_tiles",
-      "label": "Flooring & tiles",
-      "group": "industry"
-    },
-    {
-      "key": "stone_marble",
-      "label": "Marble, granite & stone",
-      "group": "industry"
-    },
-    {
-      "key": "kitchen",
-      "label": "Kitchen & appliances",
+      "key": "furniture",
+      "label": "Furniture",
       "group": "industry"
     },
     {
@@ -632,23 +336,8 @@
       "group": "industry"
     },
     {
-      "key": "furniture",
-      "label": "Furniture",
-      "group": "industry"
-    },
-    {
-      "key": "mattresses",
-      "label": "Mattresses & bedding",
-      "group": "industry"
-    },
-    {
-      "key": "paints",
-      "label": "Paints & wall finishes",
-      "group": "industry"
-    },
-    {
-      "key": "wallpaper",
-      "label": "Wallpaper & wall panels",
+      "key": "kitchen",
+      "label": "Kitchen & appliances",
       "group": "industry"
     },
     {
@@ -662,8 +351,38 @@
       "group": "industry"
     },
     {
+      "key": "mattresses",
+      "label": "Mattresses & bedding",
+      "group": "industry"
+    },
+    {
+      "key": "lighting",
+      "label": "Lighting",
+      "group": "industry"
+    },
+    {
+      "key": "wallpaper",
+      "label": "Wallpaper & wall panels",
+      "group": "industry"
+    },
+    {
+      "key": "paints",
+      "label": "Paints & wall finishes",
+      "group": "industry"
+    },
+    {
       "key": "false_ceiling",
       "label": "False ceiling & gypsum",
+      "group": "industry"
+    },
+    {
+      "key": "flooring_tiles",
+      "label": "Flooring & tiles",
+      "group": "industry"
+    },
+    {
+      "key": "stone_marble",
+      "label": "Marble, granite & stone",
       "group": "industry"
     },
     {
@@ -687,13 +406,18 @@
       "group": "industry"
     },
     {
-      "key": "electricals",
-      "label": "Electricals & switches",
+      "key": "sanitaryware",
+      "label": "Sanitaryware & bath fittings",
       "group": "industry"
     },
     {
       "key": "plumbing",
       "label": "Plumbing",
+      "group": "industry"
+    },
+    {
+      "key": "electricals",
+      "label": "Electricals & switches",
       "group": "industry"
     },
     {
@@ -707,13 +431,18 @@
       "group": "industry"
     },
     {
-      "key": "solar",
-      "label": "Solar & energy",
+      "key": "home_security",
+      "label": "Home security & CCTV",
       "group": "industry"
     },
     {
       "key": "water",
       "label": "Water purifiers & treatment",
+      "group": "industry"
+    },
+    {
+      "key": "solar",
+      "label": "Solar & energy",
       "group": "industry"
     },
     {
@@ -805,17 +534,10 @@
       "label": "Last activity"
     },
     {
-      "key": "ending",
-      "label": "Expiring soonest"
-    },
-    {
       "key": "name",
       "label": "Name A to Z"
     }
   ],
-  "renewalWindowDays": 60,
-  "$comment_renewalWindowDays": "Drives expiring-soon AND the renewal-rate denominator. It is a placeholder until UM-OD-11 fixes the window and the grace period — the screens say so rather than presenting it as settled.",
-  "graceDays": null,
   "metricDefinitions": [
     {
       "key": "totalUsers",
@@ -832,62 +554,6 @@
       "caution": "Failed and partial registrations are excluded at intake, not here."
     },
     {
-      "key": "normalUsers",
-      "label": "Users",
-      "unit": "unique users",
-      "formula": "Registered users with no currently entitling membership.",
-      "caution": "Derived at read time from membership state — there is no stored flag to drift."
-    },
-    {
-      "key": "activeMembers",
-      "label": "Active Members",
-      "unit": "unique users",
-      "formula": "Distinct users whose current membership is Active and inside its entitlement period.",
-      "caution": "Paused and Suspended members are customers but are NOT counted here — they are not entitled today."
-    },
-    {
-      "key": "newMembers",
-      "label": "New members",
-      "unit": "unique users",
-      "formula": "Users whose FIRST-EVER membership activation happened in the period.",
-      "caution": "A renewal is never counted here. That is the single most common way this figure gets inflated."
-    },
-    {
-      "key": "conversion",
-      "label": "Registration to Member",
-      "unit": "users / users",
-      "formula": "First-time activations divided by the eligible registration cohort in the window.",
-      "caution": "Cohort conversion, not a period ratio. Dividing this period's first-timers by this period's registrations compares two different populations."
-    },
-    {
-      "key": "renewalRate",
-      "label": "Renewal rate",
-      "unit": "memberships / memberships",
-      "formula": "Renewed terms divided by terms actually eligible to renew in the window.",
-      "caution": "Never divide by all registered users. The denominator is memberships, and the window is UM-OD-11."
-    },
-    {
-      "key": "churn",
-      "label": "Membership churn",
-      "unit": "memberships / memberships",
-      "formula": "Eligible terms ending without renewal divided by the eligible ending cohort.",
-      "caution": "Membership churn is not account deactivation. The two are counted separately and must never be added together."
-    },
-    {
-      "key": "expiringSoon",
-      "label": "Expiring soon",
-      "unit": "memberships",
-      "formula": "Active terms whose end date falls inside the configured renewal window.",
-      "caution": "Moves the moment the window in UM-OD-11 is fixed. So does the churn denominator."
-    },
-    {
-      "key": "arpm",
-      "label": "Revenue per active member",
-      "unit": "currency / users",
-      "formula": "Membership-linked collected revenue READ FROM FINANCE divided by the defined active-member denominator.",
-      "caution": "Contextual. This module never calculates revenue and never holds a ledger. The scope of what counts is UM-OD-12."
-    },
-    {
       "key": "profileCompletion",
       "label": "Profile completion",
       "unit": "unique users",
@@ -900,6 +566,13 @@
       "unit": "unique users",
       "formula": "Distinct users with at least one qualifying platform event in the window.",
       "caution": "UNAVAILABLE until UM-OD-10 defines the qualifying-event taxonomy. Shown as unavailable, never as zero."
+    },
+    {
+      "key": "deactivatedAccounts",
+      "label": "Deactivated accounts",
+      "unit": "unique users",
+      "formula": "Distinct users whose user_status is deactivated as of the period end.",
+      "caution": "An account status, not a commercial one. A deactivated account may still have a live subscription in Finance, and cancelling one is a separate, deliberate act."
     }
   ],
   "eventTypes": [
@@ -981,42 +654,6 @@
   ],
   "openDecisions": [
     {
-      "id": "UM-OD-01",
-      "title": "Membership plan ownership",
-      "position": "This panel CONSUMES the existing Plans catalogue rather than defining one. Whether the plan tables live in Users Management is a schema decision and is unconfirmed.",
-      "blocks": "Schema freeze"
-    },
-    {
-      "id": "UM-OD-02",
-      "title": "Activation trigger",
-      "position": "Which commercial event automatically activates a membership is undefined. Every automatic activation on these screens is stated as an assumption.",
-      "blocks": "Membership build"
-    },
-    {
-      "id": "UM-OD-03",
-      "title": "Complimentary memberships",
-      "position": "Offered here behind an explicit source and a mandatory reason. Whether they are permitted at all is undecided.",
-      "blocks": "Nothing yet"
-    },
-    {
-      "id": "UM-OD-04",
-      "title": "Pause policy",
-      "position": "The pause modal states which rule it is applying and does not guess. Freeze, extend or continue changes the renewal queue and the churn denominator.",
-      "blocks": "Lifecycle and KPI build"
-    },
-    {
-      "id": "UM-OD-05",
-      "title": "Suspension effect",
-      "position": "Which customer surfaces stay available while suspended is undefined, so the suspend modal promises nothing specific.",
-      "blocks": "Entitlement API"
-    },
-    {
-      "id": "UM-OD-06",
-      "title": "Refund consequence",
-      "position": "A refund does not automatically move a membership here. Finance stays authoritative and the consequence is an explicit lifecycle event.",
-      "blocks": "Commercial seam"
-    },
-    {
       "id": "UM-OD-09",
       "title": "Profile schema",
       "position": "profile v1 is the field set on these screens. Which fields are public and which are admin-editable is unconfirmed.",
@@ -1027,30 +664,6 @@
       "title": "Engagement taxonomy",
       "position": "No qualifying-event taxonomy exists, so DAU/WAU/MAU render as unavailable rather than as zero.",
       "blocks": "Engagement analytics"
-    },
-    {
-      "id": "UM-OD-11",
-      "title": "Churn definition",
-      "position": "A 60-day renewal window and no grace period are assumed and labelled as assumed everywhere they are used.",
-      "blocks": "Analytics freeze"
-    },
-    {
-      "id": "UM-OD-12",
-      "title": "Membership revenue KPI",
-      "position": "One contextual figure, labelled as read from Finance. Which products count is undefined.",
-      "blocks": "Nothing yet"
-    },
-    {
-      "id": "UM-OD-13",
-      "title": "Entitlement keys",
-      "position": "The keys on these screens are illustrative. The snapshot contract with the customer platform cannot be written without the real ones.",
-      "blocks": "Entitlement API"
-    },
-    {
-      "id": "UM-OD-15",
-      "title": "Concurrent memberships",
-      "position": "Overlapping active terms for the same product are refused. Whether different concurrent products will exist is unconfirmed.",
-      "blocks": "Nothing yet"
     }
   ],
   "team": [
@@ -1080,8 +693,7 @@
       "role": "Sales Head"
     }
   ],
-  "$comment_activationSources": "THREE, and the list is deliberately short. It used to carry payment / invoice / deal / manual / legacy, which mixed two different questions: WHY the term exists (a first sale, a renewal, a grant) and WHERE the money is recorded (a deal, an invoice, a payment row). The second is not a source — it is a reference, and it is one free-text field on the form. Somebody choosing between five near-synonyms picks inconsistently, and the analytics built on that choice inherit the inconsistency.",
-  "$comment_businessFacets": "FOUR FACETS, NOT ONE HIERARCHY. businessType says what kind of entity this is, segments says what it does, categories says how it engages and for which sector, and searchKeywords is the discovery long tail. They are deliberately orthogonal: 'Manufacturer + Modular kitchen' and 'Service provider + Modular kitchen' are different businesses and the pair is what says so. The first three are CLOSED lists because the marketplace filters and ranks on them and free text fragments a facet within a month ('3D Designer' / '3d designer' / '3D visualiser' are three buckets holding one thing). searchKeywords is open because matching is the one job where the long tail is the point.",
+  "$comment_businessFacets": "FOUR FACETS, NOT ONE HIERARCHY. businessType says what kind of entity this is, segments says what it does, categories says how it engages and for which sector, and searchKeywords is the discovery long tail. They are deliberately orthogonal: 'Manufacturer + Modular kitchen' and 'Service provider + Modular kitchen' are different businesses and the pair is what says so. businessType is a CLOSED list because the marketplace ranks on it; segments and categories are OPEN with a suggestion list, because a typed segment nobody anticipated is still a fact about the business — and the closed/open split is one flag per field in profileFields. searchKeywords is open because matching is the one job where the long tail is the point.",
   "businessTypes": [
     {
       "key": "independent",
@@ -1141,9 +753,9 @@
       "hint": "3D renders, walkthroughs, VR"
     },
     {
-      "key": "civil_contractor",
-      "label": "Civil contractor",
-      "hint": "Demolition, masonry, plaster"
+      "key": "renovation",
+      "label": "Renovation & remodelling",
+      "hint": "Full-home makeovers"
     },
     {
       "key": "modular_kitchen",
@@ -1156,99 +768,14 @@
       "hint": "Site carpentry, joinery, doors"
     },
     {
-      "key": "false_ceiling",
-      "label": "False ceiling & lighting",
-      "hint": "Gypsum, POP, grid ceilings"
-    },
-    {
-      "key": "flooring",
-      "label": "Flooring & tiling",
-      "hint": "Tiles, wooden, vinyl, epoxy"
-    },
-    {
-      "key": "painting",
-      "label": "Painting & wall finishes",
-      "hint": "Paint, texture, wood polish"
-    },
-    {
-      "key": "furnishing",
-      "label": "Furnishing & soft decor",
-      "hint": "Curtains, blinds, upholstery"
-    },
-    {
       "key": "furniture",
       "label": "Furniture — modular & loose",
       "hint": "Sofas, beds, tables, modular"
     },
     {
-      "key": "mep",
-      "label": "MEP — electrical, plumbing, HVAC",
-      "hint": "Wiring, plumbing, AC ducting"
-    },
-    {
-      "key": "glass_facade",
-      "label": "Glass, aluminium & façade",
-      "hint": "Toughened glass, ACP, railings"
-    },
-    {
-      "key": "landscape",
-      "label": "Landscape & outdoor",
-      "hint": "Gardens, terraces, balconies"
-    },
-    {
-      "key": "automation",
-      "label": "Smart home & automation",
-      "hint": "Smart lighting, locks, CCTV"
-    },
-    {
-      "key": "vastu",
-      "label": "Vastu consultant",
-      "hint": "Vastu-compliant layouts"
-    },
-    {
-      "key": "pmc",
-      "label": "Project management consultant",
-      "hint": "Site supervision & vendors"
-    },
-    {
-      "key": "ply_hardware",
-      "label": "Plywood, laminates & hardware",
-      "hint": "Plywood, laminates, hardware"
-    },
-    {
-      "key": "tiles_sanitary",
-      "label": "Tiles, stone & sanitaryware",
-      "hint": "Tiles, marble, sanitaryware"
-    },
-    {
-      "key": "lighting",
-      "label": "Lighting",
-      "hint": "Fixtures, LED profiles, decor"
-    },
-    {
-      "key": "waterproofing",
-      "label": "Waterproofing",
-      "hint": "Terrace, bathroom, basement"
-    },
-    {
-      "key": "renovation",
-      "label": "Renovation & remodelling",
-      "hint": "Full-home makeovers"
-    },
-    {
-      "key": "bathroom_remodel",
-      "label": "Bathroom remodelling",
-      "hint": "Complete bathroom makeover"
-    },
-    {
-      "key": "countertops",
-      "label": "Countertops & kitchen tops",
-      "hint": "Quartz, granite, solid surface"
-    },
-    {
-      "key": "wallpaper",
-      "label": "Wallpaper & wall panels",
-      "hint": "Wallpaper, PVC, wood panels"
+      "key": "furnishing",
+      "label": "Furnishing & soft decor",
+      "hint": "Curtains, blinds, upholstery"
     },
     {
       "key": "upholstery",
@@ -1261,14 +788,104 @@
       "hint": "Carpets, rugs, runners, mats"
     },
     {
+      "key": "wallpaper",
+      "label": "Wallpaper & wall panels",
+      "hint": "Wallpaper, PVC, wood panels"
+    },
+    {
+      "key": "painting",
+      "label": "Painting & wall finishes",
+      "hint": "Paint, texture, wood polish"
+    },
+    {
+      "key": "false_ceiling",
+      "label": "False ceiling & lighting",
+      "hint": "Gypsum, POP, grid ceilings"
+    },
+    {
+      "key": "lighting",
+      "label": "Lighting",
+      "hint": "Fixtures, LED profiles, decor"
+    },
+    {
+      "key": "flooring",
+      "label": "Flooring & tiling",
+      "hint": "Tiles, wooden, vinyl, epoxy"
+    },
+    {
+      "key": "countertops",
+      "label": "Countertops & kitchen tops",
+      "hint": "Quartz, granite, solid surface"
+    },
+    {
       "key": "doors_windows",
       "label": "Doors & windows",
       "hint": "uPVC, aluminium, wooden"
     },
     {
-      "key": "metal_railings",
-      "label": "Metal fabrication & railings",
-      "hint": "SS, MS railings, grills, gates"
+      "key": "bathroom_remodel",
+      "label": "Bathroom remodelling",
+      "hint": "Complete bathroom makeover"
+    },
+    {
+      "key": "civil_contractor",
+      "label": "Civil contractor",
+      "hint": "Demolition, masonry, plaster"
+    },
+    {
+      "key": "mep",
+      "label": "MEP — electrical, plumbing, HVAC",
+      "hint": "Wiring, plumbing, AC ducting"
+    },
+    {
+      "key": "glass_facade",
+      "label": "Glass, aluminium & façade",
+      "hint": "Toughened glass, ACP, railings"
+    },
+    {
+      "key": "waterproofing",
+      "label": "Waterproofing",
+      "hint": "Terrace, bathroom, basement"
+    },
+    {
+      "key": "ply_hardware",
+      "label": "Plywood, laminates & hardware",
+      "hint": "Plywood, laminates, hardware"
+    },
+    {
+      "key": "art_decor",
+      "label": "Art & decor accessories",
+      "hint": "Paintings, sculptures, planters"
+    },
+    {
+      "key": "home_staging",
+      "label": "Home staging",
+      "hint": "Furnish to sell or rent"
+    },
+    {
+      "key": "vastu",
+      "label": "Vastu consultant",
+      "hint": "Vastu-compliant layouts"
+    },
+    {
+      "key": "pmc",
+      "label": "Project management consultant",
+      "hint": "Site supervision & vendors"
+    },
+    {
+      "key": "structural_engineer",
+      "label": "Structural engineer",
+      "hint": "RCC, load, stability checks"
+    },
+    {
+      "key": "tiles_sanitary",
+      "label": "Tiles, stone & sanitaryware",
+      "hint": "Tiles, marble, sanitaryware"
+    },
+    {
+      "key": "automation",
+      "label": "Smart home & automation",
+      "hint": "Smart lighting, locks, CCTV"
     },
     {
       "key": "home_theatre",
@@ -1286,6 +903,16 @@
       "hint": "Chimney, hob, built-in ovens"
     },
     {
+      "key": "landscape",
+      "label": "Landscape & outdoor",
+      "hint": "Gardens, terraces, balconies"
+    },
+    {
+      "key": "metal_railings",
+      "label": "Metal fabrication & railings",
+      "hint": "SS, MS railings, grills, gates"
+    },
+    {
       "key": "solar",
       "label": "Solar & energy",
       "hint": "Rooftop solar, inverters"
@@ -1294,21 +921,6 @@
       "key": "home_lifts",
       "label": "Home lifts & elevators",
       "hint": "Residential lifts, stairlifts"
-    },
-    {
-      "key": "structural_engineer",
-      "label": "Structural engineer",
-      "hint": "RCC, load, stability checks"
-    },
-    {
-      "key": "home_staging",
-      "label": "Home staging",
-      "hint": "Furnish to sell or rent"
-    },
-    {
-      "key": "art_decor",
-      "label": "Art & decor accessories",
-      "hint": "Paintings, sculptures, planters"
     },
     {
       "key": "roofing",
@@ -1520,6 +1132,16 @@
     {
       "key": "custom",
       "label": "Custom"
+    },
+    {
+      "key": "premium",
+      "label": "Premium"
     }
-  ]
+  ],
+  "$comment_segmentOrder": "ORDER IS THE DEFAULT SUGGESTION. The picker shows the list as stored, so the sequence is a product decision: interior design and execution first (what most profiles are), then materials and sanitary supply, then the adjacent trades. Alphabetical would put Acoustics above Interior designer.",
+  "$comment_categoryOrder": "Same rule as segments: interior industries first, then sanitary and plumbing, then building services; sectors keep their own group after.",
+  "$comment_classifications": "TWO VALUES, derived and never stored. This module used to classify a user by their membership state — Active Member, Paused, Suspended, Past Member — and that classification moved out with the membership feature: a subscription is a Finance record now, and asking the user base who is paying would be two modules holding one fact. classify() in views/Users/store.ts is the single derivation and it reads user_status alone.",
+  "$comment_metricDefinitions": "Conversion to a paid plan, renewal rate, churn, expiring-soon and revenue per member were defined here while this module owned memberships. They are asked of the subscription that holds the money now and are defined in Finance; a second definition here would be the disagreement this operation exists to remove.",
+  "$comment_openDecisions": "Only the decisions this module can still take. UM-OD-01 to 06, 11, 12, 13 and 15 were all about the membership lifecycle, its plans, its pause and suspension rules and its revenue KPI; they left with the feature. Their subject matter is Finance's to decide now.",
+  "$comment_eventTypes": "THE MEMBERSHIP_* TYPES ARE HISTORICAL AND THEY STAY. This module no longer writes any of them, but the audit is a history: rows recorded while it did run a membership lifecycle describe things that actually happened, and the shared admin audit log still holds them. Dropping their labels here would render those rows with a raw key or with a generic word that loses which lifecycle move it was — editing the past to match today's feature set. Nothing writes them; everything can still read them."
 }

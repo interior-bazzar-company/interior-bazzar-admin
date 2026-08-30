@@ -61,8 +61,30 @@ export const HIDDEN_MODULES = new Set(["design", "payments"]);
  *  tab and is discarded on reload. The moment `GET /admin/users` exists this
  *  key comes out, in the same commit — see
  *  src/proto/v-2.2.0.0/BACKEND-INTEGRATION.md, where it is listed as work
- *  rather than as design. */
-export const PROTO_MODULES = new Set<string>(["users"]);
+ *  rather than as design.
+ *
+ *  `attendance`, `work` and `reports` (the Team group's operational half)
+ *  qualify on the same two counts and, for now, more cleanly than anything that
+ *  has been in this set before: they have no seed data and no views at all yet
+ *  — the routes resolve to ViewHost's "coming soon" state. They are here so the
+ *  nav rows are reachable while the surfaces are built. Each key comes out in
+ *  the commit that gives it either server data or a server write.
+ *
+ *  NOTE what is deliberately NOT here: `team` and `roles`. Both have real
+ *  Module rows on the server and real grants issued against them, so adding
+ *  either would hand member CRUD and role assignment to every signed-in
+ *  account. See OPERATION-2026-08-30-team-module.md § TM-BR-01. */
+export const PROTO_MODULES = new Set<string>([
+  "users",
+  "finance",
+  "finance-salaries",
+  "finance-transactions",
+  "finance-refunds",
+  "finance-analytics",
+  "attendance",
+  "work",
+  "reports",
+]);
 
 export function getSession(): MePermissions | null {
   return session;

@@ -1,0 +1,102 @@
+{
+  "$comment": "STATIC COPY for the Team module. Stands in for GET /api/v1/admin/team/vocabularies. Labels, tones, help text and the transition table — permanent content, NOT placeholder records. The panel renders from this rather than hard-coding, so a status relabelled server-side needs no code edit. TONES ARE THE PANEL'S OWN SIX and no new colour is introduced: ok · warn · bad · info · brand · '' (neutral), plus `dead` for cancelled, which is the existing inset + line-through treatment. If a status here ever needs a colour that is not in that set, the status is wrong, not the palette.",
+  "generatedAt": "2026-08-28T14:20:00+05:30",
+
+  "attendanceStates": [
+    { "key": "not_started", "label": "Not started", "tone": "", "dot": "idle", "stored": true, "help": "No day opened yet, and the business day has not ended." },
+    { "key": "working", "label": "Working", "tone": "ok", "dot": "ok", "stored": true, "help": "Day is open and no break is running." },
+    { "key": "on_break", "label": "On break", "tone": "info", "dot": "info", "stored": true, "help": "A break is open inside an open day. Elapsed keeps counting; worked time does not." },
+    { "key": "ended", "label": "Day ended", "tone": "", "dot": "", "stored": true, "help": "Closed. Worked and break totals are final." },
+    { "key": "absent", "label": "Absent", "tone": "bad", "dot": "bad", "stored": false, "help": "DERIVED. No day opened and the business day is over. Never written — a member who is simply not in yet at 10am is Not started, not Absent." },
+    { "key": "unclosed", "label": "Unclosed", "tone": "warn", "dot": "warn", "stored": false, "help": "DERIVED. Still open past the member's autoCloseAt. Contributes nothing to totals until a person resolves it. NOTHING AUTO-CLOSES: an auto-closed day is a number the system invented, an unclosed one is a question." }
+  ],
+  "$comment_attendanceStates": "`stored:false` is the whole point of this list. Absent and Unclosed are computed at read time against the member's own dayStartsAt / autoCloseAt and the payload's asOf. Storing them would need a sweep job, and this backend has no queue — only a 15-minute cron. The enquiries module withdrew its SLA sweep for exactly this reason.",
+
+  "lateRule": {
+    "basis": "member",
+    "help": "Late is computed AT OPEN against the member's own dayStartsAt plus graceMinutes, and stored on the row. Changing the policy later must not retroactively make last month late.",
+    "storedAtOpen": true
+  },
+
+  "workKinds": [
+    { "key": "task", "label": "Task", "icon": "check", "help": "A day's unit of work. Rolls up to a milestone." },
+    { "key": "milestone", "label": "Milestone", "icon": "flag", "help": "A dated commitment made of tasks. Progress is DERIVED from its children — completed ÷ total — and is never typed." },
+    { "key": "target", "label": "Target", "icon": "star", "help": "A number to reach in a period. Progress accumulates from EOD deltas; it is the one kind whose progress a person writes." }
+  ],
+
+  "workStatuses": [
+    { "key": "planned", "label": "Planned", "tone": "", "step": 1, "terminal": false },
+    { "key": "in_progress", "label": "In progress", "tone": "info", "step": 2, "terminal": false },
+    { "key": "blocked", "label": "Blocked", "tone": "bad", "step": 2, "terminal": false, "requiresReason": true },
+    { "key": "completed", "label": "Completed", "tone": "ok", "step": 3, "terminal": true },
+    { "key": "cancelled", "label": "Cancelled", "tone": "dead", "step": 3, "terminal": true, "requiresReason": true }
+  ],
+  "$comment_workStatuses": "FIVE, and `delayed` is NOT among them. Delayed is `dueDate < today AND status not terminal`, derived at read — same argument as Absent above. It renders as a warn rail on the row and a warn chip on the calendar, which is why it needs no stored status to be visible.",
+
+  "workTransitions": [
+    { "from": "planned", "to": ["in_progress", "blocked", "cancelled"] },
+    { "from": "in_progress", "to": ["completed", "blocked", "cancelled"] },
+    { "from": "blocked", "to": ["in_progress", "cancelled"] },
+    { "from": "completed", "to": ["in_progress"], "requiresReason": true, "label": "Reopen" },
+    { "from": "cancelled", "to": ["planned"], "requiresReason": true, "label": "Restore" }
+  ],
+  "$comment_workTransitions": "completed → in_progress exists but is called Reopen and demands a reason, so a completion is never quietly undone. Everything not listed is refused with 422 invalid_transition.",
+
+  "priorities": [
+    { "key": "high", "label": "High", "tone": "bad", "rank": 1 },
+    { "key": "medium", "label": "Medium", "tone": "warn", "rank": 2 },
+    { "key": "low", "label": "Low", "tone": "", "rank": 3 }
+  ],
+
+  "employmentTypes": [
+    { "key": "full_time", "label": "Full time" },
+    { "key": "part_time", "label": "Part time" },
+    { "key": "contract", "label": "Contract" },
+    { "key": "intern", "label": "Intern" }
+  ],
+
+  "workLocations": [
+    { "key": "office", "label": "Office" },
+    { "key": "remote", "label": "Remote" },
+    { "key": "hybrid", "label": "Hybrid" }
+  ],
+
+  "memberStatuses": [
+    { "key": "active", "label": "Active", "tone": "ok" },
+    { "key": "inactive", "label": "Inactive", "tone": "" },
+    { "key": "suspended", "label": "Suspended", "tone": "bad" }
+  ],
+
+  "scopes": [
+    { "key": "self", "label": "Only me", "help": "Always available, with no grant at all." },
+    { "key": "team", "label": "My reports", "help": "Members whose reportsTo points at the viewer. ONE LEVEL, not the transitive closure — a recursive default is a permission that silently widens every time somebody is hired." },
+    { "key": "all", "label": "Everyone", "help": "Full access, or the module's `all` verb." }
+  ],
+  "$comment_scopes": "TM-OD-01, answered 2026-08-30. Scoping is the API's job; the client renders what it is given and says which scope it is showing. A client-side filter over an unscoped payload is the same bug in a different place.",
+
+  "eventTypes": [
+    "ATT_IN", "ATT_BREAK", "ATT_RESUME", "ATT_OUT", "ATT_CORRECTED",
+    "WORK_CREATED", "WORK_ASSIGNED", "WORK_STATUS", "WORK_BLOCKED", "WORK_COMPLETED",
+    "PLAN_SUBMITTED", "EOD_SUBMITTED", "EOD_ACKNOWLEDGED"
+  ],
+
+  "metricDefinitions": {
+    "worked": "Time between day open and day close, minus every closed break. An open day counts up to asOf; an unclosed one counts nothing.",
+    "late": "First open later than the member's own dayStartsAt + graceMinutes. Stored at open.",
+    "absent": "No day opened and the business day is over, on a configured working day.",
+    "onTimeRate": "Days present and not late ÷ days present. Days absent are excluded — being away is not the same as being late, and averaging them together answers neither question.",
+    "completion": "Work items completed ÷ items due, within the scope being shown. Never a per-person score.",
+    "planSubmitted": "A DailyPlan exists for the member and business date with submittedAt set. A draft does not count.",
+    "eodSubmitted": "A DailyReport exists for the member and business date with submittedAt set."
+  },
+
+  "openDecisions": [
+    { "id": "TM-OD-01", "title": "Scope", "state": "answered", "note": "Senior sees their own reports, one level, plus an `all` verb for everyone." },
+    { "id": "TM-OD-14", "title": "Salary slips", "state": "answered", "note": "Generated — by Finance. Team reads Payslip rows by memberId and never generates." },
+    { "id": "TM-OD-03", "title": "Working hours", "state": "open", "note": "Per member, defaulted from a company setting. The seed already varies them." },
+    { "id": "TM-OD-08", "title": "Calendar drag and drop", "state": "open", "note": "Recommended out of v1 — a silent drag leaves no reason." },
+    { "id": "TM-OD-10", "title": "Is EOD mandatory", "state": "open", "note": "Recommended no. It surfaces as missing; it never blocks. A forced report is a fabricated one." },
+    { "id": "TM-OD-11", "title": "Performance score", "state": "open", "note": "Recommended no. Show the numbers, sort by any column." },
+    { "id": "TM-OD-13", "title": "Leave and holidays", "state": "open", "note": "Out of v1. Absent is derived only on configured working days, and the week grid already skips Sat/Sun." }
+  ]
+}

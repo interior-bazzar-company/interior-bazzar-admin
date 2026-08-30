@@ -1,0 +1,144 @@
+/* =============================================================================
+   Finance — the route component, shared by five sidebar rows.
+   -----------------------------------------------------------------------------
+     #/finance                        Subscriptions      · #/finance/SUB-0101
+     #/finance-salaries               Salaries A/C       · /SAL-AC-0011 · /RUN-…
+                                                          · /SLIP-2026-08-0011
+     #/finance-transactions           Other Transaction  · /TXN-0901
+     #/finance-refunds                Refunds            · /RF-0117
+     #/finance-analytics              Analytics          · ?tab=kpi
+
+   FIVE ROWS, ONE MODULE. Finance records four things and reads them back in a
+   fifth place, and each is its own sidebar row and its own module key — so a
+   grant can be held on one without the others. Payroll is the reason: it is
+   the most sensitive record in the panel and has to be withholdable without
+   also withholding the subscription ledger.
+
+   The five keys resolve to THIS component, which reads its own route to know
+   which section it is showing. There is no `?view=` any more and no in-page
+   tab strip: the sidebar is the navigation, so a page opens straight onto its
+   own controls.
+
+   A record lives under its own section's route, so Back always lands on the
+   list it came from and the sidebar keeps the right row lit.
+
+   NO API YET — everything comes from src/content/finance/*.json through
+   store.ts.
+   ============================================================================= */
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { hashToPath, usePageChrome } from "../../shell/AdminShell";
+import { qs } from "../../ui";
+import type { Params } from "./store";
+import { useActiveCount } from "./store";
+import { ROUTE_OF, VIEW_OF } from "./Frame";
+import Subscriptions from "./Subscriptions";
+import SubscriptionDetail from "./SubscriptionDetail";
+import Salaries from "./Salaries";
+import SalaryDetail from "./SalaryDetail";
+import Slip from "./Slip";
+import Transactions from "./Transactions";
+import TxnDetail from "./TxnDetail";
+import Refunds from "./Refunds";
+import RefundDetail from "./RefundDetail";
+import Analytics from "./Analytics";
+import "../charts.css";
+import "./finance.css";
+
+export const merge = (p: Params, extra: Params): Params => {
+  const o: Params = { ...p };
+  Object.keys(extra).forEach((k) => { o[k] = extra[k]; });
+  return o;
+};
+export const omit = (p: Params, keys: string[]): Params => {
+  const o: Params = {};
+  Object.keys(p).forEach((k) => { if (keys.indexOf(k) < 0) o[k] = p[k]; });
+  return o;
+};
+/** Hashes are built against a SECTION, not against "finance", because each
+ *  section is its own route now. */
+export const listHash = (view: string, p: Params = {}) =>
+  "#/" + (ROUTE_OF[view] || "finance") + qs(p as Record<string, string>);
+export const recHash = (view: string, id: string, p: Params = {}) =>
+  "#/" + (ROUTE_OF[view] || "finance") + "/" + encodeURIComponent(id) + qs(p as Record<string, string>);
+
+export default function Finance() {
+  const raw = useParams().id;
+  const id = raw ? decodeURIComponent(raw) : null;
+  const [sp] = useSearchParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  /* The section is the route, and the route is the first path segment — the
+     same thing ViewHost keyed the module on to get here. */
+  const route = (location.pathname.split("/").filter(Boolean)[0] || "finance").toLowerCase();
+  const view = VIEW_OF[route] || "subscriptions";
+
+  const p = useMemo(() => {
+    const o: Params = {};
+    sp.forEach((v, k) => { if (v) o[k] = v; });
+    return o;
+  }, [sp]);
+
+  /* ONE FIGURE, AND IT IS A COUNT. The topbar carried three money totals —
+     collected, net, fail to pay — on every section, including the ones they
+     had nothing to do with. Money belongs to the tiles of the section that
+     computes it, where it can carry its formula and its caution; a figure with
+     neither, repeated above every page, is a number nobody can check.
+     How many businesses are subscribed right now is scope rather than
+     analysis, and it is the same question on every section. */
+  const activeN = useActiveCount();
+  const crumbs = useMemo(() => (
+    <>
+      <span className="tb-title">Finance</span>
+      <span className="tb-stats">
+        <span className="fin-scope ok"
+          title="Subscriptions running right now — a level, read at this moment, not a total for any period.">
+          <i />
+          <span className="k">Active subscriptions</span>
+          <b className="tnum">{activeN}</b>
+        </span>
+      </span>
+    </>
+  ), [activeN]);
+
+  usePageChrome(
+    { crumbs, right: null, parent: id ? listHash(view) : null },
+    (id ? "rec" : view) + ":" + activeN,
+  );
+
+  const timer = useRef<number | undefined>(undefined);
+  const goFilter = useCallback((hash: string) => { navigate(hashToPath(hash), { replace: true }); }, [navigate]);
+  const onFilter = useCallback((name: string, value: string) => {
+    goFilter(listHash(view, merge(omit(p, ["page"]), { [name]: value || undefined })));
+  }, [p, view, goFilter]);
+  const onSearch = useCallback((name: string, value: string) => {
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(
+      () => goFilter(listHash(view, merge(omit(p, ["page"]), { [name]: value || undefined }))), 220);
+  }, [p, view, goFilter]);
+  const onUnfilter = useCallback((k: string) => {
+    if (k === "*") return goFilter(listHash(view, { tab: p.tab }));
+    goFilter(listHash(view, omit(p, k.split("+").concat(["page"]))));
+  }, [p, view, goFilter]);
+  const onParams = useCallback((patch: Params) => {
+    goFilter(listHash(view, merge(omit(p, ["page"]), patch)));
+  }, [p, view, goFilter]);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  if (id) {
+    const onRec = (patch: Params) => goFilter(recHash(view, id, merge(p, patch)));
+    if (/^SLIP-/.test(id)) return <Slip id={id} p={p} onParams={onRec} />;
+    if (/^SAL-|^RUN-/.test(id)) return <SalaryDetail id={id} p={p} onParams={onRec} />;
+    if (/^TXN-/.test(id)) return <TxnDetail id={id} p={p} onParams={onRec} />;
+    if (/^RF-/.test(id)) return <RefundDetail id={id} p={p} onParams={onRec} />;
+    return <SubscriptionDetail id={id} p={p} onParams={onRec} />;
+  }
+
+  const shared = { p, onFilter, onSearch, onUnfilter, onParams };
+  if (view === "salaries") return <Salaries {...shared} />;
+  if (view === "transactions") return <Transactions {...shared} />;
+  if (view === "refunds") return <Refunds {...shared} />;
+  if (view === "analytics") return <Analytics {...shared} />;
+  return <Subscriptions {...shared} />;
+}

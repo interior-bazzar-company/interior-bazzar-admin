@@ -24,17 +24,15 @@ import { ProtoBar } from "./bits";
 import { resetStore } from "./store";
 import type { Params, UserRow } from "./store";
 
-/* FOUR FACES, NOT FIVE. Overview is gone: it and Analytics were two dashboards
-   over one population, carrying the same headline figures with different
-   windows, and they agreed only because both called the same derivation. Its
-   content is folded into Analytics.
+/* TWO FACES. The directory and the dashboard over it — one population, asked
+   two ways. Members and Renewals are gone with the membership feature: who is
+   paying and whose term is about to end are questions for the subscription
+   that holds the money, and Finance asks them of that record.
 
    `users` is the default face and carries no `view` param, so `#/users` is the
    directory — the working surface, which is what the route already reads like. */
 export const VIEWS = [
   { key: "users", label: "Users", icon: "users" },
-  { key: "members", label: "Members", icon: "star" },
-  { key: "renewals", label: "Renewals", icon: "clock" },
   { key: "analytics", label: "Analytics", icon: "chart" },
 ];
 

@@ -9,9 +9,9 @@
    the module inherits every future change to them.
 
    What is left is the vocabulary that is genuinely this module's: the view
-   band, the classification and membership dots, plans, tags, the term cell, the
-   queue row, entitlements and the decision markers. The charts live beside
-   their own styles in charts.tsx and charts.css.
+   band, the classification dot, tags, the completeness bar, the audit row, the
+   profile form and its facet picker, and the decision markers. The charts live
+   beside their own styles in ../charts.tsx and ../charts.css.
 
    Every value is a token. There is not one literal hex here, and that is the
    rule rather than a coincidence — a hard-coded colour looks right in light
@@ -83,7 +83,6 @@
 /* A section head inside a card is a sub-head, not a page band, so it does not
    get the full inter-section gap. */
 .um-rec .card-b > .sh { margin-top: var(--space-5) }
-.um-count { font-size: var(--text-md); font-weight: var(--weight-semibold); color: var(--text-2) }
 .um-against { font-size: var(--text-sm); color: var(--text-3) }
 .um-fine { font-size: var(--text-sm); line-height: var(--lh-md); color: var(--text-3); margin: var(--space-2) 0 0 }
 .um-fine.warn { color: var(--warn) }
@@ -93,7 +92,7 @@
 
 /* The bar, funnel, legend and cohort blocks that used to sit here are gone —
    every chart form is in charts.tsx now, with its styles beside it in
-   charts.css where the validated palette is recorded. */
+   ../charts.css where the validated palette is recorded. */
 
 /* ------------------------------------------------- decisions and gaps --- */
 /* An unresolved product question, named where it bites. Dashed because it is a
@@ -149,17 +148,15 @@
 }
 
 /* -------------------------------------------------------------- table --- */
-.um-tbl { min-width: 1040px }
+.um-tbl { min-width: 880px }
 .um-tbl th.rail, .um-tbl td.rail { width: 3px; padding: 0 }
-/* THREE STATES, NOT SEVEN. The rail is the only place a row raises its voice;
-   a colour per status turns the table into a paint chart nobody can scan. */
+/* ONE STATE. The rail is the only place a row raises its voice, and there is
+   one thing left worth raising it for: a live account with an unfinished
+   profile. A colour per state turns the table into a paint chart nobody can
+   scan. */
 .um-tbl td.rail i { display: block; width: 3px; height: 52px; background: transparent;
                     border-radius: 0 2px 2px 0 }
 .um-tbl td.rail i.warn { background: var(--warn-solid) }
-.um-tbl td.rail i.bad { background: var(--bad-solid) }
-.um-termtop { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap }
-.um-tbl .cell-2 em { font-style: normal }
-.um-tbl .cell-2 em.warn { color: var(--warn); font-weight: var(--weight-medium) }
 .um-date {
   height: var(--control-md); padding: 0 var(--space-3);
   border: 1px solid var(--line-control); border-radius: var(--radius-md);
@@ -167,17 +164,6 @@
 }
 .um-pager { display: flex; align-items: center; gap: var(--space-3); justify-content: center;
             padding: var(--space-4) 0; font-size: var(--text-sm); color: var(--text-3) }
-
-/* -------------------------------------------------------------- plans --- */
-.um-plan {
-  display: inline-flex; align-items: baseline; gap: 4px; height: var(--control-xs);
-  padding: 0 var(--space-2); border-radius: var(--radius-sm); white-space: nowrap;
-  border: 1px solid var(--line-2); background: var(--bg-inset);
-  font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--text-2);
-}
-.um-plan .v { font-size: var(--text-2xs); color: var(--text-3); font-weight: var(--weight-normal) }
-.um-plan.p-growth { border-color: var(--brand-line); background: var(--brand-tint); color: var(--brand-text) }
-.um-plan.p-pro { border-color: var(--info-line); background: var(--info-bg); color: var(--info) }
 
 /* --------------------------------------------------------------- tags --- */
 /* The tag palette means NOTHING — the one place in the product where colour is
@@ -198,16 +184,10 @@
 
 /* ------------------------------------------------------ classification --- */
 /* The dot carries the pill's tint, so a row is scannable by colour and legible
-   in words. */
-.um-cls .dot.c-active_member { background: var(--ok-solid) }
-.um-cls .dot.c-paused_member { background: var(--warn-solid) }
-.um-cls .dot.c-suspended_member { background: var(--bad-solid) }
-.um-cls .dot.c-normal, .um-cls .dot.c-former_member { background: var(--line-3) }
+   in words. Two states, because there are two: the account works, or it has
+   been turned off. */
+.um-cls .dot.c-active { background: var(--ok-solid) }
 .um-cls .dot.c-deactivated { background: var(--text-3) }
-.um-ms .dot.m-active { background: var(--ok-solid) }
-.um-ms .dot.m-pending, .um-ms .dot.m-paused { background: var(--warn-solid) }
-.um-ms .dot.m-suspended { background: var(--bad-solid) }
-.um-ms .dot.m-expired, .um-ms .dot.m-cancelled { background: var(--line-3) }
 
 /* ------------------------------------------------------- completeness --- */
 .um-comp { display: inline-flex; align-items: center; gap: var(--space-2); flex-wrap: wrap }
@@ -221,25 +201,12 @@
 .um-comp .p.ok { color: var(--ok) } .um-comp .p.warn { color: var(--warn) } .um-comp .p.bad { color: var(--bad) }
 /* What is missing, not only the percentage — 60% tells nobody what to ask for. */
 .um-comp .m { font-size: var(--text-sm); color: var(--text-3) }
-.um-livecomp { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-4) }
+.um-livecomp { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);
+               margin: 0 0 var(--space-4); padding: var(--space-2) 0 var(--space-4);
+               border-bottom: 1px solid var(--line) }
+.um-livecomp > :last-child { flex: 0 1 260px; min-width: 0 }
 .um-livecomp .l { font-size: var(--text-2xs); letter-spacing: .08em; text-transform: uppercase;
                   color: var(--text-3); font-weight: var(--weight-semibold) }
-
-/* -------------------------------------------------------------- queue --- */
-.um-queue { display: flex; flex-direction: column; background: var(--surface-raised);
-            border: 1px solid var(--line); border-radius: var(--radius-xl); overflow: hidden }
-.um-q {
-  display: flex; align-items: center; gap: var(--space-4);
-  padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--line);
-  cursor: pointer; transition: background var(--duration-fast) var(--ease);
-}
-.um-q:last-child { border-bottom: none }
-.um-q:hover { background: var(--bg-hover) }
-.um-q-plan { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; min-width: 190px }
-.um-q-act { margin-left: auto; display: flex; align-items: center; gap: var(--space-3) }
-.um-q-when { font-size: var(--text-sm); color: var(--text-3); white-space: nowrap }
-.um-q-when.warn { color: var(--warn); font-weight: var(--weight-medium) }
-.um-q-when.bad { color: var(--bad); font-weight: var(--weight-medium) }
 
 .um-defs td { height: auto; padding: var(--space-2) var(--space-4);
               font-size: var(--text-sm); line-height: var(--lh-md); vertical-align: top }
@@ -264,36 +231,8 @@
 
 .um-cards { display: flex; flex-direction: column; gap: var(--space-4) }
 .um-cards > .sh:first-child { margin-top: 0 }
-.um-termcard { border-color: var(--brand-line) }
-.um-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-3) }
-.um-hist { min-width: 820px }
-
-/* The matrix for the state this term is in — shown, not described, because it
-   is the question somebody has open while reaching for a button above it. */
-.um-matrix { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
-             padding: var(--space-2) var(--space-3); background: var(--bg-inset);
-             border-radius: var(--radius-md) }
-.um-matrix .l { font-size: var(--text-sm); color: var(--text-3) }
-.um-matrix .r { display: inline-flex; align-items: center; gap: var(--space-2); flex-wrap: wrap }
-.um-matrix .um-fine { flex: 1 1 100%; margin: 0 }
-
-.um-ent { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column }
-.um-ent li { display: flex; align-items: baseline; gap: var(--space-3);
-             padding: var(--space-2) 0; border-bottom: 1px solid var(--line);
-             font-size: var(--text-base) }
-.um-ent li:last-child { border-bottom: none }
-.um-ent .ic { color: var(--ok); flex: 0 0 auto }
-.um-ent .l { flex: 0 0 190px; color: var(--text-2) }
-.um-ent .v { flex: 1 1 auto; font-weight: var(--weight-medium) }
-.um-ent .k { font-size: var(--text-2xs); color: var(--text-3) }
-.um-ent.preview .ic { color: var(--text-3) }
-
-.um-srclist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2) }
-.um-srclist li { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap;
-                 font-size: var(--text-sm); color: var(--text-2) }
-
 .um-notes { display: flex; flex-direction: column; gap: var(--space-3) }
-.um-notes article { border-left: 2px solid var(--info-line); padding-left: var(--space-3) }
+.um-notes article { border-left: 2px solid var(--line-2); padding-left: var(--space-3) }
 .um-notes header { display: flex; gap: var(--space-2); align-items: baseline;
                    font-size: var(--text-sm); flex-wrap: wrap }
 .um-notes .role, .um-notes time { color: var(--text-3) }
@@ -306,7 +245,6 @@
 .um-tagrow em { font-style: normal; font-size: var(--text-sm); color: var(--text-3) }
 
 /* -------------------------------------------------------------- forms --- */
-.um-form fieldset.um-fs { border: none; margin: 0 0 var(--space-5); padding: 0 }
 .um-fs legend { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap;
                 padding: 0; margin-bottom: var(--space-2);
                 font-size: var(--text-md); font-weight: var(--weight-semibold) }
@@ -326,62 +264,20 @@
    to end — so every public/internal badge in a group lines up in one column
    and can be scanned as one, which is the only way "which of these is public"
    gets answered at a glance. */
-.um-form .fg-lb { display: flex; align-items: baseline; gap: var(--space-2) }
-.um-form .fg-lb .um-vis { margin-left: auto }
+.um-form .fg-lb { display: flex; align-items: baseline; gap: var(--space-2);
+                  font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--text-2);
+                  margin-bottom: var(--space-1) }
 .um-form .fg { margin-bottom: 0 }
 .um-form .inp.ro { display: flex; align-items: center; gap: var(--space-2);
                    background: var(--bg-inset); color: var(--text-2) }
 .um-form textarea.inp { height: auto; padding: var(--space-2) var(--space-3); line-height: var(--lh-base) }
 .um-chips { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-2) }
 
-.um-choices { display: grid; gap: var(--space-2); grid-template-columns: repeat(3, 1fr) }
-.um-choices.tight { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)) }
-@container (max-width: 620px) { .um-choices { grid-template-columns: 1fr } }
-.um-choice {
-  display: flex; flex-direction: column; gap: 2px; text-align: left;
-  padding: var(--space-3); background: var(--bg); cursor: pointer; font: inherit; color: inherit;
-  border: 1px solid var(--line); border-radius: var(--radius-lg);
-  transition: border-color var(--duration) var(--ease), background var(--duration) var(--ease);
-}
-.um-choice:hover { border-color: var(--line-3) }
-.um-choice.on { border-color: var(--brand); background: var(--brand-tint) }
-.um-choice b { font-size: var(--text-base) }
-.um-choice.sm b { font-size: var(--text-md) }
-.um-choice span { font-size: var(--text-sm); color: var(--text-3); line-height: var(--lh-md) }
-.um-choice em { font-style: normal; font-size: var(--text-sm); color: var(--text-2);
-                font-weight: var(--weight-medium) }
-
-.um-radios { display: flex; flex-direction: column; gap: var(--space-2) }
-.um-radios label { display: grid; grid-template-columns: auto 1fr; gap: 2px var(--space-3);
-                   align-items: start; padding: var(--space-3); cursor: pointer;
-                   border: 1px solid var(--line); border-radius: var(--radius-lg) }
-.um-radios label.on { border-color: var(--brand); background: var(--brand-tint) }
-.um-radios input { grid-row: 1 / 3; margin-top: 3px }
-.um-radios b { font-size: var(--text-base) }
-.um-radios span { font-size: var(--text-sm); color: var(--text-3); line-height: var(--lh-md) }
-
 .um-consequences { list-style: none; margin: 0 0 var(--space-4); padding: 0;
                    display: flex; flex-direction: column; gap: var(--space-2) }
 .um-consequences li { display: flex; gap: var(--space-2); align-items: flex-start;
                       font-size: var(--text-base); line-height: var(--lh-base); color: var(--text-2) }
 .um-consequences .ic { flex: 0 0 auto; color: var(--text-3); margin-top: 3px }
-
-.um-transition { display: flex; align-items: center; gap: var(--space-3); justify-content: center;
-                 padding: var(--space-4); background: var(--bg-inset);
-                 border-radius: var(--radius-md); margin-bottom: var(--space-4) }
-.um-renewpreview { display: flex; flex-direction: column; gap: 2px; padding: var(--space-3);
-                   border: 1px solid var(--line); border-radius: var(--radius-md);
-                   background: var(--bg-inset); margin-bottom: var(--space-4) }
-.um-renewpreview span { font-size: var(--text-sm); color: var(--text-2) }
-.um-renewpreview em { font-style: normal; font-size: var(--text-sm); color: var(--text-3) }
-
-/* Whether a field is public on the platform or internal to us. Editing a public
-   bio and editing a private address are different acts. */
-.um-vis { font-style: normal; font-size: var(--text-2xs); letter-spacing: .06em;
-          text-transform: uppercase; margin-left: var(--space-2); padding: 1px 5px;
-          border-radius: var(--radius-xs); font-weight: var(--weight-semibold) }
-.um-vis.pub { background: var(--brand-tint); color: var(--brand-text) }
-.um-vis.int { background: var(--info-bg); color: var(--info) }
 
 .um-tagpicker { display: grid; gap: var(--space-2); grid-template-columns: repeat(2, 1fr) }
 @container (max-width: 560px) { .um-tagpicker { grid-template-columns: 1fr } }
@@ -411,7 +307,6 @@
               width: 22px; height: 22px; border: none; border-radius: var(--radius-sm);
               background: none; color: var(--text-3); cursor: pointer }
 .um-facet-x:hover { background: var(--bg-hover); color: var(--text) }
-.um-facet-re { margin-top: var(--space-1) }
 
 /* chips ------------------------------------------------------------------ */
 .um-chip { padding-right: 3px }
@@ -432,9 +327,8 @@
 /* Hover and keyboard share ONE highlight. Two of them — a hover colour and a
    separate "active descendant" colour — and the list shows two current rows at
    once, which is worse than showing none. */
-.um-opt.on { background: var(--brand-tint); color: var(--brand-text) }
+.um-opt.on { background: var(--bg-hover); color: var(--text) }
 .um-opt em { font-style: normal; font-size: var(--text-sm); color: var(--text-3); line-height: 1.35 }
-.um-opt.on em { color: var(--brand-text); opacity: .8 }
 .um-opt.add { flex-direction: row; align-items: center; gap: var(--space-2) }
 .um-opt.none { color: var(--text-3); font-size: var(--text-sm); cursor: default; padding: var(--space-3) }
 .um-optg { position: sticky; top: 0; z-index: 1; display: flex; align-items: baseline; gap: var(--space-2);
@@ -461,12 +355,16 @@
 
    Each group is now a panel with its own ground and a hairline. Cheap, and it
    turns a scroll into three things you can be in the middle of. */
+/* SUPERSEDED: the panel ground came off. Groups are separated by a hairline
+   and a small-caps section label instead — the same boundary, without a
+   second surface colour competing with the controls. */
 .um-form fieldset.um-fs {
-  padding: var(--space-4);
-  background: var(--bg-inset);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  margin-bottom: var(--space-4);
+  padding: var(--space-4) 0 0;
+  background: none;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  margin-bottom: var(--space-5);
   /* Fieldsets carry a UA `min-width: min-content` no other element has, which
      is the one that stops them shrinking with the modal and hands the whole
      dialog a horizontal scrollbar instead. */
@@ -474,9 +372,27 @@
 }
 .um-form .um-fs legend {
   float: left; width: 100%; margin: 0 0 var(--space-3);
-  padding: 0 0 var(--space-2);
-  border-bottom: 1px solid var(--line);
+  padding: 0;
+  border-bottom: 0;
+  /* Section label, not a heading: small caps in the quiet colour, the same
+     voice as the COMPLETENESS label above — one hierarchy for the modal. */
+  font-size: var(--text-2xs); letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text-3); font-weight: var(--weight-semibold);
 }
+.um-form .um-fs legend i { text-transform: none; letter-spacing: 0; font-size: var(--text-sm) }
+.um-form .um-fs legend .req { color: var(--bad) }
+/* The first section sits directly under the completeness row, which already
+   draws the line. */
+.um-form .um-livecomp + fieldset.um-fs { border-top: 0; padding-top: 0 }
+/* Between sections — Business profile → Target → Positioning — the boundary
+   has to read at a scroll: more air above the rule than below it, so the
+   label attaches to what follows, and a rule one shade firmer than the
+   hairlines inside a section. */
+.um-form fieldset.um-fs + fieldset.um-fs {
+  margin-top: var(--space-6); padding-top: var(--space-5);
+  border-top: 1px solid var(--line-2);
+}
+.um-form fieldset.um-fs + fieldset.um-fs legend { margin-bottom: var(--space-4) }
 /* THE CLEAR IS NOT OPTIONAL, and shipping without it is what broke the form
    on first browser contact. The float is the only way to make a legend lay
    out as normal content — but the grid that follows it establishes its own
@@ -493,16 +409,8 @@
 .um-form .um-f2 > * { min-width: 0 }
 .um-handle-in { min-width: 0 }
 .um-handle-in .inp { min-width: 0 }
-/* Inputs on the panel invert the usual relationship: the well is the panel
-   now, so the CONTROL is the raised thing. Without this they vanish into the
-   ground they sit on. */
-.um-form .um-fs .inp {
-  background: var(--surface-raised);
-  border-color: var(--line-2);
-}
-.um-form .um-fs .inp.ro { background: var(--bg); }
-.um-form .um-opts { background: var(--surface-raised); border-color: var(--line-2) }
-.um-form .um-optg { background: var(--surface-raised) }
+.um-form .um-fs .inp { background: var(--surface-raised); border-color: var(--line-2) }
+.um-form .um-fs .inp.ro { background: var(--bg-inset) }
 
 /* ------------------------------------------------- chips, made to read --- */
 /* A chip IS the answer to its field — the picker below it is only how you got
@@ -510,12 +418,15 @@
    The neutral `.pill` ground was a grey on a grey and lost every time. Brand
    tint, a real border, and the height of a control rather than a label. */
 .um-chips { gap: var(--space-2); margin-bottom: var(--space-3) }
+/* Under the control (a Target row's cities): the gap moves to the top, and the
+   row's two boxes share one baseline. */
+.um-chips.below { margin: var(--space-2) 0 0 }
 .um-chip.pill {
   height: var(--control-sm);
   padding: 0 var(--space-1) 0 var(--space-3);
-  background: var(--brand-tint);
-  color: var(--brand-text);
-  border-color: var(--brand-line);
+  background: var(--bg-inset);
+  color: var(--text);
+  border-color: var(--line-2);
   font-weight: var(--weight-medium);
 }
 .um-chips.ro .um-chip.pill { padding-right: var(--space-3) }
@@ -543,7 +454,7 @@
   background: var(--warn-bg); color: var(--warn); border-color: var(--warn-line);
 }
 .um-chip-x { width: 20px; height: 20px; opacity: .55 }
-.um-chip-x:hover { opacity: 1; background: var(--brand-line) }
+.um-chip-x:hover { opacity: 1; background: var(--bg-hover) }
 
 /* --------------------------------------------------- the handle field --- */
 .um-handle-in { position: relative; display: flex; align-items: center;
@@ -621,11 +532,11 @@
   display: grid; place-items: center; width: 16px; height: 16px;
   border: 1px solid var(--line-2); border-radius: var(--radius-full);
   background: var(--bg); color: var(--text-3); cursor: pointer;
-  font-size: 10px; font-style: italic; font-weight: var(--weight-semibold);
+  font-size: var(--text-2xs); font-style: italic; font-weight: var(--weight-semibold);
   font-family: Georgia, serif; line-height: 1;
 }
 .um-info-b:hover, .um-info-b[aria-expanded="true"] {
-  border-color: var(--brand-line); background: var(--brand-tint); color: var(--brand-text);
+  border-color: var(--line-control); background: var(--bg-hover); color: var(--text);
 }
 .um-info-pop {
   position: absolute; z-index: 45; top: calc(100% + 6px); left: -8px;
@@ -660,14 +571,71 @@
   font-size: var(--text-base);
 }
 .um-check:hover { border-color: var(--line-control) }
-.um-check.on { background: var(--brand-tint); border-color: var(--brand-line);
-               color: var(--brand-text) }
+.um-check.on { background: var(--surface-raised); color: var(--text);
+               border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand) }
 .um-check input { accent-color: var(--brand); margin: 0 }
 .um-check input:disabled { cursor: default }
 .um-check.off { opacity: .45; cursor: default }
 .um-checks { flex-wrap: wrap }
 
 @media print {
-  .um-views, .um-proto, .um-actions, .um-idbar .btn { display: none }
-  .card, .um-queue { break-inside: avoid }
+  .um-views, .um-proto, .um-idbar .btn { display: none }
+  .card { break-inside: avoid }
 }
+
+/* ------------------------------------------ the form, without the tint --- */
+/* Chips, a ticked Deals-in box, the Business type select and the list's
+   highlight all wore brand tint. On one modal that is four green surfaces
+   arguing with the one primary button, and the answer to "which is the
+   action" stops being obvious. The answer is the text; the tint comes off.
+   SCOPED TO THE FORM: the record's read-only chips keep their facet tones,
+   where colour still answers "which question is this". */
+.um-form .um-chips .um-chip.pill {
+  background: var(--surface-raised); color: var(--text); border-color: var(--line-control);
+}
+.um-form .um-chips .um-chip.pill.warn {
+  background: var(--warn-bg); color: var(--warn); border-color: var(--warn-line);
+}
+
+/* Business type: a full-width select in the same neutral skin as every other
+   control on the form — it was a narrow tinted box between full-width rows. */
+.um-form .selectbox { display: flex; width: 100% }
+.um-form .selectbox select {
+  width: 100%; height: var(--control-lg);
+  background: var(--surface-raised); border-color: var(--line-2);
+}
+.um-form .selectbox select:hover { border-color: var(--line-control) }
+.um-form .selectbox select:focus-visible {
+  outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-line);
+}
+.um-form .selectbox.on select {
+  background: var(--surface-raised); color: var(--text);
+  border-color: var(--line-2); font-weight: var(--weight-normal);
+}
+.um-form .selectbox.on::after { border-color: var(--text-3) }
+
+/* --------------------------------------------- select-like closed single --- */
+/* State: the answer sits in the box under a chevron; a press turns the box
+   into the search field and opens the list with the current value marked. */
+.um-facet.sellike:not(.open) .um-facet-in::after {
+  content: ""; position: absolute; right: 13px; top: 50%; width: 6px; height: 6px;
+  border-right: 1.6px solid var(--text-3); border-bottom: 1.6px solid var(--text-3);
+  transform: translateY(-70%) rotate(45deg); pointer-events: none;
+}
+.um-facet.sellike:not(.open) .um-facet-in .inp {
+  padding-left: var(--space-3); cursor: pointer; caret-color: transparent;
+}
+.um-facet.sellike:not(.open) .um-facet-in .inp:not(:placeholder-shown) {
+  color: var(--text); font-weight: var(--weight-medium);
+}
+.um-opt.picked .l { font-weight: var(--weight-medium) }
+.um-opt.picked .l::after { content: " \2713"; color: var(--brand) }
+
+/* ------------------------------------------- required, still empty --- */
+/* Marked as you go, not announced on submit: the empty required fields wear
+   a warning border and the footer names them beside Save. */
+.um-form .fg.um-fg-missing .fg-lb { color: var(--warn) }
+.um-form .fg.um-fg-missing .inp,
+.um-form .fg.um-fg-missing .um-facet-in .inp,
+.um-form .fg.um-fg-missing .um-handle-in { border-color: var(--warn-line) }
+.um-foot-note { font-size: var(--text-sm); color: var(--warn); align-self: center }

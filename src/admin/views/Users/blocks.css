@@ -19,9 +19,9 @@
   align-items: start;
   padding-bottom: var(--space-6);
 }
-/* The charts that need the width: the twelve-month column chart, the cohort
-   grid, the definitions table, and the KPI row that would otherwise wrap two
-   tiles onto a second line for no reason. */
+/* The blocks that need the width: the twelve-month column chart, the
+   definitions table, and the KPI row that would otherwise wrap two tiles onto
+   a second line for no reason. */
 .um-block.wide { grid-column: 1 / -1 }
 @container (max-width: 900px) {
   .um-blocks { grid-template-columns: 1fr }
@@ -38,10 +38,6 @@
 .um-block .card-f em { font-style: italic }
 .um-blocknums { font-size: var(--text-sm); color: var(--text-2);
                 font-variant-numeric: tabular-nums; white-space: nowrap }
-.um-blocknote { font-size: var(--text-xs); color: var(--text-3);
-                border: 1px solid var(--line); border-radius: var(--radius-full);
-                padding: 1px 8px; white-space: nowrap }
-.um-blocknote.warn { color: var(--warn); border-color: var(--warn-line); background: var(--warn-bg) }
 .um-block .um-assumed { margin-top: 0 }
 .um-block .um-unavailable { border: none; padding: 0; background: none }
 .um-block .um-defs { margin: 0 }

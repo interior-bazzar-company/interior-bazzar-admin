@@ -4,6 +4,1477 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ---
 
+## 2026-08-30
+
+### The header pill names what it counts, and Collected opens what it counted
+
+**Area:** `#/finance` — the topbar on every section, and the Collected tile
+**Files:** `src/admin/views/Finance/{index.tsx,store.ts,Subscriptions.tsx,finance.css}`,
+`scripts/{check-finance-ledger.cjs,fn-smoke.tsx}`
+
+**What changed**
+
+*The pill.* **Active** became **Active subscriptions** — "Active" alone left a
+reader to guess what was being counted, and next to a Finance title the guess
+could as easily have been invoices or payments. The figure now sits in a well
+of its own inside the pill rather than trailing the label as its last word, so
+the eye lands on the number; the label is the quiet half. Below 760px the words
+drop and the dot and figure remain, because the count is the part that cannot
+be inferred from anything else on screen.
+
+*Collected opens what it counted.* It was the only money tile with a figure and
+no way into the rows behind it — the other two have offered **show only these**
+since they were built. A new `flag=settled` lists the subscriptions that have
+settled at least one installment, and its chip reads **Settled** rather than the
+raw key.
+
+**A note on the label.** The request called the link "checkout". It is
+**show only these**, matching the two tiles beside it, because "checkout" in a
+finance ledger reads as a payment flow rather than as "look at these" — and
+three tiles offering the same affordance under two different words is how a
+reader stops trusting either. Say the word and it changes.
+
+**Temp data**
+none
+
+**Backend needed**
+- `?flag=settled` joins `failed`, `due` and `nobill` as a server-side filter on
+  the subscriptions list.
+
+**Open decisions**
+none
+
+**Verified**
+`tsc -b`, eslint and `npm run build` clean; all ten suites pass by exit code.
+`check:finance` is at **263** — three assertions holding the Collected tile to
+the rows it opens, and the render suite walks the new filtered page.
+
+**Probe-tested:** widening `flag=settled` to match everything fails two of the
+three, including the one that exists purely so the link cannot quietly become a
+no-op — it asserts the filtered list is genuinely narrower than the whole.
+
+**Not checked:** nothing was clicked in a browser, and the pill itself is not
+in the render suite — it is topbar chrome, which the smoke harness stubs. Its
+CSS is unverified beyond a build.
+
+---
+
+### Renew comes off; an installment is billed where it is paid
+
+**Area:** `#/finance` — the subscription record, and the Record payment dialog
+**Files:** `src/admin/views/Finance/{store.ts,types.ts,SubModals.tsx,SubscriptionDetail.tsx}`,
+`src/content/finance/subscriptions.json`,
+`scripts/{check-finance-ledger.cjs,fn-smoke.tsx}`
+
+**What changed**
+
+**Supersedes the Renew half of the entry below.** The button is gone, and so is
+everything that only it could reach: the dialog's renewal mode, the store's
+`renewalOf` input and its guard, the field on the type and on every seeded row.
+A field nothing writes is worse than no field — it invites a reader to trust
+something that is always null. **Renewing is still possible and always was**:
+activate a subscription from the list and pick the same business.
+
+*Record payment attaches the installment's invoice.* The sales chain raises one
+invoice per installment as each falls due, so an installment after the first
+reaches payment time carrying none — and a receipt issued against nothing
+prints a dash where the tax invoice should be. The dialog now shows **Billed
+on**: the invoice already attached, or a picker of the ones that could be, with
+the full invoice instance once chosen and a link that opens the document in
+Invoices.
+
+Four refusals, matching activation's: the invoice must exist, be **issued**
+(`invoice_not_open` — a receipt cannot cite a cancelled document), belong to
+**the same customer** (`customer_mismatch`), and be **for exactly this
+installment's amount** (`amount_mismatch` — one invoice bills one installment,
+for what that installment is). An installment already billed refuses a second
+invoice.
+
+**Attaching is not mandatory.** The money arrived either way and a payment that
+happened must stay recordable, so the dialog records without one — and says, in
+words, that the receipt will then cite no tax invoice, which is the receipt a
+customer keeps.
+
+**Temp data**
+`subscriptions.json` — `renewalOf` dropped from every row.
+
+**Backend needed**
+- `POST …/subscriptions/{id}/installments/{seq}/payment` accepts an optional
+  `invoiceNumber`, with the four refusals above.
+- `renewalOf` is **not** part of the contract. Do not build it.
+
+**Open decisions**
+none
+
+**Verified**
+`tsc -b`, eslint and `npm run build` clean; all ten suites pass by exit code.
+`check:finance` is at **260**, with a section for billing an installment.
+
+**One guard has no fixture, and the suite says so rather than pretending.** No
+customer in this seed holds both an unbilled installment and a second issued
+invoice of a different amount, so the write-level `amount_mismatch` cannot be
+reached from real data. Inventing a record purely so an assertion could fire
+would put data in the seed the business never produced. The rule is asserted
+where a person actually meets it — the picker, which never offers a
+wrong-amount invoice — and an assertion pins the gap itself, so it turns red
+the day a seed row makes the write path reachable.
+
+**Two bad assertions caught before they landed:** one compared against
+`has(x, "")`, which is always true, so the check could never fail; the other
+was the fixture above, which reported `"no fixture"` as a pass. Both were
+rewritten rather than deleted.
+
+**Not checked:** nothing was clicked in a browser. The attach flow is asserted
+through the store's refusals and as rendered markup, not as a click path.
+
+---
+
+### The Due tile and the Due filter now read one rule
+
+**Area:** `#/finance` — the Due tile on Subscriptions and the queue it opens
+**Files:** `src/admin/views/Finance/{store.ts,Subscriptions.tsx}`,
+`scripts/{check-finance-ledger.cjs,fn-smoke.tsx}`
+
+**What changed**
+
+The sub-line drops two words: *2 installments · expected, not earned* is now
+**2 installments · expected**. The full caution — "expected, not earned, and
+only what is genuinely in front of each customer" — is still on the metric,
+one press of the i button away.
+
+**The filter had not followed the figure.** The entry below narrowed what Due
+COUNTS: one installment per subscription, and nothing from a defaulting one.
+`flag=due` was still filtering on `dueN > 0` — every `due` row a subscription
+held, including the ones sitting behind a failure. So SUB-0104 contributed
+**nothing** to ₹7,55,200 and still appeared when you clicked through to see
+what made it up. A tile whose own filter disagrees with it is worse than either
+answer alone, because it makes the reader doubt the one that was right.
+
+Both now read `SubRow.dueNext` — the same `nextDue` the figure is built from.
+The Due queue lists SUB-0102 and SUB-0107, exactly the two the tile counts.
+
+`dueN` survives on the subscription record, where "3 paid, 1 due, 1 failed" and
+"Still due · N installments" genuinely mean every remaining row. It was only
+ever wrong as a queue.
+
+**Temp data**
+none
+
+**Backend needed**
+none beyond the previous entry — but the same rule governs both: a list
+endpoint filtering `?flag=due` must return what the due figure counted, not
+every unpaid installment.
+
+**Open decisions**
+none
+
+**Verified**
+`tsc -b`, eslint and `npm run build` clean; all ten suites pass by exit code.
+`check:finance` is at **261** — three assertions added holding the tile and the
+filter to one rule, including one that fails if the filter ever lists something
+the figure ignored.
+
+**Probe-tested:** putting the old `dueN > 0` filter back fails two of the three
+immediately, naming SUB-0104. The third exists to keep the pair honest in the
+other direction — it asserts a subscription really would have been listed by
+the old rule, so the check cannot quietly become vacuous if the seed changes.
+
+**Not checked:** nothing was clicked in a browser; the filter is asserted
+through `applySubFilters`, not through the link that sets it.
+
+---
+
+### Renew; a scope chip instead of three totals; and Due is what is actually in front of somebody
+
+**Area:** `#/finance` — the topbar on every section, the Subscriptions money
+strip, and the subscription record screen
+**Files:** `src/admin/views/Finance/{index,Subscriptions,SubscriptionDetail,SubModals}.tsx`,
+`{store.ts,types.ts,finance.css}`, `src/content/finance/{subscriptions,vocabularies}.json`,
+`scripts/{check-finance-ledger.cjs,fn-smoke.tsx}`
+
+**What changed**
+
+*The topbar carries one figure, and it is a count.* Collected, Net and Fail to
+pay came off it. They were three rupee totals repeated above every section —
+including the ones that had nothing to do with them — with no formula and no
+caution beside them. Money belongs to the tiles of the section that computes
+it, where its i button is; a figure nobody can check does not get to sit above
+every page. In their place, a green **Active** chip: how many businesses are
+subscribed right now. That is scope rather than analysis, and it is the same
+question on every section.
+
+*The Collected tile counts what it collected.* "1 completed · 2 defaulting" is
+off its sub-line — two figures about subscription lifecycle hanging off a tile
+about money that arrived.
+
+*Renew.* On the subscription record, beside Cancel. It is **activation again**:
+the same dialog, the same guards, the same write — the business simply arrives
+already chosen and cannot be changed, so the only thing left is to attach the
+invoice for the new term. A renewal is a **new term with its own id, its own
+invoice and its own schedule**, and it names the term it follows
+(`renewalOf`) — without that, a renewal and an unrelated second sale to the
+same customer are indistinguishable. **The term being renewed is not edited**:
+it keeps its status, its schedule, its payments and its history, which is the
+whole point of it being a record.
+
+*Due means what is actually in front of somebody.* Two rules, and both stop a
+figure claiming money that is not coming:
+
+- **A defaulting subscription contributes nothing.** Something on it already
+  failed; calling the row behind that failure "due in 30 days" says the money
+  is on its way when the last attempt at it did not clear.
+- **Only the installment in front.** Installments are paid in order, so the
+  second is not due while the first is unpaid.
+
+Due next 30 days went from **₹7,67,000 across 3** to **₹7,55,200 across 2**.
+The list's own "what is next" reads the same rule, so the tile and the row
+cannot say different things about one subscription — asserted, not assumed.
+
+**Temp data**
+`subscriptions.json` — `renewalOf` defaulted to null on every existing term.
+`vocabularies.json` — the `due_next` formula and caution rewritten to say what
+the figure now counts.
+
+**Backend needed**
+- `POST /admin/finance/subscriptions` accepts an optional `renewalOf`, and must
+  refuse one that follows another customer's term (`customer_mismatch`) or a
+  term that does not exist.
+- The due figure is a server-side derivation with the same two rules. A list
+  endpoint that returns every unpaid installment inside 30 days will not agree
+  with this panel.
+
+**Open decisions**
+none
+
+**Verified**
+`tsc -b`, eslint and `npm run build` clean; all ten suites pass by exit code.
+`check:finance` is at **258**.
+
+**A vacuous assertion caught by probing, and what it taught.** The first
+version of the due checks passed with the status guard *deleted*. The reason is
+real and worth writing down: a defaulting subscription always carries a
+failure, and the walk already stops at the first row that is not paid — so on
+this seed the two rules produce the same answer and neither assertion isolated
+either one. They are now pinned separately against shapes the seed cannot
+supply, and re-probed: removing the status guard fails exactly one assertion,
+and letting a failure stop blocking the row behind it fails exactly the other.
+
+An earlier draft of the same block also shipped a condition ending in `&& false`
+— an assertion that could never fail. It was caught before it landed.
+
+**A near-name collision, avoided this time.** The topbar chip was going to be
+`.fin-chip`, one letter from the existing `.fin-chips` filter row — the same
+shape of mistake that once put a hover state on every row in the module. It is
+`.fin-scope`, and the CSS says why.
+
+**Not checked:** nothing was clicked in a browser. Renew is asserted through
+the store's own guards and as rendered markup, not as a click path.
+
+---
+
+### A subscription is ACTIVATED against its invoice, not recorded with a typed total
+
+**Area:** `#/finance` — Activate a subscription; the subscription record screen
+**Files:** `src/admin/views/Finance/{types.ts,store.ts,SubModals.tsx,Subscriptions.tsx,SubscriptionDetail.tsx}`,
+`finance.css`, `src/content/finance/{subscriptions,vocabularies}.json`,
+`scripts/{check-finance-ledger.cjs,fn-smoke.tsx}`
+
+**What changed**
+
+**This module manages a live business subscription; it does not file a memory
+of one.** The dialog now reads *Activate a subscription* and its button says
+*Activate subscription*, because that write is what entitles a business to the
+plan. `recordSubscription` is `activateSubscription`; the event is
+`SUBSCRIPTION_ACTIVATED`; the row carries `activatedBy` and `activatedAt` where
+it carried `recordedAt`. It is still a fact rather than a claim — activation
+happens when it is done — so the premise the module was built on is intact.
+
+**The invoice carries the money now.** *Total paid* is gone as a field. You
+attach the invoice the subscription was raised on, and the dialog then shows
+**the invoice instance in full** — who it was raised for, its description,
+dates, taxable value, tax and grand total — because a person attaching the
+wrong invoice should be able to see that it is wrong, not just its number.
+
+The total is derived, never typed: the sales chain raises **one invoice per
+installment, each for the same amount** (FN-OD-14), so the subscription total
+is the attached invoice times the installment count. That is also why the
+schedule divides back exactly — by construction rather than by luck. Verified
+against the seed: SUB-0107 is ₹1,18,000 × 2 = ₹2,36,000.
+
+Four refusals the write did not have: the invoice must exist, must be **issued**
+(`invoice_not_open` — a cancelled invoice entitles nobody), must belong to **the
+same customer** (`customer_mismatch` — activating one customer's plan on
+another's invoice is how the wrong account gets entitled), and must not already
+be carried by another subscription (`duplicate_invoice`). The picker offers
+exactly the invoices that would be accepted, because offering one the write
+would refuse is a dialog lying to the person using it.
+
+Where the catalogue price and the attached invoice disagree, the dialog says so
+and **the invoice wins** — it is what the customer owes — but the mismatch is on
+screen rather than silently resolved.
+
+**Temp data**
+`subscriptions.json` — every row gains the invoice it was activated against
+(taken from its first billed installment), `activatedBy`, and `activatedAt` in
+place of `recordedAt`; `SUBSCRIPTION_RECORDED` events are now
+`SUBSCRIPTION_ACTIVATED`. `vocabularies.json` — the event type renamed with it.
+
+**Backend needed**
+- `POST /admin/finance/subscriptions` is now an **activation**, and takes an
+  `invoiceNumber` rather than a `totalPaise`. The four refusals above are the
+  contract. FN-T01 in BACKEND-INTEGRATION.md § Module 6.
+
+**Open decisions**
+FN-OD-14 (one supply, several invoices) is now load-bearing rather than
+cosmetic: it is the reason the total is the invoice times the count. If the
+chain ever raises one invoice for a whole multi-installment subscription, that
+arithmetic changes and this is the line to come back to.
+
+**Verified**
+`tsc -b`, eslint and `npm run build` clean; all ten suites pass by exit code.
+`check:finance` is at **235** — the write block was rebuilt around activation
+(every refusal plus its consequence), and three seed invariants added: every
+subscription names an invoice that exists, that invoice belongs to the same
+customer, and no two subscriptions were activated on the same one.
+
+**Probe-tested:** breaking one subscription's invoice link fails the first;
+pointing two subscriptions at one invoice fails the other two. Neither passes
+vacuously.
+
+**Not checked:** nothing was clicked in a browser. The invoice picker is
+asserted as rendered markup and through the store's own refusals, not as a
+click path.
+
+---
+
+### Subscriptions own the lifecycle; Users Management stops holding memberships
+
+**Area:** `#/finance` — Record a subscription; and Users Management throughout —
+the Membership tab, Assign membership, the renewal queue and three analytics
+blocks are gone
+**Files:** `src/admin/views/Finance/{store.ts,SubModals.tsx}`, `finance.css`,
+`src/admin/views/Users/*` (15 changed, 4 deleted), `src/admin/shell/modules.ts`,
+`src/content/users/{users,vocabularies,analytics,audit}.json`,
+`src/content/finance/{subscriptions,invoices}.json`,
+`scripts/{check-finance-ledger.cjs,fn-smoke.tsx,check-users-derivation.cjs,um-smoke.tsx}`,
+`BACKEND-INTEGRATION.md`, `README.md`,
+`OPERATION-2026-08-30-subscriptions-own-the-lifecycle.md`
+
+**What changed**
+
+Four changes that are one change wearing four hats. Finance/Subscriptions
+records what a customer bought and what they pay for it. Users Management had
+been recording the same fact as a "membership" — a term, a plan, a lifecycle, a
+renewal queue. **Two modules holding one fact is how they end up disagreeing**,
+so the subscription grew the two things it was missing and Users gave up the
+thing it should no longer own.
+
+*The customer is an account.* Recording a subscription picks from the registered
+user base — searchable by name, business, email or user id — instead of taking a
+typed name. `userId` is the link; the name is a denormalised copy kept so a
+record still reads correctly if the account is later renamed. A typed name was a
+customer the platform had never heard of and nothing else could join to.
+
+*The plan comes from the catalogue.* `AdminOpsService.plans()` is live, so the
+plan on a subscription is chosen from what the company actually sells rather
+than from a list copied into the dialog that drifts the first time pricing
+changes. **The billing cycle carries both the term and the price**, so the
+separate Term field is gone — it was two fields that had to agree with nothing
+making them — and the total prefills from the cycle. It stays editable, because
+a negotiated price is a real thing. Loading, failure and empty are all rendered:
+if the catalogue cannot be read the sale is still recordable by hand, because a
+sale that happened must not become unrecordable when an endpoint is down.
+
+*"Total agreed" is now "Total paid",* as asked. See the caveat below.
+
+*Membership left Users.* Deleted: `AssignMembership.tsx`, `RenewalQueue.tsx`,
+`LifecycleModal.tsx`, `assign.css`, `memberships.json`. `classify()` is now
+`active | deactivated` and takes one argument. Users keeps identity, profile,
+username rules, business facets, target areas, status, notes, tags and audit —
+which is a real job, and it survives intact.
+
+**What that costs, stated rather than tidied away**
+
+| Lost | Where the question goes now |
+| --- | --- |
+| **Active Member** classification | Whether someone is paying is a Finance question. |
+| **Renewal queue** | Finance's *Due in the next 30 days*, asked of the record that holds the money. |
+| **Assign / pause / suspend / cancel a term** | A subscription is recorded and cancelled in Finance. |
+| **Conversion and retention** | Finance carries MRR, ARPU and the fail-to-pay rate. |
+| **Cohort retention** | **Nowhere.** It was the only place the panel asked "do they stay", and nothing replaces it. |
+
+The **History tab is also gone** — a deviation from the literal instruction to
+keep it. It was 100% per-term content, so with membership removed there was
+nothing left to render and keeping it would have meant an empty tab. The
+account's history is the **Audit** tab, which survives whole.
+
+Users Analytics was restructured rather than left full of holes: seven blocks,
+with *Registered to a usable profile* replacing the membership funnel — the
+user-owned version of the same question — and a notice naming exactly which
+metrics moved to Finance, so a reader who came looking for churn is told where
+it went instead of finding a gap.
+
+**A defect this surfaced**
+
+Making the customer a real account revealed that **eight of nine subscriptions
+and six of seven invoice customers did not have one.** Some carried no `userId`;
+two pointed at a different company entirely — `IB-U-0975` is Verve Modular
+Kitchens, not Sandeep Kulkarni. It was invisible because Finance only ever
+displayed the name it stored and nothing ever resolved the id. Seven customers
+are now registered users, both Finance seeds point at them, and
+`check:finance` asserts every subscription resolves **to the user of that
+name** — not merely to some user.
+
+**Temp data**
+`src/content/users/memberships.json` **deleted**. `users.json` gained seven
+customers Finance had been billing without registering, and lost
+`activeMembershipId` from all 20 existing records. `vocabularies.json` lost the
+membership states, transitions, lifecycle actions and eight metrics; it **keeps
+the `MEMBERSHIP_*` event labels** so historical audit rows render as history
+rather than as raw keys. `analytics.json` lost the membership-keyed series.
+`audit.json` was **not** edited — it never held membership events; they lived on
+the term.
+
+**Backend needed**
+- `GET /admin/plans/` — **already live**, now read by Finance too.
+- The membership endpoints (UM-T02…T06, UM-T11, UM-T12) are **gone, not
+  deferred** — they must not be built. § Module 5 says so at the top and points
+  at § Module 6.
+- UM-T01, T07, T08, T09 and T10 keep their numbers. A number that moves is worse
+  than a gap in a sequence.
+
+**Open decisions**
+UM-OD-06 and UM-OD-12 retired — both described a membership. UM-OD-09 and
+UM-OD-10 stand.
+
+**Verified**
+`tsc -b`, eslint and `npm run build` clean. **All ten suites pass**, plus the
+other module's `check-team-nav`. `check:users` went from 248 assertion sites
+that could not run at all to **442 executed**; `check:users-render` to **164**;
+`check:finance` is at **232**.
+
+**A correction to my own verification.** The loop I had been checking suites
+with grepped for "N FAILED" — which a suite that *throws* never prints. It
+reported `check:finance` as passing while it was crashing on the changed
+`recordSubscription` signature. Replaced with a gate that reads **exit codes**,
+and everything re-run under it.
+
+**Three defects the rewritten Users suite caught, two of them mine.** The seven
+customers I registered carried `positioning: ["value"]` — a key the vocabulary
+had dropped, refused on save, rendered on the record as its own raw key — and
+had no audit row at all, so an account that demonstrably registered opened its
+timeline saying nothing had ever happened. I also numbered their audit ids into
+a range already in use, which the uniqueness check caught. The third was
+pre-existing and is fixed in `store.ts`: `validateFacets` read a `targetAreas`
+that was not an array as "no areas", passed it, and `updateProfile` stored it
+raw — after which the directory threw `targetAreas.some is not a function` on
+the next read. It now refuses the shape, which is what that function exists to
+do.
+
+Each of those had been **quarantined by name** in the suite rather than papered
+over, so fixing them turned the quarantine red and forced its deletion. All
+three are now asserted as positive rules. One assertion could not survive
+honestly: the empty-timeline branch is no longer reachable from the seed, so it
+is explicitly **not** asserted rather than asserted against a fixture that would
+have to be broken to produce it.
+
+**Two things worth arguing with**
+
+1. **"Total paid" is not what that field holds.** It is the agreed total, split
+   into installments that may still be `due` or `fail_to_pay`. A subscription
+   with ₹3,24,500 outstanding now shows it under a label saying "paid". The help
+   text underneath keeps the precise wording, but the label overstates. "Total
+   sold" would be accurate.
+2. The removal is **irreversible in this tree** — nothing is committed.
+
+---
+
+### Subscriptions money strip: three tiles, and Fail to pay ends it
+
+**Area:** `#/finance` — the money strip on Subscriptions
+**Files:** `src/admin/views/Finance/Subscriptions.tsx`, `finance.css`,
+`scripts/fn-smoke.tsx`
+
+**What changed**
+
+Four tiles became three, in a different order:
+
+```
+was   Collected · Fail to pay · Due in 30 days · Active subscriptions
+now   Collected + active · Due in 30 days · Fail to pay
+```
+
+**Active subscriptions moved into the Collected tile** as a second figure, and
+**Fail to pay moved to the end** — it is the one tile a person acts on, so it
+closes the strip rather than interrupting it two cells in.
+
+The combined tile keeps its two numbers **visibly different kinds**, on their
+own baseline and weight, because they are not the same sort of figure and the
+tile must not imply otherwise. Collected is a period sum — everything that came
+in during August, including money from subscriptions that have since completed,
+defaulted or been refunded. Active is a level read at this moment. Run them
+together as one headline and the tile quietly claims those four subscriptions
+produced that figure, which is not true of any month. The count carries its own
+i button saying exactly that, alongside what it counts and what it excludes.
+
+**Temp data**
+none
+
+**Backend needed**
+none
+
+**Open decisions**
+none
+
+**Verified**
+`tsc -b`, eslint and `npm run build` clean; all ten suites pass.
+`check:finance-render` gained three assertions: the strip's ORDER (pinned by
+position — order is invisible to tsc and to every other check here), that the
+active count renders as a second figure rather than part of the headline, and
+that its caution is reachable from it.
+
+**Probe-tested:** reversing the expected order in the assertion makes it fail,
+so it is not passing vacuously. One assertion had to be **weakened honestly** —
+the i button's text lives behind a click a static render cannot make, so what is
+asserted is that the caution is reachable, not that it is on screen.
+
+**Not checked:** nothing was clicked in a browser, so the two-figure tile's
+layout at narrow widths is unverified.
+
+---
+
+### Finance becomes five sidebar rows; the in-page tabs go
+
+**Area:** the sidebar — the **Finance** group; five routes `#/finance`,
+`#/finance-salaries`, `#/finance-transactions`, `#/finance-refunds`,
+`#/finance-analytics`
+**Files:** `src/admin/shell/modules.ts`, `src/admin/auth/session.ts`,
+`src/admin/views/registry.tsx`, `src/admin/views/Finance/*` (index, Frame, the
+five faces, four record screens, `finance.css`),
+`scripts/{check-finance-nav.cjs,fn-smoke.tsx}`, `package.json`,
+`BACKEND-INTEGRATION.md`
+
+**What changed**
+
+**Supersedes the entry below it.** That change made the five sections the
+panel's inline tabs. They are now **five sidebar rows** instead, and the page
+carries no navigation of its own at all:
+
+```
+Finance
+  Subscriptions        #/finance                · records under /SUB-…
+  Salaries A/C         #/finance-salaries       · /SAL-AC-… /RUN-… /SLIP-…
+  Other Transaction    #/finance-transactions   · /TXN-…
+  Refunds              #/finance-refunds        · /RF-…
+  Analytics            #/finance-analytics
+```
+
+A single row labelled **Finance** inside a group labelled **Finance** said
+nothing about what was in it and buried the five sections one click deep behind
+a tab strip you could not see from the sidebar. The group now names its own
+contents.
+
+They are separate **module keys**, not one key with five faces, because the
+grant genuinely differs: **payroll is the most sensitive record in the panel and
+has to be withholdable without also withholding the subscription ledger.** Every
+write affordance now asks about its own section — `can("finance-salaries",
+"edit")` — rather than about Finance as a whole. Same argument that made
+`reports` its own key rather than a face of `work`.
+
+All five resolve to the **same component**, which reads its own route to know
+which section it is showing. Finance is still one module over one store; the
+keys exist so the sidebar can name it and the server can grant it in parts. A
+record lives under its own section's route, so Back lands on the list it came
+from and the sidebar keeps the right row lit.
+
+`?view=` is gone, `ViewTabs` is gone, `.fin-tabbar` is gone. The switch *within*
+a section stays and stays segmented — Transactions ǀ Tags and Overview ǀ KPI are
+two views of one record type, not two sections.
+
+**Temp data**
+none
+
+**Backend needed**
+- **Five** `Module` rows, not one: `finance`, `finance-salaries`,
+  `finance-transactions`, `finance-refunds`, `finance-analytics`, all group
+  label **Finance**. Each leaves `PROTO_MODULES` in the commit that lands its
+  row. Detail in BACKEND-INTEGRATION.md § Module 6.
+
+**Open decisions**
+The sidebar shows no queue badge on any Finance row. `Q_OF` reads the
+prototype's own `derive.badges()`, which knows nothing about this module, so the
+count of subscriptions with a failed installment — previously a tab badge — is
+not surfaced in the nav. It is still the first tile on Subscriptions.
+
+**Verified**
+`tsc -b`, eslint and `npm run build` clean; all ten suites pass, including the
+other module's `check-team-nav`. New **`npm run check:finance-nav`** (17
+assertions, wired into `npm run check`) asserts the sidebar composition, which
+is otherwise entirely silent failure: a key in `PROTO_ROWS` but not
+`PROTO_MODULES` never renders and nothing errors, a mismatched group label files
+a row in a section of one, and a key the server also sends renders twice. It
+also asserts a real server row **replaces** the proto one rather than doubling
+it. `check:finance-render` walks all five new routes.
+
+**Probe-tested, not assumed:** removing `finance-refunds` from `PROTO_MODULES`
+makes the nav check fail on three assertions, and pointing `/finance-salaries`
+back at `/finance` fails five render assertions — so neither suite passes
+vacuously and the routes genuinely resolve to their own faces.
+
+**Not checked:** nothing was clicked in a browser. The sidebar is asserted as
+composed data, not as a rendered, clickable nav.
+
+---
+
+### Finance: the sub-sections become the panel's inline tabs
+
+**Area:** `#/finance` — the five sub-sections (Subscriptions · Salaries A/C ·
+Other Transaction · Refunds · Analytics)
+**Files:** `src/admin/views/Finance/{Frame,Transactions,Analytics}.tsx`,
+`finance.css`, `scripts/fn-smoke.tsx`
+
+**What changed**
+
+The five sub-sections rendered as `.fin-views` — a bespoke full-bleed band with
+its own icons, sitting above the page rather than in it. It read as a separate
+strip bolted on top. They are now the panel's ordinary inline tabs: the same
+`Tabs` component from `ui/`, the same metrics, the same underline every other
+tab strip in the panel already uses. Finance has no more claim to a navigation
+idiom of its own than any other module, and ~20 lines of duplicated tab CSS go
+with it.
+
+Two faces already carried a tab strip of their own — Transactions ǀ Tags and
+Overview ǀ KPI. Two identical underlined strips stacked on one page say the two
+levels are peers, and they are not, so those became a **segmented sub-switch**
+(`SubTabs`) that reads as subordinate at a glance. Record screens keep plain
+`Tabs`: they carry no sub-section nav, so nothing collides there.
+
+Also fixed while in the file: the print rule still hid `.fin-views` (gone) and
+`.fin-tabs` (never existed), so a printed payslip or receipt would have carried
+the navigation. There were two print blocks that could drift apart; there is
+now one, naming classes that exist.
+
+**Temp data**
+none
+
+**Backend needed**
+none
+
+**Open decisions**
+none — the icons went with the band. The shared `Tabs` takes no icon, and
+adding one to a primitive six modules render was not worth a decoration.
+
+**Verified**
+`tsc -b`, eslint, `npm run build` and all nine suites pass. `check:finance-render`
+grew to **285 checks**: every face now asserts that the strip renders as the
+shared `.tabs` and that all five sub-sections are named in it, and the two
+sub-switches assert they are segmented rather than a second tab strip. Both new
+assertions were **probe-tested by breaking the needle** — each fails on all
+seven faces when the expected string is altered, so neither passes vacuously.
+**Not checked:** nothing was clicked in a browser; the tabs are asserted as
+rendered markup, not as a working click path.
+
+---
+
+### Attendance, Work and Reports render — a work clock that is not the login
+
+**Area:** `#/attendance`, `#/work`, `#/reports` — nine faces across three routes
+**Files:** `src/content/team/{members,attendance,work,plans,reports,vocabularies}.json`,
+`src/admin/views/Team/{store.ts,bits.tsx,Attendance.tsx,Work.tsx,Reports.tsx,team.css}`,
+`src/admin/views/registry.tsx`, `scripts/check-team-derivation.cjs`,
+`BACKEND-INTEGRATION.md`, `README.md`
+
+**What changed**
+
+The operational half of the Team module renders. **Attendance** is a work clock
+opened by *Start day* and closed by *End day* — deliberately **not** the auth
+session, because somebody checking one number at 23:40 has logged in and has not
+started a shift, and a token refresh advances "last active" whether or not
+anybody is at the keyboard. **Work** is one table for tasks, milestones and
+targets, discriminated by `kind` with `parentId` as the containment, because the
+relationship between the three is containment and that is a self-reference, not
+a third system. **Reports** carries the senior's day and the member's own two
+forms, where a plan line creates or links a work item and ticking that line in
+the EOD completes it — so "what they said they would do" and "what they did" is
+a diff rather than two paragraphs somebody compares by eye.
+
+**Three things are derived and never stored,** each because storing it needs a
+sweep and this backend has no queue: `absent` (no row *and* the day is over —
+at 10am a member who is not in yet is Not started, which is a different claim),
+`unclosed` (open past the member's own auto-close — it counts towards **no**
+total, and nothing auto-closes it, because an auto-closed day is a number the
+system invented and an unclosed one is a question), and `delayed` (`dueDate <
+today` on a non-terminal item — a cancelled item that is past due is **not**
+overdue, which is the single easiest part of this to get wrong).
+
+**`isLate` is the one thing computed at open and stored,** against that
+member's own `dayStartsAt`. The seed has a member whose agreed start is 10:00
+and who clocks in at 10:06 *later than the member who is marked late* — so any
+implementation reading a company-wide constant fails the suite rather than
+looking fine.
+
+**Scope is the API's job.** `TM-OD-01` answered: self always, `team` from
+`reportsTo` one level deep, `all` behind a new verb. Every face states the scope
+it is showing, because a screen that silently widens from "your reports" to
+"everyone" when a grant changes is one nobody can reason about. **While the
+three keys sit in `PROTO_MODULES` every session resolves to `all`** — that is
+the proto hole, not this derivation, and it closes with the keys.
+
+All CSS is in a new `Team/team.css` with the `tm-` prefix; **`admin-theme.css`
+was not touched**, deliberately, because Finance is being edited concurrently
+and that file is the likeliest conflict in the repo. No hex appears in it — the
+six existing tones carry every state.
+
+**Temp data**
+Six new files under `src/content/team/`, all endpoint-shaped, all `$comment`'d.
+`members.json` → placeholder records, and the one that matters: it stands in for
+the **team-wide** member read that does not exist, plus the employment block
+(`reportsTo`, `dayStartsAt`, `expectedHoursPerDay`) that has no column on the
+server. `attendance.json`, `work.json`, `plans.json`, `reports.json` →
+placeholder records. `vocabularies.json` → **static copy**: labels, tones, the
+transition table and the metric definitions, permanently.
+Two absences in the seed are the record, not an omission: a member with no
+attendance row (absence is the lack of a row, never a row saying "absent") and
+two members with no plan.
+
+**Backend needed**
+- `GET /admin/team/members` → **the blocker.** Every member, not only those the
+  signed-in admin created, with the employment block. Replaces `members.json`.
+- `GET /admin/team/attendance?date=` · `…/{memberId}?from&to` → replaces
+  `attendance.json`. `POST …/attendance/{open,break,resume,close}` — **idempotent
+  on (member, businessDate)**; closing must close a running break in the same
+  instant.
+- `GET/POST /admin/team/work`, `POST …/{id}/status` → replaces `work.json`.
+  Must refuse `completed → planned`, and demand a reason on block, cancel and
+  reopen.
+- `GET/POST /admin/team/plans/{date}` · `…/reports/{date}` ·
+  `POST …/reports/{id}/acknowledge` → replaces `plans.json` / `reports.json`.
+  **Must reject an hours field if one is ever sent.**
+- Scoping happens server-side on every one of those. A client filter over an
+  unscoped payload is the same bug in a different place.
+- `Module` + `ModuleAction` rows for `attendance`, `work`, `reports`, each with
+  an `all` verb; every key leaves `PROTO_MODULES` in the commit that lands its
+  rows.
+
+**Open decisions**
+TM-OD-01 and TM-OD-14 are answered and recorded in §13 of the operation
+document. **TM-OD-14 landed somewhere better than either option:** slips are
+generated, and Finance already generates them — `SalaryAccount` / `Payslip` /
+`SalaryRun` exist in that module with components frozen at issue and `memberId`
+joining the live Team endpoint. Team reads them; it does not build a second
+generator. TM-AD-11 is superseded. Still open and assumed: TM-OD-03 (hours per
+member — the seed already varies them), TM-OD-10 (EOD never blocks), TM-OD-11
+(no computed score — the table sorts, it does not rank), TM-OD-13 (no leave or
+holidays; "working day" means "not a weekend" and the week grid says so).
+
+**Verified**
+`npx tsc -b` clean · `eslint` clean on all six new files · `vite build` clean
+(237 modules) · new `node scripts/check-team-derivation.cjs` — **63 assertions,
+all passing**, calling the shipped store rather than a reimplementation of it:
+the per-member late rule (including the row that would pass with a constant and
+fails without one), the unclosed day counting as nothing, terminal items never
+being overdue, derived milestone and target progress, one-level scope that is
+not transitive, the founder excluded from the no-plan count, an EOD not being
+outstanding at 14:20, idempotent day-open, close-closes-the-break, every refused
+transition, a plan line linking instead of forking, and an EOD tick completing
+the item. `check-team-nav.cjs` still green at 17, and all nine offline
+`check:*` suites pass, Finance's two included.
+**Not checked:** the screens have not been opened in a browser — this is
+verified through the store and a production build, not visually. Neither new
+check is wired into `npm run check`, because `package.json` is being edited
+concurrently by the Finance work; run them directly, or add
+`"check:team": "node scripts/check-team-derivation.cjs"` and
+`"check:team-nav": "node scripts/check-team-nav.cjs"` once that settles.
+
+---
+
+## 2026-08-30
+
+### Team becomes a sidebar group of five, and Roles moves out of Settings
+
+**Area:** the sidebar — a new **Team** group; `#/team`, `#/roles`, and three new
+routes `#/attendance`, `#/work`, `#/reports`
+**Files:** `src/admin/shell/modules.ts`, `src/admin/auth/session.ts`,
+`scripts/check-team-nav.cjs`, `scripts/team-nav-session-stub.ts`,
+`OPERATION-2026-08-30-team-module.md`, `BACKEND-INTEGRATION.md`
+
+**What changed**
+
+Phase A of the Team Module: the navigation only. **Team is now a top-level group
+holding Members · Roles · Attendance · Work · Reports**, sitting above Finance and
+well above Settings. `Members` and `Roles` were in Settings, which was right while
+Team meant "add a staff account and grant it a role" — configuration, done rarely.
+It stops being right the moment a clock, a day's work and a day's reports sit beside
+them, because those are opened every day and Settings is the group nobody opens
+daily. This is the same argument that moved Users Management out of Settings.
+
+`team` and `roles` are **server** rows carrying `groupLabel: "Settings"`, so they are
+re-filed by a new `GROUP_OVERRIDE` map in `modules.ts`. That map is a **stand-in, not
+the design** — `groupLabel` is the server's field and the fix is a Module-row update,
+at which point the map empties and nothing about the sidebar changes.
+
+The three new keys are proto rows in the established sense: no server row, no views,
+no seed data. Their routes resolve to ViewHost's existing "coming soon" state, which
+is the honest rendering of a nav item whose surface is not built. **`team` and `roles`
+are deliberately NOT in `PROTO_MODULES`** — both hold real Module rows and real issued
+grants, so adding either would hand member CRUD and role assignment to every
+signed-in account.
+
+`reports` is its own module key rather than a face of `work`, because reading
+everybody's daily plans and EOD reports is a manager's grant and must be holdable
+without the right to create or reassign anybody's work.
+
+No view was added, no endpoint was called, no existing screen was touched.
+
+**Temp data**
+`none` — Phase A adds no records. The three new modules will read
+`src/content/team/*.json` when their surfaces are built; nothing is seeded yet.
+
+**Backend needed**
+- `Module` + `ModuleAction` rows for `attendance`, `work` and `reports` → each key
+  leaves `PROTO_MODULES` in the commit that lands its rows, as `business-enquiries`
+  did with migration 0024.
+- A `groupLabel` change to `"Team"` on the existing `team` and `roles` Module rows →
+  retires `GROUP_OVERRIDE` in `shell/modules.ts`.
+- `GET /admin/users/` returning **every** member, not only those the signed-in admin
+  created → blocks Phase B and every team-wide screen after it.
+
+**Open decisions**
+TM-OD-01 answered: a senior sees **their own reports only**, scoped from
+`TeamProfile.reportsTo`, one level deep, with a new `all` verb for company-wide
+visibility — not a scope axis on the grant. TM-OD-14 answered: slips are
+**generated**, and Finance already generates them (`SalaryAccount` / `Payslip` /
+`SalaryRun`), so Team reads them by `memberId` rather than building a second
+generator. Both are recorded in full in §13 of the operation document, which
+supersedes TM-AD-11 and revises TM-BR-02. Five approval items remain open and
+**Phase B does not start without them**.
+
+**Verified**
+`npx tsc -b` clean · `eslint` clean on both changed files · new
+`node scripts/check-team-nav.cjs` — 17 assertions, all passing: group order, Team's
+membership, Settings keeping only Audit, no key rendered twice, all three icons
+resolving to real glyphs rather than the `doc` fallback, the proto gate holding for
+the three new keys and **not** holding for `team`/`roles`, a real server row not
+doubling up the proto one, and `getGroupOf()` agreeing with `getModules()`. The nine
+offline `npm run check:*` suites all pass, Finance's two included.
+**Not checked:** the sidebar has not been rendered in a browser — this is a
+composition change verified against `getModules()`, not a visual one. `check:enquiries`
+could not run: it needs a live backend at `localhost:8000` and one was not running.
+The new check is not yet wired into `npm run check` because `package.json` is being
+edited concurrently by the Finance work; run it directly, or add
+`"check:team-nav": "node scripts/check-team-nav.cjs"` once that settles.
+
+---
+
+## 2026-08-30
+
+### Finance rebuilt around four record types: Subscriptions, Salaries A/C, Other Transaction, Refunds — plus Analytics
+
+**Area:** `#/finance` — five tabs replacing five faces; five record screens
+(subscription · salary account · payslip · transaction · refund) and 20 dialogs
+**Files:** `src/admin/views/Finance/{types,store}.ts`,
+`{index,Frame,bits,dialog,InfoTip}.tsx`,
+`{Subscriptions,SubscriptionDetail,SubModals}.tsx`,
+`{Salaries,SalaryDetail,Slip,SalaryModals}.tsx`,
+`{Transactions,TxnDetail,TxnModals}.tsx`,
+`{Refunds,RefundDetail,RefundModals}.tsx`, `Analytics.tsx`, `finance.css`,
+`src/admin/views/{charts.tsx,charts.css}` (moved out of Users, now shared),
+`src/content/finance/{module,subscriptions,salaries,transactions,refunds,vocabularies}.json`,
+`scripts/{check-finance-ledger.cjs,fn-smoke.tsx}`,
+`src/proto/v-2.2.0.0/{BACKEND-INTEGRATION.md,OPERATION-2026-08-30-finance-redesign.md}`
+
+**What changed**
+
+The module was organised by accounting concept — Payments · Spend ·
+Reconciliation · Refunds · Revenue. It is now organised by **what is being
+recorded**, because that is how the business actually thinks about its money.
+Four tabs, four record types, and a fifth that is only the other four read
+back.
+
+*Subscriptions.* A sale that happened, from **sales** or from the **website**,
+paid in **installments** — and the installment, not the subscription, is the
+unit that gets paid. The whole schedule is created at once with a due date on
+every row, because a schedule invented one row at a time is not a schedule; the
+dialog draws it from the store's own generator before anything is committed.
+The new status is **Fail to pay**, and it is a *fact*: a gateway decline, a
+cancelled mandate, or a due date that has demonstrably passed. Evidence is
+mandatory, the reason is a closed list, and the store **refuses** an `overdue`
+failure on an installment that is not yet due.
+
+*Salaries A/C.* One account per team member, joined to the live Team record on
+`memberId`, with typed earnings and deductions — never derived from a role,
+because a salary is a contract with a person. Monthly runs issue one slip per
+active account, and **a slip freezes its own components**, so a raise next
+month cannot rewrite last month's slip. The payslip is a real document —
+company block, employee block, paid days, earnings against deductions, net pay
+in words — printed rather than generated, because the browser's Save as PDF is
+the export and a PDF library would be a hundred kilobytes for two documents.
+
+*Other Transaction.* Company money out and in under a tag **you create**. That
+reverses the old closed-list rule, as asked. What is *not* free is the tag's
+`kind` — it decides where the money lands in Analytics — and a tag is
+deactivated, never deleted, because deleting one silently re-buckets every row
+that used it. Money in is still restricted to three non-revenue kinds: if
+anyone could hand-key a credit, anyone could fabricate revenue.
+
+*Refunds.* Now supports raising one **by hand**, with no ledger row behind it —
+a duplicate transfer, an overpayment, an order taken off-platform. A manual
+refund carries **no policy check at all** rather than an empty one, because an
+empty check reads as a passed check. Approval still moves no money: the refund
+is `paid` only when someone records the actual transfer, and the gap between
+approved and sent is now its own figure on the Overview.
+
+*Analytics.* An **Overview** of all four record types and a separate **KPI**
+tab, thirteen decision metrics in four groups. Every figure carries its formula
+and its caution behind an i button, and a metric that cannot be computed prints
+its reason instead of a number — runway returns null and says why. Charts come
+from the panel's own kit, now shared rather than living inside Users.
+
+**Removed:** the verification vocabulary is gone for good; drafts and recurring
+rules are gone (the last objects describing money that had not moved — the open
+question in the entry below, now answered); Reconciliation is no longer a tab
+but a block on the Overview, with nothing deleted from the store.
+
+**Temp data**
+`src/content/finance/module.json` → static config: `asOf` (**the clock the whole
+module runs on**), the period, the accounts. `subscriptions.json` → 9
+subscriptions covering every installment and subscription status.
+`salaries.json` → 7 accounts and 3 runs, one of them open because the clock is
+the 25th. `transactions.json` → 10 tags (3 custom, 1 deactivated) and 18 rows
+including a reversed pair. `refunds.json` → 6 refunds across every state, four
+of them manual. `vocabularies.json` → static copy: 5 record types, 10 metrics,
+13 KPIs, 32 event types, 15 open decisions. `ledger.json`, `spend.json` and
+`revenue.json` are **deleted** — superseded, and Analytics now derives months
+from the records themselves so no second history file can disagree with a list.
+
+**Backend needed**
+- `GET /admin/finance/context` → the clock, period and accounts (`module.json`)
+- `GET /admin/finance/subscriptions` · `…/{id}` → the schedule; Σ installments
+  must equal the total, enforced server-side
+- `GET /admin/finance/salary-accounts` · `…/salary-runs` → accounts joined to
+  `AdminUserRow.id`; slips carry their own frozen components
+- `GET /admin/finance/transactions` · `…/tags`, `GET /admin/finance/refunds`,
+  `GET /admin/finance/vocabularies`
+- 17 writes, FN-T01…T17, each with its sequence and its exact refusal — the
+  full table is in BACKEND-INTEGRATION.md § Module 6
+- `GET /admin/invoices/` — **already live**; Finance reads and never writes it
+
+**Open decisions**
+FN-AD-01…05 closed. FN-OD-01 (cash view, no accrual), 02 (bank matching is
+simulated), 04 (who approves what), 05 (payroll scope — no statutory filing, no
+PF challans, no gratuity, TDS entered not derived), **06 (new — salary cost is
+net paid, employer PF and gratuity are not modelled, so cost per head
+understates true cost)**, 07 (runway not shown), 08 (tax is a summary, not a
+return), 12 (net, never profit), 14 (one supply, several invoices), **15 (new —
+fail to pay is recorded and surfaced, not chased; retry, dunning and suspension
+belong to other modules)**. Every one renders on the screen it affects.
+
+**Verified**
+`npx tsc -b` clean · `eslint src/admin/views/Finance src/admin/views/charts.tsx
+--max-warnings=0` clean · `npm run build` clean · `npm run check:finance`
+**227 assertions pass** · `npm run check:finance-render` renders every face,
+record screen and dialog. Audited mechanically: no literal hex, rgb or colour
+name anywhere in the module, and every `.fin-*` class used in TSX has CSS
+behind it.
+
+**Three real defects the check suite caught, fixed at the source rather than
+asserted around:**
+1. `setLop` pro-rated from the salary **account**, not the slip — so a raise
+   granted after a run opened would silently rewrite a frozen slip, breaking the
+   one rule the payslip exists to keep. Slips now carry `baseEarnings`, frozen
+   at open, and loss of pay is computed from those. Setting it twice is now
+   idempotent, and the suite asserts both.
+2. `setLop` assumed a 30-day month while every seeded slip used the real one.
+   Loss of pay is now a fraction of the actual calendar month.
+3. `syncSubStatus` marked a subscription **completed** as soon as every
+   installment was paid. A twelve-month plan settled up front on day one is paid
+   in full with eleven months left to serve — calling that completed drops a
+   live customer out of MRR the moment they pay. `completed` now requires the
+   term served, which is what the vocabulary always said.
+
+Also fixed: a dangling invoice reference (`IB-INV-2026-00071`, named by both a
+subscription and a refund but never present), three salary event types missing
+from the vocabulary that rendered with no label, and `actor()` reading session
+fields that do not exist on `MePermissions`.
+
+**Not checked:** nothing was clicked in a browser this pass. The SSR smoke
+renders every surface but exercises no real click path, and the Team join is
+against a live endpoint this checkout cannot reach — `memberId` is asserted for
+shape, not for existence.
+
+---
+
+### Finance records facts: the whole verification lifecycle is gone
+
+**Area:** `#/finance` — every face, both payment record screens, the dialog set
+**Files:** `src/content/finance/{ledger,vocabularies,refunds,invoices}.json`,
+`src/admin/views/Finance/{store.ts,Modals.tsx,index.tsx,Payments.tsx,
+PaymentDetail.tsx,Spend.tsx,Reconciliation.tsx,Refunds.tsx,Revenue.tsx}`,
+`finance.css`, `scripts/check-finance-ledger.cjs`, `scripts/fn-smoke.tsx`,
+`BACKEND-INTEGRATION.md`
+
+**What changed**
+
+**Supersedes the verification half of the entry below.** That build treated a
+payment as a *claim* until Finance approved it against a statement: states
+`submitted` / `held` / `rejected`, an approve-hold-reject dialog, an "Awaiting
+verification" money tile, a `verifiedBy` / `verifiedAt` pair on every row, and
+a receipt withheld until approval. **A ledger row is now a fact.** Money is
+written down because it moved; nothing is written down on the strength of
+somebody's assertion that it will.
+
+Recording a payment is one write that settles the invoice, drops the deal
+balance, **issues the receipt** and counts as collected — there is no later
+step that could change the answer, so there is no window in which two screens
+disagree. Six states remain (`recorded` · `unmatched` · `reversed` ·
+`returned` · `refund_requested` · `refunded`) and **none of them means
+"pending a decision"**. `verifyPayment` and `holdUnallocated` no longer exist,
+and the check suite asserts they are not exported — the premise is enforced,
+not merely documented.
+
+What survives is the one judgement that was never verification: an imported
+credit matching no invoice is **unallocated** — real money whose *owner* is
+unknown, not money whose *arrival* is in doubt — and a person decides whose it
+is. "Match" is now **Allocate** throughout, for that reason. Statement import
+stops being a second opinion: a line matching a recorded row just links the
+two and appends MATCHED, changing nothing else, because the statement proves
+the ledger is **complete**, not that a row is **true**.
+
+Refund approval stays a four-eyes control. It is not a verification step —
+it authorises money *leaving*, which no ledger row can assert on its own.
+
+Contract renumbered contiguously to **FN-T01…T09** (verify and hold are gone);
+`422 not_on_statement` is retired; a new invariant #10 forbids any future
+endpoint from reintroducing a "recorded but not yet believed" state.
+
+**Temp data**
+`src/content/finance/ledger.json` → rewritten: `state` is one of the six above,
+`recordedBy` / `recordedAt` replace the logged/verified pairs, and the rejected
+row PAY-4397 is deleted (it recorded something that never happened). PAY-4401
+is `recorded` with its receipt and `bankLineId: null`, so the import demo still
+has a line to link. `invoices.json` → `IB-INV-2026-00091` is now `paid`, which
+its recorded payment requires. `vocabularies.json` → static copy: six states,
+`rejectReasons` deleted, `RECORDED` replaces `LOGGED`, SUBMITTED / VERIFIED /
+HELD / REJECTED deleted, the `awaiting` metric deleted, FN-AD-01 retitled
+"Recorded is what happened". All placeholder records except the vocabulary.
+
+**Backend needed**
+- `POST /admin/finance/payments` → **FN-T01 · Record payment.** Settles the
+  invoice and issues the receipt in the same transaction. Replaces the former
+  FN-T01 (log) + FN-T02 (verify) pair.
+- `POST /admin/finance/payments/{id}/allocate` → **FN-T02**, from `unmatched`
+  only, amount-exact. Replaces the former `…/match` + `…/hold`.
+- `POST /admin/finance/payments/{id}/{approve,hold,reject}` → **do not build.**
+- Everything else in Module 6's table is unchanged apart from renumbering.
+
+**Open decisions**
+FN-OD-02 (import is simulated, no live feed) is unchanged and still on screen.
+Spend **drafts** — a recurring rule's output, and TXN-0912 — are the remaining
+"has not happened yet" objects. They are deliberately kept: a draft is a stated
+intent to pay, excluded from every total and labelled as intent, not a claim
+that money moved. Say the word and they go too.
+
+**Verified**
+`npx tsc -b` clean · `eslint src/admin/views/Finance --max-warnings=0` clean ·
+`npm run check:finance` all pass (the suite gained assertions that no row sits
+in a decision-pending state, that a recorded payment settles its invoice on the
+spot, and that verify/hold are unexported) · `npm run check:finance-render` all
+surfaces render · `npm run build` clean. **Not checked:** nothing was clicked in
+a browser this pass; the SSR smoke renders every face, record and dialog but
+does not exercise a real click path.
+
+---
+
+### Finance CSS: `.fn` collided with the theme's funnel segment
+
+**Area:** `#/finance` — every face
+**Files:** `src/admin/views/Finance/*.tsx`, `finance.css`
+
+**What changed**
+
+The module namespaced itself `.fn`, which `admin-theme.css` already owns for
+funnel segments — including `.fn:hover { background: var(--bg-hover) }`. Every
+Finance screen is inside the module root, so hovering **any** table row tinted
+the entire page instead of the row. Renamed the namespace to `.fin` / `.fin-*`
+(474 references, 13 files), matched on `\bfn-` so `store.ts`'s `(fn: () =>
+void)` callback parameters were left alone. The header comment in `finance.css`
+records why the short name is unavailable, so nobody reclaims it.
+
+**Temp data**
+none
+
+**Backend needed**
+none
+
+**Open decisions**
+none
+
+**Verified**
+`tsc -b`, eslint, `npm run build` and both Finance check suites pass. The
+collision itself was found from a screenshot, not from a check — no test
+asserts that a module's namespace is unclaimed, and none does now either.
+
+---
+
+### Finance — the payment ledger Modules 1–3 kept deferring, plus spend, reconciliation, refunds and revenue
+
+**Area:** `#/finance` — a new sidebar group **Finance**; five faces
+(Payments · Spend · Reconciliation · Refunds · Revenue), three record screens
+and fifteen dialogs
+**Files:** `src/content/finance/{ledger,invoices,spend,bank,refunds,revenue,vocabularies}.json`,
+`src/admin/views/Finance/{index,store,Frame,bits,InfoTip,Modals,Payments,PaymentDetail,Spend,
+TransactionDetail,Reconciliation,Refunds,Revenue}.tsx`, `finance.css`,
+`admin/shell/modules.ts`, `admin/auth/session.ts`, `admin/views/registry.tsx`,
+`scripts/check-finance-ledger.cjs`, `scripts/fn-smoke.tsx`,
+`scripts/build-fn-smoke.cjs`, `package.json`, `BACKEND-INTEGRATION.md`
+
+**What changed**
+
+Every rupee received now has a screen, whatever door it came through. **Three
+paths, one append-only ledger**: a salesperson logs a payment on the deal, a
+business self-reports a UTR, or a bank statement is imported — and the module
+exists so those three cannot become three different answers to "did it land?".
+
+*Payments.* The ledger with a money strip that separates what arrived
+(verified) from what was merely claimed (awaiting), what nobody has allocated,
+what Invoice says is still owed, and what was reversed. Verify a submission
+against the bank — **approve, hold or reject**, where hold is the honest third
+button because most submissions arrive before the bank feed does. Match
+unallocated money to an invoice (amount-exact, 1:1), hold it as a liability,
+or return it. **Reverse** (Super Admin) appends a counter-entry, leaves the
+original untouched and cancels the invoice it settled — the one action that
+reaches back into Module 3. The record carries the Deal → Quotation → Invoice
+→ Payment chain, the frozen receipt document, and an append-only history. There
+is **no Edit button at any role**: wrong amount, wrong invoice and wrong
+customer are all corrected by reversing and re-entering.
+
+*Spend.* Money out is a different object: a category and a bill, not a customer
+and a receipt. Every row carries a tag from a closed list — **there is no
+"uncategorised" and no "Other" with a text box**, because the fixed /
+reinvestment split behind the profit line and CAC is computed from these tags.
+Drafts (a recurring rule creates one, never a posting) sit apart from postings.
+Categories and budgets warn at 90% and **never block** — rent still has to be
+paid in a month the budget was set too low. Manual money IN is restricted to
+interest, own-transfer and vendor refund, all flagged non-revenue.
+
+*Reconciliation.* Bank statement against ledger, the only screen that can prove
+the ledger is complete. Auto-match on **amount + reference only**; name
+similarity is shown to help a person and never decides. Exceptions are matched,
+written off, or carried forward explicitly with a reason — and **the Close
+period button does not proceed while one is open**.
+
+*Refunds.* A real object rather than a policy page: request → Super-Admin
+decision, one of very few genuine four-eyes checks in the panel. The policy
+check **frames** the approval rather than blocking it, so a genuine duplicate
+can be processed instead of being issued outside the system. Approval appends a
+REFUND counter-entry and **moves no money**.
+
+*Revenue.* Collected from verified payments only, MRR and ARPU as levels, CAC
+derived from tagged reinvestment spend (and `n/a`, never ₹0, with no new
+payers), net after operating spend, the four plausible larger numbers this
+screen must never use, and a Tax summary assembled from issued invoices for a
+CA. Runway renders as **unavailable with the reason**, not as a placeholder.
+
+Every KPI tile carries an i button with its formula and caution; every assumed
+answer is a dashed `FN-OD` block on the screen it affects. All writes are
+simulated in this browser tab and every screen says so.
+
+**Temp data**
+`src/content/finance/` → `ledger.json`, `invoices.json`, `spend.json`,
+`bank.json`, `refunds.json`, `revenue.json` are **placeholder records**;
+`vocabularies.json` is **static copy** (labels, cautions, metric definitions,
+the decision register) and becomes no backend work. `invoices.json` is a
+snapshot of the Invoice module only because this checkout has no backend — the
+live `GET invoices/` and `payments/deal-ledger/` replace it. Customers, deals
+and users line up with the existing seeds (DL-3310 Priya Nair / IB-U-1041,
+DL-2291 Meera Iyer / IB-U-0944, DL-2396 Sandeep Kulkarni / IB-U-0975), so the
+figures reconcile across modules rather than only inside this one.
+
+**Backend needed**
+- `GET/POST /admin/finance/payments` · `…/{id}/{approve,hold,reject,match,return,reverse}`
+- `GET/POST /admin/finance/transactions` · `…/{id}/post` · `…/{id}/bill` · `GET/POST …/categories` · `GET …/recurring`
+- `GET/POST /admin/finance/statements` · `…/{id}/close` · `GET …/reconciliation` · `POST …/reconciliation/{match,resolve}`
+- `GET/POST /admin/finance/refunds` · `…/{id}/{approve,send-back,decline}`
+- `GET /admin/finance/revenue?months=` · `GET …/vocabularies` · `GET …/export`
+- `Module` row `finance` (group **Finance**) with a `super` sensitive action
+- Full table, payload shapes, error contract and invariants: BACKEND-INTEGRATION.md § Module 6
+
+**Open decisions**
+FN-AD-01…05 resolved on screen. Open and assumed: FN-OD-01 cash basis · 02
+statement import simulated, no live feed · 04 bill required above ₹25,000 and
+Super Admin decides refunds · 05 **no Salary centre** — payroll is a category ·
+07 **runway not shown** · 12 contribution, never profit · 14 invoice-per-receipt
+(ID-03-R) surfaced on the tax summary. Register in `vocabularies.json`.
+
+**Verified**
+`npx tsc -b` and eslint clean. New `check:finance` (78 assertions over the real
+store bundle) covers seed coherence, collected-is-verified-only, verify refusing
+without a bank line, the simulated import, a close refused then accepted after
+every row is resolved, amount-exact matching, the reversal that leaves the
+original untouched, the refund lifecycle, and the spend rules. New
+`check:finance-render` renders all five faces, every record screen and all
+fifteen dialogs. Both are wired into `npm run check`. Three seed defects the
+checks caught were fixed rather than asserted around: a July payment pointing at
+an invoice and a bank line that did not exist, and an accrual dated inside a
+closed window. **Not seen in a browser** — no backend on this checkout — so the
+layout, the dark theme and the dialog behaviour are reasoned from the shared
+tokens and primitives, not watched.
+
+---
+
+## 2026-08-29
+
+### Users Management audited end to end: 14 logic bugs fixed, journeys unblocked, tint retired, contract corrected
+
+**Area:** `#/users` — every face and the record; Edit profile, Assign, Lifecycle
+dialogs; the modal shell
+**Files:** `store.ts`, `LifecycleModal.tsx`, `AssignMembership.tsx`,
+`EditProfile.tsx`, `Detail.tsx`, `List.tsx`, `RenewalQueue.tsx`, `index.tsx`,
+`FacetPicker.tsx`, `InfoTip.tsx`, `HandleField.tsx`, `Modals.tsx`,
+`shell/ShellContext.tsx`, `users.css`, `charts.css`, `assign.css`,
+`memberships.json`, `vocabularies.json`, `scripts/check-users-derivation.cjs`,
+`scripts/um-smoke.tsx`, `BACKEND-INTEGRATION.md`, `USERS-AUDIT-2026-08-29.md`
+
+**What changed**
+
+Four read-only audits (logic, journeys, theme, contracts) were run over the
+module and everything CONFIRMED was fixed. The full register is in
+`USERS-AUDIT-2026-08-29.md` beside this file; the headline items:
+
+*Logic — the derivation was wrong under any second term.* `currentTerm` took
+the newest-start row and `classify` looked only at it, so renewing an Active
+Member — or assigning them a second product dated next month — demoted them to
+Past Member and dropped them from the queue. Now any entitling term classifies,
+the term the member HOLDS leads, and a paused/suspended/active term past its
+end date reads as expired everywhere (`effectiveStatus`). One live term per
+product is enforced at activate and renew, not only at assign. `activateNow`
+is atomic. Renewal takes its OWN reference and starts the day after the old
+term at 00:00 on the assignment date rule. One clock: writes stamp the module's
+`NOW`, so timelines stop saying "in 4 days". `updateProfile` refuses
+non-editable keys and blank text; tags are a closed list; "This year" is the
+calendar year; the seeded Pending term can be activated (it carries
+`pendingFeatures`); the active-term pointer is derived.
+
+*Journeys.* Escape inside a picker or the i panel closes that, not the whole
+dialog. The Cancel dialog's buttons no longer both read "Cancel". The
+Commercial → term link opens the term (one navigation, `onParams`). Filters
+visually reset when a chip is cleared. Queue rows carry the queue with them;
+rows are keyboard-openable; modals focus the first real control and every ✕
+has a name. Required fields are marked live and named beside Save; both big
+dialogs ask before discarding a draft. Assign steps read 1-2-3, start from
+`NOW`, link to Plans, and refuse activate-now on a feature-less plan with the
+button. Account buttons say "account"; the renewal notice sits on the
+Membership tab where Renew is; reactivate stops offering pause reasons.
+
+*Theme.* Brand tint is no longer a surface anywhere in the module — chips,
+ticked boxes, the list highlight, the assign summary and the i button are
+neutral; the four form-only un-tint overrides that fought them are gone. Plan
+tiers wear tag tones, not status/brand. Chart series 3 (light) and 2 (dark) no
+longer equal the warn and ok solids; the lightest heat cell takes dark ink
+(was 2.3:1). One inactive grey.
+
+*Contract.* `v1/admin/users/` is already the RBAC sub-admin resource — the
+platform-user API needs its own prefix. `BACKEND-INTEGRATION.md` now carries
+that, plus `asOf`/`pausePolicy`/`pendingFeatures`, the T02 and T06 bodies,
+two new error codes, the corrected vocabularies (four positioning values,
+seven business types, open segments) and the `lifecycle` permission key.
+
+**Temp data**
+`memberships.json` → `IB-MB-0958-1.pendingFeatures[]` added (placeholder
+record, the shape UM-T02 parks); `vocabularies.json` → `openDecisions[UM-OD-01]`
+text closed, `$comment_businessFacets` corrected. Static copy otherwise.
+
+**Backend needed**
+- Prefix decision: `/admin/platform-users/…` (or equivalent) — see the doc
+- `POST …/memberships/{id}/renew` → `{reference, reason?}`; `422 activation_source_required` without one
+- `POST …/{id}/memberships` with `activateNow` as one transaction; `422 snapshot_unavailable`
+- `PATCH …/{id}/profile` → `422 field_not_editable` for non-schema keys
+- `GET …/username-available?u=` (unchanged ask, still missing)
+- `Module` row `users` with a `lifecycle` sensitive action
+
+**Open decisions**
+None new. UM-OD-13 sharpened: two entitlement key schemes coexist (seeded
+`listings.max` vs catalogue `feature.N`); UM-OD-04 noted — a paused term
+inside the window is not in the queue under `continue`.
+
+**Verified**
+`npx tsc -b` and eslint clean over the module and the shell change.
+`check:users` grew five blocks — classification after renew and after a
+future-dated assignment, activate/renew conflicts, atomic activate-now, lapsed
+terms, profile/tag/year guards — all passing; the renew block now asserts the
+new source and the day-after start. `check:users-render` renders every
+surface; its "no duration step until a plan is picked" assertion was rewritten
+to the new contract (step 2 always renders, as a placeholder until then). Not
+seen in a browser — no backend on this checkout — so the neutral chip/summary
+skin, the focus change and the dirty-guard prompts are reasoned, not watched.
+
+## 2026-08-29
+
+### Target row: city chips under the box; sections get a firmer boundary
+
+**Area:** Edit profile — Target (location rows), section layout
+**Files:** `FacetPicker.tsx`, `AreaRows.tsx`, `users.css`
+
+**What changed**
+
+1. **City chips sit under the city box.** The picker's rule is chips ABOVE
+   the control, so the box you type into never moves — right everywhere
+   the picker stands alone. In a Target row it stands beside the state
+   select, and chips above pushed the city box down so the row's two
+   controls never lined up. `FacetPicker` grew a `chipsBelow` prop; the
+   row's city half uses it, the rest of the form does not. Same chips,
+   same remove control, same Backspace shortcut.
+2. **Business profile → Target reads as a boundary at a scroll.** Between
+   sections there is now more air above the rule than below it, so the
+   section label attaches to what follows, and the rule is one shade
+   firmer than the hairlines inside a section.
+
+**Temp data**
+none
+
+**Backend needed**
+- `none`
+
+**Open decisions**
+`none`
+
+**Verified**
+`npx tsc -b`, eslint clean; `check:users-render` renders every surface —
+the chip assertions hold since the same Chips component renders, only
+later in the row. Not seen in a browser (no backend on this checkout).
+
+## 2026-08-29
+
+### Edit profile: sections, not panels
+
+**Area:** Edit profile — layout
+**Files:** `users.css`
+
+**What changed**
+
+The group panels came off. Each fieldset was a tinted, bordered, rounded
+well with a bordered legend — a surface inside a surface, and on a modal
+that already has a header band and a footer band it read as boxes in a
+box. Now the form is one plain column: a small-caps section label
+(Business profile · Target · Positioning segment · About · Identity) in
+the same voice as COMPLETENESS, a hairline between sections, quiet field
+labels, and the controls carrying the ink. Completeness became one row —
+label left, meter right — closing on the first divider, so header,
+completeness, sections and footer stack as four bands of one page.
+Supersedes the "contrast: the form is groups" panel note; the float/clear
+mechanics that make a legend lay out are unchanged.
+
+**Temp data**
+none
+
+**Backend needed**
+- `none`
+
+**Open decisions**
+`none`
+
+**Verified**
+CSS only — the markup and its contract are untouched, and
+`check:users-render` still renders every surface. Not seen in a browser
+(no backend on this checkout): the spacing rhythm is reasoned from the
+theme's space tokens, not screenshotted.
+
+## 2026-08-29
+
+### Record loses the PUBLIC marker; Positioning gains Premium and an i button
+
+**Area:** User record → Profile tab; Edit profile → Positioning segment
+**Files:** `Detail.tsx`, `EditProfile.tsx`, `users.css`, `vocabularies.json`,
+`scripts/check-users-derivation.cjs`, `scripts/um-smoke.tsx`
+
+**What changed**
+
+1. **No PUBLIC tag on the record.** Every profile field wore a "public"
+   pill next to its label — the same word twelve times, since nothing on
+   the profile is internal any more. The marker and its CSS are gone; the
+   schema's `public` flag stays, it just no longer prints.
+2. **Positioning's note moves behind the i.** "Select up to 2. This is how
+   the business positions its own work…" sat under the legend on every
+   open of the form. It is now the field's `info` in the schema, so the
+   legend shows the i button and the sentence costs one press exactly when
+   somebody is unsure — the same pattern Business type uses.
+3. **Premium is a positioning option again.** Luxury · Budget-friendly ·
+   Custom · Premium, still up to two. Supersedes the entry that struck
+   `premium` alongside `value` and `eco_friendly`; the latter two stay
+   refused.
+
+**Temp data**
+`src/content/users/vocabularies.json` → `positioning` (+1 option),
+`profileFields[positioning].info`; static copy, permanent.
+
+**Backend needed**
+- `none` — the vocabularies payload carries the option and the field's
+  `info` sentence; the panel renders both from it.
+
+**Open decisions**
+`none`
+
+**Verified**
+`check:users`: positioning is "up to two of a closed four" — premium
+accepted, value/eco-friendly refused, seed values inside the four.
+`check:users-render`: six checkboxes (2 deals + 4 positioning), the i
+button present on Positioning and the cap sentence absent from the form
+markup, two tiles quiet at the cap for IB-U-0912. `npx tsc -b` and
+eslint clean. Not seen in a browser — no backend on this checkout.
+
+## 2026-08-29
+
+### Edit profile: the tint comes off, State becomes a select, lists lead with interior
+
+**Area:** Edit profile — Business type, Deals in, Segments, Categories, Location
+**Files:** `FacetPicker.tsx`, `users.css`, `vocabularies.json`,
+`scripts/um-smoke.tsx`
+
+**What changed**
+
+1. **No brand tint on the form.** Chips, a ticked Deals-in box, the
+   Business type select and the list highlight all wore brand tint — four
+   green surfaces arguing with the one primary button. On the form they
+   are now neutral: raised surface, real border, text colour; a ticked box
+   shows a brand border only. Scoped to `.um-form` — the record's
+   read-only chips keep their facet tones, where colour still answers
+   "which question is this". Supersedes the colour-by-facet note *for the
+   form only*.
+2. **Business type is a full-width select** in the same neutral skin as
+   every other control, with a focus ring — it was a narrow tinted box
+   between full-width rows.
+3. **State reads as a select.** An answered closed single used to collapse
+   to a chip plus a "Change" button — a two-part control for a one-value
+   answer, and the only place on the form where the answer was not in the
+   box. Now the box shows the answer under a chevron, read-only; a press
+   turns it into the search field and opens the same list with the current
+   value marked ✓. One control, matching Business type. Open singles
+   (City) are unchanged — a typed value still needs a remove control.
+4. **Segments and Categories lead with interior.** The picker shows the
+   vocabulary in stored order, so the sequence is a product decision:
+   interior design and execution first, then sanitary/plumbing supply,
+   then adjacent trades (solar, lifts, pest control); sectors keep their
+   group. `$comment_segmentOrder` / `$comment_categoryOrder` say why.
+
+**Temp data**
+`src/content/users/vocabularies.json` → `segments`, `categories` reordered;
+static copy, permanent. No keys added or removed.
+
+**Backend needed**
+- `none` — vocabulary order is what `GET /api/v1/admin/users/vocabularies`
+  should return; the panel renders lists in payload order.
+
+**Open decisions**
+`none`
+
+**Verified**
+`check:users-render`: the two "chip + Change" checks became "reads as a
+select" — no `>Change<` in the tree, the `sellike` shell present, the
+stored state shown as the box's value; chip-tone and picker-shell counts
+unchanged. `check:users` (vocabulary derivation) passes on the reordered
+lists. `npx tsc -b` and eslint clean. Not opened in a browser — no backend
+on this checkout — so the chevron/focus styling is reasoned, not seen.
+
 ## 2026-08-29
 
 ### The modal, read as a whole: five fixes

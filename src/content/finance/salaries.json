@@ -1,0 +1,2075 @@
+{
+  "$comment": "PLACEHOLDER RECORDS — salary accounts and monthly payroll runs for Feelsafe Technology India Private Limited (brand \"Interior bazzar\", New Delhi, GSTIN 07AAFCF1234A1ZK, CIN U62090DL2024PTC434514). Replaced by GET /admin/finance/salary-accounts and GET /admin/finance/salary-runs. A salary account is Finance's record of what one person is paid; the PERSON is Team's — `memberId` joins `AdminUserRow.id` on the live Team endpoint, and this module never invents a member. `memberName` is a denormalised copy of the name as it stood when the record was written, kept for one reason: a slip issued in June must still name the person it paid even if Team renames them in September. Read the name for display from Team; read it from here on an issued slip. Salaries are always paid from ACC-HDFC-4021, the HDFC current account — every slip in this seed carries that accountId and no other. No slip carries a bankLineId: none of these debits is on an imported statement here, and an empty match would read as a made one. Integer paise everywhere; asOf 2026-08-25T09:00:00+05:30, so August is still running and nothing is dated after the 25th.",
+  "generatedAt": "2026-08-25T09:00:00+05:30",
+  "$comment_accounts": "Seven accounts — a director, a sales head, three sales executives, a designer and an operations executive — one of which is closed. Vikram Chauhan (SAL-AC-0018) left on 30 Jun 2026 and reads active:false: he must render as an account with a history and no payable slip, which is a different thing from a deleted row. `monthlyGrossPaise` is exactly the sum of `earnings`, and the slip is built from these monthly components — never by dividing `ctcPaise` by twelve. `ctcPaise` is the annual cost to company, twelve months of gross plus the employer's ₹21,600 provident fund share, and it is presentational: nothing is computed from it. Earnings follow the ordinary Indian split — Basic at 45% of gross, HRA at half of Basic, the remainder as Special allowance, with a conveyance or performance allowance where the contract has one. Deductions: provident fund is 12% of Basic restricted to the ₹15,000 statutory wage ceiling, so every account contributes ₹1,800 — the ceiling varies, not the salary; professional tax is Delhi's flat ₹200; TDS exists only on the three accounts that actually cross the threshold, and on the others the component is ABSENT rather than zero, because a zero TDS line is a claim that tax was computed.",
+  "accounts": [
+    {
+      "salaryAccountId": "SAL-AC-0011",
+      "memberId": 1,
+      "memberName": "Rohit Malhotra",
+      "employeeCode": "IB-EMP-002",
+      "designation": "Founder & Director",
+      "joinedAt": "2024-01-15",
+      "ctcPaise": 302160000,
+      "monthlyGrossPaise": 25000000,
+      "earnings": [
+        {
+          "key": "basic",
+          "label": "Basic",
+          "amountPaise": 11250000
+        },
+        {
+          "key": "hra",
+          "label": "House rent allowance",
+          "amountPaise": 5625000
+        },
+        {
+          "key": "special",
+          "label": "Special allowance",
+          "amountPaise": 8125000
+        }
+      ],
+      "deductions": [
+        {
+          "key": "pf",
+          "label": "Provident fund",
+          "amountPaise": 180000
+        },
+        {
+          "key": "pt",
+          "label": "Professional tax",
+          "amountPaise": 20000
+        },
+        {
+          "key": "tds",
+          "label": "TDS",
+          "amountPaise": 4500000
+        }
+      ],
+      "bank": {
+        "masked": "HDFC ••••8841",
+        "ifsc": "HDFC0000123",
+        "name": "HDFC Bank"
+      },
+      "pan": "AFZPM8821K",
+      "uan": null,
+      "active": true,
+      "recordedBy": "S. Bhat",
+      "recordedAt": "2024-01-15T11:00:00+05:30",
+      "events": [
+        {
+          "eventId": "SAE-0011-1",
+          "type": "SALARY_ACCOUNT_OPENED",
+          "actor": "S. Bhat",
+          "actorRole": "Super Admin",
+          "at": "2024-01-15T11:00:00+05:30",
+          "note": "Opened at incorporation. Director's remuneration, ₹2,50,000 a month, fixed by board resolution dated 12 Jan 2024. No UAN — a director drawing remuneration is outside EPF membership here; the ₹1,800 line is a voluntary contribution the board kept."
+        }
+      ]
+    },
+    {
+      "salaryAccountId": "SAL-AC-0014",
+      "memberId": 2,
+      "memberName": "Anjali Deshpande",
+      "employeeCode": "IB-EMP-007",
+      "designation": "Head of Sales",
+      "joinedAt": "2024-06-03",
+      "ctcPaise": 146160000,
+      "monthlyGrossPaise": 12000000,
+      "earnings": [
+        {
+          "key": "basic",
+          "label": "Basic",
+          "amountPaise": 5400000
+        },
+        {
+          "key": "hra",
+          "label": "House rent allowance",
+          "amountPaise": 2700000
+        },
+        {
+          "key": "special",
+          "label": "Special allowance",
+          "amountPaise": 3000000
+        },
+        {
+          "key": "performance",
+          "label": "Performance allowance",
+          "amountPaise": 900000
+        }
+      ],
+      "deductions": [
+        {
+          "key": "pf",
+          "label": "Provident fund",
+          "amountPaise": 180000
+        },
+        {
+          "key": "pt",
+          "label": "Professional tax",
+          "amountPaise": 20000
+        },
+        {
+          "key": "tds",
+          "label": "TDS",
+          "amountPaise": 1250000
+        }
+      ],
+      "bank": {
+        "masked": "HDFC ••••2276",
+        "ifsc": "HDFC0000123",
+        "name": "HDFC Bank"
+      },
+      "pan": "BKQPD4417L",
+      "uan": "100812345678",
+      "active": true,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2024-06-03T10:20:00+05:30",
+      "events": [
+        {
+          "eventId": "SAE-0014-2",
+          "type": "SALARY_REVISED",
+          "actor": "S. Bhat",
+          "actorRole": "Super Admin",
+          "at": "2026-04-01T09:30:00+05:30",
+          "note": "Annual review. Monthly gross ₹1,05,000 → ₹1,20,000, effective 1 Apr 2026. The increase went to Special allowance and a new ₹9,000 performance allowance; Basic and HRA were restructured to 45% / half of Basic at the same time."
+        },
+        {
+          "eventId": "SAE-0014-1",
+          "type": "SALARY_ACCOUNT_OPENED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2024-06-03T10:20:00+05:30",
+          "note": "Opened on joining. Monthly gross ₹1,05,000."
+        }
+      ]
+    },
+    {
+      "salaryAccountId": "SAL-AC-0022",
+      "memberId": 4,
+      "memberName": "Karan Sethi",
+      "employeeCode": "IB-EMP-014",
+      "designation": "Sales Executive",
+      "joinedAt": "2025-07-21",
+      "ctcPaise": 64560000,
+      "monthlyGrossPaise": 5200000,
+      "earnings": [
+        {
+          "key": "basic",
+          "label": "Basic",
+          "amountPaise": 2340000
+        },
+        {
+          "key": "hra",
+          "label": "House rent allowance",
+          "amountPaise": 1170000
+        },
+        {
+          "key": "special",
+          "label": "Special allowance",
+          "amountPaise": 1690000
+        }
+      ],
+      "deductions": [
+        {
+          "key": "pf",
+          "label": "Provident fund",
+          "amountPaise": 180000
+        },
+        {
+          "key": "pt",
+          "label": "Professional tax",
+          "amountPaise": 20000
+        }
+      ],
+      "bank": {
+        "masked": "ICICI ••••5510",
+        "ifsc": "ICIC0001842",
+        "name": "ICICI Bank"
+      },
+      "pan": "CDLPS6230M",
+      "uan": "101477239055",
+      "active": true,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2025-07-21T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "SAE-0022-2",
+          "type": "SALARY_REVISED",
+          "actor": "S. Bhat",
+          "actorRole": "Super Admin",
+          "at": "2026-07-28T16:00:00+05:30",
+          "note": "Monthly gross ₹45,000 → ₹52,000, effective 1 Aug 2026, on twelve months of quota. June and July slips keep the ₹45,000 components they were issued with; the August run is the first to carry the new ones."
+        },
+        {
+          "eventId": "SAE-0022-1",
+          "type": "SALARY_ACCOUNT_OPENED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2025-07-21T12:00:00+05:30",
+          "note": "Opened on joining. Monthly gross ₹45,000. Below the TDS threshold after the standard deduction, so no TDS component exists on this account at all — an absent component, not a zero one."
+        }
+      ]
+    },
+    {
+      "salaryAccountId": "SAL-AC-0025",
+      "memberId": 5,
+      "memberName": "Priya Nair",
+      "employeeCode": "IB-EMP-016",
+      "designation": "Sales Executive",
+      "joinedAt": "2025-09-08",
+      "ctcPaise": 59760000,
+      "monthlyGrossPaise": 4800000,
+      "earnings": [
+        {
+          "key": "basic",
+          "label": "Basic",
+          "amountPaise": 2160000
+        },
+        {
+          "key": "hra",
+          "label": "House rent allowance",
+          "amountPaise": 1080000
+        },
+        {
+          "key": "conveyance",
+          "label": "Conveyance allowance",
+          "amountPaise": 160000
+        },
+        {
+          "key": "special",
+          "label": "Special allowance",
+          "amountPaise": 1400000
+        }
+      ],
+      "deductions": [
+        {
+          "key": "pf",
+          "label": "Provident fund",
+          "amountPaise": 180000
+        },
+        {
+          "key": "pt",
+          "label": "Professional tax",
+          "amountPaise": 20000
+        }
+      ],
+      "bank": {
+        "masked": "SBI ••••9034",
+        "ifsc": "SBIN0009321",
+        "name": "State Bank of India"
+      },
+      "pan": "AHRPN1188Q",
+      "uan": "101560884213",
+      "active": true,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2025-09-08T10:05:00+05:30",
+      "events": [
+        {
+          "eventId": "SAE-0025-1",
+          "type": "SALARY_ACCOUNT_OPENED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2025-09-08T10:05:00+05:30",
+          "note": "Opened on joining. Monthly gross ₹48,000, including a ₹1,600 conveyance allowance for site visits."
+        }
+      ]
+    },
+    {
+      "salaryAccountId": "SAL-AC-0031",
+      "memberId": 6,
+      "memberName": "Aditya Rao",
+      "employeeCode": "IB-EMP-011",
+      "designation": "Senior Interior Designer",
+      "joinedAt": "2024-11-11",
+      "ctcPaise": 80160000,
+      "monthlyGrossPaise": 6500000,
+      "earnings": [
+        {
+          "key": "basic",
+          "label": "Basic",
+          "amountPaise": 2925000
+        },
+        {
+          "key": "hra",
+          "label": "House rent allowance",
+          "amountPaise": 1462500
+        },
+        {
+          "key": "special",
+          "label": "Special allowance",
+          "amountPaise": 2112500
+        }
+      ],
+      "deductions": [
+        {
+          "key": "pf",
+          "label": "Provident fund",
+          "amountPaise": 180000
+        },
+        {
+          "key": "pt",
+          "label": "Professional tax",
+          "amountPaise": 20000
+        },
+        {
+          "key": "tds",
+          "label": "TDS",
+          "amountPaise": 250000
+        }
+      ],
+      "bank": {
+        "masked": "HDFC ••••4417",
+        "ifsc": "HDFC0000123",
+        "name": "HDFC Bank"
+      },
+      "pan": "BQTPR5092H",
+      "uan": "100933471182",
+      "active": true,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2024-11-11T09:45:00+05:30",
+      "events": [
+        {
+          "eventId": "SAE-0031-2",
+          "type": "SALARY_REVISED",
+          "actor": "S. Bhat",
+          "actorRole": "Super Admin",
+          "at": "2025-09-26T15:00:00+05:30",
+          "note": "Monthly gross ₹55,000 → ₹65,000, effective 1 Oct 2025, on confirmation as senior. TDS started the same month."
+        },
+        {
+          "eventId": "SAE-0031-1",
+          "type": "SALARY_ACCOUNT_OPENED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2024-11-11T09:45:00+05:30",
+          "note": "Opened on joining. Monthly gross ₹55,000."
+        }
+      ]
+    },
+    {
+      "salaryAccountId": "SAL-AC-0033",
+      "memberId": 8,
+      "memberName": "Meera Joshi",
+      "employeeCode": "IB-EMP-019",
+      "designation": "Operations & Support Executive",
+      "joinedAt": "2026-03-02",
+      "ctcPaise": 47760000,
+      "monthlyGrossPaise": 3800000,
+      "earnings": [
+        {
+          "key": "basic",
+          "label": "Basic",
+          "amountPaise": 1710000
+        },
+        {
+          "key": "hra",
+          "label": "House rent allowance",
+          "amountPaise": 855000
+        },
+        {
+          "key": "special",
+          "label": "Special allowance",
+          "amountPaise": 1235000
+        }
+      ],
+      "deductions": [
+        {
+          "key": "pf",
+          "label": "Provident fund",
+          "amountPaise": 180000
+        },
+        {
+          "key": "pt",
+          "label": "Professional tax",
+          "amountPaise": 20000
+        }
+      ],
+      "bank": {
+        "masked": "Axis ••••7729",
+        "ifsc": "UTIB0001204",
+        "name": "Axis Bank"
+      },
+      "pan": "CJSPJ7741B",
+      "uan": "101688204537",
+      "active": true,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-03-02T11:15:00+05:30",
+      "events": [
+        {
+          "eventId": "SAE-0033-1",
+          "type": "SALARY_ACCOUNT_OPENED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-03-02T11:15:00+05:30",
+          "note": "Opened on joining. Monthly gross ₹38,000. Handles the support inbox and vendor onboarding."
+        }
+      ]
+    },
+    {
+      "salaryAccountId": "SAL-AC-0018",
+      "memberId": 9,
+      "memberName": "Vikram Chauhan",
+      "employeeCode": "IB-EMP-009",
+      "designation": "Sales Executive",
+      "joinedAt": "2025-02-17",
+      "ctcPaise": 56160000,
+      "monthlyGrossPaise": 4500000,
+      "earnings": [
+        {
+          "key": "basic",
+          "label": "Basic",
+          "amountPaise": 2025000
+        },
+        {
+          "key": "hra",
+          "label": "House rent allowance",
+          "amountPaise": 1012500
+        },
+        {
+          "key": "special",
+          "label": "Special allowance",
+          "amountPaise": 1462500
+        }
+      ],
+      "deductions": [
+        {
+          "key": "pf",
+          "label": "Provident fund",
+          "amountPaise": 180000
+        },
+        {
+          "key": "pt",
+          "label": "Professional tax",
+          "amountPaise": 20000
+        }
+      ],
+      "bank": {
+        "masked": "Kotak ••••3168",
+        "ifsc": "KKBK0000261",
+        "name": "Kotak Mahindra Bank"
+      },
+      "pan": "AKMPC3306F",
+      "uan": "100729551640",
+      "active": false,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2025-02-17T10:00:00+05:30",
+      "events": [
+        {
+          "eventId": "SAE-0018-2",
+          "type": "SALARY_ACCOUNT_CLOSED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-06-30T18:50:00+05:30",
+          "note": "Resigned; last working day 30 Jun 2026. Full and final settled with the June run — the June slip is the last one on this account. Closed the same evening so the July run could not pick it up. The account stays on the list, unpayable: deleting it would take the June slip with it."
+        },
+        {
+          "eventId": "SAE-0018-1",
+          "type": "SALARY_ACCOUNT_OPENED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2025-02-17T10:00:00+05:30",
+          "note": "Opened on joining. Monthly gross ₹45,000."
+        }
+      ]
+    }
+  ],
+  "$comment_runs": "Three runs, newest first. RUN-2026-08 is `open`: the month is not over on the 25th, so every slip has paidAt null, an empty reference, no issuedAt and no sha256 — an open run is a working document, not a record of money that moved. The two paid runs are finished: each slip carries its own NEFT reference, its issue time and a SHA-256 over the issued document, and neither is ever re-rendered. Slips FREEZE their components — the earnings and deductions arrays are copied onto the slip at issue, never read back through to the account. Karan Sethi (SAL-AC-0022) is the proof: his gross went from ₹45,000 to ₹52,000 on 1 Aug 2026, so SLIP-2026-06-0022 and SLIP-2026-07-0022 still show Basic ₹20,250 / HRA ₹10,125 / Special ₹14,625 and a ₹43,000 net, while SLIP-2026-08-0022 shows Basic ₹23,400 / HRA ₹11,700 / Special ₹16,900 and ₹50,000. A raise cannot rewrite a slip that has already been issued. Vikram Chauhan appears in the June run, which settled him, and in no run after it. For every slip grossPaise is the sum of its earnings, deductionsPaise the sum of its deductions, netPaise the difference; for every run totalNetPaise is the sum of its slips' netPaise. Slip ids are the month plus the account's four-digit tail.",
+  "runs": [
+    {
+      "runId": "RUN-2026-08",
+      "month": "2026-08",
+      "state": "open",
+      "slips": [
+        {
+          "slipId": "SLIP-2026-08-0011",
+          "salaryAccountId": "SAL-AC-0011",
+          "memberId": 1,
+          "memberName": "Rohit Malhotra",
+          "employeeCode": "IB-EMP-002",
+          "designation": "Founder & Director",
+          "month": "2026-08",
+          "paidDays": 31,
+          "lopDays": 0,
+          "earnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 11250000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 5625000
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 8125000
+            }
+          ],
+          "deductions": [
+            {
+              "key": "pf",
+              "label": "Provident fund",
+              "amountPaise": 180000
+            },
+            {
+              "key": "pt",
+              "label": "Professional tax",
+              "amountPaise": 20000
+            },
+            {
+              "key": "tds",
+              "label": "TDS",
+              "amountPaise": 4500000
+            }
+          ],
+          "grossPaise": 25000000,
+          "deductionsPaise": 4700000,
+          "netPaise": 20300000,
+          "paidAt": null,
+          "mode": "",
+          "reference": "",
+          "accountId": "ACC-HDFC-4021",
+          "bank": {
+            "masked": "HDFC ••••8841",
+            "ifsc": "HDFC0000123",
+            "name": "HDFC Bank"
+          },
+          "issuedAt": null,
+          "sha256": null,
+          "baseEarnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 11250000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 5625000
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 8125000
+            }
+          ],
+          "pan": "AFZPM8821K",
+          "uan": null
+        },
+        {
+          "slipId": "SLIP-2026-08-0014",
+          "salaryAccountId": "SAL-AC-0014",
+          "memberId": 2,
+          "memberName": "Anjali Deshpande",
+          "employeeCode": "IB-EMP-007",
+          "designation": "Head of Sales",
+          "month": "2026-08",
+          "paidDays": 31,
+          "lopDays": 0,
+          "earnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 5400000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 2700000
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 3000000
+            },
+            {
+              "key": "performance",
+              "label": "Performance allowance",
+              "amountPaise": 900000
+            }
+          ],
+          "deductions": [
+            {
+              "key": "pf",
+              "label": "Provident fund",
+              "amountPaise": 180000
+            },
+            {
+              "key": "pt",
+              "label": "Professional tax",
+              "amountPaise": 20000
+            },
+            {
+              "key": "tds",
+              "label": "TDS",
+              "amountPaise": 1250000
+            }
+          ],
+          "grossPaise": 12000000,
+          "deductionsPaise": 1450000,
+          "netPaise": 10550000,
+          "paidAt": null,
+          "mode": "",
+          "reference": "",
+          "accountId": "ACC-HDFC-4021",
+          "bank": {
+            "masked": "HDFC ••••2276",
+            "ifsc": "HDFC0000123",
+            "name": "HDFC Bank"
+          },
+          "issuedAt": null,
+          "sha256": null,
+          "baseEarnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 5400000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 2700000
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 3000000
+            },
+            {
+              "key": "performance",
+              "label": "Performance allowance",
+              "amountPaise": 900000
+            }
+          ],
+          "pan": "BKQPD4417L",
+          "uan": "100812345678"
+        },
+        {
+          "slipId": "SLIP-2026-08-0022",
+          "salaryAccountId": "SAL-AC-0022",
+          "memberId": 4,
+          "memberName": "Karan Sethi",
+          "employeeCode": "IB-EMP-014",
+          "designation": "Sales Executive",
+          "month": "2026-08",
+          "paidDays": 31,
+          "lopDays": 0,
+          "earnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 2340000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 1170000
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 1690000
+            }
+          ],
+          "deductions": [
+            {
+              "key": "pf",
+              "label": "Provident fund",
+              "amountPaise": 180000
+            },
+            {
+              "key": "pt",
+              "label": "Professional tax",
+              "amountPaise": 20000
+            }
+          ],
+          "grossPaise": 5200000,
+          "deductionsPaise": 200000,
+          "netPaise": 5000000,
+          "paidAt": null,
+          "mode": "",
+          "reference": "",
+          "accountId": "ACC-HDFC-4021",
+          "bank": {
+            "masked": "ICICI ••••5510",
+            "ifsc": "ICIC0001842",
+            "name": "ICICI Bank"
+          },
+          "issuedAt": null,
+          "sha256": null,
+          "baseEarnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 2340000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 1170000
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 1690000
+            }
+          ],
+          "pan": "CDLPS6230M",
+          "uan": "101477239055"
+        },
+        {
+          "slipId": "SLIP-2026-08-0025",
+          "salaryAccountId": "SAL-AC-0025",
+          "memberId": 5,
+          "memberName": "Priya Nair",
+          "employeeCode": "IB-EMP-016",
+          "designation": "Sales Executive",
+          "month": "2026-08",
+          "paidDays": 31,
+          "lopDays": 0,
+          "earnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 2160000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 1080000
+            },
+            {
+              "key": "conveyance",
+              "label": "Conveyance allowance",
+              "amountPaise": 160000
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 1400000
+            }
+          ],
+          "deductions": [
+            {
+              "key": "pf",
+              "label": "Provident fund",
+              "amountPaise": 180000
+            },
+            {
+              "key": "pt",
+              "label": "Professional tax",
+              "amountPaise": 20000
+            }
+          ],
+          "grossPaise": 4800000,
+          "deductionsPaise": 200000,
+          "netPaise": 4600000,
+          "paidAt": null,
+          "mode": "",
+          "reference": "",
+          "accountId": "ACC-HDFC-4021",
+          "bank": {
+            "masked": "SBI ••••9034",
+            "ifsc": "SBIN0009321",
+            "name": "State Bank of India"
+          },
+          "issuedAt": null,
+          "sha256": null,
+          "baseEarnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 2160000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 1080000
+            },
+            {
+              "key": "conveyance",
+              "label": "Conveyance allowance",
+              "amountPaise": 160000
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 1400000
+            }
+          ],
+          "pan": "AHRPN1188Q",
+          "uan": "101560884213"
+        },
+        {
+          "slipId": "SLIP-2026-08-0031",
+          "salaryAccountId": "SAL-AC-0031",
+          "memberId": 6,
+          "memberName": "Aditya Rao",
+          "employeeCode": "IB-EMP-011",
+          "designation": "Senior Interior Designer",
+          "month": "2026-08",
+          "paidDays": 31,
+          "lopDays": 0,
+          "earnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 2925000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 1462500
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 2112500
+            }
+          ],
+          "deductions": [
+            {
+              "key": "pf",
+              "label": "Provident fund",
+              "amountPaise": 180000
+            },
+            {
+              "key": "pt",
+              "label": "Professional tax",
+              "amountPaise": 20000
+            },
+            {
+              "key": "tds",
+              "label": "TDS",
+              "amountPaise": 250000
+            }
+          ],
+          "grossPaise": 6500000,
+          "deductionsPaise": 450000,
+          "netPaise": 6050000,
+          "paidAt": null,
+          "mode": "",
+          "reference": "",
+          "accountId": "ACC-HDFC-4021",
+          "bank": {
+            "masked": "HDFC ••••4417",
+            "ifsc": "HDFC0000123",
+            "name": "HDFC Bank"
+          },
+          "issuedAt": null,
+          "sha256": null,
+          "baseEarnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 2925000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 1462500
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 2112500
+            }
+          ],
+          "pan": "BQTPR5092H",
+          "uan": "100933471182"
+        },
+        {
+          "slipId": "SLIP-2026-08-0033",
+          "salaryAccountId": "SAL-AC-0033",
+          "memberId": 8,
+          "memberName": "Meera Joshi",
+          "employeeCode": "IB-EMP-019",
+          "designation": "Operations & Support Executive",
+          "month": "2026-08",
+          "paidDays": 31,
+          "lopDays": 0,
+          "earnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 1710000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 855000
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 1235000
+            }
+          ],
+          "deductions": [
+            {
+              "key": "pf",
+              "label": "Provident fund",
+              "amountPaise": 180000
+            },
+            {
+              "key": "pt",
+              "label": "Professional tax",
+              "amountPaise": 20000
+            }
+          ],
+          "grossPaise": 3800000,
+          "deductionsPaise": 200000,
+          "netPaise": 3600000,
+          "paidAt": null,
+          "mode": "",
+          "reference": "",
+          "accountId": "ACC-HDFC-4021",
+          "bank": {
+            "masked": "Axis ••••7729",
+            "ifsc": "UTIB0001204",
+            "name": "Axis Bank"
+          },
+          "issuedAt": null,
+          "sha256": null,
+          "baseEarnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 1710000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 855000
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 1235000
+            }
+          ],
+          "pan": "CJSPJ7741B",
+          "uan": "101688204537"
+        }
+      ],
+      "totalNetPaise": 50100000,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-08-24T10:00:00+05:30",
+      "paidAt": null,
+      "events": [
+        {
+          "eventId": "SRE-2026-08-2",
+          "type": "RUN_DRAFT_RECALCULATED",
+          "actor": "System",
+          "actorRole": "System",
+          "at": "2026-08-24T10:00:12+05:30",
+          "note": "Karan Sethi's revision of 1 Aug picked up: ₹45,000 → ₹52,000 gross. Six slips, ₹5,01,000 net. Nothing is issued and nothing is hashed until the run is paid."
+        },
+        {
+          "eventId": "SRE-2026-08-1",
+          "type": "RUN_OPENED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-08-24T10:00:00+05:30",
+          "note": "August run opened from the six active accounts. Paid days are provisional at 31 — the month is not over, and attendance closes on the 28th."
+        }
+      ]
+    },
+    {
+      "runId": "RUN-2026-07",
+      "month": "2026-07",
+      "state": "paid",
+      "slips": [
+        {
+          "slipId": "SLIP-2026-07-0011",
+          "salaryAccountId": "SAL-AC-0011",
+          "memberId": 1,
+          "memberName": "Rohit Malhotra",
+          "employeeCode": "IB-EMP-002",
+          "designation": "Founder & Director",
+          "month": "2026-07",
+          "paidDays": 31,
+          "lopDays": 0,
+          "earnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 11250000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 5625000
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 8125000
+            }
+          ],
+          "deductions": [
+            {
+              "key": "pf",
+              "label": "Provident fund",
+              "amountPaise": 180000
+            },
+            {
+              "key": "pt",
+              "label": "Professional tax",
+              "amountPaise": 20000
+            },
+            {
+              "key": "tds",
+              "label": "TDS",
+              "amountPaise": 4500000
+            }
+          ],
+          "grossPaise": 25000000,
+          "deductionsPaise": 4700000,
+          "netPaise": 20300000,
+          "paidAt": "2026-07-31T18:35:00+05:30",
+          "mode": "NEFT",
+          "reference": "SAL0731JUL0011",
+          "accountId": "ACC-HDFC-4021",
+          "bank": {
+            "masked": "HDFC ••••8841",
+            "ifsc": "HDFC0000123",
+            "name": "HDFC Bank"
+          },
+          "issuedAt": "2026-07-31T18:50:00+05:30",
+          "sha256": "ae929c8b09e0c8c4c048ecbd8f6fe5ad31d2ba5926023d04cd473e5da133587c",
+          "baseEarnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 11250000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 5625000
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 8125000
+            }
+          ],
+          "pan": "AFZPM8821K",
+          "uan": null
+        },
+        {
+          "slipId": "SLIP-2026-07-0014",
+          "salaryAccountId": "SAL-AC-0014",
+          "memberId": 2,
+          "memberName": "Anjali Deshpande",
+          "employeeCode": "IB-EMP-007",
+          "designation": "Head of Sales",
+          "month": "2026-07",
+          "paidDays": 31,
+          "lopDays": 0,
+          "earnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 5400000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 2700000
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 3000000
+            },
+            {
+              "key": "performance",
+              "label": "Performance allowance",
+              "amountPaise": 900000
+            }
+          ],
+          "deductions": [
+            {
+              "key": "pf",
+              "label": "Provident fund",
+              "amountPaise": 180000
+            },
+            {
+              "key": "pt",
+              "label": "Professional tax",
+              "amountPaise": 20000
+            },
+            {
+              "key": "tds",
+              "label": "TDS",
+              "amountPaise": 1250000
+            }
+          ],
+          "grossPaise": 12000000,
+          "deductionsPaise": 1450000,
+          "netPaise": 10550000,
+          "paidAt": "2026-07-31T18:35:00+05:30",
+          "mode": "NEFT",
+          "reference": "SAL0731JUL0014",
+          "accountId": "ACC-HDFC-4021",
+          "bank": {
+            "masked": "HDFC ••••2276",
+            "ifsc": "HDFC0000123",
+            "name": "HDFC Bank"
+          },
+          "issuedAt": "2026-07-31T18:50:00+05:30",
+          "sha256": "ab7eda5a5917537b035edfbae2437acb00b7c0251f2026ffbf9718ab71bd5e8a",
+          "baseEarnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 5400000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 2700000
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 3000000
+            },
+            {
+              "key": "performance",
+              "label": "Performance allowance",
+              "amountPaise": 900000
+            }
+          ],
+          "pan": "BKQPD4417L",
+          "uan": "100812345678"
+        },
+        {
+          "slipId": "SLIP-2026-07-0022",
+          "salaryAccountId": "SAL-AC-0022",
+          "memberId": 4,
+          "memberName": "Karan Sethi",
+          "employeeCode": "IB-EMP-014",
+          "designation": "Sales Executive",
+          "month": "2026-07",
+          "paidDays": 31,
+          "lopDays": 0,
+          "earnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 2025000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 1012500
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 1462500
+            }
+          ],
+          "deductions": [
+            {
+              "key": "pf",
+              "label": "Provident fund",
+              "amountPaise": 180000
+            },
+            {
+              "key": "pt",
+              "label": "Professional tax",
+              "amountPaise": 20000
+            }
+          ],
+          "grossPaise": 4500000,
+          "deductionsPaise": 200000,
+          "netPaise": 4300000,
+          "paidAt": "2026-07-31T18:35:00+05:30",
+          "mode": "NEFT",
+          "reference": "SAL0731JUL0022",
+          "accountId": "ACC-HDFC-4021",
+          "bank": {
+            "masked": "ICICI ••••5510",
+            "ifsc": "ICIC0001842",
+            "name": "ICICI Bank"
+          },
+          "issuedAt": "2026-07-31T18:50:00+05:30",
+          "sha256": "8d649c69c2e35d1259f25e7e2d5652e688de3201bec4dace8cd07ffbf830ca13",
+          "baseEarnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 2025000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 1012500
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 1462500
+            }
+          ],
+          "pan": "CDLPS6230M",
+          "uan": "101477239055"
+        },
+        {
+          "slipId": "SLIP-2026-07-0025",
+          "salaryAccountId": "SAL-AC-0025",
+          "memberId": 5,
+          "memberName": "Priya Nair",
+          "employeeCode": "IB-EMP-016",
+          "designation": "Sales Executive",
+          "month": "2026-07",
+          "paidDays": 31,
+          "lopDays": 0,
+          "earnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 2160000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 1080000
+            },
+            {
+              "key": "conveyance",
+              "label": "Conveyance allowance",
+              "amountPaise": 160000
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 1400000
+            }
+          ],
+          "deductions": [
+            {
+              "key": "pf",
+              "label": "Provident fund",
+              "amountPaise": 180000
+            },
+            {
+              "key": "pt",
+              "label": "Professional tax",
+              "amountPaise": 20000
+            }
+          ],
+          "grossPaise": 4800000,
+          "deductionsPaise": 200000,
+          "netPaise": 4600000,
+          "paidAt": "2026-07-31T18:35:00+05:30",
+          "mode": "NEFT",
+          "reference": "SAL0731JUL0025",
+          "accountId": "ACC-HDFC-4021",
+          "bank": {
+            "masked": "SBI ••••9034",
+            "ifsc": "SBIN0009321",
+            "name": "State Bank of India"
+          },
+          "issuedAt": "2026-07-31T18:50:00+05:30",
+          "sha256": "9c9a6eda29251e20b674e1ab0443471c29a844b209f84b3cbaaaf6ee40802740",
+          "baseEarnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 2160000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 1080000
+            },
+            {
+              "key": "conveyance",
+              "label": "Conveyance allowance",
+              "amountPaise": 160000
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 1400000
+            }
+          ],
+          "pan": "AHRPN1188Q",
+          "uan": "101560884213"
+        },
+        {
+          "slipId": "SLIP-2026-07-0031",
+          "salaryAccountId": "SAL-AC-0031",
+          "memberId": 6,
+          "memberName": "Aditya Rao",
+          "employeeCode": "IB-EMP-011",
+          "designation": "Senior Interior Designer",
+          "month": "2026-07",
+          "paidDays": 31,
+          "lopDays": 0,
+          "earnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 2925000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 1462500
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 2112500
+            }
+          ],
+          "deductions": [
+            {
+              "key": "pf",
+              "label": "Provident fund",
+              "amountPaise": 180000
+            },
+            {
+              "key": "pt",
+              "label": "Professional tax",
+              "amountPaise": 20000
+            },
+            {
+              "key": "tds",
+              "label": "TDS",
+              "amountPaise": 250000
+            }
+          ],
+          "grossPaise": 6500000,
+          "deductionsPaise": 450000,
+          "netPaise": 6050000,
+          "paidAt": "2026-07-31T18:35:00+05:30",
+          "mode": "NEFT",
+          "reference": "SAL0731JUL0031",
+          "accountId": "ACC-HDFC-4021",
+          "bank": {
+            "masked": "HDFC ••••4417",
+            "ifsc": "HDFC0000123",
+            "name": "HDFC Bank"
+          },
+          "issuedAt": "2026-07-31T18:50:00+05:30",
+          "sha256": "02afd62b694d8365f8cb76613a394db6abc8e7ea05adca55001ba4c2b8c55b1f",
+          "baseEarnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 2925000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 1462500
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 2112500
+            }
+          ],
+          "pan": "BQTPR5092H",
+          "uan": "100933471182"
+        },
+        {
+          "slipId": "SLIP-2026-07-0033",
+          "salaryAccountId": "SAL-AC-0033",
+          "memberId": 8,
+          "memberName": "Meera Joshi",
+          "employeeCode": "IB-EMP-019",
+          "designation": "Operations & Support Executive",
+          "month": "2026-07",
+          "paidDays": 29,
+          "lopDays": 2,
+          "earnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 1599677
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 799838
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 1155322
+            }
+          ],
+          "deductions": [
+            {
+              "key": "pf",
+              "label": "Provident fund",
+              "amountPaise": 168400
+            },
+            {
+              "key": "pt",
+              "label": "Professional tax",
+              "amountPaise": 20000
+            }
+          ],
+          "grossPaise": 3554837,
+          "deductionsPaise": 188400,
+          "netPaise": 3366437,
+          "paidAt": "2026-07-31T18:35:00+05:30",
+          "mode": "NEFT",
+          "reference": "SAL0731JUL0033",
+          "accountId": "ACC-HDFC-4021",
+          "bank": {
+            "masked": "Axis ••••7729",
+            "ifsc": "UTIB0001204",
+            "name": "Axis Bank"
+          },
+          "issuedAt": "2026-07-31T18:50:00+05:30",
+          "sha256": "f3cb14fc7238bfc67d1cada840ebdfc808bc88d84e95626a97dd6380f1187b01",
+          "baseEarnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 1710000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 855000
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 1235000
+            }
+          ],
+          "pan": "CJSPJ7741B",
+          "uan": "101688204537"
+        }
+      ],
+      "totalNetPaise": 49166437,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-07-27T10:00:00+05:30",
+      "paidAt": "2026-07-31T18:35:00+05:30",
+      "events": [
+        {
+          "eventId": "SRE-2026-07-3",
+          "type": "RUN_PAID",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-07-31T18:35:00+05:30",
+          "note": "Six NEFT transfers from ACC-HDFC-4021, ₹4,91,664.37 net. Slips issued and hashed at 18:50."
+        },
+        {
+          "eventId": "SRE-2026-07-2",
+          "type": "LOP_APPLIED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-07-28T12:30:00+05:30",
+          "note": "Meera Joshi, 2 days loss of pay against an approved-leave shortfall: 29 paid days of 31. Every earning multiplied by 29/31 and truncated to the paise — Basic ₹17,100 → ₹15,996.77, HRA ₹8,550 → ₹7,998.38, Special allowance ₹12,350 → ₹11,553.22, gross ₹35,548.37. Provident fund pro-rated on the same fraction and rounded to the rupee, ₹1,800 → ₹1,684. Professional tax is a flat monthly levy and stays at ₹200. Net ₹33,664.37."
+        },
+        {
+          "eventId": "SRE-2026-07-1",
+          "type": "RUN_OPENED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-07-27T10:00:00+05:30",
+          "note": "July run opened from six accounts. Vikram Chauhan's account was closed on 30 Jun and is not in this run."
+        }
+      ]
+    },
+    {
+      "runId": "RUN-2026-06",
+      "month": "2026-06",
+      "state": "paid",
+      "slips": [
+        {
+          "slipId": "SLIP-2026-06-0011",
+          "salaryAccountId": "SAL-AC-0011",
+          "memberId": 1,
+          "memberName": "Rohit Malhotra",
+          "employeeCode": "IB-EMP-002",
+          "designation": "Founder & Director",
+          "month": "2026-06",
+          "paidDays": 30,
+          "lopDays": 0,
+          "earnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 11250000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 5625000
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 8125000
+            }
+          ],
+          "deductions": [
+            {
+              "key": "pf",
+              "label": "Provident fund",
+              "amountPaise": 180000
+            },
+            {
+              "key": "pt",
+              "label": "Professional tax",
+              "amountPaise": 20000
+            },
+            {
+              "key": "tds",
+              "label": "TDS",
+              "amountPaise": 4500000
+            }
+          ],
+          "grossPaise": 25000000,
+          "deductionsPaise": 4700000,
+          "netPaise": 20300000,
+          "paidAt": "2026-06-30T18:40:00+05:30",
+          "mode": "NEFT",
+          "reference": "SAL0630JUN0011",
+          "accountId": "ACC-HDFC-4021",
+          "bank": {
+            "masked": "HDFC ••••8841",
+            "ifsc": "HDFC0000123",
+            "name": "HDFC Bank"
+          },
+          "issuedAt": "2026-06-30T18:55:00+05:30",
+          "sha256": "211c0ba329ebcc3cb102db7e30ca5f8dc308eaca031675ddcb01817bc17500fb",
+          "baseEarnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 11250000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 5625000
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 8125000
+            }
+          ],
+          "pan": "AFZPM8821K",
+          "uan": null
+        },
+        {
+          "slipId": "SLIP-2026-06-0014",
+          "salaryAccountId": "SAL-AC-0014",
+          "memberId": 2,
+          "memberName": "Anjali Deshpande",
+          "employeeCode": "IB-EMP-007",
+          "designation": "Head of Sales",
+          "month": "2026-06",
+          "paidDays": 30,
+          "lopDays": 0,
+          "earnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 5400000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 2700000
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 3000000
+            },
+            {
+              "key": "performance",
+              "label": "Performance allowance",
+              "amountPaise": 900000
+            }
+          ],
+          "deductions": [
+            {
+              "key": "pf",
+              "label": "Provident fund",
+              "amountPaise": 180000
+            },
+            {
+              "key": "pt",
+              "label": "Professional tax",
+              "amountPaise": 20000
+            },
+            {
+              "key": "tds",
+              "label": "TDS",
+              "amountPaise": 1250000
+            }
+          ],
+          "grossPaise": 12000000,
+          "deductionsPaise": 1450000,
+          "netPaise": 10550000,
+          "paidAt": "2026-06-30T18:40:00+05:30",
+          "mode": "NEFT",
+          "reference": "SAL0630JUN0014",
+          "accountId": "ACC-HDFC-4021",
+          "bank": {
+            "masked": "HDFC ••••2276",
+            "ifsc": "HDFC0000123",
+            "name": "HDFC Bank"
+          },
+          "issuedAt": "2026-06-30T18:55:00+05:30",
+          "sha256": "7c9714ee5209653902aac8f329989539935652252a49708d441b25d98a51bb80",
+          "baseEarnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 5400000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 2700000
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 3000000
+            },
+            {
+              "key": "performance",
+              "label": "Performance allowance",
+              "amountPaise": 900000
+            }
+          ],
+          "pan": "BKQPD4417L",
+          "uan": "100812345678"
+        },
+        {
+          "slipId": "SLIP-2026-06-0022",
+          "salaryAccountId": "SAL-AC-0022",
+          "memberId": 4,
+          "memberName": "Karan Sethi",
+          "employeeCode": "IB-EMP-014",
+          "designation": "Sales Executive",
+          "month": "2026-06",
+          "paidDays": 30,
+          "lopDays": 0,
+          "earnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 2025000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 1012500
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 1462500
+            }
+          ],
+          "deductions": [
+            {
+              "key": "pf",
+              "label": "Provident fund",
+              "amountPaise": 180000
+            },
+            {
+              "key": "pt",
+              "label": "Professional tax",
+              "amountPaise": 20000
+            }
+          ],
+          "grossPaise": 4500000,
+          "deductionsPaise": 200000,
+          "netPaise": 4300000,
+          "paidAt": "2026-06-30T18:40:00+05:30",
+          "mode": "NEFT",
+          "reference": "SAL0630JUN0022",
+          "accountId": "ACC-HDFC-4021",
+          "bank": {
+            "masked": "ICICI ••••5510",
+            "ifsc": "ICIC0001842",
+            "name": "ICICI Bank"
+          },
+          "issuedAt": "2026-06-30T18:55:00+05:30",
+          "sha256": "1bfc52a4f3c13bc8d2eee9d13d5023dce9949a4ea0f0b7f08c8ac8b952e6462d",
+          "baseEarnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 2025000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 1012500
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 1462500
+            }
+          ],
+          "pan": "CDLPS6230M",
+          "uan": "101477239055"
+        },
+        {
+          "slipId": "SLIP-2026-06-0025",
+          "salaryAccountId": "SAL-AC-0025",
+          "memberId": 5,
+          "memberName": "Priya Nair",
+          "employeeCode": "IB-EMP-016",
+          "designation": "Sales Executive",
+          "month": "2026-06",
+          "paidDays": 30,
+          "lopDays": 0,
+          "earnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 2160000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 1080000
+            },
+            {
+              "key": "conveyance",
+              "label": "Conveyance allowance",
+              "amountPaise": 160000
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 1400000
+            }
+          ],
+          "deductions": [
+            {
+              "key": "pf",
+              "label": "Provident fund",
+              "amountPaise": 180000
+            },
+            {
+              "key": "pt",
+              "label": "Professional tax",
+              "amountPaise": 20000
+            }
+          ],
+          "grossPaise": 4800000,
+          "deductionsPaise": 200000,
+          "netPaise": 4600000,
+          "paidAt": "2026-06-30T18:40:00+05:30",
+          "mode": "NEFT",
+          "reference": "SAL0630JUN0025",
+          "accountId": "ACC-HDFC-4021",
+          "bank": {
+            "masked": "SBI ••••9034",
+            "ifsc": "SBIN0009321",
+            "name": "State Bank of India"
+          },
+          "issuedAt": "2026-06-30T18:55:00+05:30",
+          "sha256": "57d60f5568030ee8acf64dc860e685b77bd0ef00fef5d27855e979ba4befbe68",
+          "baseEarnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 2160000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 1080000
+            },
+            {
+              "key": "conveyance",
+              "label": "Conveyance allowance",
+              "amountPaise": 160000
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 1400000
+            }
+          ],
+          "pan": "AHRPN1188Q",
+          "uan": "101560884213"
+        },
+        {
+          "slipId": "SLIP-2026-06-0031",
+          "salaryAccountId": "SAL-AC-0031",
+          "memberId": 6,
+          "memberName": "Aditya Rao",
+          "employeeCode": "IB-EMP-011",
+          "designation": "Senior Interior Designer",
+          "month": "2026-06",
+          "paidDays": 30,
+          "lopDays": 0,
+          "earnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 2925000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 1462500
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 2112500
+            }
+          ],
+          "deductions": [
+            {
+              "key": "pf",
+              "label": "Provident fund",
+              "amountPaise": 180000
+            },
+            {
+              "key": "pt",
+              "label": "Professional tax",
+              "amountPaise": 20000
+            },
+            {
+              "key": "tds",
+              "label": "TDS",
+              "amountPaise": 250000
+            }
+          ],
+          "grossPaise": 6500000,
+          "deductionsPaise": 450000,
+          "netPaise": 6050000,
+          "paidAt": "2026-06-30T18:40:00+05:30",
+          "mode": "NEFT",
+          "reference": "SAL0630JUN0031",
+          "accountId": "ACC-HDFC-4021",
+          "bank": {
+            "masked": "HDFC ••••4417",
+            "ifsc": "HDFC0000123",
+            "name": "HDFC Bank"
+          },
+          "issuedAt": "2026-06-30T18:55:00+05:30",
+          "sha256": "f480f78b959f754e8285ded3e87021fc2cc6ed34047c4a33ed5f44fd2dd287f0",
+          "baseEarnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 2925000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 1462500
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 2112500
+            }
+          ],
+          "pan": "BQTPR5092H",
+          "uan": "100933471182"
+        },
+        {
+          "slipId": "SLIP-2026-06-0033",
+          "salaryAccountId": "SAL-AC-0033",
+          "memberId": 8,
+          "memberName": "Meera Joshi",
+          "employeeCode": "IB-EMP-019",
+          "designation": "Operations & Support Executive",
+          "month": "2026-06",
+          "paidDays": 30,
+          "lopDays": 0,
+          "earnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 1710000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 855000
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 1235000
+            }
+          ],
+          "deductions": [
+            {
+              "key": "pf",
+              "label": "Provident fund",
+              "amountPaise": 180000
+            },
+            {
+              "key": "pt",
+              "label": "Professional tax",
+              "amountPaise": 20000
+            }
+          ],
+          "grossPaise": 3800000,
+          "deductionsPaise": 200000,
+          "netPaise": 3600000,
+          "paidAt": "2026-06-30T18:40:00+05:30",
+          "mode": "NEFT",
+          "reference": "SAL0630JUN0033",
+          "accountId": "ACC-HDFC-4021",
+          "bank": {
+            "masked": "Axis ••••7729",
+            "ifsc": "UTIB0001204",
+            "name": "Axis Bank"
+          },
+          "issuedAt": "2026-06-30T18:55:00+05:30",
+          "sha256": "0707c65723726f81d48790710967d4162e2c8727ddc810cbd5bb3c49cf899331",
+          "baseEarnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 1710000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 855000
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 1235000
+            }
+          ],
+          "pan": "CJSPJ7741B",
+          "uan": "101688204537"
+        },
+        {
+          "slipId": "SLIP-2026-06-0018",
+          "salaryAccountId": "SAL-AC-0018",
+          "memberId": 9,
+          "memberName": "Vikram Chauhan",
+          "employeeCode": "IB-EMP-009",
+          "designation": "Sales Executive",
+          "month": "2026-06",
+          "paidDays": 30,
+          "lopDays": 0,
+          "earnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 2025000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 1012500
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 1462500
+            }
+          ],
+          "deductions": [
+            {
+              "key": "pf",
+              "label": "Provident fund",
+              "amountPaise": 180000
+            },
+            {
+              "key": "pt",
+              "label": "Professional tax",
+              "amountPaise": 20000
+            }
+          ],
+          "grossPaise": 4500000,
+          "deductionsPaise": 200000,
+          "netPaise": 4300000,
+          "paidAt": "2026-06-30T18:40:00+05:30",
+          "mode": "NEFT",
+          "reference": "SAL0630JUN0018",
+          "accountId": "ACC-HDFC-4021",
+          "bank": {
+            "masked": "Kotak ••••3168",
+            "ifsc": "KKBK0000261",
+            "name": "Kotak Mahindra Bank"
+          },
+          "issuedAt": "2026-06-30T18:55:00+05:30",
+          "sha256": "8a57e0f41b8badca036ade657d0b2e5ea1642b5c5063e2edfaa26bcca618fda3",
+          "baseEarnings": [
+            {
+              "key": "basic",
+              "label": "Basic",
+              "amountPaise": 2025000
+            },
+            {
+              "key": "hra",
+              "label": "House rent allowance",
+              "amountPaise": 1012500
+            },
+            {
+              "key": "special",
+              "label": "Special allowance",
+              "amountPaise": 1462500
+            }
+          ],
+          "pan": "AKMPC3306F",
+          "uan": "100729551640"
+        }
+      ],
+      "totalNetPaise": 53700000,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-06-26T10:00:00+05:30",
+      "paidAt": "2026-06-30T18:40:00+05:30",
+      "events": [
+        {
+          "eventId": "SRE-2026-06-3",
+          "type": "RUN_PAID",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-06-30T18:40:00+05:30",
+          "note": "Seven NEFT transfers from ACC-HDFC-4021, ₹5,37,000 net. Slips issued and hashed at 18:55."
+        },
+        {
+          "eventId": "SRE-2026-06-2",
+          "type": "FINAL_SETTLEMENT",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-06-30T18:40:00+05:30",
+          "note": "Vikram Chauhan's last working day was 30 Jun and he worked the full month, so his final slip is an ordinary one — no LOP, no notice-pay adjustment. Nothing is owed after this."
+        },
+        {
+          "eventId": "SRE-2026-06-1",
+          "type": "RUN_OPENED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-06-26T10:00:00+05:30",
+          "note": "June run opened from seven accounts."
+        }
+      ]
+    }
+  ]
+}

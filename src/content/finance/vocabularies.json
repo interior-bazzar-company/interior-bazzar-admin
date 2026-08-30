@@ -1,0 +1,739 @@
+{
+  "$comment": "STATIC COPY for Finance. Labels, tones, meanings, formulas and cautions — the words the module speaks. This is NOT placeholder data awaiting an endpoint: when the API arrives it serves the same list from GET /admin/finance/vocabularies, and the panel keeps reading it from one place so a state cannot be spelled one way on a list and another way on a record. Every metric and every KPI carries its own formula and its own caution, rendered behind an i button, because the only defence against one number meaning two different things six months apart is writing down what it means next to it.",
+  "generatedAt": "2026-08-25T09:00:00+05:30",
+  "moduleRule": "Finance RECORDS TRANSACTIONS. Four things get recorded and nothing else: a subscription sale and its installments, a salary, a company expense or income, a refund. Every row exists because something happened — money moved, a gateway declined, a due date passed. No state here means \"recorded but not yet believed\". Finance does not decide what is owed either; Invoice does that, and Deals holds the balance.",
+  "recordTypes": [
+    {
+      "key": "subscriptions",
+      "label": "Subscriptions",
+      "short": "Subs",
+      "help": "Business subscriptions: activated against the invoice raised for them, paid in installments. The installment is the unit that gets paid."
+    },
+    {
+      "key": "salaries",
+      "label": "Salaries A/C",
+      "short": "Salaries",
+      "help": "What each team member is paid, attached to their Team record, issued as a numbered slip they can be handed."
+    },
+    {
+      "key": "transactions",
+      "label": "Other Transaction",
+      "short": "Other",
+      "help": "Company money out and in under a tag you create. Everything that is not a subscription and not a salary."
+    },
+    {
+      "key": "refunds",
+      "label": "Refunds",
+      "short": "Refunds",
+      "help": "Money going back out — against a subscription payment, or raised by hand. The only routine action that sends money out of the company."
+    },
+    {
+      "key": "analytics",
+      "label": "Analytics",
+      "short": "Analytics",
+      "help": "The four record types read back as one picture, and the KPIs that turn it into a decision."
+    }
+  ],
+  "subscriptionSources": [
+    {
+      "key": "sales",
+      "label": "Sales",
+      "short": "SALES",
+      "help": "A salesperson closed it on a deal and recorded the payment against the invoice. Carries a deal reference."
+    },
+    {
+      "key": "website",
+      "label": "Website",
+      "short": "WEB",
+      "help": "The customer bought it themselves and paid through the gateway. No salesperson, which is why it costs nothing to acquire beyond the ad spend."
+    }
+  ],
+  "installmentStatuses": [
+    {
+      "key": "paid",
+      "label": "Paid",
+      "tone": "ok",
+      "meaning": "The money arrived and is in the ledger. The receipt is issued and it counts as collected."
+    },
+    {
+      "key": "due",
+      "label": "Due",
+      "tone": "mute",
+      "meaning": "Nothing has happened to it yet. This is the absence of an event, not a claim about one — it is not late until its due date passes."
+    },
+    {
+      "key": "fail_to_pay",
+      "label": "Fail to pay",
+      "tone": "bad",
+      "meaning": "A real failure, recorded with its evidence: a gateway declined it, a mandate was cancelled, or the due date passed with nothing against it. Never a guess."
+    },
+    {
+      "key": "cancelled",
+      "label": "Cancelled",
+      "tone": "mute",
+      "meaning": "The installment will not be collected. The subscription was ended, or its invoice was cancelled."
+    }
+  ],
+  "$comment_installmentStatuses": "FAIL TO PAY IS A FACT, NOT A DOUBT. It records something that actually occurred and stores the evidence in `failure` — a gateway response code, or a due date that has demonstrably passed. It is the one status on this page that looks like a judgement and is not one.",
+  "failureReasons": [
+    {
+      "key": "declined",
+      "label": "Declined by the bank",
+      "help": "The gateway returned a decline. The card or account exists; the payment was refused."
+    },
+    {
+      "key": "insufficient_funds",
+      "label": "Insufficient funds",
+      "help": "The account did not hold the amount on the day it was attempted."
+    },
+    {
+      "key": "mandate_cancelled",
+      "label": "Mandate cancelled",
+      "help": "The standing instruction was withdrawn, so nothing was even attempted."
+    },
+    {
+      "key": "overdue",
+      "label": "Due date passed",
+      "help": "No attempt and no payment. The date is the evidence — nothing was collected and the day has gone."
+    }
+  ],
+  "subscriptionStatuses": [
+    {
+      "key": "active",
+      "label": "Active",
+      "tone": "ok",
+      "meaning": "Running, with installments still to come."
+    },
+    {
+      "key": "completed",
+      "label": "Completed",
+      "tone": "info",
+      "meaning": "Every installment paid and the term served."
+    },
+    {
+      "key": "defaulting",
+      "label": "Defaulting",
+      "tone": "bad",
+      "meaning": "At least one installment failed and has not been recovered. The money is not coming on its own."
+    },
+    {
+      "key": "cancelled",
+      "label": "Cancelled",
+      "tone": "mute",
+      "meaning": "Ended early. Remaining installments are cancelled, not written off."
+    },
+    {
+      "key": "refunded",
+      "label": "Refunded",
+      "tone": "warn",
+      "meaning": "Money paid on it has gone back out. The counter-entries are on the record."
+    }
+  ],
+  "modes": [
+    "NEFT",
+    "RTGS",
+    "IMPS",
+    "UPI",
+    "Card",
+    "Netbanking",
+    "Cash"
+  ],
+  "salaryRunStates": [
+    {
+      "key": "open",
+      "label": "Open",
+      "tone": "info",
+      "meaning": "The month is not finished. Slips can still be adjusted; nobody has been paid."
+    },
+    {
+      "key": "paid",
+      "label": "Paid",
+      "tone": "ok",
+      "meaning": "The transfers were made and recorded. Every slip in the run is frozen."
+    }
+  ],
+  "$comment_salaryRunStates": "A run is being prepared or it happened — there is no approval state, because paying salaries is not a claim anybody verifies afterwards. `open` is not a pending decision: it means the calendar month is still running.",
+  "slipRule": "A slip freezes its own earnings and deductions. They are copied onto it, never read through to the salary account — so a raise next month cannot silently rewrite last month's slip. Gross is the sum of the earnings on the slip, net is gross minus the deductions on the slip, and neither is ever CTC divided by twelve.",
+  "tagKinds": [
+    {
+      "key": "fixed",
+      "label": "Fixed",
+      "landsIn": "Net line on Analytics",
+      "help": "Runs whether or not anything is sold: rent, tools, utilities."
+    },
+    {
+      "key": "reinvestment",
+      "label": "Reinvestment",
+      "landsIn": "Net line AND CAC",
+      "help": "Spend that buys customers. It is the CAC numerator, which is why the tag has to be right."
+    },
+    {
+      "key": "variable",
+      "label": "Variable",
+      "landsIn": "Net line only",
+      "help": "Scales with delivery: vendors, contractors, fulfilment."
+    },
+    {
+      "key": "excluded",
+      "label": "Excluded",
+      "landsIn": "Cash out, not an operating cost",
+      "help": "Taxes and statutory payments. Money leaves, the operating picture does not change."
+    }
+  ],
+  "$comment_tagKinds": "TAGS ARE CUSTOM — anyone with edit rights creates one. What is NOT free is the kind: it is chosen at creation and it decides where the money lands in analytics. A tag is deactivated, never deleted, because deleting one would silently re-bucket every transaction that already used it.",
+  "manualCreditKinds": [
+    {
+      "key": "interest",
+      "label": "Bank interest"
+    },
+    {
+      "key": "own_transfer",
+      "label": "Own transfer between accounts"
+    },
+    {
+      "key": "vendor_refund",
+      "label": "Refund from a vendor"
+    }
+  ],
+  "$comment_manualCreditKinds": "The ONLY three credits a person may hand-key, and all three are flagged non-revenue. Customer money has exactly one way in: a subscription. If anyone could type a credit, anyone could fabricate revenue.",
+  "transactionStates": [
+    {
+      "key": "recorded",
+      "label": "Recorded",
+      "tone": "ok",
+      "meaning": "The money moved. There is no draft state on this page — a row here means it happened."
+    },
+    {
+      "key": "reversed",
+      "label": "Reversed",
+      "tone": "bad",
+      "meaning": "A counter-entry was appended. The original row is untouched and still on the record."
+    }
+  ],
+  "refundOrigins": [
+    {
+      "key": "subscription",
+      "label": "Against a subscription",
+      "help": "Tied to a recorded installment payment. The policy check runs against that payment and is frozen onto the request."
+    },
+    {
+      "key": "manual",
+      "label": "Raised by hand",
+      "help": "No ledger row to reverse — a duplicate transfer someone sent us, an overpayment, an order taken off-platform. It names its own payee and carries no policy check, because an empty check would read as a passed one."
+    }
+  ],
+  "refundGrounds": [
+    {
+      "key": "duplicate",
+      "label": "Duplicate charge",
+      "permitted": true,
+      "help": "The same amount taken twice for the same thing. The clearest ground there is."
+    },
+    {
+      "key": "pre_activation",
+      "label": "Cancelled before activation",
+      "permitted": true,
+      "help": "Paid, then cancelled before the membership was switched on. Nothing was consumed."
+    },
+    {
+      "key": "overpayment",
+      "label": "Overpayment",
+      "permitted": true,
+      "help": "More money arrived than was ever owed. Common on manual transfers."
+    },
+    {
+      "key": "service_failure",
+      "label": "Service failure",
+      "permitted": true,
+      "help": "We did not deliver. Needs the detail, because the approver is being asked to accept a fault."
+    },
+    {
+      "key": "other",
+      "label": "Other / goodwill",
+      "permitted": false,
+      "help": "Not a permitted ground. The request is still accepted and still reaches the approver — it is framed as an exception, not blocked."
+    }
+  ],
+  "refundPolicy": {
+    "windowDays": 30,
+    "partial": false,
+    "$comment": "Full refunds only, for the same reason payments are full: a partial refund implies a partly-paid installment, which the 1:1 rule says cannot exist. The check FRAMES the approval, it does not block it — hard-blocking every out-of-window refund means a genuine duplicate cannot be processed at all."
+  },
+  "refundStates": [
+    {
+      "key": "requested",
+      "label": "Requested",
+      "tone": "info"
+    },
+    {
+      "key": "sent_back",
+      "label": "Sent back",
+      "tone": "warn"
+    },
+    {
+      "key": "approved",
+      "label": "Approved",
+      "tone": "ok"
+    },
+    {
+      "key": "paid",
+      "label": "Paid",
+      "tone": "ok"
+    },
+    {
+      "key": "declined",
+      "label": "Declined",
+      "tone": "mute"
+    }
+  ],
+  "$comment_refundStates": "APPROVAL MOVES NO MONEY. It authorises a transfer a human makes in the bank; the refund is only `paid` when somebody records that transfer with its reference. The gap between `approved` and `paid` is real money owed and not yet sent, and the Overview counts it.",
+  "eventTypes": [
+    {
+      "key": "SUBSCRIPTION_ACTIVATED",
+      "label": "Subscription activated",
+      "tone": "ok"
+    },
+    {
+      "key": "INSTALLMENT_PAID",
+      "label": "Installment paid",
+      "tone": "ok"
+    },
+    {
+      "key": "INSTALLMENT_FAILED",
+      "label": "Installment failed",
+      "tone": "bad"
+    },
+    {
+      "key": "INSTALLMENT_RETRIED",
+      "label": "Installment retried",
+      "tone": "info"
+    },
+    {
+      "key": "RECEIPT_ISSUED",
+      "label": "Receipt issued",
+      "tone": "ok"
+    },
+    {
+      "key": "SUBSCRIPTION_COMPLETED",
+      "label": "Subscription completed",
+      "tone": "info"
+    },
+    {
+      "key": "SUBSCRIPTION_CANCELLED",
+      "label": "Subscription cancelled",
+      "tone": "mute"
+    },
+    {
+      "key": "PAYMENT_REVERSED",
+      "label": "Payment reversed",
+      "tone": "bad"
+    },
+    {
+      "key": "SALARY_ACCOUNT_OPENED",
+      "label": "Salary account opened",
+      "tone": "ok"
+    },
+    {
+      "key": "SALARY_REVISED",
+      "label": "Salary revised",
+      "tone": "info"
+    },
+    {
+      "key": "SALARY_ACCOUNT_CLOSED",
+      "label": "Salary account closed",
+      "tone": "mute"
+    },
+    {
+      "key": "RUN_OPENED",
+      "label": "Run opened",
+      "tone": "info"
+    },
+    {
+      "key": "SLIP_ISSUED",
+      "label": "Slip issued",
+      "tone": "ok"
+    },
+    {
+      "key": "RUN_PAID",
+      "label": "Run paid",
+      "tone": "ok"
+    },
+    {
+      "key": "RUN_DRAFT_RECALCULATED",
+      "label": "Run recalculated",
+      "tone": "info"
+    },
+    {
+      "key": "LOP_APPLIED",
+      "label": "Loss of pay applied",
+      "tone": "warn"
+    },
+    {
+      "key": "FINAL_SETTLEMENT",
+      "label": "Final settlement",
+      "tone": "info"
+    },
+    {
+      "key": "TXN_RECORDED",
+      "label": "Transaction recorded",
+      "tone": "ok"
+    },
+    {
+      "key": "BILL_ATTACHED",
+      "label": "Bill attached",
+      "tone": "info"
+    },
+    {
+      "key": "TXN_REVERSED",
+      "label": "Transaction reversed",
+      "tone": "bad"
+    },
+    {
+      "key": "TAG_CREATED",
+      "label": "Tag created",
+      "tone": "info"
+    },
+    {
+      "key": "TAG_DEACTIVATED",
+      "label": "Tag deactivated",
+      "tone": "mute"
+    },
+    {
+      "key": "BUDGET_SET",
+      "label": "Budget set",
+      "tone": "info"
+    },
+    {
+      "key": "REFUND_REQUESTED",
+      "label": "Refund requested",
+      "tone": "info"
+    },
+    {
+      "key": "REFUND_APPROVED",
+      "label": "Refund approved",
+      "tone": "ok"
+    },
+    {
+      "key": "REFUND_SENT_BACK",
+      "label": "Sent back to requester",
+      "tone": "warn"
+    },
+    {
+      "key": "REFUND_DECLINED",
+      "label": "Refund declined",
+      "tone": "mute"
+    },
+    {
+      "key": "REFUND_PAID",
+      "label": "Refund paid",
+      "tone": "ok"
+    },
+    {
+      "key": "MATCHED",
+      "label": "Matched to bank",
+      "tone": "ok"
+    },
+    {
+      "key": "IMPORTED",
+      "label": "Imported from statement",
+      "tone": "info"
+    },
+    {
+      "key": "PERIOD_CLOSED",
+      "label": "Period closed",
+      "tone": "info"
+    },
+    {
+      "key": "EXPORTED",
+      "label": "Exported",
+      "tone": "mute"
+    }
+  ],
+  "metricDefinitions": [
+    {
+      "key": "collected",
+      "label": "Collected",
+      "unit": "₹",
+      "formula": "Σ installment payments in the period − Σ reversals − Σ refunds paid",
+      "caution": "Money that arrived. Installments that are due, and invoices nobody has paid, are not in this figure — the first has not happened and the second is a demand."
+    },
+    {
+      "key": "salary_cost",
+      "label": "Salary cost",
+      "unit": "₹",
+      "formula": "Σ net paid on runs whose month falls in the period",
+      "caution": "Net paid to people, not cost to company. Employer PF and gratuity are not in this seed, so this is what left the bank, not what the team costs."
+    },
+    {
+      "key": "other_out",
+      "label": "Other spend",
+      "unit": "₹",
+      "formula": "Σ recorded transactions with direction out and a tag whose kind is not excluded",
+      "caution": "Excluded tags — taxes and statutory — are real money leaving that is deliberately not in the operating picture. They are counted in cash out, never here."
+    },
+    {
+      "key": "other_in",
+      "label": "Other income",
+      "unit": "₹",
+      "formula": "Σ recorded transactions with direction in",
+      "caution": "Never revenue. All three permitted credits are flagged non-revenue, so this figure can never be mistaken for a sale."
+    },
+    {
+      "key": "refunds_out",
+      "label": "Refunds paid",
+      "unit": "₹",
+      "formula": "Σ refunds whose state is paid, by settlement date",
+      "caution": "Approved and not yet transferred is NOT in this figure. That gap is shown separately, because it is money owed and still sitting in the account."
+    },
+    {
+      "key": "refunds_owed",
+      "label": "Approved, not sent",
+      "unit": "₹",
+      "formula": "Σ refunds in state approved with no settlement",
+      "caution": "Money the company has agreed to return and has not returned. It is still in the bank balance and it is not the company's."
+    },
+    {
+      "key": "net",
+      "label": "Net",
+      "unit": "₹",
+      "formula": "collected + other_in − salary_cost − other_out − refunds_out",
+      "caution": "Say net, never profit. Full cost allocation does not exist here — no depreciation, no employer contributions, no accruals."
+    },
+    {
+      "key": "due_next",
+      "label": "Due next 30 days",
+      "unit": "₹",
+      "formula": "Σ the next payable installment of each active subscription, due within 30 days of asOf",
+      "caution": "Expected, not earned, and only what is genuinely in front of each customer: one installment per subscription, never the rows behind it, and nothing at all from a subscription that is already defaulting — the last attempt at that money did not clear."
+    },
+    {
+      "key": "failed",
+      "label": "Fail to pay",
+      "unit": "₹",
+      "formula": "Σ installments with status fail_to_pay",
+      "caution": "Money that was owed and did not arrive, with the reason recorded on each one. It is not written off — it is uncollected."
+    },
+    {
+      "key": "matched",
+      "label": "Matched to bank",
+      "unit": "%",
+      "formula": "rows carrying a bankLineId ÷ rows in an imported statement window",
+      "caution": "Completeness, not correctness. A high figure says the ledger and the bank agree on what exists, and says nothing about whether a row was tagged right."
+    }
+  ],
+  "kpiDefinitions": [
+    {
+      "key": "mrr",
+      "label": "MRR",
+      "unit": "inr",
+      "group": "Revenue",
+      "goodDirection": "up",
+      "formula": "Σ (subscription total ÷ cycle months) over active subscriptions",
+      "caution": "A level, read at a moment, never a rate summed over a period. Defaulting subscriptions are excluded the moment an installment fails — counting them is how MRR quietly becomes fiction."
+    },
+    {
+      "key": "arpu",
+      "label": "ARPU",
+      "unit": "inr",
+      "group": "Revenue",
+      "goodDirection": "up",
+      "formula": "MRR ÷ active subscriptions",
+      "caution": "Null, not zero, when there are no active subscriptions. A denominator of nothing has no average."
+    },
+    {
+      "key": "collection_rate",
+      "label": "Collection rate",
+      "unit": "pct",
+      "group": "Revenue",
+      "goodDirection": "up",
+      "formula": "installments paid ÷ (installments paid + fail to pay), by due date in the period",
+      "caution": "Installments still `due` are excluded — they are not late yet, and including them would make every current month look like a failure."
+    },
+    {
+      "key": "fail_rate",
+      "label": "Fail to pay rate",
+      "unit": "pct",
+      "group": "Revenue",
+      "goodDirection": "down",
+      "formula": "installments fail_to_pay ÷ installments due or past due in the period",
+      "caution": "The single number that says whether the installment model is working. A gateway decline and a passed due date are counted the same here; the record screen separates them."
+    },
+    {
+      "key": "salary_ratio",
+      "label": "Salary to collected",
+      "unit": "pct",
+      "group": "Cost",
+      "goodDirection": "down",
+      "formula": "salary cost ÷ collected, over the same period",
+      "caution": "Above 100% means the team cost more than the month collected. Meaningful only over a closed month — a part-month salary run against a part-month of collection compares nothing."
+    },
+    {
+      "key": "cost_per_head",
+      "label": "Cost per head",
+      "unit": "inr",
+      "group": "Cost",
+      "goodDirection": "down",
+      "formula": "salary cost ÷ active salary accounts",
+      "caution": "Net paid per person, not CTC per person. A month with a loss-of-pay adjustment will read low for a reason that has nothing to do with pay scales."
+    },
+    {
+      "key": "burn",
+      "label": "Monthly burn",
+      "unit": "inr",
+      "group": "Cost",
+      "goodDirection": "down",
+      "formula": "salary cost + other spend + refunds paid, over the period",
+      "caution": "Cash leaving, excluding tagged-excluded statutory payments. It is not the same as expenses: an expense recognised is not money gone."
+    },
+    {
+      "key": "net_margin",
+      "label": "Net margin",
+      "unit": "pct",
+      "group": "Health",
+      "goodDirection": "up",
+      "formula": "net ÷ (collected + other income)",
+      "caution": "Not profit margin. The word profit needs full cost allocation, which this module does not have."
+    },
+    {
+      "key": "refund_rate",
+      "label": "Refund rate",
+      "unit": "pct",
+      "group": "Health",
+      "goodDirection": "down",
+      "formula": "refunds paid ÷ collected, over the period",
+      "caution": "A refund is dated when the transfer was made, not when the original payment was. A refund of a July payment lands in the month it was actually sent."
+    },
+    {
+      "key": "runway",
+      "label": "Runway",
+      "unit": "months",
+      "group": "Health",
+      "goodDirection": "up",
+      "formula": "unrestricted cash ÷ average monthly burn",
+      "caution": "Needs a reconciled cash balance and several closed months of burn. Neither exists in this seed, so it returns null — a placeholder here is a decision made on a wrong number."
+    },
+    {
+      "key": "new_customers",
+      "label": "New customers",
+      "unit": "count",
+      "group": "Growth",
+      "goodDirection": "up",
+      "formula": "distinct customers whose first installment payment falls in the period",
+      "caution": "First payment, not first subscription and not signup. A renewal by an existing customer is not a new customer."
+    },
+    {
+      "key": "cac",
+      "label": "CAC",
+      "unit": "inr",
+      "group": "Growth",
+      "goodDirection": "down",
+      "formula": "Σ reinvestment-tagged spend ÷ new customers",
+      "caution": "Null, never zero, in a period with no new customer — dividing by nothing is not free acquisition. Only reinvestment-tagged spend is in the numerator, which is why the tag has to be right."
+    },
+    {
+      "key": "website_share",
+      "label": "Website share",
+      "unit": "pct",
+      "group": "Growth",
+      "goodDirection": "up",
+      "formula": "collected from website-sourced subscriptions ÷ total collected",
+      "caution": "Channel mix by money, not by count. One large sales-closed deal will move this more than ten small self-serve ones."
+    }
+  ],
+  "roles": {
+    "finance": "Record a subscription and its installments · record an installment payment · open a salary run and issue slips · record a company expense or income · create a tag · request a refund · record a refund transfer · close a period",
+    "superAdmin": "Reverse a payment or a transaction · mark a salary run paid · approve or decline a refund · deactivate a tag"
+  },
+  "openDecisions": [
+    {
+      "id": "FN-AD-01",
+      "title": "Recorded is what happened",
+      "position": "Every row in this module exists because something occurred. There is no verification step and no state meaning \"recorded but not yet believed\". Fail to pay is not an exception: it records a decline or a passed due date, and stores the evidence.",
+      "status": "resolved"
+    },
+    {
+      "id": "FN-AD-02",
+      "title": "Posted is immutable",
+      "position": "Nothing is edited or deleted. A correction is a counter-entry referencing the original, with an actor and a reason.",
+      "status": "resolved"
+    },
+    {
+      "id": "FN-AD-03",
+      "title": "One installment, one payment",
+      "position": "The installment is the unit that gets paid, in full. There is no part-payment field because there is no part-paid installment to record it against.",
+      "status": "resolved"
+    },
+    {
+      "id": "FN-AD-04",
+      "title": "Customer money has one door",
+      "position": "Revenue enters only as a subscription installment. The three hand-keyable credits are all flagged non-revenue.",
+      "status": "resolved"
+    },
+    {
+      "id": "FN-AD-05",
+      "title": "Tags are custom, kinds are not",
+      "position": "Anyone with edit rights creates a tag. The kind is chosen at creation and decides where the money lands. A tag is deactivated, never deleted.",
+      "status": "resolved"
+    },
+    {
+      "id": "FN-OD-01",
+      "title": "Cash view, not accrual",
+      "position": "Everything here is cash in and cash out on the value date. There is no accrual P&L, no deferred revenue and no revenue recognition schedule — a twelve-month subscription paid up front reads as collected in the month it was paid.",
+      "status": "open"
+    },
+    {
+      "id": "FN-OD-02",
+      "title": "Bank matching is simulated",
+      "position": "A statement import exists and can be run once against a seeded file. There is no live bank feed, so \"matched to bank\" is a demonstration of the mechanism, not a live figure.",
+      "status": "open"
+    },
+    {
+      "id": "FN-OD-04",
+      "title": "Who approves what",
+      "position": "Super Admin approves refunds and marks a salary run paid. A bill is required above ₹25,000 before a period closes.",
+      "status": "open"
+    },
+    {
+      "id": "FN-OD-05",
+      "title": "Salary scope",
+      "position": "Salaries A/C records accounts, monthly runs and slips. It does NOT do statutory filing, PF challans, gratuity, leave balances or reimbursements, and it does not compute TDS — the figure is entered, not derived.",
+      "status": "open"
+    },
+    {
+      "id": "FN-OD-06",
+      "title": "Employer cost is not in salary cost",
+      "position": "Salary cost is net paid to people. Employer PF, gratuity accrual and insurance are not modelled, so cost per head understates true cost to company.",
+      "status": "open"
+    },
+    {
+      "id": "FN-OD-07",
+      "title": "Runway is not shown",
+      "position": "It needs a reconciled cash balance and several closed months of burn, neither of which this seed carries. It returns null with the reason on screen rather than a number nobody should act on.",
+      "status": "open"
+    },
+    {
+      "id": "FN-OD-08",
+      "title": "Tax is a summary, not a return",
+      "position": "GST is shown as a summary of what was invoiced. It is not a return, it does not net input credit, and it is not a filing.",
+      "status": "open"
+    },
+    {
+      "id": "FN-OD-12",
+      "title": "Net, never profit",
+      "position": "Screens say contribution and net. Profit needs full cost allocation, which does not exist here.",
+      "status": "open"
+    },
+    {
+      "id": "FN-OD-14",
+      "title": "One supply, several invoices",
+      "position": "The sales chain raises one tax invoice per installment, so one subscription appears as several invoices. The tax summary shows it plainly and it awaits CA sign-off.",
+      "status": "open"
+    },
+    {
+      "id": "FN-OD-15",
+      "title": "Failed installments are not chased from here",
+      "position": "Fail to pay is recorded and surfaced. Retrying a charge, sending a dunning email and suspending the membership all belong to other modules; Finance shows the fact and links out.",
+      "status": "open"
+    }
+  ]
+}

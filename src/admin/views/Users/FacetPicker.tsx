@@ -34,6 +34,13 @@
    area. That split is one flag per field in the JSON, so it is a decision,
    not a wall.
 
+   A CLOSED SINGLE READS AS A SELECT. State used to answer as a chip plus a
+   "Change" button — a two-part control for a one-value answer, and the only
+   place on the form where the answer was not in the box. Now the box shows the
+   answer with a chevron; focusing it opens the same searchable list, with the
+   current value marked. One control, one place to look, and it matches the
+   plain select Business type uses.
+
    Accessibility follows the WAI-ARIA combobox pattern: the input owns
    `role="combobox"`, the popup is a `listbox`, the active option is tracked
    with `aria-activedescendant` rather than by moving focus, Escape closes and
@@ -46,17 +53,19 @@ import type { FacetOption, ProfileField } from "./store";
 
 /** The chips. Above the control on purpose — see the file header. Exported
  *  for the render harness, which asserts the stale branch displaces the tone. */
-export function Chips({ f, values, onRemove, disabled, options: given }: {
+export function Chips({ f, values, onRemove, disabled, options: given, below }: {
   f: ProfileField;
   values: string[];
   onRemove: (k: string) => void;
   disabled?: boolean;
   options?: FacetOption[];
+  /** Chips under the control instead of above it. */
+  below?: boolean;
 }) {
   if (!values.length) return null;
   const opts = given || optionsFor(f);
   return (
-    <div className="um-chips" role="list">
+    <div className={"um-chips" + (below ? " below" : "")} role="list">
       {values.map((v) => {
         const hit = opts.filter((o) => o.key === v)[0];
         /* A value the vocabulary no longer has is still a fact about this
@@ -82,11 +91,16 @@ export function Chips({ f, values, onRemove, disabled, options: given }: {
   );
 }
 
-export default function FacetPicker({ f, values, onChange, disabled, options: given }: {
+export default function FacetPicker({ f, values, onChange, disabled, options: given, chipsBelow }: {
   f: ProfileField;
   values: string[];
   onChange: (next: string[]) => void;
   disabled?: boolean;
+  /** Chips UNDER the input rather than above it. The default (above) keeps
+   *  the box you type into from moving; the exception is a picker that sits
+   *  beside another control — a Target row's cities next to its state — where
+   *  the two boxes lining up on one row matters more than the chips' side. */
+  chipsBelow?: boolean;
   /** Override the schema-resolved options. For DEPENDENT vocabularies — a
    *  target-area row's city list depends on which state that row picked, and
    *  the schema registry cannot know that. */
@@ -99,6 +113,9 @@ export default function FacetPicker({ f, values, onChange, disabled, options: gi
      that does, Segments is a list that does not. */
   const free = f.type === "tags" || f.open === true;
   const max = single ? 1 : f.max || 99;
+  /* Closed single: the box IS the answer. Open singles (City) keep the chip,
+     because a typed value needs a remove control the list cannot offer. */
+  const selectLike = single && !free;
 
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -109,6 +126,9 @@ export default function FacetPicker({ f, values, onChange, disabled, options: gi
   const options = given || optionsFor(f);
   const groups = groupsFor(f);
   const full = values.length >= max;
+  const pickedLabel = selectLike && values.length
+    ? ((options.filter((o) => o.key === values[0])[0] || { label: values[0] }).label)
+    : "";
 
   /* Already-picked options leave the list rather than sitting in it greyed
      out: the list is what you can still do, and a menu mostly made of things
@@ -116,9 +136,9 @@ export default function FacetPicker({ f, values, onChange, disabled, options: gi
   const matches = useMemo(() => {
     const needle = cleanKeyword(q).toLowerCase();
     return options.filter((o) =>
-      values.indexOf(o.key) < 0
+      (selectLike || values.indexOf(o.key) < 0)
       && (!needle || o.label.toLowerCase().indexOf(needle) >= 0));
-  }, [options, values, q]);
+  }, [options, values, q, selectLike]);
 
   /* The typed value, offered as itself. Only on an open field, and only when
      it is not already a suggestion and not already picked. */
@@ -139,7 +159,7 @@ export default function FacetPicker({ f, values, onChange, disabled, options: gi
   useEffect(() => {
     if (!open) return;
     const away = (e: MouseEvent) => {
-      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
+      if (box.current && !box.current.contains(e.target as Node)) { setOpen(false); setQ(""); }
     };
     document.addEventListener("mousedown", away);
     return () => document.removeEventListener("mousedown", away);
@@ -177,7 +197,11 @@ export default function FacetPicker({ f, values, onChange, disabled, options: gi
       return;
     }
     if (e.key === "Escape") {
+      /* CLOSES THE LIST, NOT THE DIALOG. The modal shell listens for Escape
+         on the document; letting this one through discarded a ten-field
+         form because somebody closed a dropdown. */
       e.preventDefault();
+      e.stopPropagation();
       setOpen(false);
       setQ("");
       return;
@@ -220,9 +244,10 @@ export default function FacetPicker({ f, values, onChange, disabled, options: gi
           </li>
         );
       }
+      const picked = selectLike && values[0] === r.key;
       return (
         <li key={r.key} id={optId(i)} role="option" aria-selected={active === i}
-          className={"um-opt" + (active === i ? " on" : "")}
+          className={"um-opt" + (active === i ? " on" : "") + (picked ? " picked" : "")}
           onMouseEnter={() => setActive(i)} onMouseDown={(e) => e.preventDefault()}
           onClick={() => commit(r.key)}>
           <span className="l">{r.label}</span>
@@ -255,55 +280,60 @@ export default function FacetPicker({ f, values, onChange, disabled, options: gi
   };
 
   return (
-    <div className={"um-facet" + (open ? " open" : "")} ref={box}>
-      <Chips f={f} values={values} onRemove={remove} disabled={disabled} options={given} />
-
-      {single && values.length && !open && !free ? null : (
-        <div className="um-facet-in">
-          <Icon name="search" size="sm" />
-          <input
-            ref={input}
-            className="inp"
-            type="text"
-            role="combobox"
-            aria-expanded={open}
-            aria-controls={listId}
-            aria-haspopup="listbox"
-            aria-autocomplete="list"
-            aria-activedescendant={open && rows.length ? optId(active) : undefined}
-            aria-label={f.label}
-            disabled={disabled || (full && !free && !single)}
-            placeholder={
-              full && !single
-                ? max + " of " + max + " picked"
-                : f.placeholder || (free ? "Search or type your own"
-                  : single ? "Choose one" : "Search and pick")
-            }
-            value={q}
-            onChange={(e) => { setQ(e.target.value); setOpen(true); }}
-            onFocus={() => setOpen(true)}
-            onKeyDown={onKey}
-          />
-          {!open ? null : (
-            <button type="button" className="um-facet-x" aria-label="Close the list"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => { setOpen(false); if (input.current) input.current.focus(); }}>
-              <Icon name="x" size="sm" />
-            </button>
-          )}
-        </div>
+    <div className={"um-facet" + (selectLike ? " sellike" : "") + (open ? " open" : "")} ref={box}>
+      {selectLike || chipsBelow ? null : (
+        <Chips f={f} values={values} onRemove={remove} disabled={disabled} options={given} />
       )}
 
-      {single && values.length && !open && !free ? (
-        <button type="button" className="btn sm um-facet-re" disabled={disabled}
-          onClick={() => setOpen(true)}>Change</button>
-      ) : null}
+      <div className="um-facet-in">
+        {selectLike && !open ? null : <Icon name="search" size="sm" />}
+        <input
+          ref={input}
+          className="inp"
+          type="text"
+          role="combobox"
+          aria-expanded={open}
+          aria-controls={listId}
+          aria-haspopup="listbox"
+          aria-autocomplete="list"
+          aria-activedescendant={open && rows.length ? optId(active) : undefined}
+          aria-label={f.label}
+          disabled={disabled || (full && !free && !single)}
+          placeholder={
+            full && !single
+              ? max + " of " + max + " picked"
+              : selectLike && open && pickedLabel
+                ? pickedLabel
+                : f.placeholder || (free ? "Search or type your own"
+                  : single ? "Choose one" : "Search and pick")
+          }
+          /* Closed select-like: the box shows the answer, read-only, and a
+             press opens the list. Open: it is the search box again. */
+          readOnly={selectLike && !open}
+          value={selectLike && !open ? pickedLabel : q}
+          onChange={(e) => { setQ(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onClick={() => { if (!open) setOpen(true); }}
+          onKeyDown={onKey}
+        />
+        {!open ? null : (
+          <button type="button" className="um-facet-x" aria-label="Close the list"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => { setOpen(false); if (input.current) input.current.focus(); }}>
+            <Icon name="x" size="sm" />
+          </button>
+        )}
+      </div>
 
       {open ? (
         <ul className="um-opts" role="listbox" id={listId}
           aria-multiselectable={single ? undefined : true} aria-label={f.label}>
           {rendered()}
         </ul>
+      ) : null}
+
+      {chipsBelow && !selectLike ? (
+        <Chips f={f} values={values} onRemove={remove} disabled={disabled} options={given} below />
       ) : null}
 
       {/* Only when there is something to say. An empty line under every

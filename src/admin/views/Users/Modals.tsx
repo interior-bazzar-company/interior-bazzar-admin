@@ -9,8 +9,8 @@
                       that a note exists rather than what it says.
      TagsModal        internal segmentation. Never customer-visible, at the
                       response contract and not by screen convention.
-     DeactivateModal  an ACCOUNT status, not a membership action. Soft, and it
-                      says exactly what survives.
+     DeactivateModal  an ACCOUNT status. Soft, and it says exactly what
+                      survives.
    ============================================================================= */
 import { useState } from "react";
 import { Icon, Notice } from "../../ui";
@@ -30,7 +30,7 @@ export function NoteModal({ row, onClose, onDone }: {
       <div className="md-h">
         <h3>Add an internal note</h3>
         <p>{row.user.identity.name} · <span className="mono">{row.user.userId}</span></p>
-        <button className="md-x" data-close="1" onClick={onClose}><Icon name="x" /></button>
+        <button className="md-x" data-close="1" onClick={onClose} aria-label="Close"><Icon name="x" /></button>
       </div>
       <div className="md-b um-form">
         {err ? <Notice tone="bad" text={<b>{err}</b>} /> : null}
@@ -68,7 +68,7 @@ export function TagsModal({ row, onClose, onDone }: {
       <div className="md-h">
         <h3>Operational tags</h3>
         <p>{row.user.identity.name} · internal segmentation, not profile content</p>
-        <button className="md-x" data-close="1" onClick={onClose}><Icon name="x" /></button>
+        <button className="md-x" data-close="1" onClick={onClose} aria-label="Close"><Icon name="x" /></button>
       </div>
       <div className="md-b um-form">
         <div className="um-tagpicker">
@@ -112,15 +112,15 @@ export function DeactivateModal({ row, onClose, onDone }: {
       <div className="md-h">
         <h3>{off ? "Reactivate this account" : "Deactivate this account"}</h3>
         <p>{row.user.identity.name} · <span className="mono">{row.user.userId}</span></p>
-        <button className="md-x" data-close="1" onClick={onClose}><Icon name="x" /></button>
+        <button className="md-x" data-close="1" onClick={onClose} aria-label="Close"><Icon name="x" /></button>
       </div>
       <div className="md-b um-form">
         {err ? <Notice tone="bad" text={<b>{err}</b>} /> : null}
 
         {off ? (
           <Notice text={<>
-            <b>Re-enables the account and touches no membership.</b> Account status and membership
-            state are separate facts.
+            <b>Re-enables the account and nothing else.</b> Whatever this customer has bought is
+            recorded in Finance and is not touched from here.
           </>} />
         ) : (
           <>
@@ -138,15 +138,15 @@ export function DeactivateModal({ row, onClose, onDone }: {
             </fieldset>
 
             <ul className="um-consequences">
-              <li><Icon name="chevr" size="sm" /><b>Soft.</b> The profile, every membership term, the commercial references and the whole audit trail stay exactly where they are.</li>
+              <li><Icon name="chevr" size="sm" /><b>Soft.</b> The profile, the commercial references and the whole audit trail stay exactly where they are.</li>
               <li><Icon name="chevr" size="sm" />The user leaves the active base and stays in every historical count. Deleting them would change a number already reported.</li>
-              <li><Icon name="chevr" size="sm" />This is an <b>account</b> status. It is not a membership classification, and it is displayed separately from one everywhere in this module.</li>
+              <li><Icon name="chevr" size="sm" />This is an <b>account</b> status and it stops at this module. Anything the customer has bought is a Finance record and is cancelled there, deliberately and separately.</li>
               <li><Icon name="chevr" size="sm" />Sign-in is blocked by Authentication independently. This flag does not manage sessions and does not pretend to.</li>
             </ul>
 
             <Notice tone="bad" ico="shield" text={<>
-              <b>Hard deletion is not a button.</b> Erasing a user would take their membership,
-              commercial and audit history with it. That request goes to the governed privacy
+              <b>Hard deletion is not a button.</b> Erasing a user would take their commercial
+              links and audit history with it. That request goes to the governed privacy
               process.
             </>} />
           </>
@@ -161,8 +161,8 @@ export function DeactivateModal({ row, onClose, onDone }: {
             const e = setUserStatus(row.user.userId, off ? "active" : "deactivated", reason);
             if (e) return setErr(e);
             onDone(off
-              ? "Account re-enabled. No membership was changed."
-              : "Account deactivated. Profile, terms and history are all retained.",
+              ? "Account re-enabled."
+              : "Account deactivated. Profile, links and history are all retained.",
               off ? "ok" : "warn");
           }}>
           {off ? "Reactivate account" : "Deactivate account"}

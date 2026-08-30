@@ -340,12 +340,18 @@ function LayerBox({ layer, onClose }: { layer: NonNullable<Layer>; onClose: () =
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const f = el.querySelector("input,button,[tabindex]") as HTMLElement | null;
+    /* The first REAL control. `button` alone matched the close X in every
+       header, so every dialog opened with focus on "close"; and a textarea
+       with `autofocus` lost to the 30 ms timer. */
+    const f = (el.querySelector("[autofocus]")
+      || el.querySelector("input,select,textarea,button:not(.md-x),[tabindex]:not(.md-x)")) as HTMLElement | null;
     if (f) window.setTimeout(() => f.focus(), 30);
   }, []);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      /* A component that handled Escape itself (a listbox, a popover) marks
+         the event; the layer must not close on top of it. */
+      if (e.key === "Escape" && !e.defaultPrevented) onClose();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
