@@ -1909,6 +1909,56 @@ tokens and primitives, not watched.
 
 ## 2026-09-01
 
+### Salaries splits into Accounts and Transactions, and a slip can be held
+
+**Area:** Finance · Salaries — a second tab, and one new write
+**Files:** `SalaryTransactions.tsx` (new), `Salaries.tsx`, `store.ts`,
+`types.ts`, `finance.css`, `scripts/check-finance-ledger.cjs`,
+`scripts/fn-smoke.tsx`, `BACKEND-INTEGRATION.md`
+
+**What changed**
+
+**Two readings of one payroll.** The Accounts tab is the existing face —
+who is on the payroll, what they are owed. The new **Transactions** tab is
+every slip ever issued, one row per document, newest month first: id and
+run, person, net, status (Paid / Unpaid / On hold, with the hold's reason
+under the pill), paid date — and an actions menu on every row. The money
+strip sits above both; each tab keeps its own filters (name/slip search
+and a status filter on Transactions), and switching tabs clears the other
+tab's, because carrying one across would narrow a list with a control it
+does not show.
+
+**The row menu names its consequences**: *Pay…* (unpaid only, Super Admin
+gated the same as everywhere), *Hold this slip… / Release the hold*,
+*View slip*, *View account*, *Close the account…* — the same store writes
+the rest of the module uses, never new ones.
+
+**Hold is a slip state, not an account one.** A dispute is about a month:
+holding March must not stop April going out. A held slip leaves `dueOf` —
+the pending figure, the arrears count and the pay write all skip it — and
+comes back the moment it is released. Only an unpaid slip can hold (a paid
+document is frozen), the reason is mandatory on the way in because the
+hold prints on no document, and the account timeline records both
+directions with the figure.
+
+**Backend needed**
+
+FN-T08d in the doc: hold/release endpoints, the two refusal codes, and
+the due-computation exclusion.
+
+**Verified**
+
+`check:finance` 352 → 365 — reason required, double-hold refused, the held
+month leaves what is owed, paying refuses as nothing due, release restores
+the figure and clears the reason, a paid slip refuses the hold. `fn-smoke`
+renders the tab, both sub-tabs, slip rows with both pills, the per-row
+actions menu, and the paid filter leaving no unpaid pill. The menu's
+open/close and the hold dialog are click states — browser.
+
+---
+
+## 2026-09-01
+
 ### The Pay dialog, tightened: added rows, a receipt that reads as one, remark last
 
 **Area:** Finance · the Pay dialog

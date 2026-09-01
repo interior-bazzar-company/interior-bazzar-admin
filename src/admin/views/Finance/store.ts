@@ -584,8 +584,12 @@ export function salaryTotals(): { paidPaise: number; unpaidPaise: number; unpaid
 }
 
 export function dueOf(r: SalaryRow): SalaryDue {
+  /* A HELD SLIP IS NOT DUE. It is out of the pending figure, out of the pay
+     write, and out of the arrears count until somebody releases it — the
+     Transactions tab is where it stays visible. */
   const unpaid = snap.salaryRuns
-    .flatMap((run) => run.slips.filter((s) => s.salaryAccountId === r.a.salaryAccountId && !s.paidAt))
+    .flatMap((run) => run.slips.filter((s) =>
+      s.salaryAccountId === r.a.salaryAccountId && !s.paidAt && !s.held))
     .sort((a, b) => b.month.localeCompare(a.month));
   const current = unpaid[0] || null;
   const arrears = unpaid.slice(1);
@@ -1679,6 +1683,34 @@ export function paySalary(salaryAccountId: string, input: PaySalaryInput): strin
     + (ded.line ? " · deduction " + inr(ded.line.amountPaise) + " (" + ded.line.label + ")" : "")
     + " · evidenced by " + filename + "."),
   salaryAccountId, "salary");
+  emit();
+  return "";
+}
+
+/** FN-T08d · Hold ONE slip, or release it. A dispute is about a month, not a
+ *  person: holding March must not stop April going out, which is why this is
+ *  a slip write and not an account one. Only an unpaid slip can hold — a paid
+ *  document is frozen — and the reason is mandatory on the way IN because the
+ *  hold prints nowhere else. Releasing needs none: it restores the ordinary
+ *  state, and the release event says who and when. */
+export function setSlipHold(slipId: string, hold: boolean, reason: string): string {
+  const slip = readSlip(slipId);
+  if (!slip) return "That slip no longer exists.";
+  if (slip.paidAt)
+    return slip.slipId + " is paid and frozen. A paid document cannot be held. (already_paid)";
+  if (!!slip.held === hold)
+    return hold ? slip.slipId + " is already on hold." : slip.slipId + " is not on hold.";
+  if (hold && !reason.trim())
+    return "Say why it is held. The hold prints on no document, so the reason is the only record it has. (reason_required)";
+  const acc = readSalaryAccount(slip.salaryAccountId);
+  slip.held = hold;
+  slip.heldReason = hold ? reason.trim() : null;
+  if (acc) {
+    log(pushEvent(acc.events, hold ? "SALARY_HELD" : "SALARY_RELEASED",
+      fmtMonth(slip.month) + "'s slip (" + inr(slip.netPaise) + ") "
+      + (hold ? "held: " + reason.trim() : "released — it counts as owed again.")),
+    slip.salaryAccountId, "salary");
+  }
   emit();
   return "";
 }

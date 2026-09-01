@@ -445,6 +445,27 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
 .fin-paid .facts .l { color: var(--text-3) }
 .fin-paid .fine { margin: var(--space-3) 0 0; max-width: 400px; font-size: var(--text-sm); line-height: var(--lh-md); color: var(--text-3) }
 
+/* The row kebab and its menu. The same outside-click bones as the info
+   buttons; what matters here is that it opens LEFT of the button — the button
+   sits in the table's last column, and a menu opening rightward would leave
+   the viewport. */
+.fin-menu { position: relative; display: inline-flex }
+.fin-menu-pop {
+  position: absolute; z-index: 45; top: calc(100% + 4px); right: 0;
+  display: flex; flex-direction: column; min-width: 190px; padding: var(--space-1);
+  background: var(--surface-raised); border: 1px solid var(--line-2);
+  border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+}
+.fin-mi {
+  display: block; width: 100%; text-align: left; padding: var(--space-2) var(--space-3);
+  border: none; background: none; border-radius: var(--radius-md);
+  font: inherit; font-size: var(--text-md); color: var(--text); cursor: pointer;
+}
+.fin-mi:hover:not(:disabled) { background: var(--bg-hover) }
+.fin-mi:disabled { color: var(--text-3); cursor: default }
+.fin-mi.bad { color: var(--bad) }
+.fin-mi.bad:hover:not(:disabled) { background: var(--bad-bg) }
+
 /* The role pill inside a PRIMARY button was the badge's own warn/bad colours
    on the button's green — unreadable, and worse when disabled. Inside a
    primary button it borrows the button's own text colour instead. */

@@ -206,6 +206,21 @@ has(sal, "In arrears", "...with a month older than the current one called out se
    reachable, and the day the tip is dropped from the tile this fails. */
 has(sal, "About Salary cost", "...the payroll figure still carries its caution, one press away");
 const salEmpty = check("salaries · a filter that matches nothing", () => at("/finance-salaries?q=zzzznothing"));
+/* THE TRANSACTIONS TAB — every slip, one row each, with its own actions. */
+const salTx = check("salaries · the transactions tab", () => at("/finance-salaries?tab=transactions"));
+has(salTx, ">Accounts<", "...the sub-tabs offer Accounts");
+has(salTx, ">Transactions<", "...and Transactions");
+has(salTx, "Every slip", "...the table announces its grain: every slip");
+has(salTx, "SLIP-", "...and slip ids are the rows");
+has(salTx, ">Paid<", "...a paid slip says so");
+has(salTx, ">Unpaid<", "...an unpaid one too");
+has(salTx, 'aria-label="Actions for SLIP-', "...every row carries its actions menu");
+has(salTx, ">Status<", "...under a Status column");
+check("salaries · transactions filtered to paid only", () => at("/finance-salaries?tab=transactions&status=paid"));
+/* The pill, not the word: the status dropdown's own Unpaid OPTION is still
+   on the page, and rightly. */
+hasnt(at("/finance-salaries?tab=transactions&status=paid"), 'pill warn">Unpaid',
+  "...and the paid filter leaves no unpaid row");
 has(salEmpty, "Nobody matches those filters", "...an empty payroll says the filter is why");
 has(salEmpty, "for the whole payroll, before any filter", "...and that the strip above it was not filtered");
 

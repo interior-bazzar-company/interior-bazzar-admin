@@ -927,6 +927,41 @@ S.resetStore();
   ok("...and it carries the date it closed", !!S.readRun("RUN-2026-08").paidAt, true);
 }
 
+console.log("\nwrites · a hold is about a month, not a person");
+S.resetStore();
+{
+  const PDF = { filename: "receipt.pdf", mime: "application/pdf" };
+  const row = () => S.toSalaryRow(S.readSalaryAccount("SAL-AC-0011"));
+  const before = S.dueOf(row());
+  const slipId = before.current.slipId;
+
+  ok("holding without a reason is refused — the hold prints nowhere else",
+    has(S.setSlipHold(slipId, true, "  "), "reason_required"), true);
+  ok("holding with one works", S.setSlipHold(slipId, true, "Disputed LOP, HR checking"), "");
+  ok("...and holding it twice says so",
+    has(S.setSlipHold(slipId, true, "again"), "already on hold"), true);
+
+  /* THE POINT: a held slip is not due. */
+  ok("the held month leaves what is owed", S.dueOf(row()).pendingPaise,
+    before.pendingPaise - before.currentPaise);
+  ok("...which here was the only month, so nothing is due",
+    S.dueOf(row()).pendingPaise, 0);
+  ok("...and paying is refused as nothing due",
+    has(S.paySalary("SAL-AC-0011", { via: "bank", accountId: "ACC-HDFC-4021", proof: PDF }), "nothing_due"), true);
+  ok("the slip remembers why",
+    S.readSlip(slipId).heldReason, "Disputed LOP, HR checking");
+  ok("...and the account's timeline says held, with the figure",
+    S.readSalaryAccount("SAL-AC-0011").events[0].note.indexOf("held: Disputed LOP") >= 0, true);
+
+  ok("releasing restores it", S.setSlipHold(slipId, false, ""), "");
+  ok("...the month is owed again", S.dueOf(row()).pendingPaise, before.pendingPaise);
+  ok("...the reason is gone with the hold", S.readSlip(slipId).heldReason, null);
+  ok("...and paying now goes through",
+    S.paySalary("SAL-AC-0011", { via: "bank", accountId: "ACC-HDFC-4021", proof: PDF }), "");
+  ok("a PAID slip cannot be held — it is frozen",
+    has(S.setSlipHold(slipId, true, "too late"), "already_paid"), true);
+}
+
 console.log("\nwrites · one-off incentives and deductions land on the newest slip");
 S.resetStore();
 {

@@ -25,15 +25,16 @@ import { useShell } from "../../shell/ShellContext";
 import { can } from "../../shell/AdminShell";
 import { EmptyState, FilterChips, Icon, SearchField, Select, avatarTone, initials } from "../../ui";
 import { go } from "../../ui/nav";
-import { Frame } from "./Frame";
+import { Frame, SubTabs } from "./Frame";
 import type { FaceProps } from "./Frame";
+import SalaryTransactions from "./SalaryTransactions";
 import { Money } from "./bits";
 import { MetricTip } from "./InfoTip";
 import { PaySalaryModal, SalaryAccountModal } from "./SalaryModals";
 import {
   ENGAGEMENTS, FILTER_LABELS, applySalaryFilters, dueOf, engagementMeta,
   filterValueLabel, fmtDate, fmtMonth, inr, isSuperAdmin, superAdminOnly,
-  useSalaryRows,
+  useRuns, useSalaryRows,
 } from "./store";
 import type { Params, SalaryRow } from "./store";
 
@@ -54,7 +55,7 @@ function Face({ name }: { name: string }) {
   return <span className={"av sm " + avatarTone(name)}>{initials(name)}</span>;
 }
 
-export default function Salaries({ p, onFilter, onSearch, onUnfilter }: FaceProps) {
+export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }: FaceProps) {
   const { toast, modal, closeLayer } = useShell();
   const rows = useSalaryRows();
 
@@ -75,6 +76,11 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter }: FaceProp
   const filtered = applySalaryFilters(rows, p);
   const narrowed = ["q", "active", "engagement", "due"].some((k) => p[k]);
   const writable = can("finance-salaries", "edit");
+  /* Two readings of one payroll: the PEOPLE and what they are owed, or every
+     SLIP and where it stands. The tab is a sub-switch, not a section — the
+     money strip above belongs to both. */
+  const tab = p.tab === "transactions" ? "transactions" : "accounts";
+  const heldN = useRuns().reduce((n, run) => n + run.slips.filter((x) => x.held && !x.paidAt).length, 0);
 
   const done = (msg: string, tone?: string) => { closeLayer(); toast(msg, tone); };
   /* Opening only. REVISING happens on the account's own record, where the
@@ -85,7 +91,7 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter }: FaceProp
 
   return (
     <Frame toast={toast}
-      cmd={<>
+      cmd={tab === "accounts" ? <>
         {/* KEYED ON THEIR VALUE. SearchField and Select are uncontrolled, so
             clearing a chip otherwise leaves the old text in the box. */}
         <SearchField key={"q" + (p.q || "")} ph="Name, employee code, designation…"
@@ -102,8 +108,27 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter }: FaceProp
           title={writable ? undefined : "Opening a salary account needs Finance edit rights."}>
           <Icon name="plus" size="sm" />Add a salary account
         </button>
+      </> : <>
+        <SearchField key={"q" + (p.q || "")} ph="Name, slip id, month, designation…"
+          val={p.q} onFilter={onSearch} />
+        <Select key={"status" + (p.status || "")} name="status" label="Status" value={p.status}
+          onFilter={onFilter}
+          options={[{ v: "paid", l: "Paid" }, { v: "unpaid", l: "Unpaid" }, { v: "held", l: "On hold" }]} />
+        <span className="spacer" />
       </>}
       bands={<>
+        <SubTabs cur={tab}
+          items={[
+            { k: "accounts", label: "Accounts" },
+            { k: "transactions", label: "Transactions", n: heldN },
+          ]}
+          onPick={(k) => onParams({
+            tab: k === "accounts" ? undefined : k,
+            /* Each tab keeps its own vocabulary of filters; carrying one
+               across would narrow a list with a control it does not show. */
+            q: undefined, status: undefined, due: undefined,
+            engagement: undefined, active: undefined,
+          })} />
         <div className="fin-money-strip">
           <div className="fin-mt">
             <span className="k">Monthly payroll<MetricTip k="salary_cost" /></span>
@@ -143,6 +168,9 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter }: FaceProp
         </div>
       </>}>
 
+      {tab === "transactions" ? (
+        <SalaryTransactions p={p} onUnfilter={onUnfilter} />
+      ) : (<>
       {/* ======================================================= the people === */}
       <div className="sh">
         <h2>The people</h2>
@@ -180,6 +208,7 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter }: FaceProp
             ? <button className="btn" onClick={() => onUnfilter("*")}>Clear the filters</button>
             : writable ? <button className="btn pri" onClick={() => openAccount()}>Add a salary account</button> : null} />
       )}
+      </>)}
     </Frame>
   );
 }

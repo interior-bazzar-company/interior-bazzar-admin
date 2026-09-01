@@ -260,6 +260,12 @@ export interface Payslip {
   /** Free text from whoever paid it. Never load-bearing: nothing derives from
    *  a remark, and no total reads one. */
   remark?: string;
+  /** A HOLD IS ABOUT A MONTH, NOT A PERSON. A held slip leaves `dueOf` — it is
+   *  not owed right now and the pay write skips it — while every other month
+   *  the person is owed still pays. Only an UNPAID slip can hold, and the
+   *  reason is mandatory because the hold prints nowhere else. */
+  held?: boolean;
+  heldReason?: string | null;
 }
 
 export interface SalaryRun {
