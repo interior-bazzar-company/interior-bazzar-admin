@@ -297,7 +297,10 @@ has(salAcc, "Typed, never derived", "...the slip is built from the components an
 hasnt(salAcc, "Cost to company", "...and there is no CTC figure left to misread");
 const paidSlip = page("a paid payslip", "/finance-salaries/SLIP-2026-07-0011");
 has(paidSlip, "SLIP-2026-07-0011", "...a paid slip carries its number");
-has(paidSlip, "Document hash (SHA-256): ", "...and its hash, because somebody has to be able to rely on it");
+/* The hash STAYS ON THE RECORD and off the paper: it is verification
+   plumbing, and a 64-character string on a document handed to a person is
+   noise they cannot check anyway. */
+hasnt(paidSlip, "Document hash", "...the hash is not printed on the sheet");
 has(paidSlip, "computer-generated and needs no signature", "...it is a document, not a screen");
 const draftSlip = page("an open-run (draft) payslip", "/finance-salaries/SLIP-2026-08-0011");
 /* The standing draft ALERT is gone; the draft state is still said twice on

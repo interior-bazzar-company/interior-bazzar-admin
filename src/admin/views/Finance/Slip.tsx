@@ -212,7 +212,6 @@ export default function Slip({ id, p }: {
           {draft
             ? "This is a draft. No payment has been made, no slip number has been allotted and no hash has been computed. It is not a record of anything yet.\n"
             : "This payslip is computer-generated and needs no signature.\n"}
-          {draft || !slip.sha256 ? "" : "Document hash (SHA-256): " + slip.sha256 + "\n"}
           {"The earnings and deductions above were frozen onto this slip when it was issued. "
             + "A later revision to the salary account does not change them, which is why this "
             + "document can be relied on after the fact."}
