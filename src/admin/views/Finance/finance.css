@@ -294,7 +294,15 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
   color: var(--text); opacity: .04;
 }
 .fin-slip-brand { display: flex; align-items: flex-start; gap: var(--space-3) }
-.fin-slip-logo { height: 42px; width: auto; flex: 0 0 auto }
+.fin-slip-logo {
+  display: grid; place-items: center; flex: 0 0 auto;
+  height: 44px; padding: 0 10px; border-radius: var(--radius-md);
+  background: var(--brand);
+  /* The tile must reach paper: without this most browsers strip element
+     backgrounds in print and the white mark vanishes again. */
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.fin-slip-logo img { height: 28px; width: auto; display: block }
 @media print {
   .fin-slip { overflow: visible }
   .fin-wm { opacity: .05 }

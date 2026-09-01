@@ -110,7 +110,10 @@ export default function Slip({ id, p }: {
         <div className="fin-wm" aria-hidden="true">{COMPANY.brand}</div>
         <div className="dh">
           <div className="fin-slip-brand">
-            <img className="fin-slip-logo" src={LOGO} alt="" />
+            {/* The mark is WHITE on transparency - designed for the brand
+                ground, invisible on the sheet without it. The tile is that
+                ground. */}
+            <span className="fin-slip-logo"><img src={LOGO} alt="" /></span>
             <div>
               <h3>{COMPANY.brand}</h3>
             <div className="fin-slip-co">
