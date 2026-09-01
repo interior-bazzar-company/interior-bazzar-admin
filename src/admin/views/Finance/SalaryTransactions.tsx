@@ -21,7 +21,7 @@ import { Money } from "./bits";
 import { Cancel, Dlg, Field } from "./dialog";
 import { CloseAccountModal, PaySalaryModal } from "./SalaryModals";
 import {
-  fmtDate, fmtMonth, inr, readSalaryAccount, setSlipHold,
+  ago, fmtDate, fmtMonth, inr, readSalaryAccount, setSlipHold,
   superAdminOnly, toSalaryRow, useRuns,
 } from "./store";
 import type { Params, Payslip, SalaryRun } from "./store";
@@ -32,6 +32,7 @@ const stateOf = (s: Payslip) => (s.paidAt ? "paid" : s.held ? "held" : "unpaid")
 
 function matches(x: SlipRow, p: Params): boolean {
   if (p.status && stateOf(x.s) !== p.status) return false;
+  if (p.month && x.s.month !== p.month) return false;
   if (p.q) {
     const q = p.q.toLowerCase();
     const hay = [x.s.memberName, x.s.slipId, x.s.employeeCode, x.s.designation, fmtMonth(x.s.month)]
@@ -173,7 +174,7 @@ export default function SalaryTransactions({ p, onUnfilter }: {
     .flatMap((run) => run.slips.map((s) => ({ s, run })))
     .sort((a, b) => b.s.month.localeCompare(a.s.month) || a.s.memberName.localeCompare(b.s.memberName));
   const rows = all.filter((x) => matches(x, p));
-  const narrowed = !!(p.q || p.status);
+  const narrowed = !!(p.q || p.status || p.month);
 
   const pay = (x: SlipRow) => {
     const acc = readSalaryAccount(x.s.salaryAccountId);
@@ -188,13 +189,10 @@ export default function SalaryTransactions({ p, onUnfilter }: {
     modal(<CloseAccountModal account={acc} onClose={closeLayer} onDone={done} />);
   };
 
+  /* No section head above the table: the strip in the band already states
+     the whole and its parts, the way every list in the panel does. */
   return (
     <>
-      <div className="sh">
-        <h2>Every slip</h2>
-        <span className="r fin-count">{rows.length} of {all.length}</span>
-      </div>
-
       {rows.length ? (
         <table className="tbl dls-tbl fin-tbl">
           <thead>
@@ -247,9 +245,12 @@ export default function SalaryTransactions({ p, onUnfilter }: {
                       : null}
                   </td>
                   <td>
-                    {s.paidAt
-                      ? <div className="cell-1">{fmtDate(s.paidAt)}</div>
-                      : <span className="faint">—</span>}
+                    {s.paidAt ? (
+                      <>
+                        <div className="cell-1">{fmtDate(s.paidAt)}</div>
+                        <div className="cell-2">{ago(s.paidAt)}</div>
+                      </>
+                    ) : <span className="faint">—</span>}
                   </td>
                   <td className="tight" onClick={(e) => e.stopPropagation()}
                     onKeyDown={(e) => e.stopPropagation()}>

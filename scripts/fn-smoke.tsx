@@ -210,7 +210,8 @@ const salEmpty = check("salaries · a filter that matches nothing", () => at("/f
 const salTx = check("salaries · the transactions tab", () => at("/finance-salaries?tab=transactions"));
 has(salTx, ">Accounts<", "...the sub-tabs offer Accounts");
 has(salTx, ">Transactions<", "...and Transactions");
-has(salTx, "Every slip", "...the table announces its grain: every slip");
+has(salTx, 'class="k">Total', "...the strip leads with the stated Total");
+has(salTx, 'class="k">On hold', "...and On hold is one of its parts");
 has(salTx, "SLIP-", "...and slip ids are the rows");
 has(salTx, ">Paid<", "...a paid slip says so");
 has(salTx, ">Unpaid<", "...an unpaid one too");

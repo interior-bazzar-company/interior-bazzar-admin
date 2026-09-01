@@ -1909,6 +1909,39 @@ tokens and primitives, not watched.
 
 ## 2026-09-01
 
+### The Transactions tab falls in line with the panel's list anatomy
+
+**Area:** Finance · Salaries · Transactions
+**Files:** `Salaries.tsx`, `SalaryTransactions.tsx`, `store.ts`,
+`scripts/fn-smoke.tsx`
+
+**What changed**
+
+The tab was a table with its own section head and two filters — close, but
+not the shape every other list in this panel has. It now follows the same
+logic as the Users directory it was measured against:
+
+- **A stat strip in the band**, not a heading over the table: **Total ·
+  Paid · Unpaid · On hold**, each cell a filter that sets or clears
+  `status` and nothing else — the search stays, because it is the scope
+  somebody chose. Same `StatStrip`, same tips, same stated-whole rule.
+- **A Month filter** joins Search and Status on the command row, built
+  from the runs that exist.
+- **Filter chips** now read properly: `status: On hold`, `month: Aug
+  2026` — the shared value-labeller learned the slip states and the month
+  key.
+- **Paid on** is the panel's stacked date cell — the date, and how long
+  ago beneath it.
+
+**Verified**
+
+`check:finance` 365, `fn-smoke` green — the strip's Total and On hold
+cells asserted in the band, the actions menu and both pills as before.
+
+---
+
+## 2026-09-01
+
 ### Salaries splits into Accounts and Transactions, and a slip can be held
 
 **Area:** Finance · Salaries — a second tab, and one new write

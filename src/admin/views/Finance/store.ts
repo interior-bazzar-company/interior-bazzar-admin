@@ -2173,11 +2173,18 @@ export function delta(now: number, before: number | null | undefined): { text: s
 export const FILTER_LABELS: Record<string, string> = {
   q: "Search", source: "Source", status: "Status", plan: "Plan", flag: "Queue",
   dir: "Direction", tag: "Tag", kind: "Rolls up to", state: "State", range: "Period",
-  active: "Account",
+  active: "Account", month: "Month",
 };
 export function filterValueLabel(key: string, value: string): string {
   if (key === "source") return sourceMeta(value)?.label || value;
-  if (key === "status") return subStatusMeta(value)?.label || value;
+  if (key === "status") {
+    /* Two vocabularies share the key: subscription statuses, and the slip
+       states on the salaries Transactions tab. */
+    if (value === "held") return "On hold";
+    if (value === "unpaid") return "Unpaid";
+    return subStatusMeta(value)?.label || (value === "paid" ? "Paid" : value);
+  }
+  if (key === "month") return fmtMonth(value);
   if (key === "tag") return tagOf(value)?.label || value;
   if (key === "kind") return tagKindMeta(value)?.label || value;
   if (key === "state") return txnStateMeta(value)?.label || refundStateMeta(value)?.label || value;

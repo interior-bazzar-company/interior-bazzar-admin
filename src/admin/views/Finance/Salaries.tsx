@@ -23,7 +23,8 @@
    ============================================================================= */
 import { useShell } from "../../shell/ShellContext";
 import { can } from "../../shell/AdminShell";
-import { EmptyState, FilterChips, Icon, SearchField, Select, avatarTone, initials } from "../../ui";
+import { EmptyState, FilterChips, Icon, SearchField, Select, StatStrip, avatarTone, initials } from "../../ui";
+import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import { Frame, SubTabs } from "./Frame";
 import type { FaceProps } from "./Frame";
@@ -80,7 +81,37 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
      SLIP and where it stands. The tab is a sub-switch, not a section — the
      money strip above belongs to both. */
   const tab = p.tab === "transactions" ? "transactions" : "accounts";
-  const heldN = useRuns().reduce((n, run) => n + run.slips.filter((x) => x.held && !x.paidAt).length, 0);
+  const runs = useRuns();
+  const slips = runs.flatMap((run) => run.slips);
+  const heldN = slips.filter((x) => x.held && !x.paidAt).length;
+
+  /* THE SAME STRIP LOGIC AS EVERY LIST IN THE PANEL: a stated Total, then its
+     parts, each cell a filter. It clears or sets `status` and nothing else —
+     the search is the scope somebody chose. */
+  const txHash = (patch: Record<string, string | undefined>) => {
+    const o: Record<string, string> = { tab: "transactions" };
+    ["q", "status", "month"].forEach((k) => { if (p[k]) o[k] = p[k] as string; });
+    Object.keys(patch).forEach((k) => {
+      if (patch[k]) o[k] = patch[k] as string; else delete o[k];
+    });
+    return "#/finance-salaries?" + Object.keys(o)
+      .map((k) => encodeURIComponent(k) + "=" + encodeURIComponent(o[k])).join("&");
+  };
+  const offStatus = (v: string) => (p.status === v ? undefined : v);
+  const txCells: (StatCell | "sep")[] = [
+    { k: "Total", v: slips.length, on: !p.status, to: txHash({ status: undefined }),
+      tip: <>Every slip ever issued, paid and unpaid alike. The cells beside it are its parts.</> },
+    "sep",
+    { k: "Paid", v: slips.filter((x) => x.paidAt).length, dot: "ok", on: p.status === "paid",
+      to: txHash({ status: offStatus("paid") }),
+      tip: <>Stamped, numbered and frozen. Nothing on a paid slip can change.</> },
+    { k: "Unpaid", v: slips.filter((x) => !x.paidAt && !x.held).length, dot: "warn",
+      on: p.status === "unpaid", to: txHash({ status: offStatus("unpaid") }),
+      tip: <>Issued and owed. Paying a person clears every unpaid month they have, oldest first.</> },
+    { k: "On hold", v: heldN, dot: "bad", on: p.status === "held",
+      to: txHash({ status: offStatus("held") }),
+      tip: <>Out of what is owed until somebody releases it. A hold is about a month, not a person.</> },
+  ];
 
   const done = (msg: string, tone?: string) => { closeLayer(); toast(msg, tone); };
   /* Opening only. REVISING happens on the account's own record, where the
@@ -114,6 +145,9 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
         <Select key={"status" + (p.status || "")} name="status" label="Status" value={p.status}
           onFilter={onFilter}
           options={[{ v: "paid", l: "Paid" }, { v: "unpaid", l: "Unpaid" }, { v: "held", l: "On hold" }]} />
+        <Select key={"month" + (p.month || "")} name="month" label="Month" value={p.month}
+          onFilter={onFilter}
+          options={runs.map((r) => ({ v: r.month, l: fmtMonth(r.month) }))} />
         <span className="spacer" />
       </>}
       bands={<>
@@ -126,9 +160,10 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
             tab: k === "accounts" ? undefined : k,
             /* Each tab keeps its own vocabulary of filters; carrying one
                across would narrow a list with a control it does not show. */
-            q: undefined, status: undefined, due: undefined,
+            q: undefined, status: undefined, month: undefined, due: undefined,
             engagement: undefined, active: undefined,
           })} />
+        {tab === "transactions" ? <StatStrip cells={txCells} /> : (
         <div className="fin-money-strip">
           <div className="fin-mt">
             <span className="k">Monthly payroll<MetricTip k="salary_cost" /></span>
@@ -157,6 +192,7 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
               : "nobody is owed an earlier month"}</span>
           </div>
         </div>
+        )}
         <div className="dls-chips">
           <FilterChips
             params={Object.keys(p)
