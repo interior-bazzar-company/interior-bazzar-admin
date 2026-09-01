@@ -188,7 +188,10 @@ has(subsEmpty, "Nothing matches those filters", "...an empty list says the filte
 has(subsEmpty, "counts every subscription in the module, before any filter",
   "...and says the figures above it are not what was filtered away");
 
-const sal = page("salaries · the face", "/finance-salaries");
+const sal = page("salaries · the accounts tab", "/finance-salaries?tab=accounts");
+/* The face OPENS on Transactions now: a bare URL lands on the slips. */
+has(at("/finance-salaries"), 'aria-label="Actions for SLIP-',
+  "salaries · the bare route lands on Transactions");
 /* WHAT IS OWED, ON THE FACE. This used to assert the open run's card said
    nothing had gone out; the card is gone with the run vocabulary, and the same
    guarantee is now the table's own: a person who has not been paid says so,
@@ -209,7 +212,7 @@ has(sal, "In arrears", "...with a month older than the current one called out se
    that panel, so what is asserted is that the button is THERE: the caution is
    reachable, and the day the tip is dropped from the tile this fails. */
 has(sal, "About Salary cost", "...the payroll figure still carries its caution, one press away");
-const salEmpty = check("salaries · a filter that matches nothing", () => at("/finance-salaries?q=zzzznothing"));
+const salEmpty = check("salaries · a filter that matches nothing", () => at("/finance-salaries?tab=accounts&q=zzzznothing"));
 /* THE TRANSACTIONS TAB — every slip, one row each, with its own actions. */
 const salTx = check("salaries · the transactions tab", () => at("/finance-salaries?tab=transactions"));
 has(salTx, ">Accounts<", "...the sub-tabs offer Accounts");

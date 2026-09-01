@@ -80,7 +80,10 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
   /* Two readings of one payroll: the PEOPLE and what they are owed, or every
      SLIP and where it stands. The tab is a sub-switch, not a section — the
      money strip above belongs to both. */
-  const tab = p.tab === "transactions" ? "transactions" : "accounts";
+  /* TRANSACTIONS IS THE LANDING TAB: the grain of daily work here is "where
+     is every slip", and the band lists it first. Accounts is one press away
+     and carries ?tab=accounts. */
+  const tab = p.tab === "accounts" ? "accounts" : "transactions";
   const runs = useRuns();
   const slips = runs.flatMap((run) => run.slips);
   const heldN = slips.filter((x) => x.held && !x.paidAt).length;
@@ -89,7 +92,7 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
      parts, each cell a filter. It clears or sets `status` and nothing else —
      the search is the scope somebody chose. */
   const txHash = (patch: Record<string, string | undefined>) => {
-    const o: Record<string, string> = { tab: "transactions" };
+    const o: Record<string, string> = {};
     ["q", "status", "month"].forEach((k) => { if (p[k]) o[k] = p[k] as string; });
     Object.keys(patch).forEach((k) => {
       if (patch[k]) o[k] = patch[k] as string; else delete o[k];
@@ -104,7 +107,7 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
      tiles carried that no cell can — the forward monthly payroll — rides at
      the end as a read-out, money in the strip the way Deals carries its own. */
   const accHash = (patch: Record<string, string | undefined>) => {
-    const o: Record<string, string> = {};
+    const o: Record<string, string> = { tab: "accounts" };
     ["q", "engagement", "due", "active"].forEach((k) => { if (p[k]) o[k] = p[k] as string; });
     Object.keys(patch).forEach((k) => {
       if (patch[k]) o[k] = patch[k] as string; else delete o[k];
@@ -169,7 +172,7 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
             { k: "accounts", label: "Accounts", icon: "team", n: rows.length },
           ]}
           onPick={(k) => onParams({
-            tab: k === "accounts" ? undefined : k,
+            tab: k === "transactions" ? undefined : k,
             /* Each tab keeps its own vocabulary of filters; carrying one
                across would narrow a list with a control it does not show. */
             q: undefined, status: undefined, month: undefined, due: undefined,

@@ -1909,6 +1909,29 @@ tokens and primitives, not watched.
 
 ## 2026-09-01
 
+### Transactions becomes the landing tab
+
+**Area:** Finance · Salaries
+**Files:** `Salaries.tsx`, `SalaryDetail.tsx`, `scripts/fn-smoke.tsx`
+
+**What changed**
+
+A bare `#/finance-salaries` opens on Transactions; Accounts carries
+`?tab=accounts`. The accounts strip cells keep the tab in their links so a
+cell press no longer falls out of the tab, and the account record's Back
+targets the Accounts tab explicitly - a person record is only ever opened
+from there, and its own `?tab` is its sub-tab and never travels. That Back
+was also malformed before (`&` with no `?`); the explicit base fixed it.
+
+**Verified**
+
+`check:finance` 369; `fn-smoke` asserts the bare route lands on slip rows
+and re-points the accounts assertions at `?tab=accounts`.
+
+---
+
+## 2026-09-01
+
 ### Analytics gains department-wise expenditure, modelled rather than guessed
 
 **Area:** Finance analytics, the salary account, the seed

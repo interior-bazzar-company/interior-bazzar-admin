@@ -47,7 +47,10 @@ export default function SalaryDetail({ id, p, onParams }: {
 
   /* The list state travels back with the button, so Back is a return and not a
      reset. `tab` and `run` belong to a screen, not to the list. */
-  const back = "#/finance-salaries"
+  /* Back returns to the ACCOUNTS tab explicitly: a person record is only
+     ever opened from there, and the list's default is Transactions now. The
+     record's own ?tab is its sub-tab and never travels. */
+  const back = "#/finance-salaries?tab=accounts"
     + Object.keys(p)
       .filter((k) => p[k] && ["view", "tab", "run"].indexOf(k) < 0)
       .map((k) => "&" + encodeURIComponent(k) + "=" + encodeURIComponent(p[k] as string))
