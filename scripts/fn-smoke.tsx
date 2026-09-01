@@ -300,7 +300,12 @@ has(paidSlip, "SLIP-2026-07-0011", "...a paid slip carries its number");
 has(paidSlip, "Document hash (SHA-256): ", "...and its hash, because somebody has to be able to rely on it");
 has(paidSlip, "computer-generated and needs no signature", "...it is a document, not a screen");
 const draftSlip = page("an open-run (draft) payslip", "/finance-salaries/SLIP-2026-08-0011");
-has(draftSlip, "Nobody has been paid yet", "...a draft slip says nobody has been paid");
+/* The standing draft ALERT is gone; the draft state is still said twice on
+   the page itself, and the sheet now carries the brand. */
+has(draftSlip, "Draft", "...a draft slip is stamped as one, on the pill and on the sheet");
+has(draftSlip, "no slip number until the run is paid", "...and the sheet says what a draft lacks");
+has(draftSlip, 'class="fin-wm"', "...the watermark rides behind the sheet");
+has(draftSlip, 'class="fin-slip-logo"', "...and the logo sits beside the company block");
 has(draftSlip, "Draft — no slip number until the run is paid", "...and that the number waits on the payment");
 hasnt(draftSlip, "SLIP-2026-08-0011", "...it carries no slip number stamp at all, not a greyed-out one");
 

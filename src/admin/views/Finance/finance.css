@@ -280,6 +280,25 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
 
 /* ------------------------------------------------------------ receipt --- */
 .fin-doc { background: var(--surface-raised); border: 1px solid var(--line-2); border-radius: var(--radius-md); padding: var(--space-6) var(--space-8); max-width: 760px; margin: 0 auto; box-shadow: var(--shadow-sm) }
+/* The document brand: the logo beside the company block, and a watermark
+   behind the whole sheet. The watermark is the brand name at a whisper --
+   text, not an image, so it prints from the same markup, and every child of
+   the sheet stacks above it. */
+.fin-slip { position: relative; overflow: hidden }
+.fin-slip > :not(.fin-wm) { position: relative }
+.fin-wm {
+  position: absolute; inset: 0; display: grid; place-items: center;
+  transform: rotate(-27deg); pointer-events: none; user-select: none;
+  font-size: 58px; font-weight: var(--weight-semibold);
+  letter-spacing: .28em; white-space: nowrap; text-transform: uppercase;
+  color: var(--text); opacity: .04;
+}
+.fin-slip-brand { display: flex; align-items: flex-start; gap: var(--space-3) }
+.fin-slip-logo { height: 42px; width: auto; flex: 0 0 auto }
+@media print {
+  .fin-slip { overflow: visible }
+  .fin-wm { opacity: .05 }
+}
 .fin-doc .dh { display: flex; justify-content: space-between; gap: var(--space-4); border-bottom: 2px solid var(--text); padding-bottom: var(--space-3); margin-bottom: var(--space-4) }
 .fin-doc .dh h3 { font-size: var(--text-xl); font-weight: var(--weight-semibold); letter-spacing: .04em; margin: 0 }
 .fin-doc .dh .r { text-align: right; font-size: var(--text-sm); color: var(--text-2) }

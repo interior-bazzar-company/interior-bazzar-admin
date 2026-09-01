@@ -1909,6 +1909,34 @@ tokens and primitives, not watched.
 
 ## 2026-09-01
 
+### The payslip wears the brand; the draft alert comes off
+
+**Area:** Finance - the payslip document
+**Files:** `Slip.tsx`, `finance.css`, `scripts/fn-smoke.tsx`
+
+**What changed**
+
+The standing draft alert above the sheet is removed - the draft state was
+already said twice on the page (the pill in the actions row, the stamp and
+terms on the sheet itself), and a third telling was a lecture.
+
+The sheet carries the company mark now: the IB logo beside the company
+block, and the brand name as a watermark behind the whole document - text
+at a whisper, rotated, aria-hidden and unselectable, so it prints from the
+same markup, never reaches a screen reader, and never rides along in a
+copy-paste. Light enough that every figure stays legible over it, on
+screen and on paper.
+
+**Verified**
+
+`check:finance` 369; `fn-smoke` asserts the draft stamp on the sheet, the
+watermark element and the logo - and no longer expects the removed alert.
+How the watermark actually sits on paper is a print-preview look.
+
+---
+
+## 2026-09-01
+
 ### Transactions becomes the landing tab
 
 **Area:** Finance · Salaries

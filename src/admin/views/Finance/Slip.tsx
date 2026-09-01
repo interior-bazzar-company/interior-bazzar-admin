@@ -17,8 +17,9 @@
    ============================================================================= */
 import { useShell } from "../../shell/ShellContext";
 import { useNav } from "../../shell/AdminShell";
-import { EmptyState, Icon, Notice } from "../../ui";
+import { EmptyState, Icon } from "../../ui";
 import { ProtoBar, RunPill } from "./bits";
+import LOGO from "../../../assets/images/Logo.png";
 import {
   COMPANY, accountOf, fmtDate, fmtDateTime, fmtMonth, inr, inrWordsOf, useSlip,
 } from "./store";
@@ -100,24 +101,24 @@ export default function Slip({ id, p }: {
         </button>
       </div>
 
-      {draft ? (
-        <Notice tone="warn" ico="clock" text={<>
-          <b>Nobody has been paid yet.</b> {run.runId} is open, so this slip carries no number and no
-          hash. Loss of pay can still be applied and the figures below are final only when the run is
-          paid — at which point every slip in it is stamped and frozen together.
-        </>} />
-      ) : null}
-
       {/* ======================================================== the doc === */}
       <div className="fin-doc fin-slip">
+        {/* The watermark sits behind everything, aria-hidden and unselectable:
+            it is presentation, and a screen reader or a copy-paste must never
+            meet it. Light enough that every figure stays legible over it, on
+            screen and on paper. */}
+        <div className="fin-wm" aria-hidden="true">{COMPANY.brand}</div>
         <div className="dh">
-          <div>
-            <h3>{COMPANY.brand}</h3>
+          <div className="fin-slip-brand">
+            <img className="fin-slip-logo" src={LOGO} alt="" />
+            <div>
+              <h3>{COMPANY.brand}</h3>
             <div className="fin-slip-co">
               {COMPANY.name}<br />
               {COMPANY.address}<br />
               GSTIN <span className="mono">{COMPANY.gstin}</span><br />
               CIN <span className="mono">{COMPANY.cin}</span>
+            </div>
             </div>
           </div>
           <div className="r">
