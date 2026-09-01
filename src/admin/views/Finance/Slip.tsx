@@ -19,7 +19,7 @@ import { useShell } from "../../shell/ShellContext";
 import { useNav } from "../../shell/AdminShell";
 import { EmptyState, Icon } from "../../ui";
 import { ProtoBar, RunPill } from "./bits";
-import LOGO from "../../../assets/images/Logo.png";
+import LOGO from "../../../assets/images/IB_Icon.png";
 import {
   COMPANY, accountOf, fmtDate, fmtDateTime, fmtMonth, inr, inrWordsOf, useSlip,
 } from "./store";
@@ -110,10 +110,10 @@ export default function Slip({ id, p }: {
         <div className="fin-wm" aria-hidden="true">{COMPANY.brand}</div>
         <div className="dh">
           <div className="fin-slip-brand">
-            {/* The mark is WHITE on transparency - designed for the brand
-                ground, invisible on the sheet without it. The tile is that
-                ground. */}
-            <span className="fin-slip-logo"><img src={LOGO} alt="" /></span>
+            {/* IB_Icon carries its own ground (it is a JPEG, no alpha), so
+                it needs no tile - just the corner radius of a letterhead
+                mark. */}
+            <img className="fin-slip-logo" src={LOGO} alt="" />
             <div>
               <h3>{COMPANY.brand}</h3>
             <div className="fin-slip-co">

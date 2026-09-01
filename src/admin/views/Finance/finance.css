@@ -291,21 +291,14 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
   transform: rotate(-27deg); pointer-events: none; user-select: none;
   font-size: 58px; font-weight: var(--weight-semibold);
   letter-spacing: .28em; white-space: nowrap; text-transform: uppercase;
-  color: var(--text); opacity: .04;
+  color: var(--text); opacity: .06;
 }
 .fin-slip-brand { display: flex; align-items: flex-start; gap: var(--space-3) }
-.fin-slip-logo {
-  display: grid; place-items: center; flex: 0 0 auto;
-  height: 44px; padding: 0 10px; border-radius: var(--radius-md);
-  background: var(--brand);
-  /* The tile must reach paper: without this most browsers strip element
-     backgrounds in print and the white mark vanishes again. */
-  -webkit-print-color-adjust: exact; print-color-adjust: exact;
-}
-.fin-slip-logo img { height: 28px; width: auto; display: block }
+.fin-slip-logo { height: 46px; width: 46px; object-fit: contain; flex: 0 0 auto;
+                 border-radius: var(--radius-md) }
 @media print {
   .fin-slip { overflow: visible }
-  .fin-wm { opacity: .05 }
+  .fin-wm { opacity: .07 }
 }
 .fin-doc .dh { display: flex; justify-content: space-between; gap: var(--space-4); border-bottom: 2px solid var(--text); padding-bottom: var(--space-3); margin-bottom: var(--space-4) }
 .fin-doc .dh h3 { font-size: var(--text-xl); font-weight: var(--weight-semibold); letter-spacing: .04em; margin: 0 }
