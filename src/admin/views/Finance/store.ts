@@ -572,16 +572,29 @@ export interface SalaryDue {
  *
  *  `paid` is the money that has actually left in the current period, not what
  *  was scheduled: a month nobody has been paid for contributes nothing. */
-export function salaryTotals(): { paidPaise: number; unpaidPaise: number; unpaidPeople: number } {
+export function salaryTotals(): {
+  paidPaise: number; paidAllPaise: number; unpaidPaise: number;
+  unpaidPeople: number; membersAll: number;
+} {
   let paidPaise = 0;
+  /* ALL TIME, alongside the period figure: every rupee that ever left as
+     salary, summed off the paid slips themselves. */
+  let paidAllPaise = 0;
   snap.salaryRuns.forEach((run) => run.slips.forEach((s) => {
-    if (s.paidAt && s.paidAt >= PERIOD.from && s.paidAt <= PERIOD.to + "T23:59:59") paidPaise += s.netPaise;
+    if (!s.paidAt) return;
+    paidAllPaise += s.netPaise;
+    if (s.paidAt >= PERIOD.from && s.paidAt <= PERIOD.to + "T23:59:59") paidPaise += s.netPaise;
   }));
-  const owing = salaryRows().map(dueOf).filter((d) => d.pendingPaise > 0);
+  const rows = salaryRows();
+  const owing = rows.map(dueOf).filter((d) => d.pendingPaise > 0);
   return {
     paidPaise,
+    paidAllPaise,
     unpaidPaise: owing.reduce((n, d) => n + d.pendingPaise, 0),
     unpaidPeople: owing.length,
+    /* Every account of every kind, closed ones included — a total, not a
+       head-count of who gets the next run. */
+    membersAll: rows.length,
   };
 }
 

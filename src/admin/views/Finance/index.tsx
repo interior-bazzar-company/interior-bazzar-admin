@@ -114,9 +114,10 @@ export default function Finance() {
         {view === "salaries" ? (
           <>
             <span className="tb-stat ro"
-              title="Salary accounts on the payroll right now. Closed accounts are not counted; their slips stay on the record.">
-              <span className="k">Members</span>
-              <span className="v tnum">{membersN}</span>
+              title={"Every salary account of every kind, closed ones included. "
+                + membersN + " of them are on the payroll right now."}>
+              <span className="k">Total members</span>
+              <span className="v tnum">{totals.membersAll}</span>
             </span>
             <span className="tb-sep" />
             {/* MONEY IN THE TOPBAR, WHICH THIS MODULE ONCE REFUSED — and the
@@ -129,15 +130,17 @@ export default function Finance() {
                 question that section exists to answer, and they are derived
                 from the same `dueOf` the rows below use — so the header and the
                 table cannot disagree. */}
-            <span className="tb-stat ro ok" title={"Salary paid out in " + PERIOD.label + ". A month nobody has been paid for yet is not in it."}>
-              <span className="k">Paid</span>
-              <span className="v tnum">{inr(totals.paidPaise)}</span>
+            <span className="tb-stat ro ok"
+              title={"Every rupee ever paid out as salary, summed off the paid slips. "
+                + inr(totals.paidPaise) + " of it in " + PERIOD.label + "."}>
+              <span className="k">Total paid</span>
+              <span className="v tnum">{inr(totals.paidAllPaise)}</span>
             </span>
             <span className="tb-stat ro warn"
               title={totals.unpaidPeople
                 ? totals.unpaidPeople + " " + (totals.unpaidPeople === 1 ? "person is" : "people are") + " owed, arrears included."
                 : "Everybody is paid up."}>
-              <span className="k">Unpaid</span>
+              <span className="k">Total unpaid</span>
               <span className="v tnum">{totals.unpaidPaise ? inr(totals.unpaidPaise) : "—"}</span>
             </span>
           </>
@@ -150,7 +153,8 @@ export default function Finance() {
         )}
       </span>
     </>
-  ), [view, activeN, membersN, totals.paidPaise, totals.unpaidPaise, totals.unpaidPeople]);
+  ), [view, activeN, membersN, totals.membersAll, totals.paidPaise, totals.paidAllPaise,
+    totals.unpaidPaise, totals.unpaidPeople]);
 
   usePageChrome(
     { crumbs, right: null, parent: id ? listHash(view) : null },
