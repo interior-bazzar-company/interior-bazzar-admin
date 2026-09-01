@@ -263,10 +263,7 @@ export default function SalaryTransactions({ p, onUnfilter }: {
                         <div className="cell-2">release it to pay</div>
                       </>
                     ) : (
-                      <>
-                        <div className="cell-1 faint">not yet</div>
-                        <div className="cell-2">pays with {s.memberName.split(" ")[0]}'s next payment</div>
-                      </>
+                      <div className="cell-1 faint">not yet</div>
                     )}
                   </td>
                   <td className="tight" onClick={(e) => e.stopPropagation()}

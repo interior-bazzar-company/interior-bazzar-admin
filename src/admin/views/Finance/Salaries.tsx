@@ -165,8 +165,8 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
       tabs={
         <ViewBand cur={tab}
           items={[
-            { k: "accounts", label: "Accounts", icon: "team", n: rows.length },
             { k: "transactions", label: "Transactions", icon: "invoice", n: slips.length },
+            { k: "accounts", label: "Accounts", icon: "team", n: rows.length },
           ]}
           onPick={(k) => onParams({
             tab: k === "accounts" ? undefined : k,
