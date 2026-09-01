@@ -26,7 +26,7 @@ import { can } from "../../shell/AdminShell";
 import { EmptyState, FilterChips, Icon, SearchField, Select, StatStrip, avatarTone, initials } from "../../ui";
 import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
-import { Frame, SubTabs } from "./Frame";
+import { Frame, ViewBand } from "./Frame";
 import type { FaceProps } from "./Frame";
 import SalaryTransactions from "./SalaryTransactions";
 import { Money } from "./bits";
@@ -162,6 +162,20 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
 
   return (
     <Frame toast={toast}
+      tabs={
+        <ViewBand cur={tab}
+          items={[
+            { k: "accounts", label: "Accounts", icon: "team", n: rows.length },
+            { k: "transactions", label: "Transactions", icon: "invoice", n: slips.length },
+          ]}
+          onPick={(k) => onParams({
+            tab: k === "accounts" ? undefined : k,
+            /* Each tab keeps its own vocabulary of filters; carrying one
+               across would narrow a list with a control it does not show. */
+            q: undefined, status: undefined, month: undefined, due: undefined,
+            engagement: undefined, active: undefined,
+          })} />
+      }
       cmd={tab === "accounts" ? <>
         {/* KEYED ON THEIR VALUE. SearchField and Select are uncontrolled, so
             clearing a chip otherwise leaves the old text in the box. */}
@@ -191,18 +205,6 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
         <span className="spacer" />
       </>}
       bands={<>
-        <SubTabs cur={tab}
-          items={[
-            { k: "accounts", label: "Accounts" },
-            { k: "transactions", label: "Transactions", n: heldN },
-          ]}
-          onPick={(k) => onParams({
-            tab: k === "accounts" ? undefined : k,
-            /* Each tab keeps its own vocabulary of filters; carrying one
-               across would narrow a list with a control it does not show. */
-            q: undefined, status: undefined, month: undefined, due: undefined,
-            engagement: undefined, active: undefined,
-          })} />
         {/* ONE STRIP STYLE FOR BOTH TABS. The four tiles that stood here said
             what the topbar and the strip now say between them, at four times
             the height, and matched nothing else in the panel. */}

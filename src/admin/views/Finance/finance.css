@@ -445,6 +445,35 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
 .fin-paid .facts .l { color: var(--text-3) }
 .fin-paid .fine { margin: var(--space-3) 0 0; max-width: 400px; font-size: var(--text-sm); line-height: var(--lh-md); color: var(--text-3) }
 
+/* The view band above the command row — the Users directory's tab anatomy,
+   restated because users.css belongs to that module and may not be loaded
+   here. Underline on the active tab, icon dims when inactive, count badge. */
+.fin-views {
+  display: flex; gap: 2px; flex-wrap: wrap; flex: 0 0 auto;
+  padding: var(--space-2) var(--page-pad) 0;
+  border-bottom: 1px solid var(--line);
+}
+.fin-views button {
+  position: relative; display: inline-flex; align-items: center; gap: var(--space-2);
+  height: var(--control-lg); padding: 0 var(--space-3);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  font-size: var(--text-md); font-weight: var(--weight-medium); color: var(--text-2);
+  transition: color var(--duration) var(--ease), background var(--duration) var(--ease);
+}
+.fin-views button:hover { color: var(--text); background: var(--bg-hover) }
+.fin-views button.on { color: var(--text); font-weight: var(--weight-semibold) }
+.fin-views button.on::after {
+  content: ""; position: absolute; left: var(--space-2); right: var(--space-2);
+  bottom: -1px; height: 2px; background: var(--brand); border-radius: 2px 2px 0 0;
+}
+.fin-views button .ic { color: var(--text-3) }
+.fin-views button.on .ic { color: var(--brand) }
+.fin-views button i {
+  font-style: normal; font-size: var(--text-xs); font-weight: var(--weight-semibold);
+  background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn-line);
+  border-radius: var(--radius-full); padding: 0 5px; line-height: 15px;
+}
+
 /* The row kebab and its menu. The same outside-click bones as the info
    buttons; what matters here is that it opens LEFT of the button — the button
    sits in the table's last column, and a menu opening rightward would leave

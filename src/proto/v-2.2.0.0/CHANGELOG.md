@@ -1909,6 +1909,35 @@ tokens and primitives, not watched.
 
 ## 2026-09-01
 
+### The tab switch moves above the filters, styled as the panel's view band
+
+**Area:** Finance · Salaries
+**Files:** `Frame.tsx`, `Salaries.tsx`, `finance.css`
+
+**What changed**
+
+Accounts / Transactions was a segmented control BELOW the command row —
+both the wrong clothes and the wrong floor. The tab changes WHAT the
+filters narrow, so it belongs above them; and the panel already has a
+shape for exactly this, the Users directory's view band. The switch is now
+that band: banner → tabs → filters → strip → table, underline on the
+active tab, an icon that lights with it, and the row count in the badge
+(Accounts 7 · Transactions 21).
+
+`Frame` grew a `tabs` slot above `cmd`, and the band's styles are restated
+in `finance.css` because the Users stylesheet belongs to that module and
+may not be loaded here. `SubTabs` remains for the switches that ARE
+subordinate to a page (Transactions/Tags on the company ledger).
+
+**Verified**
+
+`check:finance` 365, `fn-smoke` green — both tab labels still asserted on
+the rendered page.
+
+---
+
+## 2026-09-01
+
 ### The Accounts tab joins the panel's list anatomy too
 
 **Area:** Finance · Salaries · Accounts

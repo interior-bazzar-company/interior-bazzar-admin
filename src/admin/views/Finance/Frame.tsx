@@ -62,17 +62,43 @@ export function SubTabs({ items, cur, onPick, right }: {
 /** The workspace a section renders inside. It carries no navigation of its
  *  own any more — the five sections are sidebar rows, so the page opens
  *  straight onto its own controls. */
-export function Frame({ cmd, bands, children, toast }: {
+export function Frame({ tabs, cmd, bands, children, toast }: {
+  /** A view band ABOVE the command row — the Users directory's anatomy:
+   *  banner, tabs, filters, strip, table. SubTabs below the filters said the
+   *  levels backwards: the tab changes WHAT the filters narrow. */
+  tabs?: ReactNode;
   cmd?: ReactNode; bands?: ReactNode; children: ReactNode;
   toast?: (msg: ReactNode, tone?: string) => void;
 }) {
   return (
     <div className="dls fin">
       <ProtoBar onReset={() => { resetStore(); if (toast) toast("Back to the seed."); }} />
+      {tabs}
       {cmd ? <div className="dls-cmd">{cmd}</div> : null}
       {bands}
       <div className="dls-body">{children}</div>
     </div>
+  );
+}
+
+/** The tab band itself — the same bones as the Users directory's view band,
+ *  restated here because that stylesheet belongs to another module. */
+export function ViewBand({ items, cur, onPick }: {
+  items: { k: string; label: string; icon: string; n?: number }[];
+  cur: string; onPick: (k: string) => void;
+}) {
+  return (
+    <nav className="fin-views" aria-label="Views">
+      {items.map((t) => (
+        <button key={t.k} type="button" className={t.k === cur ? "on" : ""}
+          aria-current={t.k === cur ? "page" : undefined}
+          onClick={() => onPick(t.k)}>
+          <Icon name={t.icon} size="sm" />
+          <span>{t.label}</span>
+          {typeof t.n === "number" && t.n > 0 ? <i className="tnum">{t.n}</i> : null}
+        </button>
+      ))}
+    </nav>
   );
 }
 
