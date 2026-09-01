@@ -98,6 +98,46 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
       .map((k) => encodeURIComponent(k) + "=" + encodeURIComponent(o[k])).join("&");
   };
   const offStatus = (v: string) => (p.status === v ? undefined : v);
+  /* THE ACCOUNTS STRIP — the same anatomy as every list in the panel: a
+     stated Total, then its parts, each cell a filter. It replaces four tiles
+     that said the same things at four times the height; the one figure the
+     tiles carried that no cell can — the forward monthly payroll — rides at
+     the end as a read-out, money in the strip the way Deals carries its own. */
+  const accHash = (patch: Record<string, string | undefined>) => {
+    const o: Record<string, string> = {};
+    ["q", "engagement", "due", "active"].forEach((k) => { if (p[k]) o[k] = p[k] as string; });
+    Object.keys(patch).forEach((k) => {
+      if (patch[k]) o[k] = patch[k] as string; else delete o[k];
+    });
+    const q = Object.keys(o)
+      .map((k) => encodeURIComponent(k) + "=" + encodeURIComponent(o[k])).join("&");
+    return "#/finance-salaries" + (q ? "?" + q : "");
+  };
+  const offK = (k: string, v: string) => (p[k] === v ? undefined : v);
+  const accCells: (StatCell | "sep")[] = [
+    { k: "Total", v: rows.length, on: !p.active && !p.due,
+      to: accHash({ active: undefined, due: undefined }),
+      tip: <>Every salary account, open and closed. The cells beside it are its parts.</> },
+    "sep",
+    { k: "Active", v: active.length, dot: "ok", on: p.active === "yes",
+      to: accHash({ active: offK("active", "yes"), due: undefined }),
+      tip: <>On the payroll: the next run issues them a slip.</> },
+    { k: "Closed", v: rows.length - active.length, on: p.active === "no",
+      to: accHash({ active: offK("active", "no"), due: undefined }),
+      tip: <>Kept for their slips. No run picks a closed account up again.</> },
+    "sep",
+    { k: "Unpaid", v: owing.length, dot: "warn", on: p.due === "unpaid",
+      to: accHash({ due: offK("due", "unpaid"), active: undefined }),
+      tip: <>Owed right now — {owedPaise ? inr(owedPaise) : "nothing"} across everybody, arrears included.</> },
+    { k: "In arrears", v: inArrears.length, dot: "bad", on: p.due === "arrears",
+      to: accHash({ due: offK("due", "arrears"), active: undefined }),
+      tip: <>Owed for more than the current month. The debt that is ageing.</> },
+    "sep",
+    /* The caution is LOAD-BEARING (FN-OD-06): this is net paid to people,
+       not cost to company, and the metric tip is where that stays said. */
+    { k: <>Monthly payroll<MetricTip k="salary_cost" /></>, v: inr(payrollPaise), tone: "ro" },
+  ];
+
   const txCells: (StatCell | "sep")[] = [
     { k: "Total", v: slips.length, on: !p.status, to: txHash({ status: undefined }),
       tip: <>Every slip ever issued, paid and unpaid alike. The cells beside it are its parts.</> },
@@ -163,36 +203,10 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
             q: undefined, status: undefined, month: undefined, due: undefined,
             engagement: undefined, active: undefined,
           })} />
-        {tab === "transactions" ? <StatStrip cells={txCells} /> : (
-        <div className="fin-money-strip">
-          <div className="fin-mt">
-            <span className="k">Monthly payroll<MetricTip k="salary_cost" /></span>
-            <span className="v">{inr(payrollPaise)}</span>
-            <span className="s">net to {active.length} {active.length === 1 ? "person" : "people"}, every month</span>
-          </div>
-          <div className="fin-mt">
-            <span className="k">On the payroll</span>
-            <span className="v tnum">{active.length}</span>
-            <span className="s">{rows.length - active.length
-              ? rows.length - active.length + " closed account" + (rows.length - active.length === 1 ? "" : "s") + " kept for their slips"
-              : "no closed accounts"}</span>
-          </div>
-          <div className={"fin-mt" + (owedPaise ? " warn" : " ok")}>
-            <span className="k">Outstanding now</span>
-            <span className="v">{owedPaise ? inr(owedPaise) : "—"}</span>
-            <span className="s">{owedPaise
-              ? owing.length + " " + (owing.length === 1 ? "person" : "people") + " unpaid"
-              : "everybody is paid up"}</span>
-          </div>
-          <div className={"fin-mt" + (inArrears.length ? " bad" : " mute")}>
-            <span className="k">In arrears</span>
-            <span className="v tnum">{inArrears.length || "—"}</span>
-            <span className="s">{inArrears.length
-              ? "owed for more than the current month"
-              : "nobody is owed an earlier month"}</span>
-          </div>
-        </div>
-        )}
+        {/* ONE STRIP STYLE FOR BOTH TABS. The four tiles that stood here said
+            what the topbar and the strip now say between them, at four times
+            the height, and matched nothing else in the panel. */}
+        <StatStrip cells={tab === "transactions" ? txCells : accCells} />
         <div className="dls-chips">
           <FilterChips
             params={Object.keys(p)
@@ -207,12 +221,6 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
       {tab === "transactions" ? (
         <SalaryTransactions p={p} onUnfilter={onUnfilter} />
       ) : (<>
-      {/* ======================================================= the people === */}
-      <div className="sh">
-        <h2>The people</h2>
-        <span className="r fin-count">{filtered.length} of {rows.length}</span>
-      </div>
-
       {filtered.length ? (
         <table className="tbl dls-tbl fin-tbl">
           <thead>

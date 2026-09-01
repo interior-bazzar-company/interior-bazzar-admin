@@ -521,6 +521,8 @@ export function applySalaryFilters(rows: SalaryRow[], p: Params): SalaryRow[] {
   if (p.engagement) out = out.filter((r) => r.a.engagement === p.engagement);
   if (p.due === "unpaid") out = out.filter((r) => dueOf(r).pendingPaise > 0);
   if (p.due === "paid") out = out.filter((r) => dueOf(r).pendingPaise === 0 && !!r.lastPaidAt);
+  /* Owed for more than the current month — the strip's red cell. */
+  if (p.due === "arrears") out = out.filter((r) => dueOf(r).arrears.length > 0);
   if (p.q) {
     const q = p.q.toLowerCase().trim();
     out = out.filter((r) => r.a.memberName.toLowerCase().includes(q)
@@ -2191,6 +2193,10 @@ export function filterValueLabel(key: string, value: string): string {
   if (key === "dir") return value === "out" ? "Money out" : "Money in";
   if (key === "range") return value === "month" ? PERIOD.label : value;
   if (key === "active") return value === "yes" ? "Active" : "Closed";
+  if (key === "due") {
+    if (value === "arrears") return "In arrears";
+    return value === "unpaid" ? "Unpaid" : value === "paid" ? "Paid" : value;
+  }
   if (key === "flag") {
     if (value === "settled") return "Settled";
     if (value === "failed") return "Fail to pay";

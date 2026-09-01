@@ -1909,6 +1909,39 @@ tokens and primitives, not watched.
 
 ## 2026-09-01
 
+### The Accounts tab joins the panel's list anatomy too
+
+**Area:** Finance · Salaries · Accounts
+**Files:** `Salaries.tsx`, `store.ts`, `scripts/fn-smoke.tsx`
+
+**What changed**
+
+The previous entry brought the Transactions tab in line and left the
+Accounts tab as it was — four tiles over the table, which is exactly what
+the layout complaint was about. The tiles are gone. In their place, the
+same compact strip every list carries:
+
+    Total · ● Active · Closed | ● Unpaid · ● In arrears | Monthly payroll ₹…
+
+Every cell is a filter — Active/Closed set `active`, Unpaid sets `due`,
+and **In arrears is clickable now**, which the tile never was: `due=arrears`
+is a new filter value, so the red count finally opens the list it counts.
+The owed total lives in the Unpaid cell's tip. The payroll figure rides at
+the end as a read-out **with its metric tip kept** — the render suite
+caught it going missing, and the caution it carries is FN-OD-06: this is
+net paid to people, not cost to company. "The people" section head went
+the way of the Transactions one; the strip states the whole.
+
+**Verified**
+
+`check:finance` 365, `fn-smoke` green — the strip's Total and payroll
+cells asserted, the salary-cost caution asserted reachable, chips reading
+`due: In arrears` through the value-labeller.
+
+---
+
+## 2026-09-01
+
 ### The Transactions tab falls in line with the panel's list anatomy
 
 **Area:** Finance · Salaries · Transactions

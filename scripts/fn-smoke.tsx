@@ -194,7 +194,11 @@ const sal = page("salaries · the face", "/finance-salaries");
    guarantee is now the table's own: a person who has not been paid says so,
    and the strip totals it. The word is "Unpaid" and not "pending" — see
    HELD_AS_A_STATE below, which is why. */
-has(sal, "Outstanding now", "...the face totals what is owed right now");
+/* The four tiles became the panel's compact strip — the same anatomy as
+   every list. What must survive the change: the owed figure is still stated
+   (in the Unpaid cell), and the parts are still named. */
+has(sal, 'class="k">Total', "...the strip leads with the stated Total");
+has(sal, 'class="k">Monthly payroll', "...and the payroll figure rides at its end");
 has(sal, ">Unpaid<", "...and a person who has not been paid says so on their row");
 has(sal, "In arrears", "...with a month older than the current one called out separately");
 /* THE CAUTION MOVED, IT DID NOT GO. "Payroll here is net paid to people" was a
