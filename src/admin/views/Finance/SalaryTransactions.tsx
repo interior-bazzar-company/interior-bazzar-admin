@@ -81,11 +81,15 @@ function RowMenu({ x, writable, onPay, onHold, onCloseAccount }: {
   const state = stateOf(s);
   const saGate = superAdminOnly("Paying a salary");
 
-  const item = (label: string, act: () => void, opts?: { disabled?: boolean; title?: string; tone?: string }) => (
-    <button type="button" role="menuitem" className={"fin-mi" + (opts?.tone ? " " + opts.tone : "")}
+  /* THE PANEL'S OWN `.mi` ROW — the same item the shell's menus use: compact,
+     an icon slot, muted text. The first cut restyled all of this from scratch
+     and looked like it. */
+  const item = (icon: string, label: string, act: () => void,
+    opts?: { disabled?: boolean; title?: string; tone?: string }) => (
+    <button type="button" role="menuitem" className={"mi" + (opts?.tone ? " " + opts.tone : "")}
       disabled={opts?.disabled} title={opts?.title}
       onClick={() => { setOpen(false); act(); }}>
-      {label}
+      <Icon name={icon} size="sm" />{label}
     </button>
   );
 
@@ -99,24 +103,24 @@ function RowMenu({ x, writable, onPay, onHold, onCloseAccount }: {
       {open ? (
         <span className="fin-menu-pop" role="menu" aria-label={"Actions for " + s.slipId}>
           {state === "unpaid"
-            ? item("Pay…", onPay, {
+            ? item("cash", "Pay", onPay, {
                 disabled: !writable || !!saGate,
                 title: saGate || (!writable ? "Paying needs Finance edit rights." : undefined),
               })
             : null}
-          {state === "unpaid" ? item("Hold this slip…", onHold, {
+          {state === "unpaid" ? item("clock", "Hold slip", onHold, {
             disabled: !writable,
             title: writable ? undefined : "Holding a slip needs Finance edit rights.",
           }) : null}
-          {state === "held" ? item("Release the hold", () => {
+          {state === "held" ? item("unlock", "Release hold", () => {
             const e = setSlipHold(s.slipId, false, "");
             toast(e || fmtMonth(s.month) + "'s slip is released — " + inr(s.netPaise)
               + " counts as owed again.", e ? "bad" : "ok");
           }, { disabled: !writable }) : null}
-          {item("View slip", () => go("#/finance-salaries/" + encodeURIComponent(s.slipId)))}
-          {item("View account", () => go("#/finance-salaries/" + encodeURIComponent(s.salaryAccountId)))}
+          {item("doc", "View slip", () => go("#/finance-salaries/" + encodeURIComponent(s.slipId)))}
+          {item("user", "View account", () => go("#/finance-salaries/" + encodeURIComponent(s.salaryAccountId)))}
           {acc && acc.active
-            ? item("Close the account…", onCloseAccount, {
+            ? item("lock", "Close account", onCloseAccount, {
                 tone: "bad",
                 disabled: !writable,
                 title: writable ? undefined : "Closing an account needs Finance edit rights.",
@@ -244,13 +248,26 @@ export default function SalaryTransactions({ p, onUnfilter }: {
                       ? <div className="cell-2" title={s.heldReason}>{s.heldReason}</div>
                       : null}
                   </td>
+                  {/* NEVER A BARE DASH. An empty cell in a dated column reads
+                      as data that failed to load; an unpaid slip has a state
+                      worth saying, and a held one has a different state. */}
                   <td>
                     {s.paidAt ? (
                       <>
                         <div className="cell-1">{fmtDate(s.paidAt)}</div>
                         <div className="cell-2">{ago(s.paidAt)}</div>
                       </>
-                    ) : <span className="faint">—</span>}
+                    ) : state === "held" ? (
+                      <>
+                        <div className="cell-1 faint">not while held</div>
+                        <div className="cell-2">release it to pay</div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="cell-1 faint">not yet</div>
+                        <div className="cell-2">pays with {s.memberName.split(" ")[0]}'s next payment</div>
+                      </>
+                    )}
                   </td>
                   <td className="tight" onClick={(e) => e.stopPropagation()}
                     onKeyDown={(e) => e.stopPropagation()}>

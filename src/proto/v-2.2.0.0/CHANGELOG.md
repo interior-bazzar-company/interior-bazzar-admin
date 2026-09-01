@@ -1909,6 +1909,36 @@ tokens and primitives, not watched.
 
 ## 2026-09-01
 
+### The row menu wears the panel's clothes; Paid on never shows a bare dash
+
+**Area:** Finance · Salaries · Transactions
+**Files:** `SalaryTransactions.tsx`, `finance.css`
+
+**What changed**
+
+The actions menu had been styled from scratch — oversized rows, full-tone
+text, its own everything — and looked like it. The items are now the
+theme's own `.mi` rows, the same ones the shell's menus use: compact, an
+icon in the slot, muted text that darkens on hover. Labels lost their
+trailing ellipses and their padding words: **Pay · Hold slip · Release
+hold · View slip · View account · Close account** (red, iconed, last).
+The popover shell matches the panel's other menus — same surface, radius,
+shadow and rise animation.
+
+**Paid on never shows a bare dash.** An empty cell in a dated column reads
+as data that failed to load. Unpaid: *not yet · pays with <name>'s next
+payment*. Held: *not while held · release it to pay*. Paid keeps its date
+and its ago.
+
+**Verified**
+
+`check:finance` 365, `fn-smoke` green. The menu is a click state — one
+look in the browser.
+
+---
+
+## 2026-09-01
+
 ### The tab switch moves above the filters, styled as the panel's view band
 
 **Area:** Finance · Salaries
