@@ -97,6 +97,13 @@ export const txnStateMeta = (k: string) => first(TXN_STATES, k);
 export const eventMeta = (k: string) => first(EVENT_TYPES, k);
 export const metric = (k: string) => first(METRICS, k);
 export const kpiMeta = (k: string) => first(KPIS, k);
+/* THE PAYROLL FACE HAS ITS OWN METRIC LIST, deliberately kept apart from the
+   two above: the KPI tab renders every entry in `kpiDefinitions` grouped by
+   `group`, so a payroll figure added there would silently appear on a page
+   about subscriptions and refunds. A second list of payroll KPIs was here and
+   is gone with the metrics block it annotated. */
+export const PAYROLL_METRICS = vocabDoc.payrollMetricDefinitions;
+export const payrollMetric = (k: string) => first(PAYROLL_METRICS, k);
 export const decision = (id: string) => vocabDoc.openDecisions.filter((d) => d.id === id)[0] || null;
 export const accountOf = (id: string) => ACCOUNTS.filter((a) => a.accountId === id)[0] || null;
 
@@ -166,7 +173,11 @@ const listeners = new Set<() => void>();
 const emit = () => { version++; listeners.forEach((l) => l()); };
 const subscribe = (l: () => void) => { listeners.add(l); return () => { listeners.delete(l); }; };
 const getVersion = () => version;
-const useVersion = () => useSyncExternalStore(subscribe, getVersion, getVersion);
+/** The subscription primitive every `use…` hook in this module sits on.
+ *  EXPORTED so `payroll.ts` can build its own hooks on the same store version
+ *  rather than keeping a second subscription — two subscriptions to one
+ *  snapshot is how a chart and the table beside it end up a render apart. */
+export const useVersion = () => useSyncExternalStore(subscribe, getVersion, getVersion);
 
 export function resetStore() { snap = seed(); seq = 0; emit(); }
 
@@ -400,6 +411,29 @@ export function installmentRows(): InstRow[] {
 
 /* ======================================================== salary rows === */
 
+/** Σ a component array. One helper rather than the same `reduce` written out
+ *  at every call site, because every one of them is the same arithmetic and
+ *  the ones that drifted apart would be the hard bug to find. */
+export const money = (list: SalaryComponent[] | undefined | null): number =>
+  (list || []).reduce((n, c) => n + c.amountPaise, 0);
+
+/** WHAT VARIED THIS MONTH. Reads `incentivePaise` when the slip carries it and
+ *  falls back to summing the array, so a slip written by hand into the seed
+ *  with only one of the two is still read correctly — and a slip from before
+ *  incentives existed answers 0 without anything having to test for it.
+ *
+ *  Every payroll figure that separates fixed pay from variable goes through
+ *  here. Nothing re-derives an incentive by matching a label, which is what
+ *  it would have to do if the split were not in the record. */
+export const incentiveOf = (slip: Payslip): number =>
+  (typeof slip.incentivePaise === "number" ? slip.incentivePaise : money(slip.incentives));
+
+/** The FIXED half of a slip's gross — what the company committed to, after
+ *  loss of pay and before anything performance added. `grossPaise` minus the
+ *  incentive rather than Σ `earnings`, so the two can never disagree even on a
+ *  hand-written seed row. */
+export const fixedOf = (slip: Payslip): number => slip.grossPaise - incentiveOf(slip);
+
 export interface SalaryRow {
   a: SalaryAccount;
   lastSlip: Payslip | null;
@@ -461,6 +495,13 @@ export interface SalaryMemberOption {
   memberId: number;
   name: string;
   designation: string;
+  /** WHICH PART OF THE COMPANY, off the member record. It is not typed on the
+   *  salary form any more and it never should have been: a department is a
+   *  fact about a person, and asking Finance to restate it meant one company
+   *  could hold two spellings of Sales and no way to tell which was right.
+   *  Blank is legal and groups as Unassigned — a visible gap somebody can go
+   *  and fix on the member, which is the one place fixing it works. */
+  department: string;
   /** Already has a salary account — offered greyed rather than hidden, so
    *  somebody looking for a person finds them and learns why they cannot be
    *  picked, instead of concluding the list is broken. */
@@ -477,12 +518,15 @@ export const employeeCodeOf = (memberId: number | string) =>
 
 export function salaryMemberOptions(): SalaryMemberOption[] {
   const taken = new Set(snap.salaryAccounts.map((a) => String(a.memberId)));
-  return (teamMembersDoc.members as { memberId: string; name: string; designation: string; status: string }[])
+  return (teamMembersDoc.members as {
+    memberId: string; name: string; designation: string; department?: string; status: string;
+  }[])
     .filter((m) => m.status === "active")
     .map((m) => ({
       memberId: Number(m.memberId),
       name: m.name,
       designation: m.designation,
+      department: (m.department || "").trim(),
       taken: taken.has(m.memberId),
       employeeCode: employeeCodeOf(m.memberId),
     }));
@@ -797,37 +841,17 @@ export function overviewTiles(from = PERIOD.from, to = PERIOD.to): Tile[] {
 /** Every month the records touch, oldest first — derived from the records
  *  themselves. There is no separate history file that could disagree with the
  *  lists, which is the whole reason Analytics cannot contradict a tab. */
-/** SALARY PAID, BY DEPARTMENT, ALL TIME — summed off the paid slips joined
- *  back to their accounts. All time rather than the period, because early in
- *  a month the period figure is a column of zeros and a chart of zeros
- *  answers nothing. The department is read off the ACCOUNT, like the PAN on
- *  a slip: it is identity, not money, and a person moved to another
- *  department carries their history with them. Blank groups as "Unassigned"
- *  — a visible gap somebody can fix, never a guess. */
-export interface DepartmentSpend {
-  department: string;
-  paidPaise: number;
-  people: number;
-  slips: number;
-}
-export function departmentSpend(): DepartmentSpend[] {
-  const by = new Map<string, { paidPaise: number; people: Set<string>; slips: number }>();
-  snap.salaryRuns.forEach((run) => run.slips.forEach((sl) => {
-    if (!sl.paidAt) return;
-    const acc = snap.salaryAccounts.filter((a) => a.salaryAccountId === sl.salaryAccountId)[0];
-    const dep = (acc && (acc.department || "").trim()) || "Unassigned";
-    const cur = by.get(dep) || { paidPaise: 0, people: new Set<string>(), slips: 0 };
-    cur.paidPaise += sl.netPaise;
-    cur.people.add(sl.salaryAccountId);
-    cur.slips += 1;
-    by.set(dep, cur);
-  }));
-  return Array.from(by.entries())
-    .map(([department, v]) => ({
-      department, paidPaise: v.paidPaise, people: v.people.size, slips: v.slips,
-    }))
-    .sort((x, y) => y.paidPaise - x.paidPaise);
-}
+/* SALARY PAID BY DEPARTMENT WAS HERE, ALL TIME, AND HAS MOVED — it is
+   `departmentYear(fy)` in payroll.ts now, scoped to one financial year.
+
+   All time was the wrong window for the only thing the figure is used for,
+   which is comparing departments against each other: it silently rewarded
+   whoever had been on the payroll longest, so a team hired in January read as
+   cheap beside one hired two years earlier and the bars gave no hint why. The
+   argument for all-time was that a period figure is a column of zeros early in
+   a month — true of a MONTH, and not true of a year, which is what replaced
+   it. There is one department figure in the module, on the page that owns the
+   payroll year. */
 
 export function monthPoints(): MonthPoint[] {
   const keys = new Set<string>();
@@ -1548,6 +1572,13 @@ export function openSalaryRun(month: string): { error: string; runId: string | n
       employeeCode: acc.employeeCode, designation: acc.designation, month,
       paidDays: daysInMonth(month), lopDays: 0,
       baseEarnings: clone(acc.earnings), earnings: clone(acc.earnings), deductions: clone(acc.deductions),
+      /* A NEW SLIP HAS NO INCENTIVE, and says so with an empty array rather
+         than an absent one. Nothing is earned yet — the month has only just
+         opened — and an incentive is granted when the person is paid, not
+         when the run is cut. Present-and-empty means "none this month";
+         absent would mean "this slip predates incentives", which is a
+         different statement and true only of the historical seed. */
+      incentives: [], incentivePaise: 0,
       grossPaise: gross, deductionsPaise: ded, netPaise: gross - ded,
       paidAt: null, mode: "NEFT", reference: "", accountId: "ACC-HDFC-4021",
       bank: clone(acc.bank), pan: acc.pan, uan: acc.uan, issuedAt: null, sha256: null,
@@ -1582,7 +1613,12 @@ export function setLop(slipId: string, lopDays: number): string {
   slip.lopDays = lopDays;
   slip.paidDays = basis - lopDays;
   slip.earnings = slip.baseEarnings.map((e) => ({ ...e, amountPaise: Math.round((e.amountPaise * (basis - lopDays)) / basis) }));
-  slip.grossPaise = slip.earnings.reduce((n, e) => n + e.amountPaise, 0);
+  /* THE INCENTIVE IS NOT PRO-RATED, and that is the whole reason it lives in
+     its own array. Salary is paid for time served, so losing three days costs
+     three days of it; an incentive is paid for something that was achieved,
+     and being absent afterwards does not un-achieve it. It is added to gross
+     AFTER the pro-rating above, untouched. */
+  slip.grossPaise = money(slip.earnings) + incentiveOf(slip);
   slip.deductionsPaise = slip.deductions.reduce((n, d) => n + d.amountPaise, 0);
   slip.netPaise = slip.grossPaise - slip.deductionsPaise;
   run.totalNetPaise = run.slips.reduce((n, s) => n + s.netPaise, 0);
@@ -1680,10 +1716,20 @@ export function paySalary(salaryAccountId: string, input: PaySalaryInput): strin
       + ". A slip cannot go below zero; recover the rest from a later month. (deduction_exceeds)";
   }
   if (inc.line || ded.line) {
-    if (inc.line) newest.earnings = newest.earnings.concat([inc.line]);
+    /* THE INCENTIVE GOES TO `incentives`, NOT TO `earnings`. It used to be
+       concatenated onto `earnings`, which paid the right amount and destroyed
+       the only thing that made it an incentive: once it sat beside basic and
+       HRA, nothing downstream could tell committed pay from earned pay, and
+       payroll analytics had to guess by matching labels. It is the same money
+       on the same slip and it still prints as its own line — it is now filed
+       as what it is. Loss of pay pro-rates `earnings` and never this. */
+    if (inc.line) {
+      newest.incentives = (newest.incentives || []).concat([inc.line]);
+      newest.incentivePaise = money(newest.incentives);
+    }
     if (ded.line) newest.deductions = newest.deductions.concat([ded.line]);
-    newest.grossPaise = newest.earnings.reduce((n, c) => n + c.amountPaise, 0);
-    newest.deductionsPaise = newest.deductions.reduce((n, c) => n + c.amountPaise, 0);
+    newest.grossPaise = money(newest.earnings) + incentiveOf(newest);
+    newest.deductionsPaise = money(newest.deductions);
     newest.netPaise = newest.grossPaise - newest.deductionsPaise;
     /* The run's stored total is the sum of its slips and must stay it. */
     const holder = snap.salaryRuns.filter((r) => r.slips.indexOf(newest) >= 0)[0];
@@ -2152,7 +2198,6 @@ export function useOverview(): Overview { useVersion(); return overview(); }
 export function useOverviewTiles(): Tile[] { useVersion(); return overviewTiles(); }
 export function useKpis(): Kpi[] { useVersion(); return kpis(); }
 export function useMonthPoints(): MonthPoint[] { useVersion(); return monthPoints(); }
-export function useDepartmentSpend(): DepartmentSpend[] { useVersion(); return departmentSpend(); }
 export function useReconciliation(stmtId?: string): Recon { useVersion(); return reconciliation(stmtId); }
 export function useStatements() { useVersion(); return snap.statements; }
 export function usePendingImport() { useVersion(); return snap.pendingImport; }

@@ -369,6 +369,21 @@
       "tone": "warn"
     },
     {
+      "key": "SALARY_PAID",
+      "label": "Salary paid",
+      "tone": "ok"
+    },
+    {
+      "key": "SALARY_HELD",
+      "label": "Slip held",
+      "tone": "warn"
+    },
+    {
+      "key": "SALARY_RELEASED",
+      "label": "Hold released",
+      "tone": "ok"
+    },
+    {
       "key": "FINAL_SETTLEMENT",
       "label": "Final settlement",
       "tone": "info"
@@ -734,6 +749,50 @@
       "title": "Failed installments are not chased from here",
       "position": "Fail to pay is recorded and surfaced. Retrying a charge, sending a dunning email and suspending the membership all belong to other modules; Finance shows the fact and links out.",
       "status": "open"
+    },
+    {
+      "id": "FN-OD-16",
+      "title": "Deductions are flat, and statutory PF is not",
+      "position": "Loss of pay pro-rates earnings and leaves every deduction alone, because deductions are typed on the account and this module does not decide which of them are proportional. In law employee PF is 12% of basic and falls with a pro-rated basic, so a loss-of-pay slip overstates PF and understates net. Fixing it means marking a component proportional or flat when it is typed, which is a schema decision and a payroll-policy one, not a rendering fix.",
+      "status": "open"
+    }
+  ],
+  "$comment_payrollDefinitions": "THE PAYROLL FACE HAS ITS OWN METRIC LIST, deliberately not folded into metricDefinitions above: the KPI tab renders EVERY entry in kpiDefinitions grouped by its `group`, so a payroll figure added there would appear, unasked, on a page about subscriptions and refunds. A second list — payrollKpiDefinitions, six decision metrics with year-on-year arrows — was here and is DELETED with the block it annotated: the Salaries A/C analytics tab was cut back to four totals and three charts because the metrics, and the two wide tables under them, were the half of the page that made it confusing rather than the half that made it useful. Every figure that survived still prints its formula and its caution behind an i, which is the only defence against one number meaning two things six months apart.",
+  "payrollMetricDefinitions": [
+    {
+      "key": "payroll_cost",
+      "label": "Payroll, the year",
+      "unit": "₹",
+      "formula": "Σ (earnings + incentives) over every slip issued in the financial year",
+      "caution": "COST, not cash: it is what the payroll came to before deductions, so it does not match what left the bank. Deductions are money withheld and owed onward, not money saved — the figure a bank statement matches is Paid out, beside this one. THE YEAR IS JANUARY TO DECEMBER, the calendar year and NOT the April-to-March one that the books, TDS and PF all close on, so this total will not match a filed return. The two spans are close enough to be mistaken for each other and far enough apart to matter."
+    },
+    {
+      "key": "payroll_paid",
+      "label": "Paid out",
+      "unit": "₹",
+      "formula": "Σ net on slips stamped paid, over the financial year",
+      "caution": "What actually left the accounts. A slip issued and not yet paid is not in it, which is why this and Payroll, the year differ for any month still open."
+    },
+    {
+      "key": "payroll_owed",
+      "label": "Still owed",
+      "unit": "₹",
+      "formula": "Σ net on unpaid slips + Σ net on held slips, over the financial year",
+      "caution": "Held and unpaid are added here because both are money not yet gone, but they are NOT the same thing and the chart separates them: unpaid is a payment that has not happened, held is one somebody stopped for a stated reason. A total that hides the difference reports a dispute as arrears."
+    },
+    {
+      "key": "payroll_incentive",
+      "label": "Incentives",
+      "unit": "₹",
+      "formula": "Σ incentive lines over every slip issued in the financial year",
+      "caution": "Variable pay only — money earned for something achieved, never pro-rated by loss of pay. A fixed monthly allowance called Performance allowance is NOT in this figure: it is committed pay under a hopeful name, and it sits in the fixed half where it belongs."
+    },
+    {
+      "key": "payroll_headcount",
+      "label": "On the payroll",
+      "unit": "people",
+      "formula": "count of salary accounts that are open, as at now",
+      "caution": "THE ONLY FIGURE HERE COUNTED FROM ACCOUNTS RATHER THAN SLIPS, and the only one that moves the moment a salary account is opened. Every other figure on this page is derived from slips, so a new account changes none of them until a run is opened and paid — correct for money, and no feedback at all for somebody who has just added a person. The monthly figure beside it is what a run opened today would cost before deductions: a COMMITMENT, not a cost, and it is not part of any total on this page."
     }
   ]
 }

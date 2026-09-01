@@ -227,8 +227,8 @@ function TxnLine({ r, p }: { r: TxnRow; p: Params }) {
         </div>
       </td>
       <td>
-        <div className="cell-1">{t.description}</div>
-        <div className="cell-2 faint">{t.party || "—"}</div>
+        <div className="cell-1 fin-desc" title={t.description}>{t.description}</div>
+        <div className="cell-2 faint fin-desc" title={t.party || undefined}>{t.party || "—"}</div>
       </td>
       <td><TagChip k={t.tagKey} /></td>
       <td><Dir d={t.direction} /></td>

@@ -21,7 +21,7 @@ import { EmptyState, Icon } from "../../ui";
 import { ProtoBar, RunPill } from "./bits";
 import LOGO from "../../../assets/images/IB_Icon.png";
 import {
-  COMPANY, accountOf, fmtDate, fmtDateTime, fmtMonth, inr, inrWordsOf, useSlip,
+  COMPANY, accountOf, fmtDate, fmtDateTime, fmtMonth, inr, inrWordsOf, payViaMeta, useSlip,
 } from "./store";
 import type { Params, SalaryComponent } from "./store";
 
@@ -62,14 +62,33 @@ export default function Slip({ id, p }: {
 
   /* Computed here, from the slip's own arrays, and never taken on trust from
      the totals stored beside them. Integer paise throughout: gross is the sum
-     of the earnings, net is gross minus the deductions, and there is no third
-     way to arrive at either. */
-  const gross = sum(slip.earnings);
+     of the earnings PLUS the incentives, net is gross minus the deductions,
+     and there is no third way to arrive at either.
+
+     THE INCENTIVE WAS MISSING FROM THIS SUM and that made the document wrong
+     in the worst way available to it: the slip printed a gross lower than the
+     money that moved, and therefore a NET LOWER THAN THE TRANSFER — a payslip
+     disagreeing with the bank in the employee's favour to look at, and against
+     them on paper. It is a separate array precisely so loss of pay cannot
+     pro-rate it, and reading `earnings` alone quietly turned that separation
+     into an omission. */
+  const incentives = slip.incentives || [];
+  const gross = sum(slip.earnings) + sum(incentives);
   const ded = sum(slip.deductions);
   const net = gross - ded;
 
-  const lines = Math.max(slip.earnings.length, slip.deductions.length);
+  /* Earnings then incentives down the left column, deductions down the right.
+     The incentive sits WITH the earnings because that is what it is on a
+     payslip — money paid — and is marked, because what it is not is part of
+     the salary this person can count on next month. */
+  const left = slip.earnings.concat(incentives);
+  const lines = Math.max(left.length, slip.deductions.length);
   const paidFrom = accountOf(slip.accountId);
+  /* How it was paid, in the words somebody actually says. `mode` is the
+     ledger's vocabulary (NEFT / UPI / Cash) and stays what it was; `via` is
+     the choice a person made in the dialog, and it was stored and never once
+     displayed. */
+  const via = payViaMeta(slip.via || "");
   const toAccount = "#/finance-salaries/" + encodeURIComponent(slip.salaryAccountId) + "?tab=slips";
 
   return (
@@ -152,10 +171,24 @@ export default function Slip({ id, p }: {
             <div className="mono">{slip.bank.masked}</div>
             <div>IFSC <span className="mono">{slip.bank.ifsc}</span></div>
             <div>
-              {slip.mode}
+              {via ? via.label : slip.mode}
               {slip.reference ? <> · <span className="mono">{slip.reference}</span></> : null}
             </div>
             {paidFrom ? <div>From {paidFrom.masked}</div> : null}
+            {/* THE RECEIPT, WHICH NOTHING IN THIS MODULE USED TO SHOW. The pay
+                dialog refuses a payment without one — it is the only evidence a
+                salary payment has, since the typed bank reference was removed —
+                and then the filename was written to the slip and rendered on no
+                screen at all. Evidence nobody can see is evidence nobody can
+                check, which is the same as none at audit. It belongs here,
+                beside how the money moved. */}
+            {slip.proof
+              ? <div className="fin-slip-proof">
+                Receipt <span className="mono">{slip.proof.filename}</span>
+              </div>
+              : !draft && !slip.reference
+                ? <div className="fin-slip-proof none">No receipt on this payment</div>
+                : null}
           </div>
         </div>
 
@@ -177,11 +210,12 @@ export default function Slip({ id, p }: {
           </thead>
           <tbody>
             {Array.from({ length: lines }, (_unused, i) => {
-              const e = slip.earnings[i];
+              const e = left[i];
               const d = slip.deductions[i];
+              const earned = e ? i >= slip.earnings.length : false;
               return (
                 <tr key={i}>
-                  <td>{e ? e.label : ""}</td>
+                  <td>{e ? e.label : ""}{earned ? <span className="fin-earned">earned</span> : null}</td>
                   <td className="num tnum">{e ? inr(e.amountPaise) : ""}</td>
                   <td>{d ? d.label : ""}</td>
                   <td className="num tnum">{d ? inr(d.amountPaise) : ""}</td>
@@ -203,11 +237,34 @@ export default function Slip({ id, p }: {
         </div>
         <p className="words">{inrWordsOf(net)}</p>
 
+        {/* WHOEVER PAID IT WROTE THIS, and until now it was stored and shown
+            nowhere. Never load-bearing — no total reads a remark — but it is
+            the only place the reason for an unusual month is recorded in
+            words, and a slip that drops it makes somebody go and ask. */}
+        {slip.remark ? <p className="fin-slip-remark">{slip.remark}</p> : null}
         <div className="terms">
+          {/* THE MONTH'S REAL LENGTH, not a notional thirty. This line said "on a
+              thirty-day month" and the module has never computed one: `setLop`
+              divides by `daysInMonth`, the type says so in as many words, and a
+              check asserts it. A payslip is the one document somebody
+              recalculates by hand when they disagree with it, and this sentence
+              was telling them to do the arithmetic wrongly. */}
           {slip.lopDays
             ? "Earnings are pro-rated for " + slip.lopDays + " day"
-              + (slip.lopDays === 1 ? "" : "s") + " of loss of pay, on a thirty-day month. "
+              + (slip.lopDays === 1 ? "" : "s") + " of loss of pay, over the real length of "
+              + fmtMonth(slip.month) + " — " + slip.paidDays + " paid days of "
+              + (slip.paidDays + slip.lopDays) + ". "
               + "Deductions are not pro-rated: they are flat monthly amounts.\n"
+            : ""}
+          {/* An incentive is named as the thing it is, and only when there is
+              one. Somebody reading a slip with an unusually large month on it
+              should not have to work out for themselves which half of it they
+              can expect again. */}
+          {incentives.length
+            ? "The " + (incentives.length === 1 ? "line" : "lines") + " marked earned "
+              + (incentives.length === 1 ? "is an incentive" : "are incentives")
+              + " and not salary: " + inr(sum(incentives))
+              + " for this month, not payable again unless earned again, and not reduced by loss of pay. "
             : ""}
           {draft
             ? "This is a draft. No payment has been made, no slip number has been allotted and no hash has been computed. It is not a record of anything yet.\n"

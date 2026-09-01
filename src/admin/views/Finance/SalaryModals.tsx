@@ -131,11 +131,14 @@ export function SalaryAccountModal({ account, onClose, onDone }: {
   const [memberName, setMemberName] = useState(a ? a.memberName : "");
   const [code, setCode] = useState(a ? a.employeeCode : "");
   const [designation, setDesignation] = useState(a ? a.designation : "");
-  const [department, setDepartment] = useState(a ? a.department : "");
-  /* The departments already in use, as datalist suggestions. A hook, so it is
-     called here at the top and not from inside the markup. */
-  const departments = Array.from(new Set(
-    useSalaryRows().map((r) => r.a.department).filter(Boolean)));
+  /* DEPARTMENT IS NOT A FIELD ANY MORE. It comes off the team member with the
+     name, the designation and the code — see `pickMember`. It was a typed box
+     with a datalist of whatever had been typed before, which is a memory of
+     past spellings and not a taxonomy: the first person to type "sales" made
+     it an option for everybody after them. A department is a fact about a
+     person, it is on the member record now, and it is stated once. On a
+     revision the account keeps the one it has, because revising a salary is
+     not how somebody changes department. */
   const [joinedAt, setJoinedAt] = useState(a ? a.joinedAt : todayIso());
   const [masked, setMasked] = useState(a ? a.bank.masked : "");
   const [ifsc, setIfsc] = useState(a ? a.bank.ifsc : "");
@@ -151,15 +154,19 @@ export function SalaryAccountModal({ account, onClose, onDone }: {
   /* Read once per render: the list changes when an account is opened, and a
      picker that still offers somebody who now has one is a picker that lies. */
   const members = salaryMemberOptions();
-  /* ONE CHOICE, FOUR FIELDS. The code is derived rather than typed — it prints
+  /* ONE CHOICE, FIVE FIELDS. The code is derived rather than typed — it prints
      on the payslip, and two people typing their own conventions produce two
-     formats in one payroll. */
+     formats in one payroll. Department joined them when it came off the form:
+     it was the last thing on this dialog asking somebody to restate something
+     the Team record already knew. */
+  const [department, setDepartment] = useState(a ? a.department : "");
   const pickMember = (id: string) => {
     const m = members.filter((x) => String(x.memberId) === id)[0];
     setMemberId(id);
     setMemberName(m ? m.name : "");
     setDesignation(m ? m.designation : "");
     setCode(m ? m.employeeCode : "");
+    setDepartment(m ? m.department : "");
     setErr(null);
   };
 
@@ -242,16 +249,17 @@ export function SalaryAccountModal({ account, onClose, onDone }: {
           <Field label="Joined">
             <input type="date" className="inp" value={joinedAt} onChange={(e) => setJoinedAt(e.target.value)} />
           </Field>
-          {/* Typed, with the departments already in use as suggestions — a
-              designation does not partition into departments by itself, and a
-              free field with no memory grows "Sales", "sales" and "SALES".
-              Analytics groups a blank as Unassigned rather than guessing. */}
-          <Field label="Department" help="Where this cost rolls up in analytics.">
-            <input className="inp" value={department} list="fin-departments"
-              placeholder="Sales" onChange={(e) => setDepartment(e.target.value)} />
-            <datalist id="fin-departments">
-              {departments.map((dep) => <option key={dep} value={dep} />)}
-            </datalist>
+          {/* DEPARTMENT USED TO BE A TYPED BOX HERE and is now read off the
+              member — shown, not asked for, because somebody opening a salary
+              account still needs to know where the cost will roll up, and a
+              value that appears without being typed has to be visible or it is
+              a surprise in an analytics chart three months later. It is a
+              read-out and not a field: it is not editable here, and it should
+              not invite a click. */}
+          <Field label="Department" help="From the team record. Change it on the member, not here.">
+            <div className="fin-derived">
+              {department || <span className="faint">Unassigned — set it on the team member</span>}
+            </div>
           </Field>
         </div>
       </Fs>

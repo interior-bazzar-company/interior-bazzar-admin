@@ -67,9 +67,21 @@
   --heat-ink: #04140f;
 }
 
-.ch-chart .sw.s1, .ch-chart .fill.s1 { background: var(--s1) }
-.ch-chart .sw.s2, .ch-chart .fill.s2 { background: var(--s2) }
-.ch-chart .sw.s3, .ch-chart .fill.s3 { background: var(--s3) }
+/* THE SLOT FILLS, AND `.ch-col` WAS MISSING FROM THEM.
+
+   `BarRows` and `FunnelChart` draw their marks as `.fill`, and `Legend` draws
+   its swatch as `.sw` — both were listed here. `ColumnChart` draws its bars as
+   `.ch-col s1`, which matched neither, so every grouped column chart in the
+   panel rendered its bars TRANSPARENT: correct heights, correct tooltips,
+   correct legend swatches, and nothing visible above the baseline. Six charts
+   across Finance and Users were affected and it had never been caught, because
+   a static render asserts that markup exists and cannot see that a span has no
+   background — and the forced-colors rule at the bottom of this file already
+   treats `.ch-col` as a mark that needs a visible border, which is what the
+   author intended all along. */
+.ch-chart .sw.s1, .ch-chart .fill.s1, .ch-chart .ch-col.s1 { background: var(--s1) }
+.ch-chart .sw.s2, .ch-chart .fill.s2, .ch-chart .ch-col.s2 { background: var(--s2) }
+.ch-chart .sw.s3, .ch-chart .fill.s3, .ch-chart .ch-col.s3 { background: var(--s3) }
 .ch-chart .fill.o1 { background: var(--o1) }
 .ch-chart .fill.o2 { background: var(--o2) }
 .ch-chart .fill.o3 { background: var(--o3) }

@@ -11,6 +11,7 @@
       "phone": "+91 98200 41001",
       "username": "vshakya",
       "designation": "Founder",
+      "department": "Leadership",
       "employmentType": "full_time",
       "joiningDate": "2023-04-01",
       "reportsTo": null,
@@ -22,7 +23,9 @@
       "timezone": "Asia/Kolkata",
       "status": "active",
       "isFullAccess": true,
-      "roles": ["Super Admin"],
+      "roles": [
+        "Super Admin"
+      ],
       "addedAt": "2023-04-01T09:00:00+05:30",
       "lastLogin": "2026-08-28T08:41:00+05:30"
     },
@@ -33,6 +36,7 @@
       "phone": "+91 98200 41002",
       "username": "asharma",
       "designation": "Sales Head",
+      "department": "Sales",
       "employmentType": "full_time",
       "joiningDate": "2024-06-17",
       "reportsTo": "41",
@@ -44,7 +48,9 @@
       "timezone": "Asia/Kolkata",
       "status": "active",
       "isFullAccess": false,
-      "roles": ["Sales Head"],
+      "roles": [
+        "Sales Head"
+      ],
       "addedAt": "2024-06-17T10:12:00+05:30",
       "lastLogin": "2026-08-28T09:22:00+05:30"
     },
@@ -55,6 +61,7 @@
       "phone": "+91 98200 41003",
       "username": "dkapoor",
       "designation": "Operations Manager",
+      "department": "Operations",
       "employmentType": "full_time",
       "joiningDate": "2024-09-02",
       "reportsTo": "41",
@@ -66,7 +73,9 @@
       "timezone": "Asia/Kolkata",
       "status": "active",
       "isFullAccess": false,
-      "roles": ["Ops Manager"],
+      "roles": [
+        "Ops Manager"
+      ],
       "addedAt": "2024-09-02T11:03:00+05:30",
       "lastLogin": "2026-08-28T09:04:00+05:30"
     },
@@ -77,6 +86,7 @@
       "phone": "+91 98200 41004",
       "username": "meera",
       "designation": "Operations Executive",
+      "department": "Operations",
       "employmentType": "full_time",
       "joiningDate": "2025-02-10",
       "reportsTo": "58",
@@ -88,7 +98,9 @@
       "timezone": "Asia/Kolkata",
       "status": "active",
       "isFullAccess": false,
-      "roles": ["Ops Executive"],
+      "roles": [
+        "Ops Executive"
+      ],
       "addedAt": "2025-02-10T09:40:00+05:30",
       "lastLogin": "2026-08-28T09:01:00+05:30"
     },
@@ -99,6 +111,7 @@
       "phone": "+91 98200 41005",
       "username": "rahul",
       "designation": "Sales Executive",
+      "department": "Sales",
       "employmentType": "full_time",
       "joiningDate": "2025-07-21",
       "reportsTo": "52",
@@ -110,7 +123,9 @@
       "timezone": "Asia/Kolkata",
       "status": "active",
       "isFullAccess": false,
-      "roles": ["Sales Agent"],
+      "roles": [
+        "Sales Agent"
+      ],
       "addedAt": "2025-07-21T10:00:00+05:30",
       "lastLogin": "2026-08-28T09:47:00+05:30"
     },
@@ -121,6 +136,7 @@
       "phone": "+91 98200 41006",
       "username": "priya",
       "designation": "Sales Executive",
+      "department": "Sales",
       "employmentType": "full_time",
       "joiningDate": "2025-11-04",
       "reportsTo": "52",
@@ -133,7 +149,9 @@
       "timezone": "Asia/Kolkata",
       "status": "active",
       "isFullAccess": false,
-      "roles": ["Sales Agent"],
+      "roles": [
+        "Sales Agent"
+      ],
       "addedAt": "2025-11-04T12:30:00+05:30",
       "lastLogin": "2026-08-28T10:06:00+05:30"
     },
@@ -144,6 +162,7 @@
       "phone": "+91 98200 41007",
       "username": "sraghavan",
       "designation": "Finance Admin",
+      "department": "Operations",
       "employmentType": "full_time",
       "joiningDate": "2025-01-13",
       "reportsTo": "41",
@@ -155,7 +174,9 @@
       "timezone": "Asia/Kolkata",
       "status": "active",
       "isFullAccess": false,
-      "roles": ["Finance"],
+      "roles": [
+        "Finance"
+      ],
       "addedAt": "2025-01-13T09:15:00+05:30",
       "lastLogin": "2026-08-28T09:18:00+05:30"
     },
@@ -166,6 +187,7 @@
       "phone": "+91 98200 41008",
       "username": "npillai",
       "designation": "Support Executive",
+      "department": "Operations",
       "employmentType": "contract",
       "joiningDate": "2026-03-16",
       "reportsTo": "58",
@@ -183,5 +205,6 @@
       "addedAt": "2026-03-16T14:00:00+05:30",
       "lastLogin": "2026-08-27T17:52:00+05:30"
     }
-  ]
+  ],
+  "$comment_department": "WHICH PART OF THE COMPANY somebody belongs to. It is on the MEMBER and not on their salary account, because it is a fact about the person: a salary is a contract, a department is where they work, and the two change for different reasons and at different times. Finance reads it through `memberId` when a salary account is opened and never asks anybody to type it a second time — two people typing their own spelling produce Sales, sales and SALES in one payroll report. Blank is legal and groups as Unassigned in analytics. The server must NOT derive it from a designation, which does not partition into departments by itself: an Operations Manager and an Operations Executive share a department, a Sales Head and a Finance Admin do not, and no rule over job titles gets that right."
 }

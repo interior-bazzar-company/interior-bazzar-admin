@@ -289,9 +289,9 @@ S.resetStore();
 
   ok("salary cost counts only runs that were actually paid", [o.salaryPaise, o.salaryN], [0, 0]);
   ok("...the open August run of ₹5,01,000 contributes nothing until someone is paid",
-    S.readRun("RUN-2026-08").state + "/" + S.readRun("RUN-2026-08").totalNetPaise, "open/50100000");
+    S.readRun("RUN-2026-08").state + "/" + S.readRun("RUN-2026-08").totalNetPaise, "open/69450000");
   ok("...July's paid run is the whole salary cost of July",
-    S.overview("2026-07-01", "2026-07-31").salaryPaise, 49166437);
+    S.overview("2026-07-01", "2026-07-31").salaryPaise, 77854837);
 
   ok("net = collected + other in − salary − other spend − refunds paid",
     o.netPaise, o.collectedPaise + o.otherInPaise - o.salaryPaise - o.otherOutPaise - o.refundsPaidPaise);
@@ -423,16 +423,44 @@ S.resetStore();
 console.log("\nsalaries — the slip is frozen");
 S.resetStore();
 {
-  ok("a slip's gross is the sum of the earnings printed on it",
-    allSlips().filter((x) => money(x.p.earnings) !== x.p.grossPaise).map((x) => x.p.slipId), []);
+  /* GROSS IS EARNINGS PLUS INCENTIVES, and the two arrays are separate for a
+     reason: loss of pay pro-rates `earnings` and must never reach an
+     incentive, which is paid for something achieved. This assertion is the
+     one that would catch an incentive being quietly folded back into
+     `earnings` — where the pay dialog used to put it, and where nothing
+     downstream could tell committed pay from earned pay. */
+  ok("a slip's gross is its earnings plus its incentives, and nothing else",
+    allSlips().filter((x) => money(x.p.earnings) + money(x.p.incentives) !== x.p.grossPaise)
+      .map((x) => x.p.slipId), []);
+  ok("...and the stored incentive total is the sum of the incentive lines",
+    allSlips().filter((x) => (x.p.incentivePaise || 0) !== money(x.p.incentives)).map((x) => x.p.slipId), []);
+  ok("no incentive is filed as an ordinary earning",
+    allSlips().filter((x) => x.p.earnings.some((e) => e.key === "incentive")).map((x) => x.p.slipId), []);
+  /* AN INCENTIVE IS GRANTED WHEN SOMEBODY IS PAID, never when the run is cut,
+     so a slip on the open run carries an empty array rather than a figure. */
+  ok("a slip on the open run has earned no incentive yet",
+    allSlips().filter((x) => x.r.state === "open" && (x.p.incentivePaise || 0) > 0).map((x) => x.p.slipId), []);
   ok("a slip's deductions are the sum of the deductions printed on it",
     allSlips().filter((x) => money(x.p.deductions) !== x.p.deductionsPaise).map((x) => x.p.slipId), []);
   ok("net is gross minus deductions, never CTC divided by twelve",
     allSlips().filter((x) => x.p.netPaise !== x.p.grossPaise - x.p.deductionsPaise).map((x) => x.p.slipId), []);
   ok("a run's total is the sum of its slips' net",
     S.readRuns().filter((r) => r.totalNetPaise !== sumBy(r.slips, (s) => s.netPaise)).map((r) => r.runId), []);
-  ok("...July's ₹4,91,664.37 is six people, one of them on loss of pay",
-    [S.readRun("RUN-2026-07").totalNetPaise, S.readRun("RUN-2026-07").slips.length], [49166437, 6]);
+  ok("...July's ₹7,78,548.37 is nine people, one of them on loss of pay",
+    [S.readRun("RUN-2026-07").totalNetPaise, S.readRun("RUN-2026-07").slips.length], [77854837, 9]);
+  /* ONE ARITHMETIC FOR LOSS OF PAY, in the seed and in the write. The seeded
+     July slip used to pro-rate Provident fund while `setLop` left every
+     deduction alone, so a loss-of-pay slip meant two different things
+     depending on whether a person or the fixture had made it. The code's rule
+     won — deductions are typed and this module does not decide which are
+     proportional — and FN-OD-16 records what that costs in law. */
+  {
+    const lop = S.readRun("RUN-2026-07").slips.filter((s) => s.lopDays > 0);
+    ok("a seeded loss-of-pay slip leaves its deductions alone, exactly as setLop does",
+      lop.map((s) => s.deductionsPaise),
+      lop.map((s) => money(S.readSalaryAccount(s.salaryAccountId).deductions)));
+    ok("...and the payslip's own terms are therefore true of it", lop.length > 0, true);
+  }
   ok("an account's monthly gross is the sum of its own earnings",
     S.readSalaryAccounts().filter((a) => money(a.earnings) !== a.monthlyGrossPaise).map((a) => a.salaryAccountId), []);
   ok("every slip names the month it is for",
@@ -446,9 +474,21 @@ S.resetStore();
   ok("a slip on a paid run is stamped, referenced, issued and hashed",
     paidSlips.filter((x) => !(x.p.paidAt && x.p.reference && x.p.issuedAt && (x.p.sha256 || "").length === 64))
       .map((x) => x.p.slipId), []);
-  ok("a slip on the open run has none of the four — nobody has been paid",
-    openSlips.filter((x) => x.p.paidAt || x.p.reference || x.p.issuedAt || x.p.sha256).map((x) => x.p.slipId), []);
-  ok("...and there are six of them waiting", openSlips.length, 6);
+  /* A RUN HALF PAID IS THE ORDINARY MID-MONTH STATE. This asserted that NO slip
+     on the open run was paid, which was true of a fixture in which August had
+     not been touched at all — and false of the thing the module actually
+     supports: salaries are paid person by person, so a part-paid run is what a
+     screen shows for most of any month. The rule that survived, and the one
+     that matters, is that an UNPAID slip carries none of the four stamps. */
+  const openUnpaid = openSlips.filter((x) => !x.p.paidAt);
+  ok("an unpaid slip on the open run has none of the four — it is not a document yet",
+    openUnpaid.filter((x) => x.p.reference || x.p.issuedAt || x.p.sha256).map((x) => x.p.slipId), []);
+  ok("...and a paid one on the SAME open run carries all of them",
+    openSlips.filter((x) => x.p.paidAt)
+      .filter((x) => !(x.p.issuedAt && (x.p.sha256 || "").length === 64)).map((x) => x.p.slipId), []);
+  ok("the open run is PART paid, which is the ordinary mid-month state",
+    [openSlips.some((x) => x.p.paidAt), openSlips.some((x) => !x.p.paidAt)], [true, true]);
+  ok("...and there are nine of them waiting", openSlips.length, 9);
   ok("only one run is open at a time", S.readRuns().filter((r) => r.state === "open").length, 1);
 
   /* Karan Sethi was raised from ₹45,000 to ₹52,000 a month. */
@@ -460,16 +500,26 @@ S.resetStore();
     acc.events.some((e) => e.type === "SALARY_REVISED"), true);
   ok("A RAISE CANNOT REWRITE AN OLD SLIP: June's basic differs from August's",
     [basic(june.earnings), basic(aug.earnings)], [2025000, 2340000]);
-  ok("...June's slip still shows the old gross and net", [june.grossPaise, june.netPaise], [4500000, 4300000]);
-  ok("...August's slip is built from what he is paid now", aug.grossPaise, acc.monthlyGrossPaise);
+  /* COMPARED ON THE FIXED HALF, not on gross. June carries a sales incentive
+     and August does not — an incentive is granted when somebody is paid and
+     August is still open — so gross moves for a second reason that has
+     nothing to do with the raise. `fixedOf` is gross minus the incentive,
+     which is exactly the half a raise changes. */
+  ok("...June's slip still shows the old committed pay", S.fixedOf(june), 4500000);
+  ok("...and its net is still that, less its deductions, plus what he earned",
+    june.netPaise, 4500000 + S.incentiveOf(june) - june.deductionsPaise);
+  ok("...August's slip is built from what he is paid now", S.fixedOf(aug), acc.monthlyGrossPaise);
   ok("...and the old slip does not match the account it belongs to", basic(june.earnings) === basic(acc.earnings), false);
 
   const closed = S.readSalaryAccount("SAL-AC-0018");
   const monthsWithHim = S.readRuns().filter((r) => r.slips.some((s) => s.salaryAccountId === "SAL-AC-0018"))
     .map((r) => r.month).sort();
   ok("Vikram Chauhan's account is closed", closed.active, false);
-  ok("...he was paid in June, before it closed", monthsWithHim, ["2026-06"]);
+  ok("...June 2026 is the last month he was paid",
+    monthsWithHim[monthsWithHim.length - 1], "2026-06");
   ok("...and appears on no run after it", monthsWithHim.filter((m) => m > "2026-06"), []);
+  ok("...while every month he WAS on the payroll keeps its slip",
+    monthsWithHim.length >= 12, true);
   ok("...his June slip stays on the record", !!S.readSlip("SLIP-2026-06-0018"), true);
   ok("the open run has a slip for every active account and nobody else",
     S.readRun("RUN-2026-08").slips.length, S.readSalaryAccounts().filter((a) => a.active).length);
@@ -783,8 +833,14 @@ S.resetStore();
     has(S.openSalaryRun("2026-08").error, "duplicate_run"), true);
   ok("a month that has not started cannot be run",
     S.openSalaryRun("2026-09").error, "A month that has not started cannot be run.");
+  /* 2024-12 RATHER THAN A RECENT MONTH, and the choice is load-bearing: the
+     seed carries a run for every month from 2025-01 to 2026-08, so any of those
+     would be refused as a duplicate before this rule was ever reached, and the
+     assertion would pass for the wrong reason. December 2024 is the last month
+     with no run — and it has 31 days, which the loss-of-pay check below
+     depends on. */
   ok("a second open run is refused — two cannot be reconciled against one balance",
-    has(S.openSalaryRun("2026-05").error, "period_open"), true);
+    has(S.openSalaryRun("2024-12").error, "period_open"), true);
 
   ok("paying the run without a reference is refused",
     has(S.recordRunPaid("RUN-2026-08", "   ", "ACC-HDFC-4021"), "validation_failed"), true);
@@ -797,7 +853,7 @@ S.resetStore();
   ok("a paid run cannot be paid again",
     has(S.recordRunPaid("RUN-2026-08", "SAL0825AUGX", "ACC-HDFC-4021"), "invalid_state_transition"), true);
 
-  const opened = S.openSalaryRun("2026-05");
+  const opened = S.openSalaryRun("2024-12");
   ok("with nothing open, a past month can be run", opened.error, "");
   const may = S.readRun(opened.runId);
   ok("...one slip per active account, and nobody else",
@@ -849,13 +905,29 @@ S.resetStore();
 console.log("\nthe salary account points at a real team member");
 S.resetStore();
 {
-  /* PICKED, NOT TYPED. Four fields — id, name, designation, code — came off
-     one choice, so they cannot disagree with the Team record they came from. */
+  /* PICKED, NOT TYPED. Five fields — id, name, designation, department, code —
+     come off one choice, so they cannot disagree with the Team record they came
+     from. */
   const opts = S.salaryMemberOptions();
   ok("the picker offers the team, not a blank box", opts.length > 0, true);
   ok("...active members only", opts.length, 8);
-  ok("every option carries the three fields the form no longer asks for",
+  ok("every option carries the four fields the form no longer asks for",
     opts.every((o) => o.memberId && o.name && o.designation && o.employeeCode), true);
+
+  /* DEPARTMENT CAME OFF THE FORM AND ONTO THE MEMBER. It was the last typed
+     box on the dialog restating something the Team record already knew, and a
+     free field with a datalist of past entries is a memory of spellings rather
+     than a taxonomy — the first person to type "sales" made it an option for
+     everybody after them. These assertions are what stops it drifting back. */
+  ok("every option carries the department off the member record",
+    opts.every((o) => typeof o.department === "string" && o.department.length > 0), true);
+  ok("...and it is the member's own value, not a guess from their designation",
+    opts.filter((o) => o.memberId === 52).map((o) => o.department), ["Sales"]);
+  ok("...two people with one designation share a department",
+    Array.from(new Set(opts.filter((o) => o.designation === "Sales Executive").map((o) => o.department))),
+    ["Sales"]);
+  ok("...and two departments are NOT derivable from the titles that carry them",
+    opts.filter((o) => o.designation === "Finance Admin").map((o) => o.department), ["Operations"]);
   ok("the employee code is DERIVED from the member id, not typed",
     S.employeeCodeOf("41"), "IB-EMP-041");
   ok("...so the same person always gets the same code",
@@ -919,33 +991,113 @@ S.resetStore();
     S.readRun("RUN-2026-08").slips.some((s) => s.paidAt)
     && S.readRun("RUN-2026-08").slips.some((s) => !s.paidAt), true);
 
-  /* Pay everybody else and the run closes itself. */
+  /* Pay everybody else and the run STILL does not close, because one slip on
+     it is held — and a held slip is not due, so `paySalary` never reaches it.
+     That is the behaviour a hold exists to produce: it stops one month for one
+     person without stopping anybody else, and the run stays open because the
+     run is a consequence of its slips rather than a thing somebody marks. */
   const rest = S.readRun("RUN-2026-08").slips.filter((s) => !s.paidAt);
-  rest.forEach((s, i) => S.paySalary(s.salaryAccountId, { via: "bank", accountId: "ACC-HDFC-4021", proof: { filename: "receipt.pdf", mime: "application/pdf" } }));
+  rest.forEach((s) => S.paySalary(s.salaryAccountId, { via: "bank", accountId: "ACC-HDFC-4021", proof: { filename: "receipt.pdf", mime: "application/pdf" } }));
+  const stillHeld = S.readRun("RUN-2026-08").slips.filter((s) => !s.paidAt);
+  ok("one slip is held, so paying everybody else does not close the run",
+    [stillHeld.length, stillHeld.every((s) => s.held), S.readRun("RUN-2026-08").state],
+    [1, true, "open"]);
+
+  /* Release it and pay it, and the run closes itself. */
+  ok("releasing the hold needs no reason — it restores the ordinary state",
+    S.setSlipHold(stillHeld[0].slipId, false, ""), "");
+  S.paySalary(stillHeld[0].salaryAccountId, { via: "bank", accountId: "ACC-HDFC-4021", proof: { filename: "receipt.pdf", mime: "application/pdf" } });
   ok("the run closed itself once its last slip was paid, with nobody marking it",
     S.readRun("RUN-2026-08").state, "paid");
   ok("...and it carries the date it closed", !!S.readRun("RUN-2026-08").paidAt, true);
 }
 
-console.log("\nreads: expenditure by department sums the paid slips, nothing else");
+console.log("\nreads: the headcount indicator moves when an account is opened");
 S.resetStore();
 {
-  const dept = S.departmentSpend();
-  ok("every department in the seed appears",
+  /* EVERY OTHER FIGURE ON THE ANALYTICS TAB IS DERIVED FROM SLIPS, so opening
+     a salary account changes none of them until a run is opened and paid.
+     That is right for money and it is no feedback at all for somebody who has
+     just put a person on the payroll — they look at the page and nothing
+     happens. This one counts ACCOUNTS, and it is the only figure on that page
+     that moves in the same read as the write. */
+  const YEAR = "2026";
+  const before = S.headcount(YEAR);
+  const beforeYear = S.payrollYear(YEAR).totals;
+  ok("it counts the open salary accounts",
+    before.active, S.readSalaryAccounts().filter((a) => a.active).length);
+  ok("...and a closed account is not somebody being paid",
+    before.active < S.readSalaryAccounts().length, true);
+  ok("the monthly commitment is the sum of what the open accounts are paid",
+    before.monthlyPaise,
+    S.readSalaryAccounts().filter((a) => a.active).reduce((n, a) => n + a.monthlyGrossPaise, 0));
+
+  const member = S.salaryMemberOptions().filter((m) => !m.taken)[0];
+  ok("there is a team member with no salary account to open one for", !!member, true);
+  const r = S.upsertSalaryAccount({
+    memberId: member.memberId, memberName: member.name, employeeCode: member.employeeCode,
+    designation: member.designation, department: member.department, joinedAt: "2026-08-03",
+    earnings: [{ key: "basic", label: "Basic", amountPaise: 3000000 }],
+    deductions: [{ key: "pt", label: "Professional tax", amountPaise: 20000 }],
+    bank: { masked: "HDFC 1111", ifsc: "HDFC0000123", name: "HDFC Bank" },
+    pan: "AAAPA1111A", uan: null,
+  });
+  ok("opening a salary account is accepted", r.error, "");
+
+  const after = S.headcount(YEAR);
+  ok("THE INDICATOR MOVED, in the same read as the write", after.active, before.active + 1);
+  ok("...counted as opened in the year they joined", after.openedInYear, before.openedInYear + 1);
+  ok("...and the monthly commitment rose by exactly what they are paid",
+    after.monthlyPaise, before.monthlyPaise + 3000000);
+
+  /* AND NOTHING ELSE MOVED, which is the other half of why this tile exists. */
+  const afterYear = S.payrollYear(YEAR).totals;
+  ok("...while the year's cost did NOT move, because no slip exists yet",
+    [afterYear.grossPaise, afterYear.paidPaise, afterYear.incentivePaise],
+    [beforeYear.grossPaise, beforeYear.paidPaise, beforeYear.incentivePaise]);
+  ok("...which is exactly why a slip-derived figure could not have been the indicator",
+    afterYear.peopleEver, beforeYear.peopleEver);
+}
+
+console.log("\nreads: expenditure by department sums the paid slips of ONE YEAR");
+S.resetStore();
+{
+  /* SCOPED TO A CALENDAR YEAR, where this used to be all time. All time was
+     the wrong window for the only thing the chart is used for — comparing
+     departments against each other — because it silently rewarded whoever had
+     been on the payroll longest, and the bars gave no hint that was what they
+     were showing. 2025 is the complete twelve months in the seed. */
+  const FY = "2025";
+  const dept = S.departmentYear(FY);
+  ok("every department paid in that year appears",
     dept.map((d) => d.department).sort(),
-    ["Design", "Leadership", "Operations", "Sales"]);
-  /* THE INVARIANT: the chart's total is exactly the all-time paid total --
-     one derivation, read twice. */
-  ok("...and their sum is exactly the all-time paid figure",
-    dept.reduce((n, d) => n + d.paidPaise, 0), S.salaryTotals().paidAllPaise);
+    ["Design", "Leadership", "Marketing", "Sales", "Technology"]);
+  ok("...and Operations does not, because nobody in it was on the payroll yet",
+    dept.some((d) => d.department === "Operations"), false);
+  /* THE INVARIANT: the chart's total is exactly the year's paid total — one
+     derivation read twice, so a bar and the tile above it cannot disagree. */
+  ok("...and their sum is exactly that year's paid figure",
+    dept.reduce((n, d) => n + d.paidPaise, 0), S.payrollYear(FY).totals.paidPaise);
+  ok("the committed and the earned halves add back up to the year's gross",
+    dept.reduce((n, d) => n + d.fixedPaise + d.incentivePaise, 0),
+    S.payrollYear(FY).totals.grossPaise);
   ok("sorted largest first",
     dept.every((d, i) => i === 0 || d.paidPaise <= dept[i - 1].paidPaise), true);
+  /* LEADERSHIP EARNS NONE and everybody else earns something, which is the
+     gradient the chart exists to show: a department's SHAPE says how much of
+     its wage bill is contingent, and a chart where only two bars had a second
+     segment could not show a gradient at all. */
+  ok("every department except Leadership earned an incentive",
+    dept.filter((d) => d.incentivePaise > 0).map((d) => d.department).sort(),
+    ["Design", "Marketing", "Sales", "Technology"]);
+  ok("...and Leadership earns none, which is modelled rather than missing",
+    dept.filter((d) => d.department === "Leadership").map((d) => d.incentivePaise), [0]);
   /* A blank department is a visible gap, never a guess. */
   const acc = S.readSalaryAccount("SAL-AC-0011");
   const had = acc.department;
   acc.department = "  ";
   ok("a blank department groups as Unassigned",
-    S.departmentSpend().some((d) => d.department === "Unassigned"), true);
+    S.departmentYear(FY).some((d) => d.department === "Unassigned"), true);
   acc.department = had;
 }
 
@@ -1007,15 +1159,26 @@ S.resetStore();
       incentive: { label: "Festival bonus", amountPaise: 100000 },
       deduction: { label: "Advance recovery", amountPaise: 40000 } }), "");
   const slip = S.readRun("RUN-2026-08").slips.filter((x) => x.salaryAccountId === "SAL-AC-0011")[0];
-  ok("the incentive is a named earning line on the slip",
-    slip.earnings.filter((e) => e.label === "Festival bonus").map((e) => e.amountPaise), [100000]);
+  /* ON `incentives`, NOT ON `earnings`. It used to be concatenated onto
+     `earnings`, which paid the right amount and destroyed the only thing that
+     made it an incentive: sitting beside basic and HRA, nothing downstream
+     could tell committed pay from earned pay. Same money, same slip, still
+     its own printed line — filed as what it is. */
+  ok("the incentive is a named line on the slip, filed as an incentive",
+    slip.incentives.filter((e) => e.label === "Festival bonus").map((e) => e.amountPaise), [100000]);
+  ok("...and NOT as an ordinary earning, which is what made it invisible",
+    slip.earnings.some((e) => e.label === "Festival bonus"), false);
+  ok("...the stored incentive total moved with it", slip.incentivePaise, 100000);
+  ok("...and loss of pay would pro-rate the earnings without touching it",
+    S.fixedOf(slip) + S.incentiveOf(slip), slip.grossPaise);
   ok("the deduction is a named deduction line on it",
     slip.deductions.filter((e) => e.label === "Advance recovery").map((e) => e.amountPaise), [40000]);
   ok("the slip's net moved by exactly the difference",
     slip.netPaise, before.pendingPaise + 100000 - 40000);
   ok("...and its stored totals still equal its own arrays",
     [slip.grossPaise, slip.deductionsPaise],
-    [slip.earnings.reduce((n, e) => n + e.amountPaise, 0),
+    [slip.earnings.reduce((n, e) => n + e.amountPaise, 0)
+      + slip.incentives.reduce((n, e) => n + e.amountPaise, 0),
      slip.deductions.reduce((n, e) => n + e.amountPaise, 0)]);
   ok("the run total followed the slip",
     S.readRun("RUN-2026-08").totalNetPaise,

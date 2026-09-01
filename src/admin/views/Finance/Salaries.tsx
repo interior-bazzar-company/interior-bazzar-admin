@@ -27,6 +27,8 @@ import { EmptyState, FilterChips, Icon, SearchField, Select, StatStrip, avatarTo
 import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import { Frame, ViewBand } from "./Frame";
+import Payroll, { YearSwitch } from "./Payroll";
+import { resolveYear } from "./payrollYear";
 import type { FaceProps } from "./Frame";
 import SalaryTransactions from "./SalaryTransactions";
 import { Money } from "./bits";
@@ -82,8 +84,20 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
      money strip above belongs to both. */
   /* TRANSACTIONS IS THE LANDING TAB: the grain of daily work here is "where
      is every slip", and the band lists it first. Accounts is one press away
-     and carries ?tab=accounts. */
-  const tab = p.tab === "accounts" ? "accounts" : "transactions";
+     and carries ?tab=accounts.
+
+     ANALYTICS IS THE THIRD, and it moved here from the Analytics section. It
+     reads the salary runs and nothing else, so it belongs beside the records
+     it derives from rather than one page away among subscriptions and refunds
+     — somebody looking at what payroll cost this year got there from this
+     page, and having to leave it to ask was the whole friction. The other two
+     tabs are one month of records; this one is twelve, and the year switcher
+     in the command row is what says so. */
+  const tab = p.tab === "accounts" ? "accounts"
+    : p.tab === "analytics" ? "analytics" : "transactions";
+  /* Guarded rather than trusted: a `?year=` naming a year with no runs would
+     render twelve empty columns and look like a broken page. */
+  const year = resolveYear(p.year);
   const runs = useRuns();
   const slips = runs.flatMap((run) => run.slips);
   const heldN = slips.filter((x) => x.held && !x.paidAt).length;
@@ -170,16 +184,33 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
           items={[
             { k: "transactions", label: "Transactions", icon: "invoice", n: slips.length },
             { k: "accounts", label: "Accounts", icon: "team", n: rows.length },
+            /* NO COUNT ON ANALYTICS. The other two badges say how many records
+               are behind the tab; a year is not a number of things, and a badge
+               there would invite somebody to read it as one. */
+            { k: "analytics", label: "Analytics", icon: "chart" },
           ]}
           onPick={(k) => onParams({
             tab: k === "transactions" ? undefined : k,
             /* Each tab keeps its own vocabulary of filters; carrying one
-               across would narrow a list with a control it does not show. */
+               across would narrow a list with a control it does not show —
+               and `year`/`emp` are Analytics's own, so they go the same way. */
             q: undefined, status: undefined, month: undefined, due: undefined,
             engagement: undefined, active: undefined,
+            /* `year` and `by` are Analytics's own controls and go the same way. */
+            year: undefined, by: undefined,
           })} />
       }
-      cmd={tab === "accounts" ? <>
+      cmd={tab === "analytics" ? <>
+        {/* THE YEAR SWITCHER TAKES THE COMMAND ROW, because that is where this
+            page's scope controls live and the year IS the scope here. There are
+            no filters on this tab: a chart narrowed by a search box is a chart
+            whose total no longer matches its own caption. */}
+        <YearSwitch year={year} onPick={(y) => onParams({ year: y })} />
+        <span className="spacer" />
+        <span className="fin-sum">
+          The salary runs read over one calendar year · January to December
+        </span>
+      </> : tab === "accounts" ? <>
         {/* KEYED ON THEIR VALUE. SearchField and Select are uncontrolled, so
             clearing a chip otherwise leaves the old text in the box. */}
         <SearchField key={"q" + (p.q || "")} ph="Name, employee code, designation…"
@@ -207,15 +238,21 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
           options={runs.map((r) => ({ v: r.month, l: fmtMonth(r.month) }))} />
         <span className="spacer" />
       </>}
-      bands={<>
-        {/* ONE STRIP STYLE FOR BOTH TABS. The four tiles that stood here said
-            what the topbar and the strip now say between them, at four times
-            the height, and matched nothing else in the panel. */}
+      bands={tab === "analytics" ? null : <>
+        {/* ONE STRIP STYLE FOR BOTH RECORD TABS. The four tiles that stood here
+            said what the topbar and the strip now say between them, at four
+            times the height, and matched nothing else in the panel.
+
+            ANALYTICS GETS NEITHER. Every cell in the strip is a filter over
+            this month's slips, and the face below is a year — a strip that
+            filtered nothing on screen would be a row of live-looking controls
+            that do not work. Its own figures are in its first block, where
+            each one carries its formula. */}
         <StatStrip cells={tab === "transactions" ? txCells : accCells} />
         <div className="dls-chips">
           <FilterChips
             params={Object.keys(p)
-              .filter((k) => ["view", "run", "tab"].indexOf(k) < 0 && p[k])
+              .filter((k) => ["view", "run", "tab", "year", "by"].indexOf(k) < 0 && p[k])
               .reduce((acc, k) => { acc[k] = filterValueLabel(k, p[k] as string); return acc; },
                 {} as Record<string, string>)}
             labels={FILTER_LABELS}
@@ -223,7 +260,9 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
         </div>
       </>}>
 
-      {tab === "transactions" ? (
+      {tab === "analytics" ? (
+        <Payroll year={year} p={p} onParams={onParams} />
+      ) : tab === "transactions" ? (
         <SalaryTransactions p={p} onUnfilter={onUnfilter} />
       ) : (<>
       {filtered.length ? (

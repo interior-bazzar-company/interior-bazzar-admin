@@ -223,7 +223,12 @@ export default function SalaryTransactions({ p, onUnfilter }: {
                   <td className="rail">
                     <i className={state === "unpaid" ? "warn" : state === "held" ? "bad" : ""} />
                   </td>
-                  <td>
+                  {/* AN IDENTIFIER MUST NOT WRAP. `SLIP-2026-08-0014` broken
+                      across two lines reads as two ids, and it was breaking
+                      because nothing bounded the status cell beside it — the
+                      hold reason was taking the table and starving this column
+                      down to nothing. */}
+                  <td className="fin-c-slip">
                     <div className="cell-1 mono">{s.slipId}</div>
                     <div className="cell-2">{fmtMonth(s.month)} · {x.run.runId}</div>
                   </td>
@@ -244,14 +249,20 @@ export default function SalaryTransactions({ p, onUnfilter }: {
                     {state === "paid" ? <span className="pill ok">Paid</span>
                       : state === "held" ? <span className="pill bad">On hold</span>
                         : <span className="pill warn">Unpaid</span>}
+                    {/* CLAMPED, NOT DROPPED. A hold reason is mandatory on the
+                        way in and is the only place the hold is explained, so
+                        it belongs on the row — but printed in full it was an
+                        unbounded paragraph inside a table cell, and it pushed
+                        every other column out of shape. Two lines here, the
+                        whole of it on the title and on the slip itself. */}
                     {state === "held" && s.heldReason
-                      ? <div className="cell-2" title={s.heldReason}>{s.heldReason}</div>
+                      ? <div className="cell-2 fin-heldnote" title={s.heldReason}>{s.heldReason}</div>
                       : null}
                   </td>
                   {/* NEVER A BARE DASH. An empty cell in a dated column reads
                       as data that failed to load; an unpaid slip has a state
                       worth saying, and a held one has a different state. */}
-                  <td>
+                  <td className="fin-c-when">
                     {s.paidAt ? (
                       <>
                         <div className="cell-1">{fmtDate(s.paidAt)}</div>

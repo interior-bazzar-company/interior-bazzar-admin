@@ -30,6 +30,8 @@ g.window = {
 g.localStorage = (g.window as Record<string, unknown>).localStorage;
 g.matchMedia = (g.window as Record<string, unknown>).matchMedia;
 
+import { readFileSync } from "node:fs";
+import { cwd } from "node:process";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { ShellProvider } from "../src/admin/shell/ShellContext";
@@ -121,6 +123,14 @@ const has = (html: string, needle: string, what: string) => {
 const hasnt = (html: string, needle: string, what: string) => {
   if (html.indexOf(needle) >= 0) { failed++; console.log("  FAIL " + what + "\n         expected NOT to find: " + needle); }
   else console.log("  ok   " + what);
+};
+/** Exactly one occurrence. `has` proves a thing is present and `hasnt` proves
+ *  it is absent; neither can say "one and not three", which is the whole claim
+ *  when three blocks are collapsed into one. */
+const ok1 = (html: string, needle: string, what: string) => {
+  const n = html.split(needle).length - 1;
+  if (n === 1) console.log("  ok   " + what);
+  else { failed++; console.log("  FAIL " + what + "\n         expected exactly 1, found " + n); }
 };
 const hasntRe = (html: string, re: RegExp, what: string) => {
   const m = re.exec(html);
@@ -256,18 +266,166 @@ has(refundsEmpty, "Nothing matches those filters", "...an empty queue says the f
 has(refundsEmpty, "counts the whole queue before any filter", "...and that the tiles above it were not filtered");
 
 const an = page("analytics · the overview", "/finance-analytics");
-/* Department expenditure: identity bars off the paid slips, grouped by the
-   department typed on each account. */
-has(an, "Expenditure by department", "...the department block is on the page");
-has(an, ">Sales<", "...with the seed departments as bars");
-has(an, ">Leadership<", "...leadership among them");
-/* The needle is the bar tooltip's own format ("Unassigned: <amount>"), not
-   the bare word: the block's footnote legitimately EXPLAINS Unassigned. */
-hasnt(an, "Unassigned:", "...and no Unassigned bar, because every seeded account is assigned");
 has(an, "Analytics is not a fifth record type", "...analytics is the four lists read back, not a store");
 has(an, "collected, spent, returned", "...the strip says what it is adding up");
+/* THE DEPARTMENT BLOCK IS NO LONGER HERE. It moved to the Payroll tab and
+   became year-scoped; asserting its ABSENCE is the half of the move that
+   would otherwise rot — a second copy could reappear on Overview and every
+   other check would still pass. */
+hasnt(an, "Expenditure by department",
+  "...and the department block is NOT on Overview any more — one figure, one page");
+hasnt(an, ">Payroll<",
+  "...and Payroll is NOT a tab here any more — it moved to Salaries A/C, beside its own runs");
+
+/* ------------------------------------------------------------ the payslip -
+   THE DOCUMENT, and the three things it used to get wrong. Each of these is
+   a fix that would rot silently: nothing else in the suite reads the printed
+   page, and the slip is the artefact somebody recalculates by hand. */
+const slipInc = page("a payslip carrying an incentive",
+  "/finance-salaries/SLIP-2026-07-0014");
+has(slipInc, "Sales incentive", "...the incentive is a printed line, not an invisible addition");
+has(slipInc, "earned", "...marked earned, so it is not read as salary that repeats");
+/* ₹1,63,000 gross and ₹1,48,500 net, against ₹1,20,000 of base salary. The slip
+   summed `earnings` alone and so printed the base as the gross — a document
+   disagreeing with the transfer that produced it. These two needles are the
+   whole bug, and they are the reason this check reads amounts rather than
+   structure: the fault was arithmetic, not markup. */
+has(slipInc, "1,63,000", "...gross INCLUDES the incentive, as the money that moved did");
+has(slipInc, "1,48,500", "...and so does net, which is what the bank actually sent");
+has(slipInc, "not payable again unless earned again",
+  "...and the document says what an incentive is rather than leaving it to be assumed");
+
+const slipLop = page("a payslip with loss of pay on it", "/finance-salaries/SLIP-2026-07-0033");
+/* A NOTIONAL THIRTY-DAY MONTH IS NOT WHAT THIS MODULE COMPUTES, anywhere.
+   The terms said it did, on the one page somebody checks the arithmetic of. */
+hasnt(slipLop, "thirty-day month",
+  "...the terms no longer claim a thirty-day month the module has never used");
+has(slipLop, "29 paid days of 31", "...they state the month's real length instead");
+has(slipLop, "Deductions are not pro-rated",
+  "...and the deductions rule the seed and setLop now BOTH follow");
+
+/* THE RECEIPT IS THE ONLY EVIDENCE A SALARY PAYMENT HAS — the typed bank
+   reference was deleted precisely so it would be — and it was written to the
+   slip and rendered on no screen in the module. */
+has(page("the salary account record", "/finance-salaries/SAL-AC-0014?tab=slips"),
+  "Evidenced by", "...the slips table names what a payment is evidenced BY");
+has(at("/finance-salaries/SAL-AC-0014?tab=slips"), "of which earned",
+  "...and shows the earned half inside a gross that would otherwise just jump");
+
 const kpi = page("analytics · the KPI tab", "/finance-analytics?tab=kpi");
 has(kpi, "not computed — and not zero", "...a KPI with no inputs prints a reason, never a placeholder");
+/* --------------------------------------- the salaries analytics tab -----
+   THE THIRD TAB ON SALARIES A/C, beside Transactions and Accounts — it reads
+   the salary runs and belongs with them, not one section away among
+   subscriptions and refunds.
+
+   FOUR TOTALS AND THREE CHARTS. The page carried six blocks, six decision
+   metrics and two wide tables, and the tables were the problem: they printed
+   the same figures the charts above them drew, so every number appeared twice
+   in two shapes. The assertions below pin what it shows AND what it must not
+   grow back. */
+const pay = page("salaries · the analytics tab", "/finance-salaries?tab=analytics");
+has(pay, ">Transactions<", "...the tab band still offers Transactions");
+has(pay, ">Accounts<", "...and Accounts");
+/* BOTH CONTROLS ARE DROPDOWNS NOW, not segmented button strips: the year has
+   two entries today and grows one a year, and the grouping has three whose
+   labels are long enough that a strip wrapped in the block header. Neither is a
+   FILTER, so neither carries the blank first option the panel Select uses for
+   one — an entry meaning none would either do nothing or silently mean the
+   default, and both readings are worse than not offering it. */
+has(pay, "selectbox", "...the year control is a dropdown");
+/* PLAIN, NOT BRAND-TINTED. `.selectbox.on` is the panel's "this filter is
+   active" state — green so somebody can see at a glance which controls are
+   narrowing a list. Neither of these narrows anything, so both would have been
+   permanently green: a signal that never varies is not a signal, and it made
+   two ordinary dropdowns read as applied filters somebody ought to clear. */
+hasnt(pay, "selectbox on", "...and it is plain, not wearing the active-filter tint");
+has(pay, ">Year<", "...labelled outside the control, not as a blank first option");
+has(pay, ">Group by<", "...and the grouping is a dropdown too");
+hasnt(pay, "fin-seg", "...with no segmented strip left on the page");
+hasnt(pay, "dls-chips", "...and no filter chips, because nothing on this tab filters");
+/* THE WINDOW CAVEAT MOVED BEHIND AN `i`, so it is no longer in the static
+   markup — an InfoTip renders its panel only when opened. It is asserted where
+   it now lives instead: in the vocabulary, on the caution of the very total it
+   qualifies. A caution nobody can find is the same as one nobody wrote. */
+has(pay, "fin-info-b", "...cautions are reachable from the page, behind an i");
+{
+  const vocab = readFileSync(cwd() + "/src/content/finance/vocabularies.json", "utf8");
+  const cost = JSON.parse(vocab).payrollMetricDefinitions
+    .filter((m: { key: string }) => m.key === "payroll_cost")[0];
+  has(cost.caution, "JANUARY TO DECEMBER",
+    "...and the window is stated on the total it qualifies, not as a banner");
+  has(cost.caution, "will not match a filed return",
+    "...saying outright that it is NOT the April-to-March year the books close on");
+}
+has(pay, ">2026<", "...and the year in force is named, not implied");
+
+/* The four totals. */
+has(pay, "The wage bill", "...the strip says what the year cost");
+has(pay, "Paid out", "...what has gone out");
+has(pay, "Still owed", "...what has not");
+has(pay, "Incentives", "...and what was earned on top");
+
+/* The three charts, and nothing between them. */
+/* ONE CHART, THREE GROUPINGS. A month, a department and a person are three
+   ways of cutting the same rupees, so they cannot share an axis — putting them
+   side by side would count every rupee three times. They share a block
+   instead, and the switch says which cut is on screen. */
+has(pay, "Payroll · 2026", "...one chart block, named for the year it reads");
+has(pay, "By month", "...the switch offers the month cut");
+has(pay, "By department", "...the department cut");
+has(pay, "By member", "...and the member cut");
+/* THE POINT OF THE CHANGE, asserted directly: three charts became one, and
+   nothing should quietly put the other two back. The needle is the full class
+   attribute of the kit's figure wrapper — a bare `ch-chart` also matches
+   `ch-chartbody` inside it, and would have counted two per chart. */
+ok1(pay, "class=\"ch-chart\"", "...and there is exactly ONE chart on the page, not three");
+
+/* The month cut answers what went out and what has not — a NET question only a
+   month can answer, since a department has no due date. */
+has(pay, "Paid out", "...the month cut splits what went out");
+has(pay, "Not yet paid", "...from what has not");
+has(pay, "net paid against net owed", "...and says which measure it is drawing");
+
+const payDept = page("salaries · analytics grouped by department",
+  "/finance-salaries?tab=analytics&by=department");
+has(payDept, ">Sales<", "...the departments are on the axis");
+has(payDept, ">Leadership<", "...leadership among them");
+has(payDept, "Base salary", "...and the bars split committed pay");
+has(payDept, ">Incentive<", "...from what had to be earned");
+has(payDept, "gross, before deductions", "...stating the other measure, so the two are not confused");
+hasnt(payDept, "Not yet paid",
+  "...and the month-only series is NOT drawn here, because a department has no due date");
+
+const payPerson = page("salaries · analytics grouped by member",
+  "/finance-salaries?tab=analytics&by=member");
+has(payPerson, "Base salary", "...members carry the same split as departments");
+has(payPerson, "Anjali D.", "...named short enough to fit the axis");
+
+const payBadBy = page("salaries · analytics with a nonsense grouping",
+  "/finance-salaries?tab=analytics&by=zzzz");
+has(payBadBy, "Paid out",
+  "...an unknown ?by falls back to the month cut rather than an empty chart");
+
+/* NO TABLES. This is the whole point of the rewrite, so it is asserted
+   directly rather than inferred from the blocks that survived: `.tbl` is the
+   panel's one table class, and an analytics face has no business carrying it
+   when the two tabs beside it are tables that open records. */
+hasnt(pay, 'class="tbl', "...and NOT ONE TABLE, which is what made the page confusing");
+hasnt(pay, "of which earned", "...no month table restating the charts above it");
+hasnt(pay, "not computed — and not zero",
+  "...and no decision-metric block: six KPIs with year-on-year arrows went with the tables");
+hasnt(pay, "fin-emp-pick", "...no employee picker — every person is on one chart now");
+
+const payPrior = page("salaries · analytics, the year before",
+  "/finance-salaries?tab=analytics&year=2025");
+has(payPrior, ">2025<", "...the year switcher reaches a complete prior year");
+has(payPrior, "By member", "...and the charts follow it");
+
+const payBadFy = page("salaries · analytics with a nonsense year",
+  "/finance-salaries?tab=analytics&year=1999");
+has(payBadFy, ">2026<",
+  "...an unknown ?year falls back to the current year rather than twelve empty columns");
 
 console.log("\nthe record screens");
 const failing = page("a subscription with a fail to pay", "/finance/SUB-0104");
@@ -560,6 +718,86 @@ has(subs, "Nothing here is live.", "...and it says, in words, that nothing here 
    and Overview/KPI are two views of one record type, not two sections. */
 has(tags, "fin-subtabs", "Transactions / Tags is still a segmented sub-switch");
 has(kpi, "fin-subtabs", "Overview / KPI is still a segmented sub-switch");
+
+
+/* ==================================================== the chart marks === */
+/* A MARK WITH NO FILL IS AN INVISIBLE MARK, and nothing else in this file can
+   see one: `renderToStaticMarkup` gives markup, the CSS is bundled as `empty`,
+   and every assertion above would pass just as happily against a chart drawn
+   entirely in transparent spans.
+
+   That is not hypothetical. `.ch-col` — the class `ColumnChart` puts on every
+   bar — had no background rule at all, while `.fill` (BarRows, FunnelChart)
+   and `.sw` (the legend swatch) both did. Six charts across Finance and Users
+   drew correct heights, correct tooltips and correct legend swatches above a
+   baseline with nothing over it, and no check could tell.
+
+   So this one reads the stylesheet instead. */
+console.log("\nthe chart marks are actually painted");
+{
+  const css = readFileSync(cwd() + "/src/admin/views/charts.css", "utf8");
+  /* Emitted on a mark by ColumnChart (.ch-col), by BarRows and FunnelChart
+     (.fill), and on the legend swatch (.sw) that has to match the mark it
+     stands for. A slot missing from any of the three is a chart somebody
+     cannot read. */
+  const marks = ["ch-col", "fill", "sw"];
+  ["s1", "s2", "s3"].forEach((slot) => {
+    marks.forEach((mark) => {
+      const painted = css.split("}").some((rule) => {
+        const head = rule.split("{")[0] || "";
+        const body = rule.split("{")[1] || "";
+        return head.indexOf("." + mark + "." + slot) >= 0 && body.indexOf("background") >= 0;
+      });
+      has(painted ? "PAINTED" : "", "PAINTED",
+        "." + mark + "." + slot + " is given a background, so the mark can be seen");
+    });
+  });
+  /* The variables those rules read are scoped to .um, .um-rec and .fin, so a
+     chart rendered outside all three would paint in nothing at all. */
+  has(["--s1:", "--s2:", "--s3:"].every((v) => css.indexOf(v) >= 0) ? "PAINTED" : "", "PAINTED",
+    "the slot palette is defined for the roots the charts sit in");
+  has(at("/finance-salaries?tab=analytics"), "dls fin",
+    "...and the Finance charts do sit inside one of them");
+}
+
+
+/* ================================================ the table cells ====== */
+/* AN UNBOUNDED CELL TAKES THE TABLE. `.fin-tbl` sets a min-width and no column
+   widths, so the browser shares space out by content — fine until one cell
+   holds a paragraph. A held slip's reason is mandatory, has no length limit,
+   and is 231 characters in this seed: printed in full it swelled the status
+   column, starved the identifier column until `SLIP-2026-08-0014` wrapped
+   across two lines, and took the paid-on column with it.
+
+   Nothing above could see it. The markup was always correct; only the layout
+   was wrong, and `renderToStaticMarkup` has no layout. So this reads the
+   stylesheet, the way the chart-mark guard does. */
+console.log("\nthe table cells are bounded");
+{
+  const css = readFileSync(cwd() + "/src/admin/views/Finance/finance.css", "utf8");
+  const ruleFor = (sel: string) => css.split("}").filter((r) => (r.split("{")[0] || "").indexOf(sel) >= 0)
+    .map((r) => r.split("{")[1] || "").join(" ");
+
+  const slips = at("/finance-salaries");
+  has(slips, "fin-c-slip", "the slip id has a column class of its own");
+  has(ruleFor(".fin-c-slip"), "nowrap",
+    "...and it is told not to wrap, because an id broken over two lines reads as two ids");
+
+  has(slips, "fin-heldnote", "a held slip prints its reason on the row");
+  has(ruleFor(".fin-heldnote"), "line-clamp",
+    "...clamped rather than unbounded, so one long reason cannot take the table");
+  has(ruleFor(".fin-heldnote"), "max-width", "...and bounded in width as well as lines");
+  has(slips, "fin-heldnote\" title=",
+    "...with the whole of it on the title, so clamping loses nothing");
+
+  has(ruleFor(".fin-c-when"), "nowrap", "the paid-on column keeps its dates on one line");
+
+  /* The same fault one table over, bounded before it bites: the longest
+     description in the seed is 57 characters against the hold reason's 231,
+     which is a fact about the fixture and not about the column. */
+  has(at("/finance-transactions"), "fin-desc", "the transactions description is bounded too");
+  has(ruleFor(".fin-desc"), "ellipsis", "...with an ellipsis rather than a wrap");
+}
 
 resetStore();
 console.log(failed ? "\n" + failed + " FAILED\n" : "\nevery surface rendered\n");

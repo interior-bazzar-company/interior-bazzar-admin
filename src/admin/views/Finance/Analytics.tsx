@@ -42,7 +42,7 @@ import { BarRows, ColumnChart } from "../charts";
 import type { BarRow, Series } from "../charts";
 import {
   PERIOD, accountOf, ago, delta, eventMeta, fmtDate, fmtMonth, inr, pct, todayIso,
-  useActivity, useDepartmentSpend, useKpis, useMatchedPct, useMonthPoints, useOverview,
+  useActivity, useKpis, useMatchedPct, useMonthPoints, useOverview,
   useOverviewTiles, useReconciliation, useTagTotals, useTaxSummary,
 } from "./store";
 import type { Kpi, Tile } from "./store";
@@ -152,7 +152,6 @@ function Overview() {
   const o = useOverview();
   const months = useMonthPoints();
   const tags = useTagTotals();
-  const dept = useDepartmentSpend();
   const recon = useReconciliation();
   const matched = useMatchedPct();
   const tax = useTaxSummary();
@@ -170,17 +169,12 @@ function Overview() {
       + r.tag.kind + (r.overBudget ? ". Over the budget set on this tag." : "."),
   }));
 
-  /* One hue for every department bar — identity, not magnitude; the length
-     already says the size. Exact rupees, same as the tag chart. */
-  const deptRows: BarRow[] = dept.map((r) => ({
-    key: r.department,
-    label: r.department,
-    value: rupees(r.paidPaise),
-    hint: <>{r.people} {r.people === 1 ? "person" : "people"} · {r.slips} slip{r.slips === 1 ? "" : "s"}</>,
-    title: r.department + ": " + inr(r.paidPaise) + " net paid across " + r.slips
-      + " slip" + (r.slips === 1 ? "" : "s") + " to " + r.people
-      + (r.people === 1 ? " person" : " people") + ", all time.",
-  }));
+  /* EXPENDITURE BY DEPARTMENT WAS HERE and is on the Payroll tab now, scoped
+     to a financial year instead of all time. It was always a payroll question
+     on a page about the month, and all time was the wrong window for the only
+     thing it is used for — comparing departments — because it rewarded
+     whoever had been on the payroll longest. It is not duplicated here: one
+     figure, on the page that owns the payroll year. */
 
   return (
     <Blocks>
@@ -241,22 +235,11 @@ function Overview() {
                 month with no outgoing transaction recorded against it, not a missing figure." />}
       </Block>
 
-      {/* ===================================== who the payroll pays for === */}
-      <Block title="Expenditure by department" desc="salary paid, all time, off the paid slips"
-        right={<span className="fin-sum">
-          {(() => { const t = dept.reduce((n, r) => n + r.paidPaise, 0); return inr(t); })()} paid out
-        </span>}
-        foot={<>All time rather than the period, because early in a month this is a column of
-          zeros and a chart of zeros answers nothing — the period's own figure is on the strip
-          above. Salary only: the non-salary side of spend is the tag chart beside this, and the
-          two are never added here. The department is typed on the account when it opens; a blank
-          one shows as <em>Unassigned</em> rather than being guessed from a designation.</>}>
-        {deptRows.length
-          ? <BarRows rows={deptRows} unit="₹ · net salary paid, all time, by department" />
-          : <Unavailable title="No salary has been paid yet."
-              why="This chart sums the paid slips by the department on each account. It appears
-                with the first paid run." />}
-      </Block>
+      {/* ===================================== who the payroll pays for ===
+          The department chart that stood here has MOVED to the Payroll tab.
+          It is a payroll question, it wanted a year rather than a month, and
+          the tab that owns the payroll year is where it can be scoped to one
+          without this page acquiring a second window nobody announced. */}
 
       {/* ============================================= not collected === */}
       <Block title="What is not collected"
@@ -486,6 +469,11 @@ export default function Analytics({ p, onParams }: FaceProps) {
   return (
     <Frame toast={toast}
       cmd={<>
+        {/* TWO TABS, ONE WINDOW. A Payroll tab lived here for one commit and
+            moved to Salaries A/C, beside the runs it reads: it was the only
+            face on this page scoped to a financial year rather than to the
+            reporting period, and two windows named on one row is how somebody
+            reads a yearly figure as a monthly one. */}
         <SubTabs cur={tab}
           items={[{ k: "overview", label: "Overview" }, { k: "kpi", label: "KPI" }]}
           onPick={(k) => onParams({ tab: k === "overview" ? undefined : k })} />

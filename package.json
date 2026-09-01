@@ -22,7 +22,7 @@
     "check:users-render": "node scripts/build-um-smoke.cjs && node node_modules/.tmp/um-smoke.cjs",
     "check": "npm run check:enquiries && npm run check:export && npm run check:clock && npm run check:share && npm run check:wiring && npm run check:match && npm run check:users && npm run check:users-render && npm run check:finance-nav && npm run check:finance && npm run check:finance-render",
     "preview": "vite preview",
-    "check:finance": "esbuild src/admin/views/Finance/store.ts --bundle --platform=node --format=cjs --define:import.meta.env={} --external:react --log-level=error --outfile=node_modules/.tmp/finance-store.cjs && node scripts/check-finance-ledger.cjs",
+    "check:finance": "esbuild scripts/finance-check-entry.ts --bundle --platform=node --format=cjs --define:import.meta.env={} --external:react --log-level=error --outfile=node_modules/.tmp/finance-store.cjs && node scripts/check-finance-ledger.cjs",
     "check:finance-render": "node scripts/build-fn-smoke.cjs && node node_modules/.tmp/fn-smoke.cjs",
     "check:finance-nav": "node scripts/check-finance-nav.cjs"
   },

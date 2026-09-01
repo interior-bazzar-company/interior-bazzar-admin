@@ -239,7 +239,35 @@ export interface Payslip {
   /** What was actually earned: baseEarnings pro-rated by paidDays. Equal to
    *  baseEarnings when there is no loss of pay. */
   earnings: SalaryComponent[];
+  /** VARIABLE PAY EARNED IN THIS MONTH — a sales incentive, a delivery bonus,
+   *  a festival payout. It sits in its own array rather than merged into
+   *  `earnings`, for two reasons that are both load-bearing:
+   *
+   *  LOSS OF PAY MUST NOT REACH IT. `earnings` is `baseEarnings` pro-rated by
+   *  `paidDays`, because salary is paid for time served. An incentive is paid
+   *  for something that was achieved, and three days of absence does not
+   *  un-close a deal. It is added AFTER the pro-rating and never inside it.
+   *
+   *  FIXED AND VARIABLE PAY ARE DIFFERENT QUESTIONS. Merged into `earnings` —
+   *  which is where the pay dialog used to put it — an incentive becomes
+   *  indistinguishable from basic the moment it lands, so nothing downstream
+   *  can answer what the company COMMITTED to against what performance ADDED.
+   *  Payroll analytics is exactly that question, and it needs the split to be
+   *  in the record rather than guessed at afterwards by matching labels.
+   *
+   *  Optional because a slip issued before incentives were modelled has none,
+   *  and an absent array reads as "no incentive was recorded" — which is what
+   *  is true — rather than as a zero somebody decided on. */
+  incentives?: SalaryComponent[];
+  /** Σ `incentives`, stored beside `grossPaise` the way `deductionsPaise` is
+   *  stored beside `deductions`, so no reader has to sum an array to learn
+   *  what varied this month. */
+  incentivePaise?: number;
   deductions: SalaryComponent[];
+  /** Σ `earnings` PLUS Σ `incentives` — everything the slip pays out before
+   *  deductions. The incentive is INSIDE this figure, not beside it: it is
+   *  money the person was actually paid, and a gross that excluded it would
+   *  not match the transfer. */
   grossPaise: number;
   deductionsPaise: number;
   netPaise: number;
@@ -409,7 +437,13 @@ export interface Kpi {
   value: number | null;
   unit: "inr" | "pct" | "count" | "months";
   prior: number | null;
-  /** Whether up is good. Used for tone, never for a judgement in words. */
+  /** Whether up is good. Used for tone, never for a judgement in words.
+   *
+   *  A third value, `none`, was added here for two payroll metrics that move
+   *  for reasons a founder can want either way — and removed with them when the
+   *  payroll face was cut back to charts. It is worth restating rather than
+   *  rediscovering: a metric with no honest direction should carry `none` and
+   *  a neutral tone, never a colour picked to make a chart look decisive. */
   goodDirection: "up" | "down";
   why: string | null;
   group: string;

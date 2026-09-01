@@ -23,7 +23,7 @@ import { Rec, Block, Blocks } from "./Frame";
 import { EventList, Money, ProtoBar } from "./bits";
 import { CloseAccountModal, SalaryAccountModal } from "./SalaryModals";
 import {
-  SLIP_RULE, ago, fmtDate, fmtDateTime, fmtMonth, inr, slipsOf, useSalaryAccount,
+  SLIP_RULE, ago, fmtDate, fmtDateTime, fmtMonth, incentiveOf, inr, slipsOf, useSalaryAccount,
 } from "./store";
 import type { Params, Payslip, SalaryComponent } from "./store";
 
@@ -218,10 +218,15 @@ export default function SalaryDetail({ id, p, onParams }: {
                   <th>Month</th>
                   <th className="num">Paid days</th>
                   <th className="num">Gross</th>
+                  {/* WHAT VARIED, beside the gross that contains it. Without this
+                      column a month reads as an unexplained jump: the gross is
+                      right, the salary did not change, and nothing on the row
+                      says which of the two is true. */}
+                  <th className="num">of which earned</th>
                   <th className="num">Deductions</th>
                   <th className="num">Net</th>
                   <th>Paid</th>
-                  <th>Reference</th>
+                  <th>Evidenced by</th>
                   <th className="tight" />
                 </tr>
               </thead>
@@ -271,6 +276,9 @@ function SlipRow({ s, p }: { s: Payslip; p: Params }) {
         {s.lopDays ? <div className="cell-2">{s.lopDays} day{s.lopDays === 1 ? "" : "s"} loss of pay</div> : null}
       </td>
       <td className="num tnum">{inr(s.grossPaise)}</td>
+      <td className="num tnum">{incentiveOf(s)
+        ? inr(incentiveOf(s))
+        : <span className="faint">—</span>}</td>
       <td className="num tnum">{s.deductionsPaise ? "−" + inr(s.deductionsPaise) : <span className="faint">none</span>}</td>
       <td className="num"><Money paise={s.netPaise} strong /></td>
       <td>
@@ -278,7 +286,19 @@ function SlipRow({ s, p }: { s: Payslip; p: Params }) {
           ? <><div className="cell-1">{fmtDate(s.paidAt)}</div><div className="cell-2">{ago(s.paidAt)}</div></>
           : <span className="pill warn">Draft</span>}
       </td>
-      <td className="mono cell-2">{draft ? <span className="faint">not issued</span> : s.reference}</td>
+      {/* EVIDENCE, NOT A REFERENCE. This column printed `s.reference`, which
+          `paySalary` deliberately leaves empty — the typed UTR was removed
+          because nothing checked it against a statement — so every slip paid
+          through the panel showed a blank cell that said nothing at all. It
+          shows what the payment is actually evidenced BY: the receipt where
+          there is one, the old reference on a historical slip, and the absence
+          named where there is neither. */}
+      <td className="cell-2">
+        {draft ? <span className="faint">not issued</span>
+          : s.proof ? <span className="mono" title={"Receipt: " + s.proof.filename}>{s.proof.filename}</span>
+            : s.reference ? <span className="mono">{s.reference}</span>
+              : <span className="faint">no evidence attached</span>}
+      </td>
       <td className="tight"><Icon name="chevr" size="sm" /></td>
     </tr>
   );

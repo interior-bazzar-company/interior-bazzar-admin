@@ -6,7 +6,7 @@
    ============================================================================= */
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { kpiMeta, metric } from "./store";
+import { kpiMeta, metric, payrollMetric } from "./store";
 
 export default function InfoTip({ label, intro, rows, children }: {
   label: string;
@@ -66,3 +66,20 @@ export function KpiTip({ k }: { k: string }) {
       ]} />
   );
 }
+
+/** The i for a Payroll tile. Same two things as `MetricTip`, off the payroll
+ *  face's own vocabulary list — which is separate from `metricDefinitions` so
+ *  that a payroll figure cannot turn up unasked on the KPI tab. */
+export function PayrollMetricTip({ k }: { k: string }) {
+  const m = payrollMetric(k);
+  if (!m) return null;
+  return (
+    <InfoTip label={m.label} intro={<><b className="mono">{m.formula}</b></>}
+      rows={[{ label: "Unit", hint: m.unit }, { label: "Caution", hint: m.caution }]} />
+  );
+}
+
+/* A PayrollKpiTip stood here, for six decision metrics on this face. Both went
+   when the face was cut to three charts: the metrics were the confusing half of
+   a page whose job is to show a shape, and a tip with nothing to annotate is
+   dead weight in the one file every tile on the panel imports. */

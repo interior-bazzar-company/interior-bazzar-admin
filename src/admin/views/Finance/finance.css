@@ -658,3 +658,121 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
 }
 .fin-derived b { color: var(--text); font-weight: var(--weight-semibold) }
 .fin-derived .fin-fine { margin: 2px 0 0 }
+
+/* ============================================================== payroll ===
+   Analytics ▸ Payroll. Two controls and one row state; everything else on the
+   face is `.fin-mt`, `.tbl`, `.card` and the chart kit, which is the point —
+   a third tab that needed its own visual language would have been a third
+   page wearing this one's clothes. */
+
+/* The employee picker in a block header. NOT `.fin-pick`, which is the salary
+   account's member list — a scrolling column of buttons — and would have
+   collapsed this into a 300px-tall overflow box inside a card header. */
+.fin-emp-pick { display: inline-flex; align-items: center; gap: var(--space-2); margin-left: auto }
+.fin-emp-pick label { font-size: var(--text-2xs); letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-3); font-weight: var(--weight-semibold); white-space: nowrap }
+.fin-emp-pick select { height: var(--control-sm); max-width: 260px;
+  background: var(--surface-raised); border: 1px solid var(--line-2); border-radius: var(--radius-sm);
+  color: var(--text); padding: 0 var(--space-2); font: inherit }
+.fin-emp-pick select:hover { border-color: var(--line-3) }
+
+/* A MONTH WITH NO RUN IN IT. Dimmed rather than dropped: a year is twelve
+   months whether or not somebody opened a run for each, and a table that
+   omitted the empty ones would make a missed month and a future month look
+   the same — which is the one distinction the cell inside is there to draw. */
+.fin-norun td { color: var(--text-3); background: var(--bg-inset) }
+.fin-norun td .fin-fine { margin: 0 }
+
+/* The year switcher sits in the command row where the period line usually is,
+   so it inherits `.fin-sum`'s left margin and needs none of its own. */
+.fin-sum .fin-seg { margin-left: var(--space-2) }
+
+/* An incentive line on a payslip, marked as one. It is an EARNING — money
+   paid, in the earnings column, inside the gross — and it is not salary,
+   which is the distinction somebody reading a large month needs and cannot
+   get from the amount. A word rather than a colour, because this document is
+   printed and a tint is the first thing a mono laser printer throws away. */
+.fin-earned {
+  display: inline-block; margin-left: var(--space-2); padding: 0 5px;
+  border: 1px solid var(--line-2); border-radius: var(--radius-xs);
+  font-size: var(--text-2xs); letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-3); font-weight: var(--weight-semibold); vertical-align: 1px;
+}
+
+/* The receipt on a payslip. Quiet — it is provenance, not a figure — but
+   present, because the pay dialog refuses a payment without one and until now
+   nothing in the module ever showed it back. */
+.fin-slip-proof { font-size: var(--text-sm); color: var(--text-3) }
+.fin-slip-proof .mono { word-break: break-all }
+.fin-slip-proof.none { color: var(--warn) }
+
+/* A remark somebody typed when they paid. Set apart from `.terms` — the terms
+   are the document's standing text and a sentence about THIS payment running
+   into them made the standing text look like something a person had written. */
+.fin-slip-remark {
+  margin: var(--space-4) 0 0; padding: var(--space-2) var(--space-3);
+  border-left: 2px solid var(--line-2); background: var(--bg-inset);
+  font-size: var(--text-sm); color: var(--text-2);
+}
+
+/* A wide table inside a block. `.tw.scroll` already scrolls; this only stops
+   it drawing a second border inside the card that already has one, and gives
+   the chart above it room to breathe. */
+.fin-tw { margin-top: var(--space-4); border-radius: var(--radius-lg) }
+
+/* The grouping dropdown in the chart block header. It only needs keeping from
+   stretching in the header flex row; the control draws itself. */
+.fin-groupby { display: inline-flex; margin-left: auto; flex: 0 0 auto }
+@media (max-width: 720px) {
+  .fin-groupby { margin-left: 0; width: 100% }
+}
+
+/* ============================================ the slips table columns ===
+   `.fin-tbl` sets a min-width and no column widths, so the browser shares the
+   space out by content — which is fine until one cell has an unbounded
+   paragraph in it. The held slip's reason did, and it took the table: the
+   status column swelled, the identifier column was starved until
+   `SLIP-2026-08-0014` wrapped across two lines, and the paid-on column wrapped
+   with it. Three rules, all of them bounding a cell rather than fighting the
+   layout algorithm. */
+
+/* Shrink-to-fit around content that must stay on one line. `width: 1%` is the
+   idiom for "as narrow as your content allows" in an auto table. */
+.fin-c-slip { width: 1%; white-space: nowrap }
+.fin-c-when { width: 1%; white-space: nowrap }
+
+/* THE HOLD REASON, BOUNDED. Two lines and an ellipsis; the whole of it is on
+   the cell's title and printed in full on the slip, so nothing is lost by not
+   showing all of it in a table row. A reason is mandatory on the way in and
+   there is no length limit on it — so the row has to survive any length,
+   rather than the seed being kept short enough to fit. */
+.fin-heldnote {
+  max-width: 340px; margin-top: 3px;
+  display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2;
+  -webkit-box-orient: vertical; overflow: hidden;
+}
+
+/* DEFENSIVE, and the same bug one table over. `Transactions` prints
+   `t.description` unbounded in the same way the hold reason was: it is not
+   broken today only because the longest description in the seed is 57
+   characters against the hold reason's 231, which is a fact about the fixture
+   and not about the column. One line and an ellipsis; the full text is on the
+   record the row opens. */
+.fin-tbl td .fin-desc {
+  max-width: 380px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* A labelled dropdown for a choice that always has a value — the year, and how
+   the chart is grouped. The label sits OUTSIDE the control rather than as a
+   blank first option, which is how the panel's filter `Select` does it: a
+   filter can be empty and neither of these can, so an entry meaning "none"
+   would be an entry that either does nothing or silently means the default. */
+.fin-picker { display: inline-flex; align-items: center; gap: var(--space-2); flex: 0 0 auto }
+.fin-picker-l {
+  font-size: var(--text-2xs); letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-3); font-weight: var(--weight-semibold); white-space: nowrap;
+}
+.fin-picker .selectbox select { height: var(--control-sm) }
+/* The value carries the weight, not a colour: these are read as "which year"
+   and "which cut", and the label beside them already says which is which. */
+.fin-picker .selectbox select { font-weight: var(--weight-medium) }

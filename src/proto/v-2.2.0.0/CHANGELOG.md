@@ -4,6 +4,590 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ---
 
+## 2026-09-01
+
+### Both payroll controls become dropdowns
+
+**Area:** `#/finance-salaries?tab=analytics` · `?year=` · `?by=`
+**Files:** `src/admin/views/Finance/{Payroll,finance.css}.tsx(x)`, `scripts/fn-smoke.tsx`
+
+**What changed**
+
+**The year switcher and the grouping switch were segmented button strips and
+are dropdowns now.** The year strip grows an entry every January, and the
+grouping strip carried three labels long enough that it wrapped inside the
+block header at ordinary widths — a control that reflows as the page narrows is
+a control somebody has to hunt for.
+
+**NEITHER USES THE PANEL'S `Select`, and the reason is worth writing down.**
+`Select` renders a blank first option carrying the label, because it is built
+for FILTERS, where empty means *not filtering*. Neither of these is a filter: a
+year is always some year and a grouping is always some grouping. A blank entry
+would be one that either does nothing or silently means the default, and both
+readings are worse than not offering it. So the label sits outside the control
+and the list holds only real choices — same `.selectbox` chrome, so it still
+looks like every other dropdown in the panel.
+
+It is **controlled** rather than `defaultValue`, unlike `Select`, because the
+URL decides what is drawn: an uncontrolled dropdown can sit showing a value the
+chart underneath it is not using.
+
+**And plain, not brand-tinted.** They first shipped wearing `.selectbox.on`,
+which is the panel's *this filter is active* state — green, so somebody can see
+at a glance which controls are narrowing a list. Neither of these narrows
+anything, so both were permanently green: **a signal that never varies is not a
+signal**, and it made two ordinary dropdowns read as applied filters somebody
+ought to clear. They are ordinary `.selectbox` controls now, on the panel's own
+white, with the value in medium weight because the value is the thing being
+read and the label beside it already says which is which.
+
+**A single-year dropdown is not offered at all.** With one year in the records
+there is no choice to make, and a dropdown with one option is a control that
+looks like it does something and does not — it stays a plain read-out.
+
+**`person` became `member`**, in the label, the option and the `?by=` value.
+The account this cut counts belongs to a team member, and that is the word the
+rest of the panel uses for them.
+
+**Temp data**
+`none`.
+
+**Backend needed**
+`none`.
+
+**Open decisions**
+`none`.
+
+**Verified**
+`npx tsc -b` clean · `eslint` clean · `vite build` clean · `check:finance`
+401/401 · `check:finance-render` renders every surface. Five new assertions on
+the controls, and two of them assert an ABSENCE, which is the half that rots
+otherwise: **`hasnt(pay, "fin-seg")`** proves no segmented strip is left rather
+than only that a dropdown was added, and **`hasnt(pay, "selectbox on")`** proves
+the active-filter tint has not crept back onto a control that filters nothing. All three groupings were
+rendered and their bars counted: 9, 11 and 19 columns with height.
+**Not checked:** not opened in a browser. Two dropdowns now sit where two
+button strips did — one in the command row, one in a block header — and neither
+has been seen at a narrow width.
+
+---
+
+## 2026-09-01
+
+### One unbounded cell was taking the slips table
+
+**Area:** `#/finance-salaries` → Transactions · `#/finance-transactions`
+**Files:** `src/admin/views/Finance/{SalaryTransactions,Transactions,finance.css}.tsx(x)`,
+`scripts/fn-smoke.tsx`
+
+**What changed**
+
+**A HELD SLIP'S REASON WAS PRINTED IN FULL INSIDE A TABLE CELL.** `.fin-tbl`
+sets a min-width and no column widths, so the browser shares the space out by
+content — which is fine until one cell holds a paragraph. A hold reason is
+mandatory on the way in, has no length limit, and is **231 characters** in this
+seed. The status column swelled to fit it, the identifier column was starved
+until `SLIP-2026-08-0014` wrapped across two lines and read as two ids, the
+run line under it wrapped too, and the paid-on column went with them.
+
+Three bounded cells rather than any fight with the layout algorithm: the slip
+and paid-on columns shrink to fit and never wrap (`width: 1%`, the auto-table
+idiom for *as narrow as your content allows*), and the reason is clamped to two
+lines with the whole of it on the cell's `title` — and printed in full on the
+slip, so nothing is lost by not showing all of it in a row.
+
+**The same fault one table over, bounded before it bit.** `Transactions` prints
+`t.description` exactly as unboundedly. It is not broken today only because the
+longest description in the seed is 57 characters against the hold reason's 231
+— a fact about the fixture, not about the column.
+
+**Temp data**
+`none`. The seed's hold reason was left long on purpose: the row has to survive
+any length a person types, and keeping the fixture short enough to fit would
+have hidden the bug rather than fixed it.
+
+**Backend needed**
+`none`.
+
+**Open decisions**
+`none`.
+
+**Verified**
+`npx tsc -b` clean · `eslint` clean · `vite build` clean · `check:finance`
+401/401 · `check:finance-render` renders every surface, with **ten new
+assertions that read the stylesheet** rather than the markup.
+
+That is the point worth keeping: **nothing already in the suite could have
+caught this.** The markup was correct throughout — only the layout was wrong,
+and `renderToStaticMarkup` has no layout. It is the second fault of that exact
+shape in two days, after `.ch-col` having no fill, so the guard follows the same
+pattern: assert the rule exists in the stylesheet, next to an assertion that the
+class is on the element. **Proved by reverting:** removing the `line-clamp`
+declaration turns the suite red, and restoring it turns it green.
+**Not checked:** not opened in a browser. The clamp is `-webkit-line-clamp`,
+which is what every current browser implements, but the two-line result has not
+been seen at any width.
+
+---
+
+## 2026-09-01
+
+### The prose comes off the payroll tab, and a headcount indicator goes on
+
+**Area:** `#/finance-salaries?tab=analytics`
+**Files:** `src/admin/views/Finance/{Payroll,payrollYear}.ts(x)`,
+`src/content/finance/vocabularies.json`, `scripts/{check-finance-ledger.cjs,fn-smoke.tsx}`
+
+**What changed**
+
+**THE BANNER AND BOTH CARD FOOTERS ARE GONE.** The page carried a six-line
+standing notice above every reading of it, and two paragraphs of caution laid
+out as card footers. A footer is the worst available place for a rule: it is the
+widest text on the page, it wraps against nothing, and it is read once and then
+never again while the figures above it are read every day. A standing notice is
+worse — a caution that appears whether or not anybody is asking is one people
+learn to look past, which is worse than not writing it, because it feels like it
+was communicated.
+
+**Nothing was deleted; it moved to where it is asked for.** Every rule now sits
+behind the `i` on the tile or the chart it governs — five rows on the chart tip,
+switching with the grouping, covering why there are two bars, why they are
+grouped rather than stacked, what an empty column means, and why three cuts
+cannot share an axis. The one sentence that had to survive on its own — **this
+is the calendar year and a total here will not match a filed return** — went
+into the vocabulary, onto the caution of `payroll_cost`, the very total it
+qualifies. The page is now a strip, a chart and a switch.
+
+**A FIFTH TILE: On the payroll.** Every other figure on this tab is derived from
+SLIPS, so opening a salary account moves none of them until a run is opened and
+paid — correct for money, and no feedback at all for somebody who has just put a
+person on the payroll and is looking for a sign it worked. This one counts
+ACCOUNTS and is the only figure here that moves in the same read as the write.
+It leads the strip for that reason, and carries the forward monthly commitment
+beside it: what a run opened today would cost, stated as a commitment and part
+of no total on the page.
+
+**Temp data**
+`none` new. `vocabularies.json` gains `payroll_headcount`, and the `payroll_cost`
+caution is rewritten to carry the window caveat the banner used to.
+
+**Backend needed**
+`none` — the count is over salary accounts the module already reads.
+
+**Open decisions**
+`none`.
+
+**Verified**
+`npx tsc -b` clean · `eslint` clean · `vite build` clean · **`check:finance`
+401/401**, up from 391: ten new assertions over the indicator, and they are as
+much about what does NOT move as what does. Opening an account raises the count,
+the year-joined count and the monthly commitment by exactly the right amounts,
+**while the gross, paid and incentive totals for the year stay put** — which is
+the whole reason a slip-derived figure could not have been the indicator.
+`check:finance-render` renders every surface: the page has **zero card footers**
+and **zero notices**, six `i` controls and five tiles. The window caveat is now
+asserted out of the vocabulary rather than the markup — an `InfoTip` renders its
+panel only when opened, so a caution behind one is invisible to a static render,
+and asserting it where it lives is the only way it stays true.
+**Not checked:** not opened in a browser. Five tiles wrap where four did not,
+and the chart tip is a five-row panel that has never been opened at any width.
+
+---
+
+## 2026-09-01
+
+### The three payroll charts become one, with a grouping switch
+
+**Area:** `#/finance-salaries?tab=analytics` · `?by=month|department|person`
+**Files:** `src/admin/views/Finance/{Payroll,Salaries,finance.css}.tsx(x)`, `scripts/fn-smoke.tsx`
+
+**What changed**
+
+**Three stacked chart blocks became one block with a switch.** The page was a
+strip of four totals and then the year, then departments, then people — three
+cards of the same height doing the same job, which reads as a lot more page than
+it is.
+
+**THEY COULD NOT SHARE AN AXIS, and that is worth writing down because it is the
+reason this is a switch rather than a wider chart.** A month, a department and a
+person are three ways of cutting the SAME rupees: side by side on one axis every
+rupee would be counted three times and the total would mean nothing. What they
+can share is one block, one frame and one legend.
+
+**The series follow the grouping**, deliberately. Paid against not-yet-paid is a
+question only a MONTH can answer — a department has no due date — and it is a
+NET figure, where committed-against-earned is a division of GROSS. Forcing one
+pair across all three would have meant dropping the paid/unpaid reading or
+drawing a net bar beside a gross one, and the second is the kind of chart whose
+column heights quietly mean nothing. The legend sits directly above the marks
+and changes with them, so two meanings are never on screen at once, and the
+caption names the measure outright: *net paid against net owed* or *gross,
+before deductions*.
+
+`?by=` carries the grouping, guarded the way `?year=` is — an unknown value
+falls back to the month cut rather than drawing an empty chart with an
+empty-state that would claim nobody had been paid.
+
+**Temp data**
+`none`.
+
+**Backend needed**
+`none` — all three cuts are derived client-side from the same runs.
+
+**Open decisions**
+`none`.
+
+**Verified**
+`npx tsc -b` clean · `eslint` clean · `vite build` clean · `check:finance`
+391/391 · `check:finance-render` renders every surface. The smoke gained a
+counting helper it did not have: `has` proves a thing is present and `hasnt`
+proves it is absent, and neither can say **one and not three** — which is the
+entire claim being made here. `ok1` asserts exactly one `class="ch-chart"` on
+the page, and each grouping is rendered and checked through its own URL,
+including the assertion that the month-only series is NOT drawn on a department
+axis.
+**Not checked:** not opened in a browser. The switch sits in the block header
+with a wrap rule under 720px that has not been seen at that width.
+
+---
+
+## 2026-09-01
+
+### Column charts had no bars — `.ch-col` was never given a fill
+
+**Area:** every `ColumnChart` in the panel · `#/finance-salaries?tab=analytics` ·
+`#/finance-analytics` · `#/users?tab=analytics`
+**Files:** `src/admin/views/charts.css`, `scripts/fn-smoke.tsx`
+
+**What changed**
+
+**THE BARS WERE TRANSPARENT.** `charts.css` gives a slot colour to `.sw` — the
+legend swatch — and to `.fill`, which is what `BarRows` and `FunnelChart` draw
+their marks with. `ColumnChart` draws its bars as `.ch-col s1`, which matched
+neither, so it had **no `background` rule at all**: correct heights, correct
+tooltips, correct axis, correct legend swatches, and nothing visible above the
+baseline. Six charts across Finance and Users, since the kit was written.
+
+The fix is one selector added to each of the three slot rules. The intent was
+never in doubt — the `forced-colors` block at the foot of the same file already
+lists `.ch-col` beside `.fill` as a mark that needs a visible border.
+
+**WHY NOTHING CAUGHT IT, which is the more useful half.** `check:finance-render`
+asserts against `renderToStaticMarkup` with the CSS bundled as `empty`, so every
+assertion in it would pass just as happily against a chart drawn entirely in
+invisible spans. It was found by rendering the page and reading the actual bar
+heights out of the markup — 56 columns, 39 with height, tallest 87.5% — and then
+asking why a chart with 39 sized bars looked empty.
+
+`fn-smoke` now **reads the stylesheet**: for every class the kit puts on a mark
+(`.ch-col`, `.fill`, `.sw`) in every slot there must be a rule giving it a
+background, and the slot palette must exist. Removing the fix turns the suite red
+on three assertions, which is how it was verified.
+
+**Temp data**
+`none`.
+
+**Backend needed**
+`none`.
+
+**Open decisions**
+`none`. The nine mark assertions are a floor, not a design: they catch a mark
+with no fill and cannot catch one whose fill is the wrong colour, which still
+needs somebody to look at it.
+
+**Verified**
+`npx tsc -b` clean · `eslint` clean · `vite build` clean · `check:finance`
+391/391 · `check:finance-render` renders every surface and now paints them ·
+both Users suites and both Team suites pass. **Proved by reverting:** with the
+selector removed the suite fails on `.ch-col.s1`, `.s2` and `.s3`, and passes
+again when it is restored.
+**Not checked:** still not opened in a browser. The bars now have a background
+and a colour; that it is the RIGHT colour against this theme is not something
+either the render check or the stylesheet check can tell.
+
+---
+
+## 2026-09-01
+
+### The payslip stops disagreeing with the bank, and three other salary-flow faults
+
+**Area:** `#/finance-salaries/SLIP-…` · the account record · Add a salary account
+**Files:** `src/admin/views/Finance/{Slip,SalaryDetail,SalaryModals,finance.css}.tsx(x)`,
+`src/content/finance/{salaries,vocabularies}.json`, `src/content/team/members.json`,
+`scripts/{check-finance-ledger.cjs,fn-smoke.tsx}`
+
+**What changed**
+
+**A PAYSLIP PRINTED LESS THAN THE MONEY THAT MOVED.** `Slip.tsx` computed
+`gross` as `Σ earnings`, which stopped being the whole story the moment
+incentives became their own array — so a slip carrying one showed a gross short
+by the incentive and therefore **a net lower than the transfer**. Anjali's July
+slip read ₹1,20,000 against ₹1,61,000 actually paid. Gross is
+`Σ earnings + Σ incentives` now, the incentive prints as its own line marked
+**earned**, and the terms say what an incentive is: paid for this month, not
+payable again unless earned again, and not reduced by loss of pay.
+
+**The terms claimed a thirty-day month this module has never computed.** Loss of
+pay divides by `daysInMonth`, the type says so, and a check asserts it — while
+the one document somebody recalculates by hand told them to use thirty. It now
+states the month's real length: *29 paid days of 31*.
+
+**One arithmetic for loss of pay, where there were two.** The seeded July slip
+pro-rated Provident fund; `setLop` leaves every deduction alone. A loss-of-pay
+slip therefore meant different things depending on whether a person or the
+fixture had produced it. **The code's rule won** — deductions are typed on the
+account and this module does not decide which of them are proportional, which is
+the same refusal it makes about deriving a department from a designation. The
+seed obeys it now, and what that costs in law is written down rather than
+quietly computed: FN-OD-16.
+
+**The receipt existed and was never once shown.** `paySalary` refuses a payment
+without one — it is the only evidence a salary payment has, since the typed bank
+reference was deleted for being a UTR nobody checked — and then wrote the
+filename to a slip that rendered it nowhere. It is on the slip now beside how the
+money moved, `via` prints as the words somebody chose rather than the ledger's
+`NEFT`, and the account's **Reference** column, which was blank on every
+UI-paid slip, is **Evidenced by**: the receipt, or the old reference, or the
+absence named. The remark is shown too, in its own element rather than run into
+the standing terms.
+
+**Department came off the Add-a-salary-account dialog** and onto the team member,
+where a person's department belongs. It was a typed box with a datalist of
+whatever had been typed before — a memory of past spellings, not a taxonomy: the
+first person to type "sales" made it an option for everybody after them. It now
+comes off the picked member with the name, the designation and the code, and is
+shown read-only so nobody is surprised by it in a chart three months later. On a
+revision the account keeps the one it has, because revising a salary is not how
+somebody changes department.
+
+**Temp data**
+`src/content/team/members.json` → **new `department` on every member**, typed
+against the real roster by designation. Design has nobody, because Team has no
+designer and inventing one to fill a bar Finance already draws would be a
+fixture lying to make a chart look complete.
+`salaries.json` → the July loss-of-pay slip's deductions are flat, and the
+`LOP_APPLIED` note rewritten to say why.
+`vocabularies.json` → `FN-OD-16`.
+
+**Backend needed**
+- `AdminUserRow.department` on `GET /admin/team/members` — a typed string, blank
+  legal. **The server must not derive it from a designation:** an Operations
+  Manager and an Operations Executive share a department, a Sales Head and a
+  Finance Admin do not, and no rule over job titles gets that right.
+- `SalaryAccount.department` stays on the payload and is set from the member at
+  open. Finance no longer accepts it as typed input.
+- No change to the slip payload: `incentives[]` and `incentivePaise` were added
+  in the entry above this one.
+
+**Open decisions**
+⚠ **FN-OD-16 · Deductions are flat, and statutory PF is not.** Loss of pay
+pro-rates earnings and leaves every deduction alone. In law employee PF is 12%
+of basic and falls with a pro-rated basic, so a loss-of-pay slip overstates PF
+and understates net. Fixing it means marking a component proportional or flat
+when it is typed — a schema decision and a payroll-policy one, not a rendering
+fix. Stated rather than guessed at.
+
+**Verified**
+`npx tsc -b` clean · `eslint` clean on every changed file (the repo's 255
+pre-existing problems are unchanged, and none is in Finance) · `vite build`
+clean · **`check:finance` 389/389**: the seeded loss-of-pay slip is
+asserted to leave its deductions alone exactly as `setLop` does, and the member
+picker is asserted to carry a department that is the member's own value and
+**not** derivable from their designation — two people sharing one title share a
+department, a Finance Admin and a Sales Head do not.
+`check:finance-render` renders every surface, with **11 new assertions over the
+printed document** — the incentive prints, it is marked earned, gross and net
+both include it (₹1,61,000 and ₹1,46,500, the two needles that were the whole
+bug), the thirty-day claim is gone, the real month length is stated, and the
+account's slips table names what a payment is evidenced by. `check:finance-nav`,
+both Users suites and both Team suites pass.
+**Not checked:** not opened in a browser. Playwright is not installed in this
+repo, so the new `.fin-earned` marker, the `.fin-slip-remark` block, the receipt
+line and the read-only department field are verified through static render and
+not by looking at them — and **the payslip's print layout is unverified**, which
+matters more here than usual because two of these changes add lines to a document
+whose whole purpose is to be printed.
+
+---
+
+### Salaries A/C gains an Analytics tab: the wage bill over a calendar year
+
+**Area:** `#/finance-salaries?tab=analytics` · `?year=`
+**Files:** `src/admin/views/Finance/{Payroll.tsx,payrollYear.ts,Salaries,Analytics,InfoTip,store,types,finance.css}`,
+`src/content/finance/{salaries,vocabularies}.json`, `scripts/{finance-check-entry.ts,check-finance-ledger.cjs,fn-smoke.tsx}`, `package.json`
+
+**What changed**
+
+**A third tab on Salaries A/C**, beside Transactions and Accounts, **scoped to a
+YEAR rather than the reporting period**: four totals and three charts.
+
+     1  the year, month by month     what went out, and what has not
+     2  by department                base salary against incentive earned
+     3  by person                    the same split, everybody side by side
+
+**IT SHIPPED WITH SIX BLOCKS AND WAS CUT TO FOUR BEFORE IT SHIPPED AGAIN.** The
+first build carried an eight-column month table, a twelve-row per-person slip
+table behind a picker, and six decision metrics with year-on-year arrows. In use
+it was confusing, and the tables were why: they printed the same figures the
+charts above them drew, so **every number appeared twice in two shapes** and a
+reader had to work out which one they were meant to read. Both tables are gone
+and so is the KPI block — a table is the right form for records somebody acts on
+one at a time, which is precisely what the two tabs beside this one already are,
+and they do it better because a row there opens the slip that produced it.
+**A table on an analytics tab is a chart whose shape nobody can see.** The
+per-person picker went with them: a person's own months are on their salary
+account, one click away, beside each slip — this page could only restate that,
+worse. What no other page can show is the whole team side by side, so that is
+what it shows.
+
+**It sits with the runs it reads, not in the Analytics section.** It was built
+there first and that was the wrong address: it is the only face in the module
+scoped to a whole year rather than to the reporting period, so on a page
+whose other two tabs are scoped to August it would have put two windows on one
+row — which is how somebody reads a yearly figure as a monthly one. Here the
+year switcher owns the command row and says the scope outright, and somebody
+asking what payroll cost this year no longer has to leave the payroll page to
+find out. Analytics keeps Overview and KPI, and a check asserts Payroll is no
+longer offered there.
+
+The tab carries **no count badge** — the other two say how many records are
+behind them, and a year is not a number of things — and **no filter strip**: every
+cell in that strip filters this month's slips, and a row of live-looking controls
+that narrow nothing on screen is worse than no strip at all.
+
+**January to December**, filtered by year in the command row. It was April to
+March for one build, on the argument that TDS, PF and the books all close on 31
+March — that argument still holds and the page no longer makes it, because the
+calendar year is what was asked for. **The consequence is stated on the page
+rather than left to be discovered:** a total taken from here will *not* match a
+filed return, and the two figures are close enough to be mistaken for each other
+and far enough apart to matter. The helpers were renamed with the change —
+`fyOf`/`fyMonths`/`fyLabel` are `yearOf`/`yearMonths`/`yearLabel`, and the query
+key is `?year=` — because `fy` meaning "calendar year" is the kind of lie that
+survives for years.
+
+The year is always twelve columns: a month with no run is drawn empty and
+labelled, because a run nobody opened and a month nobody was paid look identical
+once a chart omits them.
+
+**INCENTIVES BECAME A FIRST-CLASS THING.** `paySalary` already accepted one and
+concatenated it onto `earnings`, which paid the right amount and destroyed the
+only thing that made it an incentive: beside basic and HRA nothing downstream
+could tell committed pay from earned pay. `Payslip` carries `incentives[]` and
+`incentivePaise` now, held apart from `baseEarnings` **so loss of pay cannot
+pro-rate it** — an incentive is paid for something achieved, and three days of
+absence does not un-achieve it.
+
+**Paid and not-yet-paid partition each month exactly**, so the pair reads against
+one baseline without double-counting — and the year chart draws those two rather
+than salary against incentive, which is a split of GROSS and would give a column
+whose height means nothing beside a net one. A held slip counts as not-yet-paid
+*here*, where the only question is whether money has left; **why** it has not is
+on the slip, which is the one place somebody can act on it.
+
+**Base salary against incentive is the shape both other charts draw**, so a
+department that is almost all fixed pay and one that is a fifth incentive are
+visibly different rather than two similar totals. The seed was widened for it:
+Sales now runs at ~21% variable, Design ~10%, Operations ~5%, and **Leadership at
+zero** — a director's remuneration is fixed by board resolution, and that
+contrast is the thing the chart exists to show.
+
+**Expenditure by department moved here from Overview** and is year-scoped. All
+time was the wrong window for the only thing it is used for: it silently
+rewarded whoever had been on the payroll longest, so a team hired in January read
+as cheap beside one hired two years earlier. It is not duplicated — the Overview
+block is gone, and a check asserts its absence.
+
+**Temp data**
+`salaries.json` → **17 new paid runs, 2025-01 to 2026-05**, so **calendar 2025 is
+a complete twelve months** and 2026 runs January to August. It starts in January
+rather than April for exactly that reason: a year chart whose first quarter is
+empty teaches nothing about the company and everything about the fixture.
+
+**Three more salary accounts** — Marketing, Technology and a second designer —
+because the department chart had four bars of which two sat at zero incentive, so
+the one thing it exists to show had two data points. Six departments now carry a
+real gradient: **Leadership 0% · Technology 3% · Operations 5% · Design 6% ·
+Marketing 12% · Sales 20%**, which is a chart somebody can read a decision off.
+The person chart went from seven columns to ten, staggered by joining date so the
+year has a shape, and a third raise (Nikhil Verma, January 2026) joins the two
+already there. **One slip is held** — a campaign advance still unreconciled —
+because without one the third state on the transactions strip was permanently
+zero and the year chart's second series appeared in exactly one column.
+
+**August is PART PAID** — four people settled, four owed, one held. The fixture
+had the open run entirely unpaid, so the year chart drew a zero-height *Paid* bar
+for the current month and the part-paid state the write path goes out of its way
+to support existed in no fixture at all. Which four is not arbitrary: the three
+accounts the ledger suite pays, revises and sets loss of pay on are left
+outstanding, because settling one turns half a dozen behaviour tests into
+"nothing outstanding" and they then fail for a reason unrelated to what they test.
+
+158 slips, all generated deterministically from an FNV-1a hash of accountId +
+month, so re-running produces identical output and no figure was hand-picked to
+make a chart look good. The whole seed rebuilds from HEAD in one pass.
+
+**Two faults the charts exposed by being looked at properly.** Farhan Qureshi was
+in the Design department and out of the delivery-bonus list, so the person chart
+drew him as the one designer who never earned anything — a difference between two
+people doing the same job that the fixture had invented by omission. And
+`vocabularies.json` was missing **`SALARY_PAID`, `SALARY_HELD` and
+`SALARY_RELEASED`**, three event types `paySalary` and `setSlipHold` have always
+written: `EventRow` falls back to printing the raw key, so every salary payment
+has been showing `SALARY_PAID` in the account timeline instead of a label, and
+with no tone, so a payment read as neutral and a hold did not read as a caution.
+Both surfaced from rendering the page and reading the actual bar heights out of
+the markup rather than trusting that the words were present. Two
+raises (Aditya Rao from October 2025, Anjali Deshpande from April 2026) join the
+one already there, and they are visible **only because slips freeze**. Incentives
+land on **paid slips only** — an incentive is granted when somebody is paid, not
+when the run is cut — Sales monthly with about one month in six paying nothing,
+Design occasionally, Leadership and Operations never.
+**2024-12 and earlier deliberately have no run:** `check-finance-ledger` opens one
+for a past month to test `openSalaryRun` and needs a month with no run and 31
+days in it.
+`vocabularies.json` → `payrollMetricDefinitions` (**4**, one per total), kept
+apart from the existing lists so a payroll figure cannot appear unasked on a page
+about subscriptions. `payrollKpiDefinitions` was here and is **deleted** with the
+metrics block it annotated. Incentive bands were widened for legibility: a
+variable share of 5–7% is a sliver beside a base-salary bar, and a chart whose
+second series cannot be seen is not a chart with two series.
+
+**Backend needed**
+- `Payslip.incentives[]` and `incentivePaise` on `GET /admin/finance/salary-runs`.
+  `grossPaise` INCLUDES the incentive. The server must not fold it into
+  `earnings`: loss of pay pro-rates `earnings` and must never reach it.
+- `GET /admin/finance/vocabularies` serves `payrollMetricDefinitions[]`.
+- Everything else is derived client-side in `payrollYear.ts` from the runs
+  themselves — deliberately, so no roll-up can fall out of step with the lists.
+
+**Open decisions**
+`none` new for the tab itself. The ⚠ two-fixtures-do-not-join defect is
+unchanged and still pinned by its `KNOWN:` assertion.
+
+**Verified**
+`npx tsc -b` clean · `eslint` clean · `vite build` clean · **`check:finance`
+389/389**, up from 369. Three of the newest came out of the held slip: it
+is not DUE, so paying everybody else on the run leaves it open, and the run only
+closes once the hold is released and that slip paid — which is precisely what a
+hold is for, and was untested until the seed carried one.
+`check:finance-render` renders every surface with the tab's four
+totals and three charts, the year switcher, and an unknown `?year=` falling back to
+the current year. **Four of its assertions are about what is NOT there** — not
+one `.tbl`, no month table, no decision-metric block, no employee picker —
+because a page cut back for legibility grows its tables again unless something
+fails when it does. `check:finance-nav` and both Users and Team
+suites pass. `check:finance` now bundles `scripts/finance-check-entry.ts` rather
+than `store.ts` directly, so the store and the payroll derivations share ONE
+snapshot — bundled separately, `resetStore()` in one would have left the other
+reading stale records, and that failure would not have thrown.
+**Not checked:** not opened in a browser, and this change is substantially
+visual — two new column charts, two wide tables and a segmented year switcher
+are verified through static render only. `check:enquiries` needs a running
+backend and was not run; it is unrelated to Finance.
+
+---
+
 ## 2026-08-31
 
 ### Cost to company is deleted, not hidden — and two layout bugs go with it
