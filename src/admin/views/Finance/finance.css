@@ -427,6 +427,10 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
 
 /* Editable salary components: label, amount, remove. */
 .fin-comprow { display: grid; grid-template-columns: 1fr 160px auto; gap: var(--space-2); align-items: center; margin-bottom: var(--space-2) }
+/* An adjustment is a comprow that cannot be removed — clearing the amount IS
+   removing it — so it is name + amount and nothing else. */
+.fin-adj { display: grid; grid-template-columns: 1fr 140px; gap: var(--space-2); align-items: center }
+@container (max-width: 520px) { .fin-adj { grid-template-columns: 1fr } }
 @container (max-width: 520px) { .fin-comprow { grid-template-columns: 1fr } }
 
 /* =============================================================== slip === */

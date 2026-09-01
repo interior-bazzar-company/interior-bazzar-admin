@@ -22,6 +22,7 @@
    ============================================================================= */
 import { useMemo, useRef, useState } from "react";
 import { Icon, Notice } from "../../ui";
+import { go } from "../../ui/nav";
 import { Check, Role } from "./bits";
 import InfoTip from "./InfoTip";
 import { Cancel, Dlg, Field, Fs, RupeeInput, toPaise } from "./dialog";
@@ -523,6 +524,16 @@ export function PaySalaryModal({ row, onClose, onDone }: {
   const [remark, setRemark] = useState("");
   const [accountId, setAccountId] = useState(
     (ACCOUNTS.filter((a) => a.active && a.type === "bank")[0] || ACCOUNTS[0]).accountId);
+  /* The two one-off adjustments. An amount with no name gets the plain
+     default at submit — the store refuses a nameless figure, and rightly. */
+  const [incLabel, setIncLabel] = useState("");
+  const [incAmt, setIncAmt] = useState("");
+  const [dedLabel, setDedLabel] = useState("");
+  const [dedAmt, setDedAmt] = useState("");
+  /* Set once the write has gone through. The dialog then STOPS being a form:
+     the money has left, Cancel would be a lie, and what remains to offer is
+     the slip. */
+  const [paid, setPaid] = useState<{ leaving: number; months: number; slipId: string } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   /* "" when this session may do it. Never used to hide the button — a person
@@ -537,6 +548,55 @@ export function PaySalaryModal({ row, onClose, onDone }: {
   /* Oldest first, because that is the order the write pays them in and a
      summary that lists them the other way describes a different transfer. */
   const months = d.unpaid.slice().sort((a, b) => a.month.localeCompare(b.month));
+  const newest = months[months.length - 1];
+
+  /* The same arithmetic the store will do, live, so "Leaving the account"
+     never shows a number the write would not produce. A half-typed amount
+     counts as nothing, exactly as it does in the component editor. */
+  const incPaise = toPaise(incAmt) || 0;
+  const dedPaise = toPaise(dedAmt) || 0;
+  const overdrawn = !!newest && dedPaise > newest.netPaise + incPaise;
+  const leaving = d.pendingPaise + incPaise - dedPaise;
+
+  /* ================================================== paid: the receipt === */
+  if (paid) {
+    const close = () => onDone(inr(paid.leaving) + " paid to " + row.a.memberName + " · "
+      + paid.months + " month" + (paid.months === 1 ? "" : "s")
+      + " numbered, hashed and frozen.", "ok");
+    return (
+      <Dlg title="Paid successfully"
+        sub={<>{row.a.memberName} · {inr(paid.leaving)} · {paid.months} month{paid.months === 1 ? "" : "s"} settled</>}
+        onClose={close}
+        footer={<>
+          <button className="btn" onClick={close}>Done</button>
+          {/* Straight to the document. Download there is the browser's print
+              dialog, and Save as PDF is how every document in this panel
+              becomes a file — one renderer, one definition of the slip. */}
+          <button className="btn pri" onClick={() => {
+            close();
+            go("#/finance-salaries/" + encodeURIComponent(paid.slipId));
+          }}>
+            <Icon name="download" size="sm" />Download slip
+          </button>
+        </>}>
+        <div className="fin-chks">
+          <Check ok>
+            <b>{inr(paid.leaving)} left the account.</b> The payment is on the ledger with its
+            receipt attached, and the balance moved with it.
+          </Check>
+          <Check ok>
+            <b>{paid.months === 1 ? "The slip is" : paid.months + " slips are"} numbered, hashed and
+            frozen.</b> Nothing on {paid.months === 1 ? "it" : "them"} can change now — that is what
+            makes {paid.months === 1 ? "it" : "each one"} worth handing over.
+          </Check>
+          <Check ok>
+            <b>Download slip opens <span className="mono">{paid.slipId}</span>.</b> Its Download
+            button prints the document; Save as PDF in that dialog produces the file.
+          </Check>
+        </div>
+      </Dlg>
+    );
+  }
 
   return (
     <Dlg title={"Pay " + row.a.memberName}
@@ -544,15 +604,19 @@ export function PaySalaryModal({ row, onClose, onDone }: {
       onClose={onClose} err={err}
       footer={<>
         <Cancel onClose={onClose} />
-        <button className="btn pri" disabled={!!gate || !proof} title={gate || undefined}
+        <button className="btn pri" disabled={!!gate || !proof || overdrawn} title={gate || undefined}
           onClick={() => {
             const e = paySalary(row.a.salaryAccountId, {
               via, accountId: payingFrom, proof: proof || { filename: "", mime: "" }, remark,
+              incentive: incPaise > 0
+                ? { label: incLabel.trim() || "Incentive", amountPaise: incPaise } : null,
+              deduction: dedPaise > 0
+                ? { label: dedLabel.trim() || "Deduction", amountPaise: dedPaise } : null,
             });
             if (e) return setErr(e);
-            onDone(inr(d.pendingPaise) + " paid to " + row.a.memberName + " · "
-              + months.length + " month" + (months.length === 1 ? "" : "s")
-              + " numbered, hashed and frozen. The slips can be handed over now.", "ok");
+            /* The dialog does not close: it turns into the receipt, with the
+               slip one press away. */
+            setPaid({ leaving, months: months.length, slipId: newest.slipId });
           }}>
           Record the payment<Role sa />
         </button>
@@ -638,6 +702,38 @@ export function PaySalaryModal({ row, onClose, onDone }: {
         </Field>
       </Fs>
 
+      {/* One-off money settled WITH this transfer. Each lands as a NAMED LINE
+          on the newest month's slip and moves its totals — the slip stays the
+          whole story of what was paid, which is the property everything else
+          in this module is built on. */}
+      <Fs legend="Adjustments"
+        hint={newest ? "Optional. Either one lands as a named line on " + fmtMonth(newest.month) + "'s slip." : undefined}>
+        <div className="fin-f2">
+          <Field label="Incentive">
+            <div className="fin-adj">
+              <input className="inp" value={incLabel} placeholder="Festival bonus"
+                aria-label="Incentive name" onChange={(e) => setIncLabel(e.target.value)} />
+              <RupeeInput value={incAmt} onChange={setIncAmt} />
+            </div>
+          </Field>
+          <Field label="Deduction">
+            <div className="fin-adj">
+              <input className="inp" value={dedLabel} placeholder="Advance recovery"
+                aria-label="Deduction name" onChange={(e) => setDedLabel(e.target.value)} />
+              <RupeeInput value={dedAmt} onChange={setDedAmt} />
+            </div>
+          </Field>
+        </div>
+      </Fs>
+
+      {overdrawn && newest ? (
+        <Notice tone="bad" ico="alert" text={<>
+          <b>The deduction is bigger than {fmtMonth(newest.month)}'s net{incPaise ? " plus the incentive" : ""}
+          — {inr(newest.netPaise + incPaise)}.</b> A slip cannot go below zero. Recover the rest
+          from a later month.
+        </>} />
+      ) : null}
+
       <div className="fin-summary">
         {months.map((s) => (
           <div className="row" key={s.slipId}>
@@ -649,8 +745,20 @@ export function PaySalaryModal({ row, onClose, onDone }: {
             <span className="tnum">{inr(s.netPaise)}</span>
           </div>
         ))}
+        {incPaise > 0 ? (
+          <div className="row">
+            <span className="l">Incentive <span className="faint">· {incLabel.trim() || "Incentive"}</span></span>
+            <span className="tnum">{inr(incPaise)}</span>
+          </div>
+        ) : null}
+        {dedPaise > 0 ? (
+          <div className="row">
+            <span className="l">Deduction <span className="faint">· {dedLabel.trim() || "Deduction"}</span></span>
+            <span className="tnum">−{inr(dedPaise)}</span>
+          </div>
+        ) : null}
         <div className="row grand">
-          <span className="l">Leaving the account</span><span className="tnum">{inr(d.pendingPaise)}</span>
+          <span className="l">Leaving the account</span><span className="tnum">{inr(leaving)}</span>
         </div>
       </div>
     </Dlg>

@@ -1566,6 +1566,13 @@ export interface PaySalaryInput {
    *  evidence a salary payment has now that the reference field is gone. */
   proof: { filename: string; mime: string; bytes?: number };
   remark?: string;
+  /** One-off amounts settled WITH this transfer. They land as NAMED LINES on
+   *  the newest month's slip — an incentive as an earning, a deduction as a
+   *  deduction — and the slip's own totals move with them, because the slip
+   *  is the whole story of what was paid. Money that left the account but is
+   *  on no document is money nobody can explain at audit. */
+  incentive?: { label: string; amountPaise: number } | null;
+  deduction?: { label: string; amountPaise: number } | null;
 }
 
 export function paySalary(salaryAccountId: string, input: PaySalaryInput): string {
@@ -1588,9 +1595,51 @@ export function paySalary(salaryAccountId: string, input: PaySalaryInput): strin
   const sa = superAdminOnly("Paying a salary"); if (sa) return sa;
   const accountId = input.accountId;
 
+  /* The adjustments, checked to the same standard as an account component:
+     a clean integer amount and a name. A figure nobody can name is a figure
+     nobody can explain at audit. */
+  const norm = (x: { label: string; amountPaise: number } | null | undefined, what: string):
+      { line: SalaryComponent | null; err: string } => {
+    if (!x || !x.amountPaise) return { line: null, err: "" };
+    if (!Number.isInteger(x.amountPaise) || x.amountPaise < 0)
+      return { line: null, err: "The " + what + " is not a clean amount. Rupees, up to two decimals. (adjustment_amount)" };
+    const label = (x.label || "").trim();
+    if (!label)
+      return { line: null, err: "Name the " + what + ". It prints on the slip, and a figure nobody can name is a figure nobody can explain. (adjustment_label)" };
+    return { line: { key: what, label, amountPaise: x.amountPaise }, err: "" };
+  };
+  const inc = norm(input.incentive, "incentive"); if (inc.err) return inc.err;
+  const ded = norm(input.deduction, "deduction"); if (ded.err) return ded.err;
+
   const at = stamp();
   /* Oldest first, so the debt that has been waiting longest clears first. */
   const order = due.unpaid.slice().sort((x, y) => x.month.localeCompare(y.month));
+
+  /* ADJUSTMENTS LAND ON THE NEWEST SLIP, before anything freezes. The newest
+     because that is the month being settled today — arrears are old documents
+     clearing, not places for new lines. A deduction may not push that slip
+     below zero: a negative payslip is not a document, it is a debt wearing a
+     document's clothes, and this module does not issue those. */
+  const newest = order[order.length - 1];
+  const incPaise = inc.line ? inc.line.amountPaise : 0;
+  if (ded.line && ded.line.amountPaise > newest.netPaise + incPaise) {
+    return "The deduction is bigger than " + fmtMonth(newest.month) + "'s net"
+      + (inc.line ? " plus the incentive" : "") + " — " + inr(newest.netPaise + incPaise)
+      + ". A slip cannot go below zero; recover the rest from a later month. (deduction_exceeds)";
+  }
+  if (inc.line || ded.line) {
+    if (inc.line) newest.earnings = newest.earnings.concat([inc.line]);
+    if (ded.line) newest.deductions = newest.deductions.concat([ded.line]);
+    newest.grossPaise = newest.earnings.reduce((n, c) => n + c.amountPaise, 0);
+    newest.deductionsPaise = newest.deductions.reduce((n, c) => n + c.amountPaise, 0);
+    newest.netPaise = newest.grossPaise - newest.deductionsPaise;
+    /* The run's stored total is the sum of its slips and must stay it. */
+    const holder = snap.salaryRuns.filter((r) => r.slips.indexOf(newest) >= 0)[0];
+    if (holder) holder.totalNetPaise = holder.slips.reduce((n, x) => n + x.netPaise, 0);
+  }
+  /* What actually leaves the account: the slips as they now stand. */
+  const leaving = order.reduce((n, x) => n + x.netPaise, 0);
+
   order.forEach((slip, k) => {
     slip.paidAt = at;
     slip.accountId = accountId;
@@ -1622,10 +1671,12 @@ export function paySalary(salaryAccountId: string, input: PaySalaryInput): strin
 
   const months = order.map((s) => fmtMonth(s.month)).join(", ");
   log(pushEvent(acc.events, "SALARY_PAID",
-    inr(due.pendingPaise) + " to " + acc.memberName + " by " + via.label.toLowerCase()
+    inr(leaving) + " to " + acc.memberName + " by " + via.label.toLowerCase()
     + " from " + (accountOf(accountId)?.masked || accountId)
     + " · " + months
     + (order.length > 1 ? " (" + order.length + " months, oldest first)" : "")
+    + (inc.line ? " · incentive " + inr(inc.line.amountPaise) + " (" + inc.line.label + ")" : "")
+    + (ded.line ? " · deduction " + inr(ded.line.amountPaise) + " (" + ded.line.label + ")" : "")
     + " · evidenced by " + filename + "."),
   salaryAccountId, "salary");
   emit();

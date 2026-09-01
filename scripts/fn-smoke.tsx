@@ -47,8 +47,8 @@ import {
   DecideRefundModal, ManualRefundModal, RecordTransferModal, RequestRefundModal,
 } from "../src/admin/views/Finance/RefundModals";
 import {
-  readRefund, readRun, readSalaryAccount, readSlip, readSubscription, readTransaction, toSalaryRow,
-  resetStore, tagOf,
+  fmtMonth, readRefund, readRun, readSalaryAccount, readSlip, readSubscription, readTransaction,
+  toSalaryRow, resetStore, tagOf,
 } from "../src/admin/views/Finance/store";
 import type {
   Installment, InstallmentPayment, Payslip, Refund, SalaryAccount, SalaryRun, Subscription, Tag,
@@ -393,6 +393,16 @@ has(paySal, "Cash", "...and cash");
 has(paySal, "Receipt", "...the receipt is asked for");
 has(paySal, "Image or PDF", "...and it says what kind of file it takes");
 hasnt(paySal, "Bank reference", "...the bank reference field is gone");
+/* THE ADJUSTMENTS. Two named one-off lines that land on the newest slip, and
+   a summary that must show the month being settled — the open run's month —
+   before anybody presses anything. */
+has(paySal, "Adjustments", "...the adjustments section is on the form");
+has(paySal, "Incentive", "...with an incentive line");
+has(paySal, "Deduction", "...and a deduction line");
+has(paySal, 'aria-label="Incentive name"', "...each with a name of its own");
+has(paySal, "Festival bonus", "...and a placeholder that shows what a name looks like");
+has(paySal, fmtMonth(run("RUN-2026-08").month), "...the summary names the month being settled");
+has(paySal, "Leaving the account", "...and states what leaves the account");
 hasnt(paySal, "ties this to the bank", "...and so is the sentence that explained it");
 
 /* TxnModal takes no seed. It used to, and the money-in branch — the Notice

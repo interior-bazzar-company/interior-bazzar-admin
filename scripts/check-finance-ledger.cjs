@@ -927,6 +927,49 @@ S.resetStore();
   ok("...and it carries the date it closed", !!S.readRun("RUN-2026-08").paidAt, true);
 }
 
+console.log("\nwrites · one-off incentives and deductions land on the newest slip");
+S.resetStore();
+{
+  const PDF = { filename: "receipt.pdf", mime: "application/pdf" };
+  const acct = { accountId: "ACC-HDFC-4021" };
+  const before = S.dueOf(S.toSalaryRow(S.readSalaryAccount("SAL-AC-0011")));
+
+  /* The refusals first, and that they write NOTHING. */
+  ok("a deduction bigger than the month's net is refused",
+    has(S.paySalary("SAL-AC-0011", { via: "bank", ...acct, proof: PDF,
+      deduction: { label: "Advance recovery", amountPaise: before.pendingPaise + 100 } }), "deduction_exceeds"), true);
+  ok("an amount with no name is refused — it prints on the slip",
+    has(S.paySalary("SAL-AC-0011", { via: "bank", ...acct, proof: PDF,
+      incentive: { label: "  ", amountPaise: 500000 } }), "adjustment_label"), true);
+  ok("...and neither refusal wrote anything",
+    S.dueOf(S.toSalaryRow(S.readSalaryAccount("SAL-AC-0011"))).pendingPaise, before.pendingPaise);
+
+  /* The write, with both. */
+  ok("paying with an incentive and a deduction goes through",
+    S.paySalary("SAL-AC-0011", { via: "bank", ...acct, proof: PDF,
+      incentive: { label: "Festival bonus", amountPaise: 100000 },
+      deduction: { label: "Advance recovery", amountPaise: 40000 } }), "");
+  const slip = S.readRun("RUN-2026-08").slips.filter((x) => x.salaryAccountId === "SAL-AC-0011")[0];
+  ok("the incentive is a named earning line on the slip",
+    slip.earnings.filter((e) => e.label === "Festival bonus").map((e) => e.amountPaise), [100000]);
+  ok("the deduction is a named deduction line on it",
+    slip.deductions.filter((e) => e.label === "Advance recovery").map((e) => e.amountPaise), [40000]);
+  ok("the slip's net moved by exactly the difference",
+    slip.netPaise, before.pendingPaise + 100000 - 40000);
+  ok("...and its stored totals still equal its own arrays",
+    [slip.grossPaise, slip.deductionsPaise],
+    [slip.earnings.reduce((n, e) => n + e.amountPaise, 0),
+     slip.deductions.reduce((n, e) => n + e.amountPaise, 0)]);
+  ok("the run total followed the slip",
+    S.readRun("RUN-2026-08").totalNetPaise,
+    S.readRun("RUN-2026-08").slips.reduce((n, x) => n + x.netPaise, 0));
+  ok("the account's event names both lines",
+    (() => { const ev = S.readSalaryAccount("SAL-AC-0011").events[0].note;
+      return ev.indexOf("Festival bonus") >= 0 && ev.indexOf("Advance recovery") >= 0; })(), true);
+  ok("...and states the adjusted figure, not the old pending",
+    S.readSalaryAccount("SAL-AC-0011").events[0].note.indexOf(S.inr(before.pendingPaise + 60000)) >= 0, true);
+}
+
 console.log("\nwrites · every salary payment carries a receipt, whatever the method");
 S.resetStore();
 {

@@ -1907,6 +1907,59 @@ tokens and primitives, not watched.
 
 ---
 
+## 2026-09-01
+
+### Pay-time incentives and deductions, and the payment gets a receipt screen
+
+**Area:** Finance · the Pay dialog (FN-T08b), and the write behind it
+**Files:** `SalaryModals.tsx`, `store.ts`, `finance.css`,
+`scripts/check-finance-ledger.cjs`, `scripts/fn-smoke.tsx`,
+`BACKEND-INTEGRATION.md`
+
+**What changed**
+
+**Adjustments on the payment.** The Pay dialog gains an optional Incentive
+and an optional Deduction — each a name and an amount, because the figure
+prints on the slip and a figure nobody can name is a figure nobody can
+explain at audit. "Leaving the account" moves live as they are typed, by
+the same arithmetic the write does.
+
+**They land on the newest month's slip as named lines** — the incentive an
+earning, the deduction a deduction — with the slip's totals and its run's
+total recomputed in the same write, BEFORE the freeze stamps it. Money
+that left the account but is on no document is exactly what this module
+exists to prevent, so the slip stays the whole story of what was paid.
+Three refusals guard it: a nameless amount, an unclean amount, and a
+deduction that would push the slip below zero — a negative payslip is a
+debt wearing a document's clothes. The refusing dialog shows the sentence;
+the form disables Save the moment the deduction overdraws, with the limit
+stated.
+
+**The dialog becomes the receipt.** On success it stops being a form —
+the money has left, so Cancel would be a lie — and shows *Paid
+successfully*: what left, how many slips froze, and a **Download slip**
+button that opens the newest month's slip document, where Download prints
+it and Save as PDF produces the file. One renderer, one definition of
+what the slip looks like.
+
+**Backend needed**
+
+FN-T08c in the doc: the two optional adjustment objects on the pay write,
+the three refusal codes, the recompute-before-freeze ordering, and the
+event log stating the adjusted figure that actually left.
+
+**Verified**
+
+`check:finance` 341 → 352 — the two refusals write nothing, the lines land
+named on the right slip, net moves by exactly the difference, stored
+totals still equal the slip's own arrays, the run total follows, and the
+event names both lines and the adjusted figure. `fn-smoke` renders the
+adjustments section, both named inputs, and the open run's month in the
+summary. The success screen is reached by a click, which SSR does not
+have — the receipt state and the navigation to the slip need the browser.
+
+---
+
 ## 2026-08-29
 
 ### Users Management audited end to end: 14 logic bugs fixed, journeys unblocked, tint retired, contract corrected
