@@ -192,13 +192,13 @@ export interface SalaryAccount {
    *  `vocabularies.json` so a third value is data rather than a code change. */
   engagement: string;
   joinedAt: string;
-  /** Annual cost to company. Presentational — the slip is built from the
-   *  monthly components, never by dividing this by twelve. */
-  ctcPaise: number;
   monthlyGrossPaise: number;
   earnings: SalaryComponent[];
   deductions: SalaryComponent[];
-  bank: { masked: string; ifsc: string; name: string };
+  /** Where the money goes. `upi` is optional because not everybody has one
+   *  and a blank field is not a missing record. The account number is held
+   *  MASKED — the full number is not this module's to keep. */
+  bank: { masked: string; ifsc: string; name: string; upi?: string };
   pan: string;
   uan: string | null;
   active: boolean;
@@ -250,6 +250,16 @@ export interface Payslip {
   uan: string | null;
   issuedAt: string | null;
   sha256: string | null;
+  /** How it was paid, in the words a person uses: bank transfer, UPI or cash.
+   *  `mode` above is the ledger's own vocabulary (NEFT/UPI/Cash) and stays
+   *  what it was; this is the choice somebody actually made. */
+  via?: string;
+  /** The transfer's evidence. Optional on a slip paid before proofs were asked
+   *  for, and MANDATORY when there is no reference — which is what cash is. */
+  proof?: Proof | null;
+  /** Free text from whoever paid it. Never load-bearing: nothing derives from
+   *  a remark, and no total reads one. */
+  remark?: string;
 }
 
 export interface SalaryRun {

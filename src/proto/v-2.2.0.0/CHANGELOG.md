@@ -6,6 +6,263 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-08-31
 
+### Cost to company is deleted, not hidden — and two layout bugs go with it
+
+**Area:** `#/finance-salaries` → Add a salary account, and the account record
+**Files:** `src/admin/views/Finance/{SalaryModals,SalaryDetail,store,types,finance.css}`,
+`src/content/finance/salaries.json`, `scripts/fn-smoke.tsx`
+
+**What changed**
+
+**`ctcPaise` is gone from the form, the type, the store, the record and the
+seed.** Removing it from the dialog alone would have left a stored figure
+nobody could set, so it went the whole way.
+
+It was worth deleting rather than hiding. It computed **nothing** — the type
+said "presentational", the record page said so twice, and FN-OD-06 already
+said it was not cost to company at all because employer PF and gratuity are
+not modelled. The record carried two separate cautions defending it: a footer
+line ("presentational, and never divided by twelve") and a whole `Notice`
+explaining that CTC ÷ 12 "would produce a figure no component adds up to". **A
+number that has to be defended twice on one screen is a number worth removing**,
+and both cautions went with it. What governs a slip is unchanged and now needs
+no argument: it is built from the typed components and nothing else.
+
+**Two layout faults fixed while in there.**
+`.fin-file` — the receipt picker in the pay dialog — **had no CSS at all**, so
+the button and the filename pill were unstyled inline content. It has a rule
+now, and the filename ellipsises rather than pushing the dialog sideways.
+`.fin-derived` had two rules and is now a proper read-out: a field's height and
+inset, no border, because it is not editable and should not invite a click.
+And **"Joined" was alone in a two-column grid** once CTC left it, leaving an
+empty half that reads as a field somebody forgot to render — it sits beside the
+member picker now.
+
+**Temp data**
+`salaries.json` → `ctcPaise` removed from all 7 accounts, and the `$comment`
+that explained how it was calculated rewritten to say why it is gone.
+
+**Backend needed**
+`SalaryAccount` drops `ctcPaise`. If an offer figure is ever wanted it belongs
+to whatever owns offers, not to a payroll record that cannot compute with it.
+
+**Open decisions**
+`none` new. FN-OD-06 is unchanged and is now only stated where it can be acted
+on — the `i` button on the payroll metric.
+
+**Verified**
+`npx tsc -b` clean · `eslint` clean · `vite build` clean · `check:finance`
+341/341 · `check:finance-render` renders every surface. Its CTC assertion was
+**rewritten rather than deleted**: it now asserts the claim that survived — the
+slip is built from typed components — plus a `hasnt` proving no CTC figure is
+left on the record to misread. All other suites and both Team checks pass.
+**Not checked:** not opened in a browser, and this change is half CSS — the
+`.fin-file` and `.fin-derived` rules are new and unseen.
+
+---
+
+### The salary account picks a team member instead of asking you to describe one
+
+**Area:** `#/finance-salaries` → Add a salary account
+**Files:** `src/admin/views/Finance/{SalaryModals,store,types}.ts(x)`,
+`scripts/check-finance-ledger.cjs`
+
+**What changed**
+
+**Four fields became one choice.** Team member id, Name, Employee code and
+Designation were four things somebody re-typed out of a record that already
+holds them — and the id had to match **by hand**, with the help text admitting
+it: *"type it wrong and this salary points at the wrong person."* The form picks
+a team member now, and the four fields come off that pick. The **employee code
+is derived** (`IB-EMP-041`) rather than typed, because it prints on the payslip
+and two people typing their own conventions produce two formats in one payroll.
+
+A member who already has an account is offered **greyed rather than hidden** —
+somebody looking for them finds them and learns why they cannot be picked,
+instead of concluding the list is broken.
+
+**UPI id** joins the bank block, optional, because not everybody has one and a
+blank field is not a missing record.
+
+**The description came off.** Two standing hints and five field helps are gone;
+the two that carried a real rule — cost-to-company is presentational, and an
+account below the TDS threshold has **no** TDS line rather than a zero one —
+moved behind `i` buttons, which is what `InfoTip` is for. On a revision the
+member is shown read-only, because the person does not change: a wrong one is a
+closed account and a new one, not an edit.
+
+**Temp data**
+`none` new. The picker reads **Team's own seed** (`src/content/team/members.json`)
+— a cross-module read of the same kind as `invoices.json` and `quotations.json`,
+except imported rather than copied, so there is one fixture and not two that
+drift. It becomes `AdminOpsService.users()` in the commit that retires the
+others.
+
+**Backend needed**
+- The picker's list is `GET /admin/team/members` — the team-wide read that does
+  not exist yet, and the same blocker the Team module's Phase B carries.
+- `SalaryAccount.bank.upi` on the account payload.
+
+**Open decisions**
+⚠️ **THE TWO FIXTURES DO NOT JOIN.** Finance's seven salary accounts carry
+memberIds 1-9; Team's members are 41-86. They were written independently, so
+`memberId` on every existing salary account resolves to **nobody** — the join
+the type describes ("`memberId` joins `AdminUserRow.id`") is currently
+decorative. New accounts join correctly; the historical ones do not. Fixing it
+means deciding whose cast is real, which is a product question and not mine to
+answer, so it is asserted instead: a check named `KNOWN:` fails the day somebody
+reconciles them, which is exactly when it should be revisited.
+
+**Verified**
+`npx tsc -b` clean · `eslint` clean · `vite build` clean · **`check:finance`
+341/341**, up from 334: 7 new assertions over the picker — it offers the team
+and only active members, every option carries the three fields the form stopped
+asking for, the code is derived and deterministic, an option knows whether that
+member is taken, and the zero-join defect above is pinned. `check:finance-render`
+renders every surface. All other suites and both Team checks pass.
+**Not checked:** not opened in a browser. The picker's greyed-out state and the
+`i` panels are verified through the store and a static render, not by clicking.
+
+---
+
+### The receipt replaces the reference, and the pay dialog stops explaining itself
+
+**Area:** `#/finance-salaries` → Pay
+**Files:** `src/admin/views/Finance/{SalaryModals,store,types}.ts(x)`,
+`scripts/{check-finance-ledger.cjs,fn-smoke.tsx}`
+
+**What changed**
+
+**The bank reference field is gone.** It was a UTR typed from memory on a
+screen where nothing checked it against a statement, and a reference nobody
+verifies is a reference nobody should trust. **The attachment replaced it, for
+every method** — the rule stopped varying by how the money moved and became one
+rule: a salary payment carries a receipt, or it is not recorded. A payment with
+no evidence at all is a claim, which is the one thing this module refuses to
+store.
+
+**The receipt is a real file now**, not a filename somebody types.
+`<input type="file" accept="image/*,application/pdf">`, the same pattern the
+Invoices proof upload already uses, with the chosen file shown as a pill and
+the wrong file type refused by name. Images and PDFs, because a receipt is
+either a photograph of one or a document, and a `.txt` is neither.
+
+**Three standing notes came off the dialog.** They said the slips freeze, that
+this pays one person, and that the reference ties the payment to the bank — the
+first is true of every write in the module and belongs in its documentation
+rather than above every button, the second is the dialog's own title, and the
+third described a field that no longer exists. What is left is **conditional
+only**: the Super Admin notice, which explains a disabled button, and the
+arrears warning, which appears because something is true of this payment. Field
+help is down to four words where it survived at all.
+
+**Temp data**
+`none`. `PaySalaryInput` loses `reference` and gains a required `proof`.
+
+**Backend needed**
+- `POST /admin/finance/salaries/{accountId}/pay` takes `{ via, accountId,
+  proof, remark }` — **no reference**. The server must refuse a payment with no
+  proof, and must refuse a proof that is not an image or a PDF.
+- The proof is a real upload against the S3 presigned-PUT path the panel
+  already has (`POST /common/get-upload-url/`), **not** a filename. ⚠️ It must
+  be a PRIVATE object — every upload in that path today returns a public URL,
+  and a salary receipt is the last thing that should carry one (TM-R-04 in the
+  Team plan applies here word for word).
+
+**Open decisions**
+Two, both consequences of dropping the reference and both worth stating before
+somebody reads them as defects:
+1. **Salary payments can no longer be matched to an imported statement.** They
+   never could be for cash; now they cannot be for transfers either. The
+   receipt is what a person checks against the bank by eye.
+2. **"Oldest first" is no longer visible on the slips.** Arrears used to carry
+   `-01` and `-02` suffixes on the reference, which is what made the order
+   readable on the record. With nothing to suffix, both slips take the same
+   instant and the only trace is the event note — the order became a claim in a
+   sentence rather than a fact on a document.
+
+**Verified**
+`npx tsc -b` clean · `eslint` clean · `vite build` clean · **`check:finance`
+334/334**: the evidence section was rewritten for the new single rule — all
+three methods refused without a receipt, a `.txt` refused by name, a
+spreadsheet rejected and a PDF and both image types accepted, plus a paid slip
+carrying **no reference at all**, its receipt, both vocabularies, its remark and
+its freeze. The arrears ordering assertion was **rewritten rather than deleted**
+to assert the event note, with a comment recording that the suffixes it used to
+check are gone with the field. `check:finance-render` renders every surface; its
+four assertions over the removed notes now assert the form instead — including
+two `hasnt` checks that the reference field and its sentence are really gone.
+All other suites and both Team checks pass.
+**Not checked:** not opened in a browser. **The file picker is unexercised** —
+the harness renders statically, so the accept filter, the pill and the
+wrong-type refusal are verified in the store and not by choosing a file.
+
+---
+
+### How a salary was paid decides what evidence it has to carry
+
+**Area:** `#/finance-salaries` → Pay — the transfer fieldset
+**Files:** `src/admin/views/Finance/{SalaryModals,store,types}.ts(x)`,
+`scripts/check-finance-ledger.cjs`
+
+**What changed**
+
+The dialog asked for a bank reference and nothing else, which is the wrong
+question when the money went out as cash. **Payment via** is now a dropdown —
+**Bank transfer · UPI · Cash** — and it decides what the form asks for next:
+
+- **Bank transfer and UPI** keep the bank reference, mandatory as before, and
+  keep the account picker.
+- **Cash hides the reference entirely** and says why: there is no UTR to tie it
+  to a statement. The account picker goes with it, because cash leaves the cash
+  account and there is nothing to choose.
+
+**One of the two is always required.** A transfer is tied to a statement by its
+reference; cash cannot be, so the **receipt** stands in its place and is
+mandatory there. A payment carrying neither is a sentence with nothing behind
+it — the same rule this module applies to every other row. **A cash slip stores
+an empty reference rather than an invented one**: putting `CASH-0011-08` in the
+column a bank statement will never contain is worse than a blank that says so.
+
+**Payment proof** and **Remark** are both new. The proof is a filename, the
+convention `BillModal` already uses and says out loud — no upload in this
+prototype, the filename is the whole record that a proof exists. The remark is
+optional and deliberately load-bearing on nothing: no total reads one.
+
+**Temp data**
+`none`. `Payslip` gains three optional fields — `via`, `proof`, `remark` —
+optional so the 19 seeded slips, which were paid before proofs were asked for,
+stay valid rather than being back-filled with a claim nobody made.
+
+**Backend needed**
+- `POST /admin/finance/salaries/{accountId}/pay` takes `{ via, reference,
+  accountId, proofFilename, remark }`. **The server must enforce the
+  either/or**, not just the client: a reference for bank and UPI, a proof for
+  cash, and never both absent.
+- `mode` keeps the ledger's own vocabulary (NEFT/UPI/Cash); `via` is the choice
+  somebody made. Two fields because they answer different questions, and the
+  reconciliation matcher reads `mode`.
+
+**Open decisions**
+New: **cash payments cannot be reconciled**, by construction — there is no bank
+line to match. They are recorded and they are evidenced, and the statement
+import will never see them. That is correct and it is worth saying before
+somebody reads a reconciliation gap as a defect.
+
+**Verified**
+`npx tsc -b` clean · `eslint` clean · `vite build` clean · **`check:finance`
+330/330**, up from 318: 12 new assertions over the evidence rule — bank and UPI
+both refused without a reference, the refusal naming the method, cash refused
+without a receipt, **cash NOT asked for a reference it cannot have**, an unknown
+method refused, and a paid cash slip carrying an empty reference, its receipt,
+both vocabularies, the remark, and still its freeze. The suite's seven existing
+`paySalary` call sites were migrated to the new input shape. All other suites
+and both Team checks pass.
+**Not checked:** not opened in a browser — the dropdown's three states are
+verified through the store, not by clicking between them.
+
+---
+
 ### Salaries A/C is one table, and salaries are paid person by person
 
 **Area:** `#/finance-salaries` — the whole face, and the topbar above it

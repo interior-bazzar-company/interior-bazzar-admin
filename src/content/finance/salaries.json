@@ -1,7 +1,7 @@
 {
   "$comment": "PLACEHOLDER RECORDS — salary accounts and monthly payroll runs for Feelsafe Technology India Private Limited (brand \"Interior bazzar\", New Delhi, GSTIN 07AAFCF1234A1ZK, CIN U62090DL2024PTC434514). Replaced by GET /admin/finance/salary-accounts and GET /admin/finance/salary-runs. A salary account is Finance's record of what one person is paid; the PERSON is Team's — `memberId` joins `AdminUserRow.id` on the live Team endpoint, and this module never invents a member. `memberName` is a denormalised copy of the name as it stood when the record was written, kept for one reason: a slip issued in June must still name the person it paid even if Team renames them in September. Read the name for display from Team; read it from here on an issued slip. Salaries are always paid from ACC-HDFC-4021, the HDFC current account — every slip in this seed carries that accountId and no other. No slip carries a bankLineId: none of these debits is on an imported statement here, and an empty match would read as a made one. Integer paise everywhere; asOf 2026-08-25T09:00:00+05:30, so August is still running and nothing is dated after the 25th.",
   "generatedAt": "2026-08-25T09:00:00+05:30",
-  "$comment_accounts": "Seven accounts — a director, a sales head, three sales executives, a designer and an operations executive — one of which is closed. Vikram Chauhan (SAL-AC-0018) left on 30 Jun 2026 and reads active:false: he must render as an account with a history and no payable slip, which is a different thing from a deleted row. `monthlyGrossPaise` is exactly the sum of `earnings`, and the slip is built from these monthly components — never by dividing `ctcPaise` by twelve. `ctcPaise` is the annual cost to company, twelve months of gross plus the employer's ₹21,600 provident fund share, and it is presentational: nothing is computed from it. Earnings follow the ordinary Indian split — Basic at 45% of gross, HRA at half of Basic, the remainder as Special allowance, with a conveyance or performance allowance where the contract has one. Deductions: provident fund is 12% of Basic restricted to the ₹15,000 statutory wage ceiling, so every account contributes ₹1,800 — the ceiling varies, not the salary; professional tax is Delhi's flat ₹200; TDS exists only on the three accounts that actually cross the threshold, and on the others the component is ABSENT rather than zero, because a zero TDS line is a claim that tax was computed.",
+  "$comment_accounts": "Seven accounts — a director, a sales head, three sales executives, a designer and an operations executive — one of which is closed. Vikram Chauhan (SAL-AC-0018) left on 30 Jun 2026 and reads active:false: he must render as an account with a history and no payable slip, which is a different thing from a deleted row. `monthlyGrossPaise` is exactly the sum of `earnings`, and the slip is built from these monthly components and nothing else. `ctcPaise` was here and is GONE (2026-08-31): it was presentational, nothing computed from it, and it needed two cautions on the record page saying it was not really cost to company — FN-OD-06 says employer PF and gratuity are not modelled, so the figure could only ever mislead. A number that has to be defended twice is a number worth deleting. Earnings follow the ordinary Indian split — Basic at 45% of gross, HRA at half of Basic, the remainder as Special allowance, with a conveyance or performance allowance where the contract has one. Deductions: provident fund is 12% of Basic restricted to the ₹15,000 statutory wage ceiling, so every account contributes ₹1,800 — the ceiling varies, not the salary; professional tax is Delhi's flat ₹200; TDS exists only on the three accounts that actually cross the threshold, and on the others the component is ABSENT rather than zero, because a zero TDS line is a claim that tax was computed.",
   "accounts": [
     {
       "salaryAccountId": "SAL-AC-0011",
@@ -11,7 +11,6 @@
       "designation": "Founder & Director",
       "engagement": "permanent",
       "joinedAt": "2024-01-15",
-      "ctcPaise": 302160000,
       "monthlyGrossPaise": 25000000,
       "earnings": [
         {
@@ -76,7 +75,6 @@
       "designation": "Head of Sales",
       "engagement": "permanent",
       "joinedAt": "2024-06-03",
-      "ctcPaise": 146160000,
       "monthlyGrossPaise": 12000000,
       "earnings": [
         {
@@ -154,7 +152,6 @@
       "designation": "Sales Executive",
       "engagement": "payroll",
       "joinedAt": "2025-07-21",
-      "ctcPaise": 64560000,
       "monthlyGrossPaise": 5200000,
       "earnings": [
         {
@@ -222,7 +219,6 @@
       "designation": "Sales Executive",
       "engagement": "permanent",
       "joinedAt": "2025-09-08",
-      "ctcPaise": 59760000,
       "monthlyGrossPaise": 4800000,
       "earnings": [
         {
@@ -287,7 +283,6 @@
       "designation": "Senior Interior Designer",
       "engagement": "permanent",
       "joinedAt": "2024-11-11",
-      "ctcPaise": 80160000,
       "monthlyGrossPaise": 6500000,
       "earnings": [
         {
@@ -360,7 +355,6 @@
       "designation": "Operations & Support Executive",
       "engagement": "payroll",
       "joinedAt": "2026-03-02",
-      "ctcPaise": 47760000,
       "monthlyGrossPaise": 3800000,
       "earnings": [
         {
@@ -420,7 +414,6 @@
       "designation": "Sales Executive",
       "engagement": "payroll",
       "joinedAt": "2025-02-17",
-      "ctcPaise": 56160000,
       "monthlyGrossPaise": 4500000,
       "earnings": [
         {

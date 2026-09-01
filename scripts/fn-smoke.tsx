@@ -197,7 +197,14 @@ const sal = page("salaries · the face", "/finance-salaries");
 has(sal, "Outstanding now", "...the face totals what is owed right now");
 has(sal, ">Unpaid<", "...and a person who has not been paid says so on their row");
 has(sal, "In arrears", "...with a month older than the current one called out separately");
-has(sal, "net paid to people", "...payroll says which figure it is, so nobody reads it as cost to company");
+/* THE CAUTION MOVED, IT DID NOT GO. "Payroll here is net paid to people" was a
+   standing paragraph on the face and it was removed with the rest of the
+   description. What it protected — that nobody reads this figure as cost to
+   company — is FN-OD-06 and still matters, so it now lives on the metric's own
+   i button, one press from the number it qualifies. A static render cannot open
+   that panel, so what is asserted is that the button is THERE: the caution is
+   reachable, and the day the tip is dropped from the tile this fails. */
+has(sal, "About Salary cost", "...the payroll figure still carries its caution, one press away");
 const salEmpty = check("salaries · a filter that matches nothing", () => at("/finance-salaries?q=zzzznothing"));
 has(salEmpty, "Nobody matches those filters", "...an empty payroll says the filter is why");
 has(salEmpty, "for the whole payroll, before any filter", "...and that the strip above it was not filtered");
@@ -249,8 +256,14 @@ const history = page("its history", "/finance/SUB-0101?tab=history");
 has(history, "append-only", "...history is append-only, so nothing on it was rewritten");
 
 const salAcc = page("a salary account", "/finance-salaries/SAL-AC-0011");
-has(salAcc, "Cost to company is presentational and it is not the salary",
-  "...CTC is not divided by twelve to make a slip");
+/* THE CTC CAUTION IS GONE BECAUSE THE FIGURE IS. It used to be asserted here
+   that the record said cost to company must never be divided by twelve — a
+   sentence that existed only to defend a number nothing computed and that
+   FN-OD-06 already said was not cost to company. The field went; the caution
+   went with it. What is asserted instead is the claim that survived, and the
+   one that actually governs a slip: it is built from the typed components. */
+has(salAcc, "Typed, never derived", "...the slip is built from the components and nothing else");
+hasnt(salAcc, "Cost to company", "...and there is no CTC figure left to misread");
 const paidSlip = page("a paid payslip", "/finance-salaries/SLIP-2026-07-0011");
 has(paidSlip, "SLIP-2026-07-0011", "...a paid slip carries its number");
 has(paidSlip, "Document hash (SHA-256): ", "...and its hash, because somebody has to be able to rely on it");
@@ -368,10 +381,19 @@ has(lop, "does not shrink because somebody was away", "...and it says why a flat
    has something to pay. */
 const paySal = check("pay a salary", () => modal(
   <PaySalaryModal row={toSalaryRow(account("SAL-AC-0011"))} onClose={noop} onDone={noop} />));
-has(paySal, "freeze in this write", "...the months being paid freeze in the same write");
-has(paySal, "This pays one person", "...and it pays one person, not a run");
-has(paySal, "closes itself once its last slip is paid", "...a run is a consequence now, not a button");
-has(paySal, "The reference is what ties this to the bank", "...the reference is still mandatory");
+/* THE STANDING DESCRIPTION IS GONE from this dialog — three notes that said
+   the slips freeze, that it pays one person, and that a reference ties the
+   payment to the bank. The first belongs in documentation, the second is the
+   dialog's own title, and the third described a field that no longer exists.
+   What is asserted now is the FORM: the method, the receipt that replaced the
+   reference, and the absence of the reference itself. */
+has(paySal, "Payment via", "...the method is a choice on the form");
+has(paySal, "Bank transfer", "...with bank transfer among the options");
+has(paySal, "Cash", "...and cash");
+has(paySal, "Receipt", "...the receipt is asked for");
+has(paySal, "Image or PDF", "...and it says what kind of file it takes");
+hasnt(paySal, "Bank reference", "...the bank reference field is gone");
+hasnt(paySal, "ties this to the bank", "...and so is the sentence that explained it");
 
 /* TxnModal takes no seed. It used to, and the money-in branch — the Notice
    naming the three permitted non-revenue credit kinds — now lives behind local

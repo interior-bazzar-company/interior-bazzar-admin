@@ -9,24 +9,28 @@
      OpenRunModal        one month, one slip per active account, stated in full
                          before the button is pressed.
      LopModal            loss of pay on an open run's slip, pro-rated live.
-     PayRunModal         Super Admin. The money left the bank, so every slip in
-                         the run is stamped and frozen in the same write.
+     PaySalaryModal      Super Admin. The money left the account for ONE
+                         person — every month they were owed, oldest first,
+                         each slip stamped and frozen in the same write. It
+                         carries no bank reference: the attachment is the
+                         evidence, and it is mandatory.
 
    Every one of them calls a store function and renders the refusal it returns
    INSIDE the dialog. A dialog never closes on a failed write: the sentence the
    refusal contradicts is still on screen, which is the only way a person can
    see what they got wrong.
    ============================================================================= */
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Icon, Notice } from "../../ui";
 import { Check, Role } from "./bits";
-import { Cancel, Dlg, Field, Fs, Pick, RupeeInput, toPaise } from "./dialog";
+import InfoTip from "./InfoTip";
+import { Cancel, Dlg, Field, Fs, RupeeInput, toPaise } from "./dialog";
 import type { Done } from "./dialog";
 import {
   daysInMonth,
-  ACCOUNTS, closeSalaryAccount, dueOf, fmtMonth, inr, isSuperAdmin, monthOf, openRun,
-  openSalaryRun, paySalary, setLop, superAdminOnly, todayIso, upsertSalaryAccount,
-  useRuns, useSalaryRows,
+  ACCOUNTS, PAY_VIA, closeSalaryAccount, dueOf, fmtMonth, inr, isSuperAdmin, monthOf,
+  openRun, openSalaryRun, paySalary, proofAccepted, salaryMemberOptions, setLop,
+  superAdminOnly, todayIso, upsertSalaryAccount, useRuns, useSalaryRows,
 } from "./store";
 import type { Payslip, SalaryAccount, SalaryComponent, SalaryRow, SalaryRun } from "./store";
 
@@ -127,7 +131,6 @@ export function SalaryAccountModal({ account, onClose, onDone }: {
   const [code, setCode] = useState(a ? a.employeeCode : "");
   const [designation, setDesignation] = useState(a ? a.designation : "");
   const [joinedAt, setJoinedAt] = useState(a ? a.joinedAt : todayIso());
-  const [ctc, setCtc] = useState(a ? rupeesOf(a.ctcPaise) : "");
   const [masked, setMasked] = useState(a ? a.bank.masked : "");
   const [ifsc, setIfsc] = useState(a ? a.bank.ifsc : "");
   const [bankName, setBankName] = useState(a ? a.bank.name : "");
@@ -136,7 +139,23 @@ export function SalaryAccountModal({ account, onClose, onDone }: {
   const [earn, setEarn] = useState<CompRow[]>(
     a ? toRows(a.earnings) : [{ ...blankRow(), key: "basic", label: "Basic" }]);
   const [ded, setDed] = useState<CompRow[]>(a ? toRows(a.deductions) : []);
+  const [upi, setUpi] = useState(a ? a.bank.upi || "" : "");
   const [err, setErr] = useState<string | null>(null);
+
+  /* Read once per render: the list changes when an account is opened, and a
+     picker that still offers somebody who now has one is a picker that lies. */
+  const members = salaryMemberOptions();
+  /* ONE CHOICE, FOUR FIELDS. The code is derived rather than typed — it prints
+     on the payslip, and two people typing their own conventions produce two
+     formats in one payroll. */
+  const pickMember = (id: string) => {
+    const m = members.filter((x) => String(x.memberId) === id)[0];
+    setMemberId(id);
+    setMemberName(m ? m.name : "");
+    setDesignation(m ? m.designation : "");
+    setCode(m ? m.employeeCode : "");
+    setErr(null);
+  };
 
   const gross = liveSum(earn);
   const dedTotal = liveSum(ded);
@@ -146,16 +165,16 @@ export function SalaryAccountModal({ account, onClose, onDone }: {
     if (e.bad) return setErr(e.bad);
     const d = compile(ded, "deduction");
     if (d.bad) return setErr(d.bad);
-    const ctcPaise = toPaise(ctc);
-    if (ctcPaise === null)
-      return setErr("Cost to company is a whole amount. It is presentational and it still has to be a figure somebody agreed to.");
     const id = Number(memberId);
     if (!Number.isInteger(id) || id <= 0)
       return setErr("The Team member id is a whole number above zero. It is the join to the Team record and nothing else stands in for it.");
     const r = upsertSalaryAccount({
       memberId: id, memberName, employeeCode: code.trim(), designation: designation.trim(),
-      joinedAt, ctcPaise, earnings: e.list, deductions: d.list,
-      bank: { masked: masked.trim(), ifsc: ifsc.trim().toUpperCase(), name: bankName.trim() },
+      joinedAt, earnings: e.list, deductions: d.list,
+      bank: {
+        masked: masked.trim(), ifsc: ifsc.trim().toUpperCase(), name: bankName.trim(),
+        upi: upi.trim() || undefined,
+      },
       pan: pan.trim().toUpperCase(), uan: uan.trim() || null,
     }, a ? a.salaryAccountId : undefined);
     if (r.error) return setErr(r.error);
@@ -186,52 +205,54 @@ export function SalaryAccountModal({ account, onClose, onDone }: {
         </>} />
       ) : null}
 
-      <Fs legend="Who this belongs to" req
-        hint="The account is Finance's. The person is Team's, and this module never invents one.">
+      {/* PICKED, NOT TYPED. The id, the name, the designation and the code
+          were four fields somebody re-entered from a record that already holds
+          them, and the id had to match by hand — type it wrong and the salary
+          points at the wrong person. One choice sets all four. */}
+      <Fs legend="Who this belongs to" req>
         <div className="fin-f2">
-          <Field label="Team member id"
-            help={<>The join to the Team record — <span className="mono">AdminUserRow.id</span>. The Team
-              endpoint is live and may not be reachable from here, so the id is typed rather than
-              picked; type it wrong and this salary points at the wrong person.</>}>
-            <input className="inp tnum" inputMode="numeric" value={memberId} placeholder="7"
-              onChange={(e) => setMemberId(e.target.value.replace(/[^0-9]/g, ""))} />
-          </Field>
-          <Field label="Name" help="As it should read on the payslip they are handed.">
-            <input className="inp" value={memberName} placeholder="Anjali Deshpande"
-              onChange={(e) => setMemberName(e.target.value)} />
-          </Field>
-          <Field label="Employee code">
-            <input className="inp mono" value={code} placeholder="IB-EMP-007"
-              onChange={(e) => setCode(e.target.value)} />
-          </Field>
-          <Field label="Designation">
-            <input className="inp" value={designation} placeholder="Head of Sales"
-              onChange={(e) => setDesignation(e.target.value)} />
-          </Field>
+        <Field label="Team member">
+          {a ? (
+            <div className="fin-derived">
+              <b>{a.memberName}</b> · {a.designation} · <span className="mono">{a.employeeCode}</span>
+              <div className="fin-fine">The person does not change on a revision. Close the account and open another if it is the wrong one.</div>
+            </div>
+          ) : (
+            <div className="selectbox">
+              <select value={memberId} onChange={(e) => pickMember(e.target.value)}>
+                <option value="">Pick a team member…</option>
+                {members.map((m) => (
+                  <option key={m.memberId} value={String(m.memberId)} disabled={m.taken}>
+                    {m.name} · {m.designation}{m.taken ? " — already has an account" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </Field>
+          {/* Beside the picker rather than under it. Alone in a two-column row
+              it left an empty half — the kind of gap that reads as a field
+              somebody forgot to render. */}
           <Field label="Joined">
             <input type="date" className="inp" value={joinedAt} onChange={(e) => setJoinedAt(e.target.value)} />
-          </Field>
-          <Field label="Cost to company, a year"
-            help="Presentational. The slip is built from the monthly components below, never from this figure divided by twelve.">
-            <RupeeInput value={ctc} onChange={setCtc} placeholder="1461600" />
           </Field>
         </div>
       </Fs>
 
-      <Fs legend="Earnings" req
-        hint="Every line prints on the slip under its own name. Gross is their sum.">
+      <Fs legend="Earnings" req>
         <CompEditor rows={earn} onRows={setEarn} addLabel="Add an earning" />
       </Fs>
 
-      <Fs legend="Deductions"
-        hint="What comes off the gross. An account below the TDS threshold has no TDS line — an absent component, not a zero one.">
+      <Fs legend={<>Deductions
+        <InfoTip label="deductions"
+          intro="What comes off the gross. An account below the TDS threshold has no TDS line at all — an absent component, not a zero one, because a zero implies somebody worked it out." />
+      </>}>
         <CompEditor rows={ded} onRows={setDed} addLabel="Add a deduction" />
       </Fs>
 
       <Totals gross={gross} ded={dedTotal} />
 
-      <Fs legend="Where it is paid, and the statutory identifiers"
-        hint="These print on the slip. The account number is held masked; the full number is not this module's to keep.">
+      <Fs legend="Where it is paid">
         <div className="fin-f2">
           <Field label="Bank account, masked">
             <input className="inp mono" value={masked} placeholder="HDFC ••••2276"
@@ -244,6 +265,10 @@ export function SalaryAccountModal({ account, onClose, onDone }: {
           <Field label="Bank">
             <input className="inp" value={bankName} placeholder="HDFC Bank"
               onChange={(e) => setBankName(e.target.value)} />
+          </Field>
+          <Field label="UPI id">
+            <input className="inp mono" value={upi} placeholder="anjali@okhdfcbank"
+              onChange={(e) => setUpi(e.target.value)} />
           </Field>
           <Field label="PAN">
             <input className="inp mono" value={pan} placeholder="BKQPD4417L"
@@ -493,13 +518,21 @@ export function LopModal({ slip, onClose, onDone }: {
 export function PaySalaryModal({ row, onClose, onDone }: {
   row: SalaryRow; onClose: () => void; onDone: Done;
 }) {
-  const [reference, setReference] = useState("");
+  const [via, setVia] = useState(PAY_VIA[0].key);
+  const [proof, setProof] = useState<{ filename: string; mime: string; bytes: number } | null>(null);
+  const [remark, setRemark] = useState("");
   const [accountId, setAccountId] = useState(
     (ACCOUNTS.filter((a) => a.active && a.type === "bank")[0] || ACCOUNTS[0]).accountId);
   const [err, setErr] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
   /* "" when this session may do it. Never used to hide the button — a person
      who cannot see the action cannot ask for it either. */
   const gate = superAdminOnly("Paying a salary");
+  /* Cash leaves the cash account and there is nothing to choose, so the picker
+     is not shown rather than shown with one option. */
+  const cashAccount = (ACCOUNTS.filter((a) => a.active && a.type === "cash")[0]
+    || ACCOUNTS.filter((a) => a.active)[0]).accountId;
+  const payingFrom = via === "cash" ? cashAccount : accountId;
   const d = dueOf(row);
   /* Oldest first, because that is the order the write pays them in and a
      summary that lists them the other way describes a different transfer. */
@@ -511,9 +544,11 @@ export function PaySalaryModal({ row, onClose, onDone }: {
       onClose={onClose} err={err}
       footer={<>
         <Cancel onClose={onClose} />
-        <button className="btn pri" disabled={!!gate || !reference.trim()} title={gate || undefined}
+        <button className="btn pri" disabled={!!gate || !proof} title={gate || undefined}
           onClick={() => {
-            const e = paySalary(row.a.salaryAccountId, reference, accountId);
+            const e = paySalary(row.a.salaryAccountId, {
+              via, accountId: payingFrom, proof: proof || { filename: "", mime: "" }, remark,
+            });
             if (e) return setErr(e);
             onDone(inr(d.pendingPaise) + " paid to " + row.a.memberName + " · "
               + months.length + " month" + (months.length === 1 ? "" : "s")
@@ -540,32 +575,66 @@ export function PaySalaryModal({ row, onClose, onDone }: {
         </>} />
       ) : null}
 
-      <div className="fin-chks">
-        <Check ok>
-          <b>The slips for these months freeze in this write.</b> Each takes its paid date, its
-          reference and its hash together, and nothing can rewrite one afterwards.
-        </Check>
-        <Check ok>
-          <b>This pays one person.</b> Everybody else's months are untouched — a salary run closes
-          itself once its last slip is paid, and nobody marks it.
-        </Check>
-        <Check warn>
-          <b>The reference is what ties this to the bank.</b>{months.length > 1
-            ? " Each month carries it with its own two-digit suffix, so one line on the statement resolves to a named month."
-            : " It must not already exist anywhere in the ledger."}
-        </Check>
-      </div>
+      {/* THE THREE STANDING NOTES THAT USED TO SIT HERE ARE GONE. They said
+          the slips freeze, that this pays one person, and that the reference
+          ties the payment to the bank. The first is true of every write in
+          this module and belongs in its documentation, not above every
+          button; the second is said by the dialog's own title; the third
+          described a field that no longer exists. What is left are the two
+          notices below, and both are CONDITIONAL — they appear because
+          something is true of this payment, not because the screen has room. */}
 
-      <Fs legend="The transfer" req hint="Recorded because the money moved, not to say that it should.">
-        <Field label="Bank reference"
-          help="The UTR or batch reference on the transfer. It must not already exist anywhere in the ledger.">
-          <input className="inp mono" value={reference} autoFocus placeholder="SAL0831AUG"
-            onChange={(e) => setReference(e.target.value)} />
+      <Fs legend="The transfer" req>
+        <Field label="Payment via">
+          <div className="selectbox">
+            <select value={via} onChange={(e) => { setVia(e.target.value); setErr(null); }}>
+              {PAY_VIA.map((v) => <option key={v.key} value={v.key}>{v.label}</option>)}
+            </select>
+          </div>
         </Field>
-        <Field label="Paid from">
-          <Pick value={accountId} onChange={setAccountId}
-            options={ACCOUNTS.filter((a) => a.active)
-              .map((a) => ({ key: a.accountId, label: a.masked, help: a.name }))} />
+
+        {via === "cash" ? null : (
+          <Field label="Paid from">
+            <div className="selectbox">
+              <select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+                {ACCOUNTS.filter((a) => a.active).map((a) => (
+                  <option key={a.accountId} value={a.accountId}>{a.masked} · {a.name}</option>
+                ))}
+              </select>
+            </div>
+          </Field>
+        )}
+
+        {/* THE ONLY EVIDENCE THIS PAYMENT HAS, now the reference field is gone,
+            so it is mandatory and it is a real file rather than a typed name. */}
+        <Field label="Receipt" help="Image or PDF.">
+          <div className="fin-file">
+            <button type="button" className="btn sm" onClick={() => fileRef.current?.click()}>
+              <Icon name="plus" size="sm" />{proof ? "Replace" : "Attach receipt"}
+            </button>
+            <input ref={fileRef} type="file" accept="image/*,application/pdf" hidden
+              onChange={(e) => {
+                const f = e.target.files && e.target.files[0];
+                if (!f) return;
+                if (!proofAccepted(f.type)) {
+                  setProof(null);
+                  setErr(f.name + " is neither an image nor a PDF.");
+                  return;
+                }
+                setErr(null);
+                setProof({ filename: f.name, mime: f.type, bytes: f.size });
+              }} />
+            {proof
+              ? <span className="pill ok xs" title={proof.filename}>
+                <Icon name="check" size="sm" />{proof.filename}
+              </span>
+              : <span className="faint">nothing attached yet</span>}
+          </div>
+        </Field>
+
+        <Field label="Remark" help="Optional.">
+          <input className="inp" value={remark} placeholder="Paid a day early — bank holiday on the 1st"
+            onChange={(e) => setRemark(e.target.value)} />
         </Field>
       </Fs>
 

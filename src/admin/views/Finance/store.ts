@@ -32,6 +32,7 @@ import txnDoc from "../../../content/finance/transactions.json";
 import refundsDoc from "../../../content/finance/refunds.json";
 import invoicesDoc from "../../../content/finance/invoices.json";
 import quotationsDoc from "../../../content/finance/quotations.json";
+import teamMembersDoc from "../../../content/team/members.json";
 import usersDoc from "../../../content/users/users.json";
 import bankDoc from "../../../content/finance/bank.json";
 import vocabDoc from "../../../content/finance/vocabularies.json";
@@ -437,6 +438,80 @@ export const ENGAGEMENTS = [
   { key: "permanent", label: "Permanent" },
   { key: "payroll", label: "Payroll" },
 ];
+
+/* ================================================= who a salary is for ===
+   THE PERSON BELONGS TO TEAM. A salary account points at a member and never
+   invents one, so the account form picks from the team rather than asking
+   somebody to type a name, a designation and an id that has to match.
+
+   THIS READS TEAM'S OWN SEED, which is a cross-module read of exactly the kind
+   `invoices.json` and `quotations.json` already are — the difference is that
+   this one is not copied here, it is imported, so there is one fixture and not
+   two that drift. It becomes `AdminOpsService.users()` in the same commit that
+   retires those two.
+
+   ⚠ THE TWO FIXTURES DO NOT JOIN TODAY. Finance's seeded salary accounts carry
+   memberIds 1-9 and Team's members are 41-86: different casts, written
+   independently, so `memberId` on every existing account resolves to nobody.
+   The picker below is correct and new accounts join properly; the seven
+   historical ones do not, and that is a seed defect rather than a code one.
+   Fixing it means deciding whose cast is real, which is a product question. */
+
+export interface SalaryMemberOption {
+  memberId: number;
+  name: string;
+  designation: string;
+  /** Already has a salary account — offered greyed rather than hidden, so
+   *  somebody looking for a person finds them and learns why they cannot be
+   *  picked, instead of concluding the list is broken. */
+  taken: boolean;
+  employeeCode: string;
+}
+
+/** `IB-EMP-041`. Derived from the member id rather than typed: it prints on
+ *  the payslip, and two people typing their own conventions produce two
+ *  formats in one payroll. Deterministic, so the same person always gets the
+ *  same code. */
+export const employeeCodeOf = (memberId: number | string) =>
+  "IB-EMP-" + String(memberId).padStart(3, "0");
+
+export function salaryMemberOptions(): SalaryMemberOption[] {
+  const taken = new Set(snap.salaryAccounts.map((a) => String(a.memberId)));
+  return (teamMembersDoc.members as { memberId: string; name: string; designation: string; status: string }[])
+    .filter((m) => m.status === "active")
+    .map((m) => ({
+      memberId: Number(m.memberId),
+      name: m.name,
+      designation: m.designation,
+      taken: taken.has(m.memberId),
+      employeeCode: employeeCodeOf(m.memberId),
+    }));
+}
+
+/** HOW A SALARY WAS PAID, in the words somebody says out loud. `mode` is the
+ *  ledger's own vocabulary and is what gets stored beside it. */
+export const PAY_VIA = [
+  { key: "bank", label: "Bank transfer", mode: "NEFT" },
+  { key: "upi", label: "UPI", mode: "UPI" },
+  { key: "cash", label: "Cash", mode: "Cash" },
+];
+export const payViaMeta = (k: string) => PAY_VIA.filter((v) => v.key === k)[0] || null;
+
+/** THE PROOF IS THE EVIDENCE, for every method. A salary payment carries no
+ *  bank reference any more: the field was removed on 2026-08-31 because it was
+ *  a UTR typed from memory on a screen where nothing checked it against a
+ *  statement, and a reference nobody verifies is a reference nobody should
+ *  trust. The attachment replaced it, and it is mandatory — a payment with no
+ *  evidence at all is a claim, which is the one thing this module refuses to
+ *  store.
+ *
+ *  CONSEQUENCE, stated because it is easy to read as a defect later: salary
+ *  payments cannot be auto-matched to an imported statement. They never could
+ *  be for cash, and now they cannot be for transfers either. The proof is what
+ *  a person checks against the bank by eye. */
+export const PROOF_TYPES = ["image/", "application/pdf"];
+export const proofAccepted = (mime: string) =>
+  PROOF_TYPES.some((t) => (mime || "").toLowerCase().startsWith(t));
 export const engagementMeta = (k: string) => ENGAGEMENTS.filter((e) => e.key === k)[0] || null;
 
 export function applySalaryFilters(rows: SalaryRow[], p: Params): SalaryRow[] {
@@ -486,6 +561,26 @@ export interface SalaryDue {
    *  asserts it never returns (`HELD_AS_A_STATE` in fn-smoke.tsx). Money owed
    *  and not yet sent is a fact, not a doubt, and "unpaid" says the fact. */
   state: "paid" | "unpaid" | "none";
+}
+
+/** PAID AND UNPAID, across the whole payroll. Both derived from the same
+ *  `dueOf` and the same slips the table reads, so the topbar and the rows can
+ *  never disagree about who is owed what — the rule this module applies to
+ *  every other figure it prints twice.
+ *
+ *  `paid` is the money that has actually left in the current period, not what
+ *  was scheduled: a month nobody has been paid for contributes nothing. */
+export function salaryTotals(): { paidPaise: number; unpaidPaise: number; unpaidPeople: number } {
+  let paidPaise = 0;
+  snap.salaryRuns.forEach((run) => run.slips.forEach((s) => {
+    if (s.paidAt && s.paidAt >= PERIOD.from && s.paidAt <= PERIOD.to + "T23:59:59") paidPaise += s.netPaise;
+  }));
+  const owing = salaryRows().map(dueOf).filter((d) => d.pendingPaise > 0);
+  return {
+    paidPaise,
+    unpaidPaise: owing.reduce((n, d) => n + d.pendingPaise, 0),
+    unpaidPeople: owing.length,
+  };
 }
 
 export function dueOf(r: SalaryRow): SalaryDue {
@@ -1307,9 +1402,9 @@ export interface SalaryAccountInput {
   /** Defaults to permanent where the form does not ask. A value somebody can
    *  see and change beats a blank they cannot filter on. */
   engagement?: string;
-  joinedAt: string; ctcPaise: number;
+  joinedAt: string;
   earnings: SalaryComponent[]; deductions: SalaryComponent[];
-  bank: { masked: string; ifsc: string; name: string }; pan: string; uan: string | null;
+  bank: { masked: string; ifsc: string; name: string; upi?: string }; pan: string; uan: string | null;
 }
 export function upsertSalaryAccount(input: SalaryAccountInput, id?: string): { error: string; salaryAccountId: string | null } {
   if (!input.memberId) return { error: "This account must point at a real Team member — that link is what stops a salary existing for nobody.", salaryAccountId: null };
@@ -1462,25 +1557,53 @@ export function setLop(slipId: string, lopDays: number): string {
  *  ARREARS ARE PAID OLDEST FIRST. Somebody owed two months and paid once has
  *  been paid for the older month — anything else invents a preference nobody
  *  expressed, and leaves the older debt ageing while the newer one clears. */
-export function paySalary(salaryAccountId: string, reference: string, accountId: string): string {
+export interface PaySalaryInput {
+  /** `bank` · `upi` · `cash`. See PAY_VIA. */
+  via: string;
+  accountId: string;
+  /** MANDATORY, whatever the method. An image or a PDF: the transfer receipt,
+   *  the UPI screenshot, the signed cash acknowledgement. It is the only
+   *  evidence a salary payment has now that the reference field is gone. */
+  proof: { filename: string; mime: string; bytes?: number };
+  remark?: string;
+}
+
+export function paySalary(salaryAccountId: string, input: PaySalaryInput): string {
   const acc = readSalaryAccount(salaryAccountId);
   if (!acc) return "That salary account no longer exists.";
   const row = toSalaryRow(acc);
   const due = dueOf(row);
   if (!due.unpaid.length) return acc.memberName + " has nothing outstanding. (nothing_due)";
-  if (!reference.trim()) return "The transfer reference is mandatory — it is what ties this payment to the bank. (validation_failed)";
-  if (dupReference(reference)) return "A record already carries reference " + reference.trim() + ". (duplicate_reference)";
-  if (!accountOf(accountId)) return "Pick the account it was paid from.";
-  const sa = superAdminOnly("Paying a salary"); if (sa) return sa;
 
-  const a = actor();
+  const via = payViaMeta(input.via);
+  if (!via) return "Pick how it was paid.";
+
+  /* THE PROOF IS THE EVIDENCE, and there is no longer anything else. A payment
+     with none is a claim, and this module does not store claims. */
+  const filename = (input.proof?.filename || "").trim();
+  if (!filename) return "Attach the receipt. It is the only evidence this payment has. (proof_required)";
+  if (!proofAccepted(input.proof.mime))
+    return filename + " is neither an image nor a PDF. A receipt has to be something somebody can open and read. (proof_type)";
+  if (!accountOf(input.accountId)) return "Pick the account it was paid from.";
+  const sa = superAdminOnly("Paying a salary"); if (sa) return sa;
+  const accountId = input.accountId;
+
   const at = stamp();
   /* Oldest first, so the debt that has been waiting longest clears first. */
   const order = due.unpaid.slice().sort((x, y) => x.month.localeCompare(y.month));
   order.forEach((slip, k) => {
     slip.paidAt = at;
     slip.accountId = accountId;
-    slip.reference = reference.trim() + (order.length > 1 ? "-" + String(k + 1).padStart(2, "0") : "");
+    /* NO REFERENCE, on purpose. The field is gone from the dialog and nothing
+       fabricates one here — a slip whose reference column is blank says
+       plainly that this payment is evidenced by its attachment and not by a
+       string somebody typed. `dupReference` already skips empty ones, so the
+       ledger's uniqueness rule is untouched. */
+    slip.reference = "";
+    slip.mode = via.mode;
+    slip.via = via.key;
+    slip.proof = { type: "receipt", filename, uploadedAt: at };
+    slip.remark = (input.remark || "").trim() || undefined;
     slip.issuedAt = at;
     slip.sha256 = hex64(slip.netPaise + k);
   });
@@ -1499,11 +1622,12 @@ export function paySalary(salaryAccountId: string, reference: string, accountId:
 
   const months = order.map((s) => fmtMonth(s.month)).join(", ");
   log(pushEvent(acc.events, "SALARY_PAID",
-    inr(due.pendingPaise) + " to " + acc.memberName + " from " + (accountOf(accountId)?.masked || accountId)
-    + " · " + reference.trim() + " · " + months
-    + (order.length > 1 ? " (" + order.length + " months, oldest first)" : "") + "."),
+    inr(due.pendingPaise) + " to " + acc.memberName + " by " + via.label.toLowerCase()
+    + " from " + (accountOf(accountId)?.masked || accountId)
+    + " · " + months
+    + (order.length > 1 ? " (" + order.length + " months, oldest first)" : "")
+    + " · evidenced by " + filename + "."),
   salaryAccountId, "salary");
-  void a;
   emit();
   return "";
 }
@@ -1878,6 +2002,7 @@ export function useSubRows(): SubRow[] { useVersion(); return subRows(); }
 export function useSubscription(id: string | null): SubRow | null { useVersion(); const s = readSubscription(id); return s ? toSubRow(s) : null; }
 export function useInstallmentRows(): InstRow[] { useVersion(); return installmentRows(); }
 export function useSalaryRows(): SalaryRow[] { useVersion(); return salaryRows(); }
+export function useSalaryTotals() { useVersion(); return salaryTotals(); }
 export function useSalaryAccount(id: string | null): SalaryRow | null { useVersion(); const a = readSalaryAccount(id); return a ? toSalaryRow(a) : null; }
 export function useRuns(): SalaryRun[] { useVersion(); return runsNewestFirst(); }
 export function useRun(id: string | null): SalaryRun | null { useVersion(); return readRun(id); }

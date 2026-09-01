@@ -30,7 +30,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from "react-rout
 import { hashToPath, usePageChrome } from "../../shell/AdminShell";
 import { qs } from "../../ui";
 import type { Params } from "./store";
-import { useActiveCount, useSalaryRows } from "./store";
+import { PERIOD, inr, useActiveCount, useSalaryRows, useSalaryTotals } from "./store";
 import { ROUTE_OF, VIEW_OF } from "./Frame";
 import Subscriptions from "./Subscriptions";
 import SubscriptionDetail from "./SubscriptionDetail";
@@ -80,17 +80,22 @@ export default function Finance() {
     return o;
   }, [sp]);
 
-  /* ONE FIGURE, AND IT IS A COUNT. The topbar carried three money totals —
-     collected, net, fail to pay — on every section, including the ones they
-     had nothing to do with. Money belongs to the tiles of the section that
-     computes it, where it can carry its formula and its caution; a figure with
-     neither, repeated above every page, is a number nobody can check.
-     How many businesses are subscribed right now is scope rather than
-     analysis, and it is the same question on every section. */
+  /* THE TOPBAR CARRIES WHAT THE SECTION IS ABOUT, and nothing it is not.
+     It once carried three money totals — collected, net, fail to pay — above
+     EVERY section, including the ones that had nothing to do with them, and
+     that is still the thing to avoid: a figure with no formula and no caution,
+     printed over a page that does not compute it, is a number nobody can check.
+     What replaced it is per-section. How many businesses are subscribed is
+     scope on the subscription faces; on payroll the question is who is being
+     paid and what is still owed, so that is what sits there instead — computed
+     from the same derivation the rows use, on the page that owns it. */
   const activeN = useActiveCount();
   /* People on the payroll — active accounts only. A closed one keeps its slips
      and is still on the list below, but it is not somebody being paid. */
   const membersN = useSalaryRows().filter((r) => r.a.active).length;
+  /* Paid out this period, and owed right now. Derived where the rows are, so
+     the header and the table read the same arithmetic. */
+  const totals = useSalaryTotals();
   const crumbs = useMemo(() => (
     <>
       <span className="tb-title">Finance</span>
@@ -107,11 +112,35 @@ export default function Finance() {
           tone goes on the figure and never on the word beside it. */}
       <span className="tb-stats">
         {view === "salaries" ? (
-          <span className="tb-stat ro"
-            title="Salary accounts on the payroll right now. Closed accounts are not counted; their slips stay on the record.">
-            <span className="k">Members</span>
-            <span className="v tnum">{membersN}</span>
-          </span>
+          <>
+            <span className="tb-stat ro"
+              title="Salary accounts on the payroll right now. Closed accounts are not counted; their slips stay on the record.">
+              <span className="k">Members</span>
+              <span className="v tnum">{membersN}</span>
+            </span>
+            <span className="tb-sep" />
+            {/* MONEY IN THE TOPBAR, WHICH THIS MODULE ONCE REFUSED — and the
+                refusal is worth restating, because it still holds where it was
+                made. Three totals used to sit here on EVERY section, including
+                the ones that had nothing to do with them: a figure with no
+                formula and no caution, repeated above pages that do not compute
+                it, is a number nobody can check. These two are the opposite
+                case. They belong to the section they appear on, they are the
+                question that section exists to answer, and they are derived
+                from the same `dueOf` the rows below use — so the header and the
+                table cannot disagree. */}
+            <span className="tb-stat ro ok" title={"Salary paid out in " + PERIOD.label + ". A month nobody has been paid for yet is not in it."}>
+              <span className="k">Paid</span>
+              <span className="v tnum">{inr(totals.paidPaise)}</span>
+            </span>
+            <span className="tb-stat ro warn"
+              title={totals.unpaidPeople
+                ? totals.unpaidPeople + " " + (totals.unpaidPeople === 1 ? "person is" : "people are") + " owed, arrears included."
+                : "Everybody is paid up."}>
+              <span className="k">Unpaid</span>
+              <span className="v tnum">{totals.unpaidPaise ? inr(totals.unpaidPaise) : "—"}</span>
+            </span>
+          </>
         ) : (
           <span className="tb-stat ro"
             title="Subscriptions running right now — a level, read at this moment, not a total for any period.">
@@ -121,11 +150,11 @@ export default function Finance() {
         )}
       </span>
     </>
-  ), [view, activeN, membersN]);
+  ), [view, activeN, membersN, totals.paidPaise, totals.unpaidPaise, totals.unpaidPeople]);
 
   usePageChrome(
     { crumbs, right: null, parent: id ? listHash(view) : null },
-    (id ? "rec" : view) + ":" + activeN + "/" + membersN,
+    (id ? "rec" : view) + ":" + activeN + "/" + membersN + "/" + totals.unpaidPaise,
   );
 
   const timer = useRef<number | undefined>(undefined);

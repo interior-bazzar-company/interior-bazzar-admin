@@ -155,11 +155,7 @@ export default function SalaryDetail({ id, p, onParams }: {
 
           <Block wide title="What the slip is built from"
             desc={<>Typed, never derived. Gross is the sum of the earnings; net is gross minus the deductions.</>}
-            foot={<div className="fin-actions">
-              <span className="fin-sum">
-                Cost to company <b>{inr(a.ctcPaise)}</b> a year — presentational, and never divided by twelve to make a slip.
-              </span>
-            </div>}>
+>
             <div className="fin-two">
               <div>
                 <div className="sh"><h2>Earnings</h2></div>
@@ -192,12 +188,13 @@ export default function SalaryDetail({ id, p, onParams }: {
               <span><Money paise={gross - ded} strong /></span>
             </div>
 
-            <Notice tone="info" ico="coin" text={<>
-              <b>Cost to company is presentational and it is not the salary.</b> {inr(a.ctcPaise)} a
-              year is what was agreed at offer; the slip is built from the {a.earnings.length} earning
-              {a.earnings.length === 1 ? "" : "s"} above and nothing else. CTC ÷ 12 would produce a
-              figure no component adds up to, and a slip nobody could reconcile.
-            </>} />
+            {/* THE CTC LINE THAT SAT HERE IS GONE WITH THE FIELD. It said,
+                twice on one screen, that cost to company was presentational
+                and must never be divided by twelve — two cautions about a
+                number that computed nothing and that FN-OD-06 already said
+                was not cost to company at all. A figure needing that much
+                defending was not worth keeping. The slip is the earnings
+                above and nothing else, which is now true without argument. */}
           </Block>
         </Blocks>
       ) : null}

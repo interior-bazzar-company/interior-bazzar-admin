@@ -846,6 +846,39 @@ S.resetStore();
 }
 
 /* ========================================================================== */
+console.log("\nthe salary account points at a real team member");
+S.resetStore();
+{
+  /* PICKED, NOT TYPED. Four fields — id, name, designation, code — came off
+     one choice, so they cannot disagree with the Team record they came from. */
+  const opts = S.salaryMemberOptions();
+  ok("the picker offers the team, not a blank box", opts.length > 0, true);
+  ok("...active members only", opts.length, 8);
+  ok("every option carries the three fields the form no longer asks for",
+    opts.every((o) => o.memberId && o.name && o.designation && o.employeeCode), true);
+  ok("the employee code is DERIVED from the member id, not typed",
+    S.employeeCodeOf("41"), "IB-EMP-041");
+  ok("...so the same person always gets the same code",
+    S.employeeCodeOf(41), S.employeeCodeOf("41"));
+
+  /* Somebody who already has an account is offered GREYED, not hidden — a
+     person looking for them finds them and learns why, instead of concluding
+     the list is broken. */
+  ok("an option knows whether that member already has an account",
+    opts.every((o) => typeof o.taken === "boolean"), true);
+
+  /* ⚠ THE SEED DEFECT, asserted so it cannot be forgotten. Finance's salary
+     accounts carry memberIds 1-9 and Team's members are 41-86: two casts
+     written independently, so `memberId` on every existing account resolves to
+     nobody. New accounts join correctly; the historical ones do not. This
+     assertion FAILS the day somebody reconciles them, which is the point —
+     it is a reminder, not a rule. */
+  const joined = S.readSalaryAccounts()
+    .filter((acc) => opts.some((o) => o.memberId === acc.memberId));
+  ok("KNOWN: no seeded salary account joins a seeded team member (see the note)",
+    joined.length, 0);
+}
+
 console.log("\nwrites · salaries are paid PERSON by person, not run by run");
 S.resetStore();
 {
@@ -859,23 +892,25 @@ S.resetStore();
   ok("...and it is one month, not two", before.arrears.length, 0);
   ok("...so what is due is exactly that month's net", before.pendingPaise, before.currentPaise);
 
-  ok("paying with no reference is refused — it is what ties this to the bank",
-    has(S.paySalary("SAL-AC-0011", "", "ACC-HDFC-4021"), "reference is mandatory"), true);
-  ok("...a reference the ledger already carries is refused",
-    has(S.paySalary("SAL-AC-0011", "NEFT0019AUG2213", "ACC-HDFC-4021"), "duplicate_reference"), true);
+  const PDF = { filename: "receipt.pdf", mime: "application/pdf" };
+  ok("paying with no proof is refused — it is the only evidence there is",
+    has(S.paySalary("SAL-AC-0011", { via: "bank", accountId: "ACC-HDFC-4021", proof: { filename: "", mime: "" } }), "proof_required"), true);
   ok("...and an account that does not exist is refused",
-    has(S.paySalary("SAL-AC-0011", "SALTEST01", "ACC-NOPE"), "Pick the account"), true);
+    has(S.paySalary("SAL-AC-0011", { via: "bank", accountId: "ACC-NOPE", proof: PDF }), "Pick the account"), true);
 
-  ok("paying works", S.paySalary("SAL-AC-0011", "SALTEST01", "ACC-HDFC-4021"), "");
+  ok("paying works", S.paySalary("SAL-AC-0011", { via: "bank", accountId: "ACC-HDFC-4021", proof: { filename: "receipt.pdf", mime: "application/pdf" } }), "");
   const after = S.dueOf(S.toSalaryRow(S.readSalaryAccount("SAL-AC-0011")));
   ok("...nothing is outstanding afterwards", [after.state, after.pendingPaise], ["paid", 0]);
   ok("...paying again is refused, because there is nothing to pay",
-    has(S.paySalary("SAL-AC-0011", "SALTEST02", "ACC-HDFC-4021"), "nothing_due"), true);
+    has(S.paySalary("SAL-AC-0011", { via: "bank", accountId: "ACC-HDFC-4021", proof: { filename: "receipt.pdf", mime: "application/pdf" } }), "nothing_due"), true);
 
   /* THE FREEZE, which is the guarantee that had to survive the change. */
   const slip = S.readRun("RUN-2026-08").slips.filter((s) => s.salaryAccountId === "SAL-AC-0011")[0];
-  ok("the slip took its paid date, its reference and its hash in that one write",
-    [!!slip.paidAt, !!slip.sha256, !!slip.issuedAt, slip.reference], [true, true, true, "SALTEST01"]);
+  ok("the slip took its paid date, its hash and its receipt in that one write",
+    [!!slip.paidAt, !!slip.sha256, !!slip.issuedAt, slip.proof && slip.proof.filename],
+    [true, true, true, "receipt.pdf"]);
+  ok("...and NO reference, because the field is gone and nothing invents one",
+    slip.reference, "");
 
   /* AND THE RUN IS A CONSEQUENCE. One person paid does not close it. */
   ok("the run is still open, because other people on it are not paid",
@@ -886,13 +921,56 @@ S.resetStore();
 
   /* Pay everybody else and the run closes itself. */
   const rest = S.readRun("RUN-2026-08").slips.filter((s) => !s.paidAt);
-  rest.forEach((s, i) => S.paySalary(s.salaryAccountId, "SALREST" + i, "ACC-HDFC-4021"));
+  rest.forEach((s, i) => S.paySalary(s.salaryAccountId, { via: "bank", accountId: "ACC-HDFC-4021", proof: { filename: "receipt.pdf", mime: "application/pdf" } }));
   ok("the run closed itself once its last slip was paid, with nobody marking it",
     S.readRun("RUN-2026-08").state, "paid");
   ok("...and it carries the date it closed", !!S.readRun("RUN-2026-08").paidAt, true);
 }
 
-console.log("\nwrites · arrears are paid oldest first");
+console.log("\nwrites · every salary payment carries a receipt, whatever the method");
+S.resetStore();
+{
+  /* THE REFERENCE FIELD IS GONE. It was a UTR typed from memory on a screen
+     where nothing checked it against a statement, and a reference nobody
+     verifies is one nobody should trust. The attachment replaced it, for
+     every method — a payment with no evidence at all is a claim, which is
+     the one thing this module refuses to store. */
+  const ID = "SAL-AC-0022";
+  const acct = { accountId: "ACC-HDFC-4021" };
+  const NOFILE = { filename: "", mime: "" };
+  const JPG = { filename: "upi-screenshot.jpg", mime: "image/jpeg" };
+  const TXT = { filename: "notes.txt", mime: "text/plain" };
+
+  ok("bank transfer with no receipt is refused",
+    has(S.paySalary(ID, { via: "bank", ...acct, proof: NOFILE }), "proof_required"), true);
+  ok("UPI with no receipt is refused",
+    has(S.paySalary(ID, { via: "upi", ...acct, proof: NOFILE }), "proof_required"), true);
+  ok("cash with no receipt is refused — the rule does not vary by method",
+    has(S.paySalary(ID, { via: "cash", ...acct, proof: NOFILE }), "proof_required"), true);
+
+  ok("a file that is neither an image nor a PDF is refused",
+    has(S.paySalary(ID, { via: "bank", ...acct, proof: TXT }), "proof_type"), true);
+  ok("...and the refusal names the file, so it is obvious which one",
+    has(S.paySalary(ID, { via: "bank", ...acct, proof: TXT }), "notes.txt"), true);
+  ok("a spreadsheet is not a receipt", S.proofAccepted("application/vnd.ms-excel"), false);
+  ok("a PDF is", S.proofAccepted("application/pdf"), true);
+  ok("...and so is a photo, which is what a cash acknowledgement usually is",
+    [S.proofAccepted("image/jpeg"), S.proofAccepted("image/png")], [true, true]);
+
+  ok("an unknown method is refused",
+    has(S.paySalary(ID, { via: "carrier-pigeon", ...acct, proof: JPG }), "Pick how it was paid"), true);
+
+  ok("UPI with a screenshot is accepted",
+    S.paySalary(ID, { via: "upi", ...acct, proof: JPG, remark: "Sent at 6pm" }), "");
+  const slip = S.readRun("RUN-2026-08").slips.filter((s) => s.salaryAccountId === ID)[0];
+  ok("...the slip carries NO reference at all", slip.reference, "");
+  ok("...it carries the receipt instead", slip.proof.filename, "upi-screenshot.jpg");
+  ok("...the method is stored in both vocabularies", [slip.via, slip.mode], ["upi", "UPI"]);
+  ok("...the remark is kept, load-bearing on nothing", slip.remark, "Sent at 6pm");
+  ok("...and it still froze: paid date, issued date and hash",
+    [!!slip.paidAt, !!slip.issuedAt, !!slip.sha256], [true, true, true]);
+}
+
 S.resetStore();
 {
   /* Somebody owed two months: the open August run plus a July slip unpaid by
@@ -909,12 +987,20 @@ S.resetStore();
   ok("...what is due is arrears PLUS the current month, not just one of them",
     d.pendingPaise, d.arrearsPaise + d.currentPaise);
 
-  ok("one payment settles both", S.paySalary("SAL-AC-0014", "SALARR01", "ACC-HDFC-4021"), "");
+  ok("one payment settles both", S.paySalary("SAL-AC-0014", { via: "bank", accountId: "ACC-HDFC-4021", proof: { filename: "receipt.pdf", mime: "application/pdf" } }), "");
   const j = S.readRun("RUN-2026-07").slips.filter((s) => s.salaryAccountId === "SAL-AC-0014")[0];
   const a = S.readRun("RUN-2026-08").slips.filter((s) => s.salaryAccountId === "SAL-AC-0014")[0];
   ok("...both months are paid", [!!j.paidAt, !!a.paidAt], [true, true]);
-  ok("...OLDEST FIRST: July carries suffix 01 and August 02",
-    [j.reference, a.reference], ["SALARR01-01", "SALARR01-02"]);
+  /* OLDEST FIRST IS NO LONGER VISIBLE ON THE SLIPS, and that is a real
+     consequence of removing the reference field rather than a gap in this
+     suite. The two months used to carry -01 and -02 suffixes, which is what
+     made the order readable on the record; with no reference there is nothing
+     to suffix, both slips take the same instant, and the only trace left is
+     the event note. So that is what is asserted — and it is worth knowing that
+     the order is now a claim in a sentence rather than a fact on a document. */
+  ok("...neither month carries a reference any more", [j.reference, a.reference], ["", ""]);
+  ok("...and the event says the order it paid them in",
+    has(S.readSalaryAccount("SAL-AC-0014").events.map((e) => e.note).join(" "), "oldest first"), true);
   ok("...and nothing is outstanding afterwards",
     S.dueOf(S.toSalaryRow(S.readSalaryAccount("SAL-AC-0014"))).pendingPaise, 0);
 }

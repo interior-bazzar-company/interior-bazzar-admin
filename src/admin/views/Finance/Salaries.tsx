@@ -27,12 +27,12 @@ import { EmptyState, FilterChips, Icon, SearchField, Select, avatarTone, initial
 import { go } from "../../ui/nav";
 import { Frame } from "./Frame";
 import type { FaceProps } from "./Frame";
-import { Assumed, Money } from "./bits";
+import { Money } from "./bits";
 import { MetricTip } from "./InfoTip";
 import { PaySalaryModal, SalaryAccountModal } from "./SalaryModals";
 import {
-  ENGAGEMENTS, FILTER_LABELS, PERIOD, applySalaryFilters, dueOf, engagementMeta,
-  filterValueLabel, fmtDate, fmtMonth, inr, isSuperAdmin, superAdminOnly, useOverview,
+  ENGAGEMENTS, FILTER_LABELS, applySalaryFilters, dueOf, engagementMeta,
+  filterValueLabel, fmtDate, fmtMonth, inr, isSuperAdmin, superAdminOnly,
   useSalaryRows,
 } from "./store";
 import type { Params, SalaryRow } from "./store";
@@ -57,7 +57,6 @@ function Face({ name }: { name: string }) {
 export default function Salaries({ p, onFilter, onSearch, onUnfilter }: FaceProps) {
   const { toast, modal, closeLayer } = useShell();
   const rows = useSalaryRows();
-  const o = useOverview();
 
   const active = rows.filter((r) => r.a.active);
   /* Monthly payroll is what the ACTIVE accounts come to today — a forward
@@ -144,18 +143,9 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter }: FaceProp
         </div>
       </>}>
 
-      {/* ============================================== what this money is === */}
-      <p className="fin-fine">
-        Payroll here is <b>net paid to people</b>. Analytics counts {inr(o.salaryPaise)} of salary
-        in {PERIOD.label}{o.salaryN ? " across " + o.salaryN + " slips paid inside it" : ""} —
-        a month nobody has been paid for yet is not in that figure.
-      </p>
-      <Assumed id="FN-OD-06" />
-
       {/* ======================================================= the people === */}
       <div className="sh">
         <h2>The people</h2>
-        <span className="d">One account per team member, joined to the live Team record, with what each is owed right now. A closed account stays on this list because its slips do.</span>
         <span className="r fin-count">{filtered.length} of {rows.length}</span>
       </div>
 
