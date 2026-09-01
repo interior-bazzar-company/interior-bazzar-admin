@@ -397,12 +397,17 @@ hasnt(paySal, "Bank reference", "...the bank reference field is gone");
    a summary that must show the month being settled — the open run's month —
    before anybody presses anything. */
 has(paySal, "Adjustments", "...the adjustments section is on the form");
-has(paySal, "Incentive", "...with an incentive line");
-has(paySal, "Deduction", "...and a deduction line");
-has(paySal, 'aria-label="Incentive name"', "...each with a name of its own");
-has(paySal, "Festival bonus", "...and a placeholder that shows what a name looks like");
+has(paySal, "Add incentive or deduction", "...as rows somebody ADDS — no blank rows sitting there");
+hasnt(paySal, 'aria-label="Adjustment kind"', "...so an untouched payment carries no adjustment row");
 has(paySal, fmtMonth(run("RUN-2026-08").month), "...the summary names the month being settled");
 has(paySal, "Leaving the account", "...and states what leaves the account");
+has(paySal, "Remark", "...the remark rides at the bottom of the form");
+/* The remark is the LAST input before the summary — about the whole payment,
+   not part of it. Asserted by position, in the suite's own vocabulary. */
+if (paySal.lastIndexOf("Remark") < paySal.indexOf("Add incentive or deduction")) {
+  failed++;
+  console.log("  FAIL the remark rides below the adjustments — it renders above them");
+} else console.log("  ok   ...and it sits below the adjustments");
 hasnt(paySal, "ties this to the bank", "...and so is the sentence that explained it");
 
 /* TxnModal takes no seed. It used to, and the money-in branch — the Notice

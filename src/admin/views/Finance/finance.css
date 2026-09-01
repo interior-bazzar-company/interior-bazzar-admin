@@ -427,10 +427,28 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
 
 /* Editable salary components: label, amount, remove. */
 .fin-comprow { display: grid; grid-template-columns: 1fr 160px auto; gap: var(--space-2); align-items: center; margin-bottom: var(--space-2) }
-/* An adjustment is a comprow that cannot be removed — clearing the amount IS
-   removing it — so it is name + amount and nothing else. */
-.fin-adj { display: grid; grid-template-columns: 1fr 140px; gap: var(--space-2); align-items: center }
-@container (max-width: 520px) { .fin-adj { grid-template-columns: 1fr } }
+/* An adjustment row: what kind, how much, and the way out. Same bones as
+   .fin-comprow so the two editors read as one family. */
+.fin-adjrow { display: grid; grid-template-columns: 180px 1fr auto; gap: var(--space-2); align-items: center; margin-bottom: var(--space-2) }
+@container (max-width: 520px) { .fin-adjrow { grid-template-columns: 1fr auto } }
+
+/* THE RECEIPT. The figure is the headline; everything else is a caption to
+   it. Centred because a receipt is a conclusion, not a form. */
+.fin-paid { display: flex; flex-direction: column; align-items: center; text-align: center; padding: var(--space-4) 0 var(--space-2) }
+.fin-paid .mark { display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--radius-full);
+                  background: var(--ok-bg); color: var(--ok); border: 1px solid var(--ok-line); margin-bottom: var(--space-3) }
+.fin-paid .amt { font-size: var(--text-2xl, 28px); font-weight: var(--weight-semibold); line-height: 1.2 }
+.fin-paid .to { color: var(--text-2); margin-bottom: var(--space-4) }
+.fin-paid .facts { width: 100%; max-width: 380px; border: 1px solid var(--line-2); border-radius: var(--radius-lg);
+                   background: var(--bg-inset); padding: var(--space-2) var(--space-4); text-align: left }
+.fin-paid .facts .row { display: flex; justify-content: space-between; gap: var(--space-3); padding: 4px 0; font-size: var(--text-md) }
+.fin-paid .facts .l { color: var(--text-3) }
+.fin-paid .fine { margin: var(--space-3) 0 0; max-width: 400px; font-size: var(--text-sm); line-height: var(--lh-md); color: var(--text-3) }
+
+/* The role pill inside a PRIMARY button was the badge's own warn/bad colours
+   on the button's green — unreadable, and worse when disabled. Inside a
+   primary button it borrows the button's own text colour instead. */
+.btn.pri .fin-role, .btn.pri .fin-role.sa { border-color: currentColor; color: inherit; opacity: .85 }
 @container (max-width: 520px) { .fin-comprow { grid-template-columns: 1fr } }
 
 /* =============================================================== slip === */

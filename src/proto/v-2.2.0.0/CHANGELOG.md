@@ -1909,6 +1909,50 @@ tokens and primitives, not watched.
 
 ## 2026-09-01
 
+### The Pay dialog, tightened: added rows, a receipt that reads as one, remark last
+
+**Area:** Finance · the Pay dialog
+**Files:** `SalaryModals.tsx`, `finance.css`, `scripts/fn-smoke.tsx`
+
+**What changed**
+
+**Adjustments are rows somebody ADDS.** Most payments have none, and two
+blank fields on every payment is furniture. One button — *Add incentive or
+deduction* — appends a row of kind-dropdown + amount + remove; at most one
+row per kind, because the write takes one of each and a second row of
+either would be two numbers pretending to be one. A kind the other row
+holds is disabled in the dropdown rather than refused after.
+
+**The success screen is a receipt, not a checklist.** The figure is the
+headline, centred; under it the facts of the transfer — via and account,
+months covered, the slip id — each on its own line; one quiet sentence
+about the freeze. Done and Download slip unchanged.
+
+**The remark moved to the bottom**, below the adjustments: it is the one
+thing on the form that is ABOUT the whole payment rather than part of it,
+written once everything above is settled — a note on the bottom of a
+voucher.
+
+**Payment via and Paid from share a row** — they are halves of one
+decision — with cash showing a quiet "nothing to choose" in the second
+cell instead of collapsing the grid.
+
+**The Super Admin badge on the primary button was unreadable** — the
+pill's own warn/bad colours on the button's green, worse when disabled.
+Inside a primary button it borrows the button's own text colour.
+
+**Verified**
+
+`check:finance` 352, `fn-smoke` green — an untouched payment renders no
+adjustment row, the Add button is present, the remark is asserted BELOW
+the adjustments by position, and the month and "Leaving the account"
+stay covered. The receipt screen and the add/remove behaviour are click
+states — browser, as ever.
+
+---
+
+## 2026-09-01
+
 ### Pay-time incentives and deductions, and the payment gets a receipt screen
 
 **Area:** Finance · the Pay dialog (FN-T08b), and the write behind it
