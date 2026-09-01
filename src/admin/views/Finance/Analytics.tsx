@@ -42,8 +42,8 @@ import { BarRows, ColumnChart } from "../charts";
 import type { BarRow, Series } from "../charts";
 import {
   PERIOD, accountOf, ago, delta, eventMeta, fmtDate, fmtMonth, inr, pct, todayIso,
-  useActivity, useKpis, useMatchedPct, useMonthPoints, useOverview, useOverviewTiles,
-  useReconciliation, useTagTotals, useTaxSummary,
+  useActivity, useDepartmentSpend, useKpis, useMatchedPct, useMonthPoints, useOverview,
+  useOverviewTiles, useReconciliation, useTagTotals, useTaxSummary,
 } from "./store";
 import type { Kpi, Tile } from "./store";
 
@@ -152,6 +152,7 @@ function Overview() {
   const o = useOverview();
   const months = useMonthPoints();
   const tags = useTagTotals();
+  const dept = useDepartmentSpend();
   const recon = useReconciliation();
   const matched = useMatchedPct();
   const tax = useTaxSummary();
@@ -167,6 +168,18 @@ function Overview() {
     title: r.tag.label + ": " + inr(r.spentPaise) + " over " + r.n + " payment"
       + (r.n === 1 ? "" : "s") + " in " + PERIOD.label + ". Rolls up as "
       + r.tag.kind + (r.overBudget ? ". Over the budget set on this tag." : "."),
+  }));
+
+  /* One hue for every department bar — identity, not magnitude; the length
+     already says the size. Exact rupees, same as the tag chart. */
+  const deptRows: BarRow[] = dept.map((r) => ({
+    key: r.department,
+    label: r.department,
+    value: rupees(r.paidPaise),
+    hint: <>{r.people} {r.people === 1 ? "person" : "people"} · {r.slips} slip{r.slips === 1 ? "" : "s"}</>,
+    title: r.department + ": " + inr(r.paidPaise) + " net paid across " + r.slips
+      + " slip" + (r.slips === 1 ? "" : "s") + " to " + r.people
+      + (r.people === 1 ? " person" : " people") + ", all time.",
   }));
 
   return (
@@ -226,6 +239,23 @@ function Overview() {
           : <Unavailable title="Nothing was spent under any tag in this period."
               why="Only recorded transactions with direction out appear here. An empty list is a
                 month with no outgoing transaction recorded against it, not a missing figure." />}
+      </Block>
+
+      {/* ===================================== who the payroll pays for === */}
+      <Block title="Expenditure by department" desc="salary paid, all time, off the paid slips"
+        right={<span className="fin-sum">
+          {(() => { const t = dept.reduce((n, r) => n + r.paidPaise, 0); return inr(t); })()} paid out
+        </span>}
+        foot={<>All time rather than the period, because early in a month this is a column of
+          zeros and a chart of zeros answers nothing — the period's own figure is on the strip
+          above. Salary only: the non-salary side of spend is the tag chart beside this, and the
+          two are never added here. The department is typed on the account when it opens; a blank
+          one shows as <em>Unassigned</em> rather than being guessed from a designation.</>}>
+        {deptRows.length
+          ? <BarRows rows={deptRows} unit="₹ · net salary paid, all time, by department" />
+          : <Unavailable title="No salary has been paid yet."
+              why="This chart sums the paid slips by the department on each account. It appears
+                with the first paid run." />}
       </Block>
 
       {/* ============================================= not collected === */}

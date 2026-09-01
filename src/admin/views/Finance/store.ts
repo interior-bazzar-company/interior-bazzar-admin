@@ -797,6 +797,38 @@ export function overviewTiles(from = PERIOD.from, to = PERIOD.to): Tile[] {
 /** Every month the records touch, oldest first — derived from the records
  *  themselves. There is no separate history file that could disagree with the
  *  lists, which is the whole reason Analytics cannot contradict a tab. */
+/** SALARY PAID, BY DEPARTMENT, ALL TIME — summed off the paid slips joined
+ *  back to their accounts. All time rather than the period, because early in
+ *  a month the period figure is a column of zeros and a chart of zeros
+ *  answers nothing. The department is read off the ACCOUNT, like the PAN on
+ *  a slip: it is identity, not money, and a person moved to another
+ *  department carries their history with them. Blank groups as "Unassigned"
+ *  — a visible gap somebody can fix, never a guess. */
+export interface DepartmentSpend {
+  department: string;
+  paidPaise: number;
+  people: number;
+  slips: number;
+}
+export function departmentSpend(): DepartmentSpend[] {
+  const by = new Map<string, { paidPaise: number; people: Set<string>; slips: number }>();
+  snap.salaryRuns.forEach((run) => run.slips.forEach((sl) => {
+    if (!sl.paidAt) return;
+    const acc = snap.salaryAccounts.filter((a) => a.salaryAccountId === sl.salaryAccountId)[0];
+    const dep = (acc && (acc.department || "").trim()) || "Unassigned";
+    const cur = by.get(dep) || { paidPaise: 0, people: new Set<string>(), slips: 0 };
+    cur.paidPaise += sl.netPaise;
+    cur.people.add(sl.salaryAccountId);
+    cur.slips += 1;
+    by.set(dep, cur);
+  }));
+  return Array.from(by.entries())
+    .map(([department, v]) => ({
+      department, paidPaise: v.paidPaise, people: v.people.size, slips: v.slips,
+    }))
+    .sort((x, y) => y.paidPaise - x.paidPaise);
+}
+
 export function monthPoints(): MonthPoint[] {
   const keys = new Set<string>();
   countedPayments().forEach((r) => keys.add(monthOf(r.pay.valueDate)));
@@ -1424,6 +1456,7 @@ export interface SalaryAccountInput {
   joinedAt: string;
   earnings: SalaryComponent[]; deductions: SalaryComponent[];
   bank: { masked: string; ifsc: string; name: string; upi?: string }; pan: string; uan: string | null;
+  department: string;
 }
 export function upsertSalaryAccount(input: SalaryAccountInput, id?: string): { error: string; salaryAccountId: string | null } {
   if (!input.memberId) return { error: "This account must point at a real Team member — that link is what stops a salary existing for nobody.", salaryAccountId: null };
@@ -2119,6 +2152,7 @@ export function useOverview(): Overview { useVersion(); return overview(); }
 export function useOverviewTiles(): Tile[] { useVersion(); return overviewTiles(); }
 export function useKpis(): Kpi[] { useVersion(); return kpis(); }
 export function useMonthPoints(): MonthPoint[] { useVersion(); return monthPoints(); }
+export function useDepartmentSpend(): DepartmentSpend[] { useVersion(); return departmentSpend(); }
 export function useReconciliation(stmtId?: string): Recon { useVersion(); return reconciliation(stmtId); }
 export function useStatements() { useVersion(); return snap.statements; }
 export function usePendingImport() { useVersion(); return snap.pendingImport; }

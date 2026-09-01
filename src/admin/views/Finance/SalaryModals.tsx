@@ -131,6 +131,11 @@ export function SalaryAccountModal({ account, onClose, onDone }: {
   const [memberName, setMemberName] = useState(a ? a.memberName : "");
   const [code, setCode] = useState(a ? a.employeeCode : "");
   const [designation, setDesignation] = useState(a ? a.designation : "");
+  const [department, setDepartment] = useState(a ? a.department : "");
+  /* The departments already in use, as datalist suggestions. A hook, so it is
+     called here at the top and not from inside the markup. */
+  const departments = Array.from(new Set(
+    useSalaryRows().map((r) => r.a.department).filter(Boolean)));
   const [joinedAt, setJoinedAt] = useState(a ? a.joinedAt : todayIso());
   const [masked, setMasked] = useState(a ? a.bank.masked : "");
   const [ifsc, setIfsc] = useState(a ? a.bank.ifsc : "");
@@ -171,7 +176,7 @@ export function SalaryAccountModal({ account, onClose, onDone }: {
       return setErr("The Team member id is a whole number above zero. It is the join to the Team record and nothing else stands in for it.");
     const r = upsertSalaryAccount({
       memberId: id, memberName, employeeCode: code.trim(), designation: designation.trim(),
-      joinedAt, earnings: e.list, deductions: d.list,
+      joinedAt, department: department.trim(), earnings: e.list, deductions: d.list,
       bank: {
         masked: masked.trim(), ifsc: ifsc.trim().toUpperCase(), name: bankName.trim(),
         upi: upi.trim() || undefined,
@@ -236,6 +241,17 @@ export function SalaryAccountModal({ account, onClose, onDone }: {
               somebody forgot to render. */}
           <Field label="Joined">
             <input type="date" className="inp" value={joinedAt} onChange={(e) => setJoinedAt(e.target.value)} />
+          </Field>
+          {/* Typed, with the departments already in use as suggestions — a
+              designation does not partition into departments by itself, and a
+              free field with no memory grows "Sales", "sales" and "SALES".
+              Analytics groups a blank as Unassigned rather than guessing. */}
+          <Field label="Department" help="Where this cost rolls up in analytics.">
+            <input className="inp" value={department} list="fin-departments"
+              placeholder="Sales" onChange={(e) => setDepartment(e.target.value)} />
+            <datalist id="fin-departments">
+              {departments.map((dep) => <option key={dep} value={dep} />)}
+            </datalist>
           </Field>
         </div>
       </Fs>

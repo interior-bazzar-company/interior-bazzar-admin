@@ -184,6 +184,11 @@ export interface SalaryAccount {
   memberName: string;
   employeeCode: string;
   designation: string;
+  /** WHICH PART OF THE COMPANY the cost belongs to. Typed when the account is
+   *  opened, because a designation does not partition into departments by
+   *  itself and a mapping invented in analytics code is a taxonomy nobody
+   *  agreed to. Analytics groups blank as "Unassigned" rather than guessing. */
+  department: string;
   /** How the person is engaged. `permanent` is on the books; `payroll` is paid
    *  through payroll without being permanent. The two are NOT a clean
    *  partition of the world — permanent staff are on payroll too — and the

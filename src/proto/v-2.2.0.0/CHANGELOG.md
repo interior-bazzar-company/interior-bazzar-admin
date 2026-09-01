@@ -1909,6 +1909,49 @@ tokens and primitives, not watched.
 
 ## 2026-09-01
 
+### Analytics gains department-wise expenditure, modelled rather than guessed
+
+**Area:** Finance analytics, the salary account, the seed
+**Files:** `Analytics.tsx`, `SalaryModals.tsx`, `store.ts`, `types.ts`,
+`salaries.json`, `scripts/check-finance-ledger.cjs`, `scripts/fn-smoke.tsx`,
+`BACKEND-INTEGRATION.md`
+
+**What changed**
+
+**`department` joins the salary account** — typed when the account opens,
+with the departments already in use offered as suggestions, because a
+designation does not partition into departments by itself and a mapping
+invented inside analytics code is a taxonomy nobody agreed to. The seven
+seeded accounts are assigned: Leadership, Sales, Design, Operations.
+
+**Analytics gets "Expenditure by department"** — one identity-hued bar per
+department, summed off the PAID slips joined back to their accounts, all
+time. All time rather than the period, because early in a month the period
+figure is a column of zeros and a chart of zeros answers nothing; the
+period's own number stays on the strip above. Salary only, said in the
+foot — the non-salary side is the tag chart beside it, and the two are
+never added. A blank department groups as **Unassigned**: a visible gap
+somebody can fix, never a guess. The department is read off the account
+like the PAN on a slip — identity, not money — so a person moved between
+departments carries their history.
+
+The page's other asks were already standing: the KPI tab, and the
+month-by-month money chart, which spans every month the records touch and
+becomes the yearly read as the records do.
+
+**Verified**
+
+`check:finance` 365 → 369 — the departments appear, their sum equals the
+all-time paid figure exactly (one derivation read twice), sorted largest
+first, and a blanked department groups as Unassigned. `fn-smoke` renders
+the block with the seeded departments as bars and asserts no Unassigned
+bar exists — against the tooltip format, since the footnote legitimately
+explains the word.
+
+---
+
+## 2026-09-01
+
 ### The row menu wears the panel's clothes; Paid on never shows a bare dash
 
 **Area:** Finance · Salaries · Transactions

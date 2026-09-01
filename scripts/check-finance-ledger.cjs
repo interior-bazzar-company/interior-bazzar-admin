@@ -927,6 +927,28 @@ S.resetStore();
   ok("...and it carries the date it closed", !!S.readRun("RUN-2026-08").paidAt, true);
 }
 
+console.log("\nreads: expenditure by department sums the paid slips, nothing else");
+S.resetStore();
+{
+  const dept = S.departmentSpend();
+  ok("every department in the seed appears",
+    dept.map((d) => d.department).sort(),
+    ["Design", "Leadership", "Operations", "Sales"]);
+  /* THE INVARIANT: the chart's total is exactly the all-time paid total --
+     one derivation, read twice. */
+  ok("...and their sum is exactly the all-time paid figure",
+    dept.reduce((n, d) => n + d.paidPaise, 0), S.salaryTotals().paidAllPaise);
+  ok("sorted largest first",
+    dept.every((d, i) => i === 0 || d.paidPaise <= dept[i - 1].paidPaise), true);
+  /* A blank department is a visible gap, never a guess. */
+  const acc = S.readSalaryAccount("SAL-AC-0011");
+  const had = acc.department;
+  acc.department = "  ";
+  ok("a blank department groups as Unassigned",
+    S.departmentSpend().some((d) => d.department === "Unassigned"), true);
+  acc.department = had;
+}
+
 console.log("\nwrites · a hold is about a month, not a person");
 S.resetStore();
 {

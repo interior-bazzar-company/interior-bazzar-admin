@@ -253,6 +253,14 @@ has(refundsEmpty, "Nothing matches those filters", "...an empty queue says the f
 has(refundsEmpty, "counts the whole queue before any filter", "...and that the tiles above it were not filtered");
 
 const an = page("analytics · the overview", "/finance-analytics");
+/* Department expenditure: identity bars off the paid slips, grouped by the
+   department typed on each account. */
+has(an, "Expenditure by department", "...the department block is on the page");
+has(an, ">Sales<", "...with the seed departments as bars");
+has(an, ">Leadership<", "...leadership among them");
+/* The needle is the bar tooltip's own format ("Unassigned: <amount>"), not
+   the bare word: the block's footnote legitimately EXPLAINS Unassigned. */
+hasnt(an, "Unassigned:", "...and no Unassigned bar, because every seeded account is assigned");
 has(an, "Analytics is not a fifth record type", "...analytics is the four lists read back, not a store");
 has(an, "collected, spent, returned", "...the strip says what it is adding up");
 const kpi = page("analytics · the KPI tab", "/finance-analytics?tab=kpi");
