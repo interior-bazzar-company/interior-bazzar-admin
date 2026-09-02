@@ -6,6 +6,46 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-02
 
+### Record a subscription: one pick fills the form
+
+**Area:** Finance · Subscriptions · the Record a subscription dialog
+**Files:** `src/admin/views/Finance/SubModals.tsx`, `scripts/fn-smoke.tsx`;
+`SubSamples.tsx` deleted
+
+**What changed**
+
+**Picking the business fills the form.** The newest open quotation attaches
+at once — and with it the plan, the term, the installment count and the
+chain's invoice — so the common case is one pick and one press. Nothing is
+newly locked: every block keeps its Change link, so a different quotation or
+invoice stays one press away. With no chain, a lone attachable invoice
+attaches itself for the same reason.
+
+**The Sample & use cases tab is gone,** four edits and a file, exactly as
+`SubSamples.tsx` prescribed for its own removal; the dialog opens straight
+onto the form and the smoke assertions moved with it.
+
+**And the dialog took the pay dialog's economy:** the standing fieldset
+hints and field captions came off (a hint survives only when it names THIS
+record — "From IB-QT-…"), the source picker's two explainers went, the
+chain block's fine print went, and the closing notice is one sentence. The
+conditional warnings — catalogue/invoice disagreement, quotation/billed
+mismatch, nothing to attach — all stay: they appear because something is
+true of this sale.
+
+**Temp data**
+`none` — the sample tab's removal deletes proto-only scaffolding.
+
+**Backend needed**
+`none`.
+
+**Open decisions**
+`scripts/check-finance-ledger.cjs` crashes on this branch before and after
+this change (a `sumBy` over an undefined list at line 433) — pre-existing,
+noted here so it is not read as this entry's doing.
+
+---
+
 ### The record-header and topbar pattern goes panel-wide
 
 **Area:** every module's record pages and topbar

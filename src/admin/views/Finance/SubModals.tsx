@@ -24,12 +24,11 @@ import { useEffect, useMemo, useState } from "react";
 import AdminOpsService, { call } from "../../../api/modules/adminOps";
 import type { PlanRow } from "../../../api/modules/adminOps";
 import { errMessage } from "../../../api/apiService";
-import { Notice, Tabs } from "../../ui";
+import { Notice } from "../../ui";
 import { Check } from "./bits";
 import { go } from "../../ui/nav";
 import { Cancel, Dlg, Field, Fs, Pick } from "./dialog";
 /* SAMPLE TAB — proto only, deleted at integration. */
-import { SAMPLES_ON, SubSamples } from "./SubSamples";
 import type { Done } from "./dialog";
 import {
   ACCOUNTS, FAILURE_REASONS, MODES,
@@ -91,8 +90,6 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
   const [count, setCount] = useState("1");
   const [startDate, setStartDate] = useState(todayIso());
   const [err, setErr] = useState<string | null>(null);
-  /* SAMPLE TAB — proto only, deleted at integration. See SubSamples.tsx. */
-  const [tab, setTab] = useState<"record" | "sample">("record");
 
   /* THE CATALOGUE IS LIVE. Plans is a real module with real rows, so the plan
      on a subscription is chosen from what the company actually sells rather
@@ -154,6 +151,27 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
     return list.slice(0, 8);
   }, [users, uq]);
   const chosenUser = users.filter((u) => u.userId === userId)[0] || null;
+
+  /* PICKING THE BUSINESS FILLS THE FORM. The newest open quotation is
+     attached at once — and with it the plan, the term, the installments and
+     the chain's invoice — so the common case is one pick and one press.
+     Nothing is locked by the pick that was not already locked by the chain:
+     every block keeps its Change link, so a different quotation or invoice
+     is one press away. With no chain, a lone attachable invoice attaches
+     itself for the same reason. */
+  const pickUser = (uid: string) => {
+    setUserId(uid);
+    setErr(null);
+    const opens = chainsFor(uid).filter((c) => !!c.attachable && !c.recordedAs);
+    if (opens.length) {
+      setQuotationNumber(opens[0].quotation.quotationNumber);
+      setInvoiceNumber("");
+      return;
+    }
+    setQuotationNumber("");
+    const attachable = attachableInvoices(uid);
+    setInvoiceNumber(attachable.length === 1 ? attachable[0].invoiceNumber : "");
+  };
 
   /* ------------------------------------------------------- the chain ---
      deal → quotation → invoice. Picking the business resolves it, and the
@@ -240,45 +258,18 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
   };
 
   return (
-    <Dlg title="Record a subscription" err={tab === "record" ? err : null} onClose={onClose}
-      sub="Writes down a sale that has happened. The invoice says what it cost; the whole schedule is created with it."
-      footer={tab === "sample"
-        ? <Cancel onClose={() => setTab("record")} label="Back to the form" />
-        : <>
-          <Cancel onClose={onClose} />
-          <button className="btn pri" onClick={submit}>Record subscription</button>
-        </>}>
-
-      {/* SAMPLE TAB — proto only, deleted at integration. See SubSamples.tsx
-          for the four-step removal list. */}
-      {SAMPLES_ON ? (
-        <Tabs cur={tab} onPick={(k) => setTab(k as "record" | "sample")}
-          items={[
-            { k: "record", label: "Record" },
-            { k: "sample", label: "Sample & use cases" },
-          ]} />
-      ) : null}
-
-      {/* SAMPLE TAB — the whole form is the other branch of this one
-          conditional, so removing the tab is removing this line and its
-          closing brace at the end of the dialog. */}
-      {SAMPLES_ON && tab === "sample" ? (
-        <SubSamples onUse={(u, q) => {
-          setUserId(u);
-          setQuotationNumber(q);
-          setInvoiceNumber("");
-          setErr(null);
-          setTab("record");
-        }} />
-      ) : (<></>)}
-      {tab === "sample" ? null : (<>
+    <Dlg title="Record a subscription" err={err} onClose={onClose}
+      sub="Writes down a sale that has happened."
+      footer={<>
+        <Cancel onClose={onClose} />
+        <button className="btn pri" onClick={submit}>Record subscription</button>
+      </>}>
 
       {/* WHO, FROM THE USER BASE. Not a typed name: a subscription belongs to a
           registered account, and the account id is what every other module
           joins on. A name typed here would be a customer the platform has
           never heard of. */}
-      <Fs legend="Who bought it" req
-        hint="Picked from the registered user base, so the subscription joins to a real account.">
+      <Fs legend="Who bought it" req>
         {chosenUser ? (
           <div className="fin-picked">
             <span className="n">{chosenUser.name}</span>
@@ -295,8 +286,7 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
               onChange={(e) => setUq(e.target.value)} />
             <div className="fin-pick">
               {shownUsers.length ? shownUsers.map((u) => (
-                <button key={u.userId} type="button"
-                  onClick={() => { setUserId(u.userId); setQuotationNumber(""); setInvoiceNumber(""); }}>
+                <button key={u.userId} type="button" onClick={() => pickUser(u.userId)}>
                   <span className="mono">{u.userId}</span>
                   <span className="s">{u.name}{u.business ? " · " + u.business : ""}</span>
                   <span className="a">{u.status === "active" ? "" : u.status}</span>
@@ -312,8 +302,7 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
           the number of installments. It is the difference between recording a
           sale and re-describing one. */}
       {userId ? (
-        <Fs legend="The sale it came from"
-          hint="Accepted quotations for this business. Picking one fills in everything below it.">
+        <Fs legend="The sale it came from">
           {chain ? (
             <div className="fin-inv">
               <div className="h">
@@ -337,11 +326,6 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
                     + (i.status === "cancelled" ? " (cancelled)" : "")).join("  ·  ")
                   : "none yet"}</dd>
               </dl>
-              <p className="fin-fine">
-                The plan, the term and the installment count below come from this quotation and
-                cannot be edited here. Change the quotation if any of them is wrong — a figure
-                retyped beside a document is a figure that can disagree with it.
-              </p>
             </div>
           ) : open.length ? (
             <div className="fin-pick">
@@ -374,11 +358,10 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
           the moment one is attached. Asking it anyway invites the answer that
           contradicts the document. */}
       {quote ? null : (
-        <Fs legend="How the sale happened" req
-          hint="Both are recorded identically. The difference is who typed it, and it is what channel analytics and CAC read.">
+        <Fs legend="How the sale happened" req>
           <Pick value={source} onChange={setSource} options={[
-            { key: "sales", label: "Sales", help: "A salesperson closed it on a deal and recorded the payment against the invoice." },
-            { key: "website", label: "Website", help: "The customer bought it themselves and paid through the gateway." },
+            { key: "sales", label: "Sales" },
+            { key: "website", label: "Website" },
           ]} />
         </Fs>
       )}
@@ -387,16 +370,13 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
           the price, so there is no second field for the term that could
           disagree with the first. */}
       <Fs legend="What was sold" req
-        hint={quote
-          ? "Read from " + quote.quotationNumber + " — the quotation is where this was agreed."
-          : "From the live plan catalogue. The billing cycle carries both the term and the price."}>
+        hint={quote ? "From " + quote.quotationNumber + "." : undefined}>
         {quote ? (
           <div className="fin-derived">
             <b>{quote.planName}</b> · {quote.termMonths} month{quote.termMonths === 1 ? "" : "s"}
           </div>
         ) : plans && plans.length ? (
-          <Field label="Plan and billing cycle"
-            help="Choosing one sets the term and fills the total in below.">
+          <Field label="Plan and billing cycle">
             <div className="selectbox">
               <select value={choiceId} onChange={(e) => pickPlan(e.target.value)}>
                 <option value="">Pick a plan…</option>
@@ -414,7 +394,7 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
                 <input className="inp" value={manualPlan} placeholder="As it appears on the invoice"
                   onChange={(e) => setManualPlan(e.target.value)} />
               </Field>
-              <Field label="Term" help="How long the customer is entitled for. Not the number of installments.">
+              <Field label="Term">
                 <div className="selectbox">
                   <select value={String(manualMonths)} onChange={(e) => setManualMonths(Number(e.target.value))}>
                     {[1, 3, 6, 12].map((m) => <option key={m} value={m}>{m} month{m === 1 ? "" : "s"}</option>)}
@@ -425,7 +405,7 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
           </>
         ) : <p className="fin-fine">Reading the plan catalogue…</p>}
 
-        <Field label="Starts on" help="A subscription starts when it is sold, so this cannot be a future date.">
+        <Field label="Starts on">
           <input type="date" className="inp" value={startDate} max={todayIso()}
             onChange={(e) => setStartDate(e.target.value)} />
         </Field>
@@ -435,9 +415,7 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
           the document the customer owes against, and a figure typed beside it
           could only ever be a second opinion on the same money. */}
       <Fs legend="Attach the invoice" req
-        hint={quote
-          ? "The installment invoice raised on " + quote.quotationNumber + ". Not a choice — it is the document this subscription is recorded on."
-          : "The subscription is recorded against the invoice raised for it. That document is what says how much is owed."}>
+        hint={quote ? "Raised on " + quote.quotationNumber + "." : undefined}>
         {!userId ? (
           <p className="fin-fine">Pick the business first — the invoice has to be one of theirs.</p>
         ) : invoice ? (
@@ -483,15 +461,9 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
         )}
       </Fs>
 
-      <Fs legend="How it is paid" req
-        hint={n === 1
-          ? "One payment for the whole term, against the invoice attached above."
-          : "One invoice per installment, each for the same amount. The schedule divides back exactly because of it."}>
+      <Fs legend="How it is paid" req>
         <div className="fin-stack">
-          <Field label="Payment plan"
-            help={quote
-              ? "Agreed on " + quote.quotationNumber + ". The chain raises one invoice per installment as each falls due, so this is the count the quotation agreed — not the number of invoices that exist yet."
-              : "Complete payment, or two to five installments. Beyond five it is a payment plan the sales chain raises no invoices for."}>
+          <Field label="Payment plan">
             {quote ? (
               <div className="fin-derived">
                 {quote.installments === 1
@@ -506,10 +478,7 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
               </div>
             )}
           </Field>
-          <Field label="Subscription total"
-            help={n === 1
-              ? "The attached invoice. Not typed, so it cannot disagree with the document."
-              : "The attached invoice, once per installment. Not typed, so it cannot disagree with the document."}>
+          <Field label="Subscription total">
             <div className="fin-derived tnum">
               {invoice
                 ? (n === 1
@@ -563,12 +532,9 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
       </Fs>
 
       <Notice tone="info" ico="lock" text={<>
-        <b>Recording this entitles the customer now.</b> The subscription is live from its start date and
-        the schedule exists in full — but every installment is created <em>due</em>, the absence of an
-        event. None counts as collected until a payment is recorded against it, one at a time —
-        <em>complete payment</em> included: it is one installment, not a receipt.
+        <b>Recording this entitles the customer now.</b> Every installment is created <em>due</em>;
+        none counts as collected until a payment is recorded against it.
       </>} />
-    </>)}
     </Dlg>
   );
 }

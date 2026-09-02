@@ -464,11 +464,13 @@ const draftSlip = page("an open-run (draft) payslip", "/finance-salaries/SLIP-20
 /* The standing draft ALERT is gone; the draft state is still said twice on
    the page itself, and the sheet now carries the brand. */
 has(draftSlip, "Draft", "...a draft slip is stamped as one, on the pill and on the sheet");
-has(draftSlip, "no slip number until the run is paid", "...and the sheet says what a draft lacks");
+has(draftSlip, "no slip number has been allotted", "...and the terms say what a draft lacks");
 has(draftSlip, 'class="fin-wm"', "...the watermark rides behind the sheet");
 has(draftSlip, 'class="fin-slip-logo"', "...and the logo sits beside the company block");
-has(draftSlip, "Draft — no slip number until the run is paid", "...and that the number waits on the payment");
-hasnt(draftSlip, "SLIP-2026-08-0011", "...it carries no slip number stamp at all, not a greyed-out one");
+/* The stamp is the one word Draft now — the terms at the foot carry the
+   explanation, and the action row names the slip by id even as a draft. */
+hasnt(draftSlip, "no slip number until the run is paid", "...the stamp is the one word Draft, not a sentence");
+has(draftSlip, 'class="mono fin-slipid"', "...and the action row names the slip by id");
 
 const oneTxn = page("a company transaction", "/finance-transactions/TXN-0901");
 has(oneTxn, "A recorded row is never edited", "...posted is permanent");
@@ -497,28 +499,23 @@ has(nowhere, "nothing in this module is ever", "...and it says why a missing rec
 console.log("\nevery dialog");
 const recSub = check("record a subscription", () => modal(<RecordSubModal onClose={noop} onDone={noop} />));
 
-/* SAMPLE TAB — proto only. Delete this block with the tab; see SubSamples.tsx. */
-has(recSub, "use cases", "...the sample tab is reachable from the dialog");
-/* The chain fieldset appears only once a business is picked, so what is
-   asserted here is that the RECORD tab is the one open by default. */
-has(recSub, "Who bought it", "...and the record tab is the one that opens");
+/* The sample tab is GONE — the dialog opens straight onto the form. */
+hasnt(recSub, "use cases", "...the sample tab is gone, and the dialog opens on the form");
+has(recSub, "Who bought it", "...opening on who bought it");
 has(recSub, "Writes down a sale that has happened", "...it is named as what it does: it records a sale");
 has(recSub, "Record subscription", "...and the button records rather than activates");
-has(recSub, "the whole schedule is created with it", "...the schedule is created with it");
 has(recSub, "Attach an invoice and the schedule appears here, dated, before anything is written",
   "...and the preview waits on the invoice, because the invoice is what sizes it");
 /* THE CUSTOMER IS AN ACCOUNT, NOT A STRING. A typed name would be a customer
    the platform has never heard of, and nothing else in the panel could join
    to it. The picker searches the real user base. */
-has(recSub, "Picked from the registered user base", "...the customer is picked, never typed");
-has(recSub, "IB-U-", "...and the real user base is what it offers");
+has(recSub, "IB-U-", "...the customer is picked from the real user base, never typed");
 /* THE PLAN CARRIES THE TERM AND THE PRICE. There is no separate term field
    to disagree with it. Under SSR the catalogue fetch has not resolved, so
    what renders is the loading state — which is itself the thing worth
    pinning: the dialog says what it is doing rather than showing an empty
    select. */
-has(recSub, "From the live plan catalogue", "...the plan comes from the catalogue, not a list copied into the file");
-has(recSub, "Reading the plan catalogue", "...and while it loads the dialog says so rather than rendering an empty picker");
+has(recSub, "Reading the plan catalogue", "...and while the catalogue loads the dialog says so rather than rendering an empty picker");
 hasnt(recSub, ">Starter<", "...no hardcoded plan is offered any more");
 /* The label the user asked for. */
 /* NOBODY TYPES A TOTAL any more. The invoice is the document the customer
@@ -528,7 +525,7 @@ has(recSub, "Attach the invoice", "...the money comes from an attached invoice, 
 has(recSub, "Pick the business first", "...and until a customer is chosen there is nothing to attach");
 hasnt(recSub, "Total paid", "...no typed total is left to disagree with the invoice");
 hasnt(recSub, "fin-rupee", "...and no rupee box at all");
-has(recSub, "every installment is created", "...every installment starts due — the absence of an event");
+has(recSub, "installment is created", "...every installment starts due — the absence of an event");
 has(recSub, "Recording this entitles the customer now", "...it is live on recording, and the notice says so");
 
 /* The strip's own words after the two figures came off it. */
@@ -588,7 +585,8 @@ has(paySal, "Payment via", "...the method is a choice on the form");
 has(paySal, "Bank transfer", "...with bank transfer among the options");
 has(paySal, "Cash", "...and cash");
 has(paySal, "Receipt", "...the receipt is asked for");
-has(paySal, "Image or PDF", "...and it says what kind of file it takes");
+has(paySal, "Attach receipt", "...the receipt picker is drawn as a field, the box the whole control");
+hasnt(paySal, "Image or PDF", "...with no standing caption — a wrong file is told what it takes when it happens");
 hasnt(paySal, "Bank reference", "...the bank reference field is gone");
 /* THE ADJUSTMENTS. Two named one-off lines that land on the newest slip, and
    a summary that must show the month being settled — the open run's month —
@@ -695,9 +693,12 @@ pages.forEach(([label, html]) => {
 });
 
 /* THE PROTO BANNER. Every face and every record screen renders it, so nobody
-   reads a seeded figure as a live one. */
+   reads a seeded figure as a live one — except the payslip pages, which shed
+   their chrome: the slip is a DOCUMENT a person is handed, and the banner
+   above a letterhead read as part of the letterhead. */
 pages.forEach(([label, html]) => {
-  has(html, "fin-proto", "the proto banner is on · " + label);
+  if (/payslip/i.test(label)) hasnt(html, "fin-proto", "the proto banner stays off the document · " + label);
+  else has(html, "fin-proto", "the proto banner is on · " + label);
 });
 has(subs, "Nothing here is live.", "...and it says, in words, that nothing here is live");
 
