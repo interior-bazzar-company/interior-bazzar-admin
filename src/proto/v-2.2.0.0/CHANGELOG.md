@@ -65,7 +65,10 @@ set like the paid slip's "Issued …" line; the action row gained a status pill
 actions by a thin rule. The pill takes a control's height, radius and type
 size so the row reads as one line of equals, and the separator is a drawn
 1px rule, centred, rather than a `|` glyph sitting on the text baseline.
-`Back` wears the panel's primary green — the row's one filled control.
+`Back` wears the panel's primary green — the row's one filled control. The
+row then settled into left and right halves: the slip's own number leads on
+the left with the status pill beside it (the rule between them), and the
+right keeps only the actions — More, then Back.
 
 **The salary-account dialog took the pay dialog's layout.** Both fieldsets
 went from the two-up grid to the one-per-line `.fin-stack`; the Department and

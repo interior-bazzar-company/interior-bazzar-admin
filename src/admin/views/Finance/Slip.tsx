@@ -97,9 +97,10 @@ export default function Slip({ id, p }: {
       {/* Above the document, and out of the print entirely — `.fin-actions` is
           already display:none when this page goes to paper. */}
       <div className="fin-actions">
-        <span className="spacer" />
-        <span className={"pill " + (draft ? "warn" : "ok")}>{draft ? "Draft" : "Paid"}</span>
+        <span className="mono fin-slipid">{slip.slipId}</span>
         <span className="fin-vsep" aria-hidden="true" />
+        <span className={"pill " + (draft ? "warn" : "ok")}>{draft ? "Draft" : "Paid"}</span>
+        <span className="spacer" />
         <MoreMenu
           onDownload={() => window.print()}
           pay={draft ? () => row && modal(
