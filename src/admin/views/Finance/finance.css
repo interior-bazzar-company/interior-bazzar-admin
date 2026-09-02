@@ -538,6 +538,16 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
   border-radius: var(--radius-md); font-size: var(--text-md);
 }
 /* The slip's own number, leading the row — the one fact that names the page. */
+/* A date input standing in the command row beside the dropdowns. `.inp` is a
+   block that fills its field, so in a toolbar it has to size to its own
+   content like every control next to it — and wear the panel's own
+   active-filter tint when it is narrowing the list, because a control that
+   is filtering and one that is not must not look the same. */
+.fin-cmd-date { display: inline-flex; width: auto; min-width: 150px; height: var(--control-md);
+                font-size: var(--text-md) }
+.fin-cmd-date.on { border-color: var(--brand); background: var(--brand-tint);
+                   color: var(--brand-text); font-weight: var(--weight-medium) }
+
 .fin-actions .fin-slipid { font-size: var(--text-md); font-weight: var(--weight-medium); color: var(--text-2) }
 /* The rule between the number and its state — a drawn line rather than a
    `|` glyph, which sat on the text baseline and never centred. Punctuation,

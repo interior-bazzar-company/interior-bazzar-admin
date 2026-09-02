@@ -30,7 +30,7 @@ import { RecordSubModal } from "./SubModals";
 import SubAnalytics from "./SubAnalytics";
 import {
   FILTER_LABELS, PERIOD, SUB_SOURCES, SUB_STATUSES,
-  applySubFilters, filterValueLabel, fmtDate, inr, useOverview, useSubRows,
+  applySubFilters, filterValueLabel, fmtDate, inr, startedOptions, useOverview, useSubRows,
 } from "./store";
 import type { Params, SubRow } from "./store";
 
@@ -86,7 +86,7 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
                shows no filter control would narrow a page with something
                nobody can see or clear. */
             q: undefined, source: undefined, status: undefined, flag: undefined, plan: undefined,
-            page: undefined,
+            started: undefined, page: undefined,
           })} />
       }
       cmd={tab === "analytics" ? <>
@@ -111,6 +111,20 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
             { v: "failed", l: "Has a failed installment" },
             { v: "due", l: "Has something still to pay" },
           ]} />
+        {/* WHEN IT STARTED — one filter, three grains. The dropdown carries the
+            years and their months, read off the records themselves so it can
+            never offer a month nothing was sold in; the date box beside it
+            names one day. Both write the same `started` param, because they
+            are two ways of saying one thing and two params would be two
+            filters that could contradict each other. */}
+        <Select key={"started" + (p.started || "")} name="started" label="Started"
+          value={/^\d{4}(-\d{2})?$/.test(p.started || "") ? p.started : ""}
+          onFilter={onFilter} options={startedOptions(rows)} />
+        <input type="date" className={"inp fin-cmd-date" + (/^\d{4}-\d{2}-\d{2}$/.test(p.started || "") ? " on" : "")}
+          aria-label="Started on one exact day"
+          title="Started on one exact day"
+          value={/^\d{4}-\d{2}-\d{2}$/.test(p.started || "") ? (p.started as string) : ""}
+          onChange={(e) => onFilter("started", e.target.value)} />
         <span className="spacer" />
         {writable
           ? <button className="btn pri" onClick={onRecord}>

@@ -379,11 +379,40 @@ export const subRows = (): SubRow[] =>
     return b.s.startDate.localeCompare(a.s.startDate);
   });
 
+/** WHEN A SUBSCRIPTION STARTED, at whatever granularity was asked for.
+ *
+ *  ONE PARAM, THREE GRAINS, and the value says which: `2026` is a year,
+ *  `2026-08` a month, `2026-08-21` a day. It is a prefix of the ISO start
+ *  date, so the same comparison answers all three and there is no second
+ *  field that could disagree with the first about what is being narrowed. */
+export function startedOptions(rows: SubRow[]): { v: string; l: string }[] {
+  const years = new Set<string>();
+  const months = new Set<string>();
+  rows.forEach((r) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(r.s.startDate)) return;
+    years.add(r.s.startDate.slice(0, 4));
+    months.add(r.s.startDate.slice(0, 7));
+  });
+  const out: { v: string; l: string }[] = [];
+  /* Newest first, and each year followed by its own months, so the list reads
+     as the calendar does rather than as two lists stapled together. */
+  Array.from(years).sort().reverse().forEach((y) => {
+    out.push({ v: y, l: y });
+    Array.from(months).filter((m) => m.slice(0, 4) === y).sort().reverse()
+      .forEach((m) => out.push({ v: m, l: "· " + fmtMonth(m) }));
+  });
+  return out;
+}
+
 export function applySubFilters(rows: SubRow[], p: Params): SubRow[] {
   let out = rows;
   if (p.source) out = out.filter((r) => r.s.source === p.source);
   if (p.status) out = out.filter((r) => r.s.status === p.status);
   if (p.plan) out = out.filter((r) => r.s.planId === p.plan);
+  /* The start date is the date this list is ABOUT: when the customer became
+     entitled. A payment's value date belongs to the installment it settled,
+     and filtering the sale by it would answer a different question. */
+  if (p.started) out = out.filter((r) => r.s.startDate.startsWith(p.started as string));
   if (p.flag === "settled") out = out.filter((r) => r.paidN > 0);
   if (p.flag === "failed") out = out.filter((r) => r.failedN > 0);
   if (p.flag === "due") out = out.filter((r) => !!r.dueNext);
@@ -2362,7 +2391,7 @@ export function delta(now: number, before: number | null | undefined): { text: s
 export const FILTER_LABELS: Record<string, string> = {
   q: "Search", source: "Source", status: "Status", plan: "Plan", flag: "Queue",
   dir: "Direction", tag: "Tag", kind: "Rolls up to", state: "State", range: "Period",
-  active: "Account", month: "Month",
+  active: "Account", month: "Month", started: "Started",
 };
 export function filterValueLabel(key: string, value: string): string {
   if (key === "source") return sourceMeta(value)?.label || value;
@@ -2374,6 +2403,12 @@ export function filterValueLabel(key: string, value: string): string {
     return subStatusMeta(value)?.label || (value === "paid" ? "Paid" : value);
   }
   if (key === "month") return fmtMonth(value);
+  /* The value carries its own grain: a year, a month, or a day. */
+  if (key === "started") {
+    if (/^\d{4}$/.test(value)) return value;
+    if (/^\d{4}-\d{2}$/.test(value)) return fmtMonth(value);
+    return fmtDate(value);
+  }
   if (key === "tag") return tagOf(value)?.label || value;
   if (key === "kind") return tagKindMeta(value)?.label || value;
   if (key === "state") return txnStateMeta(value)?.label || refundStateMeta(value)?.label || value;

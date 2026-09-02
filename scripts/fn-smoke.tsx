@@ -214,6 +214,25 @@ const subsSettled = check("subscriptions · filtered to the ones that have settl
 has(subsSettled, "Settled", "...and the chip names the filter that was applied");
 has(subsSettled, "clear this filter", "...offering the way back out of it");
 has(subsFiltered, "Defaulting", "...the filtered list still names the state it was filtered to");
+/* WHEN IT STARTED — one param, three grains, the value saying which. Each is
+   a prefix of the ISO start date, so one comparison answers all three and no
+   second field can disagree with the first about what is being narrowed. */
+{
+  const all = at("/finance");
+  const rowsIn = (html: string) => (html.match(/aria-label="Open SUB-/g) || []).length;
+  const byYear = check("subscriptions · started in a year", () => at("/finance?started=2026"));
+  const byMonth = check("subscriptions · started in a month", () => at("/finance?started=2026-08"));
+  const byDay = check("subscriptions · started on one day", () => at("/finance?started=2026-08-21"));
+  has(byYear, "Started", "...the chip names the filter");
+  has(byMonth, "Aug 2026", "...a month value is printed as a month, not as an ISO string");
+  ok3("a month narrows what the year matched", rowsIn(byMonth) > 0 && rowsIn(byMonth) <= rowsIn(byYear));
+  ok3("a day narrows what the month matched", rowsIn(byDay) > 0 && rowsIn(byDay) <= rowsIn(byMonth));
+  ok3("and every one of them is a subset of the whole list", rowsIn(byYear) <= rowsIn(all));
+  /* The dropdown offers only months something was actually sold in — it is
+     built from the records, never from a calendar. */
+  has(all, 'data-filter="started"', "...the filter is offered on the list");
+  hasnt(all, ">· Jan 2026<", "...and it offers no month nothing was sold in");
+}
 const subsEmpty = check("subscriptions · a filter that matches nothing", () => at("/finance?q=zzzznothing"));
 has(subsEmpty, "Nothing matches those filters", "...an empty list says the filter is why");
 has(subsEmpty, "counts every subscription in the module, before any filter",

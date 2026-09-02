@@ -6,6 +6,47 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-02
 
+### Subscriptions can be filtered by when they started
+
+**Area:** `#/finance` · `?started=`
+**Files:** `src/admin/views/Finance/{Subscriptions,store,finance.css}.tsx(ts,css)`,
+`scripts/fn-smoke.tsx`
+
+**What changed**
+
+**One filter, three grains, and the value says which:** `2026` is a year,
+`2026-08` a month, `2026-08-21` a day. Each is a prefix of the ISO start
+date, so one comparison answers all three — there is no second field that
+could disagree with the first about what is being narrowed, and the chip
+prints the value at its own grain (`2026`, `Aug 2026`, `21 Aug 2026`).
+
+**Two controls, because they are two ways of saying one thing.** A `Started`
+dropdown carries the years and, indented under each, its months — built from
+the records themselves, so it can never offer a month nothing was sold in —
+and a date box beside it names one exact day. Both write the same param;
+whichever grain is in play, the other control shows empty rather than a
+half-truth.
+
+**It filters on the START DATE**, which is the date this list is about: when
+the customer became entitled. A payment's value date belongs to the
+installment it settled, and filtering the sale by it would answer a
+different question.
+
+**Verified as narrowing, not just as rendering.** The harness counts rows and
+asserts year ⊇ month ⊇ day ⊆ the whole list, so a filter that silently
+matched everything would fail rather than pass.
+
+**Temp data**
+`none`.
+
+**Backend needed**
+`none`.
+
+**Open decisions**
+`none`.
+
+---
+
 ### Subscriptions grows a tab band and an Analytics tab
 
 **Area:** `#/finance` · `?tab=analytics`
