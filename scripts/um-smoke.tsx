@@ -620,14 +620,24 @@ console.log("\nthe record: one workspace, four tabs, and no membership among the
     if (dead.indexOf('title="Internal / demo account"') < 0) throw new Error("the reason is not carried");
     return dead;
   });
-  check("Back returns to the list you came from, filters and all", () => {
+  /* THE BUTTON IS JUST `Back` NOW, panel-wide: every record page in the panel
+     ends its header row with one primary Back, and a label that changed with
+     the face it would return to — `All users`, `Analytics` — was the odd one
+     out. Where it goes is unchanged: the list you came from, filters and all.
+
+     WHAT THIS CAN HONESTLY ASSERT is that the control is there and is the
+     row's one primary. The destination rides on an onClick, not an href, so
+     a static render cannot see it — pretending otherwise is what the old
+     assertion did by reading the label. */
+  check("the record ends its header row with one primary Back", () => {
     const fromFiltered = at("/users/IB-U-0912?status=active&city=Bengaluru");
-    if (fromFiltered.indexOf(">All users<") < 0) throw new Error("no way back");
+    if (fromFiltered.indexOf("Back</button>") < 0) throw new Error("no way back");
+    if (fromFiltered.indexOf('class="btn sm pri"') < 0) throw new Error("Back is not the row's primary");
     return fromFiltered;
   });
-  check("...and says Analytics when that is where you were", () => {
+  check("...and from Analytics just the same", () => {
     const fromAnalytics = at("/users/IB-U-0912?view=analytics");
-    if (fromAnalytics.indexOf(">Analytics<") < 0) throw new Error("Back does not name the face");
+    if (fromAnalytics.indexOf("Back</button>") < 0) throw new Error("no way back from analytics");
     return fromAnalytics;
   });
   check("a missing record is an empty state, not a crash or a blank", () => {

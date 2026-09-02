@@ -116,7 +116,14 @@
 .ch-groups { position: absolute; inset: 0; display: flex; align-items: flex-end;
              gap: var(--space-2) }
 .ch-group { position: relative; flex: 1 1 0; min-width: 0; height: 100%;
-            display: flex; flex-direction: column; justify-content: flex-end }
+            display: flex; flex-direction: column; justify-content: flex-end;
+            border-radius: var(--radius-sm);
+            transition: background var(--duration-fast) var(--ease) }
+/* HOVER HAS TO READ AS HOVER. The tooltip was the only feedback a mark gave,
+   which left the chart inert under the pointer until the tip resolved — and
+   said nothing about WHICH band the tip belonged to. The band lights instead:
+   it is the hit target, so it is the thing that should answer. */
+.ch-group:hover { background: var(--bg-hover) }
 .ch-group:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px;
                           border-radius: var(--radius-sm) }
 /* 2px of surface between touching bars. The gap is the separator; a stroke
@@ -139,7 +146,15 @@
 .ch-rows { display: flex; flex-direction: column; gap: var(--space-1) }
 .ch-row { position: relative; display: grid; align-items: center; gap: var(--space-3);
           grid-template-columns: minmax(96px, 168px) 1fr 56px minmax(0, 200px);
-          padding: var(--space-1) 0 }
+          /* The inline padding is pulled straight back out, so the row lights
+             a little wider than its content without moving any of it. */
+          padding: var(--space-1) var(--space-2); margin-inline: calc(var(--space-2) * -1);
+          border-radius: var(--radius-sm);
+          transition: background var(--duration-fast) var(--ease) }
+/* Only a row that actually answers lights up: `tabIndex` is set exactly when
+   the row carries a tooltip, so a row with nothing to say stays still rather
+   than promising something on hover and then withholding it. */
+.ch-row[tabindex]:hover { background: var(--bg-hover) }
 .ch-row:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px;
                         border-radius: var(--radius-sm) }
 .ch-row .lab { display: flex; align-items: center; gap: var(--space-2); min-width: 0;

@@ -135,6 +135,16 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
 .fin-cards { display: flex; flex-direction: column; gap: var(--space-4) }
 .fin-blocks { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: var(--space-4); margin-top: var(--space-4) }
 .fin-block.wide { grid-column: 1 / -1 }
+/* A CARD CLIPS ITS CHILDREN so its rounded corners hold — and a chart's
+   tooltip is a child that has to leave. It sits above the mark it describes,
+   which for the topmost bar and the tallest column is above the card's own
+   edge: clipped, it showed as half a tooltip or as none at all, and the chart
+   read as though hovering did nothing.
+
+   ONLY THE BLOCKS THAT HOLD A CHART stop clipping. A block holding a table
+   still needs the corner, because a row's hover tint runs to the very edge
+   and would square it off. */
+.fin-block:has(.ch-chart) { overflow: visible }
 .fin-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: var(--space-4) }
 .fin-actions { display: flex; gap: var(--space-2); flex-wrap: wrap; align-items: center; margin-top: var(--space-3) }
 .fin-actions .spacer { flex: 1 1 auto }

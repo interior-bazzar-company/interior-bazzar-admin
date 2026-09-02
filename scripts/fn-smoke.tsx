@@ -879,6 +879,30 @@ console.log("\nthe table cells are bounded");
      which is a fact about the fixture and not about the column. */
   has(at("/finance-transactions"), "fin-desc", "the transactions description is bounded too");
   has(ruleFor(".fin-desc"), "ellipsis", "...with an ellipsis rather than a wrap");
+
+  /* A CARD CLIPS ITS CHILDREN and a chart's tooltip is a child that has to
+     leave — it sits above the mark, which for the topmost bar is above the
+     card's own edge. Clipped, hovering a chart looked like it did nothing.
+     No static render can see this either: the markup was always right. */
+  has(ruleFor(".fin-block:has(.ch-chart)"), "overflow: visible",
+    "a block holding a chart lets its tooltips out of the card");
+  has(ruleFor(".fin-block:has(.ch-chart)").length ? "SCOPED" : "", "SCOPED",
+    "...and only that block, so a table's hover tint still keeps the corner");
+}
+
+/* ============================================ the charts answer a hover = */
+console.log("\nhovering a chart mark says so");
+{
+  const css = readFileSync(cwd() + "/src/admin/views/charts.css", "utf8");
+  const ruleFor = (sel: string) => css.split("}").filter((r) => (r.split("{")[0] || "").indexOf(sel) >= 0)
+    .map((r) => r.split("{")[1] || "").join(" ");
+  has(ruleFor(".ch-group:hover"), "background",
+    "the hovered column band lights, so the tooltip is anchored to something");
+  has(ruleFor(".ch-row[tabindex]:hover"), "background", "and so does the hovered bar row");
+  /* A row with nothing to say must not promise anything: `tabIndex` is set
+     exactly when the row carries a tooltip. */
+  has(ruleFor(".ch-row[tabindex]:hover").length ? "GATED" : "", "GATED",
+    "...but only a row that actually carries a tooltip");
 }
 
 resetStore();

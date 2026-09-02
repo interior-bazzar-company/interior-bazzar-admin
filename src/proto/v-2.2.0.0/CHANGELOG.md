@@ -6,6 +6,52 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-02
 
+### The charts answer a hover, and their tooltips get out of the card
+
+**Area:** every chart in the panel · `#/finance?tab=analytics` hardest hit
+**Files:** `src/admin/views/{charts.css,Finance/finance.css}`,
+`scripts/{fn-smoke,um-smoke}.tsx`
+
+**What changed**
+
+**A card clipped the tooltips.** `.card` sets `overflow: hidden` so its
+rounded corners hold, and a chart's tooltip is a child that has to leave: it
+sits above the mark it describes, which for the topmost bar and the tallest
+column is above the card's own edge. Clipped, hovering a chart showed half a
+tooltip or none — the chart read as though hover did nothing. Only the blocks
+that actually hold a chart stop clipping (`.fin-block:has(.ch-chart)`); a
+block holding a table still needs the corner, because a row's hover tint runs
+to the very edge and would square it off.
+
+**Hover now reads as hover.** The tooltip was the only feedback a mark gave,
+so until it resolved the chart was inert under the pointer — and nothing said
+WHICH band the tooltip belonged to. The hovered column band and the hovered
+bar row light instead, on the panel's own hover token. A bar row lights only
+when it actually carries a tooltip (`[tabindex]`), so a row with nothing to
+say does not promise something and then withhold it.
+
+**Both are pinned by reading the stylesheet**, the way the chart-mark and
+table-cell guards already are: no static render can see a clipped tooltip or
+a missing hover, because the markup was right the whole time.
+
+**And one stale assertion of my own, fixed.** The Users suite had been failing
+since the record-header rollout: it asserted Back was labelled `All users` /
+`Analytics`, which the panel-wide pattern deliberately changed to one plain
+`Back`. It now asserts what a static render can honestly see — the control is
+there and is the row's one primary — because the destination rides on an
+onClick, and reading the label was the old assertion pretending otherwise.
+
+**Temp data**
+`none`.
+
+**Backend needed**
+`none`.
+
+**Open decisions**
+`none`.
+
+---
+
 ### Subscriptions ▸ Analytics gets a year, and loses its captions
 
 **Area:** `#/finance?tab=analytics` · `?year=`
