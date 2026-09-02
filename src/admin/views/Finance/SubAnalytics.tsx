@@ -201,12 +201,12 @@ export default function SubAnalytics({ onQueue }: {
                 { label: "Not the same as the list's tile", hint: "that one is one period; this is everything ever collected." },
               ]} />} />
 
-          <Tile label="Upcoming installments" tone={duePaise ? "mute" : "ok"} value={inr(duePaise)}
+          <Tile label="Expected installments" tone={duePaise ? "mute" : "ok"} value={inr(duePaise)}
             sub={dueN
               ? plural(dueN, "installment", "installments") + " · expected"
               : "every installment that exists has been settled"}
             action={dueN ? <button className="lnk" onClick={() => onQueue("due")}>show only these</button> : null}
-            tip={<InfoTip label="Upcoming installments"
+            tip={<InfoTip label="Expected installments"
               intro={<>Installments that are <b>due — the absence of an event</b>. Nothing has
                 happened to them: they have not been paid and they have not failed.</>}
               rows={[

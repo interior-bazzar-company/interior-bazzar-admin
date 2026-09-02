@@ -198,7 +198,7 @@ has(subsAn, "Every subscription ever recorded", "...the analytics tab states its
    show it. Two strips in one module that read differently make a reader work
    out twice what they are looking at. */
 has(subsAn, "Expected collection", "...the strip opens on the whole contracted value");
-has(subsAn, "Upcoming installments", "...names what is still to come as installments, not as revenue");
+has(subsAn, "Expected installments", "...names what is still to come as installments, not as revenue");
 has(subsAn, "Fail installments", "...and names what did not clear");
 has(subsAn, "fin-mt-aside", "...Collected carries the active count as a second figure, not part of its own");
 has(subsAn, "show only these", "...and a tile that counts something offers to show it, on the records where narrowing means something");
