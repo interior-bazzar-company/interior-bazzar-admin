@@ -79,7 +79,13 @@ export default function Users() {
   const c = useMemo(() => countsOf(rows), [rows]);
   const crumbs = useMemo(() => (
     <>
-      <span className="tb-title">Users Management</span>
+      {/* The title names the FACE and is the way up: pressing it returns to
+          that face's default view — the job the topbar's Back button did
+          before it came off panel-wide. */}
+      <button type="button" className="tb-title" title="Back to the default view"
+        onClick={() => navigate(hashToPath(view === "users" ? ROUTE : ROUTE + qs({ view })), { replace: true })}>
+        {view === "analytics" ? "Analytics" : "Users Management"}
+      </button>
       <span className="tb-stats">
         {/* TWO figures, and neither is commercial. How many identities exist
             and how many of those accounts are live is the whole scope of this
@@ -95,7 +101,7 @@ export default function Users() {
         <span className="tb-stat ro"><span className="k">Active accounts</span><span className="v tnum">{c.active}</span></span>
       </span>
     </>
-  ), [c.total, c.active]);
+  ), [c.total, c.active, view, navigate]);
 
   /* Where "up" is: the list you opened the record from, filters and all, so
      Back is a return rather than a reset. */

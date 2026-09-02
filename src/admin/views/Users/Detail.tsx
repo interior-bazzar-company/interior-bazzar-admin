@@ -75,8 +75,12 @@ export default function Detail({ id, p, rows, onParams }: {
     <div className="um-rec">
       <ProtoBar onReset={() => { resetStore(); toast("Back to the seed."); }} />
 
+      {/* The record-header pattern the whole panel takes now: the name leads,
+          a thin rule sets the status off it, and the right side holds the
+          actions with Back — the one filled control — closing the row. */}
       <div className="um-idbar">
         <h2>{u.identity.name}</h2>
+        <span className="vsep" aria-hidden="true" />
         <ClassPill k={row.classification} lg />
         {u.userStatus === "deactivated"
           ? <span className="pill dead lg" title={u.deactivatedReason || ""}>Account off</span>
@@ -91,9 +95,8 @@ export default function Detail({ id, p, rows, onParams }: {
               {u.userStatus === "deactivated" ? "Reactivate account" : "Deactivate account"}
             </button>
           : null}
-        <button className="btn sm" onClick={() => navGo(back)}>
-          <Icon name="chevl" size="sm" />
-          {p.view === "analytics" ? "Analytics" : "All users"}
+        <button className="btn sm pri" onClick={() => navGo(back)}>
+          <Icon name="chevl" size="sm" />Back
         </button>
       </div>
 
