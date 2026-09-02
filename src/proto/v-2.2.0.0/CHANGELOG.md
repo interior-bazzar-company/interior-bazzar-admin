@@ -39,8 +39,13 @@ carried filters — the same target the empty state uses.
 Back button's own theme, opening the module's `fin-menu` popover — the same
 shell and `.mi` rows the transactions table's dots menu uses. Download still
 prints (the print stylesheet is the one definition of the slip on paper); a
-draft's menu offers Pay, a paid slip's offers Share. Both `More` and `Back`
-are text-only — the icons stay on the menu's rows, where they carry meaning.
+draft's menu offers Pay, a paid slip's offers Share. `More` is text-only —
+the icons stay on the menu's rows, where they carry meaning; `Back` keeps its
+chevron, the panel's usual sign for *this button navigates*.
+
+**The pay dialog's commit button reads `Record payment`,** without the
+`Super Admin` role pill it wore — the dialog's own notice already says who can
+press it, and a badge inside the primary button crowded the words that matter.
 
 **Temp data**
 `none`.

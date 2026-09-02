@@ -23,7 +23,7 @@
 import { useMemo, useRef, useState } from "react";
 import { Icon, Notice } from "../../ui";
 import { go } from "../../ui/nav";
-import { Check, Role } from "./bits";
+import { Check } from "./bits";
 import InfoTip from "./InfoTip";
 import { Cancel, Dlg, Field, Fs, RupeeInput, toPaise } from "./dialog";
 import type { Done } from "./dialog";
@@ -650,7 +650,7 @@ export function PaySalaryModal({ row, onClose, onDone }: {
             setPaid({ leaving, months: months.length, slipId: newest.slipId,
               via, from: payingFrom });
           }}>
-          Record the payment<Role sa />
+          Record payment
         </button>
       </>}>
 
