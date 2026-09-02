@@ -119,6 +119,9 @@ export default function Slip({ id, p }: {
             <Icon name="ext" size="sm" />Share
           </button>
         )}
+        <button className="btn" onClick={() => navGo(back)}>
+          <Icon name="chevl" size="sm" />Back
+        </button>
       </div>
 
       {/* ======================================================== the doc === */}

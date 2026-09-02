@@ -32,6 +32,9 @@ one place the state is written now.
 **GSTIN left the letterhead.** A payslip is not a tax invoice; the company
 block carries name, address and CIN.
 
+**A plain `Back` button closes the row,** to the right of Pay/Share, going to
+Salaries A/C with the carried filters — the same target the empty state uses.
+
 **Temp data**
 `none`.
 
