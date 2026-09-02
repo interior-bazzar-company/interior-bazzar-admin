@@ -4,6 +4,40 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ---
 
+## 2026-09-02
+
+### The payslip page sheds its chrome
+
+**Area:** `#/finance-salaries/SLIP-…` (the payslip document)
+**Files:** `src/admin/views/Finance/Slip.tsx`
+
+**What changed**
+
+**The action row above the slip is down to what acts on the slip.** The proto
+banner, the back-to-account button and the run-state pill are gone; the row now
+carries only a `Draft` pill when the slip is one, then Download and one primary
+action, right-aligned by the existing spacer. The document below is untouched.
+
+**The primary action depends on where the slip stands.** A paid slip offers
+**Share** (the renamed Send to member, same toast — no mail transport is wired).
+A draft offers **Pay** instead, which opens the same `PaySalaryModal` the
+Salaries list uses, resolved through `useSalaryAccount` off the slip's own
+`salaryAccountId` — one pay dialog in the module, not two.
+
+**The draft stamp on the document says `Draft`,** not the full sentence about
+slip numbers; the terms block at the foot already explains what a draft is.
+
+**Temp data**
+`none`.
+
+**Backend needed**
+`none`.
+
+**Open decisions**
+`none`.
+
+---
+
 ## 2026-09-01
 
 ### Both payroll controls become dropdowns

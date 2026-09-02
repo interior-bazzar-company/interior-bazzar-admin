@@ -18,10 +18,11 @@
 import { useShell } from "../../shell/ShellContext";
 import { useNav } from "../../shell/AdminShell";
 import { EmptyState, Icon } from "../../ui";
-import { ProtoBar, RunPill } from "./bits";
+import { PaySalaryModal } from "./SalaryModals";
 import LOGO from "../../../assets/images/IB_Icon.png";
 import {
-  COMPANY, accountOf, fmtDate, fmtDateTime, fmtMonth, inr, inrWordsOf, payViaMeta, useSlip,
+  COMPANY, accountOf, fmtDate, fmtDateTime, fmtMonth, inr, inrWordsOf, payViaMeta,
+  useSalaryAccount, useSlip,
 } from "./store";
 import type { Params, SalaryComponent } from "./store";
 
@@ -32,9 +33,10 @@ export default function Slip({ id, p }: {
   p: Params;
   onParams: (patch: Params) => void;
 }) {
-  const { toast } = useShell();
+  const { toast, modal, closeLayer } = useShell();
   const { go: navGo } = useNav();
   const hit = useSlip(id);
+  const row = useSalaryAccount(hit ? hit.slip.salaryAccountId : null);
   /* PAN and UAN live on the account rather than the slip. They are identity,
      not money: they do not change between runs, and a slip that carried its own
      stale copy of a corrected PAN would be worse than one that reads the
@@ -49,7 +51,6 @@ export default function Slip({ id, p }: {
   if (!hit) {
     return (
       <div className="fin-rec">
-        <ProtoBar />
         <EmptyState icon="search" title="No payslip at that address"
           body={<>There is no slip for <span className="mono">{id}</span>.</>}
           action={<button className="btn pri" onClick={() => navGo(back)}>Back to Salaries A/C</button>} />
@@ -89,20 +90,13 @@ export default function Slip({ id, p }: {
      the choice a person made in the dialog, and it was stored and never once
      displayed. */
   const via = payViaMeta(slip.via || "");
-  const toAccount = "#/finance-salaries/" + encodeURIComponent(slip.salaryAccountId) + "?tab=slips";
 
   return (
     <div className="fin-rec">
-      <ProtoBar />
-
       {/* Above the document, and out of the print entirely — `.fin-actions` is
           already display:none when this page goes to paper. */}
       <div className="fin-actions">
-        <button className="btn sm" onClick={() => navGo(toAccount)}>
-          <Icon name="chevl" size="sm" />{slip.memberName}'s account
-        </button>
-        <RunPill k={run.state} />
-        {draft ? <span className="pill warn">Draft · not issued</span> : null}
+        {draft ? <span className="pill warn">Draft</span> : null}
         <span className="spacer" />
         {/* PRINTING IS HOW EVERY DOCUMENT IN THIS PANEL BECOMES A PDF. There is
             no PDF library in the bundle and there should not be one: the print
@@ -113,11 +107,19 @@ export default function Slip({ id, p }: {
         <button className="btn" onClick={() => window.print()}>
           <Icon name="download" size="sm" />Download
         </button>
-        <button className="btn pri" disabled={draft}
-          title={draft ? "Nothing has been paid. A draft is not sent to anybody." : undefined}
-          onClick={() => toast(slip.memberName + " would get " + slip.slipId + " at their registered email. Nothing was sent — no mail transport is wired to this module yet.", "info")}>
-          <Icon name="mega" size="sm" />Send to member
-        </button>
+        {draft ? (
+          <button className="btn pri" disabled={!row}
+            onClick={() => row && modal(
+              <PaySalaryModal row={row} onClose={closeLayer}
+                onDone={(msg, tone) => { closeLayer(); toast(msg, tone); }} />, "wide")}>
+            <Icon name="cash" size="sm" />Pay
+          </button>
+        ) : (
+          <button className="btn pri"
+            onClick={() => toast(slip.memberName + " would get " + slip.slipId + " at their registered email. Nothing was sent — no mail transport is wired to this module yet.", "info")}>
+            <Icon name="ext" size="sm" />Share
+          </button>
+        )}
       </div>
 
       {/* ======================================================== the doc === */}
@@ -146,7 +148,7 @@ export default function Slip({ id, p }: {
           <div className="r">
             <div className="fin-slip-title">Payslip for {fmtMonth(slip.month)}</div>
             {draft ? (
-              <div className="fin-slip-stamp">Draft — no slip number until the run is paid</div>
+              <div className="fin-slip-stamp">Draft</div>
             ) : (
               <>
                 <div className="mono">{slip.slipId}</div>
