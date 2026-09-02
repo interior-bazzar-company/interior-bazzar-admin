@@ -22,23 +22,35 @@ import { useShell } from "../../shell/ShellContext";
 import { can } from "../../shell/AdminShell";
 import { EmptyState, FilterChips, Icon, SearchField, Select } from "../../ui";
 import { go } from "../../ui/nav";
-import { Frame } from "./Frame";
+import { Frame, ViewBand } from "./Frame";
 import type { FaceProps } from "./Frame";
 import { InstStrip, Money, SourceTag, SubPill } from "./bits";
 import InfoTip, { MetricTip } from "./InfoTip";
 import { RecordSubModal } from "./SubModals";
+import SubAnalytics from "./SubAnalytics";
 import {
   FILTER_LABELS, PERIOD, SUB_SOURCES, SUB_STATUSES,
   applySubFilters, filterValueLabel, fmtDate, inr, useOverview, useSubRows,
 } from "./store";
 import type { Params, SubRow } from "./store";
 
-export default function Subscriptions({ p, onFilter, onSearch, onUnfilter }: FaceProps) {
+export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onParams }: FaceProps) {
   const { toast, modal, closeLayer } = useShell();
   const rows = useSubRows();
   const o = useOverview();
   const shown = applySubFilters(rows, p);
   const writable = can("finance", "edit");
+
+  /* TWO READINGS OF ONE BOOK OF SALES: the RECORDS, which somebody acts on one
+     at a time, and what they add up to. The band is a sub-switch and not a
+     section — Subscriptions is one sidebar row, and both tabs are it.
+
+     SUBSCRIPTIONS IS THE LANDING TAB: the grain of daily work here is "where
+     is every sale and what is failing", and Analytics is one press away
+     carrying ?tab=analytics. It reads the subscriptions and nothing else, so
+     it belongs beside the records it derives from — the same move Salaries
+     A/C made with payroll. */
+  const tab = p.tab === "analytics" ? "analytics" : "subscriptions";
 
   /* `view` is the record type you are looking at and `page` is a position in a
      list. Neither narrows anything, so neither counts as a filter — a chip
@@ -58,7 +70,34 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter }: Fac
 
   return (
     <Frame toast={toast}
-      cmd={<>
+      tabs={
+        <ViewBand cur={tab}
+          items={[
+            { k: "subscriptions", label: "Subscriptions", icon: "coin", n: rows.length },
+            /* NO COUNT ON ANALYTICS. The badge beside Subscriptions says how
+               many records are behind the tab; what is behind this one is
+               every one of them read four ways, and a number there would
+               invite somebody to read it as a fifth. */
+            { k: "analytics", label: "Analytics", icon: "chart" },
+          ]}
+          onPick={(k) => onParams({
+            tab: k === "subscriptions" ? undefined : k,
+            /* The filters belong to the list. Carrying one onto a tab that
+               shows no filter control would narrow a page with something
+               nobody can see or clear. */
+            q: undefined, source: undefined, status: undefined, flag: undefined, plan: undefined,
+            page: undefined,
+          })} />
+      }
+      cmd={tab === "analytics" ? <>
+        {/* NO FILTERS ON THIS TAB, and that is the rule rather than an
+            omission: a chart narrowed by a search box is a chart whose total
+            no longer matches its own caption. The scope is stated instead. */}
+        <span className="fin-sum">
+          Every subscription ever recorded · all time, not {PERIOD.label}
+        </span>
+        <span className="spacer" />
+      </> : <>
         {/* KEYED ON THEIR VALUE. SearchField and Select are uncontrolled, so
             clearing a chip otherwise left the old text in the box. */}
         <SearchField key={"q" + (p.q || "")} val={p.q} onFilter={onSearch}
@@ -79,7 +118,7 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter }: Fac
             </button>
           : null}
       </>}
-      bands={<>
+      bands={tab === "analytics" ? null : <>
         {/* THE MONEY STRIP READS OUT; IT DOES NOT ASSERT. Each tile carries the
             metric's own definition behind the i button, so the figure means the
             same thing here as it does on Analytics six months from now. The two
@@ -146,7 +185,7 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter }: Fac
         </div>
       </>}>
 
-      {shown.length ? (
+      {tab === "analytics" ? <SubAnalytics /> : shown.length ? (
         <table className="tbl dls-tbl fin-tbl">
           <thead>
             <tr>

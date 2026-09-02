@@ -6,6 +6,61 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-02
 
+### Subscriptions grows a tab band and an Analytics tab
+
+**Area:** `#/finance` · `?tab=analytics`
+**Files:** `src/admin/views/Finance/{Subscriptions,SubAnalytics}.tsx`,
+`scripts/fn-smoke.tsx`
+
+**What changed**
+
+**The page takes the shape Salaries A/C already has:** a tab band above the
+command row — **Subscriptions** (badged with the record count) and
+**Analytics** — then the filters, then the money strip, then the table. The
+list tab is unchanged; it lands by default and carries no `?tab=`. Switching
+tabs drops the list's filters rather than carrying them onto a page that
+shows no control to clear them.
+
+**Analytics reads the subscriptions and nothing else, beside the records it
+derives from** — the move payroll analytics made when it left the Analytics
+section for Salaries A/C. It is **all time** where the list is one period,
+and says so in the command row instead of offering filters: a chart narrowed
+by a search box is a chart whose total no longer matches its own caption.
+
+Four figures, then four charts, one cut each — a month, a plan, a channel and
+an installment state are four ways of cutting the same rupees, so they never
+share an axis:
+
+| | |
+|---|---|
+| **Agreed / Collected / Still to collect / Did not clear** | the strip, each with its own definition and caution behind the `i` — written out rather than borrowed from the list's period tiles, so "collected" cannot mean two things |
+| **Collected, month by month** | one series, dated by the value date; months with nothing collected are absent, not drawn as zeros |
+| **Which plans are selling** | horizontal bars, ordered by money and grouped on the plan's **id**, so renaming a plan does not split it in two |
+| **Where the sales came from** | the channel split, count leading and money as the label beside it |
+| **Every installment, by state** | the module's real workload — paid `ok`, failed `bad`, **due and cancelled neutral**, because due is the absence of an event and a warning colour would claim something happened |
+
+Drawn with the panel's own chart kit (`ColumnChart`, `BarRows`), whose
+palette was validated when it was written and whose slots are assigned in
+fixed order — no second chart library, no new colours. Every amount is
+integer paise printed by `inr()`; the only division is the named `thousands`
+scaler feeding the axis, and nothing it returns is ever printed as money.
+
+**The harness caught one real thing:** the first draft of the installment
+caption said "nothing here is awaiting verification", and the module-wide
+rule bans that vocabulary *even in a denial*. It now says nothing waits on
+anybody's approval.
+
+**Temp data**
+`none`.
+
+**Backend needed**
+`none`.
+
+**Open decisions**
+`none`.
+
+---
+
 ### Record the payment: the invoice answers everything but the date
 
 **Area:** Finance · Subscriptions · the Record the payment dialog

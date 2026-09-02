@@ -187,6 +187,18 @@ has(subs, "fin-mt-aside", "...Collected carries the active count as a second fig
    open — so what is asserted is that it is REACHABLE from the second figure,
    which is the honest claim this harness can make about it. */
 has(subs, "About Active subscriptions", "...and the count carries its own i button, so the caution is one press away");
+/* THE ANALYTICS TAB beside the records, the move Salaries A/C made with
+   payroll. It is all time where the list is one period, it carries no filter
+   control, and its four charts are four different cuts of the same rupees —
+   never one axis, which would count every rupee four times. */
+const subsAn = page("subscriptions · the analytics tab", "/finance?tab=analytics");
+has(subsAn, "Every subscription ever recorded", "...the analytics tab states its scope: all time, not one period");
+has(subsAn, "Collected, month by month", "...it reads the money over time");
+has(subsAn, "Which plans are selling", "...which plans carry the revenue");
+has(subsAn, "Where the sales came from", "...and where the business arrives from");
+has(subsAn, "Every installment, by state", "...with the module's real workload counted one state each");
+has(subsAn, "ch-chart", "...drawn with the panel's own chart kit, not a second one");
+hasnt(subsAn, "Customer, subscription ID", "...and it carries no search box — a chart narrowed by a filter is a chart whose caption lies");
 const subsFiltered = check("subscriptions · filtered to the defaulting ones", () => at("/finance?status=defaulting"));
 const subsSettled = check("subscriptions · filtered to the ones that have settled something",
   () => at("/finance?flag=settled"));
