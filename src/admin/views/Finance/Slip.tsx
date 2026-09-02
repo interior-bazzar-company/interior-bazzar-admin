@@ -98,6 +98,8 @@ export default function Slip({ id, p }: {
           already display:none when this page goes to paper. */}
       <div className="fin-actions">
         <span className="spacer" />
+        <span className={"pill " + (draft ? "warn" : "ok")}>{draft ? "Draft" : "Paid"}</span>
+        <span className="fin-vsep" aria-hidden="true">|</span>
         <MoreMenu
           onDownload={() => window.print()}
           pay={draft ? () => row && modal(
@@ -135,7 +137,7 @@ export default function Slip({ id, p }: {
           <div className="r">
             <div className="fin-slip-title">Payslip for {fmtMonth(slip.month)}</div>
             {draft ? (
-              <div className="fin-slip-stamp">Draft</div>
+              <div>Draft</div>
             ) : (
               <>
                 <div className="mono">{slip.slipId}</div>

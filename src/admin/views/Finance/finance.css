@@ -528,11 +528,9 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
 .fin-slip { line-height: var(--lh-md) }
 .fin-slip-co { font-size: var(--text-sm); line-height: var(--lh-md); color: var(--text-2) }
 .fin-slip-title { font-size: var(--text-lg); font-weight: var(--weight-semibold); letter-spacing: .04em }
-.fin-slip-stamp {
-  display: inline-block; padding: 2px 8px; border-radius: var(--radius-xs);
-  font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .06em;
-  border: 1px dashed var(--warn-line); background: var(--warn-bg); color: var(--warn);
-}
+/* The bar between the status pill and the actions — punctuation, not a
+   control, so it stays out of the accessibility tree and off the mouse. */
+.fin-actions .fin-vsep { color: var(--line-3); user-select: none }
 .fin-slip-meta {
   display: flex; flex-wrap: wrap; gap: var(--space-6);
   padding: var(--space-3) 0; margin: var(--space-4) 0;

@@ -58,6 +58,12 @@ the `Optional.` hints on Adjustments and Remark — an unstarred field in this
 panel is optional by convention. The remark now stands off the Adjustments
 fieldset by the form's own beat.
 
+**The slip's state reads as plain text on the document and a pill in the
+row.** The dashed `DRAFT` stamp on the letterhead became the word `Draft`,
+set like the paid slip's "Issued …" line; the action row gained a status pill
+— `Draft` (warn) or `Paid` (ok) — before the More button, separated from the
+actions by a thin `|`.
+
 **Temp data**
 `none`.
 
