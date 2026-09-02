@@ -47,6 +47,17 @@ chevron, the panel's usual sign for *this button navigates*.
 `Super Admin` role pill it wore — the dialog's own notice already says who can
 press it, and a badge inside the primary button crowded the words that matter.
 
+**The pay dialog's form went line by line.** Payment via, Paid from and
+Receipt stack in one column (`.fin-stack`) instead of the two-up grid, each
+field answered before the eye moves down. **The receipt picker is drawn as the
+field it sits among** — the input's own height, border and radius, the whole
+box the button, the filename its value with a quiet `Replace` affordance once
+attached. The "nothing attached yet" and "Image or PDF." captions are gone
+(the error still names the accepted types when a wrong file is picked), as are
+the `Optional.` hints on Adjustments and Remark — an unstarred field in this
+panel is optional by convention. The remark now stands off the Adjustments
+fieldset by the form's own beat.
+
 **Temp data**
 `none`.
 

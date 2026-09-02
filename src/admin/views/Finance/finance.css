@@ -638,12 +638,34 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
    read as a field and not as a stray button: the control and what it has
    picked sit on one line, and the filename wraps rather than pushing the
    dialog sideways. */
-.fin-file {
-  display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center;
-  min-width: 0;
+/* The pay dialog's fields, one per line — the vertical rhythm of a form
+   somebody fills top to bottom. */
+.fin-stack { display: flex; flex-direction: column; gap: var(--space-4) }
+
+/* The receipt picker, drawn as the FIELD it sits among: the input's own
+   height, border and radius, with the filename as its value once a file is
+   chosen. The whole box is the button. */
+.fin-filebox {
+  display: flex; align-items: center; gap: var(--space-2);
+  width: 100%; height: var(--control-lg); padding: 0 var(--space-3);
+  border: 1px solid var(--line-2); border-radius: var(--radius-md);
+  background: var(--surface-raised); font: inherit; font-size: var(--text-base);
+  text-align: left; cursor: pointer; min-width: 0; color: var(--text-3);
+  transition: border-color var(--duration) var(--ease), box-shadow var(--duration) var(--ease);
 }
-.fin-file .pill { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
-.fin-file .faint { font-size: var(--text-sm) }
+.fin-filebox:hover { border-color: var(--line-3) }
+.fin-filebox:focus-visible { outline: none; border-color: var(--brand); box-shadow: var(--ring) }
+.fin-filebox .ph { color: var(--text-3) }
+.fin-filebox .name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+                     white-space: nowrap; color: var(--text) }
+.fin-filebox .name + .swap { flex: 0 0 auto; font-size: var(--text-sm); color: var(--text-3) }
+.fin-filebox:hover .swap { color: var(--text-2) }
+.fin-filebox .ic { flex: 0 0 auto; color: var(--text-3) }
+.fin-filebox.on .ic { color: var(--ok) }
+
+/* The remark stands off the fieldset above it by the same beat the fieldsets
+   keep between themselves. */
+.fin-remark { margin-top: var(--space-4) }
 
 /* A read-only value where a field would be — the picked member, the plan a
    quotation already decided. It is a FIELD, so it keeps the height and the

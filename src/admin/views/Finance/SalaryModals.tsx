@@ -681,9 +681,10 @@ export function PaySalaryModal({ row, onClose, onDone }: {
           something is true of this payment, not because the screen has room. */}
 
       <Fs legend="The transfer" req>
-        {/* One row, one question: how and from where. Stacked they read as two
-            separate decisions, and they are halves of one. */}
-        <div className="fin-f2">
+        {/* One field per line — each of these is answered, then the eye moves
+            down. The two-up grid this section opened with read fine on a wide
+            dialog and crowded on a narrow one. */}
+        <div className="fin-stack">
           <Field label="Payment via">
             <div className="selectbox">
               <select value={via} onChange={(e) => { setVia(e.target.value); setErr(null); }}>
@@ -706,14 +707,19 @@ export function PaySalaryModal({ row, onClose, onDone }: {
               </div>
             </Field>
           )}
-        </div>
 
-        {/* THE ONLY EVIDENCE THIS PAYMENT HAS, now the reference field is gone,
-            so it is mandatory and it is a real file rather than a typed name. */}
-        <Field label="Receipt" help="Image or PDF.">
-          <div className="fin-file">
-            <button type="button" className="btn sm" onClick={() => fileRef.current?.click()}>
-              <Icon name="plus" size="sm" />{proof ? "Replace" : "Attach receipt"}
+          {/* THE ONLY EVIDENCE THIS PAYMENT HAS, now the reference field is
+              gone, so it is mandatory and it is a real file rather than a
+              typed name. Drawn as a FIELD like everything above it — the box
+              is the whole control, and the filename becomes its value. */}
+          <Field label="Receipt">
+            <button type="button" className={"fin-filebox" + (proof ? " on" : "")}
+              title={proof ? proof.filename : undefined}
+              onClick={() => fileRef.current?.click()}>
+              {proof
+                ? <><Icon name="check" size="sm" /><span className="name">{proof.filename}</span>
+                  <span className="swap">Replace</span></>
+                : <><Icon name="plus" size="sm" /><span className="ph">Attach receipt</span></>}
             </button>
             <input ref={fileRef} type="file" accept="image/*,application/pdf" hidden
               onChange={(e) => {
@@ -727,14 +733,8 @@ export function PaySalaryModal({ row, onClose, onDone }: {
                 setErr(null);
                 setProof({ filename: f.name, mime: f.type, bytes: f.size });
               }} />
-            {proof
-              ? <span className="pill ok xs" title={proof.filename}>
-                <Icon name="check" size="sm" />{proof.filename}
-              </span>
-              : <span className="faint">nothing attached yet</span>}
-          </div>
-        </Field>
-
+          </Field>
+        </div>
       </Fs>
 
       {/* One-off money settled WITH this transfer, ADDED rather than sitting
@@ -742,8 +742,7 @@ export function PaySalaryModal({ row, onClose, onDone }: {
           payment is furniture. Each lands as a named line on the newest
           month's slip and moves its totals — the slip stays the whole story
           of what was paid. */}
-      <Fs legend="Adjustments"
-        hint={newest ? "Optional. Either lands as a line on " + fmtMonth(newest.month) + "'s slip." : undefined}>
+      <Fs legend="Adjustments">
         {adjs.map((r) => (
           <div className="fin-adjrow" key={r.rid}>
             <div className="selectbox">
@@ -771,10 +770,12 @@ export function PaySalaryModal({ row, onClose, onDone }: {
       {/* Last, because it is the one thing here that is ABOUT the whole
           payment rather than part of it — written once everything above is
           settled, like a note on the bottom of a voucher. */}
-      <Field label="Remark" help="Optional.">
-        <input className="inp" value={remark} placeholder="Paid a day early — bank holiday on the 1st"
-          onChange={(e) => setRemark(e.target.value)} />
-      </Field>
+      <div className="fin-remark">
+        <Field label="Remark">
+          <input className="inp" value={remark} placeholder="Paid a day early — bank holiday on the 1st"
+            onChange={(e) => setRemark(e.target.value)} />
+        </Field>
+      </div>
 
       {overdrawn && newest ? (
         <Notice tone="bad" ico="alert" text={<>
