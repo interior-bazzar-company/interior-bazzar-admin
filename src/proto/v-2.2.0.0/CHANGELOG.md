@@ -76,6 +76,11 @@ UAN captions and the revision read-out's fine print came off (the notices that
 appear when something is true of THIS account stay); the opening sub is one
 sentence.
 
+**The Department read-out then left the salary-account dialog entirely.**
+Picking the member fetches it with the name, designation and code, and it
+still goes on the record from there — the field showed a value nobody could
+act on here.
+
 **And then every Finance dialog followed.** The `.fin-f2` two-up grid is
 retired: the expense, tag, record-subscription and record-installment dialogs
 lay their fields one per line in `.fin-stack`, and a module-wide rule gives

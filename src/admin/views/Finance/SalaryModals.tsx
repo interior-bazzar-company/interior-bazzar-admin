@@ -246,14 +246,9 @@ export function SalaryAccountModal({ account, onClose, onDone }: {
           <Field label="Joined">
             <input type="date" className="inp" value={joinedAt} onChange={(e) => setJoinedAt(e.target.value)} />
           </Field>
-          {/* DEPARTMENT IS A READ-OUT, not a field: it comes off the member
-              record, is shown so the cost's roll-up is no surprise, and is
-              not editable here. */}
-          <Field label="Department">
-            <div className="fin-derived">
-              {department || <span className="faint">Unassigned — set it on the team member</span>}
-            </div>
-          </Field>
+          {/* DEPARTMENT IS NOT SHOWN AT ALL: picking the member fetches it
+              with the name, designation and code, and it goes on the record
+              from there — the member picker already told the whole story. */}
         </div>
       </Fs>
 
