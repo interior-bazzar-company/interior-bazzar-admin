@@ -71,6 +71,7 @@ export const ICONS: Record<string, string> = {
   chevl:'<path d="m14.5 6-6 6 6 6"/>',
   alert:'<path d="M12 3.4 21.2 20H2.8z"/><path d="M12 9.4v4.8M12 17.2h.01"/>',
   clock:'<circle cx="12" cy="12" r="8.6"/><path d="M12 7.2v5.1l3.3 1.9"/>',
+  calendar:'<rect x="3.4" y="5.2" width="17.2" height="15.4" rx="2"/><path d="M3.4 10h17.2M8.2 3.4v3.6M15.8 3.4v3.6"/>',
   lock:'<rect x="4.6" y="10" width="14.8" height="10" rx="2"/><path d="M8 10V7.2a4 4 0 0 1 8 0V10"/>',
   unlock:'<rect x="4.6" y="10" width="14.8" height="10" rx="2"/><path d="M8 10V7.2A4 4 0 0 1 15.4 5"/>',
   arrow:'<path d="M4.5 12h14M13 6.5l5.5 5.5L13 17.5"/>',

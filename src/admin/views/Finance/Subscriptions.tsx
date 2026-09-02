@@ -127,11 +127,9 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
         <Select key={"started" + (p.started || "")} name="started" label="Started"
           value={/^\d{4}(-\d{2})?$/.test(p.started || "") ? p.started : ""}
           onFilter={onFilter} options={startedOptions(rows)} />
-        <input type="date" className={"inp fin-cmd-date" + (/^\d{4}-\d{2}-\d{2}$/.test(p.started || "") ? " on" : "")}
-          aria-label="Started on one exact day"
-          title="Started on one exact day"
+        <DayPick
           value={/^\d{4}-\d{2}-\d{2}$/.test(p.started || "") ? (p.started as string) : ""}
-          onChange={(e) => onFilter("started", e.target.value)} />
+          onPick={(v) => onFilter("started", v)} />
         <span className="spacer" />
         {writable
           ? <button className="btn pri" onClick={onRecord}>
@@ -243,6 +241,39 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
 }
 
 /* -------------------------------------------------------------------------- */
+
+/** THE EXACT-DAY HALF OF THE STARTED FILTER.
+ *
+ *  A bare `<input type="date">` prints `dd-mm-yyyy` at rest: a placeholder
+ *  pretending to be a value, and the widest thing in a command row of
+ *  dropdowns that each say one word. So this is a calendar icon until a day
+ *  is picked and the day itself once one is, with an ✕ to let go of it.
+ *
+ *  THE NATIVE INPUT IS STILL THE CONTROL — laid transparent over the icon
+ *  rather than replaced by a calendar of our own. The platform's picker, its
+ *  keyboard handling, its locale and its accessibility come free, and none of
+ *  its chrome is on screen. A hand-rolled month grid would be a second date
+ *  picker in a panel that would then have two. */
+function DayPick({ value, onPick }: { value: string; onPick: (v: string) => void }) {
+  const on = !!value;
+  return (
+    <span className={"fin-datepick" + (on ? " on" : "")}
+      title={on ? "Started on " + fmtDate(value) : "Started on one exact day"}>
+      <label className="hit">
+        <Icon name="calendar" size="sm" />
+        {on ? <span className="d">{fmtDate(value)}</span> : null}
+        <input type="date" value={value} aria-label="Started on one exact day"
+          onChange={(e) => onPick(e.target.value)} />
+      </label>
+      {on ? (
+        <button type="button" className="x" aria-label="Clear the day"
+          onClick={() => onPick("")}>
+          <Icon name="x" size="sm" />
+        </button>
+      ) : null}
+    </span>
+  );
+}
 
 /** "due in 4 days" / "6 days overdue". One fragment, and it never says late
  *  about a date that has not passed. */

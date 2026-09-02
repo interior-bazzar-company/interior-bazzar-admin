@@ -233,6 +233,14 @@ has(subsFiltered, "Defaulting", "...the filtered list still names the state it w
      built from the records, never from a calendar. */
   has(all, 'data-filter="started"', "...the filter is offered on the list");
   hasnt(all, ">· Jan 2026<", "...and it offers no month nothing was sold in");
+  /* THE DAY HALF IS A CALENDAR ICON AT REST. A bare date input prints
+     `dd-mm-yyyy` when it is empty — a placeholder pretending to be a value,
+     and the widest thing in a row of controls that each say one word. The
+     native input is still the control, laid transparent over the icon. */
+  has(all, "fin-datepick", "...and one exact day is picked from a calendar icon, not a dd-mm-yyyy box");
+  has(all, 'type="date"', "...the platform's own picker is what opens, not a calendar of our own");
+  hasnt(byDay, 'class="fin-datepick"', "...and once a day is picked the control says so rather than staying blank");
+  has(byDay, "Clear the day", "...with a way to let go of it");
 }
 const subsEmpty = check("subscriptions · a filter that matches nothing", () => at("/finance?q=zzzznothing"));
 has(subsEmpty, "Nothing matches those filters", "...an empty list says the filter is why");

@@ -68,9 +68,20 @@ prints the value at its own grain (`2026`, `Aug 2026`, `21 Aug 2026`).
 **Two controls, because they are two ways of saying one thing.** A `Started`
 dropdown carries the years and, indented under each, its months — built from
 the records themselves, so it can never offer a month nothing was sold in —
-and a date box beside it names one exact day. Both write the same param;
+and a day picker beside it names one exact day. Both write the same param;
 whichever grain is in play, the other control shows empty rather than a
 half-truth.
+
+**The day picker is a calendar icon at rest.** A bare `<input type="date">`
+prints `dd-mm-yyyy` when it is empty — a placeholder pretending to be a
+value, and the widest thing in a row of controls that each say one word. So
+it is one icon until a day is picked, the day itself once one is (`21 Aug
+2026`), and an ✕ to let go of it; it wears the same brand tint every applied
+filter in the row wears. **The native input is still the control**, laid
+transparent over the icon rather than replaced by a calendar of our own — the
+platform's picker, keyboard, locale and accessibility come free, and a
+hand-rolled month grid would be a second date picker in a panel that would
+then have two. (`calendar` joins the icon set; the panel had none.)
 
 **It filters on the START DATE**, which is the date this list is about: when
 the customer became entitled. A payment's value date belongs to the
