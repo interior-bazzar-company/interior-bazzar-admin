@@ -88,10 +88,12 @@ the right, and a record whose right side would hold more than two controls
 passes `menu` items instead — the salary account's Revise and Close now sit
 behind More, exactly like the slip's Download and Pay.
 
-**The topbar's Back goes UP, not backwards.** It used to retrace session
-history — three slips deep meant three presses to reach the list the sidebar
-names in one. It now goes straight to the module's default view (or the
-parent a record declares); the browser's own Back still owns the history.
+**The topbar's Back button is gone; the module title is the way up.** Back
+first stopped retracing session history and went straight to the module's
+default view — and then the button itself came off, because the title beside
+it already names that destination. Pressing the title (`Finance`, or any
+module's, on a deep screen) returns to the module's default view; the
+browser's own Back still owns the history.
 
 **And then every Finance dialog followed.** The `.fin-f2` two-up grid is
 retired: the expense, tag, record-subscription and record-installment dialogs

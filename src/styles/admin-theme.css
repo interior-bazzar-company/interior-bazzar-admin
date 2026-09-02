@@ -713,6 +713,12 @@ b,strong{ font-weight:var(--weight-semibold) }
    would sit, and its own control on the right beside the global actions. */
 .tb-title{ font-size:var(--text-lg); font-weight:var(--weight-semibold);
            color:var(--text); letter-spacing:var(--tracking-tight); padding:0 }
+/* As a BUTTON the title is the way up — pressing it returns to the module's
+   default view. Same face as the span; only the cursor and a hover tint say
+   it acts. */
+button.tb-title{ background:none; border:none; font:inherit; cursor:pointer;
+                 font-size:var(--text-lg); font-weight:var(--weight-semibold) }
+button.tb-title:hover{ color:var(--brand-text) }
 /* The scope line rides beside the title rather than holding a row of its own.
    A hairline separates it, since the line's own segments are already
    middot-separated and a third middot would read as one more segment. */

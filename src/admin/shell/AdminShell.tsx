@@ -179,14 +179,6 @@ export default function AdminShell() {
     navigate(t.path, { replace: true }); // up replaces; it is not a step forward
   }, [backTo, navigate]);
 
-  /* A path, said the way a person would say it: the record's own reference when
-     there is one, the module's name when there is not. */
-  const labelOf = (path: string) => {
-    const seg = path.split("?")[0].split("/").filter(Boolean);
-    if (seg[1]) return decodeURIComponent(seg[1]);
-    return ITEMS[seg[0]] ? ITEMS[seg[0]].label : "back";
-  };
-
   /* ------------------------------------------------------------ keyboard */
   useEffect(() => {
     let chord: string | null = null;
@@ -274,7 +266,6 @@ export default function AdminShell() {
      the navigation is a promise that something needs doing; it comes back when
      it can be counted from the server. */
   const badges: Record<string, { n: number; alert: boolean }> = {};
-  const t = backTo();
 
   return (
     <NavCtx.Provider value={{ go, back }}>
@@ -401,24 +392,10 @@ export default function AdminShell() {
                 <Icon name="menu" />
               </button>
 
-              {/* The way out. Its own slot, before the crumb and OUTSIDE it, so a
-                  module that claims the crumb slot cannot claim away the way back. */}
-              <div className="tb-backslot" id="tbback">
-                {t && (
-                  <button
-                    className="tb-btn tb-back"
-                    data-act="back"
-                    title={"Back to " + labelOf(t.path)}
-                    aria-label={"Back to " + labelOf(t.path)}
-                    onClick={back}
-                  >
-                    <Icon name="chevl" />
-                    <span className="lb">Back</span>
-                    <span className="to">{labelOf(t.path)}</span>
-                  </button>
-                )}
-              </div>
-
+              {/* THE BACK BUTTON IS GONE. The module title in the crumb slot is
+                  the way up now: pressing it returns to the module's default
+                  view. One control that names where it goes, instead of a Back
+                  that had to explain itself beside the very title it went to. */}
               <nav className="crumbs" id="crumbs" aria-label="Breadcrumb">
                 <Crumbs claimed={chrome.crumbs} route={route} id={id} isDeep={isDeep} />
               </nav>
@@ -498,11 +475,16 @@ function Crumbs({
   /* On a record, a create flow or a sub-mode the chain is GONE. `Sales ›
      Quotations › IB-QT-2026-00208` asked the user to read a hierarchy to work
      out how to leave, and then took them to the wrong place when they did.
-     Back owns the return now, so what is left here is a label. */
+     The title IS the way up now: pressing it returns to the module's default
+     view, which is exactly what the removed Back button used to say in more
+     words. */
   if (isDeep)
     return (
       <>
-        <span className="tb-title">{item ? item.label : route}</span>
+        <button type="button" className="tb-title" title={"Back to " + (item ? item.label : route)}
+          onClick={() => uiGo("#/" + route)}>
+          {item ? item.label : route}
+        </button>
         {id && <span className="crumb-ref mono">{id}</span>}
       </>
     );

@@ -98,7 +98,12 @@ export default function Finance() {
   const totals = useSalaryTotals();
   const crumbs = useMemo(() => (
     <>
-      <span className="tb-title">Finance</span>
+      {/* The title is the way up: it returns to this section's default view,
+          the job the topbar's Back button used to do beside it. */}
+      <button type="button" className="tb-title" title="Back to the section's default view"
+        onClick={() => navigate(hashToPath(listHash(view)), { replace: true })}>
+        Finance
+      </button>
       {/* ONE FIGURE, AND IT FOLLOWS THE SECTION. Which number depends on what
           is on screen: how many businesses are subscribed is scope on the
           subscriptions face and noise on the payroll one, where the question
@@ -153,7 +158,7 @@ export default function Finance() {
         )}
       </span>
     </>
-  ), [view, activeN, membersN, totals.membersAll, totals.paidPaise, totals.paidAllPaise,
+  ), [view, activeN, membersN, navigate, totals.membersAll, totals.paidPaise, totals.paidAllPaise,
     totals.unpaidPaise, totals.unpaidPeople]);
 
   usePageChrome(
