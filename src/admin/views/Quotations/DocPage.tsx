@@ -66,19 +66,19 @@ export default function DocPage({ label, scope, fetchHtml, back, menu, rail, ban
           <h1 className="mono">{label}</h1>
           <div className="scope">{scope}</div>
         </div>
+        {/* The record-header pattern: More first, the primary Back closes the
+            row. One press on the anchor opens the menu, a second closes it —
+            the rule the detail pages' menus already follow. The rows close
+            the popover by bubbling: an action that leaves its own menu open
+            over the dialog it just opened is the bug that rule exists for. */}
+        {/* data-act is load-bearing, not decoration: the shell's outside-click
+            listener closes the popover on any click that is neither inside
+            .pop nor on a [data-act] element — and the press that OPENS it
+            reaches document after React has already mounted that listener.
+            Without the attribute the menu opens and shuts on one click. */}
         <div className="acts">
-          <button className="btn" onClick={back}><Icon name="chevl" />Back</button>
-          {/* One press on the anchor opens it, a second closes it — the rule the
-              detail pages' kebabs already follow. The rows close the popover by
-              bubbling: an action that leaves its own menu open over the dialog
-              it just opened is the bug that rule exists for. */}
-          {/* data-act is load-bearing, not decoration: the shell's outside-click
-              listener closes the popover on any click that is neither inside
-              .pop nor on a [data-act] element — and the press that OPENS it
-              reaches document after React has already mounted that listener.
-              Without the attribute the menu opens and shuts on one click. */}
-          <button className="btn icon" data-act="doc-more" aria-haspopup="menu" aria-label="More actions"
-            title="More actions"
+          <button className="btn" data-act="doc-more" aria-haspopup="menu"
+            title="Everything this document can do"
             onClick={(e) => {
               const el = e.currentTarget as HTMLElement;
               if (popAnchor === el) return closePop();
@@ -92,8 +92,9 @@ export default function DocPage({ label, scope, fetchHtml, back, menu, rail, ban
                 </div>
               ), { width: 268, cls: "pop-views" });
             }}>
-            <Icon name="dots" />
+            More
           </button>
+          <button className="btn pri" onClick={back}><Icon name="chevl" />Back</button>
         </div>
       </div>
       {rail}

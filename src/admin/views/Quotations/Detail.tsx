@@ -20,7 +20,7 @@ import type { ReactNode } from "react";
 import AdminOpsService from "../../../api/modules/adminOps";
 import type { QuotationRow } from "../../../api/modules/adminOps";
 import {
-  EmptyState, Icon, KvList, PaneLoading, Pill, SectionHead, Table, Tabs, printHtml, publicDocUrl, qs, shareOrCopy,
+  EmptyState, Icon, KvList, PaneLoading, Pill, SectionHead, Table, Tabs, TbTitle, printHtml, publicDocUrl, qs, shareOrCopy,
 } from "../../ui";
 import { inr, fmtDate } from "../../ui/format";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
@@ -44,7 +44,7 @@ export default function QuotationDetail({ id, tab, params }: {
   const { go } = useNav();
   const cur = TABS.indexOf(tab) >= 0 ? tab : "items";
 
-  usePageChrome({ crumbs: <span className="tb-title">Quotations</span>, right: null,
+  usePageChrome({ crumbs: <TbTitle label="Quotations" to="#/quotations" />, right: null,
                   parent: "#/quotations" });
 
   if (loading && !quotation) return <div className="page wide"><PaneLoading /></div>;
@@ -86,7 +86,19 @@ export default function QuotationDetail({ id, tab, params }: {
       </button>
     );
     const items: ReactNode[] = [];
-    /* The document three, first — they are what somebody on an issued
+    /* The working actions lead — the record header holds only More and Back
+       now, so what used to sit as buttons beside the menu lives at the top
+       of it. */
+    if (isDraft) {
+      if (can("quotations", "edit"))
+        items.push(mi("doc", "Edit", "Open the draft in the builder", () => go(to({ mode: "edit" }))));
+      items.push(mi("quote", "Preview & issue", "The document, ready to issue", () => go(to({ mode: "preview" }))));
+    } else {
+      items.push(mi("quote", "View document", "The issued document, as the customer has it", () => go(to({ mode: "preview" }))));
+      if (can("quotations", "edit"))
+        items.push(mi("plus", "Revise", "Clones this version into a new draft", revise));
+    }
+    /* The document three next — they are what somebody on an issued
        quotation reaches for most, and none of them changes anything. */
     if (!isDraft && q.hasDocument)
       items.push(mi("download", "Download as PDF", "The issued document, as the customer has it", download));
@@ -146,6 +158,7 @@ export default function QuotationDetail({ id, tab, params }: {
         <div className="ph-t">
           <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
             <h1 className="mono">{q.quotationNumber || "Draft"}</h1>
+            <span className="vsep" aria-hidden="true" />
             <Pill text={"v" + q.version} />
             <Pill text={STATUS_LABEL[q.status]} tone={STATUS_TONE[q.status]} />
           </div>
@@ -155,25 +168,14 @@ export default function QuotationDetail({ id, tab, params }: {
             {q.status === "issued" && q.validUntil ? " · " + validity(q.validUntil) : ""}
           </div>
         </div>
+        {/* The record-header pattern the whole panel takes: everything the
+            record can do sits behind More, and the primary Back closes the
+            row. `data-act` on the trigger is load-bearing — see the shell's
+            popover close listener. */}
         <div className="acts">
-          {isDraft
-            ? <>
-                {can("quotations", "edit")
-                  ? <button className="btn" onClick={() => go(to({ mode: "edit" }))}>
-                      <Icon name="doc" />Edit</button>
-                  : null}
-                <button className="btn pri" onClick={() => go(to({ mode: "preview" }))}>
-                  Preview &amp; issue</button>
-                <MoreBtn onClick={moreMenu} />
-              </>
-            : <>
-                <button className="btn" onClick={() => go(to({ mode: "preview" }))}>
-                  <Icon name="quote" />View document</button>
-                {can("quotations", "edit")
-                  ? <button className="btn pri" onClick={revise}><Icon name="plus" />Revise</button>
-                  : null}
-                <MoreBtn onClick={moreMenu} />
-              </>}
+          <MoreBtn onClick={moreMenu} />
+          <button className="btn pri" onClick={() => go("#/quotations")}>
+            <Icon name="chevl" />Back</button>
         </div>
       </div>
 
@@ -237,8 +239,8 @@ export default function QuotationDetail({ id, tab, params }: {
 
 function MoreBtn({ onClick }: { onClick: (e: React.MouseEvent<HTMLElement>) => void }) {
   return (
-    <button className="btn icon" data-act="qt-more" aria-haspopup="menu"
-      aria-label="More actions" title="More actions" onClick={onClick}><Icon name="dots" /></button>
+    <button className="btn" data-act="qt-more" aria-haspopup="menu"
+      title="Everything this quotation can do" onClick={onClick}>More</button>
   );
 }
 

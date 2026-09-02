@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { inr, fmtDate } from "../../ui/format";
-import { EmptyState, FilterChips, Notice, Pill, SearchField, Select, StatStrip, qs, Icon } from "../../ui";
+import { EmptyState, FilterChips, Notice, Pill, SearchField, Select, StatStrip, TbTitle, qs, Icon } from "../../ui";
 import type { StatCell } from "../../ui";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
@@ -61,7 +61,7 @@ function QuotationsList() {
      a counts endpoint when quotations outgrow one page. */
   const { loading, rows: all, error } = useQuotationsList(0, { sort: p.sort || undefined });
 
-  const crumbs = useMemo(() => <span className="tb-title">Quotations</span>, []);
+  const crumbs = useMemo(() => <TbTitle label="Quotations" to="#/quotations" />, []);
   usePageChrome({ crumbs, right: null, parent: null });
 
   const onFilter = (name: string, value: string) => {

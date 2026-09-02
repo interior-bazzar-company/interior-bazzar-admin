@@ -11,7 +11,7 @@
    ===================================================================== */
 import { useState } from "react";
 import AdminOpsService from "../../../api/modules/adminOps";
-import { EmptyState, PaneLoading, ShareLine, copyToClipboard, publicDocUrl, shareOrCopy, qs } from "../../ui";
+import { EmptyState, PaneLoading, ShareLine, TbTitle, copyToClipboard, publicDocUrl, shareOrCopy, qs } from "../../ui";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import { errMessage } from "../../../api/apiService";
@@ -31,7 +31,7 @@ export default function QuotationPreview({ id, params }: {
   const { go } = useNav();
   const [share, setShare] = useState<{ link: string; expires: string } | null>(null);
 
-  usePageChrome({ crumbs: <span className="tb-title">Quotations</span>, right: null,
+  usePageChrome({ crumbs: <TbTitle label="Quotations" to="#/quotations" />, right: null,
                   parent: "#/quotations/" + id });
 
   if (loading && !quotation) return <div className="page qpage"><PaneLoading /></div>;

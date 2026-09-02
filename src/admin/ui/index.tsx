@@ -104,6 +104,16 @@ export function Icon({ name, size, className }: { name: string; size?: "sm" | "l
   );
 }
 
+/* The topbar title, panel-wide: it names the module (or its section) and is
+   the way up — pressing it returns to the default view at `to`. The same
+   role the shell's generic Crumbs plays for modules that claim no crumbs. */
+export function TbTitle({ label, to }: { label: ReactNode; to: string }) {
+  return (
+    <button type="button" className="tb-title" title="Back to the default view"
+      onClick={() => go(to)}>{label}</button>
+  );
+}
+
 /* =============================================================== HELPERS === */
 /* esc() is deliberately absent: JSX escapes text. */
 export function initials(name?: string | null) {

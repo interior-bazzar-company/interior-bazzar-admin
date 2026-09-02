@@ -12,7 +12,7 @@
    ===================================================================== */
 import { useEffect, useRef, useState } from "react";
 import AdminOpsService from "../../../api/modules/adminOps";
-import { EmptyState, Notice, Pill, SearchField, Table, Toolbar } from "../../ui";
+import { EmptyState, Notice, Pill, SearchField, Table, TbTitle, Toolbar } from "../../ui";
 import { inr } from "../../ui/format";
 import { errMessage } from "../../../api/apiService";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
@@ -38,7 +38,7 @@ export default function PickDeal() {
   const [chains, setChains] = useState<Record<string, { n: number; live: boolean }>>({});
   const timer = useRef<number | undefined>(undefined);
 
-  usePageChrome({ crumbs: <span className="tb-title">Quotations</span>, right: null, parent: "#/quotations" });
+  usePageChrome({ crumbs: <TbTitle label="Quotations" to="#/quotations" />, right: null, parent: "#/quotations" });
 
   /* Read ONCE: the set cannot change while this page is open, so it does not
      belong in the search effect.

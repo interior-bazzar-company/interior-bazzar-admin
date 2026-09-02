@@ -10,7 +10,7 @@
    page with the reason rather than shown a form that could not save.
    ===================================================================== */
 import { useCallback, useState } from "react";
-import { EmptyState, Icon, Notice, PaneLoading, Pill, qs } from "../../ui";
+import { EmptyState, Icon, Notice, PaneLoading, Pill, TbTitle, qs } from "../../ui";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { STATUS_LABEL, useQuotation } from "./api";
 import { BuilderBody } from "./Form";
@@ -23,7 +23,7 @@ export default function QuotationBuilder({ id, params }: {
   const { loading, quotation, notFound } = useQuotation(id, tick);
   const { go } = useNav();
 
-  usePageChrome({ crumbs: <span className="tb-title">Quotations</span>, right: null,
+  usePageChrome({ crumbs: <TbTitle label="Quotations" to="#/quotations" />, right: null,
                   parent: "#/quotations/" + id });
 
   if (loading && !quotation) return <div className="page wide"><PaneLoading /></div>;
