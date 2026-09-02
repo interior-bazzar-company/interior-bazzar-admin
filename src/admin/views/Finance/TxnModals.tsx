@@ -8,15 +8,17 @@
    and touches nothing else. Every refusal from the store renders inside the
    dialog that produced it — the sentence it contradicts stays on screen.
    ============================================================================= */
-import { useState } from "react";
-import { Notice } from "../../ui";
+import { useRef, useState } from "react";
+import { Icon, Notice } from "../../ui";
+import { go } from "../../ui/nav";
 import { Cancel, Dlg, Field, Fs, Pick, RupeeInput, toPaise } from "./dialog";
 import type { Done } from "./dialog";
 import { Check, Money, TagChip } from "./bits";
 import {
   ACCOUNTS, CREDIT_KINDS, MODES, TAG_KINDS,
-  addTag, attachBill, deactivateTag, isSuperAdmin, recordTransaction, reverseTransaction,
-  setBudget as setTagBudget, tagKindMeta, todayIso, useTagTotals, useTags, useTxnRows,
+  PROOF_MAX_BYTES, addTag, attachBill, clearTxnWrong, deactivateTag, fileSize, inr, isSuperAdmin,
+  markTxnWrong, proofAccepted, proofTooBig, recordTransaction, reverseTransaction,
+  setBudget as setTagBudget, todayIso, useTagTotals, useTags, useTxnRows,
 } from "./store";
 import type { CompanyTxn, Tag, TagKind } from "./store";
 
@@ -37,86 +39,235 @@ export function TxnModal({ onClose, onDone }: { onClose: () => void; onDone: Don
   const [valueDate, setValueDate] = useState(todayIso());
   const [accountId, setAccountId] = useState(ACCOUNTS.filter((a) => a.active)[0]?.accountId || "");
   const [creditKind, setCreditKind] = useState("");
+  const [bill, setBill] = useState<{ filename: string; mime: string; bytes: number } | null>(null);
   const [err, setErr] = useState("");
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  /* Set once the write has gone through. The dialog then STOPS being a form —
+     the row is a fact, Cancel would be a lie, and what is left to offer is the
+     record. The pay-salary dialog does exactly this and it is the reason that
+     one never leaves somebody wondering whether it took. */
+  const [done, setDone] = useState<{ txnId: string; paise: number; tag: string } | null>(null);
+
+  const isIn = direction === "in";
+  const tag = tags.filter((t) => t.tagKey === tagKey)[0] || null;
+  const account = ACCOUNTS.filter((x) => x.accountId === accountId)[0] || null;
+  const paise = toPaise(amount);
+
+  /* ============================================== done: the receipt === */
+  if (done) {
+    const close = () => onDone(done.txnId + " recorded.", "ok");
+    return (
+      <Dlg title="Recorded" onClose={close}
+        footer={<>
+          <button className="btn" onClick={close}>Done</button>
+          <button className="btn pri" onClick={() => {
+            close();
+            go("#/finance-transactions/" + encodeURIComponent(done.txnId));
+          }}>Open the record</button>
+        </>}>
+        <div className="fin-paid">
+          <span className="mark"><Icon name="check" /></span>
+          <div className="amt tnum">{inr(done.paise)}</div>
+          <div className="to">{isIn ? "received into" : "paid from"} {account ? account.masked : "the account"}</div>
+          <div className="facts">
+            <div className="row"><span className="l">Filed as</span>
+              <span>{isIn ? "Credit" : "Debit"} · {done.tag}</span></div>
+            <div className="row"><span className="l">Reference</span><span className="mono">{reference}</span></div>
+            <div className="row"><span className="l">Row</span><span className="mono">{done.txnId}</span></div>
+          </div>
+        </div>
+      </Dlg>
+    );
+  }
 
   const submit = () => {
     /* toPaise returns null on anything that is not a clean rupee amount — a
        half-typed "1,2" or an empty box never becomes a number, let alone NaN
        in the field the person is still looking at. */
-    const amountPaise = toPaise(amount);
-    if (amountPaise === null) { setErr("Enter the amount in whole rupees (paise to two decimals), above zero."); return; }
+    if (paise === null) { setErr("Enter the amount in whole rupees (paise to two decimals), above zero."); return; }
     const res = recordTransaction({
-      direction, tagKey, amountPaise, description, party, mode, reference, valueDate, accountId,
-      creditKind: direction === "in" ? creditKind || null : null,
+      direction, tagKey, amountPaise: paise, description, party, mode, reference, valueDate, accountId,
+      creditKind: isIn ? creditKind || null : null,
+      bill: bill || { filename: "", mime: "" },
     });
     if (res.error) { setErr(res.error); return; }
-    onDone(res.txnId + " recorded.", "ok");
+    setDone({ txnId: res.txnId as string, paise, tag: tag ? tag.label : "the tag" });
   };
 
   return (
-    <Dlg title="Record a transaction"
-      sub="Company money in or out, under a tag. Once saved this row is a fact — nobody edits it; a correction is a counter-entry, never a rewrite."
-      onClose={onClose} err={err}
-      footer={<><Cancel onClose={onClose} /><button className="btn pri" onClick={submit}>Record</button></>}>
+    <Dlg title="Record a transaction" onClose={onClose} err={err}
+      footer={<><Cancel onClose={onClose} />
+        {/* Disabled without the receipt, because the store refuses without it —
+            a button that is going to say no is better off saying so first. */}
+        <button className="btn pri" disabled={!bill} onClick={submit}>Record</button></>}>
 
-      <Fs legend="Direction" req>
-        <Pick value={direction} onChange={(v) => { setDirection(v); setCreditKind(""); }}
-          options={[{ key: "out", label: "Money out" }, { key: "in", label: "Money in" }]} />
-      </Fs>
+      {/* EVERY CHOICE IS A DROPDOWN AND EVERY FIELD IS ON ITS OWN LINE — the
+          pay-salary dialog's rhythm. The three segmented pickers this had
+          (direction, credit kind, and a scrolling list of tag cards) spent a
+          screen and a half on three answers, and the tag list put a two-line
+          description under every option so the one thing being chosen was the
+          hardest thing to scan.
 
-      {direction === "in" ? (
-        <Fs legend="Credit kind" req hint="What a person may hand-key in, and nothing else.">
-          <Pick value={creditKind} onChange={setCreditKind}
-            options={CREDIT_KINDS.map((c) => ({ key: c.key, label: c.label }))} />
-          <Notice tone="info" text={<>
-            Money in here is restricted to these three non-revenue kinds. Customer money has
-            exactly one way into the books — a subscription installment payment — and it is never
-            recorded, faked or matched to a bank line on this screen.
-          </>} />
-        </Fs>
-      ) : null}
-
-      <Fs legend="Tag" req hint="Decides where this lands in Analytics. Only active tags are offered.">
-        <div className="fin-pick" role="listbox" aria-label="Tag">
-          {tags.map((t) => {
-            const k = tagKindMeta(t.kind);
-            return (
-              <button type="button" key={t.tagKey} role="option" aria-selected={tagKey === t.tagKey}
-                className={tagKey === t.tagKey ? "on" : ""} onClick={() => setTagKey(t.tagKey)}>
-                <span>{t.label}</span>
-                <span className="s">{k?.label || t.kind} · lands in {k?.landsIn || "—"}</span>
-                <span className="a">{t.proofRequired ? "bill required" : ""}</span>
-              </button>
-            );
-          })}
-        </div>
-      </Fs>
-
-      {/* One field per line — the pay dialog's rhythm, panel-wide now. */}
+          THE PROSE IS GONE WITH THEM. The standing sub-line, three field hints
+          and the notice about non-revenue credits said things that are either
+          true of every write in this module or enforced by the store, which
+          refuses and says why at the moment it refuses — which is the moment
+          somebody is actually asking. */}
       <div className="fin-stack">
+        {/* DEBIT AND CREDIT, said outright. Direction was two words that only
+            mean something to somebody already holding the convention; the
+            entry line below says what the row will actually do. */}
+        <Field label="Direction">
+          <div className="selectbox">
+            {/* CREDIT FIRST, DEBIT SECOND, in the same order the filter offers
+                them — one ordering across the section, so a person is not
+                re-reading the list every time they meet it. The SELECTED value
+                is still Debit, because most company rows are money out and a
+                default is about the common case rather than the list order. */}
+            <select value={direction} onChange={(e) => {
+              setDirection(e.target.value as "out" | "in");
+              setCreditKind(""); setTagKey(""); setErr("");
+            }}>
+              <option value="in">Credit</option>
+              <option value="out">Debit</option>
+            </select>
+          </div>
+        </Field>
+
+        {isIn ? (
+          <Field label="Credit kind">
+            <div className="selectbox">
+              <select value={creditKind} onChange={(e) => { setCreditKind(e.target.value); setErr(""); }}>
+                <option value="">Pick what this credit is…</option>
+                {CREDIT_KINDS.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+              </select>
+            </div>
+          </Field>
+        ) : null}
+
+        {/* GROUPED BY WHERE THE MONEY LANDS, which is the only part of a tag
+            that is not free and the only thing worth knowing while picking
+            one. It was a description line under every option; as an optgroup
+            it is structure instead of prose — the same fact, read in a glance,
+            and the option itself is just the tag's name.
+
+            `bill` rides the option because a tag that requires one will refuse
+            the write later, and finding that out at the button is worse than
+            reading it here. */}
+        <Field label="Tag">
+          <div className="selectbox">
+            <select value={tagKey} onChange={(e) => { setTagKey(e.target.value); setErr(""); }}>
+              <option value="">Pick a tag…</option>
+              {TAG_KINDS.map((k) => {
+                const inKind = tags.filter((t) => t.kind === k.key);
+                if (!inKind.length) return null;
+                return (
+                  <optgroup key={k.key} label={k.label + " · " + k.landsIn}>
+                    {inKind.map((t) => (
+                      <option key={t.tagKey} value={t.tagKey}>
+                        {t.label}{t.proofRequired ? " · bill required" : ""}
+                      </option>
+                    ))}
+                  </optgroup>
+                );
+              })}
+            </select>
+          </div>
+        </Field>
+
         <Field label="Amount"><RupeeInput value={amount} onChange={setAmount} /></Field>
+
+        {/* A LIVE Dr/Cr READ-OUT STOOD HERE FOR ONE BUILD AND IS GONE. It drew
+            the row as double entry — Dr the expense, Cr the bank — which is
+            correct bookkeeping and directly contradicted the words above it the
+            moment Direction started saying Credit and Debit. Those two labels
+            are the BANK STATEMENT's convention, where a credit is money
+            arriving; double entry uses the same two words the other way round.
+            Both are right and they cannot share a dialog: one screen, two
+            meanings of Credit, is how somebody files a refund as a cost. */}
+
         <Field label="Value date">
           <input type="date" className="inp" value={valueDate} max={todayIso()}
             onChange={(e) => setValueDate(e.target.value)} />
         </Field>
-        <Field label="Description" help="What it was for — the sentence that has to make sense to someone else at audit.">
-          <input className="inp" value={description} onChange={(e) => setDescription(e.target.value)} />
-        </Field>
+        {/* PARTY, and the placeholder says which side it means rather than a
+            help line under the box: the word is the same both ways and the
+            direction above already decided which. */}
         <Field label="Party">
-          <input className="inp" value={party} onChange={(e) => setParty(e.target.value)} />
+          <input className="inp" value={party}
+            placeholder={isIn ? "Who it came from" : "Who it was paid to"}
+            onChange={(e) => setParty(e.target.value)} />
         </Field>
         <Field label="Mode">
-          <select className="inp" value={mode} onChange={(e) => setMode(e.target.value)}>
-            {MODES.map((m) => <option key={m} value={m}>{m}</option>)}
-          </select>
+          <div className="selectbox">
+            <select value={mode} onChange={(e) => setMode(e.target.value)}>
+              {MODES.map((m) => <option key={m} value={m}>{m}</option>)}
+            </select>
+          </div>
         </Field>
-        <Field label="Reference" help="Mandatory. Without a bank reference or UTR, this row can never be tied to a statement.">
-          <input className="inp" value={reference} onChange={(e) => setReference(e.target.value)} />
+        <Field label="Reference">
+          <input className="inp" value={reference} placeholder="UTR or bank reference"
+            onChange={(e) => setReference(e.target.value)} />
+        </Field>
+        {/* THE RECEIPT, MANDATORY — the same control and the same rule as a
+            salary payment's, which is the point: evidence should not be worth
+            more on one screen than another. Images and PDFs up to 5 MB; the
+            store refuses all three ways and says which, so this is a courtesy
+            rather than the guard. */}
+        <Field label="Receipt">
+          <button type="button" className={"fin-filebox" + (bill ? " on" : "")}
+            title={bill ? bill.filename : undefined}
+            onClick={() => fileRef.current?.click()}>
+            {bill
+              ? <><Icon name="check" size="sm" /><span className="name">{bill.filename}</span>
+                <span className="swap">Replace</span></>
+              : <><Icon name="plus" size="sm" /><span className="ph">Attach receipt · image or PDF, up to {fileSize(PROOF_MAX_BYTES)}</span></>}
+          </button>
+          <input ref={fileRef} type="file" accept="image/*,application/pdf" hidden
+            onChange={(e) => {
+              const f = e.target.files && e.target.files[0];
+              e.target.value = "";
+              if (!f) return;
+              if (!proofAccepted(f.type)) {
+                setBill(null);
+                setErr(f.name + " is neither an image nor a PDF.");
+                return;
+              }
+              if (proofTooBig(f.size)) {
+                setBill(null);
+                setErr(f.name + " is " + fileSize(f.size) + ". The limit is " + fileSize(PROOF_MAX_BYTES) + ".");
+                return;
+              }
+              setBill({ filename: f.name, mime: f.type, bytes: f.size });
+              setErr("");
+            }} />
         </Field>
         <Field label="Account">
-          <select className="inp" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-            {ACCOUNTS.filter((a) => a.active).map((a) => <option key={a.accountId} value={a.accountId}>{a.masked}</option>)}
-          </select>
+          <div className="selectbox">
+            <select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+              {ACCOUNTS.filter((a) => a.active).map((a) => (
+                <option key={a.accountId} value={a.accountId}>{a.masked} · {a.name}</option>
+              ))}
+            </select>
+          </div>
+        </Field>
+
+        {/* LAST, AND A BOX RATHER THAN A LINE. It sat in the middle of the form
+            as a one-line input, which made the field that has to make sense to
+            a stranger at audit look like the same size of answer as Mode or
+            Reference — and a single line quietly asks for three words.
+
+            It is the only OPEN question on this dialog; everything above it is
+            a choice from a list, an amount, a date or a file. An open question
+            belongs after the closed ones, with room to answer. */}
+        {/* REMARK, and the stored field is still `description`. The label is
+            what a person calls it; the wire name is what the ledger and the API
+            already agree on, and renaming that would be a migration to make a
+            word nicer. */}
+        <Field label="Remark">
+          <textarea className="inp" rows={3} value={description}
+            placeholder="What it was for — the sentence that has to make sense to somebody else at audit"
+            onChange={(e) => setDescription(e.target.value)} />
         </Field>
       </div>
     </Dlg>
@@ -259,21 +410,120 @@ export function DeactivateTagModal({ tag, onClose, onDone }: { tag: Tag; onClose
 /* ----------------------------------------------------------- BillModal --- */
 /** A prototype field, not an upload — the record is that a bill exists and
  *  what it is called, which is enough to clear the missing-bill state. */
+/** THE ONE THING ON A RECORDED ROW THAT CAN CHANGE — and the dialog says so,
+ *  because it is reached from a menu item called Edit and the word promises
+ *  more than the ledger allows. The figures are what the row asserts; the
+ *  receipt is evidence ABOUT it, and only the second is amendable. */
 export function BillModal({ txn, onClose, onDone }: { txn: CompanyTxn; onClose: () => void; onDone: Done }) {
-  const [filename, setFilename] = useState(txn.bill?.filename || "");
+  const [file, setFile] = useState<{ filename: string; mime: string; bytes: number } | null>(null);
   const [err, setErr] = useState("");
+  const fileRef = useRef<HTMLInputElement | null>(null);
+  const had = txn.bill?.filename || null;
 
   const submit = () => {
-    const res = attachBill(txn.txnId, filename);
+    if (!file) { setErr("Pick a file."); return; }
+    const res = attachBill(txn.txnId, file);
     if (res) { setErr(res); return; }
-    onDone("Bill attached to " + txn.txnId + ".", "ok");
+    onDone(file.filename + (had ? " replaced the receipt on " : " attached to ") + txn.txnId + ".", "ok");
   };
 
   return (
-    <Dlg title="Attach a bill" sub={txn.txnId + " — " + txn.description} onClose={onClose} err={err}
-      footer={<><Cancel onClose={onClose} /><button className="btn pri" onClick={submit}>Attach</button></>}>
-      <Field label="Filename" help="No upload in this prototype — the filename is the whole record that a bill exists.">
-        <input className="inp" value={filename} onChange={(e) => setFilename(e.target.value)} placeholder="invoice.pdf" />
+    <Dlg title={had ? "Replace the receipt" : "Attach a receipt"}
+      sub={<span className="mono">{txn.txnId}</span>} onClose={onClose} err={err}
+      footer={<><Cancel onClose={onClose} />
+        <button className="btn pri" disabled={!file} onClick={submit}>{had ? "Replace" : "Attach"}</button></>}>
+
+      {/* The one standing note on this dialog, and it is here because the menu
+          item that opens it says Edit — a word that promises the figures. */}
+      <Notice tone="info" ico="lock" text={<>
+        <b>Only the receipt.</b> The amount, direction, tag, reference, date and account are what
+        this row asserts and none of them can be changed — a correction to any of those is a
+        counter-entry, appended, never a rewrite.
+      </>} />
+
+      <Field label="Receipt">
+        <button type="button" className={"fin-filebox" + (file ? " on" : "")}
+          title={file ? file.filename : undefined}
+          onClick={() => fileRef.current?.click()}>
+          {file
+            ? <><Icon name="check" size="sm" /><span className="name">{file.filename}</span>
+              <span className="swap">Replace</span></>
+            : <><Icon name="plus" size="sm" />
+              <span className="ph">{had ? "Pick the file that replaces " + had : "Attach receipt"}
+                {" · image or PDF, up to " + fileSize(PROOF_MAX_BYTES)}</span></>}
+        </button>
+        <input ref={fileRef} type="file" accept="image/*,application/pdf" hidden
+          onChange={(e) => {
+            const f = e.target.files && e.target.files[0];
+            e.target.value = "";
+            if (!f) return;
+            if (!proofAccepted(f.type)) { setFile(null); setErr(f.name + " is neither an image nor a PDF."); return; }
+            if (proofTooBig(f.size)) {
+              setFile(null);
+              setErr(f.name + " is " + fileSize(f.size) + ". The limit is " + fileSize(PROOF_MAX_BYTES) + ".");
+              return;
+            }
+            setFile({ filename: f.name, mime: f.type, bytes: f.size });
+            setErr("");
+          }} />
+      </Field>
+    </Dlg>
+  );
+}
+
+/* -------------------------------------------------------- MarkWrongModal --- */
+/** FN-T11b · Raise a hand about a row, or put it down again.
+ *
+ *  NEITHER OF THESE MOVES MONEY, and the dialog says so, because the button
+ *  sits next to one that does. Marking is anybody-with-edit; reversing is Super
+ *  Admin. That split is the point of the feature: the person who notices and
+ *  the person who settles it are usually not the same person, and without this
+ *  the noticing has nowhere to go but a message somebody sends. */
+export function MarkWrongModal({ txn, onClose, onDone }: {
+  txn: CompanyTxn; onClose: () => void; onDone: Done;
+}) {
+  const marked = !!txn.wrong;
+  const [text, setText] = useState("");
+  const [err, setErr] = useState("");
+
+  const submit = () => {
+    const res = marked ? clearTxnWrong(txn.txnId, text) : markTxnWrong(txn.txnId, text);
+    if (res) { setErr(res); return; }
+    onDone(marked
+      ? "The mark on " + txn.txnId + " is cleared."
+      : txn.txnId + " is marked wrong. It still counts — a counter-entry is what corrects it.",
+    marked ? "ok" : "warn");
+  };
+
+  return (
+    <Dlg title={marked ? "Clear the mark" : "Mark this row wrong"}
+      sub={<span className="mono">{txn.txnId}</span>} onClose={onClose} err={err}
+      footer={<><Cancel onClose={onClose} />
+        <button className={"btn " + (marked ? "pri" : "pri")} disabled={!text.trim()} onClick={submit}>
+          {marked ? "Clear the mark" : "Mark wrong"}
+        </button></>}>
+
+      <Notice tone="info" ico="alert" text={marked ? <>
+        <b>Nothing about the row changes.</b> It never did — the mark was a note that somebody
+        had a doubt, and clearing it is a note about what they found.
+      </> : <>
+        <b>This moves no money.</b> The row keeps its amount and every total still counts it,
+        because the money did move. A mark says somebody looked and thinks it should not have;
+        the correction is a counter-entry, which is Super Admin.
+      </>} />
+
+      {marked ? (
+        <Field label="What was raised">
+          <div className="fin-derived">{txn.wrong?.reason}</div>
+        </Field>
+      ) : null}
+
+      <Field label={marked ? "What you found" : "What is wrong with it"}>
+        <textarea className="inp" rows={3} autoFocus value={text}
+          placeholder={marked
+            ? "Why it turns out to be right, or how it was settled"
+            : "What looks wrong, so the next person can act on it without asking"}
+          onChange={(e) => { setText(e.target.value); setErr(""); }} />
       </Field>
     </Dlg>
   );

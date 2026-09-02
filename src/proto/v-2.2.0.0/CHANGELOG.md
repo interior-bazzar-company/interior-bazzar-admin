@@ -6,6 +6,338 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-02
 
+### Refunds becomes one table, like every other list in the module
+
+**Area:** `#/finance-refunds` · `?flag=awaiting` · `?flag=owed`
+**Files:** `src/admin/views/Finance/Refunds.tsx`, `scripts/fn-smoke.tsx`
+
+**What changed**
+
+**THREE BANDS BECAME ONE TABLE.** The face stacked three sections — awaiting a
+decision, approved but not sent, settled — each with its own heading, its own
+empty state, and a bespoke `.fin-q` row shape that existed nowhere else in the
+panel. On a screen that often holds four refunds that is three headings and
+three empty states, no way to see the whole book at once, and a refund that
+does not read like a slip or a transaction even though it is the same kind of
+thing.
+
+**The reasoning behind the bands was right and the answer was wrong.** Those
+*are* three different jobs. The strip answers it instead: each cell is a
+filter, so *approved, not sent* is one press rather than a section that is on
+screen whether or not anything is in it — and the table is sorted by that same
+job order, so the rows needing action are on top **with no filter applied**,
+which is what the bands were really buying.
+
+**Four read-out tiles became five strip cells that navigate.** They stated the
+four numbers and then made somebody scroll to the band that held them. The
+definitions ride the cell's `tip`, because a cell is a button and an `i` inside
+one would swallow half its own click target — the same answer Salaries A/C and
+Other Transaction reached.
+
+**APPROVAL STILL MOVES NO MONEY**, and the gap between `approved` and `paid`
+keeps its own cell, its own warn tone and its own place in the sort. Only its
+band is gone.
+
+The row carries the module's own menu — the same `.fin-menu` and `.mi` rows the
+slips table and the transaction record use — with *Record the transfer* offered
+on exactly the rows that can take one, and **disabled with the reason** on the
+rest rather than hidden.
+
+**Temp data**
+`none`.
+
+**Backend needed**
+`none`. `?flag=` is resolved client-side like every other filter on this face.
+
+**Open decisions**
+`none`. `flag` is this face's own param and sits beside `state` rather than
+replacing it, because two of the cells stand for a JOB rather than a state —
+*awaiting* is `requested` OR `sent_back`, and the state filter takes exactly
+one. One param that meant either would be a filter nobody could reason about.
+
+**Verified**
+`npx tsc -b` clean · `eslint` clean · `vite build` clean · `check:finance`
+426/426 · `check:finance-render` renders every surface. The rendered page is
+**1 table, 1 strip, 0 tiles, 0 queue rows**, and three of the new assertions
+check an ABSENCE — `ok1(refunds, 'class="tbl')` proves exactly one table rather
+than merely that a table exists, and `hasnt` proves the bespoke row shape and
+the read-out tiles are gone rather than joined by a fourth thing.
+**Not checked:** not opened in a browser. The row menu is unreachable without a
+session, and an eight-column table at narrow widths is unseen — though the
+identifier and date columns reuse the `.fin-c-slip` / `.fin-c-when` bounds that
+were added for the slips table, so the fault that one had is already answered
+here.
+
+---
+## 2026-09-02
+
+### A transaction can be marked wrong — a flag, not a third state
+
+**Area:** `#/finance-transactions` · `?flag=wrong` · `#/finance-transactions/TXN-…`
+**Files:** `src/admin/views/Finance/{TxnDetail,TxnModals,Transactions,store,types,finance.css}.ts(x)`,
+`src/content/finance/vocabularies.json`, `scripts/{check-finance-ledger.cjs,fn-smoke.tsx}`
+
+**What changed**
+
+**Somebody can now say a row is wrong without moving any money.** It was asked
+for once, declined as a third state, and asked for again — so it is built the
+one way that does not break the rule it collided with.
+
+**IT IS A FLAG, NOT A STATE.** `state` stays `recorded`, the amount is
+untouched, and **every total still counts the row** — because the money did
+move, and somebody believing it should not have is a different fact from it
+not having happened. Nothing in analytics reads the field. What it records is
+itself a fact: who raised it, when, and why.
+
+That is the same shape `Payslip.held` already has — a decision about a record,
+with a mandatory reason, that changes no money — and the reason a third *state*
+would have been wrong where a flag is not: a state is the ledger's word for
+what happened, and a doubt is not something that happened to the money.
+
+**WHAT IT BUYS is the gap between noticing and correcting.** Reversing is Super
+Admin and needs a decision; noticing is anybody's job and needs recording the
+moment it happens, or it lives in somebody's memory until they are on leave.
+**Anyone with edit may mark; only a Super Admin may reverse** — making those
+one permission would mean the people closest to the row cannot say anything
+about it.
+
+**Both halves need words.** A mark with no reason is indistinguishable from a
+misclick at audit, and a concern raised and silently dropped is worse than one
+never raised — it leaves a record that somebody looked and no record of what
+they concluded. So clearing takes a note too.
+
+**A reversal answers the mark**, so the mark comes off: leaving it would ask
+somebody to look again at the one row that no longer needs looking at. The
+events stay, which is the part worth keeping.
+
+It surfaces as a queue cell beside *Missing a bill*, a filter, a red rail and a
+line under the state pill — **beside** the pill and never instead of it,
+because a chip that replaced the state would be the third state again.
+
+**The Reverse item lost its suffix in the same breath.** It read *Reverse — this
+row was wrong*, written the turn before this one to say that reversing WAS the
+mark-it-bad action, back when there was nothing else. Beside a real *Mark as
+wrong* it said the word twice: two menu items both announcing that a row is bad,
+when only one of them corrects anything. The suffix is gone and the distinction
+moved to each item's `title`, where it costs no space on the menu — *raise a
+doubt, moves no money, anyone with edit* against *append a counter-entry, this
+is what actually corrects the money*.
+
+**Temp data**
+`none` new. `vocabularies.json` gains `TXN_MARKED_WRONG` and `TXN_MARK_CLEARED`:
+`EventRow` prints the raw key for a type the vocabulary does not know, which is
+how `SALARY_PAID` spent this whole branch showing as a constant in a timeline.
+
+**Backend needed**
+- `POST /admin/finance/transactions/{id}/mark-wrong` — `{reason}`, mandatory —
+  and `…/clear-mark` — `{note}`, mandatory. **Edit rights, not Super Admin.**
+- `CompanyTxn.wrong` on the payload: `{by, at, reason}` or null. **It must not
+  reach any aggregate.** A row marked wrong is a row that still counts, and an
+  endpoint that quietly excluded it would make the panel and the books
+  disagree about a figure neither of them changed.
+- Reversing clears it server-side too, and appends the event rather than
+  deleting the history of it.
+
+**Open decisions**
+⚠ **The mark is unrestricted by design and that is worth revisiting with
+  volume.** Anyone with edit can mark any row, including one they recorded
+  themselves, and nothing expires. If the queue grows into a place concerns go
+  to be forgotten, the answer is an age on the cell rather than a permission —
+  but that is a decision to make when there is a queue to look at, not now.
+
+**Verified**
+`npx tsc -b` clean · `eslint` clean · `vite build` clean · **`check:finance`
+426/426**, up from 409: seventeen new assertions, and the ones that matter are
+about what the mark **does not** do — the row is still `recorded`, the amount
+is unchanged, and `overview().otherOutPaise` is identical before and after.
+Also asserted: both refusals for a missing reason, the double-mark and
+clear-unmarked refusals, that a reversal clears the mark while the history
+keeps it, that an already-reversed row cannot be marked, and that **both event
+types it writes resolve in the vocabulary rather than rendering as raw keys**.
+`check:finance-render` renders every surface with the dialog asserted to say
+outright that it moves no money.
+**Not checked:** not opened in a browser. The menu items are unreachable
+without a session, so the mark and clear paths are verified through the store
+and the dialog's markup only.
+
+---
+## 2026-09-02
+
+### The transaction record gets one actions menu, its remark and a receipt section
+
+**Area:** `#/finance-transactions/TXN-…` · Record a transaction
+**Files:** `src/admin/views/Finance/{TxnDetail,TxnModals,store,finance.css}.ts(x)`,
+`scripts/fn-smoke.tsx`
+
+**What changed**
+
+**ONE MENU INSTEAD OF A ROW OF BUTTONS.** `Attach a bill` and `Reverse` sat
+side by side in the header, which gave a destructive Super-Admin action the
+same weight as attaching paperwork and had nowhere to put a third. Everything
+the row can have done to it is behind one control now — Edit receipt, Download
+receipt, Reverse, Copy row id — on the same `.fin-menu` and the same `.mi`
+rows the slips table uses, so there is one menu in the module rather than two
+that drift.
+
+**EDIT IS THE RECEIPT, AND THE DIALOG SAYS SO.** The brief asked for an Edit
+button in place of Attach a bill, and the word promises the figures — on a page
+whose own footer says a recorded row is never edited. Both are honoured rather
+than one of them quietly winning: the menu item is Edit, and the dialog it
+opens states in one line that only the receipt can change and that a wrong
+figure is corrected by a counter-entry. **The amount, direction, tag,
+reference, date and account remain unreachable from every screen**, which is
+the invariant the whole module is built on.
+
+**`attachBill` now holds a late receipt to the same standard as one attached at
+the time** — image or PDF, 5 MB, refusing by name — because evidence added
+afterwards is not worth less. It takes a file rather than a typed filename, and
+records a REPLACEMENT differently from a first attachment in the event note.
+It is still the only write that touches a recorded row, and it touches only the
+paperwork.
+
+**The remark is on the record.** `description` was collected on the dialog and
+then only ever readable in the list's own truncated column — the record page
+did not show it at all. It sits in *What moved* now, wrapping as a sentence
+rather than being cut like the single-token values around it. On the dialog it
+is **labelled Remark**; the stored field is still `description`, because the
+wire name is what the ledger and the API already agree on and renaming it would
+be a migration to make a word nicer.
+
+**The bill block became a receipt section.** It was three rows of a key-value
+list, which is the right shape for facts about money and the wrong one for a
+document: what somebody wants here is to see it is there and to open it. It
+reads as a file now — and says plainly that **the panel holds the name, not the
+bytes**, which is why Download is present and disabled with the reason on it
+rather than absent or silently doing nothing.
+
+**Temp data**
+`none`.
+
+**Backend needed**
+- A document store, and `GET /admin/finance/transactions/{id}/bill` to serve
+  it. Until it exists the filename is the whole record that a receipt exists,
+  and the page says so rather than offering a download that would do nothing.
+- `POST …/{id}/bill` takes the file and enforces the same three rules the
+  recording endpoint does. **A receipt attached later is not held to a lower
+  standard than one attached at the time.**
+
+**Open decisions**
+⚠ **A separate `bad transaction` action was asked for and is NOT built.** The
+ledger has exactly two states, `recorded` and `reversed`, and a third meaning
+*this one is wrong* would be the first state on this page that is a judgement
+rather than a fact — which is the one thing the module's own rule forbids.
+Reverse already IS that action: it appends a counter-entry and leaves the row
+as posted, and the menu item now says so in as many words — *Reverse — this row
+was wrong*. If a distinct flag is genuinely wanted it needs a state, an event
+type and a decision about what analytics does with it, and none of those should
+be invented quietly.
+
+**Verified**
+`npx tsc -b` clean · `eslint` clean · `vite build` clean · `check:finance`
+409/409 · `check:finance-render` renders every surface, with the receipt dialog
+asserted to pick a file rather than take a typed name, to carry the same 5 MB
+limit, and to say outright that only the receipt can change.
+**An assertion was REMOVED rather than left passing.** `can()` returns false
+without a session, so this harness renders every Finance page with no write
+affordance at all — `hasnt(oneTxn, ">Attach a bill<")` would have passed
+whether the button became a menu or was deleted outright. An assertion that
+passes for the wrong reason is worse than none, because it looks like cover;
+the gap is now written down where the assertion was.
+**Not checked:** not opened in a browser. The menu, its disabled items and
+their titles are unreachable without a session, and the receipt card is markup
+only.
+
+---
+## 2026-09-02
+
+### Other Transaction speaks Credit and Debit, and a receipt is part of recording a row
+
+**Area:** `#/finance-transactions` · Record a transaction · the direction filter and strip
+**Files:** `src/admin/views/Finance/{TxnModals,Transactions,bits,store,finance.css}.ts(x)`,
+`scripts/{check-finance-ledger.cjs,fn-smoke.tsx}`
+
+**What changed**
+
+**THE RECEIPT IS MANDATORY, AND FIVE MEGABYTES IS ONE RULE RATHER THAN ONE
+SCREEN'S RULE.** `PROOF_MAX_BYTES`, `proofTooBig` and `fileSize` sit beside
+`proofAccepted` in the store, because salary payments and company transactions
+both attach evidence — a cap that applied to one of them is a cap somebody
+works around by using the other screen. The store refuses three ways and names
+which: `bill_required`, `bill_type`, `bill_too_big`, the last one naming the
+file and its size, because a refusal that does not say how far over is one
+somebody just retries. The dialog uses the pay dialog's own `fin-filebox` and
+disables Record until there is a file.
+
+**WHAT THAT DOES TO THE MISSING-BILL QUEUE, stated rather than discovered.**
+`missingBill` derives from `!t.bill`, so with a receipt mandatory on every
+write **nothing new can ever join that queue again**. It is a backlog of the
+rows that predate the rule, and `attachBill` is what empties it. An assertion
+pins exactly that: a large row under a bill-required tag is accepted and does
+not join the queue.
+
+**`out` and `in` became Credit and Debit everywhere a person reads them** — the
+record dialog, the direction filter, the strip, and the `Dir` chip on every
+row. They are the bank statement's words, which is what these rows are
+reconciled against; `Out` and `In` were a second vocabulary for the same fact,
+and somebody matching a row to a statement had to translate. **The stored value
+is untouched:** the ledger still holds `out` and `in`, the option values still
+carry them, and so does the CSS class.
+
+**Credit is offered first** — in the dialog, the filter and the strip, one
+ordering across the section so nobody re-reads the list each time. The dialog's
+**default is still Debit**, because most company rows are money out: a default
+is about the common case and the list order is about reading, and they are
+allowed to disagree.
+
+**A live Dr/Cr read-out shipped one build ago and is deleted.** It drew the row
+as double entry — Dr the expense, Cr the bank — which is correct bookkeeping
+and contradicted the words above it the moment Direction started saying Credit
+and Debit. Those two labels are the STATEMENT's convention, where a credit is
+money arriving; double entry uses the same two words the other way round. Both
+are right and they cannot share a dialog: one screen with two meanings of
+*Credit* is how somebody files a refund as a cost.
+
+**The description moves to the bottom and becomes a textarea.** It sat in the
+middle of the form as a one-line input, which made the field that has to make
+sense to a stranger at audit look like the same size of answer as Mode or
+Reference — and a single line quietly asks for three words. It is the only OPEN
+question on the dialog; everything above it is a choice from a list, an amount,
+a date or a file, and an open question belongs after the closed ones with room
+to answer. **No new field was added for it:** a separate `remark` was started and
+backed out, because a second free-text box beside a description is two places to
+write the same sentence and no rule for which.
+
+**Temp data**
+`none`. The seeded rows keep the bills they have and the ones they lack — the
+rule is about new writes, and rewriting history to satisfy it would have
+emptied the queue the rule is designed to stop refilling.
+
+**Backend needed**
+- `POST /admin/finance/transactions` takes the bill with the row and rejects
+  without one (`422 bill_required`), on a non-image/PDF (`bill_type`) and over
+  5 MB (`bill_too_big`). **Enforce the size server-side too:** the dialog's
+  check is a courtesy, and `bytes` can be absent — a browser may omit it, and
+  the client accepts that rather than refusing a real file.
+- No change to `TxnDirection`. `out` and `in` are still the wire values.
+
+**Open decisions**
+`none`.
+
+**Verified**
+`npx tsc -b` clean · `eslint` clean · `vite build` clean · **`check:finance`
+409/409**, up from 402: the receipt rule asserted all three ways it refuses,
+plus the two edges that matter — **exactly** 5 MB is accepted, because a cap is
+a limit and not a margin, and a file with no `bytes` is accepted, because a
+browser can omit it. `check:finance-render` renders every surface; the modal is
+asserted to say Credit and Debit and **not** to say money out or money in, to
+list Credit first, and to keep Debit selected.
+**Not checked:** not opened in a browser. The file picker cannot be exercised
+by a static render — the refusals are asserted through the store, and the
+`fin-filebox` states are markup only.
+
+---
+## 2026-09-02
+
 ### The charts answer a hover, and their tooltips get out of the card
 
 **Area:** every chart in the panel · `#/finance?tab=analytics` hardest hit

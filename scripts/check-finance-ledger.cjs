@@ -619,10 +619,19 @@ S.resetStore();
   ok("recording that quotation's own plan is accepted",
     S.recordSubscription({ ...base, installmentCount: 3 }).error, "");
   S.resetStore();
-  ok("...but a different count is refused against the quotation that agreed it",
-    has(S.recordSubscription({ ...base, installmentCount: 1 }).error, "plan_mismatch"), true);
+  /* A COMPLETE PAYMENT IS THE STANDING EXCEPTION, and these two assertions used
+     to contradict it: they recorded ONE installment against a quotation that
+     agreed three and expected `plan_mismatch`. That was true until the payment
+     plan became "the agreed schedule, or the whole thing at once" — the store
+     lets `n === 1` through on purpose now, so the count that must be refused is
+     one that is NEITHER the agreed schedule NOR a complete payment. */
+  ok("...but a count that is neither the agreed schedule nor a complete payment is refused",
+    has(S.recordSubscription({ ...base, installmentCount: 2 }).error, "plan_mismatch"), true);
   ok("...and the refusal names both numbers, so it can be acted on",
-    has(S.recordSubscription({ ...base, installmentCount: 1 }).error, "3 installments"), true);
+    has(S.recordSubscription({ ...base, installmentCount: 2 }).error, "3 installments"), true);
+  S.resetStore();
+  ok("...while a complete payment is always available, whatever was agreed",
+    S.recordSubscription({ ...base, installmentCount: 1 }).error, "");
 
   /* An invoice with NO quotation behind it is the website purchase, and the
      count is then a real choice rather than a contradiction. */
@@ -1012,6 +1021,74 @@ S.resetStore();
   ok("...and it carries the date it closed", !!S.readRun("RUN-2026-08").paidAt, true);
 }
 
+console.log("\nwrites · a row can be marked wrong, which moves no money");
+S.resetStore();
+{
+  /* A DOUBT IS NOT A REVERSAL, and this is the whole claim the feature makes.
+     Every assertion below is either about what the mark records or about what
+     it deliberately leaves alone. */
+  const ID = "TXN-0901";
+  const before = S.readTransaction(ID);
+  const beforeMoney = [before.amountPaise, before.state];
+  const beforeOut = S.overview().otherOutPaise;
+
+  ok("a mark with no reason is refused — it would be indistinguishable from a misclick",
+    has(S.markTxnWrong(ID, "   "), "reason_required"), true);
+  ok("marking it wrong is accepted", S.markTxnWrong(ID, "Billed twice; the June invoice covers this."), "");
+
+  const after = S.readTransaction(ID);
+  ok("...it records WHO, WHEN and WHY, because a mark nobody can act on is noise",
+    [!!after.wrong.by, !!after.wrong.at, after.wrong.reason.slice(0, 12)],
+    [true, true, "Billed twice"]);
+
+  /* THE HALF THAT MATTERS MOST: nothing about the money moved. */
+  ok("...the row is STILL recorded — a mark is not a third state",
+    [after.amountPaise, after.state], beforeMoney);
+  ok("...and every total still counts it, because the money did move",
+    S.overview().otherOutPaise, beforeOut);
+
+  ok("...marking it twice is refused", has(S.markTxnWrong(ID, "again"), "invalid_state_transition"), true);
+  ok("...it joins a queue somebody can actually open",
+    S.applyTxnFilters(S.txnRows(), { flag: "wrong" }).map((r) => r.t.txnId).indexOf(ID) >= 0, true);
+
+  /* CLEARING NEEDS A WORD TOO. A concern raised and silently dropped leaves a
+     record that somebody looked and no record of what they concluded. */
+  ok("clearing without a note is refused", has(S.clearTxnWrong(ID, ""), "reason_required"), true);
+  ok("clearing it is accepted", S.clearTxnWrong(ID, "Checked against the invoice — it is right."), "");
+  ok("...the flag is gone", !!S.readTransaction(ID).wrong, false);
+  ok("...but the history keeps both, which is the part worth keeping",
+    [S.readTransaction(ID).events.some((e) => e.type === "TXN_MARKED_WRONG"),
+      S.readTransaction(ID).events.some((e) => e.type === "TXN_MARK_CLEARED")],
+    [true, true]);
+  ok("clearing a row that is not marked is refused",
+    has(S.clearTxnWrong(ID, "x"), "invalid_state_transition"), true);
+
+  /* A REVERSAL ANSWERS THE MARK, so the mark comes off — leaving it would ask
+     somebody to look again at the one row that no longer needs looking at. */
+  S.resetStore();
+  ok("a marked row can then be reversed", S.markTxnWrong(ID, "Wrong tag entirely."), "");
+  ok("...and reversing it clears the mark", [S.reverseTransaction(ID, "Corrected."), !!S.readTransaction(ID).wrong],
+    ["", false]);
+  ok("...while the history still says it was marked, and by whom",
+    S.readTransaction(ID).events.some((e) => e.type === "TXN_MARKED_WRONG"), true);
+
+  /* An already-reversed row cannot be marked: the correction has happened. */
+  ok("an already-reversed row cannot be marked wrong",
+    has(S.markTxnWrong(ID, "late doubt"), "invalid_state_transition"), true);
+
+  /* EVERY EVENT TYPE THIS WRITE PRODUCES IS IN THE VOCABULARY. Learned the
+     hard way: `EventRow` falls back to printing the raw key, so a type the
+     code writes and the vocabulary does not know shows up as a constant in a
+     timeline. */
+  S.resetStore();
+  S.markTxnWrong(ID, "check");
+  S.clearTxnWrong(ID, "check");
+  ok("...and both event types it writes are in the vocabulary, not raw keys",
+    S.readTransaction(ID).events
+      .filter((e) => e.type.indexOf("TXN_MARK") === 0)
+      .every((e) => !!S.eventMeta(e.type)), true);
+}
+
 console.log("\nreads: the headcount indicator moves when an account is opened");
 S.resetStore();
 {
@@ -1283,11 +1360,17 @@ S.resetStore();
   ok("...and every row that used it still points at it — nothing was re-bucketed",
     S.readTransactions().filter((x) => x.tagKey === "ads").length, adsBefore);
   ok("an inactive tag cannot be used on a new row",
-    has(S.recordTransaction({ direction: "out", tagKey: "ads", amountPaise: 100000, description: "x", party: "y", mode: "UPI", reference: "NEW-ADS-1", valueDate: "2026-08-24", accountId: "ACC-HDFC-4021" }).error, "inactive"), true);
+    has(S.recordTransaction({ direction: "out", tagKey: "ads", amountPaise: 100000, description: "x", party: "y", mode: "UPI", reference: "NEW-ADS-1", valueDate: "2026-08-24", accountId: "ACC-HDFC-4021", bill: { filename: "b.pdf", mime: "application/pdf" } }).error, "inactive"), true);
 
+  /* A RECEIPT IS PART OF RECORDING A ROW NOW, so the base carries one and the
+     rule gets its own assertions below. It used to be optional and attached
+     afterwards through `attachBill`, which is the only reason `missingBill`
+     exists — a queue of rows somebody meant to come back to. */
+  const BILL = { filename: "bill.pdf", mime: "application/pdf", bytes: 240 * 1024 };
   const base = {
     direction: "out", tagKey: "util", amountPaise: 100000, description: "Broadband", party: "ACT",
     mode: "UPI", reference: "UTIL-TEST-1", valueDate: "2026-08-24", accountId: "ACC-HDFC-4021",
+    bill: BILL,
   };
   ok("a row with no tag is refused — the tag is what decides where it lands",
     has(S.recordTransaction({ ...base, tagKey: "nope" }).error, "Every row needs a tag"), true);
@@ -1300,6 +1383,40 @@ S.resetStore();
   ok("bank interest is accepted and flagged non-revenue",
     [inn.error, S.readTransaction(inn.txnId).nonRevenue], ["", true]);
   const collected0 = S.overview().collectedPaise;
+  /* THE RECEIPT RULE, all three ways it refuses. Same standard as a salary
+     payment's proof, and deliberately the same helpers — a cap that applied on
+     one screen and not the other is a cap somebody works around by using the
+     other screen. */
+  ok("a row with no receipt is refused — money moved and nothing says so",
+    has(S.recordTransaction({ ...base, bill: { filename: "", mime: "" } }).error, "bill_required"), true);
+  ok("...a spreadsheet is not a receipt",
+    has(S.recordTransaction({ ...base, bill: { filename: "ledger.xlsx", mime: "application/vnd.ms-excel" } }).error, "bill_type"), true);
+  ok("...and one over five megabytes is refused, by name and by size",
+    [has(S.recordTransaction({ ...base, bill: { filename: "scan.png", mime: "image/png", bytes: 6 * 1024 * 1024 } }).error, "bill_too_big"),
+      has(S.recordTransaction({ ...base, bill: { filename: "scan.png", mime: "image/png", bytes: 6 * 1024 * 1024 } }).error, "6 MB")],
+    [true, true]);
+  ok("...exactly five megabytes is accepted — the cap is a limit, not a margin",
+    S.recordTransaction({ ...base, reference: "BILL-EDGE-1", bill: { filename: "scan.png", mime: "image/png", bytes: S.PROOF_MAX_BYTES } }).error, "");
+  S.resetStore();
+  ok("...and a file with no size given is accepted, because a browser can omit it",
+    S.recordTransaction({ ...base, reference: "BILL-EDGE-2", bill: { filename: "photo.jpg", mime: "image/jpeg" } }).error, "");
+  S.resetStore();
+
+  /* WHAT THE RECEIPT RULE DOES TO THE MISSING-BILL QUEUE, which is the
+     consequence worth stating rather than discovering: `missingBill` derives
+     from `!t.bill`, so with a receipt mandatory on every write the queue can
+     only ever hold the rows that predate the rule. It is a BACKLOG now, not a
+     queue that grows — and `attachBill` is what empties it. */
+  {
+    const before = S.txnRows().filter((r) => r.missingBill).length;
+    const r = S.recordTransaction({ ...base, reference: "BILL-QUEUE-1", tagKey: "rent",
+      amountPaise: 5000000 });
+    ok("a big row under a bill-required tag is accepted, now that it carries one", r.error, "");
+    ok("...and it does NOT join the missing-bill queue, which nothing new can join again",
+      S.txnRows().filter((x) => x.missingBill).length, before);
+    S.resetStore();
+  }
+
   const spend = S.recordTransaction(base);
   ok("a company expense is recorded", spend.error, "");
   ok("...it lands under its tag in the month's spend",

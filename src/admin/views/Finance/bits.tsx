@@ -81,8 +81,14 @@ export function TagChip({ k, big }: { k: string; big?: boolean }) {
 export function Role({ sa, children }: { sa?: boolean; children?: ReactNode }) {
   return <span className={"fin-role" + (sa ? " sa" : "")}>{children || (sa ? "Super Admin" : "Finance")}</span>;
 }
+/** THE BANK STATEMENT'S WORDS, not this module's own. A credit is money
+ *  arriving and a debit is money leaving, which is what the two of them mean on
+ *  every statement these rows are reconciled against — `Out` and `In` were a
+ *  second vocabulary for the same fact, and a person matching a row to a
+ *  statement had to translate. The STORED value is untouched: the ledger still
+ *  holds `out` and `in`, and so does the class on this span. */
 export function Dir({ d }: { d: "in" | "out" }) {
-  return <span className={"fin-dir " + d}>{d === "out" ? "Out" : "In"}</span>;
+  return <span className={"fin-dir " + d}>{d === "out" ? "Debit" : "Credit"}</span>;
 }
 
 /** Signed money: a negative row is a counter-entry and reads as one. */

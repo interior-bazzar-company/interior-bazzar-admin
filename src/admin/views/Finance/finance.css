@@ -869,3 +869,51 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
 /* The value carries the weight, not a colour: these are read as "which year"
    and "which cut", and the label beside them already says which is which. */
 .fin-picker .selectbox select { font-weight: var(--weight-medium) }
+
+/* THE ROW AS A BOOKKEEPER WOULD WRITE IT, live under the amount on the record
+   dialog. It replaced a paragraph explaining what "money in" means: a sentence
+   about a convention is read once and forgotten, and this is the convention
+   applied to the numbers actually on screen. Built on `.fin-derived`, which is
+   already the module's read-out — not editable, and it should not invite a
+   click. */
+.fin-entry {
+  display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap;
+  font-size: var(--text-md);
+}
+.fin-entry b { font-weight: var(--weight-semibold); color: var(--text) }
+.fin-entry .dr, .fin-entry .cr {
+  font-size: var(--text-2xs); letter-spacing: .08em; font-weight: var(--weight-semibold);
+  padding: 1px 5px; border-radius: var(--radius-xs); border: 1px solid var(--line-2);
+  color: var(--text-3);
+}
+/* The amount sits between the two halves, because it is the one figure both
+   sides of the entry share — that is what makes it a double entry. */
+.fin-entry .amt { margin-inline: var(--space-1); font-variant-numeric: tabular-nums; color: var(--text-2) }
+
+/* The receipt on a transaction record. It was three rows of a key-value list,
+   which is the right shape for facts about the money and the wrong one for a
+   document: what somebody wants here is to see that it is there, and to open
+   it. A file reads as a file. */
+.fin-receipt {
+  display: flex; align-items: center; gap: var(--space-3);
+  border: 1px solid var(--line-2); border-radius: var(--radius-lg);
+  background: var(--bg-inset); padding: var(--space-3);
+}
+.fin-receipt .ic {
+  display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 auto;
+  border-radius: var(--radius-md); background: var(--bg); border: 1px solid var(--line-2);
+  color: var(--text-3);
+}
+.fin-receipt .meta { display: flex; flex-direction: column; gap: 2px; min-width: 0 }
+.fin-receipt .meta b { font-size: var(--text-md); word-break: break-all }
+.fin-receipt .meta .s { font-size: var(--text-sm); color: var(--text-3) }
+
+/* A remark on the record page. It is a sentence, so it wraps — the key-value
+   list's other values are all single tokens and would have kept it on one
+   line and cut it. */
+.fin-remark { display: block; white-space: pre-wrap; line-height: var(--lh-md) }
+
+/* A row somebody has disputed. Beside the state pill and not instead of it —
+   the row is still `recorded` and still counts, and a chip that replaced the
+   state would be the third state this module refuses to have. */
+.fin-wrongmark { color: var(--bad); font-weight: var(--weight-medium) }

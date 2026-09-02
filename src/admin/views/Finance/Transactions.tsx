@@ -15,12 +15,12 @@
    ============================================================================= */
 import { useShell } from "../../shell/ShellContext";
 import { can } from "../../shell/AdminShell";
-import { EmptyState, FilterChips, Icon, Notice, qs, SearchField, Select } from "../../ui";
+import { EmptyState, FilterChips, Icon, qs, SearchField, Select, StatStrip } from "../../ui";
+import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
-import { SubTabs, Frame } from "./Frame";
+import { Frame, ViewBand } from "./Frame";
 import type { FaceProps } from "./Frame";
 import { BudgetBar, Dir, Money, TagChip, TxnPill } from "./bits";
-import { MetricTip } from "./InfoTip";
 import { BudgetModal, DeactivateTagModal, TagModal, TxnModal } from "./TxnModals";
 import {
   BILL_THRESHOLD_PAISE, FILTER_LABELS, PERIOD, TAG_KINDS, TXN_STATES,
@@ -36,7 +36,8 @@ import type { Params, Tag, TagTotal, TxnRow } from "./store";
  *  depends on which filters happen to be set is exactly what React's rules
  *  forbid. */
 function filterValueLabel(key: string, value: string, tags: Tag[]): string {
-  if (key === "dir") return value === "out" ? "Money out" : "Money in";
+  if (key === "dir") return value === "out" ? "Debit" : "Credit";
+  if (key === "flag" && value === "wrong") return "Marked wrong";
   if (key === "tag") return tags.filter((t) => t.tagKey === value)[0]?.label || value;
   if (key === "kind") return tagKindMeta(value)?.label || value;
   if (key === "state") return TXN_STATES.filter((s) => s.key === value)[0]?.label || value;
@@ -70,13 +71,133 @@ export default function Transactions({ p, onFilter, onSearch, onUnfilter, onPara
   const openBudget = (t: Tag) => modal(<BudgetModal tag={t} onClose={closeLayer} onDone={done} />);
   const openDeactivate = (t: Tag) => modal(<DeactivateTagModal tag={t} onClose={closeLayer} onDone={done} />);
 
+  /* THE ROWS AND THE VOCABULARY THAT FILES THEM. Both are records somebody
+     acts on one at a time, so both carry a count — unlike an analytics tab,
+     where a badge would invite somebody to read a derivation as a record. */
+  const txnRows = useTxnRows();
+  const o = useOverview();
+  const totals = useTagTotals();
+  const missingBillN = txnRows.filter((r) => r.missingBill).length;
+  const wrongN = txnRows.filter((r) => !!r.t.wrong).length;
+
+  /* A CELL TOGGLES: pressing the filter it already applied clears it, because
+     the only other way back is to hunt for the chip. It navigates rather than
+     calling back, so the address bar always says what is on screen. */
+  const cellHash = (patch: Record<string, string | undefined>) => {
+    const q: Record<string, string> = {};
+    Object.keys(p).forEach((k) => {
+      if (p[k] && ["page"].indexOf(k) < 0) q[k] = p[k] as string;
+    });
+    Object.keys(patch).forEach((k) => {
+      if (patch[k] && p[k] !== patch[k]) q[k] = patch[k] as string; else delete q[k];
+    });
+    return "#/finance-transactions" + qs(q);
+  };
+
+  /* THE STRIP EVERY LIST IN THIS PANEL CARRIES: a stated Total, then its
+     parts. Each part is one period where it says so, deliberately unlike the
+     topbar above it, which is all time — the label says which.
+
+     ONLY WHAT CAN BE FILTERED IS A LINK. `Excluded spend` is a read-out: it is
+     a property of the tags money was filed under rather than a column anything
+     narrows on, and a cell that looks pressable and does nothing is worse than
+     one that plainly is not. */
+  const txnCells: (StatCell | "sep")[] = [
+    { k: <>Total</>, v: txnRows.length, on: !Object.keys(p).some((k) => p[k] && k !== "tab"),
+      to: "#/finance-transactions",
+      tip: <>Every company transaction ever recorded, money in and money out, before any
+        filter. The figures beside it are for {PERIOD.label}.</> },
+    "sep",
+    /* CREDIT BEFORE DEBIT, and the words are the bank statement's rather than
+       this module's own `out`/`in`: a credit is money arriving, which is what
+       the two of them mean on every statement anybody reconciles against. The
+       stored value is untouched — the ledger still holds `out` and `in`, and
+       only what a person reads changed. */
+    { k: <>Credit <b className="tnum">{inr(o.otherInPaise)}</b></>,
+      v: o.otherInN, dot: "ok", on: p.dir === "in", to: cellHash({ dir: "in" }),
+      tip: <><b>Never revenue.</b> Interest, own transfers and vendor refunds are the only
+        three ways money comes in here. Customer money has exactly one way in — a
+        subscription — and if anyone could hand-key a credit, anyone could fabricate
+        revenue.</> },
+    { k: <>Debit · {PERIOD.label} <b className="tnum">{inr(o.otherOutPaise)}</b></>,
+      v: o.otherOutN, dot: "bad", on: p.dir === "out", to: cellHash({ dir: "out" }),
+      tip: <>Recorded payments out in {PERIOD.label}, under every tag. Excluded spend is
+        inside this figure and called out separately at the end of the strip — it left the
+        bank like everything else.</> },
+    "sep",
+    { k: <>Marked wrong</>, v: wrongN, dot: wrongN ? "bad" : undefined,
+      on: p.flag === "wrong", to: cellHash({ flag: "wrong" }),
+      tip: <>Rows somebody has looked at and disputed. <b>They still count</b> — the money moved,
+        and a doubt about a row is not a reversal of it. This is the gap between noticing and
+        correcting: anyone with edit can raise one, and only a Super Admin can settle it with a
+        counter-entry.</> },
+    { k: <>Missing a bill</>, v: missingBillN, dot: missingBillN ? "warn" : undefined,
+      on: p.flag === "nobill", to: cellHash({ flag: "nobill" }),
+      tip: <>Recorded transactions with no bill attached. One above {inr(BILL_THRESHOLD_PAISE)}
+        blocks the period from closing, which is the whole reason this is a queue and not a
+        note.</> },
+    { k: <>Excluded spend <b className="tnum">{inr(o.excludedPaise)}</b></>,
+      tone: "mute",
+      tip: <>Taxes and statutory payments, filed under tags whose kind is <b>excluded</b>.
+        Cash out of the door like any other, and deliberately not part of the operating
+        picture — so it is stated here rather than quietly left inside a total.</> },
+  ];
+
+  /* THE TAGS TAB HAD NO STRIP AT ALL, and a standing Notice instead. The rule
+     that notice carried — a budget warns and never blocks — is on the cell it
+     is about now: a caution above a table is read once, and a caution on the
+     figure it governs is read when somebody doubts the figure. */
+  const overBudgetN = totals.rows.filter((r) => r.overBudget).length;
+  const tagCells: (StatCell | "sep")[] = [
+    { k: <>Total</>, v: tags.length,
+      tip: <>Every tag, active and deactivated. A tag is never deleted once it has been
+        used — deleting one would silently re-bucket every transaction filed under it.</> },
+    "sep",
+    { k: <>Active</>, v: tags.filter((t) => t.active).length, dot: "ok",
+      tip: <>Tags a new transaction can be filed under. Deactivating one keeps its history
+        and takes it out of the picker.</> },
+    { k: <>Made here</>, v: tags.filter((t) => t.custom).length,
+      tip: <>Created in the panel rather than shipped with it. Anyone with edit rights can
+        make one; its <b>kind</b> is chosen at creation and is what decides where the money
+        lands in Analytics.</> },
+    "sep",
+    { k: <>Over budget · {PERIOD.label} <b className="tnum">{inr(totals.totalPaise)}</b></>,
+      v: overBudgetN, dot: overBudgetN ? "warn" : undefined,
+      tip: <><b>A budget warns at 90% of itself and never blocks.</b> Rent still has to be
+        paid in a month somebody set its budget too low — the number is a flag for a person,
+        not a limit the panel enforces.</> },
+  ];
+
   return (
     <Frame toast={toast}
+      tabs={
+        /* A VIEW BAND ABOVE THE FILTERS, where Subscriptions and Salaries A/C
+           already put theirs. It was a segmented `SubTabs` strip BELOW the
+           command row, which said the two levels backwards: the tab decides
+           WHAT the filters narrow, so a control that changes the whole page
+           cannot sit under one that narrows part of it. */
+        <ViewBand cur={tab}
+          items={[
+            { k: "transactions", label: "Transactions", icon: "invoice", n: txnRows.length },
+            { k: "tags", label: "Tags", icon: "tag", n: tags.length },
+          ]}
+          onPick={(k) => onParams({
+            tab: k === "transactions" ? undefined : k,
+            /* Each tab has its own vocabulary of filters; carrying one across
+               would narrow a list with a control it does not show. */
+            q: undefined, dir: undefined, tag: undefined, kind: undefined,
+            state: undefined, range: undefined, flag: undefined, page: undefined,
+          })} />
+      }
       cmd={tab === "transactions" ? (
         <>
           <SearchField key={"q" + (p.q || "")} ph="Description, party, ID or reference…" val={p.q} onFilter={onSearch} />
           <Select key={"dir" + (p.dir || "")} name="dir" label="Direction" value={p.dir} onFilter={onFilter}
-            options={[{ v: "out", l: "Money out" }, { v: "in", l: "Money in" }]} />
+            /* CREDIT FIRST. It is the order the record dialog offers them and
+               the order the strip above counts them in — one ordering across
+               the section, so nobody re-reads the list every time they meet
+               it. */
+            options={[{ v: "in", l: "Credit" }, { v: "out", l: "Debit" }]} />
           <Select key={"tag" + (p.tag || "")} name="tag" label="Tag" value={p.tag} onFilter={onFilter}
             options={tags.map((t) => ({ v: t.tagKey, l: t.label + (t.active ? "" : " — inactive") }))} />
           <Select key={"kind" + (p.kind || "")} name="kind" label="Rolls up to" value={p.kind} onFilter={onFilter}
@@ -86,7 +207,7 @@ export default function Transactions({ p, onFilter, onSearch, onUnfilter, onPara
           <Select key={"range" + (p.range || "")} name="range" label="Period" value={p.range} onFilter={onFilter}
             options={[{ v: "month", l: PERIOD.label }]} />
           <Select key={"flag" + (p.flag || "")} name="flag" label="Queue" value={p.flag} onFilter={onFilter}
-            options={[{ v: "nobill", l: "Missing a bill" }]} />
+            options={[{ v: "wrong", l: "Marked wrong" }, { v: "nobill", l: "Missing a bill" }]} />
           <span className="spacer" />
           {writable ? (
             <button className="btn pri" onClick={openTxnModal}><Icon name="plus" size="sm" />Record a transaction</button>
@@ -101,20 +222,20 @@ export default function Transactions({ p, onFilter, onSearch, onUnfilter, onPara
         </>
       )}
       bands={<>
-        <SubTabs items={[{ k: "transactions", label: "Transactions" }, { k: "tags", label: "Tags" }]} cur={tab}
-          onPick={(k) => onParams({ tab: k === "transactions" ? undefined : k })} />
+        {/* ONE STRIP STYLE FOR BOTH TABS, which is what every other list in
+            the panel carries: a stated Total, then its parts, each cell a
+            filter. It replaced four `.fin-mt` tiles that said the same four
+            things at four times the height and matched no other list here. */}
+        <StatStrip cells={tab === "transactions" ? txnCells : tagCells} />
         {tab === "transactions" ? (
-          <>
-            <MoneyTiles p={p} onParams={onParams} />
-            <div className="dls-chips">
-              <FilterChips
-                params={Object.keys(p)
-                  .filter((k) => k !== "tab" && k !== "page" && p[k])
-                  .reduce((o, k) => { o[k] = filterValueLabel(k, p[k] as string, tags); return o; }, {} as Record<string, string>)}
-                labels={FILTER_LABELS}
-                onUnfilter={onUnfilter} />
-            </div>
-          </>
+          <div className="dls-chips">
+            <FilterChips
+              params={Object.keys(p)
+                .filter((k) => k !== "tab" && k !== "page" && p[k])
+                .reduce((o, k) => { o[k] = filterValueLabel(k, p[k] as string, tags); return o; }, {} as Record<string, string>)}
+              labels={FILTER_LABELS}
+              onUnfilter={onUnfilter} />
+          </div>
         ) : null}
       </>}>
       {tab === "transactions"
@@ -124,47 +245,14 @@ export default function Transactions({ p, onFilter, onSearch, onUnfilter, onPara
   );
 }
 
-/* -------------------------------------------------------------- money tiles --- */
-/** What a person opens this face to know: what left, what came in and why
- *  that is never revenue, what has no paper behind it, and what is spent but
- *  deliberately not part of the operating picture.
- *
- *  Only "missing a bill" is a button: it is the one figure worth jumping to
- *  the queue for. The other three carry the "i" reference button from
- *  InfoTip inside them, and an interactive element cannot nest inside
- *  another one — a `<button>` around a `<button>` breaks the DOM and the
- *  click along with it — so those three are read-outs, not controls. */
-function MoneyTiles({ p, onParams }: { p: Params; onParams: (patch: Params) => void }) {
-  const o = useOverview();
-  const rows = useTxnRows();
-  const missingBillN = rows.filter((r) => r.missingBill).length;
-  const on = (patch: Params) => Object.keys(patch).every((k) => (p[k] || undefined) === patch[k]);
-  return (
-    <div className="fin-money-strip">
-      <div className="fin-mt">
-        <span className="k">Money out · {PERIOD.label}<MetricTip k="other_out" /></span>
-        <span className="v">{inr(o.otherOutPaise)}</span>
-        <span className="s">{o.otherOutN} transaction{o.otherOutN === 1 ? "" : "s"}{o.excludedPaise ? " · " + inr(o.excludedPaise) + " excluded, apart" : ""}</span>
-      </div>
-      <div className="fin-mt">
-        <span className="k">Money in — never revenue<MetricTip k="other_in" /></span>
-        <span className="v">{inr(o.otherInPaise)}</span>
-        <span className="s">{o.otherInN} credit{o.otherInN === 1 ? "" : "s"} · interest, own transfers, vendor refunds only</span>
-      </div>
-      <button type="button" className={"fin-mt" + (missingBillN ? " warn" : " mute") + (on({ flag: "nobill" }) ? " on" : "")}
-        onClick={() => onParams({ flag: "nobill" })}>
-        <span className="k">Missing a bill</span>
-        <span className="v">{missingBillN}</span>
-        <span className="s">above {inr(BILL_THRESHOLD_PAISE)} blocks closing the period</span>
-      </button>
-      <div className="fin-mt mute">
-        <span className="k">Excluded spend</span>
-        <span className="v">{inr(o.excludedPaise)}</span>
-        <span className="s">taxes &amp; statutory — cash out, not an operating cost</span>
-      </div>
-    </div>
-  );
-}
+/* MONEY TILES STOOD HERE — four `.fin-mt` blocks, each the height of a card,
+   saying what one row of the panel's own strip says. They are `txnCells`
+   above now. Their one real constraint survived the move and is worth
+   restating: a tile could carry an `i` beside its label because it was a div,
+   and a strip cell is a BUTTON — an `i` inside it would swallow half its own
+   click target. The definitions ride `tip` instead, which is the strip's own
+   description channel and the same answer Salaries A/C and Subscriptions
+   reached. */
 
 /* -------------------------------------------------------------- the table --- */
 function TxnTable({ p, writable, onRecord, onUnfilter }: {
@@ -211,7 +299,10 @@ function TxnTable({ p, writable, onRecord, onUnfilter }: {
 
 function TxnLine({ r, p }: { r: TxnRow; p: Params }) {
   const t = r.t;
-  const rail = r.missingBill ? "warn" : t.state === "reversed" ? "bad" : "";
+  /* A DISPUTED ROW OUTRANKS A MISSING BILL on the rail: one is paperwork that
+     can be chased, the other is somebody saying the money should not have
+     moved. Reversed still wins over both — that one is settled. */
+  const rail = t.state === "reversed" ? "bad" : t.wrong ? "bad" : r.missingBill ? "warn" : "";
   const to = "#/finance-transactions/" + encodeURIComponent(t.txnId) + qs(carry(p));
   const open = () => go(to);
   return (
@@ -245,7 +336,18 @@ function TxnLine({ r, p }: { r: TxnRow; p: Params }) {
             : <div className="cell-1 faint">no bill needed</div>}
         {t.bankLineId ? <div className="cell-2"><Icon name="link" size="sm" />matched to bank</div> : null}
       </td>
-      <td><TxnPill k={t.state} /></td>
+      <td>
+        <TxnPill k={t.state} />
+        {/* THE MARK IS NOT A STATE and does not replace one — it sits beside it,
+            because the row is still `recorded` and still counts. A pill that
+            replaced the state would be the third state this module refuses to
+            have. */}
+        {t.wrong
+          ? <div className="cell-2 fin-wrongmark" title={t.wrong.reason}>
+            marked wrong by {t.wrong.by}
+          </div>
+          : null}
+      </td>
       <td className="tight"><Icon name="chevr" size="sm" /></td>
     </tr>
   );
@@ -261,11 +363,10 @@ function TagsTab({ writable, onBudget, onDeactivate }: {
   }
   return (
     <>
-      <Notice tone="info" text={<>
-        <b>A budget warns at 90% of itself and never blocks.</b> Rent still has to be paid in a
-        month somebody set its budget too low — the number is a flag for a person, not a limit
-        the panel enforces.
-      </>} />
+      {/* THE BUDGET NOTICE THAT STOOD HERE is on the strip cell it is about,
+          above. A caution over a table is read once and then looked past; the
+          same sentence on the figure it governs is read at the moment somebody
+          doubts the figure, which is the only moment it does any work. */}
       <table className="tbl dls-tbl fin-tbl">
         <thead>
           <tr>

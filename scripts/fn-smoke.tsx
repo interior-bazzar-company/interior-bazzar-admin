@@ -43,7 +43,7 @@ import {
   CloseAccountModal, LopModal, OpenRunModal, PaySalaryModal, SalaryAccountModal,
 } from "../src/admin/views/Finance/SalaryModals";
 import {
-  BillModal, BudgetModal, DeactivateTagModal, ReverseTxnModal, TagModal, TxnModal,
+  BillModal, BudgetModal, DeactivateTagModal, MarkWrongModal, ReverseTxnModal, TagModal, TxnModal,
 } from "../src/admin/views/Finance/TxnModals";
 import {
   DecideRefundModal, ManualRefundModal, RecordTransferModal, RequestRefundModal,
@@ -313,9 +313,16 @@ has(salEmpty, "Nobody matches those filters", "...an empty payroll says the filt
 has(salEmpty, "for the whole payroll, before any filter", "...and that the strip above it was not filtered");
 
 const txns = page("transactions · the ledger", "/finance-transactions");
+/* THE FOUR TILES BECAME THE PANEL'S STRIP, the one every other list carries: a
+   stated Total and then its parts, each cell a filter. The definitions the
+   tiles carried on an `i` ride the cell's `tip` now — a cell is a BUTTON, and
+   an `i` inside it would swallow half its own click target. */
+has(txns, "dls-attn", "...the ledger carries the panel's own strip");
+hasnt(txns, "fin-mt", "...and not the four tall tiles it used to, which matched no other list");
 has(txns, "Missing a bill", "...a missing bill is a state, not an error");
-has(txns, "interest, own transfers, vendor refunds only",
-  "...money in is named as three non-revenue kinds");
+has(txns, "Interest, own transfers and vendor refunds are the only",
+  "...money in is named as three non-revenue kinds, on the cell it qualifies");
+has(txns, "Excluded spend", "...and excluded spend is stated rather than left inside a total");
 const txnsFiltered = check("transactions · filtered to the ones missing a bill", () => at("/finance-transactions?flag=nobill"));
 has(txnsFiltered, "Missing — required", "...and the queue shows the rows that are actually missing one");
 const txnsEmpty = check("transactions · a filter that matches nothing", () => at("/finance-transactions?q=zzzznothing"));
@@ -325,15 +332,33 @@ const tags = page("transactions · the tags that file them", "/finance-transacti
 has(tags, "warns at 90% of itself and never blocks", "...a budget is a flag, not a wall");
 has(tags, "lands in", "...and every tag says where its money lands");
 
-const refunds = page("refunds · three bands", "/finance-refunds");
+/* ONE TABLE, WHERE THERE WERE THREE BANDS. The face stacked three sections —
+   awaiting, approved-not-sent, settled — each with its own heading, its own
+   empty state and a bespoke `.fin-q` row shape that existed nowhere else in
+   the panel. Those are three different JOBS, which is true and was answered
+   with three lists; the strip answers it with three filters, and the table is
+   sorted by the same job order so the rows needing action are on top anyway. */
+const refunds = page("refunds · the book", "/finance-refunds");
+has(refunds, "dls-attn", "...refunds carry the panel's own strip");
+ok1(refunds, 'class="tbl', "...and exactly ONE table, where there were three bands");
+hasnt(refunds, "fin-queue", "...with the bespoke queue-row shape gone");
+hasnt(refunds, "fin-mt", "...and the four read-out tiles gone with it");
 has(refunds, "Nothing here has moved money", "...requests are named as requests");
-has(refunds, "Money the company has agreed to return and has not sent",
+has(refunds, "agreed to return and has not sent",
   "...approved-not-sent is real cash the company owes");
+has(refunds, "Approval moves no money", "...and the gap between approved and paid is named");
+/* THE JOB FILTERS. Two of the cells stand for a job rather than a state —
+   awaiting is `requested` OR `sent_back` — which is why this face has its own
+   `flag` beside the `state` filter. */
+const refundsWaiting = check("refunds · awaiting a decision", () => at("/finance-refunds?flag=awaiting"));
+has(refundsWaiting, "Awaiting a decision", "...the awaiting cell is a filter, not a section");
+const refundsOwed = check("refunds · approved and not sent", () => at("/finance-refunds?flag=owed"));
+has(refundsOwed, "Approved, not sent", "...and so is the one that owes money");
 const refundsFiltered = check("refunds · filtered to the manual ones", () => at("/finance-refunds?origin=manual"));
 has(refundsFiltered, "No ledger row behind this one", "...a manual refund says it has nothing behind it");
 const refundsEmpty = check("refunds · a filter that matches nothing", () => at("/finance-refunds?q=zzzznothing"));
 has(refundsEmpty, "Nothing matches those filters", "...an empty queue says the filter is why");
-has(refundsEmpty, "counts the whole queue before any filter", "...and that the tiles above it were not filtered");
+has(refundsEmpty, "counts the whole book before any filter", "...and that the strip above it was not filtered");
 
 const an = page("analytics · the overview", "/finance-analytics");
 has(an, "Analytics is not a fifth record type", "...analytics is the four lists read back, not a store");
@@ -545,6 +570,24 @@ has(draftSlip, 'class="mono fin-slipid"', "...and the action row names the slip 
 const oneTxn = page("a company transaction", "/finance-transactions/TXN-0901");
 has(oneTxn, "A recorded row is never edited", "...posted is permanent");
 has(oneTxn, "a correction is a new counter-entry", "...and a correction is an append");
+/* THE ACTIONS MENU IS NOT ASSERTED HERE, and the reason is worth writing down
+   rather than leaving as a gap. `can()` returns false without a session, so
+   this harness renders every Finance page with NO write affordance at all —
+   which means `hasnt(oneTxn, ">Attach a bill<")` would pass whether the button
+   had been replaced by a menu or deleted outright. An assertion that passes for
+   the wrong reason is worse than none, because it looks like cover.
+
+   What IS asserted is the dialog the menu's Edit item opens, below, and the two
+   things on this page that render regardless of permission. */
+/* THE REMARK, which this page did not show at all: it was collected on the
+   dialog and then only ever readable in the list's truncated column. */
+has(oneTxn, "Remark", "...the remark is on the record now");
+has(oneTxn, "fin-remark", "...as a sentence that wraps, not a truncated cell");
+/* THE RECEIPT READS AS A FILE, where it was three rows of a key-value list. */
+has(oneTxn, ">Receipt<", "...the bill block is a receipt section");
+has(oneTxn, "fin-receipt", "...and the file reads as a file");
+has(oneTxn, "holds the name, not the file",
+  "...saying what it actually holds rather than offering a download that would do nothing");
 const counter = page("its counter-entry", "/finance-transactions/TXN-RV-0917");
 has(counter, "This is a counter-entry", "...a counter-entry says which row it offsets");
 has(counter, "nothing else about the original", "...and that the original was left alone");
@@ -694,14 +737,65 @@ hasnt(paySal, "ties this to the bank", "...and so is the sentence that explained
    three kinds on its money-in tile, and TXN-0902's record screen says customer
    money has exactly one way in. Both are above. */
 const txnM = check("record a transaction", () => modal(<TxnModal onClose={noop} onDone={noop} />));
-has(txnM, "nobody edits it; a correction is a counter-entry, never a rewrite",
-  "...a recorded row is a fact and a correction is an append");
-has(txnM, "Money in", "...money in is offered as a direction");
+/* EVERY CHOICE IS A DROPDOWN NOW, on the pay-salary dialog's shape: direction,
+   credit kind and tag were three segmented pickers, the last of them a
+   scrolling list of cards with a two-line description under every option — a
+   screen and a half spent on three answers. */
+has(txnM, "selectbox", "...the choices are dropdowns, like the pay dialog");
+hasnt(txnM, "fin-pick", "...and the scrolling tag-card list is gone");
+/* THE BANK STATEMENT'S TWO WORDS, and `out`/`in` are gone from what a person
+   reads. CREDIT IS OFFERED FIRST, here and on the filter and in the strip —
+   one ordering across the section. The stored value is untouched: the option's
+   VALUE is still `out`/`in`, which is what the ledger holds. */
+has(txnM, ">Credit<", "...direction is said in the words a bank statement uses");
+has(txnM, ">Debit<", "...both ways");
+hasnt(txnM, "Money out", "...and not as money out");
+hasnt(txnM, "Money in", "...nor money in");
+ok1(txnM, 'value="in"', "...credit is one option, not a second control");
+/* Credit before Debit in the markup — the order they are read in. */
+has(txnM, 'value="in">Credit</option><option value="out"',
+  "...and credit is listed first, as it is everywhere else in the section");
+/* The DEFAULT is still Debit, because most company rows are money out — a
+   default is about the common case, and the list order is about reading. */
+has(txnM, 'value="out" selected="">Debit',
+  "...while Debit stays the default, which is the common case rather than the first row");
+/* THE RECEIPT IS PART OF RECORDING THE ROW, to the same standard and with the
+   same helpers as a salary payment's proof. */
+has(txnM, "fin-filebox", "...a receipt is attached on the dialog, not chased afterwards");
+/* THE ONE OPEN QUESTION GOES LAST, AND IN A BOX. Everything above Description
+   is a choice from a list, an amount, a date or a file; a one-line input in
+   the middle of those made the field that has to make sense to a stranger at
+   audit look like the same size of answer as Mode. */
+has(txnM, "<textarea", "...the description is a box, not a line");
+has(txnM, "make sense to somebody else at audit",
+  "...saying what it is for, in the placeholder rather than as a help line");
+has(txnM, 'Account</span><div class="selectbox"',
+  "...and Account is still a dropdown right before it");
+has(txnM, "up to 5 MB", "...with the limit said before a file is picked, not after");
+has(txnM, "disabled", "...and Record is disabled until there is one");
+/* GROUPED BY WHERE THE MONEY LANDS — the one part of a tag that is not free,
+   as structure rather than as a description line under each option. */
+has(txnM, "optgroup", "...tags are grouped by where they land");
+has(txnM, "Net line AND CAC", "...naming the destination on the group, not on every row");
+has(txnM, "bill required", "...and an option says so, because that tag refuses the write without one");
+/* THE STANDING PROSE IS GONE. The rule it carried — a row is a fact and a
+   correction is an append — is asserted where somebody MEETS it: on the
+   reversal dialog, and on the record page. Both are below and above. */
+hasnt(txnM, "nobody edits it; a correction is a counter-entry, never a rewrite",
+  "...and the standing sub-line came off, with its rule moved to where it is acted on");
+hasnt(txnM, "restricted to these three non-revenue kinds",
+  "...as did the notice the store already enforces at the moment it refuses");
 /* THE NaN GUARD. A partial seed once rendered NaN into the amount box; the
    amount, the budget and every rupee field in this dialog go through
    `toPaise`, which returns null rather than a number on anything half-typed.
    So: no NaN anywhere in the output, not just in the field it bit in. */
 hasnt(txnM, "NaN", "...and no NaN reaches the output from an unfilled amount field");
+/* WHERE THAT RULE LIVES NOW: on the dialog that performs the correction. */
+const revM = check("reverse a transaction", () =>
+  modal(<ReverseTxnModal txn={txn("TXN-0901")} onClose={noop} onDone={noop} />));
+has(revM, "counter-entry is appended",
+  "...a correction is an append, said on the dialog that appends it");
+
 const tagM = check("create a tag", () => modal(<TagModal onClose={noop} onDone={noop} />));
 has(tagM, "it decides where the money lands in Analytics", "...the kind decides where the money lands");
 has(tagM, "deactivated later, never deleted", "...and a tag is deactivated, never deleted");
@@ -714,9 +808,29 @@ const deact = check("deactivate a tag", () => modal(
   <DeactivateTagModal tag={tag("soft")} onClose={noop} onDone={noop} />));
 has(deact, "nothing is re-bucketed", "...deactivating re-buckets nothing");
 has(deact, "There is no reactivate here", "...and it does not pretend to be undoable");
-const bill = check("attach a bill", () => modal(
+/* THE RECEIPT IS PICKED NOW, NOT TYPED, and held to the same three rules as one
+   attached at the time. It used to be a text box for a filename with a note
+   saying so. */
+/* MARKING A ROW WRONG MOVES NO MONEY, and the dialog beside one that does has
+   to say so. */
+const wrongM = check("mark a transaction wrong", () => modal(
+  <MarkWrongModal txn={txn("TXN-0901")} onClose={noop} onDone={noop} />));
+has(wrongM, "This moves no money", "...it says outright that nothing about the row changes");
+has(wrongM, "every total still counts it", "...and that the figures still include it");
+has(wrongM, "the correction is a counter-entry", "...naming what does settle it, and whose job that is");
+has(wrongM, "<textarea", "...the reason is a box, because it has to be actionable by somebody else");
+has(wrongM, "disabled", "...and the button waits for one");
+
+const bill = check("edit the receipt", () => modal(
   <BillModal txn={txn("TXN-0910")} onClose={noop} onDone={noop} />));
-has(bill, "the filename is the whole record that a bill exists", "...the prototype says what it is recording");
+has(bill, "fin-filebox", "...a receipt is picked, not typed");
+has(bill, "up to 5 MB", "...to the same limit as one attached when the row was recorded");
+/* THE WORD `EDIT` PROMISES THE FIGURES, so the dialog it opens says outright
+   that it cannot touch them. This is the module's central rule and the one
+   place somebody arrives expecting the opposite. */
+has(bill, "Only the receipt", "...and says plainly that only the receipt can change");
+has(bill, "counter-entry, appended, never a rewrite",
+  "...naming what to do instead when a figure is wrong");
 const revTxn = check("reverse a transaction", () => modal(
   <ReverseTxnModal txn={txn("TXN-0901")} onClose={noop} onDone={noop} />));
 has(revTxn, "A counter-entry is appended", "...a correction is an appended counter-entry");
@@ -796,9 +910,17 @@ has(subs, "Nothing here is live.", "...and it says, in words, that nothing here 
       hasnt(html, ">" + t + "<", "...and no link naming another section · " + t + " · " + label);
     });
   });
-/* The switch WITHIN a section stays, and stays segmented — Transactions/Tags
-   and Overview/KPI are two views of one record type, not two sections. */
-has(tags, "fin-subtabs", "Transactions / Tags is still a segmented sub-switch");
+/* THE SWITCH WITHIN A SECTION STAYS — Transactions/Tags and Overview/KPI are
+   two views of one record type, not two sections. What changed is where
+   Transactions/Tags SITS: it was a segmented strip below the filters, which
+   said the two levels backwards, because the tab decides what the filters
+   narrow. It is a view band above them now, like Subscriptions and Salaries
+   A/C. Overview/KPI stays segmented: it sits inside a face that has no filter
+   row of its own for it to be under. */
+has(tags, "fin-views", "Transactions / Tags is a view band above the filters now");
+hasnt(tags, "fin-subtabs", "...and no segmented strip is left under them");
+has(tags, "dls-attn", "...the Tags tab gained a strip of its own, where it had none");
+hasnt(tags, "notice", "...and lost the standing budget notice, which moved onto the cell it is about");
 has(kpi, "fin-subtabs", "Overview / KPI is still a segmented sub-switch");
 
 

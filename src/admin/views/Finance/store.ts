@@ -40,7 +40,7 @@ import { getSession } from "../../auth/session";
 import { inr } from "../../ui/format";
 import type {
   Account, CompanyTxn, FinEvent, Installment, InstallmentPayment, Kpi, MonthPoint,
-  Params, Payslip, Proof, Refund, RefundPolicy, SalaryAccount, SalaryComponent, SalaryRun,
+  Params, Payslip, Refund, RefundPolicy, SalaryAccount, SalaryComponent, SalaryRun,
   Subscription, Tag, TagKind, Tile,
 } from "./types";
 
@@ -624,6 +624,22 @@ export const payViaMeta = (k: string) => PAY_VIA.filter((v) => v.key === k)[0] |
 export const PROOF_TYPES = ["image/", "application/pdf"];
 export const proofAccepted = (mime: string) =>
   PROOF_TYPES.some((t) => (mime || "").toLowerCase().startsWith(t));
+
+/** FIVE MEGABYTES, AND IT IS ONE RULE RATHER THAN ONE SCREEN'S RULE. A receipt
+ *  is a photograph of a piece of paper or a PDF of one; anything larger is a
+ *  scan nobody set the resolution on. It lives here beside `proofAccepted`
+ *  because both salary payments and company transactions attach evidence, and
+ *  a cap that applied to only one of them is a cap somebody works around by
+ *  using the other screen. */
+export const PROOF_MAX_BYTES = 5 * 1024 * 1024;
+export const proofTooBig = (bytes?: number) =>
+  typeof bytes === "number" && bytes > PROOF_MAX_BYTES;
+/** `5 MB`, `1.4 MB`, `812 KB`. For saying which file was refused and by how
+ *  much — a refusal that does not name the size is one somebody just retries. */
+export const fileSize = (bytes: number): string =>
+  (bytes >= 1024 * 1024
+    ? Math.round((bytes / (1024 * 1024)) * 10) / 10 + " MB"
+    : Math.max(1, Math.round(bytes / 1024)) + " KB");
 export const engagementMeta = (k: string) => ENGAGEMENTS.filter((e) => e.key === k)[0] || null;
 
 export function applySalaryFilters(rows: SalaryRow[], p: Params): SalaryRow[] {
@@ -758,6 +774,7 @@ export function applyTxnFilters(rows: TxnRow[], p: Params): TxnRow[] {
   if (p.kind) out = out.filter((r) => r.tag?.kind === p.kind);
   if (p.state) out = out.filter((r) => r.t.state === p.state);
   if (p.flag === "nobill") out = out.filter((r) => r.missingBill);
+  if (p.flag === "wrong") out = out.filter((r) => !!r.t.wrong);
   if (p.range === "month") out = out.filter((r) => inPeriod(r.t.valueDate));
   if (p.q) {
     const q = p.q.toLowerCase().trim();
@@ -2064,6 +2081,12 @@ export interface TxnInput {
   direction: "out" | "in"; tagKey: string; amountPaise: number;
   description: string; party: string; mode: string; reference: string;
   valueDate: string; accountId: string; creditKind?: string | null;
+  /** MANDATORY, on every row. It used to be optional and attached afterwards
+   *  through `attachBill`, which is why `missingBill` exists at all — a queue
+   *  of rows somebody meant to come back to. Nothing new can join that queue
+   *  now: the money moved, and the paper that says so is part of recording it.
+   *  `attachBill` stays, for the historical rows that predate this. */
+  bill: { filename: string; mime: string; bytes?: number };
 }
 export function recordTransaction(input: TxnInput): { error: string; txnId: string | null } {
   const tag = tagOf(input.tagKey);
@@ -2075,6 +2098,15 @@ export function recordTransaction(input: TxnInput): { error: string; txnId: stri
   if (dupReference(input.reference)) return { error: "A record already carries reference " + input.reference.trim() + ". (duplicate_reference)", txnId: null };
   if (!input.valueDate || input.valueDate > todayIso()) return { error: "The value date is when the money moved — it cannot be in the future.", txnId: null };
   if (!accountOf(input.accountId)) return { error: "Pick the account.", txnId: null };
+  /* THE RECEIPT, TO THE SAME STANDARD AS A SALARY PAYMENT'S. A row with no
+     paper behind it is a claim, and this module does not store claims. */
+  const billName = (input.bill?.filename || "").trim();
+  if (!billName)
+    return { error: "Attach the receipt. A recorded row with no paper behind it is a claim, not a transaction. (bill_required)", txnId: null };
+  if (!proofAccepted(input.bill.mime))
+    return { error: billName + " is neither an image nor a PDF. A receipt is a photograph of one or a document, and a spreadsheet is neither. (bill_type)", txnId: null };
+  if (proofTooBig(input.bill.bytes))
+    return { error: billName + " is " + fileSize(input.bill.bytes as number) + ". The limit is " + fileSize(PROOF_MAX_BYTES) + " — a receipt that size is a scan nobody set the resolution on. (bill_too_big)", txnId: null };
   if (input.direction === "in" && (!input.creditKind || !CREDIT_KINDS.some((c) => c.key === input.creditKind)))
     return { error: "Money in is restricted here to bank interest, an own transfer or a vendor refund. Customer money has exactly one way in: a subscription.", txnId: null };
 
@@ -2087,7 +2119,8 @@ export function recordTransaction(input: TxnInput): { error: string; txnId: stri
     txnId: id, direction: input.direction, tagKey: input.tagKey, amountPaise: input.amountPaise,
     description: input.description.trim(), party: input.party.trim(), mode: input.mode,
     reference: input.reference.trim(), valueDate: input.valueDate, accountId: input.accountId,
-    state: "recorded", bill: null, bankLineId: line ? line.lineId : null,
+    state: "recorded", bill: { type: "bill", filename: billName, uploadedAt: stamp() },
+    bankLineId: line ? line.lineId : null,
     nonRevenue: input.direction === "in", creditKind: input.direction === "in" ? input.creditKind || null : null,
     reversesTxnId: null, reversal: null, recordedBy: a.name, recordedAt: stamp(), events: [],
   };
@@ -2099,19 +2132,100 @@ export function recordTransaction(input: TxnInput): { error: string; txnId: stri
   return { error: "", txnId: id };
 }
 
-export function attachBill(id: string, filename: string): string {
+/** THE PAPERWORK IS THE ONE THING ON A RECORDED ROW THAT CAN CHANGE, and this
+ *  is the only write that changes it. It exists for the rows that predate the
+ *  receipt being mandatory, and for the case where the wrong file was picked —
+ *  a bill is evidence ABOUT the row, not part of what the row asserts.
+ *
+ *  IT DOES NOT EDIT THE ROW. The amount, the direction, the tag, the reference,
+ *  the date and the account are what the row says happened, and none of them is
+ *  reachable from here or from anywhere else: a correction to any of those is a
+ *  counter-entry through `reverseTransaction`, which appends and leaves this
+ *  row exactly as it was posted.
+ *
+ *  Same three rules as recording one, deliberately — a receipt attached later
+ *  is not held to a lower standard than a receipt attached at the time. */
+export function attachBill(
+  id: string,
+  file: string | { filename: string; mime: string; bytes?: number },
+): string {
   const t = readTransaction(id);
   if (!t) return "That transaction no longer exists.";
-  if (!filename.trim()) return "Pick a file.";
-  const bill: Proof = { type: "invoice", filename: filename.trim(), uploadedAt: stamp() };
-  t.bill = bill;
-  log(pushEvent(t.events, "BILL_ATTACHED", filename.trim() + " attached."), id, "transaction");
+  /* A bare string is the old call shape and means "trust the name": no mime to
+     check and no size to measure. Kept so a caller that only has a filename is
+     not forced to invent the rest. */
+  const f = typeof file === "string" ? { filename: file, mime: "", bytes: undefined } : file;
+  const name = (f.filename || "").trim();
+  if (!name) return "Pick a file. (bill_required)";
+  if (f.mime && !proofAccepted(f.mime))
+    return name + " is neither an image nor a PDF. (bill_type)";
+  if (proofTooBig(f.bytes))
+    return name + " is " + fileSize(f.bytes as number) + ". The limit is "
+      + fileSize(PROOF_MAX_BYTES) + ". (bill_too_big)";
+  const had = t.bill?.filename || null;
+  t.bill = { type: "invoice", filename: name, uploadedAt: stamp() };
+  log(pushEvent(t.events, "BILL_ATTACHED",
+    had && had !== name
+      ? name + " replaced " + had + ". The row itself is untouched — a bill is evidence about it, not part of what it says."
+      : name + " attached."), id, "transaction");
   emit();
   return "";
 }
 
 /** FN-T11 · Reverse a transaction. Super Admin. A counter-entry carrying a
  *  negative amount is appended; the original row is untouched. */
+/** FN-T11b · MARK A ROW WRONG, and clear the mark.
+ *
+ *  A DOUBT IS NOT A REVERSAL. This changes no money: `state` stays `recorded`,
+ *  the amount is untouched, and every total still counts the row — because the
+ *  money did move, and somebody believing it should not have is a different
+ *  fact from it not having happened. Nothing in analytics reads the flag.
+ *
+ *  WHAT IT BUYS is the gap between noticing and correcting. Reversing is Super
+ *  Admin and needs a decision; noticing is anybody's job and needs to be
+ *  recorded the moment it happens, or it lives in somebody's memory until they
+ *  are on leave. So this is the queue between the two.
+ *
+ *  ANYONE WITH EDIT MAY MARK. Deliberately not Super Admin: making the person
+ *  who notices and the person who settles it one permission means the people
+ *  closest to the row cannot say anything about it. */
+export function markTxnWrong(id: string, reason: string): string {
+  const t = readTransaction(id);
+  if (!t) return "That transaction no longer exists.";
+  if (t.state === "reversed")
+    return "It is already reversed — the correction has happened, and marking it now would queue a row nobody needs to look at. (invalid_state_transition)";
+  if (t.wrong) return "It is already marked wrong. (invalid_state_transition)";
+  if (!reason.trim())
+    return "Say what is wrong with it. A mark with no reason is indistinguishable from a misclick at audit, and the next person cannot act on it. (reason_required)";
+  const a = actor();
+  t.wrong = { by: a.name, at: stamp(), reason: reason.trim() };
+  log(pushEvent(t.events, "TXN_MARKED_WRONG",
+    a.name + " marked this row wrong — " + reason.trim()
+    + " Nothing about the row changed: the money still moved and every total still counts it. "
+    + "A counter-entry is what corrects it."), id, "transaction");
+  emit();
+  return "";
+}
+
+/** The other half, and it needs a note for the same reason the mark did: a
+ *  concern that was raised and then silently dropped is worse than one never
+ *  raised, because the record shows somebody looked and says nothing about
+ *  what they concluded. */
+export function clearTxnWrong(id: string, note: string): string {
+  const t = readTransaction(id);
+  if (!t) return "That transaction no longer exists.";
+  if (!t.wrong) return "It is not marked wrong. (invalid_state_transition)";
+  if (!note.trim())
+    return "Say what you found. Clearing a mark without a word leaves a record that somebody looked and no record of what they concluded. (reason_required)";
+  const a = actor();
+  const raised = t.wrong;
+  t.wrong = null;
+  log(pushEvent(t.events, "TXN_MARK_CLEARED",
+    a.name + " cleared the mark " + raised.by + " raised — " + note.trim()), id, "transaction");
+  emit();
+  return "";
+}
+
 export function reverseTransaction(id: string, reason: string): string {
   const t = readTransaction(id);
   if (!t) return "That transaction no longer exists.";
@@ -2127,6 +2241,15 @@ export function reverseTransaction(id: string, reason: string): string {
     recordedBy: a.name, recordedAt: stamp(), events: [],
   };
   t.state = "reversed";
+  /* THE MARK HAS BEEN ANSWERED, so it comes off — a reversed row is corrected,
+     and leaving it in the wrong-marked queue would ask somebody to look again
+     at the one row that no longer needs looking at. The event stays: the
+     history says it was marked and by whom, which is the part worth keeping. */
+  if (t.wrong) {
+    pushEvent(t.events, "TXN_MARK_CLEARED",
+      "The mark " + t.wrong.by + " raised is answered by this reversal.");
+    t.wrong = null;
+  }
   t.reversal = { counterId: cid, reason: reason.trim(), by: a.name, at: stamp() };
   log(pushEvent(c.events, "TXN_REVERSED", "Counter-entry for " + t.txnId + " · −" + inr(t.amountPaise) + " · " + reason.trim()), cid, "transaction");
   pushEvent(t.events, "TXN_REVERSED", "Reversed by " + a.name + " — " + reason.trim() + ". " + cid + " carries the offset.");
@@ -2452,7 +2575,7 @@ export function filterValueLabel(key: string, value: string): string {
   if (key === "tag") return tagOf(value)?.label || value;
   if (key === "kind") return tagKindMeta(value)?.label || value;
   if (key === "state") return txnStateMeta(value)?.label || refundStateMeta(value)?.label || value;
-  if (key === "dir") return value === "out" ? "Money out" : "Money in";
+  if (key === "dir") return value === "out" ? "Debit" : "Credit";
   if (key === "range") return value === "month" ? PERIOD.label : value;
   if (key === "active") return value === "yes" ? "Active" : "Closed";
   if (key === "due") {
