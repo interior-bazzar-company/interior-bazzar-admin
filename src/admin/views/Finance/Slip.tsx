@@ -96,7 +96,6 @@ export default function Slip({ id, p }: {
       {/* Above the document, and out of the print entirely — `.fin-actions` is
           already display:none when this page goes to paper. */}
       <div className="fin-actions">
-        {draft ? <span className="pill warn">Draft</span> : null}
         <span className="spacer" />
         {/* PRINTING IS HOW EVERY DOCUMENT IN THIS PANEL BECOMES A PDF. There is
             no PDF library in the bundle and there should not be one: the print
@@ -140,7 +139,6 @@ export default function Slip({ id, p }: {
             <div className="fin-slip-co">
               {COMPANY.name}<br />
               {COMPANY.address}<br />
-              GSTIN <span className="mono">{COMPANY.gstin}</span><br />
               CIN <span className="mono">{COMPANY.cin}</span>
             </div>
             </div>

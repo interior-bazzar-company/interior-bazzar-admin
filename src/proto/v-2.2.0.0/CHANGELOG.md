@@ -26,6 +26,11 @@ Salaries list uses, resolved through `useSalaryAccount` off the slip's own
 
 **The draft stamp on the document says `Draft`,** not the full sentence about
 slip numbers; the terms block at the foot already explains what a draft is.
+The `Draft` pill in the action row went too — the stamp on the document is the
+one place the state is written now.
+
+**GSTIN left the letterhead.** A payslip is not a tax invoice; the company
+block carries name, address and CIN.
 
 **Temp data**
 `none`.
