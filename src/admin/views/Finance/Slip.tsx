@@ -15,6 +15,7 @@
    nothing has been paid. It is drawn plainly as a draft rather than hidden:
    the person preparing the run needs to see exactly what will go out.
    ============================================================================= */
+import { useEffect, useRef, useState } from "react";
 import { useShell } from "../../shell/ShellContext";
 import { useNav } from "../../shell/AdminShell";
 import { EmptyState, Icon } from "../../ui";
@@ -97,28 +98,13 @@ export default function Slip({ id, p }: {
           already display:none when this page goes to paper. */}
       <div className="fin-actions">
         <span className="spacer" />
-        {/* PRINTING IS HOW EVERY DOCUMENT IN THIS PANEL BECOMES A PDF. There is
-            no PDF library in the bundle and there should not be one: the print
-            stylesheet already governs how this page lays out on paper, and
-            "Save as PDF" in the browser's print dialog produces a selectable,
-            searchable file from the same markup. A second renderer would be a
-            second definition of what the slip looks like. */}
-        <button className="btn" onClick={() => window.print()}>
-          <Icon name="download" size="sm" />Download
-        </button>
-        {draft ? (
-          <button className="btn pri" disabled={!row}
-            onClick={() => row && modal(
-              <PaySalaryModal row={row} onClose={closeLayer}
-                onDone={(msg, tone) => { closeLayer(); toast(msg, tone); }} />, "wide")}>
-            <Icon name="cash" size="sm" />Pay
-          </button>
-        ) : (
-          <button className="btn pri"
-            onClick={() => toast(slip.memberName + " would get " + slip.slipId + " at their registered email. Nothing was sent — no mail transport is wired to this module yet.", "info")}>
-            <Icon name="ext" size="sm" />Share
-          </button>
-        )}
+        <MoreMenu
+          onDownload={() => window.print()}
+          pay={draft ? () => row && modal(
+            <PaySalaryModal row={row} onClose={closeLayer}
+              onDone={(msg, tone) => { closeLayer(); toast(msg, tone); }} />, "wide") : null}
+          payDisabled={!row}
+          share={draft ? null : () => toast(slip.memberName + " would get " + slip.slipId + " at their registered email. Nothing was sent — no mail transport is wired to this module yet.", "info")} />
         <button className="btn" onClick={() => navGo(back)}>
           <Icon name="chevl" size="sm" />Back
         </button>
@@ -278,5 +264,60 @@ export default function Slip({ id, p }: {
         </div>
       </div>
     </div>
+  );
+}
+
+/* The row's actions behind one plain button, in the module's own `fin-menu`
+   popover — the same shell and `.mi` rows the transactions table uses, so the
+   two menus cannot drift apart in look. Exactly one of `pay` / `share` is
+   passed: a draft can be paid, a paid slip can be shared. */
+function MoreMenu({ onDownload, pay, payDisabled, share }: {
+  onDownload: () => void;
+  pay: (() => void) | null;
+  payDisabled: boolean;
+  share: (() => void) | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLSpanElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: MouseEvent) => {
+      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", away);
+    document.addEventListener("keydown", esc, true);
+    return () => {
+      document.removeEventListener("mousedown", away);
+      document.removeEventListener("keydown", esc, true);
+    };
+  }, [open]);
+
+  const item = (icon: string, label: string, act: () => void, disabled?: boolean) => (
+    <button type="button" role="menuitem" className="mi" disabled={disabled}
+      onClick={() => { setOpen(false); act(); }}>
+      <Icon name={icon} size="sm" />{label}
+    </button>
+  );
+
+  return (
+    <span className="fin-menu" ref={box}>
+      <button type="button" className="btn" aria-haspopup="menu" aria-expanded={open}
+        onClick={() => setOpen(!open)}>
+        <Icon name="dots" size="sm" />More
+      </button>
+      {open ? (
+        <span className="fin-menu-pop" role="menu" aria-label="Payslip actions">
+          {item("download", "Download", onDownload)}
+          {pay ? item("cash", "Pay", pay, payDisabled) : null}
+          {share ? item("ext", "Share", share) : null}
+        </span>
+      ) : null}
+    </span>
   );
 }

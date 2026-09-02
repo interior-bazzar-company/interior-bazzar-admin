@@ -32,8 +32,14 @@ one place the state is written now.
 **GSTIN left the letterhead.** A payslip is not a tax invoice; the company
 block carries name, address and CIN.
 
-**A plain `Back` button closes the row,** to the right of Pay/Share, going to
-Salaries A/C with the carried filters — the same target the empty state uses.
+**A plain `Back` button closes the row,** going to Salaries A/C with the
+carried filters — the same target the empty state uses.
+
+**Download and Pay/Share moved behind a `More` menu.** A plain button in the
+Back button's own theme, opening the module's `fin-menu` popover — the same
+shell and `.mi` rows the transactions table's dots menu uses. Download still
+prints (the print stylesheet is the one definition of the slip on paper); a
+draft's menu offers Pay, a paid slip's offers Share.
 
 **Temp data**
 `none`.
