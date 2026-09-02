@@ -1570,6 +1570,26 @@ a.lk:hover{ border-color:var(--brand); background:var(--brand-tint) }
 .pop-f{ display:flex; align-items:center; gap:var(--space-2);
         padding:var(--space-2) var(--space-4); border-top:1px solid var(--line);
         background:var(--bg-shell); font-size:var(--text-md); color:var(--text-2) }
+/* The panel-wide More menu (ui/menu.tsx) — Finance's `.fin-menu` pattern,
+   promoted. The shell only positions the popover; the rows are `.mi`. */
+.ib-menu{ position:relative; display:inline-flex }
+.ib-menu-pop{
+  position:absolute; z-index:45; top:calc(100% + 4px); right:0;
+  display:flex; flex-direction:column; min-width:168px; padding:var(--space-1);
+  background:var(--surface-raised); border:1px solid var(--line);
+  border-radius:var(--radius-xl); box-shadow:var(--shadow-lg);
+  animation:rise var(--duration) var(--ease-out);
+}
+.ib-menu-pop .mi{ white-space:nowrap }
+.ib-menu-pop .mi:disabled{ color:var(--text-3); cursor:default; background:none }
+.ib-menu-pop .mi.bad{ color:var(--bad) }
+.ib-menu-pop .mi.bad .ic{ color:var(--bad) }
+.ib-menu-pop .mi.bad:hover:not(:disabled){ background:var(--bad-bg) }
+/* The thin rule between a record's id and its status pills — punctuation,
+   not a control: out of the accessibility tree and off the mouse. */
+.vsep{ width:1px; height:18px; flex:0 0 auto; align-self:center;
+       background:var(--line-2); margin:0 var(--space-1); user-select:none }
+
 .mi{ display:flex; align-items:center; gap:var(--space-3); width:100%; text-align:left;
      height:var(--control-lg); padding:0 var(--space-3); border-radius:var(--radius-md);
      font-size:var(--text-md); color:var(--text-2);
