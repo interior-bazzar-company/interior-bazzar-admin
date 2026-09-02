@@ -93,7 +93,10 @@ first stopped retracing session history and went straight to the module's
 default view — and then the button itself came off, because the title beside
 it already names that destination. Pressing the title (`Finance`, or any
 module's, on a deep screen) returns to the module's default view; the
-browser's own Back still owns the history.
+browser's own Back still owns the history. **And the Finance title names the
+section, not the umbrella:** `Salaries A/C`, `Subscriptions`, `Other
+Transaction`, `Refunds` or `Analytics` from the module's own vocabulary —
+"Finance" over all five named none of them.
 
 **And then every Finance dialog followed.** The `.fin-f2` two-up grid is
 retired: the expense, tag, record-subscription and record-installment dialogs

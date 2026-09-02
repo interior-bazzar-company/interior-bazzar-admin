@@ -30,7 +30,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from "react-rout
 import { hashToPath, usePageChrome } from "../../shell/AdminShell";
 import { qs } from "../../ui";
 import type { Params } from "./store";
-import { PERIOD, inr, useActiveCount, useSalaryRows, useSalaryTotals } from "./store";
+import { PERIOD, RECORD_TYPES, inr, useActiveCount, useSalaryRows, useSalaryTotals } from "./store";
 import { ROUTE_OF, VIEW_OF } from "./Frame";
 import Subscriptions from "./Subscriptions";
 import SubscriptionDetail from "./SubscriptionDetail";
@@ -98,11 +98,14 @@ export default function Finance() {
   const totals = useSalaryTotals();
   const crumbs = useMemo(() => (
     <>
-      {/* The title is the way up: it returns to this section's default view,
-          the job the topbar's Back button used to do beside it. */}
+      {/* The title says WHICH SECTION you are in — each is its own sidebar
+          row and its own module key, so "Finance" over all five named none of
+          them. It is also the way up: pressing it returns to this section's
+          default view, the job the topbar's Back button used to do beside
+          it. */}
       <button type="button" className="tb-title" title="Back to the section's default view"
         onClick={() => navigate(hashToPath(listHash(view)), { replace: true })}>
-        Finance
+        {RECORD_TYPES.filter((r: { key: string; label: string }) => r.key === view)[0]?.label || "Finance"}
       </button>
       {/* ONE FIGURE, AND IT FOLLOWS THE SECTION. Which number depends on what
           is on screen: how many businesses are subscribed is scope on the
