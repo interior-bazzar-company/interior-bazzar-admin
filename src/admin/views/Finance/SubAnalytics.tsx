@@ -1,17 +1,25 @@
 /* =============================================================================
-   Finance · Subscriptions ▸ Analytics. Every subscription ever recorded, read
-   back as four figures and four charts.
+   Finance · Subscriptions ▸ Analytics. The sales read back as four figures and
+   four charts, over one year or over all of them.
 
    IT SITS BESIDE THE RECORDS IT DERIVES FROM, the same move Salaries A/C made
    when payroll analytics stopped living one page away. Somebody asking "which
    plan is actually selling" got there from this page; having to leave it to
    ask was the whole friction.
 
-   ALL TIME, NOT A PERIOD, and every caption says so. The list tab beside this
-   one carries the period figures — Collected · August 2026 — and repeating
-   them here in a different shape would put the same word over two different
-   numbers. What this tab answers is the question a month cannot: across
-   everything recorded, where did the money come from and where is it stuck.
+   THE YEAR IS THE SCOPE, and it is the year a subscription STARTED in — the
+   same date the list's own filter narrows on, so "2026" means one thing on
+   both tabs. Every figure and every chart on the page follows it, including
+   when the money arrived: a sale made in 2026 keeps its collections in this
+   year's reading even if an installment lands in January. Scoping the money
+   by its value date instead would put two different meanings of "2026" on one
+   page.
+
+   THE CAPTIONS ARE GONE. Every block carried a paragraph under it explaining
+   the chart above; they were the widest text on the page, read once and never
+   again, and the rule each one carried is either in the title, behind the `i`
+   on the figure it governs, or was never load-bearing. What is left is a
+   title, the marks, and the axis unit.
 
    NO MONEY ARITHMETIC. Every amount arrives as integer paise from the store's
    own `SubRow` fields and is printed by `inr()`. The one division is the
@@ -29,7 +37,7 @@ import { Unavailable } from "./bits";
 import InfoTip from "./InfoTip";
 import { BarRows, ColumnChart } from "../charts";
 import type { BarRow, Series } from "../charts";
-import { SUB_SOURCES, fmtMonth, inr, useMonthPoints, useSubRows } from "./store";
+import { SUB_SOURCES, fmtMonth, inr, useSubRows } from "./store";
 
 /* The chart kit takes plain numbers and prints them with `toLocaleString`, so
    an axis fed integer paise would read 6,77,320. This converts FOR THE MARKS
@@ -72,13 +80,33 @@ const plural = (n: number, one: string, many: string) => n + " " + (n === 1 ? on
 
 /* ================================================================ page === */
 
-export default function SubAnalytics({ onQueue }: {
+export default function SubAnalytics({ year, onQueue }: {
+  /** `""` is every year. Otherwise the calendar year a subscription STARTED
+   *  in — the same date the list filters on, so the word means one thing on
+   *  both tabs. */
+  year: string;
   /** Cross to the Subscriptions tab with one of the strip's queues applied.
    *  Narrowing belongs to the records, never to the charts. */
   onQueue: (flag: string) => void;
 }) {
-  const rows = useSubRows();
-  const months = useMonthPoints().filter((m) => m.subscriptionsPaise > 0);
+  const all = useSubRows();
+  const rows = year ? all.filter((r) => r.s.startDate.slice(0, 4) === year) : all;
+
+  /* COLLECTED BY MONTH, off the payments of these subscriptions rather than
+     off the module's own month series — the rest of the page is scoped to a
+     year of sales, and a chart reading a different set of payments would put
+     a total under this title that none of the figures above it agree with.
+     A month is the VALUE DATE's month: when the money reached the account. */
+  const byMonth = new Map<string, number>();
+  rows.forEach((r) => r.s.installments.forEach((i) => {
+    if (i.status !== "paid" || !i.payment) return;
+    const m = i.payment.valueDate.slice(0, 7);
+    byMonth.set(m, (byMonth.get(m) || 0) + i.payment.amountPaise);
+  }));
+  const months = Array.from(byMonth.entries())
+    .filter(([, paise]) => paise > 0)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([month, paise]) => ({ month, paise }));
 
   /* THE FOUR FIGURES, summed off the store's own per-subscription fields so
      this tab and the list beside it cannot disagree about what "collected"
@@ -149,11 +177,9 @@ export default function SubAnalytics({ onQueue }: {
   if (!rows.length) {
     return (
       <Blocks>
-        <Block wide title="Nothing to read back yet">
-          <Unavailable title="No subscription has been recorded."
-            why="Every figure on this tab is derived from the records beside it. The first sale
-              recorded fills all four charts at once — nothing here is seeded, forecast or
-              carried over from anywhere else." />
+        <Block wide title={year ? "Nothing was sold in " + year : "Nothing to read back yet"}>
+          <Unavailable title={year ? "No subscription started in " + year + "." : "No subscription has been recorded."}
+            why="Every figure on this tab is derived from the records beside it." />
         </Block>
       </Blocks>
     );
@@ -162,13 +188,13 @@ export default function SubAnalytics({ onQueue }: {
   return (
     <Blocks>
       {/* ============================================================ the money === */}
-      <Block wide title="The money · every subscription recorded"
+      <Block wide title={"The money · " + (year || "all time")}
         right={<span className="fin-sum">
-          {plural(rows.length, "subscription", "subscriptions")} recorded
+          {plural(rows.length, "subscription", "subscriptions")}
         </span>}>
         <div className="fin-money-strip">
           <Tile label="Expected collection" value={inr(agreedPaise)}
-            sub={plural(rows.length, "sale", "sales") + " ever recorded"}
+            sub={plural(rows.length, "sale", "sales") + " recorded"}
             tip={<InfoTip label="Expected collection"
               intro={<>The <b>whole contracted value</b> of every subscription ever recorded — each
                 one's own agreed total, summed. The three figures beside it are its parts: what has
@@ -232,51 +258,31 @@ export default function SubAnalytics({ onQueue }: {
       </Block>
 
       {/* ============================================================ over time === */}
-      <Block wide title="Collected, month by month"
-        desc="every subscription payment, by the date the bank credited it"
-        right={<span className="fin-sum">
-          {plural(months.length, "month", "months")} with money in {months.length === 1 ? "it" : "them"}
-        </span>}
-        foot={<>The axis is in thousands so the ticks stay readable at 38 pixels of gutter; every
-          exact amount is on the strip above and on the record that produced it. Months come from
-          the payments themselves, so a month nothing was collected in is absent rather than drawn
-          as a zero — and a bar is dated by the VALUE DATE, when the money reached the account,
-          never by when the sale was recorded.</>}>
+      <Block wide title="Collected, month by month">
         {months.length ? (
           <ColumnChart series={COLLECTED} labelSeries="collected"
             points={months.map((m) => ({
               key: m.month,
               label: fmtMonth(m.month),
-              values: { collected: thousands(m.subscriptionsPaise) },
+              values: { collected: thousands(m.paise) },
             }))}
-            unit="₹ thousand · hover or tab a month for its figure" />
+            unit="₹ thousand · by the date the bank credited it" />
         ) : (
           <Unavailable title="Nothing has been collected yet."
-            why="This series is built from recorded payments, not from a calendar. A bar appears
-              the moment an installment is settled with a value date." />
+            why="A bar appears the moment an installment is settled with a value date." />
         )}
       </Block>
 
       {/* ================================================================ by plan === */}
-      <Block title="Which plans are selling"
-        desc="collected to date, by plan"
-        foot={<>Ordered by money collected, not by how many were sold — the question this answers is
-          which plan is carrying the revenue. The count rides beside each bar because a plan that
-          sells often for little and one that sells rarely for a lot are two different businesses.
-          Grouped on the plan's id, so renaming a plan does not split it in two.</>}>
+      <Block title="Which plans are selling">
         {planRows.length
-          ? <BarRows rows={planRows} unit="₹ thousand · collected, all time" />
+          ? <BarRows rows={planRows} unit="₹ thousand · collected" />
           : <Unavailable title="No plan has collected anything yet."
               why="A plan appears here once money has arrived against a subscription sold on it." />}
       </Block>
 
       {/* ============================================================== by source === */}
-      <Block title="Where the sales came from"
-        desc="subscriptions recorded, by channel"
-        foot={<>Both are recorded identically and neither is worth more than the other — the
-          difference is who typed it, and it is what channel analytics and CAC read. The count
-          leads because that is what this split is about; the money beside it is a label, not a
-          second axis.</>}>
+      <Block title="Where the sales came from">
         {sourceRows.length
           ? <BarRows rows={sourceRows} unit="subscriptions · hover a bar for the money" />
           : <Unavailable title="No subscription carries a source."
@@ -284,13 +290,9 @@ export default function SubAnalytics({ onQueue }: {
       </Block>
 
       {/* ========================================================= installments === */}
-      <Block wide title="Every installment, by state"
-        desc="the whole schedule of every subscription, counted"
-        foot={<>The installment is the unit that gets paid, invoiced, receipted and — when it does
-          not clear — recorded as fail to pay, so this is the module's real workload in one row
-          each. <b>Due is the absence of an event</b> and wears no warning colour for that reason:
-          nothing has happened to those installments. Nothing here waits on anybody's approval —
-          there is no state meaning "recorded but not yet believed".</>}>
+      {/* Due wears no warning colour on purpose: it is the ABSENCE of an
+          event, and a tint would claim something happened that has not. */}
+      <Block wide title="Every installment, by state">
         <BarRows rows={instRows} unit="installments · hover a bar for what it is worth" />
       </Block>
     </Blocks>

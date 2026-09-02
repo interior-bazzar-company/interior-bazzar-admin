@@ -6,6 +6,53 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-02
 
+### Subscriptions ▸ Analytics gets a year, and loses its captions
+
+**Area:** `#/finance?tab=analytics` · `?year=`
+**Files:** `src/admin/views/Finance/{SubAnalytics,Subscriptions,store}.tsx(ts)`,
+`scripts/fn-smoke.tsx`
+
+**What changed**
+
+**The year is the scope, and it is the only control on the tab.** A `Year`
+dropdown replaces the sentence that stood there — *Every subscription ever
+recorded · all time, not August 2026* — because a control that always carries
+a value says the same thing and can change it, which a sentence cannot.
+`All time` leads it as a real answer rather than a blank meaning "not
+filtering", and the years come off the records, so one nothing was sold in is
+never offered.
+
+**It scopes by the year a subscription STARTED in** — the same date the list's
+own filter narrows on, so `2026` means one thing on both tabs. Every figure,
+every chart and the block titles follow it, **including when the money
+arrived**: a 2026 sale keeps its collections in 2026's reading even if an
+installment lands in January. Scoping the money by its own value date instead
+would have put two meanings of `2026` on one page.
+
+**The month chart is now computed from these subscriptions' own payments**
+rather than the module-wide month series — with the page scoped to a year of
+sales, a chart reading a different set of payments would print a total none
+of the figures above it agree with.
+
+**Every caption came off.** Each block carried a paragraph under it explaining
+the chart above; they were the widest text on the page, read once and never
+again. What is left is a title, the marks and the axis unit — every rule they
+carried is either in the title, behind the `i` on the figure it governs, or
+was never load-bearing. The two that were load-bearing (due is the absence of
+an event; the axis is in thousands) moved into a code comment and the unit
+caption respectively.
+
+**Temp data**
+`none`.
+
+**Backend needed**
+`none`.
+
+**Open decisions**
+`none`.
+
+---
+
 ### The subscriptions money becomes a strip, and the header carries the totals
 
 **Area:** `#/finance` · the topbar

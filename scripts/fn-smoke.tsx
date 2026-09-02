@@ -191,7 +191,28 @@ has(subs, "running", "...and the strip still refuses to let a period sum describ
    control, and its four charts are four different cuts of the same rupees —
    never one axis, which would count every rupee four times. */
 const subsAn = page("subscriptions · the analytics tab", "/finance?tab=analytics");
-has(subsAn, "Every subscription ever recorded", "...the analytics tab states its scope: all time, not one period");
+/* THE YEAR IS THE SCOPE AND THE ONLY CONTROL. The sentence that used to state
+   the scope is gone: a dropdown that always carries a value says the same
+   thing and changes it, which a sentence cannot. `All time` is a real answer
+   rather than a blank meaning "not filtering". */
+has(subsAn, 'aria-label="Year"', "...the analytics tab is scoped by a year control");
+has(subsAn, ">All time<", "...whose first entry is a real answer, not an empty one");
+has(subsAn, "The money · all time", "...and the block says which scope is on screen");
+hasnt(subsAn, "Every subscription ever recorded", "...with no sentence left restating what the control says");
+{
+  /* One year is a subset of all of them, and the page says so in its own
+     title rather than leaving the reader to guess what changed. */
+  const y2026 = check("subscriptions · analytics for one year", () => at("/finance?tab=analytics&year=2026"));
+  has(y2026, "The money · 2026", "...a year narrows the whole page, title included");
+  const junk = check("subscriptions · analytics for a year nothing was sold in",
+    () => at("/finance?tab=analytics&year=1999"));
+  has(junk, "Nothing was sold in 1999", "...and a year with no sales says so rather than drawing empty charts");
+}
+/* THE CAPTIONS UNDER THE CHARTS ARE GONE — they were the widest text on the
+   page, read once and never again, and every rule they carried is in a title
+   or behind an `i`. */
+hasnt(subsAn, "the ticks stay readable", "...no paragraph is left under a chart");
+hasnt(subsAn, "card-f", "...and no block carries a footer at all");
 /* THE SAME STRIP ANATOMY AS THE LIST TAB — label and i, the figure, a second
    figure of a different kind beside it, then what it counts and an offer to
    show it. Two strips in one module that read differently make a reader work

@@ -29,7 +29,7 @@ import { RecordSubModal } from "./SubModals";
 import SubAnalytics from "./SubAnalytics";
 import {
   FILTER_LABELS, PERIOD, SUB_SOURCES, SUB_STATUSES,
-  applySubFilters, filterValueLabel, fmtDate, inr, startedOptions, useOverview, useSubRows,
+  applySubFilters, filterValueLabel, fmtDate, inr, startedOptions, subYears, useOverview, useSubRows,
 } from "./store";
 import type { Params, SubRow } from "./store";
 
@@ -94,14 +94,30 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
                nobody can see or clear. */
             q: undefined, source: undefined, status: undefined, flag: undefined, plan: undefined,
             started: undefined, page: undefined,
+            /* `year` is Analytics's own scope and goes the same way. */
+            year: undefined,
           })} />
       }
       cmd={tab === "analytics" ? <>
-        {/* NO FILTERS ON THIS TAB, and that is the rule rather than an
-            omission: a chart narrowed by a search box is a chart whose total
-            no longer matches its own caption. The scope is stated instead. */}
-        <span className="fin-sum">
-          Every subscription ever recorded · all time, not {PERIOD.label}
+        {/* THE YEAR IS THE ONLY CONTROL ON THIS TAB, because the year IS the
+            scope here — and it says what the page is showing, which is the job
+            the sentence that stood here was doing in more words. There are no
+            filters beside it: a chart narrowed by a search box is a chart
+            whose total no longer matches its own caption.
+
+            Deliberately not the panel's `Select`, which carries a blank first
+            option because it is built for filters, where empty means "not
+            filtering". This always has a value — `All time` is a real answer,
+            not the absence of one. */}
+        <span className="fin-picker">
+          <span className="fin-picker-l">Year</span>
+          <span className="selectbox">
+            <select aria-label="Year" value={p.year || ""}
+              onChange={(e) => onParams({ year: e.target.value || undefined })}>
+              <option value="">All time</option>
+              {subYears(rows).map((y) => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </span>
         </span>
         <span className="spacer" />
       </> : <>
@@ -196,7 +212,8 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
         /* The strip's queues cross back to the records with that filter
            applied — the charts are never narrowed, so "show only these" goes
            where narrowing means something. */
-        <SubAnalytics onQueue={(flag) => onParams({ tab: undefined, flag })} />
+        <SubAnalytics year={p.year || ""}
+          onQueue={(flag) => onParams({ tab: undefined, year: undefined, flag })} />
       ) : shown.length ? (
         <table className="tbl dls-tbl fin-tbl">
           <thead>

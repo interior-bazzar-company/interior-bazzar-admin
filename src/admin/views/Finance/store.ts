@@ -435,6 +435,14 @@ export function subTotals(): SubTotals {
   };
 }
 
+/** The calendar years subscriptions were actually started in, newest first.
+ *  Read off the records, so a year nothing was sold in is never offered. */
+export function subYears(rows: SubRow[]): string[] {
+  const years = new Set<string>();
+  rows.forEach((r) => { if (/^\d{4}/.test(r.s.startDate)) years.add(r.s.startDate.slice(0, 4)); });
+  return Array.from(years).sort().reverse();
+}
+
 export function applySubFilters(rows: SubRow[], p: Params): SubRow[] {
   let out = rows;
   if (p.source) out = out.filter((r) => r.s.source === p.source);
