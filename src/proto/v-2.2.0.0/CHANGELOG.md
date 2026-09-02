@@ -64,6 +64,10 @@ set like the paid slip's "Issued …" line; the action row gained a status pill
 — `Draft` (warn) or `Paid` (ok) — before the More button, separated from the
 actions by a thin `|`.
 
+**The document breathes more.** The slip's base line-height went from the
+dense-UI 18px to 24px, the company block from 18px to 20px — a payslip is
+read line by line, not scanned like a table.
+
 **Temp data**
 `none`.
 

@@ -525,8 +525,8 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
    more air than a receipt, and the net figure has to be findable in a second.
    Printed, never generated: the browser's Save as PDF is the export, which is
    why there is no PDF library anywhere in this bundle. */
-.fin-slip { line-height: var(--lh-md) }
-.fin-slip-co { font-size: var(--text-sm); line-height: var(--lh-md); color: var(--text-2) }
+.fin-slip { line-height: var(--lh-lg) }
+.fin-slip-co { font-size: var(--text-sm); line-height: var(--lh-base); color: var(--text-2) }
 .fin-slip-title { font-size: var(--text-lg); font-weight: var(--weight-semibold); letter-spacing: .04em }
 /* The bar between the status pill and the actions — punctuation, not a
    control, so it stays out of the accessibility tree and off the mouse. */
