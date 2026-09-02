@@ -47,11 +47,10 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
      all, so everything below — plan, term, amount, installments — is read
      from documents rather than typed. */
   const [quotationNumber, setQuotationNumber] = useState("");
-  /* On an installment quotation the plan is still a choice of ONE thing: pay
-     as agreed from the 1st installment, or complete the whole agreement in
-     one payment. "schedule" follows the quotation; "complete" records one
-     installment carrying every installment's amount. */
-  const [quotePlan, setQuotePlan] = useState<"schedule" | "complete">("schedule");
+  /* The COUNT defaults to what the invoice's quotation agreed and can be
+     re-picked by hand — the customer who renegotiated the schedule but not
+     the price. "" means as agreed; the total never moves with it. */
+  const [countStr, setCountStr] = useState("");
   const [startDate, setStartDate] = useState(todayIso());
   const [remark, setRemark] = useState("");
   const [err, setErr] = useState<string | null>(null);
@@ -84,7 +83,7 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
   const pickUser = (uid: string) => {
     setUserId(uid);
     setErr(null);
-    setQuotePlan("schedule");
+    setCountStr("");
     const opens = chainsFor(uid).filter((c) => !!c.attachable && !c.recordedAs);
     setQuotationNumber(opens.length ? opens[0].quotation.quotationNumber : "");
   };
@@ -109,19 +108,19 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
      on, and the reason only chained businesses are offered at all. */
   const invoice = chain && chain.attachable ? chain.attachable : null;
 
-  /* THE COUNT COMES FROM THE QUOTATION. The chain raises one invoice per
-     installment as each falls due, so counting the documents that exist
-     would report a running schedule as shorter than it is. The one choice
-     left on an installment quotation is completing it in a single payment —
-     one row, every installment's amount, the same write the store allows
-     for the same reason. */
+  /* THE COUNT DEFAULTS FROM THE QUOTATION and can be re-picked. The chain
+     raises one invoice per installment as each falls due, so counting the
+     documents that exist would report a running schedule as shorter than it
+     is. Whatever count is picked, the TOTAL stays the whole agreement — the
+     invoice's installment amount times the agreed count — and the count only
+     splits it: 1 completes it, the agreed count follows it, another count
+     re-schedules it. */
   const fullN = quote ? quote.installments : 1;
-  const completing = !!quote && quote.installments > 1 && quotePlan === "complete";
-  const n = completing ? 1 : fullN;
+  const n = countStr ? Number(countStr) : fullN;
 
   /* One invoice per installment, each for the same amount — so the total is
-     the invoice times the agreed count, complete payment included, and nobody
-     types a figure that could disagree with the document. */
+     the invoice times the agreed count, and nobody types a figure that could
+     disagree with the document. */
   const per = invoice ? invoice.grandTotalPaise : null;
   const paise = per !== null ? per * fullN : null;
   /* The exact rows recordSubscription will write. Asking the store rather than
@@ -224,7 +223,7 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
                 <span className="pill ok">accepted</span>
                 <span className="spacer" />
                 <button type="button" className="lnk"
-                  onClick={() => { setQuotationNumber(""); setQuotePlan("schedule"); }}>Change</button>
+                  onClick={() => { setQuotationNumber(""); setCountStr(""); }}>Change</button>
               </div>
               <dl className="kv">
                 <dt>Deal</dt><dd className="mono">{chain.quotation.dealRef}</dd>
@@ -245,7 +244,7 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
             <div className="fin-pick">
               {open.map((c) => (
                 <button key={c.quotation.quotationNumber} type="button"
-                  onClick={() => { setQuotationNumber(c.quotation.quotationNumber); setQuotePlan("schedule"); }}>
+                  onClick={() => { setQuotationNumber(c.quotation.quotationNumber); setCountStr(""); }}>
                   <span className="mono">{c.quotation.quotationNumber}</span>
                   <span className="s">
                     {c.quotation.planName} · {c.quotation.termMonths}m ·{" "}
@@ -316,26 +315,24 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
       <Fs legend="How it is paid" req>
         <div className="fin-stack">
           <Field label="Payment plan">
-            {quote ? (
-              quote.installments === 1 ? (
-                <div className="fin-derived"><b>Complete payment</b></div>
-              ) : (
-                /* The agreed schedule, or the whole agreement in one payment —
-                   the only two counts the store accepts on this quotation. */
-                <div className="selectbox">
-                  <select value={quotePlan}
-                    onChange={(e) => setQuotePlan(e.target.value as "schedule" | "complete")}>
-                    <option value="schedule">
-                      {"1st installment · as agreed, " + quote.installments + " × "
-                        + (per !== null ? inr(per) : "…") + ", " + quote.installmentGapMonths + " month apart"}
-                    </option>
-                    <option value="complete">
-                      {"Complete payment · all " + quote.installments + " installments"
-                        + (per !== null ? " · " + inr(per * quote.installments) : "")}
-                    </option>
-                  </select>
-                </div>
-              )
+            {quote && per !== null ? (
+              /* Defaults to what the quotation agreed and can be re-picked —
+                 the total never moves with it. 1 completes the agreement in
+                 one payment; a count the total will not divide into is shown
+                 disabled rather than offered and refused. */
+              <div className="selectbox">
+                <select value={String(n)} onChange={(e) => setCountStr(e.target.value)}>
+                  {[1, 2, 3, 4, 5].map((k) => {
+                    const total = per * fullN;
+                    const divides = total % k === 0;
+                    const label = k === 1
+                      ? "Complete payment · " + inr(total)
+                      : k + " installments · " + k + " × " + (divides ? inr(total / k) : "—")
+                        + (k === fullN ? " · as agreed" : "");
+                    return <option key={k} value={String(k)} disabled={!divides}>{label}</option>;
+                  })}
+                </select>
+              </div>
             ) : (
               <div className="fin-derived faint">attach a quotation first</div>
             )}

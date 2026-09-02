@@ -1232,9 +1232,9 @@ export interface RecordSubInput {
    *  installment; the subscription total is that times the count. */
   invoiceNumber: string;
   /** 1 = paid in full, and the dialog says so in those words. Above 1 it is a
-   *  schedule. There is no separate "complete payment" count, because one
-   *  installment IS complete payment — offering both would put two options in
-   *  the dropdown that write the identical row. */
+   *  schedule. On an invoice from an accepted quotation the count DEFAULTS to
+   *  what was agreed and may be re-picked — the total stays the whole
+   *  agreement either way; the count only says how it is collected. */
   installmentCount: number; startDate: string;
   /** Free words about THIS recording, kept on the SUBSCRIPTION_RECORDED
    *  event — never load-bearing, but the only place the reason for an
@@ -1257,37 +1257,36 @@ export function recordSubscription(input: RecordSubInput): { error: string; subs
   if (!Number.isInteger(n) || n < 1 || n > 5)
     return { error: "Between 1 and 5 installments. Beyond five it is a payment plan the sales chain does not raise invoices for.", subscriptionId: null };
 
-  /* THE QUOTATION IS THE AUTHORITY ON THE PAYMENT PLAN — with one standing
-     exception: a complete payment is ALWAYS available. A customer who agreed
-     three installments and then pays the whole thing at once has not
-     disagreed with the document, they have finished it early; the write
-     records ONE installment carrying every installment's amount. Any other
-     count is a disagreement with what was signed. The dialog offers exactly
-     these two; this guard is for every other caller, and for the day
-     somebody adds one. */
+  /* THE QUOTATION IS THE AUTHORITY ON THE AMOUNT, and the count is a choice.
+     Where the invoice came from an accepted quotation, the TOTAL is always
+     the whole agreement — the invoice's installment amount times the count
+     the quotation agreed — and no override changes what is owed. The count
+     only says how that total is collected: as agreed, completed in one
+     payment, or re-split by hand when the customer renegotiated the
+     schedule but not the price. */
   const quote = readQuotation(invoice.quotationNumber);
-  const completesQuote = !!(quote && quote.status === "accepted" && quote.installments > 1 && n === 1);
-  if (quote && quote.status === "accepted" && quote.installments !== n && !completesQuote)
-    return {
-      error: invoice.invoiceNumber + " was raised on " + quote.quotationNumber + ", which agreed "
-        + (quote.installments === 1 ? "a complete payment" : quote.installments + " installments")
-        + " — not " + n + " installments"
-        + ". Change the quotation if the plan changed; a complete payment is always available. (plan_mismatch)",
-      subscriptionId: null,
-    };
+  const quoteN = quote && quote.status === "accepted" ? quote.installments : null;
   if (!input.startDate || input.startDate > todayIso())
     return { error: "A subscription starts when it is sold. The start date cannot be in the future.", subscriptionId: null };
 
   const a = actor();
   const id = nextId("SUB");
-  /* One invoice per installment, each for the same amount — so the total is
-     the invoice times the count, and the schedule divides back into it exactly
-     by construction. A complete payment on an installment quotation still
-     carries ALL the installments' amount: one row, the whole agreement. */
+  /* The total is the whole agreement: the invoice's installment amount times
+     the count the quotation agreed — or, with no quotation behind the
+     invoice, times the count being recorded. The chosen count then splits
+     that same total; a count it will not divide into is refused rather than
+     rounded, because a schedule that does not sum back to the agreement is
+     a different agreement. */
   const each = invoice.grandTotalPaise;
-  const totalPaise = each * (completesQuote && quote ? quote.installments : n);
+  const totalPaise = each * (quoteN ?? n);
   const installments = previewSchedule(input.startDate, n, totalPaise);
-  if (!installments.length) return { error: "That start date is not a date.", subscriptionId: null };
+  if (!installments.length)
+    return {
+      error: totalPaise % n !== 0
+        ? inr(totalPaise) + " does not divide into " + n + " equal installments. Pick a count that divides it exactly. (indivisible)"
+        : "That start date is not a date.",
+      subscriptionId: null,
+    };
   const start = new Date(input.startDate + "T00:00:00Z");
   const end = new Date(start); end.setUTCMonth(end.getUTCMonth() + input.cycleMonths);
   const s: Subscription = {
@@ -1306,7 +1305,10 @@ export function recordSubscription(input: RecordSubInput): { error: string; subs
   s.installments[0].invoiceNumber = invoice.invoiceNumber;
   log(pushEvent(s.events, "SUBSCRIPTION_RECORDED",
     input.planName + " recorded on " + invoice.invoiceNumber + " · " + inr(totalPaise)
-    + (n === 1 ? " paid in full" : " in " + n + " installments of " + inr(each))
+    + (n === 1 ? " paid in full" : " in " + n + " installments of " + inr(totalPaise / n))
+    + (quoteN !== null && quoteN !== n && quote
+      ? " (" + quote.quotationNumber + " agreed " + (quoteN === 1 ? "a complete payment" : quoteN + " installments") + ")"
+      : "")
     + " · " + (sourceMeta(input.source)?.label || input.source)
     + ". The customer is entitled from " + input.startDate + "."
     + (input.remark && input.remark.trim() ? " Remark: " + input.remark.trim() : "")),

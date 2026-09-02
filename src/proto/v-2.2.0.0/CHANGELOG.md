@@ -35,15 +35,17 @@ sale is a sales sale by definition. What stays editable: the payment plan
 (1st installment / complete payment), the start date, and a new **Remark**
 field whose words land on the SUBSCRIPTION_RECORDED event.
 
-**A complete payment is always available, and it carries the whole
-agreement.** On an installment quotation the Payment plan field became the
-one choice it really holds: *1st installment · as agreed* (the quotation's
-schedule) or *Complete payment · all N installments* — one row carrying
-every installment's amount. The store's plan-mismatch guard admits exactly
-that second count; any other disagreement with the signed document still
-refuses. The manual dropdown's options now wear their amounts off the
-attached invoice (`Complete payment · ₹X`, `3 installments · 3 × ₹X`), and
-the Subscription total reads off the same figures.
+**The count defaults from the documents and can be re-picked; the total
+never moves with it.** The Payment plan select offers 1–5, opening on what
+the quotation agreed (marked *as agreed*); 1 reads *Complete payment* with
+the full figure, and every option wears its per-installment amount. Whatever
+count is picked, the total stays the whole agreement — the invoice's
+installment amount times the agreed count — and the count only splits it:
+a customer who renegotiated the schedule did not renegotiate the price. A
+count the total will not divide into exactly is shown disabled rather than
+offered and refused, and the store refuses it in words if a caller sends
+one anyway. A count differing from the agreement is noted on the
+SUBSCRIPTION_RECORDED event beside what the quotation said.
 
 **And the dialog took the pay dialog's economy:** the standing fieldset
 hints and field captions came off (a hint survives only when it names THIS
