@@ -108,13 +108,12 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
      on, and the reason only chained businesses are offered at all. */
   const invoice = chain && chain.attachable ? chain.attachable : null;
 
-  /* THE COUNT DEFAULTS FROM THE QUOTATION and can be re-picked. The chain
-     raises one invoice per installment as each falls due, so counting the
-     documents that exist would report a running schedule as shorter than it
-     is. Whatever count is picked, the TOTAL stays the whole agreement — the
-     invoice's installment amount times the agreed count — and the count only
-     splits it: 1 completes it, the agreed count follows it, another count
-     re-schedules it. */
+  /* THE COUNT COMES FROM THE QUOTATION, with one choice on top: the agreed
+     installments, PAID ONE BY ONE — each payment recorded against its own
+     row (1st, 2nd, …) on the subscription as it arrives — or the whole
+     agreement completed in a single payment. Either way the TOTAL is the
+     whole agreement: the invoice's installment amount times the agreed
+     count. */
   const fullN = quote ? quote.installments : 1;
   const n = countStr ? Number(countStr) : fullN;
 
@@ -316,23 +315,24 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
         <div className="fin-stack">
           <Field label="Payment plan">
             {quote && per !== null ? (
-              /* Defaults to what the quotation agreed and can be re-picked —
-                 the total never moves with it. 1 completes the agreement in
-                 one payment; a count the total will not divide into is shown
-                 disabled rather than offered and refused. */
-              <div className="selectbox">
-                <select value={String(n)} onChange={(e) => setCountStr(e.target.value)}>
-                  {[1, 2, 3, 4, 5].map((k) => {
-                    const total = per * fullN;
-                    const divides = total % k === 0;
-                    const label = k === 1
-                      ? "Complete payment · " + inr(total)
-                      : k + " installments · " + k + " × " + (divides ? inr(total / k) : "—")
-                        + (k === fullN ? " · as agreed" : "");
-                    return <option key={k} value={String(k)} disabled={!divides}>{label}</option>;
-                  })}
-                </select>
-              </div>
+              quote.installments === 1 ? (
+                <div className="fin-derived"><b>Complete payment</b> · {inr(per)}</div>
+              ) : (
+                /* The agreed installments, paid ONE BY ONE — which one a
+                   payment settles (1st, 2nd, …) is decided as each is
+                   recorded on the subscription — or the whole agreement in
+                   one payment. The only two counts the document supports. */
+                <div className="selectbox">
+                  <select value={String(n)} onChange={(e) => setCountStr(e.target.value)}>
+                    <option value={String(fullN)}>
+                      {fullN + " installments · as agreed · " + fullN + " × " + inr(per) + " — paid one by one"}
+                    </option>
+                    <option value="1">
+                      {"Complete payment · all " + fullN + " installments · " + inr(per * fullN)}
+                    </option>
+                  </select>
+                </div>
+              )
             ) : (
               <div className="fin-derived faint">attach a quotation first</div>
             )}
@@ -401,7 +401,8 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
 
       <Notice tone="info" ico="lock" text={<>
         <b>Recording this entitles the customer now.</b> Every installment is created <em>due</em>;
-        none counts as collected until a payment is recorded against it.
+        none counts as collected until a payment is recorded against it — one by one, on the
+        subscription, naming which installment (1st, 2nd, …) each payment settles.
       </>} />
     </Dlg>
   );

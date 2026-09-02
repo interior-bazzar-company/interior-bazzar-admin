@@ -1257,15 +1257,21 @@ export function recordSubscription(input: RecordSubInput): { error: string; subs
   if (!Number.isInteger(n) || n < 1 || n > 5)
     return { error: "Between 1 and 5 installments. Beyond five it is a payment plan the sales chain does not raise invoices for.", subscriptionId: null };
 
-  /* THE QUOTATION IS THE AUTHORITY ON THE AMOUNT, and the count is a choice.
-     Where the invoice came from an accepted quotation, the TOTAL is always
-     the whole agreement — the invoice's installment amount times the count
-     the quotation agreed — and no override changes what is owed. The count
-     only says how that total is collected: as agreed, completed in one
-     payment, or re-split by hand when the customer renegotiated the
-     schedule but not the price. */
+  /* THE QUOTATION IS THE AUTHORITY ON THE PAYMENT PLAN — with one standing
+     exception: a complete payment is always available. The customer either
+     pays the agreed installments ONE BY ONE (each recorded against its own
+     row as it arrives — 1st, 2nd — through the installment payment write),
+     or pays the whole agreement at once. Any other count would be a schedule
+     the document never agreed. */
   const quote = readQuotation(invoice.quotationNumber);
   const quoteN = quote && quote.status === "accepted" ? quote.installments : null;
+  if (quoteN !== null && n !== quoteN && n !== 1)
+    return {
+      error: invoice.invoiceNumber + " was raised on " + quote!.quotationNumber + ", which agreed "
+        + (quoteN === 1 ? "a complete payment" : quoteN + " installments, paid one by one")
+        + ". Record that schedule, or a complete payment — not " + n + " installments. (plan_mismatch)",
+      subscriptionId: null,
+    };
   if (!input.startDate || input.startDate > todayIso())
     return { error: "A subscription starts when it is sold. The start date cannot be in the future.", subscriptionId: null };
 
