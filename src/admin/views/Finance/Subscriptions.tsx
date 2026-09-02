@@ -185,7 +185,12 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
         </div>
       </>}>
 
-      {tab === "analytics" ? <SubAnalytics /> : shown.length ? (
+      {tab === "analytics" ? (
+        /* The strip's queues cross back to the records with that filter
+           applied — the charts are never narrowed, so "show only these" goes
+           where narrowing means something. */
+        <SubAnalytics onQueue={(flag) => onParams({ tab: undefined, flag })} />
+      ) : shown.length ? (
         <table className="tbl dls-tbl fin-tbl">
           <thead>
             <tr>

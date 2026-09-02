@@ -193,6 +193,15 @@ has(subs, "About Active subscriptions", "...and the count carries its own i butt
    never one axis, which would count every rupee four times. */
 const subsAn = page("subscriptions · the analytics tab", "/finance?tab=analytics");
 has(subsAn, "Every subscription ever recorded", "...the analytics tab states its scope: all time, not one period");
+/* THE SAME STRIP ANATOMY AS THE LIST TAB — label and i, the figure, a second
+   figure of a different kind beside it, then what it counts and an offer to
+   show it. Two strips in one module that read differently make a reader work
+   out twice what they are looking at. */
+has(subsAn, "Expected collection", "...the strip opens on the whole contracted value");
+has(subsAn, "Upcoming installments", "...names what is still to come as installments, not as revenue");
+has(subsAn, "Fail installments", "...and names what did not clear");
+has(subsAn, "fin-mt-aside", "...Collected carries the active count as a second figure, not part of its own");
+has(subsAn, "show only these", "...and a tile that counts something offers to show it, on the records where narrowing means something");
 has(subsAn, "Collected, month by month", "...it reads the money over time");
 has(subsAn, "Which plans are selling", "...which plans carry the revenue");
 has(subsAn, "Where the sales came from", "...and where the business arrives from");

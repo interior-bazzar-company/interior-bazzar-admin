@@ -33,7 +33,7 @@ share an axis:
 
 | | |
 |---|---|
-| **Agreed / Collected / Still to collect / Did not clear** | the strip, each with its own definition and caution behind the `i` — written out rather than borrowed from the list's period tiles, so "collected" cannot mean two things |
+| **Expected collection / Collected / Upcoming installments / Fail installments** | the strip, in the list tab's own anatomy — label and `i`, the figure, a second figure of a different kind beside it, then what it counts and an offer to show it. Each carries its own definition behind the `i`, written out rather than borrowed from the list's period tiles, so "collected" cannot mean two things. `show only these` crosses to the Subscriptions tab with that queue applied: the charts are never narrowed, so narrowing happens where it means something |
 | **Collected, month by month** | one series, dated by the value date; months with nothing collected are absent, not drawn as zeros |
 | **Which plans are selling** | horizontal bars, ordered by money and grouped on the plan's **id**, so renaming a plan does not split it in two |
 | **Where the sales came from** | the channel split, count leading and money as the label beside it |
