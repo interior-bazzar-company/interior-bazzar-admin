@@ -107,7 +107,7 @@ export default function Slip({ id, p }: {
               onDone={(msg, tone) => { closeLayer(); toast(msg, tone); }} />, "wide") : null}
           payDisabled={!row}
           share={draft ? null : () => toast(slip.memberName + " would get " + slip.slipId + " at their registered email. Nothing was sent — no mail transport is wired to this module yet.", "info")} />
-        <button className="btn" onClick={() => navGo(back)}>
+        <button className="btn pri" onClick={() => navGo(back)}>
           <Icon name="chevl" size="sm" />Back
         </button>
       </div>

@@ -65,6 +65,7 @@ set like the paid slip's "Issued …" line; the action row gained a status pill
 actions by a thin rule. The pill takes a control's height, radius and type
 size so the row reads as one line of equals, and the separator is a drawn
 1px rule, centred, rather than a `|` glyph sitting on the text baseline.
+`Back` wears the panel's primary green — the row's one filled control.
 
 **The document breathes more.** The slip's base line-height went from the
 dense-UI 18px to 24px, the company block from 18px to 20px — a payslip is
