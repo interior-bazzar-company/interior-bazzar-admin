@@ -6,6 +6,51 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-02
 
+### The record-header and topbar pattern goes panel-wide
+
+**Area:** every module's record pages and topbar
+**Files:** `src/admin/ui/{index,menu}.tsx`, `src/styles/admin-theme.css`,
+`src/admin/views/{Users,BusinessEnquiries,Quotations,Invoices,Plans,Team,Deals}/…`
+
+**What changed**
+
+**Finance's record-header pattern became the panel's.** Two primitives were
+promoted out of the Finance module: `MoreMenu` (`ui/menu.tsx`, `.ib-menu-pop`
+— the popover with the theme's own `.mi` rows) and the thin `.vsep` rule. A
+record header now reads: the id or name leads, the rule sets the status pills
+off it, and the right side closes with More and a primary-green Back —
+anything past two controls collapses behind More.
+
+Applied to: **Users** Detail (rule after the name; Back turns primary),
+**BusinessEnquiries** Detail (rule after the id; the kebab becomes a text
+More button; "All enquiries" becomes the primary Back), **Quotations** Detail
+(Edit / Preview & issue / View document / Revise fold into the More menu the
+verdicts already lived in; a primary Back to the list appears where there was
+none), **Invoices** Detail (same fold), and the shared **DocPage** (kebab →
+More, Back primary and last). Builders and pick-deal steps keep their own
+flow controls; drawers (Deals, Plans, Roles, Team) keep their close ✕ — a
+drawer is an overlay, not a page.
+
+**Every module's topbar title is the way up now** via the shared `TbTitle`:
+Quotations, Invoices, Plans, Attendance, Work, Reports, Deals, Business
+Enquiries, and Users — where it also names the face (Users Management /
+Analytics), the move Finance's section title made first. Pressing the title
+returns to that module's default view; the generic Crumbs fallback already
+did this for Roles, Team and Audit.
+
+**Temp data**
+`none`.
+
+**Backend needed**
+`none`.
+
+**Open decisions**
+`none`.
+
+---
+
+## 2026-09-02
+
 ### The payslip page sheds its chrome
 
 **Area:** `#/finance-salaries/SLIP-…` (the payslip document)
