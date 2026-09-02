@@ -535,6 +535,15 @@ const recInst = check("record an installment payment", () => modal(
 has(recInst, "One write, and it is finished", "...recording settles it in one write");
 has(recInst, "number is issued against it", "...and the receipt is issued in that same write");
 has(recInst, "There is nothing to confirm afterwards", "...with nothing left to confirm and nobody to approve it");
+/* THE INVOICE ANSWERS THE REST. Mode, reference and the receiving account
+   are read off the document this money came in against rather than retyped,
+   and the amount is the installment's own — so the only thing left to say is
+   when the bank credited it. */
+has(recInst, "Value date", "...the one fact the document cannot know is asked: when the bank credited it");
+hasnt(recInst, "Reference / UTR", "...the reference is read off the invoice, not retyped");
+hasnt(recInst, "Credited to", "...and so is the account the money landed in");
+hasnt(recInst, "Pick the account", "...with no account left to pick");
+hasnt(recInst, "What was paid", "...no amount field: an installment is paid in full or not at all");
 const fail = check("record a fail to pay", () => modal(
   <FailToPayModal sub={sub("SUB-0104")} inst={inst("SUB-0104", 2)} onClose={noop} onDone={noop} />));
 has(fail, "not</b> retry the charge", "...it does not retry the charge");

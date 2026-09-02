@@ -467,27 +467,33 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
 export function RecordInstallmentModal({ sub, inst, onClose, onDone }: {
   sub: Subscription; inst: Installment; onClose: () => void; onDone: Done;
 }) {
-  const [mode, setMode] = useState(MODES[0] || "NEFT");
-  const [reference, setReference] = useState("");
   const [valueDate, setValueDate] = useState(todayIso());
-  const [accountId, setAccountId] = useState("");
   const [attachNo, setAttachNo] = useState("");
+  const [picking, setPicking] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   /* ONE INVOICE BILLS ONE INSTALLMENT. The chain raises them as each falls
      due, so an installment after the first usually arrives here without one,
      and this is where the two are joined up. The list is narrowed to invoices
      that would actually be accepted — this customer's, issued, unattached, and
-     for exactly this installment's amount. */
+     for exactly this installment's amount — newest first, because the one
+     raised for this installment is the one just raised. */
   const already = readInvoice(inst.invoiceNumber);
-  const offers = already ? [] : attachableForInstallment(sub.subscriptionId, inst.seq);
-  const attached = already || offers.filter((i) => i.invoiceNumber === attachNo)[0] || null;
+  const offers = already ? [] : attachableForInstallment(sub.subscriptionId, inst.seq)
+    .slice().sort((a, b) => b.invoiceDate.localeCompare(a.invoiceDate));
+  /* THE LATEST IS ATTACHED ON OPENING. It is what the operator would have
+     picked in every ordinary case, and Change is one press away for the one
+     that is not ordinary. */
+  const attached = already
+    || offers.filter((i) => i.invoiceNumber === attachNo)[0]
+    || (picking ? null : offers[0])
+    || null;
 
   const submit = () => {
     const r = recordInstallmentPayment({
       subscriptionId: sub.subscriptionId, seq: inst.seq,
-      mode, reference, valueDate, accountId,
-      invoiceNumber: already ? null : attachNo || null,
+      valueDate,
+      invoiceNumber: already || !attached ? null : attached.invoiceNumber,
     });
     if (r.error) { setErr(r.error); return; }
     onDone(
@@ -504,14 +510,12 @@ export function RecordInstallmentModal({ sub, inst, onClose, onDone }: {
         <button className="btn pri" onClick={submit}>Record payment</button>
       </>}>
 
-      <Fs legend="What was paid">
-        <Field label="Amount"
-          help="The installment's amount, in full, and not editable. An installment is paid or it is not — there is no part-paid installment to record, so there is no figure here to change.">
-          <span className="inp ro tnum">{inr(inst.amountPaise)}</span>
-        </Field>
-      </Fs>
+      {/* THE AMOUNT FIELD IS GONE: an installment is paid or it is not, there
+          is no part-paid one to record, and the invoice below already prints
+          the figure. A read-only box repeating it was a field that could
+          never be filled in.
 
-      {/* THE TAX INVOICE THIS INSTALLMENT IS BILLED ON. A receipt acknowledges
+          THE TAX INVOICE THIS INSTALLMENT IS BILLED ON. A receipt acknowledges
           funds against an invoice; issued with none, it prints a dash where the
           document should be. The chain raises one invoice per installment as
           each falls due, so this is where a later installment is joined to the
@@ -528,8 +532,9 @@ export function RecordInstallmentModal({ sub, inst, onClose, onDone }: {
               <span className="spacer" />
               <button type="button" className="lnk"
                 onClick={() => go("#/invoices?q=" + encodeURIComponent(attached.invoiceNumber))}>Open the document</button>
-              {already ? null
-                : <button type="button" className="lnk" onClick={() => setAttachNo("")}>Change</button>}
+              {already || offers.length < 2 ? null
+                : <button type="button" className="lnk"
+                    onClick={() => { setAttachNo(""); setPicking(true); }}>Change</button>}
             </div>
             <dl className="kv">
               <dt>Raised for</dt><dd>{attached.customer.name}</dd>
@@ -543,7 +548,8 @@ export function RecordInstallmentModal({ sub, inst, onClose, onDone }: {
         ) : offers.length ? (
           <div className="fin-pick">
             {offers.map((i) => (
-              <button key={i.invoiceNumber} type="button" onClick={() => setAttachNo(i.invoiceNumber)}>
+              <button key={i.invoiceNumber} type="button"
+                onClick={() => { setAttachNo(i.invoiceNumber); setPicking(false); }}>
                 <span className="mono">{i.invoiceNumber}</span>
                 <span className="s">{i.description} · {fmtDate(i.invoiceDate)} · {i.paymentStatus}</span>
                 <span className="a">{inr(i.grandTotalPaise)}</span>
@@ -560,31 +566,17 @@ export function RecordInstallmentModal({ sub, inst, onClose, onDone }: {
         )}
       </Fs>
 
-      <Fs legend="How the money arrived" req>
+      {/* MODE, REFERENCE AND CREDITED TO ARE NOT ASKED ANY MORE. The invoice
+          above answers all three — it is the document this money came in
+          against, its number is what ties the row to a statement line, and
+          the money lands in the company's own account either way. What is
+          left is the one fact the document cannot know: WHEN the bank
+          credited it. */}
+      <Fs legend="When the money arrived" req>
         <div className="fin-stack">
-          <Field label="Mode">
-            <div className="selectbox">
-              <select value={mode} onChange={(e) => setMode(e.target.value)}>
-                {MODES.map((m) => <option key={m} value={m}>{m}</option>)}
-              </select>
-            </div>
-          </Field>
-          <Field label="Value date" help="The day the bank credited it, not the day you are typing. It cannot be in the future.">
-            <input type="date" className="inp" value={valueDate} max={todayIso()}
+          <Field label="Value date">
+            <input type="date" className="inp" value={valueDate} max={todayIso()} autoFocus
               onChange={(e) => setValueDate(e.target.value)} />
-          </Field>
-          <Field label="Reference / UTR"
-            help="Mandatory, and unique across the whole ledger. Without it nothing ties this row to a line on a bank statement, and a repeated webhook would write the same money twice.">
-            <input className="inp mono" value={reference} autoFocus placeholder="NEFT0019AUG2213"
-              onChange={(e) => setReference(e.target.value)} />
-          </Field>
-          <Field label="Credited to" help="The account the money actually landed in. It is picked, never assumed.">
-            <div className="selectbox">
-              <select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-                <option value="">Pick the account…</option>
-                {accountOptions.map((a) => <option key={a.v} value={a.v}>{a.l}</option>)}
-              </select>
-            </div>
           </Field>
         </div>
       </Fs>

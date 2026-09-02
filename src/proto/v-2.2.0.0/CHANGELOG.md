@@ -6,6 +6,48 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-02
 
+### Record the payment: the invoice answers everything but the date
+
+**Area:** Finance · Subscriptions · the Record the payment dialog
+**Files:** `src/admin/views/Finance/{SubModals,store}.tsx(ts)`, `scripts/fn-smoke.tsx`
+
+**What changed**
+
+**The latest invoice is attached on opening.** The attachable list — this
+customer's, issued, unattached, for exactly this installment's amount — is
+sorted newest first and the top one is taken, because that is the one just
+raised for this installment. `Change` appears only when there is more than
+one to change to.
+
+**Four fields came off, and the document answers all four.** The read-only
+Amount box repeated the invoice total and could never be filled in. Mode,
+Reference / UTR and Credited to were retyped facts about money that arrived
+against a document already on screen. What is left is the one thing the
+invoice cannot know: **when the bank credited it**.
+
+**They are derived in the store, not dropped.** `RecordPaymentInput` makes
+mode, reference and accountId optional; the write reads the reference off
+the invoice the receipt will cite — unique by construction, since one
+invoice bills one installment, and the string somebody hunting this money
+would search — falling back to `SUB-0102/3` when there is no invoice at all,
+so nothing ever dangles. The account is the ledger's default bank account,
+the mode the module's first. Every guard that mattered still runs: duplicate
+reference, future value date, unknown account, and the whole attach block.
+
+**Temp data**
+`none`.
+
+**Backend needed**
+`none`.
+
+**Open decisions**
+The Record a subscription dialog's *Paid so far* block still asks for the
+transfer's mode, account and reference — it covers up to five installments
+in one write, where a single derived reference could not name each part.
+Left as it is deliberately, not overlooked.
+
+---
+
 ### Record a subscription: one pick fills the form
 
 **Area:** Finance · Subscriptions · the Record a subscription dialog

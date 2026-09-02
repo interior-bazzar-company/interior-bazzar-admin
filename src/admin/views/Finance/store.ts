@@ -1397,7 +1397,15 @@ export function attachableForInstallment(subscriptionId: string, seq: number) {
  *  There is no window in which two screens disagree. */
 export interface RecordPaymentInput {
   subscriptionId: string; seq: number;
-  mode: string; reference: string; valueDate: string; accountId: string;
+  valueDate: string;
+  /** THE THREE THE INVOICE ALREADY ANSWERS, and therefore optional. A
+   *  payment against an installment is billed on one document, for one
+   *  amount, into the company's own account — asking the operator to retype
+   *  any of that is asking for a second opinion on it. Left out, they are
+   *  derived below: the reference from the invoice the receipt will cite,
+   *  the account from the ledger's own default, the mode from the module's
+   *  first. A caller with better facts may still pass its own. */
+  mode?: string; reference?: string; accountId?: string;
   /** The invoice raised for THIS installment, attached as it is paid. The
    *  chain raises one per installment as it falls due, so an installment
    *  after the first usually arrives here without one. */
@@ -1410,19 +1418,35 @@ export function recordInstallmentPayment(input: RecordPaymentInput): { error: st
   if (!inst) return { error: "There is no installment " + input.seq + " on " + s.subscriptionId + ".", paymentId: null };
   if (inst.status === "paid") return { error: "Installment " + input.seq + " is already paid. (invalid_state_transition)", paymentId: null };
   if (inst.status === "cancelled") return { error: "A cancelled installment cannot be paid. (invalid_state_transition)", paymentId: null };
-  if (!input.reference.trim())
-    return { error: "The bank reference / UTR is mandatory — without it nothing ties this row to a statement.", paymentId: null };
-  if (dupReference(input.reference))
-    return { error: "A record already carries reference " + input.reference.trim() + ". (duplicate_reference)", paymentId: null };
   if (!input.valueDate || input.valueDate > todayIso())
     return { error: "The value date is when the bank credited it — it cannot be in the future.", paymentId: null };
-  if (!accountOf(input.accountId)) return { error: "Pick the account it was credited to.", paymentId: null };
 
   /* ATTACHING THE INVOICE FOR THIS INSTALLMENT. The chain raises one per
      installment as it falls due, so the later ones arrive here without one and
      this is where they are joined up. Without it the receipt is issued citing
      no tax invoice at all — it prints a dash where the document should be. */
   const attach = (input.invoiceNumber || "").trim();
+
+  /* THE THREE THE DOCUMENT ALREADY ANSWERS. Resolved before the attach block
+     because the reference is read off the invoice this payment will cite:
+     that number is what ties the row to the document and to the statement
+     line, it is unique by construction (one invoice bills one installment),
+     and it is the string somebody looking for this money would search. With
+     no invoice at all there is still something unique to say — the
+     subscription and the installment it settles — so nothing ever dangles.
+     The account is the ledger's own default and the mode the module's
+     first; a caller that knows better passes its own. */
+  const billNo = attach || inst.invoiceNumber || "";
+  const reference = (input.reference || "").trim()
+    || billNo
+    || s.subscriptionId + "/" + inst.seq;
+  const accountId = input.accountId
+    || (ACCOUNTS.filter((x) => x.active && x.type === "bank")[0] || ACCOUNTS.filter((x) => x.active)[0] || { accountId: "" }).accountId;
+  const mode = input.mode || MODES[0] || "NEFT";
+  if (dupReference(reference))
+    return { error: "A record already carries reference " + reference + ". (duplicate_reference)", paymentId: null };
+  if (!accountOf(accountId)) return { error: "Pick the account it was credited to.", paymentId: null };
+
   if (attach) {
     if (inst.invoiceNumber && inst.invoiceNumber !== attach)
       return { error: "Installment " + input.seq + " is already billed on " + inst.invoiceNumber + ". An installment is billed once. (duplicate_invoice)", paymentId: null };
@@ -1446,11 +1470,11 @@ export function recordInstallmentPayment(input: RecordPaymentInput): { error: st
      tie them together now. The statement proves the ledger complete; it is
      never a second opinion on the row. */
   const line = snap.statements.flatMap((st) => st.lines as BankLine[])
-    .filter((l) => l.dir === "credit" && norm(l.reference) === norm(input.reference) && l.amountPaise === inst.amountPaise)[0] || null;
+    .filter((l) => l.dir === "credit" && norm(l.reference) === norm(reference) && l.amountPaise === inst.amountPaise)[0] || null;
 
   const pay: InstallmentPayment = {
-    paymentId: id, amountPaise: inst.amountPaise, mode: input.mode,
-    reference: input.reference.trim(), valueDate: input.valueDate, accountId: input.accountId,
+    paymentId: id, amountPaise: inst.amountPaise, mode,
+    reference, valueDate: input.valueDate, accountId,
     recordedBy: a.name, recordedAt: stamp(), receipt: null,
     bankLineId: line ? line.lineId : null, proof: null,
   };
