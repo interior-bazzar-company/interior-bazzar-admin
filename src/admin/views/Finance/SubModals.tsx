@@ -29,7 +29,7 @@ import type { Done } from "./dialog";
 import {
   ACCOUNTS, FAILURE_REASONS, MODES,
   cancelSubscription, fmtDate, inr, markFailToPay,
-  useUsers, previewSchedule, recordSubscription, chainsFor, attachableForInstallment, readInvoice, recordInstallmentPayment, reversePayment, superAdminOnly, todayIso,
+  useUsers, previewSchedule, recordSubscription, chainsFor, attachableInvoices, attachableForInstallment, readInvoice, recordInstallmentPayment, reversePayment, superAdminOnly, todayIso,
 } from "./store";
 import type { Installment, InstallmentPayment, Subscription } from "./store";
 
@@ -468,26 +468,38 @@ export function RecordInstallmentModal({ sub, inst, onClose, onDone }: {
   sub: Subscription; inst: Installment; onClose: () => void; onDone: Done;
 }) {
   const [valueDate, setValueDate] = useState(todayIso());
-  const [attachNo, setAttachNo] = useState("");
-  const [picking, setPicking] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   /* ONE INVOICE BILLS ONE INSTALLMENT. The chain raises them as each falls
      due, so an installment after the first usually arrives here without one,
-     and this is where the two are joined up. The list is narrowed to invoices
-     that would actually be accepted — this customer's, issued, unattached, and
-     for exactly this installment's amount — newest first, because the one
-     raised for this installment is the one just raised. */
+     and this is where the two are joined up.
+
+     THE WHOLE BUSINESS'S UNCARRIED INVOICES ARE OFFERED, newest first, so
+     the operator picks the document rather than hunting for its number —
+     and the ones the write would refuse (raised for a different figure than
+     this installment) are shown DISABLED beside their reason rather than
+     hidden, because an invoice missing from a list is a question, and an
+     invoice greyed out with its amount beside it is an answer. */
   const already = readInvoice(inst.invoiceNumber);
-  const offers = already ? [] : attachableForInstallment(sub.subscriptionId, inst.seq)
-    .slice().sort((a, b) => b.invoiceDate.localeCompare(a.invoiceDate));
-  /* THE LATEST IS ATTACHED ON OPENING. It is what the operator would have
-     picked in every ordinary case, and Change is one press away for the one
-     that is not ordinary. */
-  const attached = already
-    || offers.filter((i) => i.invoiceNumber === attachNo)[0]
-    || (picking ? null : offers[0])
-    || null;
+  const byNewest = (a: { invoiceDate: string }, b: { invoiceDate: string }) =>
+    b.invoiceDate.localeCompare(a.invoiceDate);
+  const offers = already || !sub.customer.userId
+    ? []
+    : attachableInvoices(sub.customer.userId).slice().sort(byNewest);
+  /* `attachableForInstallment` stays the single definition of what this
+     installment would actually accept — the same filter, plus the amount. */
+  const fitting = already ? [] : attachableForInstallment(sub.subscriptionId, inst.seq).slice().sort(byNewest);
+  const fits = (no: string) => fitting.some((i) => i.invoiceNumber === no);
+
+  /* The newest one that fits is selected on opening: it is the invoice just
+     raised for this installment in every ordinary case. "" is a real choice
+     too — a payment recorded citing no document at all. */
+  const [attachNo, setAttachNo] = useState(() => {
+    if (readInvoice(inst.invoiceNumber)) return "";
+    const first = attachableForInstallment(sub.subscriptionId, inst.seq).slice().sort(byNewest)[0];
+    return first ? first.invoiceNumber : "";
+  });
+  const attached = already || offers.filter((i) => i.invoiceNumber === attachNo)[0] || null;
 
   const submit = () => {
     const r = recordInstallmentPayment({
@@ -521,9 +533,24 @@ export function RecordInstallmentModal({ sub, inst, onClose, onDone }: {
           each falls due, so this is where a later installment is joined to the
           one raised for it. */}
       <Fs legend="Billed on"
-        hint={already
-          ? "Raised when this installment fell due, and carried on the record since."
-          : "Raise the invoice for this installment in Invoices, then attach it here. The receipt cites it."}>
+        hint={already ? "Raised when this installment fell due." : undefined}>
+        {already ? null : (
+          <div className="fin-stack">
+            <Field label={"Invoice · " + sub.customer.name}>
+              <div className="selectbox">
+                <select value={attachNo} onChange={(e) => setAttachNo(e.target.value)}>
+                  <option value="">No invoice — the receipt will cite none</option>
+                  {offers.map((i) => (
+                    <option key={i.invoiceNumber} value={i.invoiceNumber} disabled={!fits(i.invoiceNumber)}>
+                      {i.invoiceNumber + " · " + inr(i.grandTotalPaise) + " · " + fmtDate(i.invoiceDate)
+                        + (fits(i.invoiceNumber) ? "" : " — not this installment's " + inr(inst.amountPaise))}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </Field>
+          </div>
+        )}
         {attached ? (
           <div className="fin-inv">
             <div className="h">
@@ -532,9 +559,6 @@ export function RecordInstallmentModal({ sub, inst, onClose, onDone }: {
               <span className="spacer" />
               <button type="button" className="lnk"
                 onClick={() => go("#/invoices?q=" + encodeURIComponent(attached.invoiceNumber))}>Open the document</button>
-              {already || offers.length < 2 ? null
-                : <button type="button" className="lnk"
-                    onClick={() => { setAttachNo(""); setPicking(true); }}>Change</button>}
             </div>
             <dl className="kv">
               <dt>Raised for</dt><dd>{attached.customer.name}</dd>
@@ -545,23 +569,16 @@ export function RecordInstallmentModal({ sub, inst, onClose, onDone }: {
               <dt>Invoice total</dt><dd className="tnum b">{inr(attached.grandTotalPaise)}</dd>
             </dl>
           </div>
-        ) : offers.length ? (
-          <div className="fin-pick">
-            {offers.map((i) => (
-              <button key={i.invoiceNumber} type="button"
-                onClick={() => { setAttachNo(i.invoiceNumber); setPicking(false); }}>
-                <span className="mono">{i.invoiceNumber}</span>
-                <span className="s">{i.description} · {fmtDate(i.invoiceDate)} · {i.paymentStatus}</span>
-                <span className="a">{inr(i.grandTotalPaise)}</span>
-              </button>
-            ))}
-          </div>
         ) : (
-          <Notice tone="warn" ico="alert" text={<>
-            <b>No invoice has been raised for this installment yet.</b> Raise one in Invoices for{" "}
-            {inr(inst.amountPaise)} against {sub.customer.name}, then attach it here. The payment can
-            still be recorded without one — the money arrived either way — but the receipt will cite
-            no tax invoice, and it is the receipt a customer keeps.
+          <Notice tone="warn" ico="alert" text={offers.length ? <>
+            <b>Nothing is attached, so the receipt will cite no tax invoice</b> — and it is the
+            receipt a customer keeps. Pick one of {sub.customer.name}'s invoices above, or raise one
+            in Invoices for {inr(inst.amountPaise)} if the right document does not exist yet.
+          </> : <>
+            <b>{sub.customer.name} has no invoice left to attach.</b> Every issued invoice of theirs
+            is already carried by another installment, or none has been raised. Raise one in Invoices
+            for {inr(inst.amountPaise)} — the payment can still be recorded without one, but the
+            receipt will cite no tax invoice.
           </>} />
         )}
       </Fs>

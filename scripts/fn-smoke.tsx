@@ -540,6 +540,8 @@ has(recInst, "There is nothing to confirm afterwards", "...with nothing left to 
    and the amount is the installment's own — so the only thing left to say is
    when the bank credited it. */
 has(recInst, "Value date", "...the one fact the document cannot know is asked: when the bank credited it");
+has(recInst, "Invoice · ", "...the business's own invoices are offered by name, so the document is picked not hunted");
+has(recInst, "No invoice — the receipt will cite none", "...and citing none stays a deliberate choice");
 hasnt(recInst, "Reference / UTR", "...the reference is read off the invoice, not retyped");
 hasnt(recInst, "Credited to", "...and so is the account the money landed in");
 hasnt(recInst, "Pick the account", "...with no account left to pick");

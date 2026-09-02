@@ -13,11 +13,16 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 **What changed**
 
-**The latest invoice is attached on opening.** The attachable list — this
-customer's, issued, unattached, for exactly this installment's amount — is
-sorted newest first and the top one is taken, because that is the one just
-raised for this installment. `Change` appears only when there is more than
-one to change to.
+**The business's invoices are a dropdown, and the right one is already
+chosen.** Every uncarried invoice of this customer's is listed by number,
+amount and date, newest first, with the newest that fits this installment
+selected on opening — the document is picked, never hunted for. The ones the
+write would refuse (raised for a different figure than this installment) are
+listed **disabled**, with what they are for beside them: an invoice missing
+from a list is a question, an invoice greyed out with its amount is an
+answer. `No invoice — the receipt will cite none` stays as a deliberate
+choice, and picking it says in the warning what the customer's receipt will
+then be missing.
 
 **Four fields came off, and the document answers all four.** The read-only
 Amount box repeated the invoice total and could never be filled in. Mode,
