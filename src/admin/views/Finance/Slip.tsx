@@ -99,7 +99,7 @@ export default function Slip({ id, p }: {
       <div className="fin-actions">
         <span className="spacer" />
         <span className={"pill " + (draft ? "warn" : "ok")}>{draft ? "Draft" : "Paid"}</span>
-        <span className="fin-vsep" aria-hidden="true">|</span>
+        <span className="fin-vsep" aria-hidden="true" />
         <MoreMenu
           onDownload={() => window.print()}
           pay={draft ? () => row && modal(

@@ -528,9 +528,20 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
 .fin-slip { line-height: var(--lh-lg) }
 .fin-slip-co { font-size: var(--text-sm); line-height: var(--lh-base); color: var(--text-2) }
 .fin-slip-title { font-size: var(--text-lg); font-weight: var(--weight-semibold); letter-spacing: .04em }
-/* The bar between the status pill and the actions — punctuation, not a
-   control, so it stays out of the accessibility tree and off the mouse. */
-.fin-actions .fin-vsep { color: var(--line-3); user-select: none }
+/* The status pill sits in a row of controls, so it takes a control's height,
+   radius and type size — a badge-sized pill beside 32px buttons read as a
+   misprint, not a state. */
+.fin-actions > .pill {
+  height: var(--control-md); padding: 0 var(--space-3);
+  border-radius: var(--radius-md); font-size: var(--text-md);
+}
+/* The rule between the status and the actions — a drawn line rather than a
+   `|` glyph, which sat on the text baseline and never centred. Punctuation,
+   not a control: out of the accessibility tree and off the mouse. */
+.fin-actions .fin-vsep {
+  width: 1px; height: 18px; flex: 0 0 auto; align-self: center;
+  background: var(--line-2); margin: 0 var(--space-1); user-select: none;
+}
 .fin-slip-meta {
   display: flex; flex-wrap: wrap; gap: var(--space-6);
   padding: var(--space-3) 0; margin: var(--space-4) 0;
