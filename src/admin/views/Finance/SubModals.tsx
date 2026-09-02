@@ -28,7 +28,6 @@ import { Notice } from "../../ui";
 import { Check } from "./bits";
 import { go } from "../../ui/nav";
 import { Cancel, Dlg, Field, Fs, Pick } from "./dialog";
-/* SAMPLE TAB — proto only, deleted at integration. */
 import type { Done } from "./dialog";
 import {
   ACCOUNTS, FAILURE_REASONS, MODES,
@@ -88,6 +87,11 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
      behind this sale — a website purchase — and the manual path applies. */
   const [quotationNumber, setQuotationNumber] = useState("");
   const [count, setCount] = useState("1");
+  /* On an installment quotation the plan is still a choice of ONE thing: pay
+     as agreed from the 1st installment, or complete the whole agreement in
+     one payment. "schedule" follows the quotation; "complete" records one
+     installment carrying every installment's amount. */
+  const [quotePlan, setQuotePlan] = useState<"schedule" | "complete">("schedule");
   const [startDate, setStartDate] = useState(todayIso());
   const [err, setErr] = useState<string | null>(null);
 
@@ -162,6 +166,7 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
   const pickUser = (uid: string) => {
     setUserId(uid);
     setErr(null);
+    setQuotePlan("schedule");
     const opens = chainsFor(uid).filter((c) => !!c.attachable && !c.recordedAs);
     if (opens.length) {
       setQuotationNumber(opens[0].quotation.quotationNumber);
@@ -202,13 +207,18 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
   /* THE COUNT COMES FROM THE QUOTATION, not from the dropdown, whenever one is
      attached. The chain raises one invoice per installment as each falls due,
      so counting the documents that exist would report a running schedule as
-     shorter than it is. */
-  const n = quote ? quote.installments : Number(count);
+     shorter than it is. The one choice left on an installment quotation is
+     completing it in a single payment — one row, every installment's amount,
+     the same write the store allows for the same reason. */
+  const fullN = quote ? quote.installments : Number(count);
+  const completing = !!quote && quote.installments > 1 && quotePlan === "complete";
+  const n = completing ? 1 : fullN;
 
   /* One invoice per installment, each for the same amount — so the total is
-     the invoice times the count, and nobody types a figure that could disagree
-     with the document. */
-  const paise = invoice ? invoice.grandTotalPaise * n : null;
+     the invoice times the agreed count, complete payment included, and nobody
+     types a figure that could disagree with the document. */
+  const per = invoice ? invoice.grandTotalPaise : null;
+  const paise = per !== null ? per * fullN : null;
   /* The exact rows recordSubscription will write. Asking the store rather than
      re-deriving them means the preview cannot drift from the commit, and it
      returns nothing at all when the total will not divide — the same condition
@@ -310,7 +320,7 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
                 <span className="pill ok">accepted</span>
                 <span className="spacer" />
                 <button type="button" className="lnk"
-                  onClick={() => { setQuotationNumber(""); setInvoiceNumber(""); }}>Change</button>
+                  onClick={() => { setQuotationNumber(""); setInvoiceNumber(""); setQuotePlan("schedule"); }}>Change</button>
               </div>
               <dl className="kv">
                 <dt>Deal</dt><dd className="mono">{chain.quotation.dealRef}</dd>
@@ -331,7 +341,7 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
             <div className="fin-pick">
               {open.map((c) => (
                 <button key={c.quotation.quotationNumber} type="button"
-                  onClick={() => { setQuotationNumber(c.quotation.quotationNumber); setInvoiceNumber(""); }}>
+                  onClick={() => { setQuotationNumber(c.quotation.quotationNumber); setInvoiceNumber(""); setQuotePlan("schedule"); }}>
                   <span className="mono">{c.quotation.quotationNumber}</span>
                   <span className="s">
                     {c.quotation.planName} · {c.quotation.termMonths}m ·{" "}
@@ -465,25 +475,45 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
         <div className="fin-stack">
           <Field label="Payment plan">
             {quote ? (
-              <div className="fin-derived">
-                {quote.installments === 1
-                  ? <b>Complete payment</b>
-                  : <><b>{quote.installments} installments</b>, {quote.installmentGapMonths} month apart</>}
-              </div>
+              quote.installments === 1 ? (
+                <div className="fin-derived"><b>Complete payment</b></div>
+              ) : (
+                /* The agreed schedule, or the whole agreement in one payment —
+                   the only two counts the store accepts on this quotation. */
+                <div className="selectbox">
+                  <select value={quotePlan}
+                    onChange={(e) => setQuotePlan(e.target.value as "schedule" | "complete")}>
+                    <option value="schedule">
+                      {"1st installment · as agreed, " + quote.installments + " × "
+                        + (per !== null ? inr(per) : "…") + ", " + quote.installmentGapMonths + " month apart"}
+                    </option>
+                    <option value="complete">
+                      {"Complete payment · all " + quote.installments + " installments"
+                        + (per !== null ? " · " + inr(per * quote.installments) : "")}
+                    </option>
+                  </select>
+                </div>
+              )
             ) : (
               <div className="selectbox">
                 <select value={count} onChange={(e) => setCount(e.target.value)}>
-                  {PAYMENT_PLANS.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
+                  {PAYMENT_PLANS.map((o) => (
+                    <option key={o.v} value={o.v}>
+                      {o.l + (per !== null
+                        ? " · " + (Number(o.v) === 1 ? inr(per) : Number(o.v) + " × " + inr(per))
+                        : "")}
+                    </option>
+                  ))}
                 </select>
               </div>
             )}
           </Field>
           <Field label="Subscription total">
             <div className="fin-derived tnum">
-              {invoice
-                ? (n === 1
-                  ? <b>{inr(invoice.grandTotalPaise)}</b>
-                  : <>{inr(invoice.grandTotalPaise)} × {n} = <b>{inr(invoice.grandTotalPaise * n)}</b></>)
+              {per !== null
+                ? (fullN === 1
+                  ? <b>{inr(per)}</b>
+                  : <>{inr(per)} × {fullN} = <b>{inr(per * fullN)}</b></>)
                 : "attach an invoice"}
             </div>
           </Field>

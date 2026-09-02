@@ -1253,19 +1253,22 @@ export function recordSubscription(input: RecordSubInput): { error: string; subs
   if (!Number.isInteger(n) || n < 1 || n > 5)
     return { error: "Between 1 and 5 installments. Beyond five it is a payment plan the sales chain does not raise invoices for.", subscriptionId: null };
 
-  /* THE QUOTATION IS THE AUTHORITY ON THE PAYMENT PLAN. Where the invoice came
-     from an accepted quotation, that quotation already agreed how many
-     installments this is paid in — so a different count here is not a choice,
-     it is a disagreement with the document the customer signed. The dialog
-     reads the count from the quotation and can never send a mismatch; this
-     guard is for every other caller, and for the day somebody adds one. */
+  /* THE QUOTATION IS THE AUTHORITY ON THE PAYMENT PLAN — with one standing
+     exception: a complete payment is ALWAYS available. A customer who agreed
+     three installments and then pays the whole thing at once has not
+     disagreed with the document, they have finished it early; the write
+     records ONE installment carrying every installment's amount. Any other
+     count is a disagreement with what was signed. The dialog offers exactly
+     these two; this guard is for every other caller, and for the day
+     somebody adds one. */
   const quote = readQuotation(invoice.quotationNumber);
-  if (quote && quote.status === "accepted" && quote.installments !== n)
+  const completesQuote = !!(quote && quote.status === "accepted" && quote.installments > 1 && n === 1);
+  if (quote && quote.status === "accepted" && quote.installments !== n && !completesQuote)
     return {
       error: invoice.invoiceNumber + " was raised on " + quote.quotationNumber + ", which agreed "
         + (quote.installments === 1 ? "a complete payment" : quote.installments + " installments")
-        + " — not " + (n === 1 ? "a complete payment" : n + " installments")
-        + ". Change the quotation if the plan changed. (plan_mismatch)",
+        + " — not " + n + " installments"
+        + ". Change the quotation if the plan changed; a complete payment is always available. (plan_mismatch)",
       subscriptionId: null,
     };
   if (!input.startDate || input.startDate > todayIso())
@@ -1275,9 +1278,10 @@ export function recordSubscription(input: RecordSubInput): { error: string; subs
   const id = nextId("SUB");
   /* One invoice per installment, each for the same amount — so the total is
      the invoice times the count, and the schedule divides back into it exactly
-     by construction. */
+     by construction. A complete payment on an installment quotation still
+     carries ALL the installments' amount: one row, the whole agreement. */
   const each = invoice.grandTotalPaise;
-  const totalPaise = each * n;
+  const totalPaise = each * (completesQuote && quote ? quote.installments : n);
   const installments = previewSchedule(input.startDate, n, totalPaise);
   if (!installments.length) return { error: "That start date is not a date.", subscriptionId: null };
   const start = new Date(input.startDate + "T00:00:00Z");

@@ -25,6 +25,16 @@ attaches itself for the same reason.
 `SubSamples.tsx` prescribed for its own removal; the dialog opens straight
 onto the form and the smoke assertions moved with it.
 
+**A complete payment is always available, and it carries the whole
+agreement.** On an installment quotation the Payment plan field became the
+one choice it really holds: *1st installment · as agreed* (the quotation's
+schedule) or *Complete payment · all N installments* — one row carrying
+every installment's amount. The store's plan-mismatch guard admits exactly
+that second count; any other disagreement with the signed document still
+refuses. The manual dropdown's options now wear their amounts off the
+attached invoice (`Complete payment · ₹X`, `3 installments · 3 × ₹X`), and
+the Subscription total reads off the same figures.
+
 **And the dialog took the pay dialog's economy:** the standing fieldset
 hints and field captions came off (a hint survives only when it names THIS
 record — "From IB-QT-…"), the source picker's two explainers went, the
