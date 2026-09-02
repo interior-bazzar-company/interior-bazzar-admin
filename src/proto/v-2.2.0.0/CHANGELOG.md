@@ -35,15 +35,19 @@ sale is a sales sale by definition. What stays editable: the payment plan
 (1st installment / complete payment), the start date, and a new **Remark**
 field whose words land on the SUBSCRIPTION_RECORDED event.
 
-**The payment plan is the two things a customer actually does.** The select
-briefly offered arbitrary re-splits (1–5) and settled where the flow really
-is: the agreed installments, **paid one by one** — which row a payment
-settles (1st, 2nd, …) is decided as each is recorded on the subscription —
-or a **complete payment** of the whole agreement. Both options wear their
-amounts; the total is the whole agreement either way; the store's
-plan-mismatch guard admits exactly these two counts and refuses any other
-in words. A complete payment on an installment agreement is noted on the
-SUBSCRIPTION_RECORDED event beside what the quotation said.
+**The team says which installments are already paid.** The schedule itself
+is never re-split — it is what the documents agreed, shown as a read-out —
+and the new **Paid so far** field carries the choice: *Nothing yet*, *1st
+installment paid*, *First 2 installments paid*, … or *Complete payment — all
+N paid*. The covered rows are written paid in the same write, each with its
+own payment row and receipt, exactly the shape the one-by-one write leaves;
+the rest stay due and are collected one at a time on the subscription. One
+transfer's facts back them — mode, account, reference/UTR, value date, asked
+once and validated before anything is written — and a multi-row transfer
+carries its reference as `REF/1`, `REF/2` so every payment still names its
+part. The schedule preview marks the covered rows **paid** instead of dated,
+and the toast says how many of how many were collected and when the next
+falls due.
 
 **And the dialog took the pay dialog's economy:** the standing fieldset
 hints and field captions came off (a hint survives only when it names THIS

@@ -1240,6 +1240,13 @@ export interface RecordSubInput {
    *  event — never load-bearing, but the only place the reason for an
    *  unusual sale is written down in words. */
   remark?: string;
+  /** Installments already collected by the time this is recorded. The team
+   *  says which: the first `count` rows (1st; 1st and 2nd; … all of them —
+   *  a complete payment), backed by one transfer's facts. Each covered row
+   *  is written paid with its own payment and receipt, exactly as the
+   *  one-by-one write would have; a multi-row transfer carries its
+   *  reference as REF/2, REF/3 so every payment still names its part. */
+  paid?: { count: number; mode: string; reference: string; valueDate: string; accountId: string };
 }
 export function recordSubscription(input: RecordSubInput): { error: string; subscriptionId: string | null } {
   const user = readUser(input.userId);
@@ -1293,6 +1300,22 @@ export function recordSubscription(input: RecordSubInput): { error: string; subs
         : "That start date is not a date.",
       subscriptionId: null,
     };
+  /* INSTALLMENTS ALREADY COLLECTED, validated before anything is written —
+     a half-recorded subscription is worse than a refused one. */
+  const paid = input.paid && input.paid.count > 0 ? input.paid : null;
+  if (paid) {
+    if (!Number.isInteger(paid.count) || paid.count > n)
+      return { error: "Between 1 and " + n + " installments can be marked paid — the schedule has " + n + ".", subscriptionId: null };
+    if (!paid.reference.trim())
+      return { error: "The bank reference / UTR is mandatory on the collected installments — without it nothing ties them to a statement.", subscriptionId: null };
+    if (dupReference(paid.reference))
+      return { error: "A record already carries reference " + paid.reference.trim() + ". (duplicate_reference)", subscriptionId: null };
+    if (!paid.valueDate || paid.valueDate > todayIso())
+      return { error: "The value date is when the bank credited it — it cannot be in the future.", subscriptionId: null };
+    if (!accountOf(paid.accountId))
+      return { error: "Pick the account the collected installments were credited to.", subscriptionId: null };
+  }
+
   const start = new Date(input.startDate + "T00:00:00Z");
   const end = new Date(start); end.setUTCMonth(end.getUTCMonth() + input.cycleMonths);
   const s: Subscription = {
@@ -1303,7 +1326,7 @@ export function recordSubscription(input: RecordSubInput): { error: string; subs
     endDate: end.toISOString().slice(0, 10),
     status: "active", installments,
     invoiceNumber: invoice.invoiceNumber,
-    paidInFull: n === 1,
+    paidInFull: n === 1 || (paid !== null && paid.count === n),
     soldBy: a.name, recordedBy: a.name, recordedAt: stamp(), events: [],
   };
   /* The invoice this was recorded against is the first installment's. The
@@ -1320,6 +1343,37 @@ export function recordSubscription(input: RecordSubInput): { error: string; subs
     + (input.remark && input.remark.trim() ? " Remark: " + input.remark.trim() : "")),
   id, "subscription");
   snap.subscriptions = [s].concat(snap.subscriptions);
+
+  /* Write the collected installments paid, each with its own payment row and
+     receipt — the same shape the one-by-one write leaves, so nothing
+     downstream can tell how they arrived. After the unshift, so receipt
+     numbering sees each one it just issued. */
+  if (paid) {
+    for (let k = 1; k <= paid.count; k++) {
+      const inst = s.installments[k - 1];
+      const ref = paid.count === 1 ? paid.reference.trim() : paid.reference.trim() + "/" + k;
+      const line = snap.statements.flatMap((st) => st.lines as BankLine[])
+        .filter((l) => l.dir === "credit" && norm(l.reference) === norm(ref) && l.amountPaise === inst.amountPaise)[0] || null;
+      const pay: InstallmentPayment = {
+        paymentId: nextId("PAY"), amountPaise: inst.amountPaise, mode: paid.mode,
+        reference: ref, valueDate: paid.valueDate, accountId: paid.accountId,
+        recordedBy: a.name, recordedAt: stamp(), receipt: null,
+        bankLineId: line ? line.lineId : null, proof: null,
+      };
+      inst.payment = pay;
+      inst.status = "paid";
+      inst.failure = null;
+      log(pushEvent(s.events, "INSTALLMENT_PAID",
+        "Installment " + inst.seq + " of " + inst.of + " · " + inr(pay.amountPaise) + " · " + pay.mode
+        + " · " + pay.reference
+        + (inst.invoiceNumber ? " · billed on " + inst.invoiceNumber : " · no tax invoice cited")
+        + " — collected before recording."),
+      id, "subscription");
+      issueReceipt(pay, s, inst);
+    }
+    syncSubStatus(s);
+  }
+
   emit();
   return { error: "", subscriptionId: id };
 }

@@ -47,10 +47,15 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
      all, so everything below — plan, term, amount, installments — is read
      from documents rather than typed. */
   const [quotationNumber, setQuotationNumber] = useState("");
-  /* The COUNT defaults to what the invoice's quotation agreed and can be
-     re-picked by hand — the customer who renegotiated the schedule but not
-     the price. "" means as agreed; the total never moves with it. */
-  const [countStr, setCountStr] = useState("");
+  /* HOW MANY INSTALLMENTS THE CUSTOMER HAS ALREADY PAID, picked by the team:
+     none yet, the 1st, the first two, … or all of them — a complete payment.
+     The schedule itself always stays what the documents agreed; this only
+     writes the covered rows paid, backed by the transfer's facts below. */
+  const [paidStr, setPaidStr] = useState("0");
+  const [payMode, setPayMode] = useState(MODES[0] || "NEFT");
+  const [payRef, setPayRef] = useState("");
+  const [payDate, setPayDate] = useState(todayIso());
+  const [payAccount, setPayAccount] = useState(accountOptions[0] ? accountOptions[0].v : "");
   const [startDate, setStartDate] = useState(todayIso());
   const [remark, setRemark] = useState("");
   const [err, setErr] = useState<string | null>(null);
@@ -83,7 +88,7 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
   const pickUser = (uid: string) => {
     setUserId(uid);
     setErr(null);
-    setCountStr("");
+    setPaidStr("0");
     const opens = chainsFor(uid).filter((c) => !!c.attachable && !c.recordedAs);
     setQuotationNumber(opens.length ? opens[0].quotation.quotationNumber : "");
   };
@@ -108,14 +113,13 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
      on, and the reason only chained businesses are offered at all. */
   const invoice = chain && chain.attachable ? chain.attachable : null;
 
-  /* THE COUNT COMES FROM THE QUOTATION, with one choice on top: the agreed
-     installments, PAID ONE BY ONE — each payment recorded against its own
-     row (1st, 2nd, …) on the subscription as it arrives — or the whole
-     agreement completed in a single payment. Either way the TOTAL is the
-     whole agreement: the invoice's installment amount times the agreed
-     count. */
+  /* THE SCHEDULE IS WHAT THE DOCUMENTS AGREED — the count is never re-split.
+     What the team picks is how much of it is ALREADY collected: the covered
+     rows are written paid in the same write, and the rest are collected one
+     by one on the subscription, each payment naming its row. */
   const fullN = quote ? quote.installments : 1;
-  const n = countStr ? Number(countStr) : fullN;
+  const n = fullN;
+  const paidN = Math.min(Math.max(Number(paidStr) || 0, 0), fullN);
 
   /* One invoice per installment, each for the same amount — so the total is
      the invoice times the agreed count, and nobody types a figure that could
@@ -159,14 +163,20 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
       planId, planName, cycleMonths: months,
       invoiceNumber: invoice.invoiceNumber, installmentCount: n, startDate,
       remark: remark.trim() || undefined,
+      paid: paidN > 0
+        ? { count: paidN, mode: payMode, reference: payRef, valueDate: payDate, accountId: payAccount }
+        : undefined,
     });
     if (r.error) { setErr(r.error); return; }
+    const nextDue = sched.filter((i) => i.seq > paidN)[0] || null;
     onDone(
       r.subscriptionId + " recorded · " + planName + " · " + inr(paise)
       + (quote ? " from " + quote.quotationNumber : "") + " on " + invoice.invoiceNumber
       + ". " + (chosenUser ? chosenUser.name : "The customer") + " is entitled from "
-      + fmtDate(startDate) + ", and the first installment is due "
-      + fmtDate(sched[0] ? sched[0].dueDate : startDate) + ".", "ok");
+      + fmtDate(startDate) + ", "
+      + (paidN > 0
+        ? (paidN === n ? "and every installment is collected." : paidN + " of " + n + " collected — installment " + (paidN + 1) + " is due " + fmtDate(nextDue ? nextDue.dueDate : startDate) + ".")
+        : "and the first installment is due " + fmtDate(sched[0] ? sched[0].dueDate : startDate) + "."), "ok");
   };
 
   return (
@@ -222,7 +232,7 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
                 <span className="pill ok">accepted</span>
                 <span className="spacer" />
                 <button type="button" className="lnk"
-                  onClick={() => { setQuotationNumber(""); setCountStr(""); }}>Change</button>
+                  onClick={() => { setQuotationNumber(""); setPaidStr("0"); }}>Change</button>
               </div>
               <dl className="kv">
                 <dt>Deal</dt><dd className="mono">{chain.quotation.dealRef}</dd>
@@ -243,7 +253,7 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
             <div className="fin-pick">
               {open.map((c) => (
                 <button key={c.quotation.quotationNumber} type="button"
-                  onClick={() => { setQuotationNumber(c.quotation.quotationNumber); setCountStr(""); }}>
+                  onClick={() => { setQuotationNumber(c.quotation.quotationNumber); setPaidStr("0"); }}>
                   <span className="mono">{c.quotation.quotationNumber}</span>
                   <span className="s">
                     {c.quotation.planName} · {c.quotation.termMonths}m ·{" "}
@@ -315,24 +325,11 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
         <div className="fin-stack">
           <Field label="Payment plan">
             {quote && per !== null ? (
-              quote.installments === 1 ? (
-                <div className="fin-derived"><b>Complete payment</b> · {inr(per)}</div>
-              ) : (
-                /* The agreed installments, paid ONE BY ONE — which one a
-                   payment settles (1st, 2nd, …) is decided as each is
-                   recorded on the subscription — or the whole agreement in
-                   one payment. The only two counts the document supports. */
-                <div className="selectbox">
-                  <select value={String(n)} onChange={(e) => setCountStr(e.target.value)}>
-                    <option value={String(fullN)}>
-                      {fullN + " installments · as agreed · " + fullN + " × " + inr(per) + " — paid one by one"}
-                    </option>
-                    <option value="1">
-                      {"Complete payment · all " + fullN + " installments · " + inr(per * fullN)}
-                    </option>
-                  </select>
-                </div>
-              )
+              <div className="fin-derived">
+                {fullN === 1
+                  ? <><b>Complete payment</b> · {inr(per)}</>
+                  : <><b>{fullN} installments</b> · {fullN} × {inr(per)}, {quote.installmentGapMonths} month apart — as agreed</>}
+              </div>
             ) : (
               <div className="fin-derived faint">attach a quotation first</div>
             )}
@@ -346,6 +343,57 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
                 : "attach an invoice"}
             </div>
           </Field>
+          {/* WHICH INSTALLMENTS ARE ALREADY PAID, the team's call: none, the
+              1st, the first two, … or all — a complete payment. The covered
+              rows are written paid with this write; the rest are collected
+              one by one on the subscription. */}
+          {quote && per !== null ? (
+            <Field label="Paid so far">
+              <div className="selectbox">
+                <select value={String(paidN)} onChange={(e) => setPaidStr(e.target.value)}>
+                  <option value="0">{"Nothing yet — all " + fullN + " due"}</option>
+                  {Array.from({ length: fullN }, (_, i) => i + 1).map((k) => (
+                    <option key={k} value={String(k)}>
+                      {k === fullN
+                        ? "Complete payment — all " + fullN + " paid · " + inr(per * fullN)
+                        : k === 1
+                          ? "1st installment paid · " + inr(per)
+                          : "First " + k + " installments paid · " + k + " × " + inr(per)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </Field>
+          ) : null}
+          {/* The transfer behind what was collected — the same facts the
+              one-by-one payment write demands, asked once and applied to
+              every covered row. */}
+          {paidN > 0 && quote ? (
+            <>
+              <Field label="Paid via">
+                <div className="selectbox">
+                  <select value={payMode} onChange={(e) => setPayMode(e.target.value)}>
+                    {MODES.map((m) => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </div>
+              </Field>
+              <Field label="Credited to">
+                <div className="selectbox">
+                  <select value={payAccount} onChange={(e) => setPayAccount(e.target.value)}>
+                    {accountOptions.map((a) => <option key={a.v} value={a.v}>{a.l}</option>)}
+                  </select>
+                </div>
+              </Field>
+              <Field label="Reference / UTR">
+                <input className="inp mono" value={payRef} placeholder="NEFT0019AUG2213"
+                  onChange={(e) => setPayRef(e.target.value)} />
+              </Field>
+              <Field label="Value date">
+                <input type="date" className="inp" value={payDate} max={todayIso()}
+                  onChange={(e) => setPayDate(e.target.value)} />
+              </Field>
+            </>
+          ) : null}
         </div>
 
         {/* THE QUOTATION AND THE INVOICES CAN LEGITIMATELY DIFFER. A quotation
@@ -369,7 +417,13 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
             <>
               {sched.map((i) => (
                 <div className="row" key={i.seq}>
-                  <span className="l">{i.of === 1 ? "Paid in full" : "Installment " + i.seq + " of " + i.of} · due {fmtDate(i.dueDate)}</span>
+                  <span className="l">
+                    {i.of === 1 ? "Complete payment" : "Installment " + i.seq + " of " + i.of}
+                    {" · "}
+                    {i.seq <= paidN
+                      ? <b className="ok">paid</b>
+                      : <>due {fmtDate(i.dueDate)}</>}
+                  </span>
                   <span className="tnum">{inr(i.amountPaise)}</span>
                 </div>
               ))}
