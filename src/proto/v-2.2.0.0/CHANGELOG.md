@@ -67,6 +67,12 @@ size so the row reads as one line of equals, and the separator is a drawn
 1px rule, centred, rather than a `|` glyph sitting on the text baseline.
 `Back` wears the panel's primary green — the row's one filled control.
 
+**The salary-account dialog took the pay dialog's layout.** Both fieldsets
+went from the two-up grid to the one-per-line `.fin-stack`; the Department and
+UAN captions and the revision read-out's fine print came off (the notices that
+appear when something is true of THIS account stay); the opening sub is one
+sentence.
+
 **The document breathes more.** The slip's base line-height went from the
 dense-UI 18px to 24px, the company block from 18px to 20px — a payslip is
 read line by line, not scanned like a table.

@@ -202,7 +202,7 @@ export function SalaryAccountModal({ account, onClose, onDone }: {
       title={a ? "Revise " + a.memberName + "'s salary" : "Open a salary account"}
       sub={a
         ? <>{a.salaryAccountId} · {a.designation} · {inr(a.monthlyGrossPaise)} gross a month today</>
-        : <>One account per team member. The components below are what every slip is built from.</>}
+        : <>One account per team member.</>}
       onClose={onClose}
       err={err}
       footer={<>
@@ -223,40 +223,33 @@ export function SalaryAccountModal({ account, onClose, onDone }: {
           them, and the id had to match by hand — type it wrong and the salary
           points at the wrong person. One choice sets all four. */}
       <Fs legend="Who this belongs to" req>
-        <div className="fin-f2">
-        <Field label="Team member">
-          {a ? (
-            <div className="fin-derived">
-              <b>{a.memberName}</b> · {a.designation} · <span className="mono">{a.employeeCode}</span>
-              <div className="fin-fine">The person does not change on a revision. Close the account and open another if it is the wrong one.</div>
-            </div>
-          ) : (
-            <div className="selectbox">
-              <select value={memberId} onChange={(e) => pickMember(e.target.value)}>
-                <option value="">Pick a team member…</option>
-                {members.map((m) => (
-                  <option key={m.memberId} value={String(m.memberId)} disabled={m.taken}>
-                    {m.name} · {m.designation}{m.taken ? " — already has an account" : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-        </Field>
-          {/* Beside the picker rather than under it. Alone in a two-column row
-              it left an empty half — the kind of gap that reads as a field
-              somebody forgot to render. */}
+        {/* One field per line, same rhythm as the pay dialog. */}
+        <div className="fin-stack">
+          <Field label="Team member">
+            {a ? (
+              <div className="fin-derived">
+                <b>{a.memberName}</b> · {a.designation} · <span className="mono">{a.employeeCode}</span>
+              </div>
+            ) : (
+              <div className="selectbox">
+                <select value={memberId} onChange={(e) => pickMember(e.target.value)}>
+                  <option value="">Pick a team member…</option>
+                  {members.map((m) => (
+                    <option key={m.memberId} value={String(m.memberId)} disabled={m.taken}>
+                      {m.name} · {m.designation}{m.taken ? " — already has an account" : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </Field>
           <Field label="Joined">
             <input type="date" className="inp" value={joinedAt} onChange={(e) => setJoinedAt(e.target.value)} />
           </Field>
-          {/* DEPARTMENT USED TO BE A TYPED BOX HERE and is now read off the
-              member — shown, not asked for, because somebody opening a salary
-              account still needs to know where the cost will roll up, and a
-              value that appears without being typed has to be visible or it is
-              a surprise in an analytics chart three months later. It is a
-              read-out and not a field: it is not editable here, and it should
-              not invite a click. */}
-          <Field label="Department" help="From the team record. Change it on the member, not here.">
+          {/* DEPARTMENT IS A READ-OUT, not a field: it comes off the member
+              record, is shown so the cost's roll-up is no surprise, and is
+              not editable here. */}
+          <Field label="Department">
             <div className="fin-derived">
               {department || <span className="faint">Unassigned — set it on the team member</span>}
             </div>
@@ -278,7 +271,7 @@ export function SalaryAccountModal({ account, onClose, onDone }: {
       <Totals gross={gross} ded={dedTotal} />
 
       <Fs legend="Where it is paid">
-        <div className="fin-f2">
+        <div className="fin-stack">
           <Field label="Bank account, masked">
             <input className="inp mono" value={masked} placeholder="HDFC ••••2276"
               onChange={(e) => setMasked(e.target.value)} />
@@ -299,7 +292,8 @@ export function SalaryAccountModal({ account, onClose, onDone }: {
             <input className="inp mono" value={pan} placeholder="BKQPD4417L"
               onChange={(e) => setPan(e.target.value)} />
           </Field>
-          <Field label="UAN" help="Left blank where there is genuinely no EPF membership. Blank is a fact here, not a gap.">
+          {/* UAN left blank is a fact — no EPF membership — not a gap. */}
+          <Field label="UAN">
             <input className="inp mono" value={uan} placeholder="100812345678"
               onChange={(e) => setUan(e.target.value.replace(/[^0-9]/g, ""))} />
           </Field>
