@@ -39,7 +39,8 @@ carried filters — the same target the empty state uses.
 Back button's own theme, opening the module's `fin-menu` popover — the same
 shell and `.mi` rows the transactions table's dots menu uses. Download still
 prints (the print stylesheet is the one definition of the slip on paper); a
-draft's menu offers Pay, a paid slip's offers Share.
+draft's menu offers Pay, a paid slip's offers Share. Both `More` and `Back`
+are text-only — the icons stay on the menu's rows, where they carry meaning.
 
 **Temp data**
 `none`.

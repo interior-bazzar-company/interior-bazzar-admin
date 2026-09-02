@@ -105,9 +105,7 @@ export default function Slip({ id, p }: {
               onDone={(msg, tone) => { closeLayer(); toast(msg, tone); }} />, "wide") : null}
           payDisabled={!row}
           share={draft ? null : () => toast(slip.memberName + " would get " + slip.slipId + " at their registered email. Nothing was sent — no mail transport is wired to this module yet.", "info")} />
-        <button className="btn" onClick={() => navGo(back)}>
-          <Icon name="chevl" size="sm" />Back
-        </button>
+        <button className="btn" onClick={() => navGo(back)}>Back</button>
       </div>
 
       {/* ======================================================== the doc === */}
@@ -308,9 +306,7 @@ function MoreMenu({ onDownload, pay, payDisabled, share }: {
   return (
     <span className="fin-menu" ref={box}>
       <button type="button" className="btn" aria-haspopup="menu" aria-expanded={open}
-        onClick={() => setOpen(!open)}>
-        <Icon name="dots" size="sm" />More
-      </button>
+        onClick={() => setOpen(!open)}>More</button>
       {open ? (
         <span className="fin-menu-pop" role="menu" aria-label="Payslip actions">
           {item("download", "Download", onDownload)}
