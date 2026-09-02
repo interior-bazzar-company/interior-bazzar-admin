@@ -179,9 +179,11 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
 .fin-form .fg-lb { display: flex; align-items: baseline; gap: var(--space-2) }
 .fin-form textarea.inp { height: auto; padding: var(--space-2) var(--space-3); line-height: var(--lh-base) }
 .fin-form .inp.ro { display: flex; align-items: center; background: var(--bg-inset); color: var(--text-2) }
-.fin-f2 { display: grid; gap: var(--space-4) var(--space-3); grid-template-columns: repeat(2, 1fr) }
-.fin-f2 > * { min-width: 0 }
-@container (max-width: 520px) { .fin-f2 { grid-template-columns: 1fr } }
+/* `.fin-f2`, the two-up field grid, IS RETIRED: every dialog lays its fields
+   one per line now (`.fin-stack`, defined with the pay dialog's styles), and
+   bare fields keep the same beat through the margin below. */
+.fin-form .fin-fl { margin-bottom: var(--space-4) }
+.fin-form .fin-stack > .fin-fl, .fin-form .fin-fl:last-child { margin-bottom: 0 }
 .fin-form fieldset.fin-fs { border: 0; margin: 0; padding: var(--space-4) 0 0; min-width: 0 }
 .fin-form fieldset.fin-fs legend { float: left; width: 100%; margin: 0 0 var(--space-3); padding: 0; display: flex; align-items: baseline; gap: var(--space-2);
   font-size: var(--text-2xs); letter-spacing: .08em; text-transform: uppercase; color: var(--text-3); font-weight: var(--weight-semibold) }

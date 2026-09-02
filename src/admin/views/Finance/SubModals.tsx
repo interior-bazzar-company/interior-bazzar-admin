@@ -409,7 +409,7 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
             <Notice tone="warn" ico="alert" text={plansErr
               ? <><b>The plan catalogue could not be read.</b> {plansErr} The sale still happened, so it is still recordable — name the plan and its term by hand, and correct it against the catalogue later.</>
               : <><b>The catalogue has no active plan with an active billing cycle.</b> Add one in Plans, or name the plan by hand here.</>} />
-            <div className="fin-f2">
+            <div className="fin-stack">
               <Field label="Plan">
                 <input className="inp" value={manualPlan} placeholder="As it appears on the invoice"
                   onChange={(e) => setManualPlan(e.target.value)} />
@@ -487,7 +487,7 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
         hint={n === 1
           ? "One payment for the whole term, against the invoice attached above."
           : "One invoice per installment, each for the same amount. The schedule divides back exactly because of it."}>
-        <div className="fin-f2">
+        <div className="fin-stack">
           <Field label="Payment plan"
             help={quote
               ? "Agreed on " + quote.quotationNumber + ". The chain raises one invoice per installment as each falls due, so this is the count the quotation agreed — not the number of invoices that exist yet."
@@ -672,7 +672,7 @@ export function RecordInstallmentModal({ sub, inst, onClose, onDone }: {
       </Fs>
 
       <Fs legend="How the money arrived" req>
-        <div className="fin-f2">
+        <div className="fin-stack">
           <Field label="Mode">
             <div className="selectbox">
               <select value={mode} onChange={(e) => setMode(e.target.value)}>
@@ -684,20 +684,20 @@ export function RecordInstallmentModal({ sub, inst, onClose, onDone }: {
             <input type="date" className="inp" value={valueDate} max={todayIso()}
               onChange={(e) => setValueDate(e.target.value)} />
           </Field>
+          <Field label="Reference / UTR"
+            help="Mandatory, and unique across the whole ledger. Without it nothing ties this row to a line on a bank statement, and a repeated webhook would write the same money twice.">
+            <input className="inp mono" value={reference} autoFocus placeholder="NEFT0019AUG2213"
+              onChange={(e) => setReference(e.target.value)} />
+          </Field>
+          <Field label="Credited to" help="The account the money actually landed in. It is picked, never assumed.">
+            <div className="selectbox">
+              <select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+                <option value="">Pick the account…</option>
+                {accountOptions.map((a) => <option key={a.v} value={a.v}>{a.l}</option>)}
+              </select>
+            </div>
+          </Field>
         </div>
-        <Field label="Reference / UTR"
-          help="Mandatory, and unique across the whole ledger. Without it nothing ties this row to a line on a bank statement, and a repeated webhook would write the same money twice.">
-          <input className="inp mono" value={reference} autoFocus placeholder="NEFT0019AUG2213"
-            onChange={(e) => setReference(e.target.value)} />
-        </Field>
-        <Field label="Credited to" help="The account the money actually landed in. It is picked, never assumed.">
-          <div className="selectbox">
-            <select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-              <option value="">Pick the account…</option>
-              {accountOptions.map((a) => <option key={a.v} value={a.v}>{a.l}</option>)}
-            </select>
-          </div>
-        </Field>
       </Fs>
 
       <Notice tone="ok" ico="check" text={<>

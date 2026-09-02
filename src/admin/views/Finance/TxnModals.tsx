@@ -92,20 +92,17 @@ export function TxnModal({ onClose, onDone }: { onClose: () => void; onDone: Don
         </div>
       </Fs>
 
-      <div className="fin-f2">
+      {/* One field per line — the pay dialog's rhythm, panel-wide now. */}
+      <div className="fin-stack">
         <Field label="Amount"><RupeeInput value={amount} onChange={setAmount} /></Field>
         <Field label="Value date">
           <input type="date" className="inp" value={valueDate} max={todayIso()}
             onChange={(e) => setValueDate(e.target.value)} />
         </Field>
-      </div>
-
-      <Field label="Description" help="What it was for — the sentence that has to make sense to someone else at audit.">
-        <input className="inp" value={description} onChange={(e) => setDescription(e.target.value)} />
-      </Field>
-
-      <div className="fin-f2">
-        <Field label="Party" help="Who it was paid to, or received from.">
+        <Field label="Description" help="What it was for — the sentence that has to make sense to someone else at audit.">
+          <input className="inp" value={description} onChange={(e) => setDescription(e.target.value)} />
+        </Field>
+        <Field label="Party">
           <input className="inp" value={party} onChange={(e) => setParty(e.target.value)} />
         </Field>
         <Field label="Mode">
@@ -113,9 +110,6 @@ export function TxnModal({ onClose, onDone }: { onClose: () => void; onDone: Don
             {MODES.map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
         </Field>
-      </div>
-
-      <div className="fin-f2">
         <Field label="Reference" help="Mandatory. Without a bank reference or UTR, this row can never be tied to a statement.">
           <input className="inp" value={reference} onChange={(e) => setReference(e.target.value)} />
         </Field>
@@ -162,8 +156,8 @@ export function TagModal({ onClose, onDone }: { onClose: () => void; onDone: Don
           options={TAG_KINDS.map((k) => ({ key: k.key as TagKind, label: k.label + " — " + k.landsIn, help: k.help }))} />
       </Fs>
 
-      <div className="fin-f2">
-        <Field label="Budget" help="Optional. Warns at 90% of itself and never blocks.">
+      <div className="fin-stack">
+        <Field label="Budget" help="Warns at 90% of itself and never blocks.">
           <RupeeInput value={budget} onChange={setBudgetStr} placeholder="No budget" />
         </Field>
         <Field label="Bill">

@@ -73,6 +73,13 @@ UAN captions and the revision read-out's fine print came off (the notices that
 appear when something is true of THIS account stay); the opening sub is one
 sentence.
 
+**And then every Finance dialog followed.** The `.fin-f2` two-up grid is
+retired: the expense, tag, record-subscription and record-installment dialogs
+lay their fields one per line in `.fin-stack`, and a module-wide rule gives
+bare fields the same beat, so the dialogs that never used a grid (hold, budget,
+refunds) pick the rhythm up for free. Captions that carry a real constraint
+stay; the tag budget's `Optional.` prefix and the expense Party caption went.
+
 **The document breathes more.** The slip's base line-height went from the
 dense-UI 18px to 24px, the company block from 18px to 20px — a payslip is
 read line by line, not scanned like a table.
