@@ -157,36 +157,35 @@ const page = (label: string, url: string) => {
 
 console.log("\nthe five faces");
 const subs = page("subscriptions · the default face", "/finance");
-has(subs, "each with its evidence on the record", "...fail to pay carries evidence, not a doubt");
-/* The tile names it an expectation; the full caution — "expected, NOT EARNED,
-   and only what is genuinely in front of each customer" — lives behind the i
-   button, which a static render cannot open. So what is asserted here is the
-   word on the tile and that the caution is reachable from it. */
-has(subs, "· expected", "...what is due is named as an expectation, not as revenue");
-/* Every money tile that counts something now offers to show it — Collected
-   included, which had no link at all until now. */
-has(subs, "show only these", "...and a tile that counts something offers to show it");
-has(subs, "About Due next 30 days", "...and its caution is one press away");
-hasnt(subs, "expected, not earned", "...the long form is not on the tile any more");
-has(subs, "Fail to pay", "...and it is a money tile of its own, not a footnote");
+/* THE STRIP EVERY LIST IN THIS PANEL CARRIES — a count, its label, the money
+   it stands for, one row, each cell a filter. The three money tiles that stood
+   here said the same three things at four times the height and matched no
+   other list in the module. */
+has(subs, "dls-attn", "...the money reads as the panel's own strip, not as tiles of its own");
+has(subs, "Each carries its evidence on the record", "...fail to pay carries evidence, not a doubt");
+has(subs, "Expected installments", "...what is due is named as installments, not as revenue");
+has(subs, "Expected, not earned", "...and the caution says so in as many words");
+has(subs, "Fail to pay", "...and it is a cell of its own, not a footnote");
+/* THE CELL IS THE FILTER now: it is a link, so the address bar always says
+   what is on screen. That is what cost the i buttons — an `i` inside a button
+   would swallow half its own click target — and the cautions moved to `tip`,
+   the strip's own description channel. */
+has(subs, 'data-go="#/finance?flag=settled"', "...and a cell that counts something is the filter that shows it");
+has(subs, "dls-tip", "...with the caution on the cell as a description, the way every other strip carries one");
+hasnt(subs, "fin-mt", "...no tile is left on the list");
+/* The running count is a LEVEL and the money is a period sum, so the caution
+   keeps them apart wherever they are printed together. */
+has(subs, "running", "...and the strip still refuses to let a period sum describe a level");
 
-/* THE STRIP READS IN A DELIBERATE ORDER: what came in and who is still paying,
-   then what is expected, then the one thing to act on — which ends the strip
-   rather than interrupting it. Order is invisible to tsc and to every other
-   check here, so it is pinned by position, not by presence. */
+/* THE STRIP READS IN A DELIBERATE ORDER: what came in, then what is expected,
+   then the one thing to act on — which ends the strip rather than interrupting
+   it. Order is invisible to tsc and to every other check here, so it is pinned
+   by position, not by presence. */
 {
-  const at3 = ["Collected", "Due in the next 30 days", "Fail to pay"]
+  const at3 = ["Collected", "Expected installments", "Fail to pay"]
     .map((t) => subs.indexOf(t));
-  ok3("the strip runs Collected → Due → Fail to pay", at3.every((n, i) => n >= 0 && (i === 0 || n > at3[i - 1])));
+  ok3("the strip runs Collected → Expected → Fail to pay", at3.every((n, i) => n >= 0 && (i === 0 || n > at3[i - 1])));
 }
-/* The two numbers in the first tile stay visibly different KINDS: a period sum
-   and a level read now. If the count ever renders as part of the headline
-   figure the tile starts claiming those subscriptions produced that money. */
-has(subs, "fin-mt-aside", "...Collected carries the active count as a second figure, not part of its own");
-/* The caution itself lives behind the i button, which a static render cannot
-   open — so what is asserted is that it is REACHABLE from the second figure,
-   which is the honest claim this harness can make about it. */
-has(subs, "About Active subscriptions", "...and the count carries its own i button, so the caution is one press away");
 /* THE ANALYTICS TAB beside the records, the move Salaries A/C made with
    payroll. It is all time where the list is one period, it carries no filter
    control, and its four charts are four different cuts of the same rupees —
@@ -212,7 +211,9 @@ const subsFiltered = check("subscriptions · filtered to the defaulting ones", (
 const subsSettled = check("subscriptions · filtered to the ones that have settled something",
   () => at("/finance?flag=settled"));
 has(subsSettled, "Settled", "...and the chip names the filter that was applied");
-has(subsSettled, "clear this filter", "...offering the way back out of it");
+/* The cell TOGGLES: the one already applied points at the list without it, so
+   pressing it again is the way back out. */
+has(subsSettled, 'data-go="#/finance"', "...and the applied cell points back out of itself");
 has(subsFiltered, "Defaulting", "...the filtered list still names the state it was filtered to");
 /* WHEN IT STARTED — one param, three grains, the value saying which. Each is
    a prefix of the ISO start date, so one comparison answers all three and no

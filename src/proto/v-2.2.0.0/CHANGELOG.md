@@ -6,6 +6,51 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-02
 
+### The subscriptions money becomes a strip, and the header carries the totals
+
+**Area:** `#/finance` · the topbar
+**Files:** `src/admin/views/Finance/{Subscriptions,index,store}.tsx(ts)`,
+`scripts/fn-smoke.tsx`
+
+**What changed**
+
+**Three money tiles became one strip row** — a count, its label, the money it
+stands for: `6 Collected · August 2026 ₹6,77,320 | 3 Expected installments
+₹8,26,000 | 2 Fail to pay ₹3,36,300`. It is the same `StatStrip` every other
+list in the panel carries, and it replaces three tiles that said the same
+three things at four times the height and matched nothing else in the module.
+
+**The cell is the filter now**, which is what cost the `i` buttons: a tile
+could carry one beside its label because it was a div, and a cell is a button
+— an `i` inside it would swallow half its own click target. The definitions
+moved to `tip`, the strip's own description channel, which is how Salaries
+A/C already carries the same cautions on the same control. Each cell toggles:
+the one already applied points at the list without it.
+
+**The header carries the totals, the way Salaries A/C does.** `Active
+subscriptions` · `Total collection` · `Total outstanding` — all time, where
+the strip below is one period, and the labels say which. All three come from
+one new `subTotals()` selector that the topbar, the strip's neighbours and
+the Analytics tab all read, because summing the same figures in three files
+is how one word ends up over three different numbers.
+
+**The harness caught the switch honestly:** seven assertions pinning the old
+tile anatomy failed and were rewritten against the new one — the cell is a
+link, the caution is a description, no tile is left on the list.
+
+**Temp data**
+`none`.
+
+**Backend needed**
+`none`.
+
+**Open decisions**
+The Analytics tab keeps full `i` buttons on its four tiles: they are divs
+there, nothing on that tab filters, and the formulas are longer than a
+tooltip should hold.
+
+---
+
 ### Subscriptions can be filtered by when they started
 
 **Area:** `#/finance` · `?started=`

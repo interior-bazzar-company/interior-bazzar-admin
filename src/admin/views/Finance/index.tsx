@@ -30,7 +30,7 @@ import { useLocation, useNavigate, useParams, useSearchParams } from "react-rout
 import { hashToPath, usePageChrome } from "../../shell/AdminShell";
 import { qs } from "../../ui";
 import type { Params } from "./store";
-import { PERIOD, RECORD_TYPES, inr, useActiveCount, useSalaryRows, useSalaryTotals } from "./store";
+import { PERIOD, RECORD_TYPES, inr, useActiveCount, useSalaryRows, useSalaryTotals, useSubTotals } from "./store";
 import { ROUTE_OF, VIEW_OF } from "./Frame";
 import Subscriptions from "./Subscriptions";
 import SubscriptionDetail from "./SubscriptionDetail";
@@ -96,6 +96,8 @@ export default function Finance() {
   /* Paid out this period, and owed right now. Derived where the rows are, so
      the header and the table read the same arithmetic. */
   const totals = useSalaryTotals();
+  /* All time, and the one definition the strip and the Analytics tab read too. */
+  const subs = useSubTotals();
   const crumbs = useMemo(() => (
     <>
       {/* The title says WHICH SECTION you are in — each is its own sidebar
@@ -152,6 +154,35 @@ export default function Finance() {
               <span className="v tnum">{totals.unpaidPaise ? inr(totals.unpaidPaise) : "—"}</span>
             </span>
           </>
+        ) : view === "subscriptions" ? (
+          /* THE SAME THREE-FIGURE HEADER SALARIES A/C CARRIES: how many, what
+              came in, what has not. All time, and every one of them summed by
+              `subTotals()` — the strip on the page below and the tiles on the
+              Analytics tab read that same function, so no two of them can
+              print different money under the same word. */
+          <>
+            <span className="tb-stat ro"
+              title="Subscriptions running right now — a level, read at this moment, not a total for any period.">
+              <span className="k">Active subscriptions</span>
+              <span className="v tnum">{subs.activeN}</span>
+            </span>
+            <span className="tb-sep" />
+            <span className="tb-stat ro ok"
+              title={"Every rupee ever collected against an installment, across "
+                + subs.subs + " subscription" + (subs.subs === 1 ? "" : "s") + ". "
+                + subs.collectedN + " installment" + (subs.collectedN === 1 ? "" : "s") + " settled."}>
+              <span className="k">Total collection</span>
+              <span className="v tnum">{inr(subs.collectedPaise)}</span>
+            </span>
+            <span className="tb-stat ro warn"
+              title={subs.outstandingPaise
+                ? "Agreed and not yet in the bank: " + inr(subs.duePaise) + " still expected and "
+                  + inr(subs.failedPaise) + " that did not clear."
+                : "Every installment that exists has been settled."}>
+              <span className="k">Total outstanding</span>
+              <span className="v tnum">{subs.outstandingPaise ? inr(subs.outstandingPaise) : "—"}</span>
+            </span>
+          </>
         ) : (
           <span className="tb-stat ro"
             title="Subscriptions running right now — a level, read at this moment, not a total for any period.">
@@ -161,12 +192,16 @@ export default function Finance() {
         )}
       </span>
     </>
-  ), [view, activeN, membersN, navigate, totals.membersAll, totals.paidPaise, totals.paidAllPaise,
-    totals.unpaidPaise, totals.unpaidPeople]);
+  ), [view, activeN, membersN, navigate, subs, totals.membersAll, totals.paidPaise,
+    totals.paidAllPaise, totals.unpaidPaise, totals.unpaidPeople]);
 
   usePageChrome(
     { crumbs, right: null, parent: id ? listHash(view) : null },
-    (id ? "rec" : view) + ":" + activeN + "/" + membersN + "/" + totals.unpaidPaise,
+    /* Keyed on the figures themselves: they arrive from the store after the
+       first render, and without them in the key the topbar keeps the zeros it
+       mounted with. */
+    (id ? "rec" : view) + ":" + activeN + "/" + membersN + "/" + totals.unpaidPaise
+      + "/" + subs.collectedPaise + "/" + subs.outstandingPaise,
   );
 
   const timer = useRef<number | undefined>(undefined);

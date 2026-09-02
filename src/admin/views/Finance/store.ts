@@ -404,6 +404,37 @@ export function startedOptions(rows: SubRow[]): { v: string; l: string }[] {
   return out;
 }
 
+/** EVERY SUBSCRIPTION EVER RECORDED, added up — the all-time counterpart to
+ *  `overview()`, which is one period.
+ *
+ *  ONE DEFINITION, THREE READERS: the topbar, the list's strip and the
+ *  Analytics tab all print these, and summing them in three files is how the
+ *  same word ends up over three different numbers. */
+export interface SubTotals {
+  subs: number; activeN: number;
+  agreedPaise: number;
+  collectedPaise: number; collectedN: number;
+  duePaise: number; dueN: number;
+  failedPaise: number; failedN: number;
+  /** Agreed but not yet in the bank: what is due plus what did not clear. */
+  outstandingPaise: number;
+}
+export function subTotals(): SubTotals {
+  const rows = subRows();
+  const sum = (f: (r: SubRow) => number) => rows.reduce((n, r) => n + f(r), 0);
+  const duePaise = sum((r) => r.duePaise);
+  const failedPaise = sum((r) => r.failedPaise);
+  return {
+    subs: rows.length,
+    activeN: rows.filter((r) => r.s.status === "active").length,
+    agreedPaise: sum((r) => r.s.totalPaise),
+    collectedPaise: sum((r) => r.paidPaise), collectedN: sum((r) => r.paidN),
+    duePaise, dueN: sum((r) => r.dueN),
+    failedPaise, failedN: sum((r) => r.failedN),
+    outstandingPaise: duePaise + failedPaise,
+  };
+}
+
 export function applySubFilters(rows: SubRow[], p: Params): SubRow[] {
   let out = rows;
   if (p.source) out = out.filter((r) => r.s.source === p.source);
@@ -2300,6 +2331,7 @@ export function logExport(what: string, rows: number) {
 export const activeCount = () => snap.subscriptions.filter((s) => s.status === "active").length;
 export function useActiveCount(): number { useVersion(); return activeCount(); }
 export function useSubRows(): SubRow[] { useVersion(); return subRows(); }
+export function useSubTotals(): SubTotals { useVersion(); return subTotals(); }
 export function useSubscription(id: string | null): SubRow | null { useVersion(); const s = readSubscription(id); return s ? toSubRow(s) : null; }
 export function useInstallmentRows(): InstRow[] { useVersion(); return installmentRows(); }
 export function useSalaryRows(): SalaryRow[] { useVersion(); return salaryRows(); }

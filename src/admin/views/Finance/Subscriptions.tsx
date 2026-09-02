@@ -17,15 +17,14 @@
    passed, and the record carries the evidence. There is no third state meaning
    "recorded but not yet believed", here or at the API.
    ============================================================================= */
-import type { ReactNode } from "react";
 import { useShell } from "../../shell/ShellContext";
 import { can } from "../../shell/AdminShell";
-import { EmptyState, FilterChips, Icon, SearchField, Select } from "../../ui";
+import { EmptyState, FilterChips, Icon, SearchField, Select, StatStrip } from "../../ui";
+import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import { Frame, ViewBand } from "./Frame";
 import type { FaceProps } from "./Frame";
 import { InstStrip, Money, SourceTag, SubPill } from "./bits";
-import InfoTip, { MetricTip } from "./InfoTip";
 import { RecordSubModal } from "./SubModals";
 import SubAnalytics from "./SubAnalytics";
 import {
@@ -59,10 +58,18 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
 
   const activeN = rows.filter((r) => r.s.status === "active").length;
 
-  /* A queue tile toggles: pressing the filter it already applied clears it,
-     because the only other way back is to hunt for the chip. */
-  const queue = (flag: string) => () => onFilter("flag", p.flag === flag ? "" : flag);
-  const queueLabel = (flag: string) => (p.flag === flag ? "clear this filter" : "show only these");
+  /* A queue cell TOGGLES: pressing the filter it already applied clears it,
+     because the only other way back is to hunt for the chip. The strip
+     navigates rather than calling back — every cell in every strip in this
+     panel is a link, so the address bar always says what is on screen. */
+  const queueHash = (flag: string) => {
+    const o: Record<string, string> = {};
+    Object.keys(p).forEach((k) => { if (p[k] && ["flag", "page", "tab"].indexOf(k) < 0) o[k] = p[k] as string; });
+    if (p.flag !== flag) o.flag = flag;
+    const q = Object.keys(o)
+      .map((k) => encodeURIComponent(k) + "=" + encodeURIComponent(o[k])).join("&");
+    return "#/finance" + (q ? "?" + q : "");
+  };
 
   const onRecord = () => modal(
     <RecordSubModal onClose={closeLayer}
@@ -133,58 +140,46 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
           : null}
       </>}
       bands={tab === "analytics" ? null : <>
-        {/* THE MONEY STRIP READS OUT; IT DOES NOT ASSERT. Each tile carries the
-            metric's own definition behind the i button, so the figure means the
-            same thing here as it does on Analytics six months from now. The two
-            queue tiles carry their own filter link rather than becoming buttons
-            themselves — a tile with an i button inside it cannot also be one
-            big click target without swallowing the i. */}
-        <div className="fin-money-strip">
-          {/* WHAT CAME IN, AND WHO IS STILL PAYING — one tile, two numbers,
-              kept visibly apart because they are not the same KIND of number.
-              The money is a period sum: everything collected in August, some
-              of it from subscriptions that have since completed, defaulted or
-              been refunded. The count is a level read right now. Run them
-              together and the tile quietly claims these four produced that
-              figure, which is not true of any month. */}
-          <MTile tone="ok" pair on={p.flag === "settled"}
-            label={<>Collected · {PERIOD.label}<MetricTip k="collected" /></>}
-            value={inr(o.collectedPaise)}
-            aside={<>
-              <b className="tnum">{activeN}</b> active
-              <InfoTip label="Active subscriptions"
-                intro={<>Subscriptions running right now — <b>a level, read at this moment</b>, not a total for the period.</>}
-                rows={[
-                  { label: "Counts", hint: "every subscription still being served: paid up front or still paying." },
-                  { label: "Excludes", hint: "completed, cancelled, refunded — and defaulting, which leaves the moment an installment fails." },
-                  { label: "Caution", hint: "it does not explain the figure beside it. Money collected this month includes subscriptions that are no longer active." },
-                ]} />
-            </>}
-            sub={o.collectedN + " installment" + (o.collectedN === 1 ? "" : "s") + " settled"}
-            action={rows.some((r) => r.paidN > 0)
-              ? <button className="lnk" onClick={queue("settled")}>{queueLabel("settled")}</button>
-              : null} />
+        {/* THE STRIP EVERY LIST IN THIS PANEL CARRIES: a count, its label, the
+            money it stands for — one row, each cell a filter. It replaced three
+            tiles that said the same three things at four times the height and
+            matched no other list in the module.
 
-          <MTile tone="mute" on={p.flag === "due"}
-            label={<>Due in the next 30 days<MetricTip k="due_next" /></>}
-            value={inr(o.dueNextPaise)}
-            sub={o.dueNextN + " installment" + (o.dueNextN === 1 ? "" : "s") + " · expected"}
-            action={rows.some((r) => !!r.dueNext)
-              ? <button className="lnk" onClick={queue("due")}>{queueLabel("due")}</button>
-              : null} />
+            THE CELL IS THE FILTER now, which is what cost the i buttons: a
+            tile could carry an `i` beside its label because it was a div, and
+            a cell is a button — an i inside it would swallow half its own
+            click target. The definitions moved to `tip`, the strip's own
+            description channel, which is how Salaries A/C carries the same
+            cautions on the same control.
 
-          {/* LAST, and last on purpose: it is the one a person acts on, so it
-              ends the strip rather than interrupting it. */}
-          <MTile tone={o.failedN ? "bad" : "mute"} on={p.flag === "failed"}
-            label={<>Fail to pay<MetricTip k="failed" /></>}
-            value={<>{inr(o.failedPaise)} <span className="fin-count">· {o.failedN}</span></>}
-            sub={o.failedN
-              ? o.failedN + " installment" + (o.failedN === 1 ? "" : "s") + " did not clear, each with its evidence on the record"
-              : "every installment that fell due has cleared"}
-            action={o.failedN
-              ? <button className="lnk" onClick={queue("failed")}>{queueLabel("failed")}</button>
-              : null} />
-        </div>
+            EACH CELL IS ONE PERIOD, deliberately unlike the topbar above it,
+            which is all time. The label says which. */}
+        <StatStrip cells={([
+          { k: <>Collected · {PERIOD.label} <b className="tnum">{inr(o.collectedPaise)}</b></>,
+            v: o.collectedN, dot: "ok", on: p.flag === "settled",
+            to: rows.some((r) => r.paidN > 0) ? queueHash("settled") : undefined,
+            tip: <>Installments settled in {PERIOD.label} and what they came to.
+              Money that <b>actually arrived</b> — some of it from subscriptions that have since
+              completed, defaulted or been refunded, so it does not describe the {activeN} running
+              right now.</> },
+          "sep",
+          { k: <>Expected installments <b className="tnum">{inr(o.dueNextPaise)}</b></>,
+            v: o.dueNextN, on: p.flag === "due",
+            to: rows.some((r) => !!r.dueNext) ? queueHash("due") : undefined,
+            tip: <>Due in the next 30 days: the one installment genuinely in front of each customer.
+              <b> Expected, not earned</b> — every one is a row that already exists, and none of it
+              is revenue until it is collected.</> },
+          /* LAST, and last on purpose: it is the one a person acts on, so it
+             ends the strip rather than interrupting it. */
+          { k: <>Fail to pay <b className="tnum">{inr(o.failedPaise)}</b></>,
+            v: o.failedN, dot: o.failedN ? "bad" : "", on: p.flag === "failed",
+            to: o.failedN ? queueHash("failed") : undefined,
+            tip: o.failedN
+              ? <>Installments that <b>did not clear</b> — a decline, a cancelled mandate, or a due
+                date that demonstrably passed. Each carries its evidence on the record; none of it
+                is written off.</>
+              : <>Every installment that fell due has cleared.</> },
+        ] as (StatCell | "sep")[])} />
 
         {/* `.dls-chips` supplies the page gutter and cancels the chiprow's own
             negative margin, so the chips line up with the row above. */}
@@ -248,25 +243,6 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
 }
 
 /* -------------------------------------------------------------------------- */
-
-/** One money read-out. A div, not a button: the i button and the filter link
- *  both live inside it, and nesting either inside a clickable tile would make
- *  the tile's own click target a guess. */
-/** A money tile. `aside` is a SECOND figure of a different kind sitting
- *  beside the first — same tile, its own baseline and its own weight, so a
- *  reader cannot take it for part of the headline number. */
-function MTile({ label, value, sub, tone, on, action, aside, pair }: {
-  label: ReactNode; value: ReactNode; sub: ReactNode; tone?: string; on?: boolean;
-  action?: ReactNode; aside?: ReactNode; pair?: boolean;
-}) {
-  return (
-    <div className={"fin-mt" + (tone ? " " + tone : "") + (on ? " on" : "") + (pair ? " pair" : "")}>
-      <span className="k">{label}</span>
-      <span className="v">{value}{aside ? <span className="fin-mt-aside">{aside}</span> : null}</span>
-      <span className="s">{sub}{action ? <> · {action}</> : null}</span>
-    </div>
-  );
-}
 
 /** "due in 4 days" / "6 days overdue". One fragment, and it never says late
  *  about a date that has not passed. */
