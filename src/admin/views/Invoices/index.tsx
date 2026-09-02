@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { inr, fmtDate } from "../../ui/format";
-import { EmptyState, FilterChips, Notice, Pill, SearchField, Select, StatStrip, qs, Icon } from "../../ui";
+import { EmptyState, FilterChips, Notice, Pill, SearchField, Select, StatStrip, TbTitle, qs, Icon } from "../../ui";
 import type { StatCell } from "../../ui";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { getSession } from "../../auth/session";
@@ -59,7 +59,7 @@ function InvoicesList() {
      a counts endpoint when invoices outgrow one page. */
   const { loading, rows: all, error } = useInvoicesList(0, { sort: p.sort || undefined });
 
-  const crumbs = useMemo(() => <span className="tb-title">Invoices</span>, []);
+  const crumbs = useMemo(() => <TbTitle label="Invoices" to="#/invoices" />, []);
   usePageChrome({ crumbs, right: null, parent: null });
 
   const onFilter = (name: string, value: string) => {

@@ -12,7 +12,7 @@ import { Fragment, useCallback, useState } from "react";
 import type { ReactNode } from "react";
 import AdminOpsService from "../../../api/modules/adminOps";
 import type { InvoiceRow } from "../../../api/modules/adminOps";
-import { EmptyState, Icon, KvList, Notice, PaneLoading, Pill, SectionHead, Table, Tabs, qs } from "../../ui";
+import { EmptyState, Icon, KvList, Notice, PaneLoading, Pill, SectionHead, Table, Tabs, TbTitle, qs } from "../../ui";
 import { inr, fmtDate } from "../../ui/format";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
@@ -45,7 +45,7 @@ export default function InvoiceDetail({ id, tab, params }: {
   const { go } = useNav();
   const cur = TABS.indexOf(tab) >= 0 ? tab : "plan";
 
-  usePageChrome({ crumbs: <span className="tb-title">Invoices</span>, right: null,
+  usePageChrome({ crumbs: <TbTitle label="Invoices" to="#/invoices" />, right: null,
                   parent: "#/invoices" });
 
   if (loading && !invoice) return <div className="page wide"><PaneLoading /></div>;
@@ -91,6 +91,18 @@ export default function InvoiceDetail({ id, tab, params }: {
       </button>
     );
     const items: ReactNode[] = [];
+    /* The working actions lead — the record header holds only More and Back
+       now, so what used to sit as buttons beside the menu lives at the top
+       of it. Issue still has no entry anywhere here: it happens on the
+       preview, because nobody should freeze a document they have not just
+       looked at. */
+    if (isDraft) {
+      if (can("invoices", "edit"))
+        items.push(mi("doc", "Edit", "Open the draft in the builder", () => go(to({ mode: "edit" }))));
+      items.push(mi("invoice", "Preview & issue", "The document, ready to issue", () => go(to({ mode: "preview" }))));
+    } else {
+      items.push(mi("invoice", "View document", "The issued document, as the customer has it", () => go(to({ mode: "preview" }))));
+    }
     if (isDraft && can("invoices", "edit"))
       items.push(mi("check", "Save as draft", "Keeps everything applied so far. No number is assigned.",
         saveDraft));
@@ -119,6 +131,7 @@ export default function InvoiceDetail({ id, tab, params }: {
         <div className="ph-t">
           <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
             <h1 className="mono">{inv.invoiceNumber || "Draft"}</h1>
+            <span className="vsep" aria-hidden="true" />
             <Pill text={STATUS_LABEL[inv.status]} tone={STATUS_TONE[inv.status]} />
           </div>
           <div className="scope">
@@ -130,23 +143,15 @@ export default function InvoiceDetail({ id, tab, params }: {
               : null}
           </div>
         </div>
+        {/* The record-header pattern the whole panel takes: everything the
+            record can do sits behind More, and the primary Back closes the
+            row. `data-act` on the trigger is load-bearing — see the shell's
+            popover close listener. */}
         <div className="acts">
-          {isDraft
-            ? <>
-                {can("invoices", "edit")
-                  ? <button className="btn" onClick={() => go(to({ mode: "edit" }))}>
-                      <Icon name="doc" />Edit</button>
-                  : null}
-                <button className="btn pri" onClick={() => go(to({ mode: "preview" }))}>
-                  Preview &amp; issue</button>
-              </>
-            : <button className="btn pri" onClick={() => go(to({ mode: "preview" }))}>
-                <Icon name="invoice" />View document</button>}
-          {/* Issue has no button anywhere here: it happens on the preview,
-              because nobody should freeze a document they have not just
-              looked at. */}
-          <button className="btn icon" data-act="in-more" aria-haspopup="menu"
-            aria-label="More actions" title="More actions" onClick={moreMenu}><Icon name="dots" /></button>
+          <button className="btn" data-act="in-more" aria-haspopup="menu"
+            title="Everything this invoice can do" onClick={moreMenu}>More</button>
+          <button className="btn pri" onClick={() => go("#/invoices")}>
+            <Icon name="chevl" />Back</button>
         </div>
       </div>
 

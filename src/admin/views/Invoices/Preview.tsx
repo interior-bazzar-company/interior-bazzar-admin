@@ -7,7 +7,7 @@
    ===================================================================== */
 import { useState } from "react";
 import AdminOpsService from "../../../api/modules/adminOps";
-import { EmptyState, PaneLoading, copyToClipboard, publicDocUrl, qs, ShareLine, shareOrCopy } from "../../ui";
+import { EmptyState, PaneLoading, TbTitle, copyToClipboard, publicDocUrl, qs, ShareLine, shareOrCopy } from "../../ui";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import { errMessage } from "../../../api/apiService";
@@ -26,7 +26,7 @@ export default function InvoicePreview({ id, params }: {
   const { go } = useNav();
   const [share, setShare] = useState<{ link: string; expires: string } | null>(null);
 
-  usePageChrome({ crumbs: <span className="tb-title">Invoices</span>, right: null,
+  usePageChrome({ crumbs: <TbTitle label="Invoices" to="#/invoices" />, right: null,
                   parent: "#/invoices/" + id });
 
   if (loading && !invoice) return <div className="page qpage"><PaneLoading /></div>;

@@ -10,7 +10,7 @@
    without, and they are entered in the same sitting.
    ===================================================================== */
 import { useCallback, useState } from "react";
-import { EmptyState, Icon, Notice, PaneLoading, Pill, qs } from "../../ui";
+import { EmptyState, Icon, Notice, PaneLoading, Pill, TbTitle, qs } from "../../ui";
 import { inr } from "../../ui/format";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { STATUS_LABEL, useInvoice } from "./api";
@@ -26,7 +26,7 @@ export default function InvoiceBuilder({ id, params }: {
   const { loading, invoice, notFound } = useInvoice(id, tick);
   const { go } = useNav();
 
-  usePageChrome({ crumbs: <span className="tb-title">Invoices</span>, right: null,
+  usePageChrome({ crumbs: <TbTitle label="Invoices" to="#/invoices" />, right: null,
                   parent: "#/invoices/" + id });
 
   if (loading && !invoice) return <div className="page wide"><PaneLoading /></div>;

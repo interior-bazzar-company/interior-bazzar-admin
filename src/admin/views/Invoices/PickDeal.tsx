@@ -27,7 +27,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import AdminOpsService from "../../../api/modules/adminOps";
 import type { DealRow, QuotationRow } from "../../../api/modules/adminOps";
-import { EmptyState, KvList, Notice, Pill, SearchField, SectionHead, Table, Toolbar } from "../../ui";
+import { EmptyState, KvList, Notice, Pill, SearchField, SectionHead, Table, TbTitle, Toolbar } from "../../ui";
 import { inr } from "../../ui/format";
 import { errMessage } from "../../../api/apiService";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
@@ -79,7 +79,7 @@ function installmentsOf(q: QuotationRow | null): number {
 export default function PickInvoice({ dealRef }: { dealRef: string }) {
   const { go } = useNav();
 
-  usePageChrome({ crumbs: <span className="tb-title">Invoices</span>, right: null, parent: "#/invoices" });
+  usePageChrome({ crumbs: <TbTitle label="Invoices" to="#/invoices" />, right: null, parent: "#/invoices" });
 
   if (!can("invoices", "create")) return (
     <div className="page">
