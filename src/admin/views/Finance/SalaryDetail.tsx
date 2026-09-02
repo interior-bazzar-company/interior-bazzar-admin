@@ -89,20 +89,22 @@ export default function SalaryDetail({ id, p, onParams }: {
           : <span className="pill lg" title="Closed. No run picks this account up again.">Closed</span>}
         {row.inOpenRun ? <span className="pill warn lg">On the open run</span> : null}
       </>}
-      actions={<>
-        <button className="btn sm" disabled={!writable || !a.active}
-          title={!writable ? "Revising a salary needs Finance edit rights."
-            : !a.active ? "This account is closed. Reopen it by opening a new one for the member." : undefined}
-          onClick={() => modal(<SalaryAccountModal account={a} onClose={closeLayer} onDone={done} />, "wide")}>
-          <Icon name="coin" size="sm" />Revise salary
-        </button>
-        <button className="btn sm dgr" disabled={!writable || !a.active}
-          title={!writable ? "Closing a salary account needs Finance edit rights."
-            : !a.active ? "It is already closed." : undefined}
-          onClick={() => modal(<CloseAccountModal account={a} onClose={closeLayer} onDone={done} />)}>
-          <Icon name="lock" size="sm" />Close account
-        </button>
-      </>}>
+      menu={[
+        {
+          icon: "coin", label: "Revise salary",
+          disabled: !writable || !a.active,
+          title: !writable ? "Revising a salary needs Finance edit rights."
+            : !a.active ? "This account is closed. Reopen it by opening a new one for the member." : undefined,
+          act: () => modal(<SalaryAccountModal account={a} onClose={closeLayer} onDone={done} />, "wide"),
+        },
+        {
+          icon: "lock", label: "Close account", tone: "bad",
+          disabled: !writable || !a.active,
+          title: !writable ? "Closing a salary account needs Finance edit rights."
+            : !a.active ? "It is already closed." : undefined,
+          act: () => modal(<CloseAccountModal account={a} onClose={closeLayer} onDone={done} />),
+        },
+      ]}>
 
       <div className="fin-subline">
         <b>{a.memberName}</b> · {a.designation} · <span className="mono">{a.employeeCode}</span>

@@ -142,25 +142,16 @@ export default function AdminShell() {
   useEffect(() => setGo(go), [go]);
 
   /* ---------------------------------------------------------------- back */
-  /* One return mechanism for the whole panel. Three sources, tried in order,
-     and none of them can return the page it is already on:
-       1. in-session history   → so the panel's Back and the browser's Back are
-                                 the same movement, not two
-       2. a declared parent    → how a directly-opened URL or a refresh still
-                                 knows where "up" is
-       3. the module list      → last resort, and it replaces rather than pushes */
-  const stack = useRef<string[]>([]);
+  /* One return mechanism for the whole panel, and it goes UP, not backwards:
+     the module's own default view (or the parent a module declares), never the
+     previous screen. Session history used to be tried first, which made Back
+     retrace however somebody wandered in — three slips deep meant three
+     presses to reach the list the sidebar names in one. The browser's Back
+     still owns the history; this button owns the way up:
+       1. a declared parent    → how a record names its own "up"
+       2. the module list      → the default view, and it replaces rather
+                                 than pushes */
   const here = location.pathname + location.search;
-  useEffect(() => {
-    const s = stack.current;
-    if (s[s.length - 1] === here) return; // a re-render, not a move
-    if (s.length > 1 && s[s.length - 2] === here) {
-      s.pop();
-      return;
-    } // browser Back
-    s.push(here);
-    if (s.length > 30) s.shift();
-  }, [here]);
 
   /* Back belongs on the screens you ARRIVE at — a record, a create flow, a
      sub-mode. On a module list the sidebar is already the wayfinding, and a
@@ -168,30 +159,24 @@ export default function AdminShell() {
   const search = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const isDeep = !!(id || search.get("new") || search.get("mode") || search.get("view") === "tags");
 
-  const backTo = useCallback((): { path: string; history: boolean } | null => {
+  const backTo = useCallback((): { path: string } | null => {
     if (!known || !isDeep) return null;
-    if (stack.current.length > 1)
-      return { path: stack.current[stack.current.length - 2], history: true };
     /* `false`, not null: a module saying there is no "up" from here at all —
        Deals says it for a deal open in Chat, where the list is already the left
        pane. null only means "I have no opinion", and falls through to the list. */
     if (chrome.parent === false) return null;
     if (chrome.parent) {
       const p = hashToPath(chrome.parent);
-      if (p !== here) return { path: p, history: false };
+      if (p !== here) return { path: p };
     }
     const list = "/" + route;
-    return list === here ? null : { path: list, history: false };
+    return list === here ? null : { path: list };
   }, [known, isDeep, chrome.parent, here, route]);
 
   const back = useCallback(() => {
     const t = backTo();
     if (!t) return;
-    if (t.history) {
-      window.history.back();
-      return;
-    }
-    navigate(t.path, { replace: true }); // a fallback replaces; it is not a step forward
+    navigate(t.path, { replace: true }); // up replaces; it is not a step forward
   }, [backTo, navigate]);
 
   /* A path, said the way a person would say it: the record's own reference when

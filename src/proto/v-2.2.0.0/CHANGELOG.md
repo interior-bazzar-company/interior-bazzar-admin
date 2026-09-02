@@ -81,6 +81,18 @@ Picking the member fetches it with the name, designation and code, and it
 still goes on the record from there — the field showed a value nobody could
 act on here.
 
+**The slip's row pattern became the record pages' pattern.** `MoreMenu` moved
+into Frame as the module's one popover menu, `Rec` draws the id, a thin rule
+and the status pills on the left with the actions and a primary-green Back on
+the right, and a record whose right side would hold more than two controls
+passes `menu` items instead — the salary account's Revise and Close now sit
+behind More, exactly like the slip's Download and Pay.
+
+**The topbar's Back goes UP, not backwards.** It used to retrace session
+history — three slips deep meant three presses to reach the list the sidebar
+names in one. It now goes straight to the module's default view (or the
+parent a record declares); the browser's own Back still owns the history.
+
 **And then every Finance dialog followed.** The `.fin-f2` two-up grid is
 retired: the expense, tag, record-subscription and record-installment dialogs
 lay their fields one per line in `.fin-stack`, and a module-wide rule gives

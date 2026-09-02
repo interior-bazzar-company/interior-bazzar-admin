@@ -4,6 +4,7 @@
    controls. The view band changes WHICH RECORD you are looking at; the filters
    narrow it, so the band produces no filter chip.
    ============================================================================= */
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Icon } from "../../ui";
 import { go } from "../../ui/nav";
@@ -115,19 +116,78 @@ export function Block({ title, desc, right, wide, foot, children }: {
 }
 export function Blocks({ children }: { children: ReactNode }) { return <div className="fin-blocks">{children}</div>; }
 
-/** The record screen wrapper — the same chrome on all four detail pages. */
-export function Rec({ id, pills, back, actions, children }: {
-  id: ReactNode; pills?: ReactNode; back: string; actions?: ReactNode; children: ReactNode;
+/** One entry behind a More button. */
+export interface MenuItem {
+  icon: string; label: string; act: () => void;
+  disabled?: boolean; title?: string; tone?: string;
+}
+
+/** A row's actions behind one plain button, in the module's own `fin-menu`
+ *  popover — the same shell and `.mi` rows the transactions table's dots menu
+ *  uses, so the panel's menus cannot drift apart in look. The record pages
+ *  use it whenever the right side would otherwise hold more than two
+ *  controls: two stay buttons, three collapse. */
+export function MoreMenu({ items, small }: { items: MenuItem[]; small?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLSpanElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: MouseEvent) => {
+      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", away);
+    document.addEventListener("keydown", esc, true);
+    return () => {
+      document.removeEventListener("mousedown", away);
+      document.removeEventListener("keydown", esc, true);
+    };
+  }, [open]);
+
+  return (
+    <span className="fin-menu" ref={box}>
+      <button type="button" className={"btn" + (small ? " sm" : "")} aria-haspopup="menu"
+        aria-expanded={open} onClick={() => setOpen(!open)}>More</button>
+      {open ? (
+        <span className="fin-menu-pop" role="menu" aria-label="Actions">
+          {items.map((it) => (
+            <button key={it.label} type="button" role="menuitem"
+              className={"mi" + (it.tone ? " " + it.tone : "")}
+              disabled={it.disabled} title={it.title}
+              onClick={() => { setOpen(false); it.act(); }}>
+              <Icon name={it.icon} size="sm" />{it.label}
+            </button>
+          ))}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+/** The record screen wrapper — the same chrome on all four detail pages.
+ *  The slip page's pattern: the id leads, a thin rule sets the status pills
+ *  off it, and the right side holds the actions with Back — the one filled
+ *  control — closing the row. More than two controls on the right go behind
+ *  `menu` rather than sitting as a row of buttons. */
+export function Rec({ id, pills, back, actions, menu, children }: {
+  id: ReactNode; pills?: ReactNode; back: string; actions?: ReactNode;
+  menu?: MenuItem[]; children: ReactNode;
 }) {
   return (
     <div className="fin-rec">
       <ProtoBar />
       <div className="fin-idbar">
         <h2 className="mono">{id}</h2>
-        {pills}
+        {pills ? <><span className="fin-vsep" aria-hidden="true" />{pills}</> : null}
         <span className="spacer" />
         {actions}
-        <button className="btn sm" onClick={() => go(back)}><Icon name="chevl" size="sm" />Back</button>
+        {menu && menu.length ? <MoreMenu small items={menu} /> : null}
+        <button className="btn sm pri" onClick={() => go(back)}><Icon name="chevl" size="sm" />Back</button>
       </div>
       {children}
     </div>

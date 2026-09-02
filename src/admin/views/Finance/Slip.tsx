@@ -15,10 +15,10 @@
    nothing has been paid. It is drawn plainly as a draft rather than hidden:
    the person preparing the run needs to see exactly what will go out.
    ============================================================================= */
-import { useEffect, useRef, useState } from "react";
 import { useShell } from "../../shell/ShellContext";
 import { useNav } from "../../shell/AdminShell";
 import { EmptyState, Icon } from "../../ui";
+import { MoreMenu } from "./Frame";
 import { PaySalaryModal } from "./SalaryModals";
 import LOGO from "../../../assets/images/IB_Icon.png";
 import {
@@ -101,13 +101,20 @@ export default function Slip({ id, p }: {
         <span className="fin-vsep" aria-hidden="true" />
         <span className={"pill " + (draft ? "warn" : "ok")}>{draft ? "Draft" : "Paid"}</span>
         <span className="spacer" />
-        <MoreMenu
-          onDownload={() => window.print()}
-          pay={draft ? () => row && modal(
-            <PaySalaryModal row={row} onClose={closeLayer}
-              onDone={(msg, tone) => { closeLayer(); toast(msg, tone); }} />, "wide") : null}
-          payDisabled={!row}
-          share={draft ? null : () => toast(slip.memberName + " would get " + slip.slipId + " at their registered email. Nothing was sent — no mail transport is wired to this module yet.", "info")} />
+        <MoreMenu items={[
+          { icon: "download", label: "Download", act: () => window.print() },
+          draft
+            ? {
+              icon: "cash", label: "Pay", disabled: !row,
+              act: () => row && modal(
+                <PaySalaryModal row={row} onClose={closeLayer}
+                  onDone={(msg, tone) => { closeLayer(); toast(msg, tone); }} />, "wide"),
+            }
+            : {
+              icon: "ext", label: "Share",
+              act: () => toast(slip.memberName + " would get " + slip.slipId + " at their registered email. Nothing was sent — no mail transport is wired to this module yet.", "info"),
+            },
+        ]} />
         <button className="btn pri" onClick={() => navGo(back)}>
           <Icon name="chevl" size="sm" />Back
         </button>
@@ -270,55 +277,3 @@ export default function Slip({ id, p }: {
   );
 }
 
-/* The row's actions behind one plain button, in the module's own `fin-menu`
-   popover — the same shell and `.mi` rows the transactions table uses, so the
-   two menus cannot drift apart in look. Exactly one of `pay` / `share` is
-   passed: a draft can be paid, a paid slip can be shared. */
-function MoreMenu({ onDownload, pay, payDisabled, share }: {
-  onDownload: () => void;
-  pay: (() => void) | null;
-  payDisabled: boolean;
-  share: (() => void) | null;
-}) {
-  const [open, setOpen] = useState(false);
-  const box = useRef<HTMLSpanElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const away = (e: MouseEvent) => {
-      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
-    };
-    const esc = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.stopPropagation();
-      setOpen(false);
-    };
-    document.addEventListener("mousedown", away);
-    document.addEventListener("keydown", esc, true);
-    return () => {
-      document.removeEventListener("mousedown", away);
-      document.removeEventListener("keydown", esc, true);
-    };
-  }, [open]);
-
-  const item = (icon: string, label: string, act: () => void, disabled?: boolean) => (
-    <button type="button" role="menuitem" className="mi" disabled={disabled}
-      onClick={() => { setOpen(false); act(); }}>
-      <Icon name={icon} size="sm" />{label}
-    </button>
-  );
-
-  return (
-    <span className="fin-menu" ref={box}>
-      <button type="button" className="btn" aria-haspopup="menu" aria-expanded={open}
-        onClick={() => setOpen(!open)}>More</button>
-      {open ? (
-        <span className="fin-menu-pop" role="menu" aria-label="Payslip actions">
-          {item("download", "Download", onDownload)}
-          {pay ? item("cash", "Pay", pay, payDisabled) : null}
-          {share ? item("ext", "Share", share) : null}
-        </span>
-      ) : null}
-    </span>
-  );
-}

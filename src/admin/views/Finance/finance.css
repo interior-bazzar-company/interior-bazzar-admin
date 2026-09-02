@@ -542,7 +542,7 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
 /* The rule between the number and its state — a drawn line rather than a
    `|` glyph, which sat on the text baseline and never centred. Punctuation,
    not a control: out of the accessibility tree and off the mouse. */
-.fin-actions .fin-vsep {
+.fin-actions .fin-vsep, .fin-idbar .fin-vsep {
   width: 1px; height: 18px; flex: 0 0 auto; align-self: center;
   background: var(--line-2); margin: 0 var(--space-1); user-select: none;
 }
