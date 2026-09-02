@@ -100,7 +100,12 @@ function BusinessEnquiriesRoute() {
   const { today, week } = useIntakeCounts();
   const crumbs = useMemo(() => (
     <>
-      <span className="tb-title">Business Enquiries</span>
+      {/* The title is the way up: pressing it returns to the module's default
+          view, the job the topbar's Back button did before it came off. */}
+      <button type="button" className="tb-title" title="Back to the default view"
+        onClick={() => navigate(hashToPath("#/business-enquiries"), { replace: true })}>
+        Business Enquiries
+      </button>
       {/* INTAKE, not lifecycle. The strip below already counts every state and
           counts them better — repeating two of them in the topbar said nothing
           the page was not already saying louder. What the topbar can say that
@@ -116,7 +121,7 @@ function BusinessEnquiriesRoute() {
     </>
     /* usePageChrome republishes once per LOCATION, not per render, so this
        memo only has to be right for the counts it prints. */
-  ), [today, week]);
+  ), [today, week, navigate]);
 
   /* Where "up" is. From a record, the list it was opened from — filters and
      all, so Back is a return and not a reset. */

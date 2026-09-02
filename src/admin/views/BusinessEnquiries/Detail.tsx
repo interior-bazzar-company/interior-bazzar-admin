@@ -87,8 +87,12 @@ export default function Detail({ id, listHash, prev, next, pos }: {
 
   return (
     <div className="be-detail">
+      {/* The record-header pattern the whole panel takes: the id leads, a
+          thin rule sets the status off it, and the right side closes with
+          More and a primary Back. */}
       <div className="be-idbar">
         <h2 className="mono">{e.enquiryId}</h2>
+        <span className="vsep" aria-hidden="true" />
         <StatusPill status={e.status} lg />
         <TierBadge tier={e.tier} />
         <UrgencyChip urgency={e.qualification.urgency} />
@@ -110,15 +114,11 @@ export default function Detail({ id, listHash, prev, next, pos }: {
             </button>
           </span>
         ) : null}
-        <button className="btn sm" onClick={() => go(listHash)}>
-          <Icon name="chevl" size="sm" />All enquiries
-        </button>
-
-        {/* Everything you do WITH the enquiry lives behind these, at the right
-            end of the row: copy it, image it, print it. Everything that MOVES it
-            through its lifecycle stays on the action bar in the open — a state
-            change behind an overflow menu is one nobody audits and nobody
-            expects. Nothing in this menu changes the record.
+        {/* Everything you do WITH the enquiry lives behind More: copy it,
+            image it, print it. Everything that MOVES it through its lifecycle
+            stays on the action bar in the open — a state change behind an
+            overflow menu is one nobody audits and nobody expects. Nothing in
+            this menu changes the record.
 
             `data-act` IS LOAD-BEARING, not a test hook. The shell mounts the
             popover with a document-level click listener that closes it unless
@@ -129,14 +129,17 @@ export default function Detail({ id, listHash, prev, next, pos }: {
             attribute the popover opens and closes within one click and nothing
             appears. Every other trigger in the panel carries one for the same
             reason. */}
-        <button className="btn icon sm" data-act="be-more" aria-haspopup="menu" aria-label="Share and export"
+        <button className="btn sm" data-act="be-more" aria-haspopup="menu"
           title="Copy · download image · print"
           onClick={(ev) => {
             const el = ev.currentTarget as HTMLElement;
             if (popAnchor === el) { closePop(); return; }
             openPop(el, <RecordMenu e={e} />, { width: 320, align: "right", cls: "pop-views" });
           }}>
-          <Icon name="dots" />
+          More
+        </button>
+        <button className="btn sm pri" onClick={() => go(listHash)}>
+          <Icon name="chevl" size="sm" />Back
         </button>
       </div>
 
