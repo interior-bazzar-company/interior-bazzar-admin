@@ -24,7 +24,7 @@ import { useSearchParams } from "react-router-dom";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import {
-  EmptyState, FilterChips, Icon, Notice, SearchField, Select, StatStrip, Table, Toolbar, qs,
+  EmptyState, FilterChips, Icon, Notice, SearchField, Select, StatStrip, Table, TbTitle, Toolbar, qs,
 } from "../../ui";
 import type { StatCell } from "../../ui";
 import {
@@ -55,7 +55,7 @@ export default function Attendance() {
   const shell = useShell();
 
   usePageChrome({
-    crumbs: <span className="tb-title">Attendance</span>,
+    crumbs: <TbTitle label="Attendance" to="#/attendance" />,
     right: <ScopeNote text={scopeLabel(scope, rows.length)} />,
   }, face + date);
 

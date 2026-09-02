@@ -22,7 +22,7 @@ import { useSearchParams } from "react-router-dom";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import {
-  FilterChips, Icon, KvList, Notice, SearchField, SectionHead, Select, StatStrip, Table, Toolbar, qs,
+  FilterChips, Icon, KvList, Notice, SearchField, SectionHead, Select, StatStrip, Table, TbTitle, Toolbar, qs,
 } from "../../ui";
 import type { StatCell } from "../../ui";
 import {
@@ -58,7 +58,7 @@ export default function Work() {
   const open = useItem(p.item || null);
 
   usePageChrome({
-    crumbs: <span className="tb-title">Work</span>,
+    crumbs: <TbTitle label="Work" to="#/work" />,
     right: <ScopeNote text={scopeLabel(scope, all.length)} />,
   }, face);
 

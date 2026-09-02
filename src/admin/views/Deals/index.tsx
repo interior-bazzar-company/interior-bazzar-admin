@@ -17,7 +17,7 @@
    ============================================================================= */
 import { useEffect, useMemo } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { Icon } from "../../ui";
+import { Icon, TbTitle } from "../../ui";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import {
@@ -74,9 +74,9 @@ export default function Deals() {
      figures cannot disagree. */
   const crumbs = useMemo(() => (
     view !== "chat"
-      ? <span className="tb-title">Deals</span>
+      ? <TbTitle label="Deals" to="#/deals" />
       : <>
-          <span className="tb-title">Deals</span>
+          <TbTitle label="Deals" to="#/deals" />
           <TbStats p={p} />
         </>
     // TbStats subscribes to the counts itself, so this only has to be rebuilt

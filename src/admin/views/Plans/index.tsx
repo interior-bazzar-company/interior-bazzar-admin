@@ -21,7 +21,7 @@ import { useParams, useSearchParams } from "react-router-dom";
 import AdminOpsService from "../../../api/modules/adminOps";
 import { errMessage } from "../../../api/apiService";
 import {
-  EmptyState, FilterChips, Icon, Notice, Pill, SearchField, Select, StatStrip, qs
+  EmptyState, FilterChips, Icon, Notice, Pill, SearchField, Select, StatStrip, TbTitle, qs
 } from "../../ui";
 import type { StatCell } from "../../ui";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
@@ -51,7 +51,7 @@ export default function Plans() {
   const { loading, plans, error } = usePlans(tick);
 
   /* ---------------------------------------------------------- topbar --- */
-  const crumbs = useMemo(() => <span className="tb-title">Plans</span>, []);
+  const crumbs = useMemo(() => <TbTitle label="Plans" to="#/plans" />, []);
   usePageChrome({ crumbs, right: null, parent: id ? "#/plans" + qs(params) : null });
 
   /* ---------------------------------------------------------- writes --- */

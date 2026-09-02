@@ -24,7 +24,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
-import { Icon, Notice, SectionHead, StatStrip, Table, Toolbar, qs } from "../../ui";
+import { Icon, Notice, SectionHead, StatStrip, Table, TbTitle, Toolbar, qs } from "../../ui";
 import type { StatCell } from "../../ui";
 import {
   TODAY, acknowledgeReport, attentionOf, fmtDate, fmtDayName, fmtHM, fmtTime,
@@ -50,7 +50,7 @@ export default function Reports() {
   const rows = useReview(TODAY, scope);
 
   usePageChrome({
-    crumbs: <span className="tb-title">Reports</span>,
+    crumbs: <TbTitle label="Reports" to="#/reports" />,
     right: <ScopeNote text={scopeLabel(scope, rows.length)} />,
   }, face);
 
