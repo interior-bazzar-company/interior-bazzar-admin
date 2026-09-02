@@ -1236,6 +1236,10 @@ export interface RecordSubInput {
    *  installment IS complete payment — offering both would put two options in
    *  the dropdown that write the identical row. */
   installmentCount: number; startDate: string;
+  /** Free words about THIS recording, kept on the SUBSCRIPTION_RECORDED
+   *  event — never load-bearing, but the only place the reason for an
+   *  unusual sale is written down in words. */
+  remark?: string;
 }
 export function recordSubscription(input: RecordSubInput): { error: string; subscriptionId: string | null } {
   const user = readUser(input.userId);
@@ -1304,7 +1308,8 @@ export function recordSubscription(input: RecordSubInput): { error: string; subs
     input.planName + " recorded on " + invoice.invoiceNumber + " · " + inr(totalPaise)
     + (n === 1 ? " paid in full" : " in " + n + " installments of " + inr(each))
     + " · " + (sourceMeta(input.source)?.label || input.source)
-    + ". The customer is entitled from " + input.startDate + "."),
+    + ". The customer is entitled from " + input.startDate + "."
+    + (input.remark && input.remark.trim() ? " Remark: " + input.remark.trim() : "")),
   id, "subscription");
   snap.subscriptions = [s].concat(snap.subscriptions);
   emit();

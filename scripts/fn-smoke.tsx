@@ -510,18 +510,18 @@ has(recSub, "Attach an invoice and the schedule appears here, dated, before anyt
    the platform has never heard of, and nothing else in the panel could join
    to it. The picker searches the real user base. */
 has(recSub, "IB-U-", "...the customer is picked from the real user base, never typed");
-/* THE PLAN CARRIES THE TERM AND THE PRICE. There is no separate term field
-   to disagree with it. Under SSR the catalogue fetch has not resolved, so
-   what renders is the loading state — which is itself the thing worth
-   pinning: the dialog says what it is doing rather than showing an empty
-   select. */
-has(recSub, "Reading the plan catalogue", "...and while the catalogue loads the dialog says so rather than rendering an empty picker");
+/* THE CHAIN IS MANDATORY. Only a business with an accepted quotation and its
+   raised invoice is offered, and the plan, term, amount and installments are
+   read from those documents — the catalogue picker and the manual path are
+   gone with the sales that never went through the chain. */
+hasnt(recSub, "Reading the plan catalogue", "...no catalogue picker — the quotation carries the plan and the term");
+hasnt(recSub, "How the sale happened", "...and no channel question — a chained sale is a sales sale by definition");
 hasnt(recSub, ">Starter<", "...no hardcoded plan is offered any more");
 /* The label the user asked for. */
 /* NOBODY TYPES A TOTAL any more. The invoice is the document the customer
    owes against, so a figure typed beside it could only ever be a second
    opinion on the same money. */
-has(recSub, "Attach the invoice", "...the money comes from an attached invoice, not a typed figure");
+has(recSub, "The invoice", "...the money comes from the chain's invoice, not a typed figure");
 has(recSub, "Pick the business first", "...and until a customer is chosen there is nothing to attach");
 hasnt(recSub, "Total paid", "...no typed total is left to disagree with the invoice");
 hasnt(recSub, "fin-rupee", "...and no rupee box at all");

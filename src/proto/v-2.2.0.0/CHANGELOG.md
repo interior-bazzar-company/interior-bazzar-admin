@@ -25,6 +25,16 @@ attaches itself for the same reason.
 `SubSamples.tsx` prescribed for its own removal; the dialog opens straight
 onto the form and the smoke assertions moved with it.
 
+**The chain is mandatory now.** Only a business with an accepted quotation
+and its raised invoice appears in the picker at all — a sale the write would
+refuse is not offered. The catalogue plan picker, the manual plan/term
+fallback and the Sales/Website channel question went with the manual path:
+plan, term, amount and installments are read from the documents, the invoice
+block is a read-out (the chain's invoice is not a choice), and a chained
+sale is a sales sale by definition. What stays editable: the payment plan
+(1st installment / complete payment), the start date, and a new **Remark**
+field whose words land on the SUBSCRIPTION_RECORDED event.
+
 **A complete payment is always available, and it carries the whole
 agreement.** On an installment quotation the Payment plan field became the
 one choice it really holds: *1st installment · as agreed* (the quotation's
