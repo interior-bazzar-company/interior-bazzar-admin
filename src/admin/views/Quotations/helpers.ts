@@ -61,6 +61,88 @@ export function lineNet(it: { amountPaise: number; taxableAmountPaise: number })
   return { base, net, disc: Math.max(0, base - net) };
 }
 
+/* ---------------------------------------------------------- live pricing ---
+   `lineNet` above reads a discount BACK off what the server stored. These two
+   compute it FORWARD, from the numbers still sitting in the builder's inputs,
+   so the rail can show what Save is about to write instead of what the last
+   save wrote. They are a line-for-line port of
+   interior_deals_billing/pricing.py -- `line_net` and `price` -- and must stay
+   one: the server recomputes everything on save, and a rail that disagrees
+   with the document is worse than a rail that lags.
+
+   Units are the server's, not the form's: `pct` is a whole percent, `amt` is
+   PAISE. Math.round matches pricing._round (half-away-from-zero) on the
+   non-negative figures both sides deal in. */
+export type LiveLine = { amountPaise: number; discountType: string; discountValue: number };
+export type LineNet = { base: number; disc: number; net: number };
+
+/** pricing.line_net -- disc clamped to [0, base]. */
+export function lineNetOf(l: LiveLine): LineNet {
+  const base = Math.max(0, Math.round(l.amountPaise || 0));
+  const raw = l.discountType === "amt"
+    ? Math.round(Number(l.discountValue) || 0)
+    : Math.round(base * (Number(l.discountValue) || 0) / 100);
+  const disc = Math.max(0, Math.min(raw, base));
+  return { base, disc, net: base - disc };
+}
+
+export type LiveTotals = {
+  nets: LineNet[]; subtotalPaise: number; discountAmountPaise: number; taxablePaise: number;
+  cgstPaise: number; sgstPaise: number; igstPaise: number; taxAmountPaise: number;
+  grandTotalPaise: number; gstRate: number; placeOfSupply: string; intra: boolean;
+  taxApplicable: boolean;
+};
+
+/** pricing.recalc_quotation_items + pricing.price. Halves the GST TOTAL and
+ *  derives the twin (cgst = round(gst/2), sgst = gst - cgst) rather than
+ *  halving the rate -- same rounding order as the server, so CGST + SGST never
+ *  misses the GST total by a paisa. */
+export function liveTotals(input: {
+  lines: LiveLine[]; gstRate: number; taxMode: string; placeOfSupply: string;
+}): LiveTotals {
+  const nets = input.lines.map(lineNetOf);
+  const gross = nets.reduce((a, n) => a + n.base, 0);
+  const disc = nets.reduce((a, n) => a + n.disc, 0);
+  const taxable = Math.max(0, gross - disc);
+
+  const taxApplicable = input.taxMode !== "not_applicable";
+  const gstRate = taxApplicable ? Number(input.gstRate) || 0 : 0;
+  const intra = input.placeOfSupply === SELLER.state;
+  const gst = taxApplicable ? Math.round(taxable * gstRate / 100) : 0;
+  const cgst = taxApplicable && intra ? Math.round(gst / 2) : 0;
+  const sgst = taxApplicable && intra ? gst - cgst : 0;
+  const igst = taxApplicable && !intra ? gst : 0;
+
+  return {
+    nets,
+    subtotalPaise: gross,              // gross before discount, as pricing does it
+    discountAmountPaise: disc,
+    taxablePaise: taxable,
+    cgstPaise: cgst, sgstPaise: sgst, igstPaise: igst,
+    taxAmountPaise: cgst + sgst + igst,
+    grandTotalPaise: taxable + cgst + sgst + igst,
+    gstRate, placeOfSupply: input.placeOfSupply, intra, taxApplicable,
+  };
+}
+
+/** The Discount box offers "%" or "₹", and the server reads an `amt` value as
+ *  PAISE (pricing.line_net). So the rupees somebody types have to be scaled the
+ *  same way the amount beside them is, or ₹5,000 off becomes ₹50 off and the
+ *  payable looks like the undiscounted plan cost. One function, used by the
+ *  request AND by the rail, so the two cannot drift. */
+export function discountToServer(type: string, typed: string | number): number {
+  const n = Number(typed) || 0;
+  return type === "amt" ? Math.round(n * 100) : n;
+}
+
+/** The same trip back, for seeding the box from a stored row. Without it an
+ *  existing ₹ discount reads as its own paise figure and is multiplied by a
+ *  hundred again on the next save. */
+export function discountFromServer(type: string, stored: number | null | undefined): number {
+  const n = Number(stored) || 0;
+  return type === "amt" ? n / 100 : n;
+}
+
 export type Blocker = { code: string; text: string };
 
 /** Why Issue would refuse, stated before you press it. These mirror the four

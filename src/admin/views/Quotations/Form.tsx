@@ -14,9 +14,14 @@
        what they are buying, what it says. Bill-to is reference, so it is a
        strip inside step 1 rather than a section competing with it.
 
-   Inputs are uncontrolled and read from the DOM at save time, exactly as the
-   prototype's `val(id)` does: the server recomputes every figure anyway, so
-   re-rendering the page on each keystroke would buy nothing.
+   Inputs stay uncontrolled and are read from the DOM, exactly as the
+   prototype's `val(id)` does. What the prototype does NOT do is show the
+   effect: its rail — and this one, until now — printed the figures from the
+   LAST save, so typing a discount moved nothing on screen and the only way to
+   see it applied was to save and open the document. The rail below now
+   recomputes from those same DOM fields on every keystroke (helpers.liveTotals,
+   a port of pricing.py). The server still recomputes on save and remains the
+   only source of truth — this removes the wait, not the authority.
    ===================================================================== */
 import { useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
@@ -33,8 +38,10 @@ import type { PlanPick } from "./PlanModal";
 import type { QuotationRow } from "./api";
 import type { PlanRow } from "../../../api/modules/adminOps";
 import {
-  GST_RATES, SELLER, STATES, addonsOf, blockersOf, lineNet, planItemOf, planLabel,
+  GST_RATES, SELLER, STATES, addonsOf, blockersOf, discountFromServer, discountToServer,
+  lineNet, liveTotals, planItemOf, planLabel,
 } from "./helpers";
+import type { LineNet, LiveTotals } from "./helpers";
 
 const DEFAULT_VALIDITY_DAYS = 15;
 const COUNTS = [1, 2, 3, 4, 5];
@@ -55,6 +62,45 @@ export function BuilderBody({ q, onSaved }: { q: QuotationRow; onSaved: () => vo
 
   const v = (id: string) =>
     (document.getElementById(id) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null)?.value ?? "";
+  /* Same read, but "" and "not on screen yet" stay distinguishable — the first
+     render happens before the inputs exist, and a missing box must fall back to
+     the stored value rather than price the quotation at zero. */
+  const raw = (id: string): string | null =>
+    (document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null)?.value ?? null;
+
+  /* One re-render per keystroke, so the rail can show what Save is about to
+     write. `input` covers the text/number boxes, `change` the selects; both
+     bubble, so one pair on the wrapper serves every field on the page and no
+     input has to become controlled to be counted. */
+  const [, setKeystroke] = useState(0);
+  const recalc = () => setKeystroke((k) => k + 1);
+
+  /* Priced from the DOM, field for field the way `patch()` reads it — an empty
+     box means "leave the stored value alone", which is exactly what the absent
+     key does on the server. So the rail and the request can never disagree. */
+  const live: LiveTotals = liveTotals({
+    lines: [
+      ...(plan ? [{
+        amountPaise: raw("pTotal") ? rupeesToPaise(raw("pTotal") as string) : lineNet(plan).base,
+        discountType: raw("pDiscT") || plan.discountType,
+        discountValue: raw("pDisc")
+          ? discountToServer(raw("pDiscT") || plan.discountType, raw("pDisc") as string)
+          : (plan.discountValue || 0),
+      }] : []),
+      ...addons.map((a) => ({
+        amountPaise: raw("a-am-" + a.id) === null
+          ? lineNet(a).base : rupeesToPaise(raw("a-am-" + a.id) as string),
+        discountType: raw("a-dt-" + a.id) || a.discountType,
+        discountValue: raw("a-dv-" + a.id) === null
+          ? (a.discountValue || 0)
+          : discountToServer(raw("a-dt-" + a.id) || a.discountType, raw("a-dv-" + a.id) as string),
+      })),
+    ],
+    gstRate: raw("qGst") ? Number(raw("qGst")) : q.gstRate,
+    taxMode,
+    placeOfSupply: raw("qPos") || q.placeOfSupply,
+  });
+  const planNet: LineNet = plan ? live.nets[0] : { base: 0, disc: 0, net: 0 };
 
   /* Everything on the page, in one patch. Read fresh on every write — an
      add-a-charge must not throw away what is already typed beside it. */
@@ -76,12 +122,14 @@ export function BuilderBody({ q, onSaved }: { q: QuotationRow; onSaved: () => vo
        to read, and an absent key leaves the stored one untouched. */
     installmentGapMonths: v("pGap") ? Number(v("pGap")) : undefined,
     discountType: (v("pDiscT") as "pct" | "amt") || undefined,
-    discountValue: v("pDisc") ? Number(v("pDisc")) : undefined,
+    /* Scaled the way `pTotal` beside it is: the box says ₹, the server reads
+       `amt` as paise. Sent raw, ₹5,000 off arrived as ₹50. */
+    discountValue: v("pDisc") ? discountToServer(v("pDiscT"), v("pDisc")) : undefined,
     addons: addons.map((a) => ({
       itemId: a.id, name: v("a-nm-" + a.id), hsn: v("a-hs-" + a.id),
       amountPaise: rupeesToPaise(v("a-am-" + a.id)),
       discountType: (v("a-dt-" + a.id) as "pct" | "amt") || undefined,
-      discountValue: Number(v("a-dv-" + a.id) || 0),
+      discountValue: discountToServer(v("a-dt-" + a.id), v("a-dv-" + a.id) || 0),
     })),
   });
 
@@ -132,7 +180,7 @@ export function BuilderBody({ q, onSaved }: { q: QuotationRow; onSaved: () => vo
     call(AdminOpsService.removeQuotationAddon(q.id, itemId, rowVersion)));
 
   return (
-    <div className="qbld">
+    <div className="qbld" onInput={recalc} onChange={recalc}>
       <div>
         {err ? <Notice tone="bad" text={<b>{err}</b>} /> : null}
 
@@ -156,7 +204,7 @@ export function BuilderBody({ q, onSaved }: { q: QuotationRow; onSaved: () => vo
         <Step n={2} title="What they are buying" hint="one plan, and anything one-off beside it" />
         <div className="card">
           <PlanBlock plan={plan} plans={plans} busy={busy} onChange={openPlanPicker}
-            count={count} onCount={setCount} />
+            count={count} onCount={setCount} net={planNet} />
           <AddonBlock q={q} addons={addons} busy={busy} onAdd={addAddon} onRemove={removeAddon} />
         </div>
 
@@ -169,8 +217,8 @@ export function BuilderBody({ q, onSaved }: { q: QuotationRow; onSaved: () => vo
       </div>
 
       <div className="qbld-rail">
-        <Summary q={q} plan={plan} addons={addons} taxMode={taxMode} onTaxMode={setTaxMode}
-          busy={busy} onSave={save} />
+        <Summary q={q} plan={plan} addons={addons} live={live} planNet={planNet}
+          onTaxMode={setTaxMode} busy={busy} onSave={save} />
       </div>
     </div>
   );
@@ -217,11 +265,14 @@ function Parties({ q }: { q: QuotationRow }) {
 /* The plan, as the top half of "what they are buying". A card BODY, not a card
    — its other half is the one-off charges, and the two share one surface
    because they are one answer. */
-function PlanBlock({ plan, plans, busy, onChange, count, onCount }: {
+function PlanBlock({ plan, plans, busy, onChange, count, onCount, net }: {
   plan: ReturnType<typeof planItemOf>; plans: PlanRow[]; busy: boolean;
-  onChange: () => void; count: number; onCount: (n: number) => void;
+  onChange: () => void; count: number; onCount: (n: number) => void; net: LineNet;
 }) {
   if (!plan) return <div className="card-b faint">No plan block.</div>;
+  /* `n` is what the SERVER last stored — it seeds the uncontrolled inputs
+     below, and re-seeding them from the live figure would fight the typing.
+     `net` is what those inputs currently say, and it is what gets shown. */
   const n = lineNet(plan);
   /* The catalogue row this line was picked from, matched back by the stored
      name. Absent for a hand-typed name or a tier since retired — the line
@@ -239,9 +290,9 @@ function PlanBlock({ plan, plans, busy, onChange, count, onCount }: {
           </div>
         </div>
         <div className="qplan-amt">
-          <b className="tnum">{inr(n.net)}</b>
-          {n.disc
-            ? <span className="faint tnum"><s>{inr(n.base)}</s> −{inr(n.disc)}</span>
+          <b className="tnum">{inr(net.net)}</b>
+          {net.disc
+            ? <span className="faint tnum"><s>{inr(net.base)}</s> −{inr(net.disc)}</span>
             : null}
         </div>
         <button className="btn sm" data-act="qt-plan" disabled={busy} onClick={onChange}>
@@ -278,7 +329,8 @@ function PlanBlock({ plan, plans, busy, onChange, count, onCount }: {
         <Field label="Discount"
           help="Above 30%, Module 1 turns off Target 2 eligibility on this deal."
           custom={<div className="qdisc">
-            <input className="inp" id="pDisc" type="number" defaultValue={plan.discountValue || 0} />
+            <input className="inp" id="pDisc" type="number"
+              defaultValue={discountFromServer(plan.discountType, plan.discountValue)} />
             <select className="inp" id="pDiscT" defaultValue={plan.discountType === "amt" ? "amt" : "pct"}>
               <option value="pct">%</option>
               <option value="amt">₹</option>
@@ -346,7 +398,7 @@ function AddonBlock({ q, addons, busy, onAdd, onRemove }: {
               <td><input className="inp sm" id={"a-hs-" + it.id} defaultValue={it.hsn || ""} /></td>
               <td><div style={{ display: "flex", gap: "4px" }}>
                 <input className="inp sm" id={"a-dv-" + it.id} type="number" style={{ width: "58px" }}
-                  defaultValue={it.discountValue || 0} />
+                  defaultValue={discountFromServer(it.discountType, it.discountValue)} />
                 <select className="inp sm" id={"a-dt-" + it.id} style={{ width: "54px" }}
                   defaultValue={it.discountType === "amt" ? "amt" : "pct"}>
                   <option value="pct">%</option><option value="amt">₹</option>
@@ -370,36 +422,44 @@ function AddonBlock({ q, addons, busy, onAdd, onRemove }: {
 }
 
 /* ============================================================= the rail === */
-/* Display only — every figure below is what the SERVER last computed, and it
-   recomputes them again on save. Nothing here is arithmetic this page invented
-   (see helpers.lineNet). The one commit for the whole page lives here too,
-   because this is the card that already shows what every field on it adds up
-   to. */
-function Summary({ q, plan, addons, taxMode, onTaxMode, busy, onSave }: {
+/* A preview, not a record. Every figure below is `live` — recomputed from the
+   fields on this page by helpers.liveTotals, a port of the server's pricing.py
+   — so a discount shows its effect as it is typed. Nothing here is arithmetic
+   this page invented: the same function, the same units, the same rounding
+   order, and the server recomputes the lot on save regardless.
+
+   `q` is still read for the one thing that is only true once SAVED — the issue
+   blockers, which are about the stored document, not the draft on screen. The
+   one commit for the whole page lives here too, because this is the card that
+   already shows what every field on it adds up to. */
+function Summary({ q, plan, addons, live, planNet, onTaxMode, busy, onSave }: {
   q: QuotationRow; plan: ReturnType<typeof planItemOf>; addons: ReturnType<typeof addonsOf>;
-  taxMode: string; onTaxMode: (m: "applicable" | "not_applicable") => void;
+  live: LiveTotals; planNet: LineNet;
+  onTaxMode: (m: "applicable" | "not_applicable") => void;
   busy: boolean; onSave: () => void;
 }) {
-  const applicable = taxMode !== "not_applicable";
-  const intra = q.placeOfSupply === SELLER.state;
-  const addonGross = addons.reduce((a, i) => a + lineNet(i).base, 0);
+  const applicable = live.taxApplicable;
+  const intra = live.intra;
+  /* Exact: subtotal is the gross of every line, so what is not the plan is the
+     add-ons — no second reduce that could drift from the one in liveTotals. */
+  const addonGross = live.subtotalPaise - planNet.base;
   const blockers = blockersOf(q);
 
   return (
     <div className="card">
       <div className="card-h"><h3>Summary</h3>
-        <span className="d">display only — the server recomputes</span></div>
+        <span className="d">live — the server recomputes on save</span></div>
       <div className="card-b">
         <Row k={"Plan · " + (plan && plan.termMonths ? plan.termMonths + " months" : "—")}
-          v={inr(plan ? lineNet(plan).base : 0)} />
+          v={inr(planNet.base)} />
         {addons.length ? <Row k="Add-ons" v={inr(addonGross)} /> : null}
-        <Row k={<b>Gross amount</b>} v={<b>{inr(q.subtotalPaise)}</b>}
+        <Row k={<b>Gross amount</b>} v={<b>{inr(live.subtotalPaise)}</b>}
           style={{ borderTop: "1px solid var(--line)", marginTop: "4px" }} />
-        {q.discountAmountPaise
+        {live.discountAmountPaise
           ? <Row k={<span style={{ color: "var(--warn)" }}>Discount</span>}
-              v={<span style={{ color: "var(--warn)" }}>−{inr(q.discountAmountPaise)}</span>} />
+              v={<span style={{ color: "var(--warn)" }}>−{inr(live.discountAmountPaise)}</span>} />
           : null}
-        <Row k="Taxable value" v={inr(q.taxablePaise)} style={{ borderTop: "1px solid var(--line)" }} />
+        <Row k="Taxable value" v={inr(live.taxablePaise)} style={{ borderTop: "1px solid var(--line)" }} />
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0" }}>
           <span>Tax</span>
@@ -421,10 +481,10 @@ function Summary({ q, plan, addons, taxMode, onTaxMode, busy, onSave }: {
               </div>
               {intra
                 ? <>
-                    <Row k={"CGST (" + q.gstRate / 2 + "%)"} v={inr(q.cgstPaise)} />
-                    <Row k={"SGST (" + q.gstRate / 2 + "%)"} v={inr(q.sgstPaise)} />
+                    <Row k={"CGST (" + live.gstRate / 2 + "%)"} v={inr(live.cgstPaise)} />
+                    <Row k={"SGST (" + live.gstRate / 2 + "%)"} v={inr(live.sgstPaise)} />
                   </>
-                : <Row k={"IGST (" + q.gstRate + "%)"} v={inr(q.igstPaise)} />}
+                : <Row k={"IGST (" + live.gstRate + "%)"} v={inr(live.igstPaise)} />}
             </>
           : <div className="help" style={{ marginTop: "10px" }}>
               <b>Tax not applicable.</b> The grand total excludes GST entirely — the Sales Team's
@@ -432,18 +492,18 @@ function Summary({ q, plan, addons, taxMode, onTaxMode, busy, onSave }: {
             </div>}
 
         <Row k={<b style={{ fontSize: "var(--text-lg)" }}>Grand total</b>}
-          v={<b style={{ fontSize: "var(--text-lg)" }}>{inr(q.grandTotalPaise)}</b>}
+          v={<b style={{ fontSize: "var(--text-lg)" }}>{inr(live.grandTotalPaise)}</b>}
           style={{ borderTop: "2px solid var(--line-2)", marginTop: "6px", paddingTop: "9px" }} />
         <div className="faint" style={{ fontSize: "var(--text-sm)", marginTop: "4px" }}>
-          {inrWords(q.grandTotalPaise)}
+          {inrWords(live.grandTotalPaise)}
         </div>
 
         {applicable
           ? <div className="help" style={{ marginTop: "10px" }}>
               {intra
-                ? <><b>Intra-state.</b> Place of supply is {q.placeOfSupply}, the same state as
+                ? <><b>Intra-state.</b> Place of supply is {live.placeOfSupply}, the same state as
                     Interior bazzar — so GST splits into CGST + SGST.</>
-                : <><b>Inter-state.</b> Place of supply is {q.placeOfSupply || "not set"} and Interior
+                : <><b>Inter-state.</b> Place of supply is {live.placeOfSupply || "not set"} and Interior
                     bazzar is in {SELLER.state} — so a single IGST applies.</>}
             </div>
           : null}
