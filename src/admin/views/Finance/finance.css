@@ -916,4 +916,3 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
 /* A row somebody has disputed. Beside the state pill and not instead of it —
    the row is still `recorded` and still counts, and a chip that replaced the
    state would be the third state this module refuses to have. */
-.fin-wrongmark { color: var(--bad); font-weight: var(--weight-medium) }

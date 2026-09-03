@@ -43,7 +43,7 @@ import {
   CloseAccountModal, LopModal, OpenRunModal, PaySalaryModal, SalaryAccountModal,
 } from "../src/admin/views/Finance/SalaryModals";
 import {
-  BillModal, BudgetModal, DeactivateTagModal, MarkWrongModal, ReverseTxnModal, TagModal, TxnModal,
+  BillModal, BudgetModal, DeactivateTagModal, ReverseTxnModal, TagModal, TxnModal,
 } from "../src/admin/views/Finance/TxnModals";
 import {
   DecideRefundModal, ManualRefundModal, RecordTransferModal, RequestRefundModal,
@@ -811,16 +811,6 @@ has(deact, "There is no reactivate here", "...and it does not pretend to be undo
 /* THE RECEIPT IS PICKED NOW, NOT TYPED, and held to the same three rules as one
    attached at the time. It used to be a text box for a filename with a note
    saying so. */
-/* MARKING A ROW WRONG MOVES NO MONEY, and the dialog beside one that does has
-   to say so. */
-const wrongM = check("mark a transaction wrong", () => modal(
-  <MarkWrongModal txn={txn("TXN-0901")} onClose={noop} onDone={noop} />));
-has(wrongM, "This moves no money", "...it says outright that nothing about the row changes");
-has(wrongM, "every total still counts it", "...and that the figures still include it");
-has(wrongM, "the correction is a counter-entry", "...naming what does settle it, and whose job that is");
-has(wrongM, "<textarea", "...the reason is a box, because it has to be actionable by somebody else");
-has(wrongM, "disabled", "...and the button waits for one");
-
 const bill = check("edit the receipt", () => modal(
   <BillModal txn={txn("TXN-0910")} onClose={noop} onDone={noop} />));
 has(bill, "fin-filebox", "...a receipt is picked, not typed");

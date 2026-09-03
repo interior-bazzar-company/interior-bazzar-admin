@@ -4,6 +4,57 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ---
 
+## 2026-09-03
+
+### Mark as wrong is gone — a reversal is the only way to say a row is bad
+
+**Area:** `#/finance-transactions` · the row menu · the `Marked wrong` strip cell and `?flag=wrong` queue
+**Files:** `src/admin/views/Finance/store.ts`, `src/admin/views/Finance/types.ts`, `src/admin/views/Finance/Transactions.tsx`, `src/admin/views/Finance/TxnDetail.tsx`, `src/admin/views/Finance/TxnModals.tsx`, `src/admin/views/Finance/finance.css`, `src/content/finance/vocabularies.json`, `scripts/check-finance-ledger.cjs`, `scripts/fn-smoke.tsx`
+
+**What changed**
+
+**THE FLAG THAT CHANGED NOTHING IS REMOVED.** A row could be marked wrong,
+which moved no money, changed no state and altered no total — it only put the
+row in a queue for somebody to look at again. `markTxnWrong`, `clearTxnWrong`,
+the `wrong` field on `CompanyTxn`, the `MarkWrongModal`, the `Marked wrong`
+strip cell and its `?flag=wrong` queue, the red sub-line on the row and the
+banner on the record are all gone.
+
+**REVERSAL IS THE WHOLE VOCABULARY NOW.** A correction was always the
+counter-entry; the mark was the gap between noticing and correcting, and two
+menu items both announcing that a row is bad read as two ways to do the same
+thing when only one of them corrected anything. One item, one meaning.
+
+**The row menu loses one item, the strip loses one cell.** `Queue` now offers
+only `Missing a bill`. The rail no longer has a disputed tone — reversed still
+outranks a missing bill. `TXN_MARKED_WRONG` and `TXN_MARK_CLEARED` are out of
+the event vocabulary; no seed row carried either, so no history is orphaned.
+
+**Temp data**
+`src/content/finance/vocabularies.json` → two event keys removed from
+`eventTypes` (static copy). `src/content/finance/transactions.json` unchanged —
+no seeded row ever carried a `wrong` mark.
+
+**Backend needed**
+- `none` — the endpoints this would have implied (`POST /transactions/:id/mark`,
+  `POST /transactions/:id/mark/clear`) are no longer needed, and were never
+  built. `POST /api/v1/finance/transactions/:id/reverse` is unaffected.
+
+**Open decisions**
+`none` — removing the flag settles the question it raised (who may dispute a
+row without Super Admin) by deciding nobody does: disputing and correcting are
+the same act, and it is Super Admin.
+
+**Verified**
+`npx tsc -b` clean. `npm run check:finance` → all 409 checks pass with the
+mark-wrong block removed. `npm run check:finance-render` renders every surface
+with no failures. `npm run check:finance-nav` passes. `npm run lint` reports no
+new problems in `src/admin/views/Finance/` (the repo's pre-existing `no-explicit-any`
+errors are elsewhere and untouched). Not checked against a live backend — the
+module is still proto-seeded.
+
+---
+
 ## 2026-09-02
 
 ### Refunds becomes one table, like every other list in the module

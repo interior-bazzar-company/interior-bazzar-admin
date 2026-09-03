@@ -361,24 +361,6 @@ export interface CompanyTxn {
    *  vendor refund. Customer money has exactly one way in: a subscription. */
   nonRevenue: boolean;
   creditKind: string | null;
-  /** SOMEBODY HAS LOOKED AT THIS ROW AND BELIEVES IT IS WRONG — and that is
-   *  itself a fact, which is the only reason it is allowed here. It records who
-   *  said so, when, and why.
-   *
-   *  IT IS A FLAG, NOT A THIRD STATE. `state` stays `recorded`, the amount is
-   *  untouched, and every total still counts this row — because the money did
-   *  move, and a doubt about a row is not a reversal of it. Nothing in
-   *  analytics reads this field. It is a queue: rows somebody has raised a hand
-   *  about, waiting for a counter-entry or for the mark to be cleared.
-   *
-   *  The same shape as `Payslip.held`, and for the same reason: a decision
-   *  about a record, with a mandatory reason, that changes no money. A mark
-   *  with no reason is indistinguishable from a misclick at audit.
-   *
-   *  ANYONE WITH EDIT MAY MARK; ONLY SUPER ADMIN MAY REVERSE. Raising a concern
-   *  is not the same act as moving money to settle it, and making them one
-   *  permission would mean the people who notice cannot say so. */
-  wrong?: { by: string; at: string; reason: string } | null;
   /** Set on the counter-entry, pointing at the row it reverses. */
   reversesTxnId: string | null;
   reversal: { counterId: string; reason: string; by: string; at: string } | null;

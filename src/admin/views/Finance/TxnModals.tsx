@@ -16,8 +16,8 @@ import type { Done } from "./dialog";
 import { Check, Money, TagChip } from "./bits";
 import {
   ACCOUNTS, CREDIT_KINDS, MODES, TAG_KINDS,
-  PROOF_MAX_BYTES, addTag, attachBill, clearTxnWrong, deactivateTag, fileSize, inr, isSuperAdmin,
-  markTxnWrong, proofAccepted, proofTooBig, recordTransaction, reverseTransaction,
+  PROOF_MAX_BYTES, addTag, attachBill, deactivateTag, fileSize, inr, isSuperAdmin,
+  proofAccepted, proofTooBig, recordTransaction, reverseTransaction,
   setBudget as setTagBudget, todayIso, useTagTotals, useTags, useTxnRows,
 } from "./store";
 import type { CompanyTxn, Tag, TagKind } from "./store";
@@ -466,64 +466,6 @@ export function BillModal({ txn, onClose, onDone }: { txn: CompanyTxn; onClose: 
             setFile({ filename: f.name, mime: f.type, bytes: f.size });
             setErr("");
           }} />
-      </Field>
-    </Dlg>
-  );
-}
-
-/* -------------------------------------------------------- MarkWrongModal --- */
-/** FN-T11b · Raise a hand about a row, or put it down again.
- *
- *  NEITHER OF THESE MOVES MONEY, and the dialog says so, because the button
- *  sits next to one that does. Marking is anybody-with-edit; reversing is Super
- *  Admin. That split is the point of the feature: the person who notices and
- *  the person who settles it are usually not the same person, and without this
- *  the noticing has nowhere to go but a message somebody sends. */
-export function MarkWrongModal({ txn, onClose, onDone }: {
-  txn: CompanyTxn; onClose: () => void; onDone: Done;
-}) {
-  const marked = !!txn.wrong;
-  const [text, setText] = useState("");
-  const [err, setErr] = useState("");
-
-  const submit = () => {
-    const res = marked ? clearTxnWrong(txn.txnId, text) : markTxnWrong(txn.txnId, text);
-    if (res) { setErr(res); return; }
-    onDone(marked
-      ? "The mark on " + txn.txnId + " is cleared."
-      : txn.txnId + " is marked wrong. It still counts — a counter-entry is what corrects it.",
-    marked ? "ok" : "warn");
-  };
-
-  return (
-    <Dlg title={marked ? "Clear the mark" : "Mark this row wrong"}
-      sub={<span className="mono">{txn.txnId}</span>} onClose={onClose} err={err}
-      footer={<><Cancel onClose={onClose} />
-        <button className={"btn " + (marked ? "pri" : "pri")} disabled={!text.trim()} onClick={submit}>
-          {marked ? "Clear the mark" : "Mark wrong"}
-        </button></>}>
-
-      <Notice tone="info" ico="alert" text={marked ? <>
-        <b>Nothing about the row changes.</b> It never did — the mark was a note that somebody
-        had a doubt, and clearing it is a note about what they found.
-      </> : <>
-        <b>This moves no money.</b> The row keeps its amount and every total still counts it,
-        because the money did move. A mark says somebody looked and thinks it should not have;
-        the correction is a counter-entry, which is Super Admin.
-      </>} />
-
-      {marked ? (
-        <Field label="What was raised">
-          <div className="fin-derived">{txn.wrong?.reason}</div>
-        </Field>
-      ) : null}
-
-      <Field label={marked ? "What you found" : "What is wrong with it"}>
-        <textarea className="inp" rows={3} autoFocus value={text}
-          placeholder={marked
-            ? "Why it turns out to be right, or how it was settled"
-            : "What looks wrong, so the next person can act on it without asking"}
-          onChange={(e) => { setText(e.target.value); setErr(""); }} />
       </Field>
     </Dlg>
   );

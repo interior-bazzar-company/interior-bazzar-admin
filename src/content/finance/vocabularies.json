@@ -404,16 +404,6 @@
       "tone": "bad"
     },
     {
-      "key": "TXN_MARKED_WRONG",
-      "label": "Marked wrong",
-      "tone": "warn"
-    },
-    {
-      "key": "TXN_MARK_CLEARED",
-      "label": "Mark cleared",
-      "tone": "ok"
-    },
-    {
       "key": "TAG_CREATED",
       "label": "Tag created",
       "tone": "info"

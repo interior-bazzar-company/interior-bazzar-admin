@@ -14,7 +14,7 @@ import { EmptyState, Icon, KvList, Notice, Tabs, qs } from "../../ui";
 import { go } from "../../ui/nav";
 import { Block, Blocks, Rec } from "./Frame";
 import { Dir, EventList, Money, ProtoBar, TagChip, TxnPill } from "./bits";
-import { BillModal, MarkWrongModal, ReverseTxnModal } from "./TxnModals";
+import { BillModal, ReverseTxnModal } from "./TxnModals";
 import {
   BILL_THRESHOLD_PAISE, CREDIT_KINDS,
   accountOf, ago, fmtDate, fmtDateTime, inr, isSuperAdmin, tagKindMeta, useTxn,
@@ -47,9 +47,9 @@ function carry(p: Params): Params {
  *
  *  Same `.fin-menu` and the same `.mi` rows the slips table uses — one menu in
  *  the module, not two that drift. */
-function TxnMenu({ txn, sa, reversible, onEdit, onReverse, onMarkWrong }: {
+function TxnMenu({ txn, sa, reversible, onEdit, onReverse }: {
   txn: CompanyTxn; sa: boolean; reversible: boolean;
-  onEdit: () => void; onReverse: () => void; onMarkWrong: () => void;
+  onEdit: () => void; onReverse: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLSpanElement | null>(null);
@@ -102,35 +102,11 @@ function TxnMenu({ txn, sa, reversible, onEdit, onReverse, onMarkWrong }: {
               ? "The panel holds the file's name, not the file. Download arrives with the document store."
               : "There is no receipt on this row yet.",
           })}
-          {/* RAISE A HAND, WITHOUT MOVING MONEY. Anybody with edit may do this;
-              reversing below is Super Admin. That split is the feature: the
-              person who notices and the person who settles it are usually not
-              the same person, and the noticing needs somewhere to go. */}
-          {txn.state === "reversed"
-            ? item("flag", "Mark as wrong", () => {}, {
-              disabled: true,
-              title: "It is already reversed — the correction has happened.",
-            })
-            : item(txn.wrong ? "check" : "flag",
-              txn.wrong ? "Clear the wrong mark" : "Mark as wrong", onMarkWrong,
-              {
-                tone: txn.wrong ? undefined : "dgr",
-                /* WHAT SEPARATES THIS FROM REVERSE, in the one channel that
-                   costs no space on the menu. The two items sat next to each
-                   other reading as two ways to say a row is bad; they are two
-                   different jobs, and the difference is who does them and
-                   whether money moves. */
-                title: txn.wrong
-                  ? "Close the doubt. Moves no money."
-                  : "Raise a doubt about this row. Moves no money, and anyone with edit can.",
-              })}
           {/* THE WAY A BAD ROW IS CORRECTED, and the only way. It appends a
-              counter-entry and leaves this row exactly as posted. */}
-          {/* JUST `Reverse`. It read `Reverse — this row was wrong`, which was
-              written before Mark as wrong existed and said the same word twice
-              once it did: two items on one menu both announcing that a row is
-              bad, when only one of them corrects anything. The suffix went; the
-              distinction moved to the title, where it costs no space. */}
+              counter-entry and leaves this row exactly as posted. There is no
+              second item beside it raising a doubt without moving money: a row
+              is either corrected or it is not, and a flag that changed nothing
+              only asked somebody to read the same row twice. */}
           {reversible
             ? item("recon", "Reverse", onReverse, {
               disabled: !sa,
@@ -188,7 +164,6 @@ export default function TxnDetail({ id, p, onParams }: {
   const done = (msg: string, tone?: string) => { closeLayer(); toast(msg, tone); };
   const openBill = () => modal(<BillModal txn={t} onClose={closeLayer} onDone={done} />);
   const openReverse = () => modal(<ReverseTxnModal txn={t} onClose={closeLayer} onDone={done} />);
-  const openMarkWrong = () => modal(<MarkWrongModal txn={t} onClose={closeLayer} onDone={done} />);
   /* A counter-entry cannot itself be reversed, and an already-reversed row has
      nothing left to reverse — the store refuses both, so the button is not
      offered for either. That is a fact about the row, not a permission; the
@@ -206,7 +181,7 @@ export default function TxnDetail({ id, p, onParams }: {
            put a third. Everything the row can have done to it is behind the
            one control now, in the order somebody reaches for them. */
         <TxnMenu txn={t} sa={sa} reversible={reversible}
-          onEdit={openBill} onReverse={openReverse} onMarkWrong={openMarkWrong} />
+          onEdit={openBill} onReverse={openReverse} />
       ) : null}>
 
       <div className="fin-subline">
@@ -232,15 +207,6 @@ export default function TxnDetail({ id, p, onParams }: {
                 {t.reversesTxnId}
               </a>. That negative amount is the whole effect — nothing else about the original
               row was touched.
-            </>} />
-          ) : null}
-          {t.wrong ? (
-            <Notice tone="warn" ico="flag" text={<>
-              <b>Somebody has marked this row wrong.</b> {t.wrong.by} · {fmtDateTime(t.wrong.at)}{" — "}
-              {t.wrong.reason}{" "}
-              <b>Nothing about the row has changed:</b> the money moved, every total still counts
-              it, and the mark is a note that somebody is disputing it. A counter-entry is what
-              corrects it, and clearing the mark is what closes it if it turns out to be right.
             </>} />
           ) : null}
           {t.reversal ? (

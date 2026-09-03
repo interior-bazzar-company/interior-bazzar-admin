@@ -774,7 +774,6 @@ export function applyTxnFilters(rows: TxnRow[], p: Params): TxnRow[] {
   if (p.kind) out = out.filter((r) => r.tag?.kind === p.kind);
   if (p.state) out = out.filter((r) => r.t.state === p.state);
   if (p.flag === "nobill") out = out.filter((r) => r.missingBill);
-  if (p.flag === "wrong") out = out.filter((r) => !!r.t.wrong);
   if (p.range === "month") out = out.filter((r) => inPeriod(r.t.valueDate));
   if (p.q) {
     const q = p.q.toLowerCase().trim();
@@ -2174,58 +2173,6 @@ export function attachBill(
 
 /** FN-T11 · Reverse a transaction. Super Admin. A counter-entry carrying a
  *  negative amount is appended; the original row is untouched. */
-/** FN-T11b · MARK A ROW WRONG, and clear the mark.
- *
- *  A DOUBT IS NOT A REVERSAL. This changes no money: `state` stays `recorded`,
- *  the amount is untouched, and every total still counts the row — because the
- *  money did move, and somebody believing it should not have is a different
- *  fact from it not having happened. Nothing in analytics reads the flag.
- *
- *  WHAT IT BUYS is the gap between noticing and correcting. Reversing is Super
- *  Admin and needs a decision; noticing is anybody's job and needs to be
- *  recorded the moment it happens, or it lives in somebody's memory until they
- *  are on leave. So this is the queue between the two.
- *
- *  ANYONE WITH EDIT MAY MARK. Deliberately not Super Admin: making the person
- *  who notices and the person who settles it one permission means the people
- *  closest to the row cannot say anything about it. */
-export function markTxnWrong(id: string, reason: string): string {
-  const t = readTransaction(id);
-  if (!t) return "That transaction no longer exists.";
-  if (t.state === "reversed")
-    return "It is already reversed — the correction has happened, and marking it now would queue a row nobody needs to look at. (invalid_state_transition)";
-  if (t.wrong) return "It is already marked wrong. (invalid_state_transition)";
-  if (!reason.trim())
-    return "Say what is wrong with it. A mark with no reason is indistinguishable from a misclick at audit, and the next person cannot act on it. (reason_required)";
-  const a = actor();
-  t.wrong = { by: a.name, at: stamp(), reason: reason.trim() };
-  log(pushEvent(t.events, "TXN_MARKED_WRONG",
-    a.name + " marked this row wrong — " + reason.trim()
-    + " Nothing about the row changed: the money still moved and every total still counts it. "
-    + "A counter-entry is what corrects it."), id, "transaction");
-  emit();
-  return "";
-}
-
-/** The other half, and it needs a note for the same reason the mark did: a
- *  concern that was raised and then silently dropped is worse than one never
- *  raised, because the record shows somebody looked and says nothing about
- *  what they concluded. */
-export function clearTxnWrong(id: string, note: string): string {
-  const t = readTransaction(id);
-  if (!t) return "That transaction no longer exists.";
-  if (!t.wrong) return "It is not marked wrong. (invalid_state_transition)";
-  if (!note.trim())
-    return "Say what you found. Clearing a mark without a word leaves a record that somebody looked and no record of what they concluded. (reason_required)";
-  const a = actor();
-  const raised = t.wrong;
-  t.wrong = null;
-  log(pushEvent(t.events, "TXN_MARK_CLEARED",
-    a.name + " cleared the mark " + raised.by + " raised — " + note.trim()), id, "transaction");
-  emit();
-  return "";
-}
-
 export function reverseTransaction(id: string, reason: string): string {
   const t = readTransaction(id);
   if (!t) return "That transaction no longer exists.";
@@ -2241,15 +2188,6 @@ export function reverseTransaction(id: string, reason: string): string {
     recordedBy: a.name, recordedAt: stamp(), events: [],
   };
   t.state = "reversed";
-  /* THE MARK HAS BEEN ANSWERED, so it comes off — a reversed row is corrected,
-     and leaving it in the wrong-marked queue would ask somebody to look again
-     at the one row that no longer needs looking at. The event stays: the
-     history says it was marked and by whom, which is the part worth keeping. */
-  if (t.wrong) {
-    pushEvent(t.events, "TXN_MARK_CLEARED",
-      "The mark " + t.wrong.by + " raised is answered by this reversal.");
-    t.wrong = null;
-  }
   t.reversal = { counterId: cid, reason: reason.trim(), by: a.name, at: stamp() };
   log(pushEvent(c.events, "TXN_REVERSED", "Counter-entry for " + t.txnId + " · −" + inr(t.amountPaise) + " · " + reason.trim()), cid, "transaction");
   pushEvent(t.events, "TXN_REVERSED", "Reversed by " + a.name + " — " + reason.trim() + ". " + cid + " carries the offset.");

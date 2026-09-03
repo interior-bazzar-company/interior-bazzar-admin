@@ -37,7 +37,6 @@ import type { Params, Tag, TagTotal, TxnRow } from "./store";
  *  forbid. */
 function filterValueLabel(key: string, value: string, tags: Tag[]): string {
   if (key === "dir") return value === "out" ? "Debit" : "Credit";
-  if (key === "flag" && value === "wrong") return "Marked wrong";
   if (key === "tag") return tags.filter((t) => t.tagKey === value)[0]?.label || value;
   if (key === "kind") return tagKindMeta(value)?.label || value;
   if (key === "state") return TXN_STATES.filter((s) => s.key === value)[0]?.label || value;
@@ -78,7 +77,6 @@ export default function Transactions({ p, onFilter, onSearch, onUnfilter, onPara
   const o = useOverview();
   const totals = useTagTotals();
   const missingBillN = txnRows.filter((r) => r.missingBill).length;
-  const wrongN = txnRows.filter((r) => !!r.t.wrong).length;
 
   /* A CELL TOGGLES: pressing the filter it already applied clears it, because
      the only other way back is to hunt for the chip. It navigates rather than
@@ -125,12 +123,6 @@ export default function Transactions({ p, onFilter, onSearch, onUnfilter, onPara
         inside this figure and called out separately at the end of the strip — it left the
         bank like everything else.</> },
     "sep",
-    { k: <>Marked wrong</>, v: wrongN, dot: wrongN ? "bad" : undefined,
-      on: p.flag === "wrong", to: cellHash({ flag: "wrong" }),
-      tip: <>Rows somebody has looked at and disputed. <b>They still count</b> — the money moved,
-        and a doubt about a row is not a reversal of it. This is the gap between noticing and
-        correcting: anyone with edit can raise one, and only a Super Admin can settle it with a
-        counter-entry.</> },
     { k: <>Missing a bill</>, v: missingBillN, dot: missingBillN ? "warn" : undefined,
       on: p.flag === "nobill", to: cellHash({ flag: "nobill" }),
       tip: <>Recorded transactions with no bill attached. One above {inr(BILL_THRESHOLD_PAISE)}
@@ -207,7 +199,7 @@ export default function Transactions({ p, onFilter, onSearch, onUnfilter, onPara
           <Select key={"range" + (p.range || "")} name="range" label="Period" value={p.range} onFilter={onFilter}
             options={[{ v: "month", l: PERIOD.label }]} />
           <Select key={"flag" + (p.flag || "")} name="flag" label="Queue" value={p.flag} onFilter={onFilter}
-            options={[{ v: "wrong", l: "Marked wrong" }, { v: "nobill", l: "Missing a bill" }]} />
+            options={[{ v: "nobill", l: "Missing a bill" }]} />
           <span className="spacer" />
           {writable ? (
             <button className="btn pri" onClick={openTxnModal}><Icon name="plus" size="sm" />Record a transaction</button>
@@ -299,10 +291,9 @@ function TxnTable({ p, writable, onRecord, onUnfilter }: {
 
 function TxnLine({ r, p }: { r: TxnRow; p: Params }) {
   const t = r.t;
-  /* A DISPUTED ROW OUTRANKS A MISSING BILL on the rail: one is paperwork that
-     can be chased, the other is somebody saying the money should not have
-     moved. Reversed still wins over both — that one is settled. */
-  const rail = t.state === "reversed" ? "bad" : t.wrong ? "bad" : r.missingBill ? "warn" : "";
+  /* REVERSED OUTRANKS A MISSING BILL on the rail: one is paperwork that can be
+     chased, the other is a row that has already been corrected. */
+  const rail = t.state === "reversed" ? "bad" : r.missingBill ? "warn" : "";
   const to = "#/finance-transactions/" + encodeURIComponent(t.txnId) + qs(carry(p));
   const open = () => go(to);
   return (
@@ -338,15 +329,6 @@ function TxnLine({ r, p }: { r: TxnRow; p: Params }) {
       </td>
       <td>
         <TxnPill k={t.state} />
-        {/* THE MARK IS NOT A STATE and does not replace one — it sits beside it,
-            because the row is still `recorded` and still counts. A pill that
-            replaced the state would be the third state this module refuses to
-            have. */}
-        {t.wrong
-          ? <div className="cell-2 fin-wrongmark" title={t.wrong.reason}>
-            marked wrong by {t.wrong.by}
-          </div>
-          : null}
       </td>
       <td className="tight"><Icon name="chevr" size="sm" /></td>
     </tr>
