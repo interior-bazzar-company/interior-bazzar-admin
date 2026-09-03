@@ -1308,8 +1308,8 @@ S.resetStore();
 
   /* A RECEIPT IS PART OF RECORDING A ROW NOW, so the base carries one and the
      rule gets its own assertions below. It used to be optional and attached
-     afterwards through `attachBill`, which is the only reason `missingBill`
-     exists — a queue of rows somebody meant to come back to. */
+     afterwards through a dialog of its own, which is the only reason
+     `missingBill` exists — a queue of rows somebody meant to come back to. */
   const BILL = { filename: "bill.pdf", mime: "application/pdf", bytes: 240 * 1024 };
   const base = {
     direction: "out", tagKey: "util", amountPaise: 100000, description: "Broadband", party: "ACT",
@@ -1350,7 +1350,7 @@ S.resetStore();
      consequence worth stating rather than discovering: `missingBill` derives
      from `!t.bill`, so with a receipt mandatory on every write the queue can
      only ever hold the rows that predate the rule. It is a BACKLOG now, not a
-     queue that grows — and `attachBill` is what empties it. */
+     queue that grows — and an update carrying a receipt is what empties it. */
   {
     const before = S.txnRows().filter((r) => r.missingBill).length;
     const r = S.recordTransaction({ ...base, reference: "BILL-QUEUE-1", tagKey: "rent",
@@ -1444,6 +1444,60 @@ S.resetStore();
       S.readTransaction(matched.txnId).bankLineId], ["", null]);
   ok("...and the history says why the match came off with it",
     S.readTransaction(matched.txnId).events.some((e) => /came off with it/.test(e.note)), true);
+
+  /* THE RECEIPT IS A FIELD ON THE UPDATE, not a write of its own. It had a
+     dialog and a store function to itself while a row's figures could not be
+     amended and its paper could; with one rule there is one screen, and these
+     assertions are what that has to keep true. */
+  S.resetStore();
+  const noBill = S.readTransactions().filter((t) => !t.bill && t.direction === "out")[0];
+  const nb = {
+    direction: noBill.direction, tagKey: noBill.tagKey, amountPaise: noBill.amountPaise,
+    description: noBill.description, party: noBill.party, mode: noBill.mode,
+    reference: noBill.reference, valueDate: noBill.valueDate, accountId: noBill.accountId,
+    creditKind: noBill.creditKind,
+  };
+  ok("a receipt on a backlog row is refused if it is neither an image nor a PDF",
+    has(S.updateTransaction(noBill.txnId, { ...nb, bill: { filename: "sheet.xlsx", mime: "application/vnd.ms-excel", bytes: 900 } }),
+      "bill_type"), true);
+  ok("...and refused if it is over the limit",
+    has(S.updateTransaction(noBill.txnId, { ...nb, bill: { filename: "scan.pdf", mime: "application/pdf", bytes: 40 * 1024 * 1024 } }),
+      "bill_too_big"), true);
+  ok("...held to exactly the rules a receipt attached at the time is held to",
+    S.updateTransaction(noBill.txnId, { ...nb, bill: { filename: "late-receipt.pdf", mime: "application/pdf", bytes: 200 * 1024 } }), "");
+  ok("...the row now carries it, and leaves the missing-bill backlog",
+    [S.readTransaction(noBill.txnId).bill.filename,
+      S.txnRows().filter((r) => r.t.txnId === noBill.txnId)[0].missingBill],
+    ["late-receipt.pdf", false]);
+  ok("...and attaching it is an ordinary field change, named in the same history line",
+    /Receipt: /.test(S.readTransaction(noBill.txnId).events[0].note), true);
+
+  /* LEAVING IT OUT LEAVES IT ALONE, which is what makes it safe to reopen this
+     dialog to fix a remark on a row that already has paper behind it. */
+  S.resetStore();
+  const hasBill = S.readTransactions().filter((t) => t.bill)[0];
+  const hb = {
+    direction: hasBill.direction, tagKey: hasBill.tagKey, amountPaise: hasBill.amountPaise,
+    description: hasBill.description, party: hasBill.party, mode: hasBill.mode,
+    reference: hasBill.reference, valueDate: hasBill.valueDate, accountId: hasBill.accountId,
+    creditKind: hasBill.creditKind,
+  };
+  const keptName = hasBill.bill.filename;
+  ok("an update that does not mention the receipt keeps the one the row has",
+    [S.updateTransaction(hasBill.txnId, { ...hb, party: "Renamed party" }),
+      S.readTransaction(hasBill.txnId).bill.filename], ["", keptName]);
+  ok("...and passing null means the same thing — there is no way to REMOVE a receipt",
+    [S.updateTransaction(hasBill.txnId, { ...hb, party: "Renamed twice", bill: null }),
+      !!S.readTransaction(hasBill.txnId).bill], ["", true]);
+  ok("...while passing a file replaces it, and the history says what it replaced",
+    [S.updateTransaction(hasBill.txnId, { ...hb, bill: { filename: "corrected-invoice.pdf", mime: "application/pdf", bytes: 100 * 1024 } }),
+      S.readTransaction(hasBill.txnId).bill.filename], ["", "corrected-invoice.pdf"]);
+  ok("...naming both the old file and the new one",
+    new RegExp("Receipt: " + keptName.replace(".", "\\.") + " . corrected-invoice\\.pdf")
+      .test(S.readTransaction(hasBill.txnId).events[0].note), true);
+  ok("...and swapping ONLY the receipt is a real change, not a no-op",
+    has(S.updateTransaction(hasBill.txnId, { ...hb, bill: { filename: "corrected-invoice.pdf", mime: "application/pdf", bytes: 100 * 1024 } }),
+      "no_change"), true);
 }
 
 console.log("\nwrites · refunds — approval authorises a transfer, it does not make one");

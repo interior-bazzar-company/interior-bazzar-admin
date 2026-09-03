@@ -6,6 +6,81 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-03
 
+### The receipt loses its separate upload dialog and becomes a field on Update
+
+**Area:** `#/finance-transactions` → a row → actions (the *Attach / Edit receipt* item) · the Update dialog
+**Files:** `src/admin/views/Finance/store.ts`, `src/admin/views/Finance/TxnModals.tsx`, `src/admin/views/Finance/TxnDetail.tsx`, `scripts/check-finance-ledger.cjs`, `scripts/fn-smoke.tsx`
+
+**What changed**
+
+**`BillModal` AND `attachBill` ARE GONE**, along with the *Attach receipt* /
+*Edit receipt* menu item. The receipt is now a field in the shared `TxnFields`
+set, so it appears on Record (mandatory, as before) and on Update (optional).
+
+**THE SEPARATION HAD ONE REASON AND IT EXPIRED.** A row’s figures could not be
+amended and its paper could, so the two could not share a screen — two rules,
+two dialogs, and a standing notice on the receipt dialog explaining why it could
+not touch anything else. One rule now, so one screen, and the notice goes with
+it. The paper behind a row is one of the things the row says.
+
+**LEAVING IT ALONE LEAVES IT ALONE.** On an update, both an omitted `bill` and an
+explicit `null` mean *unchanged* — so reopening the dialog to fix a remark never
+disturbs the receipt. A row that already has one shows its filename and offers
+*Replace*; a row with none offers *Attach*. There is no way to REMOVE a receipt:
+replacing one is a change the history records, removing one would be a gap
+nobody could account for.
+
+**IT IS HELD TO THE SAME THREE RULES** as a receipt attached at the time — image
+or PDF, under 5 MB, a real filename — because evidence supplied later is not
+evidence of a lower standard. And it lands in the diff like any other field:
+*Receipt: — → late-invoice.pdf*, in the same `TXN_UPDATED` entry as the rest of
+the edit.
+
+**THE MISSING-BILL BACKLOG IS STILL EMPTIABLE**, which is why the capability was
+folded in rather than deleted: `missingBill` exists precisely for the rows that
+predate the receipt rule, and an update carrying a receipt is what clears them.
+**Download receipt** stays its own (still disabled) item — reading a file and
+replacing one are not the same act.
+
+**One narrowing worth stating:** attaching a receipt to an old row used to be
+available to anyone with edit rights; it now rides on Update, which is Super
+Admin. That follows from putting it on that dialog, and is a one-line change if
+it should not.
+
+**Temp data**
+`none` — no seed or vocabulary change. The receipt is still a filename and a
+type, never bytes; the panel has no document store yet.
+
+**Backend needed**
+- `PATCH /api/v1/finance/transactions/:id` → now also accepts an optional
+  `bill`. Absent or null must mean *leave the existing receipt alone*; a file
+  must be validated exactly as create validates one, must replace the current
+  receipt, and must appear in the same `TXN_UPDATED` diff as `Receipt: was →
+  now`. There is no remove.
+- `POST /api/v1/finance/transactions/:id/bill` → **no longer needed.** Nothing
+  calls it.
+
+**Open decisions**
+One assumption, stated above and on the dialog: **a receipt can be replaced but
+never removed.** The alternative — letting somebody clear a receipt — would put a
+row back into the missing-bill queue with no record of what used to satisfy it.
+
+**Verified**
+`npx tsc -b` and `npx eslint` clean on every touched file.
+`npm run check:finance` → 436 pass, ten of them new: a receipt through Update is
+refused for the wrong type and for size, is accepted with the right one, clears
+the row from the missing-bill backlog, and is named in the diff; an omitted or
+null `bill` keeps the existing receipt; a supplied one replaces it and the diff
+names both files; and swapping only the receipt counts as a real change rather
+than a no-op. `npm run check:finance-render` renders every surface, asserting
+the receipt control on the update dialog in both states (a row with paper shows
+its filename and offers Replace; one without offers Attach).
+`npm run check:finance-nav` passes. Exercised directly against the seed:
+TXN-0910 went from `missingBill: true` to `false` on one update, with
+*Receipt: — → late-invoice.pdf* on the same history line as the party change.
+`npm run check` as a whole still stops at `check:enquiries`, which needs a
+running backend; unrelated.
+
 ### Reverse is gone; a row is corrected in place, and the history keeps every version
 
 **Area:** `#/finance-transactions` · a row → actions → Update · the ledger’s last column

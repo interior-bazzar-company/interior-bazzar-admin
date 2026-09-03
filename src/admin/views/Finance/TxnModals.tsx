@@ -2,11 +2,13 @@
    Other Transaction — the modals.
    -----------------------------------------------------------------------------
    Six write surfaces, each the client half of one store function. None of
-   them edit anything: TxnModal, TagModal and BillModal only ever APPEND a new
-   row; BudgetModal and DeactivateTagModal change a tag's own settings, never
-   a transaction that already used it. UpdateTxnModal is the one that WRITES
-   OVER something — the same field set TxnModal collects, opened on what the
-   row currently says, Super Admin, with every change named in the history. Every refusal from the store renders inside the
+   them edit anything: TxnModal and TagModal only ever APPEND a new row;
+   BudgetModal and DeactivateTagModal change a tag's own settings, never a
+   transaction that already used it. UpdateTxnModal is the one that WRITES OVER
+   something — the same field set TxnModal collects, receipt included, opened on
+   what the row currently says, Super Admin, with every change named in the
+   history. There is no separate receipt dialog: the paper behind a row is one
+   of the things the row says, and it is edited where the rest of them are. Every refusal from the store renders inside the
    dialog that produced it — the sentence it contradicts stays on screen.
    ============================================================================= */
 import { useRef, useState } from "react";
@@ -17,7 +19,7 @@ import type { Done } from "./dialog";
 import { Check, Money, TagChip } from "./bits";
 import {
   ACCOUNTS, CREDIT_KINDS, MODES, TAG_KINDS,
-  PROOF_MAX_BYTES, addTag, attachBill, deactivateTag, fileSize, inr, isSuperAdmin,
+  PROOF_MAX_BYTES, addTag, deactivateTag, fileSize, inr, isSuperAdmin,
   proofAccepted, proofTooBig, recordTransaction, updateTransaction,
   setBudget as setTagBudget, todayIso, useTagTotals, useTags, useTxnRows,
 } from "./store";
@@ -38,18 +40,27 @@ export interface TxnForm {
   direction: "out" | "in"; tagKey: string; amount: string; description: string;
   party: string; mode: string; reference: string; valueDate: string;
   accountId: string; creditKind: string;
+  /** The file PICKED IN THIS DIALOG, not the one already on the row. Null means
+   *  untouched: recording refuses that, updating takes it to mean "leave the
+   *  receipt alone". */
+  bill: { filename: string; mime: string; bytes: number } | null;
 }
 export function txnFormOf(t: CompanyTxn): TxnForm {
   return {
     direction: t.direction, tagKey: t.tagKey, amount: (t.amountPaise / 100).toFixed(2),
     description: t.description, party: t.party, mode: t.mode, reference: t.reference,
     valueDate: t.valueDate, accountId: t.accountId, creditKind: t.creditKind || "",
+    bill: null,
   };
 }
-function TxnFields({ f, set, tags }: {
+function TxnFields({ f, set, tags, had, onErr }: {
   f: TxnForm; set: (patch: Partial<TxnForm>) => void; tags: Tag[];
+  /** The receipt already on the row, if this is an edit. */
+  had?: string | null;
+  onErr: (m: string) => void;
 }) {
   const isIn = f.direction === "in";
+  const fileRef = useRef<HTMLInputElement | null>(null);
   return (
     <div className="fin-stack">
       {/* DEBIT AND CREDIT, said outright. Direction was two words that only
@@ -162,6 +173,48 @@ function TxnFields({ f, set, tags }: {
         </div>
       </Field>
 
+      {/* THE RECEIPT, and the same control on both dialogs. It had a screen of
+          its own until the figures on a row became correctable — the two could
+          not share a dialog while one was amendable and the other was not, and
+          there is nothing left to separate now. Images and PDFs up to 5 MB; the
+          store refuses all three ways and says which, so this is a courtesy
+          rather than the guard.
+
+          ON AN EDIT IT IS OPTIONAL: leaving it alone keeps the receipt the row
+          already has, and there is no way to REMOVE one. A row that had paper
+          behind it does not stop having had it. */}
+      <Field label="Receipt">
+        <button type="button" className={"fin-filebox" + (f.bill ? " on" : "")}
+          title={f.bill ? f.bill.filename : had || undefined}
+          onClick={() => fileRef.current?.click()}>
+          {f.bill
+            ? <><Icon name="check" size="sm" /><span className="name">{f.bill.filename}</span>
+              <span className="swap">Replace</span></>
+            : had
+              ? <><Icon name="check" size="sm" /><span className="name">{had}</span>
+                <span className="swap">Replace</span></>
+              : <><Icon name="plus" size="sm" />
+                <span className="ph">Attach receipt · image or PDF, up to {fileSize(PROOF_MAX_BYTES)}</span></>}
+        </button>
+        <input ref={fileRef} type="file" accept="image/*,application/pdf" hidden
+          onChange={(e) => {
+            const file = e.target.files && e.target.files[0];
+            e.target.value = "";
+            if (!file) return;
+            if (!proofAccepted(file.type)) {
+              set({ bill: null });
+              onErr(file.name + " is neither an image nor a PDF.");
+              return;
+            }
+            if (proofTooBig(file.size)) {
+              set({ bill: null });
+              onErr(file.name + " is " + fileSize(file.size) + ". The limit is " + fileSize(PROOF_MAX_BYTES) + ".");
+              return;
+            }
+            set({ bill: { filename: file.name, mime: file.type, bytes: file.size } });
+          }} />
+      </Field>
+
       {/* LAST, AND A BOX RATHER THAN A LINE. It sat in the middle of the form
           as a one-line input, which made the field that has to make sense to
           a stranger at audit look like the same size of answer as Mode or
@@ -193,11 +246,9 @@ export function TxnModal({ onClose, onDone }: { onClose: () => void; onDone: Don
   const [f, setF] = useState<TxnForm>({
     direction: "out", tagKey: "", amount: "", description: "", party: "",
     mode: MODES[0] || "NEFT", reference: "", valueDate: todayIso(),
-    accountId: ACCOUNTS.filter((a) => a.active)[0]?.accountId || "", creditKind: "",
+    accountId: ACCOUNTS.filter((a) => a.active)[0]?.accountId || "", creditKind: "", bill: null,
   });
-  const [bill, setBill] = useState<{ filename: string; mime: string; bytes: number } | null>(null);
   const [err, setErr] = useState("");
-  const fileRef = useRef<HTMLInputElement | null>(null);
   /* Set once the write has gone through. The dialog then STOPS being a form —
      the row is a fact, Cancel would be a lie, and what is left to offer is the
      record. The pay-salary dialog does exactly this and it is the reason that
@@ -246,7 +297,7 @@ export function TxnModal({ onClose, onDone }: { onClose: () => void; onDone: Don
       direction: f.direction, tagKey: f.tagKey, amountPaise: paise, description: f.description,
       party: f.party, mode: f.mode, reference: f.reference, valueDate: f.valueDate,
       accountId: f.accountId, creditKind: isIn ? f.creditKind || null : null,
-      bill: bill || { filename: "", mime: "" },
+      bill: f.bill || { filename: "", mime: "" },
     });
     if (res.error) { setErr(res.error); return; }
     setDone({ txnId: res.txnId as string, paise, tag: tag ? tag.label : "the tag" });
@@ -257,7 +308,7 @@ export function TxnModal({ onClose, onDone }: { onClose: () => void; onDone: Don
       footer={<><Cancel onClose={onClose} />
         {/* Disabled without the receipt, because the store refuses without it —
             a button that is going to say no is better off saying so first. */}
-        <button className="btn pri" disabled={!bill} onClick={submit}>Record</button></>}>
+        <button className="btn pri" disabled={!f.bill} onClick={submit}>Record</button></>}>
 
       {/* EVERY CHOICE IS A DROPDOWN AND EVERY FIELD IS ON ITS OWN LINE — the
           pay-salary dialog's rhythm. The three segmented pickers this had
@@ -271,46 +322,8 @@ export function TxnModal({ onClose, onDone }: { onClose: () => void; onDone: Don
           true of every write in this module or enforced by the store, which
           refuses and says why at the moment it refuses — which is the moment
           somebody is actually asking. */}
-      <TxnFields f={f} set={set} tags={tags} />
+      <TxnFields f={f} set={set} tags={tags} onErr={setErr} />
 
-      {/* THE RECEIPT, MANDATORY — the same control and the same rule as a
-          salary payment's, which is the point: evidence should not be worth
-          more on one screen than another. Images and PDFs up to 5 MB; the
-          store refuses all three ways and says which, so this is a courtesy
-          rather than the guard.
-
-          IT IS BELOW THE FIELD SET rather than inside it, because updating a
-          row does not touch the paper behind it — the receipt has its own
-          dialog for that, and the shared fields are exactly the ones both
-          writes are allowed to set. */}
-      <Field label="Receipt">
-        <button type="button" className={"fin-filebox" + (bill ? " on" : "")}
-          title={bill ? bill.filename : undefined}
-          onClick={() => fileRef.current?.click()}>
-          {bill
-            ? <><Icon name="check" size="sm" /><span className="name">{bill.filename}</span>
-              <span className="swap">Replace</span></>
-            : <><Icon name="plus" size="sm" /><span className="ph">Attach receipt · image or PDF, up to {fileSize(PROOF_MAX_BYTES)}</span></>}
-        </button>
-        <input ref={fileRef} type="file" accept="image/*,application/pdf" hidden
-          onChange={(e) => {
-            const file = e.target.files && e.target.files[0];
-            e.target.value = "";
-            if (!file) return;
-            if (!proofAccepted(file.type)) {
-              setBill(null);
-              setErr(file.name + " is neither an image nor a PDF.");
-              return;
-            }
-            if (proofTooBig(file.size)) {
-              setBill(null);
-              setErr(file.name + " is " + fileSize(file.size) + ". The limit is " + fileSize(PROOF_MAX_BYTES) + ".");
-              return;
-            }
-            setBill({ filename: file.name, mime: file.type, bytes: file.size });
-            setErr("");
-          }} />
-      </Field>
     </Dlg>
   );
 }
@@ -324,9 +337,12 @@ export function TxnModal({ onClose, onDone }: { onClose: () => void; onDone: Don
  *  called the same field something else would be a second thing to learn for no
  *  reason.
  *
- *  WHAT IT DOES NOT OFFER is the receipt — swapping the paper has its own
- *  dialog — and it does not offer to delete anything, because nothing in this
- *  module is ever deleted.
+ *  IT OFFERS THE RECEIPT TOO, and it is the only screen that does once a row is
+ *  written. The paper used to have a dialog of its own, which existed because a
+ *  row's figures could not be amended and its receipt could — two rules, so two
+ *  screens. One rule now, so one screen. What it does NOT offer is a way to
+ *  delete anything, the receipt included: replacing one is a change the history
+ *  records, and removing one would be a gap nobody could account for.
  *
  *  THE BUTTON WAITS FOR A CHANGE. The store refuses a write in which nothing
  *  moved, so the dialog says so first rather than opening a refusal somebody
@@ -354,6 +370,7 @@ export function UpdateTxnModal({ txn, onClose, onDone }: {
       direction: f.direction, tagKey: f.tagKey, amountPaise: paise, description: f.description,
       party: f.party, mode: f.mode, reference: f.reference, valueDate: f.valueDate,
       accountId: f.accountId, creditKind: f.direction === "in" ? f.creditKind || null : null,
+      bill: f.bill,
     });
     if (res) { setErr(res); return; }
     onDone(txn.txnId + " updated. What it said before is in its history.", "ok");
@@ -375,7 +392,7 @@ export function UpdateTxnModal({ txn, onClose, onDone }: {
         of this row is lost.
       </>} />
 
-      <TxnFields f={f} set={set} tags={tags} />
+      <TxnFields f={f} set={set} tags={tags} had={txn.bill?.filename || null} onErr={setErr} />
     </Dlg>
   );
 }
@@ -513,67 +530,4 @@ export function DeactivateTagModal({ tag, onClose, onDone }: { tag: Tag; onClose
   );
 }
 
-/* ----------------------------------------------------------- BillModal --- */
-/** A prototype field, not an upload — the record is that a bill exists and
- *  what it is called, which is enough to clear the missing-bill state. */
-/** THE ONE THING ON A RECORDED ROW THAT CAN CHANGE — and the dialog says so,
- *  because it is reached from a menu item called Edit and the word promises
- *  more than the ledger allows. The figures are what the row asserts; the
- *  receipt is evidence ABOUT it, and only the second is amendable. */
-export function BillModal({ txn, onClose, onDone }: { txn: CompanyTxn; onClose: () => void; onDone: Done }) {
-  const [file, setFile] = useState<{ filename: string; mime: string; bytes: number } | null>(null);
-  const [err, setErr] = useState("");
-  const fileRef = useRef<HTMLInputElement | null>(null);
-  const had = txn.bill?.filename || null;
-
-  const submit = () => {
-    if (!file) { setErr("Pick a file."); return; }
-    const res = attachBill(txn.txnId, file);
-    if (res) { setErr(res); return; }
-    onDone(file.filename + (had ? " replaced the receipt on " : " attached to ") + txn.txnId + ".", "ok");
-  };
-
-  return (
-    <Dlg title={had ? "Replace the receipt" : "Attach a receipt"}
-      sub={<span className="mono">{txn.txnId}</span>} onClose={onClose} err={err}
-      footer={<><Cancel onClose={onClose} />
-        <button className="btn pri" disabled={!file} onClick={submit}>{had ? "Replace" : "Attach"}</button></>}>
-
-      {/* The one standing note on this dialog, and it is here because the menu
-          item that opens it says Edit — a word that promises the figures. */}
-      <Notice tone="info" ico="lock" text={<>
-        <b>Only the receipt.</b> The amount, direction, tag, reference, date and account are what
-        this row asserts, and none of them is reachable from here — correcting any of those is
-        Update, which is Super Admin and writes what it changed into the history.
-      </>} />
-
-      <Field label="Receipt">
-        <button type="button" className={"fin-filebox" + (file ? " on" : "")}
-          title={file ? file.filename : undefined}
-          onClick={() => fileRef.current?.click()}>
-          {file
-            ? <><Icon name="check" size="sm" /><span className="name">{file.filename}</span>
-              <span className="swap">Replace</span></>
-            : <><Icon name="plus" size="sm" />
-              <span className="ph">{had ? "Pick the file that replaces " + had : "Attach receipt"}
-                {" · image or PDF, up to " + fileSize(PROOF_MAX_BYTES)}</span></>}
-        </button>
-        <input ref={fileRef} type="file" accept="image/*,application/pdf" hidden
-          onChange={(e) => {
-            const f = e.target.files && e.target.files[0];
-            e.target.value = "";
-            if (!f) return;
-            if (!proofAccepted(f.type)) { setFile(null); setErr(f.name + " is neither an image nor a PDF."); return; }
-            if (proofTooBig(f.size)) {
-              setFile(null);
-              setErr(f.name + " is " + fileSize(f.size) + ". The limit is " + fileSize(PROOF_MAX_BYTES) + ".");
-              return;
-            }
-            setFile({ filename: f.name, mime: f.type, bytes: f.size });
-            setErr("");
-          }} />
-      </Field>
-    </Dlg>
-  );
-}
 

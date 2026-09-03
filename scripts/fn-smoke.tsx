@@ -43,7 +43,7 @@ import {
   CloseAccountModal, LopModal, OpenRunModal, PaySalaryModal, SalaryAccountModal,
 } from "../src/admin/views/Finance/SalaryModals";
 import {
-  BillModal, BudgetModal, DeactivateTagModal, TagModal, TxnModal, UpdateTxnModal,
+  BudgetModal, DeactivateTagModal, TagModal, TxnModal, UpdateTxnModal,
 } from "../src/admin/views/Finance/TxnModals";
 import {
   DecideRefundModal, ManualRefundModal, RecordTransferModal, RequestRefundModal,
@@ -815,7 +815,7 @@ has(updM, "Super Admin", "...and whose call it is");
 has(updM, "Every change is recorded", "...it says outright that the history keeps what moved");
 has(updM, "Ahuja Estates", "...and it opens on what the row currently says, not on a blank form");
 has(updM, "optgroup", "...the tag picker is the record dialog's, grouped by where the money lands");
-hasnt(updM, ">Receipt<", "...but not the receipt, which has its own dialog and its own act");
+has(updM, ">Receipt<", "...the receipt included, since it no longer has a screen of its own");
 
 const tagM = check("create a tag", () => modal(<TagModal onClose={noop} onDone={noop} />));
 has(tagM, "it decides where the money lands in Analytics", "...the kind decides where the money lands");
@@ -829,20 +829,20 @@ const deact = check("deactivate a tag", () => modal(
   <DeactivateTagModal tag={tag("soft")} onClose={noop} onDone={noop} />));
 has(deact, "nothing is re-bucketed", "...deactivating re-buckets nothing");
 has(deact, "There is no reactivate here", "...and it does not pretend to be undoable");
-/* THE RECEIPT IS PICKED NOW, NOT TYPED, and held to the same three rules as one
-   attached at the time. It used to be a text box for a filename with a note
-   saying so. */
-const bill = check("edit the receipt", () => modal(
-  <BillModal txn={txn("TXN-0910")} onClose={noop} onDone={noop} />));
-has(bill, "fin-filebox", "...a receipt is picked, not typed");
-has(bill, "up to 5 MB", "...to the same limit as one attached when the row was recorded");
-/* THE WORD `EDIT` PROMISES THE FIGURES, so the dialog it opens says outright
-   that it cannot touch them. This is the module's central rule and the one
-   place somebody arrives expecting the opposite. */
-has(bill, "Only the receipt", "...and says plainly that only the receipt can change");
-has(bill, "Update, which is Super Admin",
-  "...naming what to use instead when a figure is wrong, and whose call it is");
-hasnt(bill, "reversal", "...and pointing at nothing that no longer exists");
+/* THE RECEIPT HAS NO DIALOG OF ITS OWN ANY MORE. It had one while a row's
+   figures could not be amended and its paper could — two rules, so two screens.
+   One rule now, so the receipt is a field on the update like every other. */
+const updNoBill = check("update a row that is missing its receipt", () =>
+  modal(<UpdateTxnModal txn={txn("TXN-0910")} onClose={noop} onDone={noop} />));
+has(updNoBill, "fin-filebox", "...the receipt is picked here, on the one dialog that edits a row");
+has(updNoBill, "up to 5 MB", "...to the same limit as one attached when the row was recorded");
+has(updNoBill, "Attach receipt", "...and a row with no paper behind it is offered one");
+/* A ROW THAT ALREADY HAS PAPER shows what it has, so nobody replaces a receipt
+   by accident while fixing a remark. */
+const updHasBill = check("update a row that already has one", () =>
+  modal(<UpdateTxnModal txn={txn("TXN-0901")} onClose={noop} onDone={noop} />));
+has(updHasBill, "rent-aug-2026.pdf", "...it names the receipt already on the row");
+has(updHasBill, "swap", "...and offers to replace it rather than to attach a first one");
 
 const reqRefund = check("request a refund", () => modal(<RequestRefundModal onClose={noop} onDone={noop} />));
 has(reqRefund, "Full amount only", "...refunds are full-amount-only");

@@ -15,7 +15,7 @@ import { EmptyState, Icon, KvList, Notice, Tabs, qs } from "../../ui";
 import { go } from "../../ui/nav";
 import { Block, Blocks, Rec } from "./Frame";
 import { Dir, EventList, Money, ProtoBar, TagChip } from "./bits";
-import { BillModal, UpdateTxnModal } from "./TxnModals";
+import { UpdateTxnModal } from "./TxnModals";
 import {
   BILL_THRESHOLD_PAISE, CREDIT_KINDS,
   accountOf, ago, fmtDate, fmtDateTime, inr, isSuperAdmin, tagKindMeta, useTxn,
@@ -44,14 +44,15 @@ function carry(p: Params): Params {
  *  rule, printed at the foot of this very page: the amount, direction, tag,
  *  reference, date and account are what the row ASSERTS, and a correction to
  *  any of them goes through Update, which is Super Admin and writes what it
- *  changed into the history. A receipt is evidence ABOUT the row rather than
- *  part of what it says, which is why it has its own item.
+ *  changed into the history. THE RECEIPT GOES THROUGH THE SAME ITEM: it had
+ *  one of its own while a row's figures were unamendable and its paper was, and
+ *  that was the only thing keeping them apart. Download stays separate, because
+ *  reading a file and replacing one are not the same act.
  *
  *  Same `.fin-menu` and the same `.mi` rows the slips table uses — one menu in
  *  the module, not two that drift. */
-function TxnMenu({ txn, sa, onEdit, onUpdate }: {
-  txn: CompanyTxn; sa: boolean;
-  onEdit: () => void; onUpdate: () => void;
+function TxnMenu({ txn, sa, onUpdate }: {
+  txn: CompanyTxn; sa: boolean; onUpdate: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLSpanElement | null>(null);
@@ -92,7 +93,6 @@ function TxnMenu({ txn, sa, onEdit, onUpdate }: {
       </button>
       {open ? (
         <span className="fin-menu-pop" role="menu" aria-label={"Actions for " + txn.txnId}>
-          {item("invoice", txn.bill ? "Edit receipt" : "Attach receipt", onEdit)}
           {/* DISABLED, ALWAYS, AND IT SAYS WHY. The panel holds a filename and
               not the bytes, so a download would produce nothing — and an item
               that silently does nothing is worse than one that explains. It is
@@ -157,7 +157,6 @@ export default function TxnDetail({ id, p, onParams }: {
   const creditKind = t.creditKind ? CREDIT_KINDS.filter((c) => c.key === t.creditKind)[0] : null;
 
   const done = (msg: string, tone?: string) => { closeLayer(); toast(msg, tone); };
-  const openBill = () => modal(<BillModal txn={t} onClose={closeLayer} onDone={done} />);
   const openUpdate = () => modal(<UpdateTxnModal txn={t} onClose={closeLayer} onDone={done} />);
 
   return (
@@ -168,7 +167,7 @@ export default function TxnDetail({ id, p, onParams }: {
            action the same weight as attaching paperwork, and had nowhere to
            put a third. Everything the row can have done to it is behind the
            one control now, in the order somebody reaches for them. */
-        <TxnMenu txn={t} sa={sa} onEdit={openBill} onUpdate={openUpdate} />
+        <TxnMenu txn={t} sa={sa} onUpdate={openUpdate} />
       ) : null}>
 
       <div className="fin-subline">

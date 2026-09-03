@@ -2085,11 +2085,12 @@ export interface TxnInput {
   direction: "out" | "in"; tagKey: string; amountPaise: number;
   description: string; party: string; mode: string; reference: string;
   valueDate: string; accountId: string; creditKind?: string | null;
-  /** MANDATORY, on every row. It used to be optional and attached afterwards
-   *  through `attachBill`, which is why `missingBill` exists at all — a queue
-   *  of rows somebody meant to come back to. Nothing new can join that queue
-   *  now: the money moved, and the paper that says so is part of recording it.
-   *  `attachBill` stays, for the historical rows that predate this. */
+  /** MANDATORY, on every row. It used to be optional and attached afterwards,
+   *  which is why `missingBill` exists at all — a queue of rows somebody meant
+   *  to come back to. Nothing new can join that queue now: the money moved, and
+   *  the paper that says so is part of recording it. What empties the backlog
+   *  that predates the rule is `updateTransaction`, which takes a receipt like
+   *  any other field. */
   bill: { filename: string; mime: string; bytes?: number };
 }
 export function recordTransaction(input: TxnInput): { error: string; txnId: string | null } {
@@ -2136,47 +2137,6 @@ export function recordTransaction(input: TxnInput): { error: string; txnId: stri
   return { error: "", txnId: id };
 }
 
-/** THE PAPERWORK IS THE ONE THING ON A RECORDED ROW THAT CAN CHANGE, and this
- *  is the only write that changes it. It exists for the rows that predate the
- *  receipt being mandatory, and for the case where the wrong file was picked —
- *  a bill is evidence ABOUT the row, not part of what the row asserts.
- *
- *  IT DOES NOT EDIT THE ROW. The amount, the direction, the tag, the reference,
- *  the date and the account are what the row says happened, and none of them is
- *  reachable from here: `updateTransaction` is the write for those, it is Super
- *  Admin, and it records what it changed. Two writes rather than one because
- *  swapping a receipt and restating what a row says are different acts with
- *  different consequences and, as it turns out, different permissions.
- *
- *  Same three rules as recording one, deliberately — a receipt attached later
- *  is not held to a lower standard than a receipt attached at the time. */
-export function attachBill(
-  id: string,
-  file: string | { filename: string; mime: string; bytes?: number },
-): string {
-  const t = readTransaction(id);
-  if (!t) return "That transaction no longer exists.";
-  /* A bare string is the old call shape and means "trust the name": no mime to
-     check and no size to measure. Kept so a caller that only has a filename is
-     not forced to invent the rest. */
-  const f = typeof file === "string" ? { filename: file, mime: "", bytes: undefined } : file;
-  const name = (f.filename || "").trim();
-  if (!name) return "Pick a file. (bill_required)";
-  if (f.mime && !proofAccepted(f.mime))
-    return name + " is neither an image nor a PDF. (bill_type)";
-  if (proofTooBig(f.bytes))
-    return name + " is " + fileSize(f.bytes as number) + ". The limit is "
-      + fileSize(PROOF_MAX_BYTES) + ". (bill_too_big)";
-  const had = t.bill?.filename || null;
-  t.bill = { type: "invoice", filename: name, uploadedAt: stamp() };
-  log(pushEvent(t.events, "BILL_ATTACHED",
-    had && had !== name
-      ? name + " replaced " + had + ". The row itself is untouched — a bill is evidence about it, not part of what it says."
-      : name + " attached."), id, "transaction");
-  emit();
-  return "";
-}
-
 /** FN-T11 · UPDATE A RECORDED ROW. Super Admin.
  *
  *  THE ROW SAYS WHAT IS TRUE NOW; THE TIMELINE SAYS WHAT IT EVER SAID. This
@@ -2208,6 +2168,18 @@ export interface TxnEdit {
   direction: "out" | "in"; tagKey: string; amountPaise: number;
   description: string; party: string; mode: string; reference: string;
   valueDate: string; accountId: string; creditKind?: string | null;
+  /** THE RECEIPT IS A FIELD LIKE ANY OTHER HERE. It had its own dialog and its
+   *  own write for one reason — a row's figures were unamendable and its paper
+   *  was, so the two could not share a screen. Now that the figures are
+   *  correctable there is nothing left to separate: one dialog restates the
+   *  row, and the paper behind it is part of what it says.
+   *
+   *  OMIT IT TO LEAVE THE EXISTING RECEIPT ALONE. Passing a file replaces it,
+   *  held to the same three rules as one attached at the time — a receipt
+   *  supplied later is not evidence of a lower standard. A row's receipt can be
+   *  replaced but never removed: `null` and `undefined` both mean "unchanged",
+   *  because a row that had paper behind it does not stop having had it. */
+  bill?: { filename: string; mime: string; bytes?: number } | null;
 }
 export function updateTransaction(id: string, input: TxnEdit): string {
   const t = readTransaction(id);
@@ -2228,6 +2200,15 @@ export function updateTransaction(id: string, input: TxnEdit): string {
   if (!accountOf(input.accountId)) return "Pick the account.";
   if (input.direction === "in" && (!input.creditKind || !CREDIT_KINDS.some((c) => c.key === input.creditKind)))
     return "Money in is restricted here to bank interest, an own transfer or a vendor refund. Customer money has exactly one way in: a subscription.";
+  /* THE SAME THREE RULES AS RECORDING ONE. A receipt attached later is not held
+     to a lower standard than a receipt attached at the time. */
+  const billName = (input.bill?.filename || "").trim();
+  if (input.bill && !billName) return "Pick a file. (bill_required)";
+  if (input.bill && input.bill.mime && !proofAccepted(input.bill.mime))
+    return billName + " is neither an image nor a PDF. (bill_type)";
+  if (input.bill && proofTooBig(input.bill.bytes))
+    return billName + " is " + fileSize(input.bill.bytes as number) + ". The limit is "
+      + fileSize(PROOF_MAX_BYTES) + ". (bill_too_big)";
 
   const creditKind = input.direction === "in" ? input.creditKind || null : null;
   /* WHAT ACTUALLY MOVED, in the order the dialog asks it. Rendered into the
@@ -2252,6 +2233,7 @@ export function updateTransaction(id: string, input: TxnEdit): string {
   moved("Account", accountOf(t.accountId)?.masked || t.accountId, accountOf(input.accountId)?.masked || input.accountId);
   moved("Credit kind", kindWord(t.creditKind), kindWord(creditKind));
   moved("Remark", t.description, input.description.trim());
+  const billMoved = billName ? moved("Receipt", t.bill?.filename || "", billName) : false;
   /* NOTHING CHANGED IS NOT A WRITE. It would stamp an editor and a time onto a
      row nobody edited, and put a line in the history saying so. */
   if (!changes.length) return "Nothing changed. (no_change)";
@@ -2268,6 +2250,7 @@ export function updateTransaction(id: string, input: TxnEdit): string {
   t.accountId = input.accountId;
   t.nonRevenue = input.direction === "in";
   t.creditKind = creditKind;
+  if (billMoved) t.bill = { type: "invoice", filename: billName, uploadedAt: stamp() };
   t.updatedBy = a.name;
   t.updatedAt = stamp();
   /* ONE EDIT, ONE ENTRY. The broken bank match used to be a second event, which
