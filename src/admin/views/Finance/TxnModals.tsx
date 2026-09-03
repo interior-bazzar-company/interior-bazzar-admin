@@ -4,8 +4,8 @@
    Six write surfaces, each the client half of one store function. None of
    them edit anything: TxnModal, TagModal and BillModal only ever APPEND a new
    row; BudgetModal and DeactivateTagModal change a tag's own settings, never
-   a transaction that already used it; ReverseTxnModal appends a counter-entry
-   and touches nothing else. Every refusal from the store renders inside the
+   a transaction that already used it; ReverseTxnModal writes the correction
+   onto the row it corrects and appends nothing at all. Every refusal from the store renders inside the
    dialog that produced it — the sentence it contradicts stays on screen.
    ============================================================================= */
 import { useRef, useState } from "react";
@@ -15,7 +15,7 @@ import { Cancel, Dlg, Field, Fs, Pick, RupeeInput, toPaise } from "./dialog";
 import type { Done } from "./dialog";
 import { Check, Money, TagChip } from "./bits";
 import {
-  ACCOUNTS, CREDIT_KINDS, MODES, TAG_KINDS,
+  ACCOUNTS, CREDIT_KINDS, MODES, PERIOD, TAG_KINDS,
   PROOF_MAX_BYTES, addTag, attachBill, deactivateTag, fileSize, inr, isSuperAdmin,
   proofAccepted, proofTooBig, recordTransaction, reverseTransaction,
   setBudget as setTagBudget, todayIso, useTagTotals, useTags, useTxnRows,
@@ -438,7 +438,7 @@ export function BillModal({ txn, onClose, onDone }: { txn: CompanyTxn; onClose: 
       <Notice tone="info" ico="lock" text={<>
         <b>Only the receipt.</b> The amount, direction, tag, reference, date and account are what
         this row asserts and none of them can be changed — a correction to any of those is a
-        counter-entry, appended, never a rewrite.
+        reversal, which retires the row without rewriting a word of it.
       </>} />
 
       <Field label="Receipt">
@@ -472,9 +472,9 @@ export function BillModal({ txn, onClose, onDone }: { txn: CompanyTxn; onClose: 
 }
 
 /* ----------------------------------------------------- ReverseTxnModal --- */
-/** FN-T11 · Super Admin. A correction is an append, never an edit: this
- *  writes a new row with a negative amount and leaves the original exactly
- *  as it was posted. */
+/** FN-T11 · Super Admin. A correction is recorded ON the row, never as a
+ *  second one: this stamps the reason onto it and takes it out of the totals,
+ *  and nothing it says — amount, direction, tag, date, bill — is edited. */
 export function ReverseTxnModal({ txn, onClose, onDone }: { txn: CompanyTxn; onClose: () => void; onDone: Done }) {
   const [reason, setReason] = useState("");
   const [err, setErr] = useState("");
@@ -494,8 +494,8 @@ export function ReverseTxnModal({ txn, onClose, onDone }: { txn: CompanyTxn; onC
           Reverse
         </button>
       </>}>
-      <Check ok>A counter-entry is appended, carrying <Money paise={-Math.abs(txn.amountPaise)} />.</Check>
-      <Check ok>{txn.txnId} itself is untouched — its state turns to reversed, and nothing on the row is edited.</Check>
+      <Check ok>{txn.txnId} keeps <Money paise={Math.abs(txn.amountPaise)} /> and everything else it was posted with — the amount, the direction, the tag, the date and the bill are not edited.</Check>
+      <Check ok>It stops counting: out of {PERIOD.label}'s spend, out of its tag's total, and out of every figure derived from them. No second row is appended.</Check>
       <Check warn>This moves no money by itself. Whatever the mistake needs undone in the bank happens separately, outside this screen.</Check>
       <Field label="Reason" help="Mandatory, and read at audit — a reversal with no reason is indistinguishable from a mistake nobody noticed.">
         <textarea className="inp" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />

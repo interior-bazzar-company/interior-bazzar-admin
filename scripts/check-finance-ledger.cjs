@@ -268,7 +268,7 @@ S.resetStore();
   ok("...and the refund subtracts it separately in August, the month it left",
     [o.refundsPaidPaise, o.refundsPaidN], [990000, 1]);
 
-  const out = S.readTransactions().filter((t) => t.direction === "out" && inAug(t.valueDate));
+  const out = S.readTransactions().filter((t) => t.direction === "out" && t.state === "recorded" && inAug(t.valueDate));
   const operating = out.filter((t) => S.tagOf(t.tagKey).kind !== "excluded");
   const excluded = out.filter((t) => S.tagOf(t.tagKey).kind === "excluded");
   ok("other spend is the operating rows only", o.otherOutPaise, money(operating));
@@ -276,16 +276,30 @@ S.resetStore();
     operating.some((t) => t.txnId === "TXN-0911"), false);
   ok("...it is counted apart, in full", [o.excludedPaise, money(excluded)], [540000, 540000]);
   ok("other income is Σ the credits in the period", o.otherInPaise,
-    money(S.readTransactions().filter((t) => t.direction === "in" && inAug(t.valueDate))));
+    money(S.readTransactions().filter((t) => t.direction === "in" && t.state === "recorded" && inAug(t.valueDate))));
   ok("every hand-keyed credit is flagged non-revenue — customer money has one door",
     S.readTransactions().filter((t) => t.direction === "in" && !t.nonRevenue).map((t) => t.txnId), []);
 
-  const pair = S.readTransactions().filter((t) => t.txnId === "TXN-0917" || t.txnId === "TXN-RV-0917");
-  ok("a reversed transaction and its counter-entry both fall in August", pair.filter((t) => inAug(t.valueDate)).length, 2);
-  ok("...and net to zero, so the month is not charged twice", money(pair), 0);
-  ok("...the original row is untouched and still on the record",
-    [pair.filter((t) => t.txnId === "TXN-0917")[0].amountPaise, pair.filter((t) => t.txnId === "TXN-0917")[0].state],
-    [220000, "reversed"]);
+  /* A REVERSED ROW IS ONE ROW. It used to be two — the original plus a
+     `TXN-RV-` counter-entry carrying the negative — and the month came out
+     right because they summed to zero. Now the row simply stops being counted,
+     and these assertions are the difference. */
+  const rev = S.readTransactions().filter((t) => t.txnId === "TXN-0917")[0];
+  ok("the reversed August transaction is still on the record, saying exactly what it said",
+    [rev.amountPaise, rev.direction, rev.valueDate, rev.state, !!rev.bill],
+    [220000, "out", "2026-08-05", "reversed", true]);
+  ok("...it carries its own correction — who, when and why", 
+    [!!rev.reversal.by, !!rev.reversal.at, rev.reversal.reason.slice(0, 16)],
+    [true, true, "Wrong contractor"]);
+  ok("...and there is no counter-entry anywhere in the ledger to go with it",
+    S.readTransactions().filter((t) => t.amountPaise < 0 || /-RV-/.test(t.txnId)).map((t) => t.txnId), []);
+  ok("...so the month is not charged for it: August spend excludes the reversed row",
+    o.otherOutPaise + o.excludedPaise,
+    money(S.readTransactions().filter((t) => t.direction === "out" && t.state === "recorded" && inAug(t.valueDate))));
+  ok("...and neither does its tag's total",
+    S.tagTotals().rows.filter((r) => r.tag.tagKey === rev.tagKey)[0].spentPaise,
+    money(S.readTransactions().filter((t) => t.tagKey === rev.tagKey && t.direction === "out"
+      && t.state === "recorded" && inAug(t.valueDate))));
 
   ok("salary cost counts only runs that were actually paid", [o.salaryPaise, o.salaryN], [0, 0]);
   ok("...the open August run of ₹5,01,000 contributes nothing until someone is paid",
@@ -1356,19 +1370,24 @@ S.resetStore();
   ok("...and no credit or expense ever reaches collected", S.overview().collectedPaise, collected0);
 
   const before = JSON.stringify(S.readTransaction("TXN-0912"));
+  const tagBefore = S.tagTotals().rows
+    .filter((r) => r.tag.tagKey === S.readTransaction("TXN-0912").tagKey)[0].spentPaise;
   ok("a reversal with no reason is refused", has(S.reverseTransaction("TXN-0912", " "), "reason_required"), true);
   ok("reversing a transaction is accepted", S.reverseTransaction("TXN-0912", "paid the wrong vendor"), "");
   const orig = S.readTransaction("TXN-0912");
   ok("...the original keeps its amount, its date and its bill",
     [orig.amountPaise, orig.valueDate, !!orig.bill],
     [JSON.parse(before).amountPaise, JSON.parse(before).valueDate, !!JSON.parse(before).bill]);
-  ok("...only its state moved, and it names the counter-entry",
-    [orig.state, orig.reversal.counterId], ["reversed", "TXN-RV-0912"]);
-  const counter = S.readTransaction("TXN-RV-0912");
-  ok("...the counter-entry carries the negative amount and points back",
-    [counter.amountPaise, counter.reversesTxnId], [-450000, "TXN-0912"]);
-  ok("a counter-entry cannot itself be reversed",
-    has(S.reverseTransaction("TXN-RV-0912", "again"), "invalid_state_transition"), true);
+  ok("...only its state moved, and the reason rode onto the row itself",
+    [orig.state, orig.reversal.reason], ["reversed", "paid the wrong vendor"]);
+  ok("...NO SECOND ROW WAS APPENDED — the correction is on the row it corrects",
+    S.readTransactions().filter((t) => /-RV-/.test(t.txnId) || t.amountPaise < 0).map((t) => t.txnId), []);
+  ok("...and the row stopped counting: its tag's total dropped by exactly its amount",
+    tagBefore - S.tagTotals().rows.filter((r) => r.tag.tagKey === orig.tagKey)[0].spentPaise, 450000);
+  ok("...while the row still says what it was posted for, which is the point of not editing it",
+    [orig.amountPaise, orig.direction], [450000, "out"]);
+  ok("reversing it twice is refused",
+    has(S.reverseTransaction("TXN-0912", "again"), "invalid_state_transition"), true);
 }
 
 console.log("\nwrites · refunds — approval authorises a transfer, it does not make one");

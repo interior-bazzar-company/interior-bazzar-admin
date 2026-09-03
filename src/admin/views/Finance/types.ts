@@ -338,8 +338,8 @@ export interface Tag {
 
 export type TxnDirection = "out" | "in";
 
-/** Recorded, or reversed by a counter-entry. There is no draft: a row here
- *  means the money moved. */
+/** Recorded, or reversed on itself. There is no draft: a row here means the
+ *  money moved, and a reversed one means it moved and was then corrected. */
 export type TxnState = "recorded" | "reversed";
 
 export interface CompanyTxn {
@@ -361,9 +361,11 @@ export interface CompanyTxn {
    *  vendor refund. Customer money has exactly one way in: a subscription. */
   nonRevenue: boolean;
   creditKind: string | null;
-  /** Set on the counter-entry, pointing at the row it reverses. */
-  reversesTxnId: string | null;
-  reversal: { counterId: string; reason: string; by: string; at: string } | null;
+  /** THE CORRECTION, RECORDED ON THE ROW IT CORRECTS. Set when `state` turns
+   *  `reversed`: who reversed it, when, and why. There is no counter-entry and
+   *  no second row — the amount, direction, tag, date and bill above stay
+   *  exactly as posted, and this is what stops them charging the month. */
+  reversal: { reason: string; by: string; at: string } | null;
   recordedBy: string;
   recordedAt: string;
   events: FinEvent[];

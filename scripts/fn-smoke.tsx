@@ -323,6 +323,14 @@ has(txns, "Missing a bill", "...a missing bill is a state, not an error");
 has(txns, "Interest, own transfers and vendor refunds are the only",
   "...money in is named as three non-revenue kinds, on the cell it qualifies");
 has(txns, "Excluded spend", "...and excluded spend is stated rather than left inside a total");
+/* A REVERSED ROW IN THE LIST. It is on the record forever and charges nothing,
+   so it wears the same `dim` a cancelled subscription does — struck figure,
+   greyed line — under a blue chip rather than a red one, because it is the
+   settled row on the page, not the alarming one. */
+has(txns, "clickable dim", "...a reversed row is dimmed the way every retired row in this module is");
+has(txns, "rail\"><i class=\"info", "...its rail is blue: reversed is settled, not going wrong");
+has(txns, "reversed by K. Iyer", "...and the row names who reversed it, not some other row to go and read");
+hasnt(txns, "TXN-RV", "...there is no counter-entry row in the ledger at all");
 const txnsFiltered = check("transactions · filtered to the ones missing a bill", () => at("/finance-transactions?flag=nobill"));
 has(txnsFiltered, "Missing — required", "...and the queue shows the rows that are actually missing one");
 const txnsEmpty = check("transactions · a filter that matches nothing", () => at("/finance-transactions?q=zzzznothing"));
@@ -569,7 +577,7 @@ has(draftSlip, 'class="mono fin-slipid"', "...and the action row names the slip 
 
 const oneTxn = page("a company transaction", "/finance-transactions/TXN-0901");
 has(oneTxn, "A recorded row is never edited", "...posted is permanent");
-has(oneTxn, "a correction is a new counter-entry", "...and a correction is an append");
+has(oneTxn, "a correction is a reversal", "...and a correction is a reversal, not a rewrite");
 /* THE ACTIONS MENU IS NOT ASSERTED HERE, and the reason is worth writing down
    rather than leaving as a gap. `can()` returns false without a session, so
    this harness renders every Finance page with NO write affordance at all —
@@ -588,9 +596,13 @@ has(oneTxn, ">Receipt<", "...the bill block is a receipt section");
 has(oneTxn, "fin-receipt", "...and the file reads as a file");
 has(oneTxn, "holds the name, not the file",
   "...saying what it actually holds rather than offering a download that would do nothing");
-const counter = page("its counter-entry", "/finance-transactions/TXN-RV-0917");
-has(counter, "This is a counter-entry", "...a counter-entry says which row it offsets");
-has(counter, "nothing else about the original", "...and that the original was left alone");
+/* A REVERSED ROW CARRIES ITS OWN CORRECTION. There is no counter-entry to open
+   any more, so the row itself has to say the whole thing. */
+const reversed = page("a reversed transaction", "/finance-transactions/TXN-0917");
+has(reversed, "This row has been reversed", "...a reversed row says so on its face");
+has(reversed, "Nothing it says was edited", "...and that its figures are exactly as posted");
+has(reversed, "no longer counts towards the month", "...naming the one thing that actually changed");
+hasnt(reversed, "counter-entry", "...with no second row to go and read");
 const noBill = page("a transaction missing a bill", "/finance-transactions/TXN-0910");
 has(noBill, "No bill attached", "...a missing bill is named");
 has(noBill, "cannot close while it is missing", "...and it says what the absence costs");
@@ -779,7 +791,7 @@ has(txnM, "optgroup", "...tags are grouped by where they land");
 has(txnM, "Net line AND CAC", "...naming the destination on the group, not on every row");
 has(txnM, "bill required", "...and an option says so, because that tag refuses the write without one");
 /* THE STANDING PROSE IS GONE. The rule it carried — a row is a fact and a
-   correction is an append — is asserted where somebody MEETS it: on the
+   correction is a reversal — is asserted where somebody MEETS it: on the
    reversal dialog, and on the record page. Both are below and above. */
 hasnt(txnM, "nobody edits it; a correction is a counter-entry, never a rewrite",
   "...and the standing sub-line came off, with its rule moved to where it is acted on");
@@ -793,8 +805,8 @@ hasnt(txnM, "NaN", "...and no NaN reaches the output from an unfilled amount fie
 /* WHERE THAT RULE LIVES NOW: on the dialog that performs the correction. */
 const revM = check("reverse a transaction", () =>
   modal(<ReverseTxnModal txn={txn("TXN-0901")} onClose={noop} onDone={noop} />));
-has(revM, "counter-entry is appended",
-  "...a correction is an append, said on the dialog that appends it");
+has(revM, "No second row is appended",
+  "...the dialog that performs the correction says it writes no second row");
 
 const tagM = check("create a tag", () => modal(<TagModal onClose={noop} onDone={noop} />));
 has(tagM, "it decides where the money lands in Analytics", "...the kind decides where the money lands");
@@ -819,12 +831,13 @@ has(bill, "up to 5 MB", "...to the same limit as one attached when the row was r
    that it cannot touch them. This is the module's central rule and the one
    place somebody arrives expecting the opposite. */
 has(bill, "Only the receipt", "...and says plainly that only the receipt can change");
-has(bill, "counter-entry, appended, never a rewrite",
+has(bill, "retires the row without rewriting a word of it",
   "...naming what to do instead when a figure is wrong");
 const revTxn = check("reverse a transaction", () => modal(
   <ReverseTxnModal txn={txn("TXN-0901")} onClose={noop} onDone={noop} />));
-has(revTxn, "A counter-entry is appended", "...a correction is an appended counter-entry");
-has(revTxn, "itself is untouched", "...and the original row is untouched");
+has(revTxn, "stops counting", "...the correction is the row leaving the totals");
+has(revTxn, "everything else it was posted with", "...while nothing the row says is edited");
+hasnt(revTxn, "counter-entry", "...and no second row is promised anywhere on it");
 
 const reqRefund = check("request a refund", () => modal(<RequestRefundModal onClose={noop} onDone={noop} />));
 has(reqRefund, "Full amount only", "...refunds are full-amount-only");

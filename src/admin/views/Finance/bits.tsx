@@ -91,11 +91,17 @@ export function Dir({ d }: { d: "in" | "out" }) {
   return <span className={"fin-dir " + d}>{d === "out" ? "Debit" : "Credit"}</span>;
 }
 
-/** Signed money: a negative row is a counter-entry and reads as one. */
-export function Money({ paise, sign, strong }: { paise: number; sign?: boolean; strong?: boolean }) {
+/** Signed money. `dead` strikes the figure through: the row still says this
+ *  amount — it is never edited — but the amount no longer charges anything,
+ *  which is exactly what a reversed row is. A struck figure says "this stands
+ *  on the record and counts for nothing" in the one glance a muted colour or a
+ *  separate note could not. */
+export function Money({ paise, sign, strong, dead }: {
+  paise: number; sign?: boolean; strong?: boolean; dead?: boolean;
+}) {
   const neg = paise < 0;
   return (
-    <span className={"tnum fin-money" + (neg ? " neg" : sign ? " pos" : "") + (strong ? " strong" : "")}>
+    <span className={"tnum fin-money" + (neg ? " neg" : sign ? " pos" : "") + (strong ? " strong" : "") + (dead ? " dead" : "")}>
       {neg ? "−" : sign ? "+" : ""}{inr(Math.abs(paise))}
     </span>
   );

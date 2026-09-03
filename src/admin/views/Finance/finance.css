@@ -120,9 +120,17 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
 .fin-tbl td.rail i.warn { background: var(--warn-solid) }
 .fin-tbl td.rail i.bad { background: var(--bad-solid) }
 .fin-tbl td.rail i.ok { background: var(--ok-solid) }
+/* A REVERSED ROW IS NOT AN ALARM. It is the settled one: somebody found the
+   mistake and corrected it. Red would put it in the same channel as a bill
+   that is missing and a budget that is blown, both of which still need doing. */
+.fin-tbl td.rail i.info { background: var(--info-solid) }
 .fin-tbl td.num, .fin-tbl th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap }
 .fin-tbl tr.dim td { color: var(--text-3) }
-.fin-tbl tr.dim .fin-money { text-decoration: line-through; color: var(--text-3) }
+/* STRUCK, NOT HIDDEN. A dim row and a `dead` figure are the same statement in
+   two places — the list, where the whole row greys, and a record, where only
+   the figure can. The row keeps saying what it was posted for; the strike says
+   it charges nothing. Declared once so the two cannot drift apart. */
+.fin-tbl tr.dim .fin-money, .fin-money.dead { text-decoration: line-through; color: var(--text-3) }
 .fin-pager { display: flex; align-items: center; gap: var(--space-3); justify-content: center; padding: var(--space-4) 0; font-size: var(--text-sm); color: var(--text-3) }
 
 /* -------------------------------------------------------------- record --- */

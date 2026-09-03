@@ -11,8 +11,11 @@
    `fail_to_pay` looks like the exception and is not: it records a decline that
    occurred or a due date that demonstrably passed, and it carries the evidence.
 
-   POSTED IS PERMANENT. Nothing edits or deletes a recorded row. A correction is
-   a counter-entry, or a reversal written into the history with its reason.
+   POSTED IS PERMANENT. Nothing edits or deletes what a row SAYS — the amount,
+   the direction, the tag, the date and the account are the fact it asserts, and
+   none of them is reachable by any write here. A correction is a reversal
+   recorded ON the row with its reason: the row keeps every figure it was posted
+   with, turns `reversed`, and drops out of the totals. It is never a second row.
 
    ONE CLOCK. `asOf` from module.json drives every "this month", "due in 30
    days" and "overdue by N". Never the browser clock. Writes stamp NOW plus the
@@ -758,7 +761,9 @@ export function toTxnRow(t: CompanyTxn): TxnRow {
   const tag = tagOf(t.tagKey);
   return {
     t, tag,
-    missingBill: t.direction === "out" && t.amountPaise > 0 && !t.bill
+    /* A REVERSED ROW IS NOT CHASED FOR PAPERWORK. It no longer charges the
+       month, so a bill proving what it charged would prove nothing. */
+    missingBill: t.state === "recorded" && t.direction === "out" && t.amountPaise > 0 && !t.bill
       && (!!tag?.proofRequired || t.amountPaise >= BILL_THRESHOLD_PAISE),
     ageDays: daysPast(t.valueDate),
   };
@@ -788,7 +793,8 @@ export function applyTxnFilters(rows: TxnRow[], p: Params): TxnRow[] {
 export interface TagTotal { tag: Tag; spentPaise: number; n: number; overBudget: boolean; pctOfBudget: number | null }
 export function tagTotals(from = PERIOD.from, to = PERIOD.to): { rows: TagTotal[]; totalPaise: number } {
   const rows: TagTotal[] = snap.tags.map((tag) => {
-    const list = snap.transactions.filter((t) => t.tagKey === tag.tagKey && t.direction === "out" && inPeriod(t.valueDate, from, to));
+    const list = snap.transactions.filter((t) => t.tagKey === tag.tagKey && t.direction === "out"
+      && t.state === "recorded" && inPeriod(t.valueDate, from, to));
     const spentPaise = list.reduce((n, t) => n + t.amountPaise, 0);
     return {
       tag, spentPaise, n: list.length,
@@ -865,12 +871,15 @@ export function overview(from = PERIOD.from, to = PERIOD.to): Overview {
   const runs = salaryInPeriod(from, to);
   const salaryPaise = runs.reduce((n, r) => n + r.totalNetPaise, 0);
 
-  /* Counter-entries carry a negative amount and are `recorded`, so summing
-     `out` naturally nets a reversed pair to zero. */
-  const out = snap.transactions.filter((t) => t.direction === "out" && inPeriod(t.valueDate, from, to));
+  /* A REVERSED ROW CHARGES NOTHING. There is no counter-entry netting it out
+     any more — the reversal is on the row itself, so every figure below simply
+     stops counting it. The row keeps its amount and stays on the record; what
+     it stops doing is charging the month. */
+  const live = (t: CompanyTxn) => t.state === "recorded";
+  const out = snap.transactions.filter((t) => live(t) && t.direction === "out" && inPeriod(t.valueDate, from, to));
   const operating = out.filter((t) => tagOf(t.tagKey)?.kind !== "excluded");
   const excluded = out.filter((t) => tagOf(t.tagKey)?.kind === "excluded");
-  const inn = snap.transactions.filter((t) => t.direction === "in" && inPeriod(t.valueDate, from, to));
+  const inn = snap.transactions.filter((t) => live(t) && t.direction === "in" && inPeriod(t.valueDate, from, to));
 
   const rfPaid = refundsPaidInPeriod(from, to);
   const rfOwed = snap.refunds.filter((r) => r.state === "approved" && !r.settlement);
@@ -993,7 +1002,7 @@ export function kpis(from = PERIOD.from, to = PERIOD.to): Kpi[] {
   const paidN = settled.filter((x) => x.i.status === "paid").length;
   const failN = settled.filter((x) => x.i.status === "fail_to_pay").length;
 
-  const reinvest = snap.transactions.filter((t) => t.direction === "out"
+  const reinvest = snap.transactions.filter((t) => t.state === "recorded" && t.direction === "out"
     && tagOf(t.tagKey)?.kind === "reinvestment" && inPeriod(t.valueDate, from, to))
     .reduce((n, t) => n + t.amountPaise, 0);
   const newCustomers = months.filter((m) => m.month === thisM)[0]?.newCustomers ?? 0;
@@ -2121,7 +2130,7 @@ export function recordTransaction(input: TxnInput): { error: string; txnId: stri
     state: "recorded", bill: { type: "bill", filename: billName, uploadedAt: stamp() },
     bankLineId: line ? line.lineId : null,
     nonRevenue: input.direction === "in", creditKind: input.direction === "in" ? input.creditKind || null : null,
-    reversesTxnId: null, reversal: null, recordedBy: a.name, recordedAt: stamp(), events: [],
+    reversal: null, recordedBy: a.name, recordedAt: stamp(), events: [],
   };
   log(pushEvent(t.events, "TXN_RECORDED",
     (input.direction === "out" ? "Paid " : "Received ") + inr(t.amountPaise) + " · " + tag.label + " · " + (t.party || "—") + "."), id, "transaction");
@@ -2139,8 +2148,8 @@ export function recordTransaction(input: TxnInput): { error: string; txnId: stri
  *  IT DOES NOT EDIT THE ROW. The amount, the direction, the tag, the reference,
  *  the date and the account are what the row says happened, and none of them is
  *  reachable from here or from anywhere else: a correction to any of those is a
- *  counter-entry through `reverseTransaction`, which appends and leaves this
- *  row exactly as it was posted.
+ *  reversal through `reverseTransaction`, which retires the row and leaves every
+ *  figure on it exactly as it was posted.
  *
  *  Same three rules as recording one, deliberately — a receipt attached later
  *  is not held to a lower standard than a receipt attached at the time. */
@@ -2171,27 +2180,37 @@ export function attachBill(
   return "";
 }
 
-/** FN-T11 · Reverse a transaction. Super Admin. A counter-entry carrying a
- *  negative amount is appended; the original row is untouched. */
+/** FN-T11 · Reverse a transaction. Super Admin.
+ *
+ *  THE REVERSAL IS ON THE ROW, NOT A SECOND ROW. It used to append a
+ *  counter-entry carrying a negative amount, which netted the month to zero and
+ *  cost the list a row that existed only to cancel another one — two lines to
+ *  read, two ids to hold, and a `TXN-RV-` row that was never a payment anybody
+ *  made. The row now carries its own correction: `state` turns `reversed`, the
+ *  reason and who gave it are stamped on it, and every figure stops counting it.
+ *
+ *  NOTHING THE ROW SAYS IS EDITED. The amount, the direction, the tag, the
+ *  reference, the date, the account and the bill are exactly as posted — this
+ *  is the one thing the old counter-entry was protecting and it is still true.
+ *  What changes is whether the row charges the month, which is the only thing
+ *  the counter-entry was ever really doing.
+ *
+ *  So the list shows the amount struck through under a blue `Reversed` chip
+ *  rather than a red one: red said something had gone wrong and was unresolved,
+ *  and a reversed row is the opposite — it is the one that has been settled. */
 export function reverseTransaction(id: string, reason: string): string {
   const t = readTransaction(id);
   if (!t) return "That transaction no longer exists.";
   if (t.state === "reversed") return "It is already reversed. (invalid_state_transition)";
-  if (t.reversesTxnId) return "A counter-entry cannot itself be reversed. (invalid_state_transition)";
   if (!reason.trim()) return "A reversal with no reason is indistinguishable from a mistake at audit. (reason_required)";
   const sa = superAdminOnly("Reversing a transaction"); if (sa) return sa;
   const a = actor();
-  const cid = "TXN-RV-" + (t.txnId.split("-").pop() || "0000");
-  const c: CompanyTxn = {
-    ...clone(t), txnId: cid, amountPaise: -t.amountPaise, valueDate: todayIso(),
-    state: "recorded", reversesTxnId: t.txnId, reversal: null, bill: null, bankLineId: null,
-    recordedBy: a.name, recordedAt: stamp(), events: [],
-  };
   t.state = "reversed";
-  t.reversal = { counterId: cid, reason: reason.trim(), by: a.name, at: stamp() };
-  log(pushEvent(c.events, "TXN_REVERSED", "Counter-entry for " + t.txnId + " · −" + inr(t.amountPaise) + " · " + reason.trim()), cid, "transaction");
-  pushEvent(t.events, "TXN_REVERSED", "Reversed by " + a.name + " — " + reason.trim() + ". " + cid + " carries the offset.");
-  snap.transactions = [c].concat(snap.transactions);
+  t.reversal = { reason: reason.trim(), by: a.name, at: stamp() };
+  log(pushEvent(t.events, "TXN_REVERSED",
+    "Reversed by " + a.name + " — " + reason.trim()
+    + " The row keeps " + inr(t.amountPaise) + " and everything else it was posted with; it stops counting towards the month."),
+  t.txnId, "transaction");
   emit();
   return "";
 }
@@ -2343,7 +2362,8 @@ export function importStatement(): { error: string; summary: string } {
       }
       exceptions++; return;
     }
-    const t = snap.transactions.filter((x) => !x.bankLineId && x.direction === "out" && x.amountPaise > 0
+    const t = snap.transactions.filter((x) => !x.bankLineId && x.state === "recorded"
+      && x.direction === "out" && x.amountPaise > 0
       && norm(x.reference) === norm(l.reference) && x.amountPaise === l.amountPaise)[0];
     if (t) {
       t.bankLineId = l.lineId;

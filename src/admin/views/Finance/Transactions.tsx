@@ -291,21 +291,28 @@ function TxnTable({ p, writable, onRecord, onUnfilter }: {
 
 function TxnLine({ r, p }: { r: TxnRow; p: Params }) {
   const t = r.t;
-  /* REVERSED OUTRANKS A MISSING BILL on the rail: one is paperwork that can be
-     chased, the other is a row that has already been corrected. */
-  const rail = t.state === "reversed" ? "bad" : r.missingBill ? "warn" : "";
+  /* REVERSED OUTRANKS A MISSING BILL on the rail, and it is blue rather than
+     red: a reversed row is the SETTLED one — somebody found the mistake and
+     corrected it — while a missing bill is still somebody's job. Red would file
+     the finished thing under the same colour as the unfinished ones. */
+  const reversed = t.state === "reversed";
+  const rail = reversed ? "info" : r.missingBill ? "warn" : "";
   const to = "#/finance-transactions/" + encodeURIComponent(t.txnId) + qs(carry(p));
   const open = () => go(to);
+  /* THE SAME `dim` A CANCELLED SUBSCRIPTION WEARS. A reversed row is on the
+     record forever and charges nothing, which is the one thing this module
+     already had a row treatment for — the whole line greys and the figure
+     strikes through. */
   return (
-    <tr className="clickable" tabIndex={0} role="link" aria-label={"Open " + t.txnId}
+    <tr className={"clickable" + (reversed ? " dim" : "")} tabIndex={0} role="link" aria-label={"Open " + t.txnId}
       onClick={open} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } }}>
       <td className="rail"><i className={rail} /></td>
       <td>
         <div className="cell-1 mono">{t.txnId}</div>
-        <div className="cell-2">
-          {t.reversesTxnId ? "counter-entry for " + t.reversesTxnId
-            : t.reversal ? "reversed → " + t.reversal.counterId
-            : "—"}
+        {/* IT NAMES NO OTHER ROW, because there is no other row. The
+            correction is on this one. */}
+        <div className="cell-2" title={t.reversal?.reason}>
+          {t.reversal ? "reversed by " + t.reversal.by : "—"}
         </div>
       </td>
       <td>
@@ -328,7 +335,14 @@ function TxnLine({ r, p }: { r: TxnRow; p: Params }) {
         {t.bankLineId ? <div className="cell-2"><Icon name="link" size="sm" />matched to bank</div> : null}
       </td>
       <td>
+        {/* THE AMOUNT AND THE DIRECTION ABOVE ARE UNCHANGED even here — the row
+            still says a debit of that size was paid, because it was. The chip
+            and the strike say it no longer counts, which is the whole of what
+            reversing does. */}
         <TxnPill k={t.state} />
+        {t.reversal
+          ? <div className="cell-2" title={t.reversal.reason}>{fmtDate(t.reversal.at.slice(0, 10))}</div>
+          : null}
       </td>
       <td className="tight"><Icon name="chevr" size="sm" /></td>
     </tr>

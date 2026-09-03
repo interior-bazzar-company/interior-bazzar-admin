@@ -206,8 +206,8 @@
     {
       "key": "reversed",
       "label": "Reversed",
-      "tone": "bad",
-      "meaning": "A counter-entry was appended. The original row is untouched and still on the record."
+      "tone": "info",
+      "meaning": "The row was corrected on itself. Everything it says is exactly as posted — the amount, the direction, the tag, the date — and it no longer counts towards the month."
     }
   ],
   "refundOrigins": [
@@ -669,7 +669,7 @@
     {
       "id": "FN-AD-02",
       "title": "Posted is immutable",
-      "position": "Nothing is edited or deleted. A correction is a counter-entry referencing the original, with an actor and a reason.",
+      "position": "Nothing a row says is edited or deleted. A correction is a reversal recorded on the row itself, with an actor and a reason: the figures stay exactly as posted and the row stops counting towards the period. It is never a second row.",
       "status": "resolved"
     },
     {

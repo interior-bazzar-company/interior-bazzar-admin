@@ -3,8 +3,7 @@
    -----------------------------------------------------------------------------
    A row is a fact: it exists because money moved, once, on `valueDate`. There
    is nothing here to edit — POSTED IS PERMANENT — so this screen has no form,
-   only what happened and, when it applies, the counter-entry that corrected
-   it. `Rec` from Frame.tsx supplies the id bar, the ProtoBar and Back; this
+   only what happened and, when it applies, the reversal that corrected it. `Rec` from Frame.tsx supplies the id bar, the ProtoBar and Back; this
    file supplies only what a company transaction means.
    ============================================================================= */
 import { useEffect, useRef, useState } from "react";
@@ -42,8 +41,9 @@ function carry(p: Params): Params {
  *  figures. That is not a limitation of this menu — it is the module's central
  *  rule, printed at the foot of this very page: the amount, direction, tag,
  *  reference, date and account are what the row ASSERTS, and a correction to
- *  any of them is a counter-entry that appends. A receipt is evidence ABOUT
- *  the row, which is why it is the one thing here that can change.
+ *  any of them is a reversal, which retires the row without rewriting it. A
+ *  receipt is evidence ABOUT the row, which is why it is the one thing here
+ *  that can change.
  *
  *  Same `.fin-menu` and the same `.mi` rows the slips table uses — one menu in
  *  the module, not two that drift. */
@@ -102,24 +102,23 @@ function TxnMenu({ txn, sa, reversible, onEdit, onReverse }: {
               ? "The panel holds the file's name, not the file. Download arrives with the document store."
               : "There is no receipt on this row yet.",
           })}
-          {/* THE WAY A BAD ROW IS CORRECTED, and the only way. It appends a
-              counter-entry and leaves this row exactly as posted. There is no
-              second item beside it raising a doubt without moving money: a row
-              is either corrected or it is not, and a flag that changed nothing
-              only asked somebody to read the same row twice. */}
+          {/* THE WAY A BAD ROW IS CORRECTED, and the only way. It writes the
+              correction onto this row — nothing it says is edited, and no
+              second row is appended. There is no item beside it raising a doubt
+              without correcting anything: a row is either corrected or it is
+              not, and a flag that changed nothing only asked somebody to read
+              the same row twice. */}
           {reversible
             ? item("recon", "Reverse", onReverse, {
               disabled: !sa,
               tone: "dgr",
               title: sa
-                ? "Append a counter-entry. This is what actually corrects the money."
+                ? "Mark this row reversed. It keeps every figure it was posted with and stops counting towards the month."
                 : "Reversing a transaction is Super Admin only.",
             })
             : item("recon", "Reverse", () => {}, {
               disabled: true,
-              title: txn.reversesTxnId
-                ? "A counter-entry cannot itself be reversed."
-                : "This row has already been reversed.",
+              title: "This row has already been reversed.",
             })}
           {/* `link` rather than a copy glyph, because the icon set has no copy
              and inventing one for a menu item is a new SVG to maintain for a
@@ -164,12 +163,11 @@ export default function TxnDetail({ id, p, onParams }: {
   const done = (msg: string, tone?: string) => { closeLayer(); toast(msg, tone); };
   const openBill = () => modal(<BillModal txn={t} onClose={closeLayer} onDone={done} />);
   const openReverse = () => modal(<ReverseTxnModal txn={t} onClose={closeLayer} onDone={done} />);
-  /* A counter-entry cannot itself be reversed, and an already-reversed row has
-     nothing left to reverse — the store refuses both, so the button is not
-     offered for either. That is a fact about the row, not a permission; the
-     Super Admin gate below is the permission, and THAT one disables rather
-     than hides. */
-  const reversible = t.state === "recorded" && !t.reversesTxnId;
+  /* An already-reversed row has nothing left to reverse — the store refuses
+     it, so the button is not offered. That is a fact about the row, not a
+     permission; the Super Admin gate below is the permission, and THAT one
+     disables rather than hides. */
+  const reversible = t.state === "recorded";
 
   return (
     <Rec id={t.txnId} back={back}
@@ -200,29 +198,26 @@ export default function TxnDetail({ id, p, onParams }: {
 
       {tab === "transaction" ? (
         <div className="fin-cards">
-          {t.reversesTxnId ? (
-            <Notice tone="info" ico="recon" text={<>
-              <b>This is a counter-entry.</b> It carries a negative amount and reverses{" "}
-              <a className="mono" onClick={() => go("#/finance-transactions/" + encodeURIComponent(t.reversesTxnId as string) + qs(carry(p)))}>
-                {t.reversesTxnId}
-              </a>. That negative amount is the whole effect — nothing else about the original
-              row was touched.
-            </>} />
-          ) : null}
+          {/* INFO, NOT BAD. The banner used to be red and point at a
+              counter-entry somewhere else. There is nowhere else to point now,
+              and red was wrong anyway: this is the row somebody already
+              settled, not one still going wrong. */}
           {t.reversal ? (
-            <Notice tone="bad" ico="recon" text={<>
+            <Notice tone="info" ico="recon" text={<>
               <b>This row has been reversed.</b> {t.reversal.by} · {fmtDateTime(t.reversal.at)}{" — "}
-              {t.reversal.reason} The counter-entry is{" "}
-              <a className="mono" onClick={() => go("#/finance-transactions/" + encodeURIComponent(t.reversal!.counterId) + qs(carry(p)))}>
-                {t.reversal.counterId}
-              </a>. This row itself was never edited or removed.
+              {t.reversal.reason} <b>Nothing it says was edited:</b> the amount, the direction,
+              the tag, the date and the bill are exactly as posted, and they stay on the record.
+              What changed is that it no longer counts towards the month — it is out of the spend
+              total, out of its tag's total, and out of every figure derived from them.
             </>} />
           ) : null}
 
           <Blocks>
             <Block title="What moved">
               <KvList pairs={[
-                ["Amount", <Money paise={t.amountPaise} sign={t.direction === "in"} strong />],
+                /* STRUCK IF REVERSED, and still the figure it was posted with —
+                   the row is never edited, so this never changes. */
+                ["Amount", <Money paise={t.amountPaise} sign={t.direction === "in"} strong dead={t.state === "reversed"} />],
                 ["Direction", <Dir d={t.direction} />],
                 ["Tag", <>
                   <TagChip k={t.tagKey} big />
@@ -292,8 +287,8 @@ export default function TxnDetail({ id, p, onParams }: {
 
           <Notice tone="info" ico="lock" text={<>
             <b>A recorded row is never edited.</b> Nothing here can be changed after the fact —
-            a correction is a new counter-entry with a negative amount, appended to the ledger,
-            never a rewrite of this one.
+            a correction is a reversal, which stamps a reason onto this row and takes it out of
+            the totals while leaving every figure on it exactly as posted.
           </>} />
         </div>
       ) : (

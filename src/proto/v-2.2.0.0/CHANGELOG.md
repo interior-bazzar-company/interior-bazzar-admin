@@ -6,6 +6,71 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-03
 
+### Reversing corrects the row itself — the counter-entry is gone
+
+**Area:** `#/finance-transactions` · the row menu → Reverse · the `Reversed` chip
+**Files:** `src/admin/views/Finance/store.ts`, `src/admin/views/Finance/types.ts`, `src/admin/views/Finance/Transactions.tsx`, `src/admin/views/Finance/TxnDetail.tsx`, `src/admin/views/Finance/TxnModals.tsx`, `src/admin/views/Finance/bits.tsx`, `src/admin/views/Finance/finance.css`, `src/content/finance/transactions.json`, `src/content/finance/vocabularies.json`, `scripts/check-finance-ledger.cjs`, `scripts/fn-smoke.tsx`
+
+**What changed**
+
+**ONE ROW, NOT TWO.** Reversing used to append a `TXN-RV-` counter-entry
+carrying the negative amount, and the month came out right because the pair
+summed to zero. That was two lines to read, two ids to hold, and a row in the
+ledger that was never a payment anybody made. The correction now rides on the
+row it corrects: `state` turns `reversed`, and `reversal` carries the reason,
+who gave it and when.
+
+**NOTHING THE ROW SAYS IS EDITED**, which is the rule the counter-entry existed
+to protect and it still holds. The amount, direction, tag, reference, date,
+account and bill are exactly as posted and stay on the record. What changes is
+that the row stops counting — out of the period's debit and credit totals, out
+of its tag's total, out of reinvestment, and out of the bank auto-match
+candidates. It is also no longer chased for a missing bill: a receipt proving
+what it charged would prove nothing once it charges nothing.
+
+**THE CHIP IS BLUE, NOT RED.** Red filed the finished thing beside the
+unfinished ones — a missing bill, a blown budget. A reversed row is the settled
+one on the page, so it takes the `info` tone, and the rail with it. The row
+wears the same `dim` a cancelled subscription already wore: greyed line, struck
+figure. The word stays **Reverse** — it is what the action does.
+
+**The direction chip is deliberately NOT flipped.** Showing a reversed Debit as
+a Credit would make an out-payment read as money arriving, in the tag totals,
+in Analytics and against the bank line. The row keeps saying a debit was paid,
+because one was; the strike and the chip say it counts for nothing.
+
+**Temp data**
+`src/content/finance/transactions.json` → the seeded counter-entry `TXN-RV-0917`
+is deleted (18 rows → 17) and `reversesTxnId` is off the record shape entirely;
+`TXN-0917`'s `reversal` no longer names a counter-entry. Placeholder records.
+`src/content/finance/vocabularies.json` → the `reversed` state's tone and
+meaning, and the `FN-AD-02` doctrine line. Static copy.
+
+**Backend needed**
+- `POST /api/v1/finance/transactions/:id/reverse` → must now return the SAME row
+  with `state: "reversed"` and a `reversal` of `{ reason, by, at }`. It must not
+  create a second transaction, and it must not alter any figure on the row. The
+  period and tag aggregates it feeds must exclude rows whose `state` is
+  `reversed` rather than relying on a negative row to net them out.
+
+**Open decisions**
+`FN-AD-02` (*Posted is immutable*) is restated rather than abandoned: nothing a
+row **says** is edited or deleted, and the correction is a reversal on the row
+with an actor and a reason. Its position line in `vocabularies.json` is updated
+to match, so the register and the code still point at each other.
+
+**Verified**
+`npx tsc -b` clean; `npx eslint` clean on every touched file.
+`npm run check:finance` → 413 checks pass, including new ones asserting no
+negative row and no `-RV-` id exists in the ledger, that a reversal drops the
+tag total by exactly the row's amount, and that the row keeps its amount and
+direction. `npm run check:finance-render` renders every surface, with new
+assertions on the dimmed row, the blue rail and the record banner.
+`npm run check:finance-nav` passes. Confirmed against the seed that August's
+debit total is unchanged at ₹63,250 — the pair used to net to zero, and the
+single row is now simply excluded. `npm run check` as a whole still stops at
+`check:enquiries`, which needs a running backend; not related to this change.
+
 ### Mark as wrong is gone — a reversal is the only way to say a row is bad
 
 **Area:** `#/finance-transactions` · the row menu · the `Marked wrong` strip cell and `?flag=wrong` queue
