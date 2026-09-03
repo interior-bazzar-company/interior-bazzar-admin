@@ -6,6 +6,62 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-03
 
+### Analytics: every remaining description cut to the shortest thing that is still true
+
+**Area:** `#/finance-analytics` · Overview and KPI
+**Files:** `src/admin/views/Finance/Analytics.tsx`
+
+**What changed**
+
+A second pass over the text the rebuild left behind. Visible words on Overview
+**759 → 634**, and most of what remains is figures and labels rather than prose.
+
+**Chart captions are the unit and nothing else.** *₹ thousand · August 2026 ·*
+*exact figures on every mark* → **₹ thousand**. *₹ lakh · hover a month for the*
+*exact figure* → **₹ lakh**. *₹ · one hue, because a tag is a name and not an*
+*order* → **₹**. The first two described an interaction a reader finds by
+hovering; the third argued for a design decision nobody was disputing.
+
+**KPI group lines are three or four words** — *sell more, or collect better* in
+place of a full sentence. They stayed rather than going entirely because a bare
+*Cost* does not say what the group is FOR, and a KPI nobody can attach to a
+decision gets quoted in a meeting for its own sake.
+
+**The at-risk footer is gone and the form carries it instead.** It said the four
+amounts are never added together; the table has no total row, the rails are four
+colours, and the neutral one is on the row that is not a problem — the form
+already refuses the sum the sentence was asking the reader not to make. The
+`desc` is now **never added together**, three words on the heading.
+
+**Two block footers are now just their `Assumed` chip.** The bank and tax blocks
+each carried a paragraph in front of the open-decision link that already says
+the same thing when opened.
+
+**Empty states are one clause**, and they are only ever on screen when there is
+nothing to show. **Hover titles too**: a tag bar's title was a sentence and is
+now four facts separated by middots.
+
+**What deliberately stayed.** Everything that is on screen only while a figure
+is misleading: the unpaid-run caveat beside the hero, the two KPI caveats, and
+*completeness, never correctness* on the bank block — which is now the only
+place that caveat lives, so it moved from the footer into the heading rather
+than being cut.
+
+**Temp data**
+`none` — copy only.
+
+**Backend needed**
+`none`.
+
+**Open decisions**
+`none`.
+
+**Verified**
+`npx tsc -b` and `npx eslint` clean. `npm run check:finance` → 441 pass;
+`npm run check:finance-render` renders every surface;
+`npm run check:finance-nav` passes. Word count measured off the rendered page
+rather than estimated.
+
 ### Review backfill: ten months of history, so the Analytics charts have something in them
 
 **Area:** the seed — `#/finance-analytics` is where it shows

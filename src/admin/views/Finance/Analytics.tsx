@@ -65,14 +65,16 @@ const thousands = (paise: number) => Math.round(paise / 100000);
  *  twenty columns, and −8.54 does where −8,54,000 does not. */
 const lakh = (paise: number) => Math.round(paise / 100000) / 100;
 
-/* One line per group saying which decision it informs. A KPI with no decision
-   attached to it is a number somebody will eventually quote in a meeting
-   without knowing what it was for. */
+/* What each group decides, in three or four words. It ran to a full sentence
+   each and the sentences were the longest text on the tab — but the label alone
+   ("Cost") does not say what the group is FOR, and a KPI nobody can attach to a
+   decision is a number that gets quoted in a meeting for its own sake. So: the
+   decision, and not one word past it. */
 const GROUP_DECIDES: Record<string, string> = {
-  Revenue: "decides whether to sell more of the same thing, or fix collection first",
-  Cost: "decides who to hire, and where the next rupee of spend goes",
-  Health: "decides how long the company can keep its current shape",
-  Growth: "decides which channel to feed, and what a customer is allowed to cost",
+  Revenue: "sell more, or collect better",
+  Cost: "who to hire, what to spend on",
+  Health: "how long this shape lasts",
+  Growth: "which channel, at what cost",
 };
 
 /** Which sparkline hue a metric wears. Identity, never status — a cost falling
@@ -184,16 +186,16 @@ function Overview() {
     hint: r.pctOfBudget === null
       ? <>{r.n} payment{r.n === 1 ? "" : "s"}</>
       : <span className={r.overBudget ? "bad" : undefined}>{r.pctOfBudget}% of budget</span>,
-    title: r.tag.label + ": " + inr(r.spentPaise) + " over " + r.n + " payment"
-      + (r.n === 1 ? "" : "s") + " in " + PERIOD.label + ". Rolls up as "
-      + r.tag.kind + (r.overBudget ? ". Over the budget set on this tag." : "."),
+    /* The hover line is a description too, and it was a sentence. Four facts,
+       separated, is what a tooltip is for. */
+    title: inr(r.spentPaise) + " · " + r.n + " payment" + (r.n === 1 ? "" : "s")
+      + " · " + r.tag.kind + (r.overBudget ? " · over budget" : ""),
   }));
 
   return (
     <Blocks>
       {/* ================================================== the arithmetic === */}
       <Block wide title={PERIOD.label}
-        desc="every rupee in, out and left"
         right={<span className="fin-sum">as of <b>{fmtDate(todayIso())}</b></span>}>
         <div className="fin-wfsplit">
           <div className="fin-hero">
@@ -214,22 +216,19 @@ function Overview() {
             )}
           </div>
           <div className="fin-wfplot">
-            <Waterfall steps={wf} unit={"₹ thousand · " + PERIOD.label + " · exact figures on every mark"} />
+            <Waterfall steps={wf} unit="₹ thousand" />
           </div>
         </div>
       </Block>
 
       {/* ==================================================== net by month === */}
       <Block wide title="Net by month"
-        desc="one series, read against zero"
         right={<span className="fin-sum">{months.length} month{months.length === 1 ? "" : "s"} in these records</span>}>
         {months.length > 1 ? (
-          <SignedColumns points={net} groups={years} unit="₹ lakh · hover a month for the exact figure" />
+          <SignedColumns points={net} groups={years} unit="₹ lakh" />
         ) : (
           <Unavailable title="One month is not a trend."
-            why="This series is built from the records rather than from a calendar, so it appears as
-              months accumulate — a second month with a payment, a paid run or a transaction in it
-              is all it needs." />
+            why="Built from the records, not a calendar — it appears as months accumulate." />
         )}
       </Block>
 
@@ -237,15 +236,16 @@ function Overview() {
       <Block title="Where it went" desc={"by tag · " + PERIOD.label}
         right={<span className="fin-sum">{inr(tags.totalPaise)} out</span>}>
         {spendRows.length
-          ? <BarRows rows={spendRows} unit="₹ · one hue, because a tag is a name and not an order" />
+          ? <BarRows rows={spendRows} unit="₹" />
           : <Unavailable title="Nothing was spent under any tag in this period."
-              why="Only recorded transactions with direction out appear here. An empty list is a
-                month with no outgoing transaction against it, not a missing figure." />}
+              why="An empty list is a month with no outgoing transaction, not a missing figure." />}
       </Block>
 
-      <Block title="Not where it should be" desc="owed, owing, or unexplained"
-        foot={<>These are never added together. <em>Fail to pay</em> has happened and carries its
-          evidence; <em>due next 30 days</em> has not happened and is not revenue.</>}>
+      {/* NO FOOTER SAYING THESE ARE NEVER ADDED. The table has no total row, the
+          rails are four different colours and the neutral one is on the row that
+          is not a problem — the form already refuses the sum a sentence was
+          asking the reader not to make. */}
+      <Block title="Not where it should be" desc="never added together">
         <table className="tbl fin-risk">
           <thead>
             <tr><th>What</th><th className="n">Amount</th><th>Count</th><th /></tr>
@@ -275,8 +275,7 @@ function Overview() {
               {recon.stmt.closed ? "window closed" : "window open"} · <b className="mono">{recon.stmt.stmtId}</b>
             </span>
           : null}
-        foot={<>A high figure says the records and the bank agree on <em>what exists</em>. It says
-          nothing about whether a row was tagged right.<Assumed id="FN-OD-02" /></>}>
+        foot={<Assumed id="FN-OD-02" />}>
         {recon.stmt ? (
           <>
             <div className="fin-match">
@@ -331,16 +330,14 @@ function Overview() {
           </>
         ) : (
           <Unavailable title="No statement has been imported."
-            why="Matching is a reading of an imported statement against the records. A completeness
-              figure computed from no bank lines would be 100% for the wrong reason." />
+            why="Computed from no bank lines, completeness would read 100% for the wrong reason." />
         )}
       </Block>
 
       {/* ========================================================== tax === */}
-      <Block title="Tax invoiced" desc={"on installments paid in " + PERIOD.label}
+      <Block title="Tax invoiced" desc="not a return"
         right={<span className="fin-sum">{tax.n} invoice{tax.n === 1 ? "" : "s"}</span>}
-        foot={<>A summary of what was invoiced — not a return, and it nets no input credit.
-          <Assumed id="FN-OD-08" /></>}>
+        foot={<Assumed id="FN-OD-08" />}>
         <div className="fin-summary">
           <div className="row"><span className="l">Taxable value</span><span className="tnum">{inr(tax.taxablePaise)}</span></div>
           <div className="row"><span className="l">CGST</span><span className="tnum">{inr(tax.cgstPaise)}</span></div>
@@ -351,7 +348,7 @@ function Overview() {
       </Block>
 
       {/* ===================================================== activity === */}
-      <Block wide title="Just happened" desc="the last eight writes, newest first">
+      <Block wide title="Just happened" desc="last eight writes">
         {activity.length ? (
           <div className="fin-evlist">
             {activity.map((e, i) => {
@@ -368,8 +365,7 @@ function Overview() {
           </div>
         ) : (
           <Unavailable title="Nothing has been written in this session."
-            why="The seed is what happened before this tab was opened; this list is what happens
-              inside it." />
+            why="The seed is what happened before this tab opened; this is what happens inside it." />
         )}
       </Block>
     </Blocks>
@@ -425,7 +421,7 @@ function Kpis() {
       ))}
 
       <Block wide title="What these deliberately do not tell you"
-        desc="stated here rather than discovered in a board meeting">
+>
         <Assumed id="FN-OD-01" />
         <Assumed id="FN-OD-06" />
         <Assumed id="FN-OD-07" />
