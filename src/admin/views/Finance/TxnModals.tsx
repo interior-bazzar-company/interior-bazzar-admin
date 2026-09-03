@@ -17,13 +17,12 @@ import type { Done } from "./dialog";
 import { Check, Money, TagChip } from "./bits";
 import {
   ACCOUNTS, CREDIT_KINDS, MODES, TAG_KINDS,
-  PERIOD, PROOF_MAX_BYTES, addTag, cancelTransaction, deactivateTag, fileSize, inr,
+  PROOF_MAX_BYTES, addTag, cancelTransaction, deactivateTag, fileSize, inr,
   isSuperAdmin, proofAccepted, proofTooBig, recordTransaction,
   setBudget as setTagBudget, todayIso, useTagTotals, useTags, useTxnRows,
 } from "./store";
 import type { CompanyTxn, Tag, TagKind } from "./store";
 
-/* ------------------------------------------------------------ TxnModal --- */
 /* --------------------------------------------------- TxnModal's field set --- */
 /** WHAT A TRANSACTION SAYS, AS A FORM. It was pulled out of `TxnModal` when an
  *  update dialog asked the same ten questions and two copies of 150 lines were
@@ -314,6 +313,11 @@ export function TxnModal({ onClose, onDone }: { onClose: () => void; onDone: Don
  *  named in the title, the consequence is the same every time, and the only
  *  thing this dialog does not already know is why. So it asks that and stops.
  *
+ *  IT CARRIED TWO LINES SAYING WHAT CANCELLING DOES and they came off: the
+ *  record page says all of it, in front of the row it is true of, and somebody
+ *  who picked this menu item knows what they picked. A wall of text between a
+ *  person and the one box they came to fill is not caution, it is friction.
+ *
  *  IT DOES NOT OFFER TO FIX ANYTHING, because cancelling is not a correction:
  *  it says this row should not stand. The correct figures are a NEW row,
  *  recorded the ordinary way, which is why this dialog has no form. */
@@ -338,20 +342,6 @@ export function CancelTxnModal({ txn, onClose, onDone }: {
         <button className="btn dgr" disabled={!sa || !reason.trim()}
           title={sa ? undefined : "Cancelling a transaction is Super Admin only."}
           onClick={submit}>Cancel the transaction</button></>}>
-
-      {/* WHAT IT DOES AND WHAT IT DOES NOT, in the two lines somebody needs
-          before pressing a red button. The second matters more than it looks:
-          people reach for cancel expecting a delete, and this row is going to
-          be sitting in the ledger tomorrow. */}
-      <Check ok>
-        {txn.txnId} keeps <Money paise={Math.abs(txn.amountPaise)} /> and everything else it was
-        posted with, and stays in the ledger struck through. Nothing here is ever deleted.
-      </Check>
-      <Check warn>
-        It stops counting from now on — out of {PERIOD.label}&rsquo;s figures, out of its
-        tag&rsquo;s total, and out of everything derived from them. If the payment itself needs
-        undoing at the bank, that happens separately, outside this screen.
-      </Check>
 
       <Field label="Reason"
         help="Mandatory, and read at audit — a cancellation with no reason is indistinguishable from a misclick.">

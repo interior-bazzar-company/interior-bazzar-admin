@@ -820,11 +820,10 @@ const canM = check("cancel a transaction", () =>
   modal(<CancelTxnModal txn={txn("TXN-0901")} onClose={noop} onDone={noop} />));
 has(canM, "Cancel TXN-0901", "...the dialog names the row it is about to write off");
 has(canM, "Super Admin", "...and whose call it is");
-has(canM, "Nothing here is ever deleted", "...it says outright that the row is staying");
-has(canM, "stops counting", "...and what actually changes");
 has(canM, "<textarea", "...the reason is a box");
 has(canM, "indistinguishable from a misclick", "...saying why the reason is mandatory");
 hasnt(canM, "optgroup", "...with no form on it, because cancelling corrects nothing");
+hasnt(canM, "fin-chk", "...and no standing checklist restating what cancelling does");
 
 const tagM = check("create a tag", () => modal(<TagModal onClose={noop} onDone={noop} />));
 has(tagM, "it decides where the money lands in Analytics", "...the kind decides where the money lands");

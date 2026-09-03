@@ -6,6 +6,42 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-03
 
+### The cancel dialog is the reason box and nothing else
+
+**Area:** `#/finance-transactions` → a row → actions → Cancel
+**Files:** `src/admin/views/Finance/TxnModals.tsx`, `scripts/fn-smoke.tsx`
+
+**What changed**
+
+**TWO STANDING LINES CAME OFF.** The dialog opened with a checklist — the row
+keeps its figures and stays in the ledger, and it stops counting from now on.
+Both true, both already said on the record page in front of the row they are
+true of, and both a wall of text between a person and the one box they came to
+fill. That is friction, not caution.
+
+**WHAT IT STILL DOES is refuse without a reason.** The title names the row, the
+sub-line says Super Admin, the button stays disabled until something is typed,
+and the field says why the reason is mandatory — read at audit. That is the
+whole dialog. The same trim the reverse dialog got before it was removed.
+
+**Temp data**
+`none` — copy only.
+
+**Backend needed**
+`none` — no contract change. `POST /api/v1/finance/transactions/:id/cancel` is
+unaffected; the reason stays mandatory and is still validated in the store.
+
+**Open decisions**
+`none`.
+
+**Verified**
+`npx tsc -b` and `npx eslint` clean. `npm run check:finance` → 423 pass.
+`npm run check:finance-render` renders every surface; the dialog assertions now
+pin what it must keep (the row id, Super Admin, the reason box and why it is
+mandatory) and that it carries no `fin-chk` checklist and no form.
+`npm run check:finance-nav` passes. Not checked against a live backend — the
+module is still proto-seeded.
+
 ### Cancel replaces Update; the ledger loses Paper trail and gains a row menu
 
 **Area:** `#/finance-transactions` — the table’s columns and per-row actions · a row → actions → Cancel
