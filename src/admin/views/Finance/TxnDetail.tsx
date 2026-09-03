@@ -1,10 +1,12 @@
 /* =============================================================================
    Other Transaction — one record.
    -----------------------------------------------------------------------------
-   A row is a fact: it exists because money moved, once, on `valueDate`. There
-   is nothing here to edit — POSTED IS PERMANENT — so this screen has no form,
-   only what happened and, when it applies, the reversal that corrected it. `Rec` from Frame.tsx supplies the id bar, the ProtoBar and Back; this
-   file supplies only what a company transaction means.
+   A row is a fact: it exists because money moved, once, on `valueDate`. What
+   it SAYS about that can be corrected — Update, behind the actions menu, is
+   Super Admin and names every field it moves in the history — but nothing is
+   ever deleted, and the timeline below holds every version this row has had.
+   `Rec` from Frame.tsx supplies the id bar, the ProtoBar and Back; this file
+   supplies only what a company transaction means.
    ============================================================================= */
 import { useEffect, useRef, useState } from "react";
 import { useShell } from "../../shell/ShellContext";
@@ -12,8 +14,8 @@ import { can } from "../../shell/AdminShell";
 import { EmptyState, Icon, KvList, Notice, Tabs, qs } from "../../ui";
 import { go } from "../../ui/nav";
 import { Block, Blocks, Rec } from "./Frame";
-import { Dir, EventList, Money, ProtoBar, TagChip, TxnPill } from "./bits";
-import { BillModal, ReverseTxnModal } from "./TxnModals";
+import { Dir, EventList, Money, ProtoBar, TagChip } from "./bits";
+import { BillModal, UpdateTxnModal } from "./TxnModals";
 import {
   BILL_THRESHOLD_PAISE, CREDIT_KINDS,
   accountOf, ago, fmtDate, fmtDateTime, inr, isSuperAdmin, tagKindMeta, useTxn,
@@ -41,15 +43,15 @@ function carry(p: Params): Params {
  *  figures. That is not a limitation of this menu — it is the module's central
  *  rule, printed at the foot of this very page: the amount, direction, tag,
  *  reference, date and account are what the row ASSERTS, and a correction to
- *  any of them is a reversal, which retires the row without rewriting it. A
- *  receipt is evidence ABOUT the row, which is why it is the one thing here
- *  that can change.
+ *  any of them goes through Update, which is Super Admin and writes what it
+ *  changed into the history. A receipt is evidence ABOUT the row rather than
+ *  part of what it says, which is why it has its own item.
  *
  *  Same `.fin-menu` and the same `.mi` rows the slips table uses — one menu in
  *  the module, not two that drift. */
-function TxnMenu({ txn, sa, reversible, onEdit, onReverse }: {
-  txn: CompanyTxn; sa: boolean; reversible: boolean;
-  onEdit: () => void; onReverse: () => void;
+function TxnMenu({ txn, sa, onEdit, onUpdate }: {
+  txn: CompanyTxn; sa: boolean;
+  onEdit: () => void; onUpdate: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLSpanElement | null>(null);
@@ -102,24 +104,18 @@ function TxnMenu({ txn, sa, reversible, onEdit, onReverse }: {
               ? "The panel holds the file's name, not the file. Download arrives with the document store."
               : "There is no receipt on this row yet.",
           })}
-          {/* THE WAY A BAD ROW IS CORRECTED, and the only way. It writes the
-              correction onto this row — nothing it says is edited, and no
-              second row is appended. There is no item beside it raising a doubt
-              without correcting anything: a row is either corrected or it is
-              not, and a flag that changed nothing only asked somebody to read
-              the same row twice. */}
-          {reversible
-            ? item("recon", "Reverse", onReverse, {
-              disabled: !sa,
-              tone: "dgr",
-              title: sa
-                ? "Mark this row reversed. It keeps every figure it was posted with and stops counting towards the month."
-                : "Reversing a transaction is Super Admin only.",
-            })
-            : item("recon", "Reverse", () => {}, {
-              disabled: true,
-              title: "This row has already been reversed.",
-            })}
+          {/* THE WAY A WRONG ROW IS PUT RIGHT, and the only way. It opens the
+              same form the row was recorded on, and every field that moves is
+              written into the history — so the row says what is true now and
+              the timeline says what it ever said. Disabled rather than hidden
+              without Super Admin: somebody who cannot see the action cannot
+              ask for it either. */}
+          {item("recon", "Update", onUpdate, {
+            disabled: !sa,
+            title: sa
+              ? "Correct what this row says. Every field that moves is named in the history."
+              : "Updating a transaction is Super Admin only.",
+          })}
           {/* `link` rather than a copy glyph, because the icon set has no copy
              and inventing one for a menu item is a new SVG to maintain for a
              convenience. */}
@@ -162,24 +158,17 @@ export default function TxnDetail({ id, p, onParams }: {
 
   const done = (msg: string, tone?: string) => { closeLayer(); toast(msg, tone); };
   const openBill = () => modal(<BillModal txn={t} onClose={closeLayer} onDone={done} />);
-  const openReverse = () => modal(<ReverseTxnModal txn={t} onClose={closeLayer} onDone={done} />);
-  /* An already-reversed row has nothing left to reverse — the store refuses
-     it, so the button is not offered. That is a fact about the row, not a
-     permission; the Super Admin gate below is the permission, and THAT one
-     disables rather than hides. */
-  const reversible = t.state === "recorded";
+  const openUpdate = () => modal(<UpdateTxnModal txn={t} onClose={closeLayer} onDone={done} />);
 
   return (
     <Rec id={t.txnId} back={back}
-      pills={<TxnPill k={t.state} lg />}
       actions={writable ? (
         /* ONE MENU, NOT A ROW OF BUTTONS. The header carried Attach a bill
            and Reverse side by side, which gave a destructive Super-Admin
            action the same weight as attaching paperwork, and had nowhere to
            put a third. Everything the row can have done to it is behind the
            one control now, in the order somebody reaches for them. */
-        <TxnMenu txn={t} sa={sa} reversible={reversible}
-          onEdit={openBill} onReverse={openReverse} />
+        <TxnMenu txn={t} sa={sa} onEdit={openBill} onUpdate={openUpdate} />
       ) : null}>
 
       <div className="fin-subline">
@@ -198,26 +187,23 @@ export default function TxnDetail({ id, p, onParams }: {
 
       {tab === "transaction" ? (
         <div className="fin-cards">
-          {/* INFO, NOT BAD. The banner used to be red and point at a
-              counter-entry somewhere else. There is nowhere else to point now,
-              and red was wrong anyway: this is the row somebody already
-              settled, not one still going wrong. */}
-          {t.reversal ? (
+          {/* THE FIGURES ABOVE ARE NOT THE ONES FIRST POSTED, and somebody
+              reading them deserves to know that before they act on them. It
+              points at History rather than restating the diff, because the
+              diff is already there in full and copying it here would give two
+              accounts of the same edit to keep in step. */}
+          {t.updatedBy ? (
             <Notice tone="info" ico="recon" text={<>
-              <b>This row has been reversed.</b> {t.reversal.by} · {fmtDateTime(t.reversal.at)}{" — "}
-              {t.reversal.reason} <b>Nothing it says was edited:</b> the amount, the direction,
-              the tag, the date and the bill are exactly as posted, and they stay on the record.
-              What changed is that it no longer counts towards the month — it is out of the spend
-              total, out of its tag's total, and out of every figure derived from them.
+              <b>This row has been updated.</b> {t.updatedBy} · {fmtDateTime(t.updatedAt)}. What it
+              says below is what is true now; <b>History</b> names every field that has moved on it
+              and what it moved from. Nothing was deleted to get here.
             </>} />
           ) : null}
 
           <Blocks>
             <Block title="What moved">
               <KvList pairs={[
-                /* STRUCK IF REVERSED, and still the figure it was posted with —
-                   the row is never edited, so this never changes. */
-                ["Amount", <Money paise={t.amountPaise} sign={t.direction === "in"} strong dead={t.state === "reversed"} />],
+                ["Amount", <Money paise={t.amountPaise} sign={t.direction === "in"} strong />],
                 ["Direction", <Dir d={t.direction} />],
                 ["Tag", <>
                   <TagChip k={t.tagKey} big />
@@ -236,6 +222,9 @@ export default function TxnDetail({ id, p, onParams }: {
                 ["Value date", <>{fmtDate(t.valueDate)} <span className="faint">({ago(t.valueDate)})</span></>],
                 ["Account", account ? <>{account.masked}<span className="faint"> · {account.name}</span></> : t.accountId],
                 ["Recorded by", <>{t.recordedBy} · {fmtDateTime(t.recordedAt)}</>],
+                ...(t.updatedBy
+                  ? [["Updated by", <>{t.updatedBy} · {fmtDateTime(t.updatedAt)}</>] as [string, React.ReactNode]]
+                  : []),
                 ...(t.direction === "in"
                   ? [["Credit kind", <>
                       {creditKind?.label || t.creditKind}
@@ -286,9 +275,9 @@ export default function TxnDetail({ id, p, onParams }: {
           </Blocks>
 
           <Notice tone="info" ico="lock" text={<>
-            <b>A recorded row is never edited.</b> Nothing here can be changed after the fact —
-            a correction is a reversal, which stamps a reason onto this row and takes it out of
-            the totals while leaving every figure on it exactly as posted.
+            <b>Nothing here is ever deleted.</b> A row can be corrected — Update, in the actions
+            menu, is Super Admin — and every field it moves is written into this record's history
+            with what it moved from. The row shows the current truth; the timeline shows all of it.
           </>} />
         </div>
       ) : (

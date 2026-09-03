@@ -11,11 +11,12 @@
    `fail_to_pay` looks like the exception and is not: it records a decline that
    occurred or a due date that demonstrably passed, and it carries the evidence.
 
-   POSTED IS PERMANENT. Nothing edits or deletes what a row SAYS — the amount,
-   the direction, the tag, the date and the account are the fact it asserts, and
-   none of them is reachable by any write here. A correction is a reversal
-   recorded ON the row with its reason: the row keeps every figure it was posted
-   with, turns `reversed`, and drops out of the totals. It is never a second row.
+   A ROW IS CORRECTED IN PLACE, AND THE HISTORY REMEMBERS. `updateTransaction`
+   is the one write that changes what a row says. It is Super Admin, it refuses
+   the same things recording refuses, and it appends a `TXN_UPDATED` event
+   naming every field that moved and what it moved from — so the row shows the
+   current truth and the timeline shows every version of it there has ever been.
+   Deleting is still impossible: nothing removes a row, ever.
 
    ONE CLOCK. `asOf` from module.json drives every "this month", "due in 30
    days" and "overdue by N". Never the browser clock. Writes stamp NOW plus the
@@ -52,7 +53,7 @@ export type {
   Account, CompanyTxn, Customer, FinEvent, Installment, InstallmentFailure, InstallmentPayment,
   InstallmentStatus, Kpi, MonthPoint, Params, Payslip, Proof, Receipt, Refund, RefundOrigin,
   RefundPolicy, RefundState, RunState, SalaryAccount, SalaryComponent, SalaryRun, SubSource,
-  Subscription, SubscriptionStatus, Tag, TagKind, Tile, TxnDirection, TxnState,
+  Subscription, SubscriptionStatus, Tag, TagKind, Tile, TxnDirection,
 } from "./types";
 
 /* ====================================================== the vocabulary === */
@@ -71,7 +72,6 @@ export const REFUND_ORIGINS = vocabDoc.refundOrigins;
 export const REFUND_GROUNDS = vocabDoc.refundGrounds;
 export const REFUND_POLICY = vocabDoc.refundPolicy;
 export const REFUND_STATES = vocabDoc.refundStates;
-export const TXN_STATES = vocabDoc.transactionStates;
 export const EVENT_TYPES = vocabDoc.eventTypes;
 export const METRICS = vocabDoc.metricDefinitions;
 export const KPIS = vocabDoc.kpiDefinitions;
@@ -96,7 +96,6 @@ export const tagKindMeta = (k: string) => first(TAG_KINDS, k);
 export const originMeta = (k: string) => first(REFUND_ORIGINS, k);
 export const groundMeta = (k: string) => first(REFUND_GROUNDS, k);
 export const refundStateMeta = (k: string) => first(REFUND_STATES, k);
-export const txnStateMeta = (k: string) => first(TXN_STATES, k);
 export const eventMeta = (k: string) => first(EVENT_TYPES, k);
 export const metric = (k: string) => first(METRICS, k);
 export const kpiMeta = (k: string) => first(KPIS, k);
@@ -761,9 +760,7 @@ export function toTxnRow(t: CompanyTxn): TxnRow {
   const tag = tagOf(t.tagKey);
   return {
     t, tag,
-    /* A REVERSED ROW IS NOT CHASED FOR PAPERWORK. It no longer charges the
-       month, so a bill proving what it charged would prove nothing. */
-    missingBill: t.state === "recorded" && t.direction === "out" && t.amountPaise > 0 && !t.bill
+    missingBill: t.direction === "out" && t.amountPaise > 0 && !t.bill
       && (!!tag?.proofRequired || t.amountPaise >= BILL_THRESHOLD_PAISE),
     ageDays: daysPast(t.valueDate),
   };
@@ -777,7 +774,6 @@ export function applyTxnFilters(rows: TxnRow[], p: Params): TxnRow[] {
   if (p.dir) out = out.filter((r) => r.t.direction === p.dir);
   if (p.tag) out = out.filter((r) => r.t.tagKey === p.tag);
   if (p.kind) out = out.filter((r) => r.tag?.kind === p.kind);
-  if (p.state) out = out.filter((r) => r.t.state === p.state);
   if (p.flag === "nobill") out = out.filter((r) => r.missingBill);
   if (p.range === "month") out = out.filter((r) => inPeriod(r.t.valueDate));
   if (p.q) {
@@ -794,7 +790,7 @@ export interface TagTotal { tag: Tag; spentPaise: number; n: number; overBudget:
 export function tagTotals(from = PERIOD.from, to = PERIOD.to): { rows: TagTotal[]; totalPaise: number } {
   const rows: TagTotal[] = snap.tags.map((tag) => {
     const list = snap.transactions.filter((t) => t.tagKey === tag.tagKey && t.direction === "out"
-      && t.state === "recorded" && inPeriod(t.valueDate, from, to));
+      && inPeriod(t.valueDate, from, to));
     const spentPaise = list.reduce((n, t) => n + t.amountPaise, 0);
     return {
       tag, spentPaise, n: list.length,
@@ -871,15 +867,13 @@ export function overview(from = PERIOD.from, to = PERIOD.to): Overview {
   const runs = salaryInPeriod(from, to);
   const salaryPaise = runs.reduce((n, r) => n + r.totalNetPaise, 0);
 
-  /* A REVERSED ROW CHARGES NOTHING. There is no counter-entry netting it out
-     any more — the reversal is on the row itself, so every figure below simply
-     stops counting it. The row keeps its amount and stays on the record; what
-     it stops doing is charging the month. */
-  const live = (t: CompanyTxn) => t.state === "recorded";
-  const out = snap.transactions.filter((t) => live(t) && t.direction === "out" && inPeriod(t.valueDate, from, to));
+  /* EVERY ROW COUNTS. There is no reversed state to exclude and no
+     counter-entry to net out — a row that was wrong got corrected in place, so
+     what is summed here is simply what the rows currently say. */
+  const out = snap.transactions.filter((t) => t.direction === "out" && inPeriod(t.valueDate, from, to));
   const operating = out.filter((t) => tagOf(t.tagKey)?.kind !== "excluded");
   const excluded = out.filter((t) => tagOf(t.tagKey)?.kind === "excluded");
-  const inn = snap.transactions.filter((t) => live(t) && t.direction === "in" && inPeriod(t.valueDate, from, to));
+  const inn = snap.transactions.filter((t) => t.direction === "in" && inPeriod(t.valueDate, from, to));
 
   const rfPaid = refundsPaidInPeriod(from, to);
   const rfOwed = snap.refunds.filter((r) => r.state === "approved" && !r.settlement);
@@ -1002,7 +996,7 @@ export function kpis(from = PERIOD.from, to = PERIOD.to): Kpi[] {
   const paidN = settled.filter((x) => x.i.status === "paid").length;
   const failN = settled.filter((x) => x.i.status === "fail_to_pay").length;
 
-  const reinvest = snap.transactions.filter((t) => t.state === "recorded" && t.direction === "out"
+  const reinvest = snap.transactions.filter((t) => t.direction === "out"
     && tagOf(t.tagKey)?.kind === "reinvestment" && inPeriod(t.valueDate, from, to))
     .reduce((n, t) => n + t.amountPaise, 0);
   const newCustomers = months.filter((m) => m.month === thisM)[0]?.newCustomers ?? 0;
@@ -1132,11 +1126,13 @@ export function taxSummary(from = PERIOD.from, to = PERIOD.to) {
 
 /** One reference, one row, across every record type — a repeated webhook or a
  *  second entry carrying the same UTR is refused, never written twice. */
-function dupReference(ref: string): boolean {
+function dupReference(ref: string, exceptTxnId?: string): boolean {
   const r = norm(ref);
   if (!r) return false;
   if (readPayments().some((x) => norm(x.pay.reference) === r)) return true;
-  if (snap.transactions.some((t) => norm(t.reference) === r)) return true;
+  /* A ROW EDITED WITHOUT TOUCHING ITS REFERENCE IS NOT A DUPLICATE OF ITSELF —
+     the one caller that passes this is `updateTransaction`. */
+  if (snap.transactions.some((t) => t.txnId !== exceptTxnId && norm(t.reference) === r)) return true;
   if (snap.salaryRuns.some((run) => run.slips.some((s) => s.reference && norm(s.reference).startsWith(r)))) return true;
   return snap.refunds.some((rf) => rf.settlement && norm(rf.settlement.reference) === r);
 }
@@ -2127,10 +2123,10 @@ export function recordTransaction(input: TxnInput): { error: string; txnId: stri
     txnId: id, direction: input.direction, tagKey: input.tagKey, amountPaise: input.amountPaise,
     description: input.description.trim(), party: input.party.trim(), mode: input.mode,
     reference: input.reference.trim(), valueDate: input.valueDate, accountId: input.accountId,
-    state: "recorded", bill: { type: "bill", filename: billName, uploadedAt: stamp() },
+    bill: { type: "bill", filename: billName, uploadedAt: stamp() },
     bankLineId: line ? line.lineId : null,
     nonRevenue: input.direction === "in", creditKind: input.direction === "in" ? input.creditKind || null : null,
-    reversal: null, recordedBy: a.name, recordedAt: stamp(), events: [],
+    recordedBy: a.name, recordedAt: stamp(), updatedBy: null, updatedAt: null, events: [],
   };
   log(pushEvent(t.events, "TXN_RECORDED",
     (input.direction === "out" ? "Paid " : "Received ") + inr(t.amountPaise) + " · " + tag.label + " · " + (t.party || "—") + "."), id, "transaction");
@@ -2147,9 +2143,10 @@ export function recordTransaction(input: TxnInput): { error: string; txnId: stri
  *
  *  IT DOES NOT EDIT THE ROW. The amount, the direction, the tag, the reference,
  *  the date and the account are what the row says happened, and none of them is
- *  reachable from here or from anywhere else: a correction to any of those is a
- *  reversal through `reverseTransaction`, which retires the row and leaves every
- *  figure on it exactly as it was posted.
+ *  reachable from here: `updateTransaction` is the write for those, it is Super
+ *  Admin, and it records what it changed. Two writes rather than one because
+ *  swapping a receipt and restating what a row says are different acts with
+ *  different consequences and, as it turns out, different permissions.
  *
  *  Same three rules as recording one, deliberately — a receipt attached later
  *  is not held to a lower standard than a receipt attached at the time. */
@@ -2180,37 +2177,111 @@ export function attachBill(
   return "";
 }
 
-/** FN-T11 · Reverse a transaction. Super Admin.
+/** FN-T11 · UPDATE A RECORDED ROW. Super Admin.
  *
- *  THE REVERSAL IS ON THE ROW, NOT A SECOND ROW. It used to append a
- *  counter-entry carrying a negative amount, which netted the month to zero and
- *  cost the list a row that existed only to cancel another one — two lines to
- *  read, two ids to hold, and a `TXN-RV-` row that was never a payment anybody
- *  made. The row now carries its own correction: `state` turns `reversed`, the
- *  reason and who gave it are stamped on it, and every figure stops counting it.
+ *  THE ROW SAYS WHAT IS TRUE NOW; THE TIMELINE SAYS WHAT IT EVER SAID. This
+ *  module used to answer a wrong row by retiring it — first with an appended
+ *  counter-entry, then with a `reversed` state on the row itself — and neither
+ *  actually fixed anything. A vendor typed wrong stayed typed wrong forever,
+ *  the correct figure lived on a second row or nowhere at all, and somebody
+ *  reading the ledger had to reconstruct the truth from two artefacts. So the
+ *  row is edited, and the audit lives where an audit belongs: in the history,
+ *  as a `TXN_UPDATED` event naming every field that moved AND what it moved
+ *  from. Nothing is lost, because nothing was ever thrown away.
  *
- *  NOTHING THE ROW SAYS IS EDITED. The amount, the direction, the tag, the
- *  reference, the date, the account and the bill are exactly as posted — this
- *  is the one thing the old counter-entry was protecting and it is still true.
- *  What changes is whether the row charges the month, which is the only thing
- *  the counter-entry was ever really doing.
+ *  IT REFUSES WHAT RECORDING REFUSES. A tag that is inactive, an amount that is
+ *  not a whole figure above zero, a missing remark or reference, a reference
+ *  another record already carries, a date in the future, an unknown account, a
+ *  credit that is not one of the three permitted kinds — every rule that
+ *  governs writing a row governs rewriting one, or the second write becomes the
+ *  way around the first.
  *
- *  So the list shows the amount struck through under a blue `Reversed` chip
- *  rather than a red one: red said something had gone wrong and was unresolved,
- *  and a reversed row is the opposite — it is the one that has been settled. */
-export function reverseTransaction(id: string, reason: string): string {
+ *  SUPER ADMIN, exactly where reversing was. Restating what a posted row says
+ *  is the same authority as retiring one, and the gate does not get quietly
+ *  cheaper because the mechanism got simpler.
+ *
+ *  A CHANGED FIGURE BREAKS A BANK MATCH. If the amount, the reference or the
+ *  direction moves, the statement line this row was matched to is no longer
+ *  this row, so the match comes off and the history says so. Leaving it would
+ *  be a row pointing at a line it no longer resembles. */
+export interface TxnEdit {
+  direction: "out" | "in"; tagKey: string; amountPaise: number;
+  description: string; party: string; mode: string; reference: string;
+  valueDate: string; accountId: string; creditKind?: string | null;
+}
+export function updateTransaction(id: string, input: TxnEdit): string {
   const t = readTransaction(id);
   if (!t) return "That transaction no longer exists.";
-  if (t.state === "reversed") return "It is already reversed. (invalid_state_transition)";
-  if (!reason.trim()) return "A reversal with no reason is indistinguishable from a mistake at audit. (reason_required)";
-  const sa = superAdminOnly("Reversing a transaction"); if (sa) return sa;
+  const sa = superAdminOnly("Updating a transaction"); if (sa) return sa;
+  const tag = tagOf(input.tagKey);
+  if (!tag) return "Every row needs a tag — it is what decides where this lands in Analytics.";
+  /* AN INACTIVE TAG CANNOT BE MOVED TO, but a row already filed under one may
+     keep it: deactivating a tag deliberately re-buckets nothing, and an edit to
+     the remark should not force a re-filing nobody asked for. */
+  if (!tag.active && input.tagKey !== t.tagKey) return tag.label + " is inactive. Pick a live tag.";
+  if (!Number.isInteger(input.amountPaise) || input.amountPaise <= 0) return "The amount must be a whole figure above zero.";
+  if (!input.description.trim()) return "Say what it was for.";
+  if (!input.reference.trim()) return "The reference is mandatory — without it this row can never be tied to a statement.";
+  if (dupReference(input.reference, t.txnId))
+    return "A record already carries reference " + input.reference.trim() + ". (duplicate_reference)";
+  if (!input.valueDate || input.valueDate > todayIso()) return "The value date is when the money moved — it cannot be in the future.";
+  if (!accountOf(input.accountId)) return "Pick the account.";
+  if (input.direction === "in" && (!input.creditKind || !CREDIT_KINDS.some((c) => c.key === input.creditKind)))
+    return "Money in is restricted here to bank interest, an own transfer or a vendor refund. Customer money has exactly one way in: a subscription.";
+
+  const creditKind = input.direction === "in" ? input.creditKind || null : null;
+  /* WHAT ACTUALLY MOVED, in the order the dialog asks it. Rendered into the
+     event as `field: was → now`, which is the whole audit trail — a note
+     saying "updated" and nothing else is a record that somebody touched the
+     row and no record of what they did to it. */
+  const changes: string[] = [];
+  const moved = (label: string, was: string, now: string) => {
+    if (was === now) return false;
+    changes.push(label + ": " + (was || "—") + " → " + (now || "—"));
+    return true;
+  };
+  const dirWord = (d: string) => (d === "out" ? "Debit" : "Credit");
+  const kindWord = (k: string | null) => (k ? CREDIT_KINDS.filter((c) => c.key === k)[0]?.label || k : "");
+  const dirMoved = moved("Direction", dirWord(t.direction), dirWord(input.direction));
+  moved("Tag", tagOf(t.tagKey)?.label || t.tagKey, tag.label);
+  const amtMoved = moved("Amount", inr(t.amountPaise), inr(input.amountPaise));
+  moved("Value date", fmtDate(t.valueDate), fmtDate(input.valueDate));
+  moved("Party", t.party, input.party.trim());
+  moved("Mode", t.mode, input.mode);
+  const refMoved = moved("Reference", t.reference, input.reference.trim());
+  moved("Account", accountOf(t.accountId)?.masked || t.accountId, accountOf(input.accountId)?.masked || input.accountId);
+  moved("Credit kind", kindWord(t.creditKind), kindWord(creditKind));
+  moved("Remark", t.description, input.description.trim());
+  /* NOTHING CHANGED IS NOT A WRITE. It would stamp an editor and a time onto a
+     row nobody edited, and put a line in the history saying so. */
+  if (!changes.length) return "Nothing changed. (no_change)";
+
   const a = actor();
-  t.state = "reversed";
-  t.reversal = { reason: reason.trim(), by: a.name, at: stamp() };
-  log(pushEvent(t.events, "TXN_REVERSED",
-    "Reversed by " + a.name + " — " + reason.trim()
-    + " The row keeps " + inr(t.amountPaise) + " and everything else it was posted with; it stops counting towards the month."),
-  t.txnId, "transaction");
+  t.direction = input.direction;
+  t.tagKey = input.tagKey;
+  t.amountPaise = input.amountPaise;
+  t.description = input.description.trim();
+  t.party = input.party.trim();
+  t.mode = input.mode;
+  t.reference = input.reference.trim();
+  t.valueDate = input.valueDate;
+  t.accountId = input.accountId;
+  t.nonRevenue = input.direction === "in";
+  t.creditKind = creditKind;
+  t.updatedBy = a.name;
+  t.updatedAt = stamp();
+  /* ONE EDIT, ONE ENTRY. The broken bank match used to be a second event, which
+     put the consequence above the change that caused it in a newest-first
+     timeline and left somebody reading "the match came off" with the reason on
+     the line below. It is a sentence on the same entry. */
+  let unmatched = "";
+  if ((amtMoved || refMoved || dirMoved) && t.bankLineId) {
+    unmatched = " The match to " + t.bankLineId
+      + " came off with it: the amount, the reference or the direction moved, so the row no longer resembles that statement line.";
+    t.bankLineId = null;
+  }
+  log(pushEvent(t.events, "TXN_UPDATED",
+    a.name + " updated this row — " + changes.join(" · ") + "." + unmatched), id, "transaction");
   emit();
   return "";
 }
@@ -2362,8 +2433,7 @@ export function importStatement(): { error: string; summary: string } {
       }
       exceptions++; return;
     }
-    const t = snap.transactions.filter((x) => !x.bankLineId && x.state === "recorded"
-      && x.direction === "out" && x.amountPaise > 0
+    const t = snap.transactions.filter((x) => !x.bankLineId && x.direction === "out" && x.amountPaise > 0
       && norm(x.reference) === norm(l.reference) && x.amountPaise === l.amountPaise)[0];
     if (t) {
       t.bankLineId = l.lineId;
@@ -2532,7 +2602,7 @@ export function filterValueLabel(key: string, value: string): string {
   }
   if (key === "tag") return tagOf(value)?.label || value;
   if (key === "kind") return tagKindMeta(value)?.label || value;
-  if (key === "state") return txnStateMeta(value)?.label || refundStateMeta(value)?.label || value;
+  if (key === "state") return refundStateMeta(value)?.label || value;
   if (key === "dir") return value === "out" ? "Debit" : "Credit";
   if (key === "range") return value === "month" ? PERIOD.label : value;
   if (key === "active") return value === "yes" ? "Active" : "Closed";

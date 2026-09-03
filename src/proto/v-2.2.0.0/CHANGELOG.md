@@ -6,6 +6,97 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-03
 
+### Reverse is gone; a row is corrected in place, and the history keeps every version
+
+**Area:** `#/finance-transactions` · a row → actions → Update · the ledger’s last column
+**Files:** `src/admin/views/Finance/store.ts`, `src/admin/views/Finance/types.ts`, `src/admin/views/Finance/TxnModals.tsx`, `src/admin/views/Finance/TxnDetail.tsx`, `src/admin/views/Finance/Transactions.tsx`, `src/admin/views/Finance/bits.tsx`, `src/admin/views/Finance/finance.css`, `src/content/finance/transactions.json`, `src/content/finance/vocabularies.json`, `scripts/check-finance-ledger.cjs`, `scripts/fn-smoke.tsx`
+
+**What changed**
+
+**REVERSING IS REMOVED ENTIRELY.** `reverseTransaction`, `ReverseTxnModal`, the
+`reversal` block, the `reversed` state, the whole `TxnState` type, the
+`transactionStates` vocabulary, `TxnPill` and the `TXN_REVERSED` event are all
+gone. Retiring a row never actually fixed anything — a vendor typed wrong
+stayed typed wrong forever and the correct figure lived on a second row or
+nowhere at all.
+
+**UPDATE REPLACES IT**, in the same menu slot. It opens the record dialog’s own
+field set on what the row currently says — direction, credit kind, **tag**,
+amount, value date, party, mode, reference, account and remark — and writes
+over the row. It refuses everything recording refuses: an inactive tag, a
+non-positive amount, a blank remark or reference, a reference another record
+carries, a future date, an unknown account, a credit that is not one of the
+three permitted kinds. It also refuses a write in which nothing moved.
+
+**THE AUDIT MOVED TO THE HISTORY, WHICH IS STILL APPEND-ONLY.** Each edit
+appends one `TXN_UPDATED` event naming every field that moved and what it moved
+from — *Tag: Software & tools → Vendor & contractor · Amount: ₹6,200 → ₹7,000*.
+The row shows the current truth, the timeline shows all of it, and **nothing is
+ever deleted**. `updatedBy`/`updatedAt` are on the row so a reader knows the
+figures are not the ones first posted.
+
+**ONE FORM, NOT TWO.** Record and Update were about to be two copies of the same
+150 lines, so the field set is now a single `TxnFields` component both use. The
+receipt stays outside it: it is mandatory when recording, has its own dialog
+afterwards, and swapping paper is not the same act as restating what a row says.
+
+**THE STATE COLUMN BECAME UPDATED.** With reversing gone it would have read
+*Recorded* on every row forever, so it and the State filter are removed; the
+column now names who last restated a row and when, or a dash. The `dim`/struck
+row treatment and the blue rail from the reversal build are reverted.
+
+**A CHANGED FIGURE BREAKS A BANK MATCH.** If the amount, reference or direction
+moves, `bankLineId` is cleared — the row is no longer that statement line — and
+the same history entry says so.
+
+**SUPER ADMIN, exactly where Reverse was.** Restating a posted row is the same
+authority as retiring one; the gate did not get cheaper because the mechanism
+got simpler.
+
+**Temp data**
+`src/content/finance/transactions.json` → `state`, `reversal` and
+`reversesTxnId` leave the shape; `updatedBy`/`updatedAt` join it on every row.
+TXN-0917 is the worked example: it was keyed against Sharma Carpentry Works when
+the invoice was Rakesh Contractors’, so the party now reads Rakesh Contractors
+and its history carries the diff. Placeholder records.
+`src/content/finance/vocabularies.json` → `transactionStates` removed,
+`TXN_REVERSED` → `TXN_UPDATED`, and `FN-AD-02` restated. Static copy.
+
+**Backend needed**
+- `PATCH /api/v1/finance/transactions/:id` → accepts the ten editable fields,
+  returns the updated row. Must apply the same validation as create, must treat
+  the row’s own reference as non-duplicate, must append one `TXN_UPDATED` event
+  carrying the field-level diff, must set `updatedBy`/`updatedAt`, and must
+  clear `bankLineId` when amount, reference or direction changes. Super Admin.
+- `POST /api/v1/finance/transactions/:id/reverse` → **no longer needed.** Nothing
+  calls it and the reversed state no longer exists on the record.
+- Aggregates go back to summing every row — there is no state to exclude.
+
+**Open decisions**
+`FN-AD-02` was *Posted is immutable*; it is now **Posted is correctable, and
+every correction is on the record**. The rule it protected survives in a
+stronger form: nothing is deleted, and no field moves without an audited entry
+saying what it moved from. Two calls this build assumed an answer to, both
+stated on screen: **Update is Super Admin** (matching the action it replaces),
+and **a row may keep a tag that has since been deactivated** but may not be
+moved onto one — deactivating a tag deliberately re-buckets nothing, and an edit
+to a remark should not force a re-filing nobody asked for.
+
+**Verified**
+`npx tsc -b` and `npx eslint` clean on every touched file.
+`npm run check:finance` → 426 pass, including a new writes block covering every
+refusal above, the no-change refusal, the field-level diff landing in the
+history, the money following a re-tagged row, the ledger staying the same
+length, and the bank match coming off only when a figure moves.
+`npm run check:finance-render` renders every surface, asserting the Updated
+column, the record’s update banner and *Updated by* row, and that the update
+dialog is the record dialog opened on the row (its tag optgroups present, the
+receipt field absent). `npm run check:finance-nav` passes. Exercised the write
+directly against the seed: re-tagging TXN-0904 moved ₹6,200 from Software &
+tools to Vendor & contractor, kept the ledger at 17 rows, dropped its bank match
+and wrote one history line naming all three changes. `npm run check` as a whole
+still stops at `check:enquiries`, which needs a running backend; unrelated.
+
 ### The reverse dialog is the reason box and nothing else
 
 **Area:** `#/finance-transactions` → a row → Reverse

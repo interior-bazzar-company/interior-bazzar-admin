@@ -20,10 +20,10 @@ import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import { Frame, ViewBand } from "./Frame";
 import type { FaceProps } from "./Frame";
-import { BudgetBar, Dir, Money, TagChip, TxnPill } from "./bits";
+import { BudgetBar, Dir, Money, TagChip } from "./bits";
 import { BudgetModal, DeactivateTagModal, TagModal, TxnModal } from "./TxnModals";
 import {
-  BILL_THRESHOLD_PAISE, FILTER_LABELS, PERIOD, TAG_KINDS, TXN_STATES,
+  BILL_THRESHOLD_PAISE, FILTER_LABELS, PERIOD, TAG_KINDS,
   ago, applyTxnFilters, fmtDate, inr, isSuperAdmin, tagKindMeta,
   useOverview, useTagTotals, useTags, useTxnRows,
 } from "./store";
@@ -39,7 +39,6 @@ function filterValueLabel(key: string, value: string, tags: Tag[]): string {
   if (key === "dir") return value === "out" ? "Debit" : "Credit";
   if (key === "tag") return tags.filter((t) => t.tagKey === value)[0]?.label || value;
   if (key === "kind") return tagKindMeta(value)?.label || value;
-  if (key === "state") return TXN_STATES.filter((s) => s.key === value)[0]?.label || value;
   if (key === "range") return value === "month" ? PERIOD.label : value;
   if (key === "flag") return value === "nobill" ? "Missing a bill" : value;
   return value;
@@ -194,8 +193,9 @@ export default function Transactions({ p, onFilter, onSearch, onUnfilter, onPara
             options={tags.map((t) => ({ v: t.tagKey, l: t.label + (t.active ? "" : " — inactive") }))} />
           <Select key={"kind" + (p.kind || "")} name="kind" label="Rolls up to" value={p.kind} onFilter={onFilter}
             options={TAG_KINDS.map((k) => ({ v: k.key, l: k.label }))} />
-          <Select key={"state" + (p.state || "")} name="state" label="State" value={p.state} onFilter={onFilter}
-            options={TXN_STATES.map((s) => ({ v: s.key, l: s.label }))} />
+          {/* NO STATE FILTER. There was one, offering Recorded and Reversed;
+              reversing is gone and every row is simply a row, so the control
+              had one option and filtered nothing. */}
           <Select key={"range" + (p.range || "")} name="range" label="Period" value={p.range} onFilter={onFilter}
             options={[{ v: "month", l: PERIOD.label }]} />
           <Select key={"flag" + (p.flag || "")} name="flag" label="Queue" value={p.flag} onFilter={onFilter}
@@ -278,7 +278,7 @@ function TxnTable({ p, writable, onRecord, onUnfilter }: {
           <th className="num">Amount</th>
           <th>Value date</th>
           <th>Paper trail</th>
-          <th>State</th>
+          <th>Updated</th>
           <th className="tight" />
         </tr>
       </thead>
@@ -291,29 +291,16 @@ function TxnTable({ p, writable, onRecord, onUnfilter }: {
 
 function TxnLine({ r, p }: { r: TxnRow; p: Params }) {
   const t = r.t;
-  /* REVERSED OUTRANKS A MISSING BILL on the rail, and it is blue rather than
-     red: a reversed row is the SETTLED one — somebody found the mistake and
-     corrected it — while a missing bill is still somebody's job. Red would file
-     the finished thing under the same colour as the unfinished ones. */
-  const reversed = t.state === "reversed";
-  const rail = reversed ? "info" : r.missingBill ? "warn" : "";
+  const rail = r.missingBill ? "warn" : "";
   const to = "#/finance-transactions/" + encodeURIComponent(t.txnId) + qs(carry(p));
   const open = () => go(to);
-  /* THE SAME `dim` A CANCELLED SUBSCRIPTION WEARS. A reversed row is on the
-     record forever and charges nothing, which is the one thing this module
-     already had a row treatment for — the whole line greys and the figure
-     strikes through. */
   return (
-    <tr className={"clickable" + (reversed ? " dim" : "")} tabIndex={0} role="link" aria-label={"Open " + t.txnId}
+    <tr className="clickable" tabIndex={0} role="link" aria-label={"Open " + t.txnId}
       onClick={open} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } }}>
       <td className="rail"><i className={rail} /></td>
       <td>
         <div className="cell-1 mono">{t.txnId}</div>
-        {/* IT NAMES NO OTHER ROW, because there is no other row. The
-            correction is on this one. */}
-        <div className="cell-2" title={t.reversal?.reason}>
-          {t.reversal ? "reversed by " + t.reversal.by : "—"}
-        </div>
+        <div className="cell-2">—</div>
       </td>
       <td>
         <div className="cell-1 fin-desc" title={t.description}>{t.description}</div>
@@ -334,15 +321,18 @@ function TxnLine({ r, p }: { r: TxnRow; p: Params }) {
             : <div className="cell-1 faint">no bill needed</div>}
         {t.bankLineId ? <div className="cell-2"><Icon name="link" size="sm" />matched to bank</div> : null}
       </td>
+      {/* WHAT THE STATE COLUMN BECAME. It held a pill that said Recorded on
+          every row in the ledger and Reversed on the rare one — and with
+          reversing gone it would say Recorded and nothing else, forever. What
+          is worth knowing in its place is whether the figures on this line are
+          still the ones first posted. */}
       <td>
-        {/* THE AMOUNT AND THE DIRECTION ABOVE ARE UNCHANGED even here — the row
-            still says a debit of that size was paid, because it was. The chip
-            and the strike say it no longer counts, which is the whole of what
-            reversing does. */}
-        <TxnPill k={t.state} />
-        {t.reversal
-          ? <div className="cell-2" title={t.reversal.reason}>{fmtDate(t.reversal.at.slice(0, 10))}</div>
-          : null}
+        {t.updatedBy
+          ? <>
+            <div className="cell-1">{t.updatedBy}</div>
+            <div className="cell-2">{fmtDate((t.updatedAt || "").slice(0, 10))}</div>
+          </>
+          : <div className="cell-1 faint">—</div>}
       </td>
       <td className="tight"><Icon name="chevr" size="sm" /></td>
     </tr>

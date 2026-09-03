@@ -338,9 +338,6 @@ export interface Tag {
 
 export type TxnDirection = "out" | "in";
 
-/** Recorded, or reversed on itself. There is no draft: a row here means the
- *  money moved, and a reversed one means it moved and was then corrected. */
-export type TxnState = "recorded" | "reversed";
 
 export interface CompanyTxn {
   txnId: string;
@@ -354,18 +351,22 @@ export interface CompanyTxn {
   reference: string;
   valueDate: string;
   accountId: string;
-  state: TxnState;
   bill: Proof | null;
   bankLineId: string | null;
   /** Money in that is NOT customer revenue — interest, an own transfer, a
    *  vendor refund. Customer money has exactly one way in: a subscription. */
   nonRevenue: boolean;
   creditKind: string | null;
-  /** THE CORRECTION, RECORDED ON THE ROW IT CORRECTS. Set when `state` turns
-   *  `reversed`: who reversed it, when, and why. There is no counter-entry and
-   *  no second row — the amount, direction, tag, date and bill above stay
-   *  exactly as posted, and this is what stops them charging the month. */
-  reversal: { reason: string; by: string; at: string } | null;
+  /** WHO LAST RESTATED THIS ROW, and when. Null on a row nobody has edited.
+   *
+   *  The row above always says what is true NOW — `updateTransaction` writes
+   *  over it — so this pair is what tells a reader the figures in front of them
+   *  are not the ones that were first posted. What they WERE is in `events`: a
+   *  `TXN_UPDATED` entry per edit, naming every field that moved and what it
+   *  moved from. That is the audit trail, and it is append-only even though the
+   *  row is not. */
+  updatedBy: string | null;
+  updatedAt: string | null;
   recordedBy: string;
   recordedAt: string;
   events: FinEvent[];

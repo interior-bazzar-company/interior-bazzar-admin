@@ -196,20 +196,6 @@
     }
   ],
   "$comment_manualCreditKinds": "The ONLY three credits a person may hand-key, and all three are flagged non-revenue. Customer money has exactly one way in: a subscription. If anyone could type a credit, anyone could fabricate revenue.",
-  "transactionStates": [
-    {
-      "key": "recorded",
-      "label": "Recorded",
-      "tone": "ok",
-      "meaning": "The money moved. There is no draft state on this page — a row here means it happened."
-    },
-    {
-      "key": "reversed",
-      "label": "Reversed",
-      "tone": "info",
-      "meaning": "The row was corrected on itself. Everything it says is exactly as posted — the amount, the direction, the tag, the date — and it no longer counts towards the month."
-    }
-  ],
   "refundOrigins": [
     {
       "key": "subscription",
@@ -399,9 +385,9 @@
       "tone": "info"
     },
     {
-      "key": "TXN_REVERSED",
-      "label": "Transaction reversed",
-      "tone": "bad"
+      "key": "TXN_UPDATED",
+      "label": "Transaction updated",
+      "tone": "warn"
     },
     {
       "key": "TAG_CREATED",
@@ -668,8 +654,8 @@
     },
     {
       "id": "FN-AD-02",
-      "title": "Posted is immutable",
-      "position": "Nothing a row says is edited or deleted. A correction is a reversal recorded on the row itself, with an actor and a reason: the figures stay exactly as posted and the row stops counting towards the period. It is never a second row.",
+      "title": "Posted is correctable, and every correction is on the record",
+      "position": "Nothing is ever deleted. A row is corrected in place by an update, which is Super Admin and refuses everything recording refuses; the row then says what is true now. What it said before is in its history — one TXN_UPDATED event per edit, naming every field that moved and what it moved from. The record is mutable; the audit trail is not.",
       "status": "resolved"
     },
     {

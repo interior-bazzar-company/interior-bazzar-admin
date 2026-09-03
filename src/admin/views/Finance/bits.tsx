@@ -8,7 +8,7 @@ import { Icon } from "../../ui";
 import { go } from "../../ui/nav";
 import {
   ago, decision, eventMeta, failureMeta, inr, instStatusMeta, originMeta, refundStateMeta,
-  runStateMeta, sourceMeta, subStatusMeta, tagKindMeta, tagOf, txnStateMeta,
+  runStateMeta, sourceMeta, subStatusMeta, tagKindMeta, tagOf,
 } from "./store";
 import type { FinEvent } from "./store";
 
@@ -49,10 +49,6 @@ export function RunPill({ k, lg }: { k: string; lg?: boolean }) {
   const m = runStateMeta(k);
   return <span className={"pill" + (m?.tone ? " " + m.tone : "") + (lg ? " lg" : "")} title={m?.meaning}>{m?.label || k}</span>;
 }
-export function TxnPill({ k, lg }: { k: string; lg?: boolean }) {
-  const m = txnStateMeta(k);
-  return <span className={"pill" + (m?.tone ? " " + m.tone : "") + (lg ? " lg" : "")} title={m?.meaning}>{m?.label || k}</span>;
-}
 export function RefundPill({ k, lg }: { k: string; lg?: boolean }) {
   const m = refundStateMeta(k);
   return <span className={"pill" + (m?.tone ? " " + m.tone : "") + (lg ? " lg" : "")}>{m?.label || k}</span>;
@@ -91,17 +87,11 @@ export function Dir({ d }: { d: "in" | "out" }) {
   return <span className={"fin-dir " + d}>{d === "out" ? "Debit" : "Credit"}</span>;
 }
 
-/** Signed money. `dead` strikes the figure through: the row still says this
- *  amount — it is never edited — but the amount no longer charges anything,
- *  which is exactly what a reversed row is. A struck figure says "this stands
- *  on the record and counts for nothing" in the one glance a muted colour or a
- *  separate note could not. */
-export function Money({ paise, sign, strong, dead }: {
-  paise: number; sign?: boolean; strong?: boolean; dead?: boolean;
-}) {
+/** Signed money. */
+export function Money({ paise, sign, strong }: { paise: number; sign?: boolean; strong?: boolean }) {
   const neg = paise < 0;
   return (
-    <span className={"tnum fin-money" + (neg ? " neg" : sign ? " pos" : "") + (strong ? " strong" : "") + (dead ? " dead" : "")}>
+    <span className={"tnum fin-money" + (neg ? " neg" : sign ? " pos" : "") + (strong ? " strong" : "")}>
       {neg ? "−" : sign ? "+" : ""}{inr(Math.abs(paise))}
     </span>
   );

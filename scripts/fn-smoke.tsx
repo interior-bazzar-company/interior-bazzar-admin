@@ -43,7 +43,7 @@ import {
   CloseAccountModal, LopModal, OpenRunModal, PaySalaryModal, SalaryAccountModal,
 } from "../src/admin/views/Finance/SalaryModals";
 import {
-  BillModal, BudgetModal, DeactivateTagModal, ReverseTxnModal, TagModal, TxnModal,
+  BillModal, BudgetModal, DeactivateTagModal, TagModal, TxnModal, UpdateTxnModal,
 } from "../src/admin/views/Finance/TxnModals";
 import {
   DecideRefundModal, ManualRefundModal, RecordTransferModal, RequestRefundModal,
@@ -323,14 +323,15 @@ has(txns, "Missing a bill", "...a missing bill is a state, not an error");
 has(txns, "Interest, own transfers and vendor refunds are the only",
   "...money in is named as three non-revenue kinds, on the cell it qualifies");
 has(txns, "Excluded spend", "...and excluded spend is stated rather than left inside a total");
-/* A REVERSED ROW IN THE LIST. It is on the record forever and charges nothing,
-   so it wears the same `dim` a cancelled subscription does — struck figure,
-   greyed line — under a blue chip rather than a red one, because it is the
-   settled row on the page, not the alarming one. */
-has(txns, "clickable dim", "...a reversed row is dimmed the way every retired row in this module is");
-has(txns, "rail\"><i class=\"info", "...its rail is blue: reversed is settled, not going wrong");
-has(txns, "reversed by K. Iyer", "...and the row names who reversed it, not some other row to go and read");
-hasnt(txns, "TXN-RV", "...there is no counter-entry row in the ledger at all");
+/* THE STATE COLUMN BECAME THE UPDATED COLUMN. State held a pill reading
+   Recorded on every row and Reversed on the rare one; with reversing gone it
+   would have said Recorded forever. What is worth knowing in its place is
+   whether the figures on a line are still the ones first posted. */
+has(txns, ">Updated<", "...the ledger's last column asks whether a row has been restated");
+has(txns, "K. Iyer", "...and names who last restated the one row that has been");
+hasnt(txns, ">State<", "...the state column is gone, having had one value left to say");
+hasnt(txns, "Reversed", "...and nothing on the page offers to reverse anything");
+hasnt(txns, "TXN-RV", "...no counter-entry row survives in the ledger either");
 const txnsFiltered = check("transactions · filtered to the ones missing a bill", () => at("/finance-transactions?flag=nobill"));
 has(txnsFiltered, "Missing — required", "...and the queue shows the rows that are actually missing one");
 const txnsEmpty = check("transactions · a filter that matches nothing", () => at("/finance-transactions?q=zzzznothing"));
@@ -576,8 +577,8 @@ hasnt(draftSlip, "no slip number until the run is paid", "...the stamp is the on
 has(draftSlip, 'class="mono fin-slipid"', "...and the action row names the slip by id");
 
 const oneTxn = page("a company transaction", "/finance-transactions/TXN-0901");
-has(oneTxn, "A recorded row is never edited", "...posted is permanent");
-has(oneTxn, "a correction is a reversal", "...and a correction is a reversal, not a rewrite");
+has(oneTxn, "Nothing here is ever deleted", "...deletion is off the table even now that editing is not");
+has(oneTxn, "every field it moves is written into", "...and a correction is audited, not silent");
 /* THE ACTIONS MENU IS NOT ASSERTED HERE, and the reason is worth writing down
    rather than leaving as a gap. `can()` returns false without a session, so
    this harness renders every Finance page with NO write affordance at all —
@@ -596,13 +597,15 @@ has(oneTxn, ">Receipt<", "...the bill block is a receipt section");
 has(oneTxn, "fin-receipt", "...and the file reads as a file");
 has(oneTxn, "holds the name, not the file",
   "...saying what it actually holds rather than offering a download that would do nothing");
-/* A REVERSED ROW CARRIES ITS OWN CORRECTION. There is no counter-entry to open
-   any more, so the row itself has to say the whole thing. */
-const reversed = page("a reversed transaction", "/finance-transactions/TXN-0917");
-has(reversed, "This row has been reversed", "...a reversed row says so on its face");
-has(reversed, "Nothing it says was edited", "...and that its figures are exactly as posted");
-has(reversed, "no longer counts towards the month", "...naming the one thing that actually changed");
-hasnt(reversed, "counter-entry", "...with no second row to go and read");
+/* A CORRECTED ROW SAYS SO, AND SAYS WHERE THE OLD VALUE WENT. The figures on
+   screen are not the ones first posted, and somebody about to act on them
+   deserves to know that before they do. */
+const updated = page("an updated transaction", "/finance-transactions/TXN-0917");
+has(updated, "This row has been updated", "...an updated row says so on its face");
+has(updated, "Rakesh Contractors", "...and shows the corrected value, not the one first keyed");
+has(updated, "what is true now", "...framing the row as current rather than original");
+has(updated, "Updated by", "...the record names who last restated it");
+hasnt(updated, "reversed", "...with nothing left of reversing anywhere on it");
 const noBill = page("a transaction missing a bill", "/finance-transactions/TXN-0910");
 has(noBill, "No bill attached", "...a missing bill is named");
 has(noBill, "cannot close while it is missing", "...and it says what the absence costs");
@@ -790,9 +793,9 @@ has(txnM, "disabled", "...and Record is disabled until there is one");
 has(txnM, "optgroup", "...tags are grouped by where they land");
 has(txnM, "Net line AND CAC", "...naming the destination on the group, not on every row");
 has(txnM, "bill required", "...and an option says so, because that tag refuses the write without one");
-/* THE STANDING PROSE IS GONE. The rule it carried — a row is a fact and a
-   correction is a reversal — is asserted where somebody MEETS it: on the
-   reversal dialog, and on the record page. Both are below and above. */
+/* THE STANDING PROSE IS GONE. The rule it carried — a row is a fact, and
+   correcting one is its own audited act — is asserted where somebody MEETS it:
+   on the update dialog, and on the record page. Both are below and above. */
 hasnt(txnM, "nobody edits it; a correction is a counter-entry, never a rewrite",
   "...and the standing sub-line came off, with its rule moved to where it is acted on");
 hasnt(txnM, "restricted to these three non-revenue kinds",
@@ -802,17 +805,17 @@ hasnt(txnM, "restricted to these three non-revenue kinds",
    `toPaise`, which returns null rather than a number on anything half-typed.
    So: no NaN anywhere in the output, not just in the field it bit in. */
 hasnt(txnM, "NaN", "...and no NaN reaches the output from an unfilled amount field");
-/* THE DIALOG IS THE REASON BOX AND NOTHING ELSE. It carried three lines
-   restating what a reversal does; the record page already says all of it, and
-   the person who opened this menu item knows what they picked. What it must
-   still do is refuse to proceed without a reason. */
-const revM = check("reverse a transaction", () =>
-  modal(<ReverseTxnModal txn={txn("TXN-0901")} onClose={noop} onDone={noop} />));
-has(revM, "Reverse TXN-0901", "...the dialog names the row it is about to reverse");
-has(revM, "Super Admin", "...and whose call it is");
-has(revM, "<textarea", "...the reason is a box");
-has(revM, "read at audit", "...and it says why the reason is mandatory");
-hasnt(revM, "fin-chk", "...with no standing checklist restating what a reversal does");
+/* THE UPDATE DIALOG IS THE RECORD DIALOG, OPENED ON WHAT THE ROW SAYS. That is
+   the whole design — one form, learned once — and the assertions below are
+   about it being the SAME form rather than a second one that resembles it. */
+const updM = check("update a transaction", () =>
+  modal(<UpdateTxnModal txn={txn("TXN-0901")} onClose={noop} onDone={noop} />));
+has(updM, "Update TXN-0901", "...the dialog names the row it is about to restate");
+has(updM, "Super Admin", "...and whose call it is");
+has(updM, "Every change is recorded", "...it says outright that the history keeps what moved");
+has(updM, "Ahuja Estates", "...and it opens on what the row currently says, not on a blank form");
+has(updM, "optgroup", "...the tag picker is the record dialog's, grouped by where the money lands");
+hasnt(updM, ">Receipt<", "...but not the receipt, which has its own dialog and its own act");
 
 const tagM = check("create a tag", () => modal(<TagModal onClose={noop} onDone={noop} />));
 has(tagM, "it decides where the money lands in Analytics", "...the kind decides where the money lands");
@@ -837,13 +840,9 @@ has(bill, "up to 5 MB", "...to the same limit as one attached when the row was r
    that it cannot touch them. This is the module's central rule and the one
    place somebody arrives expecting the opposite. */
 has(bill, "Only the receipt", "...and says plainly that only the receipt can change");
-has(bill, "retires the row without rewriting a word of it",
-  "...naming what to do instead when a figure is wrong");
-const revTxn = check("reverse a transaction", () => modal(
-  <ReverseTxnModal txn={txn("TXN-0901")} onClose={noop} onDone={noop} />));
-has(revTxn, "indistinguishable from a mistake nobody noticed",
-  "...a reversal without a reason is refused, and the dialog says why");
-hasnt(revTxn, "counter-entry", "...and no second row is promised anywhere on it");
+has(bill, "Update, which is Super Admin",
+  "...naming what to use instead when a figure is wrong, and whose call it is");
+hasnt(bill, "reversal", "...and pointing at nothing that no longer exists");
 
 const reqRefund = check("request a refund", () => modal(<RequestRefundModal onClose={noop} onDone={noop} />));
 has(reqRefund, "Full amount only", "...refunds are full-amount-only");
