@@ -802,11 +802,17 @@ hasnt(txnM, "restricted to these three non-revenue kinds",
    `toPaise`, which returns null rather than a number on anything half-typed.
    So: no NaN anywhere in the output, not just in the field it bit in. */
 hasnt(txnM, "NaN", "...and no NaN reaches the output from an unfilled amount field");
-/* WHERE THAT RULE LIVES NOW: on the dialog that performs the correction. */
+/* THE DIALOG IS THE REASON BOX AND NOTHING ELSE. It carried three lines
+   restating what a reversal does; the record page already says all of it, and
+   the person who opened this menu item knows what they picked. What it must
+   still do is refuse to proceed without a reason. */
 const revM = check("reverse a transaction", () =>
   modal(<ReverseTxnModal txn={txn("TXN-0901")} onClose={noop} onDone={noop} />));
-has(revM, "No second row is appended",
-  "...the dialog that performs the correction says it writes no second row");
+has(revM, "Reverse TXN-0901", "...the dialog names the row it is about to reverse");
+has(revM, "Super Admin", "...and whose call it is");
+has(revM, "<textarea", "...the reason is a box");
+has(revM, "read at audit", "...and it says why the reason is mandatory");
+hasnt(revM, "fin-chk", "...with no standing checklist restating what a reversal does");
 
 const tagM = check("create a tag", () => modal(<TagModal onClose={noop} onDone={noop} />));
 has(tagM, "it decides where the money lands in Analytics", "...the kind decides where the money lands");
@@ -835,8 +841,8 @@ has(bill, "retires the row without rewriting a word of it",
   "...naming what to do instead when a figure is wrong");
 const revTxn = check("reverse a transaction", () => modal(
   <ReverseTxnModal txn={txn("TXN-0901")} onClose={noop} onDone={noop} />));
-has(revTxn, "stops counting", "...the correction is the row leaving the totals");
-has(revTxn, "everything else it was posted with", "...while nothing the row says is edited");
+has(revTxn, "indistinguishable from a mistake nobody noticed",
+  "...a reversal without a reason is refused, and the dialog says why");
 hasnt(revTxn, "counter-entry", "...and no second row is promised anywhere on it");
 
 const reqRefund = check("request a refund", () => modal(<RequestRefundModal onClose={noop} onDone={noop} />));

@@ -15,7 +15,7 @@ import { Cancel, Dlg, Field, Fs, Pick, RupeeInput, toPaise } from "./dialog";
 import type { Done } from "./dialog";
 import { Check, Money, TagChip } from "./bits";
 import {
-  ACCOUNTS, CREDIT_KINDS, MODES, PERIOD, TAG_KINDS,
+  ACCOUNTS, CREDIT_KINDS, MODES, TAG_KINDS,
   PROOF_MAX_BYTES, addTag, attachBill, deactivateTag, fileSize, inr, isSuperAdmin,
   proofAccepted, proofTooBig, recordTransaction, reverseTransaction,
   setBudget as setTagBudget, todayIso, useTagTotals, useTags, useTxnRows,
@@ -494,9 +494,6 @@ export function ReverseTxnModal({ txn, onClose, onDone }: { txn: CompanyTxn; onC
           Reverse
         </button>
       </>}>
-      <Check ok>{txn.txnId} keeps <Money paise={Math.abs(txn.amountPaise)} /> and everything else it was posted with — the amount, the direction, the tag, the date and the bill are not edited.</Check>
-      <Check ok>It stops counting: out of {PERIOD.label}'s spend, out of its tag's total, and out of every figure derived from them. No second row is appended.</Check>
-      <Check warn>This moves no money by itself. Whatever the mistake needs undone in the bank happens separately, outside this screen.</Check>
       <Field label="Reason" help="Mandatory, and read at audit — a reversal with no reason is indistinguishable from a mistake nobody noticed.">
         <textarea className="inp" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
       </Field>

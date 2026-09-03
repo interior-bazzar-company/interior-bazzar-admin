@@ -6,6 +6,41 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-03
 
+### The reverse dialog is the reason box and nothing else
+
+**Area:** `#/finance-transactions` → a row → Reverse
+**Files:** `src/admin/views/Finance/TxnModals.tsx`, `scripts/fn-smoke.tsx`
+
+**What changed**
+
+**THREE STANDING LINES CAME OFF.** The dialog opened with a checklist — the row
+keeps its amount and everything else it was posted with, it stops counting in
+the period and its tag, and reversing moves no money by itself. All three are
+true and all three are already said on the record page, which is where somebody
+reads what a reversed row means. Restating them at the moment of the click was
+a wall of text in front of the one thing the dialog is for.
+
+**WHAT IT STILL DOES is refuse without a reason.** The title names the row, the
+sub-line says Super Admin, and the reason field says why it is mandatory — read
+at audit. That is the whole dialog now.
+
+**Temp data**
+`none` — copy only.
+
+**Backend needed**
+`none` — no contract change. `POST /api/v1/finance/transactions/:id/reverse` is
+unaffected; the reason stays mandatory and is still validated in the store.
+
+**Open decisions**
+`none`.
+
+**Verified**
+`npx tsc -b` and `npx eslint` clean. `npm run check:finance` → 413 pass.
+`npm run check:finance-render` renders every surface; the dialog assertions now
+pin what it must keep (the row id, Super Admin, the reason box and why it is
+mandatory) and that it carries no `fin-chk` checklist. Not checked against a
+live backend — the module is still proto-seeded.
+
 ### Reversing corrects the row itself — the counter-entry is gone
 
 **Area:** `#/finance-transactions` · the row menu → Reverse · the `Reversed` chip
