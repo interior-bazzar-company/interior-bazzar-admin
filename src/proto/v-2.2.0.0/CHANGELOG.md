@@ -6,6 +6,129 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-03
 
+### Member dashboard — §3.13, and the two contradictions drawing it exposed
+
+**Area:** `#/team/me` · `#/team/:id` — the container for the Pay, Documents and Work tabs
+**Files:** `src/proto/v-2.2.0.0/wireframe-team-workspace-v2.html`,
+`src/proto/v-2.2.0.0/OPERATION-2026-09-03-team-workspace-v2.md`
+
+**What changed**
+
+The member dashboard is now a screen. **Viewing as** switches between the member,
+their senior and an admin, and the tab bar, the header actions, the Access block
+and the nudge rows all re-render — because "who is looking" is the entire design
+question and a fixed screenshot cannot hold three answers.
+
+**Drawing it caught two contradictions, both now named in the doc.**
+`TM-AD-21` listed six tabs and **Reports was not among them**, though v1 shipped
+it and the daily plan and EOD have nowhere else to live; adding it back gives
+seven, past the edge that decision itself called uncomfortable. `TM-AD-22`
+resolves it by taking `TM-R-14`'s own escape hatch up front — Agreements and
+Resources become **two sections of one Documents tab** — so v1's five tabs
+survive and exactly **one** is added. `TM-AD-18` is untouched: two entities, one
+tab, and direction/permission/retention were never what a tab decides.
+
+**A nudge inherits the scope of what it points at.** Switch to the senior and the
+*Needs you* block drops from 4 rows to 2 — the unsigned NDA and the missing
+documents are **absent, not greyed**, because a row reading *"1 agreement
+unsigned"* announces a document the same screen just refused to show.
+
+**The clock on this screen is read-only.** Actions stay in the topbar strip and on
+`/attendance`; three *End the day* buttons over one open day is two chances for
+the UI to disagree with itself mid-request.
+
+**And the route does not exist.** Team shipped on 2026-08-30 with the member as a
+drawer (`views/Team/MemberDrawer.tsx`); neither `/team/:id` nor `/team/me`
+resolves. `TM-OD-15` answered *where* it lives and nothing built it — which makes
+§3.13 a prerequisite for §3.6, §3.10 and §3.11 rather than a sibling.
+
+**Temp data**
+`none` — no runtime code. The tiles, the nudge rows and the leave list are all
+derived from the same inline `ITEMS` / `LEAVE` arrays the other faces use.
+
+**Backend needed**
+`none` yet. Implied by the design: `GET /admin/team/members/{id}/dashboard`
+resolving `me` to the session's own record, and the scope table in §3.13 is the
+field-level contract it has to honour.
+
+**Open decisions**
+`TM-AD-22` **amends `TM-AD-21`** — flagged as an amendment, not a silent edit ·
+`TM-OD-31` one grant spelled two ways (`people-docs.view` vs `team.resource.view`),
+recommend one shared read verb and separate write verbs, reconcile before Phase G ·
+`TM-OD-32` what becomes of the shipped drawer, recommend it degrades to a launcher.
+
+**Verified**
+Tag balance (15/15 `section`, 385/385 `div`, 83/83 `button`, 40/40 `tr`); the 15
+`data-scr` values are contiguous 0–14; `node --check` on the extracted script.
+The DOM-stub harness grew from 36 assertions to **63, all passing** — 27 of them
+new and all on this screen: each scope's tab count (6 / 4 / 6), Pay and Documents
+present-or-absent per scope, the senior losing exactly two nudge rows with the
+absence explained on screen, the Access block hidden from the member and
+read-only for the senior, *Edit profile* on the admin alone, *Submit EOD* on the
+member alone, approve-versus-withdraw on leave, no *End the day* on any scope,
+and the work tiles matching the seed (3 open, 2 delayed). `npx tsc -b` clean.
+**Not checked:** rendered appearance in a browser — no headless one is installed.
+
+### Team Workspace v2 — the wireframe, clickable
+
+**Area:** design artifact for `#/work`, `#/attendance`, `#/reports`, `#/team/me` — nothing shipped
+**Files:** `src/proto/v-2.2.0.0/wireframe-team-workspace-v2.html` (new)
+
+**What changed**
+
+[OPERATION-2026-09-03-team-workspace-v2.md](OPERATION-2026-09-03-team-workspace-v2.md) had
+twelve ASCII sketches and ten architecture decisions and nothing anyone could
+click. This is §3.1–3.12 as fourteen screens in one standalone file, opened
+straight from disk — no build step, no server, no dependency.
+
+**The board's Group-by axis is really wired**, over the actual 22 rows of
+`content/team/work.json`. `TM-AD-15` is the decision most likely to be argued
+about and a screenshot cannot settle it: switch to *Tag* and an item with two
+tags visibly appears in two columns while the strip says *22 items, columns add
+to 23* rather than quietly printing the bigger number. The drag note flips to a
+refusal on every axis but Status. The calendar and the timeline are computed the
+same way — real dates, real `reportsTo` lanes, real derived `delayed`.
+
+**Each screen carries its own rules rather than a legend at the back.** Every
+`TM-AD`, `TM-OD` and `TM-R` id sits beside the pixels it constrains, so the
+approval conversation happens on the screen being approved.
+
+**`TM-OD-20` is drawn, not resolved.** The Department filter on the roster is
+dashed and labelled, because it is what the decision becomes *if* JD is a
+department — and if JD is a second company it is the wrong control entirely.
+Worth knowing before anyone answers: `members.json` already carries a
+`department` string on all eight members, so that reading is close to free.
+
+**Temp data**
+`none` — the wireframe reads nothing at runtime. Its member and work rows are
+copied inline from `src/content/team/members.json` and `work.json` so the file
+stays standalone; leave, tags, links and agreements are inline placeholders for
+entities that do not exist yet.
+
+**Backend needed**
+`none` — no runtime code. The endpoints this design implies are listed in the
+operation doc §4.3 and stay unbuilt until the approval gate clears.
+
+**Open decisions**
+`TM-OD-20` blocking and shown on §3.1 · `TM-OD-08` `TM-OD-11` `TM-OD-21`–`TM-OD-30`
+each rendered on the screen they govern · `TM-R-10`–`TM-R-14` likewise. Nothing
+was assumed silently.
+
+**Verified**
+Tag balance across the file (14/14 `section`, 325/325 `div`, 70/70 `button`,
+31/31 `tr`); `node --check` on the extracted script. The three computed faces
+were then run against a DOM stub — **36 assertions, all passing**: every axis's
+column counts equal the cards drawn, Status/Kind/Assignee/Priority each place all
+22 items exactly once, Tag places 23 with 9 in Untagged, the catch-all is always
+last, the month grid is 42 cells with one TODAY, a multi-day item appears on a
+middle day and not only its due date, the timeline draws 3 lanes from the
+`reportsTo` edge with no bar outside 0–100%, and the 5 undated items in scope are
+listed instead of drawn. Two annotation numbers were wrong and the harness caught
+both — *"Untagged holds 15"* (it is 9) and *"five items carry a warn rail"* (ten
+are delayed, nine warn and one bad because it is also blocked). **Not checked:**
+rendered appearance in a browser, and no `tsc`/`eslint` run applies — the file is
+not part of the TypeScript build and nothing imports it.
+
 ### Analytics: every remaining description cut to the shortest thing that is still true
 
 **Area:** `#/finance-analytics` · Overview and KPI

@@ -1,0 +1,1778 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Team Workspace v2 — Wireframe</title>
+<style>
+/* ---------------------------------------------------------------------------
+   Wireframe · Team Workspace v2
+   Realises OPERATION-2026-09-03-team-workspace-v2.md, screens 3.1 to 3.12.
+   Every class is prefixed wf- on purpose: four class collisions are on record
+   in this repo (ADMIN_PANEL_OPERATION X-08) and a bare one-word class is a
+   landmine. Tones are the panel's own six from vocabularies.json and no
+   seventh colour is introduced.
+--------------------------------------------------------------------------- */
+:root{
+  --wf-bg:#f4f4f2; --wf-panel:#fff; --wf-fill:#f7f7f6; --wf-fill2:#eeeeec;
+  --wf-line:#dcdcd8; --wf-line2:#c4c4be; --wf-ink:#1c1c1a; --wf-ink2:#5c5c56;
+  --wf-ink3:#8b8b84;
+  --wf-ok:#166b4b; --wf-ok-bg:#e6f2ec;
+  --wf-warn:#8a5200; --wf-warn-bg:#f7eedd;
+  --wf-bad:#a3231b; --wf-bad-bg:#f8e8e6;
+  --wf-info:#1a56ad; --wf-info-bg:#e6eefa;
+  --wf-brand:#5b3ae0; --wf-brand-bg:#ece7fb;
+  --wf-new:#a3231b;
+  --wf-mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--wf-bg); color:var(--wf-ink);
+  font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+code,.wf-mono{font-family:var(--wf-mono);font-size:.85em}
+h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
+
+/* ---- shell ---------------------------------------------------------------- */
+.wf-top{
+  position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:14px;
+  padding:11px 20px;background:var(--wf-panel);border-bottom:1px solid var(--wf-line);
+}
+.wf-top h1{font-size:15px}
+.wf-top .wf-sub{color:var(--wf-ink3);font-size:12px}
+.wf-spacer{flex:1}
+.wf-body{display:flex;align-items:flex-start}
+
+.wf-rail{
+  position:sticky;top:48px;flex:0 0 256px;height:calc(100vh - 48px);overflow:auto;
+  padding:14px 12px 40px;background:var(--wf-panel);border-right:1px solid var(--wf-line);
+}
+.wf-rail h4{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--wf-ink3);margin:15px 8px 6px}
+.wf-rail h4:first-child{margin-top:0}
+.wf-nav{display:flex;align-items:baseline;gap:8px;width:100%;text-align:left;border:0;background:none;
+  cursor:pointer;padding:6px 8px;border-radius:6px;color:var(--wf-ink2);font:inherit;font-size:13px}
+.wf-nav:hover{background:var(--wf-fill2)}
+.wf-nav.is-on{background:var(--wf-ink);color:#fff}
+.wf-nav.is-on .wf-nav-n{color:#fff;opacity:.55}
+.wf-nav-n{font-family:var(--wf-mono);font-size:10.5px;color:var(--wf-ink3);flex:0 0 32px}
+.wf-nav-t{flex:1}
+.wf-nav-b{font-size:9px;font-weight:700;letter-spacing:.05em;color:var(--wf-new)}
+.wf-nav.is-on .wf-nav-b{color:#ff9d95}
+.wf-main{flex:1;min-width:0;padding:22px 26px 90px;max-width:1250px}
+
+/* ---- screen --------------------------------------------------------------- */
+.wf-scr{display:none}
+.wf-scr.is-on{display:block}
+.wf-scrh{display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:2px}
+.wf-scrh .wf-num{font-family:var(--wf-mono);font-size:12px;color:var(--wf-ink3)}
+.wf-scrh h2{font-size:19px}
+.wf-route{font-family:var(--wf-mono);font-size:11.5px;color:var(--wf-ink2);
+  background:var(--wf-fill2);border:1px solid var(--wf-line);border-radius:5px;padding:2px 7px}
+.wf-lede{color:var(--wf-ink2);margin:8px 0 16px;max-width:76ch}
+
+/* ---- chips ---------------------------------------------------------------- */
+.wf-chip{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;
+  letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:4px;
+  border:1px solid var(--wf-line2);color:var(--wf-ink2);background:var(--wf-fill)}
+.wf-chip.is-new{color:#fff;background:var(--wf-new);border-color:var(--wf-new)}
+.wf-chip.is-ext{color:var(--wf-info);background:var(--wf-info-bg);border-color:#bcd0ee}
+.wf-chip.is-live{color:var(--wf-ok);background:var(--wf-ok-bg);border-color:#c2ded1}
+.wf-tone{display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:1px 7px;
+  border-radius:999px;border:1px solid var(--wf-line2);background:var(--wf-fill);color:var(--wf-ink2);white-space:nowrap}
+.wf-tone.t-ok{color:var(--wf-ok);background:var(--wf-ok-bg);border-color:#c2ded1}
+.wf-tone.t-warn{color:var(--wf-warn);background:var(--wf-warn-bg);border-color:#e6d5b2}
+.wf-tone.t-bad{color:var(--wf-bad);background:var(--wf-bad-bg);border-color:#eec9c5}
+.wf-tone.t-info{color:var(--wf-info);background:var(--wf-info-bg);border-color:#bcd0ee}
+.wf-tone.t-brand{color:var(--wf-brand);background:var(--wf-brand-bg);border-color:#d2c8f5}
+.wf-tone.t-dead{color:var(--wf-ink3);text-decoration:line-through;background:var(--wf-fill2)}
+.wf-dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex:0 0 7px}
+
+/* ---- frame ---------------------------------------------------------------- */
+.wf-frame{background:var(--wf-panel);border:1px solid var(--wf-line2);border-radius:9px;
+  overflow:hidden;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.wf-frame + .wf-frame{margin-top:18px}
+.wf-fbar{display:flex;align-items:center;gap:10px;padding:9px 14px;background:var(--wf-fill);
+  border-bottom:1px solid var(--wf-line);font-size:12.5px;color:var(--wf-ink2);flex-wrap:wrap}
+.wf-fbar strong{color:var(--wf-ink);font-weight:600}
+.wf-fbody{padding:14px}
+.wf-fsec{padding:12px 14px;border-top:1px solid var(--wf-line)}
+.wf-fsec:first-child{border-top:0}
+.wf-fsec > h4{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--wf-ink3);
+  margin-bottom:9px;display:flex;align-items:center;gap:8px}
+
+/* ---- controls ------------------------------------------------------------- */
+.wf-btn{font:inherit;font-size:12.5px;padding:5px 11px;border-radius:6px;cursor:pointer;
+  border:1px solid var(--wf-line2);background:var(--wf-panel);color:var(--wf-ink)}
+.wf-btn:hover{background:var(--wf-fill2)}
+.wf-btn.is-primary{background:var(--wf-ink);color:#fff;border-color:var(--wf-ink)}
+.wf-btn.is-quiet{border-color:transparent;color:var(--wf-ink2)}
+.wf-btn:disabled{opacity:.4;cursor:not-allowed}
+.wf-seg{display:inline-flex;border:1px solid var(--wf-line2);border-radius:6px;overflow:hidden}
+.wf-seg button{font:inherit;font-size:12.5px;padding:5px 11px;border:0;border-left:1px solid var(--wf-line);
+  background:var(--wf-panel);cursor:pointer;color:var(--wf-ink2)}
+.wf-seg button:first-child{border-left:0}
+.wf-seg button.is-on{background:var(--wf-ink);color:#fff}
+.wf-sel{font:inherit;font-size:12.5px;padding:5px 8px;border:1px solid var(--wf-line2);
+  border-radius:6px;background:var(--wf-panel);color:var(--wf-ink)}
+.wf-fake{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;padding:5px 10px;
+  border:1px solid var(--wf-line2);border-radius:6px;background:var(--wf-panel);color:var(--wf-ink3)}
+.wf-field{border:1px solid var(--wf-line2);border-radius:6px;padding:7px 10px;
+  background:var(--wf-panel);color:var(--wf-ink);font:inherit;font-size:13px;width:100%}
+.wf-field::placeholder{color:var(--wf-ink3)}
+.wf-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.wf-toolbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px 14px;
+  border-bottom:1px solid var(--wf-line)}
+
+/* ---- annotations ---------------------------------------------------------- */
+.wf-note{margin-top:13px;border-left:3px solid var(--wf-line2);padding:1px 0 1px 13px;
+  color:var(--wf-ink2);font-size:13px;max-width:88ch}
+.wf-note b{color:var(--wf-ink)}
+.wf-id{font-family:var(--wf-mono);font-size:11px;color:var(--wf-ink);
+  background:var(--wf-fill2);border:1px solid var(--wf-line);border-radius:4px;padding:1px 5px}
+.wf-note.is-open{border-left-color:var(--wf-warn)}
+.wf-note.is-risk{border-left-color:var(--wf-bad)}
+.wf-inline{display:flex;gap:9px;align-items:flex-start;font-size:12.5px;color:var(--wf-ink2);
+  background:var(--wf-fill);border:1px dashed var(--wf-line2);border-radius:6px;padding:8px 11px;margin-top:10px}
+.wf-inline .wf-i{flex:0 0 auto;font-weight:700;color:var(--wf-ink3)}
+
+/* ---- board ---------------------------------------------------------------- */
+.wf-strip{display:flex;gap:16px;flex-wrap:wrap;padding:9px 14px;border-bottom:1px solid var(--wf-line);
+  font-size:12px;color:var(--wf-ink2);background:var(--wf-fill)}
+.wf-strip b{color:var(--wf-ink)}
+.wf-cols{display:flex;gap:10px;padding:14px;overflow-x:auto;align-items:flex-start}
+.wf-col{flex:0 0 210px;background:var(--wf-fill);border:1px solid var(--wf-line);border-radius:7px;padding:8px}
+.wf-col.is-rest{background:repeating-linear-gradient(135deg,var(--wf-fill),var(--wf-fill) 6px,var(--wf-fill2) 6px,var(--wf-fill2) 12px)}
+.wf-colh{display:flex;align-items:center;gap:6px;font-size:10.5px;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--wf-ink2);margin-bottom:8px;font-weight:700}
+.wf-colh .wf-n{margin-left:auto;color:var(--wf-ink3);font-family:var(--wf-mono);letter-spacing:0;font-weight:400}
+.wf-card{background:var(--wf-panel);border:1px solid var(--wf-line2);border-radius:6px;
+  padding:8px 9px 8px 11px;margin-bottom:7px;cursor:pointer;position:relative;font-size:12.5px;
+  text-align:left;font-family:inherit;width:100%;display:block}
+.wf-card:hover{border-color:var(--wf-ink3)}
+.wf-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;
+  border-radius:6px 0 0 6px;background:var(--wf-line2)}
+.wf-card.r-ok::before{background:var(--wf-ok)} .wf-card.r-warn::before{background:var(--wf-warn)}
+.wf-card.r-bad::before{background:var(--wf-bad)} .wf-card.r-info::before{background:var(--wf-info)}
+.wf-card.is-dead{opacity:.5}
+.wf-card-t{line-height:1.35;margin-bottom:5px;color:var(--wf-ink)}
+.wf-card-m{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:10.5px;color:var(--wf-ink3)}
+.wf-tag{font-size:10px;padding:0 5px;border-radius:3px;border:1px solid var(--wf-line2);
+  background:var(--wf-fill);color:var(--wf-ink2);white-space:nowrap}
+.wf-tag.k-info{color:var(--wf-info);background:var(--wf-info-bg);border-color:#bcd0ee}
+.wf-tag.k-brand{color:var(--wf-brand);background:var(--wf-brand-bg);border-color:#d2c8f5}
+.wf-tag.k-ok{color:var(--wf-ok);background:var(--wf-ok-bg);border-color:#c2ded1}
+.wf-tag.k-warn{color:var(--wf-warn);background:var(--wf-warn-bg);border-color:#e6d5b2}
+
+/* ---- calendar ------------------------------------------------------------- */
+.wf-cal{display:grid;grid-template-columns:repeat(7,1fr)}
+.wf-cal-h{padding:6px 8px;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--wf-ink3);border-right:1px solid var(--wf-line);background:var(--wf-fill);font-weight:700}
+.wf-cal-h:nth-child(7){border-right:0}
+.wf-day{min-height:106px;border-right:1px solid var(--wf-line);border-top:1px solid var(--wf-line);
+  padding:5px 6px;background:var(--wf-panel);cursor:pointer}
+.wf-day:nth-child(7n){border-right:0}
+.wf-day.is-out{background:var(--wf-fill);color:var(--wf-ink3)}
+.wf-day.is-we{background:var(--wf-fill)}
+.wf-day.is-today{background:#fffdf4;box-shadow:inset 0 0 0 2px var(--wf-warn)}
+.wf-day-n{font-size:11px;color:var(--wf-ink3);margin-bottom:4px;display:flex;gap:6px;align-items:center}
+.wf-day.is-today .wf-day-n{color:var(--wf-warn);font-weight:700}
+.wf-ev{display:block;width:100%;text-align:left;font:inherit;font-size:10.5px;line-height:1.3;
+  border:1px solid var(--wf-line2);border-left-width:3px;border-radius:4px;padding:2px 5px;
+  margin-bottom:3px;background:var(--wf-panel);color:var(--wf-ink);cursor:pointer;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wf-ev.e-ok{border-left-color:var(--wf-ok)} .wf-ev.e-info{border-left-color:var(--wf-info)}
+.wf-ev.e-warn{border-left-color:var(--wf-warn);background:var(--wf-warn-bg)}
+.wf-ev.e-bad{border-left-color:var(--wf-bad);background:var(--wf-bad-bg)}
+.wf-ev.e-dead{opacity:.5;text-decoration:line-through}
+.wf-ev.e-leave{border-style:dashed;background:var(--wf-fill2);color:var(--wf-ink3)}
+.wf-more{font-size:10px;color:var(--wf-ink3);padding-left:3px}
+
+/* ---- timeline ------------------------------------------------------------- */
+.wf-tl-row{display:flex;border-top:1px solid var(--wf-line)}
+.wf-tl-lane{flex:0 0 172px;padding:9px 12px;border-right:1px solid var(--wf-line);background:var(--wf-fill)}
+.wf-tl-lane .wf-nm{font-size:13px;display:flex;align-items:center;gap:6px}
+.wf-tl-lane .wf-sm{font-size:11px;color:var(--wf-ink3);margin-top:2px}
+.wf-tl-grid{flex:1;position:relative;min-width:0;padding:8px 0}
+.wf-tl-head{display:flex;background:var(--wf-fill);border-top:1px solid var(--wf-line)}
+.wf-tl-ticks{flex:1;display:flex;font-size:10px;color:var(--wf-ink3);position:relative}
+.wf-tl-tick{flex:1;text-align:center;padding:5px 0;border-left:1px solid var(--wf-line);line-height:1.15}
+.wf-tl-tick.is-we{background:var(--wf-fill2)}
+.wf-tl-tick i{display:block;font-style:normal;font-size:9px;opacity:.7}
+.wf-bar{position:absolute;height:19px;border-radius:4px;border:1px solid var(--wf-line2);
+  background:var(--wf-fill2);cursor:pointer;overflow:hidden;min-width:14px}
+.wf-bar-fill{position:absolute;left:0;top:0;bottom:0;background:var(--wf-line2)}
+.wf-bar.b-info{border-color:var(--wf-info)} .wf-bar.b-info .wf-bar-fill{background:#c6d7ef}
+.wf-bar.b-ok{border-color:var(--wf-ok)}     .wf-bar.b-ok .wf-bar-fill{background:#c8e0d4}
+.wf-bar.b-warn{border-color:var(--wf-warn)} .wf-bar.b-warn .wf-bar-fill{background:#ecdcbb}
+.wf-bar.b-bad{border-color:var(--wf-bad)}   .wf-bar.b-bad .wf-bar-fill{background:#f1cfcb}
+.wf-bar.b-leave{border-style:dashed;background:repeating-linear-gradient(135deg,#fff,#fff 4px,var(--wf-fill2) 4px,var(--wf-fill2) 8px)}
+.wf-bar-t{position:relative;font-size:10.5px;line-height:17px;padding:0 7px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;color:var(--wf-ink)}
+.wf-now{position:absolute;top:0;bottom:0;border-left:2px dotted var(--wf-warn);z-index:3;pointer-events:none}
+.wf-link{position:absolute;border-top:1.5px dashed var(--wf-ink3);z-index:2;pointer-events:none}
+.wf-link::after{content:"";position:absolute;right:-1px;top:-4px;border:4px solid transparent;
+  border-left-color:var(--wf-ink3);border-right:0}
+
+/* ---- lists ---------------------------------------------------------------- */
+.wf-list{border:1px solid var(--wf-line);border-radius:7px;overflow:hidden}
+.wf-li{display:flex;align-items:center;gap:10px;padding:9px 12px;border-top:1px solid var(--wf-line);
+  font-size:13px;background:var(--wf-panel);flex-wrap:wrap}
+.wf-li:first-child{border-top:0}
+.wf-li .wf-sm{font-size:11.5px;color:var(--wf-ink3)}
+.wf-kv{display:grid;grid-template-columns:140px 1fr;gap:8px 14px;font-size:13px;align-items:baseline;margin:0}
+.wf-kv dt{color:var(--wf-ink3);font-size:12px}
+.wf-kv dd{margin:0}
+.wf-prog{height:7px;border-radius:4px;background:var(--wf-fill2);overflow:hidden;flex:0 0 118px}
+.wf-prog i{display:block;height:100%;background:var(--wf-ink2)}
+.wf-two{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+.wf-av{width:20px;height:20px;border-radius:50%;background:var(--wf-fill2);border:1px solid var(--wf-line2);
+  display:inline-flex;align-items:center;justify-content:center;font-size:9px;color:var(--wf-ink2);flex:0 0 20px}
+.wf-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.wf-tbl th{text-align:left;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--wf-ink3);padding:7px 10px;border-bottom:1px solid var(--wf-line);font-weight:700}
+.wf-tbl td{padding:8px 10px;border-bottom:1px solid var(--wf-line);vertical-align:top}
+.wf-tbl tr:last-child td{border-bottom:0}
+.wf-sig{border:1px dashed var(--wf-line2);border-radius:7px;height:74px;background:var(--wf-fill);
+  display:flex;align-items:center;justify-content:center;color:var(--wf-ink3);font-size:13px;
+  font-style:italic;font-family:"Segoe Script","Brush Script MT",cursive}
+@media (max-width:1020px){.wf-two{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<header class="wf-top">
+  <h1>Team Workspace v2 — wireframe</h1>
+  <span class="wf-chip">Interior Bazzar admin</span>
+  <span class="wf-sub">realises <code>OPERATION-2026-09-03-team-workspace-v2.md</code> · as of 3 Sep 2026 · awaiting approval</span>
+  <span class="wf-spacer"></span>
+  <span class="wf-chip is-live">Live</span>
+  <span class="wf-chip is-ext">Extends</span>
+  <span class="wf-chip is-new">New</span>
+</header>
+
+<div class="wf-body">
+<nav class="wf-rail" id="wfRail"></nav>
+<main class="wf-main" id="wfMain">
+
+<!-- ==================================================================== 0 -->
+<section class="wf-scr" data-scr="0">
+  <div class="wf-scrh"><span class="wf-num">§0</span><h2>What this is, and what it decides</h2></div>
+  <p class="wf-lede">Twelve screens, each one marked <b>live</b>, <b>extends something shipped</b>, or
+  <b>new</b>. Two entities here are genuinely new — <code>Agreement</code> and <code>Resource</code>.
+  Everything else is a face, a column, a small record, or a read of another module. The board's
+  <b>Group by</b> control is really wired, because <span class="wf-id">TM-AD-15</span> is the decision
+  most likely to be argued about and a screenshot cannot settle it.</p>
+
+  <div class="wf-frame">
+    <div class="wf-fbar"><strong>Reuse vs build</strong><span class="wf-spacer"></span><span class="wf-sub">nine notes from the brief</span></div>
+    <table class="wf-tbl">
+      <thead><tr><th>The brief</th><th>Already shipped</th><th>What is new</th><th>Screen</th></tr></thead>
+      <tbody>
+        <tr><td>Task dashboard like Google Calendar</td><td>Board · List faces</td><td><span class="wf-chip is-new">Calendar face</span></td><td>§3.3</td></tr>
+        <tr><td>Captain timeline, to measure progress</td><td><code>/reports</code> performance view</td><td><span class="wf-chip is-new">Timeline face</span></td><td>§3.4</td></tr>
+        <tr><td>Tasks · Milestones · Targets as columns</td><td>one <code>WorkItem</code> with a <code>kind</code></td><td><span class="wf-chip is-ext">selectable column axis</span></td><td>§3.2</td></tr>
+        <tr><td>every member creates their own tag</td><td>nothing — statuses are vocabulary</td><td><span class="wf-chip is-new">Tag</span> record, member-owned</td><td>§3.5 §3.6</td></tr>
+        <tr><td>link to others</td><td><code>parentId</code>, <code>blockedByItemId</code></td><td><span class="wf-chip is-new">WorkLink</span> edge list</td><td>§3.5</td></tr>
+        <tr><td>leave request</td><td>open · break · resume · close</td><td><span class="wf-chip is-new">LeaveRequest</span></td><td>§3.7 §3.8</td></tr>
+        <tr><td>agreement, virtually signed</td><td>nothing. Spec'd in v1 §3.11, never built</td><td><span class="wf-chip is-new">Agreement</span> + public page</td><td>§3.9</td></tr>
+        <tr><td>resource — documents from the member</td><td>nothing</td><td><span class="wf-chip is-new">Resource</span></td><td>§3.10</td></tr>
+        <tr><td>salaries · incentives · who earns what</td><td>Finance owns salary, payslip, run</td><td><span class="wf-chip is-ext">Pay tab</span> — a read + <span class="wf-chip is-new">Incentive</span></td><td>§3.11</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="wf-frame">
+    <div class="wf-fbar"><strong>The three rules no screen here may break</strong></div>
+    <div class="wf-fbody">
+      <ol style="margin:0;padding-left:20px;color:var(--wf-ink2)">
+        <li><b>An absence is the lack of a row.</b> <code>absent</code>, <code>unclosed</code> and
+          <code>delayed</code> are derived at read against <code>asOf</code> and never stored.</li>
+        <li><b><code>isLate</code> IS stored</b>, written once at open against that member's own
+          <code>dayStartsAt</code>. Changing policy tomorrow must not make last month late.</li>
+        <li><b>Milestone and target progress is derived, never typed.</b></li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="wf-note is-open"><span class="wf-id">TM-OD-20</span> <b>Unanswered, and deliberately left so.</b>
+    <i>"manage my JD team too"</i> — is JD a department, a job-description field, or a second company?
+    The roster's shape depends on it, and it blocks Phase&nbsp;A. It is marked on §3.1 rather than
+    silently resolved. Worth knowing before you answer: <code>members.json</code> already carries a
+    <code>department</code> string on every member (Sales · Operations · Leadership), so the
+    department reading is close to free; the second-company reading is a tenancy question and is
+    bigger than this document.</div>
+  <div class="wf-note is-risk"><span class="wf-id">TM-R-11</span> <b>The most sensitive surface in the module is §3.10.</b>
+    Every S3 object in this backend today is publicly readable by URL. Identity documents must be
+    private objects behind a signed read, decided before Phase H is scheduled.</div>
+</section>
+
+<!-- ================================================================== 3.1 -->
+<section class="wf-scr" data-scr="1">
+  <div class="wf-scrh"><span class="wf-num">§3.1</span><h2>Navigation</h2>
+    <span class="wf-chip is-live">Unchanged</span></div>
+  <p class="wf-lede">No new sidebar rows. Everything in this document lands inside the four
+  destinations the Team group already has, plus the member's own dashboard.</p>
+
+  <div class="wf-two">
+    <div class="wf-frame">
+      <div class="wf-fbar"><strong>Sidebar → Team</strong></div>
+      <div class="wf-list">
+        <div class="wf-li"><span class="wf-av">M</span><b>Members</b><code class="wf-route">/team</code><span class="wf-spacer"></span><span class="wf-chip is-live">live</span></div>
+        <div class="wf-li"><span class="wf-av">R</span><b>Roles</b><code class="wf-route">/roles</code><span class="wf-spacer"></span><span class="wf-chip is-live">live</span></div>
+        <div class="wf-li"><span class="wf-av">A</span><b>Attendance</b><code class="wf-route">/attendance</code><span class="wf-spacer"></span><span class="wf-chip is-new">+ leave, + inbox</span></div>
+        <div class="wf-li"><span class="wf-av">W</span><b>Work</b><code class="wf-route">/work</code><span class="wf-spacer"></span><span class="wf-chip is-new">+ 2 faces</span></div>
+        <div class="wf-li"><span class="wf-av">P</span><b>Reports</b><code class="wf-route">/reports</code><span class="wf-spacer"></span><span class="wf-chip is-ext">+ 3 blocks</span></div>
+        <div class="wf-li" style="background:var(--wf-fill)"><span class="wf-av">•</span><b>My dashboard</b><code class="wf-route">/team/me</code><span class="wf-spacer"></span><span class="wf-chip is-new">§3.13 — route does not exist yet</span></div>
+      </div>
+      <div class="wf-fsec">
+        <h4>Faces of one route</h4>
+        <div class="wf-row">
+          <code class="wf-route">/work?face=board</code><span class="wf-chip is-live">live</span>
+          <code class="wf-route">?face=list</code><span class="wf-chip is-live">live</span>
+          <code class="wf-route">?face=calendar</code><span class="wf-chip is-new">new</span>
+          <code class="wf-route">?face=timeline</code><span class="wf-chip is-new">new</span>
+        </div>
+        <div class="wf-row" style="margin-top:8px">
+          <code class="wf-route">/work?item=W-K04</code><span class="wf-sub" style="color:var(--wf-ink3);font-size:12px">a drawer over whichever face is open — already does this</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-frame">
+      <div class="wf-fbar"><strong>Roster</strong><code class="wf-route">/team</code><span class="wf-spacer"></span><span class="wf-chip is-live">live today</span></div>
+      <div class="wf-toolbar">
+        <span class="wf-fake">⌕ Search members</span>
+        <span class="wf-fake">Role ▾</span>
+        <span class="wf-fake">Status ▾</span>
+        <span class="wf-fake" style="border-style:dashed;border-color:var(--wf-warn);color:var(--wf-warn)">Department ▾ · TM-OD-20</span>
+      </div>
+      <div class="wf-list" style="border:0;border-radius:0">
+        <div class="wf-li"><span class="wf-av">VS</span><div><b>V. Shakya</b><div class="wf-sm">Founder · Leadership</div></div><span class="wf-spacer"></span><span class="wf-tone t-ok"><i class="wf-dot"></i>active</span></div>
+        <div class="wf-li"><span class="wf-av">AS</span><div><b>A. Sharma</b><div class="wf-sm">Sales Head · Sales · reports to V. Shakya</div></div><span class="wf-spacer"></span><span class="wf-tone">2 reports</span></div>
+        <div class="wf-li"><span class="wf-av">DK</span><div><b>D. Kapoor</b><div class="wf-sm">Operations Manager · Operations · reports to V. Shakya</div></div><span class="wf-spacer"></span><span class="wf-tone">2 reports</span></div>
+        <div class="wf-li" style="background:var(--wf-fill)"><span class="wf-av">MN</span><div><b>Meera Nair</b><div class="wf-sm">Operations Executive · reports to D. Kapoor</div></div><span class="wf-spacer"></span><span class="wf-tone t-ok"><i class="wf-dot"></i>active</span></div>
+        <div class="wf-li" style="background:var(--wf-fill)"><span class="wf-av">NP</span><div><b>N. Pillai</b><div class="wf-sm">Support Executive · contract · reports to D. Kapoor</div></div><span class="wf-spacer"></span><span class="wf-tone t-warn">2 documents missing</span></div>
+      </div>
+      <div class="wf-fsec">
+        <div class="wf-inline"><span class="wf-i">⚠</span><div><b>The Department filter above is drawn dashed because nobody has approved it.</b>
+          It is what TM-OD-20 becomes <i>if</i> JD is a department. If JD is a second company, this
+          filter is the wrong control entirely and the roster needs a tenancy switch instead.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-note"><span class="wf-id">TM-AD-12</span> <b>Calendar and Timeline are faces, not modules.</b>
+    Three sidebar rows over one dataset would triple the permission surface and give the user three
+    places to ask "where is that task".</div>
+  <div class="wf-note"><span class="wf-id">TM-AD-13</span> <b>"Captain" is <code>reportsTo</code>.</b>
+    A captain is a member whom at least one other member reports to — derived, one level deep, never
+    transitive. No new role, no new field, no new grant. A second hierarchy for the word <i>captain</i>
+    would give the module two answers to "who is this person's senior", and they would drift within a month.</div>
+</section>
+
+<!-- ================================================================== 3.2 -->
+<section class="wf-scr" data-scr="2">
+  <div class="wf-scrh"><span class="wf-num">§3.2</span><h2>Work — the selectable column axis</h2>
+    <code class="wf-route">/work?face=board</code><span class="wf-chip is-ext">extends the shipped board</span></div>
+  <p class="wf-lede">The column is a grouping choice, not a fixed property of the board.
+  <b>Change <i>Group by</i> below — it really regroups</b>, over the 22 seeded work items in
+  <code>src/content/team/work.json</code>.</p>
+
+  <div class="wf-frame">
+    <div class="wf-fbar">
+      <span class="wf-seg"><button class="is-on">▤ Board</button><button>☰ List</button>
+      <button data-goto="3">▦ Calendar</button><button data-goto="4">⊞ Timeline</button></span>
+      <span class="wf-spacer"></span><span class="wf-chip is-new">two faces new</span>
+    </div>
+    <div class="wf-toolbar">
+      <span class="wf-fake">⌕ Search</span>
+      <span class="wf-fake">Member ▾</span><span class="wf-fake">Kind ▾</span>
+      <span class="wf-fake">Status ▾</span><span class="wf-fake">Priority ▾</span>
+      <span class="wf-fake" style="border-color:var(--wf-new);color:var(--wf-new)">Tag ▾ NEW</span>
+      <span class="wf-spacer"></span><button class="wf-btn is-primary">+ New item</button>
+    </div>
+    <div class="wf-toolbar" style="background:var(--wf-fill)">
+      <label style="font-size:12.5px;color:var(--wf-ink2)">Group by</label>
+      <select class="wf-sel" id="wfAxis">
+        <option value="status">Status</option>
+        <option value="kind">Kind</option>
+        <option value="assignee">Assignee</option>
+        <option value="priority">Priority</option>
+        <option value="tag">Tag</option>
+      </select>
+      <span class="wf-chip is-new">new</span>
+      <span class="wf-spacer"></span>
+      <span id="wfDragNote" class="wf-sub" style="font-size:12px;color:var(--wf-ink3)"></span>
+    </div>
+    <div class="wf-strip" id="wfStrip"></div>
+    <div class="wf-cols" id="wfCols"></div>
+  </div>
+
+  <div class="wf-note"><span class="wf-id">TM-AD-15</span> <b>Status stays the default, and it is the only
+    draggable axis.</b> It is the one axis whose columns carry a transition table, so dragging between
+    them means something. On every other axis the columns are a read-only grouping: you cannot drag a
+    card from Meera's column into Arjun's and have that mean "reassign", because a reassignment needs a
+    reason and an audit row, and a drag has neither.</div>
+  <div class="wf-note"><b>The last column is never hidden.</b> Switch to <i>Tag</i> and watch
+    <span class="wf-chip">Untagged</span> hold 9 items. A grouping that silently drops its ungrouped rows
+    is a board that lies about its own count — and where an item carries two tags the strip says so out
+    loud (22 items, 23 cards) rather than quietly printing the bigger number.</div>
+  <div class="wf-note"><b><code>delayed</code> is not a status.</b> Ten items are delayed on this board
+    and not one of them stores a flag. It is <code>dueDate &lt; today AND status not terminal</code>,
+    computed at read against <code>asOf</code> — nine draw a warn rail and the tenth draws a bad one,
+    because it is also blocked.</div>
+</section>
+
+<!-- ================================================================== 3.3 -->
+<section class="wf-scr" data-scr="3">
+  <div class="wf-scrh"><span class="wf-num">§3.3</span><h2>Calendar face</h2>
+    <code class="wf-route">/work?face=calendar</code><span class="wf-chip is-new">new</span></div>
+  <p class="wf-lede">Google Calendar is UX inspiration only. <b>Taken</b> — the month grid, the coloured
+  chip, click-a-day-to-create, keyboard paging. <b>Not taken</b> — overlapping event layout, all-day
+  versus timed lanes, recurrence, invitations, drag-to-resize.</p>
+
+  <div class="wf-frame">
+    <div class="wf-fbar">
+      <button class="wf-btn is-quiet" id="wfCalPrev">‹</button>
+      <strong id="wfCalTitle">September 2026</strong>
+      <button class="wf-btn is-quiet" id="wfCalNext">›</button>
+      <span class="wf-seg" id="wfCalMode"><button data-mode="month" class="is-on">Month</button><button data-mode="week">Week</button></span>
+      <span class="wf-fake">Member ▾</span><span class="wf-fake">Kind ▾</span><span class="wf-fake">Tag ▾</span>
+      <span class="wf-spacer"></span><button class="wf-btn is-primary">+ New item</button>
+    </div>
+    <div class="wf-cal" id="wfCal"></div>
+    <div class="wf-fsec" style="background:var(--wf-fill)">
+      <div class="wf-row" style="font-size:12px;color:var(--wf-ink2)">
+        <span class="wf-tone t-info"><i class="wf-dot"></i>chip tone = status</span>
+        <span class="wf-tone">◆ = milestone or target</span>
+        <span class="wf-tone t-warn"><i class="wf-dot"></i>⚠ = delayed or blocked</span>
+        <span class="wf-tone">▒ = approved leave</span>
+        <span>click a day → new item with that date prefilled · click a chip → the drawer</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-note"><b>A multi-day item appears on every day it spans, not only its due date.</b>
+    <code>startDate</code> has been on the model since v1 and neither shipped face ever used it. An item
+    that shows only on its last day is a deadline list, not a schedule.</div>
+  <div class="wf-note"><b>Week view is the same grid with seven columns and rows by item — no hour gutter.</b>
+    Nothing in this module has a start and end <i>time</i> except attendance, which has its own strip.
+    An hour grid would be mostly empty, and it is the largest piece of net-new UI in the plan for the
+    least return.</div>
+  <div class="wf-note is-open"><span class="wf-id">TM-OD-08</span> <b>Drag and drop stays out, reaffirmed.</b>
+    Reschedule is a date field in the drawer. A silent drag leaves no reason behind it.</div>
+</section>
+
+<!-- ================================================================== 3.4 -->
+<section class="wf-scr" data-scr="4">
+  <div class="wf-scrh"><span class="wf-num">§3.4</span><h2>Captain timeline</h2>
+    <code class="wf-route">/work?face=timeline</code><span class="wf-chip is-new">new</span></div>
+  <p class="wf-lede">One lane per member in the viewer's <code>team</code> scope, bars from
+  <code>startDate</code> to <code>dueDate</code>. Viewer here is <b>D. Kapoor</b>, Operations Manager —
+  a captain because Meera Nair and N. Pillai point at him with <code>reportsTo</code>, not because
+  anyone gave him a title.</p>
+
+  <div class="wf-frame">
+    <div class="wf-fbar">
+      <button class="wf-btn is-quiet" id="wfTlPrev">‹</button>
+      <strong id="wfTlTitle"></strong>
+      <button class="wf-btn is-quiet" id="wfTlNext">›</button>
+      <span class="wf-seg" id="wfTlRange"><button data-w="2" class="is-on">2w</button><button data-w="4">4w</button><button data-w="13">Quarter</button></span>
+      <span class="wf-fake">Group: Member ▾</span>
+      <span class="wf-spacer"></span><span class="wf-chip">scope: my reports · one level</span>
+    </div>
+    <div id="wfTl"></div>
+    <div class="wf-fsec" style="background:var(--wf-fill)">
+      <div class="wf-row" style="font-size:12px;color:var(--wf-ink2)">
+        <span>bar fill = derived progress</span><span class="wf-tone t-warn"><i class="wf-dot"></i>delayed</span>
+        <span class="wf-tone">╌╌▶ follows link</span><span class="wf-tone">▒ approved leave</span>
+        <span>click a bar → the drawer</span>
+      </div>
+      <div class="wf-inline" id="wfTlUndated"><span class="wf-i">⚠</span><div></div></div>
+    </div>
+  </div>
+
+  <div class="wf-note"><b>An item with no <code>startDate</code> cannot be drawn</b>, so it is listed
+    under the grid instead of being given an invented start. That is the honest state; a bar beginning
+    at a date nobody chose is a lie the chart tells confidently.</div>
+  <div class="wf-note"><b>Three things this view must not become</b>, each the usual way a timeline rots.
+    <b>Not a Gantt with dependencies that gate</b> — <code>follows</code> draws the connector and nothing
+    more. <b>Not a resource planner</b> — no capacity bar, no allocation percentage; the module has no
+    estimate field and inventing one to fill a chart is how estimates get born.
+    <b>Not a ranking</b> — <span class="wf-id">TM-OD-11</span> stands: show the numbers, sort by any
+    column, compute no score.</div>
+  <div class="wf-note is-risk"><span class="wf-id">TM-R-13</span> Timeline plus calendar is more net-new
+    UI than the whole of v1's work face. Build C before D, month before week, and share one date-grid
+    primitive. If D slips, the calendar alone answers the brief's headline.</div>
+</section>
+
+<!-- ================================================================== 3.5 -->
+<section class="wf-scr" data-scr="5">
+  <div class="wf-scrh"><span class="wf-num">§3.5</span><h2>Item drawer v2 — tags, links, dates</h2>
+    <code class="wf-route">/work?item=W-K04</code><span class="wf-chip is-ext">extends the shipped drawer</span></div>
+  <p class="wf-lede">The drawer already composes over any face and keeps doing so, which is why neither
+  the calendar nor the timeline needs a detail view of its own.</p>
+
+  <div class="wf-two">
+    <div class="wf-frame">
+      <div class="wf-fbar"><strong>Work item</strong><span class="wf-spacer"></span><span class="wf-tone t-info"><i class="wf-dot"></i>in progress</span><span class="wf-tone t-bad">high</span></div>
+      <div class="wf-fsec">
+        <h4>W-K04</h4>
+        <div style="font-size:15px;font-weight:600;margin-bottom:10px">Send the revised quotation to Sharma Interiors</div>
+        <dl class="wf-kv">
+          <dt>Kind</dt><dd>task</dd>
+          <dt>Assigned to</dt><dd><span class="wf-av">RM</span> Rahul Menon</dd>
+          <dt>Tags <span class="wf-chip is-new">new</span></dt>
+          <dd><span class="wf-tag k-brand">Call ×</span> <span class="wf-tag k-warn">Follow-up ×</span> <button class="wf-btn is-quiet" style="font-size:11px;padding:1px 7px">+ add</button></dd>
+          <dt>Rolls up to</dt><dd>◆ Close Sharma Interiors <span class="wf-sm">→ open</span></dd>
+          <dt>Starts <span class="wf-chip is-ext">shown at last</span></dt><dd>28 Aug 2026</dd>
+          <dt>Due</dt><dd>28 Aug 2026 · <span class="wf-tone t-warn">6 days over</span></dd>
+          <dt>Description</dt><dd style="color:var(--wf-ink2)">Revised tier pricing after the site measurement.</dd>
+        </dl>
+      </div>
+      <div class="wf-fsec">
+        <h4>Linked items <span class="wf-chip is-new">new</span></h4>
+        <div class="wf-list">
+          <div class="wf-li"><span class="wf-tone">↔ relates to</span> Prepare the Sharma site measurement sheet <span class="wf-spacer"></span><span class="wf-sm">→ open</span></div>
+          <div class="wf-li"><span class="wf-tone">⊘ duplicates</span> Follow up the three Tuesday leads <span class="wf-spacer"></span><span class="wf-sm">→ open</span></div>
+          <div class="wf-li"><span class="wf-tone">⇢ follows</span> Site visit — Kalyani Nagar <span class="wf-spacer"></span><span class="wf-sm">→ open</span></div>
+        </div>
+        <button class="wf-btn" style="margin-top:9px">+ link an item</button>
+      </div>
+      <div class="wf-fsec"><h4>Activity</h4>
+        <div class="wf-sm">created 25 Aug · assigned to Rahul Menon · tagged Call · status × 3</div></div>
+      <div class="wf-fsec wf-row" style="background:var(--wf-fill)">
+        <button class="wf-btn">Start</button><button class="wf-btn">Complete</button><button class="wf-btn">Block…</button>
+        <span class="wf-spacer"></span><button class="wf-btn">Edit</button><button class="wf-btn is-quiet">Cancel…</button>
+      </div>
+    </div>
+
+    <div>
+      <div class="wf-frame">
+        <div class="wf-fbar"><strong>Tag picker</strong><span class="wf-spacer"></span><span class="wf-chip is-new">new</span></div>
+        <div class="wf-fsec">
+          <input class="wf-field" placeholder="Type to filter or create…" value="cli">
+          <h4 style="margin-top:12px">Your tags</h4>
+          <div class="wf-row"><span class="wf-tag k-brand">Call</span><span class="wf-tag k-info">Client call</span></div>
+          <h4 style="margin-top:12px">Suggestions <span class="wf-chip">vocabulary</span></h4>
+          <div class="wf-row"><span class="wf-tag">Meeting</span><span class="wf-tag">Follow-up</span><span class="wf-tag">Site visit</span><span class="wf-tag">Review</span><span class="wf-tag">Admin</span></div>
+          <h4 style="margin-top:12px">Create</h4>
+          <button class="wf-btn is-primary">+ Create “cli” as a new tag</button>
+          <div class="wf-inline"><span class="wf-i">ⓘ</span><div>Own tags first, then the suggestions, then create. This is the
+            <b>only place a tag is born</b> — a separate "create tag" screen would be a second entry point
+            to a six-field record.</div></div>
+        </div>
+      </div>
+
+      <div class="wf-frame">
+        <div class="wf-fbar"><strong>Link an item</strong><span class="wf-spacer"></span><span class="wf-chip is-new">new</span></div>
+        <div class="wf-fsec">
+          <div class="wf-row" style="margin-bottom:9px">
+            <select class="wf-sel"><option>↔ relates to</option><option>⊘ duplicates</option><option>⇢ follows</option><option>⇠ is followed by</option></select>
+            <input class="wf-field" style="flex:1;min-width:180px" placeholder="Search work items…">
+          </div>
+          <div class="wf-inline"><span class="wf-i">⚠</span><div><b><code>parentId</code> and <code>blockedByItemId</code>
+            are not in this list.</b> Those two are load-bearing — one drives milestone rollup, the other
+            demands a reason. A weak link must never be creatable where a strong one is expected.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-note"><span class="wf-id">TM-AD-16</span> <b>Links are an edge list and they never touch
+    rollup.</b> <code>WorkLink { fromItemId · toItemId · relation }</code>. Progress stays
+    <i>completed children ÷ total</i> and a <code>relates to</code> edge changes nothing about it.</div>
+  <div class="wf-note"><span class="wf-id">TM-AD-14</span> <b>Two members may both have a tag called
+    "Client call".</b> They are different rows, identity is <code>(ownerId, slug)</code>, and neither can
+    rename or delete the other's. Cross-member views group by <code>slug</code>, so a captain's board
+    shows one <i>Client call</i> column covering both — otherwise a team view fragments into one column
+    per person per tag and is useless at five people.</div>
+</section>
+
+<!-- ================================================================== 3.6 -->
+<section class="wf-scr" data-scr="6">
+  <div class="wf-scrh"><span class="wf-num">§3.6</span><h2>Tag manager</h2>
+    <code class="wf-route">/team/me?tab=work</code><span class="wf-chip is-new">new</span></div>
+  <p class="wf-lede">Small, and deliberately not a module. A sub-panel on the member's own dashboard.</p>
+
+  <div class="wf-frame" style="max-width:620px">
+    <div class="wf-fbar"><strong>My tags</strong><span class="wf-spacer"></span><span class="wf-sm" style="color:var(--wf-ink3)">6 of 20</span></div>
+    <div class="wf-list" style="border:0;border-radius:0">
+      <div class="wf-li"><span class="wf-tag k-info">Meeting</span><span class="wf-sm">info</span><span class="wf-spacer"></span><span class="wf-sm">4 items</span><button class="wf-btn is-quiet">rename</button><button class="wf-btn is-quiet">archive</button></div>
+      <div class="wf-li"><span class="wf-tag k-brand">Call</span><span class="wf-sm">brand</span><span class="wf-spacer"></span><span class="wf-sm">3 items</span><button class="wf-btn is-quiet">rename</button><button class="wf-btn is-quiet">archive</button></div>
+      <div class="wf-li"><span class="wf-tag k-ok">Site visit</span><span class="wf-sm">ok</span><span class="wf-spacer"></span><span class="wf-sm">2 items</span><button class="wf-btn is-quiet">rename</button><button class="wf-btn is-quiet">archive</button></div>
+      <div class="wf-li"><span class="wf-tag k-warn">Follow-up</span><span class="wf-sm">warn</span><span class="wf-spacer"></span><span class="wf-sm">3 items</span><button class="wf-btn is-quiet">rename</button><button class="wf-btn is-quiet">archive</button></div>
+      <div class="wf-li"><span class="wf-tag">Review</span><span class="wf-sm">neutral</span><span class="wf-spacer"></span><span class="wf-sm">2 items</span><button class="wf-btn is-quiet">rename</button><button class="wf-btn is-quiet">archive</button></div>
+      <div class="wf-li" style="opacity:.55"><span class="wf-tag">Q2 push</span><span class="wf-sm">archived 30 Jun</span><span class="wf-spacer"></span><span class="wf-sm">7 items</span><button class="wf-btn is-quiet">restore</button></div>
+    </div>
+    <div class="wf-fsec">
+      <div class="wf-row"><button class="wf-btn is-primary">+ New tag</button>
+        <select class="wf-sel"><option>info</option><option>brand</option><option>ok</option><option>warn</option><option>bad</option><option>neutral</option></select></div>
+      <div class="wf-inline"><span class="wf-i">ⓘ</span><div>Your tags are yours. Renaming one changes it on
+        <b>your</b> items only — another member's tag with the same name is their own record.</div></div>
+      <div class="wf-inline"><span class="wf-i">⚠</span><div><b>These counts are your own items, and they
+        will not match the board.</b> §3.2 groups by <code>slug</code> across everyone in scope, so its
+        <i>Call</i> column is your Call plus theirs. Two numbers, both right, and the screen has to say
+        which is which — that is the cost of <span class="wf-id">TM-AD-14</span>, paid here on purpose.</div></div>
+    </div>
+  </div>
+
+  <div class="wf-note"><b>Archive, not delete.</b> A deleted tag would have to either strip itself from
+    historical items — rewriting what a completed task was filed under — or leave dangling ids. Archive
+    removes it from the picker and leaves history intact, which is the same answer the module already
+    gives for a cancelled work item.</div>
+  <div class="wf-note"><b>Six tones, not a colour picker.</b> A free picker on a per-member tag produces a
+    board where two people's palettes collide, and it would introduce the first non-token colour in a
+    panel where dark mode is a token swap rather than a second palette.</div>
+  <div class="wf-note is-open"><span class="wf-id">TM-OD-21</span> An admin may <b>not</b> create a tag on
+    somebody else's behalf — member-owned means member-owned, and there is no company owner to hang it on.
+    <span class="wf-id">TM-OD-22</span> <b>Soft cap 20</b>, warned not blocked; past that a tag list stops
+    being a filter.</div>
+</section>
+
+<!-- ================================================================== 3.7 -->
+<section class="wf-scr" data-scr="7">
+  <div class="wf-scrh"><span class="wf-num">§3.7</span><h2>Attendance — the leave request block</h2>
+    <code class="wf-route">/attendance</code><span class="wf-chip is-new">new block</span></div>
+  <p class="wf-lede">Added below the shipped clock strip. Viewer is <b>N. Pillai</b>, Support Executive,
+  who reports to D. Kapoor. <b>The clock strip does not move.</b></p>
+
+  <div class="wf-two">
+    <div class="wf-frame">
+      <div class="wf-fbar"><strong>My day</strong><span class="wf-spacer"></span><span class="wf-sm">Thu 3 Sep 2026 · 14:20</span></div>
+      <div class="wf-fsec" style="background:var(--wf-fill)">
+        <div class="wf-row"><span class="wf-tone t-ok"><i class="wf-dot"></i>Working</span>
+          <span class="wf-sm">started 9:04 · <b style="color:var(--wf-warn)">late 4m</b> · worked 4h 32m</span></div>
+        <div class="wf-row" style="margin-top:10px"><button class="wf-btn">Take a break</button>
+          <span class="wf-spacer"></span><button class="wf-btn is-primary">End the day</button></div>
+        <div class="wf-sm" style="margin-top:8px">↑ shipped 2026-08-30 · unchanged</div>
+      </div>
+      <div class="wf-fsec">
+        <h4>Leave <span class="wf-chip is-new">new</span></h4>
+        <div class="wf-list">
+          <div class="wf-li"><span class="wf-tone t-warn">⏳ requested</span><div><b>12 – 13 Sep</b> <span class="wf-sm">casual · 2 days</span><div class="wf-sm">with D. Kapoor since 1 Sep</div></div><span class="wf-spacer"></span><button class="wf-btn is-quiet">Withdraw</button></div>
+          <div class="wf-li"><span class="wf-tone t-ok">✓ approved</span><div><b>28 Aug</b> <span class="wf-sm">sick · 1 day</span><div class="wf-sm">by D. Kapoor, 27 Aug</div></div><span class="wf-spacer"></span><span class="wf-sm">past</span></div>
+        </div>
+        <button class="wf-btn is-primary" style="margin-top:10px">Request leave</button>
+      </div>
+    </div>
+
+    <div class="wf-frame">
+      <div class="wf-fbar"><strong>Request leave</strong><span class="wf-spacer"></span><span class="wf-chip is-new">new</span></div>
+      <div class="wf-fsec">
+        <div class="wf-row" style="margin-bottom:10px">
+          <div style="flex:1;min-width:130px"><div class="wf-sm">From</div><input class="wf-field" value="12 Sep 2026"></div>
+          <div style="flex:1;min-width:130px"><div class="wf-sm">To</div><input class="wf-field" value="13 Sep 2026"></div>
+          <div style="align-self:flex-end;padding-bottom:8px"><span class="wf-tone">2 days</span></div>
+        </div>
+        <div class="wf-sm">Kind</div>
+        <select class="wf-sel" style="margin-bottom:10px"><option>Casual</option><option>Sick</option><option>Unpaid</option><option>Comp-off</option></select>
+        <div class="wf-sm">Reason</div>
+        <input class="wf-field" value="Family function, out of Delhi">
+        <div class="wf-inline"><span class="wf-i">ⓘ</span><div>Goes to <b>D. Kapoor</b>, who you report to.
+          <b>Until it is approved these days still count as absent.</b></div></div>
+        <div class="wf-row" style="margin-top:12px"><span class="wf-spacer"></span>
+          <button class="wf-btn is-quiet">Cancel</button><button class="wf-btn is-primary">Send request ▸</button></div>
+      </div>
+      <div class="wf-fsec" style="background:var(--wf-bad-bg)">
+        <h4 style="color:var(--wf-bad)">Refused inline — the other path</h4>
+        <div style="font-size:13px;color:var(--wf-bad)"><b>You clocked in on 12 Sep.</b> A leave record over
+          an attendance row would make the same day both worked and away.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-note"><span class="wf-id">TM-AD-20</span> <b>Leave suppresses a derived absence. It never
+    writes an attendance row.</b> <code>absent</code> is <i>no day opened, business day over, on a working
+    day</i> — the clause added is <i>and no approved leave covers this date</i>. One clause, one file. A
+    pending request changes nothing; only an approved one suppresses.</div>
+  <div class="wf-note"><b><code>on_leave</code> joins <code>attendanceStates</code> with
+    <code>stored: false</code></b>, beside <code>absent</code> and <code>unclosed</code>. Getting that flag
+    wrong is what makes leave writable, and writable leave is a second source of truth for whether somebody
+    was in.</div>
+  <div class="wf-note is-open"><span class="wf-id">TM-OD-23</span> <b>No quota in v1</b> — a quota needs an
+    accrual policy, a carry-forward rule and a year-end job. Record the days, count them in a report.
+    <span class="wf-id">TM-OD-24</span> A member may cancel an approved leave <b>before the from-date</b>,
+    and the approver is told. After it starts, an admin corrects it.</div>
+  <div class="wf-note is-risk"><span class="wf-id">TM-R-10</span> <b>Phase E edits the module's central
+    rule.</b> Nothing else touches <code>store.ts</code> while it is in flight. Seed a member with leave
+    and a member without, and assert both before and after.</div>
+</section>
+
+<!-- ================================================================== 3.8 -->
+<section class="wf-scr" data-scr="8">
+  <div class="wf-scrh"><span class="wf-num">§3.8</span><h2>Leave inbox — the senior side</h2>
+    <code class="wf-route">/attendance</code><span class="wf-chip is-new">new block</span></div>
+  <p class="wf-lede">Viewer is <b>D. Kapoor</b>. Both requests below come from members who point at him
+  with <code>reportsTo</code>; nothing here needed a new hierarchy to route.</p>
+
+  <div class="wf-frame" style="max-width:760px">
+    <div class="wf-fbar"><strong>Leave requests</strong><span class="wf-spacer"></span><span class="wf-tone t-warn">2 waiting on you</span></div>
+    <div class="wf-fsec">
+      <div class="wf-row"><span class="wf-av">NP</span><b>N. Pillai</b>
+        <span class="wf-tone">12 – 13 Sep</span><span class="wf-tone">casual</span><span class="wf-sm">2 days</span></div>
+      <div class="wf-sm" style="margin:6px 0 0 30px">“Family function, out of Delhi” · requested 1 Sep</div>
+      <div class="wf-inline" style="margin-left:30px;border-color:var(--wf-warn);background:var(--wf-warn-bg);color:var(--wf-warn)">
+        <span class="wf-i">⚠</span><div><b>Meera Nair is also away on 12 Sep.</b> That leaves nobody on
+          support that day.</div></div>
+      <div class="wf-row" style="margin-top:10px"><span class="wf-spacer"></span>
+        <button class="wf-btn">Reject…</button><button class="wf-btn is-primary">Approve</button></div>
+    </div>
+    <div class="wf-fsec">
+      <div class="wf-row"><span class="wf-av">MN</span><b>Meera Nair</b>
+        <span class="wf-tone">12 Sep</span><span class="wf-tone">casual</span><span class="wf-sm">1 day</span></div>
+      <div class="wf-sm" style="margin:6px 0 0 30px">“School event” · requested 30 Aug</div>
+      <div class="wf-row" style="margin-top:10px"><span class="wf-spacer"></span>
+        <button class="wf-btn">Reject…</button><button class="wf-btn is-primary">Approve</button></div>
+    </div>
+    <div class="wf-fsec" style="background:var(--wf-fill)">
+      <h4>The unrouted case <span class="wf-chip is-new">TM-OD-25</span></h4>
+      <div class="wf-li" style="border:1px dashed var(--wf-line2);border-radius:6px">
+        <span class="wf-av">VS</span><b>V. Shakya</b><span class="wf-tone">no one to report to</span>
+        <span class="wf-spacer"></span><span class="wf-tone t-warn">waiting on an admin</span></div>
+      <div class="wf-sm" style="margin-top:7px">Falls to any holder of <code>attendance.leave.decide</code>.
+        <b>Never silently unrouted</b> — a request with no approver that simply sits there is the
+        failure this row exists to prevent.</div>
+    </div>
+  </div>
+
+  <div class="wf-note"><b>The overlap warning is a warning, not a block.</b> The system does not know how
+    many people the day needs. Refusing on a rule nobody configured would be the module inventing a
+    staffing policy; showing the clash lets the person who does know decide.</div>
+  <div class="wf-note"><b>Reject demands a reason</b> — the panel's existing pattern for every explanatory
+    transition, the same one <code>Block</code> and <code>Cancel</code> already use. Approve does not.</div>
+  <div class="wf-note"><b>Permission delta:</b> <code>attendance.leave.request</code> is self-scope and
+    needs <i>no grant at all</i>; <code>attendance.leave.decide</code> is the verb that acts on somebody
+    else. No new module key — the four that exist absorb everything in this document.</div>
+</section>
+
+<!-- ================================================================== 3.9 -->
+<section class="wf-scr" data-scr="9">
+  <div class="wf-scrh"><span class="wf-num">§3.9</span><h2>Agreements — three surfaces</h2>
+    <code class="wf-route">/team/:id?tab=documents</code><span class="wf-chip is-new">new entity</span></div>
+  <p class="wf-lede">One <code>Agreement</code> entity; offer letter and NDA are <code>kind</code>s of it.
+  Two documents that are sent, viewed, signed, versioned, expired and revoked identically are one entity
+  with a field, not two tables that drift.</p>
+
+  <div class="wf-two">
+    <div class="wf-frame">
+      <div class="wf-fbar"><strong>Agreements</strong><span class="wf-av">NP</span><span>N. Pillai</span><span class="wf-spacer"></span><span class="wf-chip">admin side</span></div>
+      <div class="wf-list" style="border:0;border-radius:0">
+        <div class="wf-li"><div style="flex:1;min-width:200px"><b>Offer letter</b> <span class="wf-sm">v2</span>
+          <div class="wf-sm">viewed 26 Aug 13:41 · signed 26 Aug 14:02</div></div>
+          <span class="wf-tone t-ok"><i class="wf-dot"></i>signed</span><button class="wf-btn is-quiet">view PDF</button></div>
+        <div class="wf-li"><div style="flex:1;min-width:200px"><b>NDA</b> <span class="wf-sm">v1</span>
+          <div class="wf-sm">sent 2 Sep · expires 9 Sep · <b style="color:var(--wf-warn)">not opened yet</b></div></div>
+          <span class="wf-tone t-info"><i class="wf-dot"></i>sent</span><button class="wf-btn is-quiet">resend</button><button class="wf-btn is-quiet">revoke</button></div>
+        <div class="wf-li" style="opacity:.6"><div style="flex:1;min-width:200px"><b>Offer letter</b> <span class="wf-sm">v1</span>
+          <div class="wf-sm">superseded by v2, 24 Aug</div></div>
+          <span class="wf-tone t-dead">superseded</span><button class="wf-btn is-quiet">view</button></div>
+      </div>
+      <div class="wf-fsec"><button class="wf-btn is-primary">+ New agreement ▾</button>
+        <span class="wf-sm" style="margin-left:8px">Offer letter · NDA · Custom</span></div>
+    </div>
+
+    <div class="wf-frame">
+      <div class="wf-fbar"><strong>The public page</strong><code class="wf-route">/a/&lt;token&gt;</code>
+        <span class="wf-spacer"></span><span class="wf-chip is-new">no session</span></div>
+      <div class="wf-fsec" style="text-align:center;background:var(--wf-fill)">
+        <div style="font-size:15px;font-weight:600">Interior Bazzar — Offer Letter</div></div>
+      <div class="wf-fsec">
+        <div style="color:var(--wf-ink2);font-size:13px">Dear N. Pillai,<br><br>
+          <span style="color:var(--wf-ink3)">… frozen document body, exactly as sent …</span></div>
+      </div>
+      <div class="wf-fsec">
+        <h4>Sign</h4>
+        <div class="wf-sm">Type your full name</div>
+        <input class="wf-field" id="wfSigName" placeholder="N. Pillai">
+        <div class="wf-sm" style="margin:10px 0 4px">or draw it</div>
+        <div class="wf-sig" id="wfSigPad">~ sign here ~</div>
+        <label class="wf-row" style="margin-top:12px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="wfSigAgree"> I have read and agree to the terms above.</label>
+        <div class="wf-row" style="margin-top:12px">
+          <button class="wf-btn">Decline</button><span class="wf-spacer"></span>
+          <button class="wf-btn is-primary" id="wfSigBtn" disabled>Sign and accept ▸</button></div>
+        <div class="wf-inline"><span class="wf-i">ⓘ</span><div>This link expires 9 Sep 2026.
+          <b>Your name, the time, and your IP address are recorded with the signature.</b></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-frame">
+    <div class="wf-fbar"><strong>Three states this page must handle</strong><span class="wf-spacer"></span>
+      <span class="wf-sm">and that most link pages get wrong</span></div>
+    <div class="wf-fbody wf-row" style="align-items:stretch;gap:12px">
+      <div style="flex:1;min-width:210px;border:1px solid var(--wf-line);border-radius:7px;padding:11px">
+        <span class="wf-tone t-warn">expired</span>
+        <p style="margin:8px 0 0;font-size:13px;color:var(--wf-ink2)">Offer to request a new link. <b>Do not
+          show the document.</b></p></div>
+      <div style="flex:1;min-width:210px;border:1px solid var(--wf-line);border-radius:7px;padding:11px">
+        <span class="wf-tone t-ok">already signed</span>
+        <p style="margin:8px 0 0;font-size:13px;color:var(--wf-ink2)">Show the signed copy, read-only.
+          <b>Never a second signature box.</b></p></div>
+      <div style="flex:1;min-width:210px;border:1px solid var(--wf-line);border-radius:7px;padding:11px">
+        <span class="wf-tone t-bad">revoked</span>
+        <p style="margin:8px 0 0;font-size:13px;color:var(--wf-ink2)">Say <b>revoked</b>, not "not found".
+          A candidate who was told a letter was coming deserves better than a 404.</p></div>
+    </div>
+  </div>
+
+  <div class="wf-note"><span class="wf-id">TM-AD-22</span> <b>This list is a section of the
+    <i>Documents</i> tab, not a tab of its own</b> — see §3.13. <span class="wf-id">TM-AD-18</span> is
+    untouched: agreements and resources stay two entities with different direction, permission and
+    retention, and sharing a tab changes none of the three.</div>
+  <div class="wf-note"><b>Typed is first in tab order.</b> The disclosure line is not decoration — recording
+    an IP against a legal signature is something the signer is entitled to be told <i>before</i> they sign,
+    not after.</div>
+  <div class="wf-note"><b>Opening this page writes the first real <code>VIEWED</code> event in the
+    codebase.</b> The quotation module's <code>viewed</code> is a <i>seller</i> claiming it; this one is the
+    recipient's own request, and that distinction is worth keeping in the audit trail.</div>
+  <div class="wf-note is-open"><span class="wf-id">TM-OD-26</span> A signed offer letter does <b>not</b>
+    auto-activate the account. Acceptance is the candidate's act; activation is the admin's.
+    <span class="wf-id">TM-OD-27</span> An NDA cannot go to a non-member in v1 —
+    <code>Agreement.memberId</code> is required, and a prospect NDA needs a party record this module
+    does not have.</div>
+  <div class="wf-note is-risk"><span class="wf-id">TM-R-12</span> <b>An unauthenticated write on a legal
+    record, in a project with no throttle class.</b> Hashed token, expiry, single-use, revocable, per-token
+    and per-IP limits, <code>attemptCount</code>. All of it, before this ships.</div>
+</section>
+
+<!-- ================================================================= 3.10 -->
+<section class="wf-scr" data-scr="10">
+  <div class="wf-scrh"><span class="wf-num">§3.10</span><h2>Resources — the member's own documents</h2>
+    <code class="wf-route">/team/me?tab=documents</code><span class="wf-chip is-new">new entity</span></div>
+  <p class="wf-lede">Resources travel <b>member → company</b>; agreements travel <b>company → member</b>.
+  Two buckets, not one, because they differ in direction, in who may delete, and in how long they are kept.</p>
+
+  <div class="wf-two">
+    <div class="wf-frame">
+      <div class="wf-fbar"><strong>My documents</strong><span class="wf-spacer"></span><span class="wf-tone t-warn">2 missing</span></div>
+      <div class="wf-fsec">
+        <h4>Required <span class="wf-chip">vocabulary, not a gate</span></h4>
+        <div class="wf-list">
+          <div class="wf-li"><span class="wf-tone t-ok">✓</span>PAN card<span class="wf-spacer"></span><span class="wf-sm">uploaded 26 Aug</span><button class="wf-btn is-quiet">replace</button></div>
+          <div class="wf-li"><span class="wf-tone t-ok">✓</span>Aadhaar<span class="wf-spacer"></span><span class="wf-sm">uploaded 26 Aug</span><button class="wf-btn is-quiet">replace</button></div>
+          <div class="wf-li"><span class="wf-tone t-warn">⚠</span>Address proof<span class="wf-spacer"></span><span class="wf-sm">not uploaded</span><button class="wf-btn">upload</button></div>
+          <div class="wf-li"><span class="wf-tone t-warn">⚠</span>Bank passbook<span class="wf-spacer"></span><span class="wf-sm">not uploaded</span><button class="wf-btn">upload</button></div>
+        </div>
+      </div>
+      <div class="wf-fsec">
+        <h4>Other</h4>
+        <div class="wf-list">
+          <div class="wf-li"><span class="wf-tone t-ok">✓</span>B.Arch degree<span class="wf-spacer"></span><span class="wf-sm">uploaded 27 Aug</span><button class="wf-btn is-quiet">replace</button><button class="wf-btn is-quiet">×</button></div>
+        </div>
+        <button class="wf-btn" style="margin-top:9px">+ Add a document</button>
+        <div class="wf-inline"><span class="wf-i">ⓘ</span><div>Only you and an admin can open these.
+          Required documents cannot be removed while you are active.</div></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="wf-frame">
+        <div class="wf-fbar"><strong>Admin side</strong><code class="wf-route">/team/:id?tab=documents</code>
+          <span class="wf-spacer"></span><span class="wf-chip">read-only</span></div>
+        <div class="wf-fsec">
+          <div class="wf-list">
+            <div class="wf-li"><span class="wf-tone t-ok">✓</span>PAN card<span class="wf-spacer"></span><button class="wf-btn is-quiet">open</button></div>
+            <div class="wf-li"><span class="wf-tone t-warn">⚠</span>Address proof<span class="wf-spacer"></span><span class="wf-sm">missing</span></div>
+          </div>
+          <div class="wf-inline"><span class="wf-i">ⓘ</span><div>Needs the <code>team.resource.view</code>
+            verb. It shows as missing on the member row and in the roster filter — and
+            <b>nowhere in the panel blocks on it</b>. A hard gate would stop somebody working on their
+            first day over a scan.</div></div>
+        </div>
+      </div>
+
+      <div class="wf-frame" style="border-color:var(--wf-bad)">
+        <div class="wf-fbar" style="background:var(--wf-bad-bg);color:var(--wf-bad)">
+          <strong>Storage — decide before Phase H is scheduled</strong></div>
+        <div class="wf-fsec">
+          <dl class="wf-kv">
+            <dt>Today</dt><dd>every S3 object in this backend is <b>publicly readable by URL</b></dd>
+            <dt>Required</dt><dd>private objects behind a short-lived signed read</dd>
+            <dt>Forbidden</dt><dd>reusing the existing public <code>fileUrl</code> return</dd>
+            <dt>Access</dt><dd>the owner, and a holder of <code>team.resource.view</code>. Nobody else, ever.</dd>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-note"><span class="wf-id">TM-AD-22</span> <b>The second section of the <i>Documents</i>
+    tab</b> — §3.13. It is the half that travels member → company, which is why the member may delete
+    here and may not on the agreements half.</div>
+  <div class="wf-note is-open"><span class="wf-id">TM-OD-28</span> Which kinds are "required" is
+    <b>vocabulary</b>, so it is configurable without a deploy. Seed: PAN, Aadhaar, address proof, bank
+    passbook. <span class="wf-id">TM-OD-30</span> <b>Retention after a member leaves is flagged, not
+    answered</b> — it is a data-protection question, not an engineering one.</div>
+  <div class="wf-note is-risk"><span class="wf-id">TM-R-11</span> This is the single most sensitive surface
+    in the module: government identity documents on storage that is public by default. It is
+    <span class="wf-id">TM-R-04</span> again with worse consequences.</div>
+</section>
+
+<!-- ================================================================= 3.11 -->
+<section class="wf-scr" data-scr="11">
+  <div class="wf-scrh"><span class="wf-num">§3.11</span><h2>Pay — read from Finance</h2>
+    <code class="wf-route">/team/me?tab=pay</code><span class="wf-chip is-new">new tab</span>
+    <span class="wf-chip is-ext">reads Module 6</span></div>
+  <p class="wf-lede"><b>Every figure on this screen is a read.</b> There is no edit control anywhere on
+  the member side, and on the admin side the buttons link <i>into</i> Finance rather than writing from Team.</p>
+
+  <div class="wf-frame" style="max-width:760px">
+    <div class="wf-fbar"><strong>Pay</strong><span class="wf-av">NP</span><span>N. Pillai</span>
+      <span class="wf-spacer"></span><span class="wf-chip">source: Finance</span></div>
+    <div class="wf-fsec">
+      <dl class="wf-kv">
+        <dt>Salary account</dt><dd><b>₹ 42,000</b> / month</dd>
+        <dt>Effective from</dt><dd>1 Jun 2026</dd>
+        <dt>Paid from</dt><dd>HDFC current · <code>ACC-HDFC-4021</code></dd>
+        <dt>Department</dt><dd>Operations <span class="wf-sm">— read from the member record, not retyped</span></dd>
+      </dl>
+    </div>
+    <div class="wf-fsec">
+      <h4>Payslips</h4>
+      <table class="wf-tbl">
+        <tbody>
+          <tr><td>Aug 2026</td><td>₹ 42,000</td><td><span class="wf-tone t-ok">+ ₹ 4,500 incentive</span></td><td style="text-align:right"><button class="wf-btn is-quiet">download</button></td></tr>
+          <tr><td>Jul 2026</td><td>₹ 42,000</td><td></td><td style="text-align:right"><button class="wf-btn is-quiet">download</button></td></tr>
+          <tr><td>Jun 2026</td><td>₹ 28,000</td><td><span class="wf-tone">pro-rata</span></td><td style="text-align:right"><button class="wf-btn is-quiet">download</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="wf-fsec">
+      <h4>Incentives <span class="wf-chip is-new">new entity — Finance's</span></h4>
+      <table class="wf-tbl">
+        <tbody>
+          <tr><td><b>₹ 4,500</b></td><td>Aug</td><td>◆ Onboard 60 businesses <span class="wf-sm">— 38 of 60</span></td><td><span class="wf-tone t-ok">✓ paid</span></td></tr>
+          <tr><td><b>₹ 2,000</b></td><td>Sep</td><td>▸ Draft the handover — sections 1 to 3</td><td><span class="wf-tone t-warn">⏳ pending</span></td></tr>
+        </tbody>
+      </table>
+      <div class="wf-inline"><span class="wf-i">ⓘ</span><div>Earned against work; <b>approved and paid by
+        Finance</b>. The row is the join the brief asked for, in both directions: from a target,
+        <i>what did this earn</i>; from a member, <i>what have they earned</i>.</div></div>
+    </div>
+  </div>
+
+  <div class="wf-note"><span class="wf-id">TM-AD-19</span> <b>Team reads pay. It never writes it.</b>
+    <code>Incentive</code> is deliberately <b>Finance's</b> entity, not Team's — Team supplies the basis
+    (a work item), Finance owns the money. Two modules writing salary is two ledgers, and only one of them
+    reconciles.</div>
+  <div class="wf-note"><b>Nothing under <code>views/Finance/**</code> may be edited by this phase.</b>
+    The Pay tab is a consumer. If it needs a shape Finance does not expose, the change belongs in
+    Finance's own operation doc.</div>
+  <div class="wf-note is-open"><span class="wf-id">TM-OD-29</span> <b>Finance approves an incentive, not
+    the captain.</b> The captain proposes it from a work item.</div>
+  <div class="wf-note is-risk"><span class="wf-id">TM-R-14</span> Six tabs on the member dashboard, three
+    of them added at once. Ship Pay <b>last</b>. If six reads as crowded on a real member, Agreements and
+    Resources fold into one <i>Documents</i> tab with two sections — the entities stay separate either way.</div>
+</section>
+
+<!-- ================================================================= 3.12 -->
+<section class="wf-scr" data-scr="12">
+  <div class="wf-scrh"><span class="wf-num">§3.12</span><h2>Captain dashboard — the roll-up</h2>
+    <code class="wf-route">/reports</code><span class="wf-chip is-ext">three blocks added</span></div>
+  <p class="wf-lede">The shipped performance view gains three blocks. <b>It is not redesigned.</b></p>
+
+  <div class="wf-two">
+    <div>
+      <div class="wf-frame">
+        <div class="wf-fbar"><strong>Today</strong><span class="wf-spacer"></span><span class="wf-sm">Thu 3 Sep 2026</span></div>
+        <div class="wf-fsec">
+          <div class="wf-row" style="gap:14px;font-size:13px">
+            <span><b>6</b> in</span><span class="wf-tone t-warn">1 late</span>
+            <span class="wf-tone">1 on leave <span class="wf-chip is-new">new</span></span>
+            <span class="wf-tone t-ok">0 absent</span><span class="wf-tone t-warn">2 unclosed ⚠</span>
+          </div>
+          <div class="wf-sm" style="margin-top:8px">Plans in 5/7 · EOD in 0/7 <i>(the day is not over)</i></div>
+        </div>
+      </div>
+
+      <div class="wf-frame" style="border-color:var(--wf-warn)">
+        <div class="wf-fbar" style="background:var(--wf-warn-bg)"><strong>Waiting on you</strong>
+          <span class="wf-spacer"></span><span class="wf-chip is-new">new</span></div>
+        <div class="wf-list" style="border:0;border-radius:0">
+          <div class="wf-li"><span class="wf-tone t-warn">2</span>leave requests<span class="wf-spacer"></span><button class="wf-btn is-quiet" data-goto="8">open ▸</button></div>
+          <div class="wf-li"><span class="wf-tone t-warn">2</span>EOD reports unacknowledged<span class="wf-spacer"></span><button class="wf-btn is-quiet">open ▸</button></div>
+          <div class="wf-li"><span class="wf-tone t-bad">1</span>agreement sent 8 days ago, never opened ⚠<span class="wf-spacer"></span><button class="wf-btn is-quiet" data-goto="9">open ▸</button></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wf-frame">
+      <div class="wf-fbar"><strong>Progress</strong><span class="wf-spacer"></span><span class="wf-sm">derived, never typed</span></div>
+      <div class="wf-fsec">
+        <div class="wf-row" style="margin-bottom:11px"><span style="flex:1;min-width:150px">◆ Onboard 60 businesses</span>
+          <span class="wf-prog"><i style="width:63%"></i></span><span class="wf-sm">38 / 60</span></div>
+        <div class="wf-row" style="margin-bottom:11px"><span style="flex:1;min-width:150px">◆ Enquiry response under 4 hours</span>
+          <span class="wf-prog"><i style="width:60%"></i></span><span class="wf-sm">60%</span></div>
+        <div class="wf-row" style="margin-bottom:11px"><span style="flex:1;min-width:150px">◆ Support handover document</span>
+          <span class="wf-prog"><i style="width:33%"></i></span><span class="wf-sm">1 / 3</span></div>
+        <div class="wf-row"><span class="wf-spacer"></span>
+          <button class="wf-btn is-primary" data-goto="4">Open the timeline ▸ <span class="wf-chip is-new" style="background:none;color:#fff;border-color:rgba(255,255,255,.4)">new</span></button></div>
+      </div>
+      <div class="wf-fsec" style="background:var(--wf-fill)">
+        <div class="wf-inline" style="border-style:solid"><span class="wf-i">ⓘ</span><div>
+          <b>No score.</b> <span class="wf-id">TM-OD-11</span> stands — the numbers are shown and every
+          column sorts, and nothing here reduces a person to one figure.</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wf-note"><b>"Waiting on you" is the only genuinely new idea on this screen</b>, and it is one
+    query per row rather than a feed. Things that have stopped because a specific person has not acted.
+    An unopened agreement belongs in it for the same reason a pending leave request does — both are blocked
+    on a human, and neither shows up anywhere else until someone goes looking.</div>
+  <div class="wf-note"><b><code>on leave</code> is added to the Today strip, and it is derived.</b> Adding
+    it as a stored count would be the third place the panel answers "was this person in", and the three
+    would disagree inside a month.</div>
+</section>
+
+<!-- ================================================================= 3.13 -->
+<section class="wf-scr" data-scr="13">
+  <div class="wf-scrh"><span class="wf-num">§3.13</span><h2>Member dashboard</h2>
+    <code class="wf-route">/team/me · /team/:id</code><span class="wf-chip is-new">route does not exist yet</span></div>
+  <p class="wf-lede"><b>One component, three scopes. Not three screens.</b> The v1 document spec'd this
+  screen and it was never built — a member opens as a <i>drawer</i> today. So the container for
+  §3.6, §3.10 and §3.11 has to be designed before any of them has anywhere to live.
+  <b>Switch the viewer below — the tab bar, the nudges and the header all change.</b></p>
+
+  <div class="wf-row" style="margin-bottom:14px">
+    <span style="font-size:12.5px;color:var(--wf-ink2)">Viewing as</span>
+    <span class="wf-seg" id="wfMeScope">
+      <button data-scope="self" class="is-on">N. Pillai — themselves</button>
+      <button data-scope="senior">D. Kapoor — their senior</button>
+      <button data-scope="admin">An admin</button>
+    </span>
+  </div>
+
+  <div id="wfMe"></div>
+
+  <div class="wf-frame">
+    <div class="wf-fbar"><strong>What differs by scope</strong><span class="wf-spacer"></span>
+      <span class="wf-sm">the whole difference, in one table</span></div>
+    <table class="wf-tbl">
+      <thead><tr><th>Section</th><th>Member (own)</th><th>Senior (<code>work.review</code>)</th><th>Admin</th></tr></thead>
+      <tbody>
+        <tr><td>Profile · employment</td><td>read</td><td>read</td><td>read + <b>edit</b></td></tr>
+        <tr><td>Access · roles</td><td><b>hidden</b></td><td>read</td><td>read + <b>assign</b></td></tr>
+        <tr><td>Today · attendance</td><td>read <span class="wf-sm">(actions live in the topbar)</span></td><td>read</td><td>read + <b>correct entry</b></td></tr>
+        <tr><td>Work · milestones</td><td>read + <b>update status</b></td><td>read + <b>assign</b>, comment</td><td>full</td></tr>
+        <tr><td>Daily plan · EOD</td><td><b>write</b> (own, today)</td><td>read + <b>acknowledge</b></td><td>read</td></tr>
+        <tr><td>Leave</td><td><b>request</b>, withdraw</td><td><b>decide</b></td><td>decide + correct</td></tr>
+        <tr><td>Documents <span class="wf-chip is-new">agreements + resources</span></td><td>own only</td><td><b>tab absent</b></td><td>full</td></tr>
+        <tr><td>Pay <span class="wf-chip is-new">new</span></td><td>own only, read</td><td><b>tab absent</b></td><td>read → links into Finance</td></tr>
+      </tbody>
+    </table>
+    <div class="wf-fsec" style="background:var(--wf-fill)">
+      <b>Pay and documents are hidden from a senior by default, and that is not an oversight.</b>
+      A reporting line does not imply access to somebody's pay. It is a separate grant, held by whoever
+      the business decides — usually two people, and usually not the person's manager.
+    </div>
+  </div>
+
+  <div class="wf-note"><span class="wf-id">TM-AD-22</span> <b>Amends <span class="wf-id">TM-AD-21</span>,
+    which had a hole in it.</b> TM-AD-21 lists six tabs —
+    <code>overview · work · attendance · pay · agreements · resources</code> — and
+    <b>Reports is missing from that list</b>, though the v1 document shipped it as a tab and the daily
+    plan and EOD report are per-member records with nowhere else to go. Adding it back gives seven,
+    which is past the edge TM-AD-21 itself called uncomfortable.
+    <b>Resolution: fold Agreements and Resources into one <i>Documents</i> tab with two sections</b> —
+    which is exactly the escape hatch <span class="wf-id">TM-R-14</span> already wrote down, taken now
+    rather than after a real member finds it crowded. The result is
+    <code>Overview · Attendance · Work · Reports · Documents · Pay</code>: v1's five kept intact with
+    <b>one</b> tab added, instead of one dropped and two invented.
+    <b>The two entities stay separate regardless</b> — <span class="wf-id">TM-AD-18</span> is about
+    direction, permission and retention, and none of those change because two sections share a tab.</div>
+
+  <div class="wf-note"><b>A nudge must never leak what a tab hides.</b> Switch to <i>their senior</i>
+    and the <b>Needs you</b> block loses two rows. The unsigned NDA and the two missing documents are
+    gone — not greyed, not "no access", <b>gone</b> — because the Documents tab is absent for that
+    viewer and a row saying <i>"1 agreement unsigned"</i> would announce the existence of a document the
+    same screen just refused to show. Everything derived from a hidden surface inherits its scope.</div>
+
+  <div class="wf-note"><b>The clock is read-only here, and the actions stay in the topbar.</b>
+    The panel would otherwise have three <i>End the day</i> buttons — topbar strip, <code>/attendance</code>,
+    and this header — and three buttons over one open day is two chances for the UI to disagree with
+    itself mid-request. The dashboard <b>states</b> the day; <code>/attendance</code> and the topbar
+    <b>change</b> it.</div>
+
+  <div class="wf-note is-open"><span class="wf-id">TM-OD-31</span> <b>One grant is spelled two ways and
+    they must be reconciled before Phase G.</b> The v1 document calls it <code>people-docs.view</code>;
+    §5 of this one calls it <code>team.resource.view</code> and adds <code>team.agreement.send</code> /
+    <code>revoke</code>. If both ship, the panel has two answers to <i>"may I open this person's PAN
+    card"</i>, and the loose one gets handed out casually.
+    <b>Recommendation: one shared read verb</b> — the sensitivity of an offer letter and an Aadhaar scan
+    is identical — and <b>separate write verbs</b>, because sending an agreement and accepting an
+    upload are genuinely different acts.</div>
+
+  <div class="wf-note is-open"><span class="wf-id">TM-OD-32</span> <b>What happens to the member drawer
+    that ships today?</b> Once this route exists, the same facts render in two places, which is the
+    drift v1 §3.4 warned about in its own first line.
+    <b>Recommendation: the drawer becomes a launcher.</b> It keeps identity, status, roles and the four
+    actions it already owns — edit, roles, send credentials, delete — and every <i>informational</i>
+    block moves here, behind an <i>Open dashboard ▸</i>. One place per fact; the drawer stays the fast
+    path from the roster.</div>
+
+  <div class="wf-note"><b>Six tabs, and the sixth is the one to cut first.</b> If this reads as crowded
+    on a real member, <b>Reports folds into Overview</b> — the plan and the EOD are already cards there,
+    and a Reports tab is really their <i>history</i>. That is the next fold, and it is cheaper than the
+    Documents one because nothing new lives behind it.</div>
+</section>
+
+<!-- ================================================================= plan -->
+<section class="wf-scr" data-scr="14">
+  <div class="wf-scrh"><span class="wf-num">§7-9</span><h2>Phases, decisions, risks</h2></div>
+  <p class="wf-lede">Ordered by dependency. Each phase leaves the panel working.</p>
+
+  <div class="wf-frame">
+    <div class="wf-fbar"><strong>Nine phases · four independent tracks</strong></div>
+    <table class="wf-tbl">
+      <thead><tr><th style="width:44px">Phase</th><th>What</th><th>Depends on</th><th style="width:120px">Track</th></tr></thead>
+      <tbody>
+        <tr><td><b>A</b></td><td>Vocabulary extension, <code>tags.json</code>, tag records, picker and manager</td><td><span class="wf-tone t-warn">TM-OD-20 answered</span></td><td rowspan="2" style="background:var(--wf-info-bg)">1</td></tr>
+        <tr><td><b>B</b></td><td>Selectable column axis on the board</td><td>A — Tag is one of the axes</td></tr>
+        <tr><td><b>C</b></td><td>Calendar face — month, then week</td><td>—</td><td rowspan="2" style="background:var(--wf-ok-bg)">2</td></tr>
+        <tr><td><b>D</b></td><td>Timeline face</td><td>C shares the date-grid mechanics</td></tr>
+        <tr><td><b>E</b></td><td>Leave: request, inbox, and the one-clause derivation change</td><td>—</td><td style="background:var(--wf-bad-bg)">3 · exclusive</td></tr>
+        <tr><td><b>F</b></td><td>Links on the item drawer</td><td>D — <code>follows</code> draws on the timeline</td><td>2</td></tr>
+        <tr><td><b>G</b></td><td>Agreements: admin list, public page, signature</td><td>largest server surface</td><td rowspan="2" style="background:var(--wf-warn-bg)">4 · after storage</td></tr>
+        <tr><td><b>H</b></td><td>Resources</td><td>private-object storage — TM-R-11</td></tr>
+        <tr><td><b>I</b></td><td>Pay tab and the roll-up blocks</td><td>Finance's incentive endpoint</td><td>—</td></tr>
+      </tbody>
+    </table>
+    <div class="wf-fsec" style="background:var(--wf-fill)">
+      <b>Not parallel-safe:</b> E touches the central derivation in <code>store.ts</code> — nothing else
+      edits that file while it is in flight. G and H both add storage and both must land <i>after</i> the
+      private-object decision, not before it.
+      <div style="margin-top:8px"><b>Suggested order:</b> A → B → C → E → D → G → H → I → F.
+      Calendar is third rather than first: it is the most visible item in the brief, and it reads much
+      better once tags exist to colour it.</div>
+    </div>
+  </div>
+
+  <div class="wf-frame">
+    <div class="wf-fbar"><strong>Regression risk — what this touches that already works</strong></div>
+    <table class="wf-tbl">
+      <thead><tr><th>File</th><th>Change</th><th style="width:90px">Risk</th></tr></thead>
+      <tbody>
+        <tr><td><code>views/Team/store.ts</code></td><td>the <code>absent</code> derivation gains one clause</td><td><span class="wf-tone t-bad">high</span></td></tr>
+        <tr><td><code>views/Team/Work.tsx</code></td><td>two new faces, selectable column axis</td><td><span class="wf-tone t-warn">medium</span></td></tr>
+        <tr><td><code>content/team/vocabularies.json</code></td><td>five new lists, one new state with <code>stored:false</code></td><td><span class="wf-tone t-warn">medium</span></td></tr>
+        <tr><td><code>team.css</code> · <code>admin-theme.css</code></td><td>timeline and calendar grids — use the <code>tm-</code> prefix</td><td><span class="wf-tone t-warn">medium</span></td></tr>
+        <tr><td><code>views/Team/Attendance.tsx</code> · <code>Reports.tsx</code></td><td>additive blocks; the clock strip does not move</td><td><span class="wf-tone t-ok">low</span></td></tr>
+      </tbody>
+    </table>
+    <div class="wf-fsec">
+      <b>Must not change:</b> <code>teamShared.tsx</code> (<code>ActionMatrix</code> is canonical and shared
+      with Roles) · <code>views/Roles/**</code> · anything under <code>views/Finance/**</code> ·
+      <code>auth/session.ts</code> beyond leaving <code>PROTO_MODULES</code> alone.
+      <div style="margin-top:8px"><b>Re-verify after every phase:</b> the board renders unchanged with
+      Group by = Status · a member with no leave rows derives <code>absent</code> exactly as today ·
+      <code>npx tsc -b</code> and <code>npx eslint</code> clean · <code>npm run check</code> still passes untouched.</div>
+    </div>
+  </div>
+
+  <div class="wf-frame" style="border-color:var(--wf-warn)">
+    <div class="wf-fbar" style="background:var(--wf-warn-bg)"><strong>What needs an answer before Phase A</strong></div>
+    <div class="wf-list" style="border:0;border-radius:0">
+      <div class="wf-li"><span class="wf-id">TM-OD-20</span><div style="flex:1;min-width:220px"><b>What "my JD team" means.</b>
+        Department, second company, or a field on the member. <span class="wf-sm">The only blocking question.
+        Note that <code>members.json</code> already carries a <code>department</code> string.</span></div>
+        <span class="wf-tone t-bad">open</span></div>
+      <div class="wf-li"><span class="wf-id">TM-AD-19</span><div style="flex:1;min-width:220px"><b>Confirmation that Finance owns <code>Incentive</code></b>
+        <span class="wf-sm">— it puts a table in another module's territory.</span></div><span class="wf-tone t-warn">confirm</span></div>
+      <div class="wf-li"><span class="wf-id">TM-R-11</span><div style="flex:1;min-width:220px"><b>A decision on private-object storage</b>
+        <span class="wf-sm">before Phase G or H is scheduled.</span></div><span class="wf-tone t-bad">open</span></div>
+    </div>
+  </div>
+</section>
+
+</main>
+</div>
+
+<script>
+/* ---------------------------------------------------------------------------
+   Data. Members and work items are the REAL seed already on this branch:
+   src/content/team/members.json and src/content/team/work.json. Tags, links
+   and leave are placeholder records for entities this document proposes.
+--------------------------------------------------------------------------- */
+var TODAY = '2026-09-03';
+
+var MEMBERS = {
+  '41': {n:'V. Shakya',     s:'VS', d:'Founder',              to:null,  dept:'Leadership'},
+  '52': {n:'A. Sharma',     s:'AS', d:'Sales Head',           to:'41',  dept:'Sales'},
+  '58': {n:'D. Kapoor',     s:'DK', d:'Operations Manager',   to:'41',  dept:'Operations'},
+  '63': {n:'Meera Nair',    s:'MN', d:'Operations Executive', to:'58',  dept:'Operations'},
+  '70': {n:'Rahul Menon',   s:'RM', d:'Sales Executive',      to:'52',  dept:'Sales'},
+  '74': {n:'Priya Iyer',    s:'PI', d:'Sales Executive',      to:'52',  dept:'Sales'},
+  '79': {n:'S. Raghavan',   s:'SR', d:'Finance Admin',        to:'41',  dept:'Operations'},
+  '86': {n:'N. Pillai',     s:'NP', d:'Support Executive',    to:'58',  dept:'Operations'}
+};
+
+var TAGS = {
+  meeting:{l:'Meeting',t:'info'}, call:{l:'Call',t:'brand'}, 'site-visit':{l:'Site visit',t:'ok'},
+  'follow-up':{l:'Follow-up',t:'warn'}, review:{l:'Review',t:''}, admin:{l:'Admin',t:''}
+};
+
+/* id, kind, title, status, assignee, start, due, priority, parent, tags, progress */
+var ITEMS = [
+  ['W-T01','target',   'Close 40 deals this quarter',              'in_progress','52','2026-07-01','2026-09-30','high',null,[],           38],
+  ['W-T02','target',   'Onboard 60 businesses',                    'in_progress','58','2026-07-01','2026-09-30','high',null,[],           63],
+  ['W-M01','milestone','Enquiry response under 4 hours',           'in_progress','58','2026-08-01','2026-09-30','high',null,[],           60],
+  ['W-M02','milestone','Onboard 12 businesses in Pune',            'in_progress','74','2026-08-10','2026-09-15','medium','W-T02',[],      50],
+  ['W-M03','milestone','Close Sharma Interiors',                   'in_progress','70','2026-08-14','2026-09-05','high','W-T01',[],        50],
+  ['W-M04','milestone','Support handover document',                'planned',    '86','2026-08-20','2026-09-10','medium',null,[],         33],
+  ['W-K01','task',     'Triage the August enquiry backlog',        'in_progress','63','2026-08-28','2026-08-28','high','W-M01',['review'],0],
+  ['W-K02','task',     'Call back the 6 unreached leads',          'planned',    '63',null,        '2026-08-28','medium','W-M01',['call'],0],
+  ['W-K03','task',     'Update the qualification checklist copy',  'planned',    '63',null,        '2026-09-02','low','W-M01',['review'],0],
+  ['W-K04','task',     'Send the revised quotation to Sharma',     'in_progress','70','2026-08-28','2026-08-28','high','W-M03',['call','follow-up'],0],
+  ['W-K05','task',     'Follow up the three Tuesday leads',        'planned',    '70',null,        '2026-08-26','medium','W-M03',['follow-up'],0],
+  ['W-K06','task',     'Site visit — Kalyani Nagar',               'completed',  '70','2026-08-27','2026-08-27','high','W-M03',['site-visit'],100],
+  ['W-K16','task',     'Prepare the Sharma site measurement sheet','completed',  '70','2026-08-25','2026-08-25','medium','W-M03',['site-visit'],100],
+  ['W-K07','task',     'Build the Pune outreach list — 40',        'in_progress','74','2026-08-26','2026-09-01','medium','W-M02',[],      0],
+  ['W-K08','task',     'Pune tier pricing sign-off',               'blocked',    '74','2026-08-24','2026-08-27','high','W-M02',[],        0],
+  ['W-K09','task',     'Weekly ops review deck',                   'completed',  '58','2026-08-27','2026-08-27','medium',null,['meeting'],100],
+  ['W-K10','task',     'Rewrite the no-match runbook',             'planned',    '58',null,        '2026-09-04','low','W-M01',['review'], 0],
+  ['W-K11','task',     'Draft the handover — sections 1 to 3',     'in_progress','86','2026-08-27','2026-09-01','medium','W-M04',[],      0],
+  ['W-K12','task',     'Get the ticket backlog under 20',          'planned',    '86',null,        '2026-08-31','high','W-M04',['follow-up'],0],
+  ['W-K13','task',     'August payout reconciliation',             'in_progress','79','2026-08-27','2026-08-31','high',null,['admin'],    0],
+  ['W-K14','task',     'Q3 pipeline review with the founders',     'planned',    '52',null,        '2026-09-03','medium','W-T01',['meeting'],0],
+  ['W-K15','task',     'Archive the June enquiry exports',         'cancelled',  '63',null,        '2026-08-26','low',null,['admin'],     0]
+].map(function(r){
+  return {id:r[0],kind:r[1],title:r[2],status:r[3],who:r[4],start:r[5],due:r[6],pri:r[7],parent:r[8],tags:r[9],prog:r[10]};
+});
+
+/* Placeholder records for the entities this document proposes. */
+var LEAVE = [
+  {id:'LV-01', who:'86', from:'2026-09-12', to:'2026-09-13', kind:'casual', state:'requested'},
+  {id:'LV-02', who:'63', from:'2026-09-12', to:'2026-09-12', kind:'casual', state:'requested'},
+  {id:'LV-03', who:'63', from:'2026-08-28', to:'2026-08-28', kind:'sick',   state:'approved'},
+  {id:'LV-04', who:'86', from:'2026-09-08', to:'2026-09-09', kind:'casual', state:'approved'}
+];
+var LINKS = [{from:'W-K06', to:'W-K04', rel:'follows'}];
+
+var STATUS = {
+  planned:{l:'Planned',t:''}, in_progress:{l:'In progress',t:'info'}, blocked:{l:'Blocked',t:'bad'},
+  completed:{l:'Completed',t:'ok'}, cancelled:{l:'Cancelled',t:'dead'}
+};
+var PRI = {high:{l:'High',t:'bad'}, medium:{l:'Medium',t:'warn'}, low:{l:'Low',t:''}};
+var KIND = {task:{l:'Task'}, milestone:{l:'Milestone'}, target:{l:'Target'}};
+
+/* ---- derivations. Nothing below is ever stored. -------------------------- */
+function isTerminal(s){ return s === 'completed' || s === 'cancelled'; }
+function isDelayed(it){ return !!it.due && it.due < TODAY && !isTerminal(it.status); }
+function daysOver(it){ return Math.round((new Date(TODAY) - new Date(it.due)) / 86400000); }
+function railTone(it){
+  if (it.status === 'cancelled') return '';
+  if (it.status === 'blocked') return 'bad';
+  if (isDelayed(it)) return 'warn';
+  if (it.status === 'completed') return 'ok';
+  if (it.status === 'in_progress') return 'info';
+  return '';
+}
+function onLeave(mid, iso){
+  for (var i = 0; i < LEAVE.length; i++){
+    var l = LEAVE[i];
+    if (l.who === mid && l.state === 'approved' && iso >= l.from && iso <= l.to) return l;
+  }
+  return null;
+}
+function esc(s){ return String(s).replace(/[&<>"]/g, function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function iso(d){
+  return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2);
+}
+function addDays(d, n){ var x = new Date(d.getTime()); x.setDate(x.getDate()+n); return x; }
+var MON = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+/* ---- rail + screen switching --------------------------------------------- */
+var SCREENS = [
+  ['§0',   'Reuse vs build',            ''],
+  ['§3.1', 'Navigation',                ''],
+  ['§3.2', 'Work — column axis',        'EXT'],
+  ['§3.3', 'Calendar face',             'NEW'],
+  ['§3.4', 'Captain timeline',          'NEW'],
+  ['§3.5', 'Item drawer v2',            'EXT'],
+  ['§3.6', 'Tag manager',               'NEW'],
+  ['§3.7', 'Leave request',             'NEW'],
+  ['§3.8', 'Leave inbox',               'NEW'],
+  ['§3.9', 'Agreements',                'NEW'],
+  ['§3.10','Resources',                 'NEW'],
+  ['§3.11','Pay',                       'NEW'],
+  ['§3.12','Captain dashboard',         'EXT'],
+  ['§3.13','Member dashboard',          'NEW'],
+  ['§7-9', 'Phases, decisions, risks',  '']
+];
+(function buildRail(){
+  var groups = [[0,'Overview',[0,1]], [1,'Work — /work',[2,3,4,5,6]],
+                [2,'Attendance — /attendance',[7,8]], [3,'Member — /team/me',[13,9,10,11]],
+                [4,'Roll-up — /reports',[12]], [5,'Plan',[14]]];
+  var h = '';
+  groups.forEach(function(g){
+    h += '<h4>' + g[1] + '</h4>';
+    g[2].forEach(function(i){
+      var s = SCREENS[i];
+      h += '<button class="wf-nav" data-scr-btn="' + i + '">' +
+           '<span class="wf-nav-n">' + s[0] + '</span>' +
+           '<span class="wf-nav-t">' + s[1] + '</span>' +
+           (s[2] ? '<span class="wf-nav-b">' + s[2] + '</span>' : '') + '</button>';
+    });
+  });
+  document.getElementById('wfRail').innerHTML = h;
+})();
+
+function show(i){
+  document.querySelectorAll('.wf-scr').forEach(function(el){
+    el.classList.toggle('is-on', el.getAttribute('data-scr') === String(i)); });
+  document.querySelectorAll('[data-scr-btn]').forEach(function(el){
+    el.classList.toggle('is-on', el.getAttribute('data-scr-btn') === String(i)); });
+  if (location.hash !== '#s' + i) location.hash = 's' + i;
+  window.scrollTo(0, 0);
+}
+document.addEventListener('click', function(e){
+  var nav = e.target.closest('[data-scr-btn]');
+  if (nav) { show(+nav.getAttribute('data-scr-btn')); return; }
+  var go = e.target.closest('[data-goto]');
+  if (go) { show(+go.getAttribute('data-goto')); return; }
+});
+window.addEventListener('hashchange', function(){
+  var m = /^#s(\d+)$/.exec(location.hash); if (m) show(+m[1]);
+});
+document.addEventListener('keydown', function(e){
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+  var cur = +(document.querySelector('.wf-scr.is-on') || {}).getAttribute?.('data-scr') || 0;
+  if (e.key === 'ArrowRight' || e.key === 'j') show(Math.min(SCREENS.length - 1, cur + 1));
+  if (e.key === 'ArrowLeft'  || e.key === 'k') show(Math.max(0, cur - 1));
+});
+
+/* ---- §3.2 board: the column axis is really selectable -------------------- */
+var AXES = {
+  status:   {label:'Status',   keys:Object.keys(STATUS), name:function(k){return STATUS[k].l;},  of:function(i){return [i.status];}},
+  kind:     {label:'Kind',     keys:Object.keys(KIND),   name:function(k){return KIND[k].l;},    of:function(i){return [i.kind];}},
+  assignee: {label:'Assignee', keys:Object.keys(MEMBERS),name:function(k){return MEMBERS[k].n;}, of:function(i){return [i.who];}},
+  priority: {label:'Priority', keys:Object.keys(PRI),    name:function(k){return PRI[k].l;},     of:function(i){return [i.pri];}},
+  tag:      {label:'Tag',      keys:Object.keys(TAGS),   name:function(k){return TAGS[k].l;},    of:function(i){return i.tags;}}
+};
+
+function cardHtml(it){
+  var tags = it.tags.map(function(t){
+    return '<span class="wf-tag k-' + TAGS[t].t + '">' + esc(TAGS[t].l) + '</span>'; }).join('');
+  var late = isDelayed(it) ? '<span style="color:var(--wf-warn)">⚠ ' + daysOver(it) + 'd</span>' : '';
+  var done = it.status === 'completed' ? '<span style="color:var(--wf-ok)">✓</span>' : '';
+  var mark = it.kind === 'task' ? '▸' : '◆';
+  return '<button class="wf-card r-' + railTone(it) + (it.status === 'cancelled' ? ' is-dead' : '') +
+    '" data-goto="5" title="' + esc(it.id) + '">' +
+    '<span class="wf-card-t">' + mark + ' ' + esc(it.title) + '</span>' +
+    '<span class="wf-card-m"><span class="wf-av" style="width:15px;height:15px;flex-basis:15px;font-size:8px">' +
+    MEMBERS[it.who].s + '</span>' + esc(MEMBERS[it.who].n.split(' ')[0]) +
+    ' · ' + esc(it.pri) + ' ' + late + ' ' + done + ' ' + tags + '</span></button>';
+}
+
+function renderBoard(){
+  var axisKey = document.getElementById('wfAxis').value;
+  var axis = AXES[axisKey];
+  var buckets = {}, rest = [];
+  axis.keys.forEach(function(k){ buckets[k] = []; });
+  ITEMS.forEach(function(it){
+    var ks = axis.of(it).filter(function(k){ return k != null && buckets[k]; });
+    if (!ks.length) { rest.push(it); return; }
+    ks.forEach(function(k){ buckets[k].push(it); });
+  });
+
+  var placed = 0, cols = '';
+  axis.keys.forEach(function(k){
+    if (!buckets[k].length && axisKey === 'assignee') return;   /* a member with no items is not a column */
+    placed += buckets[k].length;
+    cols += '<div class="wf-col"><div class="wf-colh">' + esc(axis.name(k)) +
+            '<span class="wf-n">' + buckets[k].length + '</span></div>' +
+            buckets[k].map(cardHtml).join('') + '</div>';
+  });
+  var restName = axisKey === 'tag' ? 'Untagged' : 'Ungrouped';
+  cols += '<div class="wf-col is-rest"><div class="wf-colh">' + restName +
+          '<span class="wf-n">' + rest.length + '</span></div>' + rest.map(cardHtml).join('') + '</div>';
+  document.getElementById('wfCols').innerHTML = cols;
+
+  /* The strip and the columns must agree. On the tag axis an item may sit in two
+     columns, so the strip says so rather than quietly printing a bigger number. */
+  var n = ITEMS.length;
+  var inprog = ITEMS.filter(function(i){return i.status==='in_progress';}).length;
+  var planned = ITEMS.filter(function(i){return i.status==='planned';}).length;
+  var delayed = ITEMS.filter(isDelayed).length;
+  var blocked = ITEMS.filter(function(i){return i.status==='blocked';}).length;
+  var done = ITEMS.filter(function(i){return i.status==='completed';}).length;
+  var multi = placed + rest.length;
+  document.getElementById('wfStrip').innerHTML =
+    '<span><b>' + n + '</b> items</span>' +
+    '<span><span class="wf-tone t-info"><i class="wf-dot"></i>' + inprog + ' in progress</span> · ' + planned + ' planned</span>' +
+    '<span class="wf-tone t-warn"><i class="wf-dot"></i>' + delayed + ' delayed</span>' +
+    '<span class="wf-tone t-bad"><i class="wf-dot"></i>' + blocked + ' blocked</span>' +
+    '<span class="wf-tone t-ok"><i class="wf-dot"></i>' + done + ' done</span>' +
+    '<span class="wf-spacer"></span>' +
+    '<span style="color:var(--wf-ink3)">columns add to <b>' + multi + '</b>' +
+    (multi !== n ? ' — an item may carry two tags, so it appears in two columns' : '') + '</span>';
+
+  document.getElementById('wfDragNote').innerHTML = axisKey === 'status'
+    ? 'Cards are draggable here — status columns carry a transition table.'
+    : '<b style="color:var(--wf-warn)">Not draggable on this axis.</b> Reassigning needs a reason and an audit row; a drag has neither.';
+}
+document.getElementById('wfAxis').addEventListener('change', renderBoard);
+
+/* ---- §3.3 calendar -------------------------------------------------------- */
+var calAnchor = new Date('2026-09-01T00:00:00');
+var calMode = 'month';
+
+function eventsOn(isoDay){
+  var out = [];
+  ITEMS.forEach(function(it){
+    var s = it.start || it.due, e = it.due || it.start;
+    if (!e) return;
+    if (isoDay >= s && isoDay <= e) out.push(it);
+  });
+  return out;
+}
+function renderCal(){
+  var y = calAnchor.getFullYear(), m = calAnchor.getMonth();
+  var first = new Date(y, m, 1);
+  var lead = (first.getDay() + 6) % 7;                 /* Monday-start */
+  var startDay = addDays(first, -lead);
+  var weeks = calMode === 'week' ? 1 : 6;
+  if (calMode === 'week') {
+    var t = new Date(TODAY + 'T00:00:00');
+    startDay = addDays(t, -((t.getDay() + 6) % 7));
+  }
+  document.getElementById('wfCalTitle').textContent = calMode === 'week'
+    ? iso(startDay).slice(8) + ' – ' + iso(addDays(startDay, 6)).slice(8) + ' ' + MON[startDay.getMonth()] + ' ' + startDay.getFullYear()
+    : MON[m] + ' ' + y;
+
+  var h = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+    .map(function(d){ return '<div class="wf-cal-h">' + d + '</div>'; }).join('');
+  for (var i = 0; i < weeks * 7; i++){
+    var d = addDays(startDay, i), id = iso(d);
+    var out = d.getMonth() !== m && calMode === 'month';
+    var we = d.getDay() === 0 || d.getDay() === 6;
+    var cls = 'wf-day' + (out ? ' is-out' : '') + (we ? ' is-we' : '') + (id === TODAY ? ' is-today' : '');
+    var evs = eventsOn(id);
+    var body = '';
+    var lv = [];
+    LEAVE.forEach(function(l){
+      if (l.state === 'approved' && id >= l.from && id <= l.to) lv.push(MEMBERS[l.who].n.split(' ')[0]); });
+    if (lv.length) body += '<span class="wf-ev e-leave">▒ ' + esc(lv.join(', ')) + ' on leave</span>';
+    var cap = calMode === 'week' ? 8 : 3;
+    evs.slice(0, cap).forEach(function(it){
+      var t = it.status === 'cancelled' ? 'dead'
+            : it.status === 'blocked' ? 'bad'
+            : isDelayed(it) ? 'warn'
+            : it.status === 'completed' ? 'ok' : 'info';
+      var mark = it.kind === 'task' ? '●' : '◆';
+      var w = (isDelayed(it) || it.status === 'blocked') ? '⚠' : '';
+      body += '<button class="wf-ev e-' + t + '" data-goto="5">' + mark + ' ' + w + ' ' + esc(it.title) + '</button>';
+    });
+    if (evs.length > cap) body += '<div class="wf-more">+' + (evs.length - cap) + ' more</div>';
+    h += '<div class="' + cls + '"><div class="wf-day-n">' + d.getDate() +
+         (id === TODAY ? ' TODAY' : '') + '</div>' + body + '</div>';
+  }
+  document.getElementById('wfCal').innerHTML = h;
+}
+document.getElementById('wfCalPrev').onclick = function(){ calAnchor = new Date(calAnchor.getFullYear(), calAnchor.getMonth() - 1, 1); renderCal(); };
+document.getElementById('wfCalNext').onclick = function(){ calAnchor = new Date(calAnchor.getFullYear(), calAnchor.getMonth() + 1, 1); renderCal(); };
+document.getElementById('wfCalMode').addEventListener('click', function(e){
+  var b = e.target.closest('button'); if (!b) return;
+  calMode = b.getAttribute('data-mode');
+  this.querySelectorAll('button').forEach(function(x){ x.classList.toggle('is-on', x === b); });
+  renderCal();
+});
+
+/* ---- §3.4 timeline -------------------------------------------------------- */
+var CAPTAIN = '58';
+var tlStart = new Date('2026-08-24T00:00:00');
+var tlWeeks = 2;
+
+function renderTl(){
+  var days = tlWeeks * 7;
+  var end = addDays(tlStart, days - 1);
+  document.getElementById('wfTlTitle').textContent =
+    tlStart.getDate() + ' ' + MON[tlStart.getMonth()].slice(0,3) + ' – ' +
+    end.getDate() + ' ' + MON[end.getMonth()].slice(0,3) + ' 2026';
+
+  /* one lane per member in the viewer's team scope — reportsTo, one level */
+  var lanes = [CAPTAIN].concat(Object.keys(MEMBERS).filter(function(id){ return MEMBERS[id].to === CAPTAIN; }));
+  var scoped = ITEMS.filter(function(it){ return lanes.indexOf(it.who) >= 0; });
+  var undated = scoped.filter(function(it){ return !it.start; });
+
+  var ticks = '';
+  for (var i = 0; i < days; i++){
+    var d = addDays(tlStart, i), we = d.getDay() === 0 || d.getDay() === 6;
+    ticks += '<div class="wf-tl-tick' + (we ? ' is-we' : '') + '">' + d.getDate() +
+             '<i>' + ['S','M','T','W','T','F','S'][d.getDay()] + '</i></div>';
+  }
+  var nowPct = ((new Date(TODAY) - tlStart) / 86400000 + 0.5) / days * 100;
+  var h = '<div class="wf-tl-head"><div class="wf-tl-lane" style="padding:5px 12px;font-size:10.5px;' +
+          'letter-spacing:.07em;text-transform:uppercase;color:var(--wf-ink3)">Member</div>' +
+          '<div class="wf-tl-ticks">' + ticks + '</div></div>';
+
+  lanes.forEach(function(mid){
+    var mine = scoped.filter(function(it){ return it.who === mid && it.start; });
+    var open = scoped.filter(function(it){ return it.who === mid && !isTerminal(it.status); }).length;
+    var rows = '', top = 0;
+
+    /* approved leave draws as a band, never as an attendance row */
+    LEAVE.forEach(function(l){
+      if (l.who !== mid || l.state !== 'approved') return;
+      var a = Math.max(0, (new Date(l.from) - tlStart) / 86400000);
+      var b = Math.min(days, (new Date(l.to) - tlStart) / 86400000 + 1);
+      if (b <= 0 || a >= days) return;
+      rows += '<div class="wf-bar b-leave" style="left:' + (a/days*100) + '%;width:' + ((b-a)/days*100) +
+              '%;top:' + top + 'px"><span class="wf-bar-t">▒ on leave (approved)</span></div>';
+      top += 24;
+    });
+
+    mine.forEach(function(it){
+      var s = (new Date(it.start) - tlStart) / 86400000;
+      var e = (new Date(it.due || it.start) - tlStart) / 86400000 + 1;
+      if (e <= 0 || s >= days) return;
+      var a = Math.max(0, s), b = Math.min(days, e);
+      var tone = it.status === 'blocked' ? 'bad' : isDelayed(it) ? 'warn'
+               : it.status === 'completed' ? 'ok' : 'info';
+      var mark = it.kind === 'task' ? '' : '◆ ';
+      var suffix = isDelayed(it) ? '  ⚠ ' + daysOver(it) + 'd over'
+                 : it.status === 'completed' ? '  ✓'
+                 : it.prog ? '  ' + it.prog + '%' : '';
+      rows += '<div class="wf-bar b-' + tone + '" data-goto="5" style="left:' + (a/days*100) +
+              '%;width:' + ((b-a)/days*100) + '%;top:' + top + 'px">' +
+              '<span class="wf-bar-fill" style="width:' + (it.prog || 0) + '%"></span>' +
+              '<span class="wf-bar-t">' + mark + esc(it.title) + esc(suffix) + '</span></div>';
+      top += 24;
+    });
+
+    if (!rows) rows = '<div style="font-size:11.5px;color:var(--wf-ink3);padding-left:10px">nothing dated in this window</div>';
+    h += '<div class="wf-tl-row"><div class="wf-tl-lane">' +
+         '<div class="wf-nm"><span class="wf-av">' + MEMBERS[mid].s + '</span>' + esc(MEMBERS[mid].n) + '</div>' +
+         '<div class="wf-sm">' + MEMBERS[mid].d + ' · ' + open + ' open</div></div>' +
+         '<div class="wf-tl-grid" style="min-height:' + Math.max(38, top + 14) + 'px">' + rows +
+         (nowPct >= 0 && nowPct <= 100 ? '<div class="wf-now" style="left:' + nowPct + '%"></div>' : '') +
+         '</div></div>';
+  });
+  document.getElementById('wfTl').innerHTML = h;
+
+  var u = document.querySelector('#wfTlUndated div');
+  u.innerHTML = undated.length
+    ? '<b>' + undated.length + ' items in this scope have no start date and cannot be drawn</b> — ' +
+      undated.map(function(i){ return esc(i.title); }).join(' · ') +
+      '. Listed rather than given an invented start: a bar beginning at a date nobody chose is a lie the chart tells confidently.'
+    : 'Every item in this scope has a start date.';
+}
+document.getElementById('wfTlPrev').onclick = function(){ tlStart = addDays(tlStart, -7 * tlWeeks); renderTl(); };
+document.getElementById('wfTlNext').onclick = function(){ tlStart = addDays(tlStart,  7 * tlWeeks); renderTl(); };
+document.getElementById('wfTlRange').addEventListener('click', function(e){
+  var b = e.target.closest('button'); if (!b) return;
+  tlWeeks = +b.getAttribute('data-w');
+  this.querySelectorAll('button').forEach(function(x){ x.classList.toggle('is-on', x === b); });
+  renderTl();
+});
+
+/* ---- §3.13 member dashboard ----------------------------------------------
+   One component, three scopes. The tab bar, the header actions and the nudge
+   block are all functions of the viewer, which is the only honest way to draw
+   a screen whose whole design question is "who is looking".
+--------------------------------------------------------------------------- */
+var ME = '86';
+var meScope = 'self';
+
+var TABS = {
+  overview:'Overview', attendance:'Attendance', work:'Work',
+  reports:'Reports', documents:'Documents', pay:'Pay'
+};
+var SCOPES = {
+  self: {
+    who:'themselves',
+    tabs:['overview','attendance','work','reports','documents','pay'],
+    access:null,
+    banner:'Your own dashboard. Everything on it is <b>self-scope and needs no grant at all</b> — your leave, your tags, your documents, your pay.'
+  },
+  senior: {
+    who:'their senior',
+    tabs:['overview','attendance','work','reports'],
+    access:'read',
+    banner:'You see this because <b>N. Pillai reports to you</b> — one level, never transitive. <b>Documents and Pay are not tabs here.</b> A reporting line does not imply access to somebody’s pay.'
+  },
+  admin: {
+    who:'an admin',
+    tabs:['overview','attendance','work','reports','documents','pay'],
+    access:'assign',
+    banner:'Full record. <b>Pay opens read-only</b> and every button on it links into Finance — Team reads pay and never writes it.'
+  }
+};
+
+function renderMe(){
+  var S = SCOPES[meScope], m = MEMBERS[ME];
+  var mine = ITEMS.filter(function(i){ return i.who === ME; });
+  var open = mine.filter(function(i){ return !isTerminal(i.status); });
+  var late = mine.filter(isDelayed);
+  var marks = mine.filter(function(i){ return i.kind !== 'task'; });
+  var showDocs = S.tabs.indexOf('documents') >= 0;
+
+  /* --- header ---------------------------------------------------------- */
+  var h = '<div class="wf-frame"><div class="wf-fbar">' +
+    '<button class="wf-btn is-quiet">‹ Members</button><strong>' + esc(m.n) + '</strong>' +
+    '<span class="wf-spacer"></span>' +
+    '<span class="wf-tone t-ok"><i class="wf-dot"></i>Working · 4h 32m</span>' +
+    '<span class="wf-tone t-warn">late 4m</span>' +
+    '<span class="wf-sm" style="color:var(--wf-ink3)">read-only here</span></div>';
+
+  h += '<div class="wf-fsec"><div class="wf-row" style="align-items:flex-start">' +
+    '<span class="wf-av" style="width:38px;height:38px;flex-basis:38px;font-size:13px">' + m.s + '</span>' +
+    '<div style="flex:1;min-width:210px"><div style="font-size:16px;font-weight:600">' + esc(m.n) + '</div>' +
+    '<div class="wf-sm">' + esc(m.d) + ' · ' + esc(m.dept) + ' · contract · remote</div>' +
+    '<div class="wf-sm">reports to ' + esc(MEMBERS[m.to].n) + ' · joined 26 Aug 2026</div></div>' +
+    (meScope === 'admin'
+      ? '<button class="wf-btn">Edit profile</button><button class="wf-btn">Manage roles</button>'
+      : '') +
+    '</div>' +
+    '<div class="wf-inline" style="border-style:solid"><span class="wf-i">ⓘ</span><div>' + S.banner + '</div></div>' +
+    '</div>';
+
+  /* --- tab bar --------------------------------------------------------- */
+  h += '<div class="wf-toolbar" style="background:var(--wf-fill)">';
+  S.tabs.forEach(function(t, i){
+    var isNew = (t === 'pay' || t === 'documents');
+    h += '<button class="wf-btn' + (i === 0 ? ' is-primary' : '') + '">' + TABS[t] +
+         (isNew ? ' <span style="font-size:9px;font-weight:700;color:' +
+            (i === 0 ? '#fff' : 'var(--wf-new)') + '">NEW</span>' : '') + '</button>';
+  });
+  h += '<span class="wf-spacer"></span><span class="wf-sm" style="color:var(--wf-ink3)">' +
+       S.tabs.length + ' tabs for ' + S.who + '</span></div>';
+
+  /* --- tiles ----------------------------------------------------------- */
+  var tile = function(k, v, s, tone){
+    return '<div style="flex:1;min-width:132px;border:1px solid var(--wf-line);border-radius:7px;padding:9px 11px">' +
+      '<div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--wf-ink3)">' + k + '</div>' +
+      '<div style="font-size:17px;font-weight:600;margin:3px 0 1px">' + v + '</div>' +
+      '<div class="wf-sm"' + (tone ? ' style="color:var(--wf-' + tone + ')"' : '') + '>' + s + '</div></div>';
+  };
+  h += '<div class="wf-fsec"><div class="wf-row" style="align-items:stretch">' +
+    tile('Today', '● working', '4h 32m · 1 break') +
+    tile('This week', '4 / 5 days', '1 late', 'warn') +
+    tile('Work', open.length + ' open', late.length + ' delayed', late.length ? 'warn' : '') +
+    tile('Handover', '33%', '1 of 3 tasks done') +
+    '</div></div>';
+
+  /* --- the nudge block. Rows derived from a hidden surface stay hidden. -- */
+  var rows = [];
+  rows.push(['bad', 'EOD report not submitted', 'the day is not over — it shows as missing, it never blocks',
+             meScope === 'self' ? 'Submit ▸' : (meScope === 'senior' ? 'Acknowledge ▸' : null)]);
+  if (late.length) rows.push(['warn', late.length + ' work item' + (late.length > 1 ? 's' : '') + ' delayed',
+             late.map(function(i){ return esc(i.title); }).join(' · '), 'Open ▸']);
+  if (showDocs){
+    rows.push(['bad', 'NDA sent 2 Sep, never opened', 'expires 9 Sep · the link has 6 days left',
+               meScope === 'self' ? 'Open and sign ▸' : 'Resend ▸']);
+    rows.push(['warn', '2 required documents missing', 'address proof · bank passbook',
+               meScope === 'self' ? 'Upload ▸' : null]);
+  }
+  h += '<div class="wf-fsec"><h4>' +
+       (meScope === 'self' ? 'Needs you' : 'Blocked on ' + esc(m.n)) +
+       ' <span class="wf-chip is-new">new</span>' +
+       '<span class="wf-spacer"></span><span style="font-weight:400;text-transform:none;letter-spacing:0">' +
+       rows.length + ' rows for ' + S.who + '</span></h4><div class="wf-list">';
+  rows.forEach(function(r){
+    h += '<div class="wf-li"><span class="wf-tone t-' + r[0] + '"><i class="wf-dot"></i></span>' +
+         '<div style="flex:1;min-width:200px"><b>' + r[1] + '</b><div class="wf-sm">' + r[2] + '</div></div>' +
+         (r[3] ? '<button class="wf-btn">' + r[3] + '</button>' : '<span class="wf-sm">read only</span>') +
+         '</div>';
+  });
+  h += '</div>';
+  if (!showDocs) h += '<div class="wf-inline"><span class="wf-i">⚠</span><div><b>Two rows are absent, ' +
+    'not greyed.</b> The unsigned NDA and the missing documents live behind a tab this viewer does not ' +
+    'have, and a nudge that names them would announce what the tab just refused to show.</div></div>';
+  h += '</div>';
+
+  /* --- plan and EOD, shipped ------------------------------------------- */
+  h += '<div class="wf-fsec"><div class="wf-two">' +
+    '<div><h4>Today’s plan <span class="wf-chip is-live">shipped</span></h4>' +
+    '<div class="wf-list">' +
+      '<div class="wf-li"><span class="wf-tone t-ok">✓</span>Draft the handover — section 2<span class="wf-spacer"></span><span class="wf-tone t-warn">med</span></div>' +
+      '<div class="wf-li"><span class="wf-tone">○</span>Clear 6 support tickets<span class="wf-spacer"></span><span class="wf-tone t-bad">high</span></div>' +
+    '</div><div class="wf-sm" style="margin-top:6px">submitted 9:12 · blockers: none</div></div>' +
+    '<div><h4>EOD report <span class="wf-chip is-live">shipped</span></h4>' +
+    '<div class="wf-inline" style="margin-top:0;border-color:var(--wf-warn);background:var(--wf-warn-bg);color:var(--wf-warn)">' +
+    '<span class="wf-i">⚠</span><div>Not submitted. <b>The day is not over.</b></div></div>' +
+    (meScope === 'self' ? '<button class="wf-btn is-primary" style="margin-top:9px">Submit EOD report</button>'
+      : '<div class="wf-sm" style="margin-top:9px">You acknowledge it once it arrives. ' +
+        (meScope === 'senior' ? 'It is one of the 2 waiting on you.' : '') + '</div>') +
+    '</div></div></div>';
+
+  /* --- leave, new ------------------------------------------------------- */
+  var lv = LEAVE.filter(function(l){ return l.who === ME; });
+  h += '<div class="wf-fsec"><h4>Leave <span class="wf-chip is-new">new</span></h4><div class="wf-list">';
+  lv.forEach(function(l){
+    var ok = l.state === 'approved';
+    h += '<div class="wf-li"><span class="wf-tone t-' + (ok ? 'ok' : 'warn') + '">' +
+      (ok ? '✓ approved' : '⏳ requested') + '</span><b>' + l.from.slice(8) + ' – ' + l.to.slice(8) + ' Sep</b>' +
+      '<span class="wf-sm">' + l.kind + '</span><span class="wf-spacer"></span>' +
+      (meScope === 'self'
+        ? '<button class="wf-btn is-quiet">' + (ok ? 'Cancel' : 'Withdraw') + '</button>'
+        : (ok ? '<span class="wf-sm">decided by you</span>'
+              : '<button class="wf-btn">Reject…</button><button class="wf-btn is-primary">Approve</button>')) +
+      '</div>';
+  });
+  h += '</div><div class="wf-sm" style="margin-top:7px">Approved leave <b>suppresses a derived absence</b>. ' +
+       'It writes no attendance row, so 8 – 9 Sep will read as leave and not as two absences.</div></div>';
+
+  /* --- milestones ------------------------------------------------------- */
+  h += '<div class="wf-fsec"><h4>Milestones and targets <span class="wf-chip is-live">shipped</span></h4>';
+  marks.forEach(function(i){
+    h += '<div class="wf-row" style="margin-bottom:9px"><span style="flex:1;min-width:170px">◆ ' + esc(i.title) + '</span>' +
+      '<span class="wf-prog"><i style="width:' + i.prog + '%"></i></span>' +
+      '<span class="wf-sm">' + i.prog + '%</span>' +
+      '<span class="wf-tone' + (isDelayed(i) ? ' t-warn' : '') + '">due ' + i.due.slice(8) + ' Sep</span></div>';
+  });
+  h += '<div class="wf-sm">Progress is <b>completed children ÷ total</b>. Nobody types it.</div></div>';
+
+  /* --- access, hidden from the member themselves ------------------------ */
+  if (S.access){
+    h += '<div class="wf-fsec" style="background:var(--wf-fill)"><h4>Access ' +
+      '<span class="wf-chip">' + (S.access === 'assign' ? 'read + assign' : 'read only') + '</span></h4>' +
+      '<div class="wf-row"><span class="wf-sm">Roles</span><span class="wf-tone">none held</span>' +
+      '<span class="wf-sm">· effective grants: 0 modules</span><span class="wf-spacer"></span>' +
+      (S.access === 'assign' ? '<button class="wf-btn">Assign roles</button>' : '') + '</div>' +
+      '<div class="wf-inline"><span class="wf-i">ⓘ</span><div><b>This block does not exist on the ' +
+      'member’s own view.</b> Somebody reading their own permission matrix learns exactly which ' +
+      'verb to ask for, and the panel gains nothing by telling them.</div></div></div>';
+  }
+
+  h += '</div>';
+  document.getElementById('wfMe').innerHTML = h;
+}
+document.getElementById('wfMeScope').addEventListener('click', function(e){
+  var b = e.target.closest('button'); if (!b) return;
+  meScope = b.getAttribute('data-scope');
+  this.querySelectorAll('button').forEach(function(x){ x.classList.toggle('is-on', x === b); });
+  renderMe();
+});
+
+/* ---- §3.9 the signing gate ------------------------------------------------ */
+(function(){
+  var name = document.getElementById('wfSigName');
+  var agree = document.getElementById('wfSigAgree');
+  var btn = document.getElementById('wfSigBtn');
+  var pad = document.getElementById('wfSigPad');
+  function sync(){ btn.disabled = !(name.value.trim().length > 1 && agree.checked); }
+  name.addEventListener('input', function(){ pad.textContent = name.value.trim() || '~ sign here ~'; sync(); });
+  agree.addEventListener('change', sync);
+  btn.addEventListener('click', function(){
+    btn.textContent = '✓ Signed — 3 Sep 2026 14:22 · IP recorded';
+    btn.disabled = true; name.disabled = true; agree.disabled = true;
+  });
+})();
+
+/* ---- boot ----------------------------------------------------------------- */
+renderBoard();
+renderCal();
+renderTl();
+renderMe();
+var m = /^#s(\d+)$/.exec(location.hash);
+show(m ? +m[1] : 0);
+</script>
+</body>
+</html>

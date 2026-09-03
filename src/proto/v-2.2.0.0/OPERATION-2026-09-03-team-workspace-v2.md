@@ -35,15 +35,28 @@ summary:     Calendar and Timeline become the fourth and fifth FACE of
              Leave suppresses a derived absence and never writes an
              attendance row.
 
-outcome:     Twelve wireframes, ten architecture decisions (TM-AD-12…21), a
-             data-model delta of two new entities and four extended ones, a
-             permission delta, a regression list, six implementation phases,
-             eleven open decisions (TM-OD-20…30) and five risks (TM-R-10…14).
+outcome:     Thirteen wireframes, eleven architecture decisions (TM-AD-12…22),
+             a data-model delta of two new entities and four extended ones, a
+             permission delta, a regression list, nine implementation phases,
+             thirteen open decisions (TM-OD-20…32) and five risks (TM-R-10…14).
              NOT code. One open decision — TM-OD-20 — blocks the roster work
              and needs an answer before Phase A.
+
+             AMENDED 2026-09-03 by TM-AD-22, after the member dashboard was
+             drawn: TM-AD-21's six tabs had dropped Reports, and the route it
+             names does not exist — a member opens as a DRAWER today. §3.13
+             is the container for §3.6, §3.10 and §3.11, so it precedes all
+             three.
 ```
 
 **Module:** Team · **Date:** 2026-09-03 · **Status:** awaiting approval
+
+**The twelve screens in §3 are also a clickable file** —
+[wireframe-team-workspace-v2.html](wireframe-team-workspace-v2.html), opened straight from
+disk, no build step. The board's Group-by axis is really wired over the seeded 22 work items,
+so `TM-AD-15` can be argued against the thing itself rather than against a sketch of it. Every
+`TM-AD` / `TM-OD` / `TM-R` id below is rendered beside the screen it constrains, and `TM-OD-20`
+is drawn as an unanswered decision rather than quietly resolved.
 
 **Supersedes nothing.** This continues
 [OPERATION-2026-08-30-team-module.md](OPERATION-2026-08-30-team-module.md) and uses its
@@ -327,6 +340,45 @@ The three new member-scoped surfaces are **tabs on it**, not routes:
 Six tabs is at the edge of comfortable. It is still better than six routes, because every
 one of them would need the same header, the same scope check and the same member
 resolution — and a second screen is a second place for those to drift.
+
+### TM-AD-22 · The member dashboard is six tabs, and Reports is one of them
+
+**This amends TM-AD-21, which had a hole in it.** TM-AD-21 lists
+`overview | work | attendance | pay | agreements | resources` and **Reports is not in that
+list** — although the v1 document shipped it as a tab, and the daily plan and the EOD report
+are per-member records with nowhere else to live. Adding it back makes seven, which is past
+the edge TM-AD-21 itself called uncomfortable.
+
+**Resolution: Agreements and Resources are two sections of one `Documents` tab.** That is the
+escape hatch TM-R-14 already wrote down, taken now rather than after a real member finds the
+screen crowded.
+
+```
+/team/me?tab=overview | attendance | work | reports | documents | pay
+                                                      ^^^^^^^^^   ^^^
+                                            two sections          the only tab added
+```
+
+v1's five tabs are kept intact and **one** is added, instead of one being dropped and two
+invented. **TM-AD-18 is untouched** — it is about direction, permission and retention, and
+none of the three changes because two sections share a tab.
+
+Three rules the screen carries, each of which is the reason for the next:
+
+- **A nudge inherits the scope of what it points at.** The *Needs you* block loses two rows
+  for a senior — the unsigned NDA and the missing documents — and they are **absent, not
+  greyed**. A row reading *"1 agreement unsigned"* announces the existence of a document the
+  same screen just refused to show.
+- **The clock is read-only here.** Actions stay in the topbar strip and on `/attendance`.
+  Three *End the day* buttons over one open day is two chances for the UI to disagree with
+  itself mid-request.
+- **Access is a block, not a tab**, and it does not render on the member's own view. Someone
+  reading their own permission matrix learns exactly which verb to ask for.
+
+> **The route does not exist yet.** Team shipped on 2026-08-30 with the member as a *drawer*
+> — `views/Team/MemberDrawer.tsx` — and neither `/team/:id` nor `/team/me` resolves today.
+> TM-OD-15 answered *where* this lives; nothing built it. It is the container for §3.6, §3.10
+> and §3.11, so it precedes all three.
 
 ---
 
@@ -839,6 +891,8 @@ private-object decision, not before it.
 | **TM-OD-27** | Can an NDA be sent to a non-member? | **Not in v1.** `Agreement.memberId` is required. A prospect NDA means a party record this module does not have. |
 | **TM-OD-28** | Which resource kinds are "required"? | Vocabulary, so it is configurable without a deploy. Seed: PAN, Aadhaar, address proof, bank passbook. |
 | **TM-OD-29** | Who may approve an incentive? | **Finance**, not the captain. The captain proposes from a work item; Finance approves the money. |
+| **TM-OD-31** | **One grant, spelled two ways.** v1 calls it `people-docs.view`; §5 here calls it `team.resource.view` and adds `team.agreement.send`/`revoke`. | **One shared read verb, separate write verbs.** An offer letter and an Aadhaar scan are the same sensitivity, so one read grant; sending an agreement and accepting an upload are different acts, so two write verbs. Reconcile before Phase G. |
+| **TM-OD-32** | **What happens to the shipped member drawer** once `/team/me` exists? | **The drawer becomes a launcher** — identity, status, roles and its four actions stay; every informational block moves to the dashboard behind *Open dashboard ▸*. One place per fact. |
 | **TM-OD-30** | Retention on `Resource` after a member leaves? | Flagged, not answered — a data-protection question, not an engineering one. Same status as TM-OD-17. |
 
 ## 9. Risks
@@ -849,7 +903,7 @@ private-object decision, not before it.
 | **TM-R-11** | Identity documents on a backend where **every S3 object is publicly readable by URL**. | **High** | Private objects + signed reads, decided before Phase H starts. Do not reuse the existing public `fileUrl` return. This is TM-R-04 with worse consequences. |
 | **TM-R-12** | The public signing page is an unauthenticated write on a legal record, and the project still has no throttle class. | **High** | Inherits TM-R-05 in full: hashed token, expiry, single-use, revocable, per-token and per-IP limits, `attemptCount`. |
 | **TM-R-13** | Timeline plus calendar is more net-new UI than the whole of v1's work face. | **Medium** | C before D, month before week, and both share one date-grid primitive. If D slips, C alone answers the brief's *"like Google Calendar"*. |
-| **TM-R-14** | Six tabs on the member dashboard, three of them added at once. | **Low–Medium** | Ship Pay last (Phase I). If six reads as crowded on a real member, Agreements and Resources fold into one *Documents* tab with two sections — the entities stay separate either way (TM-AD-18). |
+| **TM-R-14** | Six tabs on the member dashboard, three of them added at once. | **Low–Medium** | **Mitigation taken up front — see TM-AD-22.** Agreements and Resources ship as two sections of one *Documents* tab, so only one tab is added, not three. Ship Pay last (Phase I). The next fold, if one is still needed, is Reports into Overview. |
 
 ---
 
