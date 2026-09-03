@@ -253,7 +253,11 @@ has(subsFiltered, "Defaulting", "...the filtered list still names the state it w
   /* The dropdown offers only months something was actually sold in — it is
      built from the records, never from a calendar. */
   has(all, 'data-filter="started"', "...the filter is offered on the list");
-  hasnt(all, ">· Jan 2026<", "...and it offers no month nothing was sold in");
+  /* Jan 2026 was the empty month this named until the review backfill sold
+     into it. The rule is unchanged — the list is built from records, never from
+     a calendar — so the example moved to a month the records still do not
+     reach at all. */
+  hasnt(all, ">· Jan 2025<", "...and it offers no month nothing was sold in");
   /* THE DAY HALF IS A CALENDAR ICON AT REST. A bare date input prints
      `dd-mm-yyyy` when it is empty — a placeholder pretending to be a value,
      and the widest thing in a row of controls that each say one word. The

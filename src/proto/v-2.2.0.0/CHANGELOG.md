@@ -6,6 +6,66 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-03
 
+### Review backfill: ten months of history, so the Analytics charts have something in them
+
+**Area:** the seed — `#/finance-analytics` is where it shows
+**Files:** `src/content/finance/subscriptions.json`, `src/content/finance/transactions.json`, `scripts/check-finance-ledger.cjs`, `scripts/fn-smoke.tsx`
+
+**What changed**
+
+**THE CHARTS HAD NOTHING TO DRAW.** The seed carried eighteen months of salary,
+no revenue at all before July 2026, and no spend before August — so net-by-month
+was a flat trough and a spike, and most KPI cards read *first reading*. Added
+**20 completed subscriptions (SUB-02xx)** and **41 recorded transactions
+(TXN-11xx)** across Sep 2025 – Jun 2026, with collection ramping ₹1.18L → ₹7.12L
+against a salary line running ₹6.7L – ₹8.5L. The trend now reads as a business
+closing a gap month by month, which is what the chart is for.
+
+**AUGUST IS BYTE-IDENTICAL, and that was the constraint.** Every added record is
+in a **closed past month** and **terminal** — completed subscriptions, recorded
+transactions — so nothing touches the reporting period. Verified by diffing the
+whole of `overview()`, `tagTotals()`, `taxSummary()`, `activeCount()` and all 13
+KPIs before and after: **no field moved.** Active subscriptions stay 6, MRR,
+collection rate and the tax summary are untouched.
+
+**IT IS REAL DATA, NOT PLACEHOLDER SHAPES.** The seed enforces its own integrity
+and the first pass failed eight of those rules, correctly: every subscription
+must resolve to a **registered user of that name**, every paid installment must
+carry a **numbered, dated and hashed receipt**, and every event type must be in
+the vocabulary. The records were regenerated against the 17 real users not yet
+tied to a subscription rather than weakening any of it. Customers repeat across
+months, which is both realistic and honest — `newCustomers` counts first payment,
+so a repeat buyer is not a new one.
+
+**Two assertions moved, neither weakened.** Both named a month that was empty
+and is not any more: the *nothing fell due* check now reads Mar 2025, and the
+*offers no month nothing was sold in* check now reads Jan 2025. Each still
+proves the same behaviour against a month the records genuinely do not reach.
+
+**Temp data**
+`src/content/finance/subscriptions.json` and `transactions.json` → the two id
+ranges above, each file carrying a `$comment_reviewBackfill` saying what they
+are and how to remove them. **Placeholder records, and deliberately separable:**
+delete the two ranges, or revert this commit, and the module is exactly as it
+was — the checks prove it, since they pin August rather than the backfill.
+
+**Backend needed**
+`none` — these are seed rows. They disappear the moment the lists come from the
+API; nothing in the code knows they exist.
+
+**Open decisions**
+`none`. One judgement worth stating: the figures ramp rather than being random.
+Random monthly revenue would have drawn a jagged line that says nothing, and the
+chart is there to answer *is the gap closing* — a question flat noise cannot
+answer either way.
+
+**Verified**
+`npx tsc -b` and `npx eslint` clean. `npm run check:finance` → 441 pass — the
+same 441 as before the backfill, including every assertion that pins an exact
+August figure. `npm run check:finance-render` renders every surface;
+`npm run check:finance-nav` passes. Diffed the full August derivation set before
+and after and confirmed nothing moved.
+
 ### Analytics, rebuilt: a waterfall, a zero rule, and the prose off the page
 
 **Area:** `#/finance-analytics` · Overview and KPI

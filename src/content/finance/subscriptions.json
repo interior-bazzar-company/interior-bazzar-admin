@@ -708,12 +708,14 @@
       "recordedBy": "A. Sharma",
       "recordedAt": "2026-07-20T12:00:00+05:30"
     },
-
     {
       "$comment": "DEMO · COMPLETE PAYMENT, recorded from the chain. Quotation IB-QT-2026-00160 agreed one payment of ₹28,320 on deal DL-2481; invoice 00098 billed it; the money arrived and the receipt was issued. Every field below came from a document — the plan and the term from the quotation, the money from the invoice — and none of it was typed. It is in the seed so the finished shape can be read without recording one first. `paidInFull` is true because the quotation agreed one installment, NOT because one row happens to be here.",
       "subscriptionId": "SUB-0110",
       "source": "sales",
-      "customer": { "name": "Bhatia Ply & Hardware", "userId": "IB-U-0921" },
+      "customer": {
+        "name": "Bhatia Ply & Hardware",
+        "userId": "IB-U-0921"
+      },
       "planId": "PL-GROWTH",
       "planName": "Growth",
       "cycleMonths": 3,
@@ -781,12 +783,14 @@
       "recordedBy": "A. Sharma",
       "recordedAt": "2026-08-19T16:40:00+05:30"
     },
-
     {
       "$comment": "DEMO · A RUNNING INSTALLMENT PLAN, recorded from the chain, and the state most screens have to get right. Quotation IB-QT-2026-00161 agreed THREE of ₹70,800 on deal DL-2488. Installment 1 is paid and receipted on invoice 00099. Installment 2 has invoice 00102 raised and is waiting. Installment 3 has NO invoice, because the chain raises one as each falls due. So this subscription has three installments and two invoices, and anything that infers the plan by counting documents reports it as a two-installment sale.",
       "subscriptionId": "SUB-0111",
       "source": "sales",
-      "customer": { "name": "Meera Studio Interiors", "userId": "IB-U-0912" },
+      "customer": {
+        "name": "Meera Studio Interiors",
+        "userId": "IB-U-0912"
+      },
       "planId": "PL-SIGNATURE",
       "planName": "Signature",
       "cycleMonths": 12,
@@ -873,6 +877,1167 @@
       "paidInFull": false,
       "recordedBy": "S. Bhat",
       "recordedAt": "2026-08-18T12:25:00+05:30"
+    },
+    {
+      "subscriptionId": "SUB-0201",
+      "source": "sales",
+      "customer": {
+        "name": "Arjun Bhat",
+        "userId": "IB-U-1038"
+      },
+      "planId": "PL-GROWTH",
+      "planName": "Growth — 1 month",
+      "cycleMonths": 1,
+      "totalPaise": 6235300,
+      "startDate": "2025-09-04",
+      "endDate": "2025-10-04",
+      "status": "completed",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 1,
+          "dueDate": "2025-09-12",
+          "amountPaise": 6235300,
+          "status": "paid",
+          "invoiceNumber": null,
+          "payment": {
+            "paymentId": "PAY-5101",
+            "amountPaise": 6235300,
+            "mode": "RTGS",
+            "reference": "HIST202509001",
+            "valueDate": "2025-09-12",
+            "accountId": "ACC-HDFC-4021",
+            "recordedBy": "A. Sharma",
+            "recordedAt": "2025-09-12T11:00:00+05:30",
+            "receipt": {
+              "number": "IB-RCP-HIST-00001",
+              "issuedAt": "2025-09-12T11:01:00+05:30",
+              "sha256": "4c8948530fcd3a38da160187982618a5ac279ae16373183754ab1601971fbccb"
+            },
+            "bankLineId": null,
+            "proof": null
+          },
+          "failure": null
+        }
+      ],
+      "soldBy": "A. Sharma",
+      "invoiceNumber": null,
+      "paidInFull": true,
+      "recordedBy": "A. Sharma",
+      "recordedAt": "2025-09-04T10:00:00+05:30",
+      "events": [
+        {
+          "eventId": "SE-0201-1",
+          "type": "SUBSCRIPTION_RECORDED",
+          "actor": "A. Sharma",
+          "actorRole": "Sales",
+          "at": "2025-09-04T10:00:00+05:30",
+          "note": "Recorded from the sales chain. Settled in full on 2025-09-12."
+        }
+      ]
+    },
+    {
+      "subscriptionId": "SUB-0202",
+      "source": "sales",
+      "customer": {
+        "name": "Nikhil Rao",
+        "userId": "IB-U-1029"
+      },
+      "planId": "PL-AUTOGROWTH",
+      "planName": "AutoGrowth",
+      "cycleMonths": 1,
+      "totalPaise": 5564700,
+      "startDate": "2025-09-07",
+      "endDate": "2025-10-07",
+      "status": "completed",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 1,
+          "dueDate": "2025-09-15",
+          "amountPaise": 5564700,
+          "status": "paid",
+          "invoiceNumber": null,
+          "payment": {
+            "paymentId": "PAY-5102",
+            "amountPaise": 5564700,
+            "mode": "UPI",
+            "reference": "HIST202509002",
+            "valueDate": "2025-09-15",
+            "accountId": "ACC-HDFC-4021",
+            "recordedBy": "K. Iyer",
+            "recordedAt": "2025-09-15T11:00:00+05:30",
+            "receipt": {
+              "number": "IB-RCP-HIST-00002",
+              "issuedAt": "2025-09-15T11:01:00+05:30",
+              "sha256": "a13c57f30a8e8bfdc5bf133cbf60e72aac6516d2b25d20b3f92cf5c884bd57a5"
+            },
+            "bankLineId": null,
+            "proof": null
+          },
+          "failure": null
+        }
+      ],
+      "soldBy": "K. Iyer",
+      "invoiceNumber": null,
+      "paidInFull": true,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2025-09-07T10:00:00+05:30",
+      "events": [
+        {
+          "eventId": "SE-0202-1",
+          "type": "SUBSCRIPTION_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Sales",
+          "at": "2025-09-07T10:00:00+05:30",
+          "note": "Recorded from the sales chain. Settled in full on 2025-09-15."
+        }
+      ]
+    },
+    {
+      "subscriptionId": "SUB-0203",
+      "source": "sales",
+      "customer": {
+        "name": "Rohit Desai",
+        "userId": "IB-U-1012"
+      },
+      "planId": "PL-STARTER",
+      "planName": "Starter — 1 month",
+      "cycleMonths": 1,
+      "totalPaise": 9427100,
+      "startDate": "2025-10-03",
+      "endDate": "2025-11-03",
+      "status": "completed",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 1,
+          "dueDate": "2025-10-11",
+          "amountPaise": 9427100,
+          "status": "paid",
+          "invoiceNumber": null,
+          "payment": {
+            "paymentId": "PAY-5103",
+            "amountPaise": 9427100,
+            "mode": "NEFT",
+            "reference": "HIST202510003",
+            "valueDate": "2025-10-11",
+            "accountId": "ACC-HDFC-4021",
+            "recordedBy": "R. Menon",
+            "recordedAt": "2025-10-11T11:00:00+05:30",
+            "receipt": {
+              "number": "IB-RCP-HIST-00003",
+              "issuedAt": "2025-10-11T11:01:00+05:30",
+              "sha256": "2211cc09a80606d6666d6c4d4fb37609f0c3764e58c3a06b9c15f8f49cb9b39c"
+            },
+            "bankLineId": null,
+            "proof": null
+          },
+          "failure": null
+        }
+      ],
+      "soldBy": "R. Menon",
+      "invoiceNumber": null,
+      "paidInFull": true,
+      "recordedBy": "R. Menon",
+      "recordedAt": "2025-10-03T10:00:00+05:30",
+      "events": [
+        {
+          "eventId": "SE-0203-1",
+          "type": "SUBSCRIPTION_RECORDED",
+          "actor": "R. Menon",
+          "actorRole": "Sales",
+          "at": "2025-10-03T10:00:00+05:30",
+          "note": "Recorded from the sales chain. Settled in full on 2025-10-11."
+        }
+      ]
+    },
+    {
+      "subscriptionId": "SUB-0204",
+      "source": "website",
+      "customer": {
+        "name": "Verve Modular Kitchens",
+        "userId": "IB-U-0975"
+      },
+      "planId": "PL-GROWTH",
+      "planName": "Growth — 1 month",
+      "cycleMonths": 1,
+      "totalPaise": 7072900,
+      "startDate": "2025-10-02",
+      "endDate": "2025-11-02",
+      "status": "completed",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 1,
+          "dueDate": "2025-10-05",
+          "amountPaise": 7072900,
+          "status": "paid",
+          "invoiceNumber": null,
+          "payment": {
+            "paymentId": "PAY-5104",
+            "amountPaise": 7072900,
+            "mode": "RTGS",
+            "reference": "HIST202510004",
+            "valueDate": "2025-10-05",
+            "accountId": "ACC-HDFC-4021",
+            "recordedBy": "A. Sharma",
+            "recordedAt": "2025-10-05T11:00:00+05:30",
+            "receipt": {
+              "number": "IB-RCP-HIST-00004",
+              "issuedAt": "2025-10-05T11:01:00+05:30",
+              "sha256": "2d4b774841a18f5e01cb513f6aed33858e9bdaf41f586111ce3db82bf21003f7"
+            },
+            "bankLineId": null,
+            "proof": null
+          },
+          "failure": null
+        }
+      ],
+      "soldBy": "A. Sharma",
+      "invoiceNumber": null,
+      "paidInFull": true,
+      "recordedBy": "A. Sharma",
+      "recordedAt": "2025-10-02T10:00:00+05:30",
+      "events": [
+        {
+          "eventId": "SE-0204-1",
+          "type": "SUBSCRIPTION_RECORDED",
+          "actor": "A. Sharma",
+          "actorRole": "Sales",
+          "at": "2025-10-02T10:00:00+05:30",
+          "note": "Recorded from the sales chain. Settled in full on 2025-10-05."
+        }
+      ]
+    },
+    {
+      "subscriptionId": "SUB-0205",
+      "source": "sales",
+      "customer": {
+        "name": "Sunlight Furnishings",
+        "userId": "IB-U-0958"
+      },
+      "planId": "PL-AUTOGROWTH",
+      "planName": "AutoGrowth",
+      "cycleMonths": 1,
+      "totalPaise": 11290000,
+      "startDate": "2025-11-07",
+      "endDate": "2025-12-07",
+      "status": "completed",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 1,
+          "dueDate": "2025-11-09",
+          "amountPaise": 11290000,
+          "status": "paid",
+          "invoiceNumber": null,
+          "payment": {
+            "paymentId": "PAY-5105",
+            "amountPaise": 11290000,
+            "mode": "UPI",
+            "reference": "HIST202511005",
+            "valueDate": "2025-11-09",
+            "accountId": "ACC-HDFC-4021",
+            "recordedBy": "K. Iyer",
+            "recordedAt": "2025-11-09T11:00:00+05:30",
+            "receipt": {
+              "number": "IB-RCP-HIST-00005",
+              "issuedAt": "2025-11-09T11:01:00+05:30",
+              "sha256": "2fb484440c6744af8841df4eb27e8b00f1ce9c61fee598755c11b0d815afb711"
+            },
+            "bankLineId": null,
+            "proof": null
+          },
+          "failure": null
+        }
+      ],
+      "soldBy": "K. Iyer",
+      "invoiceNumber": null,
+      "paidInFull": true,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2025-11-07T10:00:00+05:30",
+      "events": [
+        {
+          "eventId": "SE-0205-1",
+          "type": "SUBSCRIPTION_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Sales",
+          "at": "2025-11-07T10:00:00+05:30",
+          "note": "Recorded from the sales chain. Settled in full on 2025-11-09."
+        }
+      ]
+    },
+    {
+      "subscriptionId": "SUB-0206",
+      "source": "sales",
+      "customer": {
+        "name": "Tara Design Collective",
+        "userId": "IB-U-0944"
+      },
+      "planId": "PL-STARTER",
+      "planName": "Starter — 1 month",
+      "cycleMonths": 1,
+      "totalPaise": 9110000,
+      "startDate": "2025-11-02",
+      "endDate": "2025-12-02",
+      "status": "completed",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 1,
+          "dueDate": "2025-11-06",
+          "amountPaise": 9110000,
+          "status": "paid",
+          "invoiceNumber": null,
+          "payment": {
+            "paymentId": "PAY-5106",
+            "amountPaise": 9110000,
+            "mode": "NEFT",
+            "reference": "HIST202511006",
+            "valueDate": "2025-11-06",
+            "accountId": "ACC-HDFC-4021",
+            "recordedBy": "R. Menon",
+            "recordedAt": "2025-11-06T11:00:00+05:30",
+            "receipt": {
+              "number": "IB-RCP-HIST-00006",
+              "issuedAt": "2025-11-06T11:01:00+05:30",
+              "sha256": "8e3d07605258f4c382601a2985b7a00ae38a232ebde142f3da95503443815d48"
+            },
+            "bankLineId": null,
+            "proof": null
+          },
+          "failure": null
+        }
+      ],
+      "soldBy": "R. Menon",
+      "invoiceNumber": null,
+      "paidInFull": true,
+      "recordedBy": "R. Menon",
+      "recordedAt": "2025-11-02T10:00:00+05:30",
+      "events": [
+        {
+          "eventId": "SE-0206-1",
+          "type": "SUBSCRIPTION_RECORDED",
+          "actor": "R. Menon",
+          "actorRole": "Sales",
+          "at": "2025-11-02T10:00:00+05:30",
+          "note": "Recorded from the sales chain. Settled in full on 2025-11-06."
+        }
+      ]
+    },
+    {
+      "subscriptionId": "SUB-0207",
+      "source": "sales",
+      "customer": {
+        "name": "Lokesh Interiors",
+        "userId": "IB-U-0899"
+      },
+      "planId": "PL-GROWTH",
+      "planName": "Growth — 1 month",
+      "cycleMonths": 1,
+      "totalPaise": 15188500,
+      "startDate": "2025-12-05",
+      "endDate": "2026-01-05",
+      "status": "completed",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 1,
+          "dueDate": "2025-12-13",
+          "amountPaise": 15188500,
+          "status": "paid",
+          "invoiceNumber": null,
+          "payment": {
+            "paymentId": "PAY-5107",
+            "amountPaise": 15188500,
+            "mode": "RTGS",
+            "reference": "HIST202512007",
+            "valueDate": "2025-12-13",
+            "accountId": "ACC-HDFC-4021",
+            "recordedBy": "A. Sharma",
+            "recordedAt": "2025-12-13T11:00:00+05:30",
+            "receipt": {
+              "number": "IB-RCP-HIST-00007",
+              "issuedAt": "2025-12-13T11:01:00+05:30",
+              "sha256": "31c67a875c6e29e85ac7ed3cba04fb154bdcc0fb70561400a9b169c91bd065f6"
+            },
+            "bankLineId": null,
+            "proof": null
+          },
+          "failure": null
+        }
+      ],
+      "soldBy": "A. Sharma",
+      "invoiceNumber": null,
+      "paidInFull": true,
+      "recordedBy": "A. Sharma",
+      "recordedAt": "2025-12-05T10:00:00+05:30",
+      "events": [
+        {
+          "eventId": "SE-0207-1",
+          "type": "SUBSCRIPTION_RECORDED",
+          "actor": "A. Sharma",
+          "actorRole": "Sales",
+          "at": "2025-12-05T10:00:00+05:30",
+          "note": "Recorded from the sales chain. Settled in full on 2025-12-13."
+        }
+      ]
+    },
+    {
+      "subscriptionId": "SUB-0208",
+      "source": "website",
+      "customer": {
+        "name": "R. Menon Woodworks",
+        "userId": "IB-U-0880"
+      },
+      "planId": "PL-AUTOGROWTH",
+      "planName": "AutoGrowth",
+      "cycleMonths": 1,
+      "totalPaise": 9411500,
+      "startDate": "2025-12-04",
+      "endDate": "2026-01-04",
+      "status": "completed",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 1,
+          "dueDate": "2025-12-09",
+          "amountPaise": 9411500,
+          "status": "paid",
+          "invoiceNumber": null,
+          "payment": {
+            "paymentId": "PAY-5108",
+            "amountPaise": 9411500,
+            "mode": "UPI",
+            "reference": "HIST202512008",
+            "valueDate": "2025-12-09",
+            "accountId": "ACC-HDFC-4021",
+            "recordedBy": "K. Iyer",
+            "recordedAt": "2025-12-09T11:00:00+05:30",
+            "receipt": {
+              "number": "IB-RCP-HIST-00008",
+              "issuedAt": "2025-12-09T11:01:00+05:30",
+              "sha256": "20967a375843be87e4c94b448e0c5458d6e65d67a0403efa845537c211764531"
+            },
+            "bankLineId": null,
+            "proof": null
+          },
+          "failure": null
+        }
+      ],
+      "soldBy": "K. Iyer",
+      "invoiceNumber": null,
+      "paidInFull": true,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2025-12-04T10:00:00+05:30",
+      "events": [
+        {
+          "eventId": "SE-0208-1",
+          "type": "SUBSCRIPTION_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Sales",
+          "at": "2025-12-04T10:00:00+05:30",
+          "note": "Recorded from the sales chain. Settled in full on 2025-12-09."
+        }
+      ]
+    },
+    {
+      "subscriptionId": "SUB-0209",
+      "source": "sales",
+      "customer": {
+        "name": "Zenith Ceilings",
+        "userId": "IB-U-0867"
+      },
+      "planId": "PL-STARTER",
+      "planName": "Starter — 1 month",
+      "cycleMonths": 1,
+      "totalPaise": 17727600,
+      "startDate": "2026-01-03",
+      "endDate": "2026-02-03",
+      "status": "completed",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 1,
+          "dueDate": "2026-01-08",
+          "amountPaise": 17727600,
+          "status": "paid",
+          "invoiceNumber": null,
+          "payment": {
+            "paymentId": "PAY-5109",
+            "amountPaise": 17727600,
+            "mode": "NEFT",
+            "reference": "HIST202601009",
+            "valueDate": "2026-01-08",
+            "accountId": "ACC-HDFC-4021",
+            "recordedBy": "R. Menon",
+            "recordedAt": "2026-01-08T11:00:00+05:30",
+            "receipt": {
+              "number": "IB-RCP-HIST-00009",
+              "issuedAt": "2026-01-08T11:01:00+05:30",
+              "sha256": "bf847f5853fcd2a5c12a0224060862373e2e8df0a6b49d0a527051573a75e7e9"
+            },
+            "bankLineId": null,
+            "proof": null
+          },
+          "failure": null
+        }
+      ],
+      "soldBy": "R. Menon",
+      "invoiceNumber": null,
+      "paidInFull": true,
+      "recordedBy": "R. Menon",
+      "recordedAt": "2026-01-03T10:00:00+05:30",
+      "events": [
+        {
+          "eventId": "SE-0209-1",
+          "type": "SUBSCRIPTION_RECORDED",
+          "actor": "R. Menon",
+          "actorRole": "Sales",
+          "at": "2026-01-03T10:00:00+05:30",
+          "note": "Recorded from the sales chain. Settled in full on 2026-01-08."
+        }
+      ]
+    },
+    {
+      "subscriptionId": "SUB-0210",
+      "source": "sales",
+      "customer": {
+        "name": "Sharma Interiors",
+        "userId": "IB-U-0834"
+      },
+      "planId": "PL-GROWTH",
+      "planName": "Growth — 1 month",
+      "cycleMonths": 1,
+      "totalPaise": 14472400,
+      "startDate": "2026-01-03",
+      "endDate": "2026-02-03",
+      "status": "completed",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 1,
+          "dueDate": "2026-01-09",
+          "amountPaise": 14472400,
+          "status": "paid",
+          "invoiceNumber": null,
+          "payment": {
+            "paymentId": "PAY-5110",
+            "amountPaise": 14472400,
+            "mode": "RTGS",
+            "reference": "HIST202601010",
+            "valueDate": "2026-01-09",
+            "accountId": "ACC-HDFC-4021",
+            "recordedBy": "A. Sharma",
+            "recordedAt": "2026-01-09T11:00:00+05:30",
+            "receipt": {
+              "number": "IB-RCP-HIST-00010",
+              "issuedAt": "2026-01-09T11:01:00+05:30",
+              "sha256": "7038ad341f9ad8a1a377c5c261262cb8772cecb7a0e28e20468b2a6d34d6dc9a"
+            },
+            "bankLineId": null,
+            "proof": null
+          },
+          "failure": null
+        }
+      ],
+      "soldBy": "A. Sharma",
+      "invoiceNumber": null,
+      "paidInFull": true,
+      "recordedBy": "A. Sharma",
+      "recordedAt": "2026-01-03T10:00:00+05:30",
+      "events": [
+        {
+          "eventId": "SE-0210-1",
+          "type": "SUBSCRIPTION_RECORDED",
+          "actor": "A. Sharma",
+          "actorRole": "Sales",
+          "at": "2026-01-03T10:00:00+05:30",
+          "note": "Recorded from the sales chain. Settled in full on 2026-01-09."
+        }
+      ]
+    },
+    {
+      "subscriptionId": "SUB-0211",
+      "source": "sales",
+      "customer": {
+        "name": "Anaya Verma",
+        "userId": "IB-U-0812"
+      },
+      "planId": "PL-AUTOGROWTH",
+      "planName": "AutoGrowth",
+      "cycleMonths": 1,
+      "totalPaise": 23370500,
+      "startDate": "2026-02-06",
+      "endDate": "2026-03-06",
+      "status": "completed",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 1,
+          "dueDate": "2026-02-09",
+          "amountPaise": 23370500,
+          "status": "paid",
+          "invoiceNumber": null,
+          "payment": {
+            "paymentId": "PAY-5111",
+            "amountPaise": 23370500,
+            "mode": "UPI",
+            "reference": "HIST202602011",
+            "valueDate": "2026-02-09",
+            "accountId": "ACC-HDFC-4021",
+            "recordedBy": "K. Iyer",
+            "recordedAt": "2026-02-09T11:00:00+05:30",
+            "receipt": {
+              "number": "IB-RCP-HIST-00011",
+              "issuedAt": "2026-02-09T11:01:00+05:30",
+              "sha256": "ea8b386d43342c796504f63bada166aa973cacc6e889277a9ce08c8564fca9b0"
+            },
+            "bankLineId": null,
+            "proof": null
+          },
+          "failure": null
+        }
+      ],
+      "soldBy": "K. Iyer",
+      "invoiceNumber": null,
+      "paidInFull": true,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-02-06T10:00:00+05:30",
+      "events": [
+        {
+          "eventId": "SE-0211-1",
+          "type": "SUBSCRIPTION_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Sales",
+          "at": "2026-02-06T10:00:00+05:30",
+          "note": "Recorded from the sales chain. Settled in full on 2026-02-09."
+        }
+      ]
+    },
+    {
+      "subscriptionId": "SUB-0212",
+      "source": "website",
+      "customer": {
+        "name": "K. Iyer Interior Co.",
+        "userId": "IB-U-0790"
+      },
+      "planId": "PL-STARTER",
+      "planName": "Starter — 1 month",
+      "cycleMonths": 1,
+      "totalPaise": 16429500,
+      "startDate": "2026-02-09",
+      "endDate": "2026-03-09",
+      "status": "completed",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 1,
+          "dueDate": "2026-02-14",
+          "amountPaise": 16429500,
+          "status": "paid",
+          "invoiceNumber": null,
+          "payment": {
+            "paymentId": "PAY-5112",
+            "amountPaise": 16429500,
+            "mode": "NEFT",
+            "reference": "HIST202602012",
+            "valueDate": "2026-02-14",
+            "accountId": "ACC-HDFC-4021",
+            "recordedBy": "R. Menon",
+            "recordedAt": "2026-02-14T11:00:00+05:30",
+            "receipt": {
+              "number": "IB-RCP-HIST-00012",
+              "issuedAt": "2026-02-14T11:01:00+05:30",
+              "sha256": "4c3b0489f974867e83074c0f73709614e88b0a352baa3270123949d57989c1ce"
+            },
+            "bankLineId": null,
+            "proof": null
+          },
+          "failure": null
+        }
+      ],
+      "soldBy": "R. Menon",
+      "invoiceNumber": null,
+      "paidInFull": true,
+      "recordedBy": "R. Menon",
+      "recordedAt": "2026-02-09T10:00:00+05:30",
+      "events": [
+        {
+          "eventId": "SE-0212-1",
+          "type": "SUBSCRIPTION_RECORDED",
+          "actor": "R. Menon",
+          "actorRole": "Sales",
+          "at": "2026-02-09T10:00:00+05:30",
+          "note": "Recorded from the sales chain. Settled in full on 2026-02-14."
+        }
+      ]
+    },
+    {
+      "subscriptionId": "SUB-0213",
+      "source": "sales",
+      "customer": {
+        "name": "Craftline Carpentry",
+        "userId": "IB-U-0745"
+      },
+      "planId": "PL-GROWTH",
+      "planName": "Growth — 1 month",
+      "cycleMonths": 1,
+      "totalPaise": 25498100,
+      "startDate": "2026-03-02",
+      "endDate": "2026-04-02",
+      "status": "completed",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 1,
+          "dueDate": "2026-03-10",
+          "amountPaise": 25498100,
+          "status": "paid",
+          "invoiceNumber": null,
+          "payment": {
+            "paymentId": "PAY-5113",
+            "amountPaise": 25498100,
+            "mode": "RTGS",
+            "reference": "HIST202603013",
+            "valueDate": "2026-03-10",
+            "accountId": "ACC-HDFC-4021",
+            "recordedBy": "A. Sharma",
+            "recordedAt": "2026-03-10T11:00:00+05:30",
+            "receipt": {
+              "number": "IB-RCP-HIST-00013",
+              "issuedAt": "2026-03-10T11:01:00+05:30",
+              "sha256": "29ce0ed728c98fc168fad9a7e11bc2333aada6e580ce68326c53c838b8a21fcb"
+            },
+            "bankLineId": null,
+            "proof": null
+          },
+          "failure": null
+        }
+      ],
+      "soldBy": "A. Sharma",
+      "invoiceNumber": null,
+      "paidInFull": true,
+      "recordedBy": "A. Sharma",
+      "recordedAt": "2026-03-02T10:00:00+05:30",
+      "events": [
+        {
+          "eventId": "SE-0213-1",
+          "type": "SUBSCRIPTION_RECORDED",
+          "actor": "A. Sharma",
+          "actorRole": "Sales",
+          "at": "2026-03-02T10:00:00+05:30",
+          "note": "Recorded from the sales chain. Settled in full on 2026-03-10."
+        }
+      ]
+    },
+    {
+      "subscriptionId": "SUB-0214",
+      "source": "sales",
+      "customer": {
+        "name": "D. Fernandes",
+        "userId": "IB-U-0702"
+      },
+      "planId": "PL-AUTOGROWTH",
+      "planName": "AutoGrowth",
+      "cycleMonths": 1,
+      "totalPaise": 20001900,
+      "startDate": "2026-03-02",
+      "endDate": "2026-04-02",
+      "status": "completed",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 1,
+          "dueDate": "2026-03-08",
+          "amountPaise": 20001900,
+          "status": "paid",
+          "invoiceNumber": null,
+          "payment": {
+            "paymentId": "PAY-5114",
+            "amountPaise": 20001900,
+            "mode": "UPI",
+            "reference": "HIST202603014",
+            "valueDate": "2026-03-08",
+            "accountId": "ACC-HDFC-4021",
+            "recordedBy": "K. Iyer",
+            "recordedAt": "2026-03-08T11:00:00+05:30",
+            "receipt": {
+              "number": "IB-RCP-HIST-00014",
+              "issuedAt": "2026-03-08T11:01:00+05:30",
+              "sha256": "f8c9afc9b87f0a82f7b920e36d54b86da1ff0ac9c354be5d1d9222c4e81d899d"
+            },
+            "bankLineId": null,
+            "proof": null
+          },
+          "failure": null
+        }
+      ],
+      "soldBy": "K. Iyer",
+      "invoiceNumber": null,
+      "paidInFull": true,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-03-02T10:00:00+05:30",
+      "events": [
+        {
+          "eventId": "SE-0214-1",
+          "type": "SUBSCRIPTION_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Sales",
+          "at": "2026-03-02T10:00:00+05:30",
+          "note": "Recorded from the sales chain. Settled in full on 2026-03-08."
+        }
+      ]
+    },
+    {
+      "subscriptionId": "SUB-0215",
+      "source": "sales",
+      "customer": {
+        "name": "Saloni Interiors",
+        "userId": "IB-U-0688"
+      },
+      "planId": "PL-STARTER",
+      "planName": "Starter — 1 month",
+      "cycleMonths": 1,
+      "totalPaise": 34130800,
+      "startDate": "2026-04-06",
+      "endDate": "2026-05-06",
+      "status": "completed",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 1,
+          "dueDate": "2026-04-10",
+          "amountPaise": 34130800,
+          "status": "paid",
+          "invoiceNumber": null,
+          "payment": {
+            "paymentId": "PAY-5115",
+            "amountPaise": 34130800,
+            "mode": "NEFT",
+            "reference": "HIST202604015",
+            "valueDate": "2026-04-10",
+            "accountId": "ACC-HDFC-4021",
+            "recordedBy": "R. Menon",
+            "recordedAt": "2026-04-10T11:00:00+05:30",
+            "receipt": {
+              "number": "IB-RCP-HIST-00015",
+              "issuedAt": "2026-04-10T11:01:00+05:30",
+              "sha256": "518364512a81bbc13161b6db5fcda507fb5d1587755d73b8158e433f133a7fd9"
+            },
+            "bankLineId": null,
+            "proof": null
+          },
+          "failure": null
+        }
+      ],
+      "soldBy": "R. Menon",
+      "invoiceNumber": null,
+      "paidInFull": true,
+      "recordedBy": "R. Menon",
+      "recordedAt": "2026-04-06T10:00:00+05:30",
+      "events": [
+        {
+          "eventId": "SE-0215-1",
+          "type": "SUBSCRIPTION_RECORDED",
+          "actor": "R. Menon",
+          "actorRole": "Sales",
+          "at": "2026-04-06T10:00:00+05:30",
+          "note": "Recorded from the sales chain. Settled in full on 2026-04-10."
+        }
+      ]
+    },
+    {
+      "subscriptionId": "SUB-0216",
+      "source": "website",
+      "customer": {
+        "name": "Sandeep Kulkarni",
+        "userId": "IB-U-0655"
+      },
+      "planId": "PL-GROWTH",
+      "planName": "Growth — 1 month",
+      "cycleMonths": 1,
+      "totalPaise": 19869200,
+      "startDate": "2026-04-09",
+      "endDate": "2026-05-09",
+      "status": "completed",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 1,
+          "dueDate": "2026-04-17",
+          "amountPaise": 19869200,
+          "status": "paid",
+          "invoiceNumber": null,
+          "payment": {
+            "paymentId": "PAY-5116",
+            "amountPaise": 19869200,
+            "mode": "RTGS",
+            "reference": "HIST202604016",
+            "valueDate": "2026-04-17",
+            "accountId": "ACC-HDFC-4021",
+            "recordedBy": "A. Sharma",
+            "recordedAt": "2026-04-17T11:00:00+05:30",
+            "receipt": {
+              "number": "IB-RCP-HIST-00016",
+              "issuedAt": "2026-04-17T11:01:00+05:30",
+              "sha256": "5382414989b33573970fa0070f069e9e567c9e1e1821eb12fc7c3863e89ad0db"
+            },
+            "bankLineId": null,
+            "proof": null
+          },
+          "failure": null
+        }
+      ],
+      "soldBy": "A. Sharma",
+      "invoiceNumber": null,
+      "paidInFull": true,
+      "recordedBy": "A. Sharma",
+      "recordedAt": "2026-04-09T10:00:00+05:30",
+      "events": [
+        {
+          "eventId": "SE-0216-1",
+          "type": "SUBSCRIPTION_RECORDED",
+          "actor": "A. Sharma",
+          "actorRole": "Sales",
+          "at": "2026-04-09T10:00:00+05:30",
+          "note": "Recorded from the sales chain. Settled in full on 2026-04-17."
+        }
+      ]
+    },
+    {
+      "subscriptionId": "SUB-0217",
+      "source": "sales",
+      "customer": {
+        "name": "Founder demo account",
+        "userId": "IB-U-0601"
+      },
+      "planId": "PL-AUTOGROWTH",
+      "planName": "AutoGrowth",
+      "cycleMonths": 1,
+      "totalPaise": 38635900,
+      "startDate": "2026-05-03",
+      "endDate": "2026-06-03",
+      "status": "completed",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 1,
+          "dueDate": "2026-05-07",
+          "amountPaise": 38635900,
+          "status": "paid",
+          "invoiceNumber": null,
+          "payment": {
+            "paymentId": "PAY-5117",
+            "amountPaise": 38635900,
+            "mode": "UPI",
+            "reference": "HIST202605017",
+            "valueDate": "2026-05-07",
+            "accountId": "ACC-HDFC-4021",
+            "recordedBy": "K. Iyer",
+            "recordedAt": "2026-05-07T11:00:00+05:30",
+            "receipt": {
+              "number": "IB-RCP-HIST-00017",
+              "issuedAt": "2026-05-07T11:01:00+05:30",
+              "sha256": "236d1c7ad6a95e2c7fb91b890876956c72043d5a6eed16461eb4d4e2844882e7"
+            },
+            "bankLineId": null,
+            "proof": null
+          },
+          "failure": null
+        }
+      ],
+      "soldBy": "K. Iyer",
+      "invoiceNumber": null,
+      "paidInFull": true,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-05-03T10:00:00+05:30",
+      "events": [
+        {
+          "eventId": "SE-0217-1",
+          "type": "SUBSCRIPTION_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Sales",
+          "at": "2026-05-03T10:00:00+05:30",
+          "note": "Recorded from the sales chain. Settled in full on 2026-05-07."
+        }
+      ]
+    },
+    {
+      "subscriptionId": "SUB-0218",
+      "source": "sales",
+      "customer": {
+        "name": "Arjun Bhat",
+        "userId": "IB-U-1038"
+      },
+      "planId": "PL-STARTER",
+      "planName": "Starter — 1 month",
+      "cycleMonths": 1,
+      "totalPaise": 23164100,
+      "startDate": "2026-05-06",
+      "endDate": "2026-06-06",
+      "status": "completed",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 1,
+          "dueDate": "2026-05-13",
+          "amountPaise": 23164100,
+          "status": "paid",
+          "invoiceNumber": null,
+          "payment": {
+            "paymentId": "PAY-5118",
+            "amountPaise": 23164100,
+            "mode": "NEFT",
+            "reference": "HIST202605018",
+            "valueDate": "2026-05-13",
+            "accountId": "ACC-HDFC-4021",
+            "recordedBy": "R. Menon",
+            "recordedAt": "2026-05-13T11:00:00+05:30",
+            "receipt": {
+              "number": "IB-RCP-HIST-00018",
+              "issuedAt": "2026-05-13T11:01:00+05:30",
+              "sha256": "454a61d14b26943c85dbe4fb609099d39c6dc7fb980c8dfe3621dc33a2a5640a"
+            },
+            "bankLineId": null,
+            "proof": null
+          },
+          "failure": null
+        }
+      ],
+      "soldBy": "R. Menon",
+      "invoiceNumber": null,
+      "paidInFull": true,
+      "recordedBy": "R. Menon",
+      "recordedAt": "2026-05-06T10:00:00+05:30",
+      "events": [
+        {
+          "eventId": "SE-0218-1",
+          "type": "SUBSCRIPTION_RECORDED",
+          "actor": "R. Menon",
+          "actorRole": "Sales",
+          "at": "2026-05-06T10:00:00+05:30",
+          "note": "Recorded from the sales chain. Settled in full on 2026-05-13."
+        }
+      ]
+    },
+    {
+      "subscriptionId": "SUB-0219",
+      "source": "sales",
+      "customer": {
+        "name": "Nikhil Rao",
+        "userId": "IB-U-1029"
+      },
+      "planId": "PL-GROWTH",
+      "planName": "Growth — 1 month",
+      "cycleMonths": 1,
+      "totalPaise": 44634100,
+      "startDate": "2026-06-06",
+      "endDate": "2026-07-06",
+      "status": "completed",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 1,
+          "dueDate": "2026-06-10",
+          "amountPaise": 44634100,
+          "status": "paid",
+          "invoiceNumber": null,
+          "payment": {
+            "paymentId": "PAY-5119",
+            "amountPaise": 44634100,
+            "mode": "RTGS",
+            "reference": "HIST202606019",
+            "valueDate": "2026-06-10",
+            "accountId": "ACC-HDFC-4021",
+            "recordedBy": "A. Sharma",
+            "recordedAt": "2026-06-10T11:00:00+05:30",
+            "receipt": {
+              "number": "IB-RCP-HIST-00019",
+              "issuedAt": "2026-06-10T11:01:00+05:30",
+              "sha256": "146ac4575384e22076e86c76d3132de5e561965dc5a02af77c55d809c6a2f793"
+            },
+            "bankLineId": null,
+            "proof": null
+          },
+          "failure": null
+        }
+      ],
+      "soldBy": "A. Sharma",
+      "invoiceNumber": null,
+      "paidInFull": true,
+      "recordedBy": "A. Sharma",
+      "recordedAt": "2026-06-06T10:00:00+05:30",
+      "events": [
+        {
+          "eventId": "SE-0219-1",
+          "type": "SUBSCRIPTION_RECORDED",
+          "actor": "A. Sharma",
+          "actorRole": "Sales",
+          "at": "2026-06-06T10:00:00+05:30",
+          "note": "Recorded from the sales chain. Settled in full on 2026-06-10."
+        }
+      ]
+    },
+    {
+      "subscriptionId": "SUB-0220",
+      "source": "website",
+      "customer": {
+        "name": "Rohit Desai",
+        "userId": "IB-U-1012"
+      },
+      "planId": "PL-AUTOGROWTH",
+      "planName": "AutoGrowth",
+      "cycleMonths": 1,
+      "totalPaise": 26565900,
+      "startDate": "2026-06-09",
+      "endDate": "2026-07-09",
+      "status": "completed",
+      "installments": [
+        {
+          "seq": 1,
+          "of": 1,
+          "dueDate": "2026-06-13",
+          "amountPaise": 26565900,
+          "status": "paid",
+          "invoiceNumber": null,
+          "payment": {
+            "paymentId": "PAY-5120",
+            "amountPaise": 26565900,
+            "mode": "UPI",
+            "reference": "HIST202606020",
+            "valueDate": "2026-06-13",
+            "accountId": "ACC-HDFC-4021",
+            "recordedBy": "K. Iyer",
+            "recordedAt": "2026-06-13T11:00:00+05:30",
+            "receipt": {
+              "number": "IB-RCP-HIST-00020",
+              "issuedAt": "2026-06-13T11:01:00+05:30",
+              "sha256": "4b2e8882acabdad9eb6d4503bb8f40b546fb33b88a6423aa4188b4107b918944"
+            },
+            "bankLineId": null,
+            "proof": null
+          },
+          "failure": null
+        }
+      ],
+      "soldBy": "K. Iyer",
+      "invoiceNumber": null,
+      "paidInFull": true,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-06-09T10:00:00+05:30",
+      "events": [
+        {
+          "eventId": "SE-0220-1",
+          "type": "SUBSCRIPTION_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Sales",
+          "at": "2026-06-09T10:00:00+05:30",
+          "note": "Recorded from the sales chain. Settled in full on 2026-06-13."
+        }
+      ]
     }
-  ]
+  ],
+  "$comment_reviewBackfill": "REVIEW BACKFILL, 2026-09-03 — SUB-02xx and TXN-11xx are generated history, added so the Analytics charts can be judged with something in them. They are all in CLOSED PAST MONTHS (2025-09 to 2026-06) and every one is terminal — completed subscriptions, recorded transactions — so the reporting period (August 2026) is byte-identical with or without them: active count, MRR, collection rate, the tax summary and every August figure are untouched. Remove by deleting the two id ranges, or revert the commit that added them."
 }

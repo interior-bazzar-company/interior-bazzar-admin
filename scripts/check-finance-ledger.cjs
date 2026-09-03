@@ -1604,8 +1604,14 @@ S.resetStore();
     Math.round((of("collection_rate").value + of("fail_rate").value) * 10) / 10, 100);
   const july = S.kpis("2026-07-01", "2026-07-31");
   ok("...in July too", Math.round((of("collection_rate", july).value + of("fail_rate", july).value) * 10) / 10, 100);
+  /* A MONTH WITH NOTHING IN IT AT ALL. June used to be that month and is not
+     any more — the review backfill gave it a settled installment, which is the
+     point of the backfill. The assertion is about the BEHAVIOUR, not about
+     June, so it moved to a month the records genuinely do not reach: an empty
+     denominator has no rate, and that is still what is being proved. */
+  const quiet = S.kpis("2025-03-01", "2025-03-31");
   ok("both are null in a month where nothing fell due",
-    [of("collection_rate", june).value, of("fail_rate", june).value], [null, null]);
+    [of("collection_rate", quiet).value, of("fail_rate", quiet).value], [null, null]);
   ok("salary ratio is null while August's run is still open, and says so",
     [of("salary_ratio").value, has(of("salary_ratio").why, "still open")], [null, true]);
   const activeSubs = S.readSubscriptions().filter((x) => x.status === "active");

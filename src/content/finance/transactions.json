@@ -127,7 +127,11 @@
       "valueDate": "2026-08-01",
       "accountId": "ACC-HDFC-4021",
       "state": "recorded",
-      "bill": { "type": "invoice", "filename": "rent-aug-2026.pdf", "uploadedAt": "2026-08-01T10:35:00+05:30" },
+      "bill": {
+        "type": "invoice",
+        "filename": "rent-aug-2026.pdf",
+        "uploadedAt": "2026-08-01T10:35:00+05:30"
+      },
       "bankLineId": "L-0801-01",
       "nonRevenue": false,
       "creditKind": null,
@@ -135,9 +139,30 @@
       "recordedBy": "K. Iyer",
       "recordedAt": "2026-08-01T10:30:00+05:30",
       "events": [
-        { "eventId": "TE-0901-3", "type": "MATCHED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-06T09:00:00+05:30", "note": "Debit NEFT0001AUG991 matched on the 1–5 Aug statement." },
-        { "eventId": "TE-0901-2", "type": "BILL_ATTACHED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-01T10:35:00+05:30", "note": "Rent invoice attached." },
-        { "eventId": "TE-0901-1", "type": "TXN_RECORDED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-01T10:30:00+05:30", "note": "August rent paid to Ahuja Estates." }
+        {
+          "eventId": "TE-0901-3",
+          "type": "MATCHED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-08-06T09:00:00+05:30",
+          "note": "Debit NEFT0001AUG991 matched on the 1–5 Aug statement."
+        },
+        {
+          "eventId": "TE-0901-2",
+          "type": "BILL_ATTACHED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-08-01T10:35:00+05:30",
+          "note": "Rent invoice attached."
+        },
+        {
+          "eventId": "TE-0901-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-08-01T10:30:00+05:30",
+          "note": "August rent paid to Ahuja Estates."
+        }
       ]
     },
     {
@@ -160,8 +185,22 @@
       "recordedBy": "K. Iyer",
       "recordedAt": "2026-08-02T09:20:00+05:30",
       "events": [
-        { "eventId": "TE-0902-2", "type": "MATCHED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-06T09:05:00+05:30", "note": "Interest credit matched on the 1–5 Aug statement." },
-        { "eventId": "TE-0902-1", "type": "TXN_RECORDED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-02T09:20:00+05:30", "note": "Quarterly interest credited by HDFC. Non-revenue — it never touches the subscription income line." }
+        {
+          "eventId": "TE-0902-2",
+          "type": "MATCHED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-08-06T09:05:00+05:30",
+          "note": "Interest credit matched on the 1–5 Aug statement."
+        },
+        {
+          "eventId": "TE-0902-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-08-02T09:20:00+05:30",
+          "note": "Quarterly interest credited by HDFC. Non-revenue — it never touches the subscription income line."
+        }
       ]
     },
     {
@@ -176,7 +215,11 @@
       "valueDate": "2026-08-18",
       "accountId": "ACC-HDFC-4021",
       "state": "recorded",
-      "bill": { "type": "invoice", "filename": "bses-aug-2026.pdf", "uploadedAt": "2026-08-18T11:10:00+05:30" },
+      "bill": {
+        "type": "invoice",
+        "filename": "bses-aug-2026.pdf",
+        "uploadedAt": "2026-08-18T11:10:00+05:30"
+      },
       "bankLineId": "L-0818-02",
       "nonRevenue": false,
       "creditKind": null,
@@ -184,8 +227,22 @@
       "recordedBy": "K. Iyer",
       "recordedAt": "2026-08-18T11:00:00+05:30",
       "events": [
-        { "eventId": "TE-0903-2", "type": "MATCHED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-19T09:00:00+05:30", "note": "UPI debit 424891220071 matched on the 16–20 Aug statement." },
-        { "eventId": "TE-0903-1", "type": "TXN_RECORDED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-18T11:00:00+05:30", "note": "August electricity bill paid." }
+        {
+          "eventId": "TE-0903-2",
+          "type": "MATCHED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-08-19T09:00:00+05:30",
+          "note": "UPI debit 424891220071 matched on the 16–20 Aug statement."
+        },
+        {
+          "eventId": "TE-0903-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-08-18T11:00:00+05:30",
+          "note": "August electricity bill paid."
+        }
       ]
     },
     {
@@ -200,7 +257,11 @@
       "valueDate": "2026-08-20",
       "accountId": "ACC-HDFC-4021",
       "state": "recorded",
-      "bill": { "type": "invoice", "filename": "aws-aug-2026.pdf", "uploadedAt": "2026-08-20T08:10:00+05:30" },
+      "bill": {
+        "type": "invoice",
+        "filename": "aws-aug-2026.pdf",
+        "uploadedAt": "2026-08-20T08:10:00+05:30"
+      },
       "bankLineId": "L-0820-02",
       "nonRevenue": false,
       "creditKind": null,
@@ -208,8 +269,22 @@
       "recordedBy": "K. Iyer",
       "recordedAt": "2026-08-20T08:00:00+05:30",
       "events": [
-        { "eventId": "TE-0904-2", "type": "MATCHED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-23T06:05:00+05:30", "note": "Card debit aws-aug-2026 matched on the 20–24 Aug statement." },
-        { "eventId": "TE-0904-1", "type": "TXN_RECORDED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-20T08:00:00+05:30", "note": "Monthly AWS spend — the actual bill, not the budgeted figure." }
+        {
+          "eventId": "TE-0904-2",
+          "type": "MATCHED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-08-23T06:05:00+05:30",
+          "note": "Card debit aws-aug-2026 matched on the 20–24 Aug statement."
+        },
+        {
+          "eventId": "TE-0904-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-08-20T08:00:00+05:30",
+          "note": "Monthly AWS spend — the actual bill, not the budgeted figure."
+        }
       ]
     },
     {
@@ -224,7 +299,11 @@
       "valueDate": "2026-08-21",
       "accountId": "ACC-HDFC-4021",
       "state": "recorded",
-      "bill": { "type": "invoice", "filename": "google-ads-aug-2026.pdf", "uploadedAt": "2026-08-21T19:10:00+05:30" },
+      "bill": {
+        "type": "invoice",
+        "filename": "google-ads-aug-2026.pdf",
+        "uploadedAt": "2026-08-21T19:10:00+05:30"
+      },
       "bankLineId": "L-0821-01",
       "nonRevenue": false,
       "creditKind": null,
@@ -232,8 +311,22 @@
       "recordedBy": "K. Iyer",
       "recordedAt": "2026-08-21T19:00:00+05:30",
       "events": [
-        { "eventId": "TE-0905-2", "type": "MATCHED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-23T06:06:00+05:30", "note": "Card debit pay_GA26AUG matched on the 20–24 Aug statement." },
-        { "eventId": "TE-0905-1", "type": "TXN_RECORDED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-21T19:00:00+05:30", "note": "Actual spend for the period, not the campaign budget." }
+        {
+          "eventId": "TE-0905-2",
+          "type": "MATCHED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-08-23T06:06:00+05:30",
+          "note": "Card debit pay_GA26AUG matched on the 20–24 Aug statement."
+        },
+        {
+          "eventId": "TE-0905-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-08-21T19:00:00+05:30",
+          "note": "Actual spend for the period, not the campaign budget."
+        }
       ]
     },
     {
@@ -248,7 +341,11 @@
       "valueDate": "2026-08-21",
       "accountId": "ACC-HDFC-4021",
       "state": "recorded",
-      "bill": { "type": "invoice", "filename": "meta-ads-aug-2026.pdf", "uploadedAt": "2026-08-21T19:12:00+05:30" },
+      "bill": {
+        "type": "invoice",
+        "filename": "meta-ads-aug-2026.pdf",
+        "uploadedAt": "2026-08-21T19:12:00+05:30"
+      },
       "bankLineId": "L-0821-02",
       "nonRevenue": false,
       "creditKind": null,
@@ -256,8 +353,22 @@
       "recordedBy": "K. Iyer",
       "recordedAt": "2026-08-21T19:05:00+05:30",
       "events": [
-        { "eventId": "TE-0906-2", "type": "MATCHED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-23T06:07:00+05:30", "note": "Card debit pay_MA26AUG matched on the 20–24 Aug statement." },
-        { "eventId": "TE-0906-1", "type": "TXN_RECORDED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-21T19:05:00+05:30", "note": "Actual spend for the period." }
+        {
+          "eventId": "TE-0906-2",
+          "type": "MATCHED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-08-23T06:07:00+05:30",
+          "note": "Card debit pay_MA26AUG matched on the 20–24 Aug statement."
+        },
+        {
+          "eventId": "TE-0906-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-08-21T19:05:00+05:30",
+          "note": "Actual spend for the period."
+        }
       ]
     },
     {
@@ -272,7 +383,11 @@
       "valueDate": "2026-08-24",
       "accountId": "ACC-HDFC-4021",
       "state": "recorded",
-      "bill": { "type": "invoice", "filename": "figma-aug-2026.pdf", "uploadedAt": "2026-08-24T09:05:00+05:30" },
+      "bill": {
+        "type": "invoice",
+        "filename": "figma-aug-2026.pdf",
+        "uploadedAt": "2026-08-24T09:05:00+05:30"
+      },
       "bankLineId": "L-0824-01",
       "nonRevenue": false,
       "creditKind": null,
@@ -280,8 +395,22 @@
       "recordedBy": "K. Iyer",
       "recordedAt": "2026-08-24T09:00:00+05:30",
       "events": [
-        { "eventId": "TE-0907-2", "type": "MATCHED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-25T06:05:00+05:30", "note": "Card debit figma-aug matched on the 20–24 Aug statement." },
-        { "eventId": "TE-0907-1", "type": "TXN_RECORDED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-24T09:00:00+05:30", "note": "Design tooling seat renewal." }
+        {
+          "eventId": "TE-0907-2",
+          "type": "MATCHED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-08-25T06:05:00+05:30",
+          "note": "Card debit figma-aug matched on the 20–24 Aug statement."
+        },
+        {
+          "eventId": "TE-0907-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-08-24T09:00:00+05:30",
+          "note": "Design tooling seat renewal."
+        }
       ]
     },
     {
@@ -304,8 +433,22 @@
       "recordedBy": "K. Iyer",
       "recordedAt": "2026-08-24T10:00:00+05:30",
       "events": [
-        { "eventId": "TE-0908-2", "type": "MATCHED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-25T06:10:00+05:30", "note": "Debit CHG-AUG-01 matched on the 20–24 Aug statement." },
-        { "eventId": "TE-0908-1", "type": "TXN_RECORDED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-24T10:00:00+05:30", "note": "Monthly account maintenance and cheque book charges. No bill exists for a bank charge — the statement line is the evidence." }
+        {
+          "eventId": "TE-0908-2",
+          "type": "MATCHED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-08-25T06:10:00+05:30",
+          "note": "Debit CHG-AUG-01 matched on the 20–24 Aug statement."
+        },
+        {
+          "eventId": "TE-0908-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-08-24T10:00:00+05:30",
+          "note": "Monthly account maintenance and cheque book charges. No bill exists for a bank charge — the statement line is the evidence."
+        }
       ]
     },
     {
@@ -328,7 +471,14 @@
       "recordedBy": "K. Iyer",
       "recordedAt": "2026-07-26T16:00:00+05:30",
       "events": [
-        { "eventId": "TE-0909-1", "type": "TXN_RECORDED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-07-26T16:00:00+05:30", "note": "Paid for the Andheri site visit. Bill not yet received from the contractor." }
+        {
+          "eventId": "TE-0909-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-07-26T16:00:00+05:30",
+          "note": "Paid for the Andheri site visit. Bill not yet received from the contractor."
+        }
       ]
     },
     {
@@ -351,7 +501,14 @@
       "recordedBy": "A. Sharma",
       "recordedAt": "2026-07-14T12:00:00+05:30",
       "events": [
-        { "eventId": "TE-0910-1", "type": "TXN_RECORDED", "actor": "A. Sharma", "actorRole": "Sales", "at": "2026-07-14T12:00:00+05:30", "note": "Annual renewal charged to the company card. Receipt not yet downloaded from Notion's billing portal." }
+        {
+          "eventId": "TE-0910-1",
+          "type": "TXN_RECORDED",
+          "actor": "A. Sharma",
+          "actorRole": "Sales",
+          "at": "2026-07-14T12:00:00+05:30",
+          "note": "Annual renewal charged to the company card. Receipt not yet downloaded from Notion's billing portal."
+        }
       ]
     },
     {
@@ -366,7 +523,11 @@
       "valueDate": "2026-08-20",
       "accountId": "ACC-HDFC-4021",
       "state": "recorded",
-      "bill": { "type": "receipt", "filename": "gstr3b-jul-2026.pdf", "uploadedAt": "2026-08-20T15:10:00+05:30" },
+      "bill": {
+        "type": "receipt",
+        "filename": "gstr3b-jul-2026.pdf",
+        "uploadedAt": "2026-08-20T15:10:00+05:30"
+      },
       "bankLineId": null,
       "nonRevenue": false,
       "creditKind": null,
@@ -374,8 +535,22 @@
       "recordedBy": "K. Iyer",
       "recordedAt": "2026-08-20T15:00:00+05:30",
       "events": [
-        { "eventId": "TE-0911-2", "type": "BILL_ATTACHED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-20T15:10:00+05:30", "note": "Challan attached." },
-        { "eventId": "TE-0911-1", "type": "TXN_RECORDED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-20T15:00:00+05:30", "note": "GST liability for July, paid before the 20th deadline." }
+        {
+          "eventId": "TE-0911-2",
+          "type": "BILL_ATTACHED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-08-20T15:10:00+05:30",
+          "note": "Challan attached."
+        },
+        {
+          "eventId": "TE-0911-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-08-20T15:00:00+05:30",
+          "note": "GST liability for July, paid before the 20th deadline."
+        }
       ]
     },
     {
@@ -390,7 +565,11 @@
       "valueDate": "2026-08-12",
       "accountId": "ACC-HDFC-4021",
       "state": "recorded",
-      "bill": { "type": "invoice", "filename": "frame-light-aug-2026.pdf", "uploadedAt": "2026-08-12T18:00:00+05:30" },
+      "bill": {
+        "type": "invoice",
+        "filename": "frame-light-aug-2026.pdf",
+        "uploadedAt": "2026-08-12T18:00:00+05:30"
+      },
       "bankLineId": null,
       "nonRevenue": false,
       "creditKind": null,
@@ -398,8 +577,22 @@
       "recordedBy": "A. Sharma",
       "recordedAt": "2026-08-12T17:45:00+05:30",
       "events": [
-        { "eventId": "TE-0912-2", "type": "BILL_ATTACHED", "actor": "A. Sharma", "actorRole": "Sales", "at": "2026-08-12T18:00:00+05:30", "note": "Studio invoice attached." },
-        { "eventId": "TE-0912-1", "type": "TXN_RECORDED", "actor": "A. Sharma", "actorRole": "Sales", "at": "2026-08-12T17:45:00+05:30", "note": "New catalogue shoot for the September showroom refresh." }
+        {
+          "eventId": "TE-0912-2",
+          "type": "BILL_ATTACHED",
+          "actor": "A. Sharma",
+          "actorRole": "Sales",
+          "at": "2026-08-12T18:00:00+05:30",
+          "note": "Studio invoice attached."
+        },
+        {
+          "eventId": "TE-0912-1",
+          "type": "TXN_RECORDED",
+          "actor": "A. Sharma",
+          "actorRole": "Sales",
+          "at": "2026-08-12T17:45:00+05:30",
+          "note": "New catalogue shoot for the September showroom refresh."
+        }
       ]
     },
     {
@@ -422,7 +615,14 @@
       "recordedBy": "A. Sharma",
       "recordedAt": "2026-08-19T14:20:00+05:30",
       "events": [
-        { "eventId": "TE-0913-1", "type": "TXN_RECORDED", "actor": "A. Sharma", "actorRole": "Sales", "at": "2026-08-19T14:20:00+05:30", "note": "Petty cash paid for a client site visit in Powai." }
+        {
+          "eventId": "TE-0913-1",
+          "type": "TXN_RECORDED",
+          "actor": "A. Sharma",
+          "actorRole": "Sales",
+          "at": "2026-08-19T14:20:00+05:30",
+          "note": "Petty cash paid for a client site visit in Powai."
+        }
       ]
     },
     {
@@ -445,7 +645,14 @@
       "recordedBy": "K. Iyer",
       "recordedAt": "2026-07-08T11:00:00+05:30",
       "events": [
-        { "eventId": "TE-0914-1", "type": "TXN_RECORDED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-07-08T11:00:00+05:30", "note": "Petty cash top-up for office stationery. The 'supplies' tag was deactivated the following month once a single vendor contract took this over — this row still points at it, and still must render." }
+        {
+          "eventId": "TE-0914-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-07-08T11:00:00+05:30",
+          "note": "Petty cash top-up for office stationery. The 'supplies' tag was deactivated the following month once a single vendor contract took this over — this row still points at it, and still must render."
+        }
       ]
     },
     {
@@ -468,7 +675,14 @@
       "recordedBy": "K. Iyer",
       "recordedAt": "2026-08-05T10:00:00+05:30",
       "events": [
-        { "eventId": "TE-0915-1", "type": "TXN_RECORDED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-05T10:00:00+05:30", "note": "Matured fixed deposit moved into the current account. Own funds, not revenue." }
+        {
+          "eventId": "TE-0915-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-08-05T10:00:00+05:30",
+          "note": "Matured fixed deposit moved into the current account. Own funds, not revenue."
+        }
       ]
     },
     {
@@ -491,7 +705,14 @@
       "recordedBy": "K. Iyer",
       "recordedAt": "2026-08-10T11:30:00+05:30",
       "events": [
-        { "eventId": "TE-0916-1", "type": "TXN_RECORDED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-10T11:30:00+05:30", "note": "Contractor refunded a delivery charge billed in error last month. Non-revenue — a vendor refund is not a sale." }
+        {
+          "eventId": "TE-0916-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-08-10T11:30:00+05:30",
+          "note": "Contractor refunded a delivery charge billed in error last month. Non-revenue — a vendor refund is not a sale."
+        }
       ]
     },
     {
@@ -506,19 +727,1279 @@
       "valueDate": "2026-08-05",
       "accountId": "ACC-HDFC-4021",
       "state": "cancelled",
-      "bill": { "type": "invoice", "filename": "sharma-carpentry-aug-2026.pdf", "uploadedAt": "2026-08-05T17:10:00+05:30" },
+      "bill": {
+        "type": "invoice",
+        "filename": "sharma-carpentry-aug-2026.pdf",
+        "uploadedAt": "2026-08-05T17:10:00+05:30"
+      },
       "bankLineId": null,
       "nonRevenue": false,
       "creditKind": null,
-      "cancellation": { "reason": "Wrong contractor paid — the invoice was for Rakesh Contractors, not Sharma Carpentry Works. Recovered against next month’s invoice; the correct payment is its own row.", "by": "K. Iyer", "at": "2026-08-06T09:40:00+05:30" },
+      "cancellation": {
+        "reason": "Wrong contractor paid — the invoice was for Rakesh Contractors, not Sharma Carpentry Works. Recovered against next month’s invoice; the correct payment is its own row.",
+        "by": "K. Iyer",
+        "at": "2026-08-06T09:40:00+05:30"
+      },
       "recordedBy": "K. Iyer",
       "recordedAt": "2026-08-05T17:00:00+05:30",
       "events": [
-        { "eventId": "TE-0917-3", "type": "TXN_CANCELLED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-06T09:40:00+05:30", "note": "K. Iyer cancelled this row — wrong contractor. It keeps ₹2,20,000 and everything else it was posted with, and stops counting towards August." },
-        { "eventId": "TE-0917-2", "type": "BILL_ATTACHED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-05T17:10:00+05:30", "note": "Invoice attached at the time of payment." },
-        { "eventId": "TE-0917-1", "type": "TXN_RECORDED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-05T17:00:00+05:30", "note": "Paid against a Sharma Carpentry Works invoice for sample units." }
+        {
+          "eventId": "TE-0917-3",
+          "type": "TXN_CANCELLED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-08-06T09:40:00+05:30",
+          "note": "K. Iyer cancelled this row — wrong contractor. It keeps ₹2,20,000 and everything else it was posted with, and stops counting towards August."
+        },
+        {
+          "eventId": "TE-0917-2",
+          "type": "BILL_ATTACHED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-08-05T17:10:00+05:30",
+          "note": "Invoice attached at the time of payment."
+        },
+        {
+          "eventId": "TE-0917-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-08-05T17:00:00+05:30",
+          "note": "Paid against a Sharma Carpentry Works invoice for sample units."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1101",
+      "direction": "out",
+      "tagKey": "rent",
+      "amountPaise": 2256100,
+      "description": "Office rent · 2025-09",
+      "party": "Ahuja Estates",
+      "mode": "RTGS",
+      "reference": "HISTTX202509001",
+      "valueDate": "2025-09-04",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2025-09-04T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1101-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2025-09-04T12:00:00+05:30",
+          "note": "Recorded against rent."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1102",
+      "direction": "out",
+      "tagKey": "vendor",
+      "amountPaise": 987300,
+      "description": "Contractor work · 2025-09",
+      "party": "Sharma Carpentry Works",
+      "mode": "UPI",
+      "reference": "HISTTX202509002",
+      "valueDate": "2025-09-21",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2025-09-21T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1102-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2025-09-21T12:00:00+05:30",
+          "note": "Recorded against vendor."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1103",
+      "direction": "out",
+      "tagKey": "ads",
+      "amountPaise": 1460900,
+      "description": "Ads spend · 2025-09",
+      "party": "Meta",
+      "mode": "NEFT",
+      "reference": "HISTTX202509003",
+      "valueDate": "2025-09-16",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2025-09-16T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1103-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2025-09-16T12:00:00+05:30",
+          "note": "Recorded against ads."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1104",
+      "direction": "out",
+      "tagKey": "bank",
+      "amountPaise": 8200,
+      "description": "Bank charges · 2025-10",
+      "party": "HDFC Bank",
+      "mode": "RTGS",
+      "reference": "HISTTX202510004",
+      "valueDate": "2025-10-12",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2025-10-12T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1104-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2025-10-12T12:00:00+05:30",
+          "note": "Recorded against bank."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1105",
+      "direction": "out",
+      "tagKey": "vendor",
+      "amountPaise": 990000,
+      "description": "Contractor work · 2025-10",
+      "party": "Sharma Carpentry Works",
+      "mode": "UPI",
+      "reference": "HISTTX202510005",
+      "valueDate": "2025-10-15",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2025-10-15T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1105-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2025-10-15T12:00:00+05:30",
+          "note": "Recorded against vendor."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1106",
+      "direction": "out",
+      "tagKey": "soft",
+      "amountPaise": 714200,
+      "description": "Software renewal · 2025-10",
+      "party": "Various",
+      "mode": "NEFT",
+      "reference": "HISTTX202510006",
+      "valueDate": "2025-10-21",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2025-10-21T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1106-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2025-10-21T12:00:00+05:30",
+          "note": "Recorded against soft."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1107",
+      "direction": "out",
+      "tagKey": "ads",
+      "amountPaise": 1531300,
+      "description": "Ads spend · 2025-11",
+      "party": "Meta",
+      "mode": "RTGS",
+      "reference": "HISTTX202511007",
+      "valueDate": "2025-11-09",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2025-11-09T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1107-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2025-11-09T12:00:00+05:30",
+          "note": "Recorded against ads."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1108",
+      "direction": "out",
+      "tagKey": "bank",
+      "amountPaise": 14300,
+      "description": "Bank charges · 2025-11",
+      "party": "HDFC Bank",
+      "mode": "UPI",
+      "reference": "HISTTX202511008",
+      "valueDate": "2025-11-20",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2025-11-20T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1108-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2025-11-20T12:00:00+05:30",
+          "note": "Recorded against bank."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1109",
+      "direction": "out",
+      "tagKey": "vendor",
+      "amountPaise": 1089800,
+      "description": "Contractor work · 2025-11",
+      "party": "Sharma Carpentry Works",
+      "mode": "NEFT",
+      "reference": "HISTTX202511009",
+      "valueDate": "2025-11-24",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2025-11-24T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1109-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2025-11-24T12:00:00+05:30",
+          "note": "Recorded against vendor."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1110",
+      "direction": "out",
+      "tagKey": "travel",
+      "amountPaise": 30000,
+      "description": "Client visit · 2025-11",
+      "party": "Local auto",
+      "mode": "RTGS",
+      "reference": "HISTTX202511010",
+      "valueDate": "2025-11-10",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2025-11-10T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1110-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2025-11-10T12:00:00+05:30",
+          "note": "Recorded against travel."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1111",
+      "direction": "out",
+      "tagKey": "soft",
+      "amountPaise": 791100,
+      "description": "Software renewal · 2025-11",
+      "party": "Various",
+      "mode": "UPI",
+      "reference": "HISTTX202511011",
+      "valueDate": "2025-11-17",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2025-11-17T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1111-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2025-11-17T12:00:00+05:30",
+          "note": "Recorded against soft."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1112",
+      "direction": "out",
+      "tagKey": "rent",
+      "amountPaise": 1913200,
+      "description": "Office rent · 2025-12",
+      "party": "Ahuja Estates",
+      "mode": "NEFT",
+      "reference": "HISTTX202512012",
+      "valueDate": "2025-12-25",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2025-12-25T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1112-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2025-12-25T12:00:00+05:30",
+          "note": "Recorded against rent."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1113",
+      "direction": "out",
+      "tagKey": "travel",
+      "amountPaise": 33900,
+      "description": "Client visit · 2025-12",
+      "party": "Local auto",
+      "mode": "RTGS",
+      "reference": "HISTTX202512013",
+      "valueDate": "2025-12-10",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2025-12-10T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1113-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2025-12-10T12:00:00+05:30",
+          "note": "Recorded against travel."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1114",
+      "direction": "out",
+      "tagKey": "ads",
+      "amountPaise": 1701200,
+      "description": "Ads spend · 2025-12",
+      "party": "Meta",
+      "mode": "UPI",
+      "reference": "HISTTX202512014",
+      "valueDate": "2025-12-23",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2025-12-23T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1114-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2025-12-23T12:00:00+05:30",
+          "note": "Recorded against ads."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1115",
+      "direction": "out",
+      "tagKey": "vendor",
+      "amountPaise": 1101800,
+      "description": "Contractor work · 2025-12",
+      "party": "Sharma Carpentry Works",
+      "mode": "NEFT",
+      "reference": "HISTTX202512015",
+      "valueDate": "2025-12-14",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2025-12-14T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1115-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2025-12-14T12:00:00+05:30",
+          "note": "Recorded against vendor."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1116",
+      "direction": "out",
+      "tagKey": "soft",
+      "amountPaise": 692700,
+      "description": "Software renewal · 2025-12",
+      "party": "Various",
+      "mode": "RTGS",
+      "reference": "HISTTX202512016",
+      "valueDate": "2025-12-12",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2025-12-12T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1116-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2025-12-12T12:00:00+05:30",
+          "note": "Recorded against soft."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1117",
+      "direction": "out",
+      "tagKey": "ads",
+      "amountPaise": 1256600,
+      "description": "Ads spend · 2026-01",
+      "party": "Meta",
+      "mode": "UPI",
+      "reference": "HISTTX202601017",
+      "valueDate": "2026-01-21",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-01-21T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1117-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-01-21T12:00:00+05:30",
+          "note": "Recorded against ads."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1118",
+      "direction": "out",
+      "tagKey": "travel",
+      "amountPaise": 46200,
+      "description": "Client visit · 2026-01",
+      "party": "Local auto",
+      "mode": "NEFT",
+      "reference": "HISTTX202601018",
+      "valueDate": "2026-01-25",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-01-25T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1118-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-01-25T12:00:00+05:30",
+          "note": "Recorded against travel."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1119",
+      "direction": "out",
+      "tagKey": "soft",
+      "amountPaise": 748200,
+      "description": "Software renewal · 2026-01",
+      "party": "Various",
+      "mode": "RTGS",
+      "reference": "HISTTX202601019",
+      "valueDate": "2026-01-21",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-01-21T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1119-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-01-21T12:00:00+05:30",
+          "note": "Recorded against soft."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1120",
+      "direction": "out",
+      "tagKey": "util",
+      "amountPaise": 332100,
+      "description": "Electricity · 2026-01",
+      "party": "BSES Rajdhani",
+      "mode": "UPI",
+      "reference": "HISTTX202601020",
+      "valueDate": "2026-01-08",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-01-08T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1120-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-01-08T12:00:00+05:30",
+          "note": "Recorded against util."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1121",
+      "direction": "out",
+      "tagKey": "bank",
+      "amountPaise": 13400,
+      "description": "Bank charges · 2026-01",
+      "party": "HDFC Bank",
+      "mode": "NEFT",
+      "reference": "HISTTX202601021",
+      "valueDate": "2026-01-21",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-01-21T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1121-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-01-21T12:00:00+05:30",
+          "note": "Recorded against bank."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1122",
+      "direction": "out",
+      "tagKey": "ads",
+      "amountPaise": 1188200,
+      "description": "Ads spend · 2026-02",
+      "party": "Meta",
+      "mode": "RTGS",
+      "reference": "HISTTX202602022",
+      "valueDate": "2026-02-06",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-02-06T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1122-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-02-06T12:00:00+05:30",
+          "note": "Recorded against ads."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1123",
+      "direction": "out",
+      "tagKey": "vendor",
+      "amountPaise": 981100,
+      "description": "Contractor work · 2026-02",
+      "party": "Sharma Carpentry Works",
+      "mode": "UPI",
+      "reference": "HISTTX202602023",
+      "valueDate": "2026-02-16",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-02-16T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1123-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-02-16T12:00:00+05:30",
+          "note": "Recorded against vendor."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1124",
+      "direction": "out",
+      "tagKey": "util",
+      "amountPaise": 335500,
+      "description": "Electricity · 2026-02",
+      "party": "BSES Rajdhani",
+      "mode": "NEFT",
+      "reference": "HISTTX202602024",
+      "valueDate": "2026-02-16",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-02-16T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1124-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-02-16T12:00:00+05:30",
+          "note": "Recorded against util."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1125",
+      "direction": "out",
+      "tagKey": "ads",
+      "amountPaise": 1063200,
+      "description": "Ads spend · 2026-03",
+      "party": "Meta",
+      "mode": "RTGS",
+      "reference": "HISTTX202603025",
+      "valueDate": "2026-03-25",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-03-25T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1125-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-03-25T12:00:00+05:30",
+          "note": "Recorded against ads."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1126",
+      "direction": "out",
+      "tagKey": "travel",
+      "amountPaise": 51500,
+      "description": "Client visit · 2026-03",
+      "party": "Local auto",
+      "mode": "UPI",
+      "reference": "HISTTX202603026",
+      "valueDate": "2026-03-10",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-03-10T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1126-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-03-10T12:00:00+05:30",
+          "note": "Recorded against travel."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1127",
+      "direction": "out",
+      "tagKey": "rent",
+      "amountPaise": 2747000,
+      "description": "Office rent · 2026-03",
+      "party": "Ahuja Estates",
+      "mode": "NEFT",
+      "reference": "HISTTX202603027",
+      "valueDate": "2026-03-04",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-03-04T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1127-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-03-04T12:00:00+05:30",
+          "note": "Recorded against rent."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1128",
+      "direction": "out",
+      "tagKey": "vendor",
+      "amountPaise": 636500,
+      "description": "Contractor work · 2026-03",
+      "party": "Sharma Carpentry Works",
+      "mode": "RTGS",
+      "reference": "HISTTX202603028",
+      "valueDate": "2026-03-16",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-03-16T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1128-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-03-16T12:00:00+05:30",
+          "note": "Recorded against vendor."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1129",
+      "direction": "out",
+      "tagKey": "soft",
+      "amountPaise": 542700,
+      "description": "Software renewal · 2026-04",
+      "party": "Various",
+      "mode": "UPI",
+      "reference": "HISTTX202604029",
+      "valueDate": "2026-04-06",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-04-06T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1129-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-04-06T12:00:00+05:30",
+          "note": "Recorded against soft."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1130",
+      "direction": "out",
+      "tagKey": "util",
+      "amountPaise": 294100,
+      "description": "Electricity · 2026-04",
+      "party": "BSES Rajdhani",
+      "mode": "NEFT",
+      "reference": "HISTTX202604030",
+      "valueDate": "2026-04-25",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-04-25T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1130-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-04-25T12:00:00+05:30",
+          "note": "Recorded against util."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1131",
+      "direction": "out",
+      "tagKey": "travel",
+      "amountPaise": 50900,
+      "description": "Client visit · 2026-04",
+      "party": "Local auto",
+      "mode": "RTGS",
+      "reference": "HISTTX202604031",
+      "valueDate": "2026-04-13",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-04-13T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1131-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-04-13T12:00:00+05:30",
+          "note": "Recorded against travel."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1132",
+      "direction": "out",
+      "tagKey": "rent",
+      "amountPaise": 2307900,
+      "description": "Office rent · 2026-04",
+      "party": "Ahuja Estates",
+      "mode": "UPI",
+      "reference": "HISTTX202604032",
+      "valueDate": "2026-04-10",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-04-10T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1132-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-04-10T12:00:00+05:30",
+          "note": "Recorded against rent."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1133",
+      "direction": "out",
+      "tagKey": "ads",
+      "amountPaise": 993900,
+      "description": "Ads spend · 2026-04",
+      "party": "Meta",
+      "mode": "NEFT",
+      "reference": "HISTTX202604033",
+      "valueDate": "2026-04-08",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-04-08T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1133-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-04-08T12:00:00+05:30",
+          "note": "Recorded against ads."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1134",
+      "direction": "out",
+      "tagKey": "rent",
+      "amountPaise": 2661600,
+      "description": "Office rent · 2026-05",
+      "party": "Ahuja Estates",
+      "mode": "RTGS",
+      "reference": "HISTTX202605034",
+      "valueDate": "2026-05-18",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-05-18T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1134-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-05-18T12:00:00+05:30",
+          "note": "Recorded against rent."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1135",
+      "direction": "out",
+      "tagKey": "travel",
+      "amountPaise": 50100,
+      "description": "Client visit · 2026-05",
+      "party": "Local auto",
+      "mode": "UPI",
+      "reference": "HISTTX202605035",
+      "valueDate": "2026-05-03",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-05-03T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1135-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-05-03T12:00:00+05:30",
+          "note": "Recorded against travel."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1136",
+      "direction": "out",
+      "tagKey": "ads",
+      "amountPaise": 1383900,
+      "description": "Ads spend · 2026-05",
+      "party": "Meta",
+      "mode": "NEFT",
+      "reference": "HISTTX202605036",
+      "valueDate": "2026-05-19",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-05-19T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1136-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-05-19T12:00:00+05:30",
+          "note": "Recorded against ads."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1137",
+      "direction": "out",
+      "tagKey": "vendor",
+      "amountPaise": 967100,
+      "description": "Contractor work · 2026-05",
+      "party": "Sharma Carpentry Works",
+      "mode": "RTGS",
+      "reference": "HISTTX202605037",
+      "valueDate": "2026-05-26",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-05-26T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1137-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-05-26T12:00:00+05:30",
+          "note": "Recorded against vendor."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1138",
+      "direction": "out",
+      "tagKey": "rent",
+      "amountPaise": 2139800,
+      "description": "Office rent · 2026-06",
+      "party": "Ahuja Estates",
+      "mode": "UPI",
+      "reference": "HISTTX202606038",
+      "valueDate": "2026-06-26",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-06-26T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1138-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-06-26T12:00:00+05:30",
+          "note": "Recorded against rent."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1139",
+      "direction": "out",
+      "tagKey": "travel",
+      "amountPaise": 32900,
+      "description": "Client visit · 2026-06",
+      "party": "Local auto",
+      "mode": "NEFT",
+      "reference": "HISTTX202606039",
+      "valueDate": "2026-06-11",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-06-11T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1139-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-06-11T12:00:00+05:30",
+          "note": "Recorded against travel."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1140",
+      "direction": "out",
+      "tagKey": "vendor",
+      "amountPaise": 636800,
+      "description": "Contractor work · 2026-06",
+      "party": "Sharma Carpentry Works",
+      "mode": "RTGS",
+      "reference": "HISTTX202606040",
+      "valueDate": "2026-06-25",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-06-25T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1140-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-06-25T12:00:00+05:30",
+          "note": "Recorded against vendor."
+        }
+      ]
+    },
+    {
+      "txnId": "TXN-1141",
+      "direction": "out",
+      "tagKey": "ads",
+      "amountPaise": 1509200,
+      "description": "Ads spend · 2026-06",
+      "party": "Meta",
+      "mode": "UPI",
+      "reference": "HISTTX202606041",
+      "valueDate": "2026-06-03",
+      "accountId": "ACC-HDFC-4021",
+      "state": "recorded",
+      "bill": null,
+      "bankLineId": null,
+      "nonRevenue": false,
+      "creditKind": null,
+      "cancellation": null,
+      "recordedBy": "K. Iyer",
+      "recordedAt": "2026-06-03T12:00:00+05:30",
+      "events": [
+        {
+          "eventId": "TE-1141-1",
+          "type": "TXN_RECORDED",
+          "actor": "K. Iyer",
+          "actorRole": "Finance",
+          "at": "2026-06-03T12:00:00+05:30",
+          "note": "Recorded against ads."
+        }
       ]
     }
   ],
-  "$comment_transactions": "A row is a fact: it exists because money moved, so there is no draft state and no recurringRules block generating one unattended — every line here was actually paid or actually received on its `valueDate`. `state` is only `recorded` or `cancelled`; nothing is ever edited and nothing is ever deleted. A row that should not stand is CANCELLED with a mandatory reason: every figure on it stays exactly as posted, it stays in the ledger struck through, and it stops counting towards every total. TXN-0917 is the worked example — it was paid to Sharma Carpentry Works when the invoice was Rakesh Contractors', so it carries `state: cancelled`, a `cancellation` block and a TXN_CANCELLED event. Getting the figures right is a NEW row, recorded the ordinary way. Money coming IN is either customer revenue or it is not, and this file only ever carries the second kind: every `direction: 'in'` row here is `nonRevenue: true` with a `creditKind` of `interest`, `own_transfer` or `vendor_refund` (TXN-0902, TXN-0915, TXN-0916). Customer money has exactly one way into the books — a subscription installment payment — and it is never recorded here, faked here, or matched to a bank line here."
+  "$comment_transactions": "A row is a fact: it exists because money moved, so there is no draft state and no recurringRules block generating one unattended — every line here was actually paid or actually received on its `valueDate`. `state` is only `recorded` or `cancelled`; nothing is ever edited and nothing is ever deleted. A row that should not stand is CANCELLED with a mandatory reason: every figure on it stays exactly as posted, it stays in the ledger struck through, and it stops counting towards every total. TXN-0917 is the worked example — it was paid to Sharma Carpentry Works when the invoice was Rakesh Contractors', so it carries `state: cancelled`, a `cancellation` block and a TXN_CANCELLED event. Getting the figures right is a NEW row, recorded the ordinary way. Money coming IN is either customer revenue or it is not, and this file only ever carries the second kind: every `direction: 'in'` row here is `nonRevenue: true` with a `creditKind` of `interest`, `own_transfer` or `vendor_refund` (TXN-0902, TXN-0915, TXN-0916). Customer money has exactly one way into the books — a subscription installment payment — and it is never recorded here, faked here, or matched to a bank line here.",
+  "$comment_reviewBackfill": "REVIEW BACKFILL, 2026-09-03 — SUB-02xx and TXN-11xx are generated history, added so the Analytics charts can be judged with something in them. They are all in CLOSED PAST MONTHS (2025-09 to 2026-06) and every one is terminal — completed subscriptions, recorded transactions — so the reporting period (August 2026) is byte-identical with or without them: active count, MRR, collection rate, the tax summary and every August figure are untouched. Remove by deleting the two id ranges, or revert the commit that added them."
 }
