@@ -334,6 +334,10 @@ has(txns, "Missing a bill", "...while the queue that actually needed watching is
    usually spotted while scanning the list, and making somebody open the record
    to act on it was a step that existed only because the menu lived there. */
 has(txns, "Actions for TXN-0901", "...every row carries its own actions menu");
+/* THE TRIGGER IS A WORD, NOT A THREE-DOT GLYPH. In a column with no header,
+   beside nothing else pressable, the dots asked somebody to recognise a
+   convention; the label asks nothing. */
+has(txns, ">Actions</button>", "...and it says Actions rather than showing three dots");
 has(txns, ">State<", "...and the last data column states whether a row still stands");
 has(txns, "Cancelled", "...naming the one row in the seed that was written off");
 has(txns, "clickable dim", "...which is dimmed the way every retired row in this module is");

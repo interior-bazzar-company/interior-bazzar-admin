@@ -74,10 +74,17 @@ export function TxnMenu({ txn, sa, onCancel, onOpen, onCopied }: {
   const cancelled = txn.state === "cancelled";
   return (
     <span className="fin-menu" ref={box} onClick={(e) => e.stopPropagation()}>
+      {/* THE WORD, NOT THE GLYPH. It was a three-dot button, which is a
+          convention somebody either already holds or does not — and on a table
+          row it sat in a column with no header to explain it, next to nothing
+          else that could be pressed. `Actions` costs a few pixels in the one
+          column that has room to spare and asks nobody to recognise anything.
+          The aria-label keeps the row id, because a screen reader meeting the
+          twentieth `Actions` on a page needs to know which row it belongs to. */}
       <button type="button" className="btn sm" aria-haspopup="menu" aria-expanded={open}
         aria-label={"Actions for " + txn.txnId}
         onClick={(e) => { e.stopPropagation(); setOpen(!open); }}>
-        <Icon name="dots" size="sm" />
+        Actions
       </button>
       {open ? (
         <span className="fin-menu-pop" role="menu" aria-label={"Actions for " + txn.txnId}>

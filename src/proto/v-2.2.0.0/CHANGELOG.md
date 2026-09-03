@@ -6,6 +6,44 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-03
 
+### The row actions trigger says Actions instead of showing three dots
+
+**Area:** `#/finance-transactions` — the last column of every row, and the record header
+**Files:** `src/admin/views/Finance/bits.tsx`, `scripts/fn-smoke.tsx`
+
+**What changed**
+
+**THE GLYPH BECAME A WORD.** The menu trigger was a three-dot button — a
+convention somebody either already holds or does not. On a table row it sat in
+a column with no header to explain it, beside nothing else that could be
+pressed, so there was nothing to read it against. It says **Actions** now.
+`.tbl td.tight` is `width: 1%; white-space: nowrap`, so the column takes the few
+extra pixels from the ones with room to spare.
+
+**The aria-label still carries the row id** — *Actions for TXN-0901* — because a
+screen reader meeting the twentieth `Actions` on a page needs to know which row
+it belongs to. No caret was added: the ask was to remove the icon, not to swap
+one glyph for another.
+
+**Known inconsistency, deliberately left:** Refunds and Salaries A/C still use
+the three-dot trigger. They were not in scope and changing them is one line
+each; worth doing together if this reads better.
+
+**Temp data**
+`none`.
+
+**Backend needed**
+`none`.
+
+**Open decisions**
+`none`.
+
+**Verified**
+`npx tsc -b` and `npx eslint` clean. `npm run check:finance` → 423 pass.
+`npm run check:finance-render` renders every surface, now asserting the trigger
+renders the word rather than the glyph, alongside the existing check that every
+row carries its own menu. `npm run check:finance-nav` passes.
+
 ### The cancel dialog is the reason box and nothing else
 
 **Area:** `#/finance-transactions` → a row → actions → Cancel
