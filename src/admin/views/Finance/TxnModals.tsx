@@ -2,13 +2,11 @@
    Other Transaction — the modals.
    -----------------------------------------------------------------------------
    Six write surfaces, each the client half of one store function. None of
-   them edit anything: TxnModal and TagModal only ever APPEND a new row;
-   BudgetModal and DeactivateTagModal change a tag's own settings, never a
-   transaction that already used it. UpdateTxnModal is the one that WRITES OVER
-   something — the same field set TxnModal collects, receipt included, opened on
-   what the row currently says, Super Admin, with every change named in the
-   history. There is no separate receipt dialog: the paper behind a row is one
-   of the things the row says, and it is edited where the rest of them are. Every refusal from the store renders inside the
+   them edit anything, and that is the module's whole shape: TxnModal and
+   TagModal APPEND a new row; BudgetModal and DeactivateTagModal change a tag's
+   own settings, never a transaction that already used it; CancelTxnModal
+   changes one thing about a posted row — whether it counts — and not a single
+   figure on it. Nothing here rewrites what a row says, and nothing deletes one. Every refusal from the store renders inside the
    dialog that produced it — the sentence it contradicts stays on screen.
    ============================================================================= */
 import { useRef, useState } from "react";
@@ -19,44 +17,28 @@ import type { Done } from "./dialog";
 import { Check, Money, TagChip } from "./bits";
 import {
   ACCOUNTS, CREDIT_KINDS, MODES, TAG_KINDS,
-  PROOF_MAX_BYTES, addTag, deactivateTag, fileSize, inr, isSuperAdmin,
-  proofAccepted, proofTooBig, recordTransaction, updateTransaction,
+  PERIOD, PROOF_MAX_BYTES, addTag, cancelTransaction, deactivateTag, fileSize, inr,
+  isSuperAdmin, proofAccepted, proofTooBig, recordTransaction,
   setBudget as setTagBudget, todayIso, useTagTotals, useTags, useTxnRows,
 } from "./store";
 import type { CompanyTxn, Tag, TagKind } from "./store";
 
 /* ------------------------------------------------------------ TxnModal --- */
-/* -------------------------------------------------- the shared field set --- */
-/** WHAT A TRANSACTION SAYS, AS A FORM. Recording one and updating one ask the
- *  same ten questions in the same order, and they used to be two copies of the
- *  same 150 lines — which is two places for a placeholder to drift, two orders
- *  for the fields to fall into, and two dialogs that stop looking like the same
- *  screen the first time somebody edits one of them. There is one now.
- *
- *  THE RECEIPT IS NOT IN HERE. It is mandatory at the moment of recording and
- *  it has its own dialog afterwards, because swapping the paper behind a row
- *  and restating what the row says are different acts. */
-export interface TxnForm {
+/* --------------------------------------------------- TxnModal's field set --- */
+/** WHAT A TRANSACTION SAYS, AS A FORM. It was pulled out of `TxnModal` when an
+ *  update dialog asked the same ten questions and two copies of 150 lines were
+ *  about to drift apart. Nothing updates a row any more — a wrong one is
+ *  cancelled and recorded again — so this has one caller, and it stays a named
+ *  piece only because a form this long reads better with its own signature than
+ *  inlined into the dialog that submits it. */
+interface TxnForm {
   direction: "out" | "in"; tagKey: string; amount: string; description: string;
   party: string; mode: string; reference: string; valueDate: string;
   accountId: string; creditKind: string;
-  /** The file PICKED IN THIS DIALOG, not the one already on the row. Null means
-   *  untouched: recording refuses that, updating takes it to mean "leave the
-   *  receipt alone". */
   bill: { filename: string; mime: string; bytes: number } | null;
 }
-export function txnFormOf(t: CompanyTxn): TxnForm {
-  return {
-    direction: t.direction, tagKey: t.tagKey, amount: (t.amountPaise / 100).toFixed(2),
-    description: t.description, party: t.party, mode: t.mode, reference: t.reference,
-    valueDate: t.valueDate, accountId: t.accountId, creditKind: t.creditKind || "",
-    bill: null,
-  };
-}
-function TxnFields({ f, set, tags, had, onErr }: {
+function TxnFields({ f, set, tags, onErr }: {
   f: TxnForm; set: (patch: Partial<TxnForm>) => void; tags: Tag[];
-  /** The receipt already on the row, if this is an edit. */
-  had?: string | null;
   onErr: (m: string) => void;
 }) {
   const isIn = f.direction === "in";
@@ -173,28 +155,25 @@ function TxnFields({ f, set, tags, had, onErr }: {
         </div>
       </Field>
 
-      {/* THE RECEIPT, and the same control on both dialogs. It had a screen of
-          its own until the figures on a row became correctable — the two could
-          not share a dialog while one was amendable and the other was not, and
-          there is nothing left to separate now. Images and PDFs up to 5 MB; the
-          store refuses all three ways and says which, so this is a courtesy
-          rather than the guard.
+      {/* THE RECEIPT, MANDATORY — the same control and the same rule as a
+          salary payment's, which is the point: evidence should not be worth
+          more on one screen than another. Images and PDFs up to 5 MB; the store
+          refuses all three ways and says which, so this is a courtesy rather
+          than the guard.
 
-          ON AN EDIT IT IS OPTIONAL: leaving it alone keeps the receipt the row
-          already has, and there is no way to REMOVE one. A row that had paper
-          behind it does not stop having had it. */}
+          IT IS ONLY EVER SET HERE. Nothing attaches paper to a row after the
+          fact any more, which is why the missing-bill queue is a closed backlog
+          and why a row whose receipt turns out to be wrong is cancelled and
+          recorded again with the right one. */}
       <Field label="Receipt">
         <button type="button" className={"fin-filebox" + (f.bill ? " on" : "")}
-          title={f.bill ? f.bill.filename : had || undefined}
+          title={f.bill ? f.bill.filename : undefined}
           onClick={() => fileRef.current?.click()}>
           {f.bill
             ? <><Icon name="check" size="sm" /><span className="name">{f.bill.filename}</span>
               <span className="swap">Replace</span></>
-            : had
-              ? <><Icon name="check" size="sm" /><span className="name">{had}</span>
-                <span className="swap">Replace</span></>
-              : <><Icon name="plus" size="sm" />
-                <span className="ph">Attach receipt · image or PDF, up to {fileSize(PROOF_MAX_BYTES)}</span></>}
+            : <><Icon name="plus" size="sm" />
+              <span className="ph">Attach receipt · image or PDF, up to {fileSize(PROOF_MAX_BYTES)}</span></>}
         </button>
         <input ref={fileRef} type="file" accept="image/*,application/pdf" hidden
           onChange={(e) => {
@@ -328,71 +307,58 @@ export function TxnModal({ onClose, onDone }: { onClose: () => void; onDone: Don
   );
 }
 
-/* ------------------------------------------------------ UpdateTxnModal --- */
-/** FN-T11 · Update a recorded row. Super Admin.
+/* ------------------------------------------------------ CancelTxnModal --- */
+/** FN-T11 · Cancel a transaction. Super Admin.
  *
- *  THE SAME FORM AS RECORDING, opened on what the row currently says. That is
- *  the whole design: somebody who has recorded a transaction already knows this
- *  screen, and a correction that asked its questions in a different order or
- *  called the same field something else would be a second thing to learn for no
- *  reason.
+ *  A REASON AND NOTHING ELSE. There is nothing to choose here — the row is
+ *  named in the title, the consequence is the same every time, and the only
+ *  thing this dialog does not already know is why. So it asks that and stops.
  *
- *  IT OFFERS THE RECEIPT TOO, and it is the only screen that does once a row is
- *  written. The paper used to have a dialog of its own, which existed because a
- *  row's figures could not be amended and its receipt could — two rules, so two
- *  screens. One rule now, so one screen. What it does NOT offer is a way to
- *  delete anything, the receipt included: replacing one is a change the history
- *  records, and removing one would be a gap nobody could account for.
- *
- *  THE BUTTON WAITS FOR A CHANGE. The store refuses a write in which nothing
- *  moved, so the dialog says so first rather than opening a refusal somebody
- *  has to read to learn they pressed a button for nothing. */
-export function UpdateTxnModal({ txn, onClose, onDone }: {
+ *  IT DOES NOT OFFER TO FIX ANYTHING, because cancelling is not a correction:
+ *  it says this row should not stand. The correct figures are a NEW row,
+ *  recorded the ordinary way, which is why this dialog has no form. */
+export function CancelTxnModal({ txn, onClose, onDone }: {
   txn: CompanyTxn; onClose: () => void; onDone: Done;
 }) {
-  /* INACTIVE TAGS ARE OFFERED HERE, and only the one this row already wears —
-     a row filed under a tag that has since been deactivated must survive an
-     edit to its remark without being forced onto a different tag. The store
-     refuses a MOVE to an inactive tag; keeping one is fine. */
-  const all = useTags();
-  const tags = all.filter((t) => t.active || t.tagKey === txn.tagKey);
-  const [f, setF] = useState<TxnForm>(txnFormOf(txn));
+  const [reason, setReason] = useState("");
   const [err, setErr] = useState("");
   const sa = isSuperAdmin();
 
-  const set = (patch: Partial<TxnForm>) => { setF((p) => ({ ...p, ...patch })); setErr(""); };
-  const paise = toPaise(f.amount);
-  const changed = JSON.stringify(f) !== JSON.stringify(txnFormOf(txn));
-
   const submit = () => {
-    if (paise === null) { setErr("Enter the amount in whole rupees (paise to two decimals), above zero."); return; }
-    const res = updateTransaction(txn.txnId, {
-      direction: f.direction, tagKey: f.tagKey, amountPaise: paise, description: f.description,
-      party: f.party, mode: f.mode, reference: f.reference, valueDate: f.valueDate,
-      accountId: f.accountId, creditKind: f.direction === "in" ? f.creditKind || null : null,
-      bill: f.bill,
-    });
+    const res = cancelTransaction(txn.txnId, reason);
     if (res) { setErr(res); return; }
-    onDone(txn.txnId + " updated. What it said before is in its history.", "ok");
+    onDone(txn.txnId + " cancelled. It stays on the record and stops counting.", "ok");
   };
 
   return (
-    <Dlg title={"Update " + txn.txnId} sub="Super Admin." onClose={onClose} err={err}
+    <Dlg title={"Cancel " + txn.txnId} sub="Super Admin." onClose={onClose} err={err}
       footer={<><Cancel onClose={onClose} />
-        <button className="btn pri" disabled={!sa || !changed}
-          title={!sa ? "Updating a transaction is Super Admin only." : !changed ? "Nothing has changed yet." : undefined}
-          onClick={submit}>Save</button></>}>
+        {/* Disabled without a reason, because the store refuses without one —
+            a button that is going to say no is better off saying so first. */}
+        <button className="btn dgr" disabled={!sa || !reason.trim()}
+          title={sa ? undefined : "Cancelling a transaction is Super Admin only."}
+          onClick={submit}>Cancel the transaction</button></>}>
 
-      {/* THE ONE STANDING NOTE, and it is here because this is the only screen
-          in the module that overwrites something already on the record. What it
-          says is the deal: the row moves, the history does not. */}
-      <Notice tone="info" ico="recon" text={<>
-        <b>Every change is recorded.</b> The row will say what you leave here, and its history keeps
-        a line naming each field that moved and what it moved from — so nothing that was ever true
-        of this row is lost.
-      </>} />
+      {/* WHAT IT DOES AND WHAT IT DOES NOT, in the two lines somebody needs
+          before pressing a red button. The second matters more than it looks:
+          people reach for cancel expecting a delete, and this row is going to
+          be sitting in the ledger tomorrow. */}
+      <Check ok>
+        {txn.txnId} keeps <Money paise={Math.abs(txn.amountPaise)} /> and everything else it was
+        posted with, and stays in the ledger struck through. Nothing here is ever deleted.
+      </Check>
+      <Check warn>
+        It stops counting from now on — out of {PERIOD.label}&rsquo;s figures, out of its
+        tag&rsquo;s total, and out of everything derived from them. If the payment itself needs
+        undoing at the bank, that happens separately, outside this screen.
+      </Check>
 
-      <TxnFields f={f} set={set} tags={tags} had={txn.bill?.filename || null} onErr={setErr} />
+      <Field label="Reason"
+        help="Mandatory, and read at audit — a cancellation with no reason is indistinguishable from a misclick.">
+        <textarea className="inp" rows={3} autoFocus value={reason}
+          placeholder="Why this row should not stand"
+          onChange={(e) => { setReason(e.target.value); setErr(""); }} />
+      </Field>
     </Dlg>
   );
 }

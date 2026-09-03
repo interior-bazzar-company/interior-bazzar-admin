@@ -196,6 +196,20 @@
     }
   ],
   "$comment_manualCreditKinds": "The ONLY three credits a person may hand-key, and all three are flagged non-revenue. Customer money has exactly one way in: a subscription. If anyone could type a credit, anyone could fabricate revenue.",
+  "transactionStates": [
+    {
+      "key": "recorded",
+      "label": "Recorded",
+      "tone": "ok",
+      "meaning": "The money moved. There is no draft state on this page — a row here means it happened."
+    },
+    {
+      "key": "cancelled",
+      "label": "Cancelled",
+      "tone": "dead",
+      "meaning": "Written off with a reason. Every figure on the row is exactly as posted and the row stays on the record, but it no longer counts towards any total. Getting it right is a new row."
+    }
+  ],
   "refundOrigins": [
     {
       "key": "subscription",
@@ -385,9 +399,9 @@
       "tone": "info"
     },
     {
-      "key": "TXN_UPDATED",
-      "label": "Transaction updated",
-      "tone": "warn"
+      "key": "TXN_CANCELLED",
+      "label": "Transaction cancelled",
+      "tone": "bad"
     },
     {
       "key": "TAG_CREATED",
@@ -654,8 +668,8 @@
     },
     {
       "id": "FN-AD-02",
-      "title": "Posted is correctable, and every correction is on the record",
-      "position": "Nothing is ever deleted. A row is corrected in place by an update, which is Super Admin and refuses everything recording refuses; the row then says what is true now. What it said before is in its history — one TXN_UPDATED event per edit, naming every field that moved and what it moved from. The record is mutable; the audit trail is not.",
+      "title": "Posted is permanent; a wrong row is cancelled, not rewritten",
+      "position": "Nothing is edited and nothing is deleted. A row that should not stand is cancelled: Super Admin, a mandatory reason, every figure left exactly as posted, and the row stays in the ledger struck through. It stops counting towards every total from that moment. Getting the figures right is a NEW row, recorded the ordinary way — so the books carry every version they have ever carried, each with the person and the moment behind it.",
       "status": "resolved"
     },
     {

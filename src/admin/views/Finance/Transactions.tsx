@@ -20,14 +20,14 @@ import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import { Frame, ViewBand } from "./Frame";
 import type { FaceProps } from "./Frame";
-import { BudgetBar, Dir, Money, TagChip } from "./bits";
-import { BudgetModal, DeactivateTagModal, TagModal, TxnModal } from "./TxnModals";
+import { BudgetBar, Dir, Money, TagChip, TxnMenu, TxnPill } from "./bits";
+import { BudgetModal, CancelTxnModal, DeactivateTagModal, TagModal, TxnModal } from "./TxnModals";
 import {
-  BILL_THRESHOLD_PAISE, FILTER_LABELS, PERIOD, TAG_KINDS,
+  BILL_THRESHOLD_PAISE, FILTER_LABELS, PERIOD, TAG_KINDS, TXN_STATES,
   ago, applyTxnFilters, fmtDate, inr, isSuperAdmin, tagKindMeta,
   useOverview, useTagTotals, useTags, useTxnRows,
 } from "./store";
-import type { Params, Tag, TagTotal, TxnRow } from "./store";
+import type { CompanyTxn, Params, Tag, TagTotal, TxnRow } from "./store";
 
 /** `filterValueLabel` needs the live tag list to turn a `tag` filter's key
  *  into its label. Taking it as an argument, rather than reading the store
@@ -37,6 +37,7 @@ import type { Params, Tag, TagTotal, TxnRow } from "./store";
  *  forbid. */
 function filterValueLabel(key: string, value: string, tags: Tag[]): string {
   if (key === "dir") return value === "out" ? "Debit" : "Credit";
+  if (key === "state") return TXN_STATES.filter((s) => s.key === value)[0]?.label || value;
   if (key === "tag") return tags.filter((t) => t.tagKey === value)[0]?.label || value;
   if (key === "kind") return tagKindMeta(value)?.label || value;
   if (key === "range") return value === "month" ? PERIOD.label : value;
@@ -56,6 +57,7 @@ function carry(p: Params): Params {
 export default function Transactions({ p, onFilter, onSearch, onUnfilter, onParams }: FaceProps) {
   const { toast, modal, closeLayer } = useShell();
   const writable = can("finance-transactions", "edit");
+  const sa = isSuperAdmin();
   const tab = p.tab === "tags" ? "tags" : "transactions";
   /* Called unconditionally, once, regardless of which tab is showing — a
      Select on the Transactions tab and the chip labels both need the live
@@ -68,6 +70,11 @@ export default function Transactions({ p, onFilter, onSearch, onUnfilter, onPara
   const openTagModal = () => modal(<TagModal onClose={closeLayer} onDone={done} />);
   const openBudget = (t: Tag) => modal(<BudgetModal tag={t} onClose={closeLayer} onDone={done} />);
   const openDeactivate = (t: Tag) => modal(<DeactivateTagModal tag={t} onClose={closeLayer} onDone={done} />);
+  /* CANCELLING FROM THE LEDGER, not only from the record. A wrong row is
+     usually spotted while scanning the list, and making somebody open the
+     record to act on it is a step that exists for no reason other than where
+     the menu used to live. */
+  const openCancel = (t: CompanyTxn) => modal(<CancelTxnModal txn={t} onClose={closeLayer} onDone={done} />);
 
   /* THE ROWS AND THE VOCABULARY THAT FILES THEM. Both are records somebody
      acts on one at a time, so both carry a count — unlike an analytics tab,
@@ -193,9 +200,8 @@ export default function Transactions({ p, onFilter, onSearch, onUnfilter, onPara
             options={tags.map((t) => ({ v: t.tagKey, l: t.label + (t.active ? "" : " — inactive") }))} />
           <Select key={"kind" + (p.kind || "")} name="kind" label="Rolls up to" value={p.kind} onFilter={onFilter}
             options={TAG_KINDS.map((k) => ({ v: k.key, l: k.label }))} />
-          {/* NO STATE FILTER. There was one, offering Recorded and Reversed;
-              reversing is gone and every row is simply a row, so the control
-              had one option and filtered nothing. */}
+          <Select key={"state" + (p.state || "")} name="state" label="State" value={p.state} onFilter={onFilter}
+            options={TXN_STATES.map((s) => ({ v: s.key, l: s.label }))} />
           <Select key={"range" + (p.range || "")} name="range" label="Period" value={p.range} onFilter={onFilter}
             options={[{ v: "month", l: PERIOD.label }]} />
           <Select key={"flag" + (p.flag || "")} name="flag" label="Queue" value={p.flag} onFilter={onFilter}
@@ -231,7 +237,8 @@ export default function Transactions({ p, onFilter, onSearch, onUnfilter, onPara
         ) : null}
       </>}>
       {tab === "transactions"
-        ? <TxnTable p={p} writable={writable} onRecord={openTxnModal} onUnfilter={onUnfilter} />
+        ? <TxnTable p={p} writable={writable} sa={sa} onRecord={openTxnModal} onUnfilter={onUnfilter}
+          onCancel={openCancel} onCopied={(m) => toast(m, "ok")} />
         : <TagsTab writable={writable} onBudget={openBudget} onDeactivate={openDeactivate} />}
     </Frame>
   );
@@ -247,8 +254,9 @@ export default function Transactions({ p, onFilter, onSearch, onUnfilter, onPara
    reached. */
 
 /* -------------------------------------------------------------- the table --- */
-function TxnTable({ p, writable, onRecord, onUnfilter }: {
-  p: Params; writable: boolean; onRecord: () => void; onUnfilter: (key: string) => void;
+function TxnTable({ p, writable, sa, onRecord, onUnfilter, onCancel, onCopied }: {
+  p: Params; writable: boolean; sa: boolean; onRecord: () => void; onUnfilter: (key: string) => void;
+  onCancel: (t: CompanyTxn) => void; onCopied: (m: string) => void;
 }) {
   const rows = useTxnRows();
   const filtered = applyTxnFilters(rows, p);
@@ -277,25 +285,39 @@ function TxnTable({ p, writable, onRecord, onUnfilter }: {
           <th>Direction</th>
           <th className="num">Amount</th>
           <th>Value date</th>
-          <th>Paper trail</th>
-          <th>Updated</th>
+          <th>State</th>
+          {/* THE ACTIONS COLUMN, where the chevron was. The chevron said the
+              row opens, which the row already says by being a link and by
+              lighting under the cursor; what it could not say is that anything
+              can be DONE from here, and until now nothing could. */}
           <th className="tight" />
         </tr>
       </thead>
       <tbody>
-        {filtered.map((r) => <TxnLine key={r.t.txnId} r={r} p={p} />)}
+        {filtered.map((r) => (
+          <TxnLine key={r.t.txnId} r={r} p={p} sa={writable && sa} onCancel={onCancel} onCopied={onCopied} />
+        ))}
       </tbody>
     </table>
   );
 }
 
-function TxnLine({ r, p }: { r: TxnRow; p: Params }) {
+function TxnLine({ r, p, sa, onCancel, onCopied }: {
+  r: TxnRow; p: Params; sa: boolean;
+  onCancel: (t: CompanyTxn) => void; onCopied: (m: string) => void;
+}) {
   const t = r.t;
+  /* A CANCELLED ROW IS NOT CHASED FOR A BILL and is not an alarm either — it is
+     the settled one. Rail stays clear; the struck figure and the chip say it. */
+  const cancelled = t.state === "cancelled";
   const rail = r.missingBill ? "warn" : "";
   const to = "#/finance-transactions/" + encodeURIComponent(t.txnId) + qs(carry(p));
   const open = () => go(to);
+  /* THE SAME `dim` A CANCELLED SUBSCRIPTION WEARS — greyed line, struck figure.
+     The module already had a treatment for a row that stands on the record and
+     counts for nothing, and this is exactly that. */
   return (
-    <tr className="clickable" tabIndex={0} role="link" aria-label={"Open " + t.txnId}
+    <tr className={"clickable" + (cancelled ? " dim" : "")} tabIndex={0} role="link" aria-label={"Open " + t.txnId}
       onClick={open} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } }}>
       <td className="rail"><i className={rail} /></td>
       <td>
@@ -313,28 +335,20 @@ function TxnLine({ r, p }: { r: TxnRow; p: Params }) {
         <div className="cell-1">{fmtDate(t.valueDate)}</div>
         <div className="cell-2">{ago(t.valueDate)}</div>
       </td>
+      {/* THE PAPER TRAIL COLUMN IS GONE. It spent a wide column on a filename
+          most people never read, and the two things it was actually watched for
+          both survive it: the rail goes amber on a row missing a required bill,
+          and `Missing a bill` in the strip is still one press away. The record
+          page holds the filename and the bank match in full. */}
       <td>
-        {t.bill
-          ? <div className="cell-1"><Icon name="check" size="sm" />{t.bill.filename}</div>
-          : r.missingBill
-            ? <div className="cell-1 fin-fine warn"><Icon name="alert" size="sm" />Missing — required</div>
-            : <div className="cell-1 faint">no bill needed</div>}
-        {t.bankLineId ? <div className="cell-2"><Icon name="link" size="sm" />matched to bank</div> : null}
+        <TxnPill k={t.state} />
+        {t.cancellation
+          ? <div className="cell-2" title={t.cancellation.reason}>by {t.cancellation.by}</div>
+          : null}
       </td>
-      {/* WHAT THE STATE COLUMN BECAME. It held a pill that said Recorded on
-          every row in the ledger and Reversed on the rare one — and with
-          reversing gone it would say Recorded and nothing else, forever. What
-          is worth knowing in its place is whether the figures on this line are
-          still the ones first posted. */}
-      <td>
-        {t.updatedBy
-          ? <>
-            <div className="cell-1">{t.updatedBy}</div>
-            <div className="cell-2">{fmtDate((t.updatedAt || "").slice(0, 10))}</div>
-          </>
-          : <div className="cell-1 faint">—</div>}
+      <td className="tight">
+        <TxnMenu txn={t} sa={sa} onCancel={() => onCancel(t)} onOpen={open} onCopied={onCopied} />
       </td>
-      <td className="tight"><Icon name="chevr" size="sm" /></td>
     </tr>
   );
 }

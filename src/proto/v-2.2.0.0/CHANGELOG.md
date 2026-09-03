@@ -6,6 +6,96 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-03
 
+### Cancel replaces Update; the ledger loses Paper trail and gains a row menu
+
+**Area:** `#/finance-transactions` — the table’s columns and per-row actions · a row → actions → Cancel
+**Files:** `src/admin/views/Finance/store.ts`, `src/admin/views/Finance/types.ts`, `src/admin/views/Finance/bits.tsx`, `src/admin/views/Finance/TxnModals.tsx`, `src/admin/views/Finance/TxnDetail.tsx`, `src/admin/views/Finance/Transactions.tsx`, `src/content/finance/transactions.json`, `src/content/finance/vocabularies.json`, `scripts/check-finance-ledger.cjs`, `scripts/fn-smoke.tsx`
+
+**What changed**
+
+**UPDATING IS REMOVED ENTIRELY** — `updateTransaction`, `TxnEdit`,
+`UpdateTxnModal`, `updatedBy`/`updatedAt` and the `TXN_UPDATED` event. Nothing
+rewrites what a row says any more.
+
+**CANCEL TAKES ITS PLACE.** Super Admin, one mandatory reason, and the row turns
+`cancelled`: it keeps its amount, direction, tag, date, party, reference,
+account and receipt exactly as posted, stays in the ledger struck through, and
+stops counting — out of the period’s figures, its tag’s total, reinvestment, the
+bank-match candidates and the missing-bill queue. **It is not a delete.** The
+correct figures are a NEW row, recorded the ordinary way, so the books carry
+every version they have ever carried.
+
+**PAPER TRAIL IS OFF THE TABLE.** It spent a wide column on a filename most
+people never read. The two things it was actually watched for both survive it:
+the rail still goes amber on a row missing a required bill, and *Missing a bill*
+in the strip is still one press away. The record page holds the filename and the
+bank match in full.
+
+**EVERY ROW CARRIES AN ACTIONS MENU**, where the chevron was — Open the record,
+Download receipt (still disabled), Cancel, Copy row id. `TxnMenu` moved from
+`TxnDetail` into `bits.tsx` so the ledger and the record share one menu rather
+than growing two; it stops its own clicks, since every row in the list is a link
+and a press would otherwise navigate out from under the menu it just opened.
+The caller supplies the actions, so the component never has to know which shell
+it is inside.
+
+**THE UPDATED COLUMN BECOMES STATE AGAIN**, with the `recorded` / `cancelled`
+vocabulary restored and the State filter back. `Cancelled` takes the theme’s
+`dead` tone — struck through on an inset ground, which is what that tone already
+means everywhere else — and a cancelled row wears the module’s existing `dim`
+treatment: greyed line, struck figure.
+
+**A CONSEQUENCE WORTH STATING: the missing-bill queue is now a CLOSED backlog.**
+A receipt is settable only when recording, since nothing edits a posted row and
+the separate receipt dialog went in the previous entry. Those rows shrink out of
+the queue by being cancelled — or by being cancelled and recorded again with the
+receipt they always needed, which is the same correction story as any other
+wrong figure. `TxnFields` keeps its own signature but is back to one caller.
+
+**Temp data**
+`src/content/finance/transactions.json` → `state` returns on every row,
+`updatedBy`/`updatedAt` leave, `cancellation` joins. TXN-0917 is the worked
+example again, back to Sharma Carpentry Works with `state: cancelled`, a
+`cancellation` block and a `TXN_CANCELLED` event. Placeholder records.
+`src/content/finance/vocabularies.json` → `transactionStates` restored
+(`recorded`/ok, `cancelled`/dead), `TXN_UPDATED` → `TXN_CANCELLED`, `FN-AD-02`
+restated. Static copy.
+
+**Backend needed**
+- `POST /api/v1/finance/transactions/:id/cancel` → body `{ reason }`, Super
+  Admin, reason mandatory. Sets `state: "cancelled"` and a `cancellation` of
+  `{ reason, by, at }`, appends one `TXN_CANCELLED` event, and changes **no**
+  other field on the row. Refuses a row already cancelled.
+- `PATCH /api/v1/finance/transactions/:id` → **no longer needed.** Nothing calls
+  it; there is no edit.
+- Every aggregate must exclude rows whose `state` is `cancelled` — period spend
+  and credits, tag totals, reinvestment, bank-match candidates, missing-bill.
+
+**Open decisions**
+`FN-AD-02` is now **Posted is permanent; a wrong row is cancelled, not**
+**rewritten**. Two calls assumed and stated on screen: **Cancel is Super Admin**
+(the authority the action it replaces carried), and **a cancelled row is never
+reopened** — there is no un-cancel, because a row that was written off and then
+un-written-off is a state the books cannot explain; the way back is a new row.
+
+**Verified**
+`npx tsc -b` and `npx eslint` clean on every touched file.
+`npm run check:finance` → 423 pass, including a new writes block asserting that
+no figure moves, that the ledger neither grows nor shrinks, that the tag total
+and the period spend each drop by exactly the row’s amount, that a reason is
+mandatory and a second cancellation refused, that a cancelled row leaves the
+missing-bill queue without anyone finding paper for it, and that recording the
+corrected row afterwards leaves both on the books with only one counting.
+`npm run check:finance-render` renders every surface, asserting the actions menu
+on every ledger row, the State column, the dimmed cancelled row, the record’s
+cancellation banner and *Cancelled by* line, the cancel dialog’s shape, and that
+Paper trail’s cells are gone while the amber rail and the queue cell remain.
+`npm run check:finance-nav` passes. Exercised directly against the seed:
+cancelling TXN-0904 kept its ₹6,200, party and receipt, held the ledger at 17
+rows, and dropped August debit from ₹63,250 to ₹57,050 and the Software & tools
+tag from ₹8,600 to ₹2,400. `npm run check` as a whole still stops at
+`check:enquiries`, which needs a running backend; unrelated.
+
 ### The receipt loses its separate upload dialog and becomes a field on Update
 
 **Area:** `#/finance-transactions` → a row → actions (the *Attach / Edit receipt* item) · the Update dialog

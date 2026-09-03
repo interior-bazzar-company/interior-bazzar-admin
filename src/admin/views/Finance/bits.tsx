@@ -3,14 +3,122 @@
    tables, notices, pills and the stat strip all come from ui/ and
    admin-theme.css; what is here is only what Finance means by them.
    ============================================================================= */
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Icon } from "../../ui";
 import { go } from "../../ui/nav";
 import {
   ago, decision, eventMeta, failureMeta, inr, instStatusMeta, originMeta, refundStateMeta,
-  runStateMeta, sourceMeta, subStatusMeta, tagKindMeta, tagOf,
+  runStateMeta, sourceMeta, subStatusMeta, tagKindMeta, tagOf, txnStateMeta,
 } from "./store";
-import type { FinEvent } from "./store";
+import type { CompanyTxn, FinEvent } from "./store";
+
+/* ------------------------------------------------------------- TxnMenu --- */
+/** EVERYTHING A POSTED ROW CAN HAVE DONE TO IT, and the same menu wherever the
+ *  row appears — the ledger and the record. It lived on the record page alone
+ *  while cancelling was the only action and the record was the only place to
+ *  reach it; putting it on the list too means a wrong row can be written off
+ *  from the screen somebody noticed it on.
+ *
+ *  THERE IS NO EDIT ON IT. Nothing rewrites what a row says: the amount, the
+ *  direction, the tag, the reference, the date, the account and the receipt are
+ *  the fact it asserts, and a row that asserts the wrong thing is CANCELLED
+ *  with a reason and recorded again correctly. That is the module's whole
+ *  correction story and this menu is where it starts.
+ *
+ *  IT STOPS ITS OWN CLICKS. In the list every row is a link, so a press on the
+ *  trigger or on any item would navigate out from under the menu it just
+ *  opened. On the record there is nothing to stop and the handler is harmless.
+ *
+ *  The caller supplies the actions rather than the menu reaching for a store:
+ *  a component that opens modals is a component that has to know which shell it
+ *  is inside, and this one renders in two. */
+export function TxnMenu({ txn, sa, onCancel, onOpen, onCopied }: {
+  txn: CompanyTxn; sa: boolean;
+  onCancel: () => void;
+  /** Given on the list, where the record is somewhere to go. Omitted on the
+   *  record itself, where it would offer to open the page it is already on. */
+  onOpen?: () => void;
+  onCopied: (msg: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLSpanElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: MouseEvent) => {
+      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", away);
+    document.addEventListener("keydown", esc, true);
+    return () => {
+      document.removeEventListener("mousedown", away);
+      document.removeEventListener("keydown", esc, true);
+    };
+  }, [open]);
+
+  const item = (icon: string, label: string, act: () => void,
+    opts?: { disabled?: boolean; title?: string; tone?: string }) => (
+    <button type="button" role="menuitem" className={"mi" + (opts?.tone ? " " + opts.tone : "")}
+      disabled={opts?.disabled} title={opts?.title}
+      onClick={(e) => { e.stopPropagation(); setOpen(false); act(); }}>
+      <Icon name={icon} size="sm" />{label}
+    </button>
+  );
+
+  const cancelled = txn.state === "cancelled";
+  return (
+    <span className="fin-menu" ref={box} onClick={(e) => e.stopPropagation()}>
+      <button type="button" className="btn sm" aria-haspopup="menu" aria-expanded={open}
+        aria-label={"Actions for " + txn.txnId}
+        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}>
+        <Icon name="dots" size="sm" />
+      </button>
+      {open ? (
+        <span className="fin-menu-pop" role="menu" aria-label={"Actions for " + txn.txnId}>
+          {onOpen ? item("invoice", "Open the record", onOpen) : null}
+          {/* DISABLED, ALWAYS, AND IT SAYS WHY. The panel holds a filename and
+              not the bytes, so a download would produce nothing — and an item
+              that silently does nothing is worse than one that explains. It is
+              shown rather than hidden because somebody who cannot see the
+              action cannot ask for it either. */}
+          {item("download", "Download receipt", () => {}, {
+            disabled: true,
+            title: txn.bill
+              ? "The panel holds the file's name, not the file. Download arrives with the document store."
+              : "There is no receipt on this row.",
+          })}
+          {/* THE ONE THING THAT CHANGES A POSTED ROW, and it changes only its
+              standing: every figure stays as posted and the row stays in the
+              ledger. Disabled rather than hidden without Super Admin, because
+              somebody who cannot see the action cannot ask for it either. */}
+          {item("recon", "Cancel", onCancel, {
+            disabled: !sa || cancelled,
+            tone: "dgr",
+            title: cancelled
+              ? "It is already cancelled."
+              : sa
+                ? "Write this row off with a reason. It keeps every figure it was posted with and stops counting."
+                : "Cancelling a transaction is Super Admin only.",
+          })}
+          {/* `link` rather than a copy glyph, because the icon set has no copy
+             and inventing one for a menu item is a new SVG to maintain for a
+             convenience. */}
+          {item("link", "Copy row id", () => {
+            void navigator?.clipboard?.writeText?.(txn.txnId);
+            onCopied(txn.txnId + " copied.");
+          })}
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 
 /** Deliberately loud, never dismissible. */
 export function ProtoBar({ onReset }: { onReset?: () => void }) {
@@ -47,6 +155,10 @@ export function SubPill({ k, lg }: { k: string; lg?: boolean }) {
 }
 export function RunPill({ k, lg }: { k: string; lg?: boolean }) {
   const m = runStateMeta(k);
+  return <span className={"pill" + (m?.tone ? " " + m.tone : "") + (lg ? " lg" : "")} title={m?.meaning}>{m?.label || k}</span>;
+}
+export function TxnPill({ k, lg }: { k: string; lg?: boolean }) {
+  const m = txnStateMeta(k);
   return <span className={"pill" + (m?.tone ? " " + m.tone : "") + (lg ? " lg" : "")} title={m?.meaning}>{m?.label || k}</span>;
 }
 export function RefundPill({ k, lg }: { k: string; lg?: boolean }) {

@@ -43,7 +43,7 @@ import {
   CloseAccountModal, LopModal, OpenRunModal, PaySalaryModal, SalaryAccountModal,
 } from "../src/admin/views/Finance/SalaryModals";
 import {
-  BudgetModal, DeactivateTagModal, TagModal, TxnModal, UpdateTxnModal,
+  BudgetModal, CancelTxnModal, DeactivateTagModal, TagModal, TxnModal,
 } from "../src/admin/views/Finance/TxnModals";
 import {
   DecideRefundModal, ManualRefundModal, RecordTransferModal, RequestRefundModal,
@@ -323,17 +323,23 @@ has(txns, "Missing a bill", "...a missing bill is a state, not an error");
 has(txns, "Interest, own transfers and vendor refunds are the only",
   "...money in is named as three non-revenue kinds, on the cell it qualifies");
 has(txns, "Excluded spend", "...and excluded spend is stated rather than left inside a total");
-/* THE STATE COLUMN BECAME THE UPDATED COLUMN. State held a pill reading
-   Recorded on every row and Reversed on the rare one; with reversing gone it
-   would have said Recorded forever. What is worth knowing in its place is
-   whether the figures on a line are still the ones first posted. */
-has(txns, ">Updated<", "...the ledger's last column asks whether a row has been restated");
-has(txns, "K. Iyer", "...and names who last restated the one row that has been");
-hasnt(txns, ">State<", "...the state column is gone, having had one value left to say");
-hasnt(txns, "Reversed", "...and nothing on the page offers to reverse anything");
-hasnt(txns, "TXN-RV", "...no counter-entry row survives in the ledger either");
+/* PAPER TRAIL IS OFF THE TABLE, and the two things it was actually watched for
+   both survive it: the rail goes amber on a row missing a required bill, and
+   the strip's `Missing a bill` cell is one press away. The filename and the
+   bank match live on the record, in full. */
+hasnt(txns, "no bill needed", "...the paper trail column is gone from the ledger");
+hasnt(txns, "matched to bank", "...along with the bank-match line it carried");
+has(txns, "Missing a bill", "...while the queue that actually needed watching is still a cell");
+/* AND AN ACTIONS MENU IS ON EVERY ROW, where the chevron was. A wrong row is
+   usually spotted while scanning the list, and making somebody open the record
+   to act on it was a step that existed only because the menu lived there. */
+has(txns, "Actions for TXN-0901", "...every row carries its own actions menu");
+has(txns, ">State<", "...and the last data column states whether a row still stands");
+has(txns, "Cancelled", "...naming the one row in the seed that was written off");
+has(txns, "clickable dim", "...which is dimmed the way every retired row in this module is");
 const txnsFiltered = check("transactions · filtered to the ones missing a bill", () => at("/finance-transactions?flag=nobill"));
-has(txnsFiltered, "Missing — required", "...and the queue shows the rows that are actually missing one");
+has(txnsFiltered, "TXN-0910", "...and the queue shows the rows that are actually missing one");
+has(txnsFiltered, 'rail"><i class="warn"', "...each flagged on the rail, which is what the paper trail column left behind");
 const txnsEmpty = check("transactions · a filter that matches nothing", () => at("/finance-transactions?q=zzzznothing"));
 has(txnsEmpty, "Nothing matches those filters", "...an empty ledger says the filter is why");
 has(txnsEmpty, "for the whole ledger before any filter", "...and that the tiles above it were not filtered");
@@ -577,8 +583,9 @@ hasnt(draftSlip, "no slip number until the run is paid", "...the stamp is the on
 has(draftSlip, 'class="mono fin-slipid"', "...and the action row names the slip by id");
 
 const oneTxn = page("a company transaction", "/finance-transactions/TXN-0901");
-has(oneTxn, "Nothing here is ever deleted", "...deletion is off the table even now that editing is not");
-has(oneTxn, "every field it moves is written into", "...and a correction is audited, not silent");
+has(oneTxn, "never edited or deleted", "...posted is permanent, and so is the row itself");
+has(oneTxn, "cancelled", "...with cancelling named as what to do about a row that should not stand");
+has(oneTxn, "a new row, recorded the ordinary way", "...and a new row as where the right figures go");
 /* THE ACTIONS MENU IS NOT ASSERTED HERE, and the reason is worth writing down
    rather than leaving as a gap. `can()` returns false without a session, so
    this harness renders every Finance page with NO write affordance at all —
@@ -600,12 +607,13 @@ has(oneTxn, "holds the name, not the file",
 /* A CORRECTED ROW SAYS SO, AND SAYS WHERE THE OLD VALUE WENT. The figures on
    screen are not the ones first posted, and somebody about to act on them
    deserves to know that before they do. */
-const updated = page("an updated transaction", "/finance-transactions/TXN-0917");
-has(updated, "This row has been updated", "...an updated row says so on its face");
-has(updated, "Rakesh Contractors", "...and shows the corrected value, not the one first keyed");
-has(updated, "what is true now", "...framing the row as current rather than original");
-has(updated, "Updated by", "...the record names who last restated it");
-hasnt(updated, "reversed", "...with nothing left of reversing anywhere on it");
+const cancelled = page("a cancelled transaction", "/finance-transactions/TXN-0917");
+has(cancelled, "This row has been cancelled", "...a cancelled row says so on its face");
+has(cancelled, "Wrong contractor", "...and carries the reason somebody gave");
+has(cancelled, "exactly as posted", "...saying its figures were not touched");
+has(cancelled, "counts towards nothing", "...and naming the one thing that did change");
+has(cancelled, "Cancelled by", "...the record names who wrote it off");
+has(cancelled, "Sharma Carpentry Works", "...while the row still says what it said, unedited");
 const noBill = page("a transaction missing a bill", "/finance-transactions/TXN-0910");
 has(noBill, "No bill attached", "...a missing bill is named");
 has(noBill, "cannot close while it is missing", "...and it says what the absence costs");
@@ -805,17 +813,18 @@ hasnt(txnM, "restricted to these three non-revenue kinds",
    `toPaise`, which returns null rather than a number on anything half-typed.
    So: no NaN anywhere in the output, not just in the field it bit in. */
 hasnt(txnM, "NaN", "...and no NaN reaches the output from an unfilled amount field");
-/* THE UPDATE DIALOG IS THE RECORD DIALOG, OPENED ON WHAT THE ROW SAYS. That is
-   the whole design — one form, learned once — and the assertions below are
-   about it being the SAME form rather than a second one that resembles it. */
-const updM = check("update a transaction", () =>
-  modal(<UpdateTxnModal txn={txn("TXN-0901")} onClose={noop} onDone={noop} />));
-has(updM, "Update TXN-0901", "...the dialog names the row it is about to restate");
-has(updM, "Super Admin", "...and whose call it is");
-has(updM, "Every change is recorded", "...it says outright that the history keeps what moved");
-has(updM, "Ahuja Estates", "...and it opens on what the row currently says, not on a blank form");
-has(updM, "optgroup", "...the tag picker is the record dialog's, grouped by where the money lands");
-has(updM, ">Receipt<", "...the receipt included, since it no longer has a screen of its own");
+/* THE CANCEL DIALOG IS A REASON AND TWO SENTENCES. There is nothing to choose:
+   the row is named in the title and the consequence is the same every time, so
+   the only thing it does not already know is why. */
+const canM = check("cancel a transaction", () =>
+  modal(<CancelTxnModal txn={txn("TXN-0901")} onClose={noop} onDone={noop} />));
+has(canM, "Cancel TXN-0901", "...the dialog names the row it is about to write off");
+has(canM, "Super Admin", "...and whose call it is");
+has(canM, "Nothing here is ever deleted", "...it says outright that the row is staying");
+has(canM, "stops counting", "...and what actually changes");
+has(canM, "<textarea", "...the reason is a box");
+has(canM, "indistinguishable from a misclick", "...saying why the reason is mandatory");
+hasnt(canM, "optgroup", "...with no form on it, because cancelling corrects nothing");
 
 const tagM = check("create a tag", () => modal(<TagModal onClose={noop} onDone={noop} />));
 has(tagM, "it decides where the money lands in Analytics", "...the kind decides where the money lands");
@@ -829,20 +838,11 @@ const deact = check("deactivate a tag", () => modal(
   <DeactivateTagModal tag={tag("soft")} onClose={noop} onDone={noop} />));
 has(deact, "nothing is re-bucketed", "...deactivating re-buckets nothing");
 has(deact, "There is no reactivate here", "...and it does not pretend to be undoable");
-/* THE RECEIPT HAS NO DIALOG OF ITS OWN ANY MORE. It had one while a row's
-   figures could not be amended and its paper could — two rules, so two screens.
-   One rule now, so the receipt is a field on the update like every other. */
-const updNoBill = check("update a row that is missing its receipt", () =>
-  modal(<UpdateTxnModal txn={txn("TXN-0910")} onClose={noop} onDone={noop} />));
-has(updNoBill, "fin-filebox", "...the receipt is picked here, on the one dialog that edits a row");
-has(updNoBill, "up to 5 MB", "...to the same limit as one attached when the row was recorded");
-has(updNoBill, "Attach receipt", "...and a row with no paper behind it is offered one");
-/* A ROW THAT ALREADY HAS PAPER shows what it has, so nobody replaces a receipt
-   by accident while fixing a remark. */
-const updHasBill = check("update a row that already has one", () =>
-  modal(<UpdateTxnModal txn={txn("TXN-0901")} onClose={noop} onDone={noop} />));
-has(updHasBill, "rent-aug-2026.pdf", "...it names the receipt already on the row");
-has(updHasBill, "swap", "...and offers to replace it rather than to attach a first one");
+/* THE RECEIPT IS SET WHEN THE ROW IS WRITTEN AND NEVER AFTER. Nothing edits a
+   posted row, so there is exactly one screen that takes a receipt, and it is
+   the one that creates the row it belongs to. */
+has(txnM, "fin-filebox", "...the receipt is picked, not typed");
+has(txnM, "up to 5 MB", "...and held to a stated limit");
 
 const reqRefund = check("request a refund", () => modal(<RequestRefundModal onClose={noop} onDone={noop} />));
 has(reqRefund, "Full amount only", "...refunds are full-amount-only");

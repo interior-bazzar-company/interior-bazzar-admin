@@ -338,6 +338,11 @@ export interface Tag {
 
 export type TxnDirection = "out" | "in";
 
+/** Recorded, or cancelled. There is no draft: a row here means the money moved,
+ *  and a cancelled one means it moved and was later written off. Nothing is
+ *  ever deleted, so there is no third thing a row can be. */
+export type TxnState = "recorded" | "cancelled";
+
 
 export interface CompanyTxn {
   txnId: string;
@@ -351,22 +356,21 @@ export interface CompanyTxn {
   reference: string;
   valueDate: string;
   accountId: string;
+  state: TxnState;
   bill: Proof | null;
   bankLineId: string | null;
   /** Money in that is NOT customer revenue — interest, an own transfer, a
    *  vendor refund. Customer money has exactly one way in: a subscription. */
   nonRevenue: boolean;
   creditKind: string | null;
-  /** WHO LAST RESTATED THIS ROW, and when. Null on a row nobody has edited.
+  /** WHY THIS ROW WAS WRITTEN OFF, who did it and when. Null while `state` is
+   *  `recorded`.
    *
-   *  The row above always says what is true NOW — `updateTransaction` writes
-   *  over it — so this pair is what tells a reader the figures in front of them
-   *  are not the ones that were first posted. What they WERE is in `events`: a
-   *  `TXN_UPDATED` entry per edit, naming every field that moved and what it
-   *  moved from. That is the audit trail, and it is append-only even though the
-   *  row is not. */
-  updatedBy: string | null;
-  updatedAt: string | null;
+   *  Every figure above is untouched by it — the row still says a payment of
+   *  that size was made on that date, because it was. What cancelling changes
+   *  is whether the row counts, and this block is the record of somebody
+   *  deciding that it should not. */
+  cancellation: { reason: string; by: string; at: string } | null;
   recordedBy: string;
   recordedAt: string;
   events: FinEvent[];

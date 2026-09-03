@@ -129,6 +129,8 @@ S.resetStore();
     Array.from(new Set(allInstallments().map((x) => x.i.status).filter((s) => !S.instStatusMeta(s)))), []);
   ok("every subscription status is in the vocabulary",
     S.readSubscriptions().filter((s) => !S.subStatusMeta(s.status)).map((s) => s.subscriptionId), []);
+  ok("every transaction state is in the vocabulary",
+    S.readTransactions().filter((t) => !S.txnStateMeta(t.state)).map((t) => t.txnId), []);
   ok("every refund state and ground is in the vocabulary",
     S.readRefunds().filter((r) => !S.refundStateMeta(r.state) || !S.groundMeta(r.ground)).map((r) => r.refundId), []);
 
@@ -266,7 +268,7 @@ S.resetStore();
   ok("...and the refund subtracts it separately in August, the month it left",
     [o.refundsPaidPaise, o.refundsPaidN], [990000, 1]);
 
-  const out = S.readTransactions().filter((t) => t.direction === "out" && inAug(t.valueDate));
+  const out = S.readTransactions().filter((t) => t.direction === "out" && t.state === "recorded" && inAug(t.valueDate));
   const operating = out.filter((t) => S.tagOf(t.tagKey).kind !== "excluded");
   const excluded = out.filter((t) => S.tagOf(t.tagKey).kind === "excluded");
   ok("other spend is the operating rows only", o.otherOutPaise, money(operating));
@@ -274,30 +276,31 @@ S.resetStore();
     operating.some((t) => t.txnId === "TXN-0911"), false);
   ok("...it is counted apart, in full", [o.excludedPaise, money(excluded)], [540000, 540000]);
   ok("other income is Σ the credits in the period", o.otherInPaise,
-    money(S.readTransactions().filter((t) => t.direction === "in" && inAug(t.valueDate))));
+    money(S.readTransactions().filter((t) => t.direction === "in" && t.state === "recorded" && inAug(t.valueDate))));
   ok("every hand-keyed credit is flagged non-revenue — customer money has one door",
     S.readTransactions().filter((t) => t.direction === "in" && !t.nonRevenue).map((t) => t.txnId), []);
 
-  /* THE WORKED EXAMPLE IN THE SEED. TXN-0917 was keyed against the wrong
-     contractor and corrected in place — the row says the right name now, and
-     its history says what the wrong one was. That pair is the whole model. */
-  const upd = S.readTransactions().filter((t) => t.txnId === "TXN-0917")[0];
-  ok("the corrected August transaction says what is true NOW",
-    [upd.party, upd.amountPaise, upd.direction, upd.valueDate, !!upd.bill],
-    ["Rakesh Contractors", 220000, "out", "2026-08-05", true]);
-  ok("...and names who last restated it, and when",
-    [upd.updatedBy, upd.updatedAt.slice(0, 10)], ["K. Iyer", "2026-08-06"]);
-  ok("...while its HISTORY still holds the name it used to carry",
-    upd.events.some((e) => e.type === "TXN_UPDATED" && /Sharma Carpentry Works/.test(e.note)), true);
-  ok("...and there is no retired row, no counter-entry and no negative amount anywhere",
+  /* THE WORKED EXAMPLE IN THE SEED. TXN-0917 was paid to the wrong contractor
+     and written off; the row is still there, still saying what it said, and it
+     charges the month nothing. That pair is the whole model. */
+  const cx = S.readTransactions().filter((t) => t.txnId === "TXN-0917")[0];
+  ok("the cancelled August transaction still says exactly what it said",
+    [cx.party, cx.amountPaise, cx.direction, cx.valueDate, cx.state, !!cx.bill],
+    ["Sharma Carpentry Works", 220000, "out", "2026-08-05", "cancelled", true]);
+  ok("...and carries who wrote it off, when, and why",
+    [!!cx.cancellation.by, !!cx.cancellation.at, cx.cancellation.reason.slice(0, 16)],
+    [true, true, "Wrong contractor"]);
+  ok("...it is still IN the ledger — cancelling is not deleting",
+    S.readTransactions().filter((t) => t.txnId === "TXN-0917").length, 1);
+  ok("...and there is no counter-entry or negative amount anywhere either",
     S.readTransactions().filter((t) => t.amountPaise < 0 || /-RV-/.test(t.txnId)).map((t) => t.txnId), []);
-  ok("...a corrected row counts like any other: August spend is simply every debit in it",
+  ok("...but the month is not charged for it: August spend is the RECORDED debits only",
     o.otherOutPaise + o.excludedPaise,
-    money(S.readTransactions().filter((t) => t.direction === "out" && inAug(t.valueDate))));
-  ok("...including in its own tag's total",
-    S.tagTotals().rows.filter((r) => r.tag.tagKey === upd.tagKey)[0].spentPaise,
-    money(S.readTransactions().filter((t) => t.tagKey === upd.tagKey && t.direction === "out"
-      && inAug(t.valueDate))));
+    money(S.readTransactions().filter((t) => t.direction === "out" && t.state === "recorded" && inAug(t.valueDate))));
+  ok("...and neither is its tag's total",
+    S.tagTotals().rows.filter((r) => r.tag.tagKey === cx.tagKey)[0].spentPaise,
+    money(S.readTransactions().filter((t) => t.tagKey === cx.tagKey && t.direction === "out"
+      && t.state === "recorded" && inAug(t.valueDate))));
 
   ok("salary cost counts only runs that were actually paid", [o.salaryPaise, o.salaryN], [0, 0]);
   ok("...the open August run of ₹5,01,000 contributes nothing until someone is paid",
@@ -1368,136 +1371,76 @@ S.resetStore();
   ok("...and no credit or expense ever reaches collected", S.overview().collectedPaise, collected0);
 
   /* ---------------------------------------------------------------------
-     WRITES · UPDATING A ROW. Everything here is either about what the update
-     changes on the row or about what it refuses, and the two halves matter
-     equally: an edit that can dodge the rules recording enforces is the way
-     around recording. */
+     WRITES · CANCELLING A ROW. Every assertion here is either about what the
+     cancellation records or about what it deliberately leaves alone, because
+     "leaves alone" is the entire difference between this and an edit. */
   const before = JSON.parse(JSON.stringify(S.readTransaction("TXN-0912")));
-  const good = {
-    direction: before.direction, tagKey: before.tagKey, amountPaise: before.amountPaise,
-    description: before.description, party: before.party, mode: before.mode,
-    reference: before.reference, valueDate: before.valueDate, accountId: before.accountId,
-    creditKind: before.creditKind,
-  };
-
-  ok("an update that moves nothing is refused — it would stamp an editor onto a row nobody edited",
-    has(S.updateTransaction("TXN-0912", good), "no_change"), true);
-  ok("an update to a blank remark is refused, exactly as recording one is",
-    has(S.updateTransaction("TXN-0912", { ...good, description: "  " }), "Say what it was for"), true);
-  ok("...so is a blank reference",
-    has(S.updateTransaction("TXN-0912", { ...good, reference: " " }), "mandatory"), true);
-  ok("...an amount of zero",
-    has(S.updateTransaction("TXN-0912", { ...good, amountPaise: 0 }), "whole figure above zero"), true);
-  ok("...a value date in the future",
-    has(S.updateTransaction("TXN-0912", { ...good, valueDate: "2099-01-01" }), "cannot be in the future"), true);
-  ok("...an account nobody has",
-    has(S.updateTransaction("TXN-0912", { ...good, accountId: "ACC-NOPE" }), "Pick the account"), true);
-  ok("...a move onto an inactive tag",
-    has(S.updateTransaction("TXN-0912", { ...good, tagKey: "supplies" }), "inactive"), true);
-  ok("...and a reference another record already carries",
-    has(S.updateTransaction("TXN-0912", { ...good, reference: S.readTransaction("TXN-0901").reference }),
-      "duplicate_reference"), true);
-  ok("...but keeping its OWN reference is not a duplicate of itself",
-    has(S.updateTransaction("TXN-0912", { ...good, party: "Somebody else" }), "duplicate_reference"), false);
-  ok("...and turning a debit into a credit needs one of the three permitted kinds",
-    has(S.updateTransaction("TXN-0912", { ...good, direction: "in", creditKind: null }),
-      "Customer money has exactly one way in"), true);
-
-  S.resetStore();
-  const tagBefore = S.tagTotals().rows.filter((r) => r.tag.tagKey === "vendor")[0].spentPaise;
+  const tagBefore = S.tagTotals().rows.filter((r) => r.tag.tagKey === before.tagKey)[0].spentPaise;
   const rowsBefore = S.readTransactions().length;
-  ok("a real update is accepted",
-    S.updateTransaction("TXN-0912", { ...good, tagKey: "vendor", party: "Frame & Light Studio Pvt Ltd" }), "");
+  const outBefore = S.overview().otherOutPaise;
+
+  ok("a cancellation with no reason is refused — it would be a misclick at audit",
+    has(S.cancelTransaction("TXN-0912", "   "), "reason_required"), true);
+  ok("cancelling is accepted", S.cancelTransaction("TXN-0912", "Paid the wrong vendor."), "");
+
   const after = S.readTransaction("TXN-0912");
-  ok("...THE ROW SAYS THE NEW THING — this is the point, and no earlier model did it",
-    [after.tagKey, after.party], ["vendor", "Frame & Light Studio Pvt Ltd"]);
-  ok("...it stamps who restated it and when", [!!after.updatedBy, !!after.updatedAt], [true, true]);
-  ok("...THE HISTORY KEEPS WHAT IT SAID BEFORE, field by field, with what each moved from",
-    /Tag: Photoshoot & content → Vendor & contractor/.test(after.events[0].note)
-      && /Party: Frame & Light Studio → Frame & Light Studio Pvt Ltd/.test(after.events[0].note), true);
+  ok("...NOT ONE FIGURE MOVED — amount, direction, tag, date, party, reference, account, receipt",
+    [after.amountPaise, after.direction, after.tagKey, after.valueDate, after.party,
+      after.reference, after.accountId, !!after.bill],
+    [before.amountPaise, before.direction, before.tagKey, before.valueDate, before.party,
+      before.reference, before.accountId, !!before.bill]);
+  ok("...only its state moved, and the reason rode onto the row",
+    [after.state, after.cancellation.reason], ["cancelled", "Paid the wrong vendor."]);
+  ok("...it records who wrote it off and when", [!!after.cancellation.by, !!after.cancellation.at], [true, true]);
   ok("...the event type it writes is in the vocabulary, not a raw key",
-    !!S.eventMeta(after.events[0].type), true);
-  ok("...and the money followed the tag: the new tag's total went up by the row's amount",
-    S.tagTotals().rows.filter((r) => r.tag.tagKey === "vendor")[0].spentPaise - tagBefore,
-    after.amountPaise);
-  ok("...nothing was appended or removed — one edit, one row, one ledger",
-    S.readTransactions().length, rowsBefore);
-  ok("...and the row it edited is still the same row",
-    [S.readTransaction("TXN-0912").txnId, S.readTransaction("TXN-0912").recordedBy],
-    ["TXN-0912", before.recordedBy]);
+    [after.events[0].type, !!S.eventMeta(after.events[0].type)], ["TXN_CANCELLED", true]);
 
-  /* A CHANGED FIGURE BREAKS A BANK MATCH, because a row whose amount moved is
-     no longer the line it was matched to. */
-  S.resetStore();
-  const matched = S.readTransactions().filter((t) => t.bankLineId)[0];
-  const m0 = {
-    direction: matched.direction, tagKey: matched.tagKey, amountPaise: matched.amountPaise,
-    description: matched.description, party: matched.party, mode: matched.mode,
-    reference: matched.reference, valueDate: matched.valueDate, accountId: matched.accountId,
-    creditKind: matched.creditKind,
-  };
-  ok("editing the remark on a matched row leaves the match alone",
-    [S.updateTransaction(matched.txnId, { ...m0, description: "Reworded, same money" }),
-      !!S.readTransaction(matched.txnId).bankLineId], ["", true]);
-  ok("...but moving its amount takes the match off, because it is no longer that statement line",
-    [S.updateTransaction(matched.txnId, { ...m0, description: "Reworded, same money", amountPaise: m0.amountPaise + 100 }),
-      S.readTransaction(matched.txnId).bankLineId], ["", null]);
-  ok("...and the history says why the match came off with it",
-    S.readTransaction(matched.txnId).events.some((e) => /came off with it/.test(e.note)), true);
+  ok("...NOTHING WAS DELETED — the row is still in the ledger and the ledger is the same length",
+    [S.readTransactions().filter((t) => t.txnId === "TXN-0912").length, S.readTransactions().length],
+    [1, rowsBefore]);
+  ok("...and nothing was appended either: no counter-entry, no negative row",
+    S.readTransactions().filter((t) => t.amountPaise < 0 || /-RV-/.test(t.txnId)).map((t) => t.txnId), []);
 
-  /* THE RECEIPT IS A FIELD ON THE UPDATE, not a write of its own. It had a
-     dialog and a store function to itself while a row's figures could not be
-     amended and its paper could; with one rule there is one screen, and these
-     assertions are what that has to keep true. */
-  S.resetStore();
-  const noBill = S.readTransactions().filter((t) => !t.bill && t.direction === "out")[0];
-  const nb = {
-    direction: noBill.direction, tagKey: noBill.tagKey, amountPaise: noBill.amountPaise,
-    description: noBill.description, party: noBill.party, mode: noBill.mode,
-    reference: noBill.reference, valueDate: noBill.valueDate, accountId: noBill.accountId,
-    creditKind: noBill.creditKind,
-  };
-  ok("a receipt on a backlog row is refused if it is neither an image nor a PDF",
-    has(S.updateTransaction(noBill.txnId, { ...nb, bill: { filename: "sheet.xlsx", mime: "application/vnd.ms-excel", bytes: 900 } }),
-      "bill_type"), true);
-  ok("...and refused if it is over the limit",
-    has(S.updateTransaction(noBill.txnId, { ...nb, bill: { filename: "scan.pdf", mime: "application/pdf", bytes: 40 * 1024 * 1024 } }),
-      "bill_too_big"), true);
-  ok("...held to exactly the rules a receipt attached at the time is held to",
-    S.updateTransaction(noBill.txnId, { ...nb, bill: { filename: "late-receipt.pdf", mime: "application/pdf", bytes: 200 * 1024 } }), "");
-  ok("...the row now carries it, and leaves the missing-bill backlog",
-    [S.readTransaction(noBill.txnId).bill.filename,
-      S.txnRows().filter((r) => r.t.txnId === noBill.txnId)[0].missingBill],
-    ["late-receipt.pdf", false]);
-  ok("...and attaching it is an ordinary field change, named in the same history line",
-    /Receipt: /.test(S.readTransaction(noBill.txnId).events[0].note), true);
+  ok("...but it stopped counting: its tag's total dropped by exactly its amount",
+    tagBefore - S.tagTotals().rows.filter((r) => r.tag.tagKey === before.tagKey)[0].spentPaise,
+    before.amountPaise);
+  ok("...and so did the period's spend",
+    outBefore - S.overview().otherOutPaise, before.amountPaise);
+  ok("...it is reachable by the state filter, so somebody can see what was written off",
+    S.applyTxnFilters(S.txnRows(), { state: "cancelled" }).map((r) => r.t.txnId).indexOf("TXN-0912") >= 0, true);
+  ok("cancelling it twice is refused",
+    has(S.cancelTransaction("TXN-0912", "again"), "invalid_state_transition"), true);
 
-  /* LEAVING IT OUT LEAVES IT ALONE, which is what makes it safe to reopen this
-     dialog to fix a remark on a row that already has paper behind it. */
+  /* A CANCELLED ROW IS NOT CHASED FOR PAPERWORK, and it is not a bank-match
+     candidate: it charges nothing, so proving what it charged proves nothing. */
   S.resetStore();
-  const hasBill = S.readTransactions().filter((t) => t.bill)[0];
-  const hb = {
-    direction: hasBill.direction, tagKey: hasBill.tagKey, amountPaise: hasBill.amountPaise,
-    description: hasBill.description, party: hasBill.party, mode: hasBill.mode,
-    reference: hasBill.reference, valueDate: hasBill.valueDate, accountId: hasBill.accountId,
-    creditKind: hasBill.creditKind,
-  };
-  const keptName = hasBill.bill.filename;
-  ok("an update that does not mention the receipt keeps the one the row has",
-    [S.updateTransaction(hasBill.txnId, { ...hb, party: "Renamed party" }),
-      S.readTransaction(hasBill.txnId).bill.filename], ["", keptName]);
-  ok("...and passing null means the same thing — there is no way to REMOVE a receipt",
-    [S.updateTransaction(hasBill.txnId, { ...hb, party: "Renamed twice", bill: null }),
-      !!S.readTransaction(hasBill.txnId).bill], ["", true]);
-  ok("...while passing a file replaces it, and the history says what it replaced",
-    [S.updateTransaction(hasBill.txnId, { ...hb, bill: { filename: "corrected-invoice.pdf", mime: "application/pdf", bytes: 100 * 1024 } }),
-      S.readTransaction(hasBill.txnId).bill.filename], ["", "corrected-invoice.pdf"]);
-  ok("...naming both the old file and the new one",
-    new RegExp("Receipt: " + keptName.replace(".", "\\.") + " . corrected-invoice\\.pdf")
-      .test(S.readTransaction(hasBill.txnId).events[0].note), true);
-  ok("...and swapping ONLY the receipt is a real change, not a no-op",
-    has(S.updateTransaction(hasBill.txnId, { ...hb, bill: { filename: "corrected-invoice.pdf", mime: "application/pdf", bytes: 100 * 1024 } }),
-      "no_change"), true);
+  const noBill = S.txnRows().filter((r) => r.missingBill)[0];
+  ok("a row missing its bill is in the queue while it stands",
+    S.txnRows().filter((r) => r.missingBill).map((r) => r.t.txnId).indexOf(noBill.t.txnId) >= 0, true);
+  ok("...and leaves the queue the moment it is cancelled, without anyone finding paper for it",
+    [S.cancelTransaction(noBill.t.txnId, "Duplicate of another row."),
+      S.txnRows().filter((r) => r.missingBill).map((r) => r.t.txnId).indexOf(noBill.t.txnId) >= 0],
+    ["", false]);
+
+  /* THE CORRECT FIGURES ARE A NEW ROW. This is the half people forget, so it
+     gets an assertion: cancelling does not leave a hole, it leaves a record,
+     and the ordinary write is what fills the hole. */
+  S.resetStore();
+  const gone = S.readTransaction("TXN-0912");
+  S.cancelTransaction("TXN-0912", "Wrong amount keyed.");
+  const redo = S.recordTransaction({
+    direction: gone.direction, tagKey: gone.tagKey, amountPaise: gone.amountPaise + 5000,
+    description: gone.description, party: gone.party, mode: gone.mode,
+    reference: gone.reference + "-B", valueDate: gone.valueDate, accountId: gone.accountId,
+    creditKind: gone.creditKind, bill: { filename: "bill.pdf", mime: "application/pdf", bytes: 240 * 1024 },
+  });
+  ok("recording the corrected row afterwards is an ordinary write", redo.error, "");
+  ok("...and the books now carry both: the one that was written off and the one that stands",
+    [S.readTransaction("TXN-0912").state, S.readTransaction(redo.txnId).state],
+    ["cancelled", "recorded"]);
+  ok("...with only the standing one in the tag's total",
+    S.tagTotals().rows.filter((r) => r.tag.tagKey === gone.tagKey)[0].spentPaise
+      - (tagBefore - gone.amountPaise), gone.amountPaise + 5000);
 }
 
 console.log("\nwrites · refunds — approval authorises a transfer, it does not make one");
