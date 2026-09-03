@@ -1,0 +1,880 @@
+# Operation · Team Workspace v2 — wireframe and architecture
+
+```
+task:        Extend the Team module into a full workspace: a calendar and a
+             captain timeline over the work items, member-owned tags, links
+             between items, leave requests, virtually-signed agreements
+             (offer letter and NDA), a member resource locker, and pay —
+             salary and incentives — surfaced on the member's own dashboard.
+             Wireframe and architecture only. No production code.
+
+description: The brief reads as a new module. It is not. Team shipped on
+             2026-08-30 with members, roles, attendance, work items, daily
+             plans, EOD reports and a performance view, all live in the panel
+             today. Six of the eight things in this brief attach to records
+             that already exist; two are genuinely new entities. This document
+             is a DELTA, and it says on every screen whether it is extending
+             something shipped or building something new.
+
+operation:   The shipped module was measured first — store types, content
+             seeds, the vocabulary file that carries the module's rules, and
+             the three faces already rendering. Every decision below is taken
+             against what is there, not against a blank page. Where the brief
+             contradicts a rule the module already enforces, the contradiction
+             is named and resolved rather than absorbed.
+
+summary:     Calendar and Timeline become the fourth and fifth FACE of
+             `/work`, not new modules. "Captain" is not a new role — it is
+             `reportsTo`, which has been on the member record since day one.
+             Tags are RECORDS owned by a member, never vocabulary. Links are
+             an edge list forbidden from touching progress rollup. Offer
+             letter and NDA are one `Agreement` entity with a `kind`.
+             Resources (member to company) and Agreements (company to member)
+             are two buckets, not one, because they differ in direction,
+             permission and retention. Team READS pay and never writes it.
+             Leave suppresses a derived absence and never writes an
+             attendance row.
+
+outcome:     Twelve wireframes, ten architecture decisions (TM-AD-12…21), a
+             data-model delta of two new entities and four extended ones, a
+             permission delta, a regression list, six implementation phases,
+             eleven open decisions (TM-OD-20…30) and five risks (TM-R-10…14).
+             NOT code. One open decision — TM-OD-20 — blocks the roster work
+             and needs an answer before Phase A.
+```
+
+**Module:** Team · **Date:** 2026-09-03 · **Status:** awaiting approval
+
+**Supersedes nothing.** This continues
+[OPERATION-2026-08-30-team-module.md](OPERATION-2026-08-30-team-module.md) and uses its
+registers — architecture decisions resume at `TM-AD-12`, open decisions at `TM-OD-20`,
+risks at `TM-R-10`, transactions at `TM-T30`. One module, one set of IDs, so a decision
+and its reversal are never two documents apart.
+
+---
+
+## 0. The shipped module, as measured
+
+Everything in this table is in the panel **today**, on this branch. It was read before
+anything below was designed.
+
+| Surface | Route | Where | State |
+| --- | --- | --- | --- |
+| Members, roles, permission matrix | `/team`, `/roles` | `views/Team/index.tsx`, `views/Roles/**`, `teamShared.tsx` | **live** — `AdminOpsService` |
+| Attendance: open · break · resume · close, week strip, correction | `/attendance` | `views/Team/Attendance.tsx` (336 ln) | **shipped**, seeded |
+| Work items — task · milestone · target, one entity | `/work` | `views/Team/Work.tsx` (375 ln) | **shipped**, seeded |
+| Board face and List face | `/work?face=board\|list` | same | **shipped** |
+| Daily plan and EOD report, with senior acknowledgement | `/reports?face=plan\|eod` | `views/Team/Reports.tsx` (449 ln) | **shipped**, seeded |
+| The data module and every derivation | — | `views/Team/store.ts` (910 ln) | **shipped** |
+| Labels, tones, transition table, the `stored:false` rule | — | `src/content/team/vocabularies.json` | **static copy** |
+
+The three rules `store.ts` exists to enforce are load-bearing for everything below, and
+are quoted here so that no screen in this document can quietly break one:
+
+1. **`absent`, `unclosed` and `delayed` are never stored.** Each is derived at read
+   against the payload's `asOf`. There is no queue in this backend — only a 15-minute
+   cron — so a stored flag would be a stale flag.
+2. **`isLate` IS stored,** written once at open against that member's own `dayStartsAt`.
+   Changing policy tomorrow must not make last month late.
+3. **Milestone and target progress is derived, never typed.** A milestone counts
+   completed children; a target accumulates EOD deltas.
+
+And the convention underneath all three, from the proto README: **an absence is the lack
+of a row.** No record anywhere says "absent". Screens derive it from the roster minus
+what exists, so a day view and a roll-up cannot disagree.
+
+---
+
+## 1. The brief, line by line
+
+Each note from the brief, against what is already there.
+
+| # | The note | Already shipped | What is actually new |
+| --- | --- | --- | --- |
+| 1 | *"manage my JD team too"* | the roster, scoped by `reportsTo` | **Unclear — TM-OD-20.** Is "JD" a second company, a department, or a job-description field on the member? The answer changes the roster's shape. Blocking. |
+| 2 | *Salaries · Incentives · who earns what* | Finance owns `SalaryAccount` / `Payslip` / `SalaryRun` (Module 6) | A **Pay tab** on the member dashboard that READS them, plus **Incentive** — which exists nowhere |
+| 3 | *Agreement — virtually signed — offer letter, NDA* | nothing. Spec'd in the v1 doc §3.11, **never built** | The whole of it: `Agreement`, signature capture, public token page |
+| 4 | *Task dashboard like Google Calendar, weeks* | Board and List faces | **Calendar face** — month and week |
+| 5 | *Add Tasks, milestones, Targets = Column · Column Tag on Column* | one `WorkItem` with `kind`; board columns hard-wired to status | A **selectable column axis** — status, kind, assignee, priority, or tag |
+| 6 | *title, start date, end date, description, link to others, priority, status, tags — Meeting, Call — every member creates their own tag* | title, description, `startDate`, `dueDate`, `priority`, `status`, `parentId`, `blockedByItemId` | **Tags** (member-owned) and **links** (generic, typed) |
+| 7 | *Captain Timeline Layout · Calendar view · so they measure progress* | `/reports` performance view | **Timeline face** — one lane per member, dated bars |
+| 8 | *Resource → documents provided by member* | nothing | **Resource** — a member's own uploaded documents |
+| 9 | *Attendance: login, logout, break, leave request, EOD review* | open · break · resume · close, and EOD review with acknowledgement | **Leave request** only. TM-OD-13 put leave out of v1; this brief puts it back in. |
+
+**Two entities are genuinely new** — `Agreement` and `Resource`. **Two more** — `Tag`
+and `LeaveRequest` — are small and attach to records that exist. Everything else is a
+face, a column, or a read of another module.
+
+---
+
+## 2. Architecture decisions
+
+### TM-AD-12 · Calendar and Timeline are faces of `/work`, not modules
+
+The v1 doc already reserved `#/work?face=calendar` and shipped the `face` param with two
+values. Adding `/calendar` and `/timeline` as module keys would put one dataset behind
+three sidebar rows, triple the permission surface, and give the user three places to ask
+"where is that task".
+
+```
+/work?face=board      shipped
+/work?face=list       shipped
+/work?face=calendar   new — §3.3
+/work?face=timeline   new — §3.4
+/work?item=W-K04      shipped — a drawer over whichever face is open
+```
+
+The drawer already composes over any face. It keeps doing so, which is why neither the
+calendar nor the timeline needs a detail view of its own.
+
+### TM-AD-13 · "Captain" is `reportsTo`. No new role concept.
+
+The brief says *Captain Timeline*. The module already has exactly one hierarchy axis:
+`Member.reportsTo`, one level deep, never transitive — chosen in v1 precisely because a
+recursive default is a permission that silently widens every time somebody is hired.
+
+A "captain" is therefore **a member whom at least one other member reports to**. It is
+derived, not stored, and needs no new field, no new role and no new grant. The timeline
+face renders one lane per member in the viewer's `team` scope, which is the scope axis
+the vocabulary file already defines.
+
+> Building a second hierarchy for the word *captain* would give the module two answers
+> to "who is this person's senior", and they would drift within a month.
+
+### TM-AD-14 · Tags are records owned by a member, never vocabulary
+
+The brief says **"every member creates their own tag"**. That one clause decides the
+design, and it puts tags on the opposite side of the module's existing line:
+`vocabularies.json` is static copy for things the *company* names — statuses, priorities,
+employment types. A tag someone types at 3pm is a record.
+
+```
+Tag { tagId · ownerId · slug · label · colourToken · createdAt · archivedAt }
+      identity is (ownerId, slug)
+```
+
+Three consequences, each the reason for the next:
+
+- **Two members may both have "Client call".** They are different rows. Neither can
+  rename or delete the other's.
+- **Cross-member views group by `slug`, not `tagId`.** So a captain's timeline shows one
+  *Client call* lane covering both members' items — otherwise a team view fragments into
+  one column per person per tag and is useless at five people.
+- **A rename never rewrites anyone else's history.** The owner's label changes, the slug
+  is stable, other members' rows are untouched.
+
+`colourToken` is drawn from the panel's existing six tones — `ok · warn · bad · info ·
+brand · neutral` — and not from a colour picker. A free picker on a per-member tag
+produces a board where two people's palettes collide, and it would introduce the first
+non-token colour in a panel where dark mode is a token swap rather than a second palette.
+
+Seed suggestions — *Meeting, Call, Follow-up, Site visit, Review, Admin* — go in
+`vocabularies.json` as `tagSuggestions[]`, because they are static copy. The tags a
+member actually keeps are records in `tags.json`. **Suggesting is vocabulary; owning is a
+record.**
+
+### TM-AD-15 · The board's column axis becomes selectable
+
+*"Add Tasks, milestones, Targets = Column … like Column Tag on Column."* Read as: the
+column is a grouping choice, not a fixed property of the board.
+
+```
+Group by:  [ Status ▾ ]   Status · Kind · Assignee · Priority · Tag
+```
+
+`Status` stays the default because it is what ships today, and it is the only axis whose
+columns carry a transition table — dragging between status columns means something.
+**On every other axis the columns are read-only groupings.** You cannot drag a card from
+Meera's column into Arjun's and have that mean "reassign", because reassignment needs a
+reason and an audit row, and a drag has neither. That is TM-OD-08's answer applied to a
+case v1 did not have.
+
+### TM-AD-16 · Links are an edge list, and they never touch rollup
+
+The model already has two relationships, and both are load-bearing:
+
+- `parentId` — **the hierarchy.** Milestone progress is `completed children ÷ total`.
+- `blockedByItemId` — set only alongside `status: blocked` and a reason.
+
+The brief's *"link to others"* is a third, weaker thing, and it must stay weaker:
+
+```
+WorkLink { fromItemId · toItemId · relation · createdById · createdAt }
+           relation ∈ relates_to | duplicates | follows
+```
+
+> **TM-BR-02 · A `WorkLink` may never affect progress, status or scheduling.**
+> The moment `relates_to` contributes to a milestone percentage, the module has two
+> hierarchies and rule 3 in `store.ts` is dead. Rollup reads `parentId` and nothing else.
+
+`follows` is ordering information **for the timeline face only** — it draws a connector.
+It does not gate a start, because a gate needs a scheduler and this backend has a cron.
+
+### TM-AD-17 · One `Agreement` entity; offer letter and NDA are kinds
+
+Both are: a document generated from a template, frozen at send, delivered by a token
+link, read by someone outside the panel, signed, and stored immutably. That is one
+lifecycle. Two entities would mean two token systems, two signature captures and two
+audit trails for one behaviour.
+
+```
+Agreement { agreementId · kind · memberId · title · bodyHtml · version
+            status · sentAt · viewedAt · signedAt · declinedAt
+            signatureImageKey · signatureTypedName · signerIp · signerUa
+            tokenHash · tokenExpiresAt · supersededById }
+
+kind   ∈ offer_letter | nda | policy_ack | custom
+status ∈ draft | sent | viewed | signed | declined | expired | revoked
+```
+
+It reuses the quotation module's **freeze-and-version** machinery, which is the panel's
+existing answer to "the document must not change after it was sent". The v1 doc
+established the rest of the mechanism — TM-OD-06 signature, TM-OD-07 expiry, TM-R-04
+private objects, TM-R-05 the unauthenticated write surface — and none of it is
+re-litigated here.
+
+**`policy_ack` is in the enum and out of v1.** It is the same shape with no
+counter-signature, and naming it now costs nothing while adding it later costs a
+migration.
+
+### TM-AD-18 · Resources and Agreements are two buckets, not one
+
+Both are "documents attached to a member", and merging them is the obvious move. It is
+wrong on three axes at once:
+
+| | **Agreement** | **Resource** |
+| --- | --- | --- |
+| Direction | company → member | member → company |
+| Who uploads | admin | the member |
+| Signature | required — it is the point | none |
+| Immutable | yes, frozen at send | no, replaceable |
+| Contains | terms the member agreed to | Aadhaar, PAN, degree, address proof |
+| Retention | as long as employment is provable | **deletable on request** |
+
+The last row settles it. Identity documents are the most sensitive records this panel
+will hold, and a member asking for theirs to be removed is a request the system must be
+able to honour without touching a signed agreement. One bucket makes that a per-row
+conditional; two buckets make it a permission.
+
+### TM-AD-19 · Team reads pay. It never writes it.
+
+`BACKEND-INTEGRATION.md` § Module 7 already states this for slips: *"Team does not
+generate slips — `SalaryAccount` / `Payslip` / `SalaryRun` in Module 6 already do, with
+components frozen at issue. Two engines generating one slip is a second source of truth
+for one number."* The brief's *"salaries · incentives · what they earn"* does not change
+that; it asks for the read to be visible on the member.
+
+**Incentive is new, and it is Finance's record with a Team basis:**
+
+```
+Incentive { incentiveId · memberId · basisType · basisId · label
+            amount · currency · earnedOn · status · payslipId }
+
+basisType ∈ work_item | target | manual
+status    ∈ pending | approved | paid | rejected
+```
+
+The money and its approval are Finance's — the same module that owns every other rupee.
+`basisType`/`basisId` points back at the Team record that earned it, which is the join
+that makes the brief's *"who the fee, what they earn"* answerable in one query.
+
+> **A target's `currentValue` must never be read as an amount owed.** Progress is a
+> count of what happened; an incentive is a decision somebody made about it. Deriving
+> pay from a progress bar means an EOD report edits a payslip.
+
+### TM-AD-20 · Leave suppresses a derived absence. It never writes an attendance row.
+
+TM-OD-13 put leave out of v1. It is back in, and the interesting part is not the form —
+it is that leave collides head-on with the module's central claim.
+
+If an approved leave day wrote an attendance row, `attendanceStates` would need a seventh
+state, that state would carry `stored: true`, and **the rule that an absence is the lack
+of a row would be dead** — because now some absences are rows and some are not, and every
+roll-up would have to know which.
+
+So:
+
+```
+LeaveRequest { requestId · memberId · fromDate · toDate · kind · reason
+               status · decidedById · decidedAt · decisionNote · createdAt }
+
+kind   ∈ casual | sick | unpaid | comp_off
+status ∈ requested | approved | rejected | cancelled
+```
+
+and the derivation changes in exactly one place:
+
+```
+absent  =  no attendance row
+           AND the business day is over
+           AND no APPROVED LeaveRequest covers that date      ← the only new clause
+```
+
+`on_leave` is a **derived** display state with `stored: false`, joining `absent` and
+`unclosed` in the vocabulary. It renders where `absent` would have. Nothing sweeps,
+nothing is written, and the roster-minus-what-exists derivation still produces one
+answer.
+
+### TM-AD-21 · The member dashboard is one route with tabs
+
+`/team/:id` (admin) and `/team/me` (member) already resolve to one component — TM-OD-15.
+The three new member-scoped surfaces are **tabs on it**, not routes:
+
+```
+/team/me?tab=overview | work | attendance | pay | agreements | resources
+```
+
+Six tabs is at the edge of comfortable. It is still better than six routes, because every
+one of them would need the same header, the same scope check and the same member
+resolution — and a second screen is a second place for those to drift.
+
+---
+
+## 3. The wireframes
+
+Notation: `[ ]` a control · `▾` a menu · `◍` a member · `◆` a milestone or target ·
+`⚠` derived warning · **NEW** on a block that does not exist today.
+
+### 3.1 Navigation — unchanged
+
+No new sidebar rows. Everything below lands inside the four destinations the Team group
+already has.
+
+```
+Team
+  ├─ Members        /team          live
+  ├─ Roles          /roles         live
+  ├─ Attendance     /attendance    + leave request, + leave inbox      NEW blocks
+  ├─ Work           /work          + calendar face, + timeline face    NEW faces
+  └─ Reports        /reports       unchanged
+        /team/me    the member dashboard — + pay, agreements, resources tabs
+```
+
+### 3.2 Work — the selectable column axis (extends the shipped board)
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│ [ ▤ Board ] [ ☰ List ] [ ▦ Calendar ]NEW [ ⊞ Timeline ]NEW                        │
+├──────────────────────────────────────────────────────────────────────────────────┤
+│ ⌕ Search  [Member ▾][Kind ▾][Status ▾][Priority ▾][Tag ▾]NEW   [+ New item]       │
+│ Group by: [ Tag ▾ ]NEW    Status · Kind · Assignee · Priority · Tag               │
+├──────────────────────────────────────────────────────────────────────────────────┤
+│ 34 items │ ● 12 in progress · 8 planned │ ⚠ 5 delayed │ ● 2 blocked │ 7 done      │
+├──────────────────────────────────────────────────────────────────────────────────┤
+│  ┌─◆ MEETING 6─┐ ┌─◆ CALL 11──┐ ┌─◆ SITE VISIT 4┐ ┌─UNTAGGED 13─┐                │
+│  │ ▸ Vendor    │ │ ▸ 3 leads  │ │ ▸ Sharma flat │ │ ▸ Q3 draft  │                │
+│  │   ◍ Meera   │ │   ◍ Arjun  │ │   ◍ Meera     │ │   ◍ Sanjay  │                │
+│  │   HIGH ⚠2d  │ │   MED      │ │   LOW  10 Sep │ │   ✓ 29 Aug  │                │
+│  │   ◆ Q3      │ │   ◆ Q3     │ │               │ │             │                │
+│  └─────────────┘ └────────────┘ └───────────────┘ └─────────────┘                │
+│                                                                                   │
+│  ⓘ Cards may be dragged only when Group by = Status. On every other axis the      │
+│    columns are a grouping, and a reassignment needs a reason (TM-AD-15).          │
+└──────────────────────────────────────────────────────────────────────────────────┘
+```
+
+**`UNTAGGED` is always the last column and is never hidden.** A grouping that silently
+drops the ungrouped rows is a board that lies about its own count — the strip at the top
+says 34 and the columns must still add to 34.
+
+### 3.3 Calendar — `/work?face=calendar` NEW
+
+Builds on the v1 §3.7 sketch. Google Calendar is UX inspiration only: taken — the month
+grid, the coloured chip, click-a-day-to-create, keyboard paging. Not taken — overlapping
+event layout, all-day vs timed lanes, recurrence, invitations, drag-to-resize.
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│ ‹ August 2026 ›  [Month][Week]  [Member ▾][Kind ▾][Tag ▾]        [+ New item]     │
+├────────┬────────┬────────┬────────┬────────┬────────┬────────────────────────────┤
+│  MON   │  TUE   │  WED   │  THU   │  FRI   │  SAT   │  SUN                       │
+├────────┼────────┼────────┼────────┼────────┼────────┼────────────────────────────┤
+│  24    │  25    │  26    │  27    │  28    │  29    │  30                        │
+│ ●Triage│ ●Calls │ ◆Q3 60%│ ●Draft │ ●Triage│        │                            │
+│ ●Review│ ⚠Late  │        │ ●Calls │ ⚠Block │        │                            │
+│ +2 more│        │        │        │        │        │                            │
+├────────┼────────┼────────┼────────┼────────┼────────┼────────────────────────────┤
+│  31    │   1    │   2    │   3    │   4    │   5    │   6                        │
+│ ◆Q3 due│        │        │ TODAY  │        │        │                            │
+└────────┴────────┴────────┴────────┴────────┴────────┴────────────────────────────┘
+   chip tone = status  ·  ◆ = milestone/target  ·  ⚠ = delayed or blocked
+   click a day → new item with that date prefilled  ·  click a chip → item drawer
+```
+
+**A multi-day item appears on every day it spans, not only its due date.** `startDate`
+has been on the model since v1 and the board never used it; the calendar is the first
+face where it means anything, and an item that shows only on its last day is a deadline
+list rather than a schedule.
+
+**Week view is the same grid with seven columns and rows by item — no hour gutter.**
+Nothing in this module has a start and end *time* except attendance, which has its own
+strip. An hour grid would be mostly empty and is the largest piece of net-new UI in the
+plan for the least return.
+
+**Drag and drop stays out** (TM-OD-08, reaffirmed). Reschedule is a date field in the
+drawer.
+
+### 3.4 Captain timeline — `/work?face=timeline` NEW
+
+The brief's *"so they measure progress"*. One lane per member in the viewer's scope,
+bars from `startDate` to `dueDate`.
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│ ‹ Aug 24 – Sep 20 ›  [2w][4w][Quarter]  [Group: Member ▾]NEW      Meera's team    │
+├──────────────┬───────────────────────────────────────────────────────────────────┤
+│              │ 24  25  26  27  28  29  30  31 │ 1   2   3   4   5   6   7        │
+│              │                          ┊TODAY                                    │
+├──────────────┼───────────────────────────────────────────────────────────────────┤
+│ ◍ Meera Nair │ ▓▓▓▓▓▓▓▓░░░░  Enquiry triage         ⚠ 2d over                    │
+│   4 open     │      ▓▓▓▓▓▓▓▓▓▓▓▓▓▓  ◆ Q3 response time      60%                  │
+│              │                    ▓▓▓▓▓  Vendor meeting                          │
+├──────────────┼───────────────────────────────────────────────────────────────────┤
+│ ◍ Arjun Rao  │   ▓▓▓▓  Call 3 leads  ✓                                           │
+│   2 open     │              ▓▓▓▓▓▓▓▓╌╌╌╌▶ Follow up   ← ╌▶ = follows link        │
+├──────────────┼───────────────────────────────────────────────────────────────────┤
+│ ◍ Sanjay K.  │         ▒▒▒▒▒▒▒▒▒▒  ON LEAVE (approved)                           │
+│   0 open     │                                                                    │
+├──────────────┴───────────────────────────────────────────────────────────────────┤
+│ bar fill = derived progress · ⚠ = delayed · ▒ = approved leave · click → drawer   │
+└──────────────────────────────────────────────────────────────────────────────────┘
+```
+
+Three things this view must **not** become, each of which is the usual way a timeline
+rots:
+
+- **Not a Gantt with dependencies that gate.** `follows` draws the connector and nothing
+  more (TM-AD-16).
+- **Not a resource planner.** No capacity bar, no allocation percentage. The module has
+  no estimate field and inventing one to fill a chart is how estimates get born.
+- **Not a ranking.** TM-OD-11 stands: show the numbers, sort by any column, compute no
+  score.
+
+**An item with no `startDate` cannot be drawn** and is listed under the grid as *"6
+items with no dates — schedule them"*, which is the honest state rather than a bar
+starting at an invented date.
+
+### 3.5 Item drawer v2 — tags, links, dates (extends the shipped drawer)
+
+```
+┌─ WORK ITEM ─────────────────────────────────────────────┐
+│ ▸ Vendor meeting — Sharma Interiors  ●in progress  HIGH │
+├─────────────────────────────────────────────────────────┤
+│ Kind          task                                      │
+│ Assigned to   ◍ Meera Nair                              │
+│ Tags          [Meeting ×] [Client ×] [+ add]        NEW │
+│ Rolls up to   ◆ Q3 enquiry response time         → open │
+│ Starts        28 Aug 2026                          NEW* │
+│ Due           31 Aug 2026   (2 days)                    │
+│ Description   …                                         │
+│ Progress      ▓▓▓▓▓▓░░░░ 60%       ← milestone / target │
+├─────────────────────────────────────────────────────────┤
+│ LINKED ITEMS                                        NEW │
+│  ↔ relates to   ▸ Pricing sheet for Sharma       → open │
+│  ⊘ duplicates   ▸ Call Sharma about vendor       → open │
+│  ⇢ follows      ▸ Site visit — Sharma flat       → open │
+│  [+ link an item]                                       │
+├─────────────────────────────────────────────────────────┤
+│ ACTIVITY  created · assigned · tagged · status × 3      │
+├─────────────────────────────────────────────────────────┤
+│ [Start] [Complete] [Block…]           [Edit] [Cancel…]  │
+└─────────────────────────────────────────────────────────┘
+```
+
+`NEW*` — `startDate` is already on the model and already in the seed. It has simply never
+been shown, because neither shipped face used it. The calendar and timeline both do.
+
+**The tag picker offers the member's own tags first, then the suggestions, then "create".**
+Creating from the picker is one keystroke and is the only place tags are born — a
+separate "create tag" screen would be a second entry point to a six-field record.
+
+### 3.6 Tag manager — `/team/me?tab=work` sub-panel NEW
+
+Small, and deliberately not a module.
+
+```
+┌─ MY TAGS ───────────────────────────────────────────────┐
+│  ● Meeting        info    12 items    [rename] [archive]│
+│  ● Call           brand   11 items    [rename] [archive]│
+│  ● Site visit     ok       4 items    [rename] [archive]│
+│  ● Follow-up      warn     7 items    [rename] [archive]│
+│  [+ new tag]                                            │
+│                                                         │
+│  ⓘ Your tags are yours. Renaming one changes it on your │
+│    items only — other members' tags with the same name  │
+│    are their own records (TM-AD-14).                    │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Archive, not delete.** A deleted tag would have to either strip itself from historical
+items — rewriting what a completed task was filed under — or leave dangling ids. Archive
+removes it from the picker and leaves history intact, which is the same answer the module
+already gives for `cancelled` work items.
+
+### 3.7 Attendance — the leave request block NEW
+
+Added to the shipped `/attendance` screen. The clock strip above it does not move.
+
+```
+┌─ MY DAY ──────────────────── Thu 3 Sep 2026 · 14:20 ────┐
+│  ● Working   started 9:04 (late 4m)  ·  worked 4h 32m   │
+│  [Take a break]                        [End the day]    │  ← shipped
+├─────────────────────────────────────────────────────────┤
+│  LEAVE                                              NEW │
+│  ┌───────────────────────────────────────────────────┐  │
+│  │ Requested   12–13 Sep    casual    ⏳ with Meera  │  │
+│  │ Approved    28 Aug       sick      ✓ by Meera     │  │
+│  └───────────────────────────────────────────────────┘  │
+│  [Request leave]                                        │
+└─────────────────────────────────────────────────────────┘
+
+┌─ REQUEST LEAVE ─────────────────────────────────────────┐
+│  From [ 12 Sep 2026 ]   To [ 13 Sep 2026 ]   2 days     │
+│  Kind [ Casual ▾ ]      casual · sick · unpaid · comp-off│
+│  Reason                                                  │
+│  [ Family function, out of Delhi_____________________ ]  │
+│                                                          │
+│  ⓘ Goes to Meera Nair, who you report to. Until it is   │
+│    approved these days still count as absent.           │
+│                                                          │
+│                              [Cancel]  [Send request ▸] │
+└─────────────────────────────────────────────────────────┘
+```
+
+That last note is the screen stating the rule from TM-AD-20 in the words the rule
+actually has. A pending request changes nothing; only an approved one suppresses the
+derived absence.
+
+**Requesting leave for a date that already has an attendance row is refused inline** —
+"you clocked in on 12 Sep". The member worked; a leave record over it would make the
+same day both.
+
+### 3.8 Leave inbox — senior side, on `/attendance` NEW
+
+```
+┌─ LEAVE REQUESTS ─────────────── 3 waiting on you ───────┐
+│  ◍ Sanjay Kumar   12–13 Sep  casual   2d   "Family…"    │
+│      Team that week: Meera on leave 12 Sep too      ⚠   │
+│                              [Reject…]  [Approve]       │
+├─────────────────────────────────────────────────────────┤
+│  ◍ Arjun Rao      15 Sep     sick     1d   "Fever"      │
+│                              [Reject…]  [Approve]       │
+└─────────────────────────────────────────────────────────┘
+```
+
+**The overlap warning is a warning, not a block.** The system does not know how many
+people the day needs. Refusing on a rule nobody configured would be the module inventing
+a staffing policy; showing the clash lets the person who does know decide.
+
+**Reject demands a reason** — the panel's existing pattern for every explanatory
+transition, the same one `Block` and `Cancel` already use.
+
+### 3.9 Agreements — three surfaces NEW
+
+**Admin side**, `/team/:id?tab=agreements`:
+
+```
+┌─ AGREEMENTS ── ◍ Sanjay Kumar ──────────────────────────┐
+│  Offer letter   v2   ✓ signed 26 Aug 14:02   [view PDF] │
+│                      viewed 26 Aug 13:41                │
+│  NDA            v1   ● sent 2 Sep · expires 9 Sep       │
+│                      not opened yet   [resend] [revoke] │
+│  Offer letter   v1   ⊘ superseded by v2      [view]     │
+│  [+ New agreement ▾]   Offer letter · NDA · Custom      │
+└─────────────────────────────────────────────────────────┘
+```
+
+**The public page**, `/a/<token>` — outside `/api`, no session, mounted the way the
+quotation share link already is:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│               Interior Bazzar — Offer Letter            │
+│                                                          │
+│  Dear Sanjay Kumar,                                      │
+│  … frozen document body, exactly as sent …               │
+│                                                          │
+├─ SIGN ──────────────────────────────────────────────────┤
+│  Type your full name                                     │
+│  [ Sanjay Kumar_________________________ ]               │
+│                                                          │
+│  or draw it            ┌────────────────────────┐        │
+│                        │      ~Sanjay~          │ [clear]│
+│                        └────────────────────────┘        │
+│                                                          │
+│  ☐ I have read and agree to the terms above.            │
+│                                                          │
+│           [ Decline ]              [ Sign and accept ▸ ] │
+│  ⓘ This link expires 9 Sep 2026. Your name, the time,   │
+│    and your IP address are recorded with the signature.  │
+└─────────────────────────────────────────────────────────┘
+```
+
+Typed is first in tab order (TM-AD-06). The disclosure line is not decoration — recording
+an IP against a legal signature is something the signer is entitled to be told before
+they sign, not after.
+
+**Three states this page must handle and most link pages get wrong:** an expired token
+(offer to request a new link, do not show the document), a token already signed (show the
+signed copy read-only, never a second signature box), and a revoked token (say revoked,
+not "not found" — a candidate who was told a letter was coming deserves better than a
+404).
+
+**Opening the page writes the first real `VIEWED` event in this codebase.** The
+quotation module's `viewed` is a *seller* claiming it. This one is the recipient's own
+request, and the distinction is worth keeping in the audit trail.
+
+### 3.10 Resources — the member's own documents NEW
+
+`/team/me?tab=resources`, and the same tab read-only on the admin side.
+
+```
+┌─ MY DOCUMENTS ──────────────────────────────────────────┐
+│  Required                                                │
+│   ✓ PAN card          uploaded 26 Aug        [replace]  │
+│   ✓ Aadhaar           uploaded 26 Aug        [replace]  │
+│   ⚠ Address proof     not uploaded           [upload]   │
+│   ⚠ Bank passbook     not uploaded           [upload]   │
+│                                                          │
+│  Other                                                   │
+│   ✓ B.Arch degree     uploaded 27 Aug   [replace] [×]   │
+│   [+ add a document]                                     │
+│                                                          │
+│  ⓘ Only you and an admin can open these. Required        │
+│    documents cannot be removed while you are active.     │
+└─────────────────────────────────────────────────────────┘
+```
+
+**"Required" is a vocabulary list, not a gate.** Nothing in the panel blocks on a missing
+document; it shows as missing on the member row and in the admin's roster filter. A hard
+gate would stop somebody working on their first day over a scan.
+
+> **TM-R-11 applies here in full.** Every S3 upload in this backend today is a public
+> URL. Identity documents must be private objects behind a signed read. This is the
+> single most sensitive surface in the module.
+
+### 3.11 Pay — salary and incentives, read from Finance NEW
+
+`/team/me?tab=pay`:
+
+```
+┌─ PAY ───────────────────────────────── ◍ Sanjay Kumar ──┐
+│  Salary account            ₹ 62,000 / month             │
+│  Effective from            1 Jun 2026                   │
+│  Paid from                 HDFC current · ACC-HDFC-4021 │
+│                            → read from Finance          │
+├─ PAYSLIPS ──────────────────────────────────────────────┤
+│  Aug 2026    ₹ 62,000   + ₹ 4,500 incentive   [download]│
+│  Jul 2026    ₹ 62,000                          [download]│
+│  Jun 2026    ₹ 41,333   pro-rata               [download]│
+├─ INCENTIVES ────────────────────────────────────────NEW─┤
+│  ₹ 4,500   Aug   ◆ Close 40 deals — 45 closed   ✓ paid  │
+│  ₹ 2,000   Sep   ▸ Sharma Interiors onboarded   ⏳ pending│
+│  ⓘ Earned against work; approved and paid by Finance.   │
+└─────────────────────────────────────────────────────────┘
+```
+
+Every figure on this screen is a read (TM-AD-19). There is no edit control anywhere on
+the member side, and on the admin side the buttons link **into Finance** rather than
+writing from Team.
+
+**The incentive rows are the join the brief asked for**, in both directions: from a
+target, *what did this earn*; from a member, *what have they earned*.
+
+### 3.12 Captain dashboard — the roll-up on `/reports`
+
+The shipped performance view gains three blocks. It is not redesigned.
+
+```
+┌─ TODAY ───────────────────────── Thu 3 Sep 2026 ────────┐
+│  In 6 · late 1 · on leave 1 · absent 0 · unclosed 2  ⚠  │  ← + on leave  NEW
+│  Plans in 5/7 · EOD in 0/7 (day is not over)            │
+├─ WAITING ON YOU ────────────────────────────────────NEW─┤
+│  3 leave requests  ·  2 EOD reports unacknowledged      │
+│  1 agreement sent 8 days ago, never opened          ⚠   │
+├─ PROGRESS ──────────────────────────────────────────────┤
+│  ◆ Q3 response time   ▓▓▓▓▓▓░░░░ 60%   due 30 Sep       │
+│  ◆ Close 40 deals     ▓▓▓▓▓▓▓▓▓▓ 45/40 ✓                │
+│                              [open the timeline ▸]  NEW │
+└─────────────────────────────────────────────────────────┘
+```
+
+**"Waiting on you" is the only genuinely new idea here**, and it is one query per row
+rather than a feed: things that have stopped because a specific person has not acted.
+An unopened agreement belongs in it for the same reason a pending leave request does —
+both are blocked on a human, and neither shows up anywhere else until someone goes
+looking.
+
+---
+
+## 4. Data model delta
+
+### 4.1 New entities
+
+| Entity | Owner | Key | Note |
+| --- | --- | --- | --- |
+| `Tag` | Team | `(ownerId, slug)` | Member-owned. Archived, never deleted. |
+| `WorkLink` | Team | `(fromItemId, toItemId, relation)` | Edge list. Forbidden from rollup (TM-BR-02). |
+| `LeaveRequest` | Team | `requestId` | Approved rows suppress a derived absence. |
+| `Agreement` | Team | `agreementId` | Frozen at send, versioned, token-delivered. |
+| `Resource` | Team | `resourceId` | Private object. Deletable on request. |
+| `Incentive` | **Finance** | `incentiveId` | Team supplies the basis; Finance owns the money. |
+
+Five of the six are Team's. `Incentive` is deliberately not, and that is TM-AD-19.
+
+### 4.2 Extended entities
+
+| Entity | Added | Why |
+| --- | --- | --- |
+| `WorkItem` | `tagIds[]`, `links[]` (derived from `WorkLink`) | §3.5. `startDate` already exists and is finally used. |
+| `Member` | `departmentId` *(reserved, TM-OD-20)* | Reserved so the answer to TM-OD-20 is additive either way. |
+| `AttendanceDay` | nothing | Leave does not touch it. That is the point of TM-AD-20. |
+| `vocabularies.json` | `tagSuggestions[]`, `leaveKinds[]`, `linkRelations[]`, `agreementKinds[]`, `resourceKinds[]`, `on_leave` in `attendanceStates` with `stored: false` | Static copy, all of it. |
+
+### 4.3 Content files this adds
+
+Following the proto convention — one file per endpoint, `$comment` at the top, JSON not
+TS, committed under the `.gitignore` carve-out.
+
+```
+src/content/team/
+  tags.json         → GET /admin/team/tags                 placeholder records
+  leave.json        → GET /admin/team/leave?from&to        placeholder records
+  agreements.json   → GET /admin/team/agreements           placeholder records
+  resources.json    → GET /admin/team/resources            placeholder records
+  vocabularies.json → extended, STATIC COPY (not placeholder)
+
+src/content/finance/
+  incentives.json   → GET /admin/finance/incentives        placeholder records
+```
+
+`work.json` gains `tagIds[]` and a `links[]` array on existing seed rows rather than a new
+file — they are fields on an item, and the endpoint that returns the item returns them.
+
+**No new file for the timeline or the calendar.** Both are faces over `work.json`, and a
+file per face would be the exact mistake rule 1 of the convention exists to prevent.
+
+---
+
+## 5. Permission delta
+
+No new module keys. The four that exist absorb everything:
+
+| Key | New verbs | On |
+| --- | --- | --- |
+| `attendance` | `leave.request` *(self, no grant needed)* · `leave.decide` | §3.7, §3.8 |
+| `work` | none — tags and links are self-scope on your own items | §3.2–3.6 |
+| `team` | `agreement.send` · `agreement.revoke` · `resource.view` | §3.9, §3.10 |
+| *(Finance)* | `incentive.approve` — **Finance's key, not Team's** | §3.11 |
+
+**Self-scope needs no grant** — the rule from the v1 doc §6.3 is inherited unchanged. A
+member requests their own leave, makes their own tags, uploads their own documents and
+reads their own pay without holding a single permission. Everything that acts on somebody
+else needs a verb.
+
+> **TM-BR-01 still stands: never add `team` to `PROTO_MODULES`.** It has a real `Module`
+> row and real server data. The four new verbs go on the server the normal way. The three
+> operational keys that ARE in `PROTO_MODULES` stay there only until their endpoints
+> land, and each comes out in the same commit as its endpoint.
+
+---
+
+## 6. Regression risk — what this touches that already works
+
+| File | Change | Risk |
+| --- | --- | --- |
+| `views/Team/store.ts` | the `absent` derivation gains one clause | **High.** It is the module's central rule. Every attendance screen and every roll-up reads it. |
+| `views/Team/Work.tsx` | two new faces, selectable column axis | **Medium.** Board and List must render identically to today when Group by = Status. |
+| `views/Team/Attendance.tsx` | a leave block below the clock | **Low.** Additive; the clock strip does not move. |
+| `views/Team/Reports.tsx` | three blocks on the roll-up | **Low.** Additive. |
+| `content/team/vocabularies.json` | five new lists, one new state | **Medium.** `stored: false` on `on_leave` is load-bearing; getting it wrong makes leave writable. |
+| `content/team/work.json` | two fields on existing rows | **Low.** |
+| `admin-theme.css` / `team.css` | timeline and calendar grids | **Medium.** Use the `tm-` prefix. Four class collisions are already on record in this repo. |
+
+**Must not change:** `teamShared.tsx` (`ActionMatrix` is canonical and shared with
+Roles) · `views/Roles/**` · anything under `views/Finance/**` — the Pay tab **reads**
+Finance and must not edit a file in it · `auth/session.ts` beyond leaving
+`PROTO_MODULES` alone.
+
+**Re-verify after every phase:** the board renders unchanged with Group by = Status · a
+member with no leave rows still derives `absent` exactly as today · `npx tsc -b` and
+`npx eslint` clean · `npm run check:finance` still passes untouched.
+
+---
+
+## 7. Implementation phases
+
+Ordered by dependency. Each leaves the panel working.
+
+| Phase | What | Depends on |
+| --- | --- | --- |
+| **A** | Vocabulary extension + `tags.json` + tag records, picker and manager (§3.5, §3.6) | TM-OD-20 answered |
+| **B** | Selectable column axis on the board (§3.2) | A — Tag is one of the axes |
+| **C** | Calendar face, month then week (§3.3) | — |
+| **D** | Timeline face (§3.4) | C shares the date-grid mechanics |
+| **E** | Leave: request, inbox, and the one-clause derivation change (§3.7, §3.8, TM-AD-20) | — |
+| **F** | Links on the item drawer (§3.5) | D — `follows` draws on the timeline |
+| **G** | Agreements: admin list, public page, signature (§3.9) | — largest server surface |
+| **H** | Resources (§3.10) | private-object storage — TM-R-11 |
+| **I** | Pay tab (§3.11) and the roll-up blocks (§3.12) | Finance's incentive endpoint |
+
+**Parallel-safe:** {A→B}, {C→D}, {E}, {G}, {H} are four independent tracks.
+**Not parallel-safe:** E touches `store.ts`'s central derivation — nothing else edits
+that file while it is in flight. G and H both add storage and both must land after the
+private-object decision, not before it.
+
+---
+
+## 8. Open decisions
+
+| ID | Question | Recommendation |
+| --- | --- | --- |
+| **TM-OD-20** | **"My JD team" — is JD a second company, a department, or a job-description field?** The roster's shape depends on it. **Blocking Phase A.** | Ask. If it is a *department*, add `departmentId` to Member and one filter — cheap. If it is a *second company*, this is a tenancy question and it is bigger than this document. |
+| **TM-OD-21** | Can an admin create a tag on somebody else's behalf? | **No.** Member-owned means member-owned; an admin tag would need an owner and there is no company owner. |
+| **TM-OD-22** | Tag limit per member? | **Soft cap 20**, warn not block. Past that a tag list stops being a filter. |
+| **TM-OD-23** | Does approved leave need a balance/quota? | **No quota in v1.** A quota needs an accrual policy, a carry-forward rule and a year-end job. Record the days; count them in a report. |
+| **TM-OD-24** | Can a member cancel an approved future leave? | **Yes, before the from-date**, and it notifies the approver. After it starts, an admin corrects it. |
+| **TM-OD-25** | Who approves leave when the member has no `reportsTo`? | Falls to any holder of `attendance.leave.decide`. Shown as *"waiting on an admin"*, never silently unrouted. |
+| **TM-OD-26** | Does a signed offer letter auto-activate the account? | **No** — TM-OD-19 stands. Acceptance is the candidate's act; activation is the admin's. |
+| **TM-OD-27** | Can an NDA be sent to a non-member? | **Not in v1.** `Agreement.memberId` is required. A prospect NDA means a party record this module does not have. |
+| **TM-OD-28** | Which resource kinds are "required"? | Vocabulary, so it is configurable without a deploy. Seed: PAN, Aadhaar, address proof, bank passbook. |
+| **TM-OD-29** | Who may approve an incentive? | **Finance**, not the captain. The captain proposes from a work item; Finance approves the money. |
+| **TM-OD-30** | Retention on `Resource` after a member leaves? | Flagged, not answered — a data-protection question, not an engineering one. Same status as TM-OD-17. |
+
+## 9. Risks
+
+| ID | Risk | Severity | Mitigation |
+| --- | --- | --- | --- |
+| **TM-R-10** | The `absent` derivation is the module's central rule and Phase E edits it. A wrong clause makes leave days read as absences, or absences vanish. | **High** | One clause, one file, one phase, nothing parallel. Seed a member with leave and a member without, and assert both before and after. |
+| **TM-R-11** | Identity documents on a backend where **every S3 object is publicly readable by URL**. | **High** | Private objects + signed reads, decided before Phase H starts. Do not reuse the existing public `fileUrl` return. This is TM-R-04 with worse consequences. |
+| **TM-R-12** | The public signing page is an unauthenticated write on a legal record, and the project still has no throttle class. | **High** | Inherits TM-R-05 in full: hashed token, expiry, single-use, revocable, per-token and per-IP limits, `attemptCount`. |
+| **TM-R-13** | Timeline plus calendar is more net-new UI than the whole of v1's work face. | **Medium** | C before D, month before week, and both share one date-grid primitive. If D slips, C alone answers the brief's *"like Google Calendar"*. |
+| **TM-R-14** | Six tabs on the member dashboard, three of them added at once. | **Low–Medium** | Ship Pay last (Phase I). If six reads as crowded on a real member, Agreements and Resources fold into one *Documents* tab with two sections — the entities stay separate either way (TM-AD-18). |
+
+---
+
+## 10. Approval gate
+
+**What this document is:** a wireframe and an architecture. No code was written and none
+should be until it is approved.
+
+**Reuse vs build, the short version.** Five of nine brief items attach to shipped records
+and need no new entity: calendar, timeline, column axis, tags, links. Two are small new
+entities on existing screens: leave, incentive-as-a-read. Two are genuinely new builds
+with real server surface: agreements and resources — and both were already anticipated by
+the v1 document's §3.11 and §3.12, so neither is a surprise.
+
+**What needs an answer before Phase A:**
+
+1. **TM-OD-20 — what "my JD team" means.** Department, second company, or a field on the
+   member. This is the only blocking question in the document.
+2. **Confirmation that Finance owns `Incentive`** (TM-AD-19), since it puts a table in
+   another module's territory.
+3. **A decision on private-object storage** before Phase G or H is scheduled (TM-R-11).
+
+**Suggested order if all three clear:** A → B (tags and the board, one week, visible
+immediately) → C (calendar, the brief's headline) → E (leave, small and self-contained) →
+D (timeline) → G (agreements, the largest) → H → I → F.
+
+Calendar is deliberately third rather than first: it is the most visible item in the
+brief, and it reads much better once tags exist to colour it.
