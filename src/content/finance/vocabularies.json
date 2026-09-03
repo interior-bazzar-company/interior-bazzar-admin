@@ -266,11 +266,6 @@
       "tone": "info"
     },
     {
-      "key": "sent_back",
-      "label": "Sent back",
-      "tone": "warn"
-    },
-    {
       "key": "approved",
       "label": "Approved",
       "tone": "ok"
@@ -427,11 +422,6 @@
       "key": "REFUND_APPROVED",
       "label": "Refund approved",
       "tone": "ok"
-    },
-    {
-      "key": "REFUND_SENT_BACK",
-      "label": "Sent back to requester",
-      "tone": "warn"
     },
     {
       "key": "REFUND_DECLINED",

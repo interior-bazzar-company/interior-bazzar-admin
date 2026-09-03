@@ -384,7 +384,7 @@ export interface CompanyTxn {
 export type RefundOrigin = "subscription" | "manual";
 
 export type RefundState =
-  | "requested" | "sent_back" | "approved" | "declined" | "paid";
+  | "requested" | "approved" | "declined" | "paid";
 
 /** Computed at request time and frozen, so the approver sees what the
  *  requester saw. It frames the approval; it does not block it. */

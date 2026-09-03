@@ -824,7 +824,7 @@ export const refundRows = (): RefundRow[] =>
 export function refundQueue() {
   const rows = refundRows();
   return {
-    open: rows.filter((x) => x.r.state === "requested" || x.r.state === "sent_back"),
+    open: rows.filter((x) => x.r.state === "requested"),
     approved: rows.filter((x) => x.r.state === "approved"),
     settled: rows.filter((x) => x.r.state === "paid" || x.r.state === "declined"),
     all: rows,
@@ -2196,7 +2196,7 @@ export function requestRefund(paymentId: string, ground: string, detail: string)
   if (!hit) return { error: "That payment is not in the ledger.", refundId: null };
   if (!groundMeta(ground)) return { error: "Pick a ground.", refundId: null };
   if (!detail.trim()) return { error: "Say what happened — the approver reads this, and so does the audit.", refundId: null };
-  if (snap.refunds.some((r) => r.paymentId === paymentId && (r.state === "requested" || r.state === "sent_back" || r.state === "approved")))
+  if (snap.refunds.some((r) => r.paymentId === paymentId && (r.state === "requested" || r.state === "approved")))
     return { error: "There is already an open refund on " + paymentId + ". (duplicate_request)", refundId: null };
 
   const a = actor();
@@ -2250,11 +2250,17 @@ export function createManualRefund(payeeName: string, amountPaise: number, groun
 }
 
 /** FN-T14 · Decide. Super Admin, and never the requester — that separation is
- *  the whole control. Approval AUTHORISES a transfer; it does not make one. */
-export function decideRefund(id: string, verdict: "approve" | "send_back" | "decline", decisionNote: string): string {
+ *  the whole control. Approval AUTHORISES a transfer; it does not make one.
+ *
+ *  TWO VERDICTS, NOT THREE. There was a `send_back`, which returned the request
+ *  to the requester with a note and left it decidable again. It was a message
+ *  wearing a state: nothing about the refund changed, no money moved either
+ *  way, and a request could sit in that loop indefinitely with the ledger
+ *  saying only that somebody had asked a question. A decision is yes or no. */
+export function decideRefund(id: string, verdict: "approve" | "decline", decisionNote: string): string {
   const r = readRefund(id);
   if (!r) return "That request no longer exists.";
-  if (r.state !== "requested" && r.state !== "sent_back") return "This request is already decided. (invalid_state_transition)";
+  if (r.state !== "requested") return "This request is already decided. (invalid_state_transition)";
   if (verdict !== "approve" && !decisionNote.trim())
     return "Say what is missing or why it is refused — the requester only sees this note. (reason_required)";
   const sa = superAdminOnly("Deciding a refund"); if (sa) return sa;
@@ -2269,9 +2275,6 @@ export function decideRefund(id: string, verdict: "approve" | "send_back" | "dec
     r.state = "approved";
     log(pushEvent(r.events, "REFUND_APPROVED",
       inr(r.amountPaise) + " authorised. NO MONEY HAS MOVED — make the transfer in the bank, then record it here."), id, "refund");
-  } else if (verdict === "send_back") {
-    r.state = "sent_back";
-    log(pushEvent(r.events, "REFUND_SENT_BACK", decisionNote.trim()), id, "refund");
   } else {
     r.state = "declined";
     log(pushEvent(r.events, "REFUND_DECLINED", decisionNote.trim()), id, "refund");

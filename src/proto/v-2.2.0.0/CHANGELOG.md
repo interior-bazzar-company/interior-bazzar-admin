@@ -6,6 +6,84 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-03
 
+### Refunds: send-back is gone, the verdicts move into one Actions menu, and the standing prose comes off
+
+**Area:** `#/finance-refunds` · a refund → the header actions · the decide, request, manual and transfer dialogs
+**Files:** `src/admin/views/Finance/store.ts`, `src/admin/views/Finance/types.ts`, `src/admin/views/Finance/bits.tsx`, `src/admin/views/Finance/RefundDetail.tsx`, `src/admin/views/Finance/RefundModals.tsx`, `src/admin/views/Finance/Refunds.tsx`, `src/content/finance/refunds.json`, `src/content/finance/vocabularies.json`, `scripts/check-finance-ledger.cjs`, `scripts/fn-smoke.tsx`
+
+**What changed**
+
+**SEND-BACK IS REMOVED ENTIRELY** — the verdict, the `sent_back` state, the
+`REFUND_SENT_BACK` event, the state’s place in the union and in the sort, and
+both store filters that reached for it. It was a message wearing a state:
+nothing about the refund changed, no money moved either way, and a request could
+sit in that loop indefinitely with the ledger recording only that somebody had
+asked a question. **A decision is yes or no.**
+
+**THE VERDICTS MOVE INTO AN ACTIONS MENU.** The header carried Send back,
+Decline and Approve side by side — three verdicts competing for one glance, the
+destructive one and the ordinary one the same size, and a fourth button taking
+their place once approved. One control now, and which items are on it is decided
+by the refund’s state rather than by which buttons happen to render. Disabled
+rather than hidden without Super Admin.
+
+**THE VERDICT IS CHOSEN BEFORE THE DIALOG OPENS.** It used to be picked again
+inside, from a list of three, on a dialog reached by pressing one of three
+buttons that each preselected one — the answer given twice, and the second able
+to disagree with the first. `DecideRefundModal` now takes a `verdict` rather
+than an `initial`, titles itself *Approve RF-0117* / *Decline RF-0117*, and asks
+for the note and nothing else.
+
+**ONE MENU SHELL FOR THE MODULE.** There were two builds of the same popover —
+one on the transaction row, one on the refund row — with the same outside-click
+and Escape handlers, the same `.mi` items and two different triggers.
+`ActionMenu` in `bits.tsx` is the shell; items are data, so `role="menuitem"`
+and close-on-choose are decided once. `TxnMenu` and `RefundMenu` are both built
+on it, which also settles the inconsistency flagged in the previous entry: the
+refund menus say **Actions** too. Salaries A/C still has its own; out of scope.
+
+**THE STANDING PROSE COMES OFF the dialogs and the record.** Removed: the decide
+dialog’s two checklist lines, the transfer dialog’s two, the manual-refund
+dialog’s notice about carrying no policy check, and the paragraph under the
+policy check restating that it never blocks. Field hints that explained a rule
+rather than the field are cut to the field. **What was kept is anything that
+states a fact about THIS record** — the policy check results, the decision note,
+the *₹x has NOT moved* warning on an approved-but-unsent refund, and the line
+saying a manual refund has no original payment behind it. The rule that a block
+frames rather than gates now rides the block’s own `desc`, where it is read
+before the checks instead of after.
+
+**Temp data**
+`src/content/finance/refunds.json` → RF-0123 was the seeded `sent_back` example;
+it is back to `requested` with its decision cleared and the send-back event
+dropped. The file’s own note loses the `send-back` endpoint. Placeholder records.
+`src/content/finance/vocabularies.json` → the `sent_back` refund state and the
+`REFUND_SENT_BACK` event type are removed. Static copy.
+
+**Backend needed**
+- `POST /api/v1/finance/refunds/:id/decide` → verdict is now `approve` or
+  `decline` only. A note stays mandatory on a decline. Reject `send_back`.
+- `POST /api/v1/finance/refunds/:id/send-back` → **no longer needed.**
+- Any list or count of rows awaiting a decision is `state === "requested"` alone.
+
+**Open decisions**
+One assumption, and it is the reason send-back could go: **a request that needs
+more information is declined with the note saying what was missing, and raised
+again.** That keeps every refund on the books terminal, and the note is still
+the only thing the requester sees either way.
+
+**Verified**
+`npx tsc -b` and `npx eslint` clean on every touched file.
+`npm run check:finance` → 424 pass, with new assertions that no refund can reach
+a sent-back state and that the vocabulary does not offer one, alongside the
+existing four-eyes, mandatory-note and already-decided checks.
+`npm run check:finance-render` renders every surface, asserting the trimmed
+dialogs (no `fin-chks` checklist, no second verdict picker, the note mandatory
+on a decline), that the record page offers no Send back and no header verdict
+buttons, and that the policy-check rule is stated once rather than twice.
+`npm run check:finance-nav` passes. Not checked against a live backend — the
+module is still proto-seeded.
+
 ### The row actions trigger says Actions instead of showing three dots
 
 **Area:** `#/finance-transactions` — the last column of every row, and the record header

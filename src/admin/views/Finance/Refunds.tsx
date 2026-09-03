@@ -22,7 +22,6 @@
    the company owes and has not sent. It keeps its own cell, its own tone and
    its own place in the sort; only its band is gone.
    ============================================================================= */
-import { useEffect, useRef, useState } from "react";
 import { useShell } from "../../shell/ShellContext";
 import { can } from "../../shell/AdminShell";
 import { EmptyState, FilterChips, Icon, SearchField, Select, StatStrip, qs } from "../../ui";
@@ -30,7 +29,7 @@ import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import { Frame } from "./Frame";
 import type { FaceProps } from "./Frame";
-import { Money, OriginTag, RefundPill } from "./bits";
+import { ActionMenu, Money, OriginTag, RefundPill } from "./bits";
 import {
   FILTER_LABELS, PERIOD, REFUND_ORIGINS, REFUND_STATES,
   ago, filterValueLabel, fmtDate, groundMeta, inr, useOverview, useRefundQueue,
@@ -43,7 +42,7 @@ import { ManualRefundModal, RecordTransferModal, RequestRefundModal } from "./Re
    company owes right now; one paid or declined is finished. Rows come out in
    that order with no filter applied, which is what the bands were for. */
 const RANK: Record<string, number> = {
-  requested: 0, sent_back: 0, approved: 1, paid: 2, declined: 2,
+  requested: 0, approved: 1, paid: 2, declined: 2,
 };
 const jobOf = (state: string) => (RANK[state] ?? 3);
 
@@ -90,10 +89,8 @@ export default function Refunds({ p, onFilter, onSearch, onUnfilter }: FaceProps
     { k: <>Awaiting a decision</>, v: q.open.length,
       dot: q.open.length ? "info" : undefined,
       on: p.flag === "awaiting", to: cellHash({ flag: "awaiting" }),
-      tip: <>Requested by Finance, or sent back by a Super Admin for more information.
-        <b> Nothing here has moved money.</b> Only a Super Admin decides — requester and decider
-        are always different people, which is one of the very few genuine four-eyes checks in
-        the panel.</> },
+      tip: <>Raised and not yet decided. <b>Nothing here has moved money.</b> Only a Super Admin
+        decides, and never the requester.</> },
     { k: <>Approved, not sent <b className="tnum">{inr(ov.refundsOwedPaise)}</b></>,
       v: ov.refundsOwedN, dot: ov.refundsOwedN ? "warn" : undefined,
       on: p.flag === "owed", to: cellHash({ flag: "owed" }),
@@ -233,65 +230,23 @@ function RefundLine({ x, p, onRecord }: {
 }
 
 /* ----------------------------------------------------------- the menu ---- */
-/** The same `.fin-menu` and `.mi` rows the slips table and the transaction
- *  record use — one menu in the module, not three that drift. The only action
- *  a refund row carries is recording the transfer that pays it, and it is
- *  offered on exactly the rows that can take one. */
+/** The row's actions. Same shell as every other menu in the module, so there
+ *  is one outside-click handler and one set of item styles rather than four. */
 function RefundMenu({ r, to, onRecord }: {
-  r: RefundRow; to: string; onRecord: (() => void) | null;
+  r: RefundRow; to: string; onRecord?: (() => void) | null;
 }) {
-  const [open, setOpen] = useState(false);
-  const box = useRef<HTMLSpanElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const away = (e: MouseEvent) => {
-      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
-    };
-    const esc = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.stopPropagation();
-      setOpen(false);
-    };
-    document.addEventListener("mousedown", away);
-    document.addEventListener("keydown", esc, true);
-    return () => {
-      document.removeEventListener("mousedown", away);
-      document.removeEventListener("keydown", esc, true);
-    };
-  }, [open]);
-
-  const item = (icon: string, label: string, act: () => void,
-    opts?: { disabled?: boolean; title?: string; tone?: string }) => (
-    <button type="button" role="menuitem" className={"mi" + (opts?.tone ? " " + opts.tone : "")}
-      disabled={opts?.disabled} title={opts?.title}
-      onClick={() => { setOpen(false); act(); }}>
-      <Icon name={icon} size="sm" />{label}
-    </button>
-  );
-
   return (
-    <span className="fin-menu" ref={box}>
-      <button type="button" className="btn sm" aria-haspopup="menu" aria-expanded={open}
-        aria-label={"Actions for " + r.r.refundId} onClick={() => setOpen(!open)}>
-        <Icon name="dots" size="sm" />
-      </button>
-      {open ? (
-        <span className="fin-menu-pop" role="menu" aria-label={"Actions for " + r.r.refundId}>
-          {onRecord
-            ? item("cash", "Record the transfer", onRecord, { tone: "pri" })
-            : item("cash", "Record the transfer", () => {}, {
-              disabled: true,
-              title: r.r.state === "paid"
-                ? "It is already paid."
-                : r.r.state === "declined"
-                  ? "It was declined — no transfer will be made."
-                  : "Only an approved refund has a transfer to record.",
-            })}
-          {item("doc", "Open the refund", () => go(to))}
-        </span>
-      ) : null}
-    </span>
+    <ActionMenu forWhat={r.r.refundId} items={[
+      onRecord
+        ? { icon: "cash", label: "Record the transfer", act: onRecord, tone: "pri" }
+        : { icon: "cash", label: "Record the transfer", act: () => {}, disabled: true,
+          title: r.r.state === "paid"
+            ? "It is already paid."
+            : r.r.state === "declined"
+              ? "It was declined — no transfer will be made."
+              : "Only an approved refund has a transfer to record." },
+      { icon: "doc", label: "Open the refund", act: () => go(to) },
+    ]} />
   );
 }
 
@@ -308,17 +263,13 @@ function chipLabel(key: string, value: string): string {
 /** No store filter helper exists for refunds — this is the whole of it.
  *
  *  `flag` is this face's own, and it exists because two of the strip's cells
- *  stand for a JOB rather than a state: "awaiting a decision" is `requested`
- *  OR `sent_back`, and the `state` filter beside it takes exactly one. Two
- *  params rather than one because they are two different questions, and a
- *  single one that meant either would be a filter nobody could reason about. */
+ *  stand for a JOB rather than a state — "approved, not sent" is money owed
+ *  right now, which the `state` filter has no way to say on its own. */
 function filterRows(rows: RefundRow[], p: Params): RefundRow[] {
   let out = rows;
   if (p.origin) out = out.filter((x) => x.r.origin === p.origin);
   if (p.state) out = out.filter((x) => x.r.state === p.state);
-  if (p.flag === "awaiting") {
-    out = out.filter((x) => x.r.state === "requested" || x.r.state === "sent_back");
-  }
+  if (p.flag === "awaiting") out = out.filter((x) => x.r.state === "requested");
   if (p.flag === "owed") out = out.filter((x) => x.r.state === "approved");
   if (p.q) {
     const term = p.q.toLowerCase().trim();

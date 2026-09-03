@@ -1,5 +1,5 @@
 {
-  "$comment": "PLACEHOLDER RECORDS — refund requests. Replaced by GET /admin/finance/refunds and POST /admin/finance/refunds/{id}/{approve,send-back,decline,pay}. A refund is a REAL OBJECT: request, queue, decision, and — once money actually moves — a settlement. Finance requests; only Super Admin decides — one of the very few genuine four-eyes checks in the panel, because a refund is the only routine action that sends money out of the company, and requester and decider are always different people. Two origins: `subscription` ties back to a recorded installment payment; `manual` is raised by hand against its own named payee, for money that never became a subscription payment in the first place — a duplicate bank transfer, a cancelled order taken off-platform, a customer overpayment. On a subscription-origin refund, `subscriptionId` is a convenience denormalisation for display only; `paymentId` is the real link back to the ledger. Approval authorises a transfer a human makes in the bank — it does not move money by itself. A refund reaches `paid` only when someone records that transfer, with its own reference, in `settlement`.",
+  "$comment": "PLACEHOLDER RECORDS — refund requests. Replaced by GET /admin/finance/refunds and POST /admin/finance/refunds/{id}/{approve,decline,pay}. A refund is a REAL OBJECT: request, queue, decision, and — once money actually moves — a settlement. Finance requests; only Super Admin decides, and the decision is yes or no — there is no send-back, which was a message wearing a state — one of the very few genuine four-eyes checks in the panel, because a refund is the only routine action that sends money out of the company, and requester and decider are always different people. Two origins: `subscription` ties back to a recorded installment payment; `manual` is raised by hand against its own named payee, for money that never became a subscription payment in the first place — a duplicate bank transfer, a cancelled order taken off-platform, a customer overpayment. On a subscription-origin refund, `subscriptionId` is a convenience denormalisation for display only; `paymentId` is the real link back to the ledger. Approval authorises a transfer a human makes in the bank — it does not move money by itself. A refund reaches `paid` only when someone records that transfer, with its own reference, in `settlement`.",
   "generatedAt": "2026-08-25T09:00:00+05:30",
   "requests": [
     {
@@ -60,17 +60,16 @@
       "amountPaise": 840000,
       "ground": "overpayment",
       "detail": "Rohan Mehta's (DL-2402) third installment was due at ₹42,000; the NEFT that arrived on 21 Aug read ₹50,400 — ₹8,400 over. The installment itself is already recorded and settled in full against the correct amount; this is only the excess, and the excess was never applied to any installment or invoice, so it has no ledger row of its own to reverse. Refunding the difference back to him directly.",
-      "state": "sent_back",
+      "state": "requested",
       "policy": null,
       "requestedBy": "K. Iyer",
       "requestedAt": "2026-08-23T14:20:00+05:30",
-      "decidedBy": "S. Bhat",
-      "decidedAt": "2026-08-24T09:10:00+05:30",
-      "decisionNote": "Send back — need Rohan's bank account number and IFSC before this can be transferred; the deal file only has a UPI handle on record and NEFT can't go to that. Also check with him whether he'd rather have the ₹8,400 adjusted against installment four instead of paid out.",
+      "decidedBy": null,
+      "decidedAt": null,
+      "decisionNote": null,
       "settlement": null,
       "events": [
-        { "eventId": "RE-0123-2", "type": "REFUND_SENT_BACK", "actor": "S. Bhat", "actorRole": "Super Admin", "at": "2026-08-24T09:10:00+05:30", "note": "Sent back to K. Iyer — need bank account + IFSC, and to confirm payout vs. adjustment against installment 4." },
-        { "eventId": "RE-0123-1", "type": "REFUND_REQUESTED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-23T14:20:00+05:30", "note": "Overpayment on DL-2402 installment 3 — ₹8,400 above the amount due, 21 Aug NEFT." }
+                { "eventId": "RE-0123-1", "type": "REFUND_REQUESTED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-23T14:20:00+05:30", "note": "Overpayment on DL-2402 installment 3 — ₹8,400 above the amount due, 21 Aug NEFT." }
       ]
     },
     {

@@ -1466,9 +1466,16 @@ S.resetStore();
   ok("a manual refund with no detail is refused — the detail IS the evidence",
     has(S.createManualRefund("Ritu Sharma", 450000, "overpayment", " ").error, "the detail IS the evidence"), true);
 
-  ok("a send-back with no note is refused — the requester only sees that note",
-    has(S.decideRefund("RF-0117", "send_back", ""), "reason_required"), true);
-  ok("a decline with no note is refused", has(S.decideRefund("RF-0117", "decline", "  "), "reason_required"), true);
+  ok("a decline with no note is refused — the requester only sees that note",
+    has(S.decideRefund("RF-0117", "decline", "  "), "reason_required"), true);
+  /* THERE ARE TWO VERDICTS, NOT THREE. `send_back` returned a request to its
+     requester and left it decidable again — a message wearing a state, which
+     could loop indefinitely with the ledger recording only that somebody had
+     asked a question. A decision is yes or no. */
+  ok("there is no sent-back state left to reach",
+    S.readRefunds().filter((r) => r.state === "sent_back").map((r) => r.refundId), []);
+  ok("...and the vocabulary does not offer one either",
+    !!S.refundStateMeta("sent_back"), false);
   ok("FOUR EYES: the person who requested it cannot approve it",
     S.decideRefund(req.refundId, "approve", ""),
     "A refund cannot be approved by the person who requested it. That separation is the whole control. (super_admin_required)");

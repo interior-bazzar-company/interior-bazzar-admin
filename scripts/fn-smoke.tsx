@@ -367,7 +367,7 @@ has(refunds, "agreed to return and has not sent",
   "...approved-not-sent is real cash the company owes");
 has(refunds, "Approval moves no money", "...and the gap between approved and paid is named");
 /* THE JOB FILTERS. Two of the cells stand for a job rather than a state —
-   awaiting is `requested` OR `sent_back` — which is why this face has its own
+   approved-not-sent is money owed right now — which is why this face has its own
    `flag` beside the `state` filter. */
 const refundsWaiting = check("refunds · awaiting a decision", () => at("/finance-refunds?flag=awaiting"));
 has(refundsWaiting, "Awaiting a decision", "...the awaiting cell is a filter, not a section");
@@ -627,11 +627,16 @@ has(moneyIn, "Customer money has exactly one way in", "...and that customer mone
 
 const subRefund = page("a subscription refund", "/finance-refunds/RF-0117");
 has(subRefund, "The policy check", "...a refund with a payment behind it carries a policy check");
-has(subRefund, "none of them blocks it", "...which frames the approval rather than gating it");
+has(subRefund, "never blocks it", "...which frames the approval rather than gating it");
+/* THE STANDING PARAGRAPH UNDER THE CHECKS IS GONE; the block's own `desc`
+   carries the same rule in one line, where it is read before the checks are
+   rather than after. */
+hasnt(subRefund, "These checks frame the approval", "...said once on the block, not twice");
+hasnt(subRefund, ">Send back<", "...and nothing anywhere offers to send a request back");
+hasnt(subRefund, ">Approve</button>", "...the header's three verdict buttons are gone, replaced by one menu");
 const manualRefund = page("a manual refund", "/finance-refunds/RF-0119");
-has(manualRefund, "There is no original payment behind this refund", "...a manual refund states there is nothing behind it");
-has(manualRefund, "exactly why this request carries no policy check",
-  "...and why there is no policy check, rather than an empty one that would read as a pass");
+has(manualRefund, "No original payment behind this refund", "...a manual refund states there is nothing behind it");
+has(manualRefund, "why there is no policy check", "...and why it carries no check rather than an empty one");
 const nowhere = page("an address that does not exist", "/finance/XXX-0000");
 has(nowhere, "No subscription at that address", "...a wrong address is a wrong address, not an error page");
 has(nowhere, "nothing in this module is ever", "...and it says why a missing record means a wrong address");
@@ -849,22 +854,30 @@ has(txnM, "up to 5 MB", "...and held to a stated limit");
 
 const reqRefund = check("request a refund", () => modal(<RequestRefundModal onClose={noop} onDone={noop} />));
 has(reqRefund, "Full amount only", "...refunds are full-amount-only");
-has(reqRefund, "1:1 rule says that cannot exist", "...for the 1:1 reason");
 const manRefund = check("raise a manual refund", () => modal(<ManualRefundModal onClose={noop} onDone={noop} />));
-has(manRefund, "There is no policy check on a manual refund", "...a manual refund states there is no policy check");
-has(manRefund, "an empty check here would read as one that passed", "...and why an empty one would be worse");
-has(manRefund, "this IS the evidence", "...the detail is the evidence, because nothing else is");
-const decide = check("decide a refund", () => modal(
-  <DecideRefundModal r={refund("RF-0117")} onClose={noop} onDone={noop} />));
-has(decide, "It does NOT move money", "...approval moves no money");
-has(decide, "never the same person", "...and the approver is never the requester");
-const decline = check("decide a refund · opened on decline", () => modal(
-  <DecideRefundModal r={refund("RF-0117")} initial="decline" onClose={noop} onDone={noop} />));
-has(decline, "No transfer is authorised on this verdict", "...a decline authorises nothing");
+has(manRefund, "No ledger row sits behind this one", "...the detail is the evidence, because nothing else is");
+hasnt(manRefund, "an empty check here would read as one that passed",
+  "...with the standing notice about the missing policy check gone from the dialog");
+/* THE VERDICT IS CHOSEN BEFORE THE DIALOG OPENS. It was picked here, from a
+   list of three, on a dialog reached by pressing one of three buttons that each
+   preselected one — the answer given twice, and the second able to disagree
+   with the first. The menu item decides; the dialog takes the note. */
+const decide = check("approve a refund", () => modal(
+  <DecideRefundModal r={refund("RF-0117")} verdict="approve" onClose={noop} onDone={noop} />));
+has(decide, "Approve RF-0117", "...the dialog names the verdict and the request in its title");
+has(decide, "<textarea", "...and asks for a note");
+hasnt(decide, "fin-chks", "...with no standing checklist restating what approving does");
+hasnt(decide, "Verdict", "...and no second place to choose a verdict already chosen");
+const decline = check("decline a refund", () => modal(
+  <DecideRefundModal r={refund("RF-0117")} verdict="decline" onClose={noop} onDone={noop} />));
+has(decline, "Decline RF-0117", "...declining names itself the same way");
+has(decline, "Mandatory", "...and the note is mandatory on a refusal, because the requester only sees it");
 const transfer = check("record a refund transfer", () => modal(
   <RecordTransferModal r={refund("RF-0125")} onClose={noop} onDone={noop} />));
-has(transfer, "This is the write that makes the refund", "...this is the write that makes it paid");
-has(transfer, "Nothing before this moved money", "...and nothing before it moved money");
+has(transfer, "Record the transfer", "...the dialog names the act");
+has(transfer, "The proof the money left", "...and says what the reference is for");
+hasnt(transfer, "fin-chks", "...with no standing checklist restating what recording it does");
+
 
 console.log("\nthe premise, on screen");
 /* RUNWAY. It returns null on purpose — FN-OD-07 — so the tile has to print the

@@ -5,14 +5,14 @@
 
    APPROVAL MOVES NO MONEY. A refund sitting at `approved` with no settlement
    is real money the company has agreed to send and has not sent, and this
-   screen says so before it says anything else about the decision.
+   screen says so where the decision is.
    ============================================================================= */
 import { useShell } from "../../shell/ShellContext";
 import { can } from "../../shell/AdminShell";
 import { EmptyState, KvList, Notice, Tabs, qs } from "../../ui";
 import { go } from "../../ui/nav";
 import { Block, Blocks, Rec } from "./Frame";
-import { Check, EventList, Money, OriginTag, ProtoBar, RefundPill } from "./bits";
+import { ActionMenu, Check, EventList, Money, OriginTag, ProtoBar, RefundPill } from "./bits";
 import {
   DecideRefundModal, RecordTransferModal,
 } from "./RefundModals";
@@ -43,28 +43,35 @@ export default function RefundDetail({ id, p, onParams }: {
   const r = row.r;
   const writable = can("finance-refunds", "edit");
   const sa = isSuperAdmin();
-  const deciding = r.state === "requested" || r.state === "sent_back";
+  const deciding = r.state === "requested";
 
   const done = (msg: string, tone?: string) => { closeLayer(); toast(msg, tone); };
-  const openDecide = (verdict: "approve" | "send_back" | "decline") =>
-    modal(<DecideRefundModal r={r} initial={verdict} onClose={closeLayer} onDone={done} />);
+  const openDecide = (verdict: "approve" | "decline") =>
+    modal(<DecideRefundModal r={r} verdict={verdict} onClose={closeLayer} onDone={done} />);
   const openRecord = () => modal(<RecordTransferModal r={r} onClose={closeLayer} onDone={done} />);
 
+  /* ONE MENU, NOT A ROW OF BUTTONS. The header carried Send back, Decline and
+     Approve side by side — three verdicts competing for the same glance, with
+     the destructive one and the ordinary one the same size, and a fourth button
+     appearing in their place once the refund was approved. Everything a request
+     can have done to it is behind the one control now, and which items are on
+     it is decided by the state rather than by which buttons happen to render.
+
+     DISABLED RATHER THAN HIDDEN without Super Admin: somebody who cannot see
+     the action cannot ask for it either. */
   const saTitle = sa ? undefined : "Deciding a refund is Super Admin only.";
-  const actions = (
-    <>
-      {deciding && writable ? (
-        <>
-          <button className="btn sm" disabled={!sa} title={saTitle} onClick={() => openDecide("send_back")}>Send back</button>
-          <button className="btn sm dgr" disabled={!sa} title={saTitle} onClick={() => openDecide("decline")}>Decline</button>
-          <button className="btn sm pri" disabled={!sa} title={saTitle} onClick={() => openDecide("approve")}>Approve</button>
-        </>
-      ) : null}
-      {r.state === "approved" && writable ? (
-        <button className="btn sm pri" onClick={openRecord}>Record the transfer</button>
-      ) : null}
-    </>
-  );
+  const actions = writable ? (
+    <ActionMenu forWhat={r.refundId} items={[
+      deciding && { icon: "check", label: "Approve", act: () => openDecide("approve"),
+        tone: "pri", disabled: !sa, title: saTitle },
+      deciding && { icon: "x", label: "Decline", act: () => openDecide("decline"),
+        tone: "dgr", disabled: !sa, title: saTitle },
+      r.state === "approved" && { icon: "cash", label: "Record the transfer", act: openRecord, tone: "pri" },
+      !deciding && r.state !== "approved" && { icon: "check", label: "Decided", act: () => {},
+        disabled: true,
+        title: r.state === "paid" ? "It is paid." : "It was declined — no transfer will be made." },
+    ]} />
+  ) : null;
 
   return (
     <Rec id={r.refundId} pills={<RefundPill k={r.state} lg />} back={back} actions={actions}>
@@ -113,24 +120,21 @@ export default function RefundDetail({ id, p, onParams }: {
               )
             ) : (
               <Notice tone="info" text={<>
-                <b>There is no original payment behind this refund.</b> It never became a subscription
-                installment, so there is nothing in the ledger to point at either way — the detail
-                above <b>is</b> the evidence: what arrived, when, and how it is known. That absence is
-                exactly why this request carries no policy check.
+                <b>No original payment behind this refund.</b> The detail above is the evidence,
+                and the absence is why there is no policy check.
               </>} />
             )}
           </Block>
 
           {r.origin === "subscription" && r.policy ? (
             <Block title="The policy check"
-              desc={"Computed once, at request time, and frozen"}>
+              desc={"Frozen at request time. It frames the approval; it never blocks it"}>
               <div className="fin-chks">
                 <Check ok={r.policy.groundPermitted} warn={!r.policy.groundPermitted}>
                   {r.policy.groundPermitted
                     ? <>The ground — {groundMeta(r.ground)?.label || r.ground} — is on the permitted list.</>
-                    : <>The ground — {groundMeta(r.ground)?.label || r.ground} — is <b>not</b> a permitted ground.
-                        It still reaches the approver, marked as an exception: hard-blocking every
-                        unlisted ground would mean a genuine case could never be processed.</>}
+                    : <>The ground — {groundMeta(r.ground)?.label || r.ground} — is <b>not</b> a
+                        permitted ground. It reaches the approver as an exception.</>}
                 </Check>
                 <Check ok={r.policy.withinWindow}>
                   {r.policy.withinWindow
@@ -148,10 +152,6 @@ export default function RefundDetail({ id, p, onParams }: {
                     : <>The subscription is not active.</>}
                 </Check>
               </div>
-              <p className="fin-fine">
-                Frozen at the moment the request was made, so the approver sees exactly what the
-                requester saw. These checks frame the approval — none of them blocks it.
-              </p>
             </Block>
           ) : null}
 
@@ -167,9 +167,8 @@ export default function RefundDetail({ id, p, onParams }: {
 
             {r.state === "approved" && !r.settlement ? (
               <Notice tone="warn" text={<>
-                <b>{inr(r.amountPaise)} has NOT moved.</b> Approval authorised the transfer; it did not
-                make one. Send it from the bank, then record the transfer here with its reference —
-                only that write makes this refund <b>paid</b>.
+                <b>{inr(r.amountPaise)} has NOT moved.</b> Approval authorised the transfer. Send it
+                from the bank, then record it here — only that makes this refund <b>paid</b>.
               </>} />
             ) : null}
 

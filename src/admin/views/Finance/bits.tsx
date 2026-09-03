@@ -13,33 +13,37 @@ import {
 } from "./store";
 import type { CompanyTxn, FinEvent } from "./store";
 
-/* ------------------------------------------------------------- TxnMenu --- */
-/** EVERYTHING A POSTED ROW CAN HAVE DONE TO IT, and the same menu wherever the
- *  row appears — the ledger and the record. It lived on the record page alone
- *  while cancelling was the only action and the record was the only place to
- *  reach it; putting it on the list too means a wrong row can be written off
- *  from the screen somebody noticed it on.
+/* ---------------------------------------------------------- ActionMenu --- */
+/** ONE MENU FOR THE WHOLE MODULE. There were two builds of this — one on the
+ *  transaction row, one on the refund row — with the same outside-click
+ *  handler, the same Escape handler, the same `.mi` items and two different
+ *  triggers. The shell is here once; callers supply only what is on it.
  *
- *  THERE IS NO EDIT ON IT. Nothing rewrites what a row says: the amount, the
- *  direction, the tag, the reference, the date, the account and the receipt are
- *  the fact it asserts, and a row that asserts the wrong thing is CANCELLED
- *  with a reason and recorded again correctly. That is the module's whole
- *  correction story and this menu is where it starts.
+ *  ITEMS ARE DATA, not children, so a caller cannot accidentally put something
+ *  in a menu that is not a menu item, and so `role="menuitem"` and the
+ *  close-on-choose are decided in one place rather than per caller.
  *
- *  IT STOPS ITS OWN CLICKS. In the list every row is a link, so a press on the
- *  trigger or on any item would navigate out from under the menu it just
- *  opened. On the record there is nothing to stop and the handler is harmless.
- *
- *  The caller supplies the actions rather than the menu reaching for a store:
- *  a component that opens modals is a component that has to know which shell it
- *  is inside, and this one renders in two. */
-export function TxnMenu({ txn, sa, onCancel, onOpen, onCopied }: {
-  txn: CompanyTxn; sa: boolean;
-  onCancel: () => void;
-  /** Given on the list, where the record is somewhere to go. Omitted on the
-   *  record itself, where it would offer to open the page it is already on. */
-  onOpen?: () => void;
-  onCopied: (msg: string) => void;
+ *  IT STOPS ITS OWN CLICKS. On a table row the whole row is a link, so a press
+ *  on the trigger or an item would navigate out from under the menu it just
+ *  opened. Where there is nothing to stop, the handler is harmless. */
+export interface MenuItem {
+  icon: string;
+  label: string;
+  act: () => void;
+  disabled?: boolean;
+  title?: string;
+  /** `dgr` for the destructive one, `pri` for the expected one. */
+  tone?: string;
+}
+export function ActionMenu({ label, forWhat, items }: {
+  /** The trigger's text. It said nothing at all for a while and was three dots
+   *  instead — a convention somebody either holds or does not, sitting in a
+   *  column with no header to read it against. */
+  label?: string;
+  /** The record this menu acts on, for the aria-label: a screen reader meeting
+   *  the twentieth `Actions` on a page needs to know which row it belongs to. */
+  forWhat: string;
+  items: (MenuItem | null | false | undefined)[];
 }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLSpanElement | null>(null);
@@ -62,67 +66,75 @@ export function TxnMenu({ txn, sa, onCancel, onOpen, onCopied }: {
     };
   }, [open]);
 
-  const item = (icon: string, label: string, act: () => void,
-    opts?: { disabled?: boolean; title?: string; tone?: string }) => (
-    <button type="button" role="menuitem" className={"mi" + (opts?.tone ? " " + opts.tone : "")}
-      disabled={opts?.disabled} title={opts?.title}
-      onClick={(e) => { e.stopPropagation(); setOpen(false); act(); }}>
-      <Icon name={icon} size="sm" />{label}
-    </button>
-  );
-
-  const cancelled = txn.state === "cancelled";
+  const shown = items.filter(Boolean) as MenuItem[];
   return (
     <span className="fin-menu" ref={box} onClick={(e) => e.stopPropagation()}>
-      {/* THE WORD, NOT THE GLYPH. It was a three-dot button, which is a
-          convention somebody either already holds or does not — and on a table
-          row it sat in a column with no header to explain it, next to nothing
-          else that could be pressed. `Actions` costs a few pixels in the one
-          column that has room to spare and asks nobody to recognise anything.
-          The aria-label keeps the row id, because a screen reader meeting the
-          twentieth `Actions` on a page needs to know which row it belongs to. */}
       <button type="button" className="btn sm" aria-haspopup="menu" aria-expanded={open}
-        aria-label={"Actions for " + txn.txnId}
+        aria-label={"Actions for " + forWhat}
         onClick={(e) => { e.stopPropagation(); setOpen(!open); }}>
-        Actions
+        {label || "Actions"}
       </button>
       {open ? (
-        <span className="fin-menu-pop" role="menu" aria-label={"Actions for " + txn.txnId}>
-          {onOpen ? item("invoice", "Open the record", onOpen) : null}
-          {/* DISABLED, ALWAYS, AND IT SAYS WHY. The panel holds a filename and
-              not the bytes, so a download would produce nothing — and an item
-              that silently does nothing is worse than one that explains. It is
-              shown rather than hidden because somebody who cannot see the
-              action cannot ask for it either. */}
-          {item("download", "Download receipt", () => {}, {
-            disabled: true,
-            title: txn.bill
-              ? "The panel holds the file's name, not the file. Download arrives with the document store."
-              : "There is no receipt on this row.",
-          })}
-          {/* THE ONE THING THAT CHANGES A POSTED ROW, and it changes only its
-              standing: every figure stays as posted and the row stays in the
-              ledger. Disabled rather than hidden without Super Admin, because
-              somebody who cannot see the action cannot ask for it either. */}
-          {item("recon", "Cancel", onCancel, {
-            disabled: !sa || cancelled,
-            tone: "dgr",
-            title: cancelled
-              ? "It is already cancelled."
-              : sa
-                ? "Write this row off with a reason. It keeps every figure it was posted with and stops counting."
-                : "Cancelling a transaction is Super Admin only.",
-          })}
-          {/* `link` rather than a copy glyph, because the icon set has no copy
-             and inventing one for a menu item is a new SVG to maintain for a
-             convenience. */}
-          {item("link", "Copy row id", () => {
-            void navigator?.clipboard?.writeText?.(txn.txnId);
-            onCopied(txn.txnId + " copied.");
-          })}
+        <span className="fin-menu-pop" role="menu" aria-label={"Actions for " + forWhat}>
+          {shown.map((it) => (
+            <button key={it.label} type="button" role="menuitem"
+              className={"mi" + (it.tone ? " " + it.tone : "")}
+              disabled={it.disabled} title={it.title}
+              onClick={(e) => { e.stopPropagation(); setOpen(false); it.act(); }}>
+              <Icon name={it.icon} size="sm" />{it.label}
+            </button>
+          ))}
         </span>
       ) : null}
     </span>
+  );
+}
+
+/* ------------------------------------------------------------- TxnMenu --- */
+/** EVERYTHING A POSTED ROW CAN HAVE DONE TO IT, and the same menu wherever the
+ *  row appears — the ledger and the record.
+ *
+ *  THERE IS NO EDIT ON IT. Nothing rewrites what a row says: a row that asserts
+ *  the wrong thing is CANCELLED with a reason and recorded again correctly.
+ *
+ *  The caller supplies the handlers rather than the menu reaching for a store:
+ *  a component that opens modals has to know which shell it is inside, and this
+ *  one renders in two. */
+export function TxnMenu({ txn, sa, onCancel, onOpen, onCopied }: {
+  txn: CompanyTxn; sa: boolean;
+  onCancel: () => void;
+  /** Given on the list, where the record is somewhere to go. Omitted on the
+   *  record itself, where it would offer to open the page it is already on. */
+  onOpen?: () => void;
+  onCopied: (msg: string) => void;
+}) {
+  const cancelled = txn.state === "cancelled";
+  return (
+    <ActionMenu forWhat={txn.txnId} items={[
+      onOpen && { icon: "invoice", label: "Open the record", act: onOpen },
+      /* DISABLED, ALWAYS, AND IT SAYS WHY. The panel holds a filename and not
+         the bytes, so a download would produce nothing — and an item that
+         silently does nothing is worse than one that explains. */
+      { icon: "download", label: "Download receipt", act: () => {}, disabled: true,
+        title: txn.bill
+          ? "The panel holds the file's name, not the file. Download arrives with the document store."
+          : "There is no receipt on this row." },
+      /* THE ONE THING THAT CHANGES A POSTED ROW, and it changes only its
+         standing: every figure stays as posted and the row stays in the ledger. */
+      { icon: "recon", label: "Cancel", act: onCancel, tone: "dgr",
+        disabled: !sa || cancelled,
+        title: cancelled
+          ? "It is already cancelled."
+          : sa
+            ? "Write this row off with a reason. It keeps every figure it was posted with and stops counting."
+            : "Cancelling a transaction is Super Admin only." },
+      /* `link` rather than a copy glyph, because the icon set has no copy and
+         inventing one for a menu item is a new SVG to maintain. */
+      { icon: "link", label: "Copy row id", act: () => {
+        void navigator?.clipboard?.writeText?.(txn.txnId);
+        onCopied(txn.txnId + " copied.");
+      } },
+    ]} />
   );
 }
 
