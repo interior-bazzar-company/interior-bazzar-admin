@@ -40,8 +40,26 @@
 
 .ch-chart { margin: 0 0 var(--space-2) }
 
-/* Categorical slots, fixed order, never cycled. */
-.um, .um-rec, .fin {
+/* Categorical slots, fixed order, never cycled.
+
+   FINANCE TAKES ITS OWN ORDER, and the reason is a measured failure rather
+   than a preference. Users' slots put a green in 2 and an amber in 3 — two
+   ADJACENT slots that separate by only ΔE 5.2 under protanopia, against a
+   floor of 8 and a target of 15. On the Finance charts those two slots carry
+   salary and other spend, so roughly one man in twelve could not tell the two
+   costs apart. Moving the brand teal into slot 1 puts indigo between the two
+   warm-ish hues: the worst adjacent pair becomes ΔE 13.4 deutan / 15.8 normal,
+   with the lightness band, the chroma floor and 3:1 surface contrast all
+   passing in both modes.
+
+   It also fixes a reading problem. Slot 1 is money IN, and it was the palest,
+   coolest mark on a page whose whole subject is money arriving — salary, in
+   the brand's own green, out-shouted it in every month.
+
+   Users' slots are UNCHANGED here on purpose: the same reorder is owed to
+   them, but their slots carry different series and re-colouring that module
+   silently is not this change. */
+.um, .um-rec {
   --s1: #3f63a0; --s2: #1d7145; --s3: #9a6512;
   --o1: #8fa8d3; --o2: #3f63a0; --o3: #1a3a6e;
   --h1: #75b8a6; --h2: #0e876c; --h3: #095646;
@@ -50,8 +68,7 @@
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) .um,
-  :root:not([data-theme="light"]) .um-rec,
-  :root:not([data-theme="light"]) .fin {
+  :root:not([data-theme="light"]) .um-rec {
     --s1: #4a7fd0; --s2: #34b39f; --s3: #a17c22;
     --o1: #31548f; --o2: #4a7fd0; --o3: #8fb2ee;
     --h1: #0e876c; --h2: #12a594; --h3: #1fbfa8;
@@ -59,9 +76,32 @@
   }
 }
 :root[data-theme="dark"] .um,
-:root[data-theme="dark"] .um-rec,
-:root[data-theme="dark"] .fin {
+:root[data-theme="dark"] .um-rec {
   --s1: #4a7fd0; --s2: #12a594; --s3: #a17c22;
+  --o1: #31548f; --o2: #4a7fd0; --o3: #8fb2ee;
+  --h1: #0e876c; --h2: #12a594; --h3: #1fbfa8;
+  --heat-ink: #04140f;
+}
+
+/* Finance: money in first, and the strongest mark on the page. Validated
+   light (#0e876c, #3f63a0, #9a6512) and dark (#12a594, #4a7fd0, #a17c22) —
+   worst adjacent pair ΔE 13.4 deutan, 15.8 normal, both modes. */
+.fin {
+  --s1: #0e876c; --s2: #3f63a0; --s3: #9a6512;
+  --o1: #8fa8d3; --o2: #3f63a0; --o3: #1a3a6e;
+  --h1: #75b8a6; --h2: #0e876c; --h3: #095646;
+  --heat-ink-1: #04140f; --heat-ink: #ffffff;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .fin {
+    --s1: #12a594; --s2: #4a7fd0; --s3: #a17c22;
+    --o1: #31548f; --o2: #4a7fd0; --o3: #8fb2ee;
+    --h1: #0e876c; --h2: #12a594; --h3: #1fbfa8;
+    --heat-ink-1: #ffffff; --heat-ink: #04140f;
+  }
+}
+:root[data-theme="dark"] .fin {
+  --s1: #12a594; --s2: #4a7fd0; --s3: #a17c22;
   --o1: #31548f; --o2: #4a7fd0; --o3: #8fb2ee;
   --h1: #0e876c; --h2: #12a594; --h3: #1fbfa8;
   --heat-ink: #04140f;
@@ -91,6 +131,74 @@
 .ch-chart .fill.st-warn { background: var(--warn-solid) }
 .ch-chart .fill.st-bad { background: var(--bad-solid) }
 .ch-chart .fill.st-mute { background: var(--text-3) }
+
+/* --------------------------------------------------------- waterfall --- */
+/* THE KINDS ARE NOT SLOTS. A waterfall step is money in, money out or the
+   closing figure — three roles, not three arbitrary series — so `in` takes
+   slot 1 (the strongest mark, and the one the page is about), `out` takes
+   slot 3, and the closing bar is drawn as a tinted OUTLINE rather than a
+   fourth fill: it is the sum of the others, and a solid bar the same weight
+   would read as a fourth thing that happened. */
+.ch-chart .sw.k-in, .ch-wfbar.k-in { background: var(--s1) }
+.ch-chart .sw.k-out, .ch-wfbar.k-out { background: var(--s3) }
+.ch-chart .sw.k-total, .ch-wfbar.k-total { background: var(--brand-tint);
+  box-shadow: inset 0 0 0 1px var(--brand) }
+.ch-chart .sw.ghost { background: var(--line-3) }
+
+.ch-groups.ch-wf { align-items: stretch }
+.ch-wfcol { position: relative; flex: 1 1 auto; height: 100% }
+/* Capped thin and centred, like `.ch-col` — the band's leftover is air. */
+.ch-wfbar { position: absolute; left: 50%; transform: translateX(-50%);
+            width: 100%; max-width: 44px; min-height: 2px;
+            border-radius: var(--radius-sm) }
+.ch-wfbar em { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%);
+               padding-bottom: 3px; white-space: nowrap; font-style: normal;
+               font-size: var(--text-2xs); color: var(--text-2) }
+/* The connector: it leaves at the step's closing level and is the next step's
+   opening level by construction, so it is drawn, never inferred by the eye.
+   Dashed, hairline, and it stops at the group edge so it cannot be read as a
+   value of its own. */
+.ch-wfjoin { position: absolute; left: 50%; right: calc(var(--space-2) * -1);
+             border-top: 1px dashed var(--line-2); height: 0 }
+.ch-wfband span { display: flex; flex-direction: column; gap: 1px }
+.ch-wfband em { font-style: normal; font-size: var(--text-2xs); color: var(--text-3);
+                overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+
+/* --------------------------------------------------- signed columns --- */
+/* The only axis LINE the kit draws, and it earns it: every bar here is read
+   against zero, so the rule is the reference rather than decoration. */
+.ch-sgn { position: relative; height: 200px; display: flex; align-items: stretch;
+          gap: 3px; margin-top: var(--space-6) }
+.ch-sgnzero { position: absolute; left: 0; right: 0; height: 1px;
+              background: var(--line-3); z-index: 1 }
+.ch-sgncol { position: relative; flex: 1 1 0; min-width: 0;
+             border-radius: var(--radius-xs);
+             transition: background var(--duration-fast) var(--ease) }
+.ch-sgncol:hover { background: var(--bg-hover) }
+.ch-sgncol:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px }
+/* Rounded at the DATA end only, in both directions — the baseline end stays
+   square so a bar's length is never visually exaggerated. */
+.ch-sgnbar { position: absolute; left: 0; right: 0; min-height: 2px }
+.ch-sgnbar.up { background: var(--ok-solid); border-radius: var(--radius-xs) var(--radius-xs) 0 0 }
+.ch-sgnbar.dn { background: var(--bad-solid); border-radius: 0 0 var(--radius-xs) var(--radius-xs) }
+.ch-sgnbar em { position: absolute; left: 50%; transform: translateX(-50%);
+                white-space: nowrap; font-style: normal; font-size: var(--text-2xs);
+                font-weight: var(--weight-semibold) }
+.ch-sgnbar em.up { bottom: 100%; padding-bottom: 3px; color: var(--ok) }
+.ch-sgnbar em.dn { top: 100%; padding-top: 3px; color: var(--bad) }
+.ch-sgnbands { display: flex; gap: 3px; margin-top: var(--space-1) }
+.ch-sgnbands span { flex-basis: 0; min-width: 0; border-top: 1px solid var(--line);
+                    padding-top: var(--space-1); font-size: var(--text-2xs);
+                    letter-spacing: .06em; text-transform: uppercase;
+                    color: var(--text-3); font-weight: var(--weight-semibold);
+                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+
+/* ---------------------------------------------------------- sparkline --- */
+/* No axis, no fill, one end dot. It answers "what shape", and the delta beside
+   it answers "how much" — neither is asked to do the other's job. */
+.ch-spark { flex: 0 0 auto; overflow: visible }
+.ch-spark.s1 polyline { stroke: var(--s1) } .ch-spark.s1 circle { fill: var(--s1) }
+.ch-spark.s2 polyline { stroke: var(--s2) } .ch-spark.s2 circle { fill: var(--s2) }
 
 .ch-legend2 { display: flex; gap: var(--space-4); flex-wrap: wrap;
               margin-bottom: var(--space-3); font-size: var(--text-sm); color: var(--text-2) }
@@ -235,5 +343,11 @@
 /* Forced colours: fills collapse to system colours, so marks take a visible
    border and the heat cells fall back to the number they already carry. */
 @media (forced-colors: active) {
-  .ch-row .fill, .ch-col, .ch-cell { border: 1px solid CanvasText }
+  .ch-row .fill, .ch-col, .ch-cell,
+  .ch-wfbar, .ch-sgnbar { border: 1px solid CanvasText }
+  /* The sign is the whole message and forced colours drop the fill, so the
+     two directions have to differ in something that survives: they do, in
+     which side of the rule they sit on, and the rule itself is kept. */
+  .ch-sgnzero { background: CanvasText }
+  .ch-spark polyline { stroke: CanvasText } .ch-spark circle { fill: CanvasText }
 }

@@ -863,6 +863,10 @@ export interface Overview {
   dueNextPaise: number; dueNextN: number;
   failedPaise: number; failedN: number;
   excludedPaise: number;
+  /** Everything that left in the period — salary, other spend and refunds paid.
+   *  Derived here rather than added up in a view, so the hero figure and the
+   *  waterfall's three out-steps can never disagree about what "out" means. */
+  outPaise: number;
   netPaise: number;
 }
 
@@ -909,6 +913,7 @@ export function overview(from = PERIOD.from, to = PERIOD.to): Overview {
     dueNextPaise: due.reduce((n, x) => n + x.i.amountPaise, 0), dueNextN: due.length,
     failedPaise: failed.reduce((n, x) => n + x.i.amountPaise, 0), failedN: failed.length,
     excludedPaise: excluded.reduce((n, t) => n + t.amountPaise, 0),
+    outPaise: salaryPaise + otherOutPaise + refundsPaidPaise,
     netPaise: collectedPaise + otherInPaise - salaryPaise - otherOutPaise - refundsPaidPaise,
   };
 }
@@ -1053,6 +1058,130 @@ export function kpis(from = PERIOD.from, to = PERIOD.to): Kpi[] {
     mk("website_share", pctOf(websitePaise, o.collectedPaise), null,
       o.collectedPaise ? null : "Nothing was collected in this period."),
   ];
+}
+
+/* ========================================================== waterfall === */
+
+export interface WaterfallStep {
+  key: string; label: string; sub: string;
+  paise: number; kind: "in" | "out" | "total";
+}
+
+/** THE PERIOD AS ARITHMETIC, in the order the money moves.
+ *
+ *  This exists so that Analytics.tsx can draw the sentence the `net` tile
+ *  already prints in words — collected + other in − salary − spend − refunds —
+ *  without doing a single addition of its own. The running total is the chart's
+ *  job; what is derived here is the six signed steps and the closing figure,
+ *  and the closing figure is `overview().netPaise` rather than a sum computed
+ *  twice, so the chart and the tile cannot disagree.
+ *
+ *  A ZERO STEP IS RETURNED, NOT DROPPED. An unpaid salary run is the most
+ *  consequential thing about August and a missing bar would hide it; the sub
+ *  line says which of the two zeroes it is. */
+export function waterfall(from = PERIOD.from, to = PERIOD.to): WaterfallStep[] {
+  const o = overview(from, to);
+  const n = (c: number, one: string, many = one + "s") => c + " " + (c === 1 ? one : many);
+  return [
+    { key: "collected", label: "Collected", sub: n(o.collectedN, "installment"),
+      paise: o.collectedPaise, kind: "in" },
+    { key: "other_in", label: "Other income", sub: n(o.otherInN, "credit"),
+      paise: o.otherInPaise, kind: "in" },
+    { key: "salary", label: "Salary", sub: o.salaryN ? n(o.salaryN, "slip") : "no run paid yet",
+      paise: o.salaryPaise, kind: "out" },
+    { key: "other_out", label: "Other spend", sub: n(o.otherOutN, "transaction"),
+      paise: o.otherOutPaise, kind: "out" },
+    { key: "refunds", label: "Refunds", sub: n(o.refundsPaidN, "refund"),
+      paise: o.refundsPaidPaise, kind: "out" },
+    { key: "net", label: "Net", sub: "cash, not profit", paise: o.netPaise, kind: "total" },
+  ];
+}
+
+/* ============================================================ at risk === */
+
+export interface RiskRow {
+  key: string; label: string;
+  /** Null where the row is a count or a ratio rather than an amount. */
+  paise: number | null;
+  /** What the figure is, when it is not rupees — "287% of budget". */
+  figure: string | null;
+  count: string;
+  tone: "bad" | "warn" | "mute";
+  to: string | null;
+  /** WHAT YOU WILL SEE, never which section holds it. The five sections are
+   *  sidebar rows; a face that labels its own links with another section's name
+   *  is competing with the nav for the same job, and the panel's rule is that
+   *  it does not. "the 2 that failed" also happens to be the better link. */
+  toLabel: string;
+}
+
+/** MONEY THAT IS NOT WHERE IT SHOULD BE, gathered from all four record types.
+ *
+ *  A TABLE AND NOT A CHART, deliberately. These four amounts must never be
+ *  added together — one has happened and one has not, one is owed by us and one
+ *  to us — and any chart implies a shared axis, which is an invitation to sum
+ *  them. Rows with a destination each is the honest form.
+ *
+ *  It is the one derivation on the page that reads across every module, which
+ *  is exactly why it belongs in the store: a component assembling this list
+ *  would be a second place for "what counts as at risk" to be decided. */
+export function atRisk(from = PERIOD.from, to = PERIOD.to): RiskRow[] {
+  const o = overview(from, to);
+  const over = tagTotals(from, to).rows.filter((r) => r.overBudget);
+  const recon = reconciliation();
+  const rows: RiskRow[] = [
+    { key: "failed", label: "Fail to pay", paise: o.failedPaise, figure: null,
+      count: o.failedN + (o.failedN === 1 ? " installment" : " installments"),
+      tone: "bad", to: "#/finance?flag=failed",
+      toLabel: "the " + o.failedN + " that failed" },
+    { key: "due_next", label: "Due next 30 days", paise: o.dueNextPaise, figure: null,
+      count: o.dueNextN + (o.dueNextN === 1 ? " installment" : " installments"),
+      tone: "mute", to: "#/finance?flag=due", toLabel: "what is due" },
+  ];
+  if (o.refundsOwedN) {
+    rows.push({ key: "owed", label: "Approved, not sent", paise: o.refundsOwedPaise, figure: null,
+      count: o.refundsOwedN + (o.refundsOwedN === 1 ? " refund" : " refunds"),
+      tone: "warn", to: "#/finance-refunds?flag=owed",
+      toLabel: o.refundsOwedN === 1 ? "the refund" : "the refunds" });
+  }
+  over.forEach((r) => {
+    rows.push({ key: "budget-" + r.tag.tagKey, label: "Over budget", paise: null,
+      figure: r.pctOfBudget + "% of budget", count: r.tag.label, tone: "warn",
+      to: "#/finance-transactions?tag=" + encodeURIComponent(r.tag.tagKey),
+      toLabel: "what is on it" });
+  });
+  if (recon.bankOnly.length) {
+    rows.push({ key: "unexplained", label: "Bank lines nothing explains", paise: null,
+      figure: "net " + inr(recon.variancePaise), tone: "bad",
+      count: recon.bankOnly.length + (recon.bankOnly.length === 1 ? " line" : " lines"),
+      to: null, toLabel: "listed below" });
+  }
+  return rows;
+}
+
+/* ======================================================== kpi history === */
+
+/** THE SHAPE BEHIND A KPI, or null when there is no history to draw.
+ *
+ *  NULL IS THE POINT. A single reading rendered as a flat line is a claim about
+ *  stability that these records do not make, so a metric with fewer than two
+ *  months returns null and the card says "first reading" instead of drawing
+ *  something. Only the four metrics that CAN be read month by month off
+ *  `monthPoints` are here; the rest are levels read at a moment (MRR, ARPU) or
+ *  ratios of a period's own settled installments, and inventing a series for
+ *  them would mean deriving history a second way. */
+export function kpiSeries(key: string): number[] | null {
+  const ms = monthPoints();
+  if (ms.length < 2) return null;
+  if (key === "burn") return ms.map((m) => m.salaryPaise + m.otherOutPaise + m.refundsPaise);
+  if (key === "new_customers") return ms.map((m) => m.newCustomers);
+  /* NET MARGIN GOT ONE AND LOST IT AGAIN. The series behind it was net RUPEES
+     per month — the right shape, the wrong quantity — under a card whose value
+     is a percentage. A reader takes the line as the metric's own history, and
+     it was not: two months with the same margin and different volumes would
+     have drawn at different heights. Net by month is on the Overview, drawn at
+     full size and labelled as rupees, which is where that series belongs. */
+  return null;
 }
 
 /* ====================================================== reconciliation === */
@@ -2415,6 +2544,8 @@ export function useRefundQueue() { useVersion(); return refundQueue(); }
 export function useRefund(id: string | null): RefundRow | null { useVersion(); const r = readRefund(id); return r ? toRefundRow(r) : null; }
 export function useOverview(): Overview { useVersion(); return overview(); }
 export function useOverviewTiles(): Tile[] { useVersion(); return overviewTiles(); }
+export function useWaterfall(): WaterfallStep[] { useVersion(); return waterfall(); }
+export function useAtRisk(): RiskRow[] { useVersion(); return atRisk(); }
 export function useKpis(): Kpi[] { useVersion(); return kpis(); }
 export function useMonthPoints(): MonthPoint[] { useVersion(); return monthPoints(); }
 export function useReconciliation(stmtId?: string): Recon { useVersion(); return reconciliation(stmtId); }

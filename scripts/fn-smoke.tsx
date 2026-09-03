@@ -380,8 +380,16 @@ has(refundsEmpty, "Nothing matches those filters", "...an empty queue says the f
 has(refundsEmpty, "counts the whole book before any filter", "...and that the strip above it was not filtered");
 
 const an = page("analytics · the overview", "/finance-analytics");
-has(an, "Analytics is not a fifth record type", "...analytics is the four lists read back, not a store");
-has(an, "collected, spent, returned", "...the strip says what it is adding up");
+/* THE STANDING NOTICE AND THE BLOCK FOOTERS ARE GONE. What replaced the
+   seven-tile strip is the arithmetic itself — a waterfall from collected to
+   net — so what this must now prove is that the page still leads with the
+   figure and its working, and that the prose did not simply move. */
+has(an, "fin-wfsplit", "...the month opens as a hero figure beside its own working");
+has(an, "ch-wfbar", "...which is a waterfall, not a row of unrelated tiles");
+has(an, "ch-sgnzero", "...and net by month is read against a zero rule");
+hasnt(an, "Analytics is not a fifth record type",
+  "...the standing architecture notice is off the page and in the file header");
+hasnt(an, "never stacked", "...as are the block footers explaining their own chart forms");
 /* THE DEPARTMENT BLOCK IS NO LONGER HERE. It moved to the Payroll tab and
    became year-scoped; asserting its ABSENCE is the half of the move that
    would otherwise rot — a second copy could reappear on Overview and every

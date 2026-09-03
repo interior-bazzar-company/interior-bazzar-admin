@@ -6,6 +6,93 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-03
 
+### Analytics, rebuilt: a waterfall, a zero rule, and the prose off the page
+
+**Area:** `#/finance-analytics` · Overview and KPI
+**Files:** `src/admin/views/charts.tsx`, `src/admin/views/charts.css`, `src/admin/views/Finance/Analytics.tsx`, `src/admin/views/Finance/store.ts`, `src/admin/views/Finance/finance.css`, `scripts/check-finance-ledger.cjs`, `scripts/fn-smoke.tsx`
+
+**What changed**
+
+**THE STORY THE OLD PAGE HID.** Twenty months of records: eighteen of salary
+with no revenue at all, first collection in July 2026, August the first month
+net turns positive. The grouped column chart was scaled in ₹ thousands with no
+zero baseline, so nineteen negative months were simply not drawn. **Net by
+month** is now the second thing on the page — one series, a zero rule, negatives
+below it, extremes and the last point direct-labelled.
+
+**THE SEVEN-TILE STRIP BECOMES A WATERFALL.** Collected → other income → salary
+→ other spend → refunds → net. The net tile already printed the formula in
+words; the waterfall *is* that formula, so the words came off. A zero step is
+drawn rather than skipped — an unpaid salary run is the most consequential thing
+about August, and a tile reading ₹0 buried it.
+
+**A COLOURBLINDNESS FAILURE, FOUND AND FIXED.** The shipping chart palette put
+green in slot 2 beside amber in slot 3 — adjacent, and **ΔE 5.2 under**
+**protanopia** against a floor of 8. On these charts those slots carry salary
+and other spend, so roughly one man in twelve could not tell the two costs
+apart. Finance now has its own slot order with brand teal in slot 1: worst
+adjacent pair **ΔE 13.4 deutan / 15.8 normal**, lightness band, chroma floor and
+3:1 surface contrast all passing in **both** modes. It also fixes the reading
+problem — money in was the palest mark on a page about money arriving.
+**Users’ slots are untouched**: the same reorder is owed to them, but their
+slots carry different series and recolouring that module silently is not this
+change.
+
+**THE PROSE IS OFF THE PAGE.** The standing architecture notice at the top and
+the `foot` paragraph under every block are gone — most explained a chart form
+nobody was disputing, in front of somebody who came to read a number. What
+survives is the handful of lines where a figure is **correct and misleading**:
+burn fell 90% because the run is unpaid, the 90% margin has no salary in it,
+completeness says nothing about correctness. Those now sit **on** the figure as
+a one-clause caveat, not in a paragraph under the block.
+
+**KPI CARDS GET FOUR HONEST STATES**: a value with a delta toned by
+`goodDirection` and a sparkline; a value with **first reading** where there is
+no prior; **not computed — and not zero** with the reason in the value’s place;
+and **deliberately not computed** carrying its decision id. A sparkline is drawn
+only where a real month-by-month series exists — a flat line from one reading is
+a claim about stability these records do not make.
+
+**Three new forms in the kit**, all CSS, no library: `Waterfall`,
+`SignedColumns` and `Spark`. Geometry is scaled for the 38px axis gutter while
+every mark carries the exact figure as `display`, so nothing rounded is ever
+printed as an amount.
+
+**Temp data**
+`none` — no seed or vocabulary change. Every figure on the page was already
+derivable; what is new is `waterfall()`, `atRisk()`, `kpiSeries()` and
+`overview().outPaise` in the store, so the view still does no arithmetic.
+
+**Backend needed**
+`none` — no new endpoint. The four derivations read the same records the
+existing reads do; when the lists come from the API these compute from whatever
+the API returns.
+
+**Open decisions**
+`FN-OD-07` (runway) is unchanged and now has a card state of its own rather than
+a footnote. Two calls made here: **Overview and KPI stay two tabs** — one is
+checking the month, the other is choosing between options — and the **at-risk**
+**table is a table, never a chart**, because its four amounts must never be
+added and any shared axis invites the sum.
+
+**Verified**
+`npx tsc -b` and `npx eslint` clean on every touched file.
+`npm run check:finance` → 441 pass, seventeen of them new: the waterfall’s steps
+are the overview’s own figures and reconcile to `netPaise`, a zero salary step
+is returned rather than dropped, `outPaise` is derived once, at-risk carries one
+row per over-budget tag and none for a tag inside its budget, no at-risk row
+labels its link with a section name (the panel’s nav rule, now enforced at the
+source), and a level or a ratio gets no fabricated sparkline series.
+`npm run check:finance-render` renders every surface and asserts the waterfall,
+the zero rule and the absence of the standing notice and block footers.
+`npm run check:finance-nav` passes. Palette re-validated with the checker in
+both modes. **CSS pass:** 60 tokens used by the new rules, every one resolves,
+none hardcoded, all theme-aware through the ramps; dead `.fin-kd` removed;
+`forced-colors` rules extended to the three new marks; breakpoints at 900px
+(waterfall split collapses, hero first) and 760px (bank strip stacks).
+Read the rendered HTML directly to confirm geometry and labels rather than
+trusting the assertions alone.
+
 ### Refunds: send-back is gone, the verdicts move into one Actions menu, and the standing prose comes off
 
 **Area:** `#/finance-refunds` · a refund → the header actions · the decide, request, manual and transfer dialogs

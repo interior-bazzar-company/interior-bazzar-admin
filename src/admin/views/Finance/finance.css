@@ -438,10 +438,6 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
 /* --------------------------------------------------- KPI movement --- */
 /* Coloured by the KPI's own `goodDirection`, never by the sign: a falling
    burn and a falling MRR point the same way and mean opposite things. */
-.fin-kd { font-variant-numeric: tabular-nums; font-weight: var(--weight-medium); font-size: var(--text-sm) }
-.fin-kd.good { color: var(--ok) }
-.fin-kd.poor { color: var(--bad) }
-.fin-kd.flat { color: var(--text-3) }
 
 /* ---------------------------------------------------------- list bands --- */
 /* Three jobs, three bands. `Block` normally lives in the `.fin-blocks` grid;
@@ -916,3 +912,136 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
 /* A row somebody has disputed. Beside the state pill and not instead of it —
    the row is still `recorded` and still counts, and a chip that replaced the
    state would be the third state this module refuses to have. */
+
+/* ====================================================== analytics · 2026-09 ===
+   The four pieces the redesigned Analytics page owns. Everything else on it —
+   `.fin-summary`, `.fin-evlist`, the chart kit — was already here.
+   ========================================================================== */
+
+/* --------------------------------------------- the month, as arithmetic --- */
+/* A HERO BESIDE THE CHART, not above it. The closing figure and the steps that
+   produced it are one statement; stacking them puts a scroll between the answer
+   and its working. Below 900px the split collapses and the hero goes first,
+   because on a narrow screen the number is what somebody came for. */
+.fin-wfsplit { display: grid; grid-template-columns: minmax(200px, 236px) minmax(0, 1fr);
+               gap: var(--space-8); align-items: stretch }
+.fin-wfplot { min-width: 0 }
+.fin-hero { display: flex; flex-direction: column; gap: 2px;
+            padding-right: var(--space-8); border-right: 1px solid var(--line) }
+.fin-hero .k { display: flex; align-items: center; gap: var(--space-1);
+               font-size: var(--text-2xs); letter-spacing: .06em; text-transform: uppercase;
+               color: var(--text-3); font-weight: var(--weight-semibold) }
+/* --text-3xl / --lh-3xl: the page's hero-figure size, used once. */
+.fin-hero .v { font-size: var(--text-3xl); line-height: var(--lh-3xl);
+               font-weight: var(--weight-semibold); letter-spacing: var(--tracking-tight);
+               font-variant-numeric: tabular-nums }
+.fin-hero .v.ok { color: var(--ok) }
+.fin-hero .v.bad { color: var(--bad) }
+.fin-hero .s { font-size: var(--text-sm); color: var(--text-3) }
+.fin-heroin { display: flex; flex-direction: column; gap: var(--space-2);
+              margin: var(--space-5) 0 0 }
+.fin-heroin > div { display: flex; align-items: baseline; justify-content: space-between;
+                    gap: var(--space-3); font-size: var(--text-md) }
+.fin-heroin dt { color: var(--text-3) }
+.fin-heroin dd { margin: 0; font-weight: var(--weight-medium) }
+/* The one caveat that belongs beside the figure rather than under the block:
+   an unpaid run means the largest cost is missing from the number above it. */
+.fin-caveat { display: flex; gap: var(--space-2); margin: var(--space-4) 0 0;
+              padding: var(--space-2) var(--space-3);
+              background: var(--warn-bg); border: 1px solid var(--warn-line);
+              border-radius: var(--radius-md);
+              font-size: var(--text-sm); line-height: var(--lh-md); color: var(--warn) }
+.fin-caveat .ic { flex: 0 0 auto; margin-top: 2px }
+
+@media (max-width: 900px) {
+  .fin-wfsplit { grid-template-columns: minmax(0, 1fr) }
+  .fin-hero { padding-right: 0; padding-bottom: var(--space-4);
+              border-right: 0; border-bottom: 1px solid var(--line) }
+}
+
+/* ----------------------------------------------------------- at risk --- */
+/* A RAIL, NOT A ROW TINT. Four rows with four different backgrounds would read
+   as four severities of the same thing; these are four different KINDS of
+   thing, one of which (due next 30 days) is not a problem at all. The rail
+   colours the row's category without colouring the figure beside it. */
+.fin-risk td .lab { display: flex; align-items: center; gap: var(--space-2) }
+.fin-risk .rail { width: 3px; height: 26px; border-radius: 2px; flex: 0 0 auto }
+.fin-risk .rail.bad { background: var(--bad-solid) }
+.fin-risk .rail.warn { background: var(--warn-solid) }
+.fin-risk .rail.mute { background: var(--line-3) }
+.fin-risk td.n.bad { color: var(--bad); font-weight: var(--weight-semibold) }
+.fin-risk td.n.warn { color: var(--warn); font-weight: var(--weight-semibold) }
+.fin-risk td.n.mute { font-weight: var(--weight-semibold) }
+.fin-risk td.faint { color: var(--text-3); font-size: var(--text-sm) }
+
+/* ------------------------------------------------------ matched to bank --- */
+.fin-match { display: grid; grid-template-columns: auto minmax(0, 1fr) auto;
+             gap: var(--space-6); align-items: center;
+             padding-bottom: var(--space-4); margin-bottom: var(--space-2);
+             border-bottom: 1px solid var(--line) }
+.fin-match .fig { text-align: center }
+.fin-match .fig .v { font-size: var(--text-3xl); line-height: var(--lh-3xl);
+                     font-weight: var(--weight-semibold); letter-spacing: var(--tracking-tight);
+                     font-variant-numeric: tabular-nums }
+.fin-match .fig .k, .fin-match .acct .k { font-size: var(--text-2xs); letter-spacing: .06em;
+                     text-transform: uppercase; color: var(--text-3);
+                     font-weight: var(--weight-semibold) }
+/* Two parts of one whole, so a split bar rather than a donut — and the 2px gap
+   is the separator, the same rule every other mark in the kit follows. */
+.fin-match .track { display: flex; gap: 2px; height: 14px; border-radius: var(--radius-xs);
+                    overflow: hidden }
+.fin-match .track i { display: block; border-radius: var(--radius-xs) }
+.fin-match .track i.ok { background: var(--s1) }
+.fin-match .track i.bad { background: var(--bad-solid) }
+.fin-match .legend { display: flex; justify-content: space-between; gap: var(--space-3);
+                     padding-top: var(--space-2);
+                     font-size: var(--text-xs); color: var(--text-3) }
+.fin-match .legend .bad { color: var(--bad) }
+.fin-match .acct { text-align: right }
+.fin-match .acct .v { font-size: var(--text-md); font-weight: var(--weight-medium) }
+.fin-match .acct .s { font-size: var(--text-sm); color: var(--text-3) }
+
+@media (max-width: 760px) {
+  .fin-match { grid-template-columns: minmax(0, 1fr); gap: var(--space-3); text-align: left }
+  .fin-match .fig, .fin-match .acct { text-align: left }
+}
+
+/* ---------------------------------------------------------- KPI cards --- */
+.fin-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(232px, 1fr));
+            gap: var(--space-3) }
+.fin-kpi { display: flex; flex-direction: column; gap: var(--space-1);
+           padding: var(--space-3); min-width: 0;
+           background: var(--bg); border: 1px solid var(--line);
+           border-radius: var(--radius-lg) }
+.fin-kpi .k { display: flex; align-items: center; gap: var(--space-1);
+              font-size: var(--text-2xs); letter-spacing: .06em; text-transform: uppercase;
+              color: var(--text-3); font-weight: var(--weight-semibold) }
+.fin-kpi .v { font-size: var(--text-2xl); line-height: var(--lh-2xl);
+              font-weight: var(--weight-semibold); letter-spacing: var(--tracking-tight);
+              white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+/* The delta and the sparkline answer different questions — how much, and what
+   shape — so they sit on one line and neither is asked to do the other's job.
+   The row keeps its height whether or not a sparkline is there, so a grid of
+   cards does not go ragged. */
+.fin-kpi .foot { display: flex; align-items: center; justify-content: space-between;
+                 gap: var(--space-2); min-height: 24px }
+.fin-kpi .d { font-size: var(--text-sm); line-height: var(--lh-sm);
+              font-weight: var(--weight-semibold); white-space: nowrap }
+.fin-kpi .d.good { color: var(--ok) }
+.fin-kpi .d.poor { color: var(--bad) }
+.fin-kpi .d.flat { color: var(--text-3); font-weight: var(--weight-normal) }
+.fin-kpi .first { font-size: var(--text-sm); color: var(--text-3) }
+/* One clause, warn ink, and only while the figure beside it is misleading. */
+.fin-kpi .caveat { margin: 2px 0 0; font-size: var(--text-xs); line-height: var(--lh-xs);
+                   color: var(--warn) }
+
+/* A CARD THAT IS WAITING, NOT ONE THAT IS BROKEN. Dashed on an inset ground —
+   the same treatment an empty well gets elsewhere — because a solid card with
+   no number in it reads as a rendering failure. The reason takes the value's
+   place; a zero here would claim the thing cost nothing. */
+.fin-kpi.na { background: var(--bg-inset); border-style: dashed }
+.fin-kpi.na .why { margin: 0; font-size: var(--text-sm); line-height: var(--lh-md);
+                   color: var(--text-2) }
+.fin-kpi.na .stamp { font-size: var(--text-2xs); letter-spacing: .06em; text-transform: uppercase;
+                     font-weight: var(--weight-semibold); color: var(--text-3) }
+.fin-kpi.na .was { font-size: var(--text-xs); color: var(--text-3); white-space: nowrap }

@@ -1,12 +1,15 @@
 /* =============================================================================
    Users Management — the chart kit.
    -----------------------------------------------------------------------------
-   Four forms, each picked from the data's job rather than from what looks good:
+   Seven forms, each picked from the data's job rather than from what looks good:
 
-     ColumnChart   trend over time, several distinct series   → categorical
-     FunnelChart   ordered stages                             → ordinal ramp
-     BarRows       compare magnitude across classes           → ordinal / status
-     CohortHeat    a grid of magnitudes                       → sequential
+     ColumnChart    trend over time, several distinct series  → categorical
+     Waterfall      how a period reached its closing figure   → in / out / total
+     SignedColumns  one series against zero, sign is the news → status
+     Spark          a metric's shape, inline on a card        → categorical
+     FunnelChart    ordered stages                            → ordinal ramp
+     BarRows        compare magnitude across classes          → ordinal / status
+     CohortHeat     a grid of magnitudes                      → sequential
 
    NO CHART LIBRARY. `recharts` is a declared dependency that nothing imports
    and that is not in the bundle — pulling it in for four simple forms would add
@@ -155,6 +158,243 @@ function Legend({ series }: { series: Series[] }) {
         <span key={s.key}><i className={"sw s" + s.slot} />{s.label}</span>
       ))}
     </div>
+  );
+}
+
+/* ------------------------------------------------------------ waterfall --- */
+
+export interface WaterStep {
+  key: string;
+  label: string;
+  /** Under the label — a count, a caveat, whatever the row is worth saying. */
+  sub?: string;
+  /** SIGNED, in the chart's own unit. `total` steps ignore the sign and are
+   *  drawn from the baseline to the running total instead. */
+  value: number;
+  /** What to PRINT, when the plotted number is a scaled one.
+   *
+   *  Geometry and legibility want different units here: an axis gutter is 38px
+   *  and cannot hold `6,77,320`, while a bar's own label has the whole column
+   *  and should carry the exact figure rather than a rounded one. So the
+   *  caller scales `value` for the axis and passes the real amount here. */
+  display?: string;
+  kind: "in" | "out" | "total";
+}
+
+/**
+ * A waterfall: how a period got from nothing to its closing figure.
+ *
+ * WHY THIS AND NOT A ROW OF TILES. Seven tiles side by side are seven facts
+ * with no relationship drawn between them, and the closing figure's own caption
+ * has to spell the arithmetic out in words — "collected + other in − salary −
+ * spend − refunds". A waterfall IS that sentence, so the sentence comes off.
+ *
+ * A ZERO STEP IS DRAWN, not skipped. A month whose salary run has not been paid
+ * yet is the most important thing on this chart and a tile reading ₹0 buries
+ * it: here it is a visible flat span with the connector running straight
+ * through, which reads as "nothing happened here" rather than as "nothing is
+ * owed".
+ *
+ * The connectors are what make it legible — without them a floating bar is just
+ * a bar at a strange height — so they are drawn from each step's closing level
+ * to the next step's opening one, never inferred by the eye.
+ */
+export function Waterfall({ steps, unit }: { steps: WaterStep[]; unit: string }) {
+  const id = useId();
+
+  /* Running totals first: every geometry below is read off these, so the bar,
+     the connector and the tooltip cannot disagree about where a step sits. */
+  let run = 0;
+  const laid = steps.map((s) => {
+    const from = s.kind === "total" ? 0 : run;
+    const to = s.kind === "total" ? run : run + (s.kind === "out" ? -Math.abs(s.value) : Math.abs(s.value));
+    if (s.kind !== "total") run = to;
+    return { s, from, to, lo: Math.min(from, to), hi: Math.max(from, to) };
+  });
+
+  const peak = Math.max(1, ...laid.map((l) => l.hi));
+  const scale = niceScale(peak);
+  const y = (v: number) => (v / scale.max) * 100;
+  const ticks = scale.steps.slice().reverse();
+  const at = (i: number) => (ticks.length > 1 ? (i / (ticks.length - 1)) * 100 : 0);
+
+  return (
+    <figure className="ch-chart" aria-labelledby={id + "-cap"}>
+      <div className="ch-chartbody">
+        <div className="ch-yaxis" aria-hidden="true">
+          {ticks.map((v, i) => (
+            <span key={v} className="tnum" style={{ top: at(i) + "%" }}>{v.toLocaleString("en-IN")}</span>
+          ))}
+        </div>
+        <div className="ch-plotarea">
+          {ticks.map((v, i) => <i key={v} className="ch-rule" style={{ top: at(i) + "%" }} />)}
+          <div className="ch-groups ch-wf">
+            {laid.map((l, i) => {
+              const next = laid[i + 1];
+              return (
+                <div className="ch-group" key={l.s.key} tabIndex={0}
+                  aria-label={l.s.label + ": " + (l.s.display ?? l.s.value.toLocaleString("en-IN"))}>
+                  <div className="ch-wfcol">
+                    {/* The connector leaves at THIS step's closing level and is
+                        the next step's opening level by construction. */}
+                    {next && next.s.kind !== "total"
+                      ? <i className="ch-wfjoin" style={{ bottom: y(l.to) + "%" }} />
+                      : null}
+                    <span className={"ch-wfbar k-" + l.s.kind}
+                      style={{
+                        bottom: y(l.lo) + "%",
+                        height: Math.max(l.hi === l.lo ? 0 : 1.2, y(l.hi) - y(l.lo)) + "%",
+                      }}>
+                      <em className="tnum">{l.s.display ?? l.s.value.toLocaleString("en-IN")}</em>
+                    </span>
+                  </div>
+                  <span className="ch-tip" role="tooltip">
+                    <b>{l.s.label}</b>
+                    <span>
+                      <i className={"sw k-" + l.s.kind} />
+                      {l.s.kind === "total" ? "closing" : l.s.kind === "in" ? "in" : "out"}
+                      <em className="tnum">{l.s.display ?? l.s.value.toLocaleString("en-IN")}</em>
+                    </span>
+                    {/* NO RUNNING TOTAL IN THE TOOLTIP. It was there, and it
+                        printed the SCALED number — `728` where the bar beside
+                        it said ₹7,27,882 — because the running total is
+                        computed from the plotted values and the exact figures
+                        only exist per step. A number with no unit beside one
+                        with a unit is the kind of thing this page removed
+                        elsewhere; the connector already shows where the total
+                        stands, which is what the line was for. */}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+      <div className="ch-xband ch-wfband" aria-hidden="true">
+        {laid.map((l) => (
+          <span key={l.s.key}>
+            {l.s.label}
+            {l.s.sub ? <em>{l.s.sub}</em> : null}
+          </span>
+        ))}
+      </div>
+      <figcaption id={id + "-cap"} className="ch-unit">{unit}</figcaption>
+    </figure>
+  );
+}
+
+/* ------------------------------------------------------ signed columns --- */
+
+export interface SignedPoint {
+  key: string; label: string; value: number;
+  /** As on a waterfall step: what to print when `value` is scaled for the axis. */
+  display?: string;
+}
+
+/**
+ * One series over time, drawn against a ZERO RULE with negatives below it.
+ *
+ * THE ONE PLACE COLOUR ENCODES SIGN rather than identity. Everywhere else in
+ * the kit a hue means "which series"; here there is only one series and the
+ * whole question is which side of nothing it is on, so ok/bad carry it — and
+ * the rule itself, the only axis line the kit draws, is what they are read
+ * against.
+ *
+ * A line chart was the obvious alternative and hides the crossing: a polyline
+ * passing through zero looks like any other segment, while a column that flips
+ * from below the rule to above it is the event the reader came for.
+ *
+ * DIRECT LABELS ARE SELECTIVE — the extreme in each direction and the last
+ * point, never a number on every column, which at twenty months is twenty
+ * collisions.
+ */
+export function SignedColumns({ points, unit, groups }: {
+  points: SignedPoint[];
+  unit: string;
+  /** Optional spans under the axis: `{label, n}` in order, n = how many points. */
+  groups?: { label: string; n: number }[];
+}) {
+  const id = useId();
+  const hi = Math.max(0, ...points.map((p) => p.value));
+  const lo = Math.min(0, ...points.map((p) => p.value));
+  const span = Math.max(1, hi - lo);
+  /* The zero rule sits where zero actually falls in the range, so a month is
+     never drawn taller than another month of the same size. */
+  const zero = (hi / span) * 100;
+  const idxHi = points.reduce((b, p, i) => (p.value > points[b].value ? i : b), 0);
+  const idxLo = points.reduce((b, p, i) => (p.value < points[b].value ? i : b), 0);
+
+  return (
+    <figure className="ch-chart" aria-labelledby={id + "-cap"}>
+      <div className="ch-sgn">
+        <i className="ch-sgnzero" style={{ top: zero + "%" }} />
+        {points.map((p, i) => {
+          const up = p.value >= 0;
+          const h = (Math.abs(p.value) / span) * 100;
+          const label = i === idxHi || i === idxLo || i === points.length - 1;
+          return (
+            <div className="ch-sgncol" key={p.key} tabIndex={0}
+              aria-label={p.label + ": " + (p.display ?? p.value.toLocaleString("en-IN"))}>
+              <span className={"ch-sgnbar " + (up ? "up" : "dn")}
+                style={up
+                  ? { bottom: 100 - zero + "%", height: Math.max(1, h) + "%" }
+                  : { top: zero + "%", height: Math.max(1, h) + "%" }}>
+                {label ? <em className={"tnum " + (up ? "up" : "dn")}>{p.display ?? p.value.toLocaleString("en-IN")}</em> : null}
+              </span>
+              <span className="ch-tip" role="tooltip">
+                <b>{p.label}</b>
+                <span><i className={"sw " + (up ? "st-ok" : "st-bad")} />net<em className="tnum">{p.display ?? p.value.toLocaleString("en-IN")}</em></span>
+              </span>
+            </div>
+          );
+        })}
+      </div>
+      <div className="ch-xband" aria-hidden="true">
+        {points.map((p) => <span key={p.key}>{p.label}</span>)}
+      </div>
+      {groups ? (
+        <div className="ch-sgnbands" aria-hidden="true">
+          {groups.map((g) => <span key={g.label} style={{ flexGrow: g.n }}>{g.label}</span>)}
+        </div>
+      ) : null}
+      <figcaption id={id + "-cap"} className="ch-unit">{unit}</figcaption>
+    </figure>
+  );
+}
+
+/* ------------------------------------------------------------- sparkline --- */
+
+/**
+ * A metric's shape, at 96×24 with no axis and one end dot.
+ *
+ * IT IS OMITTED WHERE THERE IS NO HISTORY rather than drawn flat. A single
+ * reading rendered as a horizontal line is a claim about stability that the
+ * records do not make — the caller passes `null` and the card says "first
+ * reading" instead.
+ *
+ * A delta alone cannot say this: a fall from a one-off spike and a steady
+ * decline both print −90.6%, and only the shape tells them apart.
+ */
+export function Spark({ values, tone, label }: {
+  values: number[];
+  /** `s1` revenue-ish, `s2` cost-ish — identity, not status. */
+  tone: "s1" | "s2";
+  label: string;
+}) {
+  if (values.length < 2) return null;
+  const hi = Math.max(...values, 0);
+  const lo = Math.min(...values, 0);
+  const span = Math.max(1, hi - lo);
+  const step = 96 / (values.length - 1);
+  const y = (v: number) => 23 - ((v - lo) / span) * 22;
+  const pts = values.map((v, i) => (i * step).toFixed(1) + "," + y(v).toFixed(1)).join(" ");
+  const last = values[values.length - 1];
+  return (
+    <svg className={"ch-spark " + tone} width="96" height="24" viewBox="0 0 96 24"
+      fill="none" role="img" aria-label={label}>
+      <polyline points={pts} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx="96" cy={y(last).toFixed(1)} r="2.5" />
+    </svg>
   );
 }
 

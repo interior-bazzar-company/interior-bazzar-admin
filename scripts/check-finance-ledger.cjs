@@ -1507,6 +1507,70 @@ S.resetStore();
 }
 
 /* ========================================================================== */
+console.log("\nreads: the month as arithmetic, and what is not where it should be");
+S.resetStore();
+{
+  /* THE WATERFALL IS THE NET TILE'S OWN SENTENCE, drawn. Its whole value is
+     that the steps and the closing figure cannot disagree, so that is what
+     these assert — not the shape of the chart. */
+  const w = S.waterfall();
+  const o = S.overview();
+  ok("the waterfall runs in the order the money moves",
+    w.map((s) => s.key),
+    ["collected", "other_in", "salary", "other_out", "refunds", "net"]);
+  ok("...every step is the overview's own figure, never a second derivation",
+    [w[0].paise, w[1].paise, w[2].paise, w[3].paise, w[4].paise],
+    [o.collectedPaise, o.otherInPaise, o.salaryPaise, o.otherOutPaise, o.refundsPaidPaise]);
+  ok("...the closing step IS net, not a sum computed twice", w[5].paise, o.netPaise);
+  ok("...and the steps actually reconcile to it",
+    w[0].paise + w[1].paise - w[2].paise - w[3].paise - w[4].paise, o.netPaise);
+  ok("...the in and out kinds are assigned by what the money did",
+    w.map((s) => s.kind), ["in", "in", "out", "out", "out", "total"]);
+  /* A ZERO STEP IS RETURNED, NOT DROPPED — an unpaid run is the most
+     consequential thing about this month and a missing bar would hide it. */
+  ok("a salary step of zero is still a step, and says which zero it is",
+    [w[2].paise, w[2].sub], [0, "no run paid yet"]);
+  ok("out is derived once, not added up in a view",
+    o.outPaise, o.salaryPaise + o.otherOutPaise + o.refundsPaidPaise);
+
+  /* AT RISK reads across all four record types plus the bank, which is exactly
+     why it is a derivation and not a component assembling a list. */
+  const risk = S.atRisk();
+  ok("at-risk names the failed installments, with the overview's figure",
+    [risk[0].key, risk[0].paise, risk[0].tone], ["failed", o.failedPaise, "bad"]);
+  ok("...and what is merely due, toned as neither good nor bad",
+    [risk[1].key, risk[1].paise, risk[1].tone], ["due_next", o.dueNextPaise, "mute"]);
+  ok("...it carries the approved-not-sent refund",
+    risk.filter((r) => r.key === "owed").map((r) => r.paise), [o.refundsOwedPaise]);
+  ok("...one row per over-budget tag, and none for a tag inside its budget",
+    risk.filter((r) => r.key.indexOf("budget-") === 0).map((r) => r.key),
+    S.tagTotals().rows.filter((t) => t.overBudget).map((t) => "budget-" + t.tag.tagKey));
+  ok("...and the bank lines nothing explains",
+    risk.filter((r) => r.key === "unexplained").map((r) => r.count),
+    [S.reconciliation().bankOnly.length + " lines"]);
+  /* THE PANEL'S NAV RULE, enforced at the source rather than only in the
+     render: no face labels its own links with another section's name. */
+  ok("NO ROW LABELS ITS LINK WITH A SECTION NAME — the sidebar owns that job",
+    risk.filter((r) => ["Subscriptions", "Refunds", "Other Transaction", "Salaries A/C"]
+      .indexOf(r.toLabel) >= 0).map((r) => r.key), []);
+
+  /* A SPARKLINE IS OMITTED WHERE THERE IS NO SERIES. A flat line drawn from one
+     reading is a claim about stability these records do not make. */
+  ok("a metric with a real month-by-month history gets a series",
+    [(S.kpiSeries("burn") || []).length, (S.kpiSeries("new_customers") || []).length],
+    [S.monthPoints().length, S.monthPoints().length]);
+  ok("...a level read at a moment gets none, rather than a fabricated one",
+    [S.kpiSeries("mrr"), S.kpiSeries("arpu"), S.kpiSeries("collection_rate")],
+    [null, null, null]);
+  /* AND A RATIO GETS NO SERIES OF RUPEES. Net margin had one for a build: the
+     right shape, the wrong quantity, under a card printing a percentage. */
+  ok("...nor does a ratio get a series in some other unit", S.kpiSeries("net_margin"), null);
+  ok("...and burn's series is salary + other spend + refunds, month by month",
+    (S.kpiSeries("burn") || []).slice(-1)[0],
+    S.monthPoints().slice(-1)[0].salaryPaise + S.monthPoints().slice(-1)[0].otherOutPaise
+      + S.monthPoints().slice(-1)[0].refundsPaise);
+}
+
 console.log("\nKPIs — undefined is not zero");
 S.resetStore();
 {
