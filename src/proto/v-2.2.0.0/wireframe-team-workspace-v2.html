@@ -244,6 +244,19 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
 .wf-pr-t{font-size:11.5px;display:flex;gap:5px;line-height:1.35}
 .wf-pr-m{font-size:10.5px;color:var(--wf-ink3);display:flex;gap:6px;margin-top:3px;align-items:center}
 .wf-prog.is-thin{flex:1 1 auto;height:5px}
+.wf-prw{position:relative;flex:1 1 auto;display:flex;align-items:center;min-width:0}
+.wf-prw .wf-prog{width:100%;flex:1 1 auto}
+.wf-prw .wf-tick{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--wf-ink2);border-radius:1px}
+.wf-prw .wf-tick::after{content:"";position:absolute;left:-3px;top:-5px;border:4px solid transparent;
+  border-top-color:var(--wf-ink2)}
+.wf-prw .wf-tick.is-late,.wf-prw .wf-tick.is-late::after{background:var(--wf-warn)}
+.wf-prw .wf-tick.is-late::after{background:none;border-top-color:var(--wf-warn)}
+.wf-pr.is-target{border-left:3px solid var(--wf-brand);background:var(--wf-fill);
+  border-radius:0 6px 6px 0;padding:7px 9px 8px;margin-bottom:8px}
+.wf-pr-v{display:flex;align-items:baseline;gap:5px;font-size:16px;font-weight:600;margin:5px 0 4px}
+.wf-pr-v span.wf-u{font-size:11px;font-weight:400;color:var(--wf-ink3)}
+.wf-pr .wf-prog.is-val{display:block;width:100%;flex:none;height:6px}
+.wf-pr .wf-prog.is-val i{background:var(--wf-brand)}
 .wf-tk{display:flex;gap:7px;align-items:flex-start;font-size:11.5px;padding:6px 0;
   border-top:1px solid var(--wf-line);line-height:1.35}
 .wf-tk:first-of-type{border-top:0}
@@ -581,8 +594,9 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
     An hour grid would be mostly empty, and it is the largest piece of net-new UI in the plan for the
     least return.</div>
   <div class="wf-note"><span class="wf-id">TM-AD-25</span> <b>The rail belongs to the calendar face and
-    to no other.</b> It carries Create, the mini month, <i>This month</i>, <i>Progress</i> and
-    <i>Today</i>. <b>Amended:</b> it was first drawn on all four faces as module shell, and that is
+    to no other.</b> It carries Create, the mini month, <i>This month</i>, and then the three blocks in
+    TM-AD-30's order — <i>Tasks</i>, <i>Milestones</i>, <i>Targets</i>.
+    <b>Amended:</b> it was first drawn on all four faces as module shell, and that is
     withdrawn — the board and the timeline get their width back and lose the rail entirely.
     The board is a horizontal-scrolling grid of five columns and the timeline is a date grid with a
     210px lane column; the rail was taking 238px from the two faces that could least afford it, and
@@ -613,13 +627,36 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
     only thing that will make anyone close a task. One more number was reconciled on the way:
     <i>Onboard 60 businesses</i> was drawn at 38 / 60 here and stands at <b>47 / 60</b> in
     <code>work.json</code>, which is the file of record — the screen was copying a stale number.</div>
-  <div class="wf-note"><b><i>Today</i> is a summary, and it links to the page that owns the day.</b>
+  <div class="wf-note"><span class="wf-id">TM-AD-30</span> <b>Tasks, then milestones, then targets —
+    and a target is not drawn like a milestone.</b> The order is the order somebody works in: the task
+    is the thing you do today, the milestone is what the tasks add up to, the target is the number the
+    quarter is judged on. Reading top to bottom you zoom out, and the block you act on is the one you
+    reach first.
+    <b>The two shapes differ because the two things differ.</b> A milestone is a <i>window with children
+    under it</i>, so its bar is <code>completed ÷ total</code> with a <b>▾ marker at the elapsed share of
+    its window</b> — marker ahead of the fill means behind schedule, said in two numbers and no score
+    (<span class="wf-id">TM-OD-11</span>). <i>Close Sharma Interiors</i> is the case that matters:
+    50% done, <b>91% of its window gone</b>, due in two days. A target is a <i>count of units</i>, so the
+    number leads — <b>15</b> of 40 deals — over a value bar in the brand tone with a left rule, and the
+    window is one line of text underneath. Two glances, two answers: <i>is this on schedule</i> and
+    <i>how many are left</i>.</div>
+  <div class="wf-note"><b>One set of components, three surfaces.</b> The rail here, the captain roll-up
+    (§3.12) and the member dashboard (§3.13) all call the same four functions —
+    <code>pbTasks</code>, <code>pbMarks('milestone')</code>, <code>pbMarks('target')</code> and the
+    derivations under them. Same order, same bars, same ▾ marker, same <i>Mine · My team</i> split.
+    Three surfaces that each computed progress their own way is precisely how §3.12 came to be printing
+    two typed percentages that its own children disagreed with, which is what TM-AD-27 had to unpick.
+    <b>The scope changes, the component does not:</b> the rail and §3.13 are self-scope, §3.12 is
+    <code>reportsTo</code> one level, and that is the only argument any of them passes.</div>
+  <div class="wf-note"><b><i>Tasks</i> is a summary, and it links to the page that owns the day.</b>
     Overdue first, then due today, then the next three days, capped — <b>overdue above today</b>, because
     a day list that hides what is already late is how work goes missing. Ticking a box completes the
     item in place; everything else — reordering, rescheduling, the full list — is
     <code>/team/me?tab=work</code> (§3.13), which already exists in this plan and already owns the
-    member's own work. The rail summarises it and never becomes a second one.</div>
-  <div class="wf-note"><b><i>Progress</i> is two sections: <i>Mine</i>, then <i>My team</i>.</b> Team is
+    member's own work. The rail summarises it and never becomes a second one.
+    <b>On §3.12 the same block widens by one argument</b> — <code>reportsTo</code>, one level — and
+    becomes the captain's five overdue rows across two reports. Nothing else about it changes.</div>
+  <div class="wf-note"><b>Both mark blocks are two sections: <i>Mine</i>, then <i>My team</i>.</b> Team is
     <code>reportsTo</code>, one level, never transitive — TM-AD-13 — so a member with no reports simply
     never sees the second heading, and nothing on the rail is a per-person figure. <span class="wf-id">TM-OD-11</span>
     holds: a bar against a <i>milestone</i> counts its children; a bar against a <i>person</i> would be
@@ -1198,16 +1235,12 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
     </div>
 
     <div class="wf-frame">
-      <div class="wf-fbar"><strong>Progress</strong><span class="wf-spacer"></span><span class="wf-sm">derived, never typed</span></div>
-      <div class="wf-fsec">
-        <div class="wf-row" style="margin-bottom:11px"><span style="flex:1;min-width:150px">◈ Onboard 60 businesses <span class="wf-sm">target</span></span>
-          <span class="wf-prog"><i style="width:78%"></i></span><span class="wf-sm">47 / 60 businesses</span></div>
-        <div class="wf-row" style="margin-bottom:11px"><span style="flex:1;min-width:150px">◆ Enquiry response under 4 hours</span>
-          <span class="wf-prog"><i style="width:0%"></i></span><span class="wf-sm">0 / 4 tasks</span></div>
-        <div class="wf-row" style="margin-bottom:11px"><span style="flex:1;min-width:150px">◆ Support handover document <span class="wf-sm">N. Pillai's</span></span>
-          <span class="wf-prog"><i style="width:0%"></i></span><span class="wf-sm">0 / 2 tasks</span></div>
-        <div class="wf-row"><span class="wf-spacer"></span>
-          <button class="wf-btn is-primary" data-goto="4">Open the milestone timeline ▸ <span class="wf-chip is-new" style="background:none;color:#fff;border-color:rgba(255,255,255,.4)">new</span></button></div>
+      <div class="wf-fbar"><strong>Progress</strong><span class="wf-spacer"></span>
+        <span class="wf-chip is-new">same three blocks as the rail</span>
+        <span class="wf-sm">derived, never typed</span></div>
+      <div class="wf-fsec" id="wfCapProg"></div>
+      <div class="wf-fsec"><div class="wf-row"><span class="wf-spacer"></span>
+        <button class="wf-btn is-primary" data-goto="4">Open the milestone timeline ▸ <span class="wf-chip is-new" style="background:none;color:#fff;border-color:rgba(255,255,255,.4)">new</span></button></div>
       </div>
       <div class="wf-fsec" style="background:var(--wf-fill)">
         <div class="wf-inline" style="border-style:solid"><span class="wf-i">ⓘ</span><div>
@@ -1215,7 +1248,8 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
           column sorts, and nothing here reduces a person to one figure.
           <b>Two of these bars read zero</b> and that is not a rendering fault: TM-AD-27 derives them
           from the children, and no task under either milestone is complete. They read 60% and 33% while
-          the number was typed.</div></div>
+          the number was typed. The <b>▾ marker</b> is why zero is worth drawing — it says how much of
+          each window has already gone.</div></div>
       </div>
     </div>
   </div>
@@ -1791,81 +1825,122 @@ function wrMonth(){
     '<div class="wf-wrf">Counted at read against <code>asOf</code>. Nothing on this strip is stored.</div>';
 }
 
-function wrProgRow(it, who){
-  var p = progressOf(it);
+/* ---- progress components — one set, three surfaces (TM-AD-30) -------------
+   Order is tasks ▸ milestones ▸ targets, smallest thing first, because that is
+   the order somebody actually works in. A milestone and a target are drawn
+   DIFFERENTLY on purpose: a milestone is a window with children under it, so
+   its bar carries a marker for where today sits inside that window; a target
+   counts units, so the number is the thing and the bar is behind it.
+   The rail (§3.3), the captain roll-up (§3.12) and the member dashboard
+   (§3.13) all call these — three surfaces, one derivation, no drift.
+--------------------------------------------------------------------------- */
+function teamOf(who){ return Object.keys(MEMBERS).filter(function(id){ return MEMBERS[id].to === who; }); }
+function marksOf(ids, kind){
+  return ITEMS.filter(function(i){
+    return i.kind === kind && !isTerminal(i.status) && ids.indexOf(i.who) >= 0; });
+}
+/* where today sits between startDate and dueDate. Not progress — elapsed. */
+function timePct(it){
+  if (!it.start || !it.due) return null;
+  var s = new Date(it.start), e = new Date(it.due), t = new Date(TODAY);
+  if (e <= s) return 100;
+  return Math.max(0, Math.min(100, Math.round((t - s) / (e - s) * 100)));
+}
+function whoTag(it, show){
+  return show && MEMBERS[it.who] ? esc(MEMBERS[it.who].n.split(' ')[0]) + ' · ' : '';
+}
+function dueTag(it){
+  return '<span' + (isDelayed(it) ? ' class="wf-tone t-warn"' : '') + '>due ' + fmtDay(it.due) +
+         (isDelayed(it) ? ' ⚠' : '') + '</span>';
+}
+
+function pbMilestone(it, showWho){
+  var p = progressOf(it), t = timePct(it), behind = t !== null && t > p.pct + 5;
   return '<div class="wf-pr" data-goto="5">' +
-    '<div class="wf-pr-t"><span>' + (it.kind === 'target' ? '◈' : '◆') + '</span>' +
-    '<span style="flex:1;min-width:0">' + esc(it.title) + '</span></div>' +
-    '<div class="wf-pr-m"><span class="wf-prog is-thin"><i style="width:' + p.pct + '%"></i></span>' +
-    '<b style="color:var(--wf-ink2)">' + p.pct + '%</b></div>' +
-    '<div class="wf-pr-m"><span>' + (who ? esc(MEMBERS[it.who].n.split(' ')[0]) + ' · ' : '') + esc(p.note) + '</span>' +
-    '<span class="wf-spacer"></span><span' + (isDelayed(it) ? ' class="wf-tone t-warn"' : '') + '>due ' +
-    fmtDay(it.due) + (isDelayed(it) ? ' ⚠' : '') + '</span></div></div>';
+    '<div class="wf-pr-t"><span>◆</span><span style="flex:1;min-width:0">' + esc(it.title) + '</span></div>' +
+    '<div class="wf-pr-m"><span class="wf-prw"><span class="wf-prog is-thin"><i style="width:' + p.pct + '%"></i></span>' +
+      (t === null ? '' : '<i class="wf-tick' + (behind ? ' is-late' : '') + '" style="left:' + t + '%"></i>') +
+    '</span><b style="color:var(--wf-ink2)">' + p.pct + '%</b></div>' +
+    '<div class="wf-pr-m"><span>' + whoTag(it, showWho) + esc(p.note) + '</span>' +
+    '<span class="wf-spacer"></span>' + dueTag(it) + '</div>' +
+    (behind ? '<div class="wf-pr-m"><span class="wf-tone t-warn">▾ ' + t + '% of the window gone, ' +
+              p.pct + '% of the work done</span></div>' : '') + '</div>';
 }
 
-function wrProgress(){
-  var marks = function(ids){
-    return ITEMS.filter(function(i){
-      return i.kind !== 'task' && !isTerminal(i.status) && ids.indexOf(i.who) >= 0; });
-  };
-  var team = Object.keys(MEMBERS).filter(function(id){ return MEMBERS[id].to === RAIL_WHO; });
-  var mine = marks([RAIL_WHO]), theirs = marks(team);
-
-  var h = '<div class="wf-wrh">Progress<span class="wf-spacer"></span>' +
-          '<span class="wf-chip">derived</span></div>';
-  h += mine.length
-     ? '<div class="wf-sm" style="color:var(--wf-ink3);margin-bottom:6px">Mine · ' + mine.length + '</div>' +
-       mine.map(function(i){ return wrProgRow(i, false); }).join('')
-     : '<div class="wf-sm" style="color:var(--wf-ink3)">Nothing of your own is a milestone or a target.</div>';
-  if (theirs.length){
-    h += '<div class="wf-sm" style="color:var(--wf-ink3);margin:11px 0 6px;padding-top:9px;' +
-         'border-top:1px solid var(--wf-line)">My team · ' + theirs.length +
-         ' <span class="wf-chip">reportsTo, one level</span></div>' +
-         theirs.map(function(i){ return wrProgRow(i, true); }).join('');
-  }
-  return h;
+function pbTarget(it, showWho){
+  var p = progressOf(it), t = timePct(it);
+  return '<div class="wf-pr is-target" data-goto="5">' +
+    '<div class="wf-pr-t"><span>◈</span><span style="flex:1;min-width:0">' + esc(it.title) + '</span></div>' +
+    '<div class="wf-pr-v"><span>' + it.cur + '</span><span class="wf-u">of ' + it.tgt + ' ' + esc(it.unit) + '</span>' +
+    '<span class="wf-spacer"></span><span style="font-size:12px;color:var(--wf-ink2)">' + p.pct + '%</span></div>' +
+    '<span class="wf-prog is-thin is-val"><i style="width:' + p.pct + '%"></i></span>' +
+    '<div class="wf-pr-m"><span>' + whoTag(it, showWho) +
+    (t === null ? 'no window' : t + '% of the window gone') + '</span>' +
+    '<span class="wf-spacer"></span>' + dueTag(it) + '</div></div>';
 }
 
-function wrToday(){
-  var mine = ITEMS.filter(function(i){
-    return i.kind === 'task' && i.who === RAIL_WHO && !isTerminal(i.status); });
-  var over = mine.filter(isDelayed);
-  var now  = mine.filter(function(i){
+function pbTask(it){
+  return '<div class="wf-tk" data-goto="5"><span class="wf-box"></span>' +
+    '<span style="flex:1;min-width:0">' + esc(it.title) +
+    '<span class="wf-pr-m"><span class="wf-tone' + (isDelayed(it) ? ' t-warn' : '') + '">' +
+    (isDelayed(it) ? '⚠ ' + daysOver(it) + 'd over' : it.due === TODAY ? 'due today' : 'due ' + fmtDay(it.due)) +
+    '</span><span>' + PRI[it.pri].l.toLowerCase() + '</span>' +
+    (blockerOf(it) ? '<span class="wf-tone t-bad">⛔ waiting</span>' : '') +
+    (it.tags.length ? '<span class="wf-tag">' + esc(TAGS[it.tags[0]].l) + '</span>' : '') +
+    '</span></span></div>';
+}
+
+function pbSection(label, list, fn, showWho){
+  return list.length
+    ? '<div class="wf-sm" style="color:var(--wf-ink3);margin:9px 0 4px">' + label + '</div>' +
+      list.map(function(i){ return fn(i, showWho); }).join('')
+    : '';
+}
+
+/* tasks ▸ first, because it is the block somebody acts on */
+function pbTasks(who, withTeam, footer){
+  var ids = withTeam ? [who].concat(teamOf(who)) : [who];
+  var open = ITEMS.filter(function(i){
+    return i.kind === 'task' && ids.indexOf(i.who) >= 0 && !isTerminal(i.status); });
+  var over = open.filter(isDelayed);
+  var now  = open.filter(function(i){
     return !isDelayed(i) && ((i.due === TODAY) || (i.start && i.start <= TODAY && i.due >= TODAY)); });
-  var soon = mine.filter(function(i){
+  var soon = open.filter(function(i){
     return i.due > TODAY && i.due <= iso(addDays(new Date(TODAY + 'T00:00:00'), 3)) && now.indexOf(i) < 0; });
 
-  var row = function(it, tone){
-    return '<div class="wf-tk" data-goto="5"><span class="wf-box"></span>' +
-      '<span style="flex:1;min-width:0">' + esc(it.title) +
-      '<span class="wf-pr-m"><span class="wf-tone' + (tone ? ' t-' + tone : '') + '">' +
-      (isDelayed(it) ? '⚠ ' + daysOver(it) + 'd over' : it.due === TODAY ? 'due today' : 'due ' + fmtDay(it.due)) +
-      '</span><span>' + PRI[it.pri].l.toLowerCase() + '</span>' +
-      (it.tags.length ? '<span class="wf-tag">' + esc(TAGS[it.tags[0]].l) + '</span>' : '') +
-      '</span></span></div>';
-  };
-  var sec = function(label, list, tone){
-    return list.length
-      ? '<div class="wf-sm" style="color:var(--wf-ink3);margin:9px 0 2px">' + label + ' · ' + list.length + '</div>' +
-        list.map(function(i){ return row(i, tone); }).join('')
-      : '';
-  };
-
-  var h = '<div class="wf-wrh">Today<span class="wf-spacer"></span>' +
-          '<span class="wf-chip">' + fmtDay(TODAY) + '</span></div>';
+  var h = '<div class="wf-wrh">Tasks<span class="wf-spacer"></span>' +
+          '<span class="wf-chip">' + (withTeam ? 'me and my reports' : fmtDay(TODAY)) + '</span></div>';
   if (!over.length && !now.length && !soon.length){
-    h += '<div class="wf-sm" style="color:var(--wf-ink3)">Nothing of yours is open in the next three days.</div>';
+    h += '<div class="wf-sm" style="color:var(--wf-ink3)">Nothing open in the next three days.</div>';
   } else {
-    h += sec('Overdue', over, 'warn') + sec('Due today', now, 'info') + sec('Next 3 days', soon, '');
+    h += pbSection('Overdue · ' + over.length, over, pbTask, false) +
+         pbSection('Due today · ' + now.length, now, pbTask, false) +
+         pbSection('Next 3 days · ' + soon.length, soon, pbTask, false);
     if (!over.length && !now.length){
       h += '<div class="wf-sm" style="color:var(--wf-ink3);margin-top:7px">Nothing is due today.</div>';
     }
   }
-  h += '<button class="wf-tk-add">+ add a task for today</button>' +
-       '<div class="wf-wrf"><button class="wf-btn is-quiet" data-goto="13" ' +
-       'style="width:100%;justify-content:center">Open my work ▸</button>' +
-       '<div style="margin-top:6px">Ticking completes in place. Reorder and reschedule live on ' +
-       '<code>/team/me?tab=work</code> — §3.13.</div></div>';
+  if (footer !== false){
+    h += '<button class="wf-tk-add">+ add a task for today</button>' +
+         '<div class="wf-wrf"><button class="wf-btn is-quiet" data-goto="13" ' +
+         'style="width:100%;justify-content:center">Open my work ▸</button>' +
+         '<div style="margin-top:6px">Ticking completes in place. Reorder and reschedule live on ' +
+         '<code>/team/me?tab=work</code> — §3.13.</div></div>';
+  }
+  return h;
+}
+
+/* milestones ▸ then targets. Same two sections, mine before my team. */
+function pbMarks(kind, who, title, empty){
+  var mine = marksOf([who], kind), theirs = marksOf(teamOf(who), kind);
+  var fn = kind === 'target' ? pbTarget : pbMilestone;
+  var h = '<div class="wf-wrh">' + title + '<span class="wf-spacer"></span>' +
+          '<span class="wf-chip">derived</span></div>';
+  if (!mine.length && !theirs.length)
+    return h + '<div class="wf-sm" style="color:var(--wf-ink3)">' + empty + '</div>';
+  h += pbSection('Mine · ' + mine.length, mine, fn, false);
+  h += pbSection('My team · ' + theirs.length +
+                 ' <span class="wf-chip">reportsTo, one level</span>', theirs, fn, true);
   return h;
 }
 
@@ -1887,8 +1962,11 @@ function renderWorkRail(){
     wrCreate(true) +
     '<div class="wf-wrb">' + wrMini() + '</div>' +
     '<div class="wf-wrb">' + wrMonth() + '</div>' +
-    '<div class="wf-wrb">' + wrProgress() + '</div>' +
-    '<div class="wf-wrb">' + wrToday() + '</div>';
+    '<div class="wf-wrb">' + pbTasks(RAIL_WHO, false) + '</div>' +
+    '<div class="wf-wrb">' + pbMarks('milestone', RAIL_WHO, 'Milestones',
+        'No milestone is yours or your reports\'.') + '</div>' +
+    '<div class="wf-wrb">' + pbMarks('target', RAIL_WHO, 'Targets',
+        'No target is yours or your reports\'.') + '</div>';
   ['2','4'].forEach(function(n){
     var el = document.getElementById('wfCreate' + n);
     if (el) el.innerHTML = wrCreate(false);
@@ -2031,6 +2109,17 @@ document.getElementById('wfTlRange').addEventListener('click', function(e){
   renderTl();
 });
 
+/* ---- §3.12 captain roll-up: the same three blocks, one level of reports --- */
+var CAPTAIN = '58';
+function renderCap(){
+  document.getElementById('wfCapProg').innerHTML =
+    '<div class="wf-row" style="align-items:flex-start;gap:18px">' +
+      '<div style="flex:1;min-width:216px">' + pbTasks(CAPTAIN, true, false) + '</div>' +
+      '<div style="flex:1;min-width:216px">' + pbMarks('milestone', CAPTAIN, 'Milestones', 'None open.') + '</div>' +
+      '<div style="flex:1;min-width:216px">' + pbMarks('target', CAPTAIN, 'Targets', 'None open.') + '</div>' +
+    '</div>';
+}
+
 /* ---- §3.13 member dashboard ----------------------------------------------
    One component, three scopes. The tab bar, the header actions and the nudge
    block are all functions of the viewer, which is the only honest way to draw
@@ -2069,7 +2158,6 @@ function renderMe(){
   var mine = ITEMS.filter(function(i){ return i.who === ME; });
   var open = mine.filter(function(i){ return !isTerminal(i.status); });
   var late = mine.filter(isDelayed);
-  var marks = mine.filter(function(i){ return i.kind !== 'task'; });
   var showDocs = S.tabs.indexOf('documents') >= 0;
 
   /* --- header ---------------------------------------------------------- */
@@ -2114,7 +2202,13 @@ function renderMe(){
     tile('Today', '● working', '4h 32m · 1 break') +
     tile('This week', '4 / 5 days', '1 late', 'warn') +
     tile('Work', open.length + ' open', late.length + ' delayed', late.length ? 'warn' : '') +
-    tile('Handover', '33%', '1 of 3 tasks done') +
+    (function(){
+      var ms = mine.filter(function(i){ return i.kind === 'milestone'; })[0];
+      if (!ms) return tile('Milestone', '—', 'none assigned');
+      var p = progressOf(ms), t = timePct(ms);
+      return tile('Handover', p.pct + '%', p.note + ' done · ' + (t === null ? 'no window' : t + '% of the window gone'),
+                  (t !== null && t > p.pct + 5) ? 'warn' : '');
+    })() +
     '</div></div>';
 
   /* --- the nudge block. Rows derived from a hidden surface stay hidden. -- */
@@ -2178,18 +2272,21 @@ function renderMe(){
   h += '</div><div class="wf-sm" style="margin-top:7px">Approved leave <b>suppresses a derived absence</b>. ' +
        'It writes no attendance row, so 8 – 9 Sep will read as leave and not as two absences.</div></div>';
 
-  /* --- milestones ------------------------------------------------------- */
-  h += '<div class="wf-fsec"><h4>Milestones and targets <span class="wf-chip is-live">shipped</span></h4>';
-  marks.forEach(function(i){
-    var p = progressOf(i);
-    h += '<div class="wf-row" style="margin-bottom:9px"><span style="flex:1;min-width:170px">' +
-      (i.kind === 'target' ? '◈' : '◆') + ' ' + esc(i.title) + '</span>' +
-      '<span class="wf-prog"><i style="width:' + p.pct + '%"></i></span>' +
-      '<span class="wf-sm">' + p.pct + '% · ' + esc(p.note) + '</span>' +
-      '<span class="wf-tone' + (isDelayed(i) ? ' t-warn' : '') + '">due ' + i.due.slice(8) + ' Sep</span></div>';
-  });
-  h += '<div class="wf-sm">Progress is <b>completed children ÷ total</b> and it is computed right here — ' +
-       'TM-AD-27. It reads 0% because neither task under it is done, which is the point of not typing it.</div></div>';
+  /* --- work: tasks, then milestones, then targets — the rail's own order and
+     the rail's own components, so a member reads the same three blocks wherever
+     they are standing. TM-AD-30. ------------------------------------------- */
+  h += '<div class="wf-fsec"><h4>Work <span class="wf-chip is-new">tasks ▸ milestones ▸ targets</span>' +
+       '<span class="wf-spacer"></span><span style="font-weight:400;text-transform:none;letter-spacing:0" ' +
+       'class="wf-sm">the same three blocks as the calendar rail and §3.12</span></h4>' +
+       '<div class="wf-row" style="align-items:flex-start;gap:18px">' +
+       '<div style="flex:1;min-width:216px">' + pbTasks(ME, false, false) + '</div>' +
+       '<div style="flex:1;min-width:216px">' + pbMarks('milestone', ME, 'Milestones', 'None assigned.') + '</div>' +
+       '<div style="flex:1;min-width:216px">' + pbMarks('target', ME, 'Targets', 'None assigned — targets sit with the desk that owns the number.') + '</div>' +
+       '</div>' +
+       '<div class="wf-sm" style="margin-top:10px">Progress is <b>completed children ÷ total</b> for a ' +
+       'milestone and <b>currentValue ÷ targetValue</b> for a target, computed right here — TM-AD-27. ' +
+       'The milestone bar reads 0% because neither task under it is done, and the <b>▾ marker</b> says ' +
+       'two thirds of its window has already gone.</div></div>';
 
   /* --- access, hidden from the member themselves ------------------------ */
   if (S.access){
@@ -2232,6 +2329,7 @@ document.getElementById('wfMeScope').addEventListener('click', function(e){
 renderBoard();
 renderCal();          /* renders the rail too — the mini month follows the month in view */
 renderTl();
+renderCap();
 renderMe();
 var m = /^#s(\d+)$/.exec(location.hash);
 show(m ? +m[1] : 0);

@@ -43,7 +43,7 @@ summary:     Calendar and Timeline become the fourth and fifth FACE of
              Leave suppresses a derived absence and never writes an
              attendance row.
 
-outcome:     Thirteen wireframes, eighteen architecture decisions (TM-AD-12…29),
+outcome:     Thirteen wireframes, nineteen architecture decisions (TM-AD-12…30),
              a data-model delta of two new entities and four extended ones, a
              permission delta, a regression list, nine implementation phases,
              thirteen open decisions (TM-OD-20…32) and six risks (TM-R-10…15).
@@ -90,6 +90,15 @@ outcome:     Thirteen wireframes, eighteen architecture decisions (TM-AD-12…29
              stage's clothes, and it becomes `blockedByItemId` plus a reason.
              DELAY is the fifth and is computed, never stored (TM-AD-29).
              Tags stay free and member-owned; stages stay company vocabulary.
+
+             AMENDED a third time 2026-09-04 by TM-AD-30. The rail's blocks are
+             ordered TASKS ▸ MILESTONES ▸ TARGETS — the order somebody works
+             in, smallest thing first — and a target is no longer drawn like a
+             milestone: a milestone gets a work bar with a ▾ marker at the
+             elapsed share of its window, a target gets its number first over a
+             value bar. The same four components now render §3.12's roll-up and
+             §3.13's Work section as well as the rail, so the module computes
+             progress in one place and reads the same in three.
 ```
 
 **Module:** Team · **Date:** 2026-09-03 · **Status:** awaiting approval
@@ -510,8 +519,9 @@ The rail is therefore what `/work` opens on, and it carries:
 + Create ▾        one control, three kinds            TM-AD-26
 mini month        click a day → that month, that face
 This month        done · open · delay · waiting, for the month in view
-Progress          Mine, then My team — one bar per milestone or target
-Today             overdue, then due today, then the next three days
+Tasks             overdue, then due today, then the next three days
+Milestones        work bar + ▾ where today sits in the window   TM-AD-30
+Targets           the number first, over a value bar            TM-AD-30
 ```
 
 Five blocks, five queries, one component. Below **1240px** — the breakpoint the panel
@@ -657,6 +667,47 @@ labels     Planning  In progress  Delay  Complete  Cancel     vocabularies.json
 > records too, the board would have as many columns as it has people and no two of them
 > would mean the same thing.
 
+### TM-AD-30 · Tasks ▸ milestones ▸ targets, and a target is not drawn like a milestone
+
+Two instructions, and the second is the interesting one.
+
+**The order is the order somebody works in.** Task, then milestone, then target: the thing
+you do today, the thing your tasks add up to, the number the quarter is judged on. Reading
+down the rail you zoom out, and the block you can act on is the one you reach first. The
+same order is used on §3.12 and §3.13 — a member who learns it once has learned it
+everywhere.
+
+**The two mark blocks are drawn differently because the two things are different.**
+
+```
+MILESTONE            a window with children under it
+  bar   = completed children ÷ total
+  ▾     = elapsed share of startDate → dueDate
+  read  = marker ahead of fill means behind schedule
+
+TARGET               a count of units
+  number = currentValue, first and largest
+  bar    = the same ratio in the brand tone, with a left rule
+  window = one line of text underneath, not a marker
+```
+
+`Close Sharma Interiors` is the case that earns the marker: **50% done, 91% of its window
+gone, due in two days.** Neither number alone says that, and no score is computed to say
+it either — **TM-OD-11** holds, because two honest numbers side by side are not a rating.
+
+A target gets the opposite treatment for the opposite reason: nobody asks *"is the deal
+count on schedule"*, they ask **how many are left**. So `15` leads, `of 40 deals` follows
+it small, and the window is a line of text. Two glances, two different answers.
+
+**One set of components, three surfaces.** `pbTasks`, `pbMarks('milestone')`,
+`pbMarks('target')` and the derivations under them render the rail (§3.3), the captain
+roll-up (§3.12) and the member dashboard's Work section (§3.13). Scope is the only
+argument that differs — self for the rail and §3.13, `reportsTo` one level for §3.12.
+
+> Three surfaces each computing progress their own way is exactly how §3.12 came to be
+> printing two typed percentages that its own children disagreed with (TM-AD-27). One
+> component cannot drift from itself.
+
 ## 3. The wireframes
 
 Notation: `[ ]` a control · `▾` a menu · `◍` a member · `◆` a milestone or target ·
@@ -732,15 +783,15 @@ drag-to-resize, and the rail's list of tickable calendars (TM-AD-25).
 │  September 2026      │  +1                  ●Q3    book   Sharma                 │
 │   11 dated           │ ─────────────────────────────────────────────────         │
 │   0 done · 8 open    │   7      8      9     10     11     12     13             │
-│   3 late · 0 blockd  │          ▒▒ N. Pillai on leave                            │
+│   3 delay · 0 waitng │          ▒▒ N. Pillai on leave                            │
 │  ──────────────────  │                      ◆▪due                                │
-│  Progress            │                      handover                             │
-│   Mine · 1           │ ─────────────────────────────────────────────────         │
-│   My team · 2        │  14     15     16     17     18     19     20             │
-│  ──────────────────  │         ◆▪due                                             │
-│  Today · 3 Sep       │         Pune                                              │
+│  Tasks               │                      handover                             │
 │   ☐ Q3 pipeline      │ ─────────────────────────────────────────────────         │
-│  [ Open my work ▸ ]  │  … 21 – 27, nothing is dated …                            │
+│  Milestones          │  14     15     16     17     18     19     20             │
+│  ──────────────────  │         ◆▪due                                             │
+│   ◆ ███░░▾░  50%     │         Pune                                              │
+│  Targets             │ ─────────────────────────────────────────────────         │
+│   ▌◈ 15 of 40 deals  │  … 21 – 27, nothing is dated …                            │
 │                      │ ─────────────────────────────────────────────────         │
 │                      │  28     29     30      1      2      3      4             │
 │                      │                ◈▪due ◈▪due ◆▪due  (30 Sep carries 3)      │
@@ -774,27 +825,32 @@ their full width and take Create into their toolbars instead.
 │ 0 done · 8 open                │
 │ 3 in delay · 0 waiting         │
 ├────────────────────────────────┤
-│ PROGRESS            derived    │
-│ Mine · 1                       │
-│ ◈ Close 40 deals this qtr      │
-│ ████░░░░░░░░░░  38%            │
-│ 15 / 40 deals     due 30 Sep   │
-│ My team · 2   reportsTo, 1lvl  │
-│ ◆ Close Sharma Interiors       │
-│ ███████░░░░░░░  50%            │
-│ Rahul · 2 / 4 tasks  due 5 Sep │
-│ ◆ Onboard 12 in Pune           │
-│ ░░░░░░░░░░░░░░   0%            │
-│ Priya · 0 / 2      due 15 Sep  │
-├────────────────────────────────┤
-│ TODAY                  3 Sep   │
+│ TASKS                  3 Sep   │
 │ Due today · 1                  │
 │ ☐ Q3 pipeline review with      │
 │   the founders                 │
 │   due today · medium · Meetng  │
 │ ┌ + add a task for today ───┐  │
 │ [     Open my work ▸       ]   │
-│ Ticking completes in place.    │
+├────────────────────────────────┤
+│ MILESTONES          derived    │
+│ My team · 2                    │
+│ ◆ Close Sharma Interiors       │
+│ ███████░░░░░░▾░  50%           │
+│ Rahul · 2 / 4 tasks   5 Sep    │
+│ ▾ 91% of the window gone,      │
+│   50% of the work done         │
+│ ◆ Onboard 12 in Pune           │
+│ ░░░░░░░░░▾░░░░   0%            │
+│ Priya · 0 / 2 tasks  15 Sep    │
+├────────────────────────────────┤
+│ TARGETS             derived    │
+│ Mine · 1                       │
+│ ▌◈ Close 40 deals this qtr     │
+│ ▌ 15  of 40 deals       38%    │
+│ ▌ ██████░░░░░░░░░░             │
+│ ▌ 70% of the window gone       │
+│ ▌              due 30 Sep      │
 └────────────────────────────────┘
 ```
 
@@ -1110,12 +1166,28 @@ The shipped performance view gains three blocks. It is not redesigned.
 ├─ WAITING ON YOU ────────────────────────────────────NEW─┤
 │  3 leave requests  ·  2 EOD reports unacknowledged      │
 │  1 agreement sent 8 days ago, never opened          ⚠   │
-├─ PROGRESS ──────────────────────────────────────────────┤
-│  ◆ Q3 response time   ▓▓▓▓▓▓░░░░ 60%   due 30 Sep       │
-│  ◆ Close 40 deals     ▓▓▓▓▓▓▓▓▓▓ 45/40 ✓                │
+├─ TASKS ─────────────────────── me and my reports ───NEW─┤
+│  Overdue · 5   ☐ Triage the August backlog   ⚠ 6d over  │
+│                ☐ Call back the 6 unreached   ⚠ 6d over  │
+│                … and three more                         │
+│  Next 3 days   ☐ Rewrite the no-match runbook    4 Sep  │
+├─ MILESTONES ────────────────────────────────────────NEW─┤
+│  ◆ Enquiry response u/4h  ░░░░░▾░░░░  0%   0/4   30 Sep │
+│    ▾ 55% of the window gone, 0% of the work done        │
+│  ◆ Support handover doc   ░░░░░░▾░░░  0%   N.·0/2 10 Sep│
+├─ TARGETS ───────────────────────────────────────────NEW─┤
+│ ▌◈ Onboard 60 businesses                                │
+│ ▌  47  of 60 businesses                            78%  │
+│ ▌  ███████████████░░░░░                                 │
+│ ▌  70% of the window gone                    due 30 Sep │
 │                              [open the timeline ▸]  NEW │
 └─────────────────────────────────────────────────────────┘
 ```
+
+**The three lower blocks are the rail's**, not a second implementation of it — TM-AD-30.
+Same order, same components, same derivations; the only argument that changes is the
+scope, which here is `reportsTo` one level instead of self. That is why *Tasks* reads five
+overdue rows across two reports rather than the captain's own one.
 
 **"Waiting on you" is the only genuinely new idea here**, and it is one query per row
 rather than a feed: things that have stopped because a specific person has not acted.

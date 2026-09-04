@@ -6,6 +6,82 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-04
 
+### Tasks ▸ milestones ▸ targets — one set of components, three surfaces — TM-AD-30
+
+**Area:** `#/work?face=calendar` rail · `#/reports` captain roll-up (§3.12) · `#/team/me` Work section (§3.13)
+**Files:** `src/proto/v-2.2.0.0/wireframe-team-workspace-v2.html`,
+`src/proto/v-2.2.0.0/OPERATION-2026-09-03-team-workspace-v2.md`
+
+**What changed**
+
+**The rail is reordered to Tasks ▸ Milestones ▸ Targets** — the order somebody works
+in, smallest thing first: the thing you do today, the thing your tasks add up to, the
+number the quarter is judged on. Reading down you zoom out, and the block you can act on
+is the one you reach first. *Progress* is gone as a heading; the milestones and the
+targets it used to mix are now two blocks that do not look alike.
+
+**A target is no longer drawn like a milestone**, because they are not the same thing.
+
+- **A milestone is a window with children under it.** Its bar is `completed ÷ total`, and
+  it now carries a **▾ marker at the elapsed share of `startDate → dueDate`**. Marker
+  ahead of the fill means behind schedule, said in two honest numbers and no score —
+  `TM-OD-11` holds. *Close Sharma Interiors* is the case that earns it: **50% done, 91%
+  of its window gone, due in two days.** Neither number alone says that.
+- **A target is a count of units**, so the number leads — **15** *of 40 deals* — over a
+  value bar in the brand tone behind a left rule, with the window as one line of text
+  rather than a marker. Nobody asks whether a deal count is on schedule; they ask how
+  many are left.
+
+**The same components now render all three surfaces** — `pbTasks`,
+`pbMarks('milestone')`, `pbMarks('target')` and the derivations under them:
+
+- **§3.3 rail** — self scope.
+- **§3.12 captain roll-up** — the static Progress block is **replaced by the same three
+  blocks**, passed `reportsTo` one level instead of self. It reads five overdue tasks
+  across two reports, one milestone of his and one of N. Pillai's, and one target.
+- **§3.13 member dashboard** — *Milestones and targets* becomes a **Work** section with
+  the same three blocks in the same order. The *Handover* tile stops printing a typed
+  33% and now derives *0% · 0 / 2 tasks done · 67% of the window gone*.
+
+Scope is the only argument that differs. Three surfaces each computing progress their own
+way is exactly how §3.12 came to be printing two typed percentages its own children
+disagreed with (`TM-AD-27`); one component cannot drift from itself.
+
+**Temp data**
+`none` — no runtime code. No seed change: `timePct` reads `startDate` and `dueDate`,
+which `work.json` already carries on every milestone and target. One dead local
+(`marks` in `renderMe`) was removed with the block it fed.
+
+**Backend needed**
+`none` new. The ▾ marker is `(today − startDate) ÷ (dueDate − startDate)`, computed at
+read like everything else on these blocks. **A milestone with no `startDate` draws no
+marker** rather than assuming one — the same rule §3.4 applies to bars it cannot place.
+
+**Open decisions**
+`TM-AD-30` is new and is shown on §3.3, §3.12 and §3.13. Nothing is open. `TM-OD-11` is
+unchanged: a milestone bar counts its children and the ▾ marker counts days, and neither
+reduces a person to a figure. `TM-OD-20` remains the only blocker on Phase A.
+
+**Verified**
+
+Rendered headlessly against a DOM stub and read back on all three surfaces.
+**Rail** (viewer A. Sharma): Tasks — *Due today · 1*, Q3 pipeline review; Milestones —
+*My team · 2*, Close Sharma Interiors 50% with *91% of the window gone*, Onboard 12 in
+Pune 0% with 67%; Targets — *Mine · 1*, 15 of 40 deals, 38%, 70% of the window gone.
+**§3.12** (D. Kapoor, one level of reports): Tasks — *Overdue · 5* across Meera and
+N. Pillai plus *Next 3 days · 1*; Milestones — his *Enquiry response* 0% at 55% elapsed
+and N. Pillai's handover 0% at 67%; Targets — Onboard 60 businesses, 47 of 60, 78%.
+**§3.13** (N. Pillai): Tasks *Overdue · 2*, Milestones *Mine · 1* at 0% / 67% elapsed,
+Targets *None assigned*, and the Handover tile derived. Every one of those was checked
+against `work.json` by hand. `node --check` passes, tag balance checked with a parser,
+`npx tsc -b` clean, `npx vite build --mode dev` succeeds — no `.ts` was touched.
+
+**Not opened in a browser.** The ▾ marker's triangle sitting over a 5px bar, the target
+block's left rule and brand tone in dark theme, and §3.12's and §3.13's three columns
+wrapping below 700px are reasoned about and not seen.
+
+---
+
 ### Five stages for everybody, and the rail is the calendar's alone — TM-AD-29, and TM-AD-25 amended
 
 **Area:** sidebar → Team → Calendar · `#/work` — the Stage axis on `?face=board`, the rail on `?face=calendar`
