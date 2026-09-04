@@ -6,6 +6,102 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-04
 
+### Five stages for everybody, and the rail is the calendar's alone — TM-AD-29, and TM-AD-25 amended
+
+**Area:** sidebar → Team → Calendar · `#/work` — the Stage axis on `?face=board`, the rail on `?face=calendar`
+**Files:** `src/proto/v-2.2.0.0/wireframe-team-workspace-v2.html`,
+`src/proto/v-2.2.0.0/OPERATION-2026-09-03-team-workspace-v2.md`
+
+**What changed**
+
+Two directions from the founder, and the first **supersedes the entry below it**:
+the rail was drawn on all four faces this morning and is now the calendar's only.
+
+**The rail leaves the board and the timeline** (`TM-AD-25`, amended). Both get their
+full width back. The board is a horizontally scrolling grid of five columns and the
+timeline is a date grid behind a 210px lane column — the rail was taking 238px from the
+two faces that could least afford it, and on both the same information is already on
+screen in a better shape: the board's *Delay* and *Complete* columns count themselves,
+and every timeline lane states *n of m tasks done*. **Create travels with them**
+(`TM-AD-26`, amended): the same control and the same menu now sit in the board's and the
+timeline's toolbars, and at the top of the rail on the calendar. One control, one form,
+three kinds, on every face. What this costs is stated on the screen rather than
+discovered: switch to the board and the progress bars are not in front of you — the
+calendar is what `/work` opens on, and §3.12 and §3.13 carry the same derivations.
+**`TM-R-15` is closed by this**, the day it was raised.
+
+**Five stages, the same five for everyone** (`TM-AD-29`) — *Planning · In progress ·
+Delay · Complete · Cancel*. Two consequences, both drawn:
+
+- **`Blocked` leaves the stages.** It was never the same kind of thing as the other
+  four: *late* is a date, *waiting on someone* is a relationship, and only one of those
+  answers "where is this work". It becomes `blockedByItemId` **with a reason** — the
+  strong link `TM-AD-16` already refuses to let the weak link list create — and the card
+  draws ⛔ wherever it appears. The seed's one blocked row shows what the stage was
+  hiding: `Pune tier pricing sign-off` said *blocked* and recorded **nothing about what
+  was blocking it**. It is now In progress, waiting on `Q3 pipeline review with the
+  founders`, and it shows in Delay because it is seven days over. The drawer's
+  *Block…* button is now *Waiting on…*, and it writes a field rather than a stage.
+- **`Delay` is the fifth and it is computed** — `dueDate < today AND stage not terminal`,
+  at read, against `asOf`. Stored, it would need a nightly sweep this backend has no
+  queue for, and it would let a card read *In progress* three weeks past its date because
+  nobody moved it. Derived, it is identical for every member with nobody maintaining it,
+  which is what *"the same for all"* has to mean to survive a year. It **takes precedence
+  in the grouping**, so every item is in exactly one column; four columns accept a drop
+  and **Delay accepts none**, because there is nothing to write. Column order is
+  lifecycle — Delay sits before the two terminal columns, not after Complete where the
+  founder's list had it.
+
+**Tags are unchanged and that asymmetry is now written down.** A member invents tags
+freely (`TM-AD-14`) because a tag is one person's way of finding their own work. A stage
+is how the company reads everybody's work at once, so it stays vocabulary: five values in
+`vocabularies.json`, one carrying `stored: false` — the same shape `on_leave` already
+uses.
+
+**The strip now counts stages, not stored statuses.** Eleven items store `in_progress`;
+the strip says five and so does the column, because the other six are late and Delay is
+where they are. A summary that counted the stored field would disagree with the columns
+underneath it by six.
+
+**Temp data**
+`none` — no runtime code. The wireframe seed lost its one `'blocked'` row (now
+`'in_progress'`) and gained a `BLOCKED` map standing in for `blockedByItemId` plus its
+reason. Fifteen task rows also had a stale trailing progress number left behind by the
+earlier `TM-AD-27` edit; removed. `src/content/team/work.json` is untouched.
+
+**Backend needed**
+`none` new, but two shapes are now fixed for `GET /api/v1/admin/team/work`:
+**`status` returns four values**, `planned · in_progress · completed · cancelled` — a
+payload containing `blocked` is a payload against an older vocabulary — and
+**`progressPct` and any `delayed` flag must not appear at all**. Both are derived at
+read. `vocabularies.json` gains `workStages[]` with `delayed` marked `stored: false`.
+
+**Open decisions**
+`TM-AD-29` is new, is the founder's rule taken, and is shown on §3.2. `TM-AD-25` and
+`TM-AD-26` are **amended in place and say so on the screen**, so the earlier drawing —
+a rail on four faces — is not read back as current. `TM-R-15` moves to closed.
+`TM-OD-11` is unchanged. `TM-OD-20` remains the only blocker on Phase A.
+One thing was decided rather than asked: **column order is lifecycle, not the order the
+five stages were listed in.** Delay is unfinished work, so it sits between In progress
+and Complete. Say the word and it moves to fourth.
+
+**Verified**
+
+Rendered headlessly against a DOM stub and read back: the Stage axis draws
+**Planning 3 · In progress 5 · Delay 10 · Complete 3 · Cancel 1 · Ungrouped 0**, which
+adds to 22, and the strip agrees with it column for column — *22 items · 5 in progress ·
+3 planning · 10 in delay · 1 waiting on another item · 3 done*. The ⛔ marker renders on
+the one waiting card. The rail renders on `wfWr3` alone (6,365 bytes) with `wfWr2` and
+`wfWr4` gone, and the Create control renders into the board's and the timeline's
+toolbars (282 bytes each). `node --check` passes, tag balance checked with a parser,
+`npx tsc -b` clean, `npx vite build --mode dev` succeeds — no `.ts` was touched.
+
+**Not opened in a browser.** The five columns at 1280px without the rail, the ⛔ marker's
+second line on a card, the Create menu's absolute positioning inside a toolbar, and the
+dark-theme pass are reasoned about and not seen.
+
+---
+
 ### The work rail — Create, progress by milestone, and today — TM-AD-25 … 28
 
 **Area:** sidebar → Team → Calendar · `#/work`, every face — `?face=calendar` · `board` · `list` · `timeline`

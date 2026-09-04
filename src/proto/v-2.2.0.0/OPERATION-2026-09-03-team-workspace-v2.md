@@ -43,7 +43,7 @@ summary:     Calendar and Timeline become the fourth and fifth FACE of
              Leave suppresses a derived absence and never writes an
              attendance row.
 
-outcome:     Thirteen wireframes, seventeen architecture decisions (TM-AD-12…28),
+outcome:     Thirteen wireframes, eighteen architecture decisions (TM-AD-12…29),
              a data-model delta of two new entities and four extended ones, a
              permission delta, a regression list, nine implementation phases,
              thirteen open decisions (TM-OD-20…32) and six risks (TM-R-10…15).
@@ -79,6 +79,17 @@ outcome:     Thirteen wireframes, seventeen architecture decisions (TM-AD-12…2
              their own children contradict (TM-AD-27), and a month grid made
              unreadable by quarter-long items printing on all ninety-two of
              their days (TM-AD-28). The rail ships with Phase C.
+
+             AMENDED again 2026-09-04, on the founder's direction. (1) The rail
+             is WITHDRAWN from the board and the timeline and belongs to the
+             calendar face alone; Create travels to those two toolbars so it is
+             never further than one control away (TM-AD-25, TM-AD-26 amended,
+             TM-R-15 closed). (2) The stages are FIVE and identical for every
+             member — Planning · In progress · Delay · Complete · Cancel.
+             BLOCKED is removed from them: it was a relationship wearing a
+             stage's clothes, and it becomes `blockedByItemId` plus a reason.
+             DELAY is the fifth and is computed, never stored (TM-AD-29).
+             Tags stay free and member-owned; stages stay company vocabulary.
 ```
 
 **Module:** Team · **Date:** 2026-09-03 · **Status:** awaiting approval
@@ -141,7 +152,7 @@ Each note from the brief, against what is already there.
 | 3 | *Agreement — virtually signed — offer letter, NDA* | nothing. Spec'd in the v1 doc §3.11, **never built** | The whole of it: `Agreement`, signature capture, public token page |
 | 4 | *Task dashboard like Google Calendar, weeks* | Board and List faces | **Calendar face** — month and week, and the face `/work` opens on (TM-AD-23) |
 | 5 | *Add Tasks, milestones, Targets = Column · Column Tag on Column* | one `WorkItem` with `kind`; board columns hard-wired to status | A **selectable column axis** — status, kind, assignee, priority, or tag |
-| 6 | *title, start date, end date, description, link to others, priority, status, tags — Meeting, Call — every member creates their own tag* | title, description, `startDate`, `dueDate`, `priority`, `status`, `parentId`, `blockedByItemId` | **Tags** (member-owned) and **links** (generic, typed) |
+| 6 | *title, start date, end date, description, link to others, priority, status, tags — Meeting, Call — every member creates their own tag, but the stages stay the same for all* | title, description, `startDate`, `dueDate`, `priority`, `status` (five, `blocked` among them), `parentId`, `blockedByItemId` | **Tags** (member-owned) and **links** (generic, typed) · **five shared stages**, `blocked` out and `delayed` in as a derived one (TM-AD-29) |
 | 7 | *Captain Timeline Layout · Calendar view · so they measure progress* | `/reports` performance view | **Timeline face** — one lane per **target and milestone**, its tasks as dated bars (TM-AD-24) |
 | 8 | *Resource → documents provided by member* | nothing | **Resource** — a member's own uploaded documents |
 | 9 | *Attendance: login, logout, break, leave request, EOD review* | open · break · resume · close, and EOD review with acknowledgement | **Leave request** only. TM-OD-13 put leave out of v1; this brief puts it back in. |
@@ -242,7 +253,8 @@ case v1 did not have.
 The model already has two relationships, and both are load-bearing:
 
 - `parentId` — **the hierarchy.** Milestone progress is `completed children ÷ total`.
-- `blockedByItemId` — set only alongside `status: blocked` and a reason.
+- `blockedByItemId` — set with a reason. After TM-AD-29 there is no `blocked` stage
+  beside it: this field, and the reason on it, *are* "waiting on someone".
 
 The brief's *"link to others"* is a third, weaker thing, and it must stay weaker:
 
@@ -492,18 +504,34 @@ that is a calendar sidebar. Built literally it would be a progress indicator tha
 **disappears the moment somebody clicks Board**, which is the fastest way to make people
 stop trusting a number.
 
-The rail is therefore part of `/work` itself and every face keeps it:
+The rail is therefore what `/work` opens on, and it carries:
 
 ```
 + Create ▾        one control, three kinds            TM-AD-26
 mini month        click a day → that month, that face
-This month        done · open · delayed · blocked, for the month in view
+This month        done · open · delay · waiting, for the month in view
 Progress          Mine, then My team — one bar per milestone or target
 Today             overdue, then due today, then the next three days
 ```
 
-Five blocks, five queries, one component, mounted on all four faces. Below **1240px** —
-the breakpoint the panel already uses — it collapses.
+Five blocks, five queries, one component. Below **1240px** — the breakpoint the panel
+already uses — it collapses.
+
+> **Amended the same day, on the founder's direction: the rail is the calendar face's and
+> no other's.** It was first drawn on all four; the board and the timeline now have their
+> full width back and no rail at all.
+>
+> The reason it survives contact: the board is a horizontally scrolling grid of five
+> columns and the timeline is a date grid behind a 210px lane column, so the rail was
+> taking 238px from the two faces that could least afford it — and on both, the same
+> information is already on screen in a better shape. The board's **Delay** and
+> **Complete** columns count themselves; every timeline lane states *n of m tasks done*.
+>
+> What it costs is small and worth saying out loud: **switch to the board and the progress
+> bars are not in front of you.** The calendar is the face `/work` lands on (TM-AD-23), and
+> the two surfaces that exist to be read rather than worked in — §3.12's roll-up and §3.13
+> — carry the same numbers from the same derivation. **TM-R-15 is closed by this**: the
+> risk was what the rail cost the board, and the rail is no longer on the board.
 
 **What it deliberately does not hold is the filters.** Google's rail lists calendars to
 tick; ours would have to list members, kinds and tags, three filter sets that mean
@@ -528,9 +556,12 @@ bar against a person is the score **TM-OD-11** refuses to compute.
 rests on — and a target only adds `targetValue` and `targetUnit` to the same six fields.
 
 Three buttons become three forms, then three validators, then three lists, and the module
-is back to the three tables `work.json` exists to avoid. The `+ New item` button is
-removed from every face toolbar in exchange: **one entry point, always in the same
-place**, which is also what makes the rail worth its width.
+is back to the three tables `work.json` exists to avoid.
+
+**The control travels; the form does not change.** On the calendar it sits at the top of
+the rail. On the board and the timeline — which no longer have a rail — the same control
+and the same menu sit in the toolbar, where `+ New item` used to be. One control, one
+form, three kinds, on every face.
 
 ### TM-AD-27 · Every number in the rail is derived — and drawing it caught three that were not
 
@@ -580,6 +611,52 @@ every milestone and target, draws exactly twice — `▸ starts` and `▪ due`. 
 are not lost: they are in the rail with a bar, which is the right shape for a commitment
 that has no single day.
 
+### TM-AD-29 · Five stages, the same five for everyone — and the fifth is not stored
+
+The founder's rule is *"a user can add any tag to the event, but the stages remain the
+same for all"*, and the five are named: **Planning · In progress · Complete · Delay ·
+Cancel**.
+
+The first half of that was already the design (TM-AD-14: a tag is a record somebody owns,
+a stage is company vocabulary). The second half changes two things.
+
+**`Blocked` leaves the stages.** It was never the same kind of thing as the other four:
+*late* is a date and *waiting on someone* is a relationship, and only one of those belongs
+on an axis that answers "where is this work". It becomes `blockedByItemId` **with a
+reason** — the strong link TM-AD-16 already refuses to let the weak link list create — and
+the card draws a ⛔ marker wherever it appears. The one blocked row in the seed shows what
+the stage was hiding: `Pune tier pricing sign-off` said *blocked* and recorded **nothing
+about what was blocking it**. It is now In progress, waiting on `Q3 pipeline review with
+the founders`, and it shows in Delay because it is seven days over.
+
+**`Delay` joins them, and it is computed.** `dueDate < today AND stage not terminal`,
+derived at read against `asOf`, exactly as it always was — the change is that it is now a
+*column and a stage name* rather than a rail colour.
+
+```
+stored     planned · in_progress · completed · cancelled      4 values, on the item
+derived    delayed                                            0 values, on nobody
+labels     Planning  In progress  Delay  Complete  Cancel     vocabularies.json
+```
+
+- **A stored Delay needs a sweep job to stay true**, and this backend has no queue. Worse,
+  it lets a card read *In progress* three weeks past its date because nobody moved it —
+  which is the exact failure the founder's rule is trying to prevent.
+- **Derived, it is identical for every member without anyone maintaining it.** That is what
+  *"the same for all"* has to mean if it is to survive a year.
+- **It takes precedence in the grouping**, so every item is in exactly one column and the
+  strip still adds to 22.
+- **Four columns accept a drop; Delay accepts none** — there is nothing to write. Dragging
+  *out* of it is the move that matters: it sets a real stage, and the card leaves by itself
+  when the date is met.
+- **Column order is lifecycle, not the order the five were listed in.** Delay is work that
+  is not finished, so it sits before the two terminal columns rather than after Complete.
+
+> Tags are free because a tag is one person's way of finding their own work. Stages are
+> fixed because a stage is how the company reads everybody's work at once. If stages were
+> records too, the board would have as many columns as it has people and no two of them
+> would mean the same thing.
+
 ## 3. The wireframes
 
 Notation: `[ ]` a control · `▾` a menu · `◍` a member · `◆` a milestone or target ·
@@ -607,10 +684,10 @@ Team
 ┌──────────────────────────────────────────────────────────────────────────────────┐
 │ [ ▦ Calendar ]NEW·DEFAULT [ ▤ Board ] [ ☰ List ] [ ⊞ Timeline ]NEW                │
 ├──────────────────────────────────────────────────────────────────────────────────┤
-│ ⌕ Search  [Member ▾][Kind ▾][Status ▾][Priority ▾][Tag ▾]NEW   [+ New item]       │
-│ Group by: [ Tag ▾ ]NEW    Status · Kind · Assignee · Priority · Tag               │
+│ ⌕ Search  [Member ▾][Kind ▾][Stage ▾][Priority ▾][Tag ▾]NEW    [+ Create ▾]      │
+│ Group by: [ Tag ▾ ]NEW    Stage · Kind · Assignee · Priority · Tag               │
 ├──────────────────────────────────────────────────────────────────────────────────┤
-│ 34 items │ ● 12 in progress · 8 planned │ ⚠ 5 delayed │ ● 2 blocked │ 7 done      │
+│ 34 items │ ● 12 in progress · 8 planning │ ⚠ 5 in delay │ ⛔ 2 waiting │ 7 done   │
 ├──────────────────────────────────────────────────────────────────────────────────┤
 │  ┌─◆ MEETING 6─┐ ┌─◆ CALL 11──┐ ┌─◆ SITE VISIT 4┐ ┌─UNTAGGED 13─┐                │
 │  │ ▸ Vendor    │ │ ▸ 3 leads  │ │ ▸ Sharma flat │ │ ▸ Q3 draft  │                │
@@ -619,9 +696,17 @@ Team
 │  │   ◆ Q3      │ │   ◆ Q3     │ │               │ │             │                │
 │  └─────────────┘ └────────────┘ └───────────────┘ └─────────────┘                │
 │                                                                                   │
-│  ⓘ Cards may be dragged only when Group by = Status. On every other axis the      │
+│  ⓘ Cards may be dragged only when Group by = Stage. On every other axis the      │
 │    columns are a grouping, and a reassignment needs a reason (TM-AD-15).          │
 └──────────────────────────────────────────────────────────────────────────────────┘
+```
+
+On the **Stage** axis the columns are the five every member shares, and the derived one
+takes precedence so each item sits in exactly one of them — over the 22 seeded items:
+
+```
+Planning 3 │ In progress 5 │ Delay 10 │ Complete 3 │ Cancel 1   ─ and they add to 22
+   ↑ four stored stages, each accepting a drop ↑        ↑ Delay accepts none
 ```
 
 **`UNTAGGED` is always the last column and is never hidden.** A grouping that silently
@@ -662,8 +747,8 @@ drag-to-resize, and the rail's list of tickable calendars (TM-AD-25).
 └──────────────────────┴───────────────────────────────────────────────────────────┘
 ```
 
-**The rail belongs to the module, not to this face** — TM-AD-25. It is drawn identically
-on §3.2 and §3.4, from one function and five queries.
+**The rail belongs to this face and to no other** — TM-AD-25, amended. §3.2 and §3.4 keep
+their full width and take Create into their toolbars instead.
 
 ```
 ┌────────────────────────────────┐
@@ -687,7 +772,7 @@ on §3.2 and §3.4, from one function and five queries.
 │ SEPTEMBER 2026     11 dated    │
 │ ░░░░░░░░░░░░░░░░▒▒▒▒▒▒         │
 │ 0 done · 8 open                │
-│ 3 delayed · 0 blocked          │
+│ 3 in delay · 0 waiting         │
 ├────────────────────────────────┤
 │ PROGRESS            derived    │
 │ Mine · 1                       │
@@ -1064,6 +1149,7 @@ Five of the six are Team's. `Incentive` is deliberately not, and that is TM-AD-1
 | `Member` | `departmentId` *(reserved, TM-OD-20)* | Reserved so the answer to TM-OD-20 is additive either way. |
 | `AttendanceDay` | nothing | Leave does not touch it. That is the point of TM-AD-20. |
 | `vocabularies.json` | `tagSuggestions[]`, `leaveKinds[]`, `linkRelations[]`, `agreementKinds[]`, `resourceKinds[]`, `on_leave` in `attendanceStates` with `stored: false` | Static copy, all of it. |
+| `vocabularies.json` | `workStages[]` — **five**, with `blocked` removed and `delayed` added carrying `stored: false` | TM-AD-29. Same shape as `on_leave`: the file is where the panel learns that one value in a list is computed and can never be written. |
 
 ### 4.3 Content files this adds
 
@@ -1186,7 +1272,7 @@ private-object decision, not before it.
 | **TM-R-11** | Identity documents on a backend where **every S3 object is publicly readable by URL**. | **High** | Private objects + signed reads, decided before Phase H starts. Do not reuse the existing public `fileUrl` return. This is TM-R-04 with worse consequences. |
 | **TM-R-12** | The public signing page is an unauthenticated write on a legal record, and the project still has no throttle class. | **High** | Inherits TM-R-05 in full: hashed token, expiry, single-use, revocable, per-token and per-IP limits, `attemptCount`. |
 | **TM-R-13** | Timeline plus calendar is more net-new UI than the whole of v1's work face. | **Medium** | C before D, month before week, and both share one date-grid primitive. If D slips, C alone answers the brief's *"like Google Calendar"* — and after TM-AD-23 C cannot slip at all, because the sidebar row is named after it. |
-| **TM-R-15** | The rail costs 238px on every face, and the board is the face that can least afford it. | **Medium** | It collapses below 1240px, which is a breakpoint the panel already has. Above it, check the board at 1280px: five columns and a rail is the case that has to hold. If it does not, the rail collapses to icons on the board only — never disappears, because a progress indicator with a hiding place is not one. |
+| **TM-R-15** ~~open~~ **closed** | The rail costs 238px on every face, and the board is the face that can least afford it. | — | **Closed the day it was raised**, by TM-AD-25 being amended: the rail is the calendar's alone, so the board and the timeline never pay for it. What remains is ordinary — the calendar's own grid beside a 238px rail, which collapses below 1240px. |
 | **TM-R-14** | Six tabs on the member dashboard, three of them added at once. | **Low–Medium** | **Mitigation taken up front — see TM-AD-22.** Agreements and Resources ship as two sections of one *Documents* tab, so only one tab is added, not three. Ship Pay last (Phase I). The next fold, if one is still needed, is Reports into Overview. |
 
 ---

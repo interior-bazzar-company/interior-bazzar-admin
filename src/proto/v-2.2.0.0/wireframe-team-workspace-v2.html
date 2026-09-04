@@ -223,6 +223,7 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
   padding:10px;display:flex;flex-direction:column;gap:10px}
 .wf-wrb{border:1px solid var(--wf-line);border-radius:7px;background:var(--wf-panel);padding:9px 10px}
 .wf-wrb.is-plain{border:0;background:none;padding:0}
+.wf-toolbar .wf-wrb.is-plain,.wf-fbar .wf-wrb.is-plain{display:inline-block}
 .wf-wrh{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--wf-ink3);
   font-weight:700;display:flex;align-items:center;gap:6px;margin-bottom:7px}
 .wf-wrh .wf-chip{letter-spacing:0;text-transform:none}
@@ -250,7 +251,9 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
   margin-top:2px;display:block;background:var(--wf-panel)}
 .wf-tk-add{display:block;width:100%;text-align:left;font:inherit;font-size:11px;color:var(--wf-ink3);
   border:1px dashed var(--wf-line2);border-radius:5px;background:none;padding:5px 7px;margin-top:7px;cursor:pointer}
-.wf-menu{border:1px solid var(--wf-line2);border-radius:7px;background:var(--wf-panel);
+.wf-wrb.is-plain{position:relative}
+.wf-menu{position:absolute;left:0;top:100%;z-index:20;min-width:196px;
+  border:1px solid var(--wf-line2);border-radius:7px;background:var(--wf-panel);
   padding:5px;margin-top:6px;box-shadow:0 8px 20px rgba(0,0,0,.08)}
 .wf-menu button{display:block;width:100%;text-align:left;font:inherit;font-size:12.5px;padding:6px 8px;
   border:0;border-radius:5px;background:none;cursor:pointer;color:var(--wf-ink)}
@@ -316,7 +319,7 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
         <tr><td>Task dashboard like Google Calendar</td><td>Board · List faces</td><td><span class="wf-chip is-new">Calendar face — the module's default</span></td><td>§3.3</td></tr>
         <tr><td>Captain timeline, to measure progress</td><td><code>/reports</code> performance view</td><td><span class="wf-chip is-new">Timeline face</span> — lanes are <b>milestones</b>, not members</td><td>§3.4</td></tr>
         <tr><td>Tasks · Milestones · Targets as columns</td><td>one <code>WorkItem</code> with a <code>kind</code></td><td><span class="wf-chip is-ext">selectable column axis</span></td><td>§3.2</td></tr>
-        <tr><td>every member creates their own tag</td><td>nothing — statuses are vocabulary</td><td><span class="wf-chip is-new">Tag</span> record, member-owned</td><td>§3.5 §3.6</td></tr>
+        <tr><td>every member creates their own tag, but the stages stay the same for all</td><td>five statuses, <code>blocked</code> among them</td><td><span class="wf-chip is-new">Tag</span> record, member-owned · <b>five shared stages</b>, one of them derived</td><td>§3.5 §3.6 · TM-AD-29</td></tr>
         <tr><td>link to others</td><td><code>parentId</code>, <code>blockedByItemId</code></td><td><span class="wf-chip is-new">WorkLink</span> edge list</td><td>§3.5</td></tr>
         <tr><td>leave request</td><td>open · break · resume · close</td><td><span class="wf-chip is-new">LeaveRequest</span></td><td>§3.7 §3.8</td></tr>
         <tr><td>agreement, virtually signed</td><td>nothing. Spec'd in v1 §3.11, never built</td><td><span class="wf-chip is-new">Agreement</span> + public page</td><td>§3.9</td></tr>
@@ -432,7 +435,9 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
     <code class="wf-route">/work?face=board</code><span class="wf-chip is-ext">extends the shipped board</span></div>
   <p class="wf-lede">The column is a grouping choice, not a fixed property of the board.
   <b>Change <i>Group by</i> below — it really regroups</b>, over the 22 seeded work items in
-  <code>src/content/team/work.json</code>.</p>
+  <code>src/content/team/work.json</code>. On the <i>Stage</i> axis the columns are the
+  <b>five stages every member shares</b> — Planning, In progress, Delay, Complete, Cancel —
+  and no member can add a sixth (TM-AD-29).</p>
 
   <div class="wf-frame">
     <div class="wf-fbar">
@@ -440,20 +445,17 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
       <button>☰ List</button><button data-goto="4">⊞ Timeline</button></span>
       <span class="wf-spacer"></span><span class="wf-chip is-new">two faces new · calendar is first and default</span>
     </div>
-    <div class="wf-shell">
-    <aside class="wf-wr" id="wfWr2"></aside>
-    <div class="wf-main">
     <div class="wf-toolbar">
       <span class="wf-fake">⌕ Search</span>
       <span class="wf-fake">Member ▾</span><span class="wf-fake">Kind ▾</span>
       <span class="wf-fake">Status ▾</span><span class="wf-fake">Priority ▾</span>
       <span class="wf-fake" style="border-color:var(--wf-new);color:var(--wf-new)">Tag ▾ NEW</span>
-      <span class="wf-spacer"></span><span class="wf-sm" style="color:var(--wf-ink3)">create lives in the rail →</span>
+      <span class="wf-spacer"></span><span id="wfCreate2"></span>
     </div>
     <div class="wf-toolbar" style="background:var(--wf-fill)">
       <label style="font-size:12.5px;color:var(--wf-ink2)">Group by</label>
       <select class="wf-sel" id="wfAxis">
-        <option value="status">Status</option>
+        <option value="status">Stage</option>
         <option value="kind">Kind</option>
         <option value="assignee">Assignee</option>
         <option value="priority">Priority</option>
@@ -465,22 +467,47 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
     </div>
     <div class="wf-strip" id="wfStrip"></div>
     <div class="wf-cols" id="wfCols"></div>
-    </div></div>
   </div>
 
-  <div class="wf-note"><span class="wf-id">TM-AD-15</span> <b>Status stays the default, and it is the only
+  <div class="wf-note"><span class="wf-id">TM-AD-15</span> <b>Stage stays the default, and it is the only
     draggable axis.</b> It is the one axis whose columns carry a transition table, so dragging between
     them means something. On every other axis the columns are a read-only grouping: you cannot drag a
     card from Meera's column into Arjun's and have that mean "reassign", because a reassignment needs a
-    reason and an audit row, and a drag has neither.</div>
+    reason and an audit row, and a drag has neither. <b>And on this axis, four of the five columns take a
+    drop.</b> <i>Delay</i> takes none — there is nothing to write — but you can drag <i>out</i> of it,
+    which is the move that matters: it sets a real stage and the card leaves Delay by itself.</div>
   <div class="wf-note"><b>The last column is never hidden.</b> Switch to <i>Tag</i> and watch
     <span class="wf-chip">Untagged</span> hold 9 items. A grouping that silently drops its ungrouped rows
     is a board that lies about its own count — and where an item carries two tags the strip says so out
     loud (22 items, 23 cards) rather than quietly printing the bigger number.</div>
-  <div class="wf-note"><b><code>delayed</code> is not a status.</b> Ten items are delayed on this board
-    and not one of them stores a flag. It is <code>dueDate &lt; today AND status not terminal</code>,
-    computed at read against <code>asOf</code> — nine draw a warn rail and the tenth draws a bad one,
-    because it is also blocked.</div>
+  <div class="wf-note"><b>The strip counts stages, not stored statuses.</b> Eleven items store
+    <code>in_progress</code>; the strip says five and so does the column, because the other six are late
+    and <i>Delay</i> is where they are. A summary that counted the stored field would disagree with the
+    columns underneath it by six, and the columns are the thing people believe.</div>
+  <div class="wf-note"><span class="wf-id">TM-AD-29</span> <b>Five stages, the same five for everybody —
+    and the fifth is not stored.</b> <i>Planning · In progress · Delay · Complete · Cancel.</i> Four are
+    written on the item. <b>Delay is computed</b> — <code>dueDate &lt; today AND stage not terminal</code>,
+    at read, against <code>asOf</code> — so ten cards sit in that column today and not one of them stores
+    a flag. A stored Delay needs a nightly sweep to stay true, and this backend has no queue; worse, it
+    lets a card read <i>In progress</i> three weeks past its date because nobody moved it. Computed, the
+    column cannot lie and cannot drift, and it is identical for every member without anyone maintaining
+    it. <b>Column order is lifecycle, not the order the stages were listed in</b> — Delay is work that is
+    not done yet, so it belongs before the two terminal columns, not after them.</div>
+  <div class="wf-note"><b><i>Blocked</i> is gone as a stage, and what it was carrying is now written
+    down.</b> The five stages have no room for it and it was never the same kind of thing: <i>late</i> is
+    a date, <i>waiting on someone</i> is a relationship. <code>Pune tier pricing sign-off</code> was the
+    one blocked card in the seed; it is <b>In progress</b> now, it shows in <i>Delay</i> because it is
+    seven days over, and it carries <code>blockedByItemId → Q3 pipeline review with the founders</code>
+    with a reason — which is more than the status ever said. The card draws <span
+    style="color:var(--wf-bad)">⛔</span> and a bad rail; nine other delayed cards draw a warn one.
+    <b>A stage tells you where the work is. It should never also be trying to tell you whose fault it
+    is.</b></div>
+  <div class="wf-note"><b>Any tag, fixed stages — and that asymmetry is deliberate.</b> A member invents
+    tags freely (TM-AD-14: they are records, owned by whoever typed them) because a tag is one person's
+    way of finding their own work. A stage is how the company reads everybody's work at once, so it is
+    <b>vocabulary</b> — five values in <code>vocabularies.json</code>, one of them marked
+    <code>stored:false</code>. If stages were records too, this board would have as many columns as it
+    has people and no two of them would mean the same thing.</div>
 </section>
 
 <!-- ================================================================== 3.3 -->
@@ -528,7 +555,8 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
         <span class="wf-tone t-info"><i class="wf-dot"></i>chip tone = status</span>
         <span class="wf-tone">◆ milestone · ◈ target · ● task</span>
         <span class="wf-tone">▸ starts · ▪ due</span>
-        <span class="wf-tone t-warn"><i class="wf-dot"></i>⚠ = delayed or blocked</span>
+        <span class="wf-tone t-warn"><i class="wf-dot"></i>⚠ = delay</span>
+        <span class="wf-tone t-bad"><i class="wf-dot"></i>⛔ = waiting on another item</span>
         <span class="wf-tone">▒ = approved leave</span>
         <span>click a day → new item with that date prefilled · click a chip → the drawer</span>
       </div>
@@ -552,23 +580,29 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
     Nothing in this module has a start and end <i>time</i> except attendance, which has its own strip.
     An hour grid would be mostly empty, and it is the largest piece of net-new UI in the plan for the
     least return.</div>
-  <div class="wf-note"><span class="wf-id">TM-AD-25</span> <b>The rail is the module's shell, not the
-    calendar's sidebar.</b> It carries Create, the mini month, <i>This month</i>, <i>Progress</i> and
-    <i>Today</i>, and it does not move when the face does — progress that vanishes the moment somebody
-    switches to the board is a progress indicator nobody trusts. Below 1240px it collapses, which is the
-    breakpoint the panel already uses. <b>It is drawn on §3.2 and §3.4 too</b>, from the same function
-    and the same five queries, so this is one component and not three sidebars that drift.
-    <b>What it deliberately does not hold is the filters.</b> Google's rail lists calendars to tick;
-    ours would have to list members, kinds and tags — and a filter that survives a face switch is how
-    somebody loses half their board without noticing. Filters stay in each face's own toolbar. The rail
-    holds only what is true whichever face is open.</div>
+  <div class="wf-note"><span class="wf-id">TM-AD-25</span> <b>The rail belongs to the calendar face and
+    to no other.</b> It carries Create, the mini month, <i>This month</i>, <i>Progress</i> and
+    <i>Today</i>. <b>Amended:</b> it was first drawn on all four faces as module shell, and that is
+    withdrawn — the board and the timeline get their width back and lose the rail entirely.
+    The board is a horizontal-scrolling grid of five columns and the timeline is a date grid with a
+    210px lane column; the rail was taking 238px from the two faces that could least afford it, and
+    on both the same information is already on screen in a better shape — the board's <i>Delay</i> and
+    <i>Complete</i> columns count themselves, and every timeline lane states <i>n of m tasks done</i>.
+    <b>What that costs is honest and small:</b> switch to the board and the progress bars are not in
+    front of you. The calendar is the face <code>/work</code> lands on (TM-AD-23), and the two places
+    that exist to be read rather than worked in — §3.12's roll-up and §3.13 — carry the same numbers
+    from the same derivation.
+    <b>What the rail does not hold, on any face, is the filters.</b> Google's rail lists calendars to
+    tick; ours would have to list members, kinds and tags — and a filter that survives a face switch is
+    how somebody loses half their board without noticing. Filters stay in each face's own toolbar.</div>
   <div class="wf-note"><span class="wf-id">TM-AD-26</span> <b>One Create control, three kinds.</b>
     <code>+ Create ▾</code> opens <i>Task · Milestone · Target</i> and all three open the <b>same form</b>
     with <code>kind</code> prefilled — because they are one <code>WorkItem</code> with a <code>kind</code>
     (TM-AD-15's premise), and a target only adds two fields to it, <code>targetValue</code> and
     <code>targetUnit</code>. Three buttons would become three forms, then three validators, then three
-    lists. The <i>+ New item</i> button is gone from every face toolbar: one entry point, and it is
-    always in the same place.</div>
+    lists. <b>Create travels with the faces the rail no longer reaches</b> — the same control and the
+    same menu sit in the board's and the timeline's toolbars, and at the top of the rail on the calendar.
+    One control, one form, three kinds; the old <i>+ New item</i> button is gone.</div>
   <div class="wf-note"><span class="wf-id">TM-AD-27</span> <b>Every number in the rail is derived, and
     drawing it caught three that were not.</b> A milestone bar is <code>completed children ÷ total
     children</code>; a target bar is <code>currentValue ÷ targetValue</code>. Nothing is stored, and
@@ -620,11 +654,9 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
       <button class="wf-btn is-quiet" id="wfTlNext">›</button>
       <span class="wf-seg" id="wfTlRange"><button data-w="2" class="is-on">2w</button><button data-w="4">4w</button><button data-w="13">Quarter</button></span>
       <span class="wf-fake">Group: Milestone ▾</span>
-      <span class="wf-spacer"></span><span class="wf-chip">scope: targets · milestones · their tasks</span>
+      <span class="wf-spacer"></span><span id="wfCreate4"></span>
+      <span class="wf-chip">scope: targets · milestones · their tasks</span>
     </div>
-    <div class="wf-shell">
-    <aside class="wf-wr" id="wfWr4"></aside>
-    <div class="wf-main">
     <div id="wfTl"></div>
     <div class="wf-fsec" style="background:var(--wf-fill)">
       <div class="wf-row" style="font-size:12px;color:var(--wf-ink2)">
@@ -636,7 +668,6 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
       </div>
       <div class="wf-inline" id="wfTlUndated"><span class="wf-i">⚠</span><div></div></div>
     </div>
-    </div></div>
   </div>
 
   <div class="wf-note"><span class="wf-id">TM-AD-24</span> <b>The lanes are milestones, not members.</b>
@@ -704,7 +735,7 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
       <div class="wf-fsec"><h4>Activity</h4>
         <div class="wf-sm">created 25 Aug · assigned to Rahul Menon · tagged Call · status × 3</div></div>
       <div class="wf-fsec wf-row" style="background:var(--wf-fill)">
-        <button class="wf-btn">Start</button><button class="wf-btn">Complete</button><button class="wf-btn">Block…</button>
+        <button class="wf-btn">Start</button><button class="wf-btn">Complete</button><button class="wf-btn">Waiting on…</button>
         <span class="wf-spacer"></span><button class="wf-btn">Edit</button><button class="wf-btn is-quiet">Cancel…</button>
       </div>
     </div>
@@ -741,6 +772,12 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
     </div>
   </div>
 
+  <div class="wf-note"><b><i>Waiting on…</i> replaced <i>Block…</i>, and it writes a field rather than a
+    stage.</b> TM-AD-29 removed Blocked from the five, so the button now sets
+    <code>blockedByItemId</code> and its reason — the strong link §3.5 already refuses to let the weak
+    link list create. The stage does not move: work that is waiting is still In progress, and if it is
+    also past its date the board shows it in Delay, which is where somebody looking for stalled work
+    would look for it anyway.</div>
   <div class="wf-note"><span class="wf-id">TM-AD-16</span> <b>Links are an edge list and they never touch
     rollup.</b> <code>WorkLink { fromItemId · toItemId · relation }</code>. Progress stays
     <i>completed children ÷ total</i> and a <code>relates to</code> edge changes nothing about it.</div>
@@ -1392,21 +1429,21 @@ var ITEMS = [
   ['W-M02','milestone','Onboard 12 businesses in Pune',            'in_progress','74','2026-08-10','2026-09-15','medium','W-T02',[]],
   ['W-M03','milestone','Close Sharma Interiors',                   'in_progress','70','2026-08-14','2026-09-05','high','W-T01',[]],
   ['W-M04','milestone','Support handover document',                'planned',    '86','2026-08-20','2026-09-10','medium',null,[]],
-  ['W-K01','task',     'Triage the August enquiry backlog',        'in_progress','63','2026-08-28','2026-08-28','high','W-M01',['review'],0],
-  ['W-K02','task',     'Call back the 6 unreached leads',          'planned',    '63',null,        '2026-08-28','medium','W-M01',['call'],0],
-  ['W-K03','task',     'Update the qualification checklist copy',  'planned',    '63',null,        '2026-09-02','low','W-M01',['review'],0],
-  ['W-K04','task',     'Send the revised quotation to Sharma',     'in_progress','70','2026-08-28','2026-08-28','high','W-M03',['call','follow-up'],0],
-  ['W-K05','task',     'Follow up the three Tuesday leads',        'planned',    '70',null,        '2026-08-26','medium','W-M03',['follow-up'],0],
-  ['W-K06','task',     'Site visit — Kalyani Nagar',               'completed',  '70','2026-08-27','2026-08-27','high','W-M03',['site-visit'],100],
-  ['W-K16','task',     'Prepare the Sharma site measurement sheet','completed',  '70','2026-08-25','2026-08-25','medium','W-M03',['site-visit'],100],
-  ['W-K07','task',     'Build the Pune outreach list — 40',        'in_progress','74','2026-08-26','2026-09-01','medium','W-M02',[],      0],
-  ['W-K08','task',     'Pune tier pricing sign-off',               'blocked',    '74','2026-08-24','2026-08-27','high','W-M02',[],        0],
-  ['W-K09','task',     'Weekly ops review deck',                   'completed',  '58','2026-08-27','2026-08-27','medium',null,['meeting'],100],
-  ['W-K10','task',     'Rewrite the no-match runbook',             'planned',    '58',null,        '2026-09-04','low','W-M01',['review'], 0],
-  ['W-K11','task',     'Draft the handover — sections 1 to 3',     'in_progress','86','2026-08-27','2026-09-01','medium','W-M04',[],      0],
-  ['W-K12','task',     'Get the ticket backlog under 20',          'planned',    '86',null,        '2026-08-31','high','W-M04',['follow-up'],0],
-  ['W-K13','task',     'August payout reconciliation',             'in_progress','79','2026-08-27','2026-08-31','high',null,['admin'],    0],
-  ['W-K14','task',     'Q3 pipeline review with the founders',     'planned',    '52',null,        '2026-09-03','medium','W-T01',['meeting'],0],
+  ['W-K01','task',     'Triage the August enquiry backlog',        'in_progress','63','2026-08-28','2026-08-28','high','W-M01',['review']],
+  ['W-K02','task',     'Call back the 6 unreached leads',          'planned',    '63',null,        '2026-08-28','medium','W-M01',['call']],
+  ['W-K03','task',     'Update the qualification checklist copy',  'planned',    '63',null,        '2026-09-02','low','W-M01',['review']],
+  ['W-K04','task',     'Send the revised quotation to Sharma',     'in_progress','70','2026-08-28','2026-08-28','high','W-M03',['call','follow-up']],
+  ['W-K05','task',     'Follow up the three Tuesday leads',        'planned',    '70',null,        '2026-08-26','medium','W-M03',['follow-up']],
+  ['W-K06','task',     'Site visit — Kalyani Nagar',               'completed',  '70','2026-08-27','2026-08-27','high','W-M03',['site-visit']],
+  ['W-K16','task',     'Prepare the Sharma site measurement sheet','completed',  '70','2026-08-25','2026-08-25','medium','W-M03',['site-visit']],
+  ['W-K07','task',     'Build the Pune outreach list — 40',        'in_progress','74','2026-08-26','2026-09-01','medium','W-M02',[]],
+  ['W-K08','task',     'Pune tier pricing sign-off',               'in_progress','74','2026-08-24','2026-08-27','high','W-M02',[]],
+  ['W-K09','task',     'Weekly ops review deck',                   'completed',  '58','2026-08-27','2026-08-27','medium',null,['meeting']],
+  ['W-K10','task',     'Rewrite the no-match runbook',             'planned',    '58',null,        '2026-09-04','low','W-M01',['review']],
+  ['W-K11','task',     'Draft the handover — sections 1 to 3',     'in_progress','86','2026-08-27','2026-09-01','medium','W-M04',[]],
+  ['W-K12','task',     'Get the ticket backlog under 20',          'planned',    '86',null,        '2026-08-31','high','W-M04',['follow-up']],
+  ['W-K13','task',     'August payout reconciliation',             'in_progress','79','2026-08-27','2026-08-31','high',null,['admin']],
+  ['W-K14','task',     'Q3 pipeline review with the founders',     'planned',    '52',null,        '2026-09-03','medium','W-T01',['meeting']],
   ['W-K15','task',     'Archive the June enquiry exports',         'cancelled',  '63',null,        '2026-08-26','low',null,['admin']]
 ].map(function(r){
   return {id:r[0],kind:r[1],title:r[2],status:r[3],who:r[4],start:r[5],due:r[6],pri:r[7],parent:r[8],
@@ -1422,15 +1459,33 @@ var LEAVE = [
 ];
 var LINKS = [{from:'W-K06', to:'W-K04', rel:'follows'}];
 
+/* blockedByItemId lives ON the item, never in LINKS — TM-AD-16 keeps weak links out
+   of anything load-bearing, and this one demands a reason. TM-AD-29 removed Blocked
+   as a stage; what it was carrying moves here, where it has to be written down. */
+var BLOCKED = {
+  'W-K08': {by:'W-K14', why:'Pricing waits on the founders’ Q3 review.'}
+};
+
+/* TM-AD-29 · FIVE stages, the same five for everyone, and nobody can add a sixth.
+   Four are stored. `delayed` is the fifth and it is COMPUTED — column order is
+   lifecycle, so it sits before the two terminal stages rather than after them. */
 var STATUS = {
-  planned:{l:'Planned',t:''}, in_progress:{l:'In progress',t:'info'}, blocked:{l:'Blocked',t:'bad'},
-  completed:{l:'Completed',t:'ok'}, cancelled:{l:'Cancelled',t:'dead'}
+  planned:{l:'Planning',t:''},   in_progress:{l:'In progress',t:'info'},
+  delayed:{l:'Delay',t:'warn',derived:true},
+  completed:{l:'Complete',t:'ok'}, cancelled:{l:'Cancel',t:'dead'}
 };
 var PRI = {high:{l:'High',t:'bad'}, medium:{l:'Medium',t:'warn'}, low:{l:'Low',t:''}};
 var KIND = {task:{l:'Task'}, milestone:{l:'Milestone'}, target:{l:'Target'}};
 
 /* ---- derivations. Nothing below is ever stored. -------------------------- */
 function isTerminal(s){ return s === 'completed' || s === 'cancelled'; }
+/* The stage an item is IN, which is not always the stage it stores. */
+function stageOf(it){ return isDelayed(it) ? 'delayed' : it.status; }
+function blockerOf(it){
+  var b = BLOCKED[it.id]; if (!b) return null;
+  var t = ITEMS.filter(function(x){ return x.id === b.by; })[0];
+  return (t && !isTerminal(t.status)) ? {item:t, why:b.why} : null;
+}
 /* TM-AD-27. A milestone counts its children; a target counts its own units. Neither
    is stored, and the typed progressPct the seed used to carry disagreed with both. */
 function progressOf(it){
@@ -1448,7 +1503,7 @@ function isDelayed(it){ return !!it.due && it.due < TODAY && !isTerminal(it.stat
 function daysOver(it){ return Math.round((new Date(TODAY) - new Date(it.due)) / 86400000); }
 function railTone(it){
   if (it.status === 'cancelled') return '';
-  if (it.status === 'blocked') return 'bad';
+  if (isDelayed(it) && blockerOf(it)) return 'bad';   /* late AND waiting on someone */
   if (isDelayed(it)) return 'warn';
   if (it.status === 'completed') return 'ok';
   if (it.status === 'in_progress') return 'info';
@@ -1531,7 +1586,7 @@ document.addEventListener('keydown', function(e){
 
 /* ---- §3.2 board: the column axis is really selectable -------------------- */
 var AXES = {
-  status:   {label:'Status',   keys:Object.keys(STATUS), name:function(k){return STATUS[k].l;},  of:function(i){return [i.status];}},
+  status:   {label:'Stage',    keys:Object.keys(STATUS), name:function(k){return STATUS[k].l;},  of:function(i){return [stageOf(i)];}},
   kind:     {label:'Kind',     keys:Object.keys(KIND),   name:function(k){return KIND[k].l;},    of:function(i){return [i.kind];}},
   assignee: {label:'Assignee', keys:Object.keys(MEMBERS),name:function(k){return MEMBERS[k].n;}, of:function(i){return [i.who];}},
   priority: {label:'Priority', keys:Object.keys(PRI),    name:function(k){return PRI[k].l;},     of:function(i){return [i.pri];}},
@@ -1542,6 +1597,8 @@ function cardHtml(it){
   var tags = it.tags.map(function(t){
     return '<span class="wf-tag k-' + TAGS[t].t + '">' + esc(TAGS[t].l) + '</span>'; }).join('');
   var late = isDelayed(it) ? '<span style="color:var(--wf-warn)">⚠ ' + daysOver(it) + 'd</span>' : '';
+  var wait = blockerOf(it) ? '<span style="color:var(--wf-bad)" title="' + esc(blockerOf(it).why) +
+             '">⛔ waiting on ' + esc(blockerOf(it).item.title) + '</span>' : '';
   var done = it.status === 'completed' ? '<span style="color:var(--wf-ok)">✓</span>' : '';
   var mark = it.kind === 'task' ? '▸' : '◆';
   return '<button class="wf-card r-' + railTone(it) + (it.status === 'cancelled' ? ' is-dead' : '') +
@@ -1549,7 +1606,8 @@ function cardHtml(it){
     '<span class="wf-card-t">' + mark + ' ' + esc(it.title) + '</span>' +
     '<span class="wf-card-m"><span class="wf-av" style="width:15px;height:15px;flex-basis:15px;font-size:8px">' +
     MEMBERS[it.who].s + '</span>' + esc(MEMBERS[it.who].n.split(' ')[0]) +
-    ' · ' + esc(it.pri) + ' ' + late + ' ' + done + ' ' + tags + '</span></button>';
+    ' · ' + esc(it.pri) + ' ' + late + ' ' + done + ' ' + tags + '</span>' +
+    (wait ? '<span class="wf-card-m">' + wait + '</span>' : '') + '</button>';
 }
 
 function renderBoard(){
@@ -1579,24 +1637,26 @@ function renderBoard(){
   /* The strip and the columns must agree. On the tag axis an item may sit in two
      columns, so the strip says so rather than quietly printing a bigger number. */
   var n = ITEMS.length;
-  var inprog = ITEMS.filter(function(i){return i.status==='in_progress';}).length;
-  var planned = ITEMS.filter(function(i){return i.status==='planned';}).length;
+  /* Counted by STAGE, not by stored status, so the strip and the columns agree:
+     a late card is in Delay and is not also counted under In progress. */
+  var inprog = ITEMS.filter(function(i){return stageOf(i)==='in_progress';}).length;
+  var planned = ITEMS.filter(function(i){return stageOf(i)==='planned';}).length;
   var delayed = ITEMS.filter(isDelayed).length;
-  var blocked = ITEMS.filter(function(i){return i.status==='blocked';}).length;
+  var waiting = ITEMS.filter(blockerOf).length;
   var done = ITEMS.filter(function(i){return i.status==='completed';}).length;
   var multi = placed + rest.length;
   document.getElementById('wfStrip').innerHTML =
     '<span><b>' + n + '</b> items</span>' +
-    '<span><span class="wf-tone t-info"><i class="wf-dot"></i>' + inprog + ' in progress</span> · ' + planned + ' planned</span>' +
-    '<span class="wf-tone t-warn"><i class="wf-dot"></i>' + delayed + ' delayed</span>' +
-    '<span class="wf-tone t-bad"><i class="wf-dot"></i>' + blocked + ' blocked</span>' +
+    '<span><span class="wf-tone t-info"><i class="wf-dot"></i>' + inprog + ' in progress</span> · ' + planned + ' planning</span>' +
+    '<span class="wf-tone t-warn"><i class="wf-dot"></i>' + delayed + ' in delay</span>' +
+    '<span class="wf-tone t-bad"><i class="wf-dot"></i>' + waiting + ' waiting on another item</span>' +
     '<span class="wf-tone t-ok"><i class="wf-dot"></i>' + done + ' done</span>' +
     '<span class="wf-spacer"></span>' +
     '<span style="color:var(--wf-ink3)">columns add to <b>' + multi + '</b>' +
     (multi !== n ? ' — an item may carry two tags, so it appears in two columns' : '') + '</span>';
 
   document.getElementById('wfDragNote').innerHTML = axisKey === 'status'
-    ? 'Cards are draggable here — status columns carry a transition table.'
+    ? 'Draggable here — the four stored stages carry a transition table. <b>Delay accepts no drop</b>: there is nothing to write.'
     : '<b style="color:var(--wf-warn)">Not draggable on this axis.</b> Reassigning needs a reason and an audit row; a drag has neither.';
 }
 document.getElementById('wfAxis').addEventListener('change', renderBoard);
@@ -1655,11 +1715,11 @@ function renderCal(){
     evs.slice(0, cap).forEach(function(ev){
       var it = ev.it;
       var t = it.status === 'cancelled' ? 'dead'
-            : it.status === 'blocked' ? 'bad'
+            : isDelayed(it) && blockerOf(it) ? 'bad'
             : isDelayed(it) ? 'warn'
             : it.status === 'completed' ? 'ok' : 'info';
       var mark = it.kind === 'task' ? '●' : it.kind === 'target' ? '◈' : '◆';
-      var w = (isDelayed(it) || it.status === 'blocked') ? '⚠' : '';
+      var w = blockerOf(it) ? '⛔' : isDelayed(it) ? '⚠' : '';
       var edge = ev.edge === 'starts' ? '▸ starts · ' : ev.edge === 'due' ? '▪ due · ' : '';
       body += '<button class="wf-ev e-' + t + '" data-goto="5">' + mark + ' ' + w + ' ' +
               edge + esc(it.title) + '</button>';
@@ -1714,8 +1774,8 @@ function wrMonth(){
     return e && s <= b && e >= a;
   });
   var done  = inM.filter(function(i){ return i.status === 'completed'; }).length;
-  var block = inM.filter(function(i){ return i.status === 'blocked'; }).length;
-  var late  = inM.filter(function(i){ return isDelayed(i) && i.status !== 'blocked'; }).length;
+  var block = inM.filter(blockerOf).length;
+  var late  = inM.filter(function(i){ return isDelayed(i) && !blockerOf(i); }).length;
   var open  = inM.length - done - block - late;
   var n = Math.max(1, inM.length), seg = function(c, v){
     return v ? '<i style="width:' + (v / n * 100) + '%;background:var(--wf-' + c + ')"></i>' : '';
@@ -1727,7 +1787,7 @@ function wrMonth(){
       '<span class="wf-tone t-ok"><i class="wf-dot"></i>' + done + ' done</span>' +
       '<span class="wf-tone t-info"><i class="wf-dot"></i>' + open + ' open</span>' +
       '<span class="wf-tone t-warn"><i class="wf-dot"></i>' + late + ' delayed</span>' +
-      '<span class="wf-tone t-bad"><i class="wf-dot"></i>' + block + ' blocked</span></div>' +
+      '<span class="wf-tone t-bad"><i class="wf-dot"></i>' + block + ' waiting</span></div>' +
     '<div class="wf-wrf">Counted at read against <code>asOf</code>. Nothing on this strip is stored.</div>';
 }
 
@@ -1809,22 +1869,29 @@ function wrToday(){
   return h;
 }
 
+/* Create is the one control the other faces keep — TM-AD-26 is about the control
+   and the form, not about the rail. On the calendar it sits at the top of the rail;
+   on the board and the timeline it sits in the toolbar. Same markup either way. */
+function wrCreate(wide){
+  return '<div class="wf-wrb is-plain">' +
+    '<button class="wf-btn is-primary wf-create"' +
+    (wide ? ' style="width:100%;justify-content:center"' : '') + '>+ Create ▾</button>' +
+    '<div class="wf-menu" hidden>' +
+      '<button>● Task</button><button>◆ Milestone</button><button>◈ Target</button>' +
+      '<div class="wf-sm">one form · <code>kind</code> prefilled · TM-AD-26</div>' +
+    '</div></div>';
+}
+
 function renderWorkRail(){
-  var h =
-    '<div class="wf-wrb is-plain">' +
-      '<button class="wf-btn is-primary wf-create" style="width:100%;justify-content:center">+ Create ▾</button>' +
-      '<div class="wf-menu" hidden>' +
-        '<button>● Task</button><button>◆ Milestone</button><button>◈ Target</button>' +
-        '<div class="wf-sm">one form · <code>kind</code> prefilled · TM-AD-26</div>' +
-      '</div>' +
-    '</div>' +
+  document.getElementById('wfWr3').innerHTML =
+    wrCreate(true) +
     '<div class="wf-wrb">' + wrMini() + '</div>' +
     '<div class="wf-wrb">' + wrMonth() + '</div>' +
     '<div class="wf-wrb">' + wrProgress() + '</div>' +
     '<div class="wf-wrb">' + wrToday() + '</div>';
-  ['2','3','4'].forEach(function(n){
-    var el = document.getElementById('wfWr' + n);
-    if (el) el.innerHTML = h;
+  ['2','4'].forEach(function(n){
+    var el = document.getElementById('wfCreate' + n);
+    if (el) el.innerHTML = wrCreate(false);
   });
 }
 
@@ -1879,7 +1946,7 @@ function tlBar(it, cls, mark, tlS, days){
   var e = (new Date(it.due || it.start) - tlS) / 86400000 + 1;
   if (e <= 0 || s >= days) return null;
   var a = Math.max(0, s), b = Math.min(days, e);
-  var tone = it.status === 'blocked' ? 'bad' : isDelayed(it) ? 'warn'
+  var tone = isDelayed(it) && blockerOf(it) ? 'bad' : isDelayed(it) ? 'warn'
            : it.status === 'completed' ? 'ok' : 'info';
   var who = it.kind === 'task' && MEMBERS[it.who] ? MEMBERS[it.who].s + ' · ' : '';
   var suffix = isDelayed(it) ? '  ⚠ ' + daysOver(it) + 'd over'
