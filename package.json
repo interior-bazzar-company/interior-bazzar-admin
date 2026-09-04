@@ -24,7 +24,8 @@
     "preview": "vite preview",
     "check:finance": "esbuild scripts/finance-check-entry.ts --bundle --platform=node --format=cjs --define:import.meta.env={} --external:react --log-level=error --outfile=node_modules/.tmp/finance-store.cjs && node scripts/check-finance-ledger.cjs",
     "check:finance-render": "node scripts/build-fn-smoke.cjs && node node_modules/.tmp/fn-smoke.cjs",
-    "check:finance-nav": "node scripts/check-finance-nav.cjs"
+    "check:finance-nav": "node scripts/check-finance-nav.cjs",
+    "check:team": "node scripts/check-team-derivation.cjs"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.8.2",

@@ -1,23 +1,32 @@
 /* =============================================================================
-   Work — #/work
+   Calendar — #/work
    -----------------------------------------------------------------------------
-     #/work                  the board, columns are the status vocabulary
-     #/work?face=list        the same rows as a table
-     #/work?item=W-K04       one item, in a drawer over whichever face is open
+     #/work                     the calendar face, which is what the row opens on
+     #/work?face=board          the board, columns are the five stages
+     #/work?face=board&group=…  the column axis is a choice: stage · kind ·
+                                assignee · priority · tag
+     #/work?face=list           the same rows as a table
+     #/work?face=timeline       target ▸ milestone lanes, tasks as bars
+     #/work?item=W-K04          one item, in a drawer over whichever face is open
 
-   ONE TABLE FOR THREE THINGS. Tasks, milestones and targets are one entity
-   discriminated by `kind`, with `parentId` as the containment. Three tables
-   would have produced three lists, three status vocabularies and three places
-   to look for what a person is doing — and the relationship between them is
-   containment, which is a self-reference and not a third system.
+   THE SIDEBAR ROW READS CALENDAR AND THE ROUTE STAYS /work. Label and default
+   only: the entity is still WorkItem, the grant is still team.work.*, and
+   ?face=board opens exactly the board that shipped, so no link moves.
 
-   `Delayed` IS NOT A COLUMN AND NOT A STATUS. It is `dueDate < today` on a
-   non-terminal item, derived at read. It appears as a warn rail and an Overdue
-   chip, and it can be filtered on, but nothing writes it and no sweep sets it.
+   FIVE STAGES, the same five for everybody: Planning · In progress · Delay ·
+   Complete · Cancel. Four are stored. DELAY IS DERIVED — dueDate < today on a
+   non-terminal item — and it takes precedence in the grouping, so an item is in
+   exactly one column and the strip and the board cannot disagree. Nothing
+   writes it and no sweep sets it. Blocked is not a stage: waiting on someone is
+   a relationship and lives on `blockedByItemId` with a reason.
 
-   NO API YET — src/content/team/work.json through store.ts.
+   THE RAIL IS THE CALENDAR FACE'S OWN. The board is five columns and the
+   timeline is a date grid behind a lane column — both need their width, and on
+   both the same information is already on screen in a better shape.
+
+   NO API YET — src/content/team/*.json through store.ts.
    ============================================================================= */
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
@@ -26,17 +35,30 @@ import {
 } from "../../ui";
 import type { StatCell } from "../../ui";
 import {
-  TODAY, WORK_STATUS, childrenOf, fmtDate, isDelayed, labelOf, parentOf, readMember,
-  scopeLabel, scopeOf, setItemStatus, useItem, useMembers, useWork, workTotals,
+  KIND, PRIORITY, TODAY, WORK_STATUS, addDays, blockerOf, childrenOf, createTag, eventsOn, fmtDate,
+  gridDays, isDelayed, isTerminal, labelOf, lanesOf, leaveOn, meId, membersInScope, parentOf,
+  readMember, setBlockedBy, setItemStatus, stageOf, tagItem, tagsOf, tagsOwnedBy, toneOf,
+  useItem, useMembers, useTags, useWork, workTotals,
 } from "./store";
-import type { WorkItem, WorkStatus } from "./store";
-import {
-  DelayFlag, KindMark, PriorityChip, Progress, ProtoBar, ScopeNote, StatusPill, Who, ago,
-} from "./bits";
+import type { CalEvent, Tag, WorkItem, WorkStage, WorkStatus } from "./store";
+import { KindMark, PriorityChip, ProtoBar, ScopeNote, Who, ago } from "./bits";
+import { MarksBlock, ProgressWindow, StagePill, TagChips, TasksBlock, WaitFlag, daysOver, noteOf } from "./workBits";
 import "./team.css";
 
 const ROUTE = "#/work";
-const COLUMNS: WorkStatus[] = ["planned", "in_progress", "blocked", "completed"];
+const FACES = [
+  { k: "calendar", l: "Calendar", i: "calendar" },
+  { k: "board", l: "Board", i: "menu" },
+  { k: "list", l: "List", i: "doc" },
+  { k: "timeline", l: "Timeline", i: "chart" },
+];
+/** Lifecycle order, not the order the five were listed in: Delay is work that
+ *  is not finished, so it sits before the two terminal columns. */
+const STAGES: WorkStage[] = ["planned", "in_progress", "delayed", "completed", "cancelled"];
+const GROUPS = [
+  { v: "", l: "Stage" }, { v: "kind", l: "Kind" }, { v: "assignee", l: "Assignee" },
+  { v: "priority", l: "Priority" }, { v: "tag", l: "Tag" },
+];
 
 export default function Work() {
   const [sp] = useSearchParams();
@@ -46,20 +68,22 @@ export default function Work() {
     return o;
   }, [sp]);
 
-  const face = p.face === "list" ? "list" : "board";
-  const scope = scopeOf("work");
+  const face = FACES.some((f) => f.k === p.face) ? p.face : "calendar";
+  const scope = "all" as const;
   const rows = useWork({
     member: p.member, kind: p.kind, status: p.status, priority: p.priority,
-    due: p.due, q: p.q, parent: p.parent,
+    due: p.due, q: p.q, parent: p.parent, tag: p.tag,
   }, scope);
   const members = useMembers();
   const all = useWork({}, scope);
+  const tags = useTags();
   const shell = useShell();
   const open = useItem(p.item || null);
+  const me = meId();
 
   usePageChrome({
-    crumbs: <TbTitle label="Work" to="#/work" />,
-    right: <ScopeNote text={scopeLabel(scope, all.length)} />,
+    crumbs: <TbTitle label="Calendar" to="#/work" />,
+    right: <ScopeNote text={all.length + " items"} />,
   }, face);
 
   const goto = useCallback((patch: Record<string, string | undefined>) => {
@@ -72,51 +96,52 @@ export default function Work() {
   }, [p]);
 
   const onFilter = (name: string, value: string) => goto({ [name]: value || undefined });
-  const openItem = (id: string) => goto({ item: id });
+  const openItem = useCallback((id: string) => goto({ item: id }), [goto]);
 
   /* The drawer is the record, and it closes by dropping the param — the same
      arrangement `#/team` uses, so Back and the scrim agree with the URL. */
   useEffect(() => {
     if (!open) return;
-    shell.drawer(<ItemDrawer item={open} all={all} onClose={() => goto({ item: undefined })} />);
-  }, [open, all, shell, goto]);
+    shell.drawer(<ItemDrawer item={open} all={all} tags={tags} onClose={() => goto({ item: undefined })} />);
+  }, [open, all, tags, shell, goto]);
 
   const t = workTotals(all);
   const cells: (StatCell | "sep")[] = [
     { k: "items", v: t.total },
     "sep",
     { k: "in progress", v: t.inProgress, dot: "info", to: ROUTE + qs({ ...p, status: "in_progress" }), on: p.status === "in_progress" },
-    { k: "planned", v: t.planned, dot: "", to: ROUTE + qs({ ...p, status: "planned" }), on: p.status === "planned" },
+    { k: "planning", v: t.planned, dot: "", to: ROUTE + qs({ ...p, status: "planned" }), on: p.status === "planned" },
     "sep",
-    { k: "overdue", v: t.delayed, dot: t.delayed ? "warn" : "", to: ROUTE + qs({ ...p, status: "delayed" }), on: p.status === "delayed" },
-    { k: "blocked", v: t.blocked, dot: t.blocked ? "bad" : "", to: ROUTE + qs({ ...p, status: "blocked" }), on: p.status === "blocked" },
+    { k: "in delay", v: t.delayed, dot: t.delayed ? "warn" : "", to: ROUTE + qs({ ...p, status: "delayed" }), on: p.status === "delayed" },
+    { k: "waiting", v: t.waiting, dot: t.waiting ? "bad" : "" },
     "sep",
-    { k: "done", v: t.completed, dot: "ok", to: ROUTE + qs({ ...p, status: "completed" }), on: p.status === "completed" },
+    { k: "complete", v: t.completed, dot: "ok", to: ROUTE + qs({ ...p, status: "completed" }), on: p.status === "completed" },
   ];
 
   return (
     <div className="dls">
-      <ProtoBar what="Work" endpoint="GET /admin/team/work" />
+      <ProtoBar what="Calendar" endpoint="GET /admin/team/work" />
 
       <div className="dls-cmd">
         <Toolbar>
           <div className="tm-faces">
-            <button className={"tm-face" + (face === "board" ? " on" : "")} onClick={() => goto({ face: undefined })}>
-              <Icon name="menu" size="sm" />Board
-            </button>
-            <button className={"tm-face" + (face === "list" ? " on" : "")} onClick={() => goto({ face: "list" })}>
-              <Icon name="doc" size="sm" />List
-            </button>
+            {FACES.map((f) => (
+              <button key={f.k} className={"tm-face" + (face === f.k ? " on" : "")}
+                onClick={() => goto({ face: f.k === "calendar" ? undefined : f.k })}>
+                <Icon name={f.i} size="sm" />{f.l}
+              </button>
+            ))}
           </div>
           <SearchField ph="Search work" name="q" val={p.q} onFilter={onFilter} />
           <Select name="member" label="Member" value={p.member} onFilter={onFilter}
             options={members.filter((m) => m.status === "active").map((m) => ({ v: m.memberId, l: m.name }))} />
           <Select name="kind" label="Kind" value={p.kind} onFilter={onFilter}
             options={[{ v: "task", l: "Tasks" }, { v: "milestone", l: "Milestones" }, { v: "target", l: "Targets" }]} />
+          <Select name="tag" label="Tag" value={p.tag} onFilter={onFilter}
+            options={slugOptions(tags)} />
           <Select name="priority" label="Priority" value={p.priority} onFilter={onFilter}
             options={[{ v: "high", l: "High" }, { v: "medium", l: "Medium" }, { v: "low", l: "Low" }]} />
-          <Select name="due" label="Due" value={p.due} onFilter={onFilter}
-            options={[{ v: "today", l: "Due today" }, { v: "week", l: "Due this week" }]} />
+          <CreateMenu onPick={(k) => shell.modal(<NewItemModal kind={k} />, "sm")} />
         </Toolbar>
       </div>
 
@@ -125,50 +150,286 @@ export default function Work() {
       <div className="dls-chips">
         <FilterChips
           params={{
-            q: p.q, kind: p.kind, priority: p.priority, due: p.due,
+            q: p.q, kind: p.kind, priority: p.priority, due: p.due, tag: p.tag,
             member: p.member ? (readMember(p.member)?.name || p.member) : undefined,
-            status: p.status ? (p.status === "delayed" ? "overdue" : labelOf(WORK_STATUS, p.status)) : undefined,
+            status: p.status ? labelOf(WORK_STATUS, p.status) : undefined,
             parent: p.parent ? "within " + p.parent : undefined,
           }}
           onUnfilter={(n) => onFilter(n, "")} />
       </div>
 
       <div className="dls-body">
-        {face === "board"
-          ? <Board rows={rows} all={all} onOpen={openItem} />
+        {face === "calendar" ? <CalendarFace rows={rows} me={me} p={p} goto={goto} onOpen={openItem} />
+          : face === "board" ? <Board rows={rows} all={all} group={p.group || ""} goto={goto} onOpen={openItem} />
+          : face === "timeline" ? <Timeline rows={rows} onOpen={openItem} />
           : <List rows={rows} all={all} onOpen={openItem} />}
       </div>
     </div>
   );
 }
 
-/* ---------------------------------------------------------------- board --- */
+const slugOptions = (tags: Tag[]) => {
+  const seen: Record<string, string> = {};
+  tags.filter((t) => !t.archivedAt).forEach((t) => { seen[t.slug] = t.label; });
+  return Object.keys(seen).sort().map((s) => ({ v: s, l: seen[s] }));
+};
 
-function Board({ rows, all, onOpen }: { rows: WorkItem[]; all: WorkItem[]; onOpen: (id: string) => void }) {
-  /* Cancelled has no column. It is terminal and it is not a stage of work —
-     giving it one puts a permanent graveyard on a board people read left to
-     right. It is reachable from the status filter, which is where somebody
-     goes when they are actually looking for it. */
+/* -------------------------------------------------------------- create --- */
+
+/** One control, three kinds. All three open the same form with `kind`
+ *  prefilled — they are one WorkItem with a kind, and a target only adds two
+ *  fields to it. Three buttons become three forms, then three lists. */
+function CreateMenu({ onPick }: { onPick: (k: string) => void }) {
+  const [open, setOpen] = useState(false);
   return (
-    <div className="tm-board">
-      {COLUMNS.map((col) => {
-        const list = rows.filter((i) => i.status === col);
-        return (
-          <section key={col} className={"tm-col tm-col-" + col}>
-            <header>
-              <b>{labelOf(WORK_STATUS, col)}</b>
-              <span className="tnum">{list.length}</span>
-            </header>
-            <div className="tm-col-b">
-              {list.length ? list.map((i) => (
-                <Card key={i.itemId} item={i} all={all} onOpen={onOpen} />
-              )) : <p className="tm-col-e">Nothing here.</p>}
-            </div>
-          </section>
-        );
-      })}
+    <div className="tm-create">
+      <button className="btn pri" onClick={() => setOpen((o) => !o)}>
+        <Icon name="plus" size="sm" />Create
+      </button>
+      {open ? (
+        <div className="tm-menu" onMouseLeave={() => setOpen(false)}>
+          {["task", "milestone", "target"].map((k) => (
+            <button key={k} onClick={() => { setOpen(false); onPick(k); }}>
+              <KindMark kind={k} />{labelOf(KIND, k)}
+            </button>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
+}
+
+function NewItemModal({ kind }: { kind: string }) {
+  const shell = useShell();
+  return (
+    <>
+      <div className="md-h">
+        <h3>New {labelOf(KIND, kind).toLowerCase()}</h3>
+        <button className="btn icon sm md-x" aria-label="Close" onClick={() => shell.closeLayer()}>
+          <Icon name="x" size="sm" />
+        </button>
+      </div>
+      <div className="md-b">
+        <Notice text="One form, three kinds. The kind is a field on the item, not a different record." />
+      </div>
+      <div className="md-f">
+        <span className="spacer" />
+        <button className="btn" onClick={() => shell.closeLayer()}>Close</button>
+      </div>
+    </>
+  );
+}
+
+/* ------------------------------------------------------------ calendar --- */
+
+function CalendarFace({ rows, me, p, goto, onOpen }: {
+  rows: WorkItem[]; me: string; p: Record<string, string>;
+  goto: (q: Record<string, string | undefined>) => void; onOpen: (id: string) => void;
+}) {
+  const mode = p.cal === "week" ? "week" : "month";
+  const anchor = p.on || TODAY;
+  const days = gridDays(anchor, mode);
+  const month = anchor.slice(0, 7);
+  const teamIds = membersInScope("team", me).map((m) => m.memberId);
+
+  const move = (n: number) => {
+    const d = new Date(anchor + "T00:00:00");
+    if (mode === "week") return goto({ on: addDays(anchor, n * 7) });
+    d.setMonth(d.getMonth() + n);
+    return goto({ on: d.toISOString().slice(0, 10) });
+  };
+
+  return (
+    <div className="tm-shell">
+      <aside className="tm-rail">
+        <Rail me={me} anchor={anchor} rows={rows} onDay={(d) => goto({ on: d, cal: undefined })} onOpen={onOpen} />
+      </aside>
+      <div className="tm-shell-b">
+        <div className="tm-calbar">
+          <button className="btn sm" onClick={() => goto({ on: undefined })}>Today</button>
+          <button className="btn icon sm" aria-label="Previous" onClick={() => move(-1)}><Icon name="chevl" size="sm" /></button>
+          <b>{monthLabel(anchor, mode)}</b>
+          <button className="btn icon sm" aria-label="Next" onClick={() => move(1)}><Icon name="chevr" size="sm" /></button>
+          <span className="tm-seg">
+            <button className={mode === "month" ? "on" : ""} onClick={() => goto({ cal: undefined })}>Month</button>
+            <button className={mode === "week" ? "on" : ""} onClick={() => goto({ cal: "week" })}>Week</button>
+          </span>
+          <span className="spacer" />
+          <span className="tm-legend">
+            <i className="k-info" />chip tone = stage
+            <i className="k-warn" />delay
+            <i className="k-bad" />waiting
+          </span>
+        </div>
+        <div className={"tm-cal" + (mode === "week" ? " week" : "")}>
+          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+            <div key={d} className="tm-cal-h">{d}</div>
+          ))}
+          {days.map((d) => {
+            const evs = eventsOn(d, rows);
+            const cap = mode === "week" ? 10 : 4;
+            const away = leaveOn(d, teamIds);
+            return (
+              <div key={d} className={"tm-day"
+                + (d.slice(0, 7) !== month && mode === "month" ? " out" : "")
+                + (d === TODAY ? " today" : "")}>
+                <span className="tm-day-n">{Number(d.slice(8))}{d === TODAY ? " today" : ""}</span>
+                {away.length ? (
+                  <span className="tm-ev leave">{away.map((l) => nameOf(l.memberId)).join(", ")} on leave</span>
+                ) : null}
+                {evs.slice(0, cap).map((e) => <CalChip key={e.item.itemId + e.edge} ev={e} onOpen={onOpen} />)}
+                {evs.length > cap ? <span className="tm-more">+{evs.length - cap} more</span> : null}
+              </div>
+            );
+          })}
+        </div>
+        <p className="tm-foot">
+          A task of a week or less is drawn on every day it spans. Anything longer, and every milestone
+          and target, is drawn twice — the day it starts and the day it is due.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+const nameOf = (id: string) => (readMember(id)?.name || id).split(" ").slice(-1)[0];
+
+function monthLabel(d: string, mode: string) {
+  if (mode === "week") return fmtDate(d) + " – " + fmtDate(addDays(d, 6));
+  return fmtDate(d.slice(0, 8) + "01").slice(3);
+}
+
+function CalChip({ ev, onOpen }: { ev: CalEvent; onOpen: (id: string) => void }) {
+  const i = ev.item;
+  const st = stageOf(i);
+  const wait = !!blockerOf(i);
+  return (
+    <button className={"tm-ev s-" + (wait && st === "delayed" ? "bad" : toneOf(WORK_STATUS, st) || "none")}
+      onClick={() => onOpen(i.itemId)} title={i.title}>
+      <KindMark kind={i.kind} />
+      {ev.edge ? <em>{ev.edge === "starts" ? "starts" : "due"}</em> : null}
+      {i.title}
+    </button>
+  );
+}
+
+/* ---------------------------------------------------------------- rail --- */
+
+/** Create, a mini month, this month's counts, then tasks ▸ milestones ▸
+ *  targets. It belongs to this face and no other. */
+function Rail({ me, anchor, rows, onDay, onOpen }: {
+  me: string; anchor: string; rows: WorkItem[];
+  onDay: (d: string) => void; onOpen: (id: string) => void;
+}) {
+  const days = gridDays(anchor, "month");
+  const month = anchor.slice(0, 7);
+  const inMonth = rows.filter((i) => {
+    const a = i.startDate || i.dueDate, b = i.dueDate || i.startDate;
+    return !!a && !!b && a.slice(0, 7) <= month && (b as string).slice(0, 7) >= month;
+  });
+  const t = workTotals(inMonth);
+
+  return (
+    <>
+      <div className="tm-mini">
+        {["M", "T", "W", "T", "F", "S", "S"].map((d, n) => <b key={n}>{d}</b>)}
+        {days.map((d) => (
+          <button key={d} onClick={() => onDay(d)}
+            className={(d.slice(0, 7) !== month ? "out " : "") + (d === TODAY ? "today " : "")
+              + (eventsOn(d, rows).length ? "has" : "")}>
+            {Number(d.slice(8))}
+          </button>
+        ))}
+      </div>
+
+      <section className="tm-blk">
+        <header><b>{monthLabel(anchor, "month")}</b><span className="tm-blk-c">{inMonth.length} dated</span></header>
+        <span className="tm-stack">
+          <i className="k-ok" style={{ width: pct(t.completed, inMonth.length) }} />
+          <i className="k-info" style={{ width: pct(t.inProgress + t.planned, inMonth.length) }} />
+          <i className="k-warn" style={{ width: pct(t.delayed, inMonth.length) }} />
+        </span>
+        <p className="tm-blk-m">
+          <span className="u-ok-t">{t.completed} done</span>
+          <span>{t.inProgress + t.planned} open</span>
+          <span className="u-warn-t">{t.delayed} in delay</span>
+        </p>
+      </section>
+
+      <TasksBlock who={me} onOpen={onOpen} />
+      <MarksBlock kind="milestone" who={me} onOpen={onOpen} />
+      <MarksBlock kind="target" who={me} onOpen={onOpen} />
+    </>
+  );
+}
+
+const pct = (n: number, d: number) => (d ? Math.round((n / d) * 100) + "%" : "0%");
+
+/* --------------------------------------------------------------- board --- */
+
+function Board({ rows, all, group, goto, onOpen }: {
+  rows: WorkItem[]; all: WorkItem[]; group: string;
+  goto: (q: Record<string, string | undefined>) => void; onOpen: (id: string) => void;
+}) {
+  const cols = columnsFor(rows, group);
+  return (
+    <>
+      <div className="tm-groupbar">
+        <label htmlFor="tmGroup">Group by</label>
+        <select id="tmGroup" className="inp sm" value={group}
+          onChange={(e) => goto({ group: e.target.value || undefined })}>
+          {GROUPS.map((g) => <option key={g.v} value={g.v}>{g.l}</option>)}
+        </select>
+        <span className="spacer" />
+        <span className="tm-groupnote">
+          {group
+            ? "A grouping, not a workflow — a drag here would mean a reassignment, which needs a reason."
+            : "Four stored stages take a drop. Delay takes none: there is nothing to write."}
+        </span>
+      </div>
+      <div className="tm-board">
+        {cols.map((c) => (
+          <section key={c.key} className={"tm-col tm-col-" + c.key}>
+            <header><b>{c.label}</b><span className="tnum">{c.list.length}</span></header>
+            <div className="tm-col-b">
+              {c.list.length
+                ? c.list.map((i) => <Card key={i.itemId} item={i} all={all} onOpen={onOpen} />)
+                : <p className="tm-col-e">Nothing here.</p>}
+            </div>
+          </section>
+        ))}
+      </div>
+    </>
+  );
+}
+
+/** The last column is never hidden. A grouping that silently drops its
+ *  ungrouped rows is a board that lies about its own count. */
+function columnsFor(rows: WorkItem[], group: string) {
+  const cols: { key: string; label: string; list: WorkItem[] }[] = [];
+  const rest: WorkItem[] = [];
+  if (!group) {
+    STAGES.forEach((s) => cols.push({ key: s, label: labelOf(WORK_STATUS, s), list: rows.filter((i) => stageOf(i) === s) }));
+    return cols;
+  }
+  const seen: Record<string, { key: string; label: string; list: WorkItem[] }> = {};
+  const put = (key: string, label: string, i: WorkItem) => {
+    if (!seen[key]) { seen[key] = { key, label, list: [] }; cols.push(seen[key]); }
+    seen[key].list.push(i);
+  };
+  rows.forEach((i) => {
+    if (group === "kind") put(i.kind, labelOf(KIND, i.kind), i);
+    else if (group === "assignee") put(i.assigneeId, readMember(i.assigneeId)?.name || i.assigneeId, i);
+    else if (group === "priority") put(i.priority, labelOf(PRIORITY, i.priority), i);
+    else {
+      const ts = tagsOf(i);
+      if (!ts.length) rest.push(i);
+      else ts.forEach((t) => put(t.slug, t.label, i));
+    }
+  });
+  cols.sort((a, b) => a.label.localeCompare(b.label));
+  cols.push({ key: "_rest", label: group === "tag" ? "Untagged" : "Ungrouped", list: rest });
+  return cols;
 }
 
 function Card({ item, all, onOpen }: { item: WorkItem; all: WorkItem[]; onOpen: (id: string) => void }) {
@@ -178,50 +439,146 @@ function Card({ item, all, onOpen }: { item: WorkItem; all: WorkItem[]; onOpen: 
   return (
     <button className={"tm-card" + (late ? " late" : "") + (item.status === "cancelled" ? " dead" : "")}
       onClick={() => onOpen(item.itemId)}>
-      <span className="tm-card-t">
-        <KindMark kind={item.kind} />
-        <b>{item.title}</b>
-      </span>
+      <span className="tm-card-t"><KindMark kind={item.kind} /><b>{item.title}</b></span>
       <span className="tm-card-m">
         {m ? <span className="tm-card-who">{m.name}</span> : null}
         <PriorityChip p={item.priority} />
         {late ? <span className="pill warn xs">{ago(item.dueDate, TODAY)}</span> : null}
+        <WaitFlag item={item} />
+        <TagChips item={item} />
       </span>
       {parent ? (
         <span className="tm-card-p" title={"Rolls up to " + parent.title}>
           <KindMark kind={parent.kind} />{parent.title}
         </span>
       ) : null}
-      {item.kind !== "task" ? <Progress item={item} items={all} /> : null}
+      {item.kind !== "task" ? <ProgressWindow item={item} /> : null}
     </button>
   );
 }
+
+/* ------------------------------------------------------------ timeline --- */
+
+/** Lanes are the work, never the worker. A lane per person is a productivity
+ *  chart this module has no estimate field to justify. */
+function Timeline({ rows, onOpen }: { rows: WorkItem[]; onOpen: (id: string) => void }) {
+  const [weeks, setWeeks] = useState(2);
+  const [from, setFrom] = useState(() => addDays(TODAY, -((new Date(TODAY).getDay() + 6) % 7) - 7));
+  const days: string[] = [];
+  for (let i = 0; i < weeks * 7; i++) days.push(addDays(from, i));
+  const lanes = lanesOf(rows);
+  const undated = rows.filter((i) => !i.startDate && !isTerminal(i.status));
+  const span = (a: string, b: string) => {
+    const s = days.indexOf(a) >= 0 ? days.indexOf(a) : (a < days[0] ? 0 : -1);
+    const e = days.indexOf(b) >= 0 ? days.indexOf(b) : (b > days[days.length - 1] ? days.length - 1 : -1);
+    if (s < 0 || e < 0 || e < s) return null;
+    return { left: (s / days.length) * 100 + "%", width: ((e - s + 1) / days.length) * 100 + "%" };
+  };
+
+  return (
+    <div className="tm-tl">
+      <div className="tm-calbar">
+        <button className="btn icon sm" aria-label="Previous" onClick={() => setFrom(addDays(from, -7 * weeks))}><Icon name="chevl" size="sm" /></button>
+        <b>{fmtDate(days[0])} – {fmtDate(days[days.length - 1])}</b>
+        <button className="btn icon sm" aria-label="Next" onClick={() => setFrom(addDays(from, 7 * weeks))}><Icon name="chevr" size="sm" /></button>
+        <span className="tm-seg">
+          {[2, 4, 13].map((w) => (
+            <button key={w} className={weeks === w ? "on" : ""} onClick={() => setWeeks(w)}>
+              {w === 13 ? "Quarter" : w + "w"}
+            </button>
+          ))}
+        </span>
+        <span className="spacer" />
+        <span className="tm-legend"><i className="k-none" />dashed = the lane's own window</span>
+      </div>
+
+      <div className="tm-tl-head">
+        <span className="tm-tl-lane">Target · milestone</span>
+        <span className="tm-tl-grid">
+          {days.map((d) => (
+            <i key={d} className={isWeekendDay(d) ? "we" : ""}>{Number(d.slice(8))}</i>
+          ))}
+        </span>
+      </div>
+
+      {lanes.map((ln, n) => {
+        const host = ln.item;
+        const bars: { i: WorkItem; win: boolean }[] = [];
+        if (host && host.startDate) bars.push({ i: host, win: true });
+        ln.tasks.filter((i) => i.startDate).forEach((i) => bars.push({ i, win: false }));
+        return (
+          <div key={host ? host.itemId : "none" + n} className="tm-tl-row">
+            <span className={"tm-tl-lane" + (ln.sub ? " sub" : "")}>
+              {host ? (
+                <>
+                  <b><KindMark kind={host.kind} />{host.title}</b>
+                  <span className="cell-2">{labelOf(KIND, host.kind)} · {noteOf(host)}{host.dueDate ? " · due " + fmtDate(host.dueDate) : ""}</span>
+                </>
+              ) : (
+                <>
+                  <b>No milestone</b>
+                  <span className="cell-2">{ln.tasks.length} tasks hang off nothing</span>
+                </>
+              )}
+            </span>
+            <span className="tm-tl-grid">
+              {days.map((d) => <i key={d} className={isWeekendDay(d) ? "we" : ""} />)}
+              {bars.map((b, k) => {
+                const s = span(b.i.startDate as string, (b.i.dueDate || b.i.startDate) as string);
+                if (!s) return null;
+                const st = stageOf(b.i);
+                return (
+                  <button key={b.i.itemId + k} title={b.i.title}
+                    className={"tm-bar t-" + (toneOf(WORK_STATUS, st) || "none") + (b.win ? " win" : "")}
+                    style={{ left: s.left, width: s.width, top: 6 + k * 22 }}
+                    onClick={() => onOpen(b.i.itemId)}>
+                    {b.win ? null : <span className="tm-bar-w">{nameOf(b.i.assigneeId)} · </span>}
+                    {b.i.title}
+                  </button>
+                );
+              })}
+            </span>
+          </div>
+        );
+      })}
+
+      <p className="tm-foot">
+        {undated.length
+          ? undated.length + " open items have no start date and cannot be drawn: "
+            + undated.map((i) => i.title).join(" · ")
+          : "Every open item has a start date."}
+      </p>
+    </div>
+  );
+}
+
+const isWeekendDay = (d: string) => {
+  const n = new Date(d + "T00:00:00").getDay();
+  return n === 0 || n === 6;
+};
 
 /* ----------------------------------------------------------------- list --- */
 
 function List({ rows, all, onOpen }: { rows: WorkItem[]; all: WorkItem[]; onOpen: (id: string) => void }) {
   return (
     <Table
-      scroll min="1020px"
+      scroll min="1100px"
       cols={[
         { label: "", w: "3px" },
         { label: "Item" },
-        { label: "Member", w: "180px" },
-        { label: "Rolls up to", w: "200px" },
-        { label: "Status", w: "130px" },
-        { label: "Priority", w: "96px" },
-        { label: "Due", w: "130px" },
+        { label: "Member", w: "170px" },
+        { label: "Rolls up to", w: "190px" },
+        { label: "Stage", w: "130px" },
+        { label: "Priority", w: "92px" },
+        { label: "Due", w: "128px" },
         { label: "Progress", w: "140px" },
       ]}
-      empty={{
-        icon: "check", title: "No work matches",
-        body: "Clear the filters, or assign the first item.",
-      }}
+      empty={{ icon: "check", title: "No work matches", body: "Clear the filters, or create the first item." }}
       rows={rows.map((i) => {
         const m = readMember(i.assigneeId);
         const parent = parentOf(i, all);
         const late = isDelayed(i);
-        const rail = late ? "u-warn" : i.status === "blocked" ? "u-bad" : "";
+        const rail = late && blockerOf(i) ? "u-bad" : late ? "u-warn" : "";
         return (
           <tr key={i.itemId} className={"clickable " + rail + (i.status === "cancelled" ? " dim" : "")}
             tabIndex={0} role="link"
@@ -230,17 +587,17 @@ function List({ rows, all, onOpen }: { rows: WorkItem[]; all: WorkItem[]; onOpen
             <td className="rail"><i className={rail} /></td>
             <td>
               <span className="tm-title"><KindMark kind={i.kind} /><b>{i.title}</b></span>
-              {i.expectedOutcome ? <span className="cell-2">{i.expectedOutcome}</span> : null}
+              <span className="cell-2"><TagChips item={i} /><WaitFlag item={i} /></span>
             </td>
             <td>{m ? <Who m={m} /> : <span className="dim">—</span>}</td>
             <td>{parent ? <span className="tm-parent"><KindMark kind={parent.kind} />{parent.title}</span> : <span className="dim">—</span>}</td>
-            <td><StatusPill status={i.status} /> <DelayFlag item={i} /></td>
+            <td><StagePill item={i} /></td>
             <td><PriorityChip p={i.priority} /></td>
             <td className="tnum">
               {i.dueDate ? fmtDate(i.dueDate) : "—"}
               {i.dueDate ? <span className="cell-2">{ago(i.dueDate, TODAY)}</span> : null}
             </td>
-            <td>{i.kind === "task" ? <span className="dim">—</span> : <Progress item={i} items={all} />}</td>
+            <td>{i.kind === "task" ? <span className="dim">—</span> : <ProgressWindow item={i} />}</td>
           </tr>
         );
       })}
@@ -250,63 +607,73 @@ function List({ rows, all, onOpen }: { rows: WorkItem[]; all: WorkItem[]; onOpen
 
 /* --------------------------------------------------------------- drawer --- */
 
-function ItemDrawer({ item, all, onClose }: { item: WorkItem; all: WorkItem[]; onClose: () => void }) {
+function ItemDrawer({ item, all, tags, onClose }: {
+  item: WorkItem; all: WorkItem[]; tags: Tag[]; onClose: () => void;
+}) {
   const shell = useShell();
   const m = readMember(item.assigneeId);
   const parent = parentOf(item, all);
   const kids = childrenOf(item.itemId, all);
   const late = isDelayed(item);
+  const blocker = blockerOf(item, all);
+  const st = stageOf(item);
+  const mine = tagsOwnedBy(item.assigneeId);
+  const on = (item.tagIds || []);
 
   const move = (to: WorkStatus, reason?: string) => {
     const r = setItemStatus(item.itemId, to, reason);
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
     shell.toast(item.title + " → " + labelOf(WORK_STATUS, to));
   };
-
   const askReason = (to: WorkStatus, title: string) => {
-    shell.modal(
-      <ReasonModal title={title} onSubmit={(reason) => { shell.closeLayer(); move(to, reason); }} />,
-      "sm");
+    shell.modal(<ReasonModal title={title} onSubmit={(reason) => { shell.closeLayer(); move(to, reason); }} />, "sm");
   };
 
   return (
     <>
       <div className="dw-h">
         <span className="tm-dw-t"><KindMark kind={item.kind} /><b>{item.title}</b></span>
-        <StatusPill status={item.status} />
-        <DelayFlag item={item} />
+        <StagePill item={item} />
         <span className="spacer" />
         <button className="btn icon sm" aria-label="Close" onClick={onClose}><Icon name="x" size="sm" /></button>
       </div>
       <div className="dw-b">
-        {late ? <Notice tone="warn" text={"Due " + fmtDate(item.dueDate) + " — " + ago(item.dueDate, TODAY) + ". Overdue is derived from the due date, not stored; it clears the moment the item does."} /> : null}
-        {item.status === "blocked" && item.blockedReason
-          ? <Notice tone="bad" text={item.blockedReason} /> : null}
+        {late ? (
+          <Notice tone="warn" text={"Due " + fmtDate(item.dueDate) + " — " + daysOver(item) + " days over. Delay is derived from the date; the stored stage is still " + labelOf(WORK_STATUS, item.status) + "."} />
+        ) : null}
+        {blocker ? (
+          <Notice tone="bad" text={(item.blockedReason || "Waiting on another item.") + " → " + blocker.title} />
+        ) : null}
         {item.status === "cancelled" && item.cancelledReason
           ? <Notice text={item.cancelledReason} /> : null}
 
         <SectionHead title="The item" />
         <KvList cls="wide" pairs={[
-          ["Kind", <span className="tm-title" key="k"><KindMark kind={item.kind} />{item.kind}</span>],
+          ["Kind", <span className="tm-title" key="k"><KindMark kind={item.kind} />{labelOf(KIND, item.kind)}</span>],
           ["Assigned to", m ? m.name + " · " + m.designation : "—"],
+          ["Stage", <span key="s">{labelOf(WORK_STATUS, st)}{st === "delayed"
+            ? <span className="cell-2">derived · stored stage is {labelOf(WORK_STATUS, item.status)}</span> : null}</span>],
+          ["Priority", labelOf(PRIORITY, item.priority)],
           ["Rolls up to", parent
             ? <a key="p" href={"#/work?item=" + parent.itemId}>{parent.title}</a>
             : <span key="p" className="dim">Nothing — it is top level</span>],
+          ["Starts", item.startDate ? fmtDate(item.startDate) : <span key="st" className="dim">Not set — it cannot be drawn on the timeline</span>],
           ["Due", item.dueDate ? fmtDate(item.dueDate) + " · " + ago(item.dueDate, TODAY) : "—"],
-          ["Priority", item.priority],
-          ["Expected outcome", item.expectedOutcome || <span key="e" className="dim">—</span>],
-          ["Description", item.description || <span key="d" className="dim">—</span>],
+          ["Waiting on", blocker
+            ? <a key="b" href={"#/work?item=" + blocker.itemId}>{blocker.title}</a>
+            : <span key="b" className="dim">Nothing</span>],
         ]} />
+
+        <SectionHead title="Tags" desc="A tag is a record its owner holds. Two members may both hold Call." />
+        <TagPicker item={item} mine={mine} on={on} tags={tags} />
 
         {item.kind !== "task" ? (
           <>
             <SectionHead title="Progress" desc={item.kind === "target"
-              ? "Accumulated from the EOD reports that recorded it. Nothing types this number directly."
-              : "Completed children ÷ total children. Nothing types this number directly."} />
-            <Progress item={item} items={all} />
-            {item.kind === "target" && item.targetValue
-              ? <p className="tm-target tnum">{item.currentValue || 0} of {item.targetValue} {item.targetUnit}</p>
-              : null}
+              ? "Current value ÷ target. Nothing types the percentage."
+              : "Completed children ÷ total. The marker is where today sits in the window."} />
+            <ProgressWindow item={item} showNote />
+            <p className="tm-target tnum">{noteOf(item)}</p>
           </>
         ) : null}
 
@@ -316,10 +683,8 @@ function ItemDrawer({ item, all, onClose }: { item: WorkItem; all: WorkItem[]; o
             <ul className="tm-kids">
               {kids.map((k) => (
                 <li key={k.itemId} className={k.status === "completed" ? "done" : ""}>
-                  <a href={"#/work?item=" + k.itemId}>
-                    <KindMark kind={k.kind} />{k.title}
-                  </a>
-                  <StatusPill status={k.status} />
+                  <a href={"#/work?item=" + k.itemId}><KindMark kind={k.kind} />{k.title}</a>
+                  <StagePill item={k} />
                 </li>
               ))}
             </ul>
@@ -329,23 +694,110 @@ function ItemDrawer({ item, all, onClose }: { item: WorkItem; all: WorkItem[]; o
       <div className="dw-f">
         {item.status === "planned" ? <button className="btn pri" onClick={() => move("in_progress")}>Start</button> : null}
         {item.status === "in_progress" ? <button className="btn pri" onClick={() => move("completed")}>Complete</button> : null}
-        {item.status === "blocked" ? <button className="btn pri" onClick={() => move("in_progress")}>Unblock</button> : null}
         {item.status === "completed" ? <button className="btn" onClick={() => askReason("in_progress", "Reopen this item")}>Reopen…</button> : null}
-        {!["completed", "cancelled", "blocked"].includes(item.status)
-          ? <button className="btn" onClick={() => askReason("blocked", "What is blocking it?")}>Block…</button> : null}
+        {!isTerminal(item.status) ? (
+          <button className="btn" onClick={() => shell.modal(
+            <WaitModal item={item} all={all} />, "sm")}>
+            {blocker ? "Waiting on…" : "Waiting on…"}
+          </button>
+        ) : null}
         <span className="spacer" />
-        {!["completed", "cancelled"].includes(item.status)
+        {!isTerminal(item.status)
           ? <button className="btn dgr" onClick={() => askReason("cancelled", "Why is it cancelled?")}>Cancel…</button> : null}
       </div>
     </>
   );
 }
 
+/** Own tags first, then the suggestions, then create. This is the only place a
+ *  tag is born — a separate screen would be a second entry point to a record
+ *  with six fields. */
+function TagPicker({ item, mine, on, tags }: { item: WorkItem; mine: Tag[]; on: string[]; tags: Tag[] }) {
+  const shell = useShell();
+  const [draft, setDraft] = useState("");
+  const add = () => {
+    const r = createTag(item.assigneeId, draft);
+    if (!r.ok) { shell.toast(r.message, "bad"); return; }
+    tagItem(item.itemId, r.data.tagId, true);
+    setDraft("");
+  };
+  const others = tags.filter((t) => t.ownerId !== item.assigneeId && !t.archivedAt
+    && !mine.some((x) => x.slug === t.slug));
+  return (
+    <div className="tm-tagpick">
+      <div className="tm-tagrow">
+        {mine.map((t) => (
+          <button key={t.tagId}
+            className={"tm-tag pick" + (on.indexOf(t.tagId) >= 0 ? " on" : "") + (t.colourToken ? " k-" + t.colourToken : "")}
+            onClick={() => tagItem(item.itemId, t.tagId, on.indexOf(t.tagId) < 0)}>
+            {t.label}
+          </button>
+        ))}
+        {mine.length ? null : <span className="dim">No tags yet.</span>}
+      </div>
+      <div className="tm-tagnew">
+        <input className="inp sm" placeholder="New tag" value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") add(); }} />
+        <button className="btn sm" disabled={!draft.trim()} onClick={add}>Create</button>
+      </div>
+      {others.length ? (
+        <p className="cell-2">{others.length} more tags exist on other members. Cross-member views group by slug.</p>
+      ) : null}
+    </div>
+  );
+}
+
+function WaitModal({ item, all }: { item: WorkItem; all: WorkItem[] }) {
+  const shell = useShell();
+  const [pick, setPick] = useState(item.blockedByItemId || "");
+  const [why, setWhy] = useState(item.blockedReason || "");
+  const options = all.filter((i) => i.itemId !== item.itemId && !isTerminal(i.status));
+  const save = (clear?: boolean) => {
+    const r = setBlockedBy(item.itemId, clear ? null : pick || null, why);
+    if (!r.ok) { shell.toast(r.message, "bad"); return; }
+    shell.closeLayer();
+    shell.toast(clear ? "No longer waiting." : "Waiting on another item.");
+  };
+  return (
+    <>
+      <div className="md-h">
+        <h3>Waiting on</h3>
+        <button className="btn icon sm md-x" aria-label="Close" onClick={() => shell.closeLayer()}>
+          <Icon name="x" size="sm" />
+        </button>
+      </div>
+      <div className="md-b">
+        <div className="fg">
+          <label htmlFor="tmWaitOn">Item</label>
+          <select id="tmWaitOn" className="inp" value={pick} onChange={(e) => setPick(e.target.value)}>
+            <option value="">—</option>
+            {options.map((i) => <option key={i.itemId} value={i.itemId}>{i.title}</option>)}
+          </select>
+        </div>
+        <div className="fg">
+          <label htmlFor="tmWaitWhy">Reason <b className="req">*</b></label>
+          <input id="tmWaitWhy" className="inp" value={why} onChange={(e) => setWhy(e.target.value)}
+            placeholder="What it is waiting for." />
+          <span className="help">The stage does not move. Waiting is a relationship, not a stage.</span>
+        </div>
+      </div>
+      <div className="md-f">
+        {item.blockedByItemId ? <button className="btn" onClick={() => save(true)}>Clear</button> : null}
+        <span className="spacer" />
+        <button className="btn" onClick={() => shell.closeLayer()}>Cancel</button>
+        <button className="btn pri" disabled={!pick} onClick={() => save()}>Save</button>
+      </div>
+    </>
+  );
+}
+
 /** Every transition that changes what a reader would conclude asks for a
- *  sentence. A blocked item with no blocker and a cancellation with no reason
- *  are both records that cannot answer the question they will be asked. */
+ *  sentence. A cancellation with no reason cannot answer the question it will
+ *  be asked. */
 function ReasonModal({ title, onSubmit }: { title: string; onSubmit: (reason: string) => void }) {
   const shell = useShell();
+  const [v, setV] = useState("");
   return (
     <>
       <div className="md-h">
@@ -357,19 +809,17 @@ function ReasonModal({ title, onSubmit }: { title: string; onSubmit: (reason: st
       <div className="md-b">
         <div className="fg">
           <label htmlFor="tmReason">Reason <b className="req">*</b></label>
-          <textarea id="tmReason" className="inp" rows={3} autoFocus
-            placeholder="One sentence somebody reading this next month can act on." />
-          <span className="help">Stored on the item and shown wherever its status is.</span>
+          <textarea id="tmReason" className="inp" rows={3} autoFocus value={v}
+            onChange={(e) => setV(e.target.value)} />
+          <span className="help">Stored on the item and shown wherever its stage is.</span>
         </div>
       </div>
       <div className="md-f">
         <span className="spacer" />
         <button className="btn" onClick={() => shell.closeLayer()}>Cancel</button>
-        <button className="btn pri" onClick={() => {
-          const el = document.getElementById("tmReason") as HTMLTextAreaElement | null;
-          onSubmit(el ? el.value : "");
-        }}>Save</button>
+        <button className="btn pri" disabled={!v.trim()} onClick={() => onSubmit(v)}>Save</button>
       </div>
     </>
   );
 }
+

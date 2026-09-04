@@ -6,6 +6,121 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-04
 
+### Team workspace, built: Calendar with four faces, the member dashboard, and demo data for every case
+
+**Area:** sidebar → Team → **Calendar** (`#/work`, was Work) · **My dashboard** (`#/me`, `#/me/:id`) · the Reports roll-up
+**Files:** `src/content/team/work.json`, `tags.json` *(new)*, `leave.json` *(new)*, `vocabularies.json`,
+`src/admin/views/Team/store.ts`, `Work.tsx`, `workBits.tsx` *(new)*, `MemberDash.tsx` *(new)*,
+`MemberDrawer.tsx`, `Reports.tsx`, `team.css`, `src/admin/shell/modules.ts`,
+`src/admin/views/registry.tsx`, `src/admin/auth/session.ts`,
+`scripts/check-team-derivation.cjs`, `scripts/check-team-nav.cjs`, `package.json`
+
+**What changed**
+
+The wireframe is code. Everything §3.2–§3.4 and §3.13 argued now runs in the panel against
+the seed, and the two check suites assert the rules rather than the prose.
+
+**The Team row reads Calendar and `/work` opens on the calendar face.** Label and default
+only — the route, the `WorkItem` entity and the `team.work.*` grant do not move, so every
+existing link and `?item=` drawer URL keeps working. Four faces on one route:
+
+- **Calendar** — month and week, Monday-first, with a **left rail** that is this face's
+  alone: Create (one control, three kinds), a mini month that moves the grid, the month's
+  own counts, then **Tasks ▸ Milestones ▸ Targets**. Approved leave draws as a band.
+- **Board** — five stage columns with a **Group by** axis: stage · kind · assignee ·
+  priority · tag. The last column is never hidden.
+- **List** — the same rows as a table, now carrying stage, tags and the waiting flag.
+- **Timeline** — `target ▸ milestone` lanes with each lane's own window dashed and its
+  tasks solid, plus a *No milestone* lane. Lanes are the work, never the worker.
+
+**Five stages, the same five for everybody** — Planning · In progress · Delay · Complete ·
+Cancel. Four are stored; **Delay is derived** (`dueDate < today` on a non-terminal item)
+and takes precedence in the grouping, so an item is in exactly one column and the strip
+counts stages rather than stored statuses — **twenty-three items store `in_progress` and
+the column shows eighteen**, because five of them are late (the other two cards in Delay
+store `planned`). **Blocked is no longer a stage**:
+it moved to `blockedByItemId` with a reason, the card draws a waiting flag, and a finished
+blocker stops blocking without anybody clearing the field.
+
+**Tags are member-owned records.** Two members both hold `call` as two rows and neither
+can rename the other's; cross-member views group by **slug**. A tag is born in the
+drawer's picker and nowhere else, and archived rather than deleted.
+
+**`#/me` is the member dashboard.** No id opens **the team as a table — a row opens that
+member's day**. With an id: Overview, Attendance, Work, Reports and Leave, and the Work
+tab renders the *same three blocks* as the calendar rail and the roll-up, from
+`workBits.tsx`. Leave can be requested, approved and refused; approving suppresses a
+derived absence and writes no attendance row. The `#/team` drawer stays the identity
+record and gains **Open dashboard** — shown only when the operational seed knows that id,
+so it degrades to nothing rather than offering a 404.
+
+**Demo data for every case** — 47 work items across all eight members, 19 tags, 6 leave
+rows. It covers: a target nearly done and one behind pace; a milestone at 100% from its
+children, one at 0% with two thirds of its window gone, one past its date, one with no
+`startDate` at all; tasks overdue, due today, next-three-days, completed, cancelled,
+undated and multi-day; one item waiting on another; and a quarter-long target that proves
+the calendar's span rule by drawing twice instead of on ninety-two days.
+
+**Temp data**
+`src/content/team/work.json` (47 placeholder records, `tagIds[]` added, the one `blocked`
+row now In progress with `blockedByItemId`), `tags.json` and `leave.json` (both new
+placeholder records), `vocabularies.json` (STATIC COPY — `workStatuses` is now four stored
+values plus `delayed` with `stored:false`, `workTransitions` lost the blocked rows, and
+`tagSuggestions` / `leaveKinds` / `leaveStates` are new).
+
+**Backend needed**
+- `GET /api/v1/admin/team/work` → **`status` returns four values** — `planned ·
+  in_progress · completed · cancelled`. A payload carrying `blocked` is against an older
+  vocabulary, and **`progressPct` or any `delayed` flag must not appear at all**: both are
+  derived at read.
+- `GET /api/v1/admin/team/tags` → replaces `tags.json`. Identity is `(ownerId, slug)`.
+- `POST /admin/team/tags`, `POST /admin/team/work/{id}/tags` → create and attach.
+- `PATCH /admin/team/work/{id}` → `blockedByItemId` + `blockedReason`, together.
+- `GET /api/v1/admin/team/leave?from&to`, `POST /admin/team/leave`,
+  `POST /admin/team/leave/{id}/decide` → replaces `leave.json`.
+- `none` for the faces themselves: calendar, board, list and timeline are four readings of
+  the same list, and a face-specific endpoint would be four places to fix one bug.
+
+**Open decisions**
+`TM-AD-23` … `TM-AD-31` are all built as drawn. Two are worth restating because they are
+now enforced by code rather than by prose: **`TM-OD-11`** — no score is computed anywhere,
+a milestone bar counts children and the window marker counts days; and **`TM-AD-25`** —
+the rail is the calendar's alone, so the board and the timeline keep their width.
+`TM-OD-20` (what "my JD team" means) remains the only blocker on Phase A, and nothing here
+assumes an answer: scope stays `reportsTo`, one level.
+
+**Not built here, and deliberately:** Agreements, Resources and Pay (§3.9–§3.11) wait on
+the private-object storage decision, `TM-R-11`; leave does **not** yet change the `absent`
+derivation in `store.ts` (`TM-R-10`, the module's highest-risk edit) — an approved row is
+read by the calendar and the dashboard, and `onLeave()` is in place for the day that
+clause lands.
+
+**Verified**
+
+`npm run check:team` — **all checks passed**, including six new sections asserting the new
+rules: five stages with one `stored:false` and the columns adding to the total; the strip
+counting stages, not stored statuses; a quarter-long target drawing on its start and due
+days and on no day between, while a week-long task spans; timeline lanes that are never a
+member and a last lane that is never hidden; two members holding `call` as separate rows,
+create-dedupes, tag on/off, slug grouping; approved leave covering only its own dates,
+refusal needing a sentence, a decision being final, and **no attendance row written**.
+`node scripts/check-team-nav.cjs` — all checks passed, extended to assert the Team group's
+six rows and that the `work` row reads **Calendar** while its key stays `work`.
+`npx tsc -b` clean · `npx eslint src/admin/views/Team src/admin/shell/modules.ts
+src/admin/views/registry.tsx` → 0 errors, 1 pre-existing warning in `index.tsx` ·
+`npx vite build --mode dev` succeeds. The seed was read back through the shipped
+selectors: 47 items across 8 members, 7 in delay, 1 waiting, 13 timeline lanes, 25 of 42
+grid days carrying something.
+
+**Not opened in a browser.** No screen here has been seen: the rail beside the month grid,
+the five columns at 1280px, the timeline bars, the drawer's tag picker, and the dark-theme
+pass are all reasoned about and typed, not viewed. `me/permissions/` has to resolve before
+the panel renders any module and there is no backend against this checkout. The first
+thing to walk against a live session: `#/work` → switch all four faces → open an item →
+tag it → `#/me` → a member → their Work tab.
+
+---
+
 ### §P — the panel, clickable: real sidebar, routed faces, drawer over the face — TM-AD-31
 
 **Area:** `src/proto/v-2.2.0.0/wireframe-team-workspace-v2.html` → §P · simulates `#/work`, `#/reports`, `#/team`, `#/team/me`

@@ -29,6 +29,7 @@ import Finance from "./Finance";
 import Attendance from "./Team/Attendance";
 import Work from "./Team/Work";
 import TeamReports from "./Team/Reports";
+import MemberDash from "./Team/MemberDash";
 
 /** route key → the component that owns that workspace. */
 export const VIEWS: Record<string, ComponentType> = {
@@ -71,6 +72,7 @@ export const VIEWS: Record<string, ComponentType> = {
   attendance: Attendance,
   work: Work,
   reports: TeamReports,
+  me: MemberDash,
 };
 
 export function ViewHost() {

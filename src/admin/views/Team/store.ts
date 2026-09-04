@@ -42,6 +42,8 @@ import attendanceDoc from "../../../content/team/attendance.json";
 import workDoc from "../../../content/team/work.json";
 import plansDoc from "../../../content/team/plans.json";
 import reportsDoc from "../../../content/team/reports.json";
+import tagsDoc from "../../../content/team/tags.json";
+import leaveDoc from "../../../content/team/leave.json";
 import vocabDoc from "../../../content/team/vocabularies.json";
 import { can, getSession } from "../../auth/session";
 
@@ -50,7 +52,13 @@ import { can, getSession } from "../../auth/session";
 export type MemberStatus = "active" | "inactive" | "suspended";
 export type AttendanceState = "not_started" | "working" | "on_break" | "ended" | "unclosed" | "absent";
 export type WorkKind = "task" | "milestone" | "target";
-export type WorkStatus = "planned" | "in_progress" | "blocked" | "completed" | "cancelled";
+/** FOUR stored values. `blocked` is not among them: waiting on someone is a
+ *  relationship, not a stage, and it lives on `blockedByItemId`. */
+export type WorkStatus = "planned" | "in_progress" | "completed" | "cancelled";
+/** The five stages a person sees. `delayed` is derived and takes precedence,
+ *  so an item is in exactly one of them. */
+export type WorkStage = WorkStatus | "delayed";
+export type LeaveState = "requested" | "approved" | "rejected" | "withdrawn";
 export type Priority = "high" | "medium" | "low";
 export type Scope = "self" | "team" | "all";
 
@@ -61,6 +69,7 @@ export interface Member {
   phone: string;
   username: string;
   designation: string;
+  department: string;
   employmentType: string;
   joiningDate: string;
   /** The scope axis, in one column. One level deep, never transitive. */
@@ -120,8 +129,35 @@ export interface WorkItem {
   targetUnit?: string;
   currentValue?: number;
   sourcePlanLineId?: string | null;
+  /** Member-owned tag records. Free, unlike the stage, which is company-wide. */
+  tagIds?: string[];
   rowVersion: number;
   createdAt: string;
+}
+
+export interface Tag {
+  tagId: string;
+  ownerId: string;
+  /** Identity is (ownerId, slug). Two members may both hold `call`. */
+  slug: string;
+  label: string;
+  colourToken: string;
+  createdAt: string;
+  archivedAt: string | null;
+}
+
+export interface LeaveRequest {
+  leaveId: string;
+  memberId: string;
+  fromDate: string;
+  toDate: string;
+  kind: string;
+  reason: string;
+  state: LeaveState;
+  decidedById: string | null;
+  decidedAt: string | null;
+  decisionNote: string | null;
+  requestedAt: string;
 }
 
 export interface PlanLine { lineId: string; ordinal: number; title: string; priority: Priority; workItemId: string | null }
@@ -222,7 +258,11 @@ const toneMap = (rows: ToneRow[]) => {
   return o;
 };
 export const ATT_STATE = toneMap(vocabDoc.attendanceStates as ToneRow[]);
+/** All five stages, the derived one included — labels and tones come from the
+ *  vocabulary so a relabel server-side needs no code edit here. */
 export const WORK_STATUS = toneMap(vocabDoc.workStatuses as ToneRow[]);
+export const LEAVE_STATE = toneMap(vocabDoc.leaveStates as ToneRow[]);
+export const LEAVE_KIND = toneMap(vocabDoc.leaveKinds as unknown as ToneRow[]);
 export const PRIORITY = toneMap(vocabDoc.priorities as ToneRow[]);
 export const KIND = toneMap(vocabDoc.workKinds as unknown as ToneRow[]);
 
@@ -241,6 +281,8 @@ type Snapshot = {
   items: WorkItem[];
   plans: DailyPlan[];
   reports: DailyReport[];
+  tags: Tag[];
+  leave: LeaveRequest[];
   version: number;
 };
 
@@ -252,6 +294,8 @@ const seed = (): Snapshot => ({
   items: clone(workDoc.items) as WorkItem[],
   plans: clone(plansDoc.plans) as DailyPlan[],
   reports: clone(reportsDoc.reports) as DailyReport[],
+  tags: clone(tagsDoc.tags) as Tag[],
+  leave: clone(leaveDoc.leave) as LeaveRequest[],
   version: 0,
 });
 
@@ -272,6 +316,8 @@ export const readDays = (): AttendanceDay[] => snap.days;
 export const readItems = (): WorkItem[] => snap.items;
 export const readPlans = (): DailyPlan[] => snap.plans;
 export const readReports = (): DailyReport[] => snap.reports;
+export const readTags = (): Tag[] => snap.tags;
+export const readLeave = (): LeaveRequest[] => snap.leave;
 export const readMember = (id: string): Member | null =>
   snap.members.filter((m) => m.memberId === id)[0] || null;
 export const readItem = (id: string): WorkItem | null =>
@@ -470,9 +516,144 @@ export function progressOf(i: WorkItem, all = snap.items): number | null {
 export const parentOf = (i: WorkItem, all = snap.items) =>
   (i.parentId ? all.filter((p) => p.itemId === i.parentId)[0] : null) || null;
 
+/** The stage an item is IN, which is not always the stage it stores. Delay wins
+ *  over the stored value, so every item sits in exactly one column and the
+ *  strip and the board can never disagree. */
+export const stageOf = (i: WorkItem, today = TODAY): WorkStage =>
+  (isDelayed(i, today) ? "delayed" : i.status);
+
+/** What an item is waiting on, if the blocker is still open. A finished blocker
+ *  stops blocking without anybody clearing the field. */
+export function blockerOf(i: WorkItem, all = snap.items): WorkItem | null {
+  if (!i.blockedByItemId) return null;
+  const b = all.filter((x) => x.itemId === i.blockedByItemId)[0];
+  return b && !isTerminal(b.status) ? b : null;
+}
+
+/** Where today sits between startDate and dueDate, as a percentage. Elapsed —
+ *  NOT progress. Drawn as a marker over the progress bar so "50% done, 91% of
+ *  the window gone" is one glance instead of two numbers nobody compares. */
+export function timePct(i: WorkItem, today = TODAY): number | null {
+  if (!i.startDate || !i.dueDate) return null;
+  const a = new Date(i.startDate).getTime(), b = new Date(i.dueDate).getTime();
+  if (b <= a) return 100;
+  const t = new Date(today).getTime();
+  return Math.max(0, Math.min(100, Math.round(((t - a) / (b - a)) * 100)));
+}
+
+/* ============================================================== tags === */
+
+export const readTag = (id: string): Tag | null =>
+  snap.tags.filter((t) => t.tagId === id)[0] || null;
+
+/** The tags on an item, live rows rather than the ids stored on it. */
+export const tagsOf = (i: WorkItem, all = snap.tags): Tag[] =>
+  (i.tagIds || []).map((id) => all.filter((t) => t.tagId === id)[0]).filter(Boolean) as Tag[];
+
+/** A member's own tags, archived ones last and only if asked for. */
+export const tagsOwnedBy = (memberId: string, withArchived = false): Tag[] =>
+  snap.tags.filter((t) => t.ownerId === memberId && (withArchived || !t.archivedAt));
+
+/** Cross-member views group by SLUG, never by tagId: otherwise a team board
+ *  fragments into one column per person per tag and is useless at five people. */
+export function tagSlugs(items: WorkItem[]): { slug: string; label: string; n: number }[] {
+  const by: Record<string, { slug: string; label: string; n: number }> = {};
+  items.forEach((i) => tagsOf(i).forEach((t) => {
+    if (!by[t.slug]) by[t.slug] = { slug: t.slug, label: t.label, n: 0 };
+    by[t.slug].n += 1;
+  }));
+  return Object.keys(by).sort().map((k) => by[k]);
+}
+export const hasSlug = (i: WorkItem, slug: string) => tagsOf(i).some((t) => t.slug === slug);
+
+/* ============================================================= leave === */
+
+export const leaveFor = (memberId: string): LeaveRequest[] =>
+  snap.leave.filter((l) => l.memberId === memberId)
+    .slice().sort((a, b) => a.fromDate.localeCompare(b.fromDate));
+
+/** Approved leave covering a date. It suppresses a derived absence; it never
+ *  writes an attendance row. */
+export function onLeave(memberId: string, date: string): LeaveRequest | null {
+  return snap.leave.filter((l) => l.memberId === memberId && l.state === "approved"
+    && date >= l.fromDate && date <= l.toDate)[0] || null;
+}
+export const leaveOn = (date: string, ids: string[]): LeaveRequest[] =>
+  snap.leave.filter((l) => l.state === "approved" && ids.indexOf(l.memberId) >= 0
+    && date >= l.fromDate && date <= l.toDate);
+export const pendingLeave = (scope: Scope): LeaveRequest[] => {
+  const ids = membersInScope(scope).map((m) => m.memberId);
+  return snap.leave.filter((l) => l.state === "requested" && ids.indexOf(l.memberId) >= 0);
+};
+
+/* ========================================================== calendar === */
+
+/** How long an item occupies the grid. A task of a week or less is drawn on
+ *  every day it spans — that is a schedule. Anything longer, and every
+ *  milestone and target, is drawn twice: the day it starts and the day it is
+ *  due. A quarter-long target printed on ninety-two days is wallpaper, and it
+ *  buries the day's actual work under "+4 more". */
+export const CAL_SPAN_DAYS = 7;
+export type CalEdge = "" | "starts" | "due";
+export interface CalEvent { item: WorkItem; edge: CalEdge }
+
+export function eventsOn(date: string, rows: WorkItem[]): CalEvent[] {
+  const out: CalEvent[] = [];
+  rows.forEach((i) => {
+    const a = i.startDate || i.dueDate, b = i.dueDate || i.startDate;
+    if (!a || !b) return;
+    const days = Math.round((new Date(b).getTime() - new Date(a).getTime()) / DAY) + 1;
+    if (i.kind === "task" && days <= CAL_SPAN_DAYS) {
+      if (date >= a && date <= b) out.push({ item: i, edge: "" });
+    } else if (date === a && date === b) out.push({ item: i, edge: "due" });
+    else if (date === a) out.push({ item: i, edge: "starts" });
+    else if (date === b) out.push({ item: i, edge: "due" });
+  });
+  return out;
+}
+
+/** Six Monday-first weeks covering a month, or one week around a date. */
+export function gridDays(anchor: string, mode: "month" | "week"): string[] {
+  const d = new Date(anchor);
+  let start: string;
+  if (mode === "week") start = addDays(anchor, -((d.getDay() + 6) % 7));
+  else {
+    const first = anchor.slice(0, 8) + "01";
+    start = addDays(first, -((new Date(first).getDay() + 6) % 7));
+  }
+  const n = mode === "week" ? 7 : 42;
+  const out: string[] = [];
+  for (let i = 0; i < n; i++) out.push(addDays(start, i));
+  return out;
+}
+
+/* ========================================================== timeline === */
+
+export interface Lane { item: WorkItem | null; sub: boolean; tasks: WorkItem[] }
+
+/** Target ▸ milestone, with each lane's own tasks under it, and a last lane for
+ *  the tasks that hang off nothing. Lanes are the WORK, never the worker: a
+ *  lane per person is a productivity chart this module has no estimate field to
+ *  justify, and member load already has the Assignee axis and §3.13. */
+export function lanesOf(rows: WorkItem[]): Lane[] {
+  const kidsOf = (id: string | null) =>
+    rows.filter((i) => i.kind === "task" && (id ? i.parentId === id : !i.parentId));
+  const lanes: Lane[] = [];
+  rows.filter((i) => i.kind === "target").forEach((t) => {
+    lanes.push({ item: t, sub: false, tasks: kidsOf(t.itemId) });
+    rows.filter((m) => m.kind === "milestone" && m.parentId === t.itemId)
+      .forEach((m) => lanes.push({ item: m, sub: true, tasks: kidsOf(m.itemId) }));
+  });
+  rows.filter((m) => m.kind === "milestone"
+    && (!m.parentId || !rows.some((x) => x.itemId === m.parentId)))
+    .forEach((m) => lanes.push({ item: m, sub: false, tasks: kidsOf(m.itemId) }));
+  lanes.push({ item: null, sub: false, tasks: kidsOf(null) });
+  return lanes;
+}
+
 export interface WorkFilter {
   member?: string; kind?: string; status?: string; priority?: string;
-  due?: string; q?: string; parent?: string;
+  due?: string; q?: string; parent?: string; tag?: string;
 }
 
 export function workRows(f: WorkFilter, scope: Scope): WorkItem[] {
@@ -480,8 +661,8 @@ export function workRows(f: WorkFilter, scope: Scope): WorkItem[] {
   let rows = snap.items.filter((i) => ids.indexOf(i.assigneeId) >= 0);
   if (f.member) rows = rows.filter((i) => i.assigneeId === f.member);
   if (f.kind) rows = rows.filter((i) => i.kind === f.kind);
-  if (f.status === "delayed") rows = rows.filter((i) => isDelayed(i));
-  else if (f.status) rows = rows.filter((i) => i.status === f.status);
+  if (f.status) rows = rows.filter((i) => stageOf(i) === f.status);
+  if (f.tag) rows = rows.filter((i) => hasSlug(i, f.tag as string));
   if (f.priority) rows = rows.filter((i) => i.priority === f.priority);
   if (f.parent) rows = rows.filter((i) => i.parentId === f.parent || i.itemId === f.parent);
   if (f.due === "today") rows = rows.filter((i) => i.dueDate === TODAY);
@@ -507,19 +688,22 @@ export function workRows(f: WorkFilter, scope: Scope): WorkItem[] {
 }
 
 export interface WorkTotals {
-  total: number; planned: number; inProgress: number; blocked: number;
+  total: number; planned: number; inProgress: number; waiting: number;
   completed: number; cancelled: number; delayed: number;
 }
 
+/** Counted by STAGE, not by stored status, so the strip and the columns agree:
+ *  a late card is in Delay and is not also counted under In progress. */
 export function workTotals(rows: WorkItem[]): WorkTotals {
-  const t: WorkTotals = { total: rows.length, planned: 0, inProgress: 0, blocked: 0, completed: 0, cancelled: 0, delayed: 0 };
+  const t: WorkTotals = { total: rows.length, planned: 0, inProgress: 0, waiting: 0, completed: 0, cancelled: 0, delayed: 0 };
   rows.forEach((i) => {
-    if (i.status === "planned") t.planned++;
-    if (i.status === "in_progress") t.inProgress++;
-    if (i.status === "blocked") t.blocked++;
-    if (i.status === "completed") t.completed++;
-    if (i.status === "cancelled") t.cancelled++;
-    if (isDelayed(i)) t.delayed++;
+    const st = stageOf(i);
+    if (st === "planned") t.planned++;
+    if (st === "in_progress") t.inProgress++;
+    if (st === "delayed") t.delayed++;
+    if (st === "completed") t.completed++;
+    if (st === "cancelled") t.cancelled++;
+    if (blockerOf(i)) t.waiting++;
   });
   return t;
 }
@@ -554,7 +738,7 @@ export interface ReviewRow {
   done: number;
   planned: number;
   delayed: number;
-  blocked: number;
+  waiting: number;
 }
 
 /** The senior's day, one row per member in scope. Everything on it is derived
@@ -581,7 +765,7 @@ export function reviewRows(date: string, scope: Scope, at = now()): ReviewRow[] 
         done: dueToday.filter((i) => i.status === "completed").length,
         planned: dueToday.length,
         delayed: items.filter((i) => isDelayed(i)).length,
-        blocked: items.filter((i) => i.status === "blocked").length,
+        waiting: items.filter((i) => !!blockerOf(i)).length,
       };
     });
 }
@@ -590,7 +774,7 @@ export interface Attention {
   noPlan: ReviewRow[];
   noEod: ReviewRow[];
   delayed: WorkItem[];
-  blocked: WorkItem[];
+  waiting: WorkItem[];
   lateOrAbsent: ReviewRow[];
   unacknowledged: ReviewRow[];
 }
@@ -609,7 +793,7 @@ export function attentionOf(rows: ReviewRow[]): Attention {
     noPlan: rows.filter((r) => r.member.reportsTo && (!r.plan || !r.plan.submittedAt)),
     noEod: rows.filter((r) => r.member.reportsTo && r.eodDue && (!r.report || !r.report.submittedAt)),
     delayed: uniq(items.filter((i) => isDelayed(i))),
-    blocked: uniq(items.filter((i) => i.status === "blocked")),
+    waiting: uniq(items.filter((i) => !!blockerOf(i))),
     lateOrAbsent: rows.filter((r) => r.state === "absent" || (r.day && r.day.isLate)),
     unacknowledged: rows.filter((r) => r.report && r.report.submittedAt && !r.report.acknowledgedById),
   };
@@ -724,18 +908,120 @@ export function setItemStatus(itemId: string, to: WorkStatus, reason?: string): 
     .filter((t) => t.from === i.status)[0];
   if (!row || row.to.indexOf(to) < 0)
     return err("invalid_transition", labelOf(WORK_STATUS, i.status) + " cannot become " + labelOf(WORK_STATUS, to) + ".");
-  const needsReason = row.requiresReason || to === "blocked" || to === "cancelled";
+  const needsReason = row.requiresReason || to === "cancelled";
   if (needsReason && !(reason || "").trim())
     return err("reason_required", "This change needs a reason.");
   i.status = to;
   i.rowVersion += 1;
   if (to === "completed") i.completedAt = new Date(now()).toISOString();
-  if (to === "blocked") { i.blockedReason = reason; i.blockedAt = new Date(now()).toISOString(); }
   if (to === "cancelled") { i.cancelledReason = reason; i.cancelledAt = new Date(now()).toISOString(); }
-  if (to === "in_progress") { i.completedAt = null; delete i.blockedReason; delete i.blockedAt; }
+  if (to === "in_progress") i.completedAt = null;
   snap.items = items;
   emit();
   return ok(i);
+}
+
+/** Waiting on another item. A field with a reason, not a stage — the stage
+ *  keeps saying where the work is, and this says who it is stuck behind. */
+export function setBlockedBy(itemId: string, blockerId: string | null, reason?: string): Result<WorkItem> {
+  const items = snap.items.slice();
+  const i = items.filter((x) => x.itemId === itemId)[0];
+  if (!i) return err("item_not_found", "No such work item.");
+  if (blockerId) {
+    if (blockerId === itemId) return err("self_block", "An item cannot wait on itself.");
+    const b = items.filter((x) => x.itemId === blockerId)[0];
+    if (!b) return err("blocker_not_found", "No such item to wait on.");
+    if (!(reason || "").trim()) return err("reason_required", "Say what it is waiting for.");
+    i.blockedByItemId = blockerId;
+    i.blockedReason = reason;
+    i.blockedAt = new Date(now()).toISOString();
+  } else {
+    i.blockedByItemId = null;
+    delete i.blockedReason;
+    delete i.blockedAt;
+  }
+  i.rowVersion += 1;
+  snap.items = items;
+  emit();
+  return ok(i);
+}
+
+/** A tag is born here and nowhere else — one keystroke from the picker. A
+ *  member may only tag with their own tags, which is what (ownerId, slug)
+ *  identity means in practice. */
+export function createTag(ownerId: string, label: string): Result<Tag> {
+  const clean = label.trim();
+  if (!clean) return err("tag_empty", "A tag needs a name.");
+  const slug = clean.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const dup = snap.tags.filter((t) => t.ownerId === ownerId && t.slug === slug && !t.archivedAt)[0];
+  if (dup) return ok(dup);
+  const t: Tag = {
+    tagId: nextId("TG"), ownerId, slug, label: clean, colourToken: "",
+    createdAt: new Date(now()).toISOString(), archivedAt: null,
+  };
+  snap.tags = snap.tags.concat([t]);
+  emit();
+  return ok(t);
+}
+
+export function tagItem(itemId: string, tagId: string, on: boolean): Result<WorkItem> {
+  const items = snap.items.slice();
+  const i = items.filter((x) => x.itemId === itemId)[0];
+  if (!i) return err("item_not_found", "No such work item.");
+  const have = i.tagIds || [];
+  i.tagIds = on ? (have.indexOf(tagId) < 0 ? have.concat([tagId]) : have)
+                : have.filter((t) => t !== tagId);
+  i.rowVersion += 1;
+  snap.items = items;
+  emit();
+  return ok(i);
+}
+
+export function archiveTag(tagId: string): Result<Tag> {
+  const tags = snap.tags.slice();
+  const t = tags.filter((x) => x.tagId === tagId)[0];
+  if (!t) return err("tag_not_found", "No such tag.");
+  t.archivedAt = new Date(now()).toISOString();
+  snap.tags = tags;
+  emit();
+  return ok(t);
+}
+
+/* ------------------------------------------------------------- leave --- */
+
+export function requestLeave(memberId: string, input: {
+  fromDate: string; toDate: string; kind: string; reason: string;
+}): Result<LeaveRequest> {
+  if (!input.fromDate || !input.toDate) return err("dates_required", "Both dates are needed.");
+  if (input.toDate < input.fromDate) return err("bad_range", "The last day is before the first.");
+  if (!input.reason.trim()) return err("reason_required", "A leave request needs a reason.");
+  const l: LeaveRequest = {
+    leaveId: nextId("LV"), memberId, fromDate: input.fromDate, toDate: input.toDate,
+    kind: input.kind, reason: input.reason.trim(), state: "requested",
+    decidedById: null, decidedAt: null, decisionNote: null,
+    requestedAt: new Date(now()).toISOString(),
+  };
+  snap.leave = snap.leave.concat([l]);
+  emit();
+  return ok(l);
+}
+
+/** A decision needs a decider. Rejecting also needs a sentence — a refusal
+ *  nobody explained is one the member has to come and ask about. */
+export function decideLeave(leaveId: string, state: LeaveState, byId: string, note?: string): Result<LeaveRequest> {
+  const list = snap.leave.slice();
+  const l = list.filter((x) => x.leaveId === leaveId)[0];
+  if (!l) return err("leave_not_found", "No such request.");
+  if (l.state !== "requested") return err("already_decided", "That request is already " + l.state + ".");
+  if (state === "rejected" && !(note || "").trim())
+    return err("reason_required", "Say why it is refused.");
+  l.state = state;
+  l.decidedById = state === "withdrawn" ? null : byId;
+  l.decidedAt = new Date(now()).toISOString();
+  l.decisionNote = (note || "").trim() || null;
+  snap.leave = list;
+  emit();
+  return ok(l);
 }
 
 export function createItem(input: Partial<WorkItem> & { title: string; assigneeId: string; kind: WorkKind }): Result<WorkItem> {
@@ -899,6 +1185,9 @@ export function useMe(): Member | null { useVersion(); return readMember(meId())
 export function useDayRows(date: string, scope: Scope): DayRow[] { useVersion(); return dayRows(date, scope); }
 export function useWork(f: WorkFilter, scope: Scope): WorkItem[] { useVersion(); return workRows(f, scope); }
 export function useItem(id: string | null): WorkItem | null { useVersion(); return id ? readItem(id) : null; }
+export function useTags(): Tag[] { useVersion(); return snap.tags; }
+export function useLeave(): LeaveRequest[] { useVersion(); return snap.leave; }
+export function useItems(): WorkItem[] { useVersion(); return snap.items; }
 export function useReview(date: string, scope: Scope): ReviewRow[] { useVersion(); return reviewRows(date, scope); }
 export function useMyDay(date = TODAY): { day: AttendanceDay | null; state: AttendanceState; worked: number | null; breakMins: number } {
   useVersion();

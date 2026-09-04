@@ -46,8 +46,9 @@ const ICON_OF: Record<string, string> = {
   "finance-refunds": "refund",
   "finance-analytics": "chart",
   attendance: "clock",
-  work: "check",
+  work: "calendar",
   reports: "inbox",
+  me: "user",
 };
 
 /* ------------------------------------------------------- group override ---
@@ -125,8 +126,21 @@ const PROTO_ROWS: { key: string; label: string; group: string }[] = [
      is a manager's grant, and it must be possible to hold it without holding
      the right to create or reassign anybody's work. */
   { key: "attendance", label: "Attendance", group: "Team" },
-  { key: "work", label: "Work", group: "Team" },
+  /* `Calendar`, not `Work`. The label follows what somebody opens the row for —
+     a dated view of the week — and the module's headline ask was a calendar.
+     THE LABEL AND THE DEFAULT FACE ARE THE WHOLE CHANGE: the route is still
+     `work`, the entity is still WorkItem and the grant is still team.work.*,
+     so every existing link, bookmark and `?item=` drawer URL keeps working.
+     Renaming the route would buy a tidier address bar for a redirect to
+     maintain forever, and a module key that disagrees with its own table. */
+  { key: "work", label: "Calendar", group: "Team" },
   { key: "reports", label: "Reports", group: "Team" },
+  /* The member's own day, and the way into anybody else's. `#/team` stays the
+     IDENTITY record — who exists, what they may do — and this is the
+     operational one: attendance, work, reports and leave for one person. Two
+     rows because they answer two different questions and hold two different
+     grants; the roster drawer links here rather than growing a sixth tab. */
+  { key: "me", label: "My dashboard", group: "Team" },
 ];
 /** Sidebar queue-count keys, from IBData.derive.badges(). A module with no
  * entry here shows no badge, which is correct for anything the prototype

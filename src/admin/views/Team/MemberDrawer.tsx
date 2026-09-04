@@ -17,6 +17,7 @@ import { fmtDate } from "../../ui/format";
 import { can } from "../../shell/AdminShell";
 import { getSession, HIDDEN_MODULES } from "../../auth/session";
 import { Avatar, RoleChips } from "../teamShared";
+import { readMember } from "./store";
 import type { Member, Ops, Role } from "../teamShared";
 import {
   MemberDeleteModal, MemberEditModal, MemberRolesModal, MemberSendCredentialsModal,
@@ -158,6 +159,14 @@ export default function MemberDrawer({ member: u, roles, ops }: { member: Member
       </div>
 
       <div className="dw-f">
+        {/* The drawer stays the identity record and becomes a LAUNCHER for the
+            operational half — attendance, work, reports and leave live on
+            `#/me/:id`, one place per fact. The link only appears when the
+            operational seed knows this id; it degrades to nothing rather than
+            offering a route that would 404. */}
+        {readMember(String(u.id)) ? (
+          <a className="btn" href={"#/me/" + u.id}>Open dashboard</a>
+        ) : null}
         {can("team", "edit") ? (
           <button className="btn pri" data-act="tm-edit" data-ref={u.id}
                   onClick={() => ops.modal(<MemberEditModal u={u} ops={ops} />)}>Edit member</button>

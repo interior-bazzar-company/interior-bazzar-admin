@@ -1,0 +1,12 @@
+{
+  "$comment": "PLACEHOLDER RECORDS — leave requests. Stands in for GET /api/v1/admin/team/leave?from&to. An APPROVED row suppresses a derived absence for those dates; it never writes an attendance row, because two records answering 'was this person in' disagree inside a month. Open · decided is the whole lifecycle: requested → approved | rejected, or withdrawn by the member before a decision.",
+  "generatedAt": "2026-08-28T14:20:00+05:30",
+  "leave": [
+    {"leaveId": "LV-01", "memberId": "86", "fromDate": "2026-09-08", "toDate": "2026-09-09", "kind": "casual", "reason": "Family function.", "state": "approved", "decidedById": "58", "decidedAt": "2026-09-08T10:00:00+05:30", "decisionNote": null, "requestedAt": "2026-08-18T09:30:00+05:30"},
+    {"leaveId": "LV-02", "memberId": "63", "fromDate": "2026-08-31", "toDate": "2026-08-31", "kind": "sick", "reason": "Fever.", "state": "requested", "decidedById": null, "decidedAt": null, "decisionNote": null, "requestedAt": "2026-08-18T09:30:00+05:30"},
+    {"leaveId": "LV-03", "memberId": "63", "fromDate": "2026-08-20", "toDate": "2026-08-20", "kind": "sick", "reason": "Fever.", "state": "approved", "decidedById": "58", "decidedAt": "2026-08-20T10:00:00+05:30", "decisionNote": null, "requestedAt": "2026-08-18T09:30:00+05:30"},
+    {"leaveId": "LV-04", "memberId": "70", "fromDate": "2026-09-02", "toDate": "2026-09-03", "kind": "casual", "reason": "Wedding.", "state": "requested", "decidedById": null, "decidedAt": null, "decisionNote": null, "requestedAt": "2026-08-18T09:30:00+05:30"},
+    {"leaveId": "LV-05", "memberId": "74", "fromDate": "2026-08-24", "toDate": "2026-08-24", "kind": "casual", "reason": "Personal.", "state": "rejected", "decidedById": "52", "decidedAt": "2026-08-24T10:00:00+05:30", "decisionNote": "Two on the desk already.", "requestedAt": "2026-08-18T09:30:00+05:30"},
+    {"leaveId": "LV-06", "memberId": "79", "fromDate": "2026-08-27", "toDate": "2026-08-27", "kind": "casual", "reason": "Bank work.", "state": "approved", "decidedById": "41", "decidedAt": "2026-08-27T10:00:00+05:30", "decisionNote": null, "requestedAt": "2026-08-18T09:30:00+05:30"}
+  ]
+}

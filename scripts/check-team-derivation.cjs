@@ -101,8 +101,23 @@ require("esbuild").build({
   /* -------------------------------------------------------------- work --- */
   head("Delayed is derived, and terminal items are never late");
   ok("W-K05 is two days past due and still planned", S.isDelayed(S.readItem("W-K05")) === true);
-  ok("W-K08 is blocked AND past due — both, independently",
-    S.isDelayed(S.readItem("W-K08")) === true && S.readItem("W-K08").status === "blocked");
+  ok("W-K08 is WAITING on another item AND past due — two facts, not one stage",
+    S.isDelayed(S.readItem("W-K08")) === true
+    && S.readItem("W-K08").status === "in_progress"
+    && !!S.blockerOf(S.readItem("W-K08")));
+  ok("blocked is not a stage any more — nothing stores it",
+    S.readItems().every((i) => i.status !== "blocked"));
+  ok("the stage an item is IN is Delay, while the stage it STORES is In progress",
+    S.stageOf(S.readItem("W-K08")) === "delayed" && S.readItem("W-K08").status === "in_progress");
+  ok("a finished blocker stops blocking without anybody clearing the field",
+    (() => {
+      S.resetStore();
+      const before = !!S.blockerOf(S.readItem("W-K08"));
+      S.setItemStatus("W-K17", "completed");
+      const after = !!S.blockerOf(S.readItem("W-K08"));
+      S.resetStore();
+      return before === true && after === false;
+    })());
   ok("W-K15 is CANCELLED and past due — and is NOT overdue",
     S.isDelayed(S.readItem("W-K15")) === false);
   ok("W-K06 is completed and past its date — and is NOT overdue",
@@ -171,10 +186,15 @@ require("esbuild").build({
   const bad = S.setItemStatus("W-K06", "planned");
   ok("completed → planned is refused", bad.ok === false);
   eq("…with the contract's own code", bad.code, "invalid_transition");
-  ok("blocking without a reason is refused",
+  ok("blocked is not a transition at all",
     S.setItemStatus("W-K01", "blocked").ok === false);
-  ok("blocking WITH a reason is allowed",
-    S.setItemStatus("W-K01", "blocked", "Waiting on the vocabulary rewrite").ok === true);
+  ok("waiting on another item without a reason is refused",
+    S.setBlockedBy("W-K01", "W-K17").ok === false);
+  ok("…with a reason it is allowed, and the STAGE does not move",
+    S.setBlockedBy("W-K01", "W-K17", "Needs the tier table").ok === true
+    && S.readItem("W-K01").status === "in_progress");
+  ok("an item cannot wait on itself",
+    S.setBlockedBy("W-K01", "W-K01", "nonsense").ok === false);
   ok("reopening a completed item needs a reason",
     S.setItemStatus("W-K06", "in_progress").ok === false);
 
@@ -201,6 +221,86 @@ require("esbuild").build({
   eq("and the work item is now complete", S.readItem("W-K12").status, "completed");
   ok("an unticked line without a reason is refused",
     S.submitReport("63", { lines: [{ workItemId: "W-K01", title: "Triage", done: false }] }).ok === false);
+
+  head("Five stages, and the fifth is not stored");
+  S.resetStore();
+  eq("the vocabulary carries five, one of them marked stored:false",
+    S.VOCAB.workStatuses.length, 5);
+  eq("\u2026and the derived one is Delay",
+    S.VOCAB.workStatuses.filter((r) => r.stored === false).map((r) => r.key), ["delayed"]);
+  ok("every item is in exactly one stage, so the columns add to the total",
+    (() => {
+      const rows = S.readItems();
+      const t = S.workTotals(rows);
+      return t.planned + t.inProgress + t.delayed + t.completed + t.cancelled === rows.length;
+    })());
+  ok("the strip counts STAGES, not stored statuses",
+    S.workTotals(S.readItems()).inProgress
+      < S.readItems().filter((i) => i.status === "in_progress").length);
+
+  head("A long item is not an event on ninety-two days");
+  S.resetStore();
+  (() => {
+    const rows = S.readItems();
+    const target = S.readItem("W-T01");            /* 1 Jul \u2192 30 Sep */
+    const mid = "2026-08-15";
+    eq("a quarter-long target draws on neither a middle day\u2026",
+      S.eventsOn(mid, rows).filter((e) => e.item.itemId === "W-T01").length, 0);
+    eq("\u2026but it draws on the day it starts",
+      S.eventsOn(target.startDate, rows).filter((e) => e.item.itemId === "W-T01")
+        .map((e) => e.edge), ["starts"]);
+    eq("\u2026and on the day it is due",
+      S.eventsOn(target.dueDate, rows).filter((e) => e.item.itemId === "W-T01")
+        .map((e) => e.edge), ["due"]);
+    ok("a task of a week or less is drawn on every day it spans",
+      S.eventsOn("2026-08-28", rows).some((e) => e.item.itemId === "W-K07"));
+  })();
+
+  head("Timeline lanes are the work, never the worker");
+  (() => {
+    const lanes = S.lanesOf(S.readItems());
+    ok("a milestone under a target is an indented lane",
+      lanes.some((l) => l.item && l.item.itemId === "W-M03" && l.sub === true));
+    ok("the last lane holds the tasks that hang off nothing, and is never hidden",
+      lanes[lanes.length - 1].item === null);
+    ok("no lane is a member",
+      lanes.every((l) => !l.item || l.item.kind !== "task"));
+  })();
+
+  head("Any tag, fixed stages");
+  S.resetStore();
+  eq("two members both hold `call`, as two separate records",
+    S.readTags().filter((t) => t.slug === "call" && !t.archivedAt).length >= 2, true);
+  ok("a member's own tags exclude the archived one",
+    S.tagsOwnedBy("63").every((t) => !t.archivedAt));
+  ok("creating the same label twice returns the row that exists",
+    (() => {
+      const a = S.createTag("63", "Review");
+      return a.ok && a.data.tagId === S.tagsOwnedBy("63").filter((t) => t.slug === "review")[0].tagId;
+    })());
+  ok("a tag can be put on an item and taken off again",
+    (() => {
+      const t = S.tagsOwnedBy("70")[0];
+      S.tagItem("W-K04", t.tagId, true);
+      const on = (S.readItem("W-K04").tagIds || []).indexOf(t.tagId) >= 0;
+      S.tagItem("W-K04", t.tagId, false);
+      return on && (S.readItem("W-K04").tagIds || []).indexOf(t.tagId) < 0;
+    })());
+  ok("cross-member grouping is by slug, so one column covers both members",
+    S.tagSlugs(S.readItems()).some((g) => g.slug === "call" && g.n >= 2));
+
+  head("Leave suppresses a derived absence, and writes no attendance row");
+  S.resetStore();
+  ok("an approved row covers its dates", !!S.onLeave("86", "2026-09-08"));
+  ok("\u2026and only its own dates", !S.onLeave("86", "2026-09-10"));
+  ok("a requested row covers nothing yet", !S.onLeave("63", "2026-08-31"));
+  ok("refusing without a sentence is refused",
+    S.decideLeave("LV-02", "rejected", "58").ok === false);
+  ok("approving is allowed, once",
+    S.decideLeave("LV-02", "approved", "58").ok === true
+    && S.decideLeave("LV-02", "approved", "58").ok === false);
+  eq("and no attendance row was written",
+    S.readDays().filter((d) => d.memberId === "63" && d.businessDate === "2026-08-31").length, 0);
 
   head("Hours are read, never written");
   ok("no write function accepts an hours argument",

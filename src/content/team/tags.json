@@ -1,0 +1,25 @@
+{
+  "$comment": "PLACEHOLDER RECORDS — member-owned tags. Stands in for GET /api/v1/admin/team/tags. Identity is (ownerId, slug): TG-02 and TG-04 are both `call` and belong to two different members, which is the point — neither can rename or delete the other's. Cross-member views group by SLUG so a team board does not fragment into one column per person per tag. A tag is archived, never deleted, because an archived tag still explains what an old item was.",
+  "generatedAt": "2026-08-28T14:20:00+05:30",
+  "tags": [
+    {"tagId": "TG-01", "ownerId": "63", "slug": "review", "label": "Review", "colourToken": "", "createdAt": "2026-07-14T10:20:00+05:30", "archivedAt": null},
+    {"tagId": "TG-02", "ownerId": "63", "slug": "call", "label": "Call", "colourToken": "brand", "createdAt": "2026-07-14T10:20:00+05:30", "archivedAt": null},
+    {"tagId": "TG-03", "ownerId": "63", "slug": "site-visit", "label": "Site visit", "colourToken": "ok", "createdAt": "2026-07-14T10:20:00+05:30", "archivedAt": null},
+    {"tagId": "TG-04", "ownerId": "70", "slug": "call", "label": "Call", "colourToken": "brand", "createdAt": "2026-07-14T10:20:00+05:30", "archivedAt": null},
+    {"tagId": "TG-05", "ownerId": "70", "slug": "site-visit", "label": "Site visit", "colourToken": "ok", "createdAt": "2026-07-14T10:20:00+05:30", "archivedAt": null},
+    {"tagId": "TG-06", "ownerId": "70", "slug": "follow-up", "label": "Follow-up", "colourToken": "warn", "createdAt": "2026-07-14T10:20:00+05:30", "archivedAt": null},
+    {"tagId": "TG-07", "ownerId": "74", "slug": "call", "label": "Client call", "colourToken": "brand", "createdAt": "2026-07-14T10:20:00+05:30", "archivedAt": null},
+    {"tagId": "TG-08", "ownerId": "74", "slug": "follow-up", "label": "Follow-up", "colourToken": "warn", "createdAt": "2026-07-14T10:20:00+05:30", "archivedAt": null},
+    {"tagId": "TG-09", "ownerId": "79", "slug": "admin", "label": "Admin", "colourToken": "", "createdAt": "2026-07-14T10:20:00+05:30", "archivedAt": null},
+    {"tagId": "TG-10", "ownerId": "79", "slug": "follow-up", "label": "Follow-up", "colourToken": "warn", "createdAt": "2026-07-14T10:20:00+05:30", "archivedAt": null},
+    {"tagId": "TG-11", "ownerId": "86", "slug": "follow-up", "label": "Follow-up", "colourToken": "warn", "createdAt": "2026-07-14T10:20:00+05:30", "archivedAt": null},
+    {"tagId": "TG-12", "ownerId": "86", "slug": "review", "label": "Review", "colourToken": "", "createdAt": "2026-07-14T10:20:00+05:30", "archivedAt": null},
+    {"tagId": "TG-13", "ownerId": "58", "slug": "meeting", "label": "Meeting", "colourToken": "info", "createdAt": "2026-07-14T10:20:00+05:30", "archivedAt": null},
+    {"tagId": "TG-14", "ownerId": "58", "slug": "review", "label": "Review", "colourToken": "", "createdAt": "2026-07-14T10:20:00+05:30", "archivedAt": null},
+    {"tagId": "TG-15", "ownerId": "52", "slug": "meeting", "label": "Meeting", "colourToken": "info", "createdAt": "2026-07-14T10:20:00+05:30", "archivedAt": null},
+    {"tagId": "TG-16", "ownerId": "52", "slug": "review", "label": "Review", "colourToken": "", "createdAt": "2026-07-14T10:20:00+05:30", "archivedAt": null},
+    {"tagId": "TG-17", "ownerId": "41", "slug": "meeting", "label": "Meeting", "colourToken": "info", "createdAt": "2026-07-14T10:20:00+05:30", "archivedAt": null},
+    {"tagId": "TG-18", "ownerId": "41", "slug": "admin", "label": "Admin", "colourToken": "", "createdAt": "2026-07-14T10:20:00+05:30", "archivedAt": null},
+    {"tagId": "TG-19", "ownerId": "63", "slug": "june-leads", "label": "June leads", "colourToken": "", "createdAt": "2026-06-02T11:05:00+05:30", "archivedAt": "2026-08-04T09:00:00+05:30"}
+  ]
+}

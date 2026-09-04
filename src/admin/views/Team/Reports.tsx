@@ -105,14 +105,14 @@ function TheDay({ rows }: { rows: ReviewRow[] }) {
     { k: "EOD due", v: a.noEod.length, dot: a.noEod.length ? "warn" : "" },
     "sep",
     { k: "overdue", v: a.delayed.length, dot: a.delayed.length ? "warn" : "" },
-    { k: "blocked", v: a.blocked.length, dot: a.blocked.length ? "bad" : "" },
+    { k: "waiting", v: a.waiting.length, dot: a.waiting.length ? "bad" : "" },
     "sep",
     { k: "late or absent", v: a.lateOrAbsent.length, dot: a.lateOrAbsent.length ? "warn" : "" },
     { k: "unread reports", v: a.unacknowledged.length, dot: a.unacknowledged.length ? "info" : "" },
   ];
 
   const anything = a.noPlan.length || a.noEod.length || a.delayed.length
-    || a.blocked.length || a.lateOrAbsent.length || a.unacknowledged.length;
+    || a.waiting.length || a.lateOrAbsent.length || a.unacknowledged.length;
 
   return (
     <>
@@ -131,8 +131,8 @@ function TheDay({ rows }: { rows: ReviewRow[] }) {
               note="Counted only once that member's own day is over." />
             <AttnCard title="Overdue work" tone="warn"
               names={a.delayed.map((i) => i.title)} to="#/work?status=delayed" />
-            <AttnCard title="Blocked" tone="bad"
-              names={a.blocked.map((i) => i.title)} to="#/work?status=blocked" />
+            <AttnCard title="Waiting on another item" tone="bad"
+              names={a.waiting.map((i: WorkItem) => i.title)} to="#/work?wait=1" />
             <AttnCard title="Late or absent" tone="warn"
               names={a.lateOrAbsent.map((r) => r.member.name)} to="#/attendance" />
             <AttnCard title="Reports nobody has read" tone="info"
@@ -159,17 +159,17 @@ function TheDay({ rows }: { rows: ReviewRow[] }) {
           empty={{ icon: "users", title: "Nobody in scope", body: "You see yourself and the members whose reporting line points at you." }}
           rows={rows.map((r) => {
             const rail = r.state === "absent" ? "u-bad"
-              : (r.day && r.day.isLate) || r.delayed || r.blocked ? "u-warn" : "";
+              : (r.day && r.day.isLate) || r.delayed || r.waiting ? "u-warn" : "";
             return (
               <tr key={r.member.memberId} className={rail}>
                 <td className="rail"><i className={rail} /></td>
                 <td>
                   <Who m={r.member} />
-                  {r.delayed || r.blocked ? (
+                  {r.delayed || r.waiting ? (
                     <span className="cell-2">
                       {r.delayed ? r.delayed + " overdue" : null}
-                      {r.delayed && r.blocked ? " · " : null}
-                      {r.blocked ? r.blocked + " blocked" : null}
+                      {r.delayed && r.waiting ? " · " : null}
+                      {r.waiting ? r.waiting + " waiting" : null}
                     </span>
                   ) : null}
                 </td>
