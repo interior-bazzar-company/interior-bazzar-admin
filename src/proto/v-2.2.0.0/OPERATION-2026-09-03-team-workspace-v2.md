@@ -43,7 +43,8 @@ summary:     Calendar and Timeline become the fourth and fifth FACE of
              Leave suppresses a derived absence and never writes an
              attendance row.
 
-outcome:     Thirteen wireframes, nineteen architecture decisions (TM-AD-12…30),
+outcome:     Thirteen wireframes and a clickable panel (§P), twenty
+             architecture decisions (TM-AD-12…31),
              a data-model delta of two new entities and four extended ones, a
              permission delta, a regression list, nine implementation phases,
              thirteen open decisions (TM-OD-20…32) and six risks (TM-R-10…15).
@@ -99,6 +100,13 @@ outcome:     Thirteen wireframes, nineteen architecture decisions (TM-AD-12…30
              value bar. The same four components now render §3.12's roll-up and
              §3.13's Work section as well as the rail, so the module computes
              progress in one place and reads the same in three.
+
+             AMENDED a fourth time 2026-09-04 by TM-AD-31: the document now
+             carries §P, a WORKING panel — the real sidebar, the faces as tabs,
+             a routed URL and the item drawer opening over whichever face is
+             open. It is not a fourteenth wireframe: it calls the same builders
+             every screen above calls, so it cannot drift from the spec it
+             demonstrates.
 ```
 
 **Module:** Team · **Date:** 2026-09-03 · **Status:** awaiting approval
@@ -708,6 +716,37 @@ argument that differs — self for the rail and §3.13, `reportsTo` one level fo
 > printing two typed percentages that its own children disagreed with (TM-AD-27). One
 > component cannot drift from itself.
 
+### TM-AD-31 · The prototype is the spec's own components, wired to a route
+
+A clickable prototype normally rots the moment the specification moves, because it is a
+second implementation of the same screens. §P is not allowed to be one.
+
+Every renderer in this document was split into a **builder** that returns HTML and a
+**writer** that puts it somewhere:
+
+```
+calHtml()      → renderCal()      writes §3.3   ·  appCal()   places it in §P
+boardHtml(ax)  → renderBoard()    writes §3.2   ·  appBoard() places it in §P
+tlHtml()       → renderTl()       writes §3.4   ·  appTimeline()
+railHtml()     → renderWorkRail() writes §3.3   ·  appCal()
+pbTasks / pbMarks                 write §3.12, §3.13, the rail and §P
+```
+
+The rule that follows: **no face may be re-implemented for the demo.** If §P shows
+something §3.2 does not, one of them is lying, and the only way to keep that impossible is
+to make it the same function. It is also what makes §P cheap — it is a router, a sidebar,
+a drawer and nothing else.
+
+Two consequences worth stating:
+
+- **Clicks inside §P never leave §P.** The shared builders emit `data-goto="5"` because on
+  the spec screens a card jumps to §3.5; inside the panel that has to mean *open the
+  drawer*. A capture-phase handler on the panel translates it, and the few deliberate
+  "open §3.7 ▸" buttons are allowed through.
+- **§P is a prototype and says so.** Filters and search are drawn, not wired, and it says
+  which is which on the screen. A demo that hides its own edges is how a stakeholder ends
+  up approving something nobody costed.
+
 ## 3. The wireframes
 
 Notation: `[ ]` a control · `▾` a menu · `◍` a member · `◆` a milestone or target ·
@@ -1194,6 +1233,54 @@ rather than a feed: things that have stopped because a specific person has not a
 An unopened agreement belongs in it for the same reason a pending leave request does —
 both are blocked on a human, and neither shows up anywhere else until someone goes
 looking.
+
+### P. The panel, clickable — a prototype, not a fourteenth screen
+
+Thirteen wireframes argue the decisions. This one lets them be walked: the real sidebar
+down the left, the faces as tabs, an item opening as a drawer over whatever is behind it,
+and the URL that produced it printed beside the title.
+
+```
+┌──────────┬───────────────────────────────────────────────────────────────────────┐
+│ SALES    │ Calendar   [▦][▤][☰][⊞]      signed in as [A. Sharma ▾]               │
+│  Deals · │                                        #/work?face=calendar&item=W-K08│
+│  Plans · ├───────────────────────────────────────────────────────────────────────┤
+│ CLIENT   │ [Today] ‹ September 2026 ›  [Month][Week]   [Member▾][Kind▾][Tag▾]  ⌕ │
+│  Enq.  · ├──────────────┬────────────────────────────┬───────────────────────────┤
+│ TEAM     │ + Create   ▾ │  MON  TUE  WED  THU  FRI   │ ● Pune tier pricing  Delay│
+│  Members │ mini month   │   31   1    2   TODAY  4   │ ─────────────────── [✕]   │
+│  Roles   │ This month   │        ●Draft      ●Q3     │ Kind        Task          │
+│ ▸Calendar│ Tasks        │                            │ Stage       Delay derived │
+│   ▦ a tab│ Milestones   │                            │ Waiting on  ⛔ Q3 review   │
+│   not a  │ Targets      │                            │ Rolls up to ◆ Onboard 12  │
+│   row    │              │                            │ [Start][Complete][Wait…]  │
+│  Reports ├──────────────┴────────────────────────────┴───────────────────────────┤
+│  My dash │                          ░ the face keeps its place behind the drawer │
+│ FINANCE …│                                                                       │
+└──────────┴───────────────────────────────────────────────────────────────────────┘
+```
+
+**The sidebar is the real one.** Group order and row order are read off
+`admin/shell/modules.ts` — Sales, Client Ops, Business Ops, **Team**, Finance, Settings —
+with `Work` reading **Calendar** per TM-AD-23. The six modules outside Team are dimmed and
+open a note; a nav that quietly dropped them would not be a fair test of where this one
+sits. Attendance says what §3.7 and §3.8 add to it and links there.
+
+**The faces are tabs, not sidebar rows** — TM-AD-12, and the sidebar proves it by showing
+the open face as a *sub-label* under Calendar rather than as four rows. A status line is
+not a second place to click.
+
+**An item opens as a right-side drawer over the face**, `?item=` appended to whatever
+route is open, exactly as §3.5 spec'd and as the shipped panel already does for members
+and enquiries. Escape, the ✕ and the backdrop all close it, and closing drops the
+parameter rather than pushing a page. The drawer states the derived stage *and* the stored
+one — *Delay · derived · 7d past 27 Aug · stored stage is In progress* — which is TM-AD-29
+made visible at the only place someone could be misled by it.
+
+**What is real and what is drawn**, said on the screen itself. Real: the routes, the face
+switch, the drawer, the mini month, *Group by*, month and week paging, the timeline's date
+window, and every number on every block. Drawn: the filters, search, the Create form
+itself, and the six modules outside Team.
 
 ---
 

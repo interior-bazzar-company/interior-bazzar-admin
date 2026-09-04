@@ -6,6 +6,91 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-04
 
+### §P — the panel, clickable: real sidebar, routed faces, drawer over the face — TM-AD-31
+
+**Area:** `src/proto/v-2.2.0.0/wireframe-team-workspace-v2.html` → §P · simulates `#/work`, `#/reports`, `#/team`, `#/team/me`
+**Files:** `src/proto/v-2.2.0.0/wireframe-team-workspace-v2.html`,
+`src/proto/v-2.2.0.0/OPERATION-2026-09-03-team-workspace-v2.md`
+
+**What changed**
+
+The document gains a **working panel**. Thirteen wireframes argue the decisions; §P lets
+them be walked, so the module can be seen as it would be used rather than read.
+
+- **The sidebar is the real one.** Group order and row order come from
+  `admin/shell/modules.ts` — Sales · Client Ops · Business Ops · **Team** · Finance ·
+  Settings — with `Work` reading **Calendar** per `TM-AD-23`, and `My dashboard` added as
+  the sixth Team row. The six modules outside Team are dimmed and open a note instead of a
+  fabricated screen; Attendance says what §3.7 and §3.8 add to it and links there.
+- **The faces are tabs in the content area**, and the sidebar proves `TM-AD-12` by showing
+  the open face as a **sub-label** under Calendar rather than as four rows. A status line
+  is not a second place to click.
+- **Routes are real and printed**: `#/work?face=board`, `#/work?face=board&group=tag`,
+  `#/team/me?tab=work`, `#/work?face=calendar&item=W-K08`. Clicking a row, a tab, a mini
+  month day, *Group by*, the month and week pages and the timeline's window all move the
+  URL and the view together.
+- **An item opens as a right-side drawer over the face**, which keeps its place behind a
+  dimmed backdrop — `?item=` appended to whatever route is open, as §3.5 spec'd and as the
+  shipped panel already does elsewhere. Escape, ✕ and the backdrop close it and drop the
+  parameter. The drawer carries kind, assignee, **both stages** — *Delay · derived · 7d
+  past 27 Aug · stored stage is In progress* — priority, tags, parent, dates, the
+  ⛔ blocker **with its reason**, derived progress with the ▾ window marker, the children,
+  the links, and the five actions. Every related record in it is itself a click.
+- **Signed in as** switches the viewer, so the rail, the day's tasks, *Mine · My team* and
+  `/team/me` all re-scope to whoever is looking.
+
+**`TM-AD-31` is what keeps it honest.** Every renderer was split into a **builder** that
+returns HTML and a **writer** that puts it somewhere — `calHtml` / `renderCal`,
+`boardHtml` / `renderBoard`, `tlHtml` / `renderTl`, `railHtml` / `renderWorkRail` — so §P
+places the *same output* the spec screens place. **No face is re-implemented for the
+demo**: if §P showed something §3.2 does not, one of them would be lying, and the only way
+to make that impossible is for it to be the same function. §P is a router, a sidebar and a
+drawer; nothing else.
+
+Clicks inside §P never leave it: the shared builders emit `data-goto="5"` because on a
+spec screen a card jumps to §3.5, and inside the panel that has to mean *open the drawer*.
+A capture-phase handler translates it, and the deliberate "open §3.7 ▸" buttons are let
+through. **What is drawn rather than wired says so on the screen** — the filters, search,
+the Create form, and the six other modules.
+
+**Temp data**
+`none` — no runtime code and no seed change. §P reads the same inline `ITEMS`, `MEMBERS`,
+`LEAVE`, `TAGS`, `LINKS` and `BLOCKED` as every screen above it. The nav list is a
+hand-copy of `admin/shell/modules.ts` group and row order, which is the one thing here
+that can go stale — it is a wireframe of the nav, not a read of it.
+
+**Backend needed**
+`none` new. §P consumes exactly what §3.2–§3.4 already require of
+`GET /api/v1/admin/team/work`. It does make one client requirement concrete: the face and
+the open item must both live in the **URL** (`?face=`, `?item=`), because that is what
+makes a drawer shareable and the back button correct.
+
+**Open decisions**
+`TM-AD-31` is new and is shown on §P. Nothing is open. `TM-AD-12` is reaffirmed rather
+than amended — the faces stayed tabs. `TM-OD-20` remains the only blocker on Phase A.
+
+**Verified**
+
+Evaluated headlessly against a DOM stub, driving `APP` through every route and face and
+reading the output back. Sidebar renders all six groups in `modules.ts` order with Calendar
+in Team and the face sub-label under it. Board face draws the five stage columns and the
+Group-by select; List draws all 22 rows with stage, priority, due and tags; Timeline draws
+its seven lanes and the undated list; Reports draws Today, *Waiting on you* and the three
+blocks at `reportsTo` scope; Members draws the eight-row roster; Attendance draws its note
+and its link to §3.7. Drawer checked on two records — `W-K08` (task: Delay derived over a
+stored In progress, ⛔ waiting on the Q3 review with its reason, parent *Onboard 12
+businesses in Pune*) and `W-M03` (milestone: 50%, *2 / 4 tasks · 91% of the window gone*,
+four children each opening their own drawer). `appUrl()` returns
+`#/work?face=calendar&item=W-K08`. `node --check` passes, tag balance checked with a
+parser, `npx tsc -b` clean, `npx vite build --mode dev` succeeds — no `.ts` was touched.
+
+**Not opened in a browser.** The drawer's slide-in and sticky action bar, the dark sidebar
+against the light content, the backdrop over a scrolled board, Escape-to-close, and the
+whole panel below 1240px are reasoned about and not seen. Open §P and click the board
+first: five columns beside a 206px sidebar is the tightest case in the document.
+
+---
+
 ### Tasks ▸ milestones ▸ targets — one set of components, three surfaces — TM-AD-30
 
 **Area:** `#/work?face=calendar` rail · `#/reports` captain roll-up (§3.12) · `#/team/me` Work section (§3.13)

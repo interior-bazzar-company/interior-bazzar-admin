@@ -274,6 +274,34 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
 .wf-menu .wf-sm{padding:4px 8px 2px;color:var(--wf-ink3);font-size:10.5px}
 @media (max-width:1240px){.wf-wr{display:none}}
 
+/* ---- §P the panel, clickable ---------------------------------------------- */
+.wf-app{position:relative;display:flex;align-items:stretch;border:1px solid var(--wf-line2);
+  border-radius:9px;overflow:hidden;background:var(--wf-panel);min-height:620px}
+.wf-side{flex:0 0 206px;background:#20242b;color:#cfd4dc;padding:0 0 12px;overflow:auto;max-height:760px}
+.wf-side .wf-brand{font-size:12.5px;font-weight:700;color:#fff;padding:12px 12px 10px;
+  border-bottom:1px solid #2c3138;letter-spacing:.01em}
+.wf-side .wf-brand span{font-weight:400;color:#7b828d}
+.wf-side h5{margin:13px 12px 4px;font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;
+  color:#7b828d;font-weight:700}
+.wf-side button{display:flex;align-items:center;gap:8px;width:100%;text-align:left;font:inherit;
+  font-size:12.5px;padding:6px 12px;border:0;background:none;color:#cfd4dc;cursor:pointer;
+  border-left:2px solid transparent}
+.wf-side button:hover{background:#282d35}
+.wf-side button.is-on{background:#2f353e;color:#fff;border-left-color:#e0736a;font-weight:600}
+.wf-side button.is-soon{color:#767d88}
+.wf-side button .wf-n{margin-left:auto;font-size:10px;color:#767d88;background:none;padding:0}
+.wf-side .wf-side-sub{font-size:10.5px;color:#8b9199;padding:2px 12px 5px 26px}
+.wf-appmain{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--wf-bg)}
+.wf-appbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 13px;
+  background:var(--wf-panel);border-bottom:1px solid var(--wf-line)}
+.wf-appview{flex:1;min-width:0;overflow:auto;max-height:700px}
+.wf-scrim{position:absolute;inset:0;background:rgba(22,24,28,.34);z-index:30;border:0;padding:0}
+.wf-drawer{position:absolute;top:0;right:0;bottom:0;width:452px;max-width:88%;z-index:31;
+  background:var(--wf-panel);border-left:1px solid var(--wf-line2);overflow:auto;
+  box-shadow:-16px 0 38px rgba(0,0,0,.16)}
+.wf-drawer .wf-fbar{position:sticky;top:0;z-index:2}
+.wf-appempty{padding:22px}
+
 /* ---- lists ---------------------------------------------------------------- */
 .wf-list{border:1px solid var(--wf-line);border-radius:7px;overflow:hidden}
 .wf-li{display:flex;align-items:center;gap:10px;padding:9px 12px;border-top:1px solid var(--wf-line);
@@ -1426,6 +1454,42 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
   </div>
 </section>
 
+<!-- ================================================================== §P -->
+<section class="wf-scr" data-scr="15">
+  <div class="wf-scrh"><span class="wf-num">§P</span><h2>The panel, clickable</h2>
+    <span class="wf-chip is-new">prototype</span></div>
+  <p class="wf-lede">Everything above is a specification. <b>This is the same data and the same builders
+  wired to a route</b>, so the decisions can be walked instead of read: click a sidebar row, switch a
+  face, open an item, close it again. The URL beside the title is the one the real panel would show.
+  <b>The sidebar is the real one</b> — group order and row order come from
+  <code>admin/shell/modules.ts</code>, with <i>Work</i> reading <i>Calendar</i> per TM-AD-23. Rows
+  outside this operation are dimmed and open a note rather than a lie.</p>
+
+  <div class="wf-app" id="wfApp">
+    <aside class="wf-side" id="wfSide"></aside>
+    <div class="wf-appmain">
+      <div class="wf-appbar" id="wfAppbar"></div>
+      <div class="wf-appview" id="wfView"></div>
+    </div>
+    <button class="wf-scrim" id="wfScrim" hidden aria-label="close"></button>
+    <aside class="wf-drawer" id="wfDrawer" hidden></aside>
+  </div>
+
+  <div class="wf-note"><b>The faces are tabs in the content area, not rows in the sidebar.</b>
+    <span class="wf-id">TM-AD-12</span> holds: one dataset, one sidebar row, one grant. The sidebar
+    shows which face is open as a sub-label under <i>Calendar</i> — that is a status line, not a second
+    place to click, and it is why the row can stay one row.</div>
+  <div class="wf-note"><b>An item opens as a right-side drawer over the face, and the face keeps its
+    place.</b> <code>?item=W-K04</code> is appended to whatever route is open, which is exactly what the
+    shipped drawer already does on <code>/team</code> and the enquiries list — §3.5 spec'd it that way so
+    that neither the calendar nor the timeline needs a detail view of its own. Escape, the ✕ and the
+    backdrop all close it, and closing drops the parameter rather than pushing a new page.</div>
+  <div class="wf-note"><b>What is real here and what is drawn.</b> Real: the routes, the face switch,
+    the drawer, the mini month, <i>Group by</i>, the month and week pages, the timeline's date window,
+    and every number on every block — all computed from the same 22 seeded items. Drawn: the filters,
+    search, the Create form itself, and the six modules outside Team, which say so.</div>
+</section>
+
 </main>
 </div>
 
@@ -1574,10 +1638,11 @@ var SCREENS = [
   ['§3.11','Pay',                       'NEW'],
   ['§3.12','Captain dashboard',         'EXT'],
   ['§3.13','Member dashboard',          'NEW'],
-  ['§7-9', 'Phases, decisions, risks',  '']
+  ['§7-9', 'Phases, decisions, risks',  ''],
+  ['§P',   'The panel, clickable',       'NEW']
 ];
 (function buildRail(){
-  var groups = [[0,'Overview',[0,1]], [1,'Calendar — /work',[2,3,4,5,6]],
+  var groups = [[9,'Prototype',[15]], [0,'Overview',[0,1]], [1,'Calendar — /work',[2,3,4,5,6]],
                 [2,'Attendance — /attendance',[7,8]], [3,'Member — /team/me',[13,9,10,11]],
                 [4,'Roll-up — /reports',[12]], [5,'Plan',[14]]];
   var h = '';
@@ -1636,7 +1701,7 @@ function cardHtml(it){
   var done = it.status === 'completed' ? '<span style="color:var(--wf-ok)">✓</span>' : '';
   var mark = it.kind === 'task' ? '▸' : '◆';
   return '<button class="wf-card r-' + railTone(it) + (it.status === 'cancelled' ? ' is-dead' : '') +
-    '" data-goto="5" title="' + esc(it.id) + '">' +
+    '" data-goto="5" data-item="' + it.id + '" title="' + esc(it.id) + '">' +
     '<span class="wf-card-t">' + mark + ' ' + esc(it.title) + '</span>' +
     '<span class="wf-card-m"><span class="wf-av" style="width:15px;height:15px;flex-basis:15px;font-size:8px">' +
     MEMBERS[it.who].s + '</span>' + esc(MEMBERS[it.who].n.split(' ')[0]) +
@@ -1644,8 +1709,7 @@ function cardHtml(it){
     (wait ? '<span class="wf-card-m">' + wait + '</span>' : '') + '</button>';
 }
 
-function renderBoard(){
-  var axisKey = document.getElementById('wfAxis').value;
+function boardHtml(axisKey){
   var axis = AXES[axisKey];
   var buckets = {}, rest = [];
   axis.keys.forEach(function(k){ buckets[k] = []; });
@@ -1666,7 +1730,6 @@ function renderBoard(){
   var restName = axisKey === 'tag' ? 'Untagged' : 'Ungrouped';
   cols += '<div class="wf-col is-rest"><div class="wf-colh">' + restName +
           '<span class="wf-n">' + rest.length + '</span></div>' + rest.map(cardHtml).join('') + '</div>';
-  document.getElementById('wfCols').innerHTML = cols;
 
   /* The strip and the columns must agree. On the tag axis an item may sit in two
      columns, so the strip says so rather than quietly printing a bigger number. */
@@ -1679,7 +1742,7 @@ function renderBoard(){
   var waiting = ITEMS.filter(blockerOf).length;
   var done = ITEMS.filter(function(i){return i.status==='completed';}).length;
   var multi = placed + rest.length;
-  document.getElementById('wfStrip').innerHTML =
+  var strip =
     '<span><b>' + n + '</b> items</span>' +
     '<span><span class="wf-tone t-info"><i class="wf-dot"></i>' + inprog + ' in progress</span> · ' + planned + ' planning</span>' +
     '<span class="wf-tone t-warn"><i class="wf-dot"></i>' + delayed + ' in delay</span>' +
@@ -1689,9 +1752,16 @@ function renderBoard(){
     '<span style="color:var(--wf-ink3)">columns add to <b>' + multi + '</b>' +
     (multi !== n ? ' — an item may carry two tags, so it appears in two columns' : '') + '</span>';
 
-  document.getElementById('wfDragNote').innerHTML = axisKey === 'status'
+  var note = axisKey === 'status'
     ? 'Draggable here — the four stored stages carry a transition table. <b>Delay accepts no drop</b>: there is nothing to write.'
     : '<b style="color:var(--wf-warn)">Not draggable on this axis.</b> Reassigning needs a reason and an audit row; a drag has neither.';
+  return {cols:cols, strip:strip, note:note};
+}
+function renderBoard(){
+  var r = boardHtml(document.getElementById('wfAxis').value);
+  document.getElementById('wfCols').innerHTML = r.cols;
+  document.getElementById('wfStrip').innerHTML = r.strip;
+  document.getElementById('wfDragNote').innerHTML = r.note;
 }
 document.getElementById('wfAxis').addEventListener('change', renderBoard);
 
@@ -1718,7 +1788,7 @@ function eventsOn(isoDay){
   });
   return out;
 }
-function renderCal(){
+function calHtml(){
   var y = calAnchor.getFullYear(), m = calAnchor.getMonth();
   var first = new Date(y, m, 1);
   var lead = (first.getDay() + 6) % 7;                 /* Monday-start */
@@ -1728,7 +1798,7 @@ function renderCal(){
     var t = new Date(TODAY + 'T00:00:00');
     startDay = addDays(t, -((t.getDay() + 6) % 7));
   }
-  document.getElementById('wfCalTitle').textContent = calMode === 'week'
+  var title = calMode === 'week'
     ? iso(startDay).slice(8) + ' – ' + iso(addDays(startDay, 6)).slice(8) + ' ' + MON[startDay.getMonth()] + ' ' + startDay.getFullYear()
     : MON[m] + ' ' + y;
 
@@ -1755,15 +1825,21 @@ function renderCal(){
       var mark = it.kind === 'task' ? '●' : it.kind === 'target' ? '◈' : '◆';
       var w = blockerOf(it) ? '⛔' : isDelayed(it) ? '⚠' : '';
       var edge = ev.edge === 'starts' ? '▸ starts · ' : ev.edge === 'due' ? '▪ due · ' : '';
-      body += '<button class="wf-ev e-' + t + '" data-goto="5">' + mark + ' ' + w + ' ' +
+      body += '<button class="wf-ev e-' + t + '" data-goto="5" data-item="' + it.id + '">' + mark + ' ' + w + ' ' +
               edge + esc(it.title) + '</button>';
     });
     if (evs.length > cap) body += '<div class="wf-more">+' + (evs.length - cap) + ' more</div>';
     h += '<div class="' + cls + '"><div class="wf-day-n">' + d.getDate() +
          (id === TODAY ? ' TODAY' : '') + '</div>' + body + '</div>';
   }
-  document.getElementById('wfCal').innerHTML = h;
-  renderWorkRail();                     /* the mini month and the strip follow the view */
+  return {title:title, grid:h};
+}
+function renderCal(){
+  var r = calHtml();
+  document.getElementById('wfCalTitle').textContent = r.title;
+  document.getElementById('wfCal').innerHTML = r.grid;
+  renderWorkRail();     /* the mini month and the strip follow the view */
+  renderApp();          /* and so does §P, which is the same builder again */
 }
 document.getElementById('wfCalToday').onclick = function(){
   var t = new Date(TODAY + 'T00:00:00');
@@ -1856,7 +1932,7 @@ function dueTag(it){
 
 function pbMilestone(it, showWho){
   var p = progressOf(it), t = timePct(it), behind = t !== null && t > p.pct + 5;
-  return '<div class="wf-pr" data-goto="5">' +
+  return '<div class="wf-pr" data-goto="5" data-item="' + it.id + '">' +
     '<div class="wf-pr-t"><span>◆</span><span style="flex:1;min-width:0">' + esc(it.title) + '</span></div>' +
     '<div class="wf-pr-m"><span class="wf-prw"><span class="wf-prog is-thin"><i style="width:' + p.pct + '%"></i></span>' +
       (t === null ? '' : '<i class="wf-tick' + (behind ? ' is-late' : '') + '" style="left:' + t + '%"></i>') +
@@ -1869,7 +1945,7 @@ function pbMilestone(it, showWho){
 
 function pbTarget(it, showWho){
   var p = progressOf(it), t = timePct(it);
-  return '<div class="wf-pr is-target" data-goto="5">' +
+  return '<div class="wf-pr is-target" data-goto="5" data-item="' + it.id + '">' +
     '<div class="wf-pr-t"><span>◈</span><span style="flex:1;min-width:0">' + esc(it.title) + '</span></div>' +
     '<div class="wf-pr-v"><span>' + it.cur + '</span><span class="wf-u">of ' + it.tgt + ' ' + esc(it.unit) + '</span>' +
     '<span class="wf-spacer"></span><span style="font-size:12px;color:var(--wf-ink2)">' + p.pct + '%</span></div>' +
@@ -1880,7 +1956,7 @@ function pbTarget(it, showWho){
 }
 
 function pbTask(it){
-  return '<div class="wf-tk" data-goto="5"><span class="wf-box"></span>' +
+  return '<div class="wf-tk" data-goto="5" data-item="' + it.id + '"><span class="wf-box"></span>' +
     '<span style="flex:1;min-width:0">' + esc(it.title) +
     '<span class="wf-pr-m"><span class="wf-tone' + (isDelayed(it) ? ' t-warn' : '') + '">' +
     (isDelayed(it) ? '⚠ ' + daysOver(it) + 'd over' : it.due === TODAY ? 'due today' : 'due ' + fmtDay(it.due)) +
@@ -1957,9 +2033,8 @@ function wrCreate(wide){
     '</div></div>';
 }
 
-function renderWorkRail(){
-  document.getElementById('wfWr3').innerHTML =
-    wrCreate(true) +
+function railHtml(){
+  return wrCreate(true) +
     '<div class="wf-wrb">' + wrMini() + '</div>' +
     '<div class="wf-wrb">' + wrMonth() + '</div>' +
     '<div class="wf-wrb">' + pbTasks(RAIL_WHO, false) + '</div>' +
@@ -1967,6 +2042,9 @@ function renderWorkRail(){
         'No milestone is yours or your reports\'.') + '</div>' +
     '<div class="wf-wrb">' + pbMarks('target', RAIL_WHO, 'Targets',
         'No target is yours or your reports\'.') + '</div>';
+}
+function renderWorkRail(){
+  document.getElementById('wfWr3').innerHTML = railHtml();
   ['2','4'].forEach(function(n){
     var el = document.getElementById('wfCreate' + n);
     if (el) el.innerHTML = wrCreate(false);
@@ -2029,15 +2107,15 @@ function tlBar(it, cls, mark, tlS, days){
   var who = it.kind === 'task' && MEMBERS[it.who] ? MEMBERS[it.who].s + ' · ' : '';
   var suffix = isDelayed(it) ? '  ⚠ ' + daysOver(it) + 'd over'
              : it.status === 'completed' ? '  ✓' : '';
-  return '<div class="wf-bar b-' + tone + (cls ? ' ' + cls : '') + '" data-goto="5" style="left:' +
+  return '<div class="wf-bar b-' + tone + (cls ? ' ' + cls : '') + '" data-goto="5" data-item="' + it.id + '" style="left:' +
          (a/days*100) + '%;width:' + ((b-a)/days*100) + '%;top:@TOP@px">' +
          '<span class="wf-bar-t">' + mark + esc(who + it.title) + esc(suffix) + '</span></div>';
 }
 
-function renderTl(){
+function tlHtml(){
   var days = tlWeeks * 7;
   var end = addDays(tlStart, days - 1);
-  document.getElementById('wfTlTitle').textContent =
+  var title =
     tlStart.getDate() + ' ' + MON[tlStart.getMonth()].slice(0,3) + ' – ' +
     end.getDate() + ' ' + MON[end.getMonth()].slice(0,3) + ' 2026';
 
@@ -2091,14 +2169,18 @@ function renderTl(){
          (nowPct >= 0 && nowPct <= 100 ? '<div class="wf-now" style="left:' + nowPct + '%"></div>' : '') +
          '</div></div>';
   });
-  document.getElementById('wfTl').innerHTML = h;
-
-  var u = document.querySelector('#wfTlUndated div');
-  u.innerHTML = undated.length
+  var und = undated.length
     ? '<b>' + undated.length + ' open items have no start date and cannot be drawn</b> — ' +
       undated.map(function(i){ return esc(i.title); }).join(' · ') +
       '. Listed rather than given an invented start: a bar beginning at a date nobody chose is a lie the chart tells confidently.'
     : 'Every open item has a start date.';
+  return {title:title, grid:h, undated:und};
+}
+function renderTl(){
+  var r = tlHtml();
+  document.getElementById('wfTlTitle').textContent = r.title;
+  document.getElementById('wfTl').innerHTML = r.grid;
+  document.querySelector('#wfTlUndated div').innerHTML = r.undated;
 }
 document.getElementById('wfTlPrev').onclick = function(){ tlStart = addDays(tlStart, -7 * tlWeeks); renderTl(); };
 document.getElementById('wfTlNext').onclick = function(){ tlStart = addDays(tlStart,  7 * tlWeeks); renderTl(); };
@@ -2325,12 +2407,421 @@ document.getElementById('wfMeScope').addEventListener('click', function(e){
   });
 })();
 
+/* ---- §P · the panel, clickable -------------------------------------------
+   The same data and the same builders as every screen above, wired to a route.
+   Nothing here re-implements a face: appCal calls calHtml, appBoard calls
+   boardHtml, the rail is railHtml. If a decision changes, it changes once and
+   this screen changes with it.
+--------------------------------------------------------------------------- */
+var NAV = [
+  ['Sales',        [['deals','Deals',0], ['plans','Plans',0]]],
+  ['Client Ops',   [['business-enquiries','Business Enquiries',0]]],
+  ['Business Ops', [['users','Users Management',0]]],
+  ['Team',         [['team','Members',1], ['roles','Roles',1], ['attendance','Attendance',1],
+                    ['work','Calendar',1], ['reports','Reports',1], ['me','My dashboard',1]]],
+  ['Finance',      [['finance','Subscriptions',0], ['finance-salaries','Salaries A/C',0],
+                    ['finance-transactions','Other Transaction',0], ['finance-refunds','Refunds',0],
+                    ['finance-analytics','Analytics',0]]],
+  ['Settings',     [['audit','Audit log',0]]]
+];
+var NAVLABEL = {};
+NAV.forEach(function(g){ g[1].forEach(function(r){ NAVLABEL[r[0]] = r[1]; }); });
+
+var FACES  = [['calendar','▦ Calendar'], ['board','▤ Board'], ['list','☰ List'], ['timeline','⊞ Timeline']];
+var METABS = [['overview','Overview'], ['attendance','Attendance'], ['work','Work'],
+              ['reports','Reports'], ['documents','Documents'], ['pay','Pay']];
+
+var APP = {route:'work', face:'calendar', tab:'work', axis:'status', item:null};
+
+function byId(id){
+  for (var i = 0; i < ITEMS.length; i++) if (ITEMS[i].id === id) return ITEMS[i];
+  return null;
+}
+function faceLabel(k){
+  for (var i = 0; i < FACES.length; i++) if (FACES[i][0] === k) return FACES[i][1];
+  return k;
+}
+function appUrl(){
+  var u = '#/' + (APP.route === 'me' ? 'team/me' : APP.route), q = [];
+  if (APP.route === 'work'){
+    q.push('face=' + APP.face);
+    if (APP.face === 'board' && APP.axis !== 'status') q.push('group=' + APP.axis);
+  }
+  if (APP.route === 'me') q.push('tab=' + APP.tab);
+  if (APP.item) q.push('item=' + APP.item);
+  return u + (q.length ? '?' + q.join('&') : '');
+}
+
+function appSide(){
+  var h = '<div class="wf-brand">Interior bazzar <span>· admin</span></div>';
+  NAV.forEach(function(g){
+    h += '<h5>' + esc(g[0]) + '</h5>';
+    g[1].forEach(function(r){
+      var cls = r[0] === APP.route ? ' class="is-on"' : (r[2] ? '' : ' class="is-soon"');
+      h += '<button data-nav="' + r[0] + '"' + cls + '>' + esc(r[1]) +
+           (r[2] ? '' : '<span class="wf-n">·</span>') + '</button>';
+      if (r[0] === 'work' && APP.route === 'work')
+        h += '<div class="wf-side-sub">' + esc(faceLabel(APP.face)) + ' · a tab, not a row</div>';
+    });
+  });
+  return h;
+}
+
+function appBar(){
+  var h = '<strong style="font-size:14px">' + esc(NAVLABEL[APP.route] || APP.route) + '</strong>';
+  if (APP.route === 'work')
+    h += '<span class="wf-seg">' + FACES.map(function(f){
+      return '<button data-face="' + f[0] + '"' + (f[0] === APP.face ? ' class="is-on"' : '') +
+             '>' + f[1] + '</button>'; }).join('') + '</span>';
+  if (APP.route === 'me')
+    h += '<span class="wf-seg">' + METABS.map(function(t){
+      return '<button data-tab="' + t[0] + '"' + (t[0] === APP.tab ? ' class="is-on"' : '') +
+             '>' + t[1] + '</button>'; }).join('') + '</span>';
+  h += '<span class="wf-spacer"></span>' +
+       '<span class="wf-sm" style="color:var(--wf-ink3)">signed in as</span>' +
+       '<select class="wf-sel" id="pWho">' + Object.keys(MEMBERS).map(function(id){
+         return '<option value="' + id + '"' + (id === RAIL_WHO ? ' selected' : '') + '>' +
+                esc(MEMBERS[id].n) + '</option>'; }).join('') + '</select>' +
+       '<code class="wf-route">' + esc(appUrl()) + '</code>';
+  return h;
+}
+
+function appCal(){
+  var c = calHtml();
+  return '<div class="wf-toolbar" style="background:var(--wf-panel);border-bottom:1px solid var(--wf-line)">' +
+      '<button class="wf-btn" data-cal="today">Today</button>' +
+      '<button class="wf-btn is-quiet" data-cal="prev">‹</button>' +
+      '<strong>' + esc(c.title) + '</strong>' +
+      '<button class="wf-btn is-quiet" data-cal="next">›</button>' +
+      '<span class="wf-seg"><button data-cal="month"' + (calMode === 'month' ? ' class="is-on"' : '') +
+      '>Month</button><button data-cal="week"' + (calMode === 'week' ? ' class="is-on"' : '') +
+      '>Week</button></span>' +
+      '<span class="wf-fake">Member ▾</span><span class="wf-fake">Kind ▾</span><span class="wf-fake">Tag ▾</span>' +
+      '<span class="wf-spacer"></span><span class="wf-fake">⌕ Search</span></div>' +
+    '<div class="wf-shell" style="background:var(--wf-panel)">' +
+      '<aside class="wf-wr">' + railHtml() + '</aside>' +
+      '<div class="wf-main"><div class="wf-cal">' + c.grid + '</div>' +
+      '<div class="wf-fsec" style="background:var(--wf-fill)"><div class="wf-row" ' +
+      'style="font-size:12px;color:var(--wf-ink2)">' +
+      '<span class="wf-tone t-info"><i class="wf-dot"></i>chip tone = stage</span>' +
+      '<span class="wf-tone">◆ milestone · ◈ target · ● task</span>' +
+      '<span class="wf-tone">▸ starts · ▪ due</span>' +
+      '<span class="wf-tone t-warn"><i class="wf-dot"></i>⚠ delay</span>' +
+      '<span class="wf-tone t-bad"><i class="wf-dot"></i>⛔ waiting</span>' +
+      '<span>click a chip → the drawer</span></div></div></div></div>';
+}
+
+function appBoard(){
+  var b = boardHtml(APP.axis);
+  return '<div class="wf-toolbar" style="background:var(--wf-panel);border-bottom:1px solid var(--wf-line)">' +
+      '<span class="wf-fake">⌕ Search</span><span class="wf-fake">Member ▾</span>' +
+      '<span class="wf-fake">Kind ▾</span><span class="wf-fake">Stage ▾</span>' +
+      '<span class="wf-fake">Priority ▾</span><span class="wf-fake">Tag ▾</span>' +
+      '<span class="wf-spacer"></span>' + wrCreate(false) + '</div>' +
+    '<div class="wf-toolbar" style="background:var(--wf-fill)">' +
+      '<label style="font-size:12.5px;color:var(--wf-ink2)">Group by</label>' +
+      '<select class="wf-sel" id="pAxis">' + Object.keys(AXES).map(function(k){
+        return '<option value="' + k + '"' + (k === APP.axis ? ' selected' : '') + '>' +
+               AXES[k].label + '</option>'; }).join('') + '</select>' +
+      '<span class="wf-spacer"></span>' +
+      '<span class="wf-sub" style="font-size:12px;color:var(--wf-ink3)">' + b.note + '</span></div>' +
+    '<div class="wf-strip">' + b.strip + '</div>' +
+    '<div class="wf-cols">' + b.cols + '</div>';
+}
+
+function appList(){
+  var rows = ITEMS.map(function(it){
+    var st = STATUS[stageOf(it)];
+    return '<tr data-item="' + it.id + '" style="cursor:pointer">' +
+      '<td>' + (it.kind === 'task' ? '●' : it.kind === 'target' ? '◈' : '◆') + ' ' + esc(it.title) +
+        (blockerOf(it) ? ' <span class="wf-tone t-bad">⛔</span>' : '') + '</td>' +
+      '<td>' + KIND[it.kind].l + '</td>' +
+      '<td>' + esc(MEMBERS[it.who].n) + '</td>' +
+      '<td><span class="wf-tone' + (st.t ? ' t-' + st.t : '') + '"><i class="wf-dot"></i>' + st.l + '</span></td>' +
+      '<td>' + esc(PRI[it.pri].l) + '</td>' +
+      '<td>' + (it.due ? fmtDay(it.due) : '—') + '</td>' +
+      '<td>' + it.tags.map(function(t){
+        return '<span class="wf-tag k-' + TAGS[t].t + '">' + esc(TAGS[t].l) + '</span>'; }).join(' ') + '</td></tr>';
+  }).join('');
+  return '<div style="padding:13px"><div class="wf-frame"><div class="wf-fbar">' +
+    '<strong>All work</strong><span class="wf-chip is-live">live face</span>' +
+    '<span class="wf-spacer"></span>' + wrCreate(false) + '</div>' +
+    '<table class="wf-tbl"><thead><tr><th>Item</th><th>Kind</th><th>Assignee</th>' +
+    '<th>Stage</th><th>Priority</th><th>Due</th><th>Tags</th></tr></thead><tbody>' +
+    rows + '</tbody></table></div></div>';
+}
+
+function appTimeline(){
+  var t = tlHtml();
+  return '<div class="wf-toolbar" style="background:var(--wf-panel);border-bottom:1px solid var(--wf-line)">' +
+      '<button class="wf-btn is-quiet" data-tl="prev">‹</button><strong>' + esc(t.title) + '</strong>' +
+      '<button class="wf-btn is-quiet" data-tl="next">›</button>' +
+      '<span class="wf-seg">' + [2,4,13].map(function(w){
+        return '<button data-tl="' + w + '"' + (tlWeeks === w ? ' class="is-on"' : '') + '>' +
+               (w === 13 ? 'Quarter' : w + 'w') + '</button>'; }).join('') + '</span>' +
+      '<span class="wf-fake">Group: Milestone ▾</span>' +
+      '<span class="wf-spacer"></span>' + wrCreate(false) + '</div>' +
+    '<div style="background:var(--wf-panel)">' + t.grid + '</div>' +
+    '<div class="wf-fsec" style="background:var(--wf-fill)"><div class="wf-inline">' +
+    '<span class="wf-i">⚠</span><div>' + t.undated + '</div></div></div>';
+}
+
+function appReports(){
+  return '<div style="padding:13px"><div class="wf-frame">' +
+    '<div class="wf-fbar"><strong>Today</strong><span class="wf-spacer"></span>' +
+    '<span class="wf-sm">' + fmtDay(TODAY) + ' · scope: my reports, one level</span></div>' +
+    '<div class="wf-fsec"><div class="wf-row">' +
+      '<span class="wf-tone t-ok"><i class="wf-dot"></i>in 6</span>' +
+      '<span class="wf-tone t-warn"><i class="wf-dot"></i>late 1</span>' +
+      '<span class="wf-tone"><i class="wf-dot"></i>on leave 1</span>' +
+      '<span class="wf-tone t-warn">2 unclosed ⚠</span>' +
+      '<span class="wf-sm">Plans in 5/7 · EOD in 0/7 — the day is not over</span></div></div>' +
+    '<div class="wf-fsec" style="background:var(--wf-fill)"><h4>Waiting on you</h4>' +
+    '<div class="wf-row"><span class="wf-tone t-warn">2</span>leave requests' +
+    '<span class="wf-tone t-warn">2</span>EOD reports unacknowledged' +
+    '<span class="wf-tone t-bad">1</span>agreement sent 8 days ago, never opened ⚠</div></div>' +
+    '<div class="wf-fsec"><div class="wf-row" style="align-items:flex-start;gap:18px">' +
+      '<div style="flex:1;min-width:216px">' + pbTasks(RAIL_WHO, true, false) + '</div>' +
+      '<div style="flex:1;min-width:216px">' + pbMarks('milestone', RAIL_WHO, 'Milestones', 'None open.') + '</div>' +
+      '<div style="flex:1;min-width:216px">' + pbMarks('target', RAIL_WHO, 'Targets', 'None open.') + '</div>' +
+    '</div></div></div></div>';
+}
+
+function appMe(){
+  var m = MEMBERS[RAIL_WHO];
+  var h = '<div style="padding:13px"><div class="wf-frame"><div class="wf-fbar">' +
+    '<span class="wf-av">' + m.s + '</span><strong>' + esc(m.n) + '</strong>' +
+    '<span class="wf-sm">' + esc(m.d) + ' · ' + esc(m.dept) + '</span>' +
+    '<span class="wf-spacer"></span><span class="wf-chip is-new">§3.13 — this route does not exist yet</span></div>';
+  if (APP.tab === 'work'){
+    h += '<div class="wf-fsec"><div class="wf-row" style="align-items:flex-start;gap:18px">' +
+      '<div style="flex:1;min-width:216px">' + pbTasks(RAIL_WHO, false, false) + '</div>' +
+      '<div style="flex:1;min-width:216px">' + pbMarks('milestone', RAIL_WHO, 'Milestones', 'None assigned.') + '</div>' +
+      '<div style="flex:1;min-width:216px">' + pbMarks('target', RAIL_WHO, 'Targets', 'None assigned.') + '</div>' +
+      '</div></div>';
+  } else {
+    h += '<div class="wf-fsec"><div class="wf-inline"><span class="wf-i">ⓘ</span><div>' +
+      '<b>The ' + esc(APP.tab) + ' tab is drawn in full on §3.13</b>, where the same component is shown ' +
+      'three times over — as the member, as their senior and as an admin — because who is looking is the ' +
+      'whole design question and one screenshot cannot hold three answers. ' +
+      '<button class="wf-btn is-quiet" data-goto="13">Open §3.13 ▸</button></div></div></div>';
+  }
+  return h + '</div></div>';
+}
+
+function appTeam(){
+  var rows = Object.keys(MEMBERS).map(function(id){
+    var x = MEMBERS[id], open = ITEMS.filter(function(i){
+      return i.who === id && !isTerminal(i.status); }).length;
+    return '<div class="wf-li"><span class="wf-av">' + x.s + '</span>' +
+      '<div><b>' + esc(x.n) + '</b><div class="wf-sm">' + esc(x.d) + ' · ' + esc(x.dept) +
+      (x.to ? ' · reports to ' + esc(MEMBERS[x.to].n) : '') + '</div></div>' +
+      '<span class="wf-spacer"></span><span class="wf-tone">' + open + ' open</span>' +
+      '<span class="wf-tone t-ok"><i class="wf-dot"></i>active</span></div>';
+  }).join('');
+  return '<div style="padding:13px"><div class="wf-frame"><div class="wf-fbar"><strong>Members</strong>' +
+    '<span class="wf-chip is-live">live today</span><span class="wf-spacer"></span>' +
+    '<span class="wf-fake">Role ▾</span><span class="wf-fake">Status ▾</span></div>' +
+    '<div class="wf-list" style="border:0;border-radius:0">' + rows + '</div>' +
+    '<div class="wf-fsec" style="background:var(--wf-fill)"><div class="wf-inline">' +
+    '<span class="wf-i">ⓘ</span><div>A member opens as a <b>drawer</b> here today. §3.13 turns that ' +
+    'drawer into a launcher and moves every informational block to <code>/team/:id</code> — ' +
+    '<span class="wf-id">TM-OD-32</span>.</div></div></div></div></div>';
+}
+
+function appStub(k){
+  var extra = k === 'attendance'
+    ? '<b>This operation does add to Attendance</b> — a leave request block and a leave inbox — and ' +
+      'both are drawn in full on §3.7 and §3.8. <button class="wf-btn is-quiet" data-goto="7">Open §3.7 ▸</button> ' +
+      'What it does not do is redesign the clock strip, which is why there is nothing to click here.'
+    : k === 'roles'
+    ? 'Roles ships today and <span class="wf-id">TM-AD-13</span> adds nothing to it: a captain is ' +
+      '<code>reportsTo</code>, not a role, and a second hierarchy for the word would give the module ' +
+      'two answers to "who is this person\'s senior".'
+    : 'Nothing in this operation touches this module, so the prototype says so rather than drawing a ' +
+      'screen that does not exist.';
+  return '<div class="wf-appempty"><div class="wf-frame"><div class="wf-fbar">' +
+    '<strong>' + esc(NAVLABEL[k] || k) + '</strong><span class="wf-spacer"></span>' +
+    '<span class="wf-chip">' + (k === 'attendance' ? 'extended by §3.7 · §3.8' : 'outside this operation') +
+    '</span></div>' +
+    '<div class="wf-fsec"><div class="wf-inline"><span class="wf-i">ⓘ</span><div>' + extra + '</div></div>' +
+    '<div class="wf-sm" style="margin-top:9px">It is in the sidebar because <b>the sidebar is the real ' +
+    'one</b> — group order and row order come from <code>admin/shell/modules.ts</code>, and a nav that ' +
+    'quietly dropped six modules would not be a fair test of where this one sits.</div>' +
+    '</div></div></div>';
+}
+
+function appView(){
+  if (APP.route === 'work')
+    return APP.face === 'calendar' ? appCal()
+         : APP.face === 'board'    ? appBoard()
+         : APP.face === 'list'     ? appList()
+         : appTimeline();
+  if (APP.route === 'reports') return appReports();
+  if (APP.route === 'me')      return appMe();
+  if (APP.route === 'team')    return appTeam();
+  return appStub(APP.route);
+}
+
+/* the drawer — one record, over whatever face is open (§3.5) */
+function drawerHtml(it){
+  var st = STATUS[stageOf(it)], b = blockerOf(it), par = it.parent ? byId(it.parent) : null;
+  var kids = ITEMS.filter(function(k){ return k.parent === it.id; });
+  var p = it.kind === 'task' ? null : progressOf(it), tp = timePct(it);
+  var kv = function(k, v){ return '<dt>' + k + '</dt><dd>' + v + '</dd>'; };
+
+  var h = '<div class="wf-fbar"><strong>' +
+    (it.kind === 'task' ? '●' : it.kind === 'target' ? '◈' : '◆') + ' ' + esc(it.title) + '</strong>' +
+    '<span class="wf-spacer"></span>' +
+    '<span class="wf-tone' + (st.t ? ' t-' + st.t : '') + '"><i class="wf-dot"></i>' + st.l + '</span>' +
+    '<button class="wf-btn is-quiet" data-appclose="1">✕</button></div>';
+
+  h += '<div class="wf-fsec"><dl class="wf-kv">' +
+    kv('Kind', KIND[it.kind].l) +
+    kv('Assigned to', '<span class="wf-av">' + MEMBERS[it.who].s + '</span> ' + esc(MEMBERS[it.who].n)) +
+    kv('Stage', st.l + (stageOf(it) === 'delayed'
+        ? ' <span class="wf-chip">derived · ' + daysOver(it) + 'd past ' + fmtDay(it.due) +
+          ' · stored stage is ' + STATUS[it.status].l + '</span>' : '')) +
+    kv('Priority', PRI[it.pri].l) +
+    kv('Tags', it.tags.length ? it.tags.map(function(t){
+        return '<span class="wf-tag k-' + TAGS[t].t + '">' + esc(TAGS[t].l) + '</span>'; }).join(' ') +
+        ' <button class="wf-btn is-quiet">+ add</button>'
+      : '<span class="wf-sm">none</span> <button class="wf-btn is-quiet">+ add</button>') +
+    kv('Rolls up to', par ? '◆ ' + esc(par.title) + ' <button class="wf-btn is-quiet" data-item="' +
+        par.id + '">open ▸</button>' : '<span class="wf-sm">nothing — it is top level</span>') +
+    kv('Starts', it.start ? fmtDay(it.start) + ' 2026'
+      : '<span class="wf-tone t-warn">not set — it cannot be drawn on the timeline</span>') +
+    kv('Due', it.due ? fmtDay(it.due) + ' 2026' +
+        (isDelayed(it) ? ' <span class="wf-tone t-warn">⚠ ' + daysOver(it) + 'd over</span>' : '') : '—') +
+    (b ? kv('Waiting on', '<span class="wf-tone t-bad">⛔</span> ' + esc(b.item.title) +
+        ' <button class="wf-btn is-quiet" data-item="' + b.item.id + '">open ▸</button>' +
+        '<div class="wf-sm">' + esc(b.why) + '</div>') : '') +
+    (p ? kv('Progress', '<div class="wf-pr-m"><span class="wf-prw"><span class="wf-prog is-thin">' +
+        '<i style="width:' + p.pct + '%"></i></span>' +
+        (tp === null ? '' : '<i class="wf-tick' + (tp > p.pct + 5 ? ' is-late' : '') + '" style="left:' + tp + '%"></i>') +
+        '</span><b>' + p.pct + '%</b></div><div class="wf-sm">' + esc(p.note) +
+        (tp === null ? '' : ' · ' + tp + '% of the window gone') + ' — derived, never typed</div>') : '') +
+    '</dl></div>';
+
+  if (kids.length)
+    h += '<div class="wf-fsec"><h4>Under it <span class="wf-chip">' + kids.length + '</span></h4>' +
+      '<div class="wf-list">' + kids.map(function(k){
+        var ks = STATUS[stageOf(k)];
+        return '<div class="wf-li" data-item="' + k.id + '" style="cursor:pointer">' +
+          '<span>' + (k.kind === 'task' ? '●' : '◆') + '</span><b>' + esc(k.title) + '</b>' +
+          '<span class="wf-spacer"></span><span class="wf-tone' + (ks.t ? ' t-' + ks.t : '') + '">' +
+          ks.l + '</span></div>'; }).join('') + '</div></div>';
+
+  var lk = LINKS.filter(function(l){ return l.from === it.id || l.to === it.id; });
+  h += '<div class="wf-fsec"><h4>Links <span class="wf-chip is-new">new</span></h4>' +
+    (lk.length ? '<div class="wf-list">' + lk.map(function(l){
+        var other = byId(l.from === it.id ? l.to : l.from);
+        return '<div class="wf-li" data-item="' + other.id + '" style="cursor:pointer">' +
+          '<span class="wf-tone">⇢ ' + (l.from === it.id ? 'follows' : 'is followed by') + '</span>' +
+          esc(other.title) + '<span class="wf-spacer"></span><span class="wf-sm">open ▸</span></div>';
+      }).join('') + '</div>' : '<div class="wf-sm">No links.</div>') +
+    '<button class="wf-btn" style="margin-top:9px">+ link an item</button>' +
+    '<div class="wf-sm" style="margin-top:7px">A link never touches rollup — ' +
+    '<span class="wf-id">TM-AD-16</span>. <code>parentId</code> and <code>blockedByItemId</code> are ' +
+    'not creatable here.</div></div>';
+
+  h += '<div class="wf-fsec"><h4>Activity</h4><div class="wf-sm">created ' +
+    (it.start ? fmtDay(it.start) : '25 Aug') + ' · assigned to ' + esc(MEMBERS[it.who].n) +
+    (it.tags.length ? ' · tagged ' + esc(TAGS[it.tags[0]].l) : '') + ' · stage × 3</div></div>';
+
+  h += '<div class="wf-fsec wf-row" style="background:var(--wf-fill);position:sticky;bottom:0">' +
+    '<button class="wf-btn">Start</button><button class="wf-btn">Complete</button>' +
+    '<button class="wf-btn">Waiting on…</button><span class="wf-spacer"></span>' +
+    '<button class="wf-btn">Edit</button><button class="wf-btn is-quiet">Cancel…</button></div>';
+
+  h += '<div class="wf-fsec" style="background:var(--wf-fill)"><div class="wf-sm">' +
+    'The drawer composes over whichever face is open, which is why neither the calendar nor the ' +
+    'timeline needs a detail view of its own — §3.5. Route: <code>' + esc(appUrl()) + '</code></div></div>';
+  return h;
+}
+
+function renderApp(){
+  var side = document.getElementById('wfSide');
+  if (!side) return;
+  side.innerHTML = appSide();
+  document.getElementById('wfAppbar').innerHTML = appBar();
+  document.getElementById('wfView').innerHTML = appView();
+  var it = APP.item ? byId(APP.item) : null;
+  document.getElementById('wfScrim').hidden = !it;
+  var dr = document.getElementById('wfDrawer');
+  dr.hidden = !it;
+  if (it) dr.innerHTML = drawerHtml(it);
+}
+
+/* Clicks inside §P never leave §P: the builders emit data-goto="5" for the
+   spec screens, and in here that has to mean "open the drawer" instead. */
+document.addEventListener('click', function(e){
+  if (!e.target.closest || !e.target.closest('#wfApp')) return;
+  var t = e.target, el, done = true;
+  if ((el = t.closest('.wf-create'))){
+    var mn = el.parentNode.querySelector('.wf-menu');
+    mn.hidden = !mn.hidden;
+    e.stopPropagation(); return;
+  }
+  else if (t.closest('#wfScrim') || t.closest('[data-appclose]')) APP.item = null;
+  else if ((el = t.closest('[data-item]'))) APP.item = el.getAttribute('data-item');
+  else if ((el = t.closest('[data-nav]'))){ APP.route = el.getAttribute('data-nav'); APP.item = null; }
+  else if ((el = t.closest('[data-face]'))) APP.face = el.getAttribute('data-face');
+  else if ((el = t.closest('[data-tab]'))) APP.tab = el.getAttribute('data-tab');
+  else if ((el = t.closest('[data-mini]'))){
+    calAnchor = new Date(el.getAttribute('data-mini').slice(0, 8) + '01T00:00:00');
+    calMode = 'month'; APP.face = 'calendar';
+  }
+  else if ((el = t.closest('[data-cal]'))){
+    var c = el.getAttribute('data-cal'), tt = new Date(TODAY + 'T00:00:00');
+    if (c === 'today') calAnchor = new Date(tt.getFullYear(), tt.getMonth(), 1);
+    if (c === 'prev')  calAnchor = new Date(calAnchor.getFullYear(), calAnchor.getMonth() - 1, 1);
+    if (c === 'next')  calAnchor = new Date(calAnchor.getFullYear(), calAnchor.getMonth() + 1, 1);
+    if (c === 'month' || c === 'week') calMode = c;
+  }
+  else if ((el = t.closest('[data-tl]'))){
+    var v = el.getAttribute('data-tl');
+    if (v === 'prev') tlStart = addDays(tlStart, -7 * tlWeeks);
+    else if (v === 'next') tlStart = addDays(tlStart, 7 * tlWeeks);
+    else tlWeeks = +v;
+  }
+  else if ((el = t.closest('[data-goto]'))){
+    var g = el.getAttribute('data-goto');
+    if (g === '13'){ APP.route = 'me'; APP.tab = 'work'; APP.item = null; }
+    else if (g === '2'){ APP.route = 'work'; APP.face = 'board'; }
+    else if (g === '3'){ APP.route = 'work'; APP.face = 'calendar'; }
+    else if (g === '4'){ APP.route = 'work'; APP.face = 'timeline'; }
+    else if (g === '5') done = false;      /* a card: the drawer already handled it */
+    else { e.stopPropagation(); e.preventDefault(); show(+g); return; }  /* out to the spec */
+  }
+  else done = false;
+  e.stopPropagation();
+  if (done){ e.preventDefault(); renderApp(); }
+}, true);
+
+document.addEventListener('change', function(e){
+  if (!e.target.closest || !e.target.closest('#wfApp')) return;
+  if (e.target.id === 'pAxis') APP.axis = e.target.value;
+  if (e.target.id === 'pWho'){
+    RAIL_WHO = e.target.value;
+    var sel = document.getElementById('wfRailWho');
+    if (sel) sel.value = RAIL_WHO;
+    renderWorkRail();
+  }
+  renderApp();
+}, true);
+
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Escape' && APP.item){ APP.item = null; renderApp(); }
+});
+
 /* ---- boot ----------------------------------------------------------------- */
 renderBoard();
 renderCal();          /* renders the rail too — the mini month follows the month in view */
 renderTl();
 renderCap();
 renderMe();
+renderApp();
 var m = /^#s(\d+)$/.exec(location.hash);
 show(m ? +m[1] : 0);
 </script>
