@@ -1,8 +1,9 @@
 # Operation · Team Workspace v2 — wireframe and architecture
 
 ```
-task:        Extend the Team module into a full workspace: a calendar and a
-             captain timeline over the work items, member-owned tags, links
+task:        Extend the Team module into a full workspace: a calendar — the
+             face the module lands on — and a milestone timeline over the
+             work items, member-owned tags, links
              between items, leave requests, virtually-signed agreements
              (offer letter and NDA), a member resource locker, and pay —
              salary and incentives — surfaced on the member's own dashboard.
@@ -24,7 +25,11 @@ operation:   The shipped module was measured first — store types, content
              is named and resolved rather than absorbed.
 
 summary:     Calendar and Timeline become the fourth and fifth FACE of
-             `/work`, not new modules. "Captain" is not a new role — it is
+             `/work`, not new modules. The sidebar row is RENAMED Calendar
+             and `/work` with no `face` resolves to the calendar; the route,
+             the entity and the grant do not move (TM-AD-23). The timeline's
+             lanes are MILESTONES, never members (TM-AD-24).
+             "Captain" is not a new role — it is
              `reportsTo`, which has been on the member record since day one.
              Tags are RECORDS owned by a member, never vocabulary. Links are
              an edge list forbidden from touching progress rollup. Offer
@@ -35,7 +40,7 @@ summary:     Calendar and Timeline become the fourth and fifth FACE of
              Leave suppresses a derived absence and never writes an
              attendance row.
 
-outcome:     Thirteen wireframes, eleven architecture decisions (TM-AD-12…22),
+outcome:     Thirteen wireframes, thirteen architecture decisions (TM-AD-12…24),
              a data-model delta of two new entities and four extended ones, a
              permission delta, a regression list, nine implementation phases,
              thirteen open decisions (TM-OD-20…32) and five risks (TM-R-10…14).
@@ -47,6 +52,17 @@ outcome:     Thirteen wireframes, eleven architecture decisions (TM-AD-12…22),
              names does not exist — a member opens as a DRAWER today. §3.13
              is the container for §3.6, §3.10 and §3.11, so it precedes all
              three.
+
+             AMENDED 2026-09-04 by TM-AD-23 and TM-AD-24, on the founder's
+             direction. (1) The Team sidebar row reads CALENDAR and `/work`
+             opens on the calendar face — label and default only; the route,
+             entity and grant are untouched, so §3.2's board keeps its URL.
+             (2) The timeline's lanes become TARGET ▸ MILESTONE with their
+             tasks inside, not one lane per member: the face measures whether
+             a dated commitment will land, and member load stays on the
+             board's Assignee axis and §3.13. Progress fill and leave bands
+             leave with the member lanes. Phase C moves to first — the row
+             cannot promise a calendar before C ships.
 ```
 
 **Module:** Team · **Date:** 2026-09-03 · **Status:** awaiting approval
@@ -107,10 +123,10 @@ Each note from the brief, against what is already there.
 | 1 | *"manage my JD team too"* | the roster, scoped by `reportsTo` | **Unclear — TM-OD-20.** Is "JD" a second company, a department, or a job-description field on the member? The answer changes the roster's shape. Blocking. |
 | 2 | *Salaries · Incentives · who earns what* | Finance owns `SalaryAccount` / `Payslip` / `SalaryRun` (Module 6) | A **Pay tab** on the member dashboard that READS them, plus **Incentive** — which exists nowhere |
 | 3 | *Agreement — virtually signed — offer letter, NDA* | nothing. Spec'd in the v1 doc §3.11, **never built** | The whole of it: `Agreement`, signature capture, public token page |
-| 4 | *Task dashboard like Google Calendar, weeks* | Board and List faces | **Calendar face** — month and week |
+| 4 | *Task dashboard like Google Calendar, weeks* | Board and List faces | **Calendar face** — month and week, and the face `/work` opens on (TM-AD-23) |
 | 5 | *Add Tasks, milestones, Targets = Column · Column Tag on Column* | one `WorkItem` with `kind`; board columns hard-wired to status | A **selectable column axis** — status, kind, assignee, priority, or tag |
 | 6 | *title, start date, end date, description, link to others, priority, status, tags — Meeting, Call — every member creates their own tag* | title, description, `startDate`, `dueDate`, `priority`, `status`, `parentId`, `blockedByItemId` | **Tags** (member-owned) and **links** (generic, typed) |
-| 7 | *Captain Timeline Layout · Calendar view · so they measure progress* | `/reports` performance view | **Timeline face** — one lane per member, dated bars |
+| 7 | *Captain Timeline Layout · Calendar view · so they measure progress* | `/reports` performance view | **Timeline face** — one lane per **target and milestone**, its tasks as dated bars (TM-AD-24) |
 | 8 | *Resource → documents provided by member* | nothing | **Resource** — a member's own uploaded documents |
 | 9 | *Attendance: login, logout, break, leave request, EOD review* | open · break · resume · close, and EOD review with acknowledgement | **Leave request** only. TM-OD-13 put leave out of v1; this brief puts it back in. |
 
@@ -132,7 +148,7 @@ three sidebar rows, triple the permission surface, and give the user three place
 ```
 /work?face=board      shipped
 /work?face=list       shipped
-/work?face=calendar   new — §3.3
+/work?face=calendar   new — §3.3, and where bare /work resolves (TM-AD-23)
 /work?face=timeline   new — §3.4
 /work?item=W-K04      shipped — a drawer over whichever face is open
 ```
@@ -147,9 +163,12 @@ The brief says *Captain Timeline*. The module already has exactly one hierarchy 
 recursive default is a permission that silently widens every time somebody is hired.
 
 A "captain" is therefore **a member whom at least one other member reports to**. It is
-derived, not stored, and needs no new field, no new role and no new grant. The timeline
-face renders one lane per member in the viewer's `team` scope, which is the scope axis
+derived, not stored, and needs no new field, no new role and no new grant. It is what
+scopes the roster, the leave inbox and the roll-up on `/reports` — the `team` scope axis
 the vocabulary file already defines.
+
+*Amended by TM-AD-24:* the timeline face no longer draws a lane per member, so `reportsTo`
+scopes **which items** that face shows and no longer shapes its rows.
 
 > Building a second hierarchy for the word *captain* would give the module two answers
 > to "who is this person's senior", and they would drift within a month.
@@ -170,8 +189,8 @@ Three consequences, each the reason for the next:
 
 - **Two members may both have "Client call".** They are different rows. Neither can
   rename or delete the other's.
-- **Cross-member views group by `slug`, not `tagId`.** So a captain's timeline shows one
-  *Client call* lane covering both members' items — otherwise a team view fragments into
+- **Cross-member views group by `slug`, not `tagId`.** So a team board grouped by tag
+  shows one *Client call* column covering both members' items — otherwise a team view fragments into
   one column per person per tag and is useless at five people.
 - **A rename never rewrites anyone else's history.** The owner's label changes, the slug
   is stable, other members' rows are untouched.
@@ -382,6 +401,73 @@ Three rules the screen carries, each of which is the reason for the next:
 
 ---
 
+### TM-AD-23 · The row is renamed *Calendar*, and `/work` lands on the calendar face
+
+The brief's headline ask is a task dashboard *like Google Calendar*. The label should say
+what the person opens it for, and what they open it for is a dated view of the week.
+
+**The label and the default are the whole change.**
+
+```
+sidebar   Work  →  Calendar          label only
+route     /work                      unchanged
+entity    WorkItem                   unchanged
+grant     team.work.*                unchanged
+/work     → ?face=calendar           was ?face=board
+?face=board                          still exactly the board that ships today
+```
+
+Every existing link, bookmark and `?item=` drawer URL keeps working, because none of them
+were ever bare `/work`. Renaming the route to `/calendar` was considered and rejected: it
+buys a tidier address bar in exchange for a redirect to maintain forever, and it would
+make the module's key disagree with its table, its grant and its content file.
+
+Two consequences that have to be paid rather than discovered:
+
+- **The empty month.** The board opens with 22 cards whatever the week; a month with
+  nothing dated in it opens blank, and a blank landing screen reads as a broken panel. The
+  empty state therefore states what exists and offers the board — *22 items · 6 with no
+  date ▸ open the board*. It is also the cheapest nudge towards dating work the module
+  will get.
+- **The face is remembered per member.** `?face=` stays the source of truth, the last face
+  is remembered locally, and the default decides the first visit only. Someone who works
+  the board all day is not sent back to a month grid every morning.
+
+**Phase C therefore moves to first (§7).** Renaming the row before the calendar exists
+would put a board behind a label that promises a month grid.
+
+### TM-AD-24 · The timeline's lanes are milestones, not members
+
+The brief asks for a timeline *"so they measure progress"*, and the first draft of §3.4
+read that as one lane per member. That is a productivity chart whatever it is called, and
+the module cannot honestly draw one: there is no estimate field, so a bar's length is a
+date range and not an amount of work, and **TM-OD-11** forbids reducing a person to a
+score in the first place. Four bars on one row and two on another says nothing except that
+one person's work happens to carry dates.
+
+The lanes are therefore the containment tree `work.json` already stores:
+
+```
+target      ▸ its own committed window, its direct tasks
+  milestone ▸ its own committed window, its tasks          indented under the target
+milestone   ▸ parentless milestones follow, at the top level
+No milestone ▸ tasks that hang off nothing — never hidden
+```
+
+Every bar in a lane is then evidence for or against **one dated commitment somebody made**,
+which is what "measure progress" has to mean in a module whose only progress rule is
+`completed children ÷ total children`.
+
+- **The axis needs no new field and no new query** — it is `kind` and `parentId`, both on
+  the model since v1.
+- **Member load keeps two honest homes**: *Group by → Assignee* on the board (TM-AD-15),
+  and the member dashboard (§3.13). The assignee still rides on every bar as initials,
+  because *"who is this waiting on"* is a fair question to ask of a task.
+- **Progress fill and leave bands leave with the member lanes.** A fill needs a per-task
+  percentage nobody types. An approved leave band means something real on a person's row
+  and nothing at all on a milestone's — leave stays on the calendar and on §3.7. A lane
+  states instead what is countable and already stored: *n of m tasks done*, and its dates.
+
 ## 3. The wireframes
 
 Notation: `[ ]` a control · `▾` a menu · `◍` a member · `◆` a milestone or target ·
@@ -397,16 +483,17 @@ Team
   ├─ Members        /team          live
   ├─ Roles          /roles         live
   ├─ Attendance     /attendance    + leave request, + leave inbox      NEW blocks
-  ├─ Work           /work          + calendar face, + timeline face    NEW faces
+  ├─ Calendar       /work          renamed · + calendar face (default),
+  │                                 + timeline face                    NEW faces
   └─ Reports        /reports       unchanged
         /team/me    the member dashboard — + pay, agreements, resources tabs
 ```
 
-### 3.2 Work — the selectable column axis (extends the shipped board)
+### 3.2 Board — the selectable column axis (extends the shipped board)
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────┐
-│ [ ▤ Board ] [ ☰ List ] [ ▦ Calendar ]NEW [ ⊞ Timeline ]NEW                        │
+│ [ ▦ Calendar ]NEW·DEFAULT [ ▤ Board ] [ ☰ List ] [ ⊞ Timeline ]NEW                │
 ├──────────────────────────────────────────────────────────────────────────────────┤
 │ ⌕ Search  [Member ▾][Kind ▾][Status ▾][Priority ▾][Tag ▾]NEW   [+ New item]       │
 │ Group by: [ Tag ▾ ]NEW    Status · Kind · Assignee · Priority · Tag               │
@@ -429,7 +516,7 @@ Team
 drops the ungrouped rows is a board that lies about its own count — the strip at the top
 says 34 and the columns must still add to 34.
 
-### 3.3 Calendar — `/work?face=calendar` NEW
+### 3.3 Calendar — `/work?face=calendar` NEW · the default face (TM-AD-23)
 
 Builds on the v1 §3.7 sketch. Google Calendar is UX inspiration only: taken — the month
 grid, the coloured chip, click-a-day-to-create, keyboard paging. Not taken — overlapping
@@ -466,29 +553,42 @@ plan for the least return.
 **Drag and drop stays out** (TM-OD-08, reaffirmed). Reschedule is a date field in the
 drawer.
 
-### 3.4 Captain timeline — `/work?face=timeline` NEW
+### 3.4 Milestone timeline — `/work?face=timeline` NEW
 
-The brief's *"so they measure progress"*. One lane per member in the viewer's scope,
-bars from `startDate` to `dueDate`.
+The brief's *"so they measure progress"*, read as **whose commitment is this** rather than
+**who is busy** — see TM-AD-24. One lane per target and per milestone, its own committed
+window drawn dashed and its tasks drawn solid from `startDate` to `dueDate`. Nested
+milestones sit indented under their target. The last lane is *No milestone* and is never
+hidden.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────┐
-│ ‹ Aug 24 – Sep 20 ›  [2w][4w][Quarter]  [Group: Member ▾]NEW      Meera's team    │
+│ ‹ Aug 24 – Sep 6 ›  [2w][4w][Quarter]  [Group: Milestone ▾]NEW    targets · tasks│
 ├──────────────┬───────────────────────────────────────────────────────────────────┤
-│              │ 24  25  26  27  28  29  30  31 │ 1   2   3   4   5   6   7        │
-│              │                          ┊TODAY                                    │
+│              │ 24  25  26  27  28  29  30  31 │ 1   2   3   4   5   6            │
+│              │                          ┊TODAY                                   │
 ├──────────────┼───────────────────────────────────────────────────────────────────┤
-│ ◍ Meera Nair │ ▓▓▓▓▓▓▓▓░░░░  Enquiry triage         ⚠ 2d over                    │
-│   4 open     │      ▓▓▓▓▓▓▓▓▓▓▓▓▓▓  ◆ Q3 response time      60%                  │
-│              │                    ▓▓▓▓▓  Vendor meeting                          │
+│ ◆ Close 40   │ ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌  ◆ 1 Jul – 30 Sep          │
+│   deals      │                                                                   │
+│   Target ·   │                                                                   │
+│   1 milestone│                                                                   │
 ├──────────────┼───────────────────────────────────────────────────────────────────┤
-│ ◍ Arjun Rao  │   ▓▓▓▓  Call 3 leads  ✓                                           │
-│   2 open     │              ▓▓▓▓▓▓▓▓╌╌╌╌▶ Follow up   ← ╌▶ = follows link        │
+│   ◆ Close    │ ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌  ◆ due 5 Sep                   │
+│     Sharma   │ ▓▓▓▓  RM · Revised quotation → Sharma    ⚠ 6d over                │
+│     Milestone│   ▓▓  RM · Site visit — Kalyani Nagar    ✓                        │
+│     2 of 4   │ ▓▓    RM · Sharma measurement sheet      ✓                        │
+│     due 5 Sep│                                                                   │
 ├──────────────┼───────────────────────────────────────────────────────────────────┤
-│ ◍ Sanjay K.  │         ▒▒▒▒▒▒▒▒▒▒  ON LEAVE (approved)                           │
-│   0 open     │                                                                    │
+│ ◆ Enquiry    │ ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌  ◆ due 30 Sep                │
+│   response   │     ▓▓  MN · Triage the August backlog   ⚠ 6d over                │
+│   Milestone  │                                                                   │
+│   0 of 4     │                                                                   │
+├──────────────┼───────────────────────────────────────────────────────────────────┤
+│ · No         │    ▓▓  DK · Weekly ops review deck      ✓                         │
+│   milestone  │        ▓▓▓▓▓  SR · August payout recon.  ⚠ 3d over                │
+│   3 tasks    │                                                                   │
 ├──────────────┴───────────────────────────────────────────────────────────────────┤
-│ bar fill = derived progress · ⚠ = delayed · ▒ = approved leave · click → drawer   │
+│ ◆╌╌ = the lane's committed window · ▓ = a task · ⚠ delayed · click → drawer      │
 └──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -500,11 +600,16 @@ rots:
 - **Not a resource planner.** No capacity bar, no allocation percentage. The module has
   no estimate field and inventing one to fill a chart is how estimates get born.
 - **Not a ranking.** TM-OD-11 stands: show the numbers, sort by any column, compute no
-  score.
+  score. The milestone axis keeps this one true by construction — there is no member row
+  left to rank.
 
-**An item with no `startDate` cannot be drawn** and is listed under the grid as *"6
-items with no dates — schedule them"*, which is the honest state rather than a bar
-starting at an invented date.
+**An item with no `startDate` cannot be drawn** and is listed under the grid as *"6 open
+items with no start date — schedule them"*, which is the honest state rather than a bar
+starting at an invented date. That count is the number this face exists to shrink.
+
+**A lane's sub-line is countable, never a percentage:** kind, child milestones where there
+are any, *n of m tasks done*, and its own due date. Progress fill and approved-leave bands
+were removed with the member lanes (TM-AD-24).
 
 ### 3.5 Item drawer v2 — tags, links, dates (extends the shipped drawer)
 
@@ -862,7 +967,7 @@ Ordered by dependency. Each leaves the panel working.
 | --- | --- | --- |
 | **A** | Vocabulary extension + `tags.json` + tag records, picker and manager (§3.5, §3.6) | TM-OD-20 answered |
 | **B** | Selectable column axis on the board (§3.2) | A — Tag is one of the axes |
-| **C** | Calendar face, month then week (§3.3) | — |
+| **C** | Calendar face, month then week (§3.3) — **first**, it is the face `/work` lands on | — |
 | **D** | Timeline face (§3.4) | C shares the date-grid mechanics |
 | **E** | Leave: request, inbox, and the one-clause derivation change (§3.7, §3.8, TM-AD-20) | — |
 | **F** | Links on the item drawer (§3.5) | D — `follows` draws on the timeline |
@@ -902,7 +1007,7 @@ private-object decision, not before it.
 | **TM-R-10** | The `absent` derivation is the module's central rule and Phase E edits it. A wrong clause makes leave days read as absences, or absences vanish. | **High** | One clause, one file, one phase, nothing parallel. Seed a member with leave and a member without, and assert both before and after. |
 | **TM-R-11** | Identity documents on a backend where **every S3 object is publicly readable by URL**. | **High** | Private objects + signed reads, decided before Phase H starts. Do not reuse the existing public `fileUrl` return. This is TM-R-04 with worse consequences. |
 | **TM-R-12** | The public signing page is an unauthenticated write on a legal record, and the project still has no throttle class. | **High** | Inherits TM-R-05 in full: hashed token, expiry, single-use, revocable, per-token and per-IP limits, `attemptCount`. |
-| **TM-R-13** | Timeline plus calendar is more net-new UI than the whole of v1's work face. | **Medium** | C before D, month before week, and both share one date-grid primitive. If D slips, C alone answers the brief's *"like Google Calendar"*. |
+| **TM-R-13** | Timeline plus calendar is more net-new UI than the whole of v1's work face. | **Medium** | C before D, month before week, and both share one date-grid primitive. If D slips, C alone answers the brief's *"like Google Calendar"* — and after TM-AD-23 C cannot slip at all, because the sidebar row is named after it. |
 | **TM-R-14** | Six tabs on the member dashboard, three of them added at once. | **Low–Medium** | **Mitigation taken up front — see TM-AD-22.** Agreements and Resources ship as two sections of one *Documents* tab, so only one tab is added, not three. Ship Pay last (Phase I). The next fold, if one is still needed, is Reports into Overview. |
 
 ---
@@ -926,9 +1031,10 @@ the v1 document's §3.11 and §3.12, so neither is a surprise.
    another module's territory.
 3. **A decision on private-object storage** before Phase G or H is scheduled (TM-R-11).
 
-**Suggested order if all three clear:** A → B (tags and the board, one week, visible
-immediately) → C (calendar, the brief's headline) → E (leave, small and self-contained) →
-D (timeline) → G (agreements, the largest) → H → I → F.
+**Suggested order if all three clear:** C (calendar, the brief's headline and now the
+module's landing face) → A → B (tags and the board, one week, visible immediately) →
+E (leave, small and self-contained) → D (timeline) → G (agreements, the largest) → H → I → F.
 
-Calendar is deliberately third rather than first: it is the most visible item in the
-brief, and it reads much better once tags exist to colour it.
+Calendar moved from third to first with TM-AD-23: the sidebar row cannot read *Calendar*
+before the calendar exists. It loses little by going early — it reads better once tags
+exist to colour it, and tags land immediately after in A.

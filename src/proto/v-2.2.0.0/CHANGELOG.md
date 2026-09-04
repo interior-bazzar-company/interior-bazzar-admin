@@ -4,6 +4,84 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ---
 
+## 2026-09-04
+
+### Calendar is the module's face, and the timeline measures milestones — TM-AD-23, TM-AD-24
+
+**Area:** sidebar → Team → **Calendar** (was Work) · `#/work` · `?face=calendar` · `?face=timeline`
+**Files:** `src/proto/v-2.2.0.0/wireframe-team-workspace-v2.html`,
+`src/proto/v-2.2.0.0/OPERATION-2026-09-03-team-workspace-v2.md`
+
+**What changed**
+
+Two directions from the founder, both taken in the wireframe and both written up
+as decisions rather than left as drawings.
+
+**The Team row now reads *Calendar*, and bare `/work` opens the calendar face**
+(`TM-AD-23`). The label and the default are the *whole* change: the route stays
+`/work`, the entity stays `WorkItem`, the grant stays `team.work.*`, and
+`?face=board` still opens exactly the board that ships today — so no existing
+link, bookmark or `?item=` drawer URL moves. Renaming the route to `/calendar`
+was considered and rejected: a redirect to maintain forever, and a module key
+that would then disagree with its table, grant and content file. Being the
+default costs one thing that is now designed rather than discovered — **the empty
+month**, which states what exists and offers the board (*22 items · 6 with no
+date ▸ open the board*) instead of landing on a blank grid. **Phase C moves to
+first** in §7: the row cannot promise a calendar before the calendar ships.
+
+**§3.4 is no longer a captain timeline — its lanes are targets and milestones**
+(`TM-AD-24`). One lane per `target`, its milestones indented beneath it, each
+lane drawing its own committed window dashed and its child tasks solid, with a
+*No milestone* lane that is never hidden. A lane per member was a productivity
+chart the module cannot honestly draw: no estimate field, so a bar's length is a
+date range and not an amount of work, and `TM-OD-11` forbids scoring a person
+anyway. The milestone axis keeps that rule true by construction — there is no
+member row left to rank. **Progress fill and approved-leave bands left with the
+member lanes**; a lane's sub-line is countable instead — *n of m tasks done* and
+its own due date. The assignee still rides on every bar as initials, and member
+load keeps its two homes: *Group by → Assignee* on the board, and §3.13.
+
+The axis needed no new field and no new query: it is `kind` and `parentId`, both
+on the model since v1. Over the seeded 22 items it renders seven lanes and lists
+six open items that have no `startDate` and therefore cannot be drawn — which is
+the number this face exists to shrink.
+
+**Temp data**
+`none` — no runtime code. The timeline is rebuilt over the same inline `ITEMS`
+array the board and calendar already use. `LEAVE` and the `CAPTAIN` constant are
+no longer read by it — `CAPTAIN` is gone, and `reportsTo` still scopes *which*
+items the face shows, it just no longer shapes the rows. `MEMBERS` is still read,
+for the initials on each task bar.
+
+**Backend needed**
+`none` yet, and nothing new was implied. `GET /api/v1/admin/team/work` already has
+to return `kind`, `parentId`, `startDate` and `dueDate`; the lane tree is grouped
+client-side from them. The face default is a client route concern.
+
+**Open decisions**
+`TM-AD-23` and `TM-AD-24` are new and both are shown on their screens. Neither is
+open — they are decisions taken on the founder's direction, recorded so the
+earlier drawing (one lane per member, board as the default face) is not read back
+as still current. `TM-OD-11` is unchanged and is now enforced structurally rather
+than by convention. `TM-OD-20` remains the only blocker on Phase A.
+
+**Verified**
+
+The wireframe was re-rendered headlessly (its `<script>` evaluated against a DOM
+stub) and the six lanes, their bars, sub-lines and the undated list were read back
+and checked against `work.json` by hand: `Close 40 deals` → 1 milestone, its own
+window only;
+`Close Sharma Interiors` → 2 of 4 tasks done, one 6d over, two complete;
+`Onboard 12 businesses in Pune` → 0 of 2, one blocked and 7d over;
+`No milestone` → 3 tasks. `node --check` passes on the extracted script.
+
+**Not opened in a browser.** Column widths, the dashed window bar against the
+solid task bars, the indent on nested milestone lanes and the dark-theme pass have
+been reasoned about and not seen. The ASCII wireframe in the operation doc was
+width-checked programmatically instead (every box line 84 columns).
+
+---
+
 ## 2026-09-03
 
 ### Member dashboard — §3.13, and the two contradictions drawing it exposed

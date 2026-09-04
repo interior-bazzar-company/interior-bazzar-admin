@@ -191,7 +191,9 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
 
 /* ---- timeline ------------------------------------------------------------- */
 .wf-tl-row{display:flex;border-top:1px solid var(--wf-line)}
-.wf-tl-lane{flex:0 0 172px;padding:9px 12px;border-right:1px solid var(--wf-line);background:var(--wf-fill)}
+.wf-tl-lane{flex:0 0 210px;padding:9px 12px;border-right:1px solid var(--wf-line);background:var(--wf-fill)}
+.wf-tl-lane.is-sub{padding-left:26px;background:var(--wf-panel)}
+.wf-tl-lane .wf-nm b{font-weight:600}
 .wf-tl-lane .wf-nm{font-size:13px;display:flex;align-items:center;gap:6px}
 .wf-tl-lane .wf-sm{font-size:11px;color:var(--wf-ink3);margin-top:2px}
 .wf-tl-grid{flex:1;position:relative;min-width:0;padding:8px 0}
@@ -202,12 +204,11 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
 .wf-tl-tick i{display:block;font-style:normal;font-size:9px;opacity:.7}
 .wf-bar{position:absolute;height:19px;border-radius:4px;border:1px solid var(--wf-line2);
   background:var(--wf-fill2);cursor:pointer;overflow:hidden;min-width:14px}
-.wf-bar-fill{position:absolute;left:0;top:0;bottom:0;background:var(--wf-line2)}
-.wf-bar.b-info{border-color:var(--wf-info)} .wf-bar.b-info .wf-bar-fill{background:#c6d7ef}
-.wf-bar.b-ok{border-color:var(--wf-ok)}     .wf-bar.b-ok .wf-bar-fill{background:#c8e0d4}
-.wf-bar.b-warn{border-color:var(--wf-warn)} .wf-bar.b-warn .wf-bar-fill{background:#ecdcbb}
-.wf-bar.b-bad{border-color:var(--wf-bad)}   .wf-bar.b-bad .wf-bar-fill{background:#f1cfcb}
-.wf-bar.b-leave{border-style:dashed;background:repeating-linear-gradient(135deg,#fff,#fff 4px,var(--wf-fill2) 4px,var(--wf-fill2) 8px)}
+.wf-bar.b-info{border-color:var(--wf-info);background:var(--wf-info-bg)}
+.wf-bar.b-ok{border-color:var(--wf-ok);background:var(--wf-ok-bg)}
+.wf-bar.b-warn{border-color:var(--wf-warn);background:var(--wf-warn-bg)}
+.wf-bar.b-bad{border-color:var(--wf-bad);background:var(--wf-bad-bg)}
+.wf-bar.b-win{background:transparent;border-style:dashed}
 .wf-bar-t{position:relative;font-size:10.5px;line-height:17px;padding:0 7px;white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis;color:var(--wf-ink)}
 .wf-now{position:absolute;top:0;bottom:0;border-left:2px dotted var(--wf-warn);z-index:3;pointer-events:none}
@@ -270,8 +271,8 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
     <table class="wf-tbl">
       <thead><tr><th>The brief</th><th>Already shipped</th><th>What is new</th><th>Screen</th></tr></thead>
       <tbody>
-        <tr><td>Task dashboard like Google Calendar</td><td>Board · List faces</td><td><span class="wf-chip is-new">Calendar face</span></td><td>§3.3</td></tr>
-        <tr><td>Captain timeline, to measure progress</td><td><code>/reports</code> performance view</td><td><span class="wf-chip is-new">Timeline face</span></td><td>§3.4</td></tr>
+        <tr><td>Task dashboard like Google Calendar</td><td>Board · List faces</td><td><span class="wf-chip is-new">Calendar face — the module's default</span></td><td>§3.3</td></tr>
+        <tr><td>Captain timeline, to measure progress</td><td><code>/reports</code> performance view</td><td><span class="wf-chip is-new">Timeline face</span> — lanes are <b>milestones</b>, not members</td><td>§3.4</td></tr>
         <tr><td>Tasks · Milestones · Targets as columns</td><td>one <code>WorkItem</code> with a <code>kind</code></td><td><span class="wf-chip is-ext">selectable column axis</span></td><td>§3.2</td></tr>
         <tr><td>every member creates their own tag</td><td>nothing — statuses are vocabulary</td><td><span class="wf-chip is-new">Tag</span> record, member-owned</td><td>§3.5 §3.6</td></tr>
         <tr><td>link to others</td><td><code>parentId</code>, <code>blockedByItemId</code></td><td><span class="wf-chip is-new">WorkLink</span> edge list</td><td>§3.5</td></tr>
@@ -322,16 +323,19 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
         <div class="wf-li"><span class="wf-av">M</span><b>Members</b><code class="wf-route">/team</code><span class="wf-spacer"></span><span class="wf-chip is-live">live</span></div>
         <div class="wf-li"><span class="wf-av">R</span><b>Roles</b><code class="wf-route">/roles</code><span class="wf-spacer"></span><span class="wf-chip is-live">live</span></div>
         <div class="wf-li"><span class="wf-av">A</span><b>Attendance</b><code class="wf-route">/attendance</code><span class="wf-spacer"></span><span class="wf-chip is-new">+ leave, + inbox</span></div>
-        <div class="wf-li"><span class="wf-av">W</span><b>Work</b><code class="wf-route">/work</code><span class="wf-spacer"></span><span class="wf-chip is-new">+ 2 faces</span></div>
+        <div class="wf-li"><span class="wf-av">C</span><b>Calendar</b><code class="wf-route">/work</code><span class="wf-spacer"></span><span class="wf-chip is-new">renamed from Work · + 2 faces</span></div>
         <div class="wf-li"><span class="wf-av">P</span><b>Reports</b><code class="wf-route">/reports</code><span class="wf-spacer"></span><span class="wf-chip is-ext">+ 3 blocks</span></div>
         <div class="wf-li" style="background:var(--wf-fill)"><span class="wf-av">•</span><b>My dashboard</b><code class="wf-route">/team/me</code><span class="wf-spacer"></span><span class="wf-chip is-new">§3.13 — route does not exist yet</span></div>
       </div>
       <div class="wf-fsec">
         <h4>Faces of one route</h4>
         <div class="wf-row">
-          <code class="wf-route">/work?face=board</code><span class="wf-chip is-live">live</span>
+          <code class="wf-route">/work</code><span class="wf-sub" style="color:var(--wf-ink3);font-size:12px">resolves to</span>
+          <code class="wf-route">?face=calendar</code><span class="wf-chip is-new">new · default</span>
+        </div>
+        <div class="wf-row" style="margin-top:8px">
+          <code class="wf-route">?face=board</code><span class="wf-chip is-live">live</span>
           <code class="wf-route">?face=list</code><span class="wf-chip is-live">live</span>
-          <code class="wf-route">?face=calendar</code><span class="wf-chip is-new">new</span>
           <code class="wf-route">?face=timeline</code><span class="wf-chip is-new">new</span>
         </div>
         <div class="wf-row" style="margin-top:8px">
@@ -366,6 +370,14 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
   <div class="wf-note"><span class="wf-id">TM-AD-12</span> <b>Calendar and Timeline are faces, not modules.</b>
     Three sidebar rows over one dataset would triple the permission surface and give the user three
     places to ask "where is that task".</div>
+  <div class="wf-note"><span class="wf-id">TM-AD-23</span> <b>The row is renamed <i>Calendar</i> and
+    <code>/work</code> now lands on the calendar face.</b> The label follows what the person opens it
+    for — a dated view of what is happening this week — and the module's headline ask in the brief was
+    a calendar, not a board. <b>Nothing but the label and the default move.</b> The route stays
+    <code>/work</code>, the entity stays <code>WorkItem</code>, the grant stays <code>team.work.*</code>,
+    and <code>?face=board</code> still opens exactly the board that ships today, so every existing link,
+    bookmark and drawer URL keeps working. Renaming the route as well would mean a redirect to maintain
+    forever in exchange for a tidier address bar.</div>
   <div class="wf-note"><span class="wf-id">TM-AD-13</span> <b>"Captain" is <code>reportsTo</code>.</b>
     A captain is a member whom at least one other member reports to — derived, one level deep, never
     transitive. No new role, no new field, no new grant. A second hierarchy for the word <i>captain</i>
@@ -374,7 +386,7 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
 
 <!-- ================================================================== 3.2 -->
 <section class="wf-scr" data-scr="2">
-  <div class="wf-scrh"><span class="wf-num">§3.2</span><h2>Work — the selectable column axis</h2>
+  <div class="wf-scrh"><span class="wf-num">§3.2</span><h2>Board — the selectable column axis</h2>
     <code class="wf-route">/work?face=board</code><span class="wf-chip is-ext">extends the shipped board</span></div>
   <p class="wf-lede">The column is a grouping choice, not a fixed property of the board.
   <b>Change <i>Group by</i> below — it really regroups</b>, over the 22 seeded work items in
@@ -382,9 +394,9 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
 
   <div class="wf-frame">
     <div class="wf-fbar">
-      <span class="wf-seg"><button class="is-on">▤ Board</button><button>☰ List</button>
-      <button data-goto="3">▦ Calendar</button><button data-goto="4">⊞ Timeline</button></span>
-      <span class="wf-spacer"></span><span class="wf-chip is-new">two faces new</span>
+      <span class="wf-seg"><button data-goto="3">▦ Calendar</button><button class="is-on">▤ Board</button>
+      <button>☰ List</button><button data-goto="4">⊞ Timeline</button></span>
+      <span class="wf-spacer"></span><span class="wf-chip is-new">two faces new · calendar is first and default</span>
     </div>
     <div class="wf-toolbar">
       <span class="wf-fake">⌕ Search</span>
@@ -427,14 +439,16 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
 
 <!-- ================================================================== 3.3 -->
 <section class="wf-scr" data-scr="3">
-  <div class="wf-scrh"><span class="wf-num">§3.3</span><h2>Calendar face</h2>
-    <code class="wf-route">/work?face=calendar</code><span class="wf-chip is-new">new</span></div>
+  <div class="wf-scrh"><span class="wf-num">§3.3</span><h2>Calendar face — what <code>/work</code> opens on</h2>
+    <code class="wf-route">/work?face=calendar</code><span class="wf-chip is-new">new · default face</span></div>
   <p class="wf-lede">Google Calendar is UX inspiration only. <b>Taken</b> — the month grid, the coloured
   chip, click-a-day-to-create, keyboard paging. <b>Not taken</b> — overlapping event layout, all-day
   versus timed lanes, recurrence, invitations, drag-to-resize.</p>
 
   <div class="wf-frame">
     <div class="wf-fbar">
+      <span class="wf-seg"><button class="is-on">▦ Calendar</button><button data-goto="2">▤ Board</button>
+      <button data-goto="2">☰ List</button><button data-goto="4">⊞ Timeline</button></span>
       <button class="wf-btn is-quiet" id="wfCalPrev">‹</button>
       <strong id="wfCalTitle">September 2026</strong>
       <button class="wf-btn is-quiet" id="wfCalNext">›</button>
@@ -461,18 +475,28 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
     Nothing in this module has a start and end <i>time</i> except attendance, which has its own strip.
     An hour grid would be mostly empty, and it is the largest piece of net-new UI in the plan for the
     least return.</div>
+  <div class="wf-note"><b>Being the default costs one thing and it has to be paid: the empty month.</b>
+    The board opens with 22 cards no matter the week; a month with nothing dated in it opens blank, and
+    a blank landing screen reads as a broken panel. The empty state therefore says how many items exist
+    but carry no date, and links straight to the board — <i>22 items · 6 with no date ▸ open the board</i>.
+    That is also the cheapest nudge towards dating work that the module will ever get.</div>
+  <div class="wf-note"><b>The face is remembered per member, and the default only decides the first
+    visit.</b> Someone who works the board all day should not be sent back to a month grid every
+    morning — <code>?face=</code> stays the source of truth, the last face is remembered locally, and
+    <code>/work</code> with neither falls to the calendar.</div>
   <div class="wf-note is-open"><span class="wf-id">TM-OD-08</span> <b>Drag and drop stays out, reaffirmed.</b>
     Reschedule is a date field in the drawer. A silent drag leaves no reason behind it.</div>
 </section>
 
 <!-- ================================================================== 3.4 -->
 <section class="wf-scr" data-scr="4">
-  <div class="wf-scrh"><span class="wf-num">§3.4</span><h2>Captain timeline</h2>
+  <div class="wf-scrh"><span class="wf-num">§3.4</span><h2>Milestone timeline</h2>
     <code class="wf-route">/work?face=timeline</code><span class="wf-chip is-new">new</span></div>
-  <p class="wf-lede">One lane per member in the viewer's <code>team</code> scope, bars from
-  <code>startDate</code> to <code>dueDate</code>. Viewer here is <b>D. Kapoor</b>, Operations Manager —
-  a captain because Meera Nair and N. Pillai point at him with <code>reportsTo</code>, not because
-  anyone gave him a title.</p>
+  <p class="wf-lede">One lane per <b>target</b> and per <b>milestone</b> — the containment tree
+  <code>work.json</code> already stores, <code>target ▸ milestone ▸ task</code> — with the tasks inside
+  each one drawn from <code>startDate</code> to <code>dueDate</code>. <b>The axis is the work, not the
+  worker.</b> The question this face answers is <i>"is this milestone going to land"</i>; who is busy is
+  the board's <i>Assignee</i> axis (§3.2) and the member's own dashboard (§3.13).</p>
 
   <div class="wf-frame">
     <div class="wf-fbar">
@@ -480,32 +504,49 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
       <strong id="wfTlTitle"></strong>
       <button class="wf-btn is-quiet" id="wfTlNext">›</button>
       <span class="wf-seg" id="wfTlRange"><button data-w="2" class="is-on">2w</button><button data-w="4">4w</button><button data-w="13">Quarter</button></span>
-      <span class="wf-fake">Group: Member ▾</span>
-      <span class="wf-spacer"></span><span class="wf-chip">scope: my reports · one level</span>
+      <span class="wf-fake">Group: Milestone ▾</span>
+      <span class="wf-spacer"></span><span class="wf-chip">scope: targets · milestones · their tasks</span>
     </div>
     <div id="wfTl"></div>
     <div class="wf-fsec" style="background:var(--wf-fill)">
       <div class="wf-row" style="font-size:12px;color:var(--wf-ink2)">
-        <span>bar fill = derived progress</span><span class="wf-tone t-warn"><i class="wf-dot"></i>delayed</span>
-        <span class="wf-tone">╌╌▶ follows link</span><span class="wf-tone">▒ approved leave</span>
+        <span class="wf-tone">◆ dashed = the lane's own committed window</span>
+        <span class="wf-tone t-info"><i class="wf-dot"></i>solid = a task, tone is its status</span>
+        <span class="wf-tone t-warn"><i class="wf-dot"></i>delayed</span>
+        <span class="wf-tone">╌╌▶ follows link</span>
         <span>click a bar → the drawer</span>
       </div>
       <div class="wf-inline" id="wfTlUndated"><span class="wf-i">⚠</span><div></div></div>
     </div>
   </div>
 
+  <div class="wf-note"><span class="wf-id">TM-AD-24</span> <b>The lanes are milestones, not members.</b>
+    A lane per person is a productivity chart whatever it is called: it invites the reading "Meera has
+    four bars and Rahul has two", which nothing in the module justifies — there is no estimate field, so
+    a bar's length is a date range and not an amount of work, and <span class="wf-id">TM-OD-11</span>
+    forbids scoring a person anyway. A lane per milestone is a delivery chart, where every bar is
+    evidence for or against one dated commitment somebody made. <b>Member load keeps two honest homes</b>
+    — <i>Group by → Assignee</i> on the board, and §3.13 — and the assignee still rides on every bar as
+    initials, because "who is this waiting on" is a fair question to ask of a task.</div>
+  <div class="wf-note"><b>Progress fill and leave bands left with the member lanes.</b> A fill needs a
+    per-task percentage nobody types, and an approved leave band says something real on a person's row
+    and nothing at all on a milestone's. What a lane states instead is countable and already stored:
+    <b>n of m tasks done</b> and the milestone's own dates. Leave stays on the calendar and on §3.7.</div>
   <div class="wf-note"><b>An item with no <code>startDate</code> cannot be drawn</b>, so it is listed
     under the grid instead of being given an invented start. That is the honest state; a bar beginning
-    at a date nobody chose is a lie the chart tells confidently.</div>
+    at a date nobody chose is a lie the chart tells confidently. <b>Six open items are in that state
+    below</b>, and that count is the number this face exists to shrink.</div>
   <div class="wf-note"><b>Three things this view must not become</b>, each the usual way a timeline rots.
     <b>Not a Gantt with dependencies that gate</b> — <code>follows</code> draws the connector and nothing
     more. <b>Not a resource planner</b> — no capacity bar, no allocation percentage; the module has no
     estimate field and inventing one to fill a chart is how estimates get born.
     <b>Not a ranking</b> — <span class="wf-id">TM-OD-11</span> stands: show the numbers, sort by any
-    column, compute no score.</div>
+    column, compute no score. The milestone axis is what keeps the third one true by construction:
+    there is no member row left to rank.</div>
   <div class="wf-note is-risk"><span class="wf-id">TM-R-13</span> Timeline plus calendar is more net-new
     UI than the whole of v1's work face. Build C before D, month before week, and share one date-grid
-    primitive. If D slips, the calendar alone answers the brief's headline.</div>
+    primitive. If D slips, the calendar alone answers the brief's headline — and it is now the face the
+    module lands on, which is the other reason C cannot slip.</div>
 </section>
 
 <!-- ================================================================== 3.5 -->
@@ -1010,7 +1051,7 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
         <div class="wf-row" style="margin-bottom:11px"><span style="flex:1;min-width:150px">◆ Support handover document</span>
           <span class="wf-prog"><i style="width:33%"></i></span><span class="wf-sm">1 / 3</span></div>
         <div class="wf-row"><span class="wf-spacer"></span>
-          <button class="wf-btn is-primary" data-goto="4">Open the timeline ▸ <span class="wf-chip is-new" style="background:none;color:#fff;border-color:rgba(255,255,255,.4)">new</span></button></div>
+          <button class="wf-btn is-primary" data-goto="4">Open the milestone timeline ▸ <span class="wf-chip is-new" style="background:none;color:#fff;border-color:rgba(255,255,255,.4)">new</span></button></div>
       </div>
       <div class="wf-fsec" style="background:var(--wf-fill)">
         <div class="wf-inline" style="border-style:solid"><span class="wf-i">ⓘ</span><div>
@@ -1146,9 +1187,11 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
       <b>Not parallel-safe:</b> E touches the central derivation in <code>store.ts</code> — nothing else
       edits that file while it is in flight. G and H both add storage and both must land <i>after</i> the
       private-object decision, not before it.
-      <div style="margin-top:8px"><b>Suggested order:</b> A → B → C → E → D → G → H → I → F.
-      Calendar is third rather than first: it is the most visible item in the brief, and it reads much
-      better once tags exist to colour it.</div>
+      <div style="margin-top:8px"><b>Suggested order:</b> C → A → B → E → D → G → H → I → F.
+      <b>Calendar moves to first because it is now the face <code>/work</code> lands on</b> — renaming the
+      row to <i>Calendar</i> before C ships would put a board behind a label that promises a month grid.
+      It loses nothing by going first: it reads better once tags exist to colour it, and tags land
+      immediately after in A.</div>
     </div>
   </div>
 
@@ -1158,7 +1201,8 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
       <thead><tr><th>File</th><th>Change</th><th style="width:90px">Risk</th></tr></thead>
       <tbody>
         <tr><td><code>views/Team/store.ts</code></td><td>the <code>absent</code> derivation gains one clause</td><td><span class="wf-tone t-bad">high</span></td></tr>
-        <tr><td><code>views/Team/Work.tsx</code></td><td>two new faces, selectable column axis</td><td><span class="wf-tone t-warn">medium</span></td></tr>
+        <tr><td><code>views/Team/Work.tsx</code></td><td>two new faces, selectable column axis, calendar becomes the default face</td><td><span class="wf-tone t-warn">medium</span></td></tr>
+        <tr><td>sidebar nav config</td><td>the Team row reads <i>Calendar</i>; route, grant and component untouched</td><td><span class="wf-tone t-ok">low</span></td></tr>
         <tr><td><code>content/team/vocabularies.json</code></td><td>five new lists, one new state with <code>stored:false</code></td><td><span class="wf-tone t-warn">medium</span></td></tr>
         <tr><td><code>team.css</code> · <code>admin-theme.css</code></td><td>timeline and calendar grids — use the <code>tm-</code> prefix</td><td><span class="wf-tone t-warn">medium</span></td></tr>
         <tr><td><code>views/Team/Attendance.tsx</code> · <code>Reports.tsx</code></td><td>additive blocks; the clock strip does not move</td><td><span class="wf-tone t-ok">low</span></td></tr>
@@ -1291,9 +1335,9 @@ var MON = ['January','February','March','April','May','June','July','August','Se
 var SCREENS = [
   ['§0',   'Reuse vs build',            ''],
   ['§3.1', 'Navigation',                ''],
-  ['§3.2', 'Work — column axis',        'EXT'],
-  ['§3.3', 'Calendar face',             'NEW'],
-  ['§3.4', 'Captain timeline',          'NEW'],
+  ['§3.2', 'Board — column axis',       'EXT'],
+  ['§3.3', 'Calendar face · default',   'NEW'],
+  ['§3.4', 'Milestone timeline',        'NEW'],
   ['§3.5', 'Item drawer v2',            'EXT'],
   ['§3.6', 'Tag manager',               'NEW'],
   ['§3.7', 'Leave request',             'NEW'],
@@ -1306,7 +1350,7 @@ var SCREENS = [
   ['§7-9', 'Phases, decisions, risks',  '']
 ];
 (function buildRail(){
-  var groups = [[0,'Overview',[0,1]], [1,'Work — /work',[2,3,4,5,6]],
+  var groups = [[0,'Overview',[0,1]], [1,'Calendar — /work',[2,3,4,5,6]],
                 [2,'Attendance — /attendance',[7,8]], [3,'Member — /team/me',[13,9,10,11]],
                 [4,'Roll-up — /reports',[12]], [5,'Plan',[14]]];
   var h = '';
@@ -1484,10 +1528,49 @@ document.getElementById('wfCalMode').addEventListener('click', function(e){
   renderCal();
 });
 
-/* ---- §3.4 timeline -------------------------------------------------------- */
-var CAPTAIN = '58';
+/* ---- §3.4 timeline: lanes are milestones, never members ------------------
+   The lane list is the containment tree work.json already stores — target ▸
+   milestone ▸ task — so the axis needs no new field and no new query. Bars in a
+   lane are that lane's own committed window plus its child tasks. Nothing here
+   is a percentage: member progress is the board's Assignee axis and §3.13.
+--------------------------------------------------------------------------- */
 var tlStart = new Date('2026-08-24T00:00:00');
 var tlWeeks = 2;
+
+function tlLanes(){
+  var byId = {}; ITEMS.forEach(function(it){ byId[it.id] = it; });
+  var lanes = [];
+  ITEMS.filter(function(it){ return it.kind === 'target'; }).forEach(function(t){
+    lanes.push({item:t, sub:false});
+    ITEMS.filter(function(m){ return m.kind === 'milestone' && m.parent === t.id; })
+         .forEach(function(m){ lanes.push({item:m, sub:true}); });
+  });
+  ITEMS.filter(function(m){ return m.kind === 'milestone' && (!m.parent || !byId[m.parent]); })
+       .forEach(function(m){ lanes.push({item:m, sub:false}); });
+  lanes.push({item:null, sub:false});   /* tasks that hang off nothing — never hidden */
+  return lanes;
+}
+
+function tlKids(host){
+  return ITEMS.filter(function(it){
+    return it.kind === 'task' && (host ? it.parent === host.id : !it.parent);
+  });
+}
+
+function tlBar(it, cls, mark, tlS, days){
+  var s = (new Date(it.start) - tlS) / 86400000;
+  var e = (new Date(it.due || it.start) - tlS) / 86400000 + 1;
+  if (e <= 0 || s >= days) return null;
+  var a = Math.max(0, s), b = Math.min(days, e);
+  var tone = it.status === 'blocked' ? 'bad' : isDelayed(it) ? 'warn'
+           : it.status === 'completed' ? 'ok' : 'info';
+  var who = it.kind === 'task' && MEMBERS[it.who] ? MEMBERS[it.who].s + ' · ' : '';
+  var suffix = isDelayed(it) ? '  ⚠ ' + daysOver(it) + 'd over'
+             : it.status === 'completed' ? '  ✓' : '';
+  return '<div class="wf-bar b-' + tone + (cls ? ' ' + cls : '') + '" data-goto="5" style="left:' +
+         (a/days*100) + '%;width:' + ((b-a)/days*100) + '%;top:@TOP@px">' +
+         '<span class="wf-bar-t">' + mark + esc(who + it.title) + esc(suffix) + '</span></div>';
+}
 
 function renderTl(){
   var days = tlWeeks * 7;
@@ -1496,10 +1579,8 @@ function renderTl(){
     tlStart.getDate() + ' ' + MON[tlStart.getMonth()].slice(0,3) + ' – ' +
     end.getDate() + ' ' + MON[end.getMonth()].slice(0,3) + ' 2026';
 
-  /* one lane per member in the viewer's team scope — reportsTo, one level */
-  var lanes = [CAPTAIN].concat(Object.keys(MEMBERS).filter(function(id){ return MEMBERS[id].to === CAPTAIN; }));
-  var scoped = ITEMS.filter(function(it){ return lanes.indexOf(it.who) >= 0; });
-  var undated = scoped.filter(function(it){ return !it.start; });
+  var lanes = tlLanes();
+  var undated = ITEMS.filter(function(it){ return !it.start && !isTerminal(it.status); });
 
   var ticks = '';
   for (var i = 0; i < days; i++){
@@ -1509,47 +1590,41 @@ function renderTl(){
   }
   var nowPct = ((new Date(TODAY) - tlStart) / 86400000 + 0.5) / days * 100;
   var h = '<div class="wf-tl-head"><div class="wf-tl-lane" style="padding:5px 12px;font-size:10.5px;' +
-          'letter-spacing:.07em;text-transform:uppercase;color:var(--wf-ink3)">Member</div>' +
+          'letter-spacing:.07em;text-transform:uppercase;color:var(--wf-ink3)">Target · milestone</div>' +
           '<div class="wf-tl-ticks">' + ticks + '</div></div>';
 
-  lanes.forEach(function(mid){
-    var mine = scoped.filter(function(it){ return it.who === mid && it.start; });
-    var open = scoped.filter(function(it){ return it.who === mid && !isTerminal(it.status); }).length;
-    var rows = '', top = 0;
+  lanes.forEach(function(ln){
+    var host = ln.item, kids = tlKids(host), rows = '', top = 0, bar;
 
-    /* approved leave draws as a band, never as an attendance row */
-    LEAVE.forEach(function(l){
-      if (l.who !== mid || l.state !== 'approved') return;
-      var a = Math.max(0, (new Date(l.from) - tlStart) / 86400000);
-      var b = Math.min(days, (new Date(l.to) - tlStart) / 86400000 + 1);
-      if (b <= 0 || a >= days) return;
-      rows += '<div class="wf-bar b-leave" style="left:' + (a/days*100) + '%;width:' + ((b-a)/days*100) +
-              '%;top:' + top + 'px"><span class="wf-bar-t">▒ on leave (approved)</span></div>';
-      top += 24;
+    /* the lane's own committed window, drawn dashed so a task never reads as one */
+    if (host && host.start){
+      bar = tlBar(host, 'b-win', '◆ ', tlStart, days);
+      if (bar){ rows += bar.replace('@TOP@', top); top += 24; }
+    }
+    kids.filter(function(it){ return it.start; }).forEach(function(it){
+      bar = tlBar(it, '', '', tlStart, days);
+      if (bar){ rows += bar.replace('@TOP@', top); top += 24; }
     });
-
-    mine.forEach(function(it){
-      var s = (new Date(it.start) - tlStart) / 86400000;
-      var e = (new Date(it.due || it.start) - tlStart) / 86400000 + 1;
-      if (e <= 0 || s >= days) return;
-      var a = Math.max(0, s), b = Math.min(days, e);
-      var tone = it.status === 'blocked' ? 'bad' : isDelayed(it) ? 'warn'
-               : it.status === 'completed' ? 'ok' : 'info';
-      var mark = it.kind === 'task' ? '' : '◆ ';
-      var suffix = isDelayed(it) ? '  ⚠ ' + daysOver(it) + 'd over'
-                 : it.status === 'completed' ? '  ✓'
-                 : it.prog ? '  ' + it.prog + '%' : '';
-      rows += '<div class="wf-bar b-' + tone + '" data-goto="5" style="left:' + (a/days*100) +
-              '%;width:' + ((b-a)/days*100) + '%;top:' + top + 'px">' +
-              '<span class="wf-bar-fill" style="width:' + (it.prog || 0) + '%"></span>' +
-              '<span class="wf-bar-t">' + mark + esc(it.title) + esc(suffix) + '</span></div>';
-      top += 24;
-    });
-
     if (!rows) rows = '<div style="font-size:11.5px;color:var(--wf-ink3);padding-left:10px">nothing dated in this window</div>';
-    h += '<div class="wf-tl-row"><div class="wf-tl-lane">' +
-         '<div class="wf-nm"><span class="wf-av">' + MEMBERS[mid].s + '</span>' + esc(MEMBERS[mid].n) + '</div>' +
-         '<div class="wf-sm">' + MEMBERS[mid].d + ' · ' + open + ' open</div></div>' +
+
+    var done = kids.filter(function(it){ return it.status === 'completed'; }).length;
+    var label, sub;
+    if (!host){
+      label = '<span class="wf-av">·</span><b>No milestone</b>';
+      sub = kids.length + ' tasks hang off nothing';
+    } else {
+      var childMs = ITEMS.filter(function(m){ return m.kind === 'milestone' && m.parent === host.id; }).length;
+      label = '<span class="wf-av">◆</span><b>' + esc(host.title) + '</b>';
+      sub = KIND[host.kind].l + ' · ' +
+            (childMs ? childMs + (childMs === 1 ? ' milestone · ' : ' milestones · ') : '') +
+            (kids.length ? done + ' of ' + kids.length + ' tasks done · ' : '') +
+            (host.due ? 'due ' + new Date(host.due).getDate() + ' ' + MON[new Date(host.due).getMonth()].slice(0,3) : 'no due date') +
+            (isDelayed(host) ? ' ⚠' : '');
+    }
+
+    h += '<div class="wf-tl-row"><div class="wf-tl-lane' + (ln.sub ? ' is-sub' : '') + '">' +
+         '<div class="wf-nm">' + label + '</div>' +
+         '<div class="wf-sm">' + sub + '</div></div>' +
          '<div class="wf-tl-grid" style="min-height:' + Math.max(38, top + 14) + 'px">' + rows +
          (nowPct >= 0 && nowPct <= 100 ? '<div class="wf-now" style="left:' + nowPct + '%"></div>' : '') +
          '</div></div>';
@@ -1558,10 +1633,10 @@ function renderTl(){
 
   var u = document.querySelector('#wfTlUndated div');
   u.innerHTML = undated.length
-    ? '<b>' + undated.length + ' items in this scope have no start date and cannot be drawn</b> — ' +
+    ? '<b>' + undated.length + ' open items have no start date and cannot be drawn</b> — ' +
       undated.map(function(i){ return esc(i.title); }).join(' · ') +
       '. Listed rather than given an invented start: a bar beginning at a date nobody chose is a lie the chart tells confidently.'
-    : 'Every item in this scope has a start date.';
+    : 'Every open item has a start date.';
 }
 document.getElementById('wfTlPrev').onclick = function(){ tlStart = addDays(tlStart, -7 * tlWeeks); renderTl(); };
 document.getElementById('wfTlNext').onclick = function(){ tlStart = addDays(tlStart,  7 * tlWeeks); renderTl(); };
