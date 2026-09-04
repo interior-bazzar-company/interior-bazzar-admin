@@ -6,6 +6,90 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-04
 
+### The work rail — Create, progress by milestone, and today — TM-AD-25 … 28
+
+**Area:** sidebar → Team → Calendar · `#/work`, every face — `?face=calendar` · `board` · `list` · `timeline`
+**Files:** `src/proto/v-2.2.0.0/wireframe-team-workspace-v2.html`,
+`src/proto/v-2.2.0.0/OPERATION-2026-09-03-team-workspace-v2.md`
+
+**What changed**
+
+`/work` gains the left rail from the founder's Google Calendar reference, and it is
+**shell rather than a calendar sidebar** (`TM-AD-25`): all four faces carry it, so
+progress does not vanish when somebody switches to the board. Five blocks, five
+queries, one function — it is rendered into §3.2, §3.3 and §3.4 from the same call so
+the wireframe argues the decision instead of asserting it.
+
+- **`+ Create ▾` — Task · Milestone · Target** (`TM-AD-26`). All three open the *same*
+  form with `kind` prefilled, because they are one `WorkItem` with a `kind`; a target
+  adds two fields to it. `+ New item` is removed from every face toolbar in exchange:
+  one entry point, always in the same place.
+- **Mini month** — click any day and the month grid follows it; a dot marks a day that
+  carries something. A **Today** button joins the calendar toolbar.
+- **This month** — done · open · delayed · blocked for the month in view, as a stacked
+  bar. The analytics indicator the founder asked for, at the size it deserves.
+- **Progress** — one bar per milestone and target, in two sections: *Mine*, then
+  *My team* (`reportsTo`, one level). A member with no reports never sees the second
+  heading. There is no bar per person — that is the score `TM-OD-11` refuses to compute.
+- **Today** — overdue first, then due today, then the next three days, with a quick-add
+  row and **Open my work ▸** into `/team/me?tab=work` (§3.13). The rail summarises the
+  day; §3.13 owns it. No new route, no third place that answers "what am I doing today".
+
+The rail deliberately holds **no filters**: Google's lists calendars to tick, ours would
+have to list members, kinds and tags, and a filter that survives a face switch is how
+somebody loses half their board without noticing.
+
+**Drawing it against the seed found two live faults, and both are fixed here.**
+`TM-AD-27` — the wireframe's seed carried a typed `progressPct` on every milestone and
+three of the four disagreed with their own children (60% against 0 of 4, 50% against
+0 of 2, 33% against 0 of 2). §3.12's roll-up was printing two of them. The field is
+gone; a milestone is `completed children ÷ total`, a target is
+`currentValue ÷ targetValue`, and *Onboard 60 businesses* was reconciled from a stale
+38 / 60 to `work.json`'s **47 / 60**. `TM-AD-28` — rendered the naïve way, every day of
+September printed the two targets and *Enquiry response under 4 hours*, because all
+three run July → 30 September, pushing the day's real tasks into *+4 more*. A task of a
+week or less now draws on every day it spans; anything longer, and every milestone and
+target, draws exactly twice — `▸ starts` and `▪ due`. The long ones live in the rail
+with a bar, which is the right shape for a commitment with no single day.
+
+**Temp data**
+`none` — no runtime code. The rail reads the same inline `ITEMS`, `MEMBERS` and `LEAVE`
+arrays as the faces. The wireframe seed lost its `progressPct` column and the two
+targets gained `currentValue` / `targetValue` / `unit`, which `work.json` already
+carries; `src/content/team/work.json` itself is unchanged and never stored progress.
+
+**Backend needed**
+`none` new. The rail is five reads over `GET /api/v1/admin/team/work`, already required
+to return `kind`, `parentId`, `status`, `startDate`, `dueDate`, `currentValue` and
+`targetValue`. **A payload that also returns `progressPct` should have the field
+dropped, not trusted** — `work.json`'s own `$comment` on `W-M03` says so.
+
+**Open decisions**
+`TM-AD-25`, `TM-AD-26`, `TM-AD-27` and `TM-AD-28` are new and all four are shown on
+their screens. None is open: three are the founder's direction taken, and TM-AD-27/28
+are faults found by rendering. `TM-R-15` is new and is a **risk, not a decision** — the
+rail costs 238px on every face and the board is the face that can least afford it; it
+collapses below 1240px and the board must be checked at 1280px. `TM-OD-11` is unchanged
+and is now enforced by the rail's shape. `TM-OD-20` remains the only blocker on Phase A.
+
+**Verified**
+
+The wireframe's script was evaluated headlessly against a DOM stub and the rendered rail
+read back: mini month for September, *11 dated · 0 done · 8 open · 3 delayed · 0
+blocked*, *Mine · 1* (◈ Close 40 deals, 38%, 15 / 40 deals), *My team · 2* (Rahul's
+2 / 4 = 50%, Priya's 0 / 2 = 0%), and *Due today · 1* — Q3 pipeline review, which is the
+one item in the seed dated 3 September. Identical HTML on all three mounts (6,475 bytes
+each). The September grid was read cell by cell before and after `TM-AD-28`: eleven
+populated days after, against every day of the month before. `node --check` passes and
+the document's tag balance was checked with a parser. `npx tsc -b` clean and
+`npx vite build --mode dev` succeeds — no `.ts` was touched.
+
+**Not opened in a browser.** The rail's 238px against the board's columns, the collapse
+at 1240px, the mini-month dot alignment and the dark-theme pass are reasoned about and
+not seen. The board at 1280px is the first thing to look at (`TM-R-15`).
+
+---
+
 ### Calendar is the module's face, and the timeline measures milestones — TM-AD-23, TM-AD-24
 
 **Area:** sidebar → Team → **Calendar** (was Work) · `#/work` · `?face=calendar` · `?face=timeline`

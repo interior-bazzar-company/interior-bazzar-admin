@@ -216,6 +216,48 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
 .wf-link::after{content:"";position:absolute;right:-1px;top:-4px;border:4px solid transparent;
   border-left-color:var(--wf-ink3);border-right:0}
 
+/* ---- the module rail — shell on every face -------------------------------- */
+.wf-shell{display:flex;align-items:stretch}
+.wf-main{flex:1;min-width:0}
+.wf-wr{flex:0 0 238px;min-width:0;border-right:1px solid var(--wf-line);background:var(--wf-fill);
+  padding:10px;display:flex;flex-direction:column;gap:10px}
+.wf-wrb{border:1px solid var(--wf-line);border-radius:7px;background:var(--wf-panel);padding:9px 10px}
+.wf-wrb.is-plain{border:0;background:none;padding:0}
+.wf-wrh{font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--wf-ink3);
+  font-weight:700;display:flex;align-items:center;gap:6px;margin-bottom:7px}
+.wf-wrh .wf-chip{letter-spacing:0;text-transform:none}
+.wf-wrf{font-size:10.5px;color:var(--wf-ink3);margin-top:7px;padding-top:7px;border-top:1px solid var(--wf-line)}
+.wf-mini{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;font-size:10px}
+.wf-mini b{color:var(--wf-ink3);font-weight:700;text-align:center;padding:2px 0}
+.wf-mini button{font:inherit;font-size:10px;border:0;background:none;color:var(--wf-ink);line-height:1.5;
+  padding:3px 0 5px;border-radius:50%;cursor:pointer;position:relative}
+.wf-mini button.is-out{color:var(--wf-ink3);opacity:.5}
+.wf-mini button.is-today{background:var(--wf-ink);color:#fff;font-weight:700}
+.wf-mini button.has-i::after{content:"";position:absolute;left:50%;bottom:2px;width:3px;height:3px;
+  margin-left:-1.5px;border-radius:50%;background:var(--wf-info)}
+.wf-mini button.is-today.has-i::after{background:#fff}
+.wf-stack{display:flex;height:7px;border-radius:4px;overflow:hidden;background:var(--wf-fill2);margin-bottom:8px}
+.wf-stack i{display:block;height:100%}
+.wf-pr{margin-bottom:10px}
+.wf-pr:last-child{margin-bottom:0}
+.wf-pr-t{font-size:11.5px;display:flex;gap:5px;line-height:1.35}
+.wf-pr-m{font-size:10.5px;color:var(--wf-ink3);display:flex;gap:6px;margin-top:3px;align-items:center}
+.wf-prog.is-thin{flex:1 1 auto;height:5px}
+.wf-tk{display:flex;gap:7px;align-items:flex-start;font-size:11.5px;padding:6px 0;
+  border-top:1px solid var(--wf-line);line-height:1.35}
+.wf-tk:first-of-type{border-top:0}
+.wf-tk .wf-box{flex:0 0 12px;width:12px;height:12px;border:1px solid var(--wf-line2);border-radius:3px;
+  margin-top:2px;display:block;background:var(--wf-panel)}
+.wf-tk-add{display:block;width:100%;text-align:left;font:inherit;font-size:11px;color:var(--wf-ink3);
+  border:1px dashed var(--wf-line2);border-radius:5px;background:none;padding:5px 7px;margin-top:7px;cursor:pointer}
+.wf-menu{border:1px solid var(--wf-line2);border-radius:7px;background:var(--wf-panel);
+  padding:5px;margin-top:6px;box-shadow:0 8px 20px rgba(0,0,0,.08)}
+.wf-menu button{display:block;width:100%;text-align:left;font:inherit;font-size:12.5px;padding:6px 8px;
+  border:0;border-radius:5px;background:none;cursor:pointer;color:var(--wf-ink)}
+.wf-menu button:hover{background:var(--wf-fill)}
+.wf-menu .wf-sm{padding:4px 8px 2px;color:var(--wf-ink3);font-size:10.5px}
+@media (max-width:1240px){.wf-wr{display:none}}
+
 /* ---- lists ---------------------------------------------------------------- */
 .wf-list{border:1px solid var(--wf-line);border-radius:7px;overflow:hidden}
 .wf-li{display:flex;align-items:center;gap:10px;padding:9px 12px;border-top:1px solid var(--wf-line);
@@ -398,12 +440,15 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
       <button>☰ List</button><button data-goto="4">⊞ Timeline</button></span>
       <span class="wf-spacer"></span><span class="wf-chip is-new">two faces new · calendar is first and default</span>
     </div>
+    <div class="wf-shell">
+    <aside class="wf-wr" id="wfWr2"></aside>
+    <div class="wf-main">
     <div class="wf-toolbar">
       <span class="wf-fake">⌕ Search</span>
       <span class="wf-fake">Member ▾</span><span class="wf-fake">Kind ▾</span>
       <span class="wf-fake">Status ▾</span><span class="wf-fake">Priority ▾</span>
       <span class="wf-fake" style="border-color:var(--wf-new);color:var(--wf-new)">Tag ▾ NEW</span>
-      <span class="wf-spacer"></span><button class="wf-btn is-primary">+ New item</button>
+      <span class="wf-spacer"></span><span class="wf-sm" style="color:var(--wf-ink3)">create lives in the rail →</span>
     </div>
     <div class="wf-toolbar" style="background:var(--wf-fill)">
       <label style="font-size:12.5px;color:var(--wf-ink2)">Group by</label>
@@ -420,6 +465,7 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
     </div>
     <div class="wf-strip" id="wfStrip"></div>
     <div class="wf-cols" id="wfCols"></div>
+    </div></div>
   </div>
 
   <div class="wf-note"><span class="wf-id">TM-AD-15</span> <b>Status stays the default, and it is the only
@@ -441,40 +487,109 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
 <section class="wf-scr" data-scr="3">
   <div class="wf-scrh"><span class="wf-num">§3.3</span><h2>Calendar face — what <code>/work</code> opens on</h2>
     <code class="wf-route">/work?face=calendar</code><span class="wf-chip is-new">new · default face</span></div>
-  <p class="wf-lede">Google Calendar is UX inspiration only. <b>Taken</b> — the month grid, the coloured
-  chip, click-a-day-to-create, keyboard paging. <b>Not taken</b> — overlapping event layout, all-day
-  versus timed lanes, recurrence, invitations, drag-to-resize.</p>
+  <p class="wf-lede">Google Calendar is UX inspiration only, and the layout is now taken with it:
+  <b>a left rail beside a month grid</b>. <b>Taken</b> — the rail, Create at the top of it, the mini
+  month, Today, the month grid, the coloured chip, click-a-day-to-create, keyboard paging.
+  <b>Not taken</b> — overlapping event layout, all-day versus timed lanes, recurrence, invitations,
+  drag-to-resize. <b>The rail is not a calendar widget</b>: it belongs to the module and stays on all
+  four faces — switch to the board or the timeline and it is still there.</p>
 
   <div class="wf-frame">
     <div class="wf-fbar">
       <span class="wf-seg"><button class="is-on">▦ Calendar</button><button data-goto="2">▤ Board</button>
       <button data-goto="2">☰ List</button><button data-goto="4">⊞ Timeline</button></span>
+      <button class="wf-btn" id="wfCalToday">Today</button>
       <button class="wf-btn is-quiet" id="wfCalPrev">‹</button>
       <strong id="wfCalTitle">September 2026</strong>
       <button class="wf-btn is-quiet" id="wfCalNext">›</button>
       <span class="wf-seg" id="wfCalMode"><button data-mode="month" class="is-on">Month</button><button data-mode="week">Week</button></span>
       <span class="wf-fake">Member ▾</span><span class="wf-fake">Kind ▾</span><span class="wf-fake">Tag ▾</span>
-      <span class="wf-spacer"></span><button class="wf-btn is-primary">+ New item</button>
+      <span class="wf-spacer"></span><span class="wf-fake">⌕ Search</span>
     </div>
+    <div class="wf-toolbar" style="background:var(--wf-fill)">
+      <label style="font-size:12.5px;color:var(--wf-ink2)">Rail viewer</label>
+      <select class="wf-sel" id="wfRailWho">
+        <option value="52">A. Sharma — Sales Head, a captain</option>
+        <option value="58">D. Kapoor — Operations Manager, a captain</option>
+        <option value="63">Meera Nair — no reports</option>
+        <option value="86">N. Pillai — no reports</option>
+      </select>
+      <span class="wf-chip">prototype control</span>
+      <span class="wf-spacer"></span>
+      <span class="wf-sm" style="color:var(--wf-ink3)">the real rail is always the signed-in member —
+      switch it here to watch <i>My team</i> appear and disappear</span>
+    </div>
+    <div class="wf-shell">
+    <aside class="wf-wr" id="wfWr3"></aside>
+    <div class="wf-main">
     <div class="wf-cal" id="wfCal"></div>
     <div class="wf-fsec" style="background:var(--wf-fill)">
       <div class="wf-row" style="font-size:12px;color:var(--wf-ink2)">
         <span class="wf-tone t-info"><i class="wf-dot"></i>chip tone = status</span>
-        <span class="wf-tone">◆ = milestone or target</span>
+        <span class="wf-tone">◆ milestone · ◈ target · ● task</span>
+        <span class="wf-tone">▸ starts · ▪ due</span>
         <span class="wf-tone t-warn"><i class="wf-dot"></i>⚠ = delayed or blocked</span>
         <span class="wf-tone">▒ = approved leave</span>
         <span>click a day → new item with that date prefilled · click a chip → the drawer</span>
       </div>
     </div>
+    </div></div>
   </div>
 
-  <div class="wf-note"><b>A multi-day item appears on every day it spans, not only its due date.</b>
+  <div class="wf-note"><b>A multi-day task appears on every day it spans, not only its due date.</b>
     <code>startDate</code> has been on the model since v1 and neither shipped face ever used it. An item
     that shows only on its last day is a deadline list, not a schedule.</div>
+  <div class="wf-note"><span class="wf-id">TM-AD-28</span> <b>…but a quarter-long item is not an event
+    on ninety-two days.</b> Drawn the naïve way, this month is <i>unreadable</i>: the two targets and
+    <i>Enquiry response under 4 hours</i> run from July to 30 September, so every single day of September
+    printed the same three chips and pushed the day's actual tasks into <i>+4 more</i>. The rule is
+    therefore: <b>a task of a week or less draws on every day it spans; anything longer, and every
+    milestone and target, draws exactly twice</b> — <code>▸ starts</code> and <code>▪ due</code>.
+    The long ones are not lost, they are in the rail with a progress bar, which is the right shape for a
+    commitment that has no single day. This was found by rendering the month, not by reasoning about
+    it.</div>
   <div class="wf-note"><b>Week view is the same grid with seven columns and rows by item — no hour gutter.</b>
     Nothing in this module has a start and end <i>time</i> except attendance, which has its own strip.
     An hour grid would be mostly empty, and it is the largest piece of net-new UI in the plan for the
     least return.</div>
+  <div class="wf-note"><span class="wf-id">TM-AD-25</span> <b>The rail is the module's shell, not the
+    calendar's sidebar.</b> It carries Create, the mini month, <i>This month</i>, <i>Progress</i> and
+    <i>Today</i>, and it does not move when the face does — progress that vanishes the moment somebody
+    switches to the board is a progress indicator nobody trusts. Below 1240px it collapses, which is the
+    breakpoint the panel already uses. <b>It is drawn on §3.2 and §3.4 too</b>, from the same function
+    and the same five queries, so this is one component and not three sidebars that drift.
+    <b>What it deliberately does not hold is the filters.</b> Google's rail lists calendars to tick;
+    ours would have to list members, kinds and tags — and a filter that survives a face switch is how
+    somebody loses half their board without noticing. Filters stay in each face's own toolbar. The rail
+    holds only what is true whichever face is open.</div>
+  <div class="wf-note"><span class="wf-id">TM-AD-26</span> <b>One Create control, three kinds.</b>
+    <code>+ Create ▾</code> opens <i>Task · Milestone · Target</i> and all three open the <b>same form</b>
+    with <code>kind</code> prefilled — because they are one <code>WorkItem</code> with a <code>kind</code>
+    (TM-AD-15's premise), and a target only adds two fields to it, <code>targetValue</code> and
+    <code>targetUnit</code>. Three buttons would become three forms, then three validators, then three
+    lists. The <i>+ New item</i> button is gone from every face toolbar: one entry point, and it is
+    always in the same place.</div>
+  <div class="wf-note"><span class="wf-id">TM-AD-27</span> <b>Every number in the rail is derived, and
+    drawing it caught three that were not.</b> A milestone bar is <code>completed children ÷ total
+    children</code>; a target bar is <code>currentValue ÷ targetValue</code>. Nothing is stored, and
+    nothing is typed. The seed carried a typed <code>progressPct</code> on each milestone —
+    <i>Enquiry response under 4 hours</i> said 60%, <i>Support handover document</i> said 33% — and
+    against their own children both are <b>0%</b>, because not one task under either is complete. The
+    typed field is gone from the seed. <b>That gap is the feature</b>: a rail that reads 0 of 4 is the
+    only thing that will make anyone close a task. One more number was reconciled on the way:
+    <i>Onboard 60 businesses</i> was drawn at 38 / 60 here and stands at <b>47 / 60</b> in
+    <code>work.json</code>, which is the file of record — the screen was copying a stale number.</div>
+  <div class="wf-note"><b><i>Today</i> is a summary, and it links to the page that owns the day.</b>
+    Overdue first, then due today, then the next three days, capped — <b>overdue above today</b>, because
+    a day list that hides what is already late is how work goes missing. Ticking a box completes the
+    item in place; everything else — reordering, rescheduling, the full list — is
+    <code>/team/me?tab=work</code> (§3.13), which already exists in this plan and already owns the
+    member's own work. The rail summarises it and never becomes a second one.</div>
+  <div class="wf-note"><b><i>Progress</i> is two sections: <i>Mine</i>, then <i>My team</i>.</b> Team is
+    <code>reportsTo</code>, one level, never transitive — TM-AD-13 — so a member with no reports simply
+    never sees the second heading, and nothing on the rail is a per-person figure. <span class="wf-id">TM-OD-11</span>
+    holds: a bar against a <i>milestone</i> counts its children; a bar against a <i>person</i> would be
+    the score this module refuses to compute.</div>
   <div class="wf-note"><b>Being the default costs one thing and it has to be paid: the empty month.</b>
     The board opens with 22 cards no matter the week; a month with nothing dated in it opens blank, and
     a blank landing screen reads as a broken panel. The empty state therefore says how many items exist
@@ -507,6 +622,9 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
       <span class="wf-fake">Group: Milestone ▾</span>
       <span class="wf-spacer"></span><span class="wf-chip">scope: targets · milestones · their tasks</span>
     </div>
+    <div class="wf-shell">
+    <aside class="wf-wr" id="wfWr4"></aside>
+    <div class="wf-main">
     <div id="wfTl"></div>
     <div class="wf-fsec" style="background:var(--wf-fill)">
       <div class="wf-row" style="font-size:12px;color:var(--wf-ink2)">
@@ -518,6 +636,7 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
       </div>
       <div class="wf-inline" id="wfTlUndated"><span class="wf-i">⚠</span><div></div></div>
     </div>
+    </div></div>
   </div>
 
   <div class="wf-note"><span class="wf-id">TM-AD-24</span> <b>The lanes are milestones, not members.</b>
@@ -1044,19 +1163,22 @@ h1,h2,h3,h4{margin:0;font-weight:600;letter-spacing:-.01em}
     <div class="wf-frame">
       <div class="wf-fbar"><strong>Progress</strong><span class="wf-spacer"></span><span class="wf-sm">derived, never typed</span></div>
       <div class="wf-fsec">
-        <div class="wf-row" style="margin-bottom:11px"><span style="flex:1;min-width:150px">◆ Onboard 60 businesses</span>
-          <span class="wf-prog"><i style="width:63%"></i></span><span class="wf-sm">38 / 60</span></div>
+        <div class="wf-row" style="margin-bottom:11px"><span style="flex:1;min-width:150px">◈ Onboard 60 businesses <span class="wf-sm">target</span></span>
+          <span class="wf-prog"><i style="width:78%"></i></span><span class="wf-sm">47 / 60 businesses</span></div>
         <div class="wf-row" style="margin-bottom:11px"><span style="flex:1;min-width:150px">◆ Enquiry response under 4 hours</span>
-          <span class="wf-prog"><i style="width:60%"></i></span><span class="wf-sm">60%</span></div>
-        <div class="wf-row" style="margin-bottom:11px"><span style="flex:1;min-width:150px">◆ Support handover document</span>
-          <span class="wf-prog"><i style="width:33%"></i></span><span class="wf-sm">1 / 3</span></div>
+          <span class="wf-prog"><i style="width:0%"></i></span><span class="wf-sm">0 / 4 tasks</span></div>
+        <div class="wf-row" style="margin-bottom:11px"><span style="flex:1;min-width:150px">◆ Support handover document <span class="wf-sm">N. Pillai's</span></span>
+          <span class="wf-prog"><i style="width:0%"></i></span><span class="wf-sm">0 / 2 tasks</span></div>
         <div class="wf-row"><span class="wf-spacer"></span>
           <button class="wf-btn is-primary" data-goto="4">Open the milestone timeline ▸ <span class="wf-chip is-new" style="background:none;color:#fff;border-color:rgba(255,255,255,.4)">new</span></button></div>
       </div>
       <div class="wf-fsec" style="background:var(--wf-fill)">
         <div class="wf-inline" style="border-style:solid"><span class="wf-i">ⓘ</span><div>
           <b>No score.</b> <span class="wf-id">TM-OD-11</span> stands — the numbers are shown and every
-          column sorts, and nothing here reduces a person to one figure.</div></div>
+          column sorts, and nothing here reduces a person to one figure.
+          <b>Two of these bars read zero</b> and that is not a rendering fault: TM-AD-27 derives them
+          from the children, and no task under either milestone is complete. They read 60% and 33% while
+          the number was typed.</div></div>
       </div>
     </div>
   </div>
@@ -1260,14 +1382,16 @@ var TAGS = {
   'follow-up':{l:'Follow-up',t:'warn'}, review:{l:'Review',t:''}, admin:{l:'Admin',t:''}
 };
 
-/* id, kind, title, status, assignee, start, due, priority, parent, tags, progress */
+/* id, kind, title, status, assignee, start, due, priority, parent, tags — and for a
+   TARGET only, currentValue / targetValue / unit. There is no progress column:
+   TM-AD-27, progress is derived at read and stored nowhere. */
 var ITEMS = [
-  ['W-T01','target',   'Close 40 deals this quarter',              'in_progress','52','2026-07-01','2026-09-30','high',null,[],           38],
-  ['W-T02','target',   'Onboard 60 businesses',                    'in_progress','58','2026-07-01','2026-09-30','high',null,[],           63],
-  ['W-M01','milestone','Enquiry response under 4 hours',           'in_progress','58','2026-08-01','2026-09-30','high',null,[],           60],
-  ['W-M02','milestone','Onboard 12 businesses in Pune',            'in_progress','74','2026-08-10','2026-09-15','medium','W-T02',[],      50],
-  ['W-M03','milestone','Close Sharma Interiors',                   'in_progress','70','2026-08-14','2026-09-05','high','W-T01',[],        50],
-  ['W-M04','milestone','Support handover document',                'planned',    '86','2026-08-20','2026-09-10','medium',null,[],         33],
+  ['W-T01','target',   'Close 40 deals this quarter',              'in_progress','52','2026-07-01','2026-09-30','high',null,[],           15,40,'deals'],
+  ['W-T02','target',   'Onboard 60 businesses',                    'in_progress','58','2026-07-01','2026-09-30','high',null,[],           47,60,'businesses'],
+  ['W-M01','milestone','Enquiry response under 4 hours',           'in_progress','58','2026-08-01','2026-09-30','high',null,[]],
+  ['W-M02','milestone','Onboard 12 businesses in Pune',            'in_progress','74','2026-08-10','2026-09-15','medium','W-T02',[]],
+  ['W-M03','milestone','Close Sharma Interiors',                   'in_progress','70','2026-08-14','2026-09-05','high','W-T01',[]],
+  ['W-M04','milestone','Support handover document',                'planned',    '86','2026-08-20','2026-09-10','medium',null,[]],
   ['W-K01','task',     'Triage the August enquiry backlog',        'in_progress','63','2026-08-28','2026-08-28','high','W-M01',['review'],0],
   ['W-K02','task',     'Call back the 6 unreached leads',          'planned',    '63',null,        '2026-08-28','medium','W-M01',['call'],0],
   ['W-K03','task',     'Update the qualification checklist copy',  'planned',    '63',null,        '2026-09-02','low','W-M01',['review'],0],
@@ -1283,9 +1407,10 @@ var ITEMS = [
   ['W-K12','task',     'Get the ticket backlog under 20',          'planned',    '86',null,        '2026-08-31','high','W-M04',['follow-up'],0],
   ['W-K13','task',     'August payout reconciliation',             'in_progress','79','2026-08-27','2026-08-31','high',null,['admin'],    0],
   ['W-K14','task',     'Q3 pipeline review with the founders',     'planned',    '52',null,        '2026-09-03','medium','W-T01',['meeting'],0],
-  ['W-K15','task',     'Archive the June enquiry exports',         'cancelled',  '63',null,        '2026-08-26','low',null,['admin'],     0]
+  ['W-K15','task',     'Archive the June enquiry exports',         'cancelled',  '63',null,        '2026-08-26','low',null,['admin']]
 ].map(function(r){
-  return {id:r[0],kind:r[1],title:r[2],status:r[3],who:r[4],start:r[5],due:r[6],pri:r[7],parent:r[8],tags:r[9],prog:r[10]};
+  return {id:r[0],kind:r[1],title:r[2],status:r[3],who:r[4],start:r[5],due:r[6],pri:r[7],parent:r[8],
+          tags:r[9],cur:r[10],tgt:r[11],unit:r[12]};
 });
 
 /* Placeholder records for the entities this document proposes. */
@@ -1306,6 +1431,19 @@ var KIND = {task:{l:'Task'}, milestone:{l:'Milestone'}, target:{l:'Target'}};
 
 /* ---- derivations. Nothing below is ever stored. -------------------------- */
 function isTerminal(s){ return s === 'completed' || s === 'cancelled'; }
+/* TM-AD-27. A milestone counts its children; a target counts its own units. Neither
+   is stored, and the typed progressPct the seed used to carry disagreed with both. */
+function progressOf(it){
+  if (it.kind === 'target'){
+    return {pct: it.tgt ? Math.round(it.cur / it.tgt * 100) : 0,
+            note: it.cur + ' / ' + it.tgt + ' ' + it.unit};
+  }
+  var kids = ITEMS.filter(function(k){ return k.kind === 'task' && k.parent === it.id; });
+  var done = kids.filter(function(k){ return k.status === 'completed'; }).length;
+  return {pct: kids.length ? Math.round(done / kids.length * 100) : 0,
+          note: kids.length ? done + ' / ' + kids.length + ' tasks' : 'nothing under it yet'};
+}
+function fmtDay(d){ var x = new Date(d + 'T00:00:00'); return x.getDate() + ' ' + MON[x.getMonth()].slice(0,3); }
 function isDelayed(it){ return !!it.due && it.due < TODAY && !isTerminal(it.status); }
 function daysOver(it){ return Math.round((new Date(TODAY) - new Date(it.due)) / 86400000); }
 function railTone(it){
@@ -1467,12 +1605,22 @@ document.getElementById('wfAxis').addEventListener('change', renderBoard);
 var calAnchor = new Date('2026-09-01T00:00:00');
 var calMode = 'month';
 
+/* TM-AD-28. A task that runs a few days is drawn on each of them — that is a
+   schedule. A quarter-long target drawn on 92 days is wallpaper, so anything
+   longer than a week, and every milestone and target, draws twice: the day it
+   starts and the day it is due. The long ones live in the rail with a bar. */
+var CAL_SPAN = 7;
 function eventsOn(isoDay){
   var out = [];
   ITEMS.forEach(function(it){
     var s = it.start || it.due, e = it.due || it.start;
     if (!e) return;
-    if (isoDay >= s && isoDay <= e) out.push(it);
+    var days = Math.round((new Date(e) - new Date(s)) / 86400000) + 1;
+    if (it.kind === 'task' && days <= CAL_SPAN){
+      if (isoDay >= s && isoDay <= e) out.push({it:it, edge:''});
+    } else if (isoDay === s && isoDay === e){ out.push({it:it, edge:'due'});
+    } else if (isoDay === s){ out.push({it:it, edge:'starts'});
+    } else if (isoDay === e){ out.push({it:it, edge:'due'}); }
   });
   return out;
 }
@@ -1504,21 +1652,29 @@ function renderCal(){
       if (l.state === 'approved' && id >= l.from && id <= l.to) lv.push(MEMBERS[l.who].n.split(' ')[0]); });
     if (lv.length) body += '<span class="wf-ev e-leave">▒ ' + esc(lv.join(', ')) + ' on leave</span>';
     var cap = calMode === 'week' ? 8 : 3;
-    evs.slice(0, cap).forEach(function(it){
+    evs.slice(0, cap).forEach(function(ev){
+      var it = ev.it;
       var t = it.status === 'cancelled' ? 'dead'
             : it.status === 'blocked' ? 'bad'
             : isDelayed(it) ? 'warn'
             : it.status === 'completed' ? 'ok' : 'info';
-      var mark = it.kind === 'task' ? '●' : '◆';
+      var mark = it.kind === 'task' ? '●' : it.kind === 'target' ? '◈' : '◆';
       var w = (isDelayed(it) || it.status === 'blocked') ? '⚠' : '';
-      body += '<button class="wf-ev e-' + t + '" data-goto="5">' + mark + ' ' + w + ' ' + esc(it.title) + '</button>';
+      var edge = ev.edge === 'starts' ? '▸ starts · ' : ev.edge === 'due' ? '▪ due · ' : '';
+      body += '<button class="wf-ev e-' + t + '" data-goto="5">' + mark + ' ' + w + ' ' +
+              edge + esc(it.title) + '</button>';
     });
     if (evs.length > cap) body += '<div class="wf-more">+' + (evs.length - cap) + ' more</div>';
     h += '<div class="' + cls + '"><div class="wf-day-n">' + d.getDate() +
          (id === TODAY ? ' TODAY' : '') + '</div>' + body + '</div>';
   }
   document.getElementById('wfCal').innerHTML = h;
+  renderWorkRail();                     /* the mini month and the strip follow the view */
 }
+document.getElementById('wfCalToday').onclick = function(){
+  var t = new Date(TODAY + 'T00:00:00');
+  calAnchor = new Date(t.getFullYear(), t.getMonth(), 1); renderCal();
+};
 document.getElementById('wfCalPrev').onclick = function(){ calAnchor = new Date(calAnchor.getFullYear(), calAnchor.getMonth() - 1, 1); renderCal(); };
 document.getElementById('wfCalNext').onclick = function(){ calAnchor = new Date(calAnchor.getFullYear(), calAnchor.getMonth() + 1, 1); renderCal(); };
 document.getElementById('wfCalMode').addEventListener('click', function(e){
@@ -1526,6 +1682,167 @@ document.getElementById('wfCalMode').addEventListener('click', function(e){
   calMode = b.getAttribute('data-mode');
   this.querySelectorAll('button').forEach(function(x){ x.classList.toggle('is-on', x === b); });
   renderCal();
+});
+
+/* ---- the module rail — shell on all four faces (TM-AD-25) -----------------
+   Create, a mini month, the month's own numbers, progress by milestone and the
+   day's tasks. Five queries, one function, mounted three times so the wireframe
+   argues the decision instead of asserting it. Every number here is derived.
+--------------------------------------------------------------------------- */
+var RAIL_WHO = '52';
+
+function wrMini(){
+  var y = calAnchor.getFullYear(), m = calAnchor.getMonth();
+  var first = new Date(y, m, 1);
+  var s = addDays(first, -((first.getDay() + 6) % 7));
+  var h = '<div class="wf-mini">' + ['M','T','W','T','F','S','S']
+            .map(function(d){ return '<b>' + d + '</b>'; }).join('');
+  for (var i = 0; i < 42; i++){
+    var d = addDays(s, i), id = iso(d);
+    h += '<button data-mini="' + id + '" data-goto="3" class="' +
+         (d.getMonth() !== m ? 'is-out ' : '') + (id === TODAY ? 'is-today ' : '') +
+         (eventsOn(id).length ? 'has-i' : '') + '">' + d.getDate() + '</button>';
+  }
+  return h + '</div>';
+}
+
+function wrMonth(){
+  var y = calAnchor.getFullYear(), m = calAnchor.getMonth();
+  var a = iso(new Date(y, m, 1)), b = iso(new Date(y, m + 1, 0));
+  var inM = ITEMS.filter(function(i){
+    var s = i.start || i.due, e = i.due || i.start;
+    return e && s <= b && e >= a;
+  });
+  var done  = inM.filter(function(i){ return i.status === 'completed'; }).length;
+  var block = inM.filter(function(i){ return i.status === 'blocked'; }).length;
+  var late  = inM.filter(function(i){ return isDelayed(i) && i.status !== 'blocked'; }).length;
+  var open  = inM.length - done - block - late;
+  var n = Math.max(1, inM.length), seg = function(c, v){
+    return v ? '<i style="width:' + (v / n * 100) + '%;background:var(--wf-' + c + ')"></i>' : '';
+  };
+  return '<div class="wf-wrh">' + MON[m] + ' ' + y + '<span class="wf-spacer"></span>' +
+    '<span class="wf-chip">' + inM.length + ' dated</span></div>' +
+    '<div class="wf-stack">' + seg('ok', done) + seg('info', open) + seg('warn', late) + seg('bad', block) + '</div>' +
+    '<div class="wf-row" style="gap:8px;font-size:10.5px;color:var(--wf-ink2)">' +
+      '<span class="wf-tone t-ok"><i class="wf-dot"></i>' + done + ' done</span>' +
+      '<span class="wf-tone t-info"><i class="wf-dot"></i>' + open + ' open</span>' +
+      '<span class="wf-tone t-warn"><i class="wf-dot"></i>' + late + ' delayed</span>' +
+      '<span class="wf-tone t-bad"><i class="wf-dot"></i>' + block + ' blocked</span></div>' +
+    '<div class="wf-wrf">Counted at read against <code>asOf</code>. Nothing on this strip is stored.</div>';
+}
+
+function wrProgRow(it, who){
+  var p = progressOf(it);
+  return '<div class="wf-pr" data-goto="5">' +
+    '<div class="wf-pr-t"><span>' + (it.kind === 'target' ? '◈' : '◆') + '</span>' +
+    '<span style="flex:1;min-width:0">' + esc(it.title) + '</span></div>' +
+    '<div class="wf-pr-m"><span class="wf-prog is-thin"><i style="width:' + p.pct + '%"></i></span>' +
+    '<b style="color:var(--wf-ink2)">' + p.pct + '%</b></div>' +
+    '<div class="wf-pr-m"><span>' + (who ? esc(MEMBERS[it.who].n.split(' ')[0]) + ' · ' : '') + esc(p.note) + '</span>' +
+    '<span class="wf-spacer"></span><span' + (isDelayed(it) ? ' class="wf-tone t-warn"' : '') + '>due ' +
+    fmtDay(it.due) + (isDelayed(it) ? ' ⚠' : '') + '</span></div></div>';
+}
+
+function wrProgress(){
+  var marks = function(ids){
+    return ITEMS.filter(function(i){
+      return i.kind !== 'task' && !isTerminal(i.status) && ids.indexOf(i.who) >= 0; });
+  };
+  var team = Object.keys(MEMBERS).filter(function(id){ return MEMBERS[id].to === RAIL_WHO; });
+  var mine = marks([RAIL_WHO]), theirs = marks(team);
+
+  var h = '<div class="wf-wrh">Progress<span class="wf-spacer"></span>' +
+          '<span class="wf-chip">derived</span></div>';
+  h += mine.length
+     ? '<div class="wf-sm" style="color:var(--wf-ink3);margin-bottom:6px">Mine · ' + mine.length + '</div>' +
+       mine.map(function(i){ return wrProgRow(i, false); }).join('')
+     : '<div class="wf-sm" style="color:var(--wf-ink3)">Nothing of your own is a milestone or a target.</div>';
+  if (theirs.length){
+    h += '<div class="wf-sm" style="color:var(--wf-ink3);margin:11px 0 6px;padding-top:9px;' +
+         'border-top:1px solid var(--wf-line)">My team · ' + theirs.length +
+         ' <span class="wf-chip">reportsTo, one level</span></div>' +
+         theirs.map(function(i){ return wrProgRow(i, true); }).join('');
+  }
+  return h;
+}
+
+function wrToday(){
+  var mine = ITEMS.filter(function(i){
+    return i.kind === 'task' && i.who === RAIL_WHO && !isTerminal(i.status); });
+  var over = mine.filter(isDelayed);
+  var now  = mine.filter(function(i){
+    return !isDelayed(i) && ((i.due === TODAY) || (i.start && i.start <= TODAY && i.due >= TODAY)); });
+  var soon = mine.filter(function(i){
+    return i.due > TODAY && i.due <= iso(addDays(new Date(TODAY + 'T00:00:00'), 3)) && now.indexOf(i) < 0; });
+
+  var row = function(it, tone){
+    return '<div class="wf-tk" data-goto="5"><span class="wf-box"></span>' +
+      '<span style="flex:1;min-width:0">' + esc(it.title) +
+      '<span class="wf-pr-m"><span class="wf-tone' + (tone ? ' t-' + tone : '') + '">' +
+      (isDelayed(it) ? '⚠ ' + daysOver(it) + 'd over' : it.due === TODAY ? 'due today' : 'due ' + fmtDay(it.due)) +
+      '</span><span>' + PRI[it.pri].l.toLowerCase() + '</span>' +
+      (it.tags.length ? '<span class="wf-tag">' + esc(TAGS[it.tags[0]].l) + '</span>' : '') +
+      '</span></span></div>';
+  };
+  var sec = function(label, list, tone){
+    return list.length
+      ? '<div class="wf-sm" style="color:var(--wf-ink3);margin:9px 0 2px">' + label + ' · ' + list.length + '</div>' +
+        list.map(function(i){ return row(i, tone); }).join('')
+      : '';
+  };
+
+  var h = '<div class="wf-wrh">Today<span class="wf-spacer"></span>' +
+          '<span class="wf-chip">' + fmtDay(TODAY) + '</span></div>';
+  if (!over.length && !now.length && !soon.length){
+    h += '<div class="wf-sm" style="color:var(--wf-ink3)">Nothing of yours is open in the next three days.</div>';
+  } else {
+    h += sec('Overdue', over, 'warn') + sec('Due today', now, 'info') + sec('Next 3 days', soon, '');
+    if (!over.length && !now.length){
+      h += '<div class="wf-sm" style="color:var(--wf-ink3);margin-top:7px">Nothing is due today.</div>';
+    }
+  }
+  h += '<button class="wf-tk-add">+ add a task for today</button>' +
+       '<div class="wf-wrf"><button class="wf-btn is-quiet" data-goto="13" ' +
+       'style="width:100%;justify-content:center">Open my work ▸</button>' +
+       '<div style="margin-top:6px">Ticking completes in place. Reorder and reschedule live on ' +
+       '<code>/team/me?tab=work</code> — §3.13.</div></div>';
+  return h;
+}
+
+function renderWorkRail(){
+  var h =
+    '<div class="wf-wrb is-plain">' +
+      '<button class="wf-btn is-primary wf-create" style="width:100%;justify-content:center">+ Create ▾</button>' +
+      '<div class="wf-menu" hidden>' +
+        '<button>● Task</button><button>◆ Milestone</button><button>◈ Target</button>' +
+        '<div class="wf-sm">one form · <code>kind</code> prefilled · TM-AD-26</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="wf-wrb">' + wrMini() + '</div>' +
+    '<div class="wf-wrb">' + wrMonth() + '</div>' +
+    '<div class="wf-wrb">' + wrProgress() + '</div>' +
+    '<div class="wf-wrb">' + wrToday() + '</div>';
+  ['2','3','4'].forEach(function(n){
+    var el = document.getElementById('wfWr' + n);
+    if (el) el.innerHTML = h;
+  });
+}
+
+document.addEventListener('click', function(e){
+  var c = e.target.closest('.wf-create');
+  if (c){ var mn = c.parentNode.querySelector('.wf-menu'); mn.hidden = !mn.hidden; return; }
+  var d = e.target.closest('[data-mini]');
+  if (d){
+    var v = d.getAttribute('data-mini');
+    calAnchor = new Date(v.slice(0, 8) + '01T00:00:00');
+    calMode = 'month';
+    document.querySelectorAll('#wfCalMode button').forEach(function(x){
+      x.classList.toggle('is-on', x.getAttribute('data-mode') === 'month'); });
+    renderCal();
+  }
+});
+document.getElementById('wfRailWho').addEventListener('change', function(){
+  RAIL_WHO = this.value; renderWorkRail();
 });
 
 /* ---- §3.4 timeline: lanes are milestones, never members ------------------
@@ -1797,12 +2114,15 @@ function renderMe(){
   /* --- milestones ------------------------------------------------------- */
   h += '<div class="wf-fsec"><h4>Milestones and targets <span class="wf-chip is-live">shipped</span></h4>';
   marks.forEach(function(i){
-    h += '<div class="wf-row" style="margin-bottom:9px"><span style="flex:1;min-width:170px">◆ ' + esc(i.title) + '</span>' +
-      '<span class="wf-prog"><i style="width:' + i.prog + '%"></i></span>' +
-      '<span class="wf-sm">' + i.prog + '%</span>' +
+    var p = progressOf(i);
+    h += '<div class="wf-row" style="margin-bottom:9px"><span style="flex:1;min-width:170px">' +
+      (i.kind === 'target' ? '◈' : '◆') + ' ' + esc(i.title) + '</span>' +
+      '<span class="wf-prog"><i style="width:' + p.pct + '%"></i></span>' +
+      '<span class="wf-sm">' + p.pct + '% · ' + esc(p.note) + '</span>' +
       '<span class="wf-tone' + (isDelayed(i) ? ' t-warn' : '') + '">due ' + i.due.slice(8) + ' Sep</span></div>';
   });
-  h += '<div class="wf-sm">Progress is <b>completed children ÷ total</b>. Nobody types it.</div></div>';
+  h += '<div class="wf-sm">Progress is <b>completed children ÷ total</b> and it is computed right here — ' +
+       'TM-AD-27. It reads 0% because neither task under it is done, which is the point of not typing it.</div></div>';
 
   /* --- access, hidden from the member themselves ------------------------ */
   if (S.access){
@@ -1843,7 +2163,7 @@ document.getElementById('wfMeScope').addEventListener('click', function(e){
 
 /* ---- boot ----------------------------------------------------------------- */
 renderBoard();
-renderCal();
+renderCal();          /* renders the rail too — the mini month follows the month in view */
 renderTl();
 renderMe();
 var m = /^#s(\d+)$/.exec(location.hash);

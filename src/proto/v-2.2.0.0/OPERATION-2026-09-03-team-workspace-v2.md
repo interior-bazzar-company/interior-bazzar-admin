@@ -28,7 +28,10 @@ summary:     Calendar and Timeline become the fourth and fifth FACE of
              `/work`, not new modules. The sidebar row is RENAMED Calendar
              and `/work` with no `face` resolves to the calendar; the route,
              the entity and the grant do not move (TM-AD-23). The timeline's
-             lanes are MILESTONES, never members (TM-AD-24).
+             lanes are MILESTONES, never members (TM-AD-24). The module
+             gains a LEFT RAIL — Create, a mini month, this month's numbers,
+             progress by milestone and target, today's tasks — and the rail is
+             SHELL, carried by all four faces (TM-AD-25…28).
              "Captain" is not a new role — it is
              `reportsTo`, which has been on the member record since day one.
              Tags are RECORDS owned by a member, never vocabulary. Links are
@@ -40,10 +43,10 @@ summary:     Calendar and Timeline become the fourth and fifth FACE of
              Leave suppresses a derived absence and never writes an
              attendance row.
 
-outcome:     Thirteen wireframes, thirteen architecture decisions (TM-AD-12…24),
+outcome:     Thirteen wireframes, seventeen architecture decisions (TM-AD-12…28),
              a data-model delta of two new entities and four extended ones, a
              permission delta, a regression list, nine implementation phases,
-             thirteen open decisions (TM-OD-20…32) and five risks (TM-R-10…14).
+             thirteen open decisions (TM-OD-20…32) and six risks (TM-R-10…15).
              NOT code. One open decision — TM-OD-20 — blocks the roster work
              and needs an answer before Phase A.
 
@@ -63,6 +66,19 @@ outcome:     Thirteen wireframes, thirteen architecture decisions (TM-AD-12…24
              board's Assignee axis and §3.13. Progress fill and leave bands
              leave with the member lanes. Phase C moves to first — the row
              cannot promise a calendar before C ships.
+
+             AMENDED 2026-09-04 again by TM-AD-25…28, after the founder asked
+             for Google Calendar's LAYOUT and not only its grid. The module
+             gains a left rail: Create (one control, three kinds), a mini
+             month, this month's counts, progress in two sections — mine, then
+             my team — and today's tasks, linked into §3.13 rather than
+             duplicating it. It is shell, not a calendar widget: all four faces
+             carry it, it holds no filters, and every number in it is derived.
+             Drawing it against the seed found two live faults, both fixed here
+             rather than recorded as open — three typed milestone percentages
+             their own children contradict (TM-AD-27), and a month grid made
+             unreadable by quarter-long items printing on all ninety-two of
+             their days (TM-AD-28). The rail ships with Phase C.
 ```
 
 **Module:** Team · **Date:** 2026-09-03 · **Status:** awaiting approval
@@ -468,6 +484,102 @@ which is what "measure progress" has to mean in a module whose only progress rul
   and nothing at all on a milestone's — leave stays on the calendar and on §3.7. A lane
   states instead what is countable and already stored: *n of m tasks done*, and its dates.
 
+### TM-AD-25 · The rail is the module's shell, not the calendar's sidebar
+
+The founder's note is *"this left sidebar I like — an analytics indicator for our
+progress, with daily task management, interlinked with a dedicated page"*. Read literally
+that is a calendar sidebar. Built literally it would be a progress indicator that
+**disappears the moment somebody clicks Board**, which is the fastest way to make people
+stop trusting a number.
+
+The rail is therefore part of `/work` itself and every face keeps it:
+
+```
++ Create ▾        one control, three kinds            TM-AD-26
+mini month        click a day → that month, that face
+This month        done · open · delayed · blocked, for the month in view
+Progress          Mine, then My team — one bar per milestone or target
+Today             overdue, then due today, then the next three days
+```
+
+Five blocks, five queries, one component, mounted on all four faces. Below **1240px** —
+the breakpoint the panel already uses — it collapses.
+
+**What it deliberately does not hold is the filters.** Google's rail lists calendars to
+tick; ours would have to list members, kinds and tags, three filter sets that mean
+different things on each face. A filter that survives a face switch is how somebody loses
+half their board without noticing. Filters stay in each face's toolbar; the rail holds
+only what is true whichever face is open.
+
+**`Today` is a summary and it links to the page that owns the day.** Ticking completes in
+place; reordering, rescheduling and the full list are `/team/me?tab=work` (§3.13), which
+this document already had to design as the member's own work surface. The rail summarises
+it. It never becomes a second one.
+
+**`Progress` is two sections — Mine, then My team** — and team is `reportsTo`, one level,
+never transitive (TM-AD-13). A member with no reports never sees the second heading. Note
+what is *not* in it: a bar per person. A bar against a milestone counts its children; a
+bar against a person is the score **TM-OD-11** refuses to compute.
+
+### TM-AD-26 · One Create control, three kinds — never three buttons
+
+`+ Create ▾` opens *Task · Milestone · Target*, and all three open **the same form** with
+`kind` prefilled. They are one `WorkItem` with a `kind` — the premise TM-AD-15 already
+rests on — and a target only adds `targetValue` and `targetUnit` to the same six fields.
+
+Three buttons become three forms, then three validators, then three lists, and the module
+is back to the three tables `work.json` exists to avoid. The `+ New item` button is
+removed from every face toolbar in exchange: **one entry point, always in the same
+place**, which is also what makes the rail worth its width.
+
+### TM-AD-27 · Every number in the rail is derived — and drawing it caught three that were not
+
+A milestone's bar is `completed children ÷ total children`. A target's bar is
+`currentValue ÷ targetValue`. Neither is stored and neither is typed.
+
+Drawing the rail against the seed found the failure that rule exists to prevent. The
+wireframe's copy of the seed carried a typed `progressPct` on every milestone:
+
+| Milestone | Typed | Derived from its children |
+| --- | --- | --- |
+| Enquiry response under 4 hours | 60% | **0%** — 0 of 4 tasks complete |
+| Onboard 12 businesses in Pune | 50% | **0%** — 0 of 2 |
+| Support handover document | 33% | **0%** — 0 of 2 |
+| Close Sharma Interiors | 50% | 50% — 2 of 4 |
+
+Three of four were fiction, and `§3.12`'s roll-up was printing two of them. The typed
+field is gone from the wireframe seed; `work.json` never had it, and its own `$comment`
+on `W-M03` already said *"if a `progressPct` ever appears on this row in a payload, it is
+the field to delete, not the one to trust"*.
+
+> **That gap is the feature.** A rail that reads *0 of 4* is the only thing that will make
+> anybody close a task. A rail that reads 60% because someone typed 60% is decoration.
+
+One further number was reconciled: *Onboard 60 businesses* was drawn at 38 / 60 in the
+wireframe and stands at **47 / 60** in `work.json`, which is the file of record.
+
+### TM-AD-28 · A long item draws twice, not on every day it spans
+
+Rendered the naïve way — *an item appears on every day between `startDate` and
+`dueDate`* — September is **unreadable**. Both targets and *Enquiry response under 4
+hours* run from July to 30 September, so every single day of the month printed the same
+three chips and pushed that day's actual tasks into `+4 more`.
+
+```
+before                                    after
+┌────────┐  every day, all month          ┌────────┐
+│ 3      │  ◆ Close 40 deals              │ 3      │  ● Q3 pipeline review
+│ TODAY  │  ◆ Onboard 60 businesses       │ TODAY  │
+│        │  ◆ Enquiry response…           │        │
+│        │  +4 more   ← the real work     │        │
+└────────┘                                └────────┘
+```
+
+**The rule:** a *task* of a week or less draws on every day it spans; anything longer, and
+every milestone and target, draws exactly twice — `▸ starts` and `▪ due`. The long ones
+are not lost: they are in the rail with a bar, which is the right shape for a commitment
+that has no single day.
+
 ## 3. The wireframes
 
 Notation: `[ ]` a control · `▾` a menu · `◍` a member · `◆` a milestone or target ·
@@ -518,32 +630,96 @@ says 34 and the columns must still add to 34.
 
 ### 3.3 Calendar — `/work?face=calendar` NEW · the default face (TM-AD-23)
 
-Builds on the v1 §3.7 sketch. Google Calendar is UX inspiration only: taken — the month
-grid, the coloured chip, click-a-day-to-create, keyboard paging. Not taken — overlapping
-event layout, all-day vs timed lanes, recurrence, invitations, drag-to-resize.
+Builds on the v1 §3.7 sketch, and now takes Google Calendar's **layout** as well as its
+grid: a left rail beside a month. Taken — the rail, Create at the top of it, the mini
+month, the day's tasks, the coloured chip, click-a-day-to-create, keyboard paging. Not
+taken — overlapping event layout, all-day vs timed lanes, recurrence, invitations,
+drag-to-resize, and the rail's list of tickable calendars (TM-AD-25).
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────┐
-│ ‹ August 2026 ›  [Month][Week]  [Member ▾][Kind ▾][Tag ▾]        [+ New item]     │
-├────────┬────────┬────────┬────────┬────────┬────────┬────────────────────────────┤
-│  MON   │  TUE   │  WED   │  THU   │  FRI   │  SAT   │  SUN                       │
-├────────┼────────┼────────┼────────┼────────┼────────┼────────────────────────────┤
-│  24    │  25    │  26    │  27    │  28    │  29    │  30                        │
-│ ●Triage│ ●Calls │ ◆Q3 60%│ ●Draft │ ●Triage│        │                            │
-│ ●Review│ ⚠Late  │        │ ●Calls │ ⚠Block │        │                            │
-│ +2 more│        │        │        │        │        │                            │
-├────────┼────────┼────────┼────────┼────────┼────────┼────────────────────────────┤
-│  31    │   1    │   2    │   3    │   4    │   5    │   6                        │
-│ ◆Q3 due│        │        │ TODAY  │        │        │                            │
-└────────┴────────┴────────┴────────┴────────┴────────┴────────────────────────────┘
-   chip tone = status  ·  ◆ = milestone/target  ·  ⚠ = delayed or blocked
-   click a day → new item with that date prefilled  ·  click a chip → item drawer
+│ [▦ Calendar][▤ Board][☰ List][⊞ Timeline]  [Today] ‹ September 2026 › [M][W]     │
+├──────────────────────┬───────────────────────────────────────────────────────────┤
+│  + Create         ▾  │  MON    TUE    WED    THU    FRI    SAT    SUN            │
+│  ──────────────────  │ ─────────────────────────────────────────────────         │
+│  mini month          │  31      1      2      3      4      5      6             │
+│  ──────────────────  │  ●⚠Pune ●Draft        TODAY  ●Run-  ◆▪due                 │
+│  September 2026      │  +1                  ●Q3    book   Sharma                 │
+│   11 dated           │ ─────────────────────────────────────────────────         │
+│   0 done · 8 open    │   7      8      9     10     11     12     13             │
+│   3 late · 0 blockd  │          ▒▒ N. Pillai on leave                            │
+│  ──────────────────  │                      ◆▪due                                │
+│  Progress            │                      handover                             │
+│   Mine · 1           │ ─────────────────────────────────────────────────         │
+│   My team · 2        │  14     15     16     17     18     19     20             │
+│  ──────────────────  │         ◆▪due                                             │
+│  Today · 3 Sep       │         Pune                                              │
+│   ☐ Q3 pipeline      │ ─────────────────────────────────────────────────         │
+│  [ Open my work ▸ ]  │  … 21 – 27, nothing is dated …                            │
+│                      │ ─────────────────────────────────────────────────         │
+│                      │  28     29     30      1      2      3      4             │
+│                      │                ◈▪due ◈▪due ◆▪due  (30 Sep carries 3)      │
+└──────────────────────┴───────────────────────────────────────────────────────────┘
 ```
 
-**A multi-day item appears on every day it spans, not only its due date.** `startDate`
+**The rail belongs to the module, not to this face** — TM-AD-25. It is drawn identically
+on §3.2 and §3.4, from one function and five queries.
+
+```
+┌────────────────────────────────┐
+│  ┌──────────────────────────┐  │
+│  │      + Create       ▾    │  │
+│  └──────────────────────────┘  │
+│     ● Task                     │
+│     ◆ Milestone                │
+│     ◈ Target                   │
+│     one form, kind prefilled   │
+├────────────────────────────────┤
+│  M  T  W  T  F  S  S           │
+│ 31  1  2 (3) 4  5  6           │
+│  7  8  9 10 11 12 13           │
+│ 14 15 16 17 18 19 20           │
+│ 21 22 23 24 25 26 27           │
+│ 28 29 30  1  2  3  4           │
+│ (3) = today · a dot = a day    │
+│ that carries something         │
+├────────────────────────────────┤
+│ SEPTEMBER 2026     11 dated    │
+│ ░░░░░░░░░░░░░░░░▒▒▒▒▒▒         │
+│ 0 done · 8 open                │
+│ 3 delayed · 0 blocked          │
+├────────────────────────────────┤
+│ PROGRESS            derived    │
+│ Mine · 1                       │
+│ ◈ Close 40 deals this qtr      │
+│ ████░░░░░░░░░░  38%            │
+│ 15 / 40 deals     due 30 Sep   │
+│ My team · 2   reportsTo, 1lvl  │
+│ ◆ Close Sharma Interiors       │
+│ ███████░░░░░░░  50%            │
+│ Rahul · 2 / 4 tasks  due 5 Sep │
+│ ◆ Onboard 12 in Pune           │
+│ ░░░░░░░░░░░░░░   0%            │
+│ Priya · 0 / 2      due 15 Sep  │
+├────────────────────────────────┤
+│ TODAY                  3 Sep   │
+│ Due today · 1                  │
+│ ☐ Q3 pipeline review with      │
+│   the founders                 │
+│   due today · medium · Meetng  │
+│ ┌ + add a task for today ───┐  │
+│ [     Open my work ▸       ]   │
+│ Ticking completes in place.    │
+└────────────────────────────────┘
+```
+
+**A multi-day task appears on every day it spans, not only its due date.** `startDate`
 has been on the model since v1 and the board never used it; the calendar is the first
 face where it means anything, and an item that shows only on its last day is a deadline
 list rather than a schedule.
+
+**A quarter-long item, however, is not an event on ninety-two days** — TM-AD-28, and it
+was found by rendering the month rather than by reasoning about it.
 
 **Week view is the same grid with seven columns and rows by item — no hour gutter.**
 Nothing in this module has a start and end *time* except attendance, which has its own
@@ -884,6 +1060,7 @@ Five of the six are Team's. `Incentive` is deliberately not, and that is TM-AD-1
 | Entity | Added | Why |
 | --- | --- | --- |
 | `WorkItem` | `tagIds[]`, `links[]` (derived from `WorkLink`) | §3.5. `startDate` already exists and is finally used. |
+| `WorkItem` | **`progressPct` removed, not added** | TM-AD-27. Derived at read from the children, or from `currentValue ÷ targetValue`. A payload that carries it is carrying a number that will be wrong by Thursday. |
 | `Member` | `departmentId` *(reserved, TM-OD-20)* | Reserved so the answer to TM-OD-20 is additive either way. |
 | `AttendanceDay` | nothing | Leave does not touch it. That is the point of TM-AD-20. |
 | `vocabularies.json` | `tagSuggestions[]`, `leaveKinds[]`, `linkRelations[]`, `agreementKinds[]`, `resourceKinds[]`, `on_leave` in `attendanceStates` with `stored: false` | Static copy, all of it. |
@@ -946,6 +1123,7 @@ else needs a verb.
 | `views/Team/Reports.tsx` | three blocks on the roll-up | **Low.** Additive. |
 | `content/team/vocabularies.json` | five new lists, one new state | **Medium.** `stored: false` on `on_leave` is load-bearing; getting it wrong makes leave writable. |
 | `content/team/work.json` | two fields on existing rows | **Low.** |
+| `views/Team/Work.tsx` (rail) | a left rail on all four faces, and `+ New item` leaves every toolbar | **Medium.** It narrows the board's columns at every width above the 1240px collapse. Check the board at 1280px before merging. |
 | `admin-theme.css` / `team.css` | timeline and calendar grids | **Medium.** Use the `tm-` prefix. Four class collisions are already on record in this repo. |
 
 **Must not change:** `teamShared.tsx` (`ActionMatrix` is canonical and shared with
@@ -967,7 +1145,7 @@ Ordered by dependency. Each leaves the panel working.
 | --- | --- | --- |
 | **A** | Vocabulary extension + `tags.json` + tag records, picker and manager (§3.5, §3.6) | TM-OD-20 answered |
 | **B** | Selectable column axis on the board (§3.2) | A — Tag is one of the axes |
-| **C** | Calendar face, month then week (§3.3) — **first**, it is the face `/work` lands on | — |
+| **C** | Calendar face, month then week (§3.3), **and the rail** (§3.3, TM-AD-25/26/27/28) — **first**, it is the face `/work` lands on | — |
 | **D** | Timeline face (§3.4) | C shares the date-grid mechanics |
 | **E** | Leave: request, inbox, and the one-clause derivation change (§3.7, §3.8, TM-AD-20) | — |
 | **F** | Links on the item drawer (§3.5) | D — `follows` draws on the timeline |
@@ -1008,6 +1186,7 @@ private-object decision, not before it.
 | **TM-R-11** | Identity documents on a backend where **every S3 object is publicly readable by URL**. | **High** | Private objects + signed reads, decided before Phase H starts. Do not reuse the existing public `fileUrl` return. This is TM-R-04 with worse consequences. |
 | **TM-R-12** | The public signing page is an unauthenticated write on a legal record, and the project still has no throttle class. | **High** | Inherits TM-R-05 in full: hashed token, expiry, single-use, revocable, per-token and per-IP limits, `attemptCount`. |
 | **TM-R-13** | Timeline plus calendar is more net-new UI than the whole of v1's work face. | **Medium** | C before D, month before week, and both share one date-grid primitive. If D slips, C alone answers the brief's *"like Google Calendar"* — and after TM-AD-23 C cannot slip at all, because the sidebar row is named after it. |
+| **TM-R-15** | The rail costs 238px on every face, and the board is the face that can least afford it. | **Medium** | It collapses below 1240px, which is a breakpoint the panel already has. Above it, check the board at 1280px: five columns and a rail is the case that has to hold. If it does not, the rail collapses to icons on the board only — never disappears, because a progress indicator with a hiding place is not one. |
 | **TM-R-14** | Six tabs on the member dashboard, three of them added at once. | **Low–Medium** | **Mitigation taken up front — see TM-AD-22.** Agreements and Resources ship as two sections of one *Documents* tab, so only one tab is added, not three. Ship Pay last (Phase I). The next fold, if one is still needed, is Reports into Overview. |
 
 ---
