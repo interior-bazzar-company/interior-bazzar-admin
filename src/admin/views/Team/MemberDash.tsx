@@ -61,7 +61,10 @@ export default function MemberDash() {
   }, tab);
 
   if (!id) return <Roster members={members} me={me} />;
-  if (!m) return <Notice tone="bad" text="No such member." />;
+  /* The identity half (`#/team`) is LIVE and the operational half is not: a
+     member the roster knows may have no attendance, work or leave behind them
+     yet. Say which half is missing rather than 404 on a person who exists. */
+  if (!m) return <NotSeeded id={id} members={members} me={me} />;
 
   const viewer = target === me ? "self" : m.reportsTo === me ? "senior" : "admin";
 
@@ -85,6 +88,17 @@ export default function MemberDash() {
           : tab === "documents" ? (viewer === "senior" ? <Refused /> : <DocumentsTab m={m} viewer={viewer} />)
           : tab === "pay" ? (viewer === "senior" ? <Refused /> : <PayTab m={m} />)
           : <OverviewTab m={m} viewer={viewer} />}
+      </div>
+    </div>
+  );
+}
+
+function NotSeeded({ id, members, me }: { id: string; members: Member[]; me: string }) {
+  return (
+    <div className="dls">
+      <div className="dls-body">
+        <Notice tone="warn" text={"Member " + id + " has no operational record yet — attendance, work and leave arrive with the API. The eight below are the seed."} />
+        <Roster members={members} me={me} />
       </div>
     </div>
   );
