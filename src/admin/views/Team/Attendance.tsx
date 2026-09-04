@@ -19,7 +19,7 @@
    NO API YET — everything comes from src/content/team/attendance.json through
    store.ts, which is the only file that knows that.
    ============================================================================= */
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
@@ -28,9 +28,10 @@ import {
 } from "../../ui";
 import type { StatCell } from "../../ui";
 import {
-  TODAY, addDays, attendanceTotals, dayFor, endDay, fmtDate, fmtDayName, fmtHM, fmtTime,
-  meId, openDay, resumeDay, scopeLabel, scopeOf, startBreak, stateOf, useDayRows, useMe,
-  useMembers, useMyDay, weekOf, workedOf, now as clockNow,
+  LEAVE_KIND, TODAY, addDays, attendanceTotals, dayFor, decideLeave, endDay, fmtDate, fmtDayName, labelOf,
+  fmtHM, fmtTime, meId, openDay, pendingLeave, readMember, resumeDay, scopeLabel, scopeOf,
+  startBreak, stateOf, useDayRows, useLeave, useMe, useMembers, useMyDay, weekOf, workedOf,
+  now as clockNow,
 } from "./store";
 import type { DayRow, Result } from "./store";
 import { BarScale, DayBar, Meter, ScopeNote, StatePill, Who, ProtoBar } from "./bits";
@@ -92,7 +93,8 @@ export default function Attendance() {
               <Select name="state" label="State" value={p.state} onFilter={onFilter}
                 options={[{ v: "working", l: "Working" }, { v: "on_break", l: "On break" },
                   { v: "ended", l: "Day ended" }, { v: "unclosed", l: "Unclosed" },
-                  { v: "not_started", l: "Not started" }, { v: "absent", l: "Absent" }]} />
+                  { v: "not_started", l: "Not started" }, { v: "absent", l: "Absent" },
+                  { v: "on_leave", l: "On leave" }]} />
               <Select name="late" label="Late" value={p.late} onFilter={onFilter}
                 options={[{ v: "1", l: "Late only" }]} />
             </>
@@ -139,7 +141,9 @@ function MyClock({ onAct }: { onAct: (r: Result<unknown>) => void }) {
         <span className="tm-clock-x">of {expected}h expected</span>
       </div>
       <div className="tm-clock-a">
-        {state === "not_started" || state === "absent"
+        {/* On leave still offers Start day: an approved day off does not stop
+            somebody coming in, and the row they open is the truth. */}
+        {state === "not_started" || state === "absent" || state === "on_leave"
           ? <button className="btn pri" onClick={() => act(() => openDay(me.memberId))}>Start day</button>
           : null}
         {state === "working"
@@ -190,6 +194,7 @@ function Today({ rows, p, date, onFilter }: {
     "sep",
     { k: "late", v: t.late, dot: t.late ? "warn" : "", to: ROUTE + qs({ ...p, late: "1" }), on: !!p.late },
     { k: "absent", v: t.absent, dot: t.absent ? "bad" : "", to: ROUTE + qs({ ...p, state: "absent" }), on: p.state === "absent" },
+    { k: "on leave", v: t.onLeave, dot: t.onLeave ? "info" : "", to: ROUTE + qs({ ...p, state: "on_leave" }), on: p.state === "on_leave" },
     { k: "unclosed", v: t.unclosed, dot: t.unclosed ? "warn" : "", to: ROUTE + qs({ ...p, state: "unclosed" }), on: p.state === "unclosed" },
   ];
 
@@ -202,6 +207,7 @@ function Today({ rows, p, date, onFilter }: {
           onUnfilter={(n) => onFilter(n, "")} />
       </div>
       <div className="dls-body">
+        <LeaveInbox />
         <div className="tm-daterow">
           <b>{fmtDayName(date)} {fmtDate(date)}</b>
           {date === TODAY ? <span className="pill xs">today</span> : null}
@@ -332,5 +338,82 @@ function DateNav({ date, onPick }: { date: string; onPick: (d: string) => void }
       </button>
       {date !== TODAY ? <button className="btn sm" onClick={() => onPick(TODAY)}>Today</button> : null}
     </div>
+  );
+}
+
+/* ------------------------------------------------------------- leave --- */
+
+/** THE SENIOR SIDE. One block, only when there is something in it: a queue that
+ *  renders an empty state every day is a queue people stop looking at.
+ *  Approving writes NO attendance row — it suppresses the derived absence, and
+ *  the day reads On leave instead. */
+function LeaveInbox() {
+  const shell = useShell();
+  useLeave();
+  const me = meId();
+  const rows = pendingLeave(scopeOf("attendance"));
+  if (!rows.length) return null;
+
+  const decide = (id: string, state: "approved" | "rejected", note?: string) => {
+    const r = decideLeave(id, state, me, note);
+    shell.toast(r.ok ? "Leave " + state + "." : r.message, r.ok ? "" : "bad");
+  };
+
+  return (
+    <div className="tm-inbox">
+      <header>
+        <b>Leave requests</b>
+        <span className="pill warn xs">{rows.length}</span>
+      </header>
+      {rows.map((l) => {
+        const m = readMember(l.memberId);
+        const days = Math.round((new Date(l.toDate).getTime() - new Date(l.fromDate).getTime()) / 86400000) + 1;
+        return (
+          <div key={l.leaveId} className="tm-inbox-r">
+            <span className="tm-inbox-t">
+              <b>{m ? m.name : l.memberId}</b>
+              <span className="cell-2">
+                {fmtDate(l.fromDate)}{l.toDate !== l.fromDate ? " – " + fmtDate(l.toDate) : ""}
+                {" · " + days + (days > 1 ? " days" : " day") + " · " + labelOf(LEAVE_KIND, l.kind)}
+              </span>
+            </span>
+            <span className="tm-inbox-w">{l.reason}</span>
+            <span className="spacer" />
+            <button className="btn sm" onClick={() => shell.modal(
+              <RefuseModal onSubmit={(n) => { shell.closeLayer(); decide(l.leaveId, "rejected", n); }} />, "sm")}>
+              Refuse…
+            </button>
+            <button className="btn pri sm" onClick={() => decide(l.leaveId, "approved")}>Approve</button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function RefuseModal({ onSubmit }: { onSubmit: (note: string) => void }) {
+  const shell = useShell();
+  const [v, setV] = useState("");
+  return (
+    <>
+      <div className="md-h">
+        <h3>Refuse this request</h3>
+        <button className="btn icon sm md-x" aria-label="Close" onClick={() => shell.closeLayer()}>
+          <Icon name="x" size="sm" />
+        </button>
+      </div>
+      <div className="md-b">
+        <div className="fg">
+          <label htmlFor="lvRefuse">Reason <b className="req">*</b></label>
+          <input id="lvRefuse" className="inp" autoFocus value={v} onChange={(e) => setV(e.target.value)} />
+          <span className="help">The member sees it on their row.</span>
+        </div>
+      </div>
+      <div className="md-f">
+        <span className="spacer" />
+        <button className="btn" onClick={() => shell.closeLayer()}>Cancel</button>
+        <button className="btn dgr" disabled={!v.trim()} onClick={() => onSubmit(v)}>Refuse</button>
+      </div>
+    </>
   );
 }

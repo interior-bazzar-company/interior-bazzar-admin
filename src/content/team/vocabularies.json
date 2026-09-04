@@ -49,6 +49,14 @@
       "dot": "warn",
       "stored": false,
       "help": "DERIVED. Still open past the member's autoCloseAt. Contributes nothing to totals until a person resolves it. NOTHING AUTO-CLOSES: an auto-closed day is a number the system invented, an unclosed one is a question."
+    },
+    {
+      "key": "on_leave",
+      "label": "On leave",
+      "tone": "info",
+      "dot": "info",
+      "stored": false,
+      "help": "DERIVED. Approved leave covers the date and no day was opened. It suppresses Absent; it never writes an attendance row."
     }
   ],
   "$comment_attendanceStates": "`stored:false` is the whole point of this list. Absent and Unclosed are computed at read time against the member's own dayStartsAt / autoCloseAt and the payload's asOf. Storing them would need a sweep job, and this backend has no queue — only a 15-minute cron. The enquiries module withdrew its SLA sweep for exactly this reason.",
@@ -373,5 +381,80 @@
       "tone": "dead"
     }
   ],
-  "$comment_leave": "Approved leave SUPPRESSES a derived absence. It never writes an attendance row — two records answering 'was this person in' would disagree inside a month."
+  "$comment_leave": "Approved leave SUPPRESSES a derived absence. It never writes an attendance row — two records answering 'was this person in' would disagree inside a month.",
+  "agreementKinds": [
+    {
+      "key": "offer_letter",
+      "label": "Offer letter"
+    },
+    {
+      "key": "nda",
+      "label": "NDA"
+    }
+  ],
+  "agreementStates": [
+    {
+      "key": "draft",
+      "label": "Draft",
+      "tone": ""
+    },
+    {
+      "key": "sent",
+      "label": "Sent",
+      "tone": "info"
+    },
+    {
+      "key": "viewed",
+      "label": "Opened",
+      "tone": "info"
+    },
+    {
+      "key": "signed",
+      "label": "Signed",
+      "tone": "ok"
+    },
+    {
+      "key": "revoked",
+      "label": "Revoked",
+      "tone": "dead"
+    },
+    {
+      "key": "expired",
+      "label": "Expired",
+      "tone": "bad"
+    }
+  ],
+  "resourceKinds": [
+    {
+      "key": "pan",
+      "label": "PAN",
+      "required": true
+    },
+    {
+      "key": "aadhaar",
+      "label": "Aadhaar",
+      "required": true
+    },
+    {
+      "key": "address_proof",
+      "label": "Address proof",
+      "required": true
+    },
+    {
+      "key": "bank",
+      "label": "Bank passbook",
+      "required": true
+    },
+    {
+      "key": "photo",
+      "label": "Photograph",
+      "required": false
+    },
+    {
+      "key": "other",
+      "label": "Other",
+      "required": false
+    }
+  ],
+  "$comment_documents": "TWO BUCKETS, NOT ONE. An Agreement travels company → member and is frozen at send; a Resource travels member → company and the member may delete it. They differ in direction, permission and retention, which is why one tab holds two lists rather than one list holding both."
 }

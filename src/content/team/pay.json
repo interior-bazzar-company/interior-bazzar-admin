@@ -1,0 +1,14 @@
+{
+  "$comment": "PLACEHOLDER RECORDS — a READ of Finance, never a write. Stands in for GET /api/v1/admin/finance/salary-accounts + /incentives, scoped to one member. Team shows the number and links into Finance for every action; Finance owns the money. `annualCtc` is in paise-free rupees. An incentive is Team's basis and Finance's payment, which is why its state is pending → approved → paid and Team can only read it.",
+  "generatedAt": "2026-08-28T14:20:00+05:30",
+  "pay": [
+    {"memberId": "41", "annualCtc": 0, "currency": "INR", "effectiveFrom": "2026-04-01", "lastPayslip": null, "incentives": []},
+    {"memberId": "52", "annualCtc": 1450000, "currency": "INR", "effectiveFrom": "2026-04-01", "lastPayslip": {"month": "2026-07", "net": 106333, "paidAt": "2026-08-01"}, "incentives": [{"incentiveId": "IN-01", "month": "2026-07", "basis": "Q1 desk target", "amount": 25000, "state": "paid"}, {"incentiveId": "IN-02", "month": "2026-08", "basis": "August closures", "amount": 18000, "state": "approved"}]},
+    {"memberId": "58", "annualCtc": 1250000, "currency": "INR", "effectiveFrom": "2026-04-01", "lastPayslip": {"month": "2026-07", "net": 91667, "paidAt": "2026-08-01"}, "incentives": [{"incentiveId": "IN-03", "month": "2026-08", "basis": "Onboarding run rate", "amount": 12000, "state": "pending"}]},
+    {"memberId": "63", "annualCtc": 620000, "currency": "INR", "effectiveFrom": "2026-04-01", "lastPayslip": {"month": "2026-07", "net": 45467, "paidAt": "2026-08-01"}, "incentives": []},
+    {"memberId": "70", "annualCtc": 540000, "currency": "INR", "effectiveFrom": "2026-04-01", "lastPayslip": {"month": "2026-07", "net": 39600, "paidAt": "2026-08-01"}, "incentives": [{"incentiveId": "IN-04", "month": "2026-08", "basis": "Sharma Interiors", "amount": 15000, "state": "pending"}]},
+    {"memberId": "74", "annualCtc": 540000, "currency": "INR", "effectiveFrom": "2026-04-01", "lastPayslip": {"month": "2026-07", "net": 39600, "paidAt": "2026-08-01"}, "incentives": []},
+    {"memberId": "79", "annualCtc": 700000, "currency": "INR", "effectiveFrom": "2026-04-01", "lastPayslip": {"month": "2026-07", "net": 51333, "paidAt": "2026-08-01"}, "incentives": []},
+    {"memberId": "86", "annualCtc": 420000, "currency": "INR", "effectiveFrom": "2026-04-01", "lastPayslip": null, "incentives": []}
+  ]
+}

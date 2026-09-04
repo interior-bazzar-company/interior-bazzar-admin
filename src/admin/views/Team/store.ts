@@ -44,13 +44,17 @@ import plansDoc from "../../../content/team/plans.json";
 import reportsDoc from "../../../content/team/reports.json";
 import tagsDoc from "../../../content/team/tags.json";
 import leaveDoc from "../../../content/team/leave.json";
+import agreementsDoc from "../../../content/team/agreements.json";
+import resourcesDoc from "../../../content/team/resources.json";
+import payDoc from "../../../content/team/pay.json";
 import vocabDoc from "../../../content/team/vocabularies.json";
 import { can, getSession } from "../../auth/session";
 
 /* ============================================================== types === */
 
 export type MemberStatus = "active" | "inactive" | "suspended";
-export type AttendanceState = "not_started" | "working" | "on_break" | "ended" | "unclosed" | "absent";
+export type AttendanceState =
+  "not_started" | "working" | "on_break" | "ended" | "unclosed" | "absent" | "on_leave";
 export type WorkKind = "task" | "milestone" | "target";
 /** FOUR stored values. `blocked` is not among them: waiting on someone is a
  *  relationship, not a stage, and it lives on `blockedByItemId`. */
@@ -133,6 +137,51 @@ export interface WorkItem {
   tagIds?: string[];
   rowVersion: number;
   createdAt: string;
+}
+
+export type AgreementState = "draft" | "sent" | "viewed" | "signed" | "revoked" | "expired";
+
+export interface Agreement {
+  agreementId: string;
+  memberId: string;
+  kind: string;
+  title: string;
+  version: number;
+  state: AgreementState;
+  sentAt: string | null;
+  sentById: string | null;
+  viewedAt: string | null;
+  signedAt: string | null;
+  signedName: string | null;
+  signerIp: string | null;
+  expiresAt: string | null;
+  token: string;
+  fileName: string;
+}
+
+export interface Resource {
+  resourceId: string;
+  memberId: string;
+  kind: string;
+  label: string;
+  fileName: string;
+  sizeKb: number;
+  uploadedAt: string;
+  uploadedById: string;
+  verifiedById: string | null;
+  verifiedAt: string | null;
+}
+
+export interface Incentive {
+  incentiveId: string; month: string; basis: string; amount: number; state: string;
+}
+export interface Pay {
+  memberId: string;
+  annualCtc: number;
+  currency: string;
+  effectiveFrom: string;
+  lastPayslip: { month: string; net: number; paidAt: string } | null;
+  incentives: Incentive[];
 }
 
 export interface Tag {
@@ -263,6 +312,13 @@ export const ATT_STATE = toneMap(vocabDoc.attendanceStates as ToneRow[]);
 export const WORK_STATUS = toneMap(vocabDoc.workStatuses as ToneRow[]);
 export const LEAVE_STATE = toneMap(vocabDoc.leaveStates as ToneRow[]);
 export const LEAVE_KIND = toneMap(vocabDoc.leaveKinds as unknown as ToneRow[]);
+export const AGREEMENT_KIND = toneMap(vocabDoc.agreementKinds as unknown as ToneRow[]);
+export const AGREEMENT_STATE = toneMap(vocabDoc.agreementStates as ToneRow[]);
+export const RESOURCE_KIND = toneMap(vocabDoc.resourceKinds as unknown as ToneRow[]);
+/** The documents a member is expected to have handed over. Vocabulary, not a
+ *  constant here: adding one server-side must not need a code edit. */
+export const REQUIRED_DOCS: string[] = (vocabDoc.resourceKinds as { key: string; required?: boolean }[])
+  .filter((r) => r.required).map((r) => r.key);
 export const PRIORITY = toneMap(vocabDoc.priorities as ToneRow[]);
 export const KIND = toneMap(vocabDoc.workKinds as unknown as ToneRow[]);
 
@@ -283,6 +339,8 @@ type Snapshot = {
   reports: DailyReport[];
   tags: Tag[];
   leave: LeaveRequest[];
+  agreements: Agreement[];
+  resources: Resource[];
   version: number;
 };
 
@@ -296,6 +354,8 @@ const seed = (): Snapshot => ({
   reports: clone(reportsDoc.reports) as DailyReport[],
   tags: clone(tagsDoc.tags) as Tag[],
   leave: clone(leaveDoc.leave) as LeaveRequest[],
+  agreements: clone(agreementsDoc.agreements) as Agreement[],
+  resources: clone(resourcesDoc.resources) as Resource[],
   version: 0,
 });
 
@@ -318,6 +378,8 @@ export const readPlans = (): DailyPlan[] => snap.plans;
 export const readReports = (): DailyReport[] => snap.reports;
 export const readTags = (): Tag[] => snap.tags;
 export const readLeave = (): LeaveRequest[] => snap.leave;
+export const readAgreements = (): Agreement[] => snap.agreements;
+export const readResources = (): Resource[] => snap.resources;
 export const readMember = (id: string): Member | null =>
   snap.members.filter((m) => m.memberId === id)[0] || null;
 export const readItem = (id: string): WorkItem | null =>
@@ -385,7 +447,13 @@ export function isUnclosed(d: AttendanceDay, m: Member | null, at = now()): bool
   return at > cutoff;
 }
 
-export function stateOf(d: AttendanceDay | null, m: Member | null, at = now()): AttendanceState {
+/** APPROVED LEAVE SUPPRESSES A DERIVED ABSENCE. It writes no attendance row —
+ *  two records answering "was this person in" disagree inside a month — so the
+ *  suppression happens here, at read, and only when no day was opened. A member
+ *  who came in anyway has a row, and the row wins. */
+export function stateOf(d: AttendanceDay | null, m: Member | null, at = now(), date?: string): AttendanceState {
+  const on = d ? null : onLeave(m ? m.memberId : "", date || "");
+  if (on) return "on_leave";
   if (!d) {
     if (!m) return "not_started";
     /* Absent is only answerable once the day is over. At 10am a member who is
@@ -442,7 +510,7 @@ export function dayRows(date: string, scope: Scope, at = now()): DayRow[] {
       return {
         member: m,
         day,
-        state: date === TODAY ? stateOf(day, m, at) : stateOf(day, m, at + DAY),
+        state: date === TODAY ? stateOf(day, m, at, date) : stateOf(day, m, at + DAY, date),
         worked: workedOf(day, m, at),
         breakMins: breakOf(day, at),
       };
@@ -451,11 +519,11 @@ export function dayRows(date: string, scope: Scope, at = now()): DayRow[] {
 
 export interface AttendanceTotals {
   present: number; working: number; onBreak: number; ended: number;
-  late: number; absent: number; unclosed: number; total: number;
+  late: number; absent: number; onLeave: number; unclosed: number; total: number;
 }
 
 export function attendanceTotals(rows: DayRow[]): AttendanceTotals {
-  const t: AttendanceTotals = { present: 0, working: 0, onBreak: 0, ended: 0, late: 0, absent: 0, unclosed: 0, total: rows.length };
+  const t: AttendanceTotals = { present: 0, working: 0, onBreak: 0, ended: 0, late: 0, absent: 0, onLeave: 0, unclosed: 0, total: rows.length };
   rows.forEach((r) => {
     if (r.day) t.present++;
     if (r.state === "working") t.working++;
@@ -463,6 +531,7 @@ export function attendanceTotals(rows: DayRow[]): AttendanceTotals {
     if (r.state === "ended") t.ended++;
     if (r.state === "unclosed") t.unclosed++;
     if (r.state === "absent") t.absent++;
+    if (r.state === "on_leave") t.onLeave++;
     if (r.day && r.day.isLate) t.late++;
   });
   return t;
@@ -585,6 +654,40 @@ export const pendingLeave = (scope: Scope): LeaveRequest[] => {
   const ids = membersInScope(scope).map((m) => m.memberId);
   return snap.leave.filter((l) => l.state === "requested" && ids.indexOf(l.memberId) >= 0);
 };
+
+/* ====================================================== documents === */
+
+export const agreementsFor = (memberId: string): Agreement[] =>
+  snap.agreements.filter((a) => a.memberId === memberId)
+    .slice().sort((a, b) => (b.sentAt || "").localeCompare(a.sentAt || ""));
+
+export const resourcesFor = (memberId: string): Resource[] =>
+  snap.resources.filter((r) => r.memberId === memberId)
+    .slice().sort((a, b) => a.kind.localeCompare(b.kind));
+
+/** Which of the required documents this member has not handed over. Derived
+ *  from the vocabulary, so the answer changes with the list and not with a
+ *  constant somebody has to remember to edit. */
+export const missingDocs = (memberId: string): string[] => {
+  const have = resourcesFor(memberId).map((r) => r.kind);
+  return REQUIRED_DOCS.filter((k) => have.indexOf(k) < 0);
+};
+
+/** An agreement that was sent, never opened, and is running out of time. It is
+ *  the only thing on this list that is waiting on a human. */
+export const staleAgreements = (memberId: string, today = TODAY): Agreement[] =>
+  agreementsFor(memberId).filter((a) => a.state === "sent" && !!a.expiresAt && (a.expiresAt as string) >= today);
+
+/* ============================================================== pay === */
+
+/** TEAM READS PAY AND NEVER WRITES IT. Every number below belongs to Finance;
+ *  this module shows it and links there for anything that changes it. */
+export const payFor = (memberId: string): Pay | null =>
+  (payDoc.pay as Pay[]).filter((p) => p.memberId === memberId)[0] || null;
+
+export const incentiveTotal = (p: Pay | null, state?: string): number =>
+  (p ? p.incentives : []).filter((i) => !state || i.state === state)
+    .reduce((a, i) => a + i.amount, 0);
 
 /* ========================================================== calendar === */
 
@@ -755,7 +858,7 @@ export function reviewRows(date: string, scope: Scope, at = now()): ReviewRow[] 
       return {
         member: m,
         day,
-        state: stateOf(day, m, at),
+        state: stateOf(day, m, at, date),
         worked: workedOf(day, m, at),
         plan: planFor(m.memberId, date),
         report: reportFor(m.memberId, date),
@@ -987,6 +1090,90 @@ export function archiveTag(tagId: string): Result<Tag> {
   return ok(t);
 }
 
+/* --------------------------------------------------------- documents --- */
+
+/** Sending FREEZES the document. A template edit after this makes a new
+ *  version; it never changes what somebody already signed. */
+export function sendAgreement(memberId: string, kind: string, title: string): Result<Agreement> {
+  if (!title.trim()) return err("validation_failed", "A title is required.");
+  if (!readMember(memberId)) return err("member_not_found", "No such member.");
+  const a: Agreement = {
+    agreementId: nextId("AG"), memberId, kind, title: title.trim(), version: 1,
+    state: "sent", sentAt: new Date(now()).toISOString(), sentById: meId(),
+    viewedAt: null, signedAt: null, signedName: null, signerIp: null,
+    expiresAt: addDays(TODAY, 7), token: "tok_" + nextId("t").toLowerCase(),
+    fileName: title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-") + ".pdf",
+  };
+  snap.agreements = snap.agreements.concat([a]);
+  emit();
+  return ok(a);
+}
+
+/** The signature is the member's, so the name they type is stored beside the
+ *  time and the address it came from. A signed agreement is never editable. */
+export function signAgreement(agreementId: string, name: string): Result<Agreement> {
+  const list = snap.agreements.slice();
+  const a = list.filter((x) => x.agreementId === agreementId)[0];
+  if (!a) return err("agreement_not_found", "No such agreement.");
+  if (a.state === "signed") return err("already_signed", "It is already signed.");
+  if (a.state === "revoked") return err("revoked", "That link was revoked.");
+  if (!name.trim() || name.trim().length < 2) return err("name_required", "Type your full name to sign.");
+  a.state = "signed";
+  a.signedName = name.trim();
+  a.signedAt = new Date(now()).toISOString();
+  a.signerIp = "127.0.0.1";
+  a.expiresAt = null;
+  snap.agreements = list;
+  emit();
+  return ok(a);
+}
+
+export function revokeAgreement(agreementId: string): Result<Agreement> {
+  const list = snap.agreements.slice();
+  const a = list.filter((x) => x.agreementId === agreementId)[0];
+  if (!a) return err("agreement_not_found", "No such agreement.");
+  if (a.state === "signed") return err("already_signed", "A signed agreement cannot be revoked.");
+  a.state = "revoked";
+  a.expiresAt = null;
+  snap.agreements = list;
+  emit();
+  return ok(a);
+}
+
+export function addResource(memberId: string, kind: string, label: string): Result<Resource> {
+  if (!label.trim()) return err("validation_failed", "A label is required.");
+  const r: Resource = {
+    resourceId: nextId("RS"), memberId, kind, label: label.trim(),
+    fileName: label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-") + ".pdf",
+    sizeKb: 240, uploadedAt: new Date(now()).toISOString(), uploadedById: memberId,
+    verifiedById: null, verifiedAt: null,
+  };
+  snap.resources = snap.resources.concat([r]);
+  emit();
+  return ok(r);
+}
+
+/** The member may delete what they handed over. That is the half that travels
+ *  member → company, and it is theirs. */
+export function deleteResource(resourceId: string): Result<string> {
+  const before = snap.resources.length;
+  snap.resources = snap.resources.filter((r) => r.resourceId !== resourceId);
+  if (snap.resources.length === before) return err("resource_not_found", "No such document.");
+  emit();
+  return ok(resourceId);
+}
+
+export function verifyResource(resourceId: string): Result<Resource> {
+  const list = snap.resources.slice();
+  const r = list.filter((x) => x.resourceId === resourceId)[0];
+  if (!r) return err("resource_not_found", "No such document.");
+  r.verifiedById = meId();
+  r.verifiedAt = new Date(now()).toISOString();
+  snap.resources = list;
+  emit();
+  return ok(r);
+}
+
 /* ------------------------------------------------------------- leave --- */
 
 export function requestLeave(memberId: string, input: {
@@ -1187,6 +1374,8 @@ export function useWork(f: WorkFilter, scope: Scope): WorkItem[] { useVersion();
 export function useItem(id: string | null): WorkItem | null { useVersion(); return id ? readItem(id) : null; }
 export function useTags(): Tag[] { useVersion(); return snap.tags; }
 export function useLeave(): LeaveRequest[] { useVersion(); return snap.leave; }
+export function useAgreements(): Agreement[] { useVersion(); return snap.agreements; }
+export function useResources(): Resource[] { useVersion(); return snap.resources; }
 export function useItems(): WorkItem[] { useVersion(); return snap.items; }
 export function useReview(date: string, scope: Scope): ReviewRow[] { useVersion(); return reviewRows(date, scope); }
 export function useMyDay(date = TODAY): { day: AttendanceDay | null; state: AttendanceState; worked: number | null; breakMins: number } {

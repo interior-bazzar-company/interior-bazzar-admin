@@ -23,19 +23,28 @@ import {
   Icon, KvList, Notice, Pill, SectionHead, Table, Tabs, TbTitle, Tiles, qs,
 } from "../../ui";
 import {
-  ATT_STATE, LEAVE_KIND, LEAVE_STATE, TODAY, addDays, attendanceTotals, dayRows, decideLeave, fmtDate,
-  fmtHM, isDelayed, isTerminal, labelOf, leaveFor, meId, membersInScope, planFor, readItems,
-  readMember, reportFor, requestLeave, toneOf, useLeave, useMembers, workedOf,
+  AGREEMENT_KIND, AGREEMENT_STATE, ATT_STATE, LEAVE_KIND, LEAVE_STATE, RESOURCE_KIND, TODAY,
+  addDays, addResource, agreementsFor, attendanceTotals, dayRows, decideLeave, deleteResource,
+  fmtDate, fmtHM, incentiveTotal, isDelayed, isTerminal, labelOf, leaveFor, meId, membersInScope,
+  missingDocs, payFor, planFor, readItems, readMember, reportFor, requestLeave, resourcesFor,
+  revokeAgreement, sendAgreement, signAgreement, tagsOwnedBy, toneOf, useAgreements, useLeave,
+  useMembers, useResources, useTags, verifyResource, workedOf,
 } from "./store";
-import type { LeaveRequest, LeaveState, Member } from "./store";
+import type { Agreement, LeaveRequest, LeaveState, Member } from "./store";
 import { DayBar, StatePill, Who } from "./bits";
 import { MarksBlock, TasksBlock } from "./workBits";
 import "./team.css";
 
+/* SIX TABS. Leave is a block inside Attendance rather than a seventh: it is
+   about days, and the tab bar is the one place a screen gets crowded quietly.
+   Documents and Pay are not shown to a senior — a reporting line does not imply
+   access to somebody's PAN card or their salary. */
 const TABS = [
   { k: "overview", l: "Overview" }, { k: "attendance", l: "Attendance" },
-  { k: "work", l: "Work" }, { k: "reports", l: "Reports" }, { k: "leave", l: "Leave" },
+  { k: "work", l: "Work" }, { k: "reports", l: "Reports" },
+  { k: "documents", l: "Documents" }, { k: "pay", l: "Pay" },
 ];
+const PRIVATE_TABS = ["documents", "pay"];
 
 export default function MemberDash() {
   const { id } = useParams();
@@ -65,14 +74,16 @@ export default function MemberDash() {
         <a className="btn sm" href={"#/work" + qs({ member: m.memberId, face: "board" })}>Open their board</a>
       </div>
 
-      <Tabs items={TABS.map((t) => ({ k: t.k, label: t.l }))} cur={tab}
+      <Tabs items={TABS.filter((t) => viewer !== "senior" || PRIVATE_TABS.indexOf(t.k) < 0)
+        .map((t) => ({ k: t.k, label: t.l }))} cur={tab}
         onPick={(k) => { window.location.hash = "/me/" + m.memberId + qs({ tab: k === "overview" ? "" : k }); }} />
 
       <div className="dls-body">
-        {tab === "attendance" ? <AttendanceTab m={m} />
+        {tab === "attendance" ? <AttendanceTab m={m} viewer={viewer} />
           : tab === "work" ? <WorkTab m={m} />
           : tab === "reports" ? <ReportsTab m={m} />
-          : tab === "leave" ? <LeaveTab m={m} viewer={viewer} />
+          : tab === "documents" ? (viewer === "senior" ? <Refused /> : <DocumentsTab m={m} viewer={viewer} />)
+          : tab === "pay" ? (viewer === "senior" ? <Refused /> : <PayTab m={m} />)
           : <OverviewTab m={m} viewer={viewer} />}
       </div>
     </div>
@@ -164,7 +175,7 @@ const openItem = (id: string) => { window.location.hash = "/work" + qs({ item: i
 
 /* ---------------------------------------------------------- attendance --- */
 
-function AttendanceTab({ m }: { m: Member }) {
+function AttendanceTab({ m, viewer }: { m: Member; viewer: string }) {
   const days: string[] = [];
   for (let i = 13; i >= 0; i--) days.push(addDays(TODAY, -i));
   const rows = days.map((d) => ({ d, row: dayRows(d, "all").filter((r) => r.member.memberId === m.memberId)[0] }))
@@ -192,6 +203,7 @@ function AttendanceTab({ m }: { m: Member }) {
             <td className="tnum">{row.day ? fmtHM(row.day.breakMinutes) : "—"}</td>
           </tr>
         ))} />
+      <LeaveBlock m={m} viewer={viewer} />
     </>
   );
 }
@@ -199,6 +211,8 @@ function AttendanceTab({ m }: { m: Member }) {
 /* ---------------------------------------------------------------- work --- */
 
 function WorkTab({ m }: { m: Member }) {
+  useTags();
+  const mine = tagsOwnedBy(m.memberId);
   return (
     <>
       <SectionHead title="Work" desc="Tasks, then milestones, then targets — the same three blocks as the calendar rail." />
@@ -207,6 +221,19 @@ function WorkTab({ m }: { m: Member }) {
         <MarksBlock kind="milestone" who={m.memberId} onOpen={openItem} />
         <MarksBlock kind="target" who={m.memberId} onOpen={openItem} />
       </div>
+
+      <SectionHead title="Their tags" desc="A tag is a record its owner holds. Nobody else can rename or delete it." />
+      <div className="tm-tagrow">
+        {mine.length
+          ? mine.map((t) => (
+            <span key={t.tagId} className={"tm-tag" + (t.colourToken ? " k-" + t.colourToken : "")}>
+              {t.label}
+              <span className="dim"> {readItems().filter((i) => (i.tagIds || []).indexOf(t.tagId) >= 0).length}</span>
+            </span>
+          ))
+          : <span className="dim">None yet.</span>}
+      </div>
+      <p className="tm-foot">Tags are born in the item drawer, one keystroke from the picker.</p>
     </>
   );
 }
@@ -243,7 +270,7 @@ function ReportsTab({ m }: { m: Member }) {
 
 /* --------------------------------------------------------------- leave --- */
 
-function LeaveTab({ m, viewer }: { m: Member; viewer: string }) {
+function LeaveBlock({ m, viewer }: { m: Member; viewer: string }) {
   const shell = useShell();
   useLeave();
   const rows = leaveFor(m.memberId);
@@ -337,6 +364,248 @@ function LeaveModal({ memberId }: { memberId: string }) {
         <button className="btn" onClick={() => shell.closeLayer()}>Cancel</button>
         <button className="btn pri" disabled={!why.trim()} onClick={save}>Request</button>
       </div>
+    </>
+  );
+}
+
+function Refused() {
+  return <Notice tone="warn" text="Not on this view. A reporting line does not imply access to somebody's documents or pay." />;
+}
+
+/* ----------------------------------------------------------- documents --- */
+
+/** TWO BUCKETS, ONE TAB. An agreement travels company → member and is frozen at
+ *  send; a resource travels member → company and the member may delete it. They
+ *  differ in direction, permission and retention — which is not what a tab
+ *  decides, so they share one and stay two lists. */
+function DocumentsTab({ m, viewer }: { m: Member; viewer: string }) {
+  const shell = useShell();
+  useAgreements(); useResources();
+  const ags = agreementsFor(m.memberId);
+  const res = resourcesFor(m.memberId);
+  const missing = missingDocs(m.memberId);
+
+  return (
+    <>
+      <SectionHead title="Agreements" desc="Company to member. Frozen at send; a template edit makes a new version."
+        right={viewer === "admin"
+          ? <button className="btn pri sm" onClick={() => shell.modal(<SendModal memberId={m.memberId} />, "sm")}>Send</button>
+          : undefined} />
+      <Table
+        cols={[{ label: "Document" }, { label: "State", w: "130px" }, { label: "Sent", w: "130px" },
+          { label: "Signed", w: "190px" }, { label: "", w: "170px" }]}
+        empty={{ icon: "doc", title: "Nothing sent", body: "No agreement has gone out yet." }}
+        rows={ags.map((a) => (
+          <tr key={a.agreementId}>
+            <td><b>{a.title}</b><span className="cell-2">{labelOf(AGREEMENT_KIND, a.kind)} · v{a.version}</span></td>
+            <td><Pill text={labelOf(AGREEMENT_STATE, a.state)} tone={toneOf(AGREEMENT_STATE, a.state)} /></td>
+            <td>{a.sentAt ? fmtDate(a.sentAt.slice(0, 10)) : "—"}</td>
+            <td>{a.signedAt
+              ? <>{a.signedName}<span className="cell-2">{fmtDate(a.signedAt.slice(0, 10))} · {a.signerIp}</span></>
+              : a.expiresAt ? <span className="dim">link expires {fmtDate(a.expiresAt)}</span> : <span className="dim">—</span>}</td>
+            <td>
+              {a.state !== "signed" && a.state !== "revoked" && viewer === "self"
+                ? <button className="btn pri sm" onClick={() => shell.modal(<SignModal a={a} />, "sm")}>Open and sign</button> : null}
+              {a.state !== "signed" && a.state !== "revoked" && viewer === "admin"
+                ? <button className="btn sm" onClick={() => {
+                  const r = revokeAgreement(a.agreementId);
+                  shell.toast(r.ok ? "Link revoked." : r.message, r.ok ? "" : "bad");
+                }}>Revoke</button> : null}
+            </td>
+          </tr>
+        ))} />
+
+      <SectionHead title="Their documents" desc="Member to company. The member may delete their own."
+        right={viewer === "self"
+          ? <button className="btn pri sm" onClick={() => shell.modal(<UploadModal memberId={m.memberId} />, "sm")}>Add</button>
+          : undefined} />
+      {missing.length ? (
+        <Notice tone="warn" text={missing.length + " required: " + missing.map((k) => labelOf(RESOURCE_KIND, k)).join(", ")} />
+      ) : null}
+      <Table
+        cols={[{ label: "Document" }, { label: "Kind", w: "150px" }, { label: "Added", w: "130px" },
+          { label: "Verified", w: "170px" }, { label: "", w: "150px" }]}
+        empty={{ icon: "doc", title: "Nothing yet", body: "No document has been handed over." }}
+        rows={res.map((r) => (
+          <tr key={r.resourceId}>
+            <td><b>{r.label}</b><span className="cell-2">{r.fileName} · {r.sizeKb} KB</span></td>
+            <td>{labelOf(RESOURCE_KIND, r.kind)}</td>
+            <td>{fmtDate(r.uploadedAt.slice(0, 10))}</td>
+            <td>{r.verifiedById
+              ? (readMember(r.verifiedById)?.name || "verified")
+              : <Pill text="not verified" tone="warn" />}</td>
+            <td>
+              {viewer === "self"
+                ? <button className="btn sm dgr" onClick={() => {
+                  const x = deleteResource(r.resourceId);
+                  shell.toast(x.ok ? "Deleted." : x.message, x.ok ? "" : "bad");
+                }}>Delete</button> : null}
+              {viewer === "admin" && !r.verifiedById
+                ? <button className="btn sm" onClick={() => {
+                  const x = verifyResource(r.resourceId);
+                  shell.toast(x.ok ? "Verified." : x.message, x.ok ? "" : "bad");
+                }}>Verify</button> : null}
+            </td>
+          </tr>
+        ))} />
+      <p className="tm-foot">Every file here is a private object with a signed read. No public URL.</p>
+    </>
+  );
+}
+
+function SendModal({ memberId }: { memberId: string }) {
+  const shell = useShell();
+  const [kind, setKind] = useState("nda");
+  const [title, setTitle] = useState("NDA · 2026");
+  const save = () => {
+    const r = sendAgreement(memberId, kind, title);
+    if (!r.ok) { shell.toast(r.message, "bad"); return; }
+    shell.closeLayer();
+    shell.toast("Sent. The link expires in 7 days.");
+  };
+  return (
+    <>
+      <div className="md-h">
+        <h3>Send an agreement</h3>
+        <button className="btn icon sm md-x" aria-label="Close" onClick={() => shell.closeLayer()}>
+          <Icon name="x" size="sm" />
+        </button>
+      </div>
+      <div className="md-b">
+        <div className="fg">
+          <label htmlFor="agKind">Kind</label>
+          <select id="agKind" className="inp" value={kind}
+            onChange={(e) => { setKind(e.target.value); setTitle(labelOf(AGREEMENT_KIND, e.target.value) + " · 2026"); }}>
+            {["offer_letter", "nda"].map((k) => <option key={k} value={k}>{labelOf(AGREEMENT_KIND, k)}</option>)}
+          </select>
+        </div>
+        <div className="fg">
+          <label htmlFor="agTitle">Title <b className="req">*</b></label>
+          <input id="agTitle" className="inp" value={title} onChange={(e) => setTitle(e.target.value)} />
+          <span className="help">Frozen at send.</span>
+        </div>
+      </div>
+      <div className="md-f">
+        <span className="spacer" />
+        <button className="btn" onClick={() => shell.closeLayer()}>Cancel</button>
+        <button className="btn pri" disabled={!title.trim()} onClick={save}>Send</button>
+      </div>
+    </>
+  );
+}
+
+/** The signing page a member opens from their link, drawn here so the chain is
+ *  walkable. The real one is public, token-gated and single-use. */
+function SignModal({ a }: { a: Agreement }) {
+  const shell = useShell();
+  const [name, setName] = useState("");
+  const [agree, setAgree] = useState(false);
+  const save = () => {
+    const r = signAgreement(a.agreementId, name);
+    if (!r.ok) { shell.toast(r.message, "bad"); return; }
+    shell.closeLayer();
+    shell.toast("Signed.");
+  };
+  return (
+    <>
+      <div className="md-h">
+        <h3>{a.title}</h3>
+        <button className="btn icon sm md-x" aria-label="Close" onClick={() => shell.closeLayer()}>
+          <Icon name="x" size="sm" />
+        </button>
+      </div>
+      <div className="md-b">
+        <div className="fg">
+          <label htmlFor="sgName">Full name <b className="req">*</b></label>
+          <input id="sgName" className="inp" autoFocus value={name} onChange={(e) => setName(e.target.value)} />
+        </div>
+        <label className="fg-check">
+          <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+          I have read it and I agree.
+        </label>
+        <p className="tm-foot">The name, the time and the address are stored with the signature.</p>
+      </div>
+      <div className="md-f">
+        <span className="spacer" />
+        <button className="btn" onClick={() => shell.closeLayer()}>Cancel</button>
+        <button className="btn pri" disabled={!agree || name.trim().length < 2} onClick={save}>Sign</button>
+      </div>
+    </>
+  );
+}
+
+function UploadModal({ memberId }: { memberId: string }) {
+  const shell = useShell();
+  const [kind, setKind] = useState("pan");
+  const [label, setLabel] = useState("");
+  const save = () => {
+    const r = addResource(memberId, kind, label);
+    if (!r.ok) { shell.toast(r.message, "bad"); return; }
+    shell.closeLayer();
+    shell.toast("Added.");
+  };
+  return (
+    <>
+      <div className="md-h">
+        <h3>Add a document</h3>
+        <button className="btn icon sm md-x" aria-label="Close" onClick={() => shell.closeLayer()}>
+          <Icon name="x" size="sm" />
+        </button>
+      </div>
+      <div className="md-b">
+        <div className="fg">
+          <label htmlFor="rsKind">Kind</label>
+          <select id="rsKind" className="inp" value={kind}
+            onChange={(e) => { setKind(e.target.value); setLabel(labelOf(RESOURCE_KIND, e.target.value)); }}>
+            {["pan", "aadhaar", "address_proof", "bank", "photo", "other"]
+              .map((k) => <option key={k} value={k}>{labelOf(RESOURCE_KIND, k)}</option>)}
+          </select>
+        </div>
+        <div className="fg">
+          <label htmlFor="rsLabel">Label <b className="req">*</b></label>
+          <input id="rsLabel" className="inp" value={label} onChange={(e) => setLabel(e.target.value)} />
+        </div>
+      </div>
+      <div className="md-f">
+        <span className="spacer" />
+        <button className="btn" onClick={() => shell.closeLayer()}>Cancel</button>
+        <button className="btn pri" disabled={!label.trim()} onClick={save}>Add</button>
+      </div>
+    </>
+  );
+}
+
+/* ----------------------------------------------------------------- pay --- */
+
+/** TEAM READS PAY AND NEVER WRITES IT. Every action here links into Finance,
+ *  which owns the money; this tab exists so a member can see their own number
+ *  without asking somebody for it. */
+function PayTab({ m }: { m: Member }) {
+  const p = payFor(m.memberId);
+  if (!p || !p.annualCtc) return <Notice text="No salary account on this member." />;
+  const rupees = (n: number) => "₹" + n.toLocaleString("en-IN");
+  return (
+    <>
+      <Tiles list={[
+        { k: "Annual CTC", v: rupees(p.annualCtc), s: "from " + fmtDate(p.effectiveFrom) },
+        { k: "Last payslip", v: p.lastPayslip ? rupees(p.lastPayslip.net) : "—", s: p.lastPayslip ? p.lastPayslip.month : "none yet" },
+        { k: "Incentives approved", v: rupees(incentiveTotal(p, "approved")), s: "not yet paid" },
+        { k: "Incentives pending", v: rupees(incentiveTotal(p, "pending")), s: "Team's basis, Finance's call", tone: "warn" },
+      ]} />
+      <SectionHead title="Incentives" desc="Team supplies the basis. Finance approves and pays."
+        right={<a className="btn sm" href="#/finance-salaries">Open in Finance</a>} />
+      <Table
+        cols={[{ label: "Month", w: "130px" }, { label: "Basis" }, { label: "Amount", w: "140px" }, { label: "State", w: "140px" }]}
+        empty={{ icon: "cash", title: "No incentives", body: "Nothing recorded for this member." }}
+        rows={p.incentives.map((i) => (
+          <tr key={i.incentiveId}>
+            <td>{i.month}</td>
+            <td>{i.basis}</td>
+            <td className="tnum">{rupees(i.amount)}</td>
+            <td><Pill text={i.state} tone={i.state === "paid" ? "ok" : i.state === "approved" ? "info" : "warn"} /></td>
+          </tr>
+        ))} />
+      <p className="tm-foot">Read-only. Every button here goes to Finance.</p>
     </>
   );
 }

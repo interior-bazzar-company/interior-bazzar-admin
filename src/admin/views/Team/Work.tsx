@@ -35,12 +35,12 @@ import {
 } from "../../ui";
 import type { StatCell } from "../../ui";
 import {
-  KIND, PRIORITY, TODAY, WORK_STATUS, addDays, blockerOf, childrenOf, createTag, eventsOn, fmtDate,
+  KIND, PRIORITY, TODAY, WORK_STATUS, addDays, blockerOf, childrenOf, createItem, createTag, eventsOn, fmtDate,
   gridDays, isDelayed, isTerminal, labelOf, lanesOf, leaveOn, meId, membersInScope, parentOf,
   readMember, setBlockedBy, setItemStatus, stageOf, tagItem, tagsOf, tagsOwnedBy, toneOf,
   useItem, useMembers, useTags, useWork, workTotals,
 } from "./store";
-import type { CalEvent, Tag, WorkItem, WorkStage, WorkStatus } from "./store";
+import type { CalEvent, Member, Tag, WorkItem, WorkStage, WorkStatus } from "./store";
 import { KindMark, PriorityChip, ProtoBar, ScopeNote, Who, ago } from "./bits";
 import { MarksBlock, ProgressWindow, StagePill, TagChips, TasksBlock, WaitFlag, daysOver, noteOf } from "./workBits";
 import "./team.css";
@@ -141,7 +141,7 @@ export default function Work() {
             options={slugOptions(tags)} />
           <Select name="priority" label="Priority" value={p.priority} onFilter={onFilter}
             options={[{ v: "high", l: "High" }, { v: "medium", l: "Medium" }, { v: "low", l: "Low" }]} />
-          <CreateMenu onPick={(k) => shell.modal(<NewItemModal kind={k} />, "sm")} />
+          <CreateMenu onPick={(k) => shell.modal(<NewItemModal kind={k} members={members} all={all} />, "sm")} />
         </Toolbar>
       </div>
 
@@ -199,8 +199,43 @@ function CreateMenu({ onPick }: { onPick: (k: string) => void }) {
   );
 }
 
-function NewItemModal({ kind }: { kind: string }) {
+/** ONE FORM, THREE KINDS. The kind switcher is at the top rather than three
+ *  separate forms: they are one record with a `kind`, and a target only adds
+ *  two fields to the same six. */
+function NewItemModal({ kind: initial, members, all }: {
+  kind: string; members: Member[]; all: WorkItem[];
+}) {
   const shell = useShell();
+  const [kind, setKind] = useState(initial);
+  const [title, setTitle] = useState("");
+  const [who, setWho] = useState(meId());
+  const [pri, setPri] = useState("medium");
+  const [start, setStart] = useState("");
+  const [due, setDue] = useState(addDays(TODAY, 3));
+  const [parent, setParent] = useState("");
+  const [tv, setTv] = useState("");
+  const [tu, setTu] = useState("");
+
+  /* Depth 3, target ▸ milestone ▸ task. A target is always top level; a task
+     may sit under either, and nothing sits under a task. */
+  const parents = all.filter((i) => !isTerminal(i.status)
+    && (kind === "task" ? i.kind !== "task" : i.kind === "target"));
+
+  const save = () => {
+    const r = createItem({
+      title, assigneeId: who, kind: kind as "task" | "milestone" | "target",
+      priority: pri as "high" | "medium" | "low",
+      startDate: start || null, dueDate: due || null,
+      parentId: parent || null,
+      targetValue: kind === "target" && tv ? Number(tv) : undefined,
+      targetUnit: kind === "target" ? tu || undefined : undefined,
+    });
+    if (!r.ok) { shell.toast(r.message, "bad"); return; }
+    shell.closeLayer();
+    shell.toast(r.data.title + " created");
+    window.location.hash = ROUTE.slice(1) + qs({ item: r.data.itemId });
+  };
+
   return (
     <>
       <div className="md-h">
@@ -210,11 +245,77 @@ function NewItemModal({ kind }: { kind: string }) {
         </button>
       </div>
       <div className="md-b">
-        <Notice text="One form, three kinds. The kind is a field on the item, not a different record." />
+        <div className="fg">
+          <label htmlFor="niKind">Kind</label>
+          <span className="tm-seg" id="niKind">
+            {["task", "milestone", "target"].map((k) => (
+              <button key={k} className={kind === k ? "on" : ""}
+                onClick={() => { setKind(k); if (k === "target") setParent(""); }}>
+                {labelOf(KIND, k)}
+              </button>
+            ))}
+          </span>
+        </div>
+        <div className="fg">
+          <label htmlFor="niTitle">Title <b className="req">*</b></label>
+          <input id="niTitle" className="inp" autoFocus value={title}
+            onChange={(e) => setTitle(e.target.value)} />
+        </div>
+        <div className="fg2">
+          <div className="fg">
+            <label htmlFor="niWho">Assigned to</label>
+            <select id="niWho" className="inp" value={who} onChange={(e) => setWho(e.target.value)}>
+              {members.filter((m) => m.status === "active")
+                .map((m) => <option key={m.memberId} value={m.memberId}>{m.name}</option>)}
+            </select>
+          </div>
+          <div className="fg">
+            <label htmlFor="niPri">Priority</label>
+            <select id="niPri" className="inp" value={pri} onChange={(e) => setPri(e.target.value)}>
+              {["high", "medium", "low"].map((k) => <option key={k} value={k}>{labelOf(PRIORITY, k)}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="fg2">
+          <div className="fg">
+            <label htmlFor="niStart">Starts</label>
+            <input id="niStart" type="date" className="inp" value={start}
+              onChange={(e) => setStart(e.target.value)} />
+          </div>
+          <div className="fg">
+            <label htmlFor="niDue">Due</label>
+            <input id="niDue" type="date" className="inp" value={due}
+              onChange={(e) => setDue(e.target.value)} />
+          </div>
+        </div>
+        {kind !== "target" ? (
+          <div className="fg">
+            <label htmlFor="niParent">Rolls up to</label>
+            <select id="niParent" className="inp" value={parent} onChange={(e) => setParent(e.target.value)}>
+              <option value="">Nothing — top level</option>
+              {parents.map((i) => <option key={i.itemId} value={i.itemId}>{i.title}</option>)}
+            </select>
+          </div>
+        ) : (
+          <div className="fg2">
+            <div className="fg">
+              <label htmlFor="niTv">Target</label>
+              <input id="niTv" type="number" className="inp" value={tv}
+                onChange={(e) => setTv(e.target.value)} />
+            </div>
+            <div className="fg">
+              <label htmlFor="niTu">Unit</label>
+              <input id="niTu" className="inp" placeholder="deals" value={tu}
+                onChange={(e) => setTu(e.target.value)} />
+            </div>
+          </div>
+        )}
+        <p className="tm-foot">Starts as Planning. Nothing sets Delay — it is the due date.</p>
       </div>
       <div className="md-f">
         <span className="spacer" />
-        <button className="btn" onClick={() => shell.closeLayer()}>Close</button>
+        <button className="btn" onClick={() => shell.closeLayer()}>Cancel</button>
+        <button className="btn pri" disabled={!title.trim()} onClick={save}>Create</button>
       </div>
     </>
   );

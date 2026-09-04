@@ -302,6 +302,70 @@ require("esbuild").build({
   eq("and no attendance row was written",
     S.readDays().filter((d) => d.memberId === "63" && d.businessDate === "2026-08-31").length, 0);
 
+  head("Approved leave suppresses the absence it would have derived");
+  S.resetStore();
+  (() => {
+    const row = (d, id) => S.dayRows(d, "all").filter((r) => r.member.memberId === id)[0];
+    eq("86 has no attendance row for 24 August, and it reads ON LEAVE",
+      row("2026-08-24", "86").state, "on_leave");
+    eq("\u2026so nobody is absent that day", S.attendanceTotals(S.dayRows("2026-08-24", "all")).absent, 0);
+    eq("\u2026and exactly one is on leave", S.attendanceTotals(S.dayRows("2026-08-24", "all")).onLeave, 1);
+    eq("no attendance row was written for it",
+      S.readDays().filter((d) => d.memberId === "86" && d.businessDate === "2026-08-24").length, 0);
+    eq("86 today has no row and no leave \u2014 still Not started, not On leave",
+      row(S.TODAY, "86").state, "not_started");
+  })();
+
+  head("Documents: two buckets, and the required list is the vocabulary");
+  S.resetStore();
+  eq("N. Pillai is short three of the four required documents",
+    S.missingDocs("86"), ["aadhaar", "address_proof", "bank"]);
+  eq("Meera has handed over all four", S.missingDocs("63"), []);
+  ok("sending freezes a copy and gives it an expiry",
+    (() => {
+      const r = S.sendAgreement("70", "nda", "NDA \u00b7 2026");
+      return r.ok && r.data.state === "sent" && !!r.data.expiresAt && r.data.version === 1;
+    })());
+  ok("signing needs a name",
+    S.signAgreement("AG-01", "").ok === false);
+  ok("\u2026and stores the name, the time and the address",
+    (() => {
+      const r = S.signAgreement("AG-01", "N. Pillai");
+      return r.ok && r.data.state === "signed" && !!r.data.signedAt && !!r.data.signerIp
+        && r.data.expiresAt === null;
+    })());
+  ok("a signed agreement can no longer be revoked",
+    S.revokeAgreement("AG-01").ok === false);
+  ok("the member may delete what they handed over",
+    S.deleteResource("RS-02").ok === true && S.resourcesFor("86").length === 1);
+
+  head("Team reads pay and never writes it");
+  ok("no write function touches pay",
+    Object.keys(S).filter((k) => typeof S[k] === "function")
+      .every((k) => k.indexOf("Pay") < 0 || k.indexOf("payFor") === 0));
+  eq("an incentive total is per state, not a lump",
+    S.incentiveTotal(S.payFor("52"), "paid"), 25000);
+  eq("\u2026and the pending one is a different number",
+    S.incentiveTotal(S.payFor("52"), "approved"), 18000);
+
+  head("Create is one form and three kinds");
+  S.resetStore();
+  (() => {
+    const before = S.readItems().length;
+    const t = S.createItem({ title: "New target", assigneeId: "52", kind: "target",
+      targetValue: 10, targetUnit: "deals" });
+    ok("a target is created and starts at zero", t.ok && t.data.currentValue === 0);
+    ok("\u2026and it starts in Planning, never in Delay",
+      t.ok && t.data.status === "planned" && S.stageOf(t.data) !== "delayed");
+    ok("a target cannot be given a parent",
+      S.createItem({ title: "x", assigneeId: "52", kind: "target", parentId: "W-T01" }).ok === false);
+    ok("a task cannot hold children",
+      S.createItem({ title: "x", assigneeId: "52", kind: "task", parentId: "W-K01" }).ok === false);
+    ok("an untitled item is refused",
+      S.createItem({ title: "   ", assigneeId: "52", kind: "task" }).ok === false);
+    eq("one item was added, not four", S.readItems().length, before + 1);
+  })();
+
   head("Hours are read, never written");
   ok("no write function accepts an hours argument",
     ["submitReport", "submitPlan"].every((k) =>

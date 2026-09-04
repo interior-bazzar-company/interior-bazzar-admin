@@ -1,0 +1,15 @@
+{
+  "$comment": "PLACEHOLDER RECORDS — member → company. Stands in for GET /api/v1/admin/team/resources. THE MOST SENSITIVE LIST IN THE MODULE: identity documents. Every object must be private with signed reads — the public fileUrl the rest of the panel uses would put a PAN card on a guessable URL. The member may delete their own; a verified one is kept but marked.",
+  "generatedAt": "2026-08-28T14:20:00+05:30",
+  "resources": [
+    {"resourceId": "RS-01", "memberId": "86", "kind": "pan", "label": "PAN card", "fileName": "pan-card.pdf", "sizeKb": 180, "uploadedAt": "2026-08-25T10:15:00+05:30", "uploadedById": "86", "verifiedById": "58", "verifiedAt": "2026-08-25T12:00:00+05:30"},
+    {"resourceId": "RS-02", "memberId": "86", "kind": "photo", "label": "Passport photo", "fileName": "passport-photo.pdf", "sizeKb": 220, "uploadedAt": "2026-08-25T10:15:00+05:30", "uploadedById": "86", "verifiedById": null, "verifiedAt": null},
+    {"resourceId": "RS-03", "memberId": "63", "kind": "pan", "label": "PAN card", "fileName": "pan-card.pdf", "sizeKb": 260, "uploadedAt": "2025-02-11T10:15:00+05:30", "uploadedById": "63", "verifiedById": "58", "verifiedAt": "2025-02-11T12:00:00+05:30"},
+    {"resourceId": "RS-04", "memberId": "63", "kind": "aadhaar", "label": "Aadhaar", "fileName": "aadhaar.pdf", "sizeKb": 300, "uploadedAt": "2025-02-11T10:15:00+05:30", "uploadedById": "63", "verifiedById": "58", "verifiedAt": "2025-02-11T12:00:00+05:30"},
+    {"resourceId": "RS-05", "memberId": "63", "kind": "address_proof", "label": "Rent agreement", "fileName": "rent-agreement.pdf", "sizeKb": 340, "uploadedAt": "2025-02-12T10:15:00+05:30", "uploadedById": "63", "verifiedById": null, "verifiedAt": null},
+    {"resourceId": "RS-06", "memberId": "63", "kind": "bank", "label": "Bank passbook", "fileName": "bank-passbook.pdf", "sizeKb": 380, "uploadedAt": "2025-02-12T10:15:00+05:30", "uploadedById": "63", "verifiedById": "58", "verifiedAt": "2025-02-12T12:00:00+05:30"},
+    {"resourceId": "RS-07", "memberId": "70", "kind": "pan", "label": "PAN card", "fileName": "pan-card.pdf", "sizeKb": 420, "uploadedAt": "2025-08-04T10:15:00+05:30", "uploadedById": "70", "verifiedById": "52", "verifiedAt": "2025-08-04T12:00:00+05:30"},
+    {"resourceId": "RS-08", "memberId": "70", "kind": "aadhaar", "label": "Aadhaar", "fileName": "aadhaar.pdf", "sizeKb": 460, "uploadedAt": "2025-08-04T10:15:00+05:30", "uploadedById": "70", "verifiedById": "52", "verifiedAt": "2025-08-04T12:00:00+05:30"},
+    {"resourceId": "RS-09", "memberId": "74", "kind": "pan", "label": "PAN card", "fileName": "pan-card.pdf", "sizeKb": 500, "uploadedAt": "2025-11-05T10:15:00+05:30", "uploadedById": "74", "verifiedById": null, "verifiedAt": null}
+  ]
+}

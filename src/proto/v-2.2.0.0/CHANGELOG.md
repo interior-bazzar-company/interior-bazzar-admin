@@ -6,6 +6,82 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-04
 
+### The rest of the module, wired to content: leave, documents, pay, and Create that creates
+
+**Area:** sidebar → Team → **Calendar** (`#/work`) · **Attendance** (`#/attendance`) · **My dashboard** (`#/me/:id`)
+**Files:** `src/content/team/agreements.json` *(new)*, `resources.json` *(new)*, `pay.json` *(new)*,
+`leave.json`, `vocabularies.json`, `src/admin/views/Team/store.ts`, `Work.tsx`, `MemberDash.tsx`,
+`Attendance.tsx`, `team.css`, `scripts/check-team-derivation.cjs`
+
+**What changed**
+
+`src/content/team/*.json` is the API until there is one. Everything that was still a
+placeholder now runs against it, so the module can be walked end to end before a single
+endpoint exists.
+
+- **Create creates.** The `+ Create` menu opens one form with the kind switchable at the
+  top — title, assignee, priority, start, due, parent, and `targetValue`/`targetUnit` when
+  the kind is target. It refuses what the model refuses: a target with a parent, a task as
+  a parent, an empty title. New items land in **Planning**, and nothing can set Delay.
+- **Leave is decided, and it suppresses the absence it would have derived.** A senior sees
+  a **leave inbox** at the top of `#/attendance` — only when something is in it — with
+  Approve and Refuse, and refusing needs a sentence. Approving writes **no attendance
+  row**: `stateOf` reads the approved row at the point it would have said Absent and says
+  **On leave** instead. N. Pillai has no attendance record for 24 August and that day now
+  reads On leave, while today — no row, no leave — still reads Not started.
+- **Documents, two buckets in one tab.** Agreements travel company → member, are frozen at
+  send with a 7-day link, and can be revoked until they are signed; signing stores the
+  typed name, the time and the address, and a signed agreement can no longer be revoked.
+  Resources travel member → company: the member may delete their own, an admin may verify,
+  and the **missing list is derived from the vocabulary** rather than a constant.
+- **Pay is a read of Finance.** Annual CTC, the last payslip, and incentives by state, with
+  every action linking into Finance. Nothing on this tab writes.
+- **Six tabs, and two of them are private.** Overview · Attendance · Work · Reports ·
+  Documents · Pay. Leave folded into Attendance rather than becoming a seventh. **A senior
+  does not see Documents or Pay** — a reporting line does not imply access to somebody's
+  PAN card or their salary.
+- The Work tab also lists that member's own tags with a count each.
+
+**Temp data**
+`agreements.json` (6), `resources.json` (9), `pay.json` (8) — all new placeholder records.
+`leave.json` gains LV-07, the row that makes the suppression visible. `vocabularies.json`
+gains `on_leave` with `stored:false`, `agreementKinds`, `agreementStates` and
+`resourceKinds` carrying `required:true` — static copy, all of it.
+
+**Backend needed**
+- `GET /admin/team/agreements`, `POST /admin/team/agreements` (send, freezes a version),
+  `POST /admin/team/agreements/{id}/revoke`, and a **public** `POST /agreements/{token}/sign`
+  — hashed token, single-use, expiring, rate-limited per token and per IP.
+- `GET /admin/team/resources`, `POST` (multipart), `DELETE`, `POST /{id}/verify`. **Every
+  object private with signed reads.** The public `fileUrl` the rest of the panel uses would
+  put a PAN card on a guessable URL.
+- `GET /admin/finance/salary-accounts?member=` and `/incentives?member=` — Finance's, read
+  only. Team never writes pay.
+- `none` new for leave: `POST /admin/team/leave` and `/decide` were already on the list.
+
+**Open decisions**
+`TM-R-11` (private-object storage) is now the **only** thing standing between this and the
+real endpoints for Documents — the screens are drawn and the writes are simulated, and
+nothing here assumes a public URL. `TM-R-10` is answered in code: the `absent` derivation
+gained exactly one clause, in `stateOf`, and the check suite asserts both sides of it.
+
+**Verified**
+
+`npm run check:team` — **116 assertions, all passed**, extended with four new sections:
+approved leave suppressing an absence while writing no attendance row and *not* changing a
+member with no leave; the required-document list coming from the vocabulary; send → sign →
+cannot-revoke, and delete; pay totals per incentive state; and Create refusing a target
+with a parent, a task as a parent and an empty title while adding exactly one item.
+`node scripts/check-team-nav.cjs` passed. `npx tsc -b` clean · `npx eslint src/admin/views/Team`
+→ 0 errors, 1 pre-existing warning · `npx vite build --mode dev` succeeds.
+
+**Not opened in a browser** — still no backend against this checkout. The walk, once
+`me/permissions/` resolves: `#/work` → Create → the item opens in its drawer → tag it →
+`#/attendance` as a senior → approve a leave request → `#/me/86` → Documents → sign the
+NDA → Pay.
+
+---
+
 ### Team workspace, built: Calendar with four faces, the member dashboard, and demo data for every case
 
 **Area:** sidebar → Team → **Calendar** (`#/work`, was Work) · **My dashboard** (`#/me`, `#/me/:id`) · the Reports roll-up
