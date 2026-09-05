@@ -92,29 +92,6 @@ export default function Work() {
   const open = useItem(p.item || null);
   const me = meId();
 
-  /* THE HEADER IS THE TOPBAR, the way Deals settled it: the title on the left,
-     and on the right the one control that changes what this page IS. A
-     dropdown rather than four tabs — it names the face you are in, which a row
-     of icons cannot do without spending the width of the filter row on it.
-
-     No scope line beside the title any more: "47 items" was a second rendering
-     of the strip's own first cell, sitting where you cannot click it. */
-  usePageChrome({
-    crumbs: <><TbTitle label="Calendar" to="#/work" /><WorkStats p={p} /></>,
-    right: (
-      <button className="btn tb-view-btn" aria-haspopup="menu"
-        onClick={(e) => {
-          const el = e.currentTarget;
-          if (shell.popAnchor === el) { shell.closePop(); return; }
-          shell.openPop(el, <FaceMenu face={face} goto={goto} />,
-            { width: 268, align: "right", cls: "pop-views" });
-        }}>
-        <Icon name={(FACES.filter((f) => f.k === face)[0] || FACES[0]).i} />
-        {(FACES.filter((f) => f.k === face)[0] || FACES[0]).l}
-        <Icon name="chev" size="sm" />
-      </button>
-    ),
-  }, face);
 
   useEffect(() => { ensureAdopted(); }, []);
 
@@ -129,6 +106,18 @@ export default function Work() {
 
   const onFilter = (name: string, value: string) => goto({ [name]: value || undefined });
   const openItem = useCallback((id: string) => goto({ item: id }), [goto]);
+
+  /* THE HEADER IS THE TOPBAR, the way Deals settled it: the title on the left,
+     and on the right the one control that changes what this page IS. A
+     dropdown rather than four tabs — it names the face you are in, which a row
+     of icons cannot do without spending the width of the filter row on it.
+
+     No scope line beside the title any more: "47 items" was a second rendering
+     of the strip's own first cell, sitting where you cannot click it. */
+  usePageChrome({
+    crumbs: <><TbTitle label="Calendar" to="#/work" /><WorkStats p={p} /></>,
+    right: <FaceSwitch face={face} goto={goto} />,
+  }, face);
 
   /* The drawer is the record, and it closes by dropping the param — the same
      arrangement `#/team` uses, so Back and the scrim agree with the URL. */
@@ -362,6 +351,30 @@ function WorkStats({ p }: { p: Record<string, string> }) {
       {cell("waiting", t.waiting, !!p.wait, p.wait ? route() : route("wait", "1"), t.waiting ? "bad" : "")}
       {stage("complete", t.completed, "completed", "ok")}
     </span>
+  );
+}
+
+/** THE SWITCHER IS A COMPONENT, NOT A NODE, and that is not a style choice.
+ *  Published chrome is captured once per location, so a `shell` closed over at
+ *  publish time keeps the `popAnchor` it had then — forever null. The
+ *  toggle-to-close branch could never fire, and pressing the button a second
+ *  time re-opened the menu instead of shutting it. Reading the shell inside the
+ *  component reads it at click time, which is when the answer matters. */
+function FaceSwitch({ face, goto }: {
+  face: string; goto: (q: Record<string, string | undefined>) => void;
+}) {
+  const shell = useShell();
+  const cur = FACES.filter((f) => f.k === face)[0] || FACES[0];
+  return (
+    <button className="btn tb-view-btn" aria-haspopup="menu"
+      onClick={(e) => {
+        const el = e.currentTarget;
+        if (shell.popAnchor === el) { shell.closePop(); return; }
+        shell.openPop(el, <FaceMenu face={face} goto={goto} />,
+          { width: 268, align: "right", cls: "pop-views" });
+      }}>
+      <Icon name={cur.i} />{cur.l}<Icon name="chev" size="sm" />
+    </button>
   );
 }
 

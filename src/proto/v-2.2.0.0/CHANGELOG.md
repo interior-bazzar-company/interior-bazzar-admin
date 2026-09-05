@@ -6,6 +6,35 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-04
 
+### The face switcher: read the shell at click time, and never let the slot be squeezed
+
+**Area:** topbar → the Calendar face switcher (`#/work`)
+**Files:** `src/admin/views/Team/Work.tsx`, `src/styles/admin-theme.css`
+
+**What changed**
+
+- **The switcher is a component now, not a node.** Published chrome is captured once per
+  location, so a `shell` closed over at publish time keeps the `popAnchor` it had then —
+  forever null. The toggle-to-close branch could never fire, and a second press re-opened the
+  menu instead of shutting it. Reading the shell *inside* the component reads it at click
+  time, which is when the answer matters.
+- **The chrome call moved below the helpers it depends on.** It sat above `goto`, which only
+  worked while `goto` was buried in a click handler; the moment it became a prop it was a
+  temporal-dead-zone error. It was fragile in the old shape and is now ordered honestly.
+- **`.tb-slot` never shrinks** (`flex:0 0 auto`, and its button `white-space:nowrap`). The
+  slot holds the one control that changes what a page *is*, and the crumb beside it can now
+  carry a run of counts — Deals in chat, Calendar everywhere — that would otherwise eat the
+  row and crush it to nothing. The counts scroll, as `.tb-stats` already asks to; the
+  switcher does not move. Shell-level, so it lands in the theme rather than leaking out of a
+  module stylesheet.
+
+**Verified**
+`npm run check:team` green · `check-team-nav.cjs` green · `npx tsc -b` clean · eslint 0 errors
+· `npx vite build` succeeds. The control was confirmed present in the built bundle before and
+after, so this was never a build or tree-shaking problem.
+
+---
+
 ### The Create dialog goes back to the panel's own field
 
 **Area:** sidebar → Team → **Calendar** (`#/work`) — the Create dialog

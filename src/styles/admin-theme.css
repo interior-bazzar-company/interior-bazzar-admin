@@ -787,7 +787,12 @@ button.tb-stat:hover{ background:var(--bg-hover) }
 .tb-money{ display:flex; align-items:center; gap:2px; flex:0 0 auto }
 .tb-money::before{ content:""; flex:0 0 auto; width:1px; height:14px;
                    background:var(--line-2); margin:0 var(--space-2) 0 var(--space-1) }
-.tb-slot{ margin-left:auto; display:flex; align-items:center }
+/* NEVER SQUEEZED. The slot holds the one control that changes what a page IS,
+   and the crumb beside it can hold a run of counts (Deals in chat, Calendar
+   everywhere) that would otherwise eat the row and crush this to nothing. The
+   counts scroll — `.tb-stats` already says so — and this does not move. */
+.tb-slot{ margin-left:auto; display:flex; align-items:center; flex:0 0 auto }
+.tb-slot > .btn{ white-space:nowrap }
 .tb-slot:empty{ display:none }
 /* the breaker: only drawn when the slot beside it actually has something in it,
    so routes that don't claim the slot keep a clean actions cluster. */
