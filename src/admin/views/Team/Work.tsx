@@ -31,7 +31,7 @@ import { useSearchParams } from "react-router-dom";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import {
-  FilterChips, Icon, KvList, Notice, SearchField, SectionHead, Select, Table, TbTitle, qs,
+  FilterChips, Icon, KvList, Notice, SearchField, SectionHead, Select, Table, Tabs, TbTitle, qs,
 } from "../../ui";
 import { go } from "../../ui/nav";
 import {
@@ -303,9 +303,18 @@ function CreateMenu({ onPick, big }: { onPick: (k: string) => void; big?: boolea
   );
 }
 
-/** ONE FORM, THREE KINDS. The kind switcher is at the top rather than three
- *  separate forms: they are one record with a `kind`, and a target only adds
- *  two fields to the same six. */
+/** ONE FORM, THREE KINDS, AND THE TITLE IS THE FORM.
+ *
+ *  It was six labelled fields in a two-column grid, which asks somebody to read
+ *  the form before they can write the one thing they came to write. Google's
+ *  create dialog opens on a single empty title and lets every other fact be a
+ *  quiet row under the icon that names it — no labels, no boxes until you reach
+ *  for one — and that is the shape borrowed here.
+ *
+ *  The kind switcher is the panel's own tab row directly under the title: they
+ *  are one record with a `kind`, and a target only adds two fields to the same
+ *  five. Enter in the title creates, because for most of these the title IS the
+ *  whole entry. */
 function NewItemModal({ kind: initial, members, all, date }: {
   kind: string; members: Member[]; all: WorkItem[]; date?: string;
 }) {
@@ -344,80 +353,71 @@ function NewItemModal({ kind: initial, members, all, date }: {
 
   return (
     <>
-      <div className="md-h">
-        <h3>New {labelOf(KIND, kind).toLowerCase()}</h3>
+      {/* The title lives in the header slot: it is the heading, so a second one
+          above it would be the dialog naming itself twice. */}
+      <div className="md-h tm-ni-h">
+        <input className="tm-ni-t" autoFocus value={title} aria-label="Title"
+          placeholder={"Add a " + labelOf(KIND, kind).toLowerCase()}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && title.trim()) save(); }} />
         <button className="btn icon sm md-x" aria-label="Close" onClick={() => shell.closeLayer()}>
           <Icon name="x" size="sm" />
         </button>
       </div>
-      <div className="md-b">
-        <div className="fg">
-          <label htmlFor="niKind">Kind</label>
-          <span className="tm-seg" id="niKind">
-            {["task", "milestone", "target"].map((k) => (
-              <button key={k} className={kind === k ? "on" : ""}
-                onClick={() => { setKind(k); if (k === "target") setParent(""); }}>
-                {labelOf(KIND, k)}
-              </button>
-            ))}
-          </span>
+
+      <div className="md-b tm-ni">
+        <Tabs items={["task", "milestone", "target"].map((k) => ({ k, label: labelOf(KIND, k) }))}
+          cur={kind} onPick={(k) => { setKind(k); if (k === "target") setParent(""); }} />
+
+        <div className="tm-ni-r">
+          <Icon name="calendar" className="tm-ni-i" />
+          <input type="date" className="inp" value={start} aria-label="Starts"
+            onChange={(e) => setStart(e.target.value)} />
+          <span className="tm-ni-to" aria-hidden="true">→</span>
+          <input type="date" className="inp" value={due} aria-label="Due"
+            onChange={(e) => setDue(e.target.value)} />
         </div>
-        <div className="fg">
-          <label htmlFor="niTitle">Title <b className="req">*</b></label>
-          <input id="niTitle" className="inp" autoFocus value={title}
-            onChange={(e) => setTitle(e.target.value)} />
+
+        <div className="tm-ni-r">
+          <Icon name="user" className="tm-ni-i" />
+          <select className="inp" value={who} aria-label="Assigned to"
+            onChange={(e) => setWho(e.target.value)}>
+            {members.filter((m) => m.status === "active")
+              .map((m) => <option key={m.memberId} value={m.memberId}>{m.name}</option>)}
+          </select>
         </div>
-        <div className="tm-fg2">
-          <div className="fg">
-            <label htmlFor="niWho">Assigned to</label>
-            <select id="niWho" className="inp" value={who} onChange={(e) => setWho(e.target.value)}>
-              {members.filter((m) => m.status === "active")
-                .map((m) => <option key={m.memberId} value={m.memberId}>{m.name}</option>)}
-            </select>
-          </div>
-          <div className="fg">
-            <label htmlFor="niPri">Priority</label>
-            <select id="niPri" className="inp" value={pri} onChange={(e) => setPri(e.target.value)}>
-              {["high", "medium", "low"].map((k) => <option key={k} value={k}>{labelOf(PRIORITY, k)}</option>)}
-            </select>
-          </div>
+
+        <div className="tm-ni-r">
+          <Icon name="flag" className="tm-ni-i" />
+          <select className="inp" value={pri} aria-label="Priority"
+            onChange={(e) => setPri(e.target.value)}>
+            {["high", "medium", "low"].map((k) =>
+              <option key={k} value={k}>{labelOf(PRIORITY, k)} priority</option>)}
+          </select>
         </div>
-        <div className="tm-fg2">
-          <div className="fg">
-            <label htmlFor="niStart">Starts</label>
-            <input id="niStart" type="date" className="inp" value={start}
-              onChange={(e) => setStart(e.target.value)} />
+
+        {kind === "target" ? (
+          <div className="tm-ni-r">
+            <Icon name="star" className="tm-ni-i" />
+            <input type="number" className="inp tm-ni-n" value={tv} placeholder="60"
+              aria-label="Target value" onChange={(e) => setTv(e.target.value)} />
+            <input className="inp" value={tu} placeholder="businesses"
+              aria-label="Unit" onChange={(e) => setTu(e.target.value)} />
           </div>
-          <div className="fg">
-            <label htmlFor="niDue">Due</label>
-            <input id="niDue" type="date" className="inp" value={due}
-              onChange={(e) => setDue(e.target.value)} />
-          </div>
-        </div>
-        {kind !== "target" ? (
-          <div className="fg">
-            <label htmlFor="niParent">Rolls up to</label>
-            <select id="niParent" className="inp" value={parent} onChange={(e) => setParent(e.target.value)}>
-              <option value="">Nothing — top level</option>
+        ) : (
+          <div className="tm-ni-r">
+            <Icon name="link" className="tm-ni-i" />
+            <select className="inp" value={parent} aria-label="Rolls up to"
+              onChange={(e) => setParent(e.target.value)}>
+              <option value="">Rolls up to nothing</option>
               {parents.map((i) => <option key={i.itemId} value={i.itemId}>{i.title}</option>)}
             </select>
           </div>
-        ) : (
-          <div className="tm-fg2">
-            <div className="fg">
-              <label htmlFor="niTv">Target</label>
-              <input id="niTv" type="number" className="inp" value={tv}
-                onChange={(e) => setTv(e.target.value)} />
-            </div>
-            <div className="fg">
-              <label htmlFor="niTu">Unit</label>
-              <input id="niTu" className="inp" placeholder="deals" value={tu}
-                onChange={(e) => setTu(e.target.value)} />
-            </div>
-          </div>
         )}
-        <p className="tm-foot">Starts as Planning. Nothing sets Delay — it is the due date.</p>
+
+        <p className="tm-ni-note">It opens in Planning. Nothing sets Delay — the due date does.</p>
       </div>
+
       <div className="md-f">
         <span className="spacer" />
         <button className="btn" onClick={() => shell.closeLayer()}>Cancel</button>

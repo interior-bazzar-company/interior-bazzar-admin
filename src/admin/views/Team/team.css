@@ -599,6 +599,45 @@
 .tm-groupnote { font-size: var(--text-2xs); color: var(--text-3) }
 
 
+/* ------------------------------------------------------------- create --- */
+/* THE TITLE IS THE FORM. Six labelled fields in a two-column grid asked a
+   person to read the dialog before writing the one thing they opened it for.
+   The title is the heading now, the kind is a tab row under it, and every other
+   fact is one quiet row led by the icon that names it. */
+
+.tm-ni-h { padding-right: var(--space-8) }
+.tm-ni-t {
+  width: 100%; border: 0; outline: none; background: none;
+  padding: var(--space-1) 0; border-bottom: 2px solid var(--line);
+  font: inherit; font-size: var(--text-xl); font-weight: var(--weight-medium); color: var(--text);
+  transition: border-color var(--duration) var(--ease);
+}
+.tm-ni-t::placeholder { color: var(--text-3); font-weight: var(--weight-normal) }
+.tm-ni-t:focus { border-bottom-color: var(--brand) }
+
+.tm-ni .tabs { margin-bottom: var(--space-3) }
+.tm-ni-r { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-1) }
+.tm-ni-i { flex: 0 0 auto; color: var(--text-3) }
+.tm-ni-to { flex: 0 0 auto; color: var(--text-3); font-size: var(--text-sm) }
+.tm-ni-n { max-width: 96px }
+
+/* QUIET UNTIL REACHED FOR. A border on every control turns five optional facts
+   into a wall of boxes; they take their box on hover and focus. Only the
+   BACKGROUND-COLOUR is cleared — `select.inp` draws its chevron with a
+   background-image, and the shorthand would take the arrow with it. */
+.tm-ni-r .inp {
+  height: var(--control-md); font-size: var(--text-md);
+  border-color: transparent; background-color: transparent;
+}
+.tm-ni-r .inp:hover { border-color: var(--line-control); background-color: var(--bg) }
+.tm-ni-r .inp:focus { border-color: var(--brand); background-color: var(--bg) }
+
+.tm-ni-note {
+  margin: var(--space-4) 0 0;
+  padding-left: calc(var(--icon-md) + var(--space-3));
+  font-size: var(--text-sm); color: var(--text-3);
+}
+
 /* ---------------------------------------------------- member dashboard -- */
 
 .tm-mh { display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap }

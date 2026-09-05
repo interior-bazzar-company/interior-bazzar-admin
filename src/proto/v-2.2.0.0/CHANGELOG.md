@@ -6,6 +6,40 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-04
 
+### Create opens on a title, not on a form
+
+**Area:** sidebar → Team → **Calendar** (`#/work`) — the Create dialog, every kind
+**Files:** `src/admin/views/Team/Work.tsx`, `team.css`
+
+**What changed**
+
+It was six labelled fields in a two-column grid, which asks somebody to read the dialog
+before they can write the one thing they opened it for. Google's create dialog opens on a
+single empty title and lets every other fact be a quiet row under the icon that names it;
+that shape is borrowed here.
+
+- **The title is the heading.** A large borderless field in the header slot, focused on open,
+  with a rule under it that turns brand on focus — so there is no second heading above it
+  saying the same word the tabs already say.
+- **Kind is a tab row** directly under the title, on the panel's own `.tabs` — the underline
+  idiom the member page already uses, not a fourth switcher invented for one dialog.
+- **Five facts, five icon-led rows.** Dates (`start → due`), assignee, priority, and then
+  either what it rolls up to or, for a target, its value and unit. No labels: the icon names
+  the row and the control carries the value.
+- **Quiet until reached for.** The controls have no border at rest and take one on hover and
+  focus; a border on each of five optional facts is a wall of boxes. Only the background
+  *colour* is cleared — `select.inp` draws its chevron with a background-image, and the
+  shorthand would have taken the arrow with it.
+- **Enter creates.** For most of these the title is the whole entry.
+
+Nothing about the record changed: the same refusals, the same depth-3 parent rule, the same
+"opens in Planning, and only the due date makes it Delay".
+
+**Verified**
+`npx tsc -b` clean · eslint 0 errors · `npx vite build` succeeds · both check suites pass.
+
+---
+
 ### The pane opens with air, instead of welding its first control to the topbar
 
 **Area:** sidebar → Team → **Calendar** (`#/work`, every face)
