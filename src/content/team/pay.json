@@ -1,14 +1,284 @@
 {
-  "$comment": "PLACEHOLDER RECORDS — a READ of Finance, never a write. Stands in for GET /api/v1/admin/finance/salary-accounts + /incentives, scoped to one member. Team shows the number and links into Finance for every action; Finance owns the money. `annualCtc` is in paise-free rupees. An incentive is Team's basis and Finance's payment, which is why its state is pending → approved → paid and Team can only read it.",
+  "$comment": "PLACEHOLDER RECORDS — a READ of Finance, never a write. Stands in for GET /api/v1/admin/finance/salary-accounts + /incentives, scoped to one member. A payslip carries the incentive that was paid with it, so the two lists cannot disagree. Team shows the number and links into Finance for every action; Finance owns the money. `annualCtc` is in paise-free rupees. An incentive names the WORK ITEM it was earned against (workItemId), so the join reads in both directions: from a target, what did it earn; from a member, what have they earned. It is Team's basis and Finance's payment, which is why its state is pending → approved → paid and Team can only read it.",
   "generatedAt": "2026-08-28T14:20:00+05:30",
   "pay": [
-    {"memberId": "41", "annualCtc": 0, "currency": "INR", "effectiveFrom": "2026-04-01", "lastPayslip": null, "incentives": []},
-    {"memberId": "52", "annualCtc": 1450000, "currency": "INR", "effectiveFrom": "2026-04-01", "lastPayslip": {"month": "2026-07", "net": 106333, "paidAt": "2026-08-01"}, "incentives": [{"incentiveId": "IN-01", "month": "2026-07", "basis": "Q1 desk target", "amount": 25000, "state": "paid"}, {"incentiveId": "IN-02", "month": "2026-08", "basis": "August closures", "amount": 18000, "state": "approved"}]},
-    {"memberId": "58", "annualCtc": 1250000, "currency": "INR", "effectiveFrom": "2026-04-01", "lastPayslip": {"month": "2026-07", "net": 91667, "paidAt": "2026-08-01"}, "incentives": [{"incentiveId": "IN-03", "month": "2026-08", "basis": "Onboarding run rate", "amount": 12000, "state": "pending"}]},
-    {"memberId": "63", "annualCtc": 620000, "currency": "INR", "effectiveFrom": "2026-04-01", "lastPayslip": {"month": "2026-07", "net": 45467, "paidAt": "2026-08-01"}, "incentives": []},
-    {"memberId": "70", "annualCtc": 540000, "currency": "INR", "effectiveFrom": "2026-04-01", "lastPayslip": {"month": "2026-07", "net": 39600, "paidAt": "2026-08-01"}, "incentives": [{"incentiveId": "IN-04", "month": "2026-08", "basis": "Sharma Interiors", "amount": 15000, "state": "pending"}]},
-    {"memberId": "74", "annualCtc": 540000, "currency": "INR", "effectiveFrom": "2026-04-01", "lastPayslip": {"month": "2026-07", "net": 39600, "paidAt": "2026-08-01"}, "incentives": []},
-    {"memberId": "79", "annualCtc": 700000, "currency": "INR", "effectiveFrom": "2026-04-01", "lastPayslip": {"month": "2026-07", "net": 51333, "paidAt": "2026-08-01"}, "incentives": []},
-    {"memberId": "86", "annualCtc": 420000, "currency": "INR", "effectiveFrom": "2026-04-01", "lastPayslip": null, "incentives": []}
+    {
+      "memberId": "41",
+      "annualCtc": 0,
+      "currency": "INR",
+      "effectiveFrom": "2026-04-01",
+      "incentives": [],
+      "account": null,
+      "payslips": []
+    },
+    {
+      "memberId": "52",
+      "annualCtc": 1450000,
+      "currency": "INR",
+      "effectiveFrom": "2026-04-01",
+      "incentives": [
+        {
+          "incentiveId": "IN-01",
+          "month": "2026-07",
+          "basis": "Close 40 deals this quarter",
+          "amount": 25000,
+          "state": "paid",
+          "workItemId": "W-T01"
+        },
+        {
+          "incentiveId": "IN-02",
+          "month": "2026-08",
+          "basis": "Close 40 deals this quarter",
+          "amount": 18000,
+          "state": "approved",
+          "workItemId": "W-T01"
+        }
+      ],
+      "account": {
+        "bank": "HDFC current",
+        "ref": "ACC-HDFC-4021"
+      },
+      "payslips": [
+        {
+          "month": "2026-07",
+          "net": 131333,
+          "base": 106333,
+          "incentive": 25000,
+          "note": null,
+          "paidAt": "2026-08-01"
+        },
+        {
+          "month": "2026-06",
+          "net": 106333,
+          "base": 106333,
+          "incentive": null,
+          "note": null,
+          "paidAt": "2026-07-01"
+        },
+        {
+          "month": "2026-05",
+          "net": 70179,
+          "base": 70179,
+          "incentive": null,
+          "note": null,
+          "paidAt": "2026-06-01"
+        }
+      ]
+    },
+    {
+      "memberId": "58",
+      "annualCtc": 1250000,
+      "currency": "INR",
+      "effectiveFrom": "2026-04-01",
+      "incentives": [
+        {
+          "incentiveId": "IN-03",
+          "month": "2026-08",
+          "basis": "Onboard 60 businesses",
+          "amount": 12000,
+          "state": "pending",
+          "workItemId": "W-T02"
+        }
+      ],
+      "account": {
+        "bank": "HDFC current",
+        "ref": "ACC-HDFC-4021"
+      },
+      "payslips": [
+        {
+          "month": "2026-07",
+          "net": 91667,
+          "base": 91667,
+          "incentive": null,
+          "note": null,
+          "paidAt": "2026-08-01"
+        },
+        {
+          "month": "2026-06",
+          "net": 91667,
+          "base": 91667,
+          "incentive": null,
+          "note": null,
+          "paidAt": "2026-07-01"
+        },
+        {
+          "month": "2026-05",
+          "net": 60500,
+          "base": 60500,
+          "incentive": null,
+          "note": null,
+          "paidAt": "2026-06-01"
+        }
+      ]
+    },
+    {
+      "memberId": "63",
+      "annualCtc": 620000,
+      "currency": "INR",
+      "effectiveFrom": "2026-04-01",
+      "incentives": [],
+      "account": {
+        "bank": "HDFC current",
+        "ref": "ACC-HDFC-4021"
+      },
+      "payslips": [
+        {
+          "month": "2026-07",
+          "net": 45467,
+          "base": 45467,
+          "incentive": null,
+          "note": null,
+          "paidAt": "2026-08-01"
+        },
+        {
+          "month": "2026-06",
+          "net": 45467,
+          "base": 45467,
+          "incentive": null,
+          "note": null,
+          "paidAt": "2026-07-01"
+        },
+        {
+          "month": "2026-05",
+          "net": 30008,
+          "base": 30008,
+          "incentive": null,
+          "note": null,
+          "paidAt": "2026-06-01"
+        }
+      ]
+    },
+    {
+      "memberId": "70",
+      "annualCtc": 540000,
+      "currency": "INR",
+      "effectiveFrom": "2026-04-01",
+      "incentives": [
+        {
+          "incentiveId": "IN-04",
+          "month": "2026-08",
+          "basis": "Close Sharma Interiors",
+          "amount": 15000,
+          "state": "pending",
+          "workItemId": "W-M03"
+        }
+      ],
+      "account": {
+        "bank": "ICICI payroll",
+        "ref": "ACC-ICICI-8830"
+      },
+      "payslips": [
+        {
+          "month": "2026-07",
+          "net": 39600,
+          "base": 39600,
+          "incentive": null,
+          "note": null,
+          "paidAt": "2026-08-01"
+        },
+        {
+          "month": "2026-06",
+          "net": 39600,
+          "base": 39600,
+          "incentive": null,
+          "note": null,
+          "paidAt": "2026-07-01"
+        },
+        {
+          "month": "2026-05",
+          "net": 26136,
+          "base": 26136,
+          "incentive": null,
+          "note": null,
+          "paidAt": "2026-06-01"
+        }
+      ]
+    },
+    {
+      "memberId": "74",
+      "annualCtc": 540000,
+      "currency": "INR",
+      "effectiveFrom": "2026-04-01",
+      "incentives": [],
+      "account": {
+        "bank": "ICICI payroll",
+        "ref": "ACC-ICICI-8830"
+      },
+      "payslips": [
+        {
+          "month": "2026-07",
+          "net": 39600,
+          "base": 39600,
+          "incentive": null,
+          "note": null,
+          "paidAt": "2026-08-01"
+        },
+        {
+          "month": "2026-06",
+          "net": 39600,
+          "base": 39600,
+          "incentive": null,
+          "note": null,
+          "paidAt": "2026-07-01"
+        },
+        {
+          "month": "2026-05",
+          "net": 26136,
+          "base": 26136,
+          "incentive": null,
+          "note": null,
+          "paidAt": "2026-06-01"
+        }
+      ]
+    },
+    {
+      "memberId": "79",
+      "annualCtc": 700000,
+      "currency": "INR",
+      "effectiveFrom": "2026-04-01",
+      "incentives": [],
+      "account": {
+        "bank": "HDFC current",
+        "ref": "ACC-HDFC-4021"
+      },
+      "payslips": [
+        {
+          "month": "2026-07",
+          "net": 51333,
+          "base": 51333,
+          "incentive": null,
+          "note": null,
+          "paidAt": "2026-08-01"
+        },
+        {
+          "month": "2026-06",
+          "net": 51333,
+          "base": 51333,
+          "incentive": null,
+          "note": null,
+          "paidAt": "2026-07-01"
+        },
+        {
+          "month": "2026-05",
+          "net": 33879,
+          "base": 33879,
+          "incentive": null,
+          "note": null,
+          "paidAt": "2026-06-01"
+        }
+      ]
+    },
+    {
+      "memberId": "86",
+      "annualCtc": 420000,
+      "currency": "INR",
+      "effectiveFrom": "2026-04-01",
+      "incentives": [],
+      "account": {
+        "bank": "HDFC current",
+        "ref": "ACC-HDFC-4021"
+      },
+      "payslips": []
+    }
   ]
 }

@@ -339,14 +339,124 @@ require("esbuild").build({
   ok("the member may delete what they handed over",
     S.deleteResource("RS-02").ok === true && S.resourcesFor("86").length === 1);
 
+  head("A leave request has two ways to be impossible, and both are refusals");
+  S.resetStore();
+  (() => {
+    const T = S.TODAY;
+    /* datesIn is field arithmetic, not an ISO round-trip. At +05:30 the naive
+       version silently loses the first day of every range. */
+    eq("a range covers both its ends", S.datesIn(T, S.addDays(T, 2)).length, 3);
+    eq("a single day is one day, not zero", S.datesIn(T, T).length, 1);
+
+    /* 63 has attendance rows in the seed. A leave record over one of them would
+       make that date both worked and away. */
+    const worked = S.readDays().filter((d) => d.memberId === "63").map((d) => d.businessDate);
+    const day = worked[worked.length - 1];
+    ok("the clash names the day that was already clocked",
+      S.leaveClash("63", day, day).worked.indexOf(day) >= 0);
+    const bad = S.requestLeave("63", { fromDate: day, toDate: day, kind: "casual", reason: "x" });
+    ok("…and the store refuses it, not just the form",
+      bad.ok === false && bad.code === "day_worked");
+
+    /* The form warns; the store is what decides. A second request over a date
+       the member already asked for is the other refusal. */
+    const free = S.addDays(T, 30);
+    const first = S.requestLeave("63", { fromDate: free, toDate: S.addDays(free, 2), kind: "casual", reason: "a" });
+    ok("a clean range is accepted", first.ok === true);
+    const dup = S.requestLeave("63", { fromDate: S.addDays(free, 1), toDate: S.addDays(free, 4), kind: "casual", reason: "b" });
+    ok("…and an overlapping second one is not",
+      dup.ok === false && dup.code === "already_requested");
+
+    /* A pending request suppresses nothing. Only an approval does. */
+    ok("a pending request leaves the derivation alone",
+      S.onLeave("63", free) === null);
+    S.decideLeave(first.data.leaveId, "approved", "58");
+    ok("…and approving it is what covers the day",
+      S.onLeave("63", free) !== null);
+  })();
+
+  head("The approver is warned about the peer group, never blocked");
+  S.resetStore();
+  (() => {
+    /* 63 and 86 both report to 58, so they are peers. 70 reports to 52 and must
+       not show up in either one's overlap. */
+    const T = S.addDays(S.TODAY, 40);
+    const a = S.requestLeave("63", { fromDate: T, toDate: T, kind: "casual", reason: "a" });
+    S.decideLeave(a.data.leaveId, "approved", "58");
+    const b = S.requestLeave("86", { fromDate: T, toDate: T, kind: "casual", reason: "b" });
+    const clash = S.leaveOverlap(b.data);
+    ok("a peer already away on the day is surfaced",
+      clash.length === 1 && clash[0].members.some((m) => m.memberId === "63"));
+    ok("…and it is a warning: the request still goes through",
+      S.decideLeave(b.data.leaveId, "approved", "58").ok === true);
+
+    const c = S.requestLeave("70", { fromDate: T, toDate: T, kind: "casual", reason: "c" });
+    ok("somebody under a different senior is not a clash",
+      S.leaveOverlap(c.data).length === 0);
+  })();
+
+  head("A request with no approver is never silent");
+  S.resetStore();
+  (() => {
+    ok("nothing is unrouted in the seed", S.unroutedLeave().length === 0);
+    /* 41 is the founder: reportsTo is null, so there is no line to route down. */
+    const r = S.requestLeave("41", {
+      fromDate: S.addDays(S.TODAY, 50), toDate: S.addDays(S.TODAY, 50),
+      kind: "casual", reason: "founder",
+    });
+    ok("a request from the top of the tree is accepted", r.ok === true);
+    ok("…and lands in the unrouted list rather than nowhere",
+      S.unroutedLeave().some((l) => l.leaveId === r.data.leaveId));
+    ok("…and is not double-counted in a senior's own queue",
+      S.pendingLeave("team").every((l) => l.memberId !== "41"));
+  })();
+
   head("Team reads pay and never writes it");
-  ok("no write function touches pay",
-    Object.keys(S).filter((k) => typeof S[k] === "function")
-      .every((k) => k.indexOf("Pay") < 0 || k.indexOf("payFor") === 0));
+  /* The old form of this banned any exported name containing "Pay", which
+     caught `lastPayslip` — a READ — the moment payslip history landed. What it
+     was actually asserting is that the module has no verb that CHANGES money,
+     so that is what it asserts now: every pay-shaped export is a read, and the
+     write verbs Finance owns are absent by name. */
+  const PAY_READS = ["payFor", "incentiveTotal", "lastPayslip"];
+  const payish = Object.keys(S).filter((k) =>
+    typeof S[k] === "function" && /pay|payslip|incentive|salary|ctc/i.test(k));
+  ok("every pay-shaped export is a read",
+    payish.every((k) => PAY_READS.indexOf(k) >= 0));
+  ok("and none of Finance's write verbs live here",
+    ["setPay", "updatePay", "writePay", "addIncentive", "approveIncentive",
+      "payIncentive", "setSalary", "createPayslip"]
+      .every((k) => typeof S[k] === "undefined"));
   eq("an incentive total is per state, not a lump",
     S.incentiveTotal(S.payFor("52"), "paid"), 25000);
   eq("\u2026and the pending one is a different number",
     S.incentiveTotal(S.payFor("52"), "approved"), 18000);
+
+  /* THE JOIN THE BRIEF ASKED FOR, both directions. An incentive names the work
+     item it was earned against, and the item's progress is read live rather
+     than restated in the pay record — two copies of "how far along is that
+     target" is one copy too many, and the stale one gets quoted. */
+  (() => {
+    const inc = S.payFor("52").incentives;
+    ok("an incentive points at a real work item",
+      inc.every((i) => !i.workItemId || S.readItem(i.workItemId) !== null));
+    const withItem = inc.filter((i) => i.workItemId)[0];
+    ok("\u2026and the item carries its own live number, not a copy",
+      !!withItem && S.readItem(withItem.workItemId).currentValue !== undefined
+      && withItem.currentValue === undefined);
+  })();
+
+  /* A payslip carries the incentive that went out with it, so the payslip list
+     and the incentive ledger cannot disagree about a month. */
+  (() => {
+    const p52 = S.payFor("52");
+    ok("the last payslip is the newest one, whatever order the seed is in",
+      S.lastPayslip(p52).month === p52.payslips
+        .map((x) => x.month).sort().reverse()[0]);
+    ok("every slip's net is its base plus whatever incentive it carried",
+      p52.payslips.every((x) => x.net === x.base + (x.incentive || 0)));
+    ok("a member with no salary account has no slips to disagree with",
+      S.payFor("41").payslips.length === 0);
+  })();
 
   head("Create is one form and three kinds");
   S.resetStore();

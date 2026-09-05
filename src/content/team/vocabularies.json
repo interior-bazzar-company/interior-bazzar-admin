@@ -357,6 +357,10 @@
     {
       "key": "unpaid",
       "label": "Unpaid"
+    },
+    {
+      "key": "comp_off",
+      "label": "Comp-off"
     }
   ],
   "leaveStates": [
@@ -390,6 +394,10 @@
     {
       "key": "nda",
       "label": "NDA"
+    },
+    {
+      "key": "custom",
+      "label": "Custom"
     }
   ],
   "agreementStates": [

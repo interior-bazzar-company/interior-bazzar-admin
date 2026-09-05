@@ -4,6 +4,140 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ---
 
+## 2026-09-05
+
+### The member is a place, and every operation on them is a page
+
+**Area:** sidebar → Team · `#/team`, `#/team/:id`, `#/team/:id/{attendance,work,leave,reports,agreements,documents,pay}`, `#/attendance`
+**Files:** `src/routes/index.tsx`, `src/admin/views/Team/index.tsx`, `MemberPage.tsx`,
+`Attendance.tsx`, `store.ts`, `team.css`, `member/ops.ts` *(new)*, `member/frame.tsx` *(new)*,
+`member/modals.tsx` *(new)*, `member/AttendancePage.tsx` *(new)*, `member/WorkPage.tsx` *(new)*,
+`member/LeavePage.tsx` *(new)*, `member/ReportsPage.tsx` *(new)*, `member/AgreementsPage.tsx` *(new)*,
+`member/DocumentsPage.tsx` *(new)*, `member/PayPage.tsx` *(new)*, `memberTabs.tsx` *(deleted)*,
+`src/content/team/pay.json`, `vocabularies.json`, `scripts/tm-smoke.tsx`,
+`scripts/check-team-derivation.cjs`
+
+**What changed**
+
+The operational half of a member used to be six tabs on one screen. It is now **seven pages**,
+each with its own address: `#/team/86/leave` is a link somebody can paste into a message, and it
+opens on the thing it names. The route table gained a third segment (`/:route/:id/:sub`) — one
+line, and the host still keys on the first segment, so a route without a third segment behaves
+exactly as before.
+
+`#/team/:id` stopped being a container and became a **launcher**: who this is, what is true right
+now, and what needs somebody to act. Seven cards, each carrying one live figure — *1 waiting*,
+*2 missing*, *₹104,167 a month* — because a card that only repeats its own title is a link with
+extra padding.
+
+**Three rules the rebuild is actually built on**
+
+- **A nudge must never leak what a page hides.** Every row in the summary block carries the
+  operation it was derived from and is **dropped whole** when that operation is off this viewer's
+  list — not greyed, not "no access". A row reading *"1 agreement unsigned"* would announce the
+  existence of a document the same screen just refused to open. The refusal is enforced twice: the
+  card is not drawn, and the URL is refused with the same sentence, because hiding a door and
+  opening it to anyone who types the address is worse than not hiding it.
+- **A dialog warns early; the store refuses anyway.** The leave form now names the clash before
+  the request is sent — *"There is already an attendance row on 28 Aug"* — and `requestLeave`
+  refuses on the same rule. A form is not a gate: the dates can be edited after the warning
+  renders, and a second tab never saw it.
+- **Agreements and documents are two pages, not one tab.** They were folded together to avoid a
+  seventh *tab*; with a page each there is no tab budget forcing them together, and they differ in
+  direction, in who may delete, and in how long they are kept. Company → member is frozen at send
+  and has no edit control at all. Member → company is theirs to take back.
+
+**Leave got the logic the wireframe specified and the store never had**
+
+`leaveClash` (a day already clocked, or already covered by their own live request — both
+refusals), `leaveOverlap` (who *else* in the same reporting group is away on those dates — a
+**warning**, never a block, because nothing here knows how many people a day needs), `unroutedLeave`
+(a request from somebody at the top of the tree points at no approver, so it now surfaces in its
+own block on `#/attendance` instead of sitting there silently), and `datesIn`, which is field
+arithmetic rather than an ISO round-trip — at +05:30 the naive version loses the first day of
+every range.
+
+**Pay is a read with a payslip history and a real join**
+
+The seed gained the account the money leaves from and three months of slips. An incentive now
+names the **work item** it was earned against rather than restating a sentence, so the item's own
+live progress rides along — two copies of "how far along is that target" is one copy too many, and
+the stale one gets quoted. A slip carries the incentive it went out with, so the two lists cannot
+disagree about a month.
+
+**The roster says more than a name**
+
+Reports-to and a *documents* column, plus a Department filter and a `documents short` stat. Missing
+documents show on the row, on the member's page and in the filter, and **nothing anywhere blocks on
+them** — a hard gate would stop somebody working on their first day over a scan.
+
+**Temp data**
+
+`src/content/team/pay.json` → placeholder. Gained `account {bank, ref}` and `payslips[]`
+(`month`, `base`, `incentive`, `net`, `paidAt`); `lastPayslip` is gone, derived by `lastPayslip()`
+instead. `incentives[]` gained `workItemId`, joining to `work.json`.
+`src/content/team/vocabularies.json` → `comp_off` added to `leaveKinds`, `custom` to
+`agreementKinds`; both were on the wireframe and missing from the list.
+`leave.json`, `agreements.json`, `resources.json`, `work.json`, `members.json`,
+`attendance.json`, `plans.json`, `reports.json`, `tags.json` → unchanged placeholders.
+
+**Backend needed**
+
+- `GET /api/v1/admin/team/leave` → the request list; `POST` to create, `PATCH` to decide. The
+  clash refusals (`day_worked`, `already_requested`) must be enforced server-side too — the client
+  ones are courtesy.
+- `GET /api/v1/admin/team/agreements` → the list; `POST` to send, `PATCH` to revoke. **The signing
+  surface is still a dialog, not the public `/a/<token>` page** — that page is unauthenticated
+  writing to a legal record and needs a hashed single-use token, expiry, revocation, and per-token
+  and per-IP limits before it ships.
+- `GET /api/v1/admin/team/resources` → the list; upload needs **private objects behind a
+  short-lived signed read**. There is deliberately no open or download control on the Documents
+  page until that exists, because a working button would be the leak.
+- `GET /api/v1/admin/finance/salary-accounts/<memberId>` + `/incentives` → replaces `pay.json`.
+  Team reads it and never writes it.
+- `none — already live` for the roster, roles and the member's account block
+  (`AdminOpsService.users()` / `listRoles()`).
+
+**Open decisions**
+
+- **TM-OD-20 · what "my JD team" means** — still unanswered. The Department filter added here
+  filters on the `department` string every member already carries; it does **not** settle the
+  question. If JD is a second company rather than a department, this control is the wrong shape
+  and the roster needs a tenancy switch.
+- **TM-OD-23 · no leave quota.** A quota needs an accrual policy, a carry-forward rule and a
+  year-end job. The days are recorded and counted; nothing accrues.
+- **TM-OD-30 · retention after a member leaves** — flagged, not answered. It is a data-protection
+  question.
+- **TM-OD-31 · one grant spelled two ways.** Agreements and documents are hidden from a senior by
+  the same rule here; `people-docs.view` and `team.resource.view` still have to be reconciled into
+  one read verb before either ships.
+- **TM-AD-22 amended.** It folded agreements and resources into one Documents tab to stay under
+  seven tabs. With operations as pages that constraint is gone and they are two pages again —
+  TM-AD-18 always said they were two entities, and this stops pretending otherwise.
+
+**Verified**
+
+`npm run check:team-render` renders **every operation at every scope** — self, senior and admin,
+seven pages each — plus the launcher, the four work faces, and all seven dialogs, and fails on any
+throw. It asserts specifically that a senior's switcher hides Agreements, Documents and Pay, that
+typing those URLs is refused *without drawing the page*, and that the senior's summary block names
+no agreement and no document while the seed still holds an unsigned one for it to hide.
+
+`npm run check:team` gained sixteen assertions: the two leave refusals (form and store), that a
+pending request suppresses nothing and an approval does, that the overlap warning finds a peer and
+ignores somebody under a different senior, that an unrouted request lands in its own list and is
+not double-counted, and the payslip/incentive join.
+
+`npx tsc -b` clean · eslint **0 errors** across `src/admin`, `src/routes` and `scripts` (58
+pre-existing warnings; the 195 errors `eslint .` reports are all in `src/api`, `src/components`
+and `src/types` and predate this) · `npm run build` green · `team.css` still has **zero** hex or
+rgba literals, so dark mode stays a token swap.
+
+**Not checked:** nothing was clicked in a browser. Every assertion above is a static render or a
+derivation, so hover, focus order and the real dialog flow are unverified by machine.
+
+---
+
 ## 2026-09-04
 
 ### A blank pane under an intact topbar: the adoption fetch could take the module down

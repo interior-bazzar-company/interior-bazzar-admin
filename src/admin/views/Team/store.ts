@@ -175,14 +175,32 @@ export interface Resource {
 }
 
 export interface Incentive {
-  incentiveId: string; month: string; basis: string; amount: number; state: string;
+  incentiveId: string; month: string;
+  /** The work item it was earned against — the join in both directions. Null
+   *  where the basis is not a tracked item, which the screen has to survive. */
+  workItemId: string | null;
+  /** A readable label for that basis, so a deleted item still prints. */
+  basis: string;
+  amount: number; state: string;
+}
+export interface Payslip {
+  month: string; net: number; base: number;
+  /** The incentive PAID with this slip, if any. It is repeated from the
+   *  incentive ledger on purpose: a payslip that quietly omitted it would send
+   *  somebody to Finance to ask why the two numbers differ. */
+  incentive: number | null;
+  note: string | null;
+  paidAt: string;
 }
 export interface Pay {
   memberId: string;
   annualCtc: number;
   currency: string;
   effectiveFrom: string;
-  lastPayslip: { month: string; net: number; paidAt: string } | null;
+  /** The account the money leaves from. Finance's record; Team only names it so
+   *  a member can check it is the right one without asking. */
+  account: { bank: string; ref: string } | null;
+  payslips: Payslip[];
   incentives: Incentive[];
 }
 
@@ -749,6 +767,64 @@ export const pendingLeave = (scope: Scope): LeaveRequest[] => {
   return snap.leave.filter((l) => l.state === "requested" && ids.indexOf(l.memberId) >= 0);
 };
 
+/** Every date a range covers, inclusive. Field arithmetic through addDays, not
+ *  `new Date(...).toISOString()`: this panel runs at +05:30, where an ISO
+ *  round-trip of a local midnight lands on the day before. */
+export function datesIn(from: string, to: string): string[] {
+  const out: string[] = [];
+  for (let d = from; d <= to && out.length < 400; d = addDays(d, 1)) out.push(d);
+  return out;
+}
+
+/** WHAT MAKES THIS REQUEST IMPOSSIBLE, said before it is sent.
+ *
+ *  Two clashes, and they are different in kind:
+ *
+ *  · **A day already opened.** §3.7: a leave record laid over an attendance row
+ *    makes one date both worked and away, and the derivation has no way to
+ *    choose between them. It is refused, not warned.
+ *  · **A day already spoken for** by this member's own live request. A second
+ *    request over the same date gives the approver two rows to decide and the
+ *    member two answers.
+ *
+ *  It returns the dates rather than a sentence, so the form can name them and
+ *  the store can refuse on exactly the same rule. */
+export interface LeaveClash { worked: string[]; taken: string[] }
+export function leaveClash(memberId: string, from: string, to: string): LeaveClash {
+  const days = datesIn(from, to);
+  const live = snap.leave.filter((l) => l.memberId === memberId
+    && (l.state === "requested" || l.state === "approved"));
+  return {
+    worked: days.filter((d) => !!dayFor(memberId, d)),
+    taken: days.filter((d) => live.some((l) => d >= l.fromDate && d <= l.toDate)),
+  };
+}
+
+/** WHO ELSE IS AWAY over the same dates, among the people this request's
+ *  approver is responsible for. §3.8: this is a WARNING and never a block —
+ *  nothing in the module knows how many people a day needs, and refusing on a
+ *  staffing rule nobody configured would be the panel inventing one. */
+export interface LeaveOverlap { date: string; members: Member[] }
+export function leaveOverlap(l: LeaveRequest): LeaveOverlap[] {
+  const m = readMember(l.memberId);
+  if (!m) return [];
+  /* The peer group is everyone reporting to the same senior, minus the person
+     asking. A clash only matters against people who cover the same work. */
+  const peers = snap.members.filter((x) => x.memberId !== l.memberId
+    && x.status === "active" && !!m.reportsTo && x.reportsTo === m.reportsTo);
+  const ids = peers.map((x) => x.memberId);
+  return datesIn(l.fromDate, l.toDate)
+    .map((date) => ({ date, members: leaveOn(date, ids).map((x) => readMember(x.memberId)).filter(Boolean) as Member[] }))
+    .filter((r) => r.members.length > 0);
+}
+
+/** A REQUEST WITH NO APPROVER MUST NEVER JUST SIT THERE. §3.8/TM-OD-25: a
+ *  member at the top of the tree points at nobody, so their request routes to
+ *  whoever holds the deciding verb instead of falling down a hole. Surfacing
+ *  the list is what stops that being silent. */
+export const unroutedLeave = (): LeaveRequest[] =>
+  snap.leave.filter((l) => l.state === "requested" && !(readMember(l.memberId) || { reportsTo: "x" }).reportsTo);
+
 /* ====================================================== documents === */
 
 export const agreementsFor = (memberId: string): Agreement[] =>
@@ -789,6 +865,11 @@ export const payFor = (memberId: string): Pay | null =>
 export const incentiveTotal = (p: Pay | null, state?: string): number =>
   (p ? p.incentives : []).filter((i) => !state || i.state === state)
     .reduce((a, i) => a + i.amount, 0);
+
+/** The most recent slip. The seed is newest-first; sorting here rather than
+ *  trusting that is one line and removes a way for a reordered seed to lie. */
+export const lastPayslip = (p: Pay | null): Payslip | null =>
+  (p ? p.payslips : []).slice().sort((a, b) => b.month.localeCompare(a.month))[0] || null;
 
 /** THE ONLY WAY A TYPED ADDRESS BECOMES A STORED ONE.
  *
@@ -1403,6 +1484,15 @@ export function requestLeave(memberId: string, input: {
   if (!input.fromDate || !input.toDate) return err("dates_required", "Both dates are needed.");
   if (input.toDate < input.fromDate) return err("bad_range", "The last day is before the first.");
   if (!input.reason.trim()) return err("reason_required", "A leave request needs a reason.");
+  /* THE SAME RULE THE FORM DREW, ENFORCED. The form warns early because that is
+     kinder; this refuses because a form is not a gate — the dates can be edited
+     after the warning renders, and a second tab never saw it at all. */
+  const clash = leaveClash(memberId, input.fromDate, input.toDate);
+  if (clash.worked.length)
+    return err("day_worked", "They clocked in on " + fmtDate(clash.worked[0])
+      + ". A leave record over an attendance row makes that day both worked and away.");
+  if (clash.taken.length)
+    return err("already_requested", fmtDate(clash.taken[0]) + " is already covered by another request.");
   const l: LeaveRequest = {
     leaveId: nextId("LV"), memberId, fromDate: input.fromDate, toDate: input.toDate,
     kind: input.kind, reason: input.reason.trim(), state: "requested",
@@ -1709,6 +1799,8 @@ export function useWork(f: WorkFilter, scope: Scope): WorkItem[] { useVersion();
 export function useItem(id: string | null): WorkItem | null { useVersion(); return id ? readItem(id) : null; }
 export function useTags(): Tag[] { useVersion(); return snap.tags; }
 export function useLeave(): LeaveRequest[] { useVersion(); return snap.leave; }
+export function usePlans(): DailyPlan[] { useVersion(); return snap.plans; }
+export function useReports(): DailyReport[] { useVersion(); return snap.reports; }
 export function useAgreements(): Agreement[] { useVersion(); return snap.agreements; }
 export function useResources(): Resource[] { useVersion(); return snap.resources; }
 export function useLinks(): WorkLink[] { useVersion(); return snap.links; }

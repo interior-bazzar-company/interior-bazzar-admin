@@ -21,7 +21,7 @@ import { useParams, useSearchParams } from "react-router-dom";
 import AdminOpsService from "../../../api/modules/adminOps";
 import { errMessage } from "../../../api/apiService";
 import {
-  EmptyState, FilterChips, Icon, SearchField, Select, StatStrip, TbTitle, qs,
+  EmptyState, FilterChips, Icon, Pill, SearchField, Select, StatStrip, TbTitle, qs,
 } from "../../ui";
 import type { StatCell } from "../../ui";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
@@ -31,12 +31,13 @@ import type { Member, Ops, Role } from "../teamShared";
 import { ListSkeleton } from "../../ui";
 import MemberPage from "./MemberPage";
 import { adoptPeople } from "./adopt";
-import { readMember } from "./store";
+import { RESOURCE_KIND, labelOf, missingDocs, readMember, readMembers, useMembers, useResources } from "./store";
+import { opOf } from "./member/ops";
 import { MemberNewModal } from "./memberModals";
 import AccessRequests, { pendingRequests } from "./AccessRequests";
 
 export default function Team() {
-  const { id } = useParams();
+  const { id, sub } = useParams();
   const [sp] = useSearchParams();
   const { go } = useNav();
   const { modal, closeLayer, toast } = useShell();
@@ -45,7 +46,8 @@ export default function Team() {
   const [roles, setRoles] = useState<Role[]>([]);
 
   const p: Record<string, string> = {
-    q: sp.get("q") || "", role: sp.get("role") || "", tab: sp.get("tab") || "",
+    q: sp.get("q") || "", role: sp.get("role") || "", dept: sp.get("dept") || "",
+    tab: sp.get("tab") || "",
   };
   const tab = p.tab === "requests" ? "requests" : "members";
 
@@ -58,6 +60,9 @@ export default function Team() {
       toast, modal, closeLayer, go, refresh,
     };
   }, [closeLayer, toast, modal, go]);
+
+  useMembers();
+  useResources();
 
   useEffect(() => {
     let cancelled = false;
@@ -83,9 +88,25 @@ export default function Team() {
     if (!id) return <span className="tb-title">Team</span>;
     const u = (rows || []).find((x) => String(x.id) === id);
     const name = u ? u.name : readMember(id)?.name || "Member";
-    return <TbTitle label={name} to="#/team" />;
-  }, [id, rows]);
-  usePageChrome({ crumbs, parent: id ? "#/team" + qs(p) : null }, (id || "") + p.tab);
+    /* ON AN OPERATION PAGE THE CRUMB SAYS BOTH. The name is the way back to the
+       person; the operation is where you are. A topbar that named only the
+       person on `/team/58/leave` would leave the deepest page in the module
+       looking identical to the one above it. */
+    const op = sub ? opOf(sub) : null;
+    if (!op) return <TbTitle label={name} to="#/team" />;
+    return (
+      <>
+        <TbTitle label={name} to={"#/team/" + id} />
+        <span className="tb-sep">/</span>
+        <span className="tb-title is-here">{op.label}</span>
+      </>
+    );
+  }, [id, rows, sub]);
+  /* Up from an operation is the member, not the roster. */
+  usePageChrome({
+    crumbs,
+    parent: id ? (sub ? "#/team/" + id : "#/team" + qs(p)) : null,
+  }, (id || "") + "/" + (sub || "") + p.tab);
 
   /* ----------------------------------------------------------- filters -- */
   const typing = useRef<number | undefined>(undefined);
@@ -122,12 +143,14 @@ export default function Team() {
      tabs, and the admin actions moved into its header. */
   if (id) {
     const u = rows.find((x) => String(x.id) === id) || null;
-    return <MemberPage id={id} tab={p.tab} live={u} roles={roles} ops={ops} />;
+    return <MemberPage id={id} sub={sub || ""} live={u} roles={roles} ops={ops} />;
   }
 
   /* -------------------------------------------------------------- rows -- */
   let list = rows.slice();
+  const depts = uniq(readMembers().map((m) => m.department).filter(Boolean) as string[]);
   if (p.role) list = list.filter((u) => u.roles.some((r) => String(r.id) === p.role));
+  if (p.dept) list = list.filter((u) => (readMember(String(u.id))?.department || "") === p.dept);
   if (p.q) {
     const s = p.q.toLowerCase();
     list = list.filter((u) =>
@@ -135,14 +158,20 @@ export default function Team() {
   }
 
   const noRole = rows.filter((u) => !u.roles.length).length;
+  const noDocs = rows.filter((u) => missingDocs(String(u.id)).length).length;
   const waiting = pendingRequests();
-  const filtered = !!(p.q || p.role);
+  const filtered = !!(p.q || p.role || p.dept);
 
   const cells: (StatCell | "sep")[] = [
     { k: "members", v: rows.length, to: "#/team", on: !p.role && !p.q },
     "sep",
     { k: "no role", v: noRole, dot: noRole ? "warn" : "", tone: noRole ? "warn" : "",
       title: "Signed-in and granted nothing — a successful login never implies access" },
+    "sep",
+    /* A COUNT, NEVER A GATE. Nothing in the panel blocks on a missing document —
+       a hard gate would stop somebody working on their first day over a scan. */
+    { k: "documents short", v: noDocs, dot: noDocs ? "warn" : "", tone: noDocs ? "warn" : "",
+      title: "Members missing at least one required document. Nothing blocks on it." },
     "sep",
     { k: "roles", v: roles.length, to: "#/roles", title: "Open Roles" },
   ];
@@ -169,6 +198,16 @@ export default function Team() {
             <Select key={"role:" + p.role} name="role" label="Role"
               options={roles.map((r) => ({ v: String(r.id), l: r.name }))}
               value={p.role} onFilter={setFilter} />
+            {/* DEPARTMENT IS A FILTER, NOT AN ANSWER. `department` is already a
+                string on every member, so filtering by it costs nothing. It
+                does NOT settle what "my JD team" means — if that turns out to
+                be a second company rather than a department, the roster needs a
+                tenancy switch and this control is the wrong shape entirely. */}
+            {depts.length ? (
+              <Select key={"dept:" + p.dept} name="dept" label="Department"
+                options={depts.map((d) => ({ v: d, l: d }))}
+                value={p.dept} onFilter={setFilter} />
+            ) : null}
             <span className="spacer"></span>
             {can("team", "create") ? (
               <button className="btn pri" data-act="tm-new"
@@ -182,7 +221,8 @@ export default function Team() {
 
           {filtered ? (
             <div className="dls-chips">
-              <FilterChips params={p} labels={{ q: "Search", role: "Role" }} onUnfilter={unfilter} />
+              <FilterChips params={p} labels={{ q: "Search", role: "Role", dept: "Department" }}
+                onUnfilter={unfilter} />
             </div>
           ) : null}
 
@@ -191,7 +231,10 @@ export default function Team() {
               <table className="tbl dls-tbl">
                 <thead>
                   <tr>
-                    <th style={{ width: "3px" }}></th><th>Member</th><th>Role</th>
+                    <th style={{ width: "3px" }}></th><th>Member</th>
+                    <th style={{ width: "220px" }}>Reports to</th>
+                    <th style={{ width: "230px" }}>Role</th>
+                    <th style={{ width: "190px" }}>Documents</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -208,7 +251,9 @@ export default function Team() {
                         </div>
                         <div className="cell-2 mono">{u.username || "—"} · {u.email}</div>
                       </td>
+                      <td><ReportsTo id={String(u.id)} /></td>
                       <td><RoleChips u={u} /></td>
+                      <td><DocsCell id={String(u.id)} /></td>
                     </tr>
                   ))}
                 </tbody>
@@ -233,4 +278,47 @@ export default function Team() {
       )}
     </div>
   );
+}
+
+/* ================================================== two derived columns === */
+
+/** WHO REVIEWS THIS PERSON, one level and never transitive. It is the same
+ *  `reportsTo` the leave inbox routes on and the member page derives `senior`
+ *  from — a second hierarchy for the word "captain" would give the module two
+ *  answers to the same question and they would drift within a month. */
+function ReportsTo({ id }: { id: string }) {
+  const m = readMember(id);
+  if (!m) return <span className="faint">—</span>;
+  if (!m.reportsTo) return <span className="dim">nobody</span>;
+  const s = readMember(m.reportsTo);
+  return (
+    <>
+      <span className="cell-1">{s ? s.name : "—"}</span>
+      <span className="cell-2">{m.department || m.designation}</span>
+    </>
+  );
+}
+
+/** MISSING DOCUMENTS, ON THE ROW. This is the whole enforcement: it shows here,
+ *  on the member's own page and in the roster filter, and nothing anywhere
+ *  blocks on it. Naming which ones are short is what makes the column
+ *  actionable — "2 missing" sends somebody hunting. */
+function DocsCell({ id }: { id: string }) {
+  const m = readMember(id);
+  if (!m) return <span className="faint">—</span>;
+  const missing = missingDocs(id);
+  if (!missing.length) return <Pill text="Complete" tone="ok" />;
+  return (
+    <>
+      <Pill text={missing.length + " missing"} tone="warn" />
+      <span className="cell-2">{missing.map((k) => labelOf(RESOURCE_KIND, k)).join(", ")}</span>
+    </>
+  );
+}
+
+/** Distinct, order preserved. */
+function uniq(list: string[]): string[] {
+  const out: string[] = [];
+  list.forEach((x) => { if (out.indexOf(x) < 0) out.push(x); });
+  return out.sort();
 }

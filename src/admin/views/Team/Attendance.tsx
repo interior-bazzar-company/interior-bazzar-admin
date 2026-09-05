@@ -19,7 +19,7 @@
    NO API YET — everything comes from src/content/team/attendance.json through
    store.ts, which is the only file that knows that.
    ============================================================================= */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
@@ -29,12 +29,13 @@ import {
 import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import {
-  LEAVE_KIND, TODAY, addDays, attendanceTotals, dayFor, decideLeave, endDay, fmtDate, fmtDayName, labelOf,
-  fmtHM, fmtTime, meId, openDay, pendingLeave, readMember, resumeDay, scopeLabel, scopeOf,
-  startBreak, stateOf, useDayRows, useLeave, useMe, useMembers, useMyDay, weekOf, workedOf,
-  now as clockNow,
+  LEAVE_KIND, TODAY, addDays, attendanceTotals, datesIn, dayFor, endDay, fmtDate, fmtDayName,
+  labelOf, leaveOverlap, fmtHM, fmtTime, meId, openDay, pendingLeave, readMember, resumeDay,
+  scopeLabel, scopeOf, startBreak, stateOf, unroutedLeave, useDayRows, useLeave, useMe, useMembers,
+  useMyDay, weekOf, workedOf, now as clockNow,
 } from "./store";
-import type { DayRow, Result } from "./store";
+import type { DayRow, LeaveRequest, Result } from "./store";
+import { LeaveDecideModal } from "./member/modals";
 import { BarScale, DayBar, Meter, ScopeNote, StatePill, Who } from "./bits";
 import { ensureAdopted } from "./adopt";
 import "./team.css";
@@ -343,77 +344,94 @@ function DateNav({ date, onPick }: { date: string; onPick: (d: string) => void }
 
 /* ------------------------------------------------------------- leave --- */
 
-/** THE SENIOR SIDE. One block, only when there is something in it: a queue that
- *  renders an empty state every day is a queue people stop looking at.
- *  Approving writes NO attendance row — it suppresses the derived absence, and
- *  the day reads On leave instead. */
+/** THE SENIOR SIDE, and the two things a queue like this usually gets wrong.
+ *
+ *  · **An empty queue renders nothing.** A block that draws "no requests" every
+ *    single day is a block people stop looking at, and then miss the day it has
+ *    something in it.
+ *  · **A request with no approver is never silent.** Somebody at the top of the
+ *    tree points at nobody with `reportsTo`, so their request has no reporting
+ *    line to route down. It falls to any holder of the deciding verb and it
+ *    says so out loud — a request that simply sat there is the exact failure
+ *    this second block exists to prevent.
+ *
+ *  Approving writes NO attendance row. It suppresses the derived absence, and
+ *  the day reads On leave instead.
+ */
 function LeaveInbox() {
-  const shell = useShell();
   useLeave();
-  const me = meId();
-  const rows = pendingLeave(scopeOf("attendance"));
-  if (!rows.length) return null;
-
-  const decide = (id: string, state: "approved" | "rejected", note?: string) => {
-    const r = decideLeave(id, state, me, note);
-    shell.toast(r.ok ? "Leave " + state + "." : r.message, r.ok ? "" : "bad");
-  };
+  const mine = pendingLeave(scopeOf("attendance"));
+  const unrouted = unroutedLeave().filter((l) => mine.every((x) => x.leaveId !== l.leaveId));
+  if (!mine.length && !unrouted.length) return null;
 
   return (
-    <div className="tm-inbox">
-      <header>
-        <b>Leave requests</b>
-        <span className="pill warn xs">{rows.length}</span>
-      </header>
-      {rows.map((l) => {
-        const m = readMember(l.memberId);
-        const days = Math.round((new Date(l.toDate).getTime() - new Date(l.fromDate).getTime()) / 86400000) + 1;
-        return (
-          <div key={l.leaveId} className="tm-inbox-r">
-            <span className="tm-inbox-t">
-              <b>{m ? m.name : l.memberId}</b>
-              <span className="cell-2">
-                {fmtDate(l.fromDate)}{l.toDate !== l.fromDate ? " – " + fmtDate(l.toDate) : ""}
-                {" · " + days + (days > 1 ? " days" : " day") + " · " + labelOf(LEAVE_KIND, l.kind)}
-              </span>
-            </span>
-            <span className="tm-inbox-w">{l.reason}</span>
+    <>
+      {mine.length ? (
+        <div className="tm-inbox">
+          <header>
+            <b>Leave requests</b>
+            <span className="pill warn xs">{mine.length}</span>
             <span className="spacer" />
-            <button className="btn sm" onClick={() => shell.modal(
-              <RefuseModal onSubmit={(n) => { shell.closeLayer(); decide(l.leaveId, "rejected", n); }} />, "sm")}>
-              Refuse…
-            </button>
-            <button className="btn pri sm" onClick={() => decide(l.leaveId, "approved")}>Approve</button>
-          </div>
-        );
-      })}
-    </div>
+            <span className="tm-inbox-w">Until you decide, those days still read as absent.</span>
+          </header>
+          {mine.map((l) => <InboxRow key={l.leaveId} l={l} />)}
+        </div>
+      ) : null}
+
+      {unrouted.length ? (
+        <div className="tm-inbox">
+          <header>
+            <b>Nobody to route these to</b>
+            <span className="pill warn xs">{unrouted.length}</span>
+            <span className="spacer" />
+            <span className="tm-inbox-w">
+              These members report to nobody, so they fall to any admin who can decide leave.
+            </span>
+          </header>
+          {unrouted.map((l) => <InboxRow key={l.leaveId} l={l} unrouted />)}
+        </div>
+      ) : null}
+    </>
   );
 }
 
-function RefuseModal({ onSubmit }: { onSubmit: (note: string) => void }) {
+function InboxRow({ l, unrouted }: { l: LeaveRequest; unrouted?: boolean }) {
   const shell = useShell();
-  const [v, setV] = useState("");
+  const m = readMember(l.memberId);
+  const days = datesIn(l.fromDate, l.toDate).length;
+  /* The clash is shown ON THE ROW as well as in the dialog, because the whole
+     point of it is to be seen before somebody clicks Approve out of habit. */
+  const clash = leaveOverlap(l)[0] || null;
+
   return (
-    <>
-      <div className="md-h">
-        <h3>Refuse this request</h3>
-        <button className="btn icon sm md-x" aria-label="Close" onClick={() => shell.closeLayer()}>
-          <Icon name="x" size="sm" />
-        </button>
-      </div>
-      <div className="md-b">
-        <div className="fg">
-          <label htmlFor="lvRefuse">Reason <b className="req">*</b></label>
-          <input id="lvRefuse" className="inp" autoFocus value={v} onChange={(e) => setV(e.target.value)} />
-          <span className="help">The member sees it on their row.</span>
-        </div>
-      </div>
-      <div className="md-f">
-        <span className="spacer" />
-        <button className="btn" onClick={() => shell.closeLayer()}>Cancel</button>
-        <button className="btn dgr" disabled={!v.trim()} onClick={() => onSubmit(v)}>Refuse</button>
-      </div>
-    </>
+    <div className="tm-inbox-r">
+      <span className="tm-inbox-t">
+        <b>{m ? m.name : l.memberId}</b>
+        <span className="cell-2">
+          {fmtDate(l.fromDate)}{l.toDate !== l.fromDate ? " – " + fmtDate(l.toDate) : ""}
+          {" · " + days + (days > 1 ? " days" : " day") + " · " + labelOf(LEAVE_KIND, l.kind)}
+        </span>
+      </span>
+      <span className="tm-inbox-w">
+        {l.reason}
+        {clash ? (
+          <b className="u-warn">
+            {" "}{clash.members.map((x) => x.name).join(", ")}
+            {clash.members.length > 1 ? " are" : " is"} also away on {fmtDate(clash.date)}.
+          </b>
+        ) : null}
+        {unrouted ? <b className="u-warn"> Waiting on an admin.</b> : null}
+      </span>
+      <span className="spacer" />
+      {m ? (
+        <button className="btn sm" onClick={() => go("#/team/" + m.memberId + "/leave")}>Open</button>
+      ) : null}
+      <button className="btn sm" onClick={() => shell.modal(<LeaveDecideModal l={l} state="rejected" />)}>
+        Refuse…
+      </button>
+      <button className="btn pri sm" onClick={() => shell.modal(<LeaveDecideModal l={l} state="approved" />)}>
+        Approve…
+      </button>
+    </div>
   );
 }
