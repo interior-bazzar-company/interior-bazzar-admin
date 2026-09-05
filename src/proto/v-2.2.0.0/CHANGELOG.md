@@ -6,6 +6,41 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-04
 
+### The calendar takes Google Calendar's layout, and the month says its own name
+
+**Area:** sidebar → Team → **Calendar** (`#/work`, the calendar face)
+**Files:** `src/admin/views/Team/Work.tsx`, `store.ts`, `team.css`, `scripts/check-team-derivation.cjs`
+
+**What changed**
+
+- **The month heading said `ep 2026`.** It was being cut out of a full date with
+  `fmtDate(...).slice(3)` — three characters into "1 Sep 2026". There is a `fmtMonth()` now,
+  built from the month name, and the suite asserts both forms and both year edges.
+- **Stepping a month walked the date back a day, every press.** `toISOString()` on a local
+  midnight is +05:30 behind, so September went to 3 October, then 2 November. `monthStep()`
+  does field arithmetic and lands on the first. Twelve steps forward and twelve back now
+  return to where they started — asserted.
+- **Create opens the sidebar,** full width, as a pill with its three kinds under it. It
+  leaves the toolbar on the calendar face and stays in the toolbar on board, list and
+  timeline, which have no rail (TM-AD-25).
+- **The mini month names itself** — "September 2026" with its own ‹ › — and marks three
+  states apart: today filled, the day being viewed tinted, a day with work dotted.
+- **Today is the number, not the square.** The whole cell was washed in warning amber, which
+  in this panel means something is wrong. It is a filled brand circle on the date now.
+- **The grid is Google's:** equal cells, hairlines, weekday heads centred over them, the day
+  number centred at the top, out-of-month days on the shell ground.
+- **Clicking the empty part of a day starts something on it,** with the date already filled
+  in; the chips inside still open their own item, because the test is the cell being the
+  click target. `+N more` opens that day in week view instead of being dead text.
+- The date bar reads Today ‹ › then the month at 22px, with Month/Week moved to the right on
+  the theme's own `.btn-group`.
+
+**Verified**
+`npm run check:team` all green, five assertions added for the heading and the month step.
+`npx tsc -b` clean · eslint 0 errors · `npx vite build` succeeds.
+
+---
+
 ### The module attaches to the Team table, and it navigates
 
 **Area:** sidebar → Team → **Members** (`#/team`, now the one front door) · **Calendar** (`#/work`) ·

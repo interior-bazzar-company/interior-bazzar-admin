@@ -302,33 +302,48 @@
 .tm-shell { display: flex; align-items: stretch; gap: var(--space-4); min-width: 0 }
 .tm-shell-b { flex: 1; min-width: 0 }
 .tm-rail {
-  flex: 0 0 244px; min-width: 0;
+  flex: 0 0 248px; min-width: 0;
   display: flex; flex-direction: column; gap: var(--space-3);
 }
 @media (max-width: 1240px) { .tm-rail { display: none } }
 
+/* Create opens the sidebar, the way it does in the calendar everybody already
+   knows. A pill, full width, and its menu drops under the whole button. */
+.tm-create-b { display: block }
+.tm-create-b > .btn {
+  width: 100%; justify-content: center; gap: var(--space-2);
+  height: var(--control-lg); border-radius: var(--radius-full);
+  font-size: var(--text-md); box-shadow: var(--shadow-sm);
+}
+.tm-create-b .ib-menu-pop { left: 0; right: auto; min-width: 100% }
+
 /* ---------------------------------------------------------- mini month -- */
 
 .tm-mini {
-  display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px;
-  background: var(--bg-inset); border-radius: var(--radius-lg); padding: var(--space-2);
+  background: var(--bg-inset); border-radius: var(--radius-lg);
+  padding: var(--space-2); display: flex; flex-direction: column; gap: var(--space-1);
 }
-.tm-mini b {
+.tm-mini-h { display: flex; align-items: center; gap: 2px; padding-left: var(--space-1) }
+.tm-mini-h b { font-size: var(--text-sm); color: var(--text); font-weight: var(--weight-medium) }
+.tm-mini-h .btn.icon { height: 22px; width: 22px; min-width: 22px }
+.tm-mini-g { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px }
+.tm-mini-g b {
   text-align: center; font-size: var(--text-2xs); color: var(--text-3);
   font-weight: 500; padding: 2px 0;
 }
-.tm-mini button {
+.tm-mini-g button {
   font: inherit; font-size: var(--text-2xs); border: 0; background: none; cursor: pointer;
   color: var(--text-2); padding: 4px 0 6px; border-radius: var(--radius-full); position: relative;
 }
-.tm-mini button:hover { background: var(--bg-hover); color: var(--text) }
-.tm-mini button.out { color: var(--text-3); opacity: .55 }
-.tm-mini button.today { background: var(--text); color: var(--bg); font-weight: 600 }
-.tm-mini button.has::after {
+.tm-mini-g button:hover { background: var(--bg-hover); color: var(--text) }
+.tm-mini-g button.out { color: var(--text-3); opacity: .55 }
+.tm-mini-g button.sel { background: var(--brand-tint); color: var(--brand-text); font-weight: 600 }
+.tm-mini-g button.today { background: var(--brand); color: var(--brand-ink); font-weight: 600 }
+.tm-mini-g button.has::after {
   content: ""; position: absolute; left: 50%; bottom: 2px; width: 3px; height: 3px;
   margin-left: -1.5px; border-radius: var(--radius-full); background: var(--info-solid);
 }
-.tm-mini button.today.has::after { background: var(--bg) }
+.tm-mini-g button.today.has::after { background: var(--brand-ink) }
 
 /* --------------------------------------------------------------- blocks -- */
 
@@ -436,6 +451,10 @@
   padding-bottom: var(--space-3);
 }
 .tm-calbar > b { font-size: var(--text-sm); color: var(--text) }
+.tm-calh {
+  font-size: var(--text-2xl); line-height: 1; font-weight: var(--weight-medium);
+  color: var(--text); margin: 0 0 0 var(--space-2);
+}
 .tm-seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: var(--radius-md); overflow: hidden }
 .tm-seg button {
   font: inherit; font-size: var(--text-xs); padding: 3px 10px; border: 0;
@@ -454,21 +473,37 @@
   border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden;
 }
 .tm-cal-h {
-  padding: 5px 8px; font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: .07em;
-  color: var(--text-3); background: var(--bg-inset); border-right: 1px solid var(--line); font-weight: 600;
+  padding: var(--space-2) 0; text-align: center;
+  font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: .07em;
+  color: var(--text-3); background: var(--bg); border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line); font-weight: 600;
 }
 .tm-cal-h:nth-child(7) { border-right: 0 }
+
+/* Equal cells, hairlines, and the day number centred at the top — the shape a
+   month grid has had since paper. The cell itself is the create target, so it
+   takes the pointer; the chips inside it stop the click by being the target. */
 .tm-day {
-  min-height: 104px; padding: 4px 5px; background: var(--bg);
+  min-height: 116px; padding: 0 var(--space-1) var(--space-1); background: var(--bg);
   border-right: 1px solid var(--line); border-top: 1px solid var(--line);
-  display: flex; flex-direction: column; gap: 2px; min-width: 0;
+  display: flex; flex-direction: column; gap: 2px; min-width: 0; cursor: pointer;
 }
 .tm-day:nth-child(7n) { border-right: 0 }
-.tm-day.out { background: var(--bg-inset) }
-.tm-day.today { background: var(--warn-bg) }
+.tm-day:hover { background: var(--bg-hover) }
+.tm-day.out { background: var(--bg-shell) }
+.tm-day.out .tm-day-n { color: var(--text-3); opacity: .6 }
 .tm-cal.week .tm-day { min-height: 320px }
-.tm-day-n { font-size: var(--text-2xs); color: var(--text-3) }
-.tm-day.today .tm-day-n { color: var(--warn); font-weight: 600 }
+
+.tm-day-n {
+  align-self: center; margin-top: var(--space-1);
+  display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px;
+  border-radius: var(--radius-full); pointer-events: none;
+  font-size: var(--text-xs); color: var(--text-2); font-weight: var(--weight-medium);
+}
+/* TODAY IS THE NUMBER, not the square. A whole tinted cell reads as a warning
+   in a panel where a tinted row means something is wrong. */
+.tm-day.today .tm-day-n { background: var(--brand); color: var(--brand-ink); font-weight: 600 }
+.tm-day.sel .tm-day-n { background: var(--brand-tint); color: var(--brand-text) }
 
 .tm-ev {
   display: block; width: 100%; text-align: left; font: inherit; font-size: var(--text-2xs);
@@ -485,7 +520,12 @@
 .tm-ev.s-bad { border-left-color: var(--bad-solid); background: var(--bad-bg) }
 .tm-ev.s-dead { opacity: .5; text-decoration: line-through }
 .tm-ev.leave { border-style: dashed; color: var(--text-3); background: var(--bg-inset) }
-.tm-more { font-size: var(--text-2xs); color: var(--text-3); padding-left: 3px }
+.tm-more {
+  font: inherit; font-size: var(--text-2xs); color: var(--text-3);
+  background: none; border: 0; text-align: left; padding: 2px 5px; cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.tm-more:hover { background: var(--bg-active); color: var(--text) }
 .tm-foot { font-size: var(--text-2xs); color: var(--text-3); margin: var(--space-3) 0 0 }
 
 /* ------------------------------------------------------------- timeline -- */

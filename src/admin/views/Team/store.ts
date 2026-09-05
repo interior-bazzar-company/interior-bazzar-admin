@@ -309,6 +309,8 @@ export const fmtTime = (iso: string | null | undefined) => {
 };
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTHS_LONG = ["January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"];
 const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /** Parsed field by field, not through Date(string), so a date-only value is
@@ -319,6 +321,19 @@ export const fmtDate = (d: string | null | undefined) => {
   const p = d.slice(0, 10).split("-");
   return Number(p[2]) + " " + MONTHS[Number(p[1]) - 1] + " " + p[0];
 };
+/** "September 2026", or "Sep 2026" short. A month heading was being cut out of
+ *  a full date with a slice, which is how the calendar came to say "ep 2026". */
+export const fmtMonth = (d: string, long?: boolean) =>
+  (long ? MONTHS_LONG : MONTHS)[Number(d.slice(5, 7)) - 1] + " " + d.slice(0, 4);
+
+/** The first of the month `n` months away. Field arithmetic, never
+ *  `toISOString()` on a local midnight — that is +05:30 behind and walks the
+ *  anchor back a day on every press. */
+export const monthStep = (d: string, n: number) => {
+  const dt = new Date(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1 + n, 1);
+  return dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0") + "-01";
+};
+
 export const fmtDayName = (d: string) => {
   const p = d.slice(0, 10).split("-");
   return DOW[new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2])).getDay()];

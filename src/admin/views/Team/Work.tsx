@@ -37,7 +37,8 @@ import { go } from "../../ui/nav";
 import type { StatCell } from "../../ui";
 import {
   KIND, PRIORITY, TODAY, WORK_STATUS, addDays, addLink, blockerOf, childrenOf, createItem, createTag,
-  eventsOn, fmtDate, gridDays, isDelayed, isTerminal, labelOf, lanesOf, leaveOn, linkLabelOf, linksOf,
+  eventsOn, fmtDate, fmtMonth, gridDays, isDelayed, isTerminal, labelOf, lanesOf, leaveOn,
+  linkLabelOf, linksOf, monthStep,
   meId, membersInScope, parentOf, readMember, removeLink, setBlockedBy, setItemStatus, stageOf,
   tagItem, tagsOf, tagsOwnedBy, toneOf, useItem, useLinks, useMembers, useTags, useWork, workTotals,
 } from "./store";
@@ -146,7 +147,12 @@ export default function Work() {
             options={slugOptions(tags)} />
           <Select name="priority" label="Priority" value={p.priority} onFilter={onFilter}
             options={[{ v: "high", l: "High" }, { v: "medium", l: "Medium" }, { v: "low", l: "Low" }]} />
-          <CreateMenu onPick={(k) => shell.modal(<NewItemModal kind={k} members={members} all={all} />, "sm")} />
+          {/* The calendar face carries Create at the top of its own rail, where
+              Google puts it and where the founder asked for it. The other three
+              have no rail, so it rides their toolbar. */}
+          {face === "calendar" ? null : (
+            <CreateMenu onPick={(k) => shell.modal(<NewItemModal kind={k} members={members} all={all} />, "sm")} />
+          )}
         </Toolbar>
       </div>
 
@@ -165,7 +171,7 @@ export default function Work() {
       </div>
 
       <div className="dls-body">
-        {face === "calendar" ? <CalendarFace rows={rows} me={me} p={p} goto={goto} onOpen={openItem} />
+        {face === "calendar" ? <CalendarFace rows={rows} me={me} p={p} goto={goto} onOpen={openItem} members={members} all={all} />
           : face === "board" ? <Board rows={rows} all={all} group={p.group || ""} goto={goto} onOpen={openItem} />
           : face === "timeline" ? <Timeline rows={rows} onOpen={openItem} />
           : <List rows={rows} all={all} onOpen={openItem} />}
@@ -185,7 +191,7 @@ const slugOptions = (tags: Tag[]) => {
 /** One control, three kinds. All three open the same form with `kind`
  *  prefilled — they are one WorkItem with a kind, and a target only adds two
  *  fields to it. Three buttons become three forms, then three lists. */
-function CreateMenu({ onPick }: { onPick: (k: string) => void }) {
+function CreateMenu({ onPick, big }: { onPick: (k: string) => void; big?: boolean }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLSpanElement | null>(null);
   useEffect(() => {
@@ -206,10 +212,10 @@ function CreateMenu({ onPick }: { onPick: (k: string) => void }) {
     };
   }, [open]);
   return (
-    <span className="ib-menu" ref={box}>
+    <span className={"ib-menu" + (big ? " tm-create-b" : "")} ref={box}>
       <button className="btn pri" aria-haspopup="menu" aria-expanded={open}
         onClick={() => setOpen((o) => !o)}>
-        <Icon name="plus" size="sm" />Create
+        <Icon name="plus" size={big ? undefined : "sm"} />Create
       </button>
       {open ? (
         <span className="ib-menu-pop" role="menu" aria-label="Create">
@@ -228,16 +234,18 @@ function CreateMenu({ onPick }: { onPick: (k: string) => void }) {
 /** ONE FORM, THREE KINDS. The kind switcher is at the top rather than three
  *  separate forms: they are one record with a `kind`, and a target only adds
  *  two fields to the same six. */
-function NewItemModal({ kind: initial, members, all }: {
-  kind: string; members: Member[]; all: WorkItem[];
+function NewItemModal({ kind: initial, members, all, date }: {
+  kind: string; members: Member[]; all: WorkItem[]; date?: string;
 }) {
   const shell = useShell();
   const [kind, setKind] = useState(initial);
   const [title, setTitle] = useState("");
   const [who, setWho] = useState(meId());
   const [pri, setPri] = useState("medium");
-  const [start, setStart] = useState("");
-  const [due, setDue] = useState(addDays(TODAY, 3));
+  /* A day was clicked: it is both the start and the due date, so the item
+     lands on the day somebody pointed at rather than near it. */
+  const [start, setStart] = useState(date || "");
+  const [due, setDue] = useState(date || addDays(TODAY, 3));
   const [parent, setParent] = useState("");
   const [tv, setTv] = useState("");
   const [tu, setTu] = useState("");
@@ -349,43 +357,51 @@ function NewItemModal({ kind: initial, members, all }: {
 
 /* ------------------------------------------------------------ calendar --- */
 
-function CalendarFace({ rows, me, p, goto, onOpen }: {
+/** GOOGLE'S SHAPE, this module's data. A sidebar that opens with Create and a
+ *  mini month, a date bar reading Today ‹ › over a large month name, and a flat
+ *  seven-column grid whose cells are equal and whose TODAY is marked on the
+ *  number — never as a wash over the whole square, which reads as a warning in
+ *  a panel where a tinted row means something is wrong. */
+function CalendarFace({ rows, me, p, goto, onOpen, members, all }: {
   rows: WorkItem[]; me: string; p: Record<string, string>;
   goto: (q: Record<string, string | undefined>) => void; onOpen: (id: string) => void;
+  members: Member[]; all: WorkItem[];
 }) {
+  const shell = useShell();
   const mode = p.cal === "week" ? "week" : "month";
   const anchor = p.on || TODAY;
   const days = gridDays(anchor, mode);
   const month = anchor.slice(0, 7);
   const teamIds = membersInScope("team", me).map((m) => m.memberId);
 
-  const move = (n: number) => {
-    const d = new Date(anchor + "T00:00:00");
-    if (mode === "week") return goto({ on: addDays(anchor, n * 7) });
-    d.setMonth(d.getMonth() + n);
-    return goto({ on: d.toISOString().slice(0, 10) });
-  };
+  const move = (n: number) => goto({
+    on: mode === "week" ? addDays(anchor, n * 7) : monthStep(anchor, n),
+  });
+  const create = (kind: string, date?: string) =>
+    shell.modal(<NewItemModal kind={kind} members={members} all={all} date={date} />, "sm");
 
   return (
     <div className="tm-shell">
       <aside className="tm-rail">
-        <Rail me={me} anchor={anchor} rows={rows} onDay={(d) => goto({ on: d, cal: undefined })} onOpen={onOpen} />
+        <Rail me={me} anchor={anchor} rows={rows} onDay={(d) => goto({ on: d })}
+          onMonth={(n) => goto({ on: monthStep(anchor, n) })}
+          onCreate={(k) => create(k)} onOpen={onOpen} />
       </aside>
       <div className="tm-shell-b">
         <div className="tm-calbar">
           <button className="btn sm" onClick={() => goto({ on: undefined })}>Today</button>
           <button className="btn icon sm" aria-label="Previous" onClick={() => move(-1)}><Icon name="chevl" size="sm" /></button>
-          <b>{monthLabel(anchor, mode)}</b>
           <button className="btn icon sm" aria-label="Next" onClick={() => move(1)}><Icon name="chevr" size="sm" /></button>
-          <span className="tm-seg">
-            <button className={mode === "month" ? "on" : ""} onClick={() => goto({ cal: undefined })}>Month</button>
-            <button className={mode === "week" ? "on" : ""} onClick={() => goto({ cal: "week" })}>Week</button>
-          </span>
+          <h2 className="tm-calh">{monthLabel(anchor, mode)}</h2>
           <span className="spacer" />
           <span className="tm-legend">
-            <i className="k-info" />chip tone = stage
+            <i className="k-info" />stage
             <i className="k-warn" />delay
             <i className="k-bad" />waiting
+          </span>
+          <span className="btn-group">
+            <button className={mode === "month" ? "on" : ""} onClick={() => goto({ cal: undefined })}>Month</button>
+            <button className={mode === "week" ? "on" : ""} onClick={() => goto({ cal: "week" })}>Week</button>
           </span>
         </div>
         <div className={"tm-cal" + (mode === "week" ? " week" : "")}>
@@ -394,18 +410,27 @@ function CalendarFace({ rows, me, p, goto, onOpen }: {
           ))}
           {days.map((d) => {
             const evs = eventsOn(d, rows);
-            const cap = mode === "week" ? 10 : 4;
+            const cap = mode === "week" ? 12 : 4;
             const away = leaveOn(d, teamIds);
             return (
+              /* Clicking the EMPTY part of a day starts something on it — the
+                 one Google gesture worth keeping. The test is the event target
+                 being the cell itself, so a chip inside it still opens. */
               <div key={d} className={"tm-day"
                 + (d.slice(0, 7) !== month && mode === "month" ? " out" : "")
-                + (d === TODAY ? " today" : "")}>
-                <span className="tm-day-n">{Number(d.slice(8))}{d === TODAY ? " today" : ""}</span>
+                + (d === anchor && d !== TODAY ? " sel" : "")
+                + (d === TODAY ? " today" : "")}
+                onClick={(e) => { if (e.target === e.currentTarget) create("task", d); }}>
+                <span className="tm-day-n">{Number(d.slice(8))}</span>
                 {away.length ? (
                   <span className="tm-ev leave">{away.map((l) => nameOf(l.memberId)).join(", ")} on leave</span>
                 ) : null}
                 {evs.slice(0, cap).map((e) => <CalChip key={e.item.itemId + e.edge} ev={e} onOpen={onOpen} />)}
-                {evs.length > cap ? <span className="tm-more">+{evs.length - cap} more</span> : null}
+                {evs.length > cap ? (
+                  <button className="tm-more" onClick={() => goto({ cal: "week", on: d })}>
+                    +{evs.length - cap} more
+                  </button>
+                ) : null}
               </div>
             );
           })}
@@ -423,7 +448,7 @@ const nameOf = (id: string) => (readMember(id)?.name || id).split(" ").slice(-1)
 
 function monthLabel(d: string, mode: string) {
   if (mode === "week") return fmtDate(d) + " – " + fmtDate(addDays(d, 6));
-  return fmtDate(d.slice(0, 8) + "01").slice(3);
+  return fmtMonth(d, true);
 }
 
 function CalChip({ ev, onOpen }: { ev: CalEvent; onOpen: (id: string) => void }) {
@@ -444,9 +469,10 @@ function CalChip({ ev, onOpen }: { ev: CalEvent; onOpen: (id: string) => void })
 
 /** Create, a mini month, this month's counts, then tasks ▸ milestones ▸
  *  targets. It belongs to this face and no other. */
-function Rail({ me, anchor, rows, onDay, onOpen }: {
+function Rail({ me, anchor, rows, onDay, onMonth, onCreate, onOpen }: {
   me: string; anchor: string; rows: WorkItem[];
-  onDay: (d: string) => void; onOpen: (id: string) => void;
+  onDay: (d: string) => void; onMonth: (n: number) => void;
+  onCreate: (kind: string) => void; onOpen: (id: string) => void;
 }) {
   const days = gridDays(anchor, "month");
   const month = anchor.slice(0, 7);
@@ -458,19 +484,34 @@ function Rail({ me, anchor, rows, onDay, onOpen }: {
 
   return (
     <>
+      <CreateMenu big onPick={onCreate} />
+
       <div className="tm-mini">
-        {["M", "T", "W", "T", "F", "S", "S"].map((d, n) => <b key={n}>{d}</b>)}
-        {days.map((d) => (
-          <button key={d} onClick={() => onDay(d)}
-            className={(d.slice(0, 7) !== month ? "out " : "") + (d === TODAY ? "today " : "")
-              + (eventsOn(d, rows).length ? "has" : "")}>
-            {Number(d.slice(8))}
+        <div className="tm-mini-h">
+          <b>{fmtMonth(anchor, true)}</b>
+          <span className="spacer" />
+          <button className="btn icon sm" aria-label="Previous month" onClick={() => onMonth(-1)}>
+            <Icon name="chevl" size="sm" />
           </button>
-        ))}
+          <button className="btn icon sm" aria-label="Next month" onClick={() => onMonth(1)}>
+            <Icon name="chevr" size="sm" />
+          </button>
+        </div>
+        <div className="tm-mini-g">
+          {["M", "T", "W", "T", "F", "S", "S"].map((d, n) => <b key={n}>{d}</b>)}
+          {days.map((d) => (
+            <button key={d} onClick={() => onDay(d)}
+              className={(d.slice(0, 7) !== month ? "out " : "") + (d === TODAY ? "today " : "")
+                + (d === anchor && d !== TODAY ? "sel " : "")
+                + (eventsOn(d, rows).length ? "has" : "")}>
+              {Number(d.slice(8))}
+            </button>
+          ))}
+        </div>
       </div>
 
       <section className="tm-blk">
-        <header><b>{monthLabel(anchor, "month")}</b><span className="tm-blk-c">{inMonth.length} dated</span></header>
+        <header><b>{fmtMonth(anchor)}</b><span className="tm-blk-c">{inMonth.length} dated</span></header>
         <span className="tm-stack">
           <i className="k-ok" style={{ width: pct(t.completed, inMonth.length) }} />
           <i className="k-info" style={{ width: pct(t.inProgress + t.planned, inMonth.length) }} />

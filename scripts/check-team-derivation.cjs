@@ -367,6 +367,21 @@ require("esbuild").build({
   })();
 
 
+  head("A month heading is built, never sliced out of a date");
+  eq("the short form", S.fmtMonth("2026-09-04"), "Sep 2026");
+  eq("the long form the calendar prints", S.fmtMonth("2026-09-04", true), "September 2026");
+  eq("both year edges", S.fmtMonth("2026-01-31", true) + " / " + S.fmtMonth("2026-12-01", true),
+    "January 2026 / December 2026");
+  ok("stepping months never walks the day back",
+    (() => {
+      let a = "2026-09-04";
+      for (let i = 0; i < 12; i++) a = S.monthStep(a, 1);
+      for (let i = 0; i < 12; i++) a = S.monthStep(a, -1);
+      return a === "2026-09-01";
+    })());
+  eq("…and it wraps the year both ways",
+    S.monthStep("2026-12-15", 1) + " " + S.monthStep("2026-01-15", -1), "2027-01-01 2025-12-01");
+
   head("The clock only rolls forward in a browser");
   eq("in Node the shift is zero and the frame is the authored one", S.SHIFT_DAYS, 0);
 
