@@ -471,9 +471,9 @@
 }
 .tm-body .tm-cal {
   flex: 1 1 auto; min-height: 0; overflow: auto;
-  grid-template-rows: auto repeat(6, minmax(128px, 1fr));
+  grid-template-rows: auto repeat(6, minmax(132px, 1fr));
 }
-.tm-body .tm-cal.week { grid-template-rows: auto minmax(320px, 1fr) }
+.tm-body .tm-cal.week { grid-template-rows: auto minmax(380px, 1fr) }
 .tm-body .tm-day { min-height: 0; overflow: hidden }
 .tm-body .tm-calfoot { flex: 0 0 auto }
 .tm-cal-h {
@@ -495,7 +495,7 @@
 .tm-day {
   min-height: 116px; padding: 0 var(--space-2) var(--space-1); background: var(--bg);
   border-right: 1px solid var(--line); border-top: 1px solid var(--line);
-  display: flex; flex-direction: column; gap: 2px; min-width: 0; cursor: pointer;
+  display: flex; flex-direction: column; gap: 3px; min-width: 0; cursor: pointer;
 }
 .tm-day:nth-child(7n) { border-right: 0 }
 /* A work calendar that draws Saturday exactly like Tuesday makes the reader
@@ -504,7 +504,7 @@
 .tm-day:hover { background: var(--bg-hover) }
 .tm-day.out { background: var(--bg-shell) }
 .tm-day.out .tm-day-n { color: var(--text-3); opacity: .6 }
-.tm-cal.week .tm-day { min-height: 320px }
+.tm-cal.week .tm-day { min-height: 380px; gap: 6px }
 
 .tm-day-n {
   align-self: center; margin-top: var(--space-1);

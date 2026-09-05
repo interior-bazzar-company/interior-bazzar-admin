@@ -6,6 +6,30 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-04
 
+### The gap between chips is a different number in a week than in a month
+
+**Area:** sidebar → Team → **Calendar** (`#/work`) — the month and week grids
+**Files:** `src/admin/views/Team/team.css`
+
+**What changed**
+
+At 2px a stack of chips reads as one block rather than a list of things — worst in the week
+view, where a cell is four times the height and holds the same handful of rows.
+
+- **Month: 3px**, and the row floor goes 128 → 132 to pay for it. Three chips plus the
+  overflow link now measure 126 of 132.
+- **Week: 6px**, with the floor 320 → 380. Twelve chips measure 372 of 380.
+
+Both numbers were computed rather than nudged, because the cells clip: a gap that does not
+fit its floor slices the last chip in half, which is the defect this grid already had once.
+Six rows still need 826px of the 924 a 1080-tall window leaves, so the month keeps stretching
+to fill rather than scrolling.
+
+**Verified**
+`npx tsc -b` clean · eslint 0 errors · `npx vite build` succeeds · both check suites pass.
+
+---
+
 ### Create opens on a title, not on a form
 
 **Area:** sidebar → Team → **Calendar** (`#/work`) — the Create dialog, every kind
