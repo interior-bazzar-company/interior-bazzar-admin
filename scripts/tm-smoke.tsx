@@ -56,8 +56,9 @@ import {
   AddResourceModal, LeaveDecideModal, LeaveRequestModal, NewTagModal, SendAgreementModal,
   SignAgreementModal,
 } from "../src/admin/views/Team/member/modals";
+import { EodModal, PlanModal } from "../src/admin/views/Team/member/reportForms";
 import {
-  TODAY, agreementsFor, leaveFor, meId, readItems, readMembers, resetStore,
+  TODAY, agreementsFor, leaveFor, meId, readItems, readMember, readMembers, resetStore,
 } from "../src/admin/views/Team/store";
 import type { Ops, Role } from "../src/admin/views/teamShared";
 
@@ -173,11 +174,6 @@ renders("the clock, in the topbar slot", () => node(<TopClock />, "/attendance")
    each named by something only it draws, so a tab that renders an empty shell
    instead of itself fails here rather than in a browser. */
 renders("reports · the record", () => at("/reports"), ["dls", "tabs", "tbl", "tm-datef"]);
-/* `tm-form` and not `fg`: the plan has a read-only branch for a day already
-   submitted, and in this seed the signed-in member has submitted. An assertion
-   that only holds for the empty form is an assertion about the seed. */
-renders("reports · my plan", () => at("/reports?mine=plan"), ["dls-body", "tm-form"]);
-renders("reports · my EOD", () => at("/reports?mine=eod"), ["dls-body"]);
 /* The heading, not the cards: with no session the scope narrows to one member
    who happens to need nothing, and "nothing needs you" is a correct render of
    this tab rather than a failure of it. */
@@ -196,6 +192,11 @@ renders("reports · analytics", () => at("/reports?face=analytics"),
      queue stacked on top of a table, the other belonged to neither. */
   ok("the attention cards left the record tab", html.indexOf("tm-attn") < 0);
   ok("the progress roll-up left the record tab", html.indexOf("tm-cols3") < 0);
+  /* Writing your own day left this page entirely: it is a senior's review
+     surface, and two write controls made it answer to two people at once. */
+  ok("the plan and EOD forms left the review page", html.indexOf("My plan") < 0);
+  /* The date scopes all three tabs, so it sits with them rather than under one. */
+  ok("the date sits in the tab row", html.indexOf("tm-tabrow") >= 0);
 })();
 
 const menu = node(<FaceMenu face="calendar" goto={() => {}} />);
@@ -229,6 +230,13 @@ renders("the launcher draws its cards and its nudges", () => member(MINE, ""),
 MEMBER_OPS.forEach((o) => {
   renders("self · " + o.key, () => member(MINE, o.key), ["tm-oph"]);
 });
+/* The two write controls belong to the person, and to nobody looking at them. */
+ok("your own reports page offers the plan and the EOD",
+  member(MINE, "reports").indexOf("EOD report") >= 0
+  || member(MINE, "reports").indexOf("Today's report") >= 0);
+ok("...and a senior's view of somebody else's does not",
+  member(REPORT, "reports").indexOf("EOD report") < 0
+  && member(REPORT, "reports").indexOf("Write today's plan") < 0);
 
 /* A SENIOR MUST NOT SEE THE THREE PRIVATE ONES, and the URL must refuse them
    with the same words the missing card would have carried. Hiding the door and
@@ -284,6 +292,9 @@ const dialogs: [string, React.ReactNode][] = [
   ["sign an agreement", <SignAgreementModal a={ag} />],
   ["add a document", <AddResourceModal memberId={REPORT} />],
   ["new tag", <NewTagModal ownerId={MINE} />],
+  /* They moved off `#/reports` and onto the member's own page as dialogs. */
+  ["today's plan", <PlanModal m={readMember(MINE)!} />],
+  ["end of day", <EodModal m={readMember(MINE)!} />],
 ];
 dialogs.forEach(([what, n]) => {
   const html = renders("the " + what + " dialog", () => node(n), ["md-h", "md-f"]);

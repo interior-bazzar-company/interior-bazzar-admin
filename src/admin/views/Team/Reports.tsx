@@ -1,16 +1,19 @@
 /* =============================================================================
    Reports — #/reports
    -----------------------------------------------------------------------------
-     #/reports                       the records: today by member, and my own two forms
+     #/reports                       the record: one day, by member
      #/reports?face=actions          only the things blocked on a person
      #/reports?face=analytics        plans and EODs over a window
 
-   THREE TABS, AND THE SPLIT IS BY WHAT YOU CAME TO DO. Reports is the record —
-   who wrote what, and the two forms where you write your own. Actions is the
-   short list of things that have stopped because a specific person has not
-   moved, and it carries a count so it can be read from the tab. Analytics is
-   the shape of a fortnight. They were one screen, which meant the actions were
-   buried above a table and the analytics did not exist.
+   THREE TABS, AND THE SPLIT IS BY WHAT YOU CAME TO DO. Reports is the record.
+   Actions is the short list of things that have stopped because a specific
+   person has not moved, and it carries a count so it can be read from the tab.
+   Analytics is the shape of a fortnight.
+
+   THIS PAGE IS A SENIOR'S REVIEW SURFACE AND IT ONLY READS. Writing your own
+   plan and your own EOD moved to `/team/:id/reports`, where a member's records
+   already live — two write controls on a screen that is otherwise entirely a
+   read made the page answer to two different people at once.
 
    TWO FORMS AND ONE REVIEW, over the same records. A plan line CREATES OR LINKS
    a work item, and ticking that line in the EOD COMPLETES it — so "what they
@@ -37,11 +40,10 @@ import type { StatCell } from "../../ui";
 import {
   TODAY, acknowledgeReport, addDays, attentionOf, fmtDate, fmtDayName, fmtHM, fmtTime,
   meId, pendingLeave, readMember, reportSpanDays, reportSpanRows, reportSpanTotals, scopeOf,
-  submitPlan, submitReport, unopenedAgreements, useAgreements, useLeave, useMe, usePlan,
-  useReport, useReports, useReview, useWork,
+  unopenedAgreements, useAgreements, useLeave, useReports, useReview,
 } from "./store";
-import type { Priority, ReportSpanRow, ReviewRow, WorkItem } from "./store";
-import { Meter, PriorityChip, StatePill, Who } from "./bits";
+import type { ReportSpanRow, ReviewRow, WorkItem } from "./store";
+import { Meter, StatePill, Who } from "./bits";
 import { MarksBlock, TasksBlock } from "./workBits";
 import { ensureAdopted } from "./adopt";
 import "./team.css";
@@ -57,12 +59,11 @@ export default function Reports() {
   }, [sp]);
 
   const face = FACES.some((f) => f.k === p.face) ? (p.face as string) : "reports";
-  const mine = p.mine === "plan" ? "plan" : p.mine === "eod" ? "eod" : "";
   const date = p.date && p.date <= TODAY ? p.date : TODAY;
   const scope = scopeOf("reports");
   const rows = useReview(date, scope);
 
-  usePageChrome({ crumbs: <TbTitle label="Reports" to="#/reports" /> }, face + mine + date);
+  usePageChrome({ crumbs: <TbTitle label="Reports" to="#/reports" /> }, face + date);
 
   useEffect(() => { ensureAdopted(); }, []);
 
@@ -83,48 +84,26 @@ export default function Reports() {
 
   return (
     <div className="dls">
-      <div className="dls-chips">
+      {/* THE DAY SITS WITH THE TABS. It scopes the whole page — the record,
+          the queue and the window all read the same day — so it belongs beside
+          what it scopes rather than in a toolbar under one of them. */}
+      <div className="dls-chips tm-tabrow">
         <div className="tabs">
           {FACES.map((f) => (
             <button key={f.k} className={face === f.k ? "on" : ""}
-              onClick={() => goto({ face: f.k === "reports" ? undefined : f.k, mine: undefined })}>
+              onClick={() => goto({ face: f.k === "reports" ? undefined : f.k })}>
               <Icon name={f.icon} size="sm" />{f.label}
               {f.k === "actions" && pending ? <span className="n">{pending}</span> : null}
             </button>
           ))}
         </div>
+        <span className="spacer" />
+        {face === "analytics" ? null : (
+          <DateNav date={date} onPick={(d) => goto({ date: d === TODAY ? undefined : d })} />
+        )}
       </div>
 
-      {face === "reports" ? (
-        <>
-          <div className="dls-cmd">
-            <span className="btn-group">
-              <button className={!mine ? "on" : ""} onClick={() => goto({ mine: undefined })}>
-                <Icon name="users" size="sm" />Everyone
-              </button>
-              <button className={mine === "plan" ? "on" : ""} onClick={() => goto({ mine: "plan" })}>
-                <Icon name="check" size="sm" />My plan
-              </button>
-              <button className={mine === "eod" ? "on" : ""} onClick={() => goto({ mine: "eod" })}>
-                <Icon name="doc" size="sm" />My EOD
-              </button>
-            </span>
-            <span className="spacer" />
-            {/* THE DAY IS A FIELD. These are per-day records and the page could
-                only ever show today — so yesterday's EOD, the one you actually
-                want to read this morning, was unreachable. The two forms write
-                for today only, so the field is theirs to ignore. */}
-            {!mine ? (
-              <DateNav date={date} onPick={(d) => goto({ date: d === TODAY ? undefined : d })} />
-            ) : (
-              <span className="dim tnum">{fmtDayName(TODAY)} {fmtDate(TODAY)}</span>
-            )}
-          </div>
-          {mine === "plan" ? <div className="dls-body"><PlanForm /></div>
-            : mine === "eod" ? <div className="dls-body"><EodForm /></div>
-              : <TheDay rows={rows} date={date} />}
-        </>
-      ) : null}
+      {face === "reports" ? <TheDay rows={rows} /> : null}
 
       {face === "actions" ? <Actions rows={rows} /> : null}
       {face === "analytics" ? (
@@ -170,10 +149,9 @@ function DateNav({ date, onPick }: { date: string; onPick: (d: string) => void }
  *  came back. The two blocks that used to sit on top of it — the attention
  *  cards and "waiting on you" — are the Actions tab now: they are things to DO,
  *  and burying them above a table is how a queue gets missed. */
-function TheDay({ rows, date }: { rows: ReviewRow[]; date: string }) {
+function TheDay({ rows }: { rows: ReviewRow[] }) {
   const shell = useShell();
   const a = attentionOf(rows);
-
   const cells: (StatCell | "sep")[] = [
     { k: "in scope", v: rows.length },
     "sep",
@@ -188,24 +166,15 @@ function TheDay({ rows, date }: { rows: ReviewRow[]; date: string }) {
     { k: "unread reports", v: a.unacknowledged.length, dot: a.unacknowledged.length ? "info" : "" },
   ];
 
-  const anything = a.noPlan.length || a.noEod.length || a.unacknowledged.length;
-
   return (
     <>
       <StatStrip cells={cells} />
       <div className="dls-body">
-        {anything ? (
-          <Notice tone="warn" ico="inbox" text={
-            <>
-              <b>{a.noPlan.length + a.noEod.length + a.unacknowledged.length} of these rows need
-                somebody to move.</b> They are listed with the rest of the queue on the Actions tab,
-              rather than stacked on top of the record you came here to read.
-            </>
-          } />
-        ) : null}
-
-        <SectionHead title={date === TODAY ? "Today, by member" : fmtDayName(date) + " " + fmtDate(date) + ", by member"}
-          desc="Click any row to open that member's work." />
+        {/* No heading and no banner. The tab says Reports, the date sits beside
+            it, and the strip above counts the rows — a title repeating all
+            three, over a table whose columns are already labelled, is a line
+            nobody reads twice. The count of what needs moving lives on the
+            Actions tab, which carries it as a badge. */}
         <Table
           scroll min="1040px"
           cols={[
@@ -559,224 +528,7 @@ function AttnCard({ title, tone, names, note, to }: {
   );
 }
 
-/* ------------------------------------------------------------ my plan --- */
-
-interface Line { title: string; priority: Priority }
-
-function PlanForm() {
-  const shell = useShell();
-  const me = useMe();
-  const plan = usePlan(meId());
-  const [lines, setLines] = useState<Line[]>(
-    plan && plan.lines.length
-      ? plan.lines.map((l) => ({ title: l.title, priority: l.priority }))
-      : [{ title: "", priority: "medium" }]);
-
-  if (!me) return null;
-
-  if (plan && plan.submittedAt) {
-    return (
-      <div className="tm-form">
-        <SectionHead title="Today's plan" desc={"Submitted " + fmtTime(plan.submittedAt)} />
-        <Notice tone="ok" text="Your plan is in. The day is changed by changing the work items, not by editing this — which is what actually happened." />
-        <ol className="tm-plan-r">
-          {plan.lines.map((l) => (
-            <li key={l.lineId}>
-              <span>{l.title}</span>
-              <PriorityChip p={l.priority} />
-              {l.workItemId ? <a data-go={"#/work?item=" + l.workItemId}
-                onClick={() => openWork(l.workItemId as string)}>open →</a> : null}
-            </li>
-          ))}
-        </ol>
-        {plan.expectedOutcome ? <p><b>Expected outcome.</b> {plan.expectedOutcome}</p> : null}
-        {plan.blockers ? <Notice tone="warn" text={plan.blockers} /> : null}
-      </div>
-    );
-  }
-
-  const set = (n: number, patch: Partial<Line>) =>
-    setLines(lines.map((l, i) => (i === n ? { ...l, ...patch } : l)));
-
-  return (
-    <div className="tm-form">
-      <SectionHead title="What am I doing today?"
-        desc="Each line becomes a work item due today. A line matching something already open links to it instead of making a second copy." />
-      <ol className="tm-plan">
-        {lines.map((l, i) => (
-          <li key={i}>
-            <input className="inp" value={l.title} autoFocus={i === 0}
-              placeholder="One thing you are doing today"
-              onChange={(e) => set(i, { title: e.target.value })} />
-            <select className="inp" value={l.priority}
-              onChange={(e) => set(i, { priority: e.target.value as Priority })}>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
-            <button className="btn icon sm" aria-label="Remove line"
-              onClick={() => setLines(lines.filter((_, n) => n !== i))}>
-              <Icon name="x" size="sm" />
-            </button>
-          </li>
-        ))}
-      </ol>
-      <button className="btn sm" onClick={() => setLines(lines.concat([{ title: "", priority: "medium" }]))}>
-        <Icon name="plus" size="sm" />Add a line
-      </button>
-
-      <div className="fg">
-        <label htmlFor="tmOutcome">Expected outcome <span className="tm-opt">optional</span></label>
-        <input id="tmOutcome" className="inp" placeholder="What good looks like by this evening" />
-      </div>
-      <div className="fg">
-        <label htmlFor="tmBlockers">Anything blocking you? <span className="tm-opt">optional</span></label>
-        <input id="tmBlockers" className="inp" placeholder="Say it now rather than at six o'clock" />
-      </div>
-
-      <div className="tm-form-f">
-        <span className="help">Three fields and a list. If this takes more than a minute it is the wrong form.</span>
-        <span className="spacer" />
-        <button className="btn pri" onClick={() => {
-          const outcome = (document.getElementById("tmOutcome") as HTMLInputElement | null)?.value;
-          const blockers = (document.getElementById("tmBlockers") as HTMLInputElement | null)?.value;
-          const r = submitPlan(me.memberId, { lines, expectedOutcome: outcome, blockers });
-          shell.toast(r.ok ? "Plan submitted" : r.message, r.ok ? undefined : "bad");
-        }}>Submit plan</button>
-      </div>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------- my EOD --- */
-
-function EodForm() {
-  const shell = useShell();
-  const me = useMe();
-  const plan = usePlan(meId());
-  const report = useReport(meId());
-  const mine = useWork({ member: meId() }, "self");
-
-  /* Pre-filled from this morning's plan and anything completed today, so the
-     form opens already knowing what the day was about. */
-  const seedLines = useMemo(() => {
-    const fromPlan: { workItemId: string | null; title: string; done: boolean }[] =
-      plan ? plan.lines.map((l) => {
-        const it = mine.filter((i) => i.itemId === l.workItemId)[0];
-        return { workItemId: l.workItemId, title: l.title, done: !!it && it.status === "completed" };
-      }) : [];
-    const seen: Record<string, boolean> = {};
-    fromPlan.forEach((l) => { if (l.workItemId) seen[l.workItemId] = true; });
-    const alsoDone = mine
-      .filter((i: WorkItem) => i.status === "completed" && !seen[i.itemId]
-        && (i.completedAt || "").slice(0, 10) === TODAY)
-      .map((i) => ({ workItemId: i.itemId, title: i.title, done: true }));
-    return fromPlan.concat(alsoDone);
-  }, [plan, mine]);
-
-  const [lines, setLines] = useState(seedLines);
-  const { day, worked, breakMins } = useMyDayLocal();
-
-  if (!me) return null;
-
-  if (report && report.submittedAt) {
-    return (
-      <div className="tm-form">
-        <SectionHead title="Today's report" desc={"Submitted " + fmtTime(report.submittedAt)} />
-        <Notice tone="ok" text={report.acknowledgedById
-          ? "Submitted and read."
-          : "Submitted. Nobody has marked it read yet."} />
-      </div>
-    );
-  }
-
-  const undone = lines.filter((l) => !l.done).length;
-
-  return (
-    <div className="tm-form">
-      <SectionHead title="End of day"
-        desc="Pre-filled from this morning's plan. Ticking a line completes that work item, so the board and this report cannot disagree." />
-
-      {!plan || !plan.submittedAt
-        ? <Notice tone="warn" text="You did not submit a plan this morning, so there is nothing pre-filled. Add what you did below." />
-        : null}
-
-      <ul className="tm-eod">
-        {lines.map((l, i) => (
-          <li key={i}>
-            <label className="check">
-              <input type="checkbox" checked={l.done}
-                onChange={(e) => setLines(lines.map((x, n) => (n === i ? { ...x, done: e.target.checked } : x)))} />
-              <span></span>
-              <b>{l.title}</b>
-            </label>
-            {l.workItemId ? <a data-go={"#/work?item=" + l.workItemId}
-              onClick={() => openWork(l.workItemId as string)}>open →</a> : null}
-          </li>
-        ))}
-        {!lines.length ? <li className="dim">Nothing on today's plan.</li> : null}
-      </ul>
-      <button className="btn sm" onClick={() => setLines(lines.concat([{ workItemId: null, title: "", done: true }]))}>
-        <Icon name="plus" size="sm" />Something not on the plan
-      </button>
-      {lines.some((l) => !l.title) ? (
-        <div className="fg">
-          <label htmlFor="tmExtra">What was it?</label>
-          <input id="tmExtra" className="inp" placeholder="The unplanned thing that took the afternoon"
-            onChange={(e) => setLines(lines.map((l) => (l.title ? l : { ...l, title: e.target.value })))} />
-        </div>
-      ) : null}
-
-      {undone ? (
-        <div className="fg">
-          <label htmlFor="tmPending">Why did the unticked lines not get done? <b className="req">*</b></label>
-          <textarea id="tmPending" className="inp" rows={2}
-            placeholder="The reason, not an apology. It is what a senior reads first." />
-          <span className="help">{undone} line{undone > 1 ? "s" : ""} unticked.</span>
-        </div>
-      ) : null}
-
-      <div className="fg">
-        <label htmlFor="tmWin">Biggest win today <span className="tm-opt">optional</span></label>
-        <input id="tmWin" className="inp" />
-      </div>
-      <div className="fg">
-        <label htmlFor="tmHelp">Blocked on, or need help with <span className="tm-opt">optional</span></label>
-        <input id="tmHelp" className="inp" />
-      </div>
-      <div className="fg">
-        <label htmlFor="tmTomorrow">Tomorrow's first priority <span className="tm-opt">optional</span></label>
-        <input id="tmTomorrow" className="inp" />
-      </div>
-
-      <Notice text={day
-        ? "Worked " + fmtHM(worked) + (breakMins ? " · " + fmtHM(breakMins) + " break" : "")
-        + " · started " + fmtTime(day.startedAt) + ". Read from your clock — there is no field for it here on purpose."
-        : "You have not clocked in today, so there are no hours to attach to this."} />
-
-      <div className="tm-form-f">
-        <span className="spacer" />
-        <button className="btn pri" onClick={() => {
-          const g = (id: string) => (document.getElementById(id) as HTMLInputElement | HTMLTextAreaElement | null)?.value;
-          const r = submitReport(me.memberId, {
-            lines: lines.filter((l) => l.title).map((l) => ({ ...l, targetDelta: null })),
-            pendingReason: g("tmPending"),
-            achievement: g("tmWin"),
-            supportNeeded: g("tmHelp"),
-            tomorrowPriority: g("tmTomorrow"),
-          });
-          shell.toast(r.ok ? "Report submitted" : r.message, r.ok ? undefined : "bad");
-        }}>Submit report</button>
-      </div>
-    </div>
-  );
-}
-
-/* Local wrapper so the EOD form reads the clock through the same derivation the
-   Attendance face does, rather than re-deriving hours it must never own. */
-function useMyDayLocal() {
-  const rows = useReview(TODAY, "self");
-  const r = rows.filter((x) => x.member.memberId === meId())[0];
-  return { day: r ? r.day : null, worked: r ? r.worked : null, breakMins: r && r.day ? r.day.breakMinutes : 0 };
-}
-
+/* The plan and the EOD forms are not here any more. They write a member's OWN
+   day, and this page is a senior's review surface — one screen answering to two
+   different people. They live in member/reportForms.tsx and open as dialogs
+   from `/team/:id/reports`, beside the records they write into. */

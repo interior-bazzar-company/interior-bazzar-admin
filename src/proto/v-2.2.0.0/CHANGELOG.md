@@ -6,6 +6,60 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-05
 
+### Writing your own day moves to your own page, and the review page becomes a read
+
+**Area:** `#/reports` · `/team/:id/reports`
+**Files:** `src/admin/views/Team/Reports.tsx`, `member/ReportsPage.tsx`,
+`member/reportForms.tsx` *(new)*, `team.css`, `scripts/tm-smoke.tsx`
+
+**What changed**
+
+**The plan and EOD forms left `#/reports`.** That page is a senior's review surface — who was in,
+what they said they would do, what came back, what is waiting on a decision. A segmented control for
+writing your *own* day sat on it, which made one screen answer to two different people and put the
+only write control on a page that is otherwise entirely a read.
+
+They are **dialogs on `/team/:id/reports` now**, beside the records they write into, and offered only
+to the person they belong to — a senior looking at somebody else's page gets neither button. Writing
+a plan is something you finish and leave, not a place you navigate to, and as a dialog the week you
+are writing into is still on screen behind it.
+
+Both gained real validation on the way. The plan refuses an empty list; the EOD refuses until the
+unticked lines have a reason, which was previously a starred field with nothing enforcing it. Both
+close on success instead of leaving you looking at a form you already submitted. The four
+`document.getElementById` reads at submit time are gone — the fields are state now, so a re-render
+cannot quietly drop what somebody typed.
+
+**The date moved up beside the tabs.** It scopes all three of them — the record, the queue and the
+window all read the same day — so it belongs next to what it scopes rather than in a toolbar under
+one of them. The tabs' underline moved up to the row with it: inside a flex box `.tabs` shrinks to
+its own content, so its border would have stopped under the last tab instead of running the width of
+the page.
+
+**Two lines removed from the record tab.** The banner counting rows that need somebody, and the
+"Today, by member" heading. The tab says Reports, the date sits beside it, the strip above counts
+the rows, and the table's own columns are labelled — a title repeating all three is a line nobody
+reads twice. What needs moving is on the Actions tab, which carries it as a badge.
+
+**Temp data** none. **Backend needed** `POST /api/v1/admin/team/plans` and `/reports` — unchanged,
+`submitPlan` / `submitReport` still own the write.
+
+**Open decisions** none.
+
+**Verified**
+
+`check:team-render` renders both dialogs, asserts your own reports page offers them and that a
+senior's view of somebody else's does not, that the forms are gone from the review page, and that
+the date is in the tab row. 96 assertions green.
+
+`tsc -b` clean · eslint 0 errors across `src/admin`, `src/routes` and `scripts` · `check:team` ·
+build green · `team.css` still zero hex/rgba.
+
+**Not checked:** nothing was clicked. The dialogs open at `wide`, which was not eyeballed against a
+long plan on a small window.
+
+---
+
 ### Reports splits into Reports · Actions · Analytics
 
 **Area:** sidebar → Team · `#/reports` (`?face=actions|analytics`, `?mine=plan|eod`, `?date=`, `?span=`)

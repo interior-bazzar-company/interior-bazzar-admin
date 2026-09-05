@@ -1114,3 +1114,15 @@
 .tm-an-pair > i.eo { background: var(--ok-solid) }
 .tm-an-key i.pl { background: var(--info-solid) }
 .tm-an-key i.eo { background: var(--ok-solid) }
+
+/* THE TAB ROW CARRIES THE DATE ON ITS RIGHT, because the date scopes all three
+   tabs rather than one of them. The underline moves from `.tabs` up to the row:
+   inside a flex box `.tabs` shrinks to its own content, so its border would
+   stop under the last tab instead of running the width of the page. Aligning
+   to the bottom keeps the active tab's marker sitting on that rule. */
+.tm-tabrow {
+  display: flex; align-items: flex-end; gap: var(--space-3); flex-wrap: wrap;
+  border-bottom: 1px solid var(--line);
+}
+.tm-tabrow .tabs { margin-bottom: 0; border-bottom: 0; flex: 0 1 auto }
+.tm-tabrow .tm-datenav { margin-bottom: var(--space-2) }

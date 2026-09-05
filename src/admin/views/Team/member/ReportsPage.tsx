@@ -17,9 +17,10 @@
    ============================================================================= */
 import { Icon, Notice, Pill, Tiles } from "../../../ui";
 import { useShell } from "../../../shell/ShellContext";
+import { EodModal, PlanModal } from "./reportForms";
 import {
   TODAY, acknowledgeReport, addDays, eodDue, fmtDate, fmtDayName, isWeekend, planFor,
-  readMember, reportFor, useReports,
+  planFor as planOn, readMember, reportFor, useReports,
 } from "../store";
 import type { DailyPlan, DailyReport, Member } from "../store";
 import type { Viewer } from "./ops";
@@ -57,6 +58,15 @@ export default function ReportsPage({ m, viewer }: { m: Member; viewer: Viewer }
      own, which would make the whole record circular. */
   const canAck = viewer !== "self";
 
+  /* What the two buttons above say depends on what is already in. A primary
+     button for something already submitted is a button that lies about being
+     needed. */
+  const tp = planOn(m.memberId, TODAY);
+  const todayPlan = !!(tp && tp.submittedAt);
+  const tr = reportFor(m.memberId, TODAY);
+  const todayReport = !!(tr && tr.submittedAt);
+  const todayEodDue = eodDue(TODAY, m);
+
   const ack = (r: DailyReport) => {
     const x = acknowledgeReport(r.reportId);
     shell.toast(x.ok ? "Marked as read." : (x as { message: string }).message, x.ok ? "" : "bad");
@@ -66,7 +76,23 @@ export default function ReportsPage({ m, viewer }: { m: Member; viewer: Viewer }
     <>
       <OpHead
         title="Reports"
-        desc={"The last " + WINDOW + " days. Weekends are listed and never counted against anybody."} />
+        desc={"The last " + WINDOW + " days. Weekends are listed and never counted against anybody."}
+        right={viewer === "self" ? (
+          <>
+            {/* WRITING YOUR OWN DAY BELONGS ON YOUR OWN PAGE. These two were a
+                segmented control on `#/reports`, which is a senior's review
+                surface — one screen answering to two different people, with a
+                write control on a page that is otherwise entirely a read. */}
+            <button className={"btn" + (todayPlan ? "" : " pri")}
+              onClick={() => shell.modal(<PlanModal m={m} />, "wide")}>
+              <Icon name="check" size="sm" />{todayPlan ? "Today's plan" : "Write today's plan"}
+            </button>
+            <button className={"btn" + (todayReport || !todayEodDue ? "" : " pri")}
+              onClick={() => shell.modal(<EodModal m={m} />, "wide")}>
+              <Icon name="doc" size="sm" />{todayReport ? "Today's report" : "Submit EOD report"}
+            </button>
+          </>
+        ) : null} />
 
       <Tiles list={[
         { k: "Plans in", v: plans + " / " + working.length, s: "submitted in the morning" },
