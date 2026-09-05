@@ -6,6 +6,35 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-04
 
+### Calendar takes the Deals header: a title, and one dropdown that names the face
+
+**Area:** sidebar → Team → **Calendar** (`#/work`)
+**Files:** `src/admin/views/Team/Work.tsx`
+
+**What changed**
+
+The header is the topbar now, the way Deals settled it — the page opens straight onto its
+controls and spends no row on a heading it already has.
+
+- **The four faces became one dropdown, top right.** Calendar · Board · List · Timeline, each
+  row saying what it is for, the current one ticked. It *names* the face you are in, which a
+  row of tabs can only do by spending the width of the filter row; Deals reached the same
+  answer at four views and this is the same control (`.tb-view-btn` + `.pop-views`), not a
+  second one that looks like it.
+- **The scope note beside the title is gone.** "47 items" was a second rendering of the
+  strip's own first cell, sitting where you cannot click it.
+- **The filtration row is otherwise untouched** — search, Member, Kind, Tag, Priority, and
+  Create at the right on the three faces that have no rail. It just lost the face buttons
+  that were crowding its left edge.
+
+Attendance and Reports keep their button groups: two and three faces fit, and a dropdown for
+two options is a click to read one word.
+
+**Verified**
+`npx tsc -b` clean · eslint 0 errors · `npx vite build` succeeds · both check suites pass.
+
+---
+
 ### The proto banner comes off, and the rail stops drawing a second calendar
 
 **Area:** sidebar → Team → **Calendar** (`#/work`) · **Attendance** · **Reports**

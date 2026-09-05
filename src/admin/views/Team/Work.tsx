@@ -44,16 +44,16 @@ import {
 } from "./store";
 import type { CalEvent, LinkRelation, Member, Tag, WorkItem, WorkStage, WorkStatus } from "./store";
 import { ensureAdopted } from "./adopt";
-import { KindMark, PriorityChip, ScopeNote, Who, ago } from "./bits";
+import { KindMark, PriorityChip, Who, ago } from "./bits";
 import { MarksBlock, ProgressWindow, StagePill, TagChips, TasksBlock, WaitFlag, daysOver, noteOf } from "./workBits";
 import "./team.css";
 
 const ROUTE = "#/work";
 const FACES = [
-  { k: "calendar", l: "Calendar", i: "calendar" },
-  { k: "board", l: "Board", i: "menu" },
-  { k: "list", l: "List", i: "doc" },
-  { k: "timeline", l: "Timeline", i: "chart" },
+  { k: "calendar", l: "Calendar", i: "calendar", d: "The month, and what each day owes" },
+  { k: "board", l: "Board", i: "menu", d: "Five stages, or group by kind, member, priority or tag" },
+  { k: "list", l: "List", i: "doc", d: "Every item as one table" },
+  { k: "timeline", l: "Timeline", i: "chart", d: "Target and milestone lanes, tasks as bars" },
 ];
 /** Lifecycle order, not the order the five were listed in: Delay is work that
  *  is not finished, so it sits before the two terminal columns. */
@@ -88,9 +88,28 @@ export default function Work() {
   const open = useItem(p.item || null);
   const me = meId();
 
+  /* THE HEADER IS THE TOPBAR, the way Deals settled it: the title on the left,
+     and on the right the one control that changes what this page IS. A
+     dropdown rather than four tabs — it names the face you are in, which a row
+     of icons cannot do without spending the width of the filter row on it.
+
+     No scope line beside the title any more: "47 items" was a second rendering
+     of the strip's own first cell, sitting where you cannot click it. */
   usePageChrome({
     crumbs: <TbTitle label="Calendar" to="#/work" />,
-    right: <ScopeNote text={all.length + " items"} />,
+    right: (
+      <button className="btn tb-view-btn" aria-haspopup="menu"
+        onClick={(e) => {
+          const el = e.currentTarget;
+          if (shell.popAnchor === el) { shell.closePop(); return; }
+          shell.openPop(el, <FaceMenu face={face} goto={goto} />,
+            { width: 268, align: "right", cls: "pop-views" });
+        }}>
+        <Icon name={(FACES.filter((f) => f.k === face)[0] || FACES[0]).i} />
+        {(FACES.filter((f) => f.k === face)[0] || FACES[0]).l}
+        <Icon name="chev" size="sm" />
+      </button>
+    ),
   }, face);
 
   useEffect(() => { ensureAdopted(); }, []);
@@ -135,14 +154,6 @@ export default function Work() {
           context in another and added a bottom margin, which is what pushed
           Create onto a line of its own. */}
       <div className="dls-cmd">
-        <span className="btn-group">
-          {FACES.map((f) => (
-            <button key={f.k} className={face === f.k ? "on" : ""}
-              onClick={() => goto({ face: f.k === "calendar" ? undefined : f.k })}>
-              <Icon name={f.i} size="sm" />{f.l}
-            </button>
-          ))}
-        </span>
         <SearchField ph="Search work" name="q" val={p.q} onFilter={onFilter} />
         <Select name="member" label="Member" value={p.member} onFilter={onFilter}
           options={members.filter((m) => m.status === "active").map((m) => ({ v: m.memberId, l: m.name }))} />
@@ -192,6 +203,27 @@ const slugOptions = (tags: Tag[]) => {
   tags.filter((t) => !t.archivedAt).forEach((t) => { seen[t.slug] = t.label; });
   return Object.keys(seen).sort().map((s) => ({ v: s, l: seen[s] }));
 };
+
+/** The four faces, one per row, each saying what it is for. `on` marks the one
+ *  you are in — a switcher that cannot answer "where am I" is a switcher you
+ *  have to open to read. */
+function FaceMenu({ face, goto }: {
+  face: string; goto: (q: Record<string, string | undefined>) => void;
+}) {
+  const shell = useShell();
+  return (
+    <div className="pop-b">
+      {FACES.map((f) => (
+        <button key={f.k} className={"mi" + (f.k === face ? " on" : "")}
+          onClick={() => { shell.closePop(); goto({ face: f.k === "calendar" ? undefined : f.k }); }}>
+          <Icon name={f.i} />
+          <span><b>{f.l}</b><span className="d">{f.d}</span></span>
+          {f.k === face ? <span className="r"><Icon name="check" size="sm" /></span> : null}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 /* -------------------------------------------------------------- create --- */
 
