@@ -649,27 +649,16 @@
 
 .tm-ni .tabs { margin-bottom: var(--space-3) }
 
-/* ONE FIELD TO A LINE, IN THREE COLUMNS: the icon that marks a group, the
-   label that names the field, and one control column every input shares. The
-   shared column is the point — a form whose boxes all start at the same x
-   reads as a list of answers, and one whose boxes start wherever the label
-   ended reads as a zigzag. */
-.tm-ni-line { display: flex; align-items: center; gap: var(--space-3); margin-top: var(--space-2) }
-.tm-ni-i { flex: 0 0 var(--icon-md); width: var(--icon-md); color: var(--text-3) }
-.tm-ni-l { flex: 0 0 96px; font-size: var(--text-md); color: var(--text-2) }
-.tm-ni-c { flex: 1; min-width: 0; display: flex; align-items: center; gap: var(--space-2) }
-.tm-ni-c > .inp { width: 100% }
-
-/* A control that wants the width takes the line under its own label, indented
-   to the same column the other controls start at. */
-.tm-ni-block { margin-top: var(--space-3) }
-.tm-ni-bh { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-1) }
-.tm-ni-bh .tm-ni-l { flex: 0 0 auto }
-.tm-ni-bh .tm-rt-bar { margin-left: auto; margin-bottom: 0 }
-.tm-ni-bb { padding-left: calc(var(--icon-md) + var(--space-3)) }
+/* The fields are the panel's own `.fg` + `.inp` — a bold label over a bordered,
+   full-width control, exactly as every other dialog here draws one. Nothing is
+   restyled: the only additions are a header row for the format buttons and a
+   quieter sub-label for the two fields that sit inside a group. */
+.tm-fgh { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-1) }
+.tm-fgh > label { margin-bottom: 0 !important }
+.tm-fgh .tm-rt-bar { margin-left: auto; margin-bottom: 0 }
 .tm-ni-sub {
-  display: block; font-size: var(--text-sm); color: var(--text-3);
-  margin: var(--space-2) 0 3px;
+  display: block; font-size: var(--text-sm); font-weight: var(--weight-medium);
+  color: var(--text-3); margin: var(--space-3) 0 var(--space-1);
 }
 .tm-ni-sub:first-child { margin-top: 0 }
 
@@ -677,21 +666,17 @@
    into a wall of boxes; they take their box on hover and focus. Only the
    BACKGROUND-COLOUR is cleared — `select.inp` draws its chevron with a
    background-image, and the shorthand would take the arrow with it. */
-.tm-ni-c .inp, .tm-ni-bb .inp {
-  height: var(--control-md); font-size: var(--text-md);
-  border-color: transparent; background-color: transparent;
-}
-.tm-ni-c .inp:hover, .tm-ni-bb .inp:hover { border-color: var(--line-control); background-color: var(--bg) }
-.tm-ni-c .inp:focus, .tm-ni-bb .inp:focus { border-color: var(--brand); background-color: var(--bg) }
-/* A refused address keeps its border at rest: the field is the error message's
-   subject, so it cannot go quiet while the message is on screen. */
-.tm-ni-bb .inp.bad { border-color: var(--bad-solid); background-color: var(--bg) }
+/* NO QUIET FIELDS. Borderless-until-hovered is a real pattern, and it was the
+   wrong one here: on a dialog of eight controls there was nothing to say where
+   a field began, and it made this the only form in the panel that did not look
+   like a form. `.inp` keeps its own border, and the theme's own hover and focus
+   states do the rest. */
 
 /* the rule between the five facts and the three fields that take real writing */
 .tm-ni-sep { height: 1px; background: var(--line); margin: var(--space-4) 0 var(--space-1) }
 
 /* ---- description ---- */
-.tm-rt-bar { display: flex; align-items: center; gap: 2px; margin-bottom: var(--space-1) }
+.tm-rt-bar { display: flex; align-items: center; gap: 2px }
 .tm-rt-b {
   width: 26px; height: 24px; display: grid; place-items: center;
   border: 0; border-radius: var(--radius-sm); background: none;
@@ -699,7 +684,6 @@
 }
 .tm-rt-b:hover { background: var(--bg-hover); color: var(--text) }
 .tm-rt-b:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px }
-.tm-rt-hint { margin-left: auto; font-size: var(--text-2xs); color: var(--text-3); font-family: var(--font-mono) }
 .tm-ni-ta { min-height: 68px; width: 100%; line-height: var(--lh-md) }
 
 /* the parsed result, wherever it is read back */
@@ -726,9 +710,9 @@
 .tm-lk-add { display: flex; flex-direction: column; align-items: stretch }
 .tm-lk-add .inp { width: 100%; min-width: 0 }
 .tm-lk-add .help { margin-top: var(--space-1) }
-.tm-lk-btn { align-self: flex-start; margin-top: var(--space-2) }
+.tm-lk-btn { align-self: flex-start; margin-top: var(--space-3) }
+.tm-tagnew { margin-top: var(--space-3) }
 .tm-tagnew .inp { flex: 1; min-width: 0 }
-.tm-ni-bb .tm-tagnew { margin-top: var(--space-2) }
 
 .tm-ni-note {
   margin: var(--space-4) 0 0;

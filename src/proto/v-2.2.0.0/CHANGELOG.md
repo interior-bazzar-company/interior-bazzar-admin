@@ -6,6 +6,36 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-04
 
+### The Create dialog goes back to the panel's own field
+
+**Area:** sidebar → Team → **Calendar** (`#/work`) — the Create dialog
+**Files:** `src/admin/views/Team/Work.tsx`, `team.css`
+
+**What changed**
+
+The fields were borderless until hovered, under an icon column, in a bespoke three-column
+line. Borderless-until-hovered is a real pattern and it was the wrong one here: on a dialog
+of eleven controls there was nothing to say where a field began, and it made this the only
+form in the panel that did not look like a form.
+
+- **`.fg` + `.inp`, the way every other dialog here draws a field** — a bold label over a
+  full-width control with its own border. Edit member, Send credentials and the leave form
+  have always looked like this; now so does Create. The custom line, its icon column and the
+  `border-color: transparent` override are all gone rather than tuned.
+- **Eleven controls, eleven labels, none pointing nowhere** — checked by script. The two
+  fields nested inside a group (a link's address and name, and the new-tag box) carry a
+  quieter sub-label under the group's own `.fg-lb`, which is the theme's label for a group of
+  buttons that cannot take a `for`.
+- The format buttons moved onto the Details label's own row, so they sit beside the thing
+  they act on instead of floating over the box.
+
+**Verified**
+No `border-color: transparent` left in the module, no orphan rule from the removed line
+components, ten fields on the house `.fg`. `npm run check:team` green · `check-team-nav.cjs`
+green · `npx tsc -b` clean · eslint 0 errors · `npx vite build` succeeds.
+
+---
+
 ### One field to a line, and every one of them named
 
 **Area:** sidebar → Team → **Calendar** (`#/work`) — the Create dialog
