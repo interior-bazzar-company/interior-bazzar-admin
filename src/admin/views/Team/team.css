@@ -664,6 +664,51 @@
 .tm-ni-r .inp:hover { border-color: var(--line-control); background-color: var(--bg) }
 .tm-ni-r .inp:focus { border-color: var(--brand); background-color: var(--bg) }
 
+/* A row whose control is taller than one line puts its icon at the top, beside
+   the first line, rather than floating halfway down a text box. */
+.tm-ni-r.top { align-items: flex-start; margin-top: var(--space-3) }
+.tm-ni-r.top .tm-ni-i { margin-top: 7px }
+.tm-ni-grow { flex: 1; min-width: 0 }
+.tm-ni-sep { height: 1px; background: var(--line); margin: var(--space-4) 0 var(--space-1) }
+
+/* ---- description ---- */
+.tm-rt-bar { display: flex; align-items: center; gap: 2px; margin-bottom: var(--space-1) }
+.tm-rt-b {
+  width: 26px; height: 24px; display: grid; place-items: center;
+  border: 0; border-radius: var(--radius-sm); background: none;
+  color: var(--text-2); font: inherit; font-size: var(--text-md); cursor: pointer;
+}
+.tm-rt-b:hover { background: var(--bg-hover); color: var(--text) }
+.tm-rt-b:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px }
+.tm-rt-hint { margin-left: auto; font-size: var(--text-2xs); color: var(--text-3); font-family: var(--font-mono) }
+.tm-ni-ta { min-height: 68px; line-height: var(--lh-md) }
+
+/* the parsed result, wherever it is read back */
+.tm-rt { font-size: var(--text-md); color: var(--text-2); line-height: var(--lh-md) }
+.tm-rt p { margin: 0 0 var(--space-2) }
+.tm-rt p:last-child, .tm-rt ul:last-child { margin-bottom: 0 }
+.tm-rt b { color: var(--text); font-weight: var(--weight-semibold) }
+.tm-rt ul { margin: 0 0 var(--space-2); padding-left: var(--space-4); list-style: disc }
+.tm-rt li { margin: 2px 0 }
+
+/* ---- links ---- */
+.tm-lk { list-style: none; margin: 0 0 var(--space-2); padding: 0; display: flex; flex-direction: column; gap: 2px }
+.tm-lk li {
+  display: flex; align-items: center; gap: var(--space-2); min-width: 0;
+  padding: var(--space-1) var(--space-2); border-radius: var(--radius-md);
+  background: var(--bg-inset);
+}
+.tm-lk li > .ic { flex: 0 0 auto; color: var(--text-3) }
+.tm-lk-t { min-width: 0; flex: 1; display: flex; flex-direction: column }
+.tm-lk-t b, .tm-lk-t a { font-size: var(--text-md); font-weight: var(--weight-medium); color: var(--text) }
+.tm-lk-t a { text-decoration: none }
+.tm-lk-t a:hover { text-decoration: underline }
+.tm-lk-t .cell-2 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.tm-lk-add { display: flex; gap: var(--space-2); align-items: center }
+.tm-lk-add .inp { min-width: 0 }
+.tm-lk-add .inp:first-child { flex: 2 }
+.tm-lk-add .inp:nth-child(2) { flex: 1 }
+
 .tm-ni-note {
   margin: var(--space-4) 0 0;
   padding-left: calc(var(--icon-md) + var(--space-3));

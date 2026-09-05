@@ -136,6 +136,7 @@ export interface WorkItem {
   sourcePlanLineId?: string | null;
   /** Member-owned tag records. Free, unlike the stage, which is company-wide. */
   tagIds?: string[];
+  attachments?: Attachment[];
   rowVersion: number;
   createdAt: string;
 }
@@ -195,6 +196,10 @@ export interface Tag {
   createdAt: string;
   archivedAt: string | null;
 }
+
+/** A link hung on an item — a brief, a sheet, a thread. Stored as an address
+ *  and a name, never as markup. */
+export interface Attachment { url: string; label: string }
 
 export type LinkRelation = "relates_to" | "duplicates" | "follows";
 
@@ -784,6 +789,29 @@ export const payFor = (memberId: string): Pay | null =>
 export const incentiveTotal = (p: Pay | null, state?: string): number =>
   (p ? p.incentives : []).filter((i) => !state || i.state === state)
     .reduce((a, i) => a + i.amount, 0);
+
+/** THE ONLY WAY A TYPED ADDRESS BECOMES A STORED ONE.
+ *
+ *  It returns null rather than throwing, so a half-typed address is simply not
+ *  addable yet. Two things it is doing that are not cosmetic:
+ *
+ *  · **http and https only.** `javascript:alert(1)` is a valid URL and a valid
+ *    `href`, and one click on a stored one runs script with the panel's
+ *    session. A link field is the classic way that gets in, so the scheme is
+ *    allow-listed here rather than sanitised at the render.
+ *  · A bare `docs.google.com/…` is treated as https, because a link somebody
+ *    pastes without a scheme is still a link and `//` is not a thing anybody
+ *    should have to remember. */
+export function normaliseUrl(raw: string): string | null {
+  const v = (raw || "").trim();
+  if (!v) return null;
+  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(v) ? v : "https://" + v;
+  try {
+    const u = new URL(withScheme);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    return u.href;
+  } catch { return null; }
+}
 
 /* ============================================================= links === */
 
@@ -1433,6 +1461,8 @@ export function createItem(input: Partial<WorkItem> & { title: string; assigneeI
     expectedOutcome: input.expectedOutcome || null,
     targetValue: input.targetValue,
     targetUnit: input.targetUnit,
+    tagIds: input.tagIds && input.tagIds.length ? input.tagIds : undefined,
+    attachments: input.attachments && input.attachments.length ? input.attachments : undefined,
     currentValue: input.kind === "target" ? 0 : undefined,
     rowVersion: 1,
     createdAt: new Date(now()).toISOString(),

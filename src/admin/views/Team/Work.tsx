@@ -39,12 +39,17 @@ import {
   eventsOn, fmtDate, fmtMonth, gridDays, isDelayed, isTerminal, labelOf, lanesOf, leaveOn,
   linkLabelOf, linksOf, monthStep,
   meId, membersInScope, parentOf, readMember, removeLink, setBlockedBy, setItemStatus, stageOf,
-  tagItem, tagsOf, tagsOwnedBy, toneOf, useItem, useLinks, useMembers, useTags, useWork, workTotals,
+  normaliseUrl, tagItem, tagsOf, tagsOwnedBy, toneOf, useItem, useLinks, useMembers, useTags,
+  useWork, workTotals,
 } from "./store";
-import type { CalEvent, LinkRelation, Member, Tag, WorkItem, WorkStage, WorkStatus } from "./store";
+import type {
+  Attachment, CalEvent, LinkRelation, Member, Tag, WorkItem, WorkStage, WorkStatus,
+} from "./store";
 import { ensureAdopted } from "./adopt";
 import { KindMark, PriorityChip, Who, ago } from "./bits";
-import { MarksBlock, ProgressWindow, StagePill, TagChips, TasksBlock, WaitFlag, daysOver, noteOf } from "./workBits";
+import {
+  MarksBlock, ProgressWindow, RichText, StagePill, TagChips, TasksBlock, WaitFlag, daysOver, noteOf,
+} from "./workBits";
 import "./team.css";
 
 const ROUTE = "#/work";
@@ -158,7 +163,7 @@ export default function Work() {
           <span className="spacer" />
           {/* Create rides this row on the three faces with no rail; the
               calendar carries it at the top of its own. */}
-          <CreateMenu onPick={(k) => shell.modal(<NewItemModal kind={k} members={members} all={all} />, "sm")} />
+          <CreateMenu onPick={(k) => shell.modal(<NewItemModal kind={k} members={members} all={all} />)} />
         </div>
       )}
 
@@ -191,6 +196,112 @@ const slugOptions = (tags: Tag[]) => {
   tags.filter((t) => !t.archivedAt).forEach((t) => { seen[t.slug] = t.label; });
   return Object.keys(seen).sort().map((s) => ({ v: s, l: seen[s] }));
 };
+
+/** Wrap the selection in a mark, or drop one in and put the caret inside it.
+ *  The selection is restored afterwards so a second press is an undo rather
+ *  than a second pair of asterisks somewhere else. */
+function wrapSel(
+  ref: React.RefObject<HTMLTextAreaElement | null>, value: string,
+  set: (v: string) => void, mark: string,
+) {
+  const el = ref.current;
+  if (!el) return;
+  const a = el.selectionStart, b = el.selectionEnd;
+  const sel = value.slice(a, b);
+  const wrapped = sel.slice(0, mark.length) === mark && sel.slice(-mark.length) === mark;
+  const next = wrapped ? sel.slice(mark.length, -mark.length) : mark + (sel || "bold") + mark;
+  set(value.slice(0, a) + next + value.slice(b));
+  requestAnimationFrame(() => {
+    el.focus();
+    const from = wrapped ? a : a + mark.length;
+    el.setSelectionRange(from, from + (wrapped ? next.length : (sel || "bold").length));
+  });
+}
+
+/** Toggle "- " on every line the selection touches, whole lines at a time. */
+function bulletSel(
+  ref: React.RefObject<HTMLTextAreaElement | null>, value: string, set: (v: string) => void,
+) {
+  const el = ref.current;
+  if (!el) return;
+  const a = value.lastIndexOf("\n", Math.max(0, el.selectionStart - 1)) + 1;
+  const end = value.indexOf("\n", el.selectionEnd);
+  const b = end < 0 ? value.length : end;
+  const lines = (value.slice(a, b) || "item").split("\n");
+  const on = lines.every((l) => /^\s*-\s/.test(l));
+  const next = lines.map((l) => (on ? l.replace(/^\s*-\s/, "") : "- " + l)).join("\n");
+  set(value.slice(0, a) + next + value.slice(b));
+  requestAnimationFrame(() => { el.focus(); el.setSelectionRange(a + next.length, a + next.length); });
+}
+
+/** A list of links, and one row to add another. The address is normalised
+ *  before it can be added, so what lands on the item is always a real http(s)
+ *  URL and never a `javascript:` one. */
+function LinkField({ links, onChange }: {
+  links: Attachment[]; onChange: (v: Attachment[]) => void;
+}) {
+  const [url, setUrl] = useState("");
+  const [label, setLabel] = useState("");
+  const ok = normaliseUrl(url);
+  const add = () => {
+    if (!ok) return;
+    onChange(links.concat([{ url: ok, label: label.trim() || hostOf(ok) }]));
+    setUrl(""); setLabel("");
+  };
+  return (
+    <>
+      {links.length ? (
+        <ul className="tm-lk">
+          {links.map((l, i) => (
+            <li key={l.url + i}>
+              <Icon name="ext" size="sm" />
+              <span className="tm-lk-t"><b>{l.label}</b><span className="cell-2">{l.url}</span></span>
+              <button className="btn icon sm" aria-label={"Remove the link to " + l.label}
+                onClick={() => onChange(links.filter((_, n) => n !== i))}>
+                <Icon name="x" size="sm" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <div className="tm-lk-add">
+        <input className="inp sm" value={url} aria-label="Link address" placeholder="Paste a link"
+          onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} />
+        <input className="inp sm" value={label} aria-label="Link name" placeholder="Name it (optional)"
+          onChange={(e) => setLabel(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} />
+        <button className="btn sm" disabled={!ok} onClick={add}>Add</button>
+      </div>
+      {url.trim() && !ok
+        ? <p className="help bad">That is not a web address. Links have to be http or https.</p>
+        : null}
+    </>
+  );
+}
+
+const hostOf = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; } };
+
+/** A tag is born here as it is in the drawer — one field, one keystroke. It is
+ *  a record of its own, so it survives this dialog being cancelled. */
+function NewTagField({ ownerId, onMade }: { ownerId: string; onMade: (id: string) => void }) {
+  const shell = useShell();
+  const [draft, setDraft] = useState("");
+  const add = () => {
+    const r = createTag(ownerId, draft);
+    if (!r.ok) { shell.toast(r.message, "bad"); return; }
+    onMade(r.data.tagId);
+    setDraft("");
+  };
+  return (
+    <div className="tm-tagnew">
+      <input className="inp sm" value={draft} aria-label="New tag" placeholder="New tag"
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} />
+      <button className="btn sm" disabled={!draft.trim()} onClick={add}>Create</button>
+    </div>
+  );
+}
 
 /** THE COUNTS LIVE IN THE HEADER, beside the title — the arrangement Deals
  *  settled on. They were a band of their own under the command row, which on a
@@ -330,6 +441,16 @@ function NewItemModal({ kind: initial, members, all, date }: {
   const [parent, setParent] = useState("");
   const [tv, setTv] = useState("");
   const [tu, setTu] = useState("");
+  const [desc, setDesc] = useState("");
+  const [links, setLinks] = useState<Attachment[]>([]);
+  const [tags, setTags] = useState<string[]>([]);
+  const ta = useRef<HTMLTextAreaElement | null>(null);
+  useTags();
+  const mine = tagsOwnedBy(who);
+
+  /* A tag belongs to a member, so handing the item to somebody else cannot
+     carry the last person's tags with it. */
+  const assign = (id: string) => { setWho(id); setTags([]); };
 
   /* Depth 3, target ▸ milestone ▸ task. A target is always top level; a task
      may sit under either, and nothing sits under a task. */
@@ -342,6 +463,8 @@ function NewItemModal({ kind: initial, members, all, date }: {
       priority: pri as "high" | "medium" | "low",
       startDate: start || null, dueDate: due || null,
       parentId: parent || null,
+      description: desc.trim() || null,
+      attachments: links, tagIds: tags,
       targetValue: kind === "target" && tv ? Number(tv) : undefined,
       targetUnit: kind === "target" ? tu || undefined : undefined,
     });
@@ -381,7 +504,7 @@ function NewItemModal({ kind: initial, members, all, date }: {
         <div className="tm-ni-r">
           <Icon name="user" className="tm-ni-i" />
           <select className="inp" value={who} aria-label="Assigned to"
-            onChange={(e) => setWho(e.target.value)}>
+            onChange={(e) => assign(e.target.value)}>
             {members.filter((m) => m.status === "active")
               .map((m) => <option key={m.memberId} value={m.memberId}>{m.name}</option>)}
           </select>
@@ -414,6 +537,53 @@ function NewItemModal({ kind: initial, members, all, date }: {
             </select>
           </div>
         )}
+
+        <div className="tm-ni-sep" />
+
+        {/* DESCRIPTION — plain text with two marks in it. The buttons write the
+            marks so nobody has to know them; see RichText for why this is not
+            a contentEditable. */}
+        <div className="tm-ni-r top">
+          <Icon name="doc" className="tm-ni-i" />
+          <div className="tm-ni-grow">
+            <div className="tm-rt-bar">
+              <button className="tm-rt-b" title="Bold" aria-label="Bold"
+                onClick={() => wrapSel(ta, desc, setDesc, "**")}><b>B</b></button>
+              <button className="tm-rt-b" title="Bulleted list" aria-label="Bulleted list"
+                onClick={() => bulletSel(ta, desc, setDesc)}><Icon name="menu" size="sm" /></button>
+              <span className="tm-rt-hint">**bold** · - list</span>
+            </div>
+            <textarea ref={ta} className="inp tm-ni-ta" rows={3} value={desc}
+              aria-label="Description" placeholder="What does done look like?"
+              onChange={(e) => setDesc(e.target.value)} />
+          </div>
+        </div>
+
+        <div className="tm-ni-r top">
+          <Icon name="link" className="tm-ni-i" />
+          <div className="tm-ni-grow">
+            <LinkField links={links} onChange={setLinks} />
+          </div>
+        </div>
+
+        <div className="tm-ni-r top">
+          <Icon name="tag" className="tm-ni-i" />
+          <div className="tm-ni-grow">
+            <div className="tm-tagrow">
+              {mine.map((t) => (
+                <button key={t.tagId}
+                  className={"pill xs tm-pick" + (tags.indexOf(t.tagId) >= 0 ? " on" : "")
+                    + " tag-" + (t.colourToken || "slate")}
+                  onClick={() => setTags(tags.indexOf(t.tagId) >= 0
+                    ? tags.filter((x) => x !== t.tagId) : tags.concat([t.tagId]))}>
+                  {t.label}
+                </button>
+              ))}
+              {mine.length ? null : <span className="dim">No tags yet — the first one is a word away.</span>}
+            </div>
+            <NewTagField ownerId={who} onMade={(id) => setTags((v) => v.concat([id]))} />
+          </div>
+        </div>
 
         <p className="tm-ni-note">It opens in Planning. Nothing sets Delay — the due date does.</p>
       </div>
@@ -450,7 +620,7 @@ function CalendarFace({ rows, me, p, goto, onOpen, members, all }: {
     on: mode === "week" ? addDays(anchor, n * 7) : monthStep(anchor, n),
   });
   const create = (kind: string, date?: string) =>
-    shell.modal(<NewItemModal kind={kind} members={members} all={all} date={date} />, "sm");
+    shell.modal(<NewItemModal kind={kind} members={members} all={all} date={date} />);
 
   return (
     <div className="tm-shell">
@@ -916,6 +1086,32 @@ function ItemDrawer({ item, all, tags, onClose, onOpen }: {
                 onClick={() => onOpen(blocker.itemId)}>{blocker.title}</a>
             : <span key="b" className="dim">Nothing</span>],
         ]} />
+
+        {item.description ? (
+          <>
+            <SectionHead title="Description" />
+            <RichText text={item.description} />
+          </>
+        ) : null}
+
+        {(item.attachments || []).length ? (
+          <>
+            <SectionHead title="Links" desc="Opens in a new tab." />
+            <ul className="tm-lk">
+              {(item.attachments || []).map((l, i) => (
+                <li key={l.url + i}>
+                  <Icon name="ext" size="sm" />
+                  <span className="tm-lk-t">
+                    {/* noreferrer as well as noopener: the target must not be
+                        handed this panel's URL in its referrer. */}
+                    <a href={l.url} target="_blank" rel="noopener noreferrer">{l.label}</a>
+                    <span className="cell-2">{l.url}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : null}
 
         <SectionHead title="Tags" desc="A tag is a record its owner holds. Two members may both hold Call." />
         <TagPicker item={item} mine={mine} on={on} tags={tags} />

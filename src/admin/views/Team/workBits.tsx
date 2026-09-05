@@ -13,12 +13,49 @@
    where today sits inside that window; a target counts units, so the number
    leads and the bar sits behind it.
    ============================================================================= */
+import type { ReactNode } from "react";
 import { Icon, Pill } from "../../ui";
 import {
   TODAY, WORK_STATUS, addDays, blockerOf, childrenOf, fmtDate, isDelayed, isTerminal,
   labelOf, membersInScope, progressOf, readMember, readItems, stageOf, tagsOf, timePct, toneOf,
 } from "./store";
 import type { WorkItem, WorkKind, WorkStage } from "./store";
+
+/* ----------------------------------------------------------- rich text --- */
+
+/** BOLD AND BULLETS, PARSED — NEVER INJECTED.
+ *
+ *  `innerHTML` is banned in this panel (see ui/index.tsx), and a description
+ *  box is exactly where that rule earns its keep: it is the one field where a
+ *  person's own typing would be handed back to the browser as markup. So the
+ *  editor writes plain text with two marks in it — `**bold**` and `- ` — and
+ *  this turns them into real elements. Nothing else is a mark, so nothing else
+ *  can be smuggled in: an angle bracket is an angle bracket.
+ *
+ *  Deals reached the same answer for the same reason (views/Deals/bits.tsx). */
+const inline = (s: string): ReactNode[] =>
+  s.split(/(\*\*[\s\S]+?\*\*)/g).map((part, i) =>
+    part.length > 4 && part.slice(0, 2) === "**" && part.slice(-2) === "**"
+      ? <b key={i}>{part.slice(2, -2)}</b>
+      : part);
+
+export function RichText({ text }: { text: string }) {
+  const out: ReactNode[] = [];
+  let bullets: string[] = [];
+  const flush = (key: string) => {
+    if (!bullets.length) return;
+    const rows = bullets;
+    bullets = [];
+    out.push(<ul key={key}>{rows.map((l, i) => <li key={i}>{inline(l)}</li>)}</ul>);
+  };
+  text.split("\n").forEach((line, i) => {
+    if (/^\s*[-*]\s+/.test(line)) { bullets.push(line.replace(/^\s*[-*]\s+/, "")); return; }
+    flush("u" + i);
+    if (line.trim()) out.push(<p key={"p" + i}>{inline(line)}</p>);
+  });
+  flush("uz");
+  return <div className="tm-rt">{out}</div>;
+}
 
 /* ---------------------------------------------------------------- atoms --- */
 

@@ -385,6 +385,47 @@ require("esbuild").build({
   head("The clock only rolls forward in a browser");
   eq("in Node the shift is zero and the frame is the authored one", S.SHIFT_DAYS, 0);
 
+  head("A link field is where javascript: gets in, so the scheme is allow-listed");
+  eq("a bare host is taken as https", S.normaliseUrl("docs.google.com/x"), "https://docs.google.com/x");
+  eq("https is kept", S.normaliseUrl("https://a.in/b?c=1"), "https://a.in/b?c=1");
+  eq("http is allowed — an intranet is not https", S.normaliseUrl("http://wiki.local/x"), "http://wiki.local/x");
+  ok("javascript: is refused, in any casing",
+    S.normaliseUrl("javascript:alert(1)") === null
+    && S.normaliseUrl("JavaScript:alert(1)") === null
+    && S.normaliseUrl("  javascript:alert(1)  ") === null);
+  ok("so are data:, file: and vbscript:",
+    ["data:text/html;base64,x", "file:///etc/passwd", "vbscript:msgbox"]
+      .every((u) => S.normaliseUrl(u) === null));
+  ok("nothing typed is not an error, it is just not addable yet",
+    S.normaliseUrl("") === null && S.normaliseUrl("   ") === null);
+
+  head("Create carries the description, the links and the tags");
+  /* Built from parts rather than written with escapes: this file is read by
+     people as the module's rule list, and a backslash-n in a description is
+     the one character nobody proof-reads correctly. */
+  const DESC = ["**Done** looks like:", "- one", "- two"].join(String.fromCharCode(10));
+  S.resetStore();
+  (() => {
+    const r = S.createItem({
+      title: "With everything", assigneeId: "63", kind: "task",
+      description: DESC,
+      attachments: [{ url: "https://x.in/brief", label: "Brief" }],
+      tagIds: ["TG-01"],
+    });
+    ok("the description is stored as the text somebody typed, marks and all",
+      r.ok && r.data.description === DESC);
+    ok("…and no markup was made out of it",
+      r.ok && (r.data.description || "").indexOf("<") < 0);
+    eq("the link is on the item", r.ok ? r.data.attachments.length : 0, 1);
+    eq("so is the tag", r.ok ? r.data.tagIds : [], ["TG-01"]);
+    ok("an item created without them carries neither, rather than empty arrays",
+      (() => {
+        const p = S.createItem({ title: "Bare", assigneeId: "63", kind: "task" });
+        return p.ok && p.data.attachments === undefined && p.data.tagIds === undefined
+          && p.data.description === null;
+      })());
+  })();
+
   head("Links: soft edges that restate nothing");
   S.resetStore();
   (() => {

@@ -6,6 +6,41 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-04
 
+### Create grows a description, links and tags — and none of it is markup
+
+**Area:** sidebar → Team → **Calendar** (`#/work`) — the Create dialog and the item drawer
+**Files:** `src/admin/views/Team/Work.tsx`, `workBits.tsx`, `store.ts`, `team.css`,
+`scripts/check-team-derivation.cjs`
+
+**What changed**
+
+- **A description, with bold and bullets.** The editor is a plain textarea and the two
+  buttons write two marks into it — `**bold**` and `- `. It is **not** a contentEditable, and
+  that is the whole design: `innerHTML` is banned in this panel (`ui/index.tsx`), and a
+  description box is the one field where a person's own typing would otherwise be handed back
+  to the browser as markup. `RichText` parses the two marks into real elements; nothing else
+  is a mark, so nothing else can be smuggled in — an angle bracket stays an angle bracket.
+  Deals reached the same answer for the same reason.
+- **Links, allow-listed by scheme.** `normaliseUrl()` is the only way a typed address becomes
+  a stored one: it takes a bare `docs.google.com/x` as https, keeps http for an intranet, and
+  **refuses `javascript:`, `data:`, `file:` and `vbscript:`** — a link field is the classic
+  way a script gets into a panel, so the gate is at the write rather than at the render. In
+  the drawer they open with `rel="noopener noreferrer"`.
+- **Tags at creation.** The assignee's own tags as toggle chips, plus one field to make a new
+  one — the same birth as the drawer's picker. Reassigning clears the selection, because a
+  tag belongs to a member and cannot travel with the item to somebody else.
+- The dialog moves from 440px to the panel's default 560px to carry them, and each of the
+  three sits on a row whose icon aligns with its first line rather than floating mid-box.
+
+**Verified**
+`npm run check:team` green, with eleven assertions added: every rejected scheme in every
+casing, a bare host becoming https, the description stored as the characters somebody typed
+with no markup made from them, and an item created without the three carrying `undefined`
+rather than empty arrays. `npx tsc -b` clean · eslint 0 errors · `npx vite build` succeeds ·
+`check-team-nav.cjs` passes.
+
+---
+
 ### A UX audit of the calendar: one real defect, one emoji, and one thing that was already right
 
 **Area:** sidebar → Team → **Calendar** (`#/work`) — the month grid and the rail
