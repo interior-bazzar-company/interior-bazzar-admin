@@ -32,14 +32,14 @@ import { go } from "../../ui/nav";
 import {
   LEAVE_KIND, TODAY, addDays, attendanceTotals, datesIn, dayFor, endDay, fmtDate, fmtDayName,
   labelOf, leaveOverlap, leaveQueue, fmtHM, fmtTime, meId, openDay, readMember, resumeDay,
-  arrivalSpread, earliestAttendance, scopeLabel, scopeOf, spanDays, spanRows, spanTotals,
+  arrivalSpread, earliestAttendance, scopeOf, spanDays, spanRows, spanTotals,
   startBreak, stateOf,
   useDayRows, useLeave, useMe, useMembers, useMyDay, weekOf, workedOf,
   now as clockNow,
 } from "./store";
 import type { DayRow, LeaveRequest, Result, SpanRow } from "./store";
 import { LeaveDecideModal } from "./member/modals";
-import { BarScale, DayBar, Meter, ScopeNote, StatePill, Who } from "./bits";
+import { BarScale, DayBar, Meter, StatePill, Who } from "./bits";
 import { ensureAdopted } from "./adopt";
 import "./team.css";
 
@@ -102,8 +102,6 @@ export default function Attendance() {
             </button>
           ))}
         </div>
-        <span className="spacer" />
-        <ScopeNote text={scopeLabel(scope, rows.length)} />
       </div>
 
       {face === "today" || face === "history" ? (
@@ -125,7 +123,7 @@ export default function Attendance() {
         </div>
       ) : null}
 
-      {face === "today" ? <Today rows={rows} p={p} date={date} onFilter={onFilter} />
+      {face === "today" ? <Today rows={rows} p={p} onFilter={onFilter} />
         : face === "history" ? <History members={members} me={me ? me.memberId : meId()} scope={scope} date={date} />
           : face === "analytics" ? <Analytics scope={scope} span={p.span || "7"} onSpan={(v) => goto({ span: v === "7" ? undefined : v })} />
             : <Requests />}
@@ -215,8 +213,8 @@ export function TopClock() {
 
 /* ---------------------------------------------------------------- today --- */
 
-function Today({ rows, p, date, onFilter }: {
-  rows: DayRow[]; p: Record<string, string>; date: string;
+function Today({ rows, p, onFilter }: {
+  rows: DayRow[]; p: Record<string, string>;
   onFilter: (n: string, v: string) => void;
 }) {
   const nowH = useMemo(() => {
@@ -256,10 +254,6 @@ function Today({ rows, p, date, onFilter }: {
           onUnfilter={(n) => onFilter(n, "")} />
       </div>
       <div className="dls-body">
-        <div className="tm-daterow">
-          <b>{fmtDayName(date)} {fmtDate(date)}</b>
-          {date === TODAY ? <span className="pill xs">today</span> : null}
-        </div>
         <Table
           scroll min="980px"
           cols={[
@@ -602,19 +596,32 @@ function Requests() {
 
 /* ------------------------------------------------------------- date nav --- */
 
+/** THE DATE IS A FILTER NOW, not two chevrons and a label.
+ *
+ *  Stepping a day at a time is the right control for "yesterday" and a terrible
+ *  one for "the Tuesday before last" — twelve presses to reach a date somebody
+ *  already knows. The chevrons stay because the common move IS one day; the
+ *  field is there for every other move.
+ *
+ *  It is the native date input rather than a calendar of our own: it is the
+ *  same control the leave and item forms use, it comes with a keyboard and a
+ *  picker for free, and `max` is what actually stops a future date rather than
+ *  a disabled button somebody can route around by typing the URL. */
 function DateNav({ date, onPick }: { date: string; onPick: (d: string) => void }) {
   return (
     <div className="tm-datenav">
       <button className="btn icon sm" aria-label="Previous day" onClick={() => onPick(addDays(date, -1))}>
         <Icon name="chevl" size="sm" />
       </button>
-      <span className="tnum">{fmtDate(date)}</span>
+      <input type="date" className="inp sm tm-datef" value={date} max={TODAY}
+        aria-label="Show this day"
+        onChange={(e) => { if (e.target.value && e.target.value <= TODAY) onPick(e.target.value); }} />
       <button className="btn icon sm" aria-label="Next day"
         disabled={date >= TODAY}
         onClick={() => onPick(addDays(date, 1))}>
         <Icon name="chevr" size="sm" />
       </button>
-      {date !== TODAY ? <button className="btn sm" onClick={() => onPick(TODAY)}>Today</button> : null}
+      <button className="btn sm" disabled={date === TODAY} onClick={() => onPick(TODAY)}>Today</button>
     </div>
   );
 }

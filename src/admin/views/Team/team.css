@@ -30,6 +30,9 @@
 .dls-attn { flex-wrap: wrap; overflow-x: visible }
 
 .tm-datenav { display: inline-flex; gap: var(--space-2); align-items: center; font-size: var(--text-xs) }
+/* The date is a field, not a label between two chevrons. Fixed width so the
+   toolbar does not resize as the locale renders the value differently. */
+.tm-datef { width: 148px; flex: 0 0 148px }
 .tm-daterow {
   display: flex; gap: var(--space-3); align-items: baseline;
   padding: var(--space-3) 0 var(--space-2);
@@ -253,7 +256,7 @@
 /* ----------------------------------------------------------------- print -- */
 
 @media print {
-  .tm-datenav, .dls-cmd, .dls-chips, .tm-clock-a { display: none !important }
+  .tm-datenav, .dls-cmd, .dls-chips, .tm-tclock { display: none !important }
   .tm-attn-c, .tm-card, .tm-col { break-inside: avoid }
   .tm-bar-work, .tm-bar-break { print-color-adjust: exact; -webkit-print-color-adjust: exact }
 }

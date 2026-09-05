@@ -57,7 +57,7 @@ import {
   SignAgreementModal,
 } from "../src/admin/views/Team/member/modals";
 import {
-  agreementsFor, leaveFor, meId, readItems, readMembers, resetStore,
+  TODAY, agreementsFor, leaveFor, meId, readItems, readMembers, resetStore,
 } from "../src/admin/views/Team/store";
 import type { Ops, Role } from "../src/admin/views/teamShared";
 
@@ -134,7 +134,7 @@ ok("the calendar has no filter band", cal.indexOf("dls-cmd") < 0);
 /* ATTENDANCE HAS FOUR FACES NOW and each answers a different question, so each
    names something only it draws. The clock is asserted separately because it
    lives in the topbar slot, which a module-only render never reaches. */
-renders("attendance today", () => at("/attendance"), ["dls", "tabs", "tm-daterow"]);
+renders("attendance today", () => at("/attendance"), ["dls", "tabs", "tbl", "tm-datef"]);
 renders("attendance history", () => at("/attendance?face=history"), ["dls", "tm-daterow"]);
 renders("attendance analytics", () => at("/attendance?face=analytics"),
   ["tm-an-days", "tm-an-stack", "tm-sort"]);
@@ -143,6 +143,17 @@ renders("attendance requests", () => at("/attendance?face=requests"), ["dls-body
   ok("the attendance tabs offer " + l, at("/attendance").indexOf(l) >= 0));
 ok("the leave queue left the middle of the day table",
   at("/attendance").indexOf("tm-inbox") < 0);
+/* The date is a FIELD, so any date is one move away rather than twelve presses
+   of a chevron — and `max` is what stops a future day, not a disabled button
+   somebody routes around by typing the URL. */
+ok("the day is pickable, not just steppable",
+  at("/attendance").indexOf('type="date"') >= 0);
+ok("…and a future day cannot be asked for",
+  at("/attendance").indexOf('max="' + TODAY + '"') >= 0);
+/* Two labels the toolbar already says. The day heading repeated the date field
+   directly above it, and the scope note repeated a count the strip carries. */
+ok("the day heading is gone from the table", at("/attendance").indexOf("tm-daterow") < 0);
+ok("the scope note is gone from the tab row", at("/attendance").indexOf("tm-scope\"") < 0);
 renders("the clock, in the topbar slot", () => node(<TopClock />, "/attendance"),
   ["tm-tclock", "tm-tclock-a"]);
 

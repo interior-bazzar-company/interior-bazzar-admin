@@ -6,6 +6,49 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-05
 
+### The attendance date becomes a filter, and two labels that repeated it go
+
+**Area:** `#/attendance` — the Today toolbar
+**Files:** `src/admin/views/Team/Attendance.tsx`, `team.css`, `scripts/tm-smoke.tsx`
+
+**What changed**
+
+- **The date is a field.** Stepping a day at a time is the right control for "yesterday" and a
+  terrible one for "the Tuesday before last" — twelve presses to reach a date somebody already
+  knows. The chevrons stay, because one day IS the common move; the field is there for every other
+  move. It is the native date input, the same control the leave and item forms use, and its `max`
+  is what actually refuses a future day — a disabled button is routed around by typing the URL.
+  *Today* is now always present and disabled when you are on it, rather than appearing and shifting
+  the toolbar under the cursor.
+- **`Everyone · 7` is gone** from the tab row. The count it carried is in the stat strip a few
+  pixels below it.
+- **The `Fri 4 Sep 2026 · today` heading is gone** from the table. It restated the date field
+  directly above it. The History face keeps its own heading, which says something the toolbar does
+  not — *Week of 31 Aug · 5 working days*.
+
+**Worth knowing:** the screen no longer states its scope anywhere. That was the one thing the
+removed note said that nothing else does — whether you are looking at everybody or only the people
+who report to you. Nothing on the page is wrong without it; if it should come back, the honest place
+is beside the Analytics "Per member" heading, where the scope actually changes what the numbers mean.
+
+**Temp data** none — layout only.
+
+**Backend needed** none.
+
+**Open decisions** none.
+
+**Verified**
+
+`check:team-render` asserts the day is pickable (`type="date"` present), that a future day cannot be
+asked for (`max` is today), and that both removed labels are actually absent rather than merely
+hidden. `tsc -b` clean · eslint 0 errors · `check:team` · `check:team-nav` · build green.
+
+**Not checked:** the native date input renders per the viewer's locale, so the field will read
+`04-09-2026` or `09/04/2026` depending on the browser. That is the trade for a control that comes
+with a keyboard and a picker for free, and it was not eyeballed in more than one locale.
+
+---
+
 ### Attendance: the clock moves to the topbar, and the day gets three faces beside it
 
 **Area:** sidebar → Team · `#/attendance` (`?face=today|history|analytics|requests`)
