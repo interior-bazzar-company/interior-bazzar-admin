@@ -92,8 +92,14 @@ export function TaskRow({ item, onOpen, who }: { item: WorkItem; onOpen: (id: st
         <b>{item.title}</b>
         <span className="tm-tk-m">
           {m ? <span>{m.name.split(" ").slice(-1)[0]}</span> : null}
-          <span className={late ? "u-warn-t" : ""}>
-            {late ? "⚠ " + daysOver(item) + "d over" : item.dueDate === TODAY ? "due today" : "due " + fmtDate(item.dueDate)}
+          {/* THE PANEL'S OWN ICON, not an emoji. An emoji renders as a different
+              glyph on every platform, ignores currentColor so it cannot follow
+              the warn tone beside it, and is read out as "warning sign" in the
+              middle of a sentence. */}
+          <span className={late ? "u-warn-t tm-over" : ""}>
+            {late
+              ? <><Icon name="alert" size="sm" />{daysOver(item)}d over</>
+              : item.dueDate === TODAY ? "due today" : "due " + fmtDate(item.dueDate)}
           </span>
           <WaitFlag item={item} />
           <TagChips item={item} />

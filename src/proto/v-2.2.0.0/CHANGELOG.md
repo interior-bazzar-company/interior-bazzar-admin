@@ -6,6 +6,39 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-04
 
+### A UX audit of the calendar: one real defect, one emoji, and one thing that was already right
+
+**Area:** sidebar → Team → **Calendar** (`#/work`) — the month grid and the rail
+**Files:** `src/admin/views/Team/Work.tsx`, `workBits.tsx`, `team.css`
+
+**What changed**
+
+- **A day could only be clicked, never tabbed to.** The cell that starts an item on its date
+  was a `div` with an `onClick`: no name for a screen reader, no way in from the keyboard,
+  and an affordance a sighted mouse user could only find by accident. There is a real button
+  in each cell now — named *"Add on 4 September"*, revealed by **focus as well as hover**, so
+  the keyboard finds it exactly where the pointer does. The whole-cell click stays as the
+  pointer shortcut it always was.
+- **`⚠` was doing an icon's job** in the rail's overdue rows. An emoji renders as a different
+  glyph on every platform, ignores `currentColor` so it cannot follow the warn tone beside
+  it, and is announced as "warning sign" in the middle of a sentence. It is the panel's own
+  `alert` icon now.
+- **The "+n more" link names its day** — "3 more on 11 September — open the week" rather than
+  a bare "+3" repeated forty times down the tab order.
+
+**What was checked and deliberately left alone**
+
+The receding tone on completed chips was the obvious contrast suspect, so it was measured
+instead of adjusted: `--text-3` on the chip ground is **7.21:1 in light and 6.35:1 in dark**,
+past AA and past AAA in light. Changing it would have made done work compete with open work
+again for no accessibility gain. The rest of the sweep came back clean — no emoji left, no
+colour literal anywhere in `team.css`, and no icon-only control without a name.
+
+**Verified**
+`npx tsc -b` clean · eslint 0 errors · `npx vite build` succeeds · both check suites pass.
+
+---
+
 ### A task you can read: two lines in the week, and done work that looks done
 
 **Area:** sidebar → Team → **Calendar** (`#/work`) — the month and week grids

@@ -496,12 +496,23 @@ function CalendarFace({ rows, me, p, goto, onOpen, members, all }: {
                 + (d === TODAY ? " today" : "")}
                 onClick={(e) => { if (e.target === e.currentTarget) create("task", d); }}>
                 <span className="tm-day-n">{Number(d.slice(8))}</span>
+                {/* THE CELL'S CLICK IS A POINTER SHORTCUT, AND A SHORTCUT IS ALL
+                    IT CAN BE: a div that only answers a mouse announces nothing
+                    to a screen reader and cannot be reached by tab. The real
+                    control is this button — named, focusable, and revealed by
+                    focus as well as by hover, so the keyboard finds it exactly
+                    where the pointer does. */}
+                <button className="tm-day-add" aria-label={"Add on " + fmtDate(d)}
+                  onClick={() => create("task", d)}>
+                  <Icon name="plus" size="sm" />
+                </button>
                 {away.length ? (
                   <span className="tm-ev leave">{away.map((l) => nameOf(l.memberId)).join(", ")} on leave</span>
                 ) : null}
                 {evs.slice(0, cap).map((e) => <CalChip key={e.item.itemId + e.edge} ev={e} onOpen={onOpen} />)}
                 {evs.length > cap ? (
-                  <button className="tm-more" onClick={() => goto({ cal: "week", on: d })}>
+                  <button className="tm-more" onClick={() => goto({ cal: "week", on: d })}
+                    aria-label={evs.length - cap + " more on " + fmtDate(d) + " — open the week"}>
                     +{evs.length - cap} more
                   </button>
                 ) : null}
