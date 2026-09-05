@@ -257,7 +257,9 @@ function Today({ rows, p, onFilter }: {
           labels={{ late: "late only" }}
           onUnfilter={(n) => onFilter(n, "")} />
       </div>
-      <div className="dls-body">
+      {/* The day heading used to supply this gap. `.dls-body` has none of its
+          own, so without the pane the table welds itself to the filter chips. */}
+      <div className="dls-body tm-pane">
         <Table
           scroll min="980px"
           cols={[
@@ -584,7 +586,7 @@ function Requests() {
   useLeave();
   const q = leaveQueue(scopeOf("attendance"));
   return (
-    <div className="dls-body">
+    <div className="dls-body tm-pane">
       {q.total ? <LeaveInbox /> : (
         <EmptyState icon="inbox" title="Nothing waiting on you"
           body={"No leave request needs a decision. A request appears here only while it is undecided — "

@@ -197,7 +197,13 @@ renders("reports · analytics", () => at("/reports?face=analytics"),
   ok("the plan and EOD forms left the review page", html.indexOf("My plan") < 0);
   /* The date scopes all three tabs, so it sits with them rather than under one. */
   ok("the date sits in the tab row", html.indexOf("tm-tabrow") >= 0);
+  /* `.dls-body` carries no top padding by design — the band above a list screen
+     supplies it. Removing the heading took that away and welded the table's
+     header to the strip's bottom rule. */
+  ok("the table is not welded to the strip above it", html.indexOf("dls-body tm-pane") >= 0);
 })();
+ok("the attendance day table is not welded either",
+  at("/attendance").indexOf("dls-body tm-pane") >= 0);
 
 const menu = node(<FaceMenu face="calendar" goto={() => {}} />);
 ["Calendar", "Board", "List", "Timeline"].forEach((l) =>

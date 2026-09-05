@@ -169,7 +169,10 @@ function TheDay({ rows }: { rows: ReviewRow[] }) {
   return (
     <>
       <StatStrip cells={cells} />
-      <div className="dls-body">
+      {/* `tm-pane` because the strip below the tabs ends in a rule and `.dls-body`
+          carries no top padding by design — without it the table's header sits
+          directly on that line and the two read as one welded band. */}
+      <div className="dls-body tm-pane">
         {/* No heading and no banner. The tab says Reports, the date sits beside
             it, and the strip above counts the rows — a title repeating all
             three, over a table whose columns are already labelled, is a line
@@ -237,9 +240,6 @@ function TheDay({ rows }: { rows: ReviewRow[] }) {
             );
           })}
         />
-        <Notice text={
-          "“Done” counts items due today that are complete. An EOD is only outstanding once that member's own "
-          + "day is over — missing at four in the afternoon is early, not missing."} />
       </div>
     </>
   );
@@ -262,7 +262,7 @@ function Actions({ rows }: { rows: ReviewRow[] }) {
     || a.waiting.length || a.lateOrAbsent.length || a.unacknowledged.length;
 
   return (
-    <div className="dls-body">
+    <div className="dls-body tm-pane">
       <SectionHead title="Needs attention"
         desc="Each card is a filter over the same rows the Reports tab lists — a count and the list it opens cannot disagree." />
       {anything ? (

@@ -6,6 +6,42 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-05
 
+### The tables get their air back, and a footnote goes
+
+**Area:** `#/reports` · `#/attendance`
+**Files:** `src/admin/views/Team/Reports.tsx`, `Attendance.tsx`, `scripts/tm-smoke.tsx`
+
+**What changed**
+
+**Spacing between the strip and the table.** `.dls-body` carries no top padding by design — on a
+list screen the command row above it supplies that gap. Removing the two headings in the last two
+entries took the gap with them, and the table's header row ended up sitting directly on the stat
+strip's bottom rule, so the two read as one welded band. Four bodies now carry `tm-pane`, the class
+this module already uses for exactly this: the attendance day table, the attendance request queue,
+the reports record, and the reports action queue.
+
+Worth naming, because it is the second time: **removing a heading removes the spacing it was
+silently providing.** Nothing in `.dls-body` replaces it, and the result never looks like a missing
+element — it looks like a squashed one.
+
+**Removed the closing footnote** from the reports record — the one explaining what "Done" counts and
+when an EOD becomes outstanding. Both rules are still true and both are still enforced; the sentence
+was a caption under a table that nobody reads twice, and the EOD half is said where it matters, on
+the Actions tab and in the analytics notice.
+
+**Temp data** none. **Backend needed** none. **Open decisions** none.
+
+**Verified**
+
+`check:team-render` asserts both tables carry the pane, so the gap cannot be removed again without a
+failure. `tsc -b` clean · eslint 0 errors · `check:team` · `check:team-nav` · build green.
+
+**Not checked:** the pane is 16px of padding on a scroll container whose table header is
+`position: sticky`. That combination already ships on the work list face, so it is proven rather
+than reasoned — but it was not re-eyeballed here.
+
+---
+
 ### Writing your own day moves to your own page, and the review page becomes a read
 
 **Area:** `#/reports` · `/team/:id/reports`
