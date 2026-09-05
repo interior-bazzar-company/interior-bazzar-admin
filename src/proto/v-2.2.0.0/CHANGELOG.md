@@ -6,6 +6,34 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-04
 
+### The counts move into the header, beside the title — Deals' arrangement
+
+**Area:** sidebar → Team → **Calendar** (`#/work`, every face)
+**Files:** `src/admin/views/Team/Work.tsx`
+
+**What changed**
+
+- **47 items · 18 in progress · 13 planning · 7 in delay · 1 waiting · 7 complete** now sit in
+  the topbar next to the title, on the panel's own `.tb-stats` — the same control Deals puts
+  there, with its hairline divider, its `on` state and its scroll-when-narrow behaviour.
+  They were a band of their own under the command row, which on a face bounded to the
+  viewport is a full row's height spent on one line of text.
+- **They read the store themselves** rather than taking the totals as a prop: the chrome node
+  is captured once per location, so a prop would freeze at whatever the numbers were before
+  the last write. Create something and the header moves.
+- **Every count is still the filter for itself,** and pressing the one you are already on
+  clears it — so the header is never a trap you have to leave by the chip row. Stage and
+  waiting are one axis: two answers to "what state is this in", and a strip that could hold
+  both at once would light two cells for one list. This also gives the calendar face its
+  filtering back in one line, having lost the filter band.
+- **The calendar face now carries no body band at all** — title, counts and the view switcher
+  are all chrome, and the body is the rail and the grid.
+
+**Verified**
+`npx tsc -b` clean · eslint 0 errors · `npx vite build` succeeds · both check suites pass.
+
+---
+
 ### The calendar drops its filter row, moves the date controls right, and the rail becomes an indicator
 
 **Area:** sidebar → Team → **Calendar** (`#/work`, the calendar face)

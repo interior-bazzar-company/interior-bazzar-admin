@@ -31,10 +31,9 @@ import { useSearchParams } from "react-router-dom";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import {
-  FilterChips, Icon, KvList, Notice, SearchField, SectionHead, Select, StatStrip, Table, TbTitle, qs,
+  FilterChips, Icon, KvList, Notice, SearchField, SectionHead, Select, Table, TbTitle, qs,
 } from "../../ui";
 import { go } from "../../ui/nav";
-import type { StatCell } from "../../ui";
 import {
   KIND, PRIORITY, TODAY, WORK_STATUS, addDays, addLink, blockerOf, childrenOf, createItem, createTag,
   eventsOn, fmtDate, fmtMonth, gridDays, isDelayed, isTerminal, labelOf, lanesOf, leaveOn,
@@ -96,7 +95,7 @@ export default function Work() {
      No scope line beside the title any more: "47 items" was a second rendering
      of the strip's own first cell, sitting where you cannot click it. */
   usePageChrome({
-    crumbs: <TbTitle label="Calendar" to="#/work" />,
+    crumbs: <><TbTitle label="Calendar" to="#/work" /><WorkStats p={p} /></>,
     right: (
       <button className="btn tb-view-btn" aria-haspopup="menu"
         onClick={(e) => {
@@ -134,19 +133,6 @@ export default function Work() {
       onClose={() => goto({ item: undefined })} onOpen={openItem} />);
   }, [open, all, tags, shell, goto, openItem]);
 
-  const t = workTotals(all);
-  const cells: (StatCell | "sep")[] = [
-    { k: "items", v: t.total },
-    "sep",
-    { k: "in progress", v: t.inProgress, dot: "info", to: ROUTE + qs({ ...p, status: "in_progress" }), on: p.status === "in_progress" },
-    { k: "planning", v: t.planned, dot: "", to: ROUTE + qs({ ...p, status: "planned" }), on: p.status === "planned" },
-    "sep",
-    { k: "in delay", v: t.delayed, dot: t.delayed ? "warn" : "", to: ROUTE + qs({ ...p, status: "delayed" }), on: p.status === "delayed" },
-    { k: "waiting", v: t.waiting, dot: t.waiting ? "bad" : "", to: ROUTE + qs({ ...p, wait: "1" }), on: !!p.wait },
-    "sep",
-    { k: "complete", v: t.completed, dot: "ok", to: ROUTE + qs({ ...p, status: "completed" }), on: p.status === "completed" },
-  ];
-
   return (
     <div className="dls">
       {/* NO FILTER BAND ON THE CALENDAR. A month is read, not queried: the
@@ -175,8 +161,6 @@ export default function Work() {
           <CreateMenu onPick={(k) => shell.modal(<NewItemModal kind={k} members={members} all={all} />, "sm")} />
         </div>
       )}
-
-      <StatStrip cells={cells} />
 
       {FILTERS.some((k) => p[k]) ? (
         <div className="dls-chips">
@@ -207,6 +191,51 @@ const slugOptions = (tags: Tag[]) => {
   tags.filter((t) => !t.archivedAt).forEach((t) => { seen[t.slug] = t.label; });
   return Object.keys(seen).sort().map((s) => ({ v: s, l: seen[s] }));
 };
+
+/** THE COUNTS LIVE IN THE HEADER, beside the title — the arrangement Deals
+ *  settled on. They were a band of their own under the command row, which on a
+ *  face bounded to the viewport is a row of six numbers charging full height
+ *  for a line of text.
+ *
+ *  It reads the store ITSELF rather than taking the totals as a prop: the
+ *  chrome node is captured once per location, so a prop would freeze at
+ *  whatever the numbers were before the last write landed.
+ *
+ *  Every count is still the filter for itself, and pressing the one you are
+ *  already on clears it — so the header is never a trap you have to leave by
+ *  the chip row. Stage and waiting are one axis here: they are two answers to
+ *  "what state is this in", and a strip that could hold both at once would
+ *  show two cells lit for one list. */
+function WorkStats({ p }: { p: Record<string, string> }) {
+  const t = workTotals(useWork({}, "all"));
+
+  const route = (key?: string, val?: string) => {
+    const next: Record<string, string> = { ...p };
+    delete next.status; delete next.wait;
+    if (key && val) next[key] = val;
+    return ROUTE + qs(next);
+  };
+  const cell = (k: string, v: number, on: boolean, to: string, dot?: string) => (
+    <button key={k} className={"tb-stat" + (on ? " on" : "")} data-go={to}
+      title={v + " " + k} onClick={() => go(to)}>
+      {dot !== undefined ? <span className={"dls-cdot " + dot}></span> : null}
+      <span className="v tnum">{v}</span><span className="k">{k}</span>
+    </button>
+  );
+  const stage = (k: string, v: number, st: string, dot?: string) =>
+    cell(k, v, p.status === st, p.status === st ? route() : route("status", st), dot);
+
+  return (
+    <span className="tb-stats">
+      {cell("items", t.total, !p.status && !p.wait, route())}
+      {stage("in progress", t.inProgress, "in_progress", "info")}
+      {stage("planning", t.planned, "planned", "")}
+      {stage("in delay", t.delayed, "delayed", t.delayed ? "warn" : "")}
+      {cell("waiting", t.waiting, !!p.wait, p.wait ? route() : route("wait", "1"), t.waiting ? "bad" : "")}
+      {stage("complete", t.completed, "completed", "ok")}
+    </span>
+  );
+}
 
 /** The four faces, one per row, each saying what it is for. `on` marks the one
  *  you are in — a switcher that cannot answer "where am I" is a switcher you
