@@ -171,21 +171,12 @@ export function WeekBars({ cells, expected, dayName }: {
 
 /* ------------------------------------------------------------- chrome --- */
 
-/** The same words on every face of this module, and the same words the Users
- *  and Finance modules use. It names the endpoint that does not exist, because
- *  "this is a prototype" answers nothing a person can act on. */
-export function ProtoBar({ what, endpoint }: { what: string; endpoint: string }) {
-  return (
-    <div className="tm-proto">
-      <Icon name="alert" size="sm" />
-      <span>
-        <b>{what} renders from bundled sample data, worn by your live roster.</b> Nothing
-        here is saved — a reload restores the seed. It stands in for <code>{endpoint}</code>,
-        which does not exist yet.
-      </span>
-    </div>
-  );
-}
+/* THE PROTO BANNER IS GONE from every face of this module. It said the same
+   sentence on every screen on every load, and a warning nobody can act on is
+   one people stop reading — which costs the warnings that matter. The fact it
+   carried is not lost: store.ts states it at the top of the only file that
+   knows where these records come from, and BACKEND-INTEGRATION.md lists the
+   endpoints that have to land. */
 
 /** Every face says whose records it is showing. The scope is a permission
  *  answer, and a screen that silently widens from "your reports" to "everyone"

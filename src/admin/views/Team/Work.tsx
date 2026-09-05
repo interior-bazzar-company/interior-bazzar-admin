@@ -44,7 +44,7 @@ import {
 } from "./store";
 import type { CalEvent, LinkRelation, Member, Tag, WorkItem, WorkStage, WorkStatus } from "./store";
 import { ensureAdopted } from "./adopt";
-import { KindMark, PriorityChip, ProtoBar, ScopeNote, Who, ago } from "./bits";
+import { KindMark, PriorityChip, ScopeNote, Who, ago } from "./bits";
 import { MarksBlock, ProgressWindow, StagePill, TagChips, TasksBlock, WaitFlag, daysOver, noteOf } from "./workBits";
 import "./team.css";
 
@@ -130,8 +130,6 @@ export default function Work() {
 
   return (
     <div className="dls">
-      <ProtoBar what="Calendar" endpoint="GET /admin/team/work" />
-
       {/* ONE BAND, NOT A TOOLBAR INSIDE A BAND. `.dls-cmd` is already the flex
           row every list screen uses; wrapping a `.toolbar` in it nested one flex
           context in another and added a bottom margin, which is what pushed
@@ -392,9 +390,7 @@ function CalendarFace({ rows, me, p, goto, onOpen, members, all }: {
   return (
     <div className="tm-shell">
       <aside className="tm-rail">
-        <Rail me={me} anchor={anchor} rows={rows} onDay={(d) => goto({ on: d })}
-          onMonth={(n) => goto({ on: monthStep(anchor, n) })}
-          onCreate={(k) => create(k)} onOpen={onOpen} />
+        <Rail me={me} anchor={anchor} rows={rows} onCreate={(k) => create(k)} onOpen={onOpen} />
       </aside>
       <div className="tm-shell-b">
         <div className="tm-calbar">
@@ -476,14 +472,16 @@ function CalChip({ ev, onOpen }: { ev: CalEvent; onOpen: (id: string) => void })
 
 /* ---------------------------------------------------------------- rail --- */
 
-/** Create, a mini month, this month's counts, then tasks ▸ milestones ▸
- *  targets. It belongs to this face and no other. */
-function Rail({ me, anchor, rows, onDay, onMonth, onCreate, onOpen }: {
+/** Create, this month's counts, then tasks ▸ milestones ▸ targets. It belongs
+ *  to this face and no other.
+ *
+ *  NO MINI MONTH. It sat a second month grid immediately beside the first one,
+ *  and the two answered the same question at two sizes — the big grid is
+ *  already the date picker, and ‹ › on the bar is already the month step. */
+function Rail({ me, anchor, rows, onCreate, onOpen }: {
   me: string; anchor: string; rows: WorkItem[];
-  onDay: (d: string) => void; onMonth: (n: number) => void;
   onCreate: (kind: string) => void; onOpen: (id: string) => void;
 }) {
-  const days = gridDays(anchor, "month");
   const month = anchor.slice(0, 7);
   const inMonth = rows.filter((i) => {
     const a = i.startDate || i.dueDate, b = i.dueDate || i.startDate;
@@ -493,35 +491,11 @@ function Rail({ me, anchor, rows, onDay, onMonth, onCreate, onOpen }: {
 
   return (
     <>
-      {/* Create and the mini month PIN; the three blocks scroll under them.
-          They are the two controls somebody reaches for at any scroll position,
-          and a sidebar that hides its own Create button has lost the plot. */}
+      {/* Create PINS; the blocks scroll under it. It is the control somebody
+          reaches for at any scroll position, and a sidebar that scrolls its own
+          Create button away has lost the plot. */}
       <div className="tm-rail-t">
         <CreateMenu big onPick={onCreate} />
-
-        <div className="tm-mini">
-          <div className="tm-mini-h">
-            <b>{fmtMonth(anchor, true)}</b>
-            <span className="spacer" />
-            <button className="btn icon sm" aria-label="Previous month" onClick={() => onMonth(-1)}>
-              <Icon name="chevl" size="sm" />
-            </button>
-            <button className="btn icon sm" aria-label="Next month" onClick={() => onMonth(1)}>
-              <Icon name="chevr" size="sm" />
-            </button>
-          </div>
-          <div className="tm-mini-g">
-            {["M", "T", "W", "T", "F", "S", "S"].map((d, n) => <b key={n}>{d}</b>)}
-            {days.map((d) => (
-              <button key={d} onClick={() => onDay(d)}
-                className={(d.slice(0, 7) !== month ? "out " : "") + (d === TODAY ? "today " : "")
-                  + (d === anchor && d !== TODAY ? "sel " : "")
-                  + (eventsOn(d, rows).length ? "has" : "")}>
-                {Number(d.slice(8))}
-              </button>
-            ))}
-          </div>
-        </div>
       </div>
 
       <div className="tm-rail-b">

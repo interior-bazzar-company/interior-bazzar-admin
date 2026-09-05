@@ -35,7 +35,7 @@ import {
   now as clockNow,
 } from "./store";
 import type { DayRow, Result } from "./store";
-import { BarScale, DayBar, Meter, ScopeNote, StatePill, Who, ProtoBar } from "./bits";
+import { BarScale, DayBar, Meter, ScopeNote, StatePill, Who } from "./bits";
 import { ensureAdopted } from "./adopt";
 import "./team.css";
 
@@ -77,8 +77,6 @@ export default function Attendance() {
 
   return (
     <div className="dls">
-      <ProtoBar what="Attendance" endpoint="GET /admin/team/attendance" />
-
       <MyClock onAct={(r) => { if (!r.ok) shell.toast(r.message, "bad"); }} />
 
       <div className="dls-cmd">

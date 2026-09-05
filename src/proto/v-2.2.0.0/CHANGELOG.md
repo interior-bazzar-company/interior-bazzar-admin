@@ -6,6 +6,30 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-04
 
+### The proto banner comes off, and the rail stops drawing a second calendar
+
+**Area:** sidebar → Team → **Calendar** (`#/work`) · **Attendance** · **Reports**
+**Files:** `src/admin/views/Team/Work.tsx`, `Attendance.tsx`, `Reports.tsx`, `bits.tsx`, `team.css`
+
+**What changed**
+
+- **The amber banner is gone from all three faces.** It said the same sentence on every
+  screen on every load, and a warning nobody can act on is one people stop reading — which
+  costs the warnings that do matter (a day left unclosed, a leave request waiting, an
+  agreement nobody opened). `ProtoBar` is deleted from this module rather than hidden. The
+  fact it carried is not lost: `store.ts` states it at the top of the only file that knows
+  where these records come from, and BACKEND-INTEGRATION.md lists the endpoints owed.
+  *(Finance, Users and Business Enquiries keep their own banners — not this module's call.)*
+- **The mini month leaves the rail.** It sat a second month grid immediately beside the
+  first, answering the same question at two sizes. The big grid is already the date picker —
+  a click on a day starts something there — and `‹ ›` on the bar is already the month step.
+  The rail is now Create, pinned, over this month's counts, tasks, milestones and targets.
+
+**Verified**
+`npx tsc -b` clean · eslint 0 errors · `npx vite build` succeeds · both check suites pass.
+
+---
+
 ### The calendar is a one-pager, and the filter row stops nesting itself
 
 **Area:** sidebar → Team → **Calendar** (`#/work`) · **Attendance** · **Reports**

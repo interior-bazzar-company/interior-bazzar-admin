@@ -20,20 +20,6 @@
 
 /* ---------------------------------------------------------------- chrome -- */
 
-.tm-proto {
-  display: flex; gap: var(--space-2); align-items: flex-start; flex: 0 0 auto;
-  margin: var(--space-3) var(--page-pad) 0; padding: var(--space-2) var(--space-3);
-  border: 1px dashed var(--warn-line); border-radius: var(--radius-md);
-  background: var(--warn-bg); color: var(--warn);
-  font-size: var(--text-sm); line-height: var(--lh-sm);
-}
-.tm-proto .ic { flex: none; margin-top: 1px }
-.tm-proto b { font-weight: 500 }
-.tm-proto code {
-  font-family: var(--font-mono); font-size: var(--text-2xs);
-  background: var(--bg-inset); padding: 0 4px; border-radius: var(--radius-xs);
-}
-
 .tm-scope {
   display: inline-flex; gap: var(--space-1); align-items: center;
   font-size: var(--text-xs); color: var(--text-3);
@@ -287,7 +273,7 @@
 /* ----------------------------------------------------------------- print -- */
 
 @media print {
-  .tm-proto, .tm-datenav, .dls-cmd, .dls-chips, .tm-clock-a { display: none !important }
+  .tm-datenav, .dls-cmd, .dls-chips, .tm-clock-a { display: none !important }
   .tm-attn-c, .tm-card, .tm-col { break-inside: avoid }
   .tm-bar-work, .tm-bar-break { print-color-adjust: exact; -webkit-print-color-adjust: exact }
 }
@@ -330,34 +316,6 @@
   font-size: var(--text-md); box-shadow: var(--shadow-sm);
 }
 .tm-create-b .ib-menu-pop { left: 0; right: auto; min-width: 100% }
-
-/* ---------------------------------------------------------- mini month -- */
-
-.tm-mini {
-  background: var(--bg-inset); border-radius: var(--radius-lg);
-  padding: var(--space-2); display: flex; flex-direction: column; gap: var(--space-1);
-}
-.tm-mini-h { display: flex; align-items: center; gap: 2px; padding-left: var(--space-1) }
-.tm-mini-h b { font-size: var(--text-sm); color: var(--text); font-weight: var(--weight-medium) }
-.tm-mini-h .btn.icon { height: 22px; width: 22px; min-width: 22px }
-.tm-mini-g { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px }
-.tm-mini-g b {
-  text-align: center; font-size: var(--text-2xs); color: var(--text-3);
-  font-weight: 500; padding: 2px 0;
-}
-.tm-mini-g button {
-  font: inherit; font-size: var(--text-2xs); border: 0; background: none; cursor: pointer;
-  color: var(--text-2); padding: 4px 0 6px; border-radius: var(--radius-full); position: relative;
-}
-.tm-mini-g button:hover { background: var(--bg-hover); color: var(--text) }
-.tm-mini-g button.out { color: var(--text-3); opacity: .55 }
-.tm-mini-g button.sel { background: var(--brand-tint); color: var(--brand-text); font-weight: 600 }
-.tm-mini-g button.today { background: var(--brand); color: var(--brand-ink); font-weight: 600 }
-.tm-mini-g button.has::after {
-  content: ""; position: absolute; left: 50%; bottom: 2px; width: 3px; height: 3px;
-  margin-left: -1.5px; border-radius: var(--radius-full); background: var(--info-solid);
-}
-.tm-mini-g button.today.has::after { background: var(--brand-ink) }
 
 /* --------------------------------------------------------------- blocks -- */
 

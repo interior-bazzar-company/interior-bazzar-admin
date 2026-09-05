@@ -33,7 +33,7 @@ import {
   unopenedAgreements, useAgreements, useLeave, useMe, usePlan, useReport, useReview, useWork,
 } from "./store";
 import type { Priority, ReviewRow, WorkItem } from "./store";
-import { PriorityChip, ProtoBar, ScopeNote, StatePill, Who } from "./bits";
+import { PriorityChip, ScopeNote, StatePill, Who } from "./bits";
 import { MarksBlock, TasksBlock } from "./workBits";
 import { ensureAdopted } from "./adopt";
 import "./team.css";
@@ -70,8 +70,6 @@ export default function Reports() {
 
   return (
     <div className="dls">
-      <ProtoBar what="Reports" endpoint="GET /admin/team/reports" />
-
       <div className="dls-cmd">
         <span className="btn-group">
           <button className={face === "today" ? "on" : ""} onClick={() => goto({ face: undefined })}>
