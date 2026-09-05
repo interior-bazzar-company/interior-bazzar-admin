@@ -1422,7 +1422,13 @@ a.lk:hover{ border-color:var(--brand); background:var(--brand-tint) }
    ========================================================================== */
 .tabs{ display:flex; align-items:center; gap:2px; margin-bottom:var(--space-4);
        border-bottom:1px solid var(--line) }
-.tabs button{ position:relative; height:var(--control-lg); padding:0 var(--space-3);
+/* A TAB MAY CARRY AN ICON, and until this was a flex box it could not: `.ic`
+   declares `flex:0 0 <size>`, which does nothing outside a flex container, so
+   the svg laid out as inline text — sitting ON the baseline, hanging below the
+   label, with no space between the two. Text-only tabs are unaffected: a single
+   child in a flex row lays out exactly as it did inline. */
+.tabs button{ position:relative; display:inline-flex; align-items:center; gap:6px;
+              height:var(--control-lg); padding:0 var(--space-3);
               border-radius:var(--radius-md) var(--radius-md) 0 0;
               font-size:var(--text-md); font-weight:var(--weight-medium); color:var(--text-2);
               transition:color var(--duration) var(--ease), background var(--duration) var(--ease) }
@@ -1430,7 +1436,13 @@ a.lk:hover{ border-color:var(--brand); background:var(--brand-tint) }
 .tabs button.on{ color:var(--text); font-weight:var(--weight-semibold) }
 .tabs button.on::after{ content:""; position:absolute; left:var(--space-2); right:var(--space-2);
                         bottom:-1px; height:2px; background:var(--brand); border-radius:2px 2px 0 0 }
-.tabs .n{ margin-left:5px; font-size:var(--text-xs); color:var(--text-3);
+/* The icon recedes until the tab is the one you are on. It is a marker for the
+   row, not a second thing to read. */
+.tabs button .ic{ color:var(--text-3); transition:color var(--duration) var(--ease) }
+.tabs button:hover .ic{ color:var(--text-2) }
+.tabs button.on .ic{ color:var(--text) }
+/* The gap owns the spacing now; a margin on top of it would double it. */
+.tabs .n{ margin-left:0; font-size:var(--text-xs); color:var(--text-3);
           font-variant-numeric:tabular-nums }
 
 

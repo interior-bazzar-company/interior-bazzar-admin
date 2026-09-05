@@ -6,6 +6,43 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-05
 
+### Tabs can carry an icon, and the attendance queue moves to second
+
+**Area:** panel-wide `.tabs`; `#/attendance` tab order
+**Files:** `src/styles/admin-theme.css`, `src/admin/views/Team/Attendance.tsx`,
+`scripts/tm-smoke.tsx`
+
+**What changed**
+
+**The icon was broken at the component, not in Team.** `.tabs button` was not a flex container, and
+`.ic` declares `flex:0 0 <size>` — which does nothing outside one. So the svg laid out as inline
+text: sitting ON the baseline, hanging below the label, with no space between the two. It is a flex
+row now with a 6px gap, and the icon recedes to `--text-3` until the tab is the one you are on. The
+count's own `margin-left` went with it; the gap owns that spacing now, and keeping both would have
+doubled it.
+
+Text-only tabs are unaffected — a single child in a flex row lays out exactly as it did inline —
+which matters, because nine other surfaces use this component and none of them pass an icon.
+
+**Attendance tab order is now Today · Requests · History · Analytics.** Order is urgency, not
+chronology: Today is the live day, Requests is the only tab that can be waiting on the reader, and
+the two that look backwards come after both. Requests was third, behind two views nobody opens twice
+a day — which is how a queue with a count on it still gets missed.
+
+**Temp data** none. **Backend needed** none. **Open decisions** none.
+
+**Verified**
+
+The render check asserted the four tabs as a SET, which passes just as happily with Requests last —
+so it now asserts the order, and that each tab actually emits its icon inside the button. The other
+two render suites (`check:users-render`, `check:finance-render`) were run because this edit is
+panel-wide: both green. `tsc -b` · eslint 0 errors · `check:team` · build green.
+
+**Not checked:** the icon colour shift on hover and on the active tab is a token swap that was
+reasoned, not eyeballed in either theme.
+
+---
+
 ### The attendance date becomes a filter, and two labels that repeated it go
 
 **Area:** `#/attendance` — the Today toolbar

@@ -139,8 +139,20 @@ renders("attendance history", () => at("/attendance?face=history"), ["dls", "tm-
 renders("attendance analytics", () => at("/attendance?face=analytics"),
   ["tm-an-days", "tm-an-stack", "tm-sort"]);
 renders("attendance requests", () => at("/attendance?face=requests"), ["dls-body"]);
-["Today", "History", "Analytics", "Requests"].forEach((l) =>
-  ok("the attendance tabs offer " + l, at("/attendance").indexOf(l) >= 0));
+/* ORDER, NOT JUST PRESENCE. The four were asserted as a set, which passes just
+   as happily when Requests — the only tab that can be waiting on the reader —
+   sits last behind two views nobody opens twice a day. */
+(() => {
+  const html = at("/attendance");
+  const want = ["Today", "Requests", "History", "Analytics"];
+  const at_ = want.map((l) => html.indexOf(">" + l));
+  ok("every attendance tab is drawn", at_.every((i) => i >= 0));
+  ok("...in the order Today, Requests, History, Analytics",
+    at_.every((i, n) => n === 0 || at_[n - 1] < i));
+  /* The icon is inside the button, and `.ic` only lays out in a flex box — as
+     inline text it hangs below the label. */
+  ok("each tab carries its icon", (html.match(/<button[^>]*>\s*<svg class="ic sm"/g) || []).length >= 4);
+})();
 ok("the leave queue left the middle of the day table",
   at("/attendance").indexOf("tm-inbox") < 0);
 /* The date is a FIELD, so any date is one move away rather than twelve presses

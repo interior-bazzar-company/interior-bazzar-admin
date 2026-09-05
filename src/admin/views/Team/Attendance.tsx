@@ -131,11 +131,15 @@ export default function Attendance() {
   );
 }
 
+/* ORDER IS URGENCY, NOT CHRONOLOGY. Today is the live day, Requests is the only
+   tab that can be waiting on the reader, and the two that look backwards come
+   after both. Requests was third and behind two views nobody opens twice a day,
+   which is how a queue with a count on it still gets missed. */
 const FACES = [
   { k: "today", label: "Today", icon: "clock" },
+  { k: "requests", label: "Requests", icon: "inbox" },
   { k: "history", label: "History", icon: "history" },
   { k: "analytics", label: "Analytics", icon: "chart" },
-  { k: "requests", label: "Requests", icon: "inbox" },
 ];
 
 /* ----------------------------------------------------------- the clock --- */
