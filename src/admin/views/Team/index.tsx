@@ -5,7 +5,7 @@
    AdminUserViews) instead of IBData.TeamStore's localStorage store.
 
      /team        who is on the team, and what they may do
-     /team/:id    the member drawer
+     /team/:id    the member page — identity AND the operational half, tabbed
      /roles       what a responsibility means, as a matrix (its own folder)
 
    KNOWN LIMITATION, not a bug here: the list endpoint
@@ -21,7 +21,7 @@ import { useParams, useSearchParams } from "react-router-dom";
 import AdminOpsService from "../../../api/modules/adminOps";
 import { errMessage } from "../../../api/apiService";
 import {
-  EmptyState, FilterChips, Icon, SearchField, Select, StatStrip, qs,
+  EmptyState, FilterChips, Icon, SearchField, Select, StatStrip, TbTitle, qs,
 } from "../../ui";
 import type { StatCell } from "../../ui";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
@@ -29,7 +29,9 @@ import { useShell } from "../../shell/ShellContext";
 import { Avatar, RoleChips } from "../teamShared";
 import type { Member, Ops, Role } from "../teamShared";
 import { ListSkeleton } from "../../ui";
-import MemberDrawer from "./MemberDrawer";
+import MemberPage from "./MemberPage";
+import { adoptPeople } from "./adopt";
+import { readMember } from "./store";
 import { MemberNewModal } from "./memberModals";
 import AccessRequests, { pendingRequests } from "./AccessRequests";
 
@@ -37,7 +39,7 @@ export default function Team() {
   const { id } = useParams();
   const [sp] = useSearchParams();
   const { go } = useNav();
-  const { drawer, modal, closeLayer, toast } = useShell();
+  const { modal, closeLayer, toast } = useShell();
   const [tick, setTick] = useState(0);
   const [rows, setRows] = useState<Member[] | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
@@ -62,6 +64,9 @@ export default function Team() {
     Promise.all([AdminOpsService.users(), AdminOpsService.listRoles()])
       .then(([u, r]) => {
         if (cancelled) return;
+        /* The operational seed puts on the live roster's faces before anything
+           renders against it — see adopt.ts. */
+        adoptPeople(u.data);
         setRows(u.data);
         setRoles(r.data.roles);
       })
@@ -72,24 +77,13 @@ export default function Team() {
   }, [tick]);
 
   /* ------------------------------------------------------------ chrome -- */
-  const crumbs = useMemo(() => (id ? undefined : <span className="tb-title">Team</span>), [id]);
-  usePageChrome({ crumbs, parent: id ? "#/team" + qs(p) : null });
-
-  /* The drawer is the record. It re-opens itself on every data change, which
-     is how the prototype's `render()` behaved after a write. */
-  useEffect(() => {
-    if (!id || !rows) return;
-    const u = rows.find((x) => String(x.id) === id);
-    if (!u) { toast("404 member_not_found.", "bad"); go("#/team"); return; }
-    drawer(<MemberDrawer member={u} roles={roles} ops={ops} />);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, tick, rows]);
-
-  /* …and it closes itself when the id goes away. Without this, deleting a
-     member left their drawer on screen — over a list that no longer had them —
-     still offering Edit and Delete on a record the server had dropped. Same
-     line Plans, Quotations and Invoices already carry. */
-  useEffect(() => { if (!id) return; return () => closeLayer(); }, [id, closeLayer]);
+  const crumbs = useMemo(() => {
+    if (!id) return <span className="tb-title">Team</span>;
+    const u = (rows || []).find((x) => String(x.id) === id);
+    const name = u ? u.name : readMember(id)?.name || "Member";
+    return <TbTitle label={name} to="#/team" />;
+  }, [id, rows]);
+  usePageChrome({ crumbs, parent: id ? "#/team" + qs(p) : null }, (id || "") + p.tab);
 
   /* ----------------------------------------------------------- filters -- */
   const typing = useRef<number | undefined>(undefined);
@@ -120,6 +114,14 @@ export default function Team() {
   }
 
   if (!rows) return <ListSkeleton />;
+
+  /* A ROW IS A PERSON AND IT OPENS THEIR PAGE. The drawer is gone: identity,
+     access, attendance, work, reports, documents and pay are one screen with
+     tabs, and the admin actions moved into its header. */
+  if (id) {
+    const u = rows.find((x) => String(x.id) === id) || null;
+    return <MemberPage id={id} tab={p.tab} live={u} roles={roles} ops={ops} />;
+  }
 
   /* -------------------------------------------------------------- rows -- */
   let list = rows.slice();

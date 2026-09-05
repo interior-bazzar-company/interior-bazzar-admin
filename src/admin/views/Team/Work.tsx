@@ -26,21 +26,23 @@
 
    NO API YET — src/content/team/*.json through store.ts.
    ============================================================================= */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import {
   FilterChips, Icon, KvList, Notice, SearchField, SectionHead, Select, StatStrip, Table, TbTitle, Toolbar, qs,
 } from "../../ui";
+import { go } from "../../ui/nav";
 import type { StatCell } from "../../ui";
 import {
-  KIND, PRIORITY, TODAY, WORK_STATUS, addDays, blockerOf, childrenOf, createItem, createTag, eventsOn, fmtDate,
-  gridDays, isDelayed, isTerminal, labelOf, lanesOf, leaveOn, meId, membersInScope, parentOf,
-  readMember, setBlockedBy, setItemStatus, stageOf, tagItem, tagsOf, tagsOwnedBy, toneOf,
-  useItem, useMembers, useTags, useWork, workTotals,
+  KIND, PRIORITY, TODAY, WORK_STATUS, addDays, addLink, blockerOf, childrenOf, createItem, createTag,
+  eventsOn, fmtDate, gridDays, isDelayed, isTerminal, labelOf, lanesOf, leaveOn, linkLabelOf, linksOf,
+  meId, membersInScope, parentOf, readMember, removeLink, setBlockedBy, setItemStatus, stageOf,
+  tagItem, tagsOf, tagsOwnedBy, toneOf, useItem, useLinks, useMembers, useTags, useWork, workTotals,
 } from "./store";
-import type { CalEvent, Member, Tag, WorkItem, WorkStage, WorkStatus } from "./store";
+import type { CalEvent, LinkRelation, Member, Tag, WorkItem, WorkStage, WorkStatus } from "./store";
+import { ensureAdopted } from "./adopt";
 import { KindMark, PriorityChip, ProtoBar, ScopeNote, Who, ago } from "./bits";
 import { MarksBlock, ProgressWindow, StagePill, TagChips, TasksBlock, WaitFlag, daysOver, noteOf } from "./workBits";
 import "./team.css";
@@ -72,7 +74,7 @@ export default function Work() {
   const scope = "all" as const;
   const rows = useWork({
     member: p.member, kind: p.kind, status: p.status, priority: p.priority,
-    due: p.due, q: p.q, parent: p.parent, tag: p.tag,
+    due: p.due, q: p.q, parent: p.parent, tag: p.tag, wait: p.wait,
   }, scope);
   const members = useMembers();
   const all = useWork({}, scope);
@@ -86,13 +88,15 @@ export default function Work() {
     right: <ScopeNote text={all.length + " items"} />,
   }, face);
 
+  useEffect(() => { ensureAdopted(); }, []);
+
   const goto = useCallback((patch: Record<string, string | undefined>) => {
     const next: Record<string, string> = { ...p };
     Object.keys(patch).forEach((k) => {
       const v = patch[k];
       if (v) next[k] = v; else delete next[k];
     });
-    window.location.hash = ROUTE.slice(1) + qs(next);
+    go(ROUTE + qs(next));
   }, [p]);
 
   const onFilter = (name: string, value: string) => goto({ [name]: value || undefined });
@@ -102,8 +106,9 @@ export default function Work() {
      arrangement `#/team` uses, so Back and the scrim agree with the URL. */
   useEffect(() => {
     if (!open) return;
-    shell.drawer(<ItemDrawer item={open} all={all} tags={tags} onClose={() => goto({ item: undefined })} />);
-  }, [open, all, tags, shell, goto]);
+    shell.drawer(<ItemDrawer item={open} all={all} tags={tags}
+      onClose={() => goto({ item: undefined })} onOpen={openItem} />);
+  }, [open, all, tags, shell, goto, openItem]);
 
   const t = workTotals(all);
   const cells: (StatCell | "sep")[] = [
@@ -113,7 +118,7 @@ export default function Work() {
     { k: "planning", v: t.planned, dot: "", to: ROUTE + qs({ ...p, status: "planned" }), on: p.status === "planned" },
     "sep",
     { k: "in delay", v: t.delayed, dot: t.delayed ? "warn" : "", to: ROUTE + qs({ ...p, status: "delayed" }), on: p.status === "delayed" },
-    { k: "waiting", v: t.waiting, dot: t.waiting ? "bad" : "" },
+    { k: "waiting", v: t.waiting, dot: t.waiting ? "bad" : "", to: ROUTE + qs({ ...p, wait: "1" }), on: !!p.wait },
     "sep",
     { k: "complete", v: t.completed, dot: "ok", to: ROUTE + qs({ ...p, status: "completed" }), on: p.status === "completed" },
   ];
@@ -124,14 +129,14 @@ export default function Work() {
 
       <div className="dls-cmd">
         <Toolbar>
-          <div className="tm-faces">
+          <span className="btn-group">
             {FACES.map((f) => (
-              <button key={f.k} className={"tm-face" + (face === f.k ? " on" : "")}
+              <button key={f.k} className={face === f.k ? "on" : ""}
                 onClick={() => goto({ face: f.k === "calendar" ? undefined : f.k })}>
                 <Icon name={f.i} size="sm" />{f.l}
               </button>
             ))}
-          </div>
+          </span>
           <SearchField ph="Search work" name="q" val={p.q} onFilter={onFilter} />
           <Select name="member" label="Member" value={p.member} onFilter={onFilter}
             options={members.filter((m) => m.status === "active").map((m) => ({ v: m.memberId, l: m.name }))} />
@@ -154,6 +159,7 @@ export default function Work() {
             member: p.member ? (readMember(p.member)?.name || p.member) : undefined,
             status: p.status ? labelOf(WORK_STATUS, p.status) : undefined,
             parent: p.parent ? "within " + p.parent : undefined,
+            wait: p.wait ? "waiting" : undefined,
           }}
           onUnfilter={(n) => onFilter(n, "")} />
       </div>
@@ -181,21 +187,41 @@ const slugOptions = (tags: Tag[]) => {
  *  fields to it. Three buttons become three forms, then three lists. */
 function CreateMenu({ onPick }: { onPick: (k: string) => void }) {
   const [open, setOpen] = useState(false);
+  const box = useRef<HTMLSpanElement | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: MouseEvent) => {
+      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      setOpen(false);
+    };
+    document.addEventListener("mousedown", away);
+    document.addEventListener("keydown", esc, true);
+    return () => {
+      document.removeEventListener("mousedown", away);
+      document.removeEventListener("keydown", esc, true);
+    };
+  }, [open]);
   return (
-    <div className="tm-create">
-      <button className="btn pri" onClick={() => setOpen((o) => !o)}>
+    <span className="ib-menu" ref={box}>
+      <button className="btn pri" aria-haspopup="menu" aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}>
         <Icon name="plus" size="sm" />Create
       </button>
       {open ? (
-        <div className="tm-menu" onMouseLeave={() => setOpen(false)}>
+        <span className="ib-menu-pop" role="menu" aria-label="Create">
           {["task", "milestone", "target"].map((k) => (
-            <button key={k} onClick={() => { setOpen(false); onPick(k); }}>
+            <button key={k} role="menuitem" className="mi"
+              onClick={() => { setOpen(false); onPick(k); }}>
               <KindMark kind={k} />{labelOf(KIND, k)}
             </button>
           ))}
-        </div>
+        </span>
       ) : null}
-    </div>
+    </span>
   );
 }
 
@@ -233,7 +259,7 @@ function NewItemModal({ kind: initial, members, all }: {
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
     shell.closeLayer();
     shell.toast(r.data.title + " created");
-    window.location.hash = ROUTE.slice(1) + qs({ item: r.data.itemId });
+    go(ROUTE + qs({ item: r.data.itemId }));
   };
 
   return (
@@ -261,7 +287,7 @@ function NewItemModal({ kind: initial, members, all }: {
           <input id="niTitle" className="inp" autoFocus value={title}
             onChange={(e) => setTitle(e.target.value)} />
         </div>
-        <div className="fg2">
+        <div className="tm-fg2">
           <div className="fg">
             <label htmlFor="niWho">Assigned to</label>
             <select id="niWho" className="inp" value={who} onChange={(e) => setWho(e.target.value)}>
@@ -276,7 +302,7 @@ function NewItemModal({ kind: initial, members, all }: {
             </select>
           </div>
         </div>
-        <div className="fg2">
+        <div className="tm-fg2">
           <div className="fg">
             <label htmlFor="niStart">Starts</label>
             <input id="niStart" type="date" className="inp" value={start}
@@ -297,7 +323,7 @@ function NewItemModal({ kind: initial, members, all }: {
             </select>
           </div>
         ) : (
-          <div className="fg2">
+          <div className="tm-fg2">
             <div className="fg">
               <label htmlFor="niTv">Target</label>
               <input id="niTv" type="number" className="inp" value={tv}
@@ -488,17 +514,19 @@ function Board({ rows, all, group, goto, onOpen }: {
             : "Four stored stages take a drop. Delay takes none: there is nothing to write."}
         </span>
       </div>
-      <div className="tm-board">
-        {cols.map((c) => (
-          <section key={c.key} className={"tm-col tm-col-" + c.key}>
-            <header><b>{c.label}</b><span className="tnum">{c.list.length}</span></header>
-            <div className="tm-col-b">
-              {c.list.length
-                ? c.list.map((i) => <Card key={i.itemId} item={i} all={all} onOpen={onOpen} />)
-                : <p className="tm-col-e">Nothing here.</p>}
-            </div>
-          </section>
-        ))}
+      <div className="tm-boardwrap">
+        <div className="tm-board">
+          {cols.map((c) => (
+            <section key={c.key} className={"tm-col tm-col-" + c.key}>
+              <header><b>{c.label}</b><span className="tnum">{c.list.length}</span></header>
+              <div className="tm-col-b">
+                {c.list.length
+                  ? c.list.map((i) => <Card key={i.itemId} item={i} all={all} onOpen={onOpen} />)
+                  : <p className="tm-col-e">Nothing here.</p>}
+              </div>
+            </section>
+          ))}
+        </div>
       </div>
     </>
   );
@@ -630,10 +658,10 @@ function Timeline({ rows, onOpen }: { rows: WorkItem[]; onOpen: (id: string) => 
                 const st = stageOf(b.i);
                 return (
                   <button key={b.i.itemId + k} title={b.i.title}
-                    className={"tm-bar t-" + (toneOf(WORK_STATUS, st) || "none") + (b.win ? " win" : "")}
+                    className={"tm-tlbar t-" + (toneOf(WORK_STATUS, st) || "none") + (b.win ? " win" : "")}
                     style={{ left: s.left, width: s.width, top: 6 + k * 22 }}
                     onClick={() => onOpen(b.i.itemId)}>
-                    {b.win ? null : <span className="tm-bar-w">{nameOf(b.i.assigneeId)} · </span>}
+                    {b.win ? null : <span className="tm-tlbar-w">{nameOf(b.i.assigneeId)} · </span>}
                     {b.i.title}
                   </button>
                 );
@@ -708,10 +736,12 @@ function List({ rows, all, onOpen }: { rows: WorkItem[]; all: WorkItem[]; onOpen
 
 /* --------------------------------------------------------------- drawer --- */
 
-function ItemDrawer({ item, all, tags, onClose }: {
-  item: WorkItem; all: WorkItem[]; tags: Tag[]; onClose: () => void;
+function ItemDrawer({ item, all, tags, onClose, onOpen }: {
+  item: WorkItem; all: WorkItem[]; tags: Tag[]; onClose: () => void; onOpen: (id: string) => void;
 }) {
   const shell = useShell();
+  useLinks();
+  const links = linksOf(item.itemId);
   const m = readMember(item.assigneeId);
   const parent = parentOf(item, all);
   const kids = childrenOf(item.itemId, all);
@@ -756,17 +786,37 @@ function ItemDrawer({ item, all, tags, onClose }: {
             ? <span className="cell-2">derived · stored stage is {labelOf(WORK_STATUS, item.status)}</span> : null}</span>],
           ["Priority", labelOf(PRIORITY, item.priority)],
           ["Rolls up to", parent
-            ? <a key="p" href={"#/work?item=" + parent.itemId}>{parent.title}</a>
+            ? <a key="p" data-go={"#/work?item=" + parent.itemId}
+                onClick={() => onOpen(parent.itemId)}>{parent.title}</a>
             : <span key="p" className="dim">Nothing — it is top level</span>],
           ["Starts", item.startDate ? fmtDate(item.startDate) : <span key="st" className="dim">Not set — it cannot be drawn on the timeline</span>],
           ["Due", item.dueDate ? fmtDate(item.dueDate) + " · " + ago(item.dueDate, TODAY) : "—"],
           ["Waiting on", blocker
-            ? <a key="b" href={"#/work?item=" + blocker.itemId}>{blocker.title}</a>
+            ? <a key="b" data-go={"#/work?item=" + blocker.itemId}
+                onClick={() => onOpen(blocker.itemId)}>{blocker.title}</a>
             : <span key="b" className="dim">Nothing</span>],
         ]} />
 
         <SectionHead title="Tags" desc="A tag is a record its owner holds. Two members may both hold Call." />
         <TagPicker item={item} mine={mine} on={on} tags={tags} />
+
+        <SectionHead title="Linked items"
+          desc="Soft edges. The parent and the waiting-on links live above; an edge here never touches rollup."
+          right={<button className="btn sm" onClick={() => shell.modal(<LinkModal item={item} all={all} />, "sm")}>Link…</button>} />
+        {links.length ? (
+          <ul className="tm-kids">
+            {links.map(({ link, other, outward }) => (
+              <li key={link.linkId}>
+                <a data-go={"#/work?item=" + other.itemId} onClick={() => onOpen(other.itemId)}>
+                  <span className="tm-lk">{linkLabelOf(link.relation, outward)}</span>
+                  <KindMark kind={other.kind} />{other.title}
+                </a>
+                <button className="btn icon sm" aria-label="Remove this link"
+                  onClick={() => removeLink(link.linkId)}><Icon name="x" size="sm" /></button>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="tm-foot">Nothing linked.</p>}
 
         {item.kind !== "task" ? (
           <>
@@ -784,7 +834,9 @@ function ItemDrawer({ item, all, tags, onClose }: {
             <ul className="tm-kids">
               {kids.map((k) => (
                 <li key={k.itemId} className={k.status === "completed" ? "done" : ""}>
-                  <a href={"#/work?item=" + k.itemId}><KindMark kind={k.kind} />{k.title}</a>
+                  <a data-go={"#/work?item=" + k.itemId} onClick={() => onOpen(k.itemId)}>
+                    <KindMark kind={k.kind} />{k.title}
+                  </a>
                   <StagePill item={k} />
                 </li>
               ))}
@@ -829,7 +881,7 @@ function TagPicker({ item, mine, on, tags }: { item: WorkItem; mine: Tag[]; on: 
       <div className="tm-tagrow">
         {mine.map((t) => (
           <button key={t.tagId}
-            className={"tm-tag pick" + (on.indexOf(t.tagId) >= 0 ? " on" : "") + (t.colourToken ? " k-" + t.colourToken : "")}
+            className={"pill xs tm-pick" + (on.indexOf(t.tagId) >= 0 ? " on" : "") + " tag-" + (t.colourToken || "slate")}
             onClick={() => tagItem(item.itemId, t.tagId, on.indexOf(t.tagId) < 0)}>
             {t.label}
           </button>
@@ -888,6 +940,56 @@ function WaitModal({ item, all }: { item: WorkItem; all: WorkItem[] }) {
         <span className="spacer" />
         <button className="btn" onClick={() => shell.closeLayer()}>Cancel</button>
         <button className="btn pri" disabled={!pick} onClick={() => save()}>Save</button>
+      </div>
+    </>
+  );
+}
+
+/** One picker, one relation. The list already excludes the parent and the
+ *  blocker — those are the strong links, and the store refuses them anyway. */
+function LinkModal({ item, all }: { item: WorkItem; all: WorkItem[] }) {
+  const shell = useShell();
+  const [pick, setPick] = useState("");
+  const [rel, setRel] = useState<LinkRelation>("relates_to");
+  const options = all.filter((i) => i.itemId !== item.itemId
+    && i.itemId !== item.parentId && i.parentId !== item.itemId
+    && i.itemId !== item.blockedByItemId);
+  const save = () => {
+    const r = addLink(item.itemId, pick, rel);
+    if (!r.ok) { shell.toast(r.message, "bad"); return; }
+    shell.closeLayer();
+    shell.toast("Linked.");
+  };
+  return (
+    <>
+      <div className="md-h">
+        <h3>Link an item</h3>
+        <button className="btn icon sm md-x" aria-label="Close" onClick={() => shell.closeLayer()}>
+          <Icon name="x" size="sm" />
+        </button>
+      </div>
+      <div className="md-b">
+        <div className="fg">
+          <label htmlFor="lkRel">Relation</label>
+          <select id="lkRel" className="inp" value={rel}
+            onChange={(e) => setRel(e.target.value as LinkRelation)}>
+            {(["relates_to", "duplicates", "follows"] as LinkRelation[]).map((k) =>
+              <option key={k} value={k}>{linkLabelOf(k, true)}</option>)}
+          </select>
+        </div>
+        <div className="fg">
+          <label htmlFor="lkTo">Item</label>
+          <select id="lkTo" className="inp" value={pick} onChange={(e) => setPick(e.target.value)}>
+            <option value="">—</option>
+            {options.map((i) => <option key={i.itemId} value={i.itemId}>{i.title}</option>)}
+          </select>
+          <span className="help">Gates nothing. A follows edge draws a sequence; it never blocks the work.</span>
+        </div>
+      </div>
+      <div className="md-f">
+        <span className="spacer" />
+        <button className="btn" onClick={() => shell.closeLayer()}>Cancel</button>
+        <button className="btn pri" disabled={!pick} onClick={save}>Link</button>
       </div>
     </>
   );

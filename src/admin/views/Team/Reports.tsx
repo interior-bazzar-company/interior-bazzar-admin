@@ -20,19 +20,22 @@
 
    NO API YET — src/content/team/{plans,reports}.json through store.ts.
    ============================================================================= */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import { Icon, Notice, SectionHead, StatStrip, Table, TbTitle, Toolbar, qs } from "../../ui";
+import { go } from "../../ui/nav";
 import type { StatCell } from "../../ui";
 import {
   TODAY, acknowledgeReport, attentionOf, fmtDate, fmtDayName, fmtHM, fmtTime,
-  meId, scopeLabel, scopeOf, submitPlan, submitReport, useMe, usePlan,
-  useReport, useReview, useWork,
+  meId, pendingLeave, readMember, scopeLabel, scopeOf, submitPlan, submitReport,
+  unopenedAgreements, useAgreements, useLeave, useMe, usePlan, useReport, useReview, useWork,
 } from "./store";
 import type { Priority, ReviewRow, WorkItem } from "./store";
 import { PriorityChip, ProtoBar, ScopeNote, StatePill, Who } from "./bits";
+import { MarksBlock, TasksBlock } from "./workBits";
+import { ensureAdopted } from "./adopt";
 import "./team.css";
 
 const ROUTE = "#/reports";
@@ -54,13 +57,15 @@ export default function Reports() {
     right: <ScopeNote text={scopeLabel(scope, rows.length)} />,
   }, face);
 
+  useEffect(() => { ensureAdopted(); }, []);
+
   const goto = useCallback((patch: Record<string, string | undefined>) => {
     const next: Record<string, string> = { ...p };
     Object.keys(patch).forEach((k) => {
       const v = patch[k];
       if (v) next[k] = v; else delete next[k];
     });
-    window.location.hash = ROUTE.slice(1) + qs(next);
+    go(ROUTE + qs(next));
   }, [p]);
 
   return (
@@ -69,17 +74,17 @@ export default function Reports() {
 
       <div className="dls-cmd">
         <Toolbar>
-          <div className="tm-faces">
-            <button className={"tm-face" + (face === "today" ? " on" : "")} onClick={() => goto({ face: undefined })}>
+          <span className="btn-group">
+            <button className={face === "today" ? "on" : ""} onClick={() => goto({ face: undefined })}>
               <Icon name="users" size="sm" />The day
             </button>
-            <button className={"tm-face" + (face === "plan" ? " on" : "")} onClick={() => goto({ face: "plan" })}>
+            <button className={face === "plan" ? "on" : ""} onClick={() => goto({ face: "plan" })}>
               <Icon name="check" size="sm" />My plan
             </button>
-            <button className={"tm-face" + (face === "eod" ? " on" : "")} onClick={() => goto({ face: "eod" })}>
+            <button className={face === "eod" ? "on" : ""} onClick={() => goto({ face: "eod" })}>
               <Icon name="doc" size="sm" />My EOD
             </button>
-          </div>
+          </span>
           <span className="spacer" />
           <span className="dim tnum">{fmtDayName(TODAY)} {fmtDate(TODAY)}</span>
         </Toolbar>
@@ -108,6 +113,7 @@ function TheDay({ rows }: { rows: ReviewRow[] }) {
     { k: "waiting", v: a.waiting.length, dot: a.waiting.length ? "bad" : "" },
     "sep",
     { k: "late or absent", v: a.lateOrAbsent.length, dot: a.lateOrAbsent.length ? "warn" : "" },
+    { k: "on leave", v: rows.filter((r) => r.state === "on_leave").length, dot: "info" },
     { k: "unread reports", v: a.unacknowledged.length, dot: a.unacknowledged.length ? "info" : "" },
   ];
 
@@ -142,6 +148,18 @@ function TheDay({ rows }: { rows: ReviewRow[] }) {
         ) : (
           <Notice tone="ok" text="Nothing needs you. Every plan is in, no work is overdue or blocked, and every report has been read." />
         )}
+
+        <WaitingOnYou rows={rows} />
+
+        <SectionHead title="Progress"
+          desc="The same three blocks as the calendar rail, one level wider — you and your reports."
+          right={<button className="btn sm" data-go="#/work?face=timeline"
+            onClick={() => go("#/work?face=timeline")}>Open the milestone timeline</button>} />
+        <div className="tm-cols3 tm-gap-b">
+          <TasksBlock who={meId()} withTeam onOpen={openWork} />
+          <MarksBlock kind="milestone" who={meId()} onOpen={openWork} />
+          <MarksBlock kind="target" who={meId()} onOpen={openWork} />
+        </div>
 
         <SectionHead title="Today, by member" desc="Click any row to open that member's work." />
         <Table
@@ -186,7 +204,8 @@ function TheDay({ rows }: { rows: ReviewRow[] }) {
                       : <span className="pill warn xs">—</span>}
                 </td>
                 <td>{r.doing
-                  ? <a href={"#/work?item=" + r.doing.itemId} className="tm-doing">{r.doing.title}</a>
+                  ? <a data-go={"#/work?item=" + r.doing.itemId} className="tm-doing"
+                      onClick={() => openWork((r.doing as WorkItem).itemId)}>{r.doing.title}</a>
                   : <span className="dim">—</span>}</td>
                 <td className="c tnum">{r.planned ? r.done + "/" + r.planned : "—"}</td>
                 <td>
@@ -213,6 +232,55 @@ function TheDay({ rows }: { rows: ReviewRow[] }) {
   );
 }
 
+const openWork = (id: string) => go("#/work" + qs({ item: id }));
+
+/** §3.12 — not the work, the things only THIS reader can move: a leave request
+ *  waits for a decision, a submitted EOD waits to be read, a sent agreement
+ *  waits to be opened. Renders only when something is in it. */
+function WaitingOnYou({ rows }: { rows: ReviewRow[] }) {
+  useLeave(); useAgreements();
+  const scope = scopeOf("reports");
+  const leave = pendingLeave(scope);
+  const unread = rows.filter((r) => r.report && r.report.submittedAt && !r.report.acknowledgedById);
+  const unopened = unopenedAgreements(scope);
+  if (!leave.length && !unread.length && !unopened.length) return null;
+  return (
+    <>
+      <SectionHead title="Waiting on you" desc="Not the work — the things only you can move." />
+      <div className="tm-attn">
+        {leave.length ? (
+          <div className="tm-attn-c warn">
+            <b>{leave.length} leave request{leave.length > 1 ? "s" : ""}</b>
+            <ul>{leave.slice(0, 4).map((l) => (
+              <li key={l.leaveId}>{readMember(l.memberId)?.name || l.memberId} · {fmtDate(l.fromDate)}</li>
+            ))}</ul>
+            <a data-go="#/attendance" onClick={() => go("#/attendance")}>Decide →</a>
+          </div>
+        ) : null}
+        {unread.length ? (
+          <div className="tm-attn-c info">
+            <b>{unread.length} EOD{unread.length > 1 ? "s" : ""} to read</b>
+            <ul>{unread.slice(0, 4).map((r) => <li key={r.member.memberId}>{r.member.name}</li>)}</ul>
+            <span className="tm-attn-n">Mark read on the table below — the writer believes it was read.</span>
+          </div>
+        ) : null}
+        {unopened.length ? (
+          <div className="tm-attn-c warn">
+            <b>{unopened.length} agreement{unopened.length > 1 ? "s" : ""} never opened</b>
+            <ul>{unopened.slice(0, 4).map((a) => (
+              <li key={a.agreementId}>
+                <a data-go={"#/team/" + a.memberId + "?tab=documents"}
+                  onClick={() => go("#/team/" + a.memberId + "?tab=documents")}>
+                  {readMember(a.memberId)?.name || a.memberId}</a> · {a.title}
+              </li>
+            ))}</ul>
+          </div>
+        ) : null}
+      </div>
+    </>
+  );
+}
+
 function AttnCard({ title, tone, names, note, to }: {
   title: string; tone: string; names: string[]; note?: string; to?: string;
 }) {
@@ -222,7 +290,7 @@ function AttnCard({ title, tone, names, note, to }: {
       <b>{names.length} {title.toLowerCase()}</b>
       <ul>{names.slice(0, 4).map((n, i) => <li key={i}>{n}</li>)}</ul>
       {names.length > 4 ? <span className="dim">+{names.length - 4} more</span> : null}
-      {to ? <a href={to}>Open →</a> : null}
+      {to ? <a data-go={to} onClick={() => go(to)}>Open →</a> : null}
       {note ? <span className="tm-attn-n">{note}</span> : null}
     </div>
   );
@@ -253,7 +321,8 @@ function PlanForm() {
             <li key={l.lineId}>
               <span>{l.title}</span>
               <PriorityChip p={l.priority} />
-              {l.workItemId ? <a href={"#/work?item=" + l.workItemId}>open →</a> : null}
+              {l.workItemId ? <a data-go={"#/work?item=" + l.workItemId}
+                onClick={() => openWork(l.workItemId as string)}>open →</a> : null}
             </li>
           ))}
         </ol>
@@ -294,11 +363,11 @@ function PlanForm() {
       </button>
 
       <div className="fg">
-        <label htmlFor="tmOutcome">Expected outcome <span className="help-i">optional</span></label>
+        <label htmlFor="tmOutcome">Expected outcome <span className="tm-opt">optional</span></label>
         <input id="tmOutcome" className="inp" placeholder="What good looks like by this evening" />
       </div>
       <div className="fg">
-        <label htmlFor="tmBlockers">Anything blocking you? <span className="help-i">optional</span></label>
+        <label htmlFor="tmBlockers">Anything blocking you? <span className="tm-opt">optional</span></label>
         <input id="tmBlockers" className="inp" placeholder="Say it now rather than at six o'clock" />
       </div>
 
@@ -378,7 +447,8 @@ function EodForm() {
               <span></span>
               <b>{l.title}</b>
             </label>
-            {l.workItemId ? <a href={"#/work?item=" + l.workItemId}>open →</a> : null}
+            {l.workItemId ? <a data-go={"#/work?item=" + l.workItemId}
+              onClick={() => openWork(l.workItemId as string)}>open →</a> : null}
           </li>
         ))}
         {!lines.length ? <li className="dim">Nothing on today's plan.</li> : null}
@@ -404,15 +474,15 @@ function EodForm() {
       ) : null}
 
       <div className="fg">
-        <label htmlFor="tmWin">Biggest win today <span className="help-i">optional</span></label>
+        <label htmlFor="tmWin">Biggest win today <span className="tm-opt">optional</span></label>
         <input id="tmWin" className="inp" />
       </div>
       <div className="fg">
-        <label htmlFor="tmHelp">Blocked on, or need help with <span className="help-i">optional</span></label>
+        <label htmlFor="tmHelp">Blocked on, or need help with <span className="tm-opt">optional</span></label>
         <input id="tmHelp" className="inp" />
       </div>
       <div className="fg">
-        <label htmlFor="tmTomorrow">Tomorrow's first priority <span className="help-i">optional</span></label>
+        <label htmlFor="tmTomorrow">Tomorrow's first priority <span className="tm-opt">optional</span></label>
         <input id="tmTomorrow" className="inp" />
       </div>
 

@@ -6,6 +6,74 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-04
 
+### The module attaches to the Team table, and it navigates
+
+**Area:** sidebar → Team → **Members** (`#/team`, now the one front door) · **Calendar** (`#/work`) ·
+**Attendance** (`#/attendance`) · **Reports** (`#/reports`)
+**Files:** `src/admin/views/Team/MemberPage.tsx` *(new)*, `memberTabs.tsx` *(new, from MemberDash.tsx)*,
+`adopt.ts` *(new)*, `index.tsx`, `Work.tsx`, `Attendance.tsx`, `Reports.tsx`, `store.ts`, `workBits.tsx`,
+`bits.tsx`, `team.css`, `shell/modules.ts`, `auth/session.ts`, `views/registry.tsx`,
+`src/content/team/links.json` *(new)*, `tags.json`, `vocabularies.json`, both check scripts.
+**Deleted:** `MemberDrawer.tsx`, `MemberDash.tsx`, the `me` sidebar row, `#/me`.
+
+**Why**
+
+Two structural faults, both fatal to "click around and see it work". First, the panel is a
+**BrowserRouter on real paths** — every `window.location.hash =` write and raw `<a href="#/…">`
+in the Team faces changed only the URL fragment and navigated **nowhere**: Open dashboard,
+face switches, item links — dead. Second, the member dashboard was its own sidebar row with a
+second roster, keyed to eight seeded ids no live roster has, so the Team table — the place a
+founder actually clicks — opened a drawer that led to an empty page.
+
+**What changed**
+
+- **The Team table is the one front door.** A row on `#/team` opens `#/team/:id` — a full
+  page: Overview (tiles, employment record, profile, roles, **effective access**) ·
+  Attendance (with leave) · Work (blocks + **tag manager**) · Reports · Documents · Pay. The
+  drawer's identity sections and its four admin actions (Edit / Roles / Send password /
+  Delete) moved into the page header; the "My dashboard" row, its duplicate roster and the
+  `me` module key are gone — `modules.ts`, `PROTO_MODULES` and the registry all dropped it.
+- **The seed wears your live roster.** `adoptRoster()` re-keys the eight seeded members onto
+  the real users from `GET /admin/users/`: the signed-in admin takes the senior slot (the
+  leave inbox, the sent agreements, the EODs to read), the rest fill in priority order,
+  unfilled slots drop with their identity-bound rows, and their work reassigns so the board
+  stays rich. Every face triggers it once per load; a failed fetch leaves the seed walkable.
+- **The demo clock rolls forward, whole weeks at a time,** in the browser only — "today" is
+  the most recent seed-weekday, every weekday stays what it was, and Node keeps the authored
+  frame so the check suite still pins real dates.
+- **Every link navigates.** All Team-face navigation goes through the router (`go()`); not
+  one `window.location.hash =` or bare `#/…` anchor is left in the module.
+- **The last wireframe gaps are built:** the item drawer's **Linked items** (relates to /
+  duplicates / follows — soft edges that may not restate the parent or the waiting-on link),
+  the **tag manager** (rename, archive, restore, tone from the tag palette, soft cap of 20),
+  Reports' **Waiting on you** (leave to decide, EODs to read, agreements never opened) and
+  **Progress** blocks with the timeline button and an on-leave count, and the `wait` filter
+  the roll-up was already linking to.
+- **CSS aligned to the theme:** faces ride `.btn-group`, the Create menu is the shell's
+  `.ib-menu`, tags are `.pill.tag-<hue>` from the tag palette (never a status tone), the
+  proto note takes the panel's dashed-card geometry, board breakpoints are container
+  queries, the timeline bar no longer overrides the attendance day bar, the literal shadow
+  and z-index are tokens, and `.fg2`/`.fg-check`/`.help-i` stopped leaking unprefixed.
+
+**Temp data**
+`links.json` (4 edges, all three relations). `tags.json` tones remapped to tag-palette hues.
+`vocabularies.json` gains `linkRelations` (with inverse labels) and `tagTones`.
+
+**Backend needed**
+`GET/POST/DELETE /admin/team/work-links` · everything previously listed. Adoption retires the
+day `GET /admin/team/members` exists: the store then reads real members and `adopt.ts` comes out.
+
+**Verified**
+`npm run check:team` all green, extended with four sections: the Node clock never shifts;
+links restate nothing (both directions) and dedupe to the existing edge; rename/restore/tone
+and the cap that warns; the wait filter returns exactly the blocked item; adoption with three
+people re-keys every collection, repoints dropped deciders to the signed-in user, drops
+nothing dangling, and reset restores the eight. `check-team-nav.cjs` asserts five Team rows
+and no `me` anywhere. `npx tsc -b` clean · eslint 0 errors (1 pre-existing warning) ·
+`npx vite build` succeeds.
+
+---
+
 ### The rest of the module, wired to content: leave, documents, pay, and Create that creates
 
 **Area:** sidebar → Team → **Calendar** (`#/work`) · **Attendance** (`#/attendance`) · **My dashboard** (`#/me/:id`)

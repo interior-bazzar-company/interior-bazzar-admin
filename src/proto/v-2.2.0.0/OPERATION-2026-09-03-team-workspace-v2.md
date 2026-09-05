@@ -716,6 +716,49 @@ argument that differs — self for the rail and §3.13, `reportsTo` one level fo
 > printing two typed percentages that its own children disagreed with (TM-AD-27). One
 > component cannot drift from itself.
 
+### TM-AD-32 · The member dashboard lives at `/team/:id`; the `me` module is deleted
+**2026-09-04.** §3.13 said `/team/me` and the build said `#/me` — the founder settled it from
+the panel: *"why create dashboard… it attach with team table, when click open member
+dashboard."* A row on the Members table opens the member's full page; the drawer's identity
+sections and admin actions merged into it, and the second roster went. Consequence accepted
+and recorded: the page now sits under the real `team.view` grant rather than the proto gate —
+a member without it cannot open their own dashboard until the grant model answers that
+(follow-up decision for Phase G). Chrome belongs to `Team/index.tsx` alone so two
+`usePageChrome` calls never fight.
+
+### TM-AD-33 · The seed adopts the live roster
+**2026-09-04.** The seeded ids matched no real environment, so every entry point looked
+empty. `adoptRoster(people)` re-keys the eight slots onto the live users in one pass — the
+signed-in user takes slot 58 (the senior the fixture is written around), slots map in
+priority order `58, 41, 52, 86, 63, 70, 74, 79`, unfilled slots drop with their
+identity-bound rows, their work items reassign round-robin, and orphaned secondary
+references (decidedBy, sentBy, verifiedBy…) repoint to the signed-in user. The function is
+pure over the snapshot and check-suite-tested; `adopt.ts` owns when it runs. It retires
+wholesale when `GET /admin/team/members` exists.
+
+### TM-AD-34 · The demo clock rolls forward by whole weeks, in the browser only
+**2026-09-04.** A fixture dated last month reads as broken, not as a demo. `SHIFT_DAYS` moves
+`asOf` — and every date-shaped string in every seed row — forward by exact weeks to the most
+recent seed-weekday, so weekday-relative rules (late, absent, weekOf, eodDue) hold
+unchanged. In Node the shift is zero: the check suite keeps asserting the authored frame,
+which is the falsifiability the suite exists for.
+
+### TM-AD-35 · Navigation is the router's, without exception
+**2026-09-04.** The panel is a BrowserRouter on real paths; a `window.location.hash =` write
+changes the fragment and navigates nowhere — which is what made the first integration read
+as dead. Every Team link now goes through `ui/nav`'s `go()` (hash→path), the convention the
+rest of the panel already followed. A raw `#/…` anchor in this module is a defect by
+definition now.
+
+### TM-AD-36 · Links, tag manager, wait filter, and the roll-up's two blocks — built
+**2026-09-04.** The remaining §3.5/§3.6/§3.12 surfaces: `WorkLink` edges (three relations,
+inverse labels, may not restate `parentId` or `blockedByItemId`, dedupe to the existing
+edge), the owner's tag manager (rename re-slugs, restore refuses an active twin, tones from
+the tag palette, a cap of twenty that warns and never blocks), `WorkFilter.wait` behind the
+`#/work?wait=1` link Reports was already sending, and Reports' *Waiting on you* + *Progress*
+blocks from the same workBits every other surface renders. Still deliberately unbuilt: the
+public `/a/<token>` page (TM-R-12) and private-object storage (TM-R-11).
+
 ### TM-AD-31 · The prototype is the spec's own components, wired to a route
 
 A clickable prototype normally rots the moment the specification moves, because it is a

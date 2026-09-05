@@ -179,8 +179,8 @@ export function ProtoBar({ what, endpoint }: { what: string; endpoint: string })
     <div className="tm-proto">
       <Icon name="alert" size="sm" />
       <span>
-        <b>{what} renders from bundled sample data.</b> Nothing here is saved —
-        a reload restores the seed. It stands in for <code>{endpoint}</code>,
+        <b>{what} renders from bundled sample data, worn by your live roster.</b> Nothing
+        here is saved — a reload restores the seed. It stands in for <code>{endpoint}</code>,
         which does not exist yet.
       </span>
     </div>

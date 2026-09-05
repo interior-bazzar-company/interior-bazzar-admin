@@ -21,10 +21,11 @@
 /* ---------------------------------------------------------------- chrome -- */
 
 .tm-proto {
-  display: flex; gap: var(--space-2); align-items: flex-start;
-  padding: var(--space-3) var(--space-4);
-  background: var(--warn-bg); border-bottom: 1px solid var(--warn-line);
-  color: var(--warn); font-size: var(--text-xs); line-height: var(--lh-xs);
+  display: flex; gap: var(--space-2); align-items: flex-start; flex: 0 0 auto;
+  margin: var(--space-3) var(--page-pad) 0; padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--warn-line); border-radius: var(--radius-md);
+  background: var(--warn-bg); color: var(--warn);
+  font-size: var(--text-sm); line-height: var(--lh-sm);
 }
 .tm-proto .ic { flex: none; margin-top: 1px }
 .tm-proto b { font-weight: 500 }
@@ -38,20 +39,9 @@
   font-size: var(--text-xs); color: var(--text-3);
 }
 
-.tm-faces { display: flex; gap: 2px }
-.tm-face {
-  display: inline-flex; gap: var(--space-1); align-items: center;
-  height: var(--control-sm); padding: 0 var(--space-3);
-  border: 1px solid transparent; border-radius: var(--radius-md);
-  background: none; color: var(--text-3);
-  font: inherit; font-size: var(--text-xs); cursor: pointer;
-}
-.tm-face:hover { background: var(--bg-hover); color: var(--text) }
-.tm-face.on {
-  background: var(--bg-selected); color: var(--brand-text);
-  border-color: var(--brand-line); font-weight: 500;
-}
-.tm-face:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px }
+/* The strip wrap both mature modules carry: a long strip wraps to a second
+   line instead of scrolling off the pane edge. */
+.dls-attn { flex-wrap: wrap; overflow-x: visible }
 
 .tm-datenav { display: inline-flex; gap: var(--space-2); align-items: center; font-size: var(--text-xs) }
 .tm-daterow {
@@ -77,7 +67,7 @@
   display: flex; flex-wrap: wrap; gap: var(--space-4);
   align-items: center; justify-content: space-between;
   padding: var(--space-4) var(--space-5);
-  margin: var(--space-4) 0 0;
+  margin: var(--space-4) var(--page-pad) 0;
   background: var(--surface-raised);
   border: 1px solid var(--line); border-radius: var(--radius-lg);
 }
@@ -153,16 +143,20 @@
 
 /* ----------------------------------------------------------------- board -- */
 
+/* Breakpoints are CONTAINER queries against the board's own wrapper: content
+   width is viewport minus nav minus gutters, and a viewport query is ~310px
+   off (the convention enquiries.css states). */
+.tm-boardwrap { container-type: inline-size }
 .tm-board {
   display: grid; grid-template-columns: repeat(5, minmax(200px, 1fr));
   gap: var(--space-3); align-items: start;
   padding-bottom: var(--space-4);
 }
-@media (max-width: 1400px) { .tm-board { grid-template-columns: repeat(3, minmax(200px, 1fr)) } }
-@media (max-width: 1100px) { .tm-board { grid-template-columns: repeat(2, minmax(200px, 1fr)) } }
-@media (max-width: 680px) { .tm-board { grid-template-columns: 1fr } }
+@container (max-width: 1080px) { .tm-board { grid-template-columns: repeat(3, minmax(200px, 1fr)) } }
+@container (max-width: 780px) { .tm-board { grid-template-columns: repeat(2, minmax(200px, 1fr)) } }
+@container (max-width: 480px) { .tm-board { grid-template-columns: 1fr } }
 
-.tm-col { background: var(--bg-inset); border-radius: var(--radius-lg); min-width: 0 }
+.tm-col { background: var(--bg-shell); border-radius: var(--radius-lg); min-width: 0 }
 .tm-col > header {
   display: flex; gap: var(--space-2); align-items: baseline; justify-content: space-between;
   padding: var(--space-3) var(--space-3) var(--space-2);
@@ -264,7 +258,7 @@
   border-top: 1px solid var(--line);
 }
 .tm-form-f .help { font-size: var(--text-2xs) }
-.help-i { font-weight: 400; color: var(--text-3); font-size: var(--text-2xs); margin-left: var(--space-1) }
+.tm-opt { font-weight: 400; color: var(--text-3); font-size: var(--text-2xs); margin-left: var(--space-1) }
 
 .tm-plan { list-style: none; margin: var(--space-3) 0 var(--space-2); padding: 0; counter-reset: pl }
 .tm-plan li {
@@ -293,7 +287,7 @@
 /* ----------------------------------------------------------------- print -- */
 
 @media print {
-  .tm-proto, .tm-faces, .tm-datenav, .dls-cmd, .dls-chips, .tm-clock-a { display: none !important }
+  .tm-proto, .tm-datenav, .dls-cmd, .dls-chips, .tm-clock-a { display: none !important }
   .tm-attn-c, .tm-card, .tm-col { break-inside: avoid }
   .tm-bar-work, .tm-bar-break { print-color-adjust: exact; -webkit-print-color-adjust: exact }
 }
@@ -420,17 +414,11 @@
 
 /* ----------------------------------------------------------- tag chips -- */
 
-.tm-tag {
-  font-size: var(--text-2xs); line-height: 1.5; padding: 0 5px;
-  border: 1px solid var(--line-2); border-radius: var(--radius-sm);
-  background: var(--bg-inset); color: var(--text-2); white-space: nowrap;
-}
-.tm-tag.k-info { color: var(--info); background: var(--info-bg); border-color: var(--info-line) }
-.tm-tag.k-ok { color: var(--ok); background: var(--ok-bg); border-color: var(--ok-line) }
-.tm-tag.k-warn { color: var(--warn); background: var(--warn-bg); border-color: var(--warn-line) }
-.tm-tag.k-brand { color: var(--brand); background: var(--brand-bg); border-color: var(--brand-line) }
-.tm-tag.pick { cursor: pointer }
-.tm-tag.pick.on { background: var(--text); color: var(--bg); border-color: var(--text) }
+/* A tag is a .pill.tag-<hue> from the theme's tag palette — never a status
+   tone. The picker states ride on top of the pill. */
+.tm-pick { cursor: pointer; opacity: .55 }
+.tm-pick:hover { opacity: .85 }
+.tm-pick.on { opacity: 1; box-shadow: inset 0 0 0 1px currentColor }
 .tm-tagpick { display: flex; flex-direction: column; gap: var(--space-2) }
 .tm-tagrow { display: flex; gap: var(--space-1); flex-wrap: wrap; align-items: center }
 .tm-tagnew { display: flex; gap: var(--space-2); align-items: center }
@@ -454,7 +442,7 @@
   border-left: 1px solid var(--line); background: var(--bg); color: var(--text-2); cursor: pointer;
 }
 .tm-seg button:first-child { border-left: 0 }
-.tm-seg button.on { background: var(--text); color: var(--bg) }
+.tm-seg button.on { background: var(--bg-active); color: var(--text); font-weight: var(--weight-semibold) }
 .tm-legend { display: inline-flex; gap: var(--space-2); align-items: center; font-size: var(--text-2xs); color: var(--text-3) }
 .tm-legend i { width: 7px; height: 7px; border-radius: var(--radius-full); background: var(--line-2) }
 .tm-legend .k-info { background: var(--info-solid) }
@@ -517,18 +505,18 @@
   font-size: var(--text-2xs); color: var(--text-3); text-align: center; padding: 3px 0;
 }
 .tm-tl-grid > i.we { background: var(--bg-inset) }
-.tm-bar {
+.tm-tlbar {
   position: absolute; height: 18px; border-radius: var(--radius-sm); cursor: pointer;
   border: 1px solid var(--line-2); background: var(--bg-inset); overflow: hidden;
   font: inherit; font-size: var(--text-2xs); line-height: 16px; padding: 0 6px;
   color: var(--text); text-align: left; white-space: nowrap; text-overflow: ellipsis;
 }
-.tm-bar.t-info { border-color: var(--info-line); background: var(--info-bg) }
-.tm-bar.t-ok { border-color: var(--ok-line); background: var(--ok-bg) }
-.tm-bar.t-warn { border-color: var(--warn-line); background: var(--warn-bg) }
-.tm-bar.t-dead { opacity: .5 }
-.tm-bar.win { background: none; border-style: dashed }
-.tm-bar-w { color: var(--text-3) }
+.tm-tlbar.t-info { border-color: var(--info-line); background: var(--info-bg) }
+.tm-tlbar.t-ok { border-color: var(--ok-line); background: var(--ok-bg) }
+.tm-tlbar.t-warn { border-color: var(--warn-line); background: var(--warn-bg) }
+.tm-tlbar.t-dead { opacity: .5 }
+.tm-tlbar.win { background: none; border-style: dashed }
+.tm-tlbar-w { color: var(--text-3) }
 
 /* --------------------------------------------------------------- board -- */
 
@@ -539,18 +527,6 @@
 .tm-groupbar .inp { max-width: 160px }
 .tm-groupnote { font-size: var(--text-2xs); color: var(--text-3) }
 
-.tm-create { position: relative }
-.tm-menu {
-  position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; min-width: 176px;
-  background: var(--bg); border: 1px solid var(--line-2); border-radius: var(--radius-lg);
-  box-shadow: 0 10px 28px rgba(0, 0, 0, .12); padding: 4px;
-}
-.tm-menu button {
-  display: flex; gap: var(--space-2); align-items: center; width: 100%; text-align: left;
-  font: inherit; font-size: var(--text-xs); padding: 6px 8px; border: 0; border-radius: var(--radius-md);
-  background: none; color: var(--text); cursor: pointer;
-}
-.tm-menu button:hover { background: var(--bg-hover) }
 
 /* ---------------------------------------------------- member dashboard -- */
 
@@ -582,9 +558,18 @@
 .tm-inbox-t b { display: block; font-size: var(--text-sm); font-weight: 500; color: var(--text) }
 .tm-inbox-w { font-size: var(--text-xs); color: var(--text-2); min-width: 0 }
 
-/* two fields on a row, and a checkbox that is a label */
-.fg2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3) }
-.fg-check {
-  display: flex; gap: var(--space-2); align-items: center;
-  font-size: var(--text-md); color: var(--text-2); margin-bottom: var(--space-4);
+/* two fields on a row */
+.tm-fg2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3) }
+
+/* the drawer's linked-items relation prefix */
+.tm-lk {
+  font-size: var(--text-2xs); color: var(--text-3);
+  min-width: 84px; display: inline-block;
+}
+.tm-gap-b { margin-bottom: var(--space-5) }
+
+/* the member page header */
+.tm-mh-n {
+  display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap;
+  font-size: var(--text-lg); font-weight: var(--weight-semibold); color: var(--text);
 }

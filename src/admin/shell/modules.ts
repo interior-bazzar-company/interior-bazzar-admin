@@ -48,7 +48,6 @@ const ICON_OF: Record<string, string> = {
   attendance: "clock",
   work: "calendar",
   reports: "inbox",
-  me: "user",
 };
 
 /* ------------------------------------------------------- group override ---
@@ -135,12 +134,9 @@ const PROTO_ROWS: { key: string; label: string; group: string }[] = [
      maintain forever, and a module key that disagrees with its own table. */
   { key: "work", label: "Calendar", group: "Team" },
   { key: "reports", label: "Reports", group: "Team" },
-  /* The member's own day, and the way into anybody else's. `#/team` stays the
-     IDENTITY record — who exists, what they may do — and this is the
-     operational one: attendance, work, reports and leave for one person. Two
-     rows because they answer two different questions and hold two different
-     grants; the roster drawer links here rather than growing a sixth tab. */
-  { key: "me", label: "My dashboard", group: "Team" },
+  /* There is no `me` row. The member dashboard lives at `#/team/:id` — a row
+     on the Members table opens it — because "the team, as a table" already
+     existed there and a second roster was a second front door to one room. */
 ];
 /** Sidebar queue-count keys, from IBData.derive.badges(). A module with no
  * entry here shows no badge, which is correct for anything the prototype

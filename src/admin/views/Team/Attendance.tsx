@@ -19,7 +19,7 @@
    NO API YET — everything comes from src/content/team/attendance.json through
    store.ts, which is the only file that knows that.
    ============================================================================= */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
@@ -27,6 +27,7 @@ import {
   EmptyState, FilterChips, Icon, Notice, SearchField, Select, StatStrip, Table, TbTitle, Toolbar, qs,
 } from "../../ui";
 import type { StatCell } from "../../ui";
+import { go } from "../../ui/nav";
 import {
   LEAVE_KIND, TODAY, addDays, attendanceTotals, dayFor, decideLeave, endDay, fmtDate, fmtDayName, labelOf,
   fmtHM, fmtTime, meId, openDay, pendingLeave, readMember, resumeDay, scopeLabel, scopeOf,
@@ -35,6 +36,7 @@ import {
 } from "./store";
 import type { DayRow, Result } from "./store";
 import { BarScale, DayBar, Meter, ScopeNote, StatePill, Who, ProtoBar } from "./bits";
+import { ensureAdopted } from "./adopt";
 import "./team.css";
 
 const ROUTE = "#/attendance";
@@ -60,13 +62,15 @@ export default function Attendance() {
     right: <ScopeNote text={scopeLabel(scope, rows.length)} />,
   }, face + date);
 
+  useEffect(() => { ensureAdopted(); }, []);
+
   const goto = useCallback((patch: Record<string, string | undefined>) => {
     const next: Record<string, string> = { ...p };
     Object.keys(patch).forEach((k) => {
       const v = patch[k];
       if (v) next[k] = v; else delete next[k];
     });
-    window.location.hash = ROUTE.slice(1) + qs(next);
+    go(ROUTE + qs(next));
   }, [p]);
 
   const onFilter = (name: string, value: string) => goto({ [name]: value || undefined });
@@ -79,14 +83,14 @@ export default function Attendance() {
 
       <div className="dls-cmd">
         <Toolbar>
-          <div className="tm-faces">
-            <button className={"tm-face" + (face === "today" ? " on" : "")} onClick={() => goto({ face: undefined })}>
+          <span className="btn-group">
+            <button className={face === "today" ? "on" : ""} onClick={() => goto({ face: undefined })}>
               <Icon name="clock" size="sm" />Today
             </button>
-            <button className={"tm-face" + (face === "history" ? " on" : "")} onClick={() => goto({ face: "history" })}>
+            <button className={face === "history" ? "on" : ""} onClick={() => goto({ face: "history" })}>
               <Icon name="history" size="sm" />History
             </button>
-          </div>
+          </span>
           {face === "today" ? (
             <>
               <SearchField ph="Search member" name="q" val={p.q} onFilter={onFilter} />

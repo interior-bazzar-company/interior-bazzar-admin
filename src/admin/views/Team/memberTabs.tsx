@@ -1,200 +1,48 @@
 /* =============================================================================
-   Member dashboard — #/me · #/me/:id
+   Member dashboard — the tab bodies.
    -----------------------------------------------------------------------------
-     #/me            the team, as a table — click a member to open their day
-     #/me/:id        one member: overview · attendance · work · reports · leave
+   Every component here takes the member and the viewer as PROPS and reads the
+   route never: the page (MemberPage.tsx) owns where it lives, so these survive
+   being re-mounted anywhere. The Work tab renders the SAME three blocks as the
+   calendar rail and the roll-up — one derivation, three surfaces.
 
-   ONE COMPONENT, THREE SCOPES. Who is looking decides the tabs and the actions,
-   not three separate screens: a member sees everything of their own, a senior
-   sees the operational half of somebody who reports to them, and an admin sees
-   the record. The tab bar is a function of the viewer for exactly that reason.
-
-   The Work tab renders the SAME three blocks as the calendar rail and the
-   roll-up — tasks ▸ milestones ▸ targets, from workBits — so a member reads the
-   same three blocks wherever they are standing.
-
-   NO API YET — src/content/team/*.json through store.ts.
+   Documents and Pay never render for a senior; MemberPage filters the tab bar
+   AND refuses the direct URL, and the refusal lives here so both paths say the
+   same words.
    ============================================================================= */
 import { useState } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
-import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
+import { Icon, KvList, Notice, Pill, SectionHead, Table, Tiles, qs } from "../../ui";
+import { go } from "../../ui/nav";
 import {
-  Icon, KvList, Notice, Pill, SectionHead, Table, Tabs, TbTitle, Tiles, qs,
-} from "../../ui";
-import {
-  AGREEMENT_KIND, AGREEMENT_STATE, ATT_STATE, LEAVE_KIND, LEAVE_STATE, RESOURCE_KIND, TODAY,
-  addDays, addResource, agreementsFor, attendanceTotals, dayRows, decideLeave, deleteResource,
-  fmtDate, fmtHM, incentiveTotal, isDelayed, isTerminal, labelOf, leaveFor, meId, membersInScope,
-  missingDocs, payFor, planFor, readItems, readMember, reportFor, requestLeave, resourcesFor,
-  revokeAgreement, sendAgreement, signAgreement, tagsOwnedBy, toneOf, useAgreements, useLeave,
-  useMembers, useResources, useTags, verifyResource, workedOf,
+  AGREEMENT_KIND, AGREEMENT_STATE, ATT_STATE, LEAVE_KIND, LEAVE_STATE, RESOURCE_KIND, TAG_CAP,
+  TODAY, VOCAB, addDays, addResource, agreementsFor, archiveTag, attendanceTotals, createTag,
+  dayRows, decideLeave, deleteResource, fmtDate, fmtHM, incentiveTotal, isDelayed, isTerminal,
+  labelOf, leaveFor, meId, membersInScope, missingDocs, payFor, planFor, readItems, readMember,
+  renameTag, reportFor, requestLeave, resourcesFor, restoreTag, revokeAgreement, sendAgreement,
+  setTagTone, signAgreement, tagsOwnedBy, toneOf, useAgreements, useLeave, useResources, useTags,
+  verifyResource, workedOf, now as clockNow,
 } from "./store";
-import type { Agreement, LeaveRequest, LeaveState, Member } from "./store";
-import { DayBar, StatePill, Who } from "./bits";
+import type { Agreement, LeaveRequest, LeaveState, Member, Tag } from "./store";
+import { DayBar, StatePill } from "./bits";
 import { MarksBlock, TasksBlock } from "./workBits";
-import "./team.css";
 
-/* SIX TABS. Leave is a block inside Attendance rather than a seventh: it is
-   about days, and the tab bar is the one place a screen gets crowded quietly.
-   Documents and Pay are not shown to a senior — a reporting line does not imply
-   access to somebody's PAN card or their salary. */
-const TABS = [
-  { k: "overview", l: "Overview" }, { k: "attendance", l: "Attendance" },
-  { k: "work", l: "Work" }, { k: "reports", l: "Reports" },
-  { k: "documents", l: "Documents" }, { k: "pay", l: "Pay" },
-];
-const PRIVATE_TABS = ["documents", "pay"];
+export const openItem = (id: string) => go("#/work" + qs({ item: id }));
 
-export default function MemberDash() {
-  const { id } = useParams();
-  const [sp] = useSearchParams();
-  const members = useMembers();
-  const me = meId();
-  const target = id || me;
-  const m = readMember(target);
-  const tab = sp.get("tab") || "overview";
-
-  usePageChrome({
-    crumbs: <TbTitle label={m ? m.name : "My dashboard"} to="#/me" />,
-    parent: id ? "#/me" : null,
-  }, tab);
-
-  if (!id) return <Roster members={members} me={me} />;
-  /* The identity half (`#/team`) is LIVE and the operational half is not: a
-     member the roster knows may have no attendance, work or leave behind them
-     yet. Say which half is missing rather than 404 on a person who exists. */
-  if (!m) return <NotSeeded id={id} members={members} me={me} />;
-
-  const viewer = target === me ? "self" : m.reportsTo === me ? "senior" : "admin";
-
-  return (
-    <div className="dls">
-      <div className="dls-cmd tm-mh">
-        <Who m={m} sub={m.designation + " · " + (m.department || "—")} />
-        <span className="spacer" />
-        <span className="cell-2">{viewer === "self" ? "your own dashboard" : viewer === "senior" ? "reports to you" : "admin view"}</span>
-        <a className="btn sm" href={"#/work" + qs({ member: m.memberId, face: "board" })}>Open their board</a>
-      </div>
-
-      <Tabs items={TABS.filter((t) => viewer !== "senior" || PRIVATE_TABS.indexOf(t.k) < 0)
-        .map((t) => ({ k: t.k, label: t.l }))} cur={tab}
-        onPick={(k) => { window.location.hash = "/me/" + m.memberId + qs({ tab: k === "overview" ? "" : k }); }} />
-
-      <div className="dls-body">
-        {tab === "attendance" ? <AttendanceTab m={m} viewer={viewer} />
-          : tab === "work" ? <WorkTab m={m} />
-          : tab === "reports" ? <ReportsTab m={m} />
-          : tab === "documents" ? (viewer === "senior" ? <Refused /> : <DocumentsTab m={m} viewer={viewer} />)
-          : tab === "pay" ? (viewer === "senior" ? <Refused /> : <PayTab m={m} />)
-          : <OverviewTab m={m} viewer={viewer} />}
-      </div>
-    </div>
-  );
+export function Refused() {
+  return <Notice tone="warn" text="Not on this view. A reporting line does not imply access to somebody's documents or pay." />;
 }
-
-function NotSeeded({ id, members, me }: { id: string; members: Member[]; me: string }) {
-  return (
-    <div className="dls">
-      <div className="dls-body">
-        <Notice tone="warn" text={"Member " + id + " has no operational record yet — attendance, work and leave arrive with the API. The eight below are the seed."} />
-        <Roster members={members} me={me} />
-      </div>
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------- roster --- */
-
-/** The table the module opens on when no member is named. A row is a person and
- *  it opens their day — the drawer on `#/team` stays what it is, the identity
- *  record. */
-function Roster({ members, me }: { members: Member[]; me: string }) {
-  const rows = members.filter((m) => m.status === "active");
-  return (
-    <div className="dls">
-      <div className="dls-body">
-        <SectionHead title="The team" desc="A row opens that member's dashboard." />
-        <Table
-          cols={[{ label: "Member" }, { label: "Reports to", w: "180px" },
-            { label: "Today", w: "150px" }, { label: "Open work", w: "110px" },
-            { label: "In delay", w: "100px" }]}
-          rows={rows.map((m) => {
-            const items = readItems().filter((i) => i.assigneeId === m.memberId);
-            const open = items.filter((i) => !isTerminal(i.status));
-            const late = open.filter((i) => isDelayed(i));
-            const day = dayRows(TODAY, "all").filter((r) => r.member.memberId === m.memberId)[0];
-            return (
-              <tr key={m.memberId} className="clickable" tabIndex={0} role="link"
-                onClick={() => { window.location.hash = "/me/" + m.memberId; }}
-                onKeyDown={(e) => { if (e.key === "Enter") window.location.hash = "/me/" + m.memberId; }}>
-                <td><Who m={m} sub={m.memberId === me ? "you" : m.designation} /></td>
-                <td>{m.reportsTo ? (readMember(m.reportsTo)?.name || "—") : <span className="dim">—</span>}</td>
-                <td>{day ? <StatePill state={day.state} /> : <span className="dim">—</span>}</td>
-                <td className="tnum">{open.length}</td>
-                <td className="tnum">{late.length ? <span className="u-warn-t">{late.length}</span> : "0"}</td>
-              </tr>
-            );
-          })} />
-      </div>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------ overview --- */
-
-function OverviewTab({ m, viewer }: { m: Member; viewer: string }) {
-  const items = readItems().filter((i) => i.assigneeId === m.memberId);
-  const open = items.filter((i) => !isTerminal(i.status));
-  const late = open.filter((i) => isDelayed(i));
-  const day = dayRows(TODAY, "all").filter((r) => r.member.memberId === m.memberId)[0];
-  const plan = planFor(m.memberId, TODAY);
-  const report = reportFor(m.memberId, TODAY);
-  const ms = items.filter((i) => i.kind === "milestone" && !isTerminal(i.status))[0];
-
-  return (
-    <>
-      <Tiles list={[
-        { k: "Today", v: day ? labelOf(ATT_STATE, day.state) : "—", s: day && day.day ? fmtHM(workedOf(day.day, m)) : "no row yet" },
-        { k: "Open work", v: String(open.length), s: late.length + " in delay", tone: late.length ? "warn" : "" },
-        { k: "Plan", v: plan && plan.submittedAt ? "in" : "missing", s: "for " + fmtDate(TODAY), tone: plan && plan.submittedAt ? "" : "warn" },
-        { k: "EOD", v: report && report.submittedAt ? "in" : "not yet", s: "the day is not over", tone: "" },
-      ]} />
-
-      <SectionHead title="Record" />
-      <KvList cls="wide" pairs={[
-        ["Designation", m.designation],
-        ["Department", m.department || "—"],
-        ["Reports to", m.reportsTo ? (readMember(m.reportsTo)?.name || "—") : "Nobody"],
-        ["Employment", m.employmentType.replace("_", " ")],
-        ["Joined", fmtDate(m.joiningDate)],
-        ["Day starts", m.dayStartsAt + " · " + m.graceMinutes + "m grace"],
-      ]} />
-
-      {ms ? (
-        <>
-          <SectionHead title="Milestone" desc="Progress is completed children ÷ total, computed here." />
-          <MarksBlock kind="milestone" who={m.memberId} onOpen={openItem} />
-        </>
-      ) : null}
-
-      {viewer !== "self" ? (
-        <Notice text="Pay and documents are not on this view. A reporting line does not imply access to somebody's pay." />
-      ) : null}
-    </>
-  );
-}
-
-const openItem = (id: string) => { window.location.hash = "/work" + qs({ item: id }); };
 
 /* ---------------------------------------------------------- attendance --- */
 
-function AttendanceTab({ m, viewer }: { m: Member; viewer: string }) {
+export function AttendanceTab({ m, viewer }: { m: Member; viewer: string }) {
   const days: string[] = [];
   for (let i = 13; i >= 0; i--) days.push(addDays(TODAY, -i));
   const rows = days.map((d) => ({ d, row: dayRows(d, "all").filter((r) => r.member.memberId === m.memberId)[0] }))
     .filter((x) => !!x.row);
   const tot = attendanceTotals(rows.map((x) => x.row));
+  const at = new Date(clockNow());
+  const nowH = at.getHours() + at.getMinutes() / 60;
 
   return (
     <>
@@ -212,7 +60,7 @@ function AttendanceTab({ m, viewer }: { m: Member; viewer: string }) {
           <tr key={d}>
             <td>{fmtDate(d)}</td>
             <td><StatePill state={row.state} /></td>
-            <td><DayBar row={row} nowH={14.33} /></td>
+            <td><DayBar row={row} nowH={nowH} /></td>
             <td className="tnum">{fmtHM(row.day ? workedOf(row.day, m) : null)}</td>
             <td className="tnum">{row.day ? fmtHM(row.day.breakMinutes) : "—"}</td>
           </tr>
@@ -224,7 +72,7 @@ function AttendanceTab({ m, viewer }: { m: Member; viewer: string }) {
 
 /* ---------------------------------------------------------------- work --- */
 
-function WorkTab({ m }: { m: Member }) {
+export function WorkTab({ m, viewer }: { m: Member; viewer: string }) {
   useTags();
   const mine = tagsOwnedBy(m.memberId);
   return (
@@ -236,25 +84,177 @@ function WorkTab({ m }: { m: Member }) {
         <MarksBlock kind="target" who={m.memberId} onOpen={openItem} />
       </div>
 
-      <SectionHead title="Their tags" desc="A tag is a record its owner holds. Nobody else can rename or delete it." />
-      <div className="tm-tagrow">
-        {mine.length
-          ? mine.map((t) => (
-            <span key={t.tagId} className={"tm-tag" + (t.colourToken ? " k-" + t.colourToken : "")}>
-              {t.label}
-              <span className="dim"> {readItems().filter((i) => (i.tagIds || []).indexOf(t.tagId) >= 0).length}</span>
-            </span>
-          ))
-          : <span className="dim">None yet.</span>}
-      </div>
-      <p className="tm-foot">Tags are born in the item drawer, one keystroke from the picker.</p>
+      {viewer === "self" ? (
+        <TagManager m={m} />
+      ) : (
+        <>
+          <SectionHead title="Their tags" desc="A tag is a record its owner holds. Nobody else can rename or delete it." />
+          <div className="tm-tagrow">
+            {mine.length
+              ? mine.map((t) => (
+                <span key={t.tagId} className={"pill xs tag-" + (t.colourToken || "slate")}>
+                  {t.label}
+                  <span className="dim"> {tagCount(t)}</span>
+                </span>
+              ))
+              : <span className="dim">None yet.</span>}
+          </div>
+        </>
+      )}
     </>
+  );
+}
+
+const tagCount = (t: Tag) =>
+  readItems().filter((i) => (i.tagIds || []).indexOf(t.tagId) >= 0).length;
+
+/* ----------------------------------------------------------- tag manager --- */
+
+/** §3.6 — the owner's own list: rename, retone, archive, restore, and a soft
+ *  cap of twenty that warns and never blocks (TM-OD-22). Counts here are the
+ *  owner's own items; a board groups by slug and may count higher. */
+function TagManager({ m }: { m: Member }) {
+  const shell = useShell();
+  const mine = tagsOwnedBy(m.memberId, true);
+  const active = mine.filter((t) => !t.archivedAt);
+  const act = (r: { ok: boolean } & { message?: string }) => {
+    if (!r.ok) shell.toast((r as { message: string }).message, "bad");
+  };
+
+  return (
+    <>
+      <SectionHead title="My tags"
+        desc={active.length + " of " + TAG_CAP + " · archive keeps the history, delete does not exist."
+          + " Cross-member boards group by name."}
+        right={<button className="btn sm" onClick={() => shell.modal(<NewTagModal ownerId={m.memberId} />, "sm")}>
+          <Icon name="plus" size="sm" />New tag
+        </button>} />
+      {active.length >= TAG_CAP ? (
+        <Notice tone="warn" text={"Past " + TAG_CAP + " tags they stop being memorable. Nothing blocks, but archive what is done."} />
+      ) : null}
+      <Table
+        cols={[{ label: "Tag" }, { label: "On", w: "70px", cls: "n" }, { label: "Tone", w: "130px" }, { label: "", w: "200px" }]}
+        empty={{ icon: "tag", title: "No tags yet", body: "The first one is a keystroke away, here or in the item drawer." }}
+        rows={mine.map((t) => (
+          <tr key={t.tagId} className={t.archivedAt ? "dim" : ""}>
+            <td>
+              <span className={"pill xs tag-" + (t.colourToken || "slate")}>{t.label}</span>
+              {t.archivedAt ? <span className="cell-2">archived {fmtDate(t.archivedAt.slice(0, 10))}</span> : null}
+            </td>
+            <td className="n tnum">{tagCount(t)}</td>
+            <td>
+              {t.archivedAt ? <span className="dim">—</span> : (
+                <select className="inp sm" value={t.colourToken || "slate"} aria-label={"Tone for " + t.label}
+                  onChange={(e) => act(setTagTone(t.tagId, e.target.value))}>
+                  {(VOCAB.tagTones as { key: string; label: string }[]).map((o) =>
+                    <option key={o.key} value={o.key}>{o.label}</option>)}
+                </select>
+              )}
+            </td>
+            <td>
+              {t.archivedAt ? (
+                <button className="btn sm" onClick={() => act(restoreTag(t.tagId))}>Restore</button>
+              ) : (
+                <>
+                  <button className="btn sm" onClick={() => shell.modal(<RenameTagModal t={t} />, "sm")}>Rename…</button>
+                  <button className="btn sm" onClick={() => act(archiveTag(t.tagId))}>Archive</button>
+                </>
+              )}
+            </td>
+          </tr>
+        ))} />
+    </>
+  );
+}
+
+function NewTagModal({ ownerId }: { ownerId: string }) {
+  const shell = useShell();
+  const [name, setName] = useState("");
+  const [tone, setTone] = useState("slate");
+  const save = () => {
+    const r = createTag(ownerId, name, tone);
+    if (!r.ok) { shell.toast(r.message, "bad"); return; }
+    shell.closeLayer();
+    shell.toast(r.data.label + " created.");
+  };
+  return (
+    <>
+      <div className="md-h">
+        <h3>New tag</h3>
+        <button className="btn icon sm md-x" aria-label="Close" onClick={() => shell.closeLayer()}>
+          <Icon name="x" size="sm" />
+        </button>
+      </div>
+      <div className="md-b">
+        <div className="fg">
+          <label htmlFor="tgName">Name <b className="req">*</b></label>
+          <input id="tgName" className="inp" autoFocus value={name} onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) save(); }} />
+        </div>
+        <ToneField value={tone} onPick={setTone} />
+      </div>
+      <div className="md-f">
+        <span className="spacer" />
+        <button className="btn" onClick={() => shell.closeLayer()}>Cancel</button>
+        <button className="btn pri" disabled={!name.trim()} onClick={save}>Create</button>
+      </div>
+    </>
+  );
+}
+
+function RenameTagModal({ t }: { t: Tag }) {
+  const shell = useShell();
+  const [name, setName] = useState(t.label);
+  const save = () => {
+    const r = renameTag(t.tagId, name);
+    if (!r.ok) { shell.toast(r.message, "bad"); return; }
+    shell.closeLayer();
+    shell.toast("Renamed.");
+  };
+  return (
+    <>
+      <div className="md-h">
+        <h3>Rename {t.label}</h3>
+        <button className="btn icon sm md-x" aria-label="Close" onClick={() => shell.closeLayer()}>
+          <Icon name="x" size="sm" />
+        </button>
+      </div>
+      <div className="md-b">
+        <div className="fg">
+          <label htmlFor="tgRename">Name <b className="req">*</b></label>
+          <input id="tgRename" className="inp" autoFocus value={name} onChange={(e) => setName(e.target.value)} />
+          <span className="help">Every item wearing it follows the rename.</span>
+        </div>
+      </div>
+      <div className="md-f">
+        <span className="spacer" />
+        <button className="btn" onClick={() => shell.closeLayer()}>Cancel</button>
+        <button className="btn pri" disabled={!name.trim()} onClick={save}>Rename</button>
+      </div>
+    </>
+  );
+}
+
+function ToneField({ value, onPick }: { value: string; onPick: (t: string) => void }) {
+  return (
+    <div className="fg">
+      <span className="fg-lb">Tone</span>
+      <div className="tm-tagrow">
+        {(VOCAB.tagTones as { key: string; label: string }[]).map((o) => (
+          <button key={o.key} type="button"
+            className={"pill xs tm-pick tag-" + o.key + (value === o.key ? " on" : "")}
+            onClick={() => onPick(o.key)}>
+            {o.label}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
 /* ------------------------------------------------------------- reports --- */
 
-function ReportsTab({ m }: { m: Member }) {
+export function ReportsTab({ m }: { m: Member }) {
   const days: string[] = [];
   for (let i = 6; i >= 0; i--) days.push(addDays(TODAY, -i));
   return (
@@ -284,7 +284,7 @@ function ReportsTab({ m }: { m: Member }) {
 
 /* --------------------------------------------------------------- leave --- */
 
-function LeaveBlock({ m, viewer }: { m: Member; viewer: string }) {
+export function LeaveBlock({ m, viewer }: { m: Member; viewer: string }) {
   const shell = useShell();
   useLeave();
   const rows = leaveFor(m.memberId);
@@ -352,7 +352,7 @@ function LeaveModal({ memberId }: { memberId: string }) {
         </button>
       </div>
       <div className="md-b">
-        <div className="fg2">
+        <div className="tm-fg2">
           <div className="fg">
             <label htmlFor="lvFrom">From</label>
             <input id="lvFrom" type="date" className="inp" value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -382,8 +382,31 @@ function LeaveModal({ memberId }: { memberId: string }) {
   );
 }
 
-function Refused() {
-  return <Notice tone="warn" text="Not on this view. A reporting line does not imply access to somebody's documents or pay." />;
+export function RejectModal({ onSubmit }: { onSubmit: (note: string) => void }) {
+  const shell = useShell();
+  const [v, setV] = useState("");
+  return (
+    <>
+      <div className="md-h">
+        <h3>Refuse this request</h3>
+        <button className="btn icon sm md-x" aria-label="Close" onClick={() => shell.closeLayer()}>
+          <Icon name="x" size="sm" />
+        </button>
+      </div>
+      <div className="md-b">
+        <div className="fg">
+          <label htmlFor="lvNo">Reason <b className="req">*</b></label>
+          <input id="lvNo" className="inp" autoFocus value={v} onChange={(e) => setV(e.target.value)} />
+          <span className="help">The member sees it on the row.</span>
+        </div>
+      </div>
+      <div className="md-f">
+        <span className="spacer" />
+        <button className="btn" onClick={() => shell.closeLayer()}>Cancel</button>
+        <button className="btn dgr" disabled={!v.trim()} onClick={() => onSubmit(v)}>Refuse</button>
+      </div>
+    </>
+  );
 }
 
 /* ----------------------------------------------------------- documents --- */
@@ -392,7 +415,7 @@ function Refused() {
  *  send; a resource travels member → company and the member may delete it. They
  *  differ in direction, permission and retention — which is not what a tab
  *  decides, so they share one and stay two lists. */
-function DocumentsTab({ m, viewer }: { m: Member; viewer: string }) {
+export function DocumentsTab({ m, viewer }: { m: Member; viewer: string }) {
   const shell = useShell();
   useAgreements(); useResources();
   const ags = agreementsFor(m.memberId);
@@ -533,8 +556,9 @@ function SignModal({ a }: { a: Agreement }) {
           <label htmlFor="sgName">Full name <b className="req">*</b></label>
           <input id="sgName" className="inp" autoFocus value={name} onChange={(e) => setName(e.target.value)} />
         </div>
-        <label className="fg-check">
+        <label className="check">
           <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+          <span></span>
           I have read it and I agree.
         </label>
         <p className="tm-foot">The name, the time and the address are stored with the signature.</p>
@@ -594,7 +618,7 @@ function UploadModal({ memberId }: { memberId: string }) {
 /** TEAM READS PAY AND NEVER WRITES IT. Every action here links into Finance,
  *  which owns the money; this tab exists so a member can see their own number
  *  without asking somebody for it. */
-function PayTab({ m }: { m: Member }) {
+export function PayTab({ m }: { m: Member }) {
   const p = payFor(m.memberId);
   if (!p || !p.annualCtc) return <Notice text="No salary account on this member." />;
   const rupees = (n: number) => "₹" + n.toLocaleString("en-IN");
@@ -607,7 +631,8 @@ function PayTab({ m }: { m: Member }) {
         { k: "Incentives pending", v: rupees(incentiveTotal(p, "pending")), s: "Team's basis, Finance's call", tone: "warn" },
       ]} />
       <SectionHead title="Incentives" desc="Team supplies the basis. Finance approves and pays."
-        right={<a className="btn sm" href="#/finance-salaries">Open in Finance</a>} />
+        right={<button className="btn sm" data-go="#/finance-salaries"
+          onClick={() => go("#/finance-salaries")}>Open in Finance</button>} />
       <Table
         cols={[{ label: "Month", w: "130px" }, { label: "Basis" }, { label: "Amount", w: "140px" }, { label: "State", w: "140px" }]}
         empty={{ icon: "cash", title: "No incentives", body: "Nothing recorded for this member." }}
@@ -624,29 +649,43 @@ function PayTab({ m }: { m: Member }) {
   );
 }
 
-function RejectModal({ onSubmit }: { onSubmit: (note: string) => void }) {
-  const shell = useShell();
-  const [v, setV] = useState("");
+/* ------------------------------------------------------------ overview --- */
+
+export function OverviewTab({ m }: { m: Member }) {
+  const items = readItems().filter((i) => i.assigneeId === m.memberId);
+  const open = items.filter((i) => !isTerminal(i.status));
+  const late = open.filter((i) => isDelayed(i));
+  const day = dayRows(TODAY, "all").filter((r) => r.member.memberId === m.memberId)[0];
+  const plan = planFor(m.memberId, TODAY);
+  const report = reportFor(m.memberId, TODAY);
+  const ms = items.filter((i) => i.kind === "milestone" && !isTerminal(i.status))[0];
+
   return (
     <>
-      <div className="md-h">
-        <h3>Refuse this request</h3>
-        <button className="btn icon sm md-x" aria-label="Close" onClick={() => shell.closeLayer()}>
-          <Icon name="x" size="sm" />
-        </button>
-      </div>
-      <div className="md-b">
-        <div className="fg">
-          <label htmlFor="lvNo">Reason <b className="req">*</b></label>
-          <input id="lvNo" className="inp" autoFocus value={v} onChange={(e) => setV(e.target.value)} />
-          <span className="help">The member sees it on the row.</span>
-        </div>
-      </div>
-      <div className="md-f">
-        <span className="spacer" />
-        <button className="btn" onClick={() => shell.closeLayer()}>Cancel</button>
-        <button className="btn dgr" disabled={!v.trim()} onClick={() => onSubmit(v)}>Refuse</button>
-      </div>
+      <Tiles list={[
+        { k: "Today", v: day ? labelOf(ATT_STATE, day.state) : "—", s: day && day.day ? fmtHM(workedOf(day.day, m)) : "no row yet" },
+        { k: "Open work", v: String(open.length), s: late.length + " in delay", tone: late.length ? "warn" : "" },
+        { k: "Plan", v: plan && plan.submittedAt ? "in" : "missing", s: "for " + fmtDate(TODAY), tone: plan && plan.submittedAt ? "" : "warn" },
+        { k: "EOD", v: report && report.submittedAt ? "in" : "not yet", s: "the day is not over", tone: "" },
+      ]} />
+
+      <SectionHead title="Record" />
+      <KvList cls="wide" pairs={[
+        ["Designation", m.designation],
+        ["Department", m.department || "—"],
+        ["Reports to", m.reportsTo ? (readMember(m.reportsTo)?.name || "—") : "Nobody"],
+        ["Employment", m.employmentType.replace("_", " ")],
+        ["Joined", fmtDate(m.joiningDate)],
+        ["Day starts", m.dayStartsAt + " · " + m.graceMinutes + "m grace"],
+      ]} />
+
+      {ms ? (
+        <>
+          <SectionHead title="Milestone" desc="Progress is completed children ÷ total, computed here." />
+          <MarksBlock kind="milestone" who={m.memberId} onOpen={openItem} />
+        </>
+      ) : null}
+
     </>
   );
 }

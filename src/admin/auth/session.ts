@@ -84,7 +84,6 @@ export const PROTO_MODULES = new Set<string>([
   "attendance",
   "work",
   "reports",
-  "me",
 ]);
 
 export function getSession(): MePermissions | null {

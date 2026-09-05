@@ -2,7 +2,7 @@
    Work — the pieces the rail, the roll-up and the member dashboard all render.
    -----------------------------------------------------------------------------
    ONE SET OF COMPONENTS, THREE SURFACES. `#/work` (the rail), `#/reports` (the
-   roll-up) and `#/me` (the member dashboard) call exactly these, and the only
+   roll-up) and `#/team/:id` (the member page) call exactly these, and the only
    argument that differs is the scope. Three surfaces each computing progress
    their own way is how a roll-up ends up printing a number its own children
    disagree with.
@@ -33,7 +33,7 @@ export function TagChips({ item }: { item: WorkItem }) {
   return (
     <>
       {tags.map((t) => (
-        <span key={t.tagId} className={"tm-tag" + (t.colourToken ? " k-" + t.colourToken : "")}>{t.label}</span>
+        <span key={t.tagId} className={"pill xs tag-" + (t.colourToken || "slate")}>{t.label}</span>
       ))}
     </>
   );

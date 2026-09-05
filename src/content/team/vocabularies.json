@@ -456,5 +456,51 @@
       "required": false
     }
   ],
-  "$comment_documents": "TWO BUCKETS, NOT ONE. An Agreement travels company → member and is frozen at send; a Resource travels member → company and the member may delete it. They differ in direction, permission and retention, which is why one tab holds two lists rather than one list holding both."
+  "$comment_documents": "TWO BUCKETS, NOT ONE. An Agreement travels company → member and is frozen at send; a Resource travels member → company and the member may delete it. They differ in direction, permission and retention, which is why one tab holds two lists rather than one list holding both.",
+  "linkRelations": [
+    {
+      "key": "relates_to",
+      "label": "Relates to",
+      "inverse": "Relates to",
+      "tone": ""
+    },
+    {
+      "key": "duplicates",
+      "label": "Duplicates",
+      "inverse": "Duplicated by",
+      "tone": "warn"
+    },
+    {
+      "key": "follows",
+      "label": "Follows",
+      "inverse": "Followed by",
+      "tone": "info"
+    }
+  ],
+  "tagTones": [
+    {
+      "key": "slate",
+      "label": "Slate"
+    },
+    {
+      "key": "blue",
+      "label": "Blue"
+    },
+    {
+      "key": "green",
+      "label": "Green"
+    },
+    {
+      "key": "amber",
+      "label": "Amber"
+    },
+    {
+      "key": "violet",
+      "label": "Violet"
+    },
+    {
+      "key": "pink",
+      "label": "Pink"
+    }
+  ]
 }

@@ -116,7 +116,9 @@ esbuild.build({
   ok("Team sits above Catalogue and Settings", names.indexOf("Team") < names.indexOf("Settings"));
 
   eq("Team group members, in the order of a working day",
-    of("Team"), ["team", "roles", "attendance", "work", "reports", "me"]);
+    of("Team"), ["team", "roles", "attendance", "work", "reports"]);
+  ok("no `me` row — the member dashboard is `#/team/:id`, not a module",
+    of("Team").indexOf("me") < 0);
   eq("the Work row reads Calendar — label only, the key does not move",
     (groups.filter((g) => g.group === "Team")[0].items
       .filter((i) => i.key === "work")[0] || {}).label, "Calendar");
@@ -131,12 +133,14 @@ esbuild.build({
 
   /* ---- icons resolve, not fall back to doc ---------------------------- */
   const items = A.getItems();
-  ["attendance", "work", "reports", "me"].forEach((k) =>
+  ["attendance", "work", "reports"].forEach((k) =>
     ok("`" + k + "` has a real icon (" + items[k].icon + ")", items[k].icon !== "doc"));
 
   /* ---- the proto gate ------------------------------------------------- */
   ok("attendance/work/reports are proto-gated",
-    ["attendance", "work", "reports", "me"].every((k) => A.PROTO_MODULES.has(k)));
+    ["attendance", "work", "reports"].every((k) => A.PROTO_MODULES.has(k)));
+  ok("`me` is out of the proto set — no dead always-true grant",
+    !A.PROTO_MODULES.has("me"));
   ok("team is NOT proto-gated (TM-BR-01)", !A.PROTO_MODULES.has("team"));
   ok("roles is NOT proto-gated (TM-BR-01)", !A.PROTO_MODULES.has("roles"));
 

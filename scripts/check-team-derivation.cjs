@@ -366,6 +366,108 @@ require("esbuild").build({
     eq("one item was added, not four", S.readItems().length, before + 1);
   })();
 
+
+  head("The clock only rolls forward in a browser");
+  eq("in Node the shift is zero and the frame is the authored one", S.SHIFT_DAYS, 0);
+
+  head("Links: soft edges that restate nothing");
+  S.resetStore();
+  (() => {
+    eq("the seed carries four edges", S.readLinks().length, 4);
+    const of6 = S.linksOf("W-K06");
+    ok("W-K06 follows W-K05, read outward",
+      of6.length === 1 && of6[0].outward === true && of6[0].other.itemId === "W-K05");
+    const of5 = S.linksOf("W-K05");
+    eq("\u2026and W-K05 sees two edges pointed at it", of5.length, 2);
+    ok("\u2026reading the same follows edge inward", of5.some((l) =>
+      l.outward === false && l.other.itemId === "W-K06" && l.link.relation === "follows"));
+    eq("the inward label flips, the stored edge does not",
+      S.linkLabelOf("follows", false), "Followed by");
+    ok("an item cannot link to itself", S.addLink("W-K01", "W-K01", "relates_to").ok === false);
+    ok("an edge may not restate the parent link",
+      S.addLink("W-K01", "W-M01", "relates_to").ok === false);
+    ok("\u2026nor the waiting-on link", S.addLink("W-K08", "W-K17", "follows").ok === false);
+    const dup = S.addLink("W-K05", "W-K06", "follows");
+    ok("the same pair and relation hands back the edge that exists",
+      dup.ok && dup.data.linkId === "LN-01" && S.readLinks().length === 4);
+    const made = S.addLink("W-K01", "W-K02", "relates_to");
+    ok("a real edge lands beside the seeded one", made.ok && S.linksOf("W-K02").length === 2);
+    ok("\u2026and removing it removes exactly it",
+      S.removeLink(made.ok ? made.data.linkId : "").ok === true && S.readLinks().length === 4);
+  })();
+
+  head("The tag manager: rename, restore, retone \u2014 the cap warns, never blocks");
+  S.resetStore();
+  (() => {
+    const r = S.renameTag("TG-01", "Design review");
+    ok("rename keeps the record and re-slugs it",
+      r.ok && r.data.slug === "design-review" && r.data.tagId === "TG-01");
+    ok("a rename into an existing active name is refused",
+      S.renameTag("TG-01", "Call").ok === false);
+    ok("restore is refused while an active twin holds the name",
+      (() => {
+        const dead = S.readTags().filter((t) => t.tagId === "TG-19")[0];
+        const twin = S.createTag("63", "June leads");
+        return twin.ok && S.restoreTag(dead.tagId).ok === false;
+      })());
+    ok("a tone is a hue from the tag palette, stored as typed",
+      S.setTagTone("TG-02", "pink").ok && S.readTags().filter((t) => t.tagId === "TG-02")[0].colourToken === "pink");
+    ok("the twentieth tag is created, not refused \u2014 the cap is a warning",
+      (() => {
+        for (let i = 0; S.tagsOwnedBy("63").length < S.TAG_CAP + 1; i++) {
+          const c = S.createTag("63", "overflow " + i);
+          if (!c.ok) return false;
+        }
+        return S.tagsOwnedBy("63").length > S.TAG_CAP;
+      })());
+  })();
+
+  head("The wait filter is wired, not a dead parameter");
+  S.resetStore();
+  (() => {
+    const waiting = S.workRows({ wait: "1" }, "all");
+    eq("exactly the items with an open blocker", waiting.map((i) => i.itemId), ["W-K08"]);
+    ok("\u2026and completing the blocker empties the filter",
+      (() => {
+        S.setItemStatus("W-K17", "in_progress");
+        S.setItemStatus("W-K17", "completed");
+        return S.workRows({ wait: "1" }, "all").length === 0;
+      })());
+  })();
+
+  head("Adoption: the seed wears a live roster");
+  S.resetStore();
+  (() => {
+    S.adoptRoster([
+      { id: 901, name: "Panel Admin", email: "pa@x.in", isSuperAdmin: true },
+      { id: 902, name: "Nikhil" },
+      { id: 903, name: "Rajni Singh" },
+    ]);
+    const ids = S.readMembers().map((m) => m.memberId).sort();
+    eq("three people, three members \u2014 the other five slots dropped",
+      ids, ["901", "902", "903"]);
+    eq("the signed-in user holds the senior slot", S.meId(), "901");
+    ok("the founder slot keeps no boss and the senior reports into it",
+      S.readMember("902").reportsTo === null && S.readMember("901").reportsTo === "902");
+    ok("every work item lands on a live person",
+      S.readItems().every((i) => ids.indexOf(i.assigneeId) >= 0 && ids.indexOf(i.createdById) >= 0));
+    ok("attendance rows only for adopted people",
+      S.readDays().every((d) => ids.indexOf(d.memberId) >= 0));
+    ok("dropped members' leave went with them \u2014 nothing dangles",
+      S.readLeave().every((l) => ids.indexOf(l.memberId) >= 0));
+    ok("no item wears a tag its owner did not keep",
+      (() => {
+        const live = S.readTags().map((t) => t.tagId);
+        return S.readItems().every((i) => (i.tagIds || []).every((t) => live.indexOf(t) >= 0));
+      })());
+    ok("pay re-keys with everything else",
+      S.payFor("903") !== null && S.payFor("52") === null);
+    ok("a decided-by that pointed at a dropped member repoints to the signed-in user",
+      S.readLeave().every((l) => !l.decidedById || ids.indexOf(l.decidedById) >= 0));
+    S.resetStore();
+    eq("\u2026and reset restores the authored eight", S.readMembers().length, 8);
+  })();
+
   head("Hours are read, never written");
   ok("no write function accepts an hours argument",
     ["submitReport", "submitPlan"].every((k) =>

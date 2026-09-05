@@ -1,0 +1,34 @@
+{
+  "$comment": "PLACEHOLDER RECORDS - soft edges between work items (TM-AD-16). Stands in for GET/POST/DELETE /api/v1/admin/team/work-links. An edge never touches rollup and gates nothing; parentId and blockedByItemId are the two strong links and an edge may not restate either. Relations: relates_to (symmetric), duplicates, follows (drawn on the timeline, gates nothing).",
+  "generatedAt": "2026-08-28T14:20:00+05:30",
+  "links": [
+    {
+      "linkId": "LN-01",
+      "fromItemId": "W-K06",
+      "toItemId": "W-K05",
+      "relation": "follows",
+      "createdAt": "2026-08-25T10:05:00+05:30"
+    },
+    {
+      "linkId": "LN-02",
+      "fromItemId": "W-K09",
+      "toItemId": "W-K30",
+      "relation": "relates_to",
+      "createdAt": "2026-08-24T16:40:00+05:30"
+    },
+    {
+      "linkId": "LN-03",
+      "fromItemId": "W-K02",
+      "toItemId": "W-K05",
+      "relation": "duplicates",
+      "createdAt": "2026-08-26T11:20:00+05:30"
+    },
+    {
+      "linkId": "LN-04",
+      "fromItemId": "W-K34",
+      "toItemId": "W-M06",
+      "relation": "follows",
+      "createdAt": "2026-08-27T09:15:00+05:30"
+    }
+  ]
+}
