@@ -39,7 +39,21 @@ export function adoptPeople(rows: { id: number; name: string; email?: string; ph
 export function ensureAdopted(): void {
   if (state !== "idle") return;
   state = "running";
-  AdminOpsService.users()
-    .then((r) => { state = "idle"; adoptPeople(r.data || []); })
-    .catch(() => { state = "idle"; });
+  /* THE SEED IS THE FALLBACK, SO NOTHING HERE MAY TAKE THE PAGE DOWN WITH IT.
+     `users()` can throw SYNCHRONOUSLY — no token, a bad base URL, an
+     interceptor that raises before a promise exists — and an exception out of
+     this function leaves the effect that called it, unmounts the module, and
+     leaves a blank pane under a perfectly intact topbar. Every face renders
+     from the seed without a roster; wearing the live one is an improvement on
+     that, never a precondition for it. */
+  try {
+    AdminOpsService.users()
+      .then((r) => {
+        state = "idle";
+        try { adoptPeople(r.data || []); } catch { /* the seed keeps its own ids */ }
+      })
+      .catch(() => { state = "idle"; });
+  } catch {
+    state = "idle";
+  }
 }

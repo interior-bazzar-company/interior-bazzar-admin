@@ -381,7 +381,7 @@ function FaceSwitch({ face, goto }: {
 /** The four faces, one per row, each saying what it is for. `on` marks the one
  *  you are in — a switcher that cannot answer "where am I" is a switcher you
  *  have to open to read. */
-function FaceMenu({ face, goto }: {
+export function FaceMenu({ face, goto }: {
   face: string; goto: (q: Record<string, string | undefined>) => void;
 }) {
   const shell = useShell();
@@ -456,7 +456,7 @@ function CreateMenu({ onPick, big }: { onPick: (k: string) => void; big?: boolea
  *  are one record with a `kind`, and a target only adds two fields to the same
  *  five. Enter in the title creates, because for most of these the title IS the
  *  whole entry. */
-function NewItemModal({ kind: initial, members, all, date }: {
+export function NewItemModal({ kind: initial, members, all, date }: {
   kind: string; members: Member[]; all: WorkItem[]; date?: string;
 }) {
   const shell = useShell();

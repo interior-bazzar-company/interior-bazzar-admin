@@ -65,8 +65,10 @@ export default function Team() {
       .then(([u, r]) => {
         if (cancelled) return;
         /* The operational seed puts on the live roster's faces before anything
-           renders against it — see adopt.ts. */
-        adoptPeople(u.data);
+           renders against it — see adopt.ts. It is guarded because it must not
+           be able to cost us the list: a re-key that fails leaves the seed's own
+           ids in place, which is a worse demo and a working page. */
+        try { adoptPeople(u.data); } catch { /* the seed keeps its own ids */ }
         setRows(u.data);
         setRoles(r.data.roles);
       })

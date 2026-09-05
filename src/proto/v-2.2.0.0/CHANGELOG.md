@@ -6,6 +6,46 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-04
 
+### A blank pane under an intact topbar: the adoption fetch could take the module down
+
+**Area:** sidebar → Team — every face
+**Files:** `src/admin/views/Team/adopt.ts`, `index.tsx`, `scripts/tm-smoke.tsx` *(new)*,
+`scripts/build-tm-smoke.cjs` *(new)*, `package.json`
+
+**What was wrong**
+
+`ensureAdopted()` ran in an effect and called `AdminOpsService.users()` **unguarded**. That
+call can throw *synchronously* — no token, a bad base URL, an interceptor that raises before
+a promise exists — and a synchronous throw out of that function leaves the effect, unmounts
+the module, and leaves exactly what was reported: a blank pane under a perfectly intact
+topbar, because the topbar is chrome and lives outside the boundary that caught it.
+
+The seed exists so this module is walkable with no API at all. Wearing the live roster is an
+improvement on that and was never allowed to be a precondition for it. Both call sites are
+guarded now, and a re-key that fails leaves the seed's own ids in place — a worse demo and a
+working page.
+
+**And the reason it took a screenshot to find it**
+
+Team had no render check. Users and Finance have had one for a while; `tsc`, eslint and the
+derivation suite can all stay green while a face renders nothing, because none of them ever
+calls the component. **`npm run check:team-render`** now renders all four faces, Attendance,
+Reports, the switcher and the Create dialog, and fails on any throw. It asserts, among other
+things, that **the switcher offers all four views and marks the one you are in** — the
+complaint that started this — and that the calendar has no filter band while the three list
+faces keep theirs.
+
+It cannot catch this particular bug (effects do not run in a static render), which is stated
+here rather than glossed: what it catches is the whole class of "the face stopped rendering"
+that would otherwise reach a browser first.
+
+**Verified**
+All four faces render — the calendar at 26,113 characters, with its rail, its month grid and
+its date bar. `npm run check:team` · `check:team-nav` · `check:team-render` · `npx tsc -b` ·
+eslint 0 errors · `npx vite build` — all green.
+
+---
+
 ### The face switcher: read the shell at click time, and never let the slot be squeezed
 
 **Area:** topbar → the Calendar face switcher (`#/work`)
