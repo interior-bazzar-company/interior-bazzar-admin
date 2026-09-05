@@ -6,6 +6,46 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-04
 
+### One field to a line, and every one of them named
+
+**Area:** sidebar → Team → **Calendar** (`#/work`) — the Create dialog
+**Files:** `src/admin/views/Team/Work.tsx`, `team.css`
+
+**What changed**
+
+The dialog paired fields on shared rows — start beside due, target beside unit, an address
+beside a name beside a button — and named none of them, leaning on icons and placeholders.
+Both halves of that were wrong, and fixing the layout is what made room to fix the labels.
+
+- **One field to a line, in three columns:** the icon that marks where a group starts, the
+  label that names the field, and **one control column every input shares**. The shared
+  column is the point — a form whose boxes all begin at the same x reads as a list of
+  answers; one whose boxes begin wherever the label ended reads as a zigzag. A continuing
+  line (Due under Starts) leaves the icon column blank rather than repeating the icon.
+- **Every input has a visible label**, tied to it with `htmlFor`/`id`. An icon was a guess —
+  a flag is priority or a milestone, a link is a URL or a parent — and a placeholder vanishes
+  the moment somebody types, leaving a filled form with nothing saying what its values are.
+  *(The one exception is the title, which IS the dialog's heading: it keeps its `aria-label`
+  and placeholder, the way every editor that opens on a title does.)*
+- **The link refusal is tied to the field it is about** with `aria-describedby`, and that
+  field keeps its border while the message is up — a control cannot go quiet while it is the
+  subject of an error. Address and name are two questions, so they are two lines.
+- Controls elsewhere stay quiet until hovered or focused; the labels now carry the meaning
+  the borders were being asked to.
+
+**On the two skills that were run**
+
+`ui-styling` is a shadcn/ui + Tailwind skill and this panel has neither — its stack was not
+applied, because installing it would put a second design system beside `admin-theme.css`.
+Its transferable half (tokens, dark-mode parity, visible labels) is what informed the above.
+
+**Verified**
+Label coverage checked by script: eight ids in the dialog, eight labels, none pointing
+nowhere, no placeholder-only control but the title. `npm run check:team` green ·
+`check-team-nav.cjs` green · `npx tsc -b` clean · eslint 0 errors · `npx vite build` succeeds.
+
+---
+
 ### Create grows a description, links and tags — and none of it is markup
 
 **Area:** sidebar → Team → **Calendar** (`#/work`) — the Create dialog and the item drawer

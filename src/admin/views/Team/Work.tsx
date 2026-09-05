@@ -27,6 +27,7 @@
    NO API YET — src/content/team/*.json through store.ts.
    ============================================================================= */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
@@ -197,6 +198,39 @@ const slugOptions = (tags: Tag[]) => {
   return Object.keys(seen).sort().map((s) => ({ v: s, l: seen[s] }));
 };
 
+/** ONE LINE, ONE FIELD. The icon marks where a group starts and is left blank
+ *  on the lines that continue it, so a pair like Starts/Due reads as one thing
+ *  without repeating its own icon down the form. */
+function NiLine({ icon, label, htmlFor, children }: {
+  icon?: string; label: string; htmlFor: string; children: ReactNode;
+}) {
+  return (
+    <div className="tm-ni-line">
+      {icon ? <Icon name={icon} className="tm-ni-i" /> : <span className="tm-ni-i" aria-hidden="true" />}
+      <label className="tm-ni-l" htmlFor={htmlFor}>{label}</label>
+      <span className="tm-ni-c">{children}</span>
+    </div>
+  );
+}
+
+/** A field whose control wants the whole width: the label sits above it, and
+ *  anything that acts ON the control (the format buttons) sits beside the
+ *  label rather than floating over the box. */
+function NiBlock({ icon, label, htmlFor, right, children }: {
+  icon: string; label: string; htmlFor: string; right?: ReactNode; children: ReactNode;
+}) {
+  return (
+    <div className="tm-ni-block">
+      <div className="tm-ni-bh">
+        <Icon name={icon} className="tm-ni-i" />
+        <label className="tm-ni-l" htmlFor={htmlFor}>{label}</label>
+        {right}
+      </div>
+      <div className="tm-ni-bb">{children}</div>
+    </div>
+  );
+}
+
 /** Wrap the selection in a mark, or drop one in and put the caret inside it.
  *  The selection is restored afterwards so a second press is an undo rather
  *  than a second pair of asterisks somewhere else. */
@@ -248,6 +282,7 @@ function LinkField({ links, onChange }: {
     onChange(links.concat([{ url: ok, label: label.trim() || hostOf(ok) }]));
     setUrl(""); setLabel("");
   };
+  const bad = !!url.trim() && !ok;
   return (
     <>
       {links.length ? (
@@ -264,18 +299,28 @@ function LinkField({ links, onChange }: {
           ))}
         </ul>
       ) : null}
+      {/* The address and the name are two questions, so they are two lines. The
+          refusal is tied to the field it is about with aria-describedby — an
+          error somewhere else on the form is an error nobody can act on. */}
       <div className="tm-lk-add">
-        <input className="inp sm" value={url} aria-label="Link address" placeholder="Paste a link"
+        <label className="tm-ni-sub" htmlFor="niUrl">Address</label>
+        <input id="niUrl" className={"inp sm" + (bad ? " bad" : "")} value={url}
+          placeholder="docs.google.com/…" aria-describedby={bad ? "niUrlErr" : undefined}
           onChange={(e) => setUrl(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} />
-        <input className="inp sm" value={label} aria-label="Link name" placeholder="Name it (optional)"
+        {bad ? (
+          <p id="niUrlErr" className="help bad">That is not a web address — links have to be http or https.</p>
+        ) : null}
+
+        <label className="tm-ni-sub" htmlFor="niUrlName">Name <span className="tm-opt">optional</span></label>
+        <input id="niUrlName" className="inp sm" value={label} placeholder="The brief"
           onChange={(e) => setLabel(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} />
-        <button className="btn sm" disabled={!ok} onClick={add}>Add</button>
+
+        <button className="btn sm tm-lk-btn" disabled={!ok} onClick={add}>
+          <Icon name="plus" size="sm" />Add link
+        </button>
       </div>
-      {url.trim() && !ok
-        ? <p className="help bad">That is not a web address. Links have to be http or https.</p>
-        : null}
     </>
   );
 }
@@ -295,7 +340,7 @@ function NewTagField({ ownerId, onMade }: { ownerId: string; onMade: (id: string
   };
   return (
     <div className="tm-tagnew">
-      <input className="inp sm" value={draft} aria-label="New tag" placeholder="New tag"
+      <input id="niTag" className="inp sm" value={draft} placeholder="Name a new tag"
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} />
       <button className="btn sm" disabled={!draft.trim()} onClick={add}>Create</button>
@@ -492,50 +537,54 @@ function NewItemModal({ kind: initial, members, all, date }: {
         <Tabs items={["task", "milestone", "target"].map((k) => ({ k, label: labelOf(KIND, k) }))}
           cur={kind} onPick={(k) => { setKind(k); if (k === "target") setParent(""); }} />
 
-        <div className="tm-ni-r">
-          <Icon name="calendar" className="tm-ni-i" />
-          <input type="date" className="inp" value={start} aria-label="Starts"
+        {/* ONE FIELD TO A LINE, AND EVERY ONE OF THEM NAMED. The icons alone
+            were a guess — a flag could be priority or a milestone, a link could
+            be a URL or a parent — and a placeholder disappears the moment
+            somebody types, which leaves a filled form with nothing saying what
+            its values are. The labels share a column so the controls line up
+            and the eye runs down one edge instead of zigzagging across pairs. */}
+        <NiLine icon="calendar" label="Starts" htmlFor="niStart">
+          <input id="niStart" type="date" className="inp" value={start}
             onChange={(e) => setStart(e.target.value)} />
-          <span className="tm-ni-to" aria-hidden="true">→</span>
-          <input type="date" className="inp" value={due} aria-label="Due"
+        </NiLine>
+        <NiLine label="Due" htmlFor="niDue">
+          <input id="niDue" type="date" className="inp" value={due}
             onChange={(e) => setDue(e.target.value)} />
-        </div>
+        </NiLine>
 
-        <div className="tm-ni-r">
-          <Icon name="user" className="tm-ni-i" />
-          <select className="inp" value={who} aria-label="Assigned to"
-            onChange={(e) => assign(e.target.value)}>
+        <NiLine icon="user" label="Assigned to" htmlFor="niWho">
+          <select id="niWho" className="inp" value={who} onChange={(e) => assign(e.target.value)}>
             {members.filter((m) => m.status === "active")
               .map((m) => <option key={m.memberId} value={m.memberId}>{m.name}</option>)}
           </select>
-        </div>
+        </NiLine>
 
-        <div className="tm-ni-r">
-          <Icon name="flag" className="tm-ni-i" />
-          <select className="inp" value={pri} aria-label="Priority"
-            onChange={(e) => setPri(e.target.value)}>
+        <NiLine icon="flag" label="Priority" htmlFor="niPri">
+          <select id="niPri" className="inp" value={pri} onChange={(e) => setPri(e.target.value)}>
             {["high", "medium", "low"].map((k) =>
-              <option key={k} value={k}>{labelOf(PRIORITY, k)} priority</option>)}
+              <option key={k} value={k}>{labelOf(PRIORITY, k)}</option>)}
           </select>
-        </div>
+        </NiLine>
 
         {kind === "target" ? (
-          <div className="tm-ni-r">
-            <Icon name="star" className="tm-ni-i" />
-            <input type="number" className="inp tm-ni-n" value={tv} placeholder="60"
-              aria-label="Target value" onChange={(e) => setTv(e.target.value)} />
-            <input className="inp" value={tu} placeholder="businesses"
-              aria-label="Unit" onChange={(e) => setTu(e.target.value)} />
-          </div>
+          <>
+            <NiLine icon="star" label="Target" htmlFor="niTv">
+              <input id="niTv" type="number" className="inp" value={tv} placeholder="60"
+                onChange={(e) => setTv(e.target.value)} />
+            </NiLine>
+            <NiLine label="Unit" htmlFor="niTu">
+              <input id="niTu" className="inp" value={tu} placeholder="businesses"
+                onChange={(e) => setTu(e.target.value)} />
+            </NiLine>
+          </>
         ) : (
-          <div className="tm-ni-r">
-            <Icon name="link" className="tm-ni-i" />
-            <select className="inp" value={parent} aria-label="Rolls up to"
+          <NiLine icon="link" label="Rolls up to" htmlFor="niParent">
+            <select id="niParent" className="inp" value={parent}
               onChange={(e) => setParent(e.target.value)}>
-              <option value="">Rolls up to nothing</option>
+              <option value="">Nothing — it is top level</option>
               {parents.map((i) => <option key={i.itemId} value={i.itemId}>{i.title}</option>)}
             </select>
-          </div>
+          </NiLine>
         )}
 
         <div className="tm-ni-sep" />
@@ -543,47 +592,39 @@ function NewItemModal({ kind: initial, members, all, date }: {
         {/* DESCRIPTION — plain text with two marks in it. The buttons write the
             marks so nobody has to know them; see RichText for why this is not
             a contentEditable. */}
-        <div className="tm-ni-r top">
-          <Icon name="doc" className="tm-ni-i" />
-          <div className="tm-ni-grow">
-            <div className="tm-rt-bar">
-              <button className="tm-rt-b" title="Bold" aria-label="Bold"
-                onClick={() => wrapSel(ta, desc, setDesc, "**")}><b>B</b></button>
-              <button className="tm-rt-b" title="Bulleted list" aria-label="Bulleted list"
-                onClick={() => bulletSel(ta, desc, setDesc)}><Icon name="menu" size="sm" /></button>
-              <span className="tm-rt-hint">**bold** · - list</span>
-            </div>
-            <textarea ref={ta} className="inp tm-ni-ta" rows={3} value={desc}
-              aria-label="Description" placeholder="What does done look like?"
-              onChange={(e) => setDesc(e.target.value)} />
-          </div>
-        </div>
+        <NiBlock icon="doc" label="Details" htmlFor="niDesc" right={
+          <span className="tm-rt-bar">
+            <button className="tm-rt-b" title="Bold" aria-label="Bold"
+              onClick={() => wrapSel(ta, desc, setDesc, "**")}><b>B</b></button>
+            <button className="tm-rt-b" title="Bulleted list" aria-label="Bulleted list"
+              onClick={() => bulletSel(ta, desc, setDesc)}><Icon name="menu" size="sm" /></button>
+          </span>
+        }>
+          <textarea id="niDesc" ref={ta} className="inp tm-ni-ta" rows={3} value={desc}
+            placeholder="What does done look like?"
+            onChange={(e) => setDesc(e.target.value)} />
+        </NiBlock>
 
-        <div className="tm-ni-r top">
-          <Icon name="link" className="tm-ni-i" />
-          <div className="tm-ni-grow">
-            <LinkField links={links} onChange={setLinks} />
-          </div>
-        </div>
+        <NiBlock icon="link" label="Links" htmlFor="niUrl">
+          <LinkField links={links} onChange={setLinks} />
+        </NiBlock>
 
-        <div className="tm-ni-r top">
-          <Icon name="tag" className="tm-ni-i" />
-          <div className="tm-ni-grow">
-            <div className="tm-tagrow">
-              {mine.map((t) => (
-                <button key={t.tagId}
-                  className={"pill xs tm-pick" + (tags.indexOf(t.tagId) >= 0 ? " on" : "")
-                    + " tag-" + (t.colourToken || "slate")}
-                  onClick={() => setTags(tags.indexOf(t.tagId) >= 0
-                    ? tags.filter((x) => x !== t.tagId) : tags.concat([t.tagId]))}>
-                  {t.label}
-                </button>
-              ))}
-              {mine.length ? null : <span className="dim">No tags yet — the first one is a word away.</span>}
-            </div>
-            <NewTagField ownerId={who} onMade={(id) => setTags((v) => v.concat([id]))} />
+        <NiBlock icon="tag" label="Tags" htmlFor="niTag">
+          <div className="tm-tagrow">
+            {mine.map((t) => (
+              <button key={t.tagId}
+                className={"pill xs tm-pick" + (tags.indexOf(t.tagId) >= 0 ? " on" : "")
+                  + " tag-" + (t.colourToken || "slate")}
+                aria-pressed={tags.indexOf(t.tagId) >= 0}
+                onClick={() => setTags(tags.indexOf(t.tagId) >= 0
+                  ? tags.filter((x) => x !== t.tagId) : tags.concat([t.tagId]))}>
+                {t.label}
+              </button>
+            ))}
+            {mine.length ? null : <span className="dim">None yet — the first one is a word away.</span>}
           </div>
-        </div>
+          <NewTagField ownerId={who} onMade={(id) => setTags((v) => v.concat([id]))} />
+        </NiBlock>
 
         <p className="tm-ni-note">It opens in Planning. Nothing sets Delay — the due date does.</p>
       </div>
