@@ -24,7 +24,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
-import { Icon, Notice, SectionHead, StatStrip, Table, TbTitle, Toolbar, qs } from "../../ui";
+import { Icon, Notice, SectionHead, StatStrip, Table, TbTitle, qs } from "../../ui";
 import { go } from "../../ui/nav";
 import type { StatCell } from "../../ui";
 import {
@@ -73,21 +73,19 @@ export default function Reports() {
       <ProtoBar what="Reports" endpoint="GET /admin/team/reports" />
 
       <div className="dls-cmd">
-        <Toolbar>
-          <span className="btn-group">
-            <button className={face === "today" ? "on" : ""} onClick={() => goto({ face: undefined })}>
-              <Icon name="users" size="sm" />The day
-            </button>
-            <button className={face === "plan" ? "on" : ""} onClick={() => goto({ face: "plan" })}>
-              <Icon name="check" size="sm" />My plan
-            </button>
-            <button className={face === "eod" ? "on" : ""} onClick={() => goto({ face: "eod" })}>
-              <Icon name="doc" size="sm" />My EOD
-            </button>
-          </span>
-          <span className="spacer" />
-          <span className="dim tnum">{fmtDayName(TODAY)} {fmtDate(TODAY)}</span>
-        </Toolbar>
+        <span className="btn-group">
+          <button className={face === "today" ? "on" : ""} onClick={() => goto({ face: undefined })}>
+            <Icon name="users" size="sm" />The day
+          </button>
+          <button className={face === "plan" ? "on" : ""} onClick={() => goto({ face: "plan" })}>
+            <Icon name="check" size="sm" />My plan
+          </button>
+          <button className={face === "eod" ? "on" : ""} onClick={() => goto({ face: "eod" })}>
+            <Icon name="doc" size="sm" />My EOD
+          </button>
+        </span>
+        <span className="spacer" />
+        <span className="dim tnum">{fmtDayName(TODAY)} {fmtDate(TODAY)}</span>
       </div>
 
       {face === "today" ? <TheDay rows={rows} /> : null}

@@ -6,6 +6,35 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-04
 
+### The calendar is a one-pager, and the filter row stops nesting itself
+
+**Area:** sidebar → Team → **Calendar** (`#/work`) · **Attendance** · **Reports**
+**Files:** `src/admin/views/Team/Work.tsx`, `Attendance.tsx`, `Reports.tsx`, `team.css`
+
+**What changed**
+
+- **The filter row was a toolbar inside a toolbar.** `.dls-cmd` is already the flex row every
+  list screen in this panel uses; the three Team faces wrapped their controls in a second
+  `.toolbar` inside it — a nested flex context with its own bottom margin, which is what
+  pushed Create onto a line of its own and stopped the search field growing. The wrapper is
+  gone from all three; the controls are children of the band, the way the Members list has
+  always done it, and a spacer pushes Create to the right edge.
+- **The chip band no longer costs 12px when it is empty.** It renders only when a filter is
+  actually set — on a face bounded to the viewport, dead padding is the whole budget.
+- **The calendar is one page and does not scroll.** `.dls` was already bounded to the
+  viewport; on this face the body stops scrolling and hands its height down. The month grid
+  gets six rows that stretch on a tall screen and hold a 128px floor on a short one — where
+  the GRID scrolls, not the page — and the weekday heads stay put while it does.
+- **The sidebar adjusts with it.** Create and the mini month pin at the top; the month
+  counts, tasks, milestones and targets scroll under them. They are the two controls
+  somebody reaches for at any scroll position.
+- The footnote is one line instead of two.
+
+**Verified**
+`npx tsc -b` clean · eslint 0 errors · `npx vite build` succeeds · both check suites pass.
+
+---
+
 ### The calendar takes Google Calendar's layout, and the month says its own name
 
 **Area:** sidebar → Team → **Calendar** (`#/work`, the calendar face)

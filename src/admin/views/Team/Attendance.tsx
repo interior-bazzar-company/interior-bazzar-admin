@@ -24,7 +24,7 @@ import { useSearchParams } from "react-router-dom";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import {
-  EmptyState, FilterChips, Icon, Notice, SearchField, Select, StatStrip, Table, TbTitle, Toolbar, qs,
+  EmptyState, FilterChips, Icon, Notice, SearchField, Select, StatStrip, Table, TbTitle, qs,
 } from "../../ui";
 import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
@@ -82,30 +82,28 @@ export default function Attendance() {
       <MyClock onAct={(r) => { if (!r.ok) shell.toast(r.message, "bad"); }} />
 
       <div className="dls-cmd">
-        <Toolbar>
-          <span className="btn-group">
-            <button className={face === "today" ? "on" : ""} onClick={() => goto({ face: undefined })}>
-              <Icon name="clock" size="sm" />Today
-            </button>
-            <button className={face === "history" ? "on" : ""} onClick={() => goto({ face: "history" })}>
-              <Icon name="history" size="sm" />History
-            </button>
-          </span>
-          {face === "today" ? (
-            <>
-              <SearchField ph="Search member" name="q" val={p.q} onFilter={onFilter} />
-              <Select name="state" label="State" value={p.state} onFilter={onFilter}
-                options={[{ v: "working", l: "Working" }, { v: "on_break", l: "On break" },
-                  { v: "ended", l: "Day ended" }, { v: "unclosed", l: "Unclosed" },
-                  { v: "not_started", l: "Not started" }, { v: "absent", l: "Absent" },
-                  { v: "on_leave", l: "On leave" }]} />
-              <Select name="late" label="Late" value={p.late} onFilter={onFilter}
-                options={[{ v: "1", l: "Late only" }]} />
-            </>
-          ) : null}
-          <span className="spacer" />
-          <DateNav date={date} onPick={(d) => goto({ date: d === TODAY ? undefined : d })} />
-        </Toolbar>
+        <span className="btn-group">
+          <button className={face === "today" ? "on" : ""} onClick={() => goto({ face: undefined })}>
+            <Icon name="clock" size="sm" />Today
+          </button>
+          <button className={face === "history" ? "on" : ""} onClick={() => goto({ face: "history" })}>
+            <Icon name="history" size="sm" />History
+          </button>
+        </span>
+        {face === "today" ? (
+          <>
+            <SearchField ph="Search member" name="q" val={p.q} onFilter={onFilter} />
+            <Select name="state" label="State" value={p.state} onFilter={onFilter}
+              options={[{ v: "working", l: "Working" }, { v: "on_break", l: "On break" },
+                { v: "ended", l: "Day ended" }, { v: "unclosed", l: "Unclosed" },
+                { v: "not_started", l: "Not started" }, { v: "absent", l: "Absent" },
+                { v: "on_leave", l: "On leave" }]} />
+            <Select name="late" label="Late" value={p.late} onFilter={onFilter}
+              options={[{ v: "1", l: "Late only" }]} />
+          </>
+        ) : null}
+        <span className="spacer" />
+        <DateNav date={date} onPick={(d) => goto({ date: d === TODAY ? undefined : d })} />
       </div>
 
       {face === "today"

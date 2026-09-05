@@ -31,7 +31,7 @@ import { useSearchParams } from "react-router-dom";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import {
-  FilterChips, Icon, KvList, Notice, SearchField, SectionHead, Select, StatStrip, Table, TbTitle, Toolbar, qs,
+  FilterChips, Icon, KvList, Notice, SearchField, SectionHead, Select, StatStrip, Table, TbTitle, qs,
 } from "../../ui";
 import { go } from "../../ui/nav";
 import type { StatCell } from "../../ui";
@@ -58,6 +58,10 @@ const FACES = [
 /** Lifecycle order, not the order the five were listed in: Delay is work that
  *  is not finished, so it sits before the two terminal columns. */
 const STAGES: WorkStage[] = ["planned", "in_progress", "delayed", "completed", "cancelled"];
+/** The params that put a chip in the band — listed so the band can be absent
+ *  when none of them is set. On a face bounded to the viewport an empty row
+ *  still costs its padding, and this one was costing it on every load. */
+const FILTERS = ["q", "kind", "priority", "due", "tag", "member", "status", "parent", "wait"];
 const GROUPS = [
   { v: "", l: "Stage" }, { v: "kind", l: "Kind" }, { v: "assignee", l: "Assignee" },
   { v: "priority", l: "Priority" }, { v: "tag", l: "Tag" },
@@ -128,49 +132,54 @@ export default function Work() {
     <div className="dls">
       <ProtoBar what="Calendar" endpoint="GET /admin/team/work" />
 
+      {/* ONE BAND, NOT A TOOLBAR INSIDE A BAND. `.dls-cmd` is already the flex
+          row every list screen uses; wrapping a `.toolbar` in it nested one flex
+          context in another and added a bottom margin, which is what pushed
+          Create onto a line of its own. */}
       <div className="dls-cmd">
-        <Toolbar>
-          <span className="btn-group">
-            {FACES.map((f) => (
-              <button key={f.k} className={face === f.k ? "on" : ""}
-                onClick={() => goto({ face: f.k === "calendar" ? undefined : f.k })}>
-                <Icon name={f.i} size="sm" />{f.l}
-              </button>
-            ))}
-          </span>
-          <SearchField ph="Search work" name="q" val={p.q} onFilter={onFilter} />
-          <Select name="member" label="Member" value={p.member} onFilter={onFilter}
-            options={members.filter((m) => m.status === "active").map((m) => ({ v: m.memberId, l: m.name }))} />
-          <Select name="kind" label="Kind" value={p.kind} onFilter={onFilter}
-            options={[{ v: "task", l: "Tasks" }, { v: "milestone", l: "Milestones" }, { v: "target", l: "Targets" }]} />
-          <Select name="tag" label="Tag" value={p.tag} onFilter={onFilter}
-            options={slugOptions(tags)} />
-          <Select name="priority" label="Priority" value={p.priority} onFilter={onFilter}
-            options={[{ v: "high", l: "High" }, { v: "medium", l: "Medium" }, { v: "low", l: "Low" }]} />
-          {/* The calendar face carries Create at the top of its own rail, where
-              Google puts it and where the founder asked for it. The other three
-              have no rail, so it rides their toolbar. */}
-          {face === "calendar" ? null : (
-            <CreateMenu onPick={(k) => shell.modal(<NewItemModal kind={k} members={members} all={all} />, "sm")} />
-          )}
-        </Toolbar>
+        <span className="btn-group">
+          {FACES.map((f) => (
+            <button key={f.k} className={face === f.k ? "on" : ""}
+              onClick={() => goto({ face: f.k === "calendar" ? undefined : f.k })}>
+              <Icon name={f.i} size="sm" />{f.l}
+            </button>
+          ))}
+        </span>
+        <SearchField ph="Search work" name="q" val={p.q} onFilter={onFilter} />
+        <Select name="member" label="Member" value={p.member} onFilter={onFilter}
+          options={members.filter((m) => m.status === "active").map((m) => ({ v: m.memberId, l: m.name }))} />
+        <Select name="kind" label="Kind" value={p.kind} onFilter={onFilter}
+          options={[{ v: "task", l: "Tasks" }, { v: "milestone", l: "Milestones" }, { v: "target", l: "Targets" }]} />
+        <Select name="tag" label="Tag" value={p.tag} onFilter={onFilter}
+          options={slugOptions(tags)} />
+        <Select name="priority" label="Priority" value={p.priority} onFilter={onFilter}
+          options={[{ v: "high", l: "High" }, { v: "medium", l: "Medium" }, { v: "low", l: "Low" }]} />
+        <span className="spacer" />
+        {/* The calendar face carries Create at the top of its own rail, where
+            Google puts it and where the founder asked for it. The other three
+            have no rail, so it rides this row. */}
+        {face === "calendar" ? null : (
+          <CreateMenu onPick={(k) => shell.modal(<NewItemModal kind={k} members={members} all={all} />, "sm")} />
+        )}
       </div>
 
       <StatStrip cells={cells} />
 
-      <div className="dls-chips">
-        <FilterChips
-          params={{
-            q: p.q, kind: p.kind, priority: p.priority, due: p.due, tag: p.tag,
-            member: p.member ? (readMember(p.member)?.name || p.member) : undefined,
-            status: p.status ? labelOf(WORK_STATUS, p.status) : undefined,
-            parent: p.parent ? "within " + p.parent : undefined,
-            wait: p.wait ? "waiting" : undefined,
-          }}
-          onUnfilter={(n) => onFilter(n, "")} />
-      </div>
+      {FILTERS.some((k) => p[k]) ? (
+        <div className="dls-chips">
+          <FilterChips
+            params={{
+              q: p.q, kind: p.kind, priority: p.priority, due: p.due, tag: p.tag,
+              member: p.member ? (readMember(p.member)?.name || p.member) : undefined,
+              status: p.status ? labelOf(WORK_STATUS, p.status) : undefined,
+              parent: p.parent ? "within " + p.parent : undefined,
+              wait: p.wait ? "waiting" : undefined,
+            }}
+            onUnfilter={(n) => onFilter(n, "")} />
+        </div>
+      ) : null}
 
-      <div className="dls-body">
+      <div className={"dls-body" + (face === "calendar" ? " tm-body" : "")}>
         {face === "calendar" ? <CalendarFace rows={rows} me={me} p={p} goto={goto} onOpen={openItem} members={members} all={all} />
           : face === "board" ? <Board rows={rows} all={all} group={p.group || ""} goto={goto} onOpen={openItem} />
           : face === "timeline" ? <Timeline rows={rows} onOpen={openItem} />
@@ -436,8 +445,8 @@ function CalendarFace({ rows, me, p, goto, onOpen, members, all }: {
           })}
         </div>
         <p className="tm-foot">
-          A task of a week or less is drawn on every day it spans. Anything longer, and every milestone
-          and target, is drawn twice — the day it starts and the day it is due.
+          A task of a week or less spans every day it covers; anything longer, and every milestone and
+          target, is drawn twice — where it starts and where it is due.
         </p>
       </div>
     </div>
@@ -484,49 +493,56 @@ function Rail({ me, anchor, rows, onDay, onMonth, onCreate, onOpen }: {
 
   return (
     <>
-      <CreateMenu big onPick={onCreate} />
+      {/* Create and the mini month PIN; the three blocks scroll under them.
+          They are the two controls somebody reaches for at any scroll position,
+          and a sidebar that hides its own Create button has lost the plot. */}
+      <div className="tm-rail-t">
+        <CreateMenu big onPick={onCreate} />
 
-      <div className="tm-mini">
-        <div className="tm-mini-h">
-          <b>{fmtMonth(anchor, true)}</b>
-          <span className="spacer" />
-          <button className="btn icon sm" aria-label="Previous month" onClick={() => onMonth(-1)}>
-            <Icon name="chevl" size="sm" />
-          </button>
-          <button className="btn icon sm" aria-label="Next month" onClick={() => onMonth(1)}>
-            <Icon name="chevr" size="sm" />
-          </button>
-        </div>
-        <div className="tm-mini-g">
-          {["M", "T", "W", "T", "F", "S", "S"].map((d, n) => <b key={n}>{d}</b>)}
-          {days.map((d) => (
-            <button key={d} onClick={() => onDay(d)}
-              className={(d.slice(0, 7) !== month ? "out " : "") + (d === TODAY ? "today " : "")
-                + (d === anchor && d !== TODAY ? "sel " : "")
-                + (eventsOn(d, rows).length ? "has" : "")}>
-              {Number(d.slice(8))}
+        <div className="tm-mini">
+          <div className="tm-mini-h">
+            <b>{fmtMonth(anchor, true)}</b>
+            <span className="spacer" />
+            <button className="btn icon sm" aria-label="Previous month" onClick={() => onMonth(-1)}>
+              <Icon name="chevl" size="sm" />
             </button>
-          ))}
+            <button className="btn icon sm" aria-label="Next month" onClick={() => onMonth(1)}>
+              <Icon name="chevr" size="sm" />
+            </button>
+          </div>
+          <div className="tm-mini-g">
+            {["M", "T", "W", "T", "F", "S", "S"].map((d, n) => <b key={n}>{d}</b>)}
+            {days.map((d) => (
+              <button key={d} onClick={() => onDay(d)}
+                className={(d.slice(0, 7) !== month ? "out " : "") + (d === TODAY ? "today " : "")
+                  + (d === anchor && d !== TODAY ? "sel " : "")
+                  + (eventsOn(d, rows).length ? "has" : "")}>
+                {Number(d.slice(8))}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      <section className="tm-blk">
-        <header><b>{fmtMonth(anchor)}</b><span className="tm-blk-c">{inMonth.length} dated</span></header>
-        <span className="tm-stack">
-          <i className="k-ok" style={{ width: pct(t.completed, inMonth.length) }} />
-          <i className="k-info" style={{ width: pct(t.inProgress + t.planned, inMonth.length) }} />
-          <i className="k-warn" style={{ width: pct(t.delayed, inMonth.length) }} />
-        </span>
-        <p className="tm-blk-m">
-          <span className="u-ok-t">{t.completed} done</span>
-          <span>{t.inProgress + t.planned} open</span>
-          <span className="u-warn-t">{t.delayed} in delay</span>
-        </p>
-      </section>
+      <div className="tm-rail-b">
+        <section className="tm-blk">
+          <header><b>{fmtMonth(anchor)}</b><span className="tm-blk-c">{inMonth.length} dated</span></header>
+          <span className="tm-stack">
+            <i className="k-ok" style={{ width: pct(t.completed, inMonth.length) }} />
+            <i className="k-info" style={{ width: pct(t.inProgress + t.planned, inMonth.length) }} />
+            <i className="k-warn" style={{ width: pct(t.delayed, inMonth.length) }} />
+          </span>
+          <p className="tm-blk-m">
+            <span className="u-ok-t">{t.completed} done</span>
+            <span>{t.inProgress + t.planned} open</span>
+            <span className="u-warn-t">{t.delayed} in delay</span>
+          </p>
+        </section>
 
-      <TasksBlock who={me} onOpen={onOpen} />
-      <MarksBlock kind="milestone" who={me} onOpen={onOpen} />
-      <MarksBlock kind="target" who={me} onOpen={onOpen} />
+        <TasksBlock who={me} onOpen={onOpen} />
+        <MarksBlock kind="milestone" who={me} onOpen={onOpen} />
+        <MarksBlock kind="target" who={me} onOpen={onOpen} />
+      </div>
     </>
   );
 }

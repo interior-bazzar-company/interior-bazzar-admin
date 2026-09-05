@@ -299,11 +299,25 @@
    timeline is a date grid behind a lane column, and both need their width.
    ============================================================================= */
 
-.tm-shell { display: flex; align-items: stretch; gap: var(--space-4); min-width: 0 }
-.tm-shell-b { flex: 1; min-width: 0 }
+/* THE CALENDAR IS A ONE-PAGER. `.dls` is already bounded to the viewport, so
+   on this face the body stops scrolling and hands its height down: the rail
+   scrolls inside itself, the month grid takes what is left, and the page
+   itself never moves. Every other face keeps the ordinary scrolling body. */
+.dls-body.tm-body { overflow: hidden; display: flex; padding-bottom: var(--space-3) }
+.tm-body .tm-shell { flex: 1 1 auto; height: 100% }
+
+.tm-shell { display: flex; align-items: stretch; gap: var(--space-4); min-width: 0; min-height: 0 }
+.tm-shell-b { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0 }
 .tm-rail {
-  flex: 0 0 248px; min-width: 0;
+  flex: 0 0 248px; min-width: 0; min-height: 0;
   display: flex; flex-direction: column; gap: var(--space-3);
+}
+/* Create and the mini month pin; the three blocks scroll under them. */
+.tm-rail-t { flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--space-3) }
+.tm-rail-b {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: var(--space-3);
+  padding-bottom: var(--space-2);
 }
 @media (max-width: 1240px) { .tm-rail { display: none } }
 
@@ -448,7 +462,7 @@
 
 .tm-calbar {
   display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap;
-  padding-bottom: var(--space-3);
+  flex: 0 0 auto; padding-bottom: var(--space-3);
 }
 .tm-calbar > b { font-size: var(--text-sm); color: var(--text) }
 .tm-calh {
@@ -468,11 +482,21 @@
 .tm-legend .k-warn { background: var(--warn-solid) }
 .tm-legend .k-bad { background: var(--bad-solid) }
 
+/* Six rows that stretch to fill a tall screen and hold their floor on a short
+   one — where the GRID scrolls, not the page. */
 .tm-cal {
   display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
   border: 1px solid var(--line); border-radius: var(--radius-lg); overflow: hidden;
 }
+.tm-body .tm-cal {
+  flex: 1 1 auto; min-height: 0; overflow: auto;
+  grid-template-rows: auto repeat(6, minmax(128px, 1fr));
+}
+.tm-body .tm-cal.week { grid-template-rows: auto minmax(320px, 1fr) }
+.tm-body .tm-day { min-height: 0; overflow: hidden }
+.tm-body .tm-foot { flex: 0 0 auto; margin-top: var(--space-2) }
 .tm-cal-h {
+  position: sticky; top: 0; z-index: 1;
   padding: var(--space-2) 0; text-align: center;
   font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: .07em;
   color: var(--text-3); background: var(--bg); border-right: 1px solid var(--line);
