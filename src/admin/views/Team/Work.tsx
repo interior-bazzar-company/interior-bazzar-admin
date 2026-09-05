@@ -462,11 +462,6 @@ function CalendarFace({ rows, me, p, goto, onOpen, members, all }: {
             over the grid it moves; the legend holds the left rather than
             leaving the row half empty. */}
         <div className="tm-calbar">
-          <span className="tm-legend">
-            <i className="k-info" />stage
-            <i className="k-warn" />delay
-            <i className="k-bad" />waiting
-          </span>
           <span className="spacer" />
           <button className="btn sm" onClick={() => goto({ on: undefined })}>Today</button>
           <button className="btn icon sm" aria-label="Previous" onClick={() => move(-1)}><Icon name="chevl" size="sm" /></button>
@@ -483,14 +478,20 @@ function CalendarFace({ rows, me, p, goto, onOpen, members, all }: {
           ))}
           {days.map((d) => {
             const evs = eventsOn(d, rows);
-            const cap = mode === "week" ? 12 : 4;
             const away = leaveOn(d, teamIds);
+            /* THE CAP IS A HEIGHT, NOT A TASTE. A month row is 128px: the date
+               takes 26, each chip 21, the "+n more" 18. Three chips fit with
+               the overflow link still visible — four did not, which is why the
+               last one was being sliced in half by the cell's own clip. The
+               leave banner is a row like any other and counts against it. */
+            const cap = Math.max(1, (mode === "week" ? 12 : 3) - (away.length ? 1 : 0));
             return (
               /* Clicking the EMPTY part of a day starts something on it — the
                  one Google gesture worth keeping. The test is the event target
                  being the cell itself, so a chip inside it still opens. */
               <div key={d} className={"tm-day"
                 + (d.slice(0, 7) !== month && mode === "month" ? " out" : "")
+                + (isWeekendDay(d) ? " we" : "")
                 + (d === anchor && d !== TODAY ? " sel" : "")
                 + (d === TODAY ? " today" : "")}
                 onClick={(e) => { if (e.target === e.currentTarget) create("task", d); }}>
@@ -508,10 +509,17 @@ function CalendarFace({ rows, me, p, goto, onOpen, members, all }: {
             );
           })}
         </div>
-        <p className="tm-foot">
-          A task of a week or less spans every day it covers; anything longer, and every milestone and
-          target, is drawn twice — where it starts and where it is due.
-        </p>
+        <div className="tm-calfoot">
+          <span className="tm-legend">
+            <i className="k-info" />stage
+            <i className="k-warn" />delay
+            <i className="k-bad" />waiting
+          </span>
+          <p className="tm-foot">
+            A task of a week or less spans every day it covers; anything longer, and every milestone
+            and target, is drawn twice — where it starts and where it is due.
+          </p>
+        </div>
       </div>
     </div>
   );

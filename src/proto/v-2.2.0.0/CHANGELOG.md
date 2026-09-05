@@ -6,6 +6,46 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-04
 
+### The calendar's layout pass: seven defects, measured rather than nudged
+
+**Area:** sidebar → Team → **Calendar** (`#/work`, the calendar face)
+**Files:** `src/admin/views/Team/Work.tsx`, `workBits.tsx`, `team.css`
+
+**What was wrong, and what it is now**
+
+1. **Chips were being sliced in half.** Not a spacing preference — arithmetic. A month row is
+   128px; the date takes 26, a chip 22, the overflow link 18. Four chips plus "+n more" needs
+   137px, so the cell's own clip cut the last one through the middle. The cap is three, and
+   the **leave banner counts against it** — a day with somebody off was silently one row over.
+2. **Two hairlines under the weekday heads.** The head carried a `border-bottom` and every day
+   cell carries a `border-top`, so the first row drew both. The head's is gone: the row under
+   it already draws the line, and it keeps doing so as the grid scrolls beneath the sticky
+   head instead of doubling against whatever lands there.
+3. **Every event was an outlined box** — forty rectangles on one screen, a grid inside a grid.
+   The border is gone; the 3px tone rail carries the stage and a quiet ground carries the
+   rest, so the eye sorts by colour instead of counting edges. Hover draws an outline rather
+   than a new ground, so hovering a delayed chip no longer washes out the tint saying it is
+   delayed.
+4. **Chip text was 10px**, under this panel's readable floor, on the only words on the screen
+   anybody actually reads. Now 11px — which is affordable precisely because the cap is three.
+5. **Saturday was drawn exactly like Tuesday.** Weekends take the shell ground: quiet, not a
+   different kind of cell, so a week is one glance instead of a column count.
+6. **Empty progress tracks read as broken** — three milestones at 0% were three hairlines with
+   a stray tick floating over them. The track has an inset edge, so it is still a track when
+   nothing has filled it.
+7. **Two rail blocks were chipped "derived" and the third with today's date.** The first is
+   this module's vocabulary rather than the reader's; the second named a day the block does
+   not show. All three carry a count.
+
+Also: the legend moved out of the date bar — stranded at the far left of a row of
+right-aligned controls — down beside the footnote, next to the chips it explains.
+
+**Verified**
+`npx tsc -b` clean · eslint 0 errors · `npx vite build` succeeds · both check suites pass.
+Row budget recomputed: 3 chips + the overflow link = 115px of 128.
+
+---
+
 ### The counts move into the header, beside the title — Deals' arrangement
 
 **Area:** sidebar → Team → **Calendar** (`#/work`, every face)

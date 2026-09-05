@@ -399,9 +399,12 @@
 
 /* the bar, with a marker where today sits in the window */
 .tm-pw { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap }
+/* Three milestones at 0% were three hairlines with a stray tick over them. A
+   track with an edge is still a track when nothing has filled it. */
 .tm-pw-bar {
-  position: relative; flex: 1; min-width: 60px; height: 5px;
+  position: relative; flex: 1; min-width: 60px; height: 6px;
   background: var(--bg-inset); border-radius: var(--radius-full);
+  box-shadow: inset 0 0 0 1px var(--line);
 }
 .tm-pw-bar > i { display: block; height: 100%; background: var(--text-2); border-radius: var(--radius-full) }
 .tm-pw-tick {
@@ -465,14 +468,18 @@
 }
 .tm-body .tm-cal.week { grid-template-rows: auto minmax(320px, 1fr) }
 .tm-body .tm-day { min-height: 0; overflow: hidden }
-.tm-body .tm-foot { flex: 0 0 auto; margin-top: var(--space-2) }
+.tm-body .tm-calfoot { flex: 0 0 auto }
 .tm-cal-h {
   position: sticky; top: 0; z-index: 1;
   padding: var(--space-2) 0; text-align: center;
   font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: .07em;
   color: var(--text-3); background: var(--bg); border-right: 1px solid var(--line);
-  border-bottom: 1px solid var(--line); font-weight: 600;
+  font-weight: 600;
 }
+/* No border-bottom here on purpose: every day cell carries its own border-top,
+   so the heads already have a line under them — and when the grid scrolls under
+   this sticky row, the line stays with whichever row is beneath it instead of
+   doubling up against the first. */
 .tm-cal-h:nth-child(7) { border-right: 0 }
 
 /* Equal cells, hairlines, and the day number centred at the top — the shape a
@@ -484,6 +491,9 @@
   display: flex; flex-direction: column; gap: 2px; min-width: 0; cursor: pointer;
 }
 .tm-day:nth-child(7n) { border-right: 0 }
+/* A work calendar that draws Saturday exactly like Tuesday makes the reader
+   count columns to find the week. Quiet ground, not a different cell. */
+.tm-day.we { background: var(--bg-shell) }
 .tm-day:hover { background: var(--bg-hover) }
 .tm-day.out { background: var(--bg-shell) }
 .tm-day.out .tm-day-n { color: var(--text-3); opacity: .6 }
@@ -500,27 +510,46 @@
 .tm-day.today .tm-day-n { background: var(--brand); color: var(--brand-ink); font-weight: 600 }
 .tm-day.sel .tm-day-n { background: var(--brand-tint); color: var(--brand-text) }
 
+/* AN EVENT IS A LABEL, NOT A BOX. Forty outlined rectangles on one screen read
+   as a grid inside a grid; the tone rail carries the stage and the ground
+   carries the rest, so the eye sorts by colour instead of counting borders.
+   11px because 10 is under this panel's readable floor and these are the only
+   words on the screen a person actually reads. */
 .tm-ev {
-  display: block; width: 100%; text-align: left; font: inherit; font-size: var(--text-2xs);
-  line-height: 1.35; padding: 2px 5px; cursor: pointer; min-width: 0;
-  border: 1px solid var(--line-2); border-left-width: 3px; border-radius: var(--radius-sm);
-  background: var(--bg); color: var(--text);
+  display: block; width: 100%; text-align: left; font: inherit; font-size: var(--text-xs);
+  line-height: 1.5; padding: 2px var(--space-2); cursor: pointer; min-width: 0;
+  border: 0; border-left: 3px solid var(--line-2);
+  border-radius: var(--radius-xs) var(--radius-sm) var(--radius-sm) var(--radius-xs);
+  background: var(--bg-inset); color: var(--text);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .tm-ev em { font-style: normal; color: var(--text-3); margin-right: 3px }
-.tm-ev:hover { background: var(--bg-hover) }
+/* An outline on hover rather than a new ground, so hovering a delayed chip does
+   not wash out the tint that says it is delayed. */
+.tm-ev:hover { box-shadow: inset 0 0 0 1px var(--line-3) }
 .tm-ev.s-info { border-left-color: var(--info-solid) }
 .tm-ev.s-ok { border-left-color: var(--ok-solid) }
 .tm-ev.s-warn { border-left-color: var(--warn-solid); background: var(--warn-bg) }
 .tm-ev.s-bad { border-left-color: var(--bad-solid); background: var(--bad-bg) }
 .tm-ev.s-dead { opacity: .5; text-decoration: line-through }
-.tm-ev.leave { border-style: dashed; color: var(--text-3); background: var(--bg-inset) }
+.tm-ev.leave {
+  border-left-style: dashed; border-left-color: var(--line-3);
+  color: var(--text-3); background: none;
+}
 .tm-more {
-  font: inherit; font-size: var(--text-2xs); color: var(--text-3);
-  background: none; border: 0; text-align: left; padding: 2px 5px; cursor: pointer;
-  border-radius: var(--radius-sm);
+  font: inherit; font-size: var(--text-2xs); font-weight: var(--weight-medium);
+  color: var(--text-3); background: none; border: 0; text-align: left;
+  padding: 1px var(--space-2); cursor: pointer; border-radius: var(--radius-sm);
 }
 .tm-more:hover { background: var(--bg-active); color: var(--text) }
+
+/* The legend sits with the note, under the grid — beside the chips it explains
+   rather than stranded at the far end of a bar of date controls. */
+.tm-calfoot {
+  display: flex; align-items: baseline; gap: var(--space-4); flex-wrap: wrap;
+  padding-top: var(--space-2);
+}
+.tm-calfoot .tm-foot { margin: 0; flex: 1 1 320px; min-width: 0 }
 .tm-foot { font-size: var(--text-2xs); color: var(--text-3); margin: var(--space-3) 0 0 }
 
 /* ------------------------------------------------------------- timeline -- */

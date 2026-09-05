@@ -194,7 +194,10 @@ export function TasksBlock({ who, withTeam, onOpen }: {
   ) : null);
 
   return (
-    <Block title="Tasks" chip={withTeam ? "me and my reports" : fmtDate(TODAY)}>
+    /* The chip is a COUNT on all three blocks. It said "derived" on two of them
+       and a date on the third — the first is this module's vocabulary rather
+       than the reader's, and the second named a day the block does not show. */
+    <Block title="Tasks" chip={String(over.length + now.length + soon.length)}>
       {over.length || now.length || soon.length ? (
         <>{sec("Overdue", over)}{sec("Due today", now)}{sec("Next 3 days", soon)}</>
       ) : empty("Nothing open in the next three days.")}
@@ -223,7 +226,7 @@ export function MarksBlock({ kind, who, onOpen, compact, limit }: {
     const shown = limit ? rows.slice(0, limit) : rows;
     const rest = rows.length - shown.length;
     return (
-      <Block title={title} chip="derived">
+      <Block title={title} chip={String(rows.length)}>
         {shown.length ? (
           <>
             {shown.map((i) => <MarkRow key={i.itemId} item={i} onOpen={onOpen} compact />)}
@@ -235,7 +238,7 @@ export function MarksBlock({ kind, who, onOpen, compact, limit }: {
   }
 
   return (
-    <Block title={title} chip="derived">
+    <Block title={title} chip={String(mine.length + theirs.length)}>
       {mine.length || theirs.length ? (
         <>
           {mine.length ? (
