@@ -47,7 +47,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { ShellProvider } from "../src/admin/shell/ShellContext";
 import Work from "../src/admin/views/Team/Work";
-import Attendance from "../src/admin/views/Team/Attendance";
+import Attendance, { TopClock } from "../src/admin/views/Team/Attendance";
 import Reports from "../src/admin/views/Team/Reports";
 import { FaceMenu, NewItemModal } from "../src/admin/views/Team/Work";
 import MemberPage from "../src/admin/views/Team/MemberPage";
@@ -131,7 +131,21 @@ ok("the calendar has no filter band", cal.indexOf("dls-cmd") < 0);
   ok("the " + f + " keeps its filter band", at("/work?face=" + f).indexOf("dls-cmd") >= 0);
 });
 
-renders("attendance", () => at("/attendance"), ["dls", "tm-clock"]);
+/* ATTENDANCE HAS FOUR FACES NOW and each answers a different question, so each
+   names something only it draws. The clock is asserted separately because it
+   lives in the topbar slot, which a module-only render never reaches. */
+renders("attendance today", () => at("/attendance"), ["dls", "tabs", "tm-daterow"]);
+renders("attendance history", () => at("/attendance?face=history"), ["dls", "tm-daterow"]);
+renders("attendance analytics", () => at("/attendance?face=analytics"),
+  ["tm-an-days", "tm-an-stack", "tm-sort"]);
+renders("attendance requests", () => at("/attendance?face=requests"), ["dls-body"]);
+["Today", "History", "Analytics", "Requests"].forEach((l) =>
+  ok("the attendance tabs offer " + l, at("/attendance").indexOf(l) >= 0));
+ok("the leave queue left the middle of the day table",
+  at("/attendance").indexOf("tm-inbox") < 0);
+renders("the clock, in the topbar slot", () => node(<TopClock />, "/attendance"),
+  ["tm-tclock", "tm-tclock-a"]);
+
 renders("reports", () => at("/reports"), ["dls", "dls-cmd"]);
 
 const menu = node(<FaceMenu face="calendar" goto={() => {}} />);

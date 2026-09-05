@@ -19,22 +19,25 @@
    NO API YET — everything comes from src/content/team/attendance.json through
    store.ts, which is the only file that knows that.
    ============================================================================= */
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import {
-  EmptyState, FilterChips, Icon, Notice, SearchField, Select, StatStrip, Table, TbTitle, qs,
+  EmptyState, FilterChips, Icon, Notice, SearchField, SectionHead, Select, StatStrip, Table,
+  TbTitle, Tiles, qs,
 } from "../../ui";
 import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import {
   LEAVE_KIND, TODAY, addDays, attendanceTotals, datesIn, dayFor, endDay, fmtDate, fmtDayName,
-  labelOf, leaveOverlap, fmtHM, fmtTime, meId, openDay, pendingLeave, readMember, resumeDay,
-  scopeLabel, scopeOf, startBreak, stateOf, unroutedLeave, useDayRows, useLeave, useMe, useMembers,
-  useMyDay, weekOf, workedOf, now as clockNow,
+  labelOf, leaveOverlap, leaveQueue, fmtHM, fmtTime, meId, openDay, readMember, resumeDay,
+  arrivalSpread, earliestAttendance, scopeLabel, scopeOf, spanDays, spanRows, spanTotals,
+  startBreak, stateOf,
+  useDayRows, useLeave, useMe, useMembers, useMyDay, weekOf, workedOf,
+  now as clockNow,
 } from "./store";
-import type { DayRow, LeaveRequest, Result } from "./store";
+import type { DayRow, LeaveRequest, Result, SpanRow } from "./store";
 import { LeaveDecideModal } from "./member/modals";
 import { BarScale, DayBar, Meter, ScopeNote, StatePill, Who } from "./bits";
 import { ensureAdopted } from "./adopt";
@@ -50,17 +53,21 @@ export default function Attendance() {
     return o;
   }, [sp]);
 
-  const face = p.face === "history" ? "history" : "today";
+  const face = FACES.some((f) => f.k === p.face) ? (p.face as string) : "today";
   const date = p.date || TODAY;
   const scope = scopeOf("attendance");
   const rows = useDayRows(date, scope);
   const members = useMembers();
   const me = useMe();
-  const shell = useShell();
 
+  /* THE CLOCK IS A COMPONENT IN THE SLOT, not a node handed to it. Chrome is
+     published once per location, so a node built here would close over the
+     worked-minutes it had at publish time and sit there frozen while the day
+     ran on. Reading the store inside the component reads it at render time,
+     which is the only time that answer is worth anything. */
   usePageChrome({
     crumbs: <TbTitle label="Attendance" to="#/attendance" />,
-    right: <ScopeNote text={scopeLabel(scope, rows.length)} />,
+    right: <TopClock />,
   }, face + date);
 
   useEffect(() => { ensureAdopted(); }, []);
@@ -76,91 +83,132 @@ export default function Attendance() {
 
   const onFilter = (name: string, value: string) => goto({ [name]: value || undefined });
 
+  /* FOUR FACES, AND EACH ONE ANSWERS A DIFFERENT QUESTION. Today is "who is in
+     right now", History is "what did this week look like", Analytics is "what
+     is the shape of the last fortnight", and Requests is "what is waiting on
+     me". They were one screen with the analytics implied and the requests
+     buried in the middle of the day table, which is how a queue gets missed. */
+  const waiting = leaveQueue(scope).total;
+
   return (
     <div className="dls">
-      <MyClock onAct={(r) => { if (!r.ok) shell.toast(r.message, "bad"); }} />
-
-      <div className="dls-cmd">
-        <span className="btn-group">
-          <button className={face === "today" ? "on" : ""} onClick={() => goto({ face: undefined })}>
-            <Icon name="clock" size="sm" />Today
-          </button>
-          <button className={face === "history" ? "on" : ""} onClick={() => goto({ face: "history" })}>
-            <Icon name="history" size="sm" />History
-          </button>
-        </span>
-        {face === "today" ? (
-          <>
-            <SearchField ph="Search member" name="q" val={p.q} onFilter={onFilter} />
-            <Select name="state" label="State" value={p.state} onFilter={onFilter}
-              options={[{ v: "working", l: "Working" }, { v: "on_break", l: "On break" },
-                { v: "ended", l: "Day ended" }, { v: "unclosed", l: "Unclosed" },
-                { v: "not_started", l: "Not started" }, { v: "absent", l: "Absent" },
-                { v: "on_leave", l: "On leave" }]} />
-            <Select name="late" label="Late" value={p.late} onFilter={onFilter}
-              options={[{ v: "1", l: "Late only" }]} />
-          </>
-        ) : null}
+      <div className="dls-chips">
+        <div className="tabs">
+          {FACES.map((f) => (
+            <button key={f.k} className={face === f.k ? "on" : ""}
+              onClick={() => goto({ face: f.k === "today" ? undefined : f.k })}>
+              <Icon name={f.icon} size="sm" />{f.label}
+              {f.k === "requests" && waiting ? <span className="n">{waiting}</span> : null}
+            </button>
+          ))}
+        </div>
         <span className="spacer" />
-        <DateNav date={date} onPick={(d) => goto({ date: d === TODAY ? undefined : d })} />
+        <ScopeNote text={scopeLabel(scope, rows.length)} />
       </div>
 
-      {face === "today"
-        ? <Today rows={rows} p={p} date={date} onFilter={onFilter} />
-        : <History members={members} me={me ? me.memberId : meId()} scope={scope} date={date} />}
+      {face === "today" || face === "history" ? (
+        <div className="dls-cmd">
+          {face === "today" ? (
+            <>
+              <SearchField ph="Search member" name="q" val={p.q} onFilter={onFilter} />
+              <Select name="state" label="State" value={p.state} onFilter={onFilter}
+                options={[{ v: "working", l: "Working" }, { v: "on_break", l: "On break" },
+                  { v: "ended", l: "Day ended" }, { v: "unclosed", l: "Unclosed" },
+                  { v: "not_started", l: "Not started" }, { v: "absent", l: "Absent" },
+                  { v: "on_leave", l: "On leave" }]} />
+              <Select name="late" label="Late" value={p.late} onFilter={onFilter}
+                options={[{ v: "1", l: "Late only" }]} />
+            </>
+          ) : null}
+          <span className="spacer" />
+          <DateNav date={date} onPick={(d) => goto({ date: d === TODAY ? undefined : d })} />
+        </div>
+      ) : null}
+
+      {face === "today" ? <Today rows={rows} p={p} date={date} onFilter={onFilter} />
+        : face === "history" ? <History members={members} me={me ? me.memberId : meId()} scope={scope} date={date} />
+          : face === "analytics" ? <Analytics scope={scope} span={p.span || "7"} onSpan={(v) => goto({ span: v === "7" ? undefined : v })} />
+            : <Requests />}
     </div>
   );
 }
 
-/* ------------------------------------------------------------- my clock --- */
+const FACES = [
+  { k: "today", label: "Today", icon: "clock" },
+  { k: "history", label: "History", icon: "history" },
+  { k: "analytics", label: "Analytics", icon: "chart" },
+  { k: "requests", label: "Requests", icon: "inbox" },
+];
 
-/** The member's own day, and the only place on this screen anybody writes.
+/* ----------------------------------------------------------- the clock --- */
+
+/** THE MEMBER'S OWN DAY, IN THE TOPBAR — and it earned the slot.
  *
- *  It is a card here rather than a strip in the topbar because the topbar is
- *  shared chrome for every module in the panel and this module has not earned a
- *  permanent slot in it yet. When it has, the same four buttons move up there
- *  and nothing else about this file changes. */
-function MyClock({ onAct }: { onAct: (r: Result<unknown>) => void }) {
+ *  It used to be a card at the top of the body, which cost a whole band of
+ *  vertical space on a screen that is otherwise a table, and put the one
+ *  control anybody presses twice a day below the fold on a laptop. The topbar
+ *  slot belongs to whichever module claims it, this module claims it on this
+ *  route only, and the four buttons are the only place on the screen anybody
+ *  writes.
+ *
+ *  IT IS A COMPONENT, NOT A NODE. Published chrome is captured once per
+ *  location; a node built at publish time would freeze the worked-minutes it
+ *  had then. This reads the store on every render of its own.
+ *
+ *  THE ACTIONS LIVE HERE AND NOWHERE ELSE. The member page states the day and
+ *  never changes it — three "End the day" buttons over one open day is two
+ *  chances for the panel to disagree with itself mid-request. */
+export function TopClock() {
+  const shell = useShell();
   const me = useMe();
   const { day, state, worked, breakMins } = useMyDay();
   if (!me) return null;
 
-  const act = (fn: () => Result<unknown>) => onAct(fn());
+  const act = (fn: () => Result<unknown>) => {
+    const r = fn();
+    if (!r.ok) shell.toast(r.message, "bad");
+  };
   const expected = me.expectedHoursPerDay;
+  const pct = Math.min(100, Math.round(((worked || 0) / (expected * 60)) * 100));
 
   return (
-    <div className={"tm-clock " + state}>
-      <div className="tm-clock-l">
-        <span className="tm-clock-s"><StatePill state={state} /></span>
-        <span className="tm-clock-v tnum">{worked != null ? fmtHM(worked) : "—"}</span>
-        <span className="tm-clock-k">
-          {day ? "in at " + fmtTime(day.startedAt) : "not started"}
-          {day && day.isLate ? <b className="warn"> · {day.lateByMinutes}m late</b> : null}
-          {breakMins ? " · " + fmtHM(breakMins) + " break" : null}
+    <div className={"tm-tclock " + state}>
+      <StatePill state={state} />
+
+      <span className="tm-tclock-n">
+        <b className="tnum">{worked != null ? fmtHM(worked) : "—"}</b>
+        {/* The bar is decoration over a number that is already stated, so it is
+            hidden from the reader who is being read to rather than repeated. */}
+        <span className="tm-tclock-bar" aria-hidden="true">
+          <i style={{ width: pct + "%" }} />
         </span>
-        <Meter value={worked || 0} of={expected * 60} tone={state === "on_break" ? "info" : "ok"} />
-        <span className="tm-clock-x">of {expected}h expected</span>
-      </div>
-      <div className="tm-clock-a">
+      </span>
+
+      <span className="tm-tclock-k">
+        of {expected}h expected
+        {day ? <> · in at {fmtTime(day.startedAt)}</> : null}
+        {day && day.isLate ? <b className="u-warn"> · {day.lateByMinutes}m late</b> : null}
+        {breakMins ? <> · {fmtHM(breakMins)} break</> : null}
+      </span>
+
+      <span className="tm-tclock-a">
         {/* On leave still offers Start day: an approved day off does not stop
             somebody coming in, and the row they open is the truth. */}
         {state === "not_started" || state === "absent" || state === "on_leave"
-          ? <button className="btn pri" onClick={() => act(() => openDay(me.memberId))}>Start day</button>
+          ? <button className="btn pri sm" onClick={() => act(() => openDay(me.memberId))}>Start day</button>
           : null}
-        {state === "working"
-          ? <>
-            <button className="btn" onClick={() => act(() => startBreak(me.memberId))}>Break</button>
-            <button className="btn pri" onClick={() => act(() => endDay(me.memberId))}>End day</button>
+        {state === "working" ? (
+          <>
+            <button className="btn sm" onClick={() => act(() => startBreak(me.memberId))}>Break</button>
+            <button className="btn pri sm" onClick={() => act(() => endDay(me.memberId))}>End day</button>
           </>
-          : null}
+        ) : null}
         {state === "on_break"
-          ? <button className="btn pri" onClick={() => act(() => resumeDay(me.memberId))}>Resume</button>
+          ? <button className="btn pri sm" onClick={() => act(() => resumeDay(me.memberId))}>Resume</button>
           : null}
-        {state === "ended" ? <span className="dim">Day closed.</span> : null}
-        {state === "unclosed"
-          ? <Notice tone="warn" text="This day was never closed. Ask an admin to correct it — nothing is written automatically." />
-          : null}
-      </div>
+        {state === "ended" ? <span className="tm-tclock-x">Day closed.</span> : null}
+        {state === "unclosed" ? <span className="tm-tclock-x u-warn">Never closed.</span> : null}
+      </span>
     </div>
   );
 }
@@ -208,7 +256,6 @@ function Today({ rows, p, date, onFilter }: {
           onUnfilter={(n) => onFilter(n, "")} />
       </div>
       <div className="dls-body">
-        <LeaveInbox />
         <div className="tm-daterow">
           <b>{fmtDayName(date)} {fmtDate(date)}</b>
           {date === TODAY ? <span className="pill xs">today</span> : null}
@@ -223,7 +270,12 @@ function Today({ rows, p, date, onFilter }: {
             { label: "Out", w: "82px" },
             { label: "Break", cls: "n", w: "80px" },
             { label: "Worked", cls: "n", w: "92px" },
-            { label: <>The day <BarScale /></>, w: "300px" },
+            /* AGAINST EXPECTED, on the row. "6h 10m" is a fact; whether it is a
+               short day depends on what that member was expected to do, and
+               that number lives on the member. Without this column the reader
+               has to know eight people's contracted hours by heart. */
+            { label: "Of expected", w: "180px" },
+            { label: <>The day <BarScale /></>, w: "280px" },
           ]}
           empty={{
             icon: "clock",
@@ -249,6 +301,14 @@ function Today({ rows, p, date, onFilter }: {
                 <td className="tnum">{r.day && r.day.endedAt ? fmtTime(r.day.endedAt) : "—"}</td>
                 <td className="n tnum">{r.breakMins ? fmtHM(r.breakMins) : "—"}</td>
                 <td className="n tnum">{r.worked != null ? fmtHM(r.worked) : "—"}</td>
+                <td>
+                  {r.worked != null ? (
+                    <Meter value={r.worked} of={r.member.expectedHoursPerDay * 60}
+                      tone={r.state === "on_break" ? "info"
+                        : r.worked >= r.member.expectedHoursPerDay * 60 ? "ok" : "warn"}
+                      label={<>{fmtHM(r.worked)} of {r.member.expectedHoursPerDay}h</>} />
+                  ) : <span className="dim">no row</span>}
+                </td>
                 <td><DayBar row={r} nowH={nowH} /></td>
               </tr>
             );
@@ -323,6 +383,223 @@ function History({ members, me, scope, date }: {
   );
 }
 
+/* ------------------------------------------------------------ analytics --- */
+
+const SPANS = [{ v: "7", l: "7 days" }, { v: "14", l: "14 days" }, { v: "30", l: "30 days" }];
+
+/** THE SHAPE OF A FORTNIGHT, which no single day can show.
+ *
+ *  Everything here comes from `spanRows` — the same `dayRows` the table draws,
+ *  summed. Two counting rules would be one too many, and the one nobody is
+ *  looking at is always the one that drifts.
+ *
+ *  WHAT IT DELIBERATELY DOES NOT DO: reduce a person to a score. Every column
+ *  is a raw count or a total, every column sorts, and there is no composite
+ *  anywhere on the face. "Meera: 78" would be a number the panel invented and
+ *  a conversation nobody could have honestly.
+ */
+function Analytics({ scope, span, onSpan }: {
+  scope: ReturnType<typeof scopeOf>; span: string; onSpan: (v: string) => void;
+}) {
+  useMembers();
+  const [sort, setSort] = useState("late");
+
+  const days = Math.max(1, Number(span) || 7);
+  const from = addDays(TODAY, -(days - 1));
+  const rows = spanRows(from, TODAY, scope);
+  const t = spanTotals(rows);
+  const daily = spanDays(from, TODAY, scope);
+  const spread = arrivalSpread(rows);
+  /* A window that reaches back past the first row ever written is not showing
+     absence, it is showing the edge of the record — and to a derivation whose
+     whole rule is "an absence is the lack of a row" those two are identical.
+     So the screen says which one it is looking at. */
+  const first = earliestAttendance();
+
+  const rank = (r: SpanRow): number => {
+    if (sort === "present") return r.present;
+    if (sort === "late") return r.late;
+    if (sort === "absent") return r.absent;
+    if (sort === "unclosed") return r.unclosed;
+    if (sort === "worked") return r.worked;
+    if (sort === "avg") return r.present ? r.worked / r.present : 0;
+    return 0;
+  };
+  const sorted = rows.slice().sort((a, b) =>
+    (sort === "name" ? 0 : rank(b) - rank(a)) || a.member.name.localeCompare(b.member.name));
+
+  const col = (k: string, label: string, w?: string) => ({
+    label: (
+      <button className={"tm-sort" + (sort === k ? " on" : "")} onClick={() => setSort(k)}
+        aria-pressed={sort === k}>
+        {label}{sort === k ? <Icon name="chev" size="sm" /> : null}
+      </button>
+    ),
+    cls: k === "name" ? "" : "n",
+    w,
+  });
+
+  const peak = Math.max(1, ...spread.map((x) => x.n));
+
+  return (
+    <>
+      <div className="dls-cmd">
+        <span className="btn-group">
+          {SPANS.map((o) => (
+            <button key={o.v} className={span === o.v ? "on" : ""} onClick={() => onSpan(o.v)}>{o.l}</button>
+          ))}
+        </span>
+        <span className="dim">{fmtDate(from)} to {fmtDate(TODAY)} · weekends excluded</span>
+        <span className="spacer" />
+      </div>
+
+      <div className="dls-body">
+        <Tiles list={[
+          {
+            k: "On time", v: t.onTimePct === null ? "\u2014" : t.onTimePct + "%",
+            s: t.present ? t.late + " late of " + t.present + " days worked" : "nothing worked yet",
+            tone: t.onTimePct !== null && t.onTimePct < 80 ? "warn" : "",
+          },
+          {
+            k: "Average day", v: t.avgDay === null ? "\u2014" : fmtHM(t.avgDay),
+            s: t.days ? "against " + fmtHM(Math.round(t.expected / t.days)) + " expected" : "\u2014",
+          },
+          {
+            k: "Absent", v: String(t.absent),
+            s: t.days ? Math.round((t.absent / t.days) * 100) + "% of expected days" : "\u2014",
+            tone: t.absent ? "bad" : "",
+          },
+          {
+            k: "Unclosed", v: String(t.unclosed),
+            s: "counted towards no total", tone: t.unclosed ? "warn" : "",
+          },
+        ]} />
+
+        {first && from < first ? (
+          <Notice tone="warn" ico="alert" text={
+            <>
+              <b>Nothing is recorded before {fmtDate(first)}.</b> Every earlier day in this window
+              counts as absent, because an absence IS the lack of a row and nothing here can tell
+              "nobody came in" apart from "nothing was written". Narrow the window, or read those
+              days as the edge of the record rather than as a week nobody worked.
+            </>
+          } />
+        ) : null}
+
+        <SectionHead title="Day by day"
+          desc="One bar per working day, across everybody in scope. Absence is the lack of a row, so it is drawn as the part of the bar nobody filled." />
+        <div className="tm-an-days">
+          <div className="tm-an-plot">
+            {daily.map((d) => {
+              const total = Math.max(1, d.present + d.absent + d.onLeave + d.unclosed);
+              const seg = (n: number, cls: string, what: string) => (n
+                ? <i key={cls} className={cls} style={{ height: (n / total) * 100 + "%" }} title={n + " " + what} />
+                : null);
+              return (
+                <span key={d.date} className={"tm-an-day" + (d.date === TODAY ? " today" : "")}>
+                  <span className="tm-an-stack" role="img"
+                    aria-label={fmtDate(d.date) + ": " + (d.present - d.late) + " on time, " + d.late
+                      + " late, " + d.onLeave + " on leave, " + d.absent + " absent, "
+                      + d.unclosed + " unclosed"}>
+                    {seg(d.unclosed, "u", "unclosed")}
+                    {seg(d.absent, "a", "absent")}
+                    {seg(d.onLeave, "l", "on leave")}
+                    {seg(d.late, "t", "late")}
+                    {seg(d.present - d.late, "p", "in on time")}
+                  </span>
+                  <b>{d.date.slice(8)}</b>
+                  <i>{fmtDayName(d.date).slice(0, 1)}</i>
+                </span>
+              );
+            })}
+          </div>
+          <span className="tm-an-key">
+            <span><i className="p" />on time</span>
+            <span><i className="t" />late</span>
+            <span><i className="l" />leave</span>
+            <span><i className="a" />absent</span>
+            <span><i className="u" />unclosed</span>
+          </span>
+        </div>
+
+        <SectionHead title="When people arrive"
+          desc="A spread, not an average. One person at 11:00 moves a mean and tells you nothing about everybody else." />
+        {spread.length ? (
+          <div className="tm-an-spread">
+            {spread.map((b) => (
+              <span key={b.at} className="tm-an-col" title={b.n + " arrivals in the half-hour from " + b.label}>
+                <b>{b.n}</b>
+                <i style={{ height: (b.n / peak) * 100 + "%" }} />
+                <em>{b.label}</em>
+              </span>
+            ))}
+          </div>
+        ) : (
+          <Notice text="Nobody has clocked in over this window, so there is nothing to spread." />
+        )}
+
+        <SectionHead title="Per member"
+          desc="Counts and totals. Every column sorts and none of them add up to a score — that is the point." />
+        <Table
+          scroll min="960px"
+          cols={[col("name", "Member"), col("present", "In", "100px"), col("late", "Late", "110px"),
+            col("absent", "Absent", "100px"), col("unclosed", "Unclosed", "110px"),
+            col("worked", "Worked", "110px"), col("avg", "Average day", "130px"),
+            { label: "Against expected", w: "220px" }]}
+          empty={{ icon: "users", title: "Nobody in scope", body: "No active member reports into this view." }}
+          rows={sorted.map((r) => (
+            <tr key={r.member.memberId}>
+              <td><Who m={r.member} /></td>
+              <td className="n tnum">{r.present}<span className="cell-2">of {r.days}</span></td>
+              <td className={"n tnum" + (r.late ? " u-warn" : "")}>
+                {r.late || "\u2014"}
+                {r.late ? <span className="cell-2">{fmtHM(r.lateMinutes)} over</span> : null}
+              </td>
+              <td className={"n tnum" + (r.absent ? " u-bad" : "")}>{r.absent || "\u2014"}</td>
+              <td className={"n tnum" + (r.unclosed ? " u-warn" : "")}>{r.unclosed || "\u2014"}</td>
+              <td className="n tnum">{fmtHM(r.worked)}</td>
+              <td className="n tnum">{r.present ? fmtHM(Math.round(r.worked / r.present)) : "\u2014"}</td>
+              <td>
+                <Meter value={r.worked} of={Math.max(1, r.expected)}
+                  tone={r.worked >= r.expected * 0.95 ? "ok" : r.worked >= r.expected * 0.8 ? "info" : "warn"}
+                  label={<>{fmtHM(r.worked)} of {fmtHM(r.expected)}</>} />
+              </td>
+            </tr>
+          ))} />
+
+        <Notice text={
+          "An unclosed day adds no hours and is not an absence — it is its own column, exactly as it is on "
+          + "the day view. Nobody is counted before the day they joined, so a new member does not open on a "
+          + "fortnight of absences they could not have attended."} />
+      </div>
+    </>
+  );
+}
+
+/* ------------------------------------------------------------- requests --- */
+
+/** THE QUEUE, ON ITS OWN. It used to sit in the middle of the day table, above
+ *  the rows and below the stats — a fine place for something nobody is looking
+ *  for, and a poor one for the only block on this screen waiting on a person.
+ *  It has a tab and a count now. */
+function Requests() {
+  useLeave();
+  const q = leaveQueue(scopeOf("attendance"));
+  return (
+    <div className="dls-body">
+      {q.total ? <LeaveInbox /> : (
+        <EmptyState icon="inbox" title="Nothing waiting on you"
+          body={"No leave request needs a decision. A request appears here only while it is undecided — "
+            + "once it is approved or refused it lives on that member's own leave page."} />
+      )}
+      <Notice text={
+        "Approving writes no attendance row. It suppresses the derived absence and those days read as "
+        + "On leave instead — which is why a request left sitting here quietly counts as absence until "
+        + "somebody decides it."} />
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------- date nav --- */
 
 function DateNav({ date, onPick }: { date: string; onPick: (d: string) => void }) {
@@ -360,8 +637,7 @@ function DateNav({ date, onPick }: { date: string; onPick: (d: string) => void }
  */
 function LeaveInbox() {
   useLeave();
-  const mine = pendingLeave(scopeOf("attendance"));
-  const unrouted = unroutedLeave().filter((l) => mine.every((x) => x.leaveId !== l.leaveId));
+  const { mine, unrouted } = leaveQueue(scopeOf("attendance"));
   if (!mine.length && !unrouted.length) return null;
 
   return (

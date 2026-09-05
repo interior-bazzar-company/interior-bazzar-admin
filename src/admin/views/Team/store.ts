@@ -666,6 +666,157 @@ export function weekOf(date: string): string[] {
   return out;
 }
 
+/* ====================================================== attendance span === */
+
+/** ONE MEMBER OVER A RANGE OF DAYS, counted the same way one day is counted.
+ *
+ *  Everything here is derived from the same `dayRows` the table draws, so the
+ *  analytics and the day view cannot disagree — the alternative is two
+ *  counting rules, and the one nobody is looking at is always the wrong one.
+ *
+ *  Three things it refuses to get wrong:
+ *
+ *  · **Weekends are not days.** They are excluded from the denominator, so an
+ *    "80% present" figure is 80% of the days somebody was expected.
+ *  · **Nobody is absent before they joined.** A member who started last Tuesday
+ *    is not counted against the fortnight before it. Without this a new joiner
+ *    reads as the worst attender in the company on their first week.
+ *  · **An unclosed day adds no hours and is not an absence.** It is its own
+ *    state, counted separately, exactly as it is on the day view.
+ */
+export interface SpanRow {
+  member: Member;
+  /** Working days this member was actually expected, joining date honoured. */
+  days: number;
+  present: number;
+  late: number;
+  absent: number;
+  onLeave: number;
+  unclosed: number;
+  /** Minutes. `worked` excludes unclosed days, which contribute nothing. */
+  worked: number;
+  expected: number;
+  lateMinutes: number;
+  breakMinutes: number;
+  /** Start times as minutes past midnight, for the arrival spread. */
+  arrivals: number[];
+}
+
+export function spanRows(from: string, to: string, scope: Scope): SpanRow[] {
+  const dates = datesIn(from, to).filter((d) => !isWeekend(d));
+  const out = new Map<string, SpanRow>();
+  membersInScope(scope).filter((m) => m.status === "active").forEach((m) => {
+    out.set(m.memberId, {
+      member: m, days: 0, present: 0, late: 0, absent: 0, onLeave: 0, unclosed: 0,
+      worked: 0, expected: 0, lateMinutes: 0, breakMinutes: 0, arrivals: [],
+    });
+  });
+
+  dates.forEach((d) => {
+    dayRows(d, scope).forEach((r) => {
+      const row = out.get(r.member.memberId);
+      if (!row) return;
+      /* Before somebody joined there is nothing to count and nothing to miss. */
+      if (d < r.member.joiningDate) return;
+      row.days++;
+      row.expected += r.member.expectedHoursPerDay * 60;
+      if (r.state === "unclosed") { row.unclosed++; return; }
+      if (r.state === "on_leave") { row.onLeave++; return; }
+      if (!r.day) { row.absent++; return; }
+      row.present++;
+      row.worked += r.worked || 0;
+      row.breakMinutes += r.breakMins || 0;
+      if (r.day.isLate) { row.late++; row.lateMinutes += r.day.lateByMinutes || 0; }
+      const t = new Date(r.day.startedAt);
+      row.arrivals.push(t.getHours() * 60 + t.getMinutes());
+    });
+  });
+  return Array.from(out.values());
+}
+
+export interface SpanTotals {
+  members: number; days: number; present: number; late: number; absent: number;
+  onLeave: number; unclosed: number; worked: number; expected: number;
+  /** Present days that were NOT late, over present days. Null with no data —
+   *  a percentage of nothing is 0% on screen and a lie in the reader's head. */
+  onTimePct: number | null;
+  /** Average length of a day somebody actually worked, in minutes. */
+  avgDay: number | null;
+}
+
+export function spanTotals(rows: SpanRow[]): SpanTotals {
+  const t: SpanTotals = {
+    members: rows.length, days: 0, present: 0, late: 0, absent: 0, onLeave: 0,
+    unclosed: 0, worked: 0, expected: 0, onTimePct: null, avgDay: null,
+  };
+  rows.forEach((r) => {
+    t.days += r.days; t.present += r.present; t.late += r.late; t.absent += r.absent;
+    t.onLeave += r.onLeave; t.unclosed += r.unclosed;
+    t.worked += r.worked; t.expected += r.expected;
+  });
+  if (t.present) {
+    t.onTimePct = Math.round(((t.present - t.late) / t.present) * 100);
+    t.avgDay = Math.round(t.worked / t.present);
+  }
+  return t;
+}
+
+/** WHEN PEOPLE ACTUALLY ARRIVE, in half-hours. This is the one figure on the
+ *  analytics face that no single day can show, and it is the honest version of
+ *  "are we starting on time" — a spread, not an average, because one person at
+ *  11:00 moves a mean and changes nothing about the rest. */
+export function arrivalSpread(rows: SpanRow[]): { at: number; label: string; n: number }[] {
+  const buckets = new Map<number, number>();
+  rows.forEach((r) => r.arrivals.forEach((mins) => {
+    const slot = Math.floor(mins / 30) * 30;
+    buckets.set(slot, (buckets.get(slot) || 0) + 1);
+  }));
+  return Array.from(buckets.keys()).sort((a, b) => a - b).map((at) => ({
+    at,
+    label: String(Math.floor(at / 60)).padStart(2, "0") + ":" + String(at % 60).padStart(2, "0"),
+    n: buckets.get(at) || 0,
+  }));
+}
+
+/** Each working day of the span, counted across everybody — the shape the
+ *  fortnight had, rather than one number for it. */
+/** THE FIRST DAY ANYBODY EVER CLOCKED, across the whole record.
+ *
+ *  A window that reaches back past this is not showing absence, it is showing
+ *  the edge of the data — and the two are indistinguishable to a derivation
+ *  whose whole rule is "an absence is the lack of a row". So the screen has to
+ *  say which one it is looking at, and this is how it knows. It is a real
+ *  question against a real API too: an attendance table has a first row. */
+export const earliestAttendance = (): string | null =>
+  snap.days.reduce<string | null>((a, d) =>
+    (!a || d.businessDate < a ? d.businessDate : a), null);
+
+export interface SpanDay { date: string; present: number; late: number; absent: number; onLeave: number; unclosed: number }
+
+/** THE SAME PARTITION `spanRows` USES, one entry per day rather than per member.
+ *
+ *  It deliberately does NOT call `attendanceTotals`, and a derivation check
+ *  caught why: that function counts `present` as "a row was opened", so an
+ *  unclosed day is both present AND unclosed there — correct on the day view,
+ *  where the two are separate columns answering separate questions. Here the
+ *  numbers are drawn as one stacked bar, and a stack whose segments overlap is
+ *  a bar that is taller than the team. Every day lands in exactly one of the
+ *  four, and `late` is a subset of `present`. */
+export function spanDays(from: string, to: string, scope: Scope): SpanDay[] {
+  return datesIn(from, to).filter((d) => !isWeekend(d)).map((d) => {
+    const t: SpanDay = { date: d, present: 0, late: 0, absent: 0, onLeave: 0, unclosed: 0 };
+    dayRows(d, scope).forEach((r) => {
+      if (d < r.member.joiningDate) return;
+      if (r.state === "unclosed") { t.unclosed++; return; }
+      if (r.state === "on_leave") { t.onLeave++; return; }
+      if (!r.day) { t.absent++; return; }
+      t.present++;
+      if (r.day.isLate) t.late++;
+    });
+    return t;
+  });
+}
+
 /* ============================================================== work === */
 
 export const isTerminal = (s: WorkStatus) => s === "completed" || s === "cancelled";
@@ -824,6 +975,20 @@ export function leaveOverlap(l: LeaveRequest): LeaveOverlap[] {
  *  the list is what stops that being silent. */
 export const unroutedLeave = (): LeaveRequest[] =>
   snap.leave.filter((l) => l.state === "requested" && !(readMember(l.memberId) || { reportsTo: "x" }).reportsTo);
+
+/** THE WHOLE QUEUE, SPLIT AND DE-DUPLICATED — one function, so the tab's count
+ *  and the list under it cannot disagree.
+ *
+ *  They could, and briefly did: an admin whose scope reaches the founder sees
+ *  that request in `pendingLeave` AND in `unroutedLeave`, and adding the two
+ *  lengths counted it twice. A badge that says 3 over a list of 2 is a badge
+ *  nobody trusts again. */
+export interface LeaveQueue { mine: LeaveRequest[]; unrouted: LeaveRequest[]; total: number }
+export function leaveQueue(scope: Scope): LeaveQueue {
+  const mine = pendingLeave(scope);
+  const unrouted = unroutedLeave().filter((l) => mine.every((x) => x.leaveId !== l.leaveId));
+  return { mine, unrouted, total: mine.length + unrouted.length };
+}
 
 /* ====================================================== documents === */
 

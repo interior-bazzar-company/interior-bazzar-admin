@@ -6,6 +6,106 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-05
 
+### Attendance: the clock moves to the topbar, and the day gets three faces beside it
+
+**Area:** sidebar → Team · `#/attendance` (`?face=today|history|analytics|requests`)
+**Files:** `src/admin/views/Team/Attendance.tsx`, `store.ts`, `team.css`,
+`scripts/tm-smoke.tsx`, `scripts/check-team-derivation.cjs`
+
+**What changed**
+
+**The clock is in the header.** State, hours, the bar against expected, *in at 9:04am · 12m break*,
+and the four buttons — all of it moved out of the body and into the topbar slot on this route. As a
+card it cost a whole band of vertical space on a screen that is otherwise a table, and put the one
+control anybody presses twice a day below the fold on a laptop. The member page already claimed the
+actions live in the topbar; that sentence is now true.
+
+It is a **component in the slot, not a node handed to it.** Published chrome is captured once per
+location, so a node built at publish time would freeze the worked-minutes it had then and sit there
+while the day ran on. The same lesson the face switcher taught, applied before it could bite.
+
+**Four faces where there were two.** *Today* is who is in right now, *History* is what the week
+looked like, **Analytics** is the shape of the last stretch, and **Requests** is what is waiting on
+a decision. The leave queue used to sit *between* the stat strip and the day table — a fine place
+for something nobody is looking for, and a poor one for the only block on the screen blocked on a
+person. It has a tab and a count now.
+
+**The day table gained an *Of expected* column.** "6h 10m" is a fact; whether it is a short day
+depends on what that member is contracted for, and that number lives on the member. Without the
+column the reader has to know eight people's hours by heart.
+
+**Analytics, and what it refuses to do**
+
+Day-by-day stacked bars (on time · late · leave · absent · unclosed), an **arrival spread** in
+half-hours, and a per-member table where every column sorts. There is **no composite score
+anywhere** — TM-OD-11 stands. "Meera: 78" would be a number the panel invented and a conversation
+nobody could have honestly. The spread is a spread rather than an average for the same reason: one
+person at 11:00 moves a mean and says nothing about everybody else.
+
+Everything is summed from the same `dayRows` the table draws. Two counting rules would be one too
+many, and the one nobody is looking at is the one that drifts.
+
+**Three things the derivation refuses to get wrong**
+
+- **Weekends are not days.** They are out of the denominator, so "84% on time" is a share of days
+  somebody was actually expected.
+- **Nobody is absent before they joined.** Without this a new member opens on the worst attendance
+  in the company during their first week.
+- **A window past the first row ever written is showing the edge of the record, not absence** — and
+  to a rule whose whole premise is *an absence is the lack of a row*, those two are identical. The
+  face says which one it is looking at. The default window is 7 days, which is inside the seed;
+  choose 14 or 30 and the notice appears.
+
+**Two bugs the checks caught before a browser did**
+
+- `spanDays` reused `attendanceTotals`, where `present` means "a row was opened" — so an unclosed
+  day counted as **both** present and unclosed. Correct on the day view, where they are separate
+  columns answering separate questions; wrong here, where the numbers are drawn as one stacked bar,
+  and a stack whose segments overlap is a bar taller than the team.
+- The Requests **badge double-counted the founder.** An admin whose scope reaches somebody with no
+  `reportsTo` sees that request in `pendingLeave` *and* in `unroutedLeave`; adding the two lengths
+  counted it twice, while the list below deduplicated. A badge saying 3 over a list of 2 is a badge
+  nobody trusts again. `leaveQueue(scope)` is now the single source for both.
+
+**Temp data**
+
+`src/content/team/attendance.json` → unchanged placeholder. Worth knowing: it holds rows from
+**24 Aug** only, which is why a 14- or 30-day analytics window is mostly the warning above rather
+than a company that stopped coming to work.
+
+**Backend needed**
+
+- `none` for the clock — `openDay` / `startBreak` / `resumeDay` / `endDay` already run through the
+  store and swap to the API unchanged.
+- `GET /api/v1/admin/team/attendance?from&to` → the span the analytics face reads. It must return
+  rows only; every derived state (`absent`, `unclosed`, `on_leave`) stays computed client-side
+  against `asOf`, or the panel gains a second answer to "was this person in".
+
+**Open decisions**
+
+- **TM-OD-11 holds.** Numbers are shown, every column sorts, nothing is scored. The analytics face
+  was the obvious place to break that and did not.
+- **TM-OD-13 · holidays.** "Working day" still means "not a weekend" and nothing more, so a public
+  holiday reads as a company-wide absence. Flagged, not solved — a holiday calendar is a record this
+  module does not have.
+
+**Verified**
+
+`npm run check:team` gained eleven assertions on the span, and two of them failed first: the
+present-day hand count against `dayRows` (37 vs 38, the unclosed-day overlap) and the queue
+de-duplication. Both are fixed and both are asserted. `npm run check:team-render` now renders all
+four attendance faces plus the clock as a topbar node, and asserts the leave queue is **no longer**
+in the middle of the day table.
+
+`npx tsc -b` clean · eslint 0 errors across `src/admin`, `src/routes` and `scripts` · `npm run
+build` green · `team.css` still zero hex/rgba, and the dead `.tm-clock` card rules went with the
+card.
+
+**Not checked:** nothing was clicked in a browser. The topbar slot is finite and the caption and bar
+drop at 1180px and 900px by media query — that was reasoned, not measured on a real window.
+
+---
+
 ### The member is a place, and every operation on them is a page
 
 **Area:** sidebar → Team · `#/team`, `#/team/:id`, `#/team/:id/{attendance,work,leave,reports,agreements,documents,pay}`, `#/attendance`

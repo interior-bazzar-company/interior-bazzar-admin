@@ -48,29 +48,9 @@
 }
 
 /* ------------------------------------------------------------- the clock -- */
-
-.tm-clock {
-  display: flex; flex-wrap: wrap; gap: var(--space-4);
-  align-items: center; justify-content: space-between;
-  padding: var(--space-4) var(--space-5);
-  margin: var(--space-4) var(--page-pad) 0;
-  background: var(--surface-raised);
-  border: 1px solid var(--line); border-radius: var(--radius-lg);
-}
-/* The left edge carries the state, so the card reads before it is read. */
-.tm-clock { border-left: 3px solid var(--line-2) }
-.tm-clock.working { border-left-color: var(--ok-solid) }
-.tm-clock.on_break { border-left-color: var(--info-solid) }
-.tm-clock.unclosed { border-left-color: var(--warn-solid) }
-.tm-clock.absent { border-left-color: var(--bad-solid) }
-
-.tm-clock-l { display: flex; gap: var(--space-3); align-items: center; flex-wrap: wrap; min-width: 0 }
-.tm-clock-v { font-size: var(--text-2xl); line-height: 1; color: var(--text); font-weight: 500 }
-.tm-clock-k { font-size: var(--text-xs); color: var(--text-3) }
-.tm-clock-k b.warn { color: var(--warn); font-weight: 500 }
-.tm-clock-x { font-size: var(--text-2xs); color: var(--text-3) }
-.tm-clock-l .tm-meter { width: 140px }
-.tm-clock-a { display: flex; gap: var(--space-2); align-items: center }
+/* The clock card that used to live at the top of the body is gone: the day now
+   sits in the topbar slot on this route. Its rules moved with it and are at the
+   bottom of this file under `.tm-tclock`. */
 
 /* --------------------------------------------------------------- day bar -- */
 
@@ -988,3 +968,130 @@
   cursor: default; color: var(--text-3);
   font-weight: var(--weight-medium);
 }
+
+/* =========================================================================
+   ATTENDANCE — the clock in the topbar, and the analytics face.
+   -------------------------------------------------------------------------
+   Tokens only. No hex, no rgba: dark mode here is a token swap.
+   ========================================================================= */
+
+/* ---- the clock, in the topbar slot -------------------------------------- */
+/* It earned the slot. As a card it cost a whole band of vertical space on a
+   screen that is otherwise a table, and put the one control anybody presses
+   twice a day below the fold on a laptop. */
+.tm-tclock {
+  display: flex; align-items: center; gap: var(--space-3);
+  min-width: 0;
+}
+.tm-tclock-n { display: flex; flex-direction: column; gap: 3px; min-width: 62px }
+.tm-tclock-n b {
+  font-size: var(--text-base); line-height: 1;
+  font-weight: var(--weight-semibold); color: var(--text);
+}
+.tm-tclock-bar {
+  display: block; height: 3px; width: 100%;
+  border-radius: var(--radius-full); background: var(--bg-active); overflow: hidden;
+}
+.tm-tclock-bar > i {
+  display: block; height: 100%; border-radius: var(--radius-full);
+  background: var(--ok-solid); transition: width var(--duration) var(--ease);
+}
+.tm-tclock.on_break .tm-tclock-bar > i { background: var(--info-solid) }
+.tm-tclock.unclosed .tm-tclock-bar > i { background: var(--warn-solid) }
+.tm-tclock.absent .tm-tclock-bar > i,
+.tm-tclock.not_started .tm-tclock-bar > i { background: var(--neutral-line) }
+
+.tm-tclock-k {
+  font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--text-3);
+  white-space: nowrap;
+}
+.tm-tclock-a { display: flex; align-items: center; gap: var(--space-2) }
+.tm-tclock-x { font-size: var(--text-sm); color: var(--text-3); white-space: nowrap }
+
+/* The topbar is shared chrome and it is finite. The caption is the first thing
+   to go, then the bar; the state, the total and the buttons never go, because
+   they are the reason the block is up there. */
+@media (max-width: 1180px) { .tm-tclock-k { display: none } }
+@media (max-width: 900px) { .tm-tclock-bar { display: none } }
+
+/* ---- analytics: the day-by-day stack ------------------------------------ */
+.tm-an-days {
+  border: 1px solid var(--line); border-radius: var(--radius-lg);
+  background: var(--surface); padding: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+.tm-an-plot {
+  display: flex; gap: 4px; align-items: flex-end;
+  overflow-x: auto; padding-bottom: var(--space-1);
+}
+.tm-an-day {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  flex: 1 1 26px; min-width: 26px;
+}
+.tm-an-stack {
+  display: flex; flex-direction: column; justify-content: flex-end;
+  width: 100%; height: 92px; border-radius: var(--radius-sm);
+  background: var(--bg-inset); overflow: hidden;
+}
+.tm-an-stack > i { display: block; width: 100% }
+.tm-an-stack > i.p { background: var(--ok-solid) }
+.tm-an-stack > i.t { background: var(--warn-solid) }
+.tm-an-stack > i.l { background: var(--info-solid) }
+.tm-an-stack > i.a { background: var(--bad-solid) }
+.tm-an-stack > i.u { background: var(--neutral-line) }
+.tm-an-day b { font-size: var(--text-sm); color: var(--text-2); font-weight: var(--weight-medium) }
+.tm-an-day i { font-size: var(--text-2xs); font-style: normal; color: var(--text-3) }
+.tm-an-day.today b { color: var(--brand-text); font-weight: var(--weight-semibold) }
+
+.tm-an-key {
+  display: flex; gap: var(--space-3); flex-wrap: wrap;
+  margin-top: var(--space-3); padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
+  font-size: var(--text-sm); color: var(--text-3);
+}
+.tm-an-key > span { display: inline-flex; align-items: center; gap: 5px }
+.tm-an-key i {
+  width: 9px; height: 9px; border-radius: 2px; display: inline-block;
+  background: var(--neutral-line);
+}
+.tm-an-key i.p { background: var(--ok-solid) }
+.tm-an-key i.t { background: var(--warn-solid) }
+.tm-an-key i.l { background: var(--info-solid) }
+.tm-an-key i.a { background: var(--bad-solid) }
+.tm-an-key i.u { background: var(--neutral-line) }
+
+/* ---- analytics: the arrival spread -------------------------------------- */
+/* A spread, not an average. One person at 11:00 moves a mean and says nothing
+   about everybody else. */
+.tm-an-spread {
+  display: flex; gap: var(--space-2); align-items: flex-end;
+  border: 1px solid var(--line); border-radius: var(--radius-lg);
+  background: var(--surface); padding: var(--space-3);
+  margin-bottom: var(--space-4); overflow-x: auto;
+}
+.tm-an-col {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  flex: 1 1 46px; min-width: 46px;
+}
+.tm-an-col b {
+  font-size: var(--text-sm); color: var(--text-2); font-weight: var(--weight-semibold);
+}
+.tm-an-col > i {
+  display: block; width: 100%; min-height: 3px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: var(--brand); opacity: .85;
+}
+.tm-an-col em {
+  font-size: var(--text-2xs); font-style: normal; color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- a sortable column head --------------------------------------------- */
+.tm-sort {
+  display: inline-flex; align-items: center; gap: 3px;
+  border: 0; background: none; padding: 0; font: inherit; cursor: pointer;
+  color: inherit; letter-spacing: inherit; text-transform: inherit;
+}
+.tm-sort:hover { color: var(--text) }
+.tm-sort.on { color: var(--text) }
+.tm-sort .ic { width: var(--icon-xs); height: var(--icon-xs); flex: 0 0 var(--icon-xs) }

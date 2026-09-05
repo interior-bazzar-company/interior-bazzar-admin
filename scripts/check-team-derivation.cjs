@@ -339,6 +339,68 @@ require("esbuild").build({
   ok("the member may delete what they handed over",
     S.deleteResource("RS-02").ok === true && S.resourcesFor("86").length === 1);
 
+  head("The attendance span counts exactly what the day view counts");
+  S.resetStore();
+  (() => {
+    const from = S.addDays(S.TODAY, -13);
+    const rows = S.spanRows(from, S.TODAY, "all");
+    const t = S.spanTotals(rows);
+
+    ok("every active member gets a row, including the ones with no attendance",
+      rows.length === S.readMembers().filter((m) => m.status === "active").length);
+
+    /* THE SAME DAYS, COUNTED TWICE, MUST AGREE. If the span used its own rule
+       the analytics face and the day table would drift, and the one nobody is
+       looking at is always the wrong one. */
+    const days = S.datesIn(from, S.TODAY).filter((d) => !S.isWeekend(d));
+    let present = 0;
+    days.forEach((d) => {
+      S.dayRows(d, "all").forEach((r) => {
+        if (d < r.member.joiningDate) return;
+        if (r.state === "unclosed" || r.state === "on_leave") return;
+        if (r.day) present++;
+      });
+    });
+    eq("present days match a hand count over dayRows", t.present, present);
+
+    ok("weekends are not in the denominator",
+      days.every((d) => !S.isWeekend(d)) && t.days === rows.reduce((a, r) => a + r.days, 0));
+
+    /* Nobody is absent before they existed. Without this a new joiner opens on
+       the worst attendance in the company. */
+    const late = S.readMembers().filter((m) => m.joiningDate > from)[0];
+    if (late) {
+      const row = rows.filter((r) => r.member.memberId === late.memberId)[0];
+      ok("a member who joined mid-window is only counted from their joining date",
+        row.days === days.filter((d) => d >= late.joiningDate).length);
+    } else {
+      ok("a member who joined mid-window is only counted from their joining date (none in seed)", true);
+    }
+
+    ok("an unclosed day adds no hours and is not an absence",
+      rows.every((r) => r.present + r.absent + r.onLeave + r.unclosed === r.days));
+    ok("on-time is a share of days WORKED, not of days expected",
+      t.onTimePct === null || t.onTimePct === Math.round(((t.present - t.late) / t.present) * 100));
+    ok("a window with nothing in it reports null rather than a confident zero",
+      (() => {
+        const f = S.addDays(S.TODAY, 400);
+        const e = S.spanTotals(S.spanRows(f, S.addDays(f, 4), "all"));
+        return e.onTimePct === null && e.avgDay === null;
+      })());
+
+    const spread = S.arrivalSpread(rows);
+    ok("the arrival spread is in half-hours and sorted",
+      spread.every((b) => b.at % 30 === 0)
+      && spread.every((b, i) => i === 0 || spread[i - 1].at < b.at));
+    eq("every arrival lands in exactly one bucket",
+      spread.reduce((a, b) => a + b.n, 0), t.present);
+
+    const daily = S.spanDays(from, S.TODAY, "all");
+    eq("one entry per working day", daily.length, days.length);
+    eq("the day-by-day present total is the span present total",
+      daily.reduce((a, d) => a + d.present, 0), t.present);
+  })();
+
   head("A leave request has two ways to be impossible, and both are refusals");
   S.resetStore();
   (() => {
@@ -409,6 +471,18 @@ require("esbuild").build({
       S.unroutedLeave().some((l) => l.leaveId === r.data.leaveId));
     ok("…and is not double-counted in a senior's own queue",
       S.pendingLeave("team").every((l) => l.memberId !== "41"));
+
+    /* THE BADGE AND THE LIST COME FROM ONE FUNCTION. An admin whose scope
+       reaches the founder sees that request in both halves, and adding the two
+       lengths counted it twice — a badge saying 3 over a list of 2 is a badge
+       nobody trusts again. */
+    const q = S.leaveQueue("all");
+    eq("the queue total is the two lists, de-duplicated",
+      q.total, q.mine.length + q.unrouted.length);
+    ok("nothing appears in both halves",
+      q.unrouted.every((l) => q.mine.every((x) => x.leaveId !== l.leaveId)));
+    ok("the founder's request is in the queue exactly once",
+      q.mine.concat(q.unrouted).filter((l) => l.memberId === "41").length === 1);
   })();
 
   head("Team reads pay and never writes it");
