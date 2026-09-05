@@ -6,6 +6,34 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-04
 
+### The pane opens with air, instead of welding its first control to the topbar
+
+**Area:** sidebar → Team → **Calendar** (`#/work`, every face)
+**Files:** `src/admin/views/Team/Work.tsx`, `team.css`
+
+**What changed**
+
+`.dls-body` carries **no top padding by design** — on a list screen the command row above it
+supplies that gap. This module took that row off the calendar and moved the counts into the
+topbar, so nothing was left to hold the first control off the chrome: Create and the date row
+sat flush against the bar above them.
+
+- **The pane provides its own gap** (`.tm-pane`, 16px) on every face, so the layout no longer
+  depends on a band being present to breathe. Board, List and Timeline get it too — they lost
+  the same strip.
+- **16px between the date row and the grid** it drives, up from 12.
+- **Chips stop touching the cell walls** — 8px of side padding instead of 4.
+- The note under the grid takes the same rhythm.
+
+Budget rechecked rather than eyeballed: a row is 122px of its 128px floor (6px spare), and six
+rows plus the heads need 802px — inside the 924px a 1080-tall window leaves, so the rows
+stretch to fill it rather than scrolling.
+
+**Verified**
+`npx tsc -b` clean · eslint 0 errors · `npx vite build` succeeds · both check suites pass.
+
+---
+
 ### The calendar's layout pass: seven defects, measured rather than nudged
 
 **Area:** sidebar → Team → **Calendar** (`#/work`, the calendar face)

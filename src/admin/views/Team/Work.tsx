@@ -176,7 +176,7 @@ export default function Work() {
         </div>
       ) : null}
 
-      <div className={"dls-body" + (face === "calendar" ? " tm-body" : "")}>
+      <div className={"dls-body tm-pane" + (face === "calendar" ? " tm-body" : "")}>
         {face === "calendar" ? <CalendarFace rows={rows} me={me} p={p} goto={goto} onOpen={openItem} members={members} all={all} />
           : face === "board" ? <Board rows={rows} all={all} group={p.group || ""} goto={goto} onOpen={openItem} />
           : face === "timeline" ? <Timeline rows={rows} onOpen={openItem} />

@@ -285,6 +285,13 @@
    timeline is a date grid behind a lane column, and both need their width.
    ============================================================================= */
 
+/* THE BODY OPENS WITH AIR. `.dls-body` carries no top padding by design — the
+   command row above it supplies that gap on a list screen. This module took
+   that row off the calendar and moved the counts to the topbar, which welded
+   the first control to the chrome above it. The pane restores the gap itself,
+   on every face, so nothing here depends on a band being present. */
+.dls-body.tm-pane { padding-top: var(--space-4) }
+
 /* THE CALENDAR IS A ONE-PAGER. `.dls` is already bounded to the viewport, so
    on this face the body stops scrolling and hands its height down: the rail
    scrolls inside itself, the month grid takes what is left, and the page
@@ -436,7 +443,7 @@
 
 .tm-calbar {
   display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap;
-  flex: 0 0 auto; padding-bottom: var(--space-3);
+  flex: 0 0 auto; padding-bottom: var(--space-4);
 }
 .tm-calbar > b { font-size: var(--text-sm); color: var(--text) }
 .tm-calh {
@@ -486,7 +493,7 @@
    month grid has had since paper. The cell itself is the create target, so it
    takes the pointer; the chips inside it stop the click by being the target. */
 .tm-day {
-  min-height: 116px; padding: 0 var(--space-1) var(--space-1); background: var(--bg);
+  min-height: 116px; padding: 0 var(--space-2) var(--space-1); background: var(--bg);
   border-right: 1px solid var(--line); border-top: 1px solid var(--line);
   display: flex; flex-direction: column; gap: 2px; min-width: 0; cursor: pointer;
 }
@@ -547,7 +554,7 @@
    rather than stranded at the far end of a bar of date controls. */
 .tm-calfoot {
   display: flex; align-items: baseline; gap: var(--space-4); flex-wrap: wrap;
-  padding-top: var(--space-2);
+  padding-top: var(--space-3);
 }
 .tm-calfoot .tm-foot { margin: 0; flex: 1 1 320px; min-width: 0 }
 .tm-foot { font-size: var(--text-2xs); color: var(--text-3); margin: var(--space-3) 0 0 }
