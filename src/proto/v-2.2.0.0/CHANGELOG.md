@@ -6,6 +6,33 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-04
 
+### A task you can read: two lines in the week, and done work that looks done
+
+**Area:** sidebar → Team → **Calendar** (`#/work`) — the month and week grids
+**Files:** `src/admin/views/Team/team.css`
+
+**What changed**
+
+- **The week stops truncating.** Every title in it was being cut mid-word to hold one line in
+  a cell four times taller than it needed — and the whole reason to open a week is to read
+  what is on the day. Two lines now, and measured against the seed rather than guessed: **19
+  of 35 task titles are longer than one line and none are longer than two**, so every one of
+  them arrives whole. The floor goes 380 → 560; twelve chips measure 528 of it.
+- **Done work recedes.** Every chip carried full-contrast text whatever state it was in, so a
+  finished task and one nobody has started read identically and the eye had no order to work
+  in. Completed drops to the third text tone with its tick in the ok colour; open work keeps
+  the foreground; only delay and waiting take a tint, because only those two need somebody.
+- **The kind mark was too faint to be doing a job** — third tone on an 11px chip. Second now,
+  so task, milestone and target are told apart at a glance.
+
+The month view is unchanged: one line is all that fits in 132px, and the ellipsis there is the
+honest answer.
+
+**Verified**
+`npx tsc -b` clean · eslint 0 errors · `npx vite build` succeeds · both check suites pass.
+
+---
+
 ### The gap between chips is a different number in a week than in a month
 
 **Area:** sidebar → Team → **Calendar** (`#/work`) — the month and week grids
