@@ -6,6 +6,35 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-04
 
+### The calendar drops its filter row, moves the date controls right, and the rail becomes an indicator
+
+**Area:** sidebar → Team → **Calendar** (`#/work`, the calendar face)
+**Files:** `src/admin/views/Team/Work.tsx`, `workBits.tsx`, `team.css`
+
+**What changed**
+
+- **No filter band on the calendar.** A month is read, not queried: the rail already answers
+  "what is mine" and the grid answers "what is when", and the row was costing 56px of the one
+  face bounded to the viewport. The three faces that ARE lists keep every filter, and a
+  filter set on one of them survives the switch — the chips band stays and can still clear it.
+- **Everything that moves the calendar sits at the right edge,** over the grid it moves:
+  Today, ‹ ›, the month, and the Month/Week pair. The legend holds the left rather than
+  leaving the row half empty.
+- **The rail reads as an indicator, not a list.** A milestone row is now a heading — its name
+  and its one number — over a bar, and nothing else. No "Mine / My team" split, no assignee,
+  no due date: the grid beside it is already carrying all three, and at 248px those headings
+  cost more rows than the rows they introduce.
+- **One target, not four.** It is the number the quarter is judged on; a column of four is a
+  list, not an indicator. What is cut says so — "2 more on the board" — rather than
+  disappearing. The member dashboard and the roll-up keep the detailed rows: one component,
+  a density flag, not a fork.
+
+**Verified**
+`npx tsc -b` clean · eslint 0 errors · `npx vite build` succeeds · both check suites pass.
+Rail content checked against both rosters: 5 milestone bars, 1 target, "2 more on the board".
+
+---
+
 ### Calendar takes the Deals header: a title, and one dropdown that names the face
 
 **Area:** sidebar → Team → **Calendar** (`#/work`)

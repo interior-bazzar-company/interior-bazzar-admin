@@ -53,7 +53,9 @@ export function WaitFlag({ item }: { item: WorkItem }) {
 /** Work done, with a marker for where today sits in the window. Marker ahead of
  *  the fill means behind schedule — two numbers, and no score computed from
  *  them. */
-export function ProgressWindow({ item, showNote }: { item: WorkItem; showNote?: boolean }) {
+export function ProgressWindow({ item, showNote, bare }: {
+  item: WorkItem; showNote?: boolean; bare?: boolean;
+}) {
   const pct = progressOf(item) ?? 0;
   const t = timePct(item);
   const behind = t !== null && t > pct + 5;
@@ -63,7 +65,7 @@ export function ProgressWindow({ item, showNote }: { item: WorkItem; showNote?: 
         <i style={{ width: pct + "%" }} />
         {t !== null ? <b className={"tm-pw-tick" + (behind ? " late" : "")} style={{ left: t + "%" }} /> : null}
       </span>
-      <span className="tm-pw-n tnum">{pct}%</span>
+      {bare ? null : <span className="tm-pw-n tnum">{pct}%</span>}
       {showNote && behind ? (
         <span className="tm-pw-note">{t}% of the window gone, {pct}% done</span>
       ) : null}
@@ -101,10 +103,31 @@ export function TaskRow({ item, onOpen, who }: { item: WorkItem; onOpen: (id: st
   );
 }
 
-export function MarkRow({ item, onOpen, who }: { item: WorkItem; onOpen: (id: string) => void; who?: boolean }) {
+/** COMPACT IS THE RAIL'S ROW. One heading — the name and the one number that
+ *  answers it — and the bar under it. The calendar beside it already carries
+ *  the dates, the assignee and the due day; a second copy of them in a 248px
+ *  column is detail nobody reads twice. */
+export function MarkRow({ item, onOpen, who, compact }: {
+  item: WorkItem; onOpen: (id: string) => void; who?: boolean; compact?: boolean;
+}) {
   const m = who ? readMember(item.assigneeId) : null;
   const target = item.kind === "target";
   const late = isDelayed(item);
+
+  if (compact) {
+    return (
+      <button className={"tm-mk compact" + (target ? " target" : "")} onClick={() => onOpen(item.itemId)}>
+        <span className="tm-mk-h">
+          <b>{item.title}</b>
+          <span className="tnum">{target
+            ? (item.currentValue || 0) + " / " + (item.targetValue || 0)
+            : (progressOf(item) ?? 0) + "%"}</span>
+        </span>
+        <ProgressWindow item={item} bare />
+      </button>
+    );
+  }
+
   return (
     <button className={"tm-mk" + (target ? " target" : "")} onClick={() => onOpen(item.itemId)}>
       <span className="tm-mk-t">
@@ -181,14 +204,35 @@ export function TasksBlock({ who, withTeam, onOpen }: {
 
 /** Mine, then my team — `reportsTo`, one level. A member with no reports never
  *  sees the second heading, and there is no bar against a person anywhere. */
-export function MarksBlock({ kind, who, onOpen }: {
+export function MarksBlock({ kind, who, onOpen, compact, limit }: {
   kind: Exclude<WorkKind, "task">; who: string; onOpen: (id: string) => void;
+  compact?: boolean; limit?: number;
 }) {
   const all = readItems().filter((i) => i.kind === kind && !isTerminal(i.status));
   const team = membersInScope("team", who).map((m) => m.memberId).filter((id) => id !== who);
   const mine = all.filter((i) => i.assigneeId === who);
   const theirs = all.filter((i) => team.indexOf(i.assigneeId) >= 0);
   const title = kind === "target" ? "Targets" : "Milestones";
+
+  /* ONE HEADER, THEN BARS. No "Mine"/"My team" split and no meta line: at rail
+     width those headings cost more rows than the rows they introduce. `limit`
+     says how many belong on a panel that is meant to be read at a glance —
+     what it cuts is named rather than silently dropped. */
+  if (compact) {
+    const rows = mine.concat(theirs);
+    const shown = limit ? rows.slice(0, limit) : rows;
+    const rest = rows.length - shown.length;
+    return (
+      <Block title={title} chip="derived">
+        {shown.length ? (
+          <>
+            {shown.map((i) => <MarkRow key={i.itemId} item={i} onOpen={onOpen} compact />)}
+            {rest > 0 ? <p className="tm-blk-e">{rest} more on the board.</p> : null}
+          </>
+        ) : empty("None open.")}
+      </Block>
+    );
+  }
 
   return (
     <Block title={title} chip="derived">

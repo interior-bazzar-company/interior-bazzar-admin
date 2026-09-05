@@ -149,28 +149,32 @@ export default function Work() {
 
   return (
     <div className="dls">
-      {/* ONE BAND, NOT A TOOLBAR INSIDE A BAND. `.dls-cmd` is already the flex
-          row every list screen uses; wrapping a `.toolbar` in it nested one flex
-          context in another and added a bottom margin, which is what pushed
-          Create onto a line of its own. */}
-      <div className="dls-cmd">
-        <SearchField ph="Search work" name="q" val={p.q} onFilter={onFilter} />
-        <Select name="member" label="Member" value={p.member} onFilter={onFilter}
-          options={members.filter((m) => m.status === "active").map((m) => ({ v: m.memberId, l: m.name }))} />
-        <Select name="kind" label="Kind" value={p.kind} onFilter={onFilter}
-          options={[{ v: "task", l: "Tasks" }, { v: "milestone", l: "Milestones" }, { v: "target", l: "Targets" }]} />
-        <Select name="tag" label="Tag" value={p.tag} onFilter={onFilter}
-          options={slugOptions(tags)} />
-        <Select name="priority" label="Priority" value={p.priority} onFilter={onFilter}
-          options={[{ v: "high", l: "High" }, { v: "medium", l: "Medium" }, { v: "low", l: "Low" }]} />
-        <span className="spacer" />
-        {/* The calendar face carries Create at the top of its own rail, where
-            Google puts it and where the founder asked for it. The other three
-            have no rail, so it rides this row. */}
-        {face === "calendar" ? null : (
+      {/* NO FILTER BAND ON THE CALENDAR. A month is read, not queried: the
+          rail already answers "what is mine", the grid answers "what is when",
+          and the row cost 56px of the one face that is bounded to the viewport.
+          The three faces that ARE lists keep every filter — and a filter set on
+          one of them survives the switch, because the chips band below stays
+          and can still clear it.
+
+          ONE BAND, NOT A TOOLBAR INSIDE A BAND: `.dls-cmd` is already the flex
+          row every list screen uses. */}
+      {face === "calendar" ? null : (
+        <div className="dls-cmd">
+          <SearchField ph="Search work" name="q" val={p.q} onFilter={onFilter} />
+          <Select name="member" label="Member" value={p.member} onFilter={onFilter}
+            options={members.filter((m) => m.status === "active").map((m) => ({ v: m.memberId, l: m.name }))} />
+          <Select name="kind" label="Kind" value={p.kind} onFilter={onFilter}
+            options={[{ v: "task", l: "Tasks" }, { v: "milestone", l: "Milestones" }, { v: "target", l: "Targets" }]} />
+          <Select name="tag" label="Tag" value={p.tag} onFilter={onFilter}
+            options={slugOptions(tags)} />
+          <Select name="priority" label="Priority" value={p.priority} onFilter={onFilter}
+            options={[{ v: "high", l: "High" }, { v: "medium", l: "Medium" }, { v: "low", l: "Low" }]} />
+          <span className="spacer" />
+          {/* Create rides this row on the three faces with no rail; the
+              calendar carries it at the top of its own. */}
           <CreateMenu onPick={(k) => shell.modal(<NewItemModal kind={k} members={members} all={all} />, "sm")} />
-        )}
-      </div>
+        </div>
+      )}
 
       <StatStrip cells={cells} />
 
@@ -425,17 +429,20 @@ function CalendarFace({ rows, me, p, goto, onOpen, members, all }: {
         <Rail me={me} anchor={anchor} rows={rows} onCreate={(k) => create(k)} onOpen={onOpen} />
       </aside>
       <div className="tm-shell-b">
+        {/* Everything that MOVES the calendar sits together at the right edge,
+            over the grid it moves; the legend holds the left rather than
+            leaving the row half empty. */}
         <div className="tm-calbar">
-          <button className="btn sm" onClick={() => goto({ on: undefined })}>Today</button>
-          <button className="btn icon sm" aria-label="Previous" onClick={() => move(-1)}><Icon name="chevl" size="sm" /></button>
-          <button className="btn icon sm" aria-label="Next" onClick={() => move(1)}><Icon name="chevr" size="sm" /></button>
-          <h2 className="tm-calh">{monthLabel(anchor, mode)}</h2>
-          <span className="spacer" />
           <span className="tm-legend">
             <i className="k-info" />stage
             <i className="k-warn" />delay
             <i className="k-bad" />waiting
           </span>
+          <span className="spacer" />
+          <button className="btn sm" onClick={() => goto({ on: undefined })}>Today</button>
+          <button className="btn icon sm" aria-label="Previous" onClick={() => move(-1)}><Icon name="chevl" size="sm" /></button>
+          <button className="btn icon sm" aria-label="Next" onClick={() => move(1)}><Icon name="chevr" size="sm" /></button>
+          <h2 className="tm-calh">{monthLabel(anchor, mode)}</h2>
           <span className="btn-group">
             <button className={mode === "month" ? "on" : ""} onClick={() => goto({ cal: undefined })}>Month</button>
             <button className={mode === "week" ? "on" : ""} onClick={() => goto({ cal: "week" })}>Week</button>
@@ -546,8 +553,10 @@ function Rail({ me, anchor, rows, onCreate, onOpen }: {
         </section>
 
         <TasksBlock who={me} onOpen={onOpen} />
-        <MarksBlock kind="milestone" who={me} onOpen={onOpen} />
-        <MarksBlock kind="target" who={me} onOpen={onOpen} />
+        <MarksBlock kind="milestone" who={me} onOpen={onOpen} compact />
+        {/* ONE target. It is the number the quarter is judged on, and a column
+            of four of them is a list, not an indicator. */}
+        <MarksBlock kind="target" who={me} onOpen={onOpen} compact limit={1} />
       </div>
     </>
   );

@@ -374,6 +374,19 @@
   padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
   margin-bottom: var(--space-2);
 }
+/* THE RAIL'S ROW: a heading and a bar. Nothing else — the grid beside it is
+   already carrying the dates and the names. */
+.tm-mk.compact { padding: var(--space-2) 0 }
+.tm-mk.compact.target {
+  border-top: 0; padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+}
+.tm-mk-h { display: flex; align-items: baseline; gap: var(--space-2); margin-bottom: 5px }
+.tm-mk-h b {
+  flex: 1; min-width: 0; font-weight: 400; font-size: var(--text-xs); color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tm-mk-h .tnum { flex: none; font-size: var(--text-2xs); color: var(--text-2) }
+
 .tm-mk-t { display: flex; gap: var(--space-2); align-items: flex-start }
 .tm-mk-t b { font-weight: 400; font-size: var(--text-xs); color: var(--text); line-height: var(--lh-xs) }
 .tm-mk-v { display: flex; gap: var(--space-2); align-items: baseline; margin: var(--space-2) 0 4px }
