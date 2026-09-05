@@ -703,7 +703,9 @@ export interface SpanRow {
 }
 
 export function spanRows(from: string, to: string, scope: Scope): SpanRow[] {
-  const dates = datesIn(from, to).filter((d) => !isWeekend(d));
+  /* A day nobody has lived yet is not an absence. Same guard as the report
+     span, for the same reason. */
+  const dates = datesIn(from, to).filter((d) => !isWeekend(d) && d <= TODAY);
   const out = new Map<string, SpanRow>();
   membersInScope(scope).filter((m) => m.status === "active").forEach((m) => {
     out.set(m.memberId, {
@@ -803,7 +805,7 @@ export interface SpanDay { date: string; present: number; late: number; absent: 
  *  a bar that is taller than the team. Every day lands in exactly one of the
  *  four, and `late` is a subset of `present`. */
 export function spanDays(from: string, to: string, scope: Scope): SpanDay[] {
-  return datesIn(from, to).filter((d) => !isWeekend(d)).map((d) => {
+  return datesIn(from, to).filter((d) => !isWeekend(d) && d <= TODAY).map((d) => {
     const t: SpanDay = { date: d, present: 0, late: 0, absent: 0, onLeave: 0, unclosed: 0 };
     dayRows(d, scope).forEach((r) => {
       if (d < r.member.joiningDate) return;
@@ -1262,6 +1264,121 @@ export function reviewRows(date: string, scope: Scope, at = now()): ReviewRow[] 
         waiting: items.filter((i) => !!blockerOf(i)).length,
       };
     });
+}
+
+/* ==================================================== reports over a span === */
+
+/** PLANS AND EODS OVER A RANGE, counted the way the day view counts them.
+ *
+ *  The pair is the point: a plan is what somebody meant to do this morning, an
+ *  EOD is what happened, and the gap between `planned` and `done` is the only
+ *  thing in this module that compares an intention with an outcome. Summing
+ *  them here rather than in the component keeps one counting rule; two would
+ *  drift, and the one nobody is watching is the one that drifts.
+ *
+ *  Three rules it inherits from `attentionOf`, deliberately and not by accident:
+ *
+ *  · **Anybody with no reporting line is out of the submission counts.** The
+ *    founder reports to nobody, so a plan from them is owed to nobody. A figure
+ *    that always shows the same person delinquent is a figure people stop
+ *    reading. They still appear in the table — with their expected days at zero,
+ *    which says why rather than hiding them.
+ *  · **An EOD is only owed once that member's own day is over.** `eodDue` takes
+ *    the member and the clock, so missing at four in the afternoon is early.
+ *  · **Weekends are not days, and nobody owes anything before they joined.**
+ */
+export interface ReportSpanRow {
+  member: Member;
+  /** Working days this member was expected to plan for. Zero for anybody with
+   *  no reporting line, which is what keeps them out of the percentages. */
+  days: number;
+  plans: number;
+  /** Days on which an EOD had actually fallen due. */
+  eodsDue: number;
+  eods: number;
+  /** Submitted and still nobody has opened it. */
+  unread: number;
+  /** Plan lines written, and report lines ticked. The two numbers, never a
+   *  score made out of them. */
+  planned: number;
+  done: number;
+}
+
+export function reportSpanRows(from: string, to: string, scope: Scope): ReportSpanRow[] {
+  /* NOTHING IS OWED FOR A DAY THAT HAS NOT HAPPENED. Callers pass `to = TODAY`,
+     so this never bites in the panel — and a derivation that is only correct
+     because of how it happens to be called is one bad argument from lying. A
+     check asking for a window in the future is what found it. */
+  const dates = datesIn(from, to).filter((d) => !isWeekend(d) && d <= TODAY);
+  return membersInScope(scope).filter((m) => m.status === "active").map((m) => {
+    const row: ReportSpanRow = {
+      member: m, days: 0, plans: 0, eodsDue: 0, eods: 0, unread: 0, planned: 0, done: 0,
+    };
+    dates.forEach((d) => {
+      if (d < m.joiningDate) return;
+      if (m.reportsTo) row.days++;
+      const plan = planFor(m.memberId, d);
+      if (plan && plan.submittedAt) { row.plans++; row.planned += plan.lines.length; }
+      const due = eodDue(d, m);
+      if (m.reportsTo && due) row.eodsDue++;
+      const rep = reportFor(m.memberId, d);
+      if (rep && rep.submittedAt) {
+        row.eods++;
+        row.done += rep.lines.filter((l) => l.done).length;
+        if (!rep.acknowledgedById) row.unread++;
+      }
+    });
+    return row;
+  });
+}
+
+export interface ReportSpanTotals {
+  members: number; days: number; plans: number; eodsDue: number; eods: number;
+  unread: number; planned: number; done: number;
+  /** Null rather than zero where there is nothing to divide — a percentage of
+   *  nothing reads as 0% and lands in the reader's head as a failure. */
+  planPct: number | null;
+  eodPct: number | null;
+  keptPct: number | null;
+}
+
+export function reportSpanTotals(rows: ReportSpanRow[]): ReportSpanTotals {
+  const t: ReportSpanTotals = {
+    members: rows.length, days: 0, plans: 0, eodsDue: 0, eods: 0, unread: 0,
+    planned: 0, done: 0, planPct: null, eodPct: null, keptPct: null,
+  };
+  rows.forEach((r) => {
+    t.days += r.days; t.plans += r.plans; t.eodsDue += r.eodsDue; t.eods += r.eods;
+    t.unread += r.unread; t.planned += r.planned; t.done += r.done;
+  });
+  if (t.days) t.planPct = Math.round((t.plans / t.days) * 100);
+  if (t.eodsDue) t.eodPct = Math.round((t.eods / t.eodsDue) * 100);
+  if (t.planned) t.keptPct = Math.round((t.done / t.planned) * 100);
+  return t;
+}
+
+/** The same numbers a day at a time, for the shape rather than the total. */
+export interface ReportSpanDay {
+  date: string; owed: number; plans: number; eodsDue: number; eods: number; unread: number;
+}
+export function reportSpanDays(from: string, to: string, scope: Scope): ReportSpanDay[] {
+  const people = membersInScope(scope).filter((m) => m.status === "active");
+  return datesIn(from, to).filter((d) => !isWeekend(d) && d <= TODAY).map((d) => {
+    const t: ReportSpanDay = { date: d, owed: 0, plans: 0, eodsDue: 0, eods: 0, unread: 0 };
+    people.forEach((m) => {
+      if (d < m.joiningDate) return;
+      if (m.reportsTo) t.owed++;
+      const plan = planFor(m.memberId, d);
+      if (plan && plan.submittedAt) t.plans++;
+      if (m.reportsTo && eodDue(d, m)) t.eodsDue++;
+      const rep = reportFor(m.memberId, d);
+      if (rep && rep.submittedAt) {
+        t.eods++;
+        if (!rep.acknowledgedById) t.unread++;
+      }
+    });
+    return t;
+  });
 }
 
 export interface Attention {

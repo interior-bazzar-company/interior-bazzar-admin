@@ -169,7 +169,34 @@ ok("the scope note is gone from the tab row", at("/attendance").indexOf("tm-scop
 renders("the clock, in the topbar slot", () => node(<TopClock />, "/attendance"),
   ["tm-tclock", "tm-tclock-a"]);
 
-renders("reports", () => at("/reports"), ["dls", "dls-cmd"]);
+/* REPORTS IS THREE TABS NOW. The record, the queue, and the shape of a window —
+   each named by something only it draws, so a tab that renders an empty shell
+   instead of itself fails here rather than in a browser. */
+renders("reports · the record", () => at("/reports"), ["dls", "tabs", "tbl", "tm-datef"]);
+/* `tm-form` and not `fg`: the plan has a read-only branch for a day already
+   submitted, and in this seed the signed-in member has submitted. An assertion
+   that only holds for the empty form is an assertion about the seed. */
+renders("reports · my plan", () => at("/reports?mine=plan"), ["dls-body", "tm-form"]);
+renders("reports · my EOD", () => at("/reports?mine=eod"), ["dls-body"]);
+/* The heading, not the cards: with no session the scope narrows to one member
+   who happens to need nothing, and "nothing needs you" is a correct render of
+   this tab rather than a failure of it. */
+renders("reports · actions", () => at("/reports?face=actions"),
+  ["dls-body", "Needs attention"]);
+renders("reports · analytics", () => at("/reports?face=analytics"),
+  ["tm-an-pair", "tm-sort", "tm-cols3"]);
+(() => {
+  const html = at("/reports");
+  const want = ["Reports", "Actions", "Analytics"];
+  const pos = want.map((l) => html.indexOf(">" + l));
+  ok("every reports tab is drawn", pos.every((i) => i >= 0));
+  ok("...in the order Reports, Actions, Analytics",
+    pos.every((i, n) => n === 0 || pos[n - 1] < i));
+  /* The attention cards and the progress roll-up left the record. One was a
+     queue stacked on top of a table, the other belonged to neither. */
+  ok("the attention cards left the record tab", html.indexOf("tm-attn") < 0);
+  ok("the progress roll-up left the record tab", html.indexOf("tm-cols3") < 0);
+})();
 
 const menu = node(<FaceMenu face="calendar" goto={() => {}} />);
 ["Calendar", "Board", "List", "Timeline"].forEach((l) =>

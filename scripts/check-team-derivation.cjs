@@ -339,6 +339,56 @@ require("esbuild").build({
   ok("the member may delete what they handed over",
     S.deleteResource("RS-02").ok === true && S.resourcesFor("86").length === 1);
 
+  head("Plans and EODs over a span inherit the day view's exclusions");
+  S.resetStore();
+  (() => {
+    const from = S.addDays(S.TODAY, -13);
+    const rows = S.reportSpanRows(from, S.TODAY, "all");
+    const t = S.reportSpanTotals(rows);
+    const days = S.datesIn(from, S.TODAY).filter((d) => !S.isWeekend(d));
+
+    /* ANYBODY WITH NO REPORTING LINE IS OWED NOTHING. The founder reports to
+       nobody, so a plan from them is owed to nobody — and a figure that always
+       shows the same person delinquent is a figure people stop reading. They
+       still get a ROW, with zero expected days, which says why rather than
+       quietly dropping them from the table. */
+    const founder = rows.filter((r) => !r.member.reportsTo)[0];
+    ok("the founder is in the table", !!founder);
+    eq("...and is owed no plans", founder.days, 0);
+    eq("...and no EODs", founder.eodsDue, 0);
+    ok("everybody else is owed the working days since they joined",
+      rows.filter((r) => r.member.reportsTo).every((r) =>
+        r.days === days.filter((d) => d >= r.member.joiningDate).length));
+
+    /* An EOD is owed only once that member's own day is over. Today is usually
+       mid-afternoon in the seed's clock, so today is normally not counted. */
+    ok("an EOD is never owed before the day is over",
+      rows.every((r) => r.eodsDue <= r.days));
+
+    ok("a submitted report can never outnumber the days it could be written on",
+      rows.every((r) => r.eods <= days.filter((d) => d >= r.member.joiningDate).length));
+    ok("unread is a subset of submitted", rows.every((r) => r.unread <= r.eods));
+    ok("done lines never exceed planned lines across the span",
+      t.done <= t.planned || t.planned === 0);
+
+    /* Percentages are null, never a confident zero, where there is nothing to
+       divide — 0% reads as failure and "no data" does not. */
+    const empty = S.reportSpanTotals(S.reportSpanRows(
+      S.addDays(S.TODAY, 400), S.addDays(S.TODAY, 404), "all"));
+    ok("an empty window reports null rather than 0%",
+      empty.planPct === null && empty.eodPct === null && empty.keptPct === null);
+
+    /* The day-by-day shape and the totals are the same numbers. */
+    const daily = S.reportSpanDays(from, S.TODAY, "all");
+    eq("one entry per working day", daily.length, days.length);
+    eq("plans day by day sum to the span total",
+      daily.reduce((a, d) => a + d.plans, 0), t.plans);
+    eq("reports day by day sum to the span total",
+      daily.reduce((a, d) => a + d.eods, 0), t.eods);
+    eq("what was owed day by day sums to the span total",
+      daily.reduce((a, d) => a + d.owed, 0), t.days);
+  })();
+
   head("The attendance span counts exactly what the day view counts");
   S.resetStore();
   (() => {
@@ -387,6 +437,13 @@ require("esbuild").build({
         const e = S.spanTotals(S.spanRows(f, S.addDays(f, 4), "all"));
         return e.onTimePct === null && e.avgDay === null;
       })());
+
+    /* A day nobody has lived yet is not an absence. The report span had the
+       same hole and a future window is what found it. */
+    ok("a window in the future counts no days at all",
+      S.spanRows(S.addDays(S.TODAY, 400), S.addDays(S.TODAY, 404), "all")
+        .every((r) => r.days === 0 && r.absent === 0)
+      && S.spanDays(S.addDays(S.TODAY, 400), S.addDays(S.TODAY, 404), "all").length === 0);
 
     const spread = S.arrivalSpread(rows);
     ok("the arrival spread is in half-hours and sorted",

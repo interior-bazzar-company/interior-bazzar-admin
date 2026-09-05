@@ -6,6 +6,89 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-05
 
+### Reports splits into Reports · Actions · Analytics
+
+**Area:** sidebar → Team · `#/reports` (`?face=actions|analytics`, `?mine=plan|eod`, `?date=`, `?span=`)
+**Files:** `src/admin/views/Team/Reports.tsx`, `store.ts`, `team.css`,
+`scripts/tm-smoke.tsx`, `scripts/check-team-derivation.cjs`
+
+**What changed**
+
+One screen carried four different jobs: a queue of things to approve, a roll-up of work progress, a
+table of who submitted what, and two forms for writing your own. **Three tabs now, split by what you
+came to do.**
+
+- **Reports** — the record. Who was in, what they said they would do, what came back. Plus the two
+  forms, as a segmented control on the right: *Everyone · My plan · My EOD*.
+- **Actions** — only the things blocked on a person, with the count on the tab. It was the top block
+  of the day view, stacked above a table, which is how a queue gets missed. The tab carries the
+  number so an empty queue does not have to be opened to be discovered empty, and it renders
+  *"nothing needs you"* rather than a blank page.
+- **Analytics** — plans and reports over a window, and **the comparison this module exists to
+  make**: what people said they would do against what came back. `planned` and `done` are both on
+  screen; the bar between them is the same derived shape a milestone bar is. No column adds up with
+  another, nothing is weighted, and the table sorts by whichever raw count you ask for.
+
+**The day is a field on the Reports tab.** These are per-day records and the page could only ever
+show today — so yesterday's EOD, the one you actually want over coffee, was unreachable. Same
+control as the attendance toolbar, `max` set to today.
+
+**Progress moved to Analytics.** The three blocks the calendar rail draws sat between a table of
+submissions and a queue of approvals, belonging to neither.
+
+**Three exclusions the span inherits, deliberately**
+
+They are the same ones `attentionOf` already applied to the day view, and getting them wrong is what
+makes a number people stop reading:
+
+- **Anybody with no reporting line is owed nothing.** The founder reports to nobody, so a plan from
+  them is owed to nobody. They keep a row reading *not owed* rather than being dropped — the table
+  says why instead of hiding the question.
+- **An EOD is owed only once that member's own day is over.** Missing at four in the afternoon is
+  early.
+- **Weekends are not days, and nobody owes anything before they joined.**
+
+**A defect the checks found**
+
+Both spans counted a day **in the future** as owed, and as absent. It never bit in the panel, because
+every caller passes `to = TODAY` — and a derivation that is only correct because of how it happens to
+be called is one bad argument away from lying. A check asking for a window four hundred days out is
+what surfaced it. Guarded in `reportSpanRows`, `reportSpanDays`, `spanRows` and `spanDays`.
+
+**Temp data** `src/content/team/{plans,reports}.json` → unchanged placeholders. Read here by
+`reportSpanRows` / `reportSpanDays`.
+
+**Backend needed**
+
+- `GET /api/v1/admin/team/plans?from&to` and `/reports?from&to` → the window the Analytics tab reads.
+  `submittedAt` and `acknowledgedById` are the only two fields the counts depend on; every
+  percentage stays derived client-side against `asOf`.
+
+**Open decisions**
+
+- **TM-OD-11 holds.** The Analytics tab was the obvious place to invent a submission score and did
+  not. Two numbers and the ratio between them, both shown.
+
+**Verified**
+
+`check:team` gained thirteen assertions on the report span — the founder exclusion, the EOD-due
+rule, unread as a subset of submitted, null rather than 0% on an empty window, and the day-by-day
+totals reconciling with the span totals. One of them failed first and found the future-day bug.
+
+`check:team-render` renders all three tabs plus both forms, and asserts the tab **order** rather than
+just their presence, that the attention cards left the record tab, and that the progress roll-up
+left it too. Two of my own assertions failed first for the right reason — they were shaped around
+the seed (an empty plan form, a non-empty queue) rather than around the markup, and were rewritten.
+
+`tsc -b` clean · eslint 0 errors across `src/admin`, `src/routes` and `scripts` · `check:team-nav` ·
+`check:users-render` · `check:finance-render` · build green · `team.css` still zero hex/rgba.
+
+**Not checked:** nothing was clicked in a browser. In the render harness there is no session, so the
+scope narrows to one member and the Actions tab renders its empty state — the populated card layout
+is asserted nowhere and was not eyeballed.
+
+---
+
 ### Tabs can carry an icon, and the attendance queue moves to second
 
 **Area:** panel-wide `.tabs`; `#/attendance` tab order

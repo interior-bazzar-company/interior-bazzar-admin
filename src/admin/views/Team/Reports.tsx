@@ -1,9 +1,16 @@
 /* =============================================================================
    Reports — #/reports
    -----------------------------------------------------------------------------
-     #/reports                 the senior's day: needs attention, then everyone
-     #/reports?face=plan       my plan for today — what am I doing
-     #/reports?face=eod        my end-of-day report — what got done
+     #/reports                       the records: today by member, and my own two forms
+     #/reports?face=actions          only the things blocked on a person
+     #/reports?face=analytics        plans and EODs over a window
+
+   THREE TABS, AND THE SPLIT IS BY WHAT YOU CAME TO DO. Reports is the record —
+   who wrote what, and the two forms where you write your own. Actions is the
+   short list of things that have stopped because a specific person has not
+   moved, and it carries a count so it can be read from the tab. Analytics is
+   the shape of a fortnight. They were one screen, which meant the actions were
+   buried above a table and the analytics did not exist.
 
    TWO FORMS AND ONE REVIEW, over the same records. A plan line CREATES OR LINKS
    a work item, and ticking that line in the EOD COMPLETES it — so "what they
@@ -24,16 +31,17 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
-import { Icon, Notice, SectionHead, StatStrip, Table, TbTitle, qs } from "../../ui";
+import { Icon, Notice, SectionHead, StatStrip, Table, TbTitle, Tiles, qs } from "../../ui";
 import { go } from "../../ui/nav";
 import type { StatCell } from "../../ui";
 import {
-  TODAY, acknowledgeReport, attentionOf, fmtDate, fmtDayName, fmtHM, fmtTime,
-  meId, pendingLeave, readMember, scopeLabel, scopeOf, submitPlan, submitReport,
-  unopenedAgreements, useAgreements, useLeave, useMe, usePlan, useReport, useReview, useWork,
+  TODAY, acknowledgeReport, addDays, attentionOf, fmtDate, fmtDayName, fmtHM, fmtTime,
+  meId, pendingLeave, readMember, reportSpanDays, reportSpanRows, reportSpanTotals, scopeOf,
+  submitPlan, submitReport, unopenedAgreements, useAgreements, useLeave, useMe, usePlan,
+  useReport, useReports, useReview, useWork,
 } from "./store";
-import type { Priority, ReviewRow, WorkItem } from "./store";
-import { PriorityChip, ScopeNote, StatePill, Who } from "./bits";
+import type { Priority, ReportSpanRow, ReviewRow, WorkItem } from "./store";
+import { Meter, PriorityChip, StatePill, Who } from "./bits";
 import { MarksBlock, TasksBlock } from "./workBits";
 import { ensureAdopted } from "./adopt";
 import "./team.css";
@@ -48,14 +56,13 @@ export default function Reports() {
     return o;
   }, [sp]);
 
-  const face = p.face === "plan" ? "plan" : p.face === "eod" ? "eod" : "today";
+  const face = FACES.some((f) => f.k === p.face) ? (p.face as string) : "reports";
+  const mine = p.mine === "plan" ? "plan" : p.mine === "eod" ? "eod" : "";
+  const date = p.date && p.date <= TODAY ? p.date : TODAY;
   const scope = scopeOf("reports");
-  const rows = useReview(TODAY, scope);
+  const rows = useReview(date, scope);
 
-  usePageChrome({
-    crumbs: <TbTitle label="Reports" to="#/reports" />,
-    right: <ScopeNote text={scopeLabel(scope, rows.length)} />,
-  }, face);
+  usePageChrome({ crumbs: <TbTitle label="Reports" to="#/reports" /> }, face + mine + date);
 
   useEffect(() => { ensureAdopted(); }, []);
 
@@ -68,34 +75,102 @@ export default function Reports() {
     go(ROUTE + qs(next));
   }, [p]);
 
+  /* The count on the tab is the whole reason Actions is a tab: a queue you have
+     to open to discover is empty is a queue you stop opening. */
+  const a = attentionOf(rows);
+  const pending = a.noPlan.length + a.noEod.length + a.unacknowledged.length
+    + pendingLeave(scope).length + unopenedAgreements(scope).length;
+
   return (
     <div className="dls">
-      <div className="dls-cmd">
-        <span className="btn-group">
-          <button className={face === "today" ? "on" : ""} onClick={() => goto({ face: undefined })}>
-            <Icon name="users" size="sm" />The day
-          </button>
-          <button className={face === "plan" ? "on" : ""} onClick={() => goto({ face: "plan" })}>
-            <Icon name="check" size="sm" />My plan
-          </button>
-          <button className={face === "eod" ? "on" : ""} onClick={() => goto({ face: "eod" })}>
-            <Icon name="doc" size="sm" />My EOD
-          </button>
-        </span>
-        <span className="spacer" />
-        <span className="dim tnum">{fmtDayName(TODAY)} {fmtDate(TODAY)}</span>
+      <div className="dls-chips">
+        <div className="tabs">
+          {FACES.map((f) => (
+            <button key={f.k} className={face === f.k ? "on" : ""}
+              onClick={() => goto({ face: f.k === "reports" ? undefined : f.k, mine: undefined })}>
+              <Icon name={f.icon} size="sm" />{f.label}
+              {f.k === "actions" && pending ? <span className="n">{pending}</span> : null}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {face === "today" ? <TheDay rows={rows} /> : null}
-      {face === "plan" ? <div className="dls-body"><PlanForm /></div> : null}
-      {face === "eod" ? <div className="dls-body"><EodForm /></div> : null}
+      {face === "reports" ? (
+        <>
+          <div className="dls-cmd">
+            <span className="btn-group">
+              <button className={!mine ? "on" : ""} onClick={() => goto({ mine: undefined })}>
+                <Icon name="users" size="sm" />Everyone
+              </button>
+              <button className={mine === "plan" ? "on" : ""} onClick={() => goto({ mine: "plan" })}>
+                <Icon name="check" size="sm" />My plan
+              </button>
+              <button className={mine === "eod" ? "on" : ""} onClick={() => goto({ mine: "eod" })}>
+                <Icon name="doc" size="sm" />My EOD
+              </button>
+            </span>
+            <span className="spacer" />
+            {/* THE DAY IS A FIELD. These are per-day records and the page could
+                only ever show today — so yesterday's EOD, the one you actually
+                want to read this morning, was unreachable. The two forms write
+                for today only, so the field is theirs to ignore. */}
+            {!mine ? (
+              <DateNav date={date} onPick={(d) => goto({ date: d === TODAY ? undefined : d })} />
+            ) : (
+              <span className="dim tnum">{fmtDayName(TODAY)} {fmtDate(TODAY)}</span>
+            )}
+          </div>
+          {mine === "plan" ? <div className="dls-body"><PlanForm /></div>
+            : mine === "eod" ? <div className="dls-body"><EodForm /></div>
+              : <TheDay rows={rows} date={date} />}
+        </>
+      ) : null}
+
+      {face === "actions" ? <Actions rows={rows} /> : null}
+      {face === "analytics" ? (
+        <Analytics scope={scope} span={p.span || "7"}
+          onSpan={(v) => goto({ span: v === "7" ? undefined : v })} />
+      ) : null}
+    </div>
+  );
+}
+
+/* ORDER IS URGENCY. The record is what the page is for, Actions is the only tab
+   that can be waiting on the reader, and the shape of a fortnight comes last. */
+const FACES = [
+  { k: "reports", label: "Reports", icon: "doc" },
+  { k: "actions", label: "Actions", icon: "inbox" },
+  { k: "analytics", label: "Analytics", icon: "chart" },
+];
+
+/** Step a day, or pick one. Same control as the attendance toolbar, and `max`
+ *  is what refuses a future date rather than a disabled button somebody routes
+ *  around by typing the URL. */
+function DateNav({ date, onPick }: { date: string; onPick: (d: string) => void }) {
+  return (
+    <div className="tm-datenav">
+      <button className="btn icon sm" aria-label="Previous day" onClick={() => onPick(addDays(date, -1))}>
+        <Icon name="chevl" size="sm" />
+      </button>
+      <input type="date" className="inp sm tm-datef" value={date} max={TODAY}
+        aria-label="Show this day"
+        onChange={(e) => { if (e.target.value && e.target.value <= TODAY) onPick(e.target.value); }} />
+      <button className="btn icon sm" aria-label="Next day" disabled={date >= TODAY}
+        onClick={() => onPick(addDays(date, 1))}>
+        <Icon name="chevr" size="sm" />
+      </button>
+      <button className="btn sm" disabled={date === TODAY} onClick={() => onPick(TODAY)}>Today</button>
     </div>
   );
 }
 
 /* -------------------------------------------------------------- the day --- */
 
-function TheDay({ rows }: { rows: ReviewRow[] }) {
+/** THE RECORD, for one day. Who was in, what they said they would do, and what
+ *  came back. The two blocks that used to sit on top of it — the attention
+ *  cards and "waiting on you" — are the Actions tab now: they are things to DO,
+ *  and burying them above a table is how a queue gets missed. */
+function TheDay({ rows, date }: { rows: ReviewRow[]; date: string }) {
   const shell = useShell();
   const a = attentionOf(rows);
 
@@ -113,51 +188,24 @@ function TheDay({ rows }: { rows: ReviewRow[] }) {
     { k: "unread reports", v: a.unacknowledged.length, dot: a.unacknowledged.length ? "info" : "" },
   ];
 
-  const anything = a.noPlan.length || a.noEod.length || a.delayed.length
-    || a.waiting.length || a.lateOrAbsent.length || a.unacknowledged.length;
+  const anything = a.noPlan.length || a.noEod.length || a.unacknowledged.length;
 
   return (
     <>
       <StatStrip cells={cells} />
       <div className="dls-body">
-
-        <SectionHead title="Needs attention"
-          desc="Everything here is a filter over the same rows below — a count and the list it opens cannot disagree." />
         {anything ? (
-          <div className="tm-attn">
-            <AttnCard title="No plan submitted" tone="warn"
-              names={a.noPlan.map((r) => r.member.name)}
-              note="Anybody with no reporting line is excluded — a number that always shows the founder delinquent is one people learn to ignore." />
-            <AttnCard title="EOD outstanding" tone="warn"
-              names={a.noEod.map((r) => r.member.name)}
-              note="Counted only once that member's own day is over." />
-            <AttnCard title="Overdue work" tone="warn"
-              names={a.delayed.map((i) => i.title)} to="#/work?status=delayed" />
-            <AttnCard title="Waiting on another item" tone="bad"
-              names={a.waiting.map((i: WorkItem) => i.title)} to="#/work?wait=1" />
-            <AttnCard title="Late or absent" tone="warn"
-              names={a.lateOrAbsent.map((r) => r.member.name)} to="#/attendance" />
-            <AttnCard title="Reports nobody has read" tone="info"
-              names={a.unacknowledged.map((r) => r.member.name)}
-              note="A report nobody read is worse than one nobody wrote — the person who wrote it believes it was read." />
-          </div>
-        ) : (
-          <Notice tone="ok" text="Nothing needs you. Every plan is in, no work is overdue or blocked, and every report has been read." />
-        )}
+          <Notice tone="warn" ico="inbox" text={
+            <>
+              <b>{a.noPlan.length + a.noEod.length + a.unacknowledged.length} of these rows need
+                somebody to move.</b> They are listed with the rest of the queue on the Actions tab,
+              rather than stacked on top of the record you came here to read.
+            </>
+          } />
+        ) : null}
 
-        <WaitingOnYou rows={rows} />
-
-        <SectionHead title="Progress"
-          desc="The same three blocks as the calendar rail, one level wider — you and your reports."
-          right={<button className="btn sm" data-go="#/work?face=timeline"
-            onClick={() => go("#/work?face=timeline")}>Open the milestone timeline</button>} />
-        <div className="tm-cols3 tm-gap-b">
-          <TasksBlock who={meId()} withTeam onOpen={openWork} />
-          <MarksBlock kind="milestone" who={meId()} onOpen={openWork} />
-          <MarksBlock kind="target" who={meId()} onOpen={openWork} />
-        </div>
-
-        <SectionHead title="Today, by member" desc="Click any row to open that member's work." />
+        <SectionHead title={date === TODAY ? "Today, by member" : fmtDayName(date) + " " + fmtDate(date) + ", by member"}
+          desc="Click any row to open that member's work." />
         <Table
           scroll min="1040px"
           cols={[
@@ -230,6 +278,51 @@ function TheDay({ rows }: { rows: ReviewRow[] }) {
 
 const openWork = (id: string) => go("#/work" + qs({ item: id }));
 
+/* ------------------------------------------------------------- actions --- */
+
+/** ONLY THE THINGS BLOCKED ON A PERSON. Every card is one query rather than a
+ *  feed, and the tab carries the count so an empty queue does not have to be
+ *  opened to be discovered empty.
+ *
+ *  It renders its own empty state rather than nothing: a tab that draws a blank
+ *  page reads as broken, and "nothing needs you" is a genuinely useful sentence
+ *  at five in the afternoon. */
+function Actions({ rows }: { rows: ReviewRow[] }) {
+  const a = attentionOf(rows);
+  const anything = a.noPlan.length || a.noEod.length || a.delayed.length
+    || a.waiting.length || a.lateOrAbsent.length || a.unacknowledged.length;
+
+  return (
+    <div className="dls-body">
+      <SectionHead title="Needs attention"
+        desc="Each card is a filter over the same rows the Reports tab lists — a count and the list it opens cannot disagree." />
+      {anything ? (
+        <div className="tm-attn">
+          <AttnCard title="No plan submitted" tone="warn"
+            names={a.noPlan.map((r) => r.member.name)}
+            note="Anybody with no reporting line is excluded — a number that always shows the founder delinquent is one people learn to ignore." />
+          <AttnCard title="EOD outstanding" tone="warn"
+            names={a.noEod.map((r) => r.member.name)}
+            note="Counted only once that member's own day is over." />
+          <AttnCard title="Overdue work" tone="warn"
+            names={a.delayed.map((i) => i.title)} to="#/work?status=delayed" />
+          <AttnCard title="Waiting on another item" tone="bad"
+            names={a.waiting.map((i: WorkItem) => i.title)} to="#/work?wait=1" />
+          <AttnCard title="Late or absent" tone="warn"
+            names={a.lateOrAbsent.map((r) => r.member.name)} to="#/attendance" />
+          <AttnCard title="Reports nobody has read" tone="info"
+            names={a.unacknowledged.map((r) => r.member.name)}
+            note="A report nobody read is worse than one nobody wrote — the person who wrote it believes it was read." />
+        </div>
+      ) : (
+        <Notice tone="ok" ico="check" text="Nothing needs you. Every plan is in, no work is overdue or blocked, and every report has been read." />
+      )}
+
+      <WaitingOnYou rows={rows} />
+    </div>
+  );
+}
+
 /** §3.12 — not the work, the things only THIS reader can move: a leave request
  *  waits for a decision, a submitted EOD waits to be read, a sent agreement
  *  waits to be opened. Renders only when something is in it. */
@@ -272,6 +365,180 @@ function WaitingOnYou({ rows }: { rows: ReviewRow[] }) {
             ))}</ul>
           </div>
         ) : null}
+      </div>
+    </>
+  );
+}
+
+/* ----------------------------------------------------------- analytics --- */
+
+const SPANS = [{ v: "7", l: "7 days" }, { v: "14", l: "14 days" }, { v: "30", l: "30 days" }];
+
+/** PLANS AND EODS OVER A WINDOW, and the one comparison this module exists to
+ *  make: what people said they would do against what came back.
+ *
+ *  `planned` and `done` are both shown. The ratio between them is drawn too,
+ *  because it is the same kind of derived figure a milestone bar is — completed
+ *  over total, with both numbers on screen beside it. What is NOT here is a
+ *  score: no column adds up with another, nothing is weighted, and the table
+ *  sorts by whichever raw count you asked for. "Meera: 78" would be a number
+ *  the panel invented.
+ *
+ *  Progress lives here too. It is the three blocks the calendar rail draws, one
+ *  level wider, and it was on the day view — where it sat between a table of
+ *  who submitted what and a queue of things to approve, belonging to neither. */
+function Analytics({ scope, span, onSpan }: {
+  scope: ReturnType<typeof scopeOf>; span: string; onSpan: (v: string) => void;
+}) {
+  useReports();
+  const [sort, setSort] = useState("eods");
+
+  const days = Math.max(1, Number(span) || 7);
+  const from = addDays(TODAY, -(days - 1));
+  const rows = reportSpanRows(from, TODAY, scope);
+  const t = reportSpanTotals(rows);
+  const daily = reportSpanDays(from, TODAY, scope);
+
+  const rank = (r: ReportSpanRow): number => {
+    if (sort === "plans") return r.plans;
+    if (sort === "eods") return r.eods;
+    if (sort === "unread") return r.unread;
+    if (sort === "planned") return r.planned;
+    if (sort === "done") return r.done;
+    if (sort === "kept") return r.planned ? r.done / r.planned : -1;
+    return 0;
+  };
+  const sorted = rows.slice().sort((a, b) =>
+    (sort === "name" ? 0 : rank(b) - rank(a)) || a.member.name.localeCompare(b.member.name));
+
+  const col = (k: string, label: string, w?: string) => ({
+    label: (
+      <button className={"tm-sort" + (sort === k ? " on" : "")} onClick={() => setSort(k)}
+        aria-pressed={sort === k}>
+        {label}{sort === k ? <Icon name="chev" size="sm" /> : null}
+      </button>
+    ),
+    cls: k === "name" ? "" : "n",
+    w,
+  });
+
+  return (
+    <>
+      <div className="dls-cmd">
+        <span className="btn-group">
+          {SPANS.map((o) => (
+            <button key={o.v} className={span === o.v ? "on" : ""} onClick={() => onSpan(o.v)}>{o.l}</button>
+          ))}
+        </span>
+        <span className="dim">{fmtDate(from)} to {fmtDate(TODAY)} · weekends excluded</span>
+        <span className="spacer" />
+      </div>
+
+      <div className="dls-body">
+        <Tiles list={[
+          {
+            k: "Plans in", v: t.planPct === null ? "\u2014" : t.planPct + "%",
+            s: t.plans + " of " + t.days + " owed",
+            tone: t.planPct !== null && t.planPct < 70 ? "warn" : "",
+          },
+          {
+            k: "Reports in", v: t.eodPct === null ? "\u2014" : t.eodPct + "%",
+            s: t.eods + " of " + t.eodsDue + " due",
+            tone: t.eodPct !== null && t.eodPct < 70 ? "warn" : "",
+          },
+          {
+            k: "Nobody read", v: String(t.unread),
+            s: t.eods ? "of " + t.eods + " submitted" : "nothing submitted",
+            tone: t.unread ? "warn" : "",
+          },
+          {
+            k: "Planned, then done", v: t.keptPct === null ? "\u2014" : t.keptPct + "%",
+            s: t.done + " of " + t.planned + " lines",
+          },
+        ]} />
+
+        {t.unread ? (
+          <Notice tone="warn" ico="inbox" text={
+            <><b>{t.unread} report{t.unread > 1 ? "s" : ""} nobody has opened.</b> The person who
+              wrote each one believes it was read. That is the failure this number exists to
+              surface — it is the only one on the page that is nobody's fault but the reader's.</>
+          } />
+        ) : null}
+
+        <SectionHead title="Day by day"
+          desc="Plans and reports against what was owed. A day with nothing owed — a weekend, or before anybody joined — is not drawn." />
+        <div className="tm-an-days">
+          <div className="tm-an-plot">
+            {daily.map((d) => {
+              const top = Math.max(1, d.owed, d.eodsDue);
+              return (
+                <span key={d.date} className={"tm-an-day" + (d.date === TODAY ? " today" : "")}>
+                  <span className="tm-an-pair" role="img"
+                    aria-label={fmtDate(d.date) + ": " + d.plans + " of " + d.owed + " plans, "
+                      + d.eods + " of " + d.eodsDue + " reports, " + d.unread + " unread"}>
+                    <i className="pl" style={{ height: (d.plans / top) * 100 + "%" }}
+                      title={d.plans + " of " + d.owed + " plans"} />
+                    <i className="eo" style={{ height: (d.eods / top) * 100 + "%" }}
+                      title={d.eods + " of " + d.eodsDue + " reports"} />
+                  </span>
+                  <b>{d.date.slice(8)}</b>
+                  <i>{fmtDayName(d.date).slice(0, 1)}</i>
+                </span>
+              );
+            })}
+          </div>
+          <span className="tm-an-key">
+            <span><i className="pl" />plan submitted</span>
+            <span><i className="eo" />report submitted</span>
+            <span className="dim">against what was owed that day</span>
+          </span>
+        </div>
+
+        <SectionHead title="Per member"
+          desc="Counts, and one ratio made of two of them. Every column sorts and nothing adds up to a rating." />
+        <Table
+          scroll min="940px"
+          cols={[col("name", "Member"), col("plans", "Plans", "110px"), col("eods", "Reports", "120px"),
+            col("unread", "Unread", "110px"), col("planned", "Lines planned", "140px"),
+            col("done", "Done", "100px"), col("kept", "Of those planned", "200px")]}
+          empty={{ icon: "users", title: "Nobody in scope", body: "You see yourself and the members whose reporting line points at you." }}
+          rows={sorted.map((r) => (
+            <tr key={r.member.memberId}>
+              <td><Who m={r.member} /></td>
+              <td className="n tnum">
+                {r.days ? r.plans + " / " + r.days : <span className="dim">not owed</span>}
+              </td>
+              <td className="n tnum">
+                {r.eodsDue ? r.eods + " / " + r.eodsDue : <span className="dim">not owed</span>}
+              </td>
+              <td className={"n tnum" + (r.unread ? " u-warn" : "")}>{r.unread || "\u2014"}</td>
+              <td className="n tnum">{r.planned || "\u2014"}</td>
+              <td className="n tnum">{r.done || "\u2014"}</td>
+              <td>
+                {r.planned
+                  ? <Meter value={r.done} of={r.planned}
+                      tone={r.done >= r.planned * 0.8 ? "ok" : r.done >= r.planned * 0.5 ? "info" : "warn"}
+                      label={<>{r.done} of {r.planned}</>} />
+                  : <span className="dim">nothing planned</span>}
+              </td>
+            </tr>
+          ))} />
+
+        <Notice text={
+          "Anybody with no reporting line is owed nothing and reads as \u201cnot owed\u201d rather than as a "
+          + "failure \u2014 a figure that always shows the founder delinquent is a figure people stop reading. "
+          + "An EOD counts as due only once that member's own day is over."} />
+
+        <SectionHead title="Progress"
+          desc="The three blocks the calendar rail draws, one level wider — you and your reports. Derived from the children, never typed."
+          right={<button className="btn sm" onClick={() => go("#/work?face=timeline")}>
+            Open the milestone timeline
+          </button>} />
+        <div className="tm-cols3 tm-gap-b">
+          <TasksBlock who={meId()} withTeam onOpen={openWork} />
+          <MarksBlock kind="milestone" who={meId()} onOpen={openWork} />
+          <MarksBlock kind="target" who={meId()} onOpen={openWork} />
+        </div>
       </div>
     </>
   );
