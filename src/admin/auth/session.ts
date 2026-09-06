@@ -70,6 +70,18 @@ export const HIDDEN_MODULES = new Set(["design", "payments"]);
  *  nav rows are reachable while the surfaces are built. Each key comes out in
  *  the commit that gives it either server data or a server write.
  *
+ *  `resources` (the form module) qualifies on both counts as well: its four
+ *  definitions and nine responses are fixtures in src/content/resources/*.json,
+ *  and creating a form or submitting an answer writes the browser tab and
+ *  nothing else. It is the newest entry here and it comes out the same way the
+ *  others do.
+ *
+ *  `agreements` is the same case again, with one wrinkle worth naming: the
+ *  AGREEMENTS it reads are real Team records, not fixtures — but they are Team
+ *  fixtures, and every write still lands in the tab. The templates beside them
+ *  are src/content/agreements/templates.json. It comes out with `team`'s own
+ *  server data, whichever lands first.
+ *
  *  NOTE what is deliberately NOT here: `team` and `roles`. Both have real
  *  Module rows on the server and real grants issued against them, so adding
  *  either would hand member CRUD and role assignment to every signed-in
@@ -84,6 +96,8 @@ export const PROTO_MODULES = new Set<string>([
   "attendance",
   "work",
   "reports",
+  "resources",
+  "agreements",
 ]);
 
 export function getSession(): MePermissions | null {

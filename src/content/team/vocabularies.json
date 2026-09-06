@@ -165,14 +165,20 @@
   "$comment_workTransitions": "Delay accepts no drop — there is nothing to write. Dragging OUT of it sets a stored stage, and the card leaves the column by itself once the date is met.",
   "priorities": [
     {
+      "key": "urgent",
+      "label": "Urgent",
+      "tone": "bad",
+      "rank": 0
+    },
+    {
       "key": "high",
       "label": "High",
-      "tone": "bad",
+      "tone": "warn",
       "rank": 1
     },
     {
       "key": "medium",
-      "label": "Medium",
+      "label": "Normal",
       "tone": "warn",
       "rank": 2
     },
@@ -432,7 +438,7 @@
       "tone": "bad"
     }
   ],
-  "resourceKinds": [
+  "documentKinds": [
     {
       "key": "pan",
       "label": "PAN",
@@ -464,7 +470,7 @@
       "required": false
     }
   ],
-  "$comment_documents": "TWO BUCKETS, NOT ONE. An Agreement travels company → member and is frozen at send; a Resource travels member → company and the member may delete it. They differ in direction, permission and retention, which is why one tab holds two lists rather than one list holding both.",
+  "$comment_documents": "TWO BUCKETS, NOT ONE. An Agreement travels company → member and is frozen at send; a MemberDocument travels member → company and the member may delete it. They differ in direction, permission and retention, which is why one tab holds two lists rather than one list holding both.",
   "linkRelations": [
     {
       "key": "relates_to",
@@ -510,5 +516,6 @@
       "key": "pink",
       "label": "Pink"
     }
-  ]
+  ],
+  "$comment_priorities": "FOUR VALUES, AND ONLY ONE OF THEM SHOUTS. `urgent` was added above `high` rather than replacing it — a scale whose top value is also its common value has no top value. `high` stepped down from `bad` to `warn` at the same time, because two values cannot both be the loudest thing on a board. `medium` reads as Normal: it was always the default and never the middle of anything anybody thought about. `rank` is the sort order and it is what the board and the list order by, never the key."
 }

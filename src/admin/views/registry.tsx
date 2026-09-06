@@ -26,6 +26,8 @@ import Invoices from "./Invoices";
 import BusinessEnquiries from "./BusinessEnquiries";
 import Users from "./Users";
 import Finance from "./Finance";
+import Resources from "./Resources";
+import Agreements from "./Agreements";
 import Attendance from "./Team/Attendance";
 import Work from "./Team/Work";
 import TeamReports from "./Team/Reports";
@@ -71,6 +73,19 @@ export const VIEWS: Record<string, ComponentType> = {
   attendance: Attendance,
   work: Work,
   reports: TeamReports,
+  /* Resources · the form module. Frontend-first like Users and Finance:
+     src/content/resources/*.json through views/Resources/store.ts. Its own
+     sidebar group — see PROTO_ROWS in shell/modules.ts — because a form is not
+     a team surface even when the first one is an onboarding pack. It takes a
+     second and third URL segment (`/new`, `/:id/edit`) for the builder, both
+     already covered by the routes in src/routes/index.tsx. */
+  resources: Resources,
+  /* Agreements · the templates are frontend-first
+     (src/content/agreements/templates.json), but the AGREEMENTS themselves are
+     Team's own records — this module reads and writes them through Team's
+     store rather than keeping a second list of the same signed documents. The
+     per-member view at `#/team/:id/agreements` is unchanged. */
+  agreements: Agreements,
 };
 
 export function ViewHost() {

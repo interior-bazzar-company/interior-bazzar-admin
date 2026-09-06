@@ -16,6 +16,14 @@
    resolves it. An auto-closed day is a number the system invented; an unclosed
    one is a question, and a question is honest.
 
+   THIS SCREEN READS THE DAY; IT DOES NOT KEEP IT. The clock — the reader's own
+   state, worked total, Break and End day — sat in this topbar while the admin
+   panel was the only surface anybody had. It belongs to the member dashboard,
+   so it moves there rather than being drawn in both: one open day with two
+   places to close it is two chances for the panel to disagree with itself
+   mid-request. The write API it needs (openDay · startBreak · resumeDay ·
+   endDay) stays in store.ts, unchanged and still covered by check:team.
+
    NO API YET — everything comes from src/content/team/attendance.json through
    store.ts, which is the only file that knows that.
    ============================================================================= */
@@ -30,14 +38,14 @@ import {
 import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import {
-  LEAVE_KIND, TODAY, addDays, attendanceTotals, datesIn, dayFor, endDay, fmtDate, fmtDayName,
-  labelOf, leaveOverlap, leaveQueue, fmtHM, fmtTime, meId, openDay, readMember, resumeDay,
+  LEAVE_KIND, TODAY, addDays, attendanceTotals, datesIn, dayFor, fmtDate, fmtDayName,
+  labelOf, leaveOverlap, leaveQueue, fmtHM, fmtTime, meId, readMember,
   arrivalSpread, earliestAttendance, scopeOf, spanDays, spanRows, spanTotals,
-  startBreak, stateOf,
-  useDayRows, useLeave, useMe, useMembers, useMyDay, weekOf, workedOf,
+  stateOf,
+  useDayRows, useLeave, useMe, useMembers, weekOf, workedOf,
   now as clockNow,
 } from "./store";
-import type { DayRow, LeaveRequest, Result, SpanRow } from "./store";
+import type { DayRow, LeaveRequest, SpanRow } from "./store";
 import { LeaveDecideModal } from "./member/modals";
 import { BarScale, DayBar, Meter, StatePill, Who } from "./bits";
 import { ensureAdopted } from "./adopt";
@@ -60,14 +68,8 @@ export default function Attendance() {
   const members = useMembers();
   const me = useMe();
 
-  /* THE CLOCK IS A COMPONENT IN THE SLOT, not a node handed to it. Chrome is
-     published once per location, so a node built here would close over the
-     worked-minutes it had at publish time and sit there frozen while the day
-     ran on. Reading the store inside the component reads it at render time,
-     which is the only time that answer is worth anything. */
   usePageChrome({
     crumbs: <TbTitle label="Attendance" to="#/attendance" />,
-    right: <TopClock />,
   }, face + date);
 
   useEffect(() => { ensureAdopted(); }, []);
@@ -141,79 +143,6 @@ const FACES = [
   { k: "history", label: "History", icon: "history" },
   { k: "analytics", label: "Analytics", icon: "chart" },
 ];
-
-/* ----------------------------------------------------------- the clock --- */
-
-/** THE MEMBER'S OWN DAY, IN THE TOPBAR — and it earned the slot.
- *
- *  It used to be a card at the top of the body, which cost a whole band of
- *  vertical space on a screen that is otherwise a table, and put the one
- *  control anybody presses twice a day below the fold on a laptop. The topbar
- *  slot belongs to whichever module claims it, this module claims it on this
- *  route only, and the four buttons are the only place on the screen anybody
- *  writes.
- *
- *  IT IS A COMPONENT, NOT A NODE. Published chrome is captured once per
- *  location; a node built at publish time would freeze the worked-minutes it
- *  had then. This reads the store on every render of its own.
- *
- *  THE ACTIONS LIVE HERE AND NOWHERE ELSE. The member page states the day and
- *  never changes it — three "End the day" buttons over one open day is two
- *  chances for the panel to disagree with itself mid-request. */
-export function TopClock() {
-  const shell = useShell();
-  const me = useMe();
-  const { day, state, worked, breakMins } = useMyDay();
-  if (!me) return null;
-
-  const act = (fn: () => Result<unknown>) => {
-    const r = fn();
-    if (!r.ok) shell.toast(r.message, "bad");
-  };
-  const expected = me.expectedHoursPerDay;
-  const pct = Math.min(100, Math.round(((worked || 0) / (expected * 60)) * 100));
-
-  return (
-    <div className={"tm-tclock " + state}>
-      <StatePill state={state} />
-
-      <span className="tm-tclock-n">
-        <b className="tnum">{worked != null ? fmtHM(worked) : "—"}</b>
-        {/* The bar is decoration over a number that is already stated, so it is
-            hidden from the reader who is being read to rather than repeated. */}
-        <span className="tm-tclock-bar" aria-hidden="true">
-          <i style={{ width: pct + "%" }} />
-        </span>
-      </span>
-
-      <span className="tm-tclock-k">
-        of {expected}h expected
-        {day ? <> · in at {fmtTime(day.startedAt)}</> : null}
-        {day && day.isLate ? <b className="u-warn"> · {day.lateByMinutes}m late</b> : null}
-        {breakMins ? <> · {fmtHM(breakMins)} break</> : null}
-      </span>
-
-      <span className="tm-tclock-a">
-        {/* On leave still offers Start day: an approved day off does not stop
-            somebody coming in, and the row they open is the truth. */}
-        {state === "not_started" || state === "absent" || state === "on_leave"
-          ? <button className="btn pri sm" onClick={() => act(() => openDay(me.memberId))}>Start day</button>
-          : null}
-        {state === "working" ? (
-          <>
-            <button className="btn sm" onClick={() => act(() => startBreak(me.memberId))}>Break</button>
-            <button className="btn pri sm" onClick={() => act(() => endDay(me.memberId))}>End day</button>
-          </>
-        ) : null}
-        {state === "on_break"
-          ? <button className="btn pri sm" onClick={() => act(() => resumeDay(me.memberId))}>Resume</button>
-          : null}
-        {state === "ended" ? <span className="tm-tclock-x">Day closed.</span> : null}
-        {state === "unclosed" ? <span className="tm-tclock-x u-warn">Never closed.</span> : null}
-      </span>
-    </div>
-  );
-}
 
 /* ---------------------------------------------------------------- today --- */
 

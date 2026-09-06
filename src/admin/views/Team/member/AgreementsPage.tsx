@@ -8,9 +8,9 @@
    THE DIRECTION IS WHAT SEPARATES THIS PAGE FROM /documents. An agreement
    travels company → member: the company writes it, the member signs it, and
    nobody may edit it afterwards — a signature only means something against a
-   document that cannot change. A resource travels the other way and the member
-   may delete their own. Same tab in an earlier draft, two pages here, because
-   with a page each there is no tab budget forcing them together.
+   document that cannot change. A MemberDocument travels the other way and the
+   member may delete their own. Same tab in an earlier draft, two pages here,
+   because with a page each there is no tab budget forcing them together.
 
    FROZEN AT SEND is enforced by having no edit control at all, not by a rule
    somebody has to remember. The only writes on this page are: send a new one,

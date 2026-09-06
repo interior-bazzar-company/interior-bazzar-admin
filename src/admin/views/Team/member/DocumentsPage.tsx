@@ -22,28 +22,28 @@
 import { Icon, Notice, Pill, Table } from "../../../ui";
 import { useShell } from "../../../shell/ShellContext";
 import {
-  REQUIRED_DOCS, RESOURCE_KIND, deleteResource, fmtDate, labelOf, missingDocs, readMember,
-  resourcesFor, useResources, verifyResource,
+  REQUIRED_DOCS, DOCUMENT_KIND, deleteDocument, fmtDate, labelOf, missingDocs, readMember,
+  documentsFor, useDocuments, verifyDocument,
 } from "../store";
-import type { Member, Resource } from "../store";
+import type { Member, MemberDocument } from "../store";
 import type { Viewer } from "./ops";
 import { OpHead } from "./frame";
-import { AddResourceModal } from "./modals";
+import { AddDocumentModal } from "./modals";
 
 export default function DocumentsPage({ m, viewer }: { m: Member; viewer: Viewer }) {
   const shell = useShell();
-  useResources();
-  const all = resourcesFor(m.memberId);
+  useDocuments();
+  const all = documentsFor(m.memberId);
   const missing = missingDocs(m.memberId);
   const other = all.filter((r) => REQUIRED_DOCS.indexOf(r.kind) < 0);
   const unverified = all.filter((r) => !r.verifiedById);
 
-  const remove = (r: Resource) => {
-    const x = deleteResource(r.resourceId);
+  const remove = (r: MemberDocument) => {
+    const x = deleteDocument(r.documentId);
     shell.toast(x.ok ? "Deleted." : (x as { message: string }).message, x.ok ? "" : "bad");
   };
-  const verify = (r: Resource) => {
-    const x = verifyResource(r.resourceId);
+  const verify = (r: MemberDocument) => {
+    const x = verifyDocument(r.documentId);
     shell.toast(x.ok ? "Marked as checked." : (x as { message: string }).message, x.ok ? "" : "bad");
   };
 
@@ -53,7 +53,7 @@ export default function DocumentsPage({ m, viewer }: { m: Member; viewer: Viewer
         title="Documents"
         desc="Member to company. These are theirs to give and theirs to withdraw."
         right={viewer === "self"
-          ? <button className="btn pri" onClick={() => shell.modal(<AddResourceModal memberId={m.memberId} />)}>
+          ? <button className="btn pri" onClick={() => shell.modal(<AddDocumentModal memberId={m.memberId} />)}>
             <Icon name="plus" size="sm" />Add a document
           </button>
           : null} />
@@ -84,7 +84,7 @@ export default function DocumentsPage({ m, viewer }: { m: Member; viewer: Viewer
           return (
             <tr key={kind} className={r ? "" : "u-warn"}>
               <td>
-                <span className="cell-1"><b>{labelOf(RESOURCE_KIND, kind)}</b></span>
+                <span className="cell-1"><b>{labelOf(DOCUMENT_KIND, kind)}</b></span>
                 {r ? <span className="cell-2">{r.label} · {r.sizeKb} KB</span>
                   : <span className="cell-2">required</span>}
               </td>
@@ -96,14 +96,14 @@ export default function DocumentsPage({ m, viewer }: { m: Member; viewer: Viewer
               <td>
                 {!r && viewer === "self" ? (
                   <button className="btn sm pri" onClick={() =>
-                    shell.modal(<AddResourceModal memberId={m.memberId} kind={kind} />)}>Upload</button>
+                    shell.modal(<AddDocumentModal memberId={m.memberId} kind={kind} />)}>Upload</button>
                 ) : null}
                 {r && viewer === "admin" && !r.verifiedById ? (
                   <button className="btn sm" onClick={() => verify(r)}>Mark as checked</button>
                 ) : null}
                 {r && viewer === "self" ? (
                   <button className="btn sm" onClick={() =>
-                    shell.modal(<AddResourceModal memberId={m.memberId} kind={kind} />)}>Replace</button>
+                    shell.modal(<AddDocumentModal memberId={m.memberId} kind={kind} />)}>Replace</button>
                 ) : null}
               </td>
             </tr>
@@ -122,12 +122,12 @@ export default function DocumentsPage({ m, viewer }: { m: Member; viewer: Viewer
           body: "Only the required documents are on this record.",
         }}
         rows={other.map((r) => (
-          <tr key={r.resourceId}>
+          <tr key={r.documentId}>
             <td>
               <span className="cell-1"><b>{r.label}</b></span>
               <span className="cell-2">{r.fileName} · {r.sizeKb} KB</span>
             </td>
-            <td>{labelOf(RESOURCE_KIND, r.kind)}</td>
+            <td>{labelOf(DOCUMENT_KIND, r.kind)}</td>
             <td>{fmtDate(r.uploadedAt.slice(0, 10))}</td>
             <td><Checked r={r} /></td>
             <td>
@@ -157,7 +157,7 @@ export default function DocumentsPage({ m, viewer }: { m: Member; viewer: Viewer
   );
 }
 
-function Checked({ r }: { r: Resource | null }) {
+function Checked({ r }: { r: MemberDocument | null }) {
   if (!r) return <span className="dim">—</span>;
   if (!r.verifiedById) return <Pill text="Not checked" tone="warn" />;
   const by = readMember(r.verifiedById);

@@ -48,6 +48,8 @@ const ICON_OF: Record<string, string> = {
   attendance: "clock",
   work: "calendar",
   reports: "inbox",
+  resources: "flag",
+  agreements: "shield",
 };
 
 /* ------------------------------------------------------- group override ---
@@ -68,6 +70,33 @@ const ICON_OF: Record<string, string> = {
 const GROUP_OVERRIDE: Record<string, string> = {
   team: "Team",
   roles: "Team",
+};
+
+/* ------------------------------------------------------- label override ---
+   The same arrangement as GROUP_OVERRIDE above, for the same reason, on the
+   other field: the server sends each module's `label`, and that is normally
+   the whole answer.
+
+   `team` is the exception. Its row reads "Team", which is now the name of the
+   GROUP it sits in — so the sidebar printed Team ▸ Team, and the row that
+   opens the roster was named after the section rather than after what is on
+   it. The screen is a table of people, every other row in the group is named
+   by its own noun (Attendance, Calendar, Reports), and this module's own page
+   already calls its tab Members.
+
+   LABEL ONLY. The key is still `team`, the route is still `#/team`, the grant
+   is still `team.*` and the member dashboard is still `#/team/:id` — the same
+   reasoning that renamed `work` to Calendar in PROTO_ROWS without moving the
+   route. Nothing here changes what a link points at.
+
+   This is a STAND-IN, not the design: `label` is the server's field and the
+   fix is a Module-row update, at which point this map empties and the sidebar
+   does not change. Listed as work in BACKEND-INTEGRATION.md.
+
+   Note it renames rather than supplies: a key absent here keeps whatever the
+   server said, so a new server module still appears under its own name. */
+const LABEL_OVERRIDE: Record<string, string> = {
+  team: "Members",
 };
 
 /* ---------------------------------------------------------- proto rows ---
@@ -125,15 +154,44 @@ const PROTO_ROWS: { key: string; label: string; group: string }[] = [
      is a manager's grant, and it must be possible to hold it without holding
      the right to create or reassign anybody's work. */
   { key: "attendance", label: "Attendance", group: "Team" },
-  /* `Calendar`, not `Work`. The label follows what somebody opens the row for —
-     a dated view of the week — and the module's headline ask was a calendar.
-     THE LABEL AND THE DEFAULT FACE ARE THE WHOLE CHANGE: the route is still
-     `work`, the entity is still WorkItem and the grant is still team.work.*,
-     so every existing link, bookmark and `?item=` drawer URL keeps working.
-     Renaming the route would buy a tidier address bar for a redirect to
-     maintain forever, and a module key that disagrees with its own table. */
-  { key: "work", label: "Calendar", group: "Team" },
+  /* `Tasks`. It was `Work`, then `Calendar` — named after one of its four
+     faces, which is why nobody could find the task board in it. The module has
+     always been the company's tasks; the label finally says so.
+
+     THE LABEL IS STILL THE WHOLE CHANGE: the route is `work`, the entity is
+     WorkItem and the grant is `team.work.*`, so every existing link, bookmark
+     and `?item=` drawer URL keeps working, and the member's own Work page and
+     the nudges on their record read the same rows they always did. Renaming
+     the route would buy a tidier address bar for a redirect to maintain
+     forever, and a module key that disagrees with its own table. */
+  { key: "work", label: "Tasks", group: "Team" },
   { key: "reports", label: "Reports", group: "Team" },
+
+  /* Resources · A SECTION OF ITS OWN, and a group of one for now.
+     It is not filed under Team even though the first form anybody builds here
+     is an onboarding pack, because the module is about the FORM and not about
+     the person: an asset handover, a policy acknowledgement and a vendor
+     declaration are the same machine pointed at different audiences, and only
+     some of those audiences are staff. Filing it under Team would have made the
+     staff case look like the definition rather than the first example.
+
+     A group of one is normally a filing mistake, and this is the honest state
+     of a section that has one surface in it rather than a reason to hide that
+     surface somewhere it does not belong — the same call Business Ops made when
+     Users Management arrived alone. */
+  { key: "resources", label: "Resources", group: "Resources" },
+
+  /* Agreements · beside Resources, and the pairing is the point. Both are a
+     document the company sends a member and gets something back on; they
+     differ in what comes back — a form's answers, or a signature. Filing them
+     apart would have made that difference look bigger than it is, and would
+     have left the group with one row in it.
+
+     It is NOT under Team, even though every copy points at a member, for the
+     same reason Resources is not: the module is about the DOCUMENT. The
+     per-member view already exists at `#/team/:id/agreements` and still
+     works — this is the same records read across everybody. */
+  { key: "agreements", label: "Agreements", group: "Resources" },
   /* There is no `me` row. The member dashboard lives at `#/team/:id` — a row
      on the Members table opens it — because "the team, as a table" already
      existed there and a second roster was a second front door to one room. */
@@ -163,6 +221,11 @@ const GROUP_ORDER = [
      group nobody opens daily. Same argument that moved Users Management out of
      Settings into Business Ops. */
   "Team",
+  /* Resources sits directly under Team because that is where its traffic comes
+     from — somebody joins, and the pack they owe is the next thing anybody
+     looks at. It is above Finance for the same reason Team is: it is opened on
+     the days people arrive and leave, which is more often than the ledger. */
+  "Resources",
   "Finance",
   "Catalogue",
   "Settings",
@@ -190,7 +253,8 @@ export function getModules(): ModuleGroup[] {
       q: Q_OF[key],
     });
   };
-  mods.forEach((m) => put(m.key, m.label, GROUP_OVERRIDE[m.key] || m.groupLabel || ""));
+  mods.forEach((m) =>
+    put(m.key, LABEL_OVERRIDE[m.key] || m.label, GROUP_OVERRIDE[m.key] || m.groupLabel || ""));
   /* Appended last and only if the server did not send the key, so a real
      Module row always takes precedence over the proto stand-in. Also gated on
      a session existing at all: a signed-out browser must see no nav. */

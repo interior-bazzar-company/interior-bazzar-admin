@@ -461,10 +461,203 @@ of the operation document.
 | --- | --- | --- |
 | `Module` rows for `attendance`, `work`, `reports` | server | Group label **Team**, and it must match `GROUP_ORDER` in `shell/modules.ts` exactly or the module lands in a section of one. Verbs: `attendance` → `view/edit/correct/export/all`; `work` → `view/create/edit/assign/review/export/all`; `reports` → `view/review/export/all`. **`correct` is separate and sensitive** — amending a time record is the one attendance action that rewrites history. Then remove each key from `PROTO_MODULES` in `auth/session.ts` **in the same commit as its rows** — until then `can()` on all three is **true for everyone**, which is safe only while there is no server data behind them and no server write to authorise. |
 | `groupLabel` on the existing `team` and `roles` rows | server | Change `"Settings"` to `"Team"`. That retires `GROUP_OVERRIDE` in `shell/modules.ts`, which re-files them client-side today. The map is a stand-in; `groupLabel` is the server's field. |
+| `label` on the existing `team` row | server | Change `"Team"` to `"Members"`. The row sits in a group also called Team, so the sidebar reads Team ▸ Team and the roster is named after its section rather than after what is on it. `LABEL_OVERRIDE` in `shell/modules.ts` renames it client-side today and empties when this lands. Same shape as the `groupLabel` row above, on the other field. **Label only** — the key, the route `#/team`, the `team.*` grants and the member dashboard at `#/team/:id` do not move. |
 | New verbs on the existing `team` and `roles` rows | server | `team` needs **`delete`** split from `status` (which gates *Delete member* today while reading as "Activate" in `ACTION_LABEL`), and `roles` needs `delete` split from `edit`. `ActionMatrix` picks up new columns automatically from `m.actions[]`; the only client change is a label. |
 | `DELETE /admin/roles/{id}` | server | Called by `AdminOpsService.deleteRole` and **not wired server-side** — already noted at `adminOps/index.ts:517`. Pre-existing; Team inherits it. |
 | Private S3 objects | server | Every upload today returns a **public URL** — there is no signed read anywhere in the backend. Signatures, member documents and Finance's payslip links must not inherit this. The `DocumentToken` above is the read path for all three. |
 | `AuthTasks.LogoutUser` | server | A no-op that returns `True` and never sets `UserSession.revokedAt`. Two lines. Not a blocker — attendance is a **deliberate work clock, not the auth session** — but it is what makes the login evidence shown beside a correction complete. |
+
+---
+
+## Module 8 · Resources
+
+> **The whole module is frontend-first.** `#/resources` and `#/team/:id/resources`
+> render from `src/content/resources/*.json` through
+> `src/admin/views/Resources/store.ts` — no view imports JSON and no view fetches,
+> so it is a one-file swap.
+
+A **resource is a form plus its departments.** The form is the fields; the departments are
+who has to fill them in — a member in **any** of them is in the audience. The two are one record on purpose: "the onboarding pack" and
+"everyone in Sales" are one thing an operator sets up once, not a template plus a
+distribution list somebody has to remember to re-send.
+
+### Reads
+
+| Content file | Status | Endpoint it stands in for | Must return |
+| --- | --- | --- | --- |
+| `forms.json` → `resources[]` | stand-in | `GET /admin/resources` · `GET /admin/resources/{id}` | The definition: `title`, `description`, `tags[]`, `departments[]`, `state`, **`version`** and `fields[]`. `fields[]` is ordered and the order is the order the member meets them, so it must round-trip as an array and not as an object. Each field carries `accept[]` — a `file` field's allowed types as groups (`pdf`/`image`/`doc`/`sheet`), empty meaning any file — and `maxMb`, its size cap, `null` meaning no limit. `tags[]` is **free text**: accept any string and do not validate it against the vocabulary. `department` is the whole audience rule — see the invariants, because how the server *evaluates* it is the module. |
+| `responses.json` → `responses[]` | stand-in | `GET /admin/resources/{id}/responses` · `GET /admin/resources/responses?memberId=` | One row per submission: `resourceId`, **`version` answered**, `memberId`, `submittedAt`, and `answers[]` of `{fieldId, label, value, file?}`. **The label is stored on the answer, not looked up.** `file` is `{fileName, mimeType, sizeKb, url}` and is present only on a file field; `value` is the file's name so any reader can print an answer without knowing its type. The second endpoint is what `#/team/:id/resources` reads and it is the only join the member page needs. |
+| `vocabularies.json` | **static copy** | `GET /admin/resources/vocabularies` | `resourceKinds[]`, `resourceStates[]`, `responseStates[]`, `fieldTypes[]`. `fieldTypes` is the one list here that is **not** config: it is the set of inputs this panel can render, so a key the client has no renderer for draws a blank field. Adding a type is a client change and then a server change, in that order. |
+
+### Writes
+
+| Action | Endpoint | Notes |
+| --- | --- | --- |
+| Create | `POST /admin/resources` | Always lands as `draft`, `version: 1`, `openedAt: null`. The client refuses an untitled resource, one with no fields, a field with no label and a choice field with no options — the server must refuse all four too, because the client's copy is a convenience and not the rule. |
+| Edit | `PATCH /admin/resources/{id}` | **Bumps `version` if and only if `fields[]` changed AND at least one response exists.** Editing title, purpose or audience never bumps: nobody answered a title. Refused outright while `state` is `closed`. |
+| Open / close | `POST /admin/resources/{id}/open` · `/close` | Close stops new submissions and keeps every one already made. `openedAt` is set once and survives a close/reopen cycle. |
+| Reopen | `POST /admin/resources/{id}/open` | The way back from both `closed` and `outdated`. **It must stay reachable**: the row menu dropped Close on 2026-09-06 and kept Reopen precisely so Outdated is not a one-way door. |
+| Mark outdated | `POST /admin/resources/{id}/outdate` | A fourth state. Refuses submissions and revokes outstanding links like `closed`, keeps every answer, sorts last. Reopening undoes it. **It is a different state from `closed` on purpose** — closed is a round that ended, outdated is a form that is wrong now — and if that distinction proves unused, collapse the two rather than keeping both. |
+| Duplicate | `POST /admin/resources/{id}/duplicate` | Returns a new **draft** on version 1 carrying fields, tags and department, and **no responses**. |
+| Delete a submission | `DELETE /admin/resources/responses/{id}` | The space one, and the only destructive call in the module. **Must unlink the uploaded objects in the same transaction** — a response deleted while its files stayed on a disk frees nothing and leaves a PAN card behind. Returns the bytes reclaimed; the panel prints the figure. The member returns to pending and their link must start working again. |
+| Delete | `DELETE /admin/resources/{id}` | **Any resource with no responses**, whatever its state. One that has responses is refused, with the count in the message — never a cascade. The two ways out are deleting the responses first or marking it outdated. |
+| Submit | `POST /admin/resources/{id}/responses` | Refused unless `state` is `open`; refused on a second submission by the same member; refused if a `required` field is blank — and a required **file** field is blank unless a file is attached, whatever text came with it. Stamps the resource's **current** version and copies each field's label onto the answer. |
+| Upload | `POST /admin/resources/{id}/uploads` | One file, returning a `FileAnswer` the submit call then references. Must enforce the field's `accept` server-side: the client's `accept` attribute is a convenience for the file picker and is not a check. |
+| Mint a link | `POST /admin/resources/{id}/links` | Body `{memberId}`, returning `{token, url, expiresAt}`. **Single-use and expiring**, minted server-side. The client's `shareToken` is a deterministic stand-in so a fixture link is stable enough to test; it is not a secret and nothing treats it as authorisation. |
+| Resolve a link | `GET /r/{token}` | The member-facing page. **Not this panel's** — it belongs to the member dashboard, and until that ships the links this panel hands out resolve to nothing. |
+
+### Error contract
+
+Same shape as Modules 4–7: `{ code, message }`, and the code is what the client
+branches on. Codes in use: `not_found`, `invalid`, `closed`, `not_draft`,
+`has_responses`, `not_open`, `already_submitted`, `already_open`, `already_closed`,
+`incomplete`. `incomplete` must name the first missing field in `message` — the
+screen prints it verbatim.
+
+### Invariants the API has to keep
+
+1. **The audience is a rule, evaluated at read time — never a materialised list of
+   member ids.** The day somebody joins Sales they are inside the onboarding
+   audience with no write anywhere. A server that expands the rule to ids on save
+   would silently stop picking up new joiners, and nothing would look broken.
+
+2. **An empty `departments[]` is EVERY active member, not none**, and several
+   departments are an **OR**. Both are silent when got backwards: reading empty
+   as nobody makes every company-wide form address nobody, and ANDing the list
+   matches nobody always — a member is in one department — so it would look like
+   an empty roster rather than a broken rule.
+
+   It was four axes until 2026-09-06 (departments, designations, a joined-after
+   date, named members), then one string, and is now a free-text list. The
+   endpoint should carry `departments[]` and nothing else. **It is not a foreign
+   key**: a resource may name a department that has no members yet, and the
+   server must accept the string rather than validate it against the roster.
+
+3. **`pending` is derived and has no row.** It is the audience minus the responses.
+   There must be no `pending` record, no assignment table, and no sweep job — the
+   same reason attendance has no `absent` row. A stored pending would need a write
+   every time the roster moved, and would let a count disagree with the list it
+   drills into.
+
+4. **A submitted answer is immutable, and it carries its own label.** There is no
+   edit endpoint for a response, deliberately. `answers[].label` duplicates the
+   field label at submit time so a response still reads correctly after the form
+   has been edited twice — the same "frozen at send" rule agreements already live
+   by. Resolving the label from the live definition at read time would quietly
+   undo it.
+
+5. **A response outlives the audience.** Narrowing a condition, or a member
+   leaving, must not delete or hide answers already given. The client lists them
+   apart from the completion count (`strayResponses`), so the percentage keeps
+   meaning "of the people it is asking about today".
+
+6. **`memberId` is the Team roster's id**, unchanged — `AdminUserRow.id`, the same
+   id Finance's `SalaryAccount.memberId` joins on. It is the entire link back to
+   the profile and it must not be re-minted.
+
+7. **A share link names a member as well as a resource.** A link to the form
+   alone comes back as an answer from nobody. It must be single-use, expiring,
+   and revoked when the resource closes — and it authorises **one submission of
+   one resource by one member**, never a session.
+
+8. **An uploaded file is a private object behind a signed, expiring read.** These
+   are PAN cards and passport photographs. Every upload in this panel today
+   returns a **public URL** and this one must not inherit that — it is the same
+   `DocumentToken` path Module 7 needs for member documents, and neither should
+   ship without it.
+
+9. **`accept` and `maxMb` are enforced server-side.** The client checks both and
+   the file input carries an `accept` attribute, but neither is a control — a
+   direct POST bypasses both. `maxMb` is megabytes and `null` is *no limit*, which
+   is a deliberate value and not a missing one.
+
+### Open decisions this UI had to assume an answer to
+
+| ID | Question | What the screens assume |
+| --- | --- | --- |
+| **RS-OD-01** | Can a member submit the same resource twice? | **No.** The second is refused. A correction is a new *resource*, not a second answer — an audit trail with two answers and no rule for which one counts is not an audit trail. Revisit if a genuine resubmission case appears. |
+| **RS-OD-06** | Should the narrower audience rules come back? | Not until a real case asks for them. Designation, joined-after and named-member axes all worked and were removed on 2026-09-06 because they made *send this to Sales* a four-control decision. If one returns it should be as an optional narrowing of `department`, never as a replacement for it. |
+| **RS-OD-02** | Who may read a submission? | `self` and `admin`, never `senior` — the line agreements and documents already draw. An onboarding pack carries a PAN name and a signed offer letter, and a reporting line is about the work. |
+| **RS-OD-03** | Does opening a resource notify its audience? | **Nothing is sent.** The panel states who is outstanding; it does not chase. A notification path is real work and it is not assumed here. |
+| **RS-OD-04** | What is a `file` answer? | `{fileName, mimeType, sizeKb, url}`, with `url` a plain path in the seed. It has to become the same private-object-with-signed-read path member documents need — see the row below. Type and size limits ARE decided now: `accept[]` and `maxMb` per field, defaulting to any type and 10 MB, both printed to the member before they open a file picker and both refused on submit. |
+| **RS-OD-05** | Can a member fill a form in themselves? | Not in this panel, and the links it hands out point at a page that does not exist yet. Submission exists in the store and is exercised by `check:resources`; the surface belongs to the member dashboard. **This is the one gap that makes the feature incomplete end-to-end**, and the screen says so rather than implying the link works. |
+
+### Not an endpoint — but on this list
+
+| Item | Where | What has to happen |
+| --- | --- | --- |
+| A `Module` row for `resources` | server | Group label **Resources**, and it must match `GROUP_ORDER` in `shell/modules.ts` exactly or the module lands in a section of one. Verbs: `view/create/edit/open/close/delete/all`, plus `respond` for the member-facing half when it lands. Then remove the key from `PROTO_MODULES` in `auth/session.ts` **in the same commit as the row** — until then `can("resources")` is **true for everyone**, which is safe only while there is no server data behind it and no server write to authorise. |
+| `file` answers as private objects | server | A `file` field's value is a filename today. Uploads elsewhere in this panel return a **public URL**; an onboarding pack must not inherit that — it is the same `DocumentToken` signed-read path Module 7 needs for member documents, and neither should ship without it. |
+| Audience evaluation, server-side | server | The rule must be evaluated where the roster is, not in the browser. The client filters an already-fetched roster today because the roster is a fixture; against a real API, `GET /admin/resources/{id}/responses` should return the audience alongside the answers so the two cannot be computed from two different reads of the team. |
+
+---
+
+## Module 9 · Agreements
+
+> **Half of this is already a Team record.** `Agreement` — its lifecycle, token, expiry,
+> typed name and signer IP — has been in `views/Team/store.ts` since Module 7, and
+> `#/team/:id/agreements` reads it per member. This module adds the TEMPLATES and a
+> cross-member view, and **writes through Team's store**. There must be exactly one list
+> of signed documents; two would render perfectly and disagree.
+
+A **template is not an agreement.** The template is the wording, written once; an Agreement
+is one copy of it sent to one member with the body **copied in** at send.
+
+### Reads
+
+| Content file | Status | Endpoint it stands in for | Must return |
+| --- | --- | --- | --- |
+| `agreements/templates.json` → `templates[]` | stand-in | `GET /admin/agreements/templates` · `/{id}` | `title`, `kind`, `purpose`, `state` (`draft`/`active`/`retired`), **`version`**, `clauses[]` of `{clauseId, heading, text}`. `clauses[]` is ordered and cited by number, so it must round-trip as an array. |
+| `team/agreements.json` → `agreements[]` | **Module 7's** | `GET /admin/team/agreements` | Unchanged, plus two columns: **`templateId`** (provenance, nullable) and **`body`** (the rendered clauses as they went out). |
+
+### Writes
+
+| Action | Endpoint | Notes |
+| --- | --- | --- |
+| Create | `POST /admin/agreements/templates` | Lands as `draft`, version 1. Refuses an untitled template, one with no clauses, and a clause with no text. |
+| Edit | `PATCH /admin/agreements/templates/{id}` | **Bumps `version` if and only if `clauses[]` changed AND the template has been sent.** Title and purpose never bump — nobody signed a title. Refused while `retired`. |
+| Activate / retire | `POST …/{id}/activate` · `/retire` | Retiring stops it being sent and keeps every copy already made. |
+| Delete | `DELETE …/{id}` | **Only a template that has never been sent.** One that has is refused, with the count — deleting would leave signatures pointing at nothing. |
+| Send | `POST …/{id}/send` | Body `{memberId}`. **Renders the placeholders and freezes the body server-side**, stamps the template's current version, and returns the Agreement. Refuses a template that is not `active`, and refuses a second live copy to the same member. |
+| Sign | `POST /sign/{token}` | The member-facing call. Captures the typed name, the server's timestamp and the request IP, and clears the expiry. **Not this panel's page.** |
+
+### Invariants the API has to keep
+
+1. **The body is COPIED at send, never referenced.** This is the module. A server that
+   resolved the body through `templateId` at read time would let a template edit silently
+   rewrite documents people have already signed — and every screen would keep rendering,
+   showing today's wording as what was agreed to. `body` is written once and is immutable.
+
+2. **`version` on an Agreement is the TEMPLATE's version at the moment of sending**, not the
+   template's current one, so a copy can say which draft was actually signed.
+
+3. **Only `{{name}}` and `{{date}}` are substituted.** Anything else in braces passes
+   through exactly as typed. A hole in a document is worse than a stray brace, because only
+   the second is obvious to whoever proof-reads it.
+
+4. **Expiry is derived, not stored.** An agreement is `sent`/`viewed`/`signed`/`revoked`;
+   *expired* is a comparison against today, computed at read. Stored, it is wrong between
+   sweeps and nothing throws.
+
+5. **A signed agreement is immutable and cannot be revoked**, and no member signs the same
+   copy twice. The signature, its timestamp and its IP are written by the **server** — a
+   client-supplied signing time is not evidence.
+
+6. **One live copy per member per template.** A second is refused; revoking the first is the
+   way to issue a new one. Two links to one obligation and no rule for which signature counts
+   is not an audit trail.
+
+7. **The token is single-use and expiring**, minted server-side, and authorises **one
+   signature of one agreement by one member** — never a session. The client never treats it
+   as authorisation.
+
+### Not an endpoint — but on this list
+
+| Item | Where | What has to happen |
+| --- | --- | --- |
+| A `Module` row for `agreements` | server | Group label **Resources**, matching `GROUP_ORDER` in `shell/modules.ts` exactly. Verbs: `view/create/edit/send/revoke/all`. Then remove the key from `PROTO_MODULES` in `auth/session.ts` **in the same commit** — until then `can("agreements")` is true for everyone, which is safe only while the templates are fixtures. |
+| `GET /sign/{token}` | server + member dashboard | The page a member actually signs on. It does not exist, so **every link this panel hands out currently resolves to nothing** — the screen says so rather than implying otherwise. Same gap Resources has for uploads. |
+| A signed PDF | server | `fileName` on an Agreement is a stub string. If a countersigned PDF is ever wanted it is a render of the frozen `body`, stored as a private object behind a signed read — the same path Modules 7 and 8 need. |
 
 ---
 

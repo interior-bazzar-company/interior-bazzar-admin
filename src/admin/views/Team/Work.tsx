@@ -31,14 +31,18 @@ import { useSearchParams } from "react-router-dom";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import {
-  FilterChips, Icon, KvList, Notice, SearchField, SectionHead, Select, Table, Tabs, TbTitle, qs,
+  EmptyState, FilterChips, Icon, KvList, Notice, SearchField, SectionHead, Select, StatStrip,
+  Table, Tabs, TbTitle, cap, qs,
 } from "../../ui";
+import type { StatCell } from "../../ui";
+import { BarRows } from "../charts";
 import { go } from "../../ui/nav";
 import {
-  KIND, PRIORITY, TODAY, WORK_STATUS, addDays, addLink, blockerOf, childrenOf, createItem, createTag,
-  eventsOn, fmtDate, fmtMonth, gridDays, isDelayed, isTerminal, labelOf, lanesOf, leaveOn,
-  linkLabelOf, linksOf, monthStep,
-  meId, membersInScope, parentOf, readMember, removeLink, setBlockedBy, setItemStatus, stageOf,
+  KIND, PRIORITY, TODAY, WORK_STATUS, addDays, addLink, blockerOf, checkCount, childrenOf,
+  createItem, createTag, eventsOn, fmtDate, fmtMonth, gridDays, isDelayed, isTerminal, labelOf,
+  lanesOf, leaveOn, linkLabelOf, linksOf, monthStep,
+  meId, membersInScope, parentOf, progressOf, readMember, removeLink, setBlockedBy,
+  setItemStatus, stageOf,
   normaliseUrl, tagItem, tagsOf, tagsOwnedBy, toneOf, useItem, useLinks, useMembers, useTags,
   useWork, workTotals,
 } from "./store";
@@ -46,19 +50,44 @@ import type {
   Attachment, CalEvent, LinkRelation, Member, Tag, WorkItem, WorkStage, WorkStatus,
 } from "./store";
 import { ensureAdopted } from "./adopt";
-import { KindMark, PriorityChip, Who, ago } from "./bits";
+import { KindMark, Meter, PriorityChip, Who, ago } from "./bits";
 import {
   MarksBlock, ProgressWindow, RichText, StagePill, TagChips, TasksBlock, WaitFlag, daysOver, noteOf,
 } from "./workBits";
 import "./team.css";
 
 const ROUTE = "#/work";
+/* THREE FACES, AND THEY ARE THREE QUESTIONS: what is there, when is it, and
+   how is it going. List, Board and Calendar were three of the four tabs and
+   they are not three questions — they are three ways of looking at the same
+   set, which is what a view switcher is for. They moved inside Tasks.
+
+   THE OLD `?face=` VALUES STILL RESOLVE. `?face=board` and `?face=calendar`
+   are links people have; they land on Tasks with that view selected rather
+   than 404-ing or silently showing something else. See `readFace` below. */
 const FACES = [
-  { k: "calendar", l: "Calendar", i: "calendar", d: "The month, and what each day owes" },
-  { k: "board", l: "Board", i: "menu", d: "Five stages, or group by kind, member, priority or tag" },
-  { k: "list", l: "List", i: "doc", d: "Every item as one table" },
+  { k: "tasks", l: "Tasks", i: "check", d: "Everything there is, as a list, a board or a month" },
   { k: "timeline", l: "Timeline", i: "chart", d: "Target and milestone lanes, tasks as bars" },
+  { k: "analysis", l: "Analysis", i: "chart", d: "How the work is going, and where it is stuck" },
 ];
+
+/** The three ways of looking at one set. A view, not a face — the question is
+ *  the same in all three. */
+const VIEWS = [
+  { k: "list", l: "List", i: "doc" },
+  { k: "board", l: "Board", i: "menu" },
+  { k: "calendar", l: "Calendar", i: "calendar" },
+];
+
+/** A face from the URL, with the three old tab values folded into the view
+ *  they became. A link somebody sent last week still lands where it meant. */
+function readFace(p: Record<string, string>): { face: string; view: string } {
+  const raw = p.face || "";
+  if (VIEWS.some((v) => v.k === raw)) return { face: "tasks", view: raw };
+  const face = FACES.some((x) => x.k === raw) ? raw : "tasks";
+  const view = VIEWS.some((v) => v.k === p.view) ? p.view : "list";
+  return { face, view };
+}
 /** Lifecycle order, not the order the five were listed in: Delay is work that
  *  is not finished, so it sits before the two terminal columns. */
 const STAGES: WorkStage[] = ["planned", "in_progress", "delayed", "completed", "cancelled"];
@@ -79,7 +108,7 @@ export default function Work() {
     return o;
   }, [sp]);
 
-  const face = FACES.some((f) => f.k === p.face) ? p.face : "calendar";
+  const { face, view } = readFace(p);
   const scope = "all" as const;
   const rows = useWork({
     member: p.member, kind: p.kind, status: p.status, priority: p.priority,
@@ -138,7 +167,7 @@ export default function Work() {
 
           ONE BAND, NOT A TOOLBAR INSIDE A BAND: `.dls-cmd` is already the flex
           row every list screen uses. */}
-      {face === "calendar" ? null : (
+      {face === "tasks" && view === "calendar" ? null : (
         <div className="dls-cmd">
           <SearchField ph="Search work" name="q" val={p.q} onFilter={onFilter} />
           <Select name="member" label="Member" value={p.member} onFilter={onFilter}
@@ -170,11 +199,27 @@ export default function Work() {
         </div>
       ) : null}
 
-      <div className={"dls-body tm-pane" + (face === "calendar" ? " tm-body" : "")}>
-        {face === "calendar" ? <CalendarFace rows={rows} me={me} p={p} goto={goto} onOpen={openItem} members={members} all={all} />
-          : face === "board" ? <Board rows={rows} all={all} group={p.group || ""} goto={goto} onOpen={openItem} />
-          : face === "timeline" ? <Timeline rows={rows} onOpen={openItem} />
-          : <List rows={rows} all={all} onOpen={openItem} />}
+      {face === "tasks" ? (
+        <div className="dls-chips tm-views">
+          <div className="seg" role="tablist" aria-label="How to look at them">
+            {VIEWS.map((v) => (
+              <button key={v.k} role="tab" aria-selected={v.k === view}
+                className={v.k === view ? "on" : ""}
+                onClick={() => goto({ face: undefined, view: v.k === "list" ? undefined : v.k })}>
+                <Icon name={v.i} size="sm" />{v.l}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <div className={"dls-body tm-pane"
+        + (face === "tasks" && view === "calendar" ? " tm-body" : "")}>
+        {face === "timeline" ? <Timeline rows={rows} onOpen={openItem} />
+          : face === "analysis" ? <Analysis rows={rows} all={all} members={members} />
+            : view === "calendar" ? <CalendarFace rows={rows} me={me} p={p} goto={goto} onOpen={openItem} members={members} all={all} />
+              : view === "board" ? <Board rows={rows} all={all} group={p.group || ""} goto={goto} onOpen={openItem} />
+                : <List rows={rows} all={all} onOpen={openItem} />}
       </div>
     </div>
   );
@@ -389,12 +434,209 @@ export function FaceMenu({ face, goto }: {
     <div className="pop-b">
       {FACES.map((f) => (
         <button key={f.k} className={"mi" + (f.k === face ? " on" : "")}
-          onClick={() => { shell.closePop(); goto({ face: f.k === "calendar" ? undefined : f.k }); }}>
+          onClick={() => { shell.closePop(); goto({
+            face: f.k === "tasks" ? undefined : f.k, view: undefined }); }}>
           <Icon name={f.i} />
           <span><b>{f.l}</b><span className="d">{f.d}</span></span>
           {f.k === face ? <span className="r"><Icon name="check" size="sm" /></span> : null}
         </button>
       ))}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------ analysis --- */
+
+/** HOW THE WORK IS GOING, AND WHERE IT IS STUCK — in that order, because the
+ *  second is the reason anybody opens this.
+ *
+ *  IT READS THE ROWS ON SCREEN, not the whole table. Every filter above it
+ *  applies, so "Analysis" of one member's marketing tasks is the same three
+ *  questions asked of a smaller set rather than a different screen. A chart
+ *  that ignored the filter band would be a chart nobody could trust against
+ *  the list beside it.
+ *
+ *  NO NEW CHART LIBRARY. `BarRows` is the panel's own, and the two things this
+ *  face has to say — how much of each stage there is, and who is carrying what
+ *  — are both magnitudes across classes, which is what a bar row is for. A
+ *  donut of five stages would have been the template answer and would read
+ *  worse at every size.
+ */
+function Analysis({ rows, all, members }: {
+  rows: WorkItem[]; all: WorkItem[]; members: Member[];
+}) {
+  const tasks = rows.filter((i) => i.kind === "task");
+  const open = rows.filter((i) => !isTerminal(i.status));
+  const late = rows.filter((i) => isDelayed(i));
+  const blocked = rows.filter((i) => !!blockerOf(i, all));
+
+  /* Completed over everything that is not cancelled. A cancelled task is not a
+     failure to finish, it is a decision not to — counting it against the rate
+     would make cancelling look like slipping. */
+  const counted = rows.filter((i) => i.status !== "cancelled");
+  const done = counted.filter((i) => i.status === "completed").length;
+  const rate = counted.length ? Math.round((done / counted.length) * 100) : null;
+
+  const byStage = STAGES.map((st) => ({
+    key: st,
+    label: labelOf(WORK_STATUS, st) || cap(st),
+    value: rows.filter((i) => stageOf(i) === st).length,
+    /* The chart kit's own reserved status tones, not the pill vocabulary —
+       they are different scales and mixing them is how a chart ends up
+       colouring a stage with a hue that means something else. */
+    tone: st === "delayed" ? "st-bad" : st === "completed" ? "st-ok" : "st-mute",
+  })).filter((r) => r.value > 0);
+
+  /* AN ORDINAL SCALE, DRAWN AS ONE. Priority is ranked, so it takes the kit's
+     ordinal steps rather than four unrelated hues — the reader should be able
+     to see the order without reading the labels. */
+  const byPriority = ["urgent", "high", "medium", "low"].map((p, n) => ({
+    key: p,
+    label: labelOf(PRIORITY, p),
+    value: open.filter((i) => i.priority === p).length,
+    tone: n === 0 ? "st-bad" : n === 1 ? "o1" : n === 2 ? "o2" : "o3",
+  })).filter((r) => r.value > 0);
+
+  /* WHO IS CARRYING WHAT — open items only, because a person's finished work is
+     not load. Sorted by what is late rather than by volume: eight on time is a
+     working week and two overdue is a conversation. */
+  const byMember = members
+    .map((m) => {
+      const mine = open.filter((i) => i.assigneeId === m.memberId);
+      return {
+        m,
+        open: mine.length,
+        late: mine.filter((i) => isDelayed(i)).length,
+      };
+    })
+    .filter((r) => r.open > 0)
+    .sort((a, b) => (b.late - a.late) || (b.open - a.open));
+
+  /* A checklist is the only place a task says how far in it is, so the tasks
+     that HAVE one are worth reading apart from the ones that do not. */
+  const withList = tasks.filter((i) => (i.checklist || []).length);
+  const lineTotal = withList.reduce((a, i) => a + checkCount(i).total, 0);
+  const lineDone = withList.reduce((a, i) => a + checkCount(i).done, 0);
+
+  const cells: (StatCell | "sep")[] = [
+    { k: "in view", v: rows.length, title: "Every filter above applies to this page" },
+    "sep",
+    { k: "open", v: open.length },
+    { k: "delayed", v: late.length, dot: late.length ? "bad" : "" },
+    { k: "blocked", v: blocked.length, dot: blocked.length ? "warn" : "" },
+    "sep",
+    { k: "finished", v: rate === null ? "—" : rate + "%", title: "Completed, of everything not cancelled" },
+  ];
+
+  if (!rows.length) {
+    return (
+      <EmptyState icon="chart" title="Nothing to analyse"
+        body="No item matches the filters above. Clear one and the numbers come back." />
+    );
+  }
+
+  return (
+    <div className="tm-an">
+      <StatStrip cells={cells} />
+
+      {late.length ? (
+        <Notice tone="bad">
+          <b>{late.length} {late.length === 1 ? "item is" : "items are"} past due.</b>{" "}
+          Delay is derived from the date, not stored — nothing swept overnight to decide this, and
+          it stops being true the moment the date or the status moves.
+        </Notice>
+      ) : null}
+
+      <div className="tm-an-pair">
+        <section className="tm-card">
+          <SectionHead title="Where the work is"
+            desc="Every item in view, by the stage it is actually in." />
+          <BarRows rows={byStage} unit="" />
+        </section>
+
+        <section className="tm-card">
+          <SectionHead title="What is open, by priority"
+            desc="Finished work carries no urgency, so it is not counted here." />
+          {byPriority.length
+            ? <BarRows rows={byPriority} unit="" />
+            : <span className="cell-2">Nothing is open.</span>}
+        </section>
+      </div>
+
+      <section className="tm-card">
+        <SectionHead title="Who is carrying what"
+          desc="Open items only. Ordered by what is late, not by how much — eight on time is a working week, two overdue is a conversation." />
+        {byMember.length ? (
+          <Table
+            cols={[
+              { label: "Member" },
+              { label: "Open", cls: "n", w: "90px" },
+              { label: "Delayed", cls: "n", w: "100px" },
+              { label: "Load", w: "220px" },
+            ]}
+            rows={byMember.map((r) => (
+              <tr key={r.m.memberId}>
+                <td><Who m={r.m} /></td>
+                <td className="n tnum">{r.open}</td>
+                <td className={"n tnum" + (r.late ? " u-bad" : "")}>{r.late || "—"}</td>
+                <td>
+                  <Meter value={r.open - r.late} of={Math.max(1, r.open)}
+                    tone={r.late ? "warn" : "ok"}
+                    label={<>{r.open - r.late} on time{r.late ? " · " + r.late + " late" : ""}</>} />
+                </td>
+              </tr>
+            ))}
+          />
+        ) : <span className="cell-2">Nobody has anything open in this view.</span>}
+      </section>
+
+      <section className="tm-card">
+        <SectionHead title="Steps ticked off"
+          desc="Only the tasks that carry a checklist — the rest have no way to say how far in they are." />
+        {withList.length ? (
+          <>
+            <div className="tm-an-steps">
+              <Meter value={lineDone} of={Math.max(1, lineTotal)}
+                tone={lineDone === lineTotal ? "ok" : "warn"}
+                label={<>{lineDone} of {lineTotal} steps</>} />
+            </div>
+            <Table
+              cols={[
+                { label: "Task" },
+                { label: "Steps", cls: "n", w: "110px" },
+                { label: "Progress", w: "200px" },
+              ]}
+              rows={withList
+                .slice()
+                .sort((a, b) => (progressOf(a) || 0) - (progressOf(b) || 0))
+                .map((i) => {
+                  const c = checkCount(i);
+                  return (
+                    <tr key={i.itemId}>
+                      <td>
+                        <div className="tm-who-t">
+                          <b>{i.title}</b>
+                          <span className="cell-2">{labelOf(WORK_STATUS, i.status)}</span>
+                        </div>
+                      </td>
+                      <td className="n tnum">{c.done} of {c.total}</td>
+                      <td>
+                        <Meter value={c.done} of={Math.max(1, c.total)}
+                          tone={c.done === c.total ? "ok" : ""}
+                          label={<>{progressOf(i)}%</>} />
+                      </td>
+                    </tr>
+                  );
+                })}
+            />
+          </>
+        ) : (
+          <span className="cell-2">
+            No task in view has a checklist. Add steps to one and its progress stops being a
+            choice between nothing and everything.
+          </span>
+        )}
+      </section>
     </div>
   );
 }

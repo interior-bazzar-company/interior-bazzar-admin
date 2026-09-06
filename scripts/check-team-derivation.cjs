@@ -337,7 +337,7 @@ require("esbuild").build({
   ok("a signed agreement can no longer be revoked",
     S.revokeAgreement("AG-01").ok === false);
   ok("the member may delete what they handed over",
-    S.deleteResource("RS-02").ok === true && S.resourcesFor("86").length === 1);
+    S.deleteDocument("DOC-02").ok === true && S.documentsFor("86").length === 1);
 
   head("Plans and EODs over a span inherit the day view's exclusions");
   S.resetStore();
@@ -764,6 +764,85 @@ require("esbuild").build({
     S.resetStore();
     eq("\u2026and reset restores the authored eight", S.readMembers().length, 8);
   })();
+
+head("A task says how far in it is");
+
+  /* THE CHECKLIST IS THE ONE STORED THING in a module that derives almost
+     everything else — a tick is an act somebody performed and there is nothing
+     to compute it from. What it buys is a task's progress: without it a task
+     is a coin-flip between 0 and 100. */
+  const withList = S.readItems().filter((i) => i.kind === "task" && (i.checklist || []).length);
+  ok("the seed has tasks carrying a checklist", withList.length >= 4);
+  ok("…and a partly-done one reads between the ends",
+    withList.some((i) => {
+      const p = S.progressOf(i);
+      return i.status !== "completed" && p > 0 && p < 100;
+    }));
+  ok("…which is exactly its ticked lines over its total",
+    withList.every((i) => {
+      const c = S.checkCount(i);
+      return i.status === "completed"
+        || S.progressOf(i) === Math.round((c.done / c.total) * 100);
+    }));
+  ok("a task with no checklist is still binary",
+    S.readItems().filter((i) => i.kind === "task" && !(i.checklist || []).length)
+      .every((i) => [0, 100].indexOf(S.progressOf(i)) >= 0));
+
+  /* A COMPLETED TASK IS 100 WHATEVER THE LINES SAY. Somebody closing a task
+     with two lines open has decided those lines did not matter, and a bar
+     reading 60% on a finished task argues with them. */
+  (() => {
+    const t = withList[0];
+    S.addCheckLine(t.itemId, "One more thing nobody will do");
+    const after = S.readItems().filter((i) => i.itemId === t.itemId)[0];
+    ok("adding an unticked step moves the bar down", S.progressOf(after) < 100);
+    S.setItemStatus(t.itemId, "completed");
+    ok("…and completing it reads 100 anyway",
+      S.progressOf(S.readItems().filter((i) => i.itemId === t.itemId)[0]) === 100);
+  })();
+  S.resetStore();
+
+  const task = S.readItems().filter((i) => i.kind === "task")[0];
+  ok("a step can be added", S.addCheckLine(task.itemId, "Draft it").ok === true);
+  ok("…but not an empty one", S.addCheckLine(task.itemId, "   ").ok === false);
+  (() => {
+    const t = S.readItems().filter((i) => i.itemId === task.itemId)[0];
+    const line = t.checklist[t.checklist.length - 1];
+    const read = () => S.readItems().filter((i) => i.itemId === task.itemId)[0]
+      .checklist.filter((l) => l.lineId === line.lineId)[0];
+    ok("a step can be ticked",
+      S.toggleCheckLine(task.itemId, line.lineId).ok === true && read().done === true);
+    ok("…and unticked again",
+      S.toggleCheckLine(task.itemId, line.lineId).ok === true && read().done === false);
+    ok("…and removed", S.removeCheckLine(task.itemId, line.lineId).ok === true);
+  })();
+
+head("A link needs a name and a scheme");
+
+  /* A bare URL saved as `docs.google.com/...` resolves against THIS panel's
+     origin and 404s, which reads as a broken document rather than a typo. */
+  ok("a link needs a name", S.addResourceLink(task.itemId, "", "https://x.com").ok === false);
+  ok("…and an address", S.addResourceLink(task.itemId, "Brief", "  ").ok === false);
+  ok("…and a scheme on that address",
+    S.addResourceLink(task.itemId, "Brief", "docs.google.com/d/1").ok === false);
+  ok("…and then it saves",
+    S.addResourceLink(task.itemId, "Brief", "https://docs.google.com/d/1").ok === true);
+  ok("…and can be removed", (() => {
+    const t = S.readItems().filter((i) => i.itemId === task.itemId)[0];
+    return S.removeResourceLink(task.itemId, t.links[t.links.length - 1].linkId).ok === true;
+  })());
+  S.resetStore();
+
+head("Four priorities, and only one of them shouts");
+
+  ok("urgent exists, above high", !!S.PRIORITY.urgent);
+  eq("…and it is the top of the scale", S.PRIORITY.urgent.label, "Urgent");
+  eq("medium reads as Normal, because it was always the default",
+    S.PRIORITY.medium.label, "Normal");
+  ok("…and only urgent carries the loudest tone",
+    S.PRIORITY.urgent.tone === "bad" && S.PRIORITY.high.tone !== "bad");
+  ok("every seeded item still has a priority the scale knows",
+    S.readItems().every((i) => !!S.PRIORITY[i.priority]));
 
   head("Hours are read, never written");
   ok("no write function accepts an hours argument",

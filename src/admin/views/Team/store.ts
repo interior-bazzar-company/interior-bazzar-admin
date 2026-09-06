@@ -45,7 +45,7 @@ import reportsDoc from "../../../content/team/reports.json";
 import tagsDoc from "../../../content/team/tags.json";
 import leaveDoc from "../../../content/team/leave.json";
 import agreementsDoc from "../../../content/team/agreements.json";
-import resourcesDoc from "../../../content/team/resources.json";
+import documentsDoc from "../../../content/team/documents.json";
 import payDoc from "../../../content/team/pay.json";
 import linksDoc from "../../../content/team/links.json";
 import vocabDoc from "../../../content/team/vocabularies.json";
@@ -64,7 +64,12 @@ export type WorkStatus = "planned" | "in_progress" | "completed" | "cancelled";
  *  so an item is in exactly one of them. */
 export type WorkStage = WorkStatus | "delayed";
 export type LeaveState = "requested" | "approved" | "rejected" | "withdrawn";
-export type Priority = "high" | "medium" | "low";
+/** FOUR, AND `urgent` IS NEW. It sits above `high` rather than replacing it:
+ *  a scale whose top value is also its common value has no top value, and
+ *  every existing item keeps the priority it was given. `medium` reads as
+ *  "Normal" now — it was always the default and never the middle of anything
+ *  anybody thought about. */
+export type Priority = "urgent" | "high" | "medium" | "low";
 export type Scope = "self" | "team" | "all";
 
 export interface Member {
@@ -111,6 +116,22 @@ export interface AttendanceDay {
   correctionReason?: string;
 }
 
+/** One line of a task's checklist. `done` is stored — unlike almost everything
+ *  else derived in this module — because a tick is an act somebody performed
+ *  and there is nothing to derive it from. */
+export interface CheckLine {
+  lineId: string;
+  text: string;
+  done: boolean;
+}
+
+/** A named link out of the panel. */
+export interface ResourceLink {
+  linkId: string;
+  label: string;
+  url: string;
+}
+
 export interface WorkItem {
   itemId: string;
   kind: WorkKind;
@@ -137,6 +158,15 @@ export interface WorkItem {
   /** Member-owned tag records. Free, unlike the stage, which is company-wide. */
   tagIds?: string[];
   attachments?: Attachment[];
+  /** THE WORK INSIDE THE WORK. A task's description says what it is; the
+   *  checklist says what is left of it. It is what makes a task's progress a
+   *  number rather than a coin-flip between 0 and 100 — see `progressOf`. */
+  checklist?: CheckLine[];
+  /** Where the work actually lives: the brief, the folder, the board. A URL
+   *  with a name on it, because a bare link in a list of six is a link nobody
+   *  clicks. Distinct from `attachments`, which are files this panel holds,
+   *  and from item↔item links, which are relationships between records. */
+  links?: ResourceLink[];
   rowVersion: number;
   createdAt: string;
 }
@@ -148,6 +178,14 @@ export interface Agreement {
   memberId: string;
   kind: string;
   title: string;
+  /** The template it was made from, if it was made from one. Null for the
+   *  agreements that predate templates — the link is provenance, never a read:
+   *  `body` below is the document, and the template may have moved on. */
+  templateId: string | null;
+  /** THE DOCUMENT ITSELF, frozen at send. A signature over a body that can
+   *  still change is not a signature — this is the whole reason a template edit
+   *  makes a new version rather than rewriting what is out there. */
+  body: string;
   version: number;
   state: AgreementState;
   sentAt: string | null;
@@ -161,8 +199,8 @@ export interface Agreement {
   fileName: string;
 }
 
-export interface Resource {
-  resourceId: string;
+export interface MemberDocument {
+  documentId: string;
   memberId: string;
   kind: string;
   label: string;
@@ -389,10 +427,10 @@ export const LEAVE_STATE = toneMap(vocabDoc.leaveStates as ToneRow[]);
 export const LEAVE_KIND = toneMap(vocabDoc.leaveKinds as unknown as ToneRow[]);
 export const AGREEMENT_KIND = toneMap(vocabDoc.agreementKinds as unknown as ToneRow[]);
 export const AGREEMENT_STATE = toneMap(vocabDoc.agreementStates as ToneRow[]);
-export const RESOURCE_KIND = toneMap(vocabDoc.resourceKinds as unknown as ToneRow[]);
+export const DOCUMENT_KIND = toneMap(vocabDoc.documentKinds as unknown as ToneRow[]);
 /** The documents a member is expected to have handed over. Vocabulary, not a
  *  constant here: adding one server-side must not need a code edit. */
-export const REQUIRED_DOCS: string[] = (vocabDoc.resourceKinds as { key: string; required?: boolean }[])
+export const REQUIRED_DOCS: string[] = (vocabDoc.documentKinds as { key: string; required?: boolean }[])
   .filter((r) => r.required).map((r) => r.key);
 export const LINK_RELATION = toneMap(vocabDoc.linkRelations as unknown as ToneRow[]);
 /** The label read from the side you are standing on: "Follows" out, "Followed
@@ -426,7 +464,7 @@ type Snapshot = {
   tags: Tag[];
   leave: LeaveRequest[];
   agreements: Agreement[];
-  resources: Resource[];
+  documents: MemberDocument[];
   links: WorkLink[];
   /** In the snapshot so a roster adoption re-keys it with everything else —
    *  but nothing in this file ever writes it. Team reads pay. */
@@ -461,7 +499,7 @@ const seed = (): Snapshot => ({
   tags: seedRows(clone(tagsDoc.tags)) as Tag[],
   leave: seedRows(clone(leaveDoc.leave)) as LeaveRequest[],
   agreements: seedRows(clone(agreementsDoc.agreements)) as Agreement[],
-  resources: seedRows(clone(resourcesDoc.resources)) as Resource[],
+  documents: seedRows(clone(documentsDoc.documents)) as MemberDocument[],
   links: seedRows(clone(linksDoc.links)) as WorkLink[],
   pay: seedRows(clone(payDoc.pay)) as Pay[],
   version: 0,
@@ -487,7 +525,7 @@ export const readReports = (): DailyReport[] => snap.reports;
 export const readTags = (): Tag[] => snap.tags;
 export const readLeave = (): LeaveRequest[] => snap.leave;
 export const readAgreements = (): Agreement[] => snap.agreements;
-export const readResources = (): Resource[] => snap.resources;
+export const readDocuments = (): MemberDocument[] => snap.documents;
 export const readLinks = (): WorkLink[] => snap.links;
 export const readMember = (id: string): Member | null =>
   snap.members.filter((m) => m.memberId === id)[0] || null;
@@ -826,6 +864,14 @@ export const isTerminal = (s: WorkStatus) => s === "completed" || s === "cancell
 /** Past due and not finished. Never stored — see rule 1 at the top. A cancelled
  *  item is excluded, which is the single easiest part of this to get wrong:
  *  a terminal item cannot be late. */
+/** How much of a task's checklist is done, as a fraction rather than a
+ *  percentage — the list wants "3 of 5", the bar wants a number, and they
+ *  should not be two computations. */
+export const checkCount = (i: WorkItem): { done: number; total: number } => {
+  const lines = i.checklist || [];
+  return { done: lines.filter((l) => l.done).length, total: lines.length };
+};
+
 export function isDelayed(i: WorkItem, today = TODAY): boolean {
   if (isTerminal(i.status)) return false;
   return !!i.dueDate && i.dueDate < today;
@@ -834,10 +880,22 @@ export function isDelayed(i: WorkItem, today = TODAY): boolean {
 export const childrenOf = (id: string, all = snap.items) => all.filter((i) => i.parentId === id);
 
 /** Progress, derived. A milestone counts its completed children; a target
- *  divides what its EOD reports accumulated by what it asked for; a task is
- *  binary. Nothing here reads a stored percentage, and none is written. */
+ *  divides what its EOD reports accumulated by what it asked for; a task
+ *  counts its ticked lines, and is binary only when it has none.
+ *
+ *  A COMPLETED TASK IS 100 WHATEVER ITS LINES SAY. Somebody closing a task
+ *  with two lines unticked has decided those lines did not matter, and a bar
+ *  reading 60% on a finished task argues with them. The unticked lines are
+ *  still on the record; the percentage is not the place to make the point.
+ *
+ *  Nothing here reads a stored percentage, and none is written. */
 export function progressOf(i: WorkItem, all = snap.items): number | null {
-  if (i.kind === "task") return i.status === "completed" ? 100 : 0;
+  if (i.kind === "task") {
+    if (i.status === "completed") return 100;
+    const lines = i.checklist || [];
+    if (!lines.length) return 0;
+    return Math.round((lines.filter((l) => l.done).length / lines.length) * 100);
+  }
   if (i.kind === "target") {
     if (!i.targetValue) return null;
     return Math.min(100, Math.round(((i.currentValue || 0) / i.targetValue) * 100));
@@ -998,15 +1056,15 @@ export const agreementsFor = (memberId: string): Agreement[] =>
   snap.agreements.filter((a) => a.memberId === memberId)
     .slice().sort((a, b) => (b.sentAt || "").localeCompare(a.sentAt || ""));
 
-export const resourcesFor = (memberId: string): Resource[] =>
-  snap.resources.filter((r) => r.memberId === memberId)
+export const documentsFor = (memberId: string): MemberDocument[] =>
+  snap.documents.filter((r) => r.memberId === memberId)
     .slice().sort((a, b) => a.kind.localeCompare(b.kind));
 
 /** Which of the required documents this member has not handed over. Derived
  *  from the vocabulary, so the answer changes with the list and not with a
  *  constant somebody has to remember to edit. */
 export const missingDocs = (memberId: string): string[] => {
-  const have = resourcesFor(memberId).map((r) => r.kind);
+  const have = documentsFor(memberId).map((r) => r.kind);
   return REQUIRED_DOCS.filter((k) => have.indexOf(k) < 0);
 };
 
@@ -1643,13 +1701,24 @@ export function setTagTone(tagId: string, tone: string): Result<Tag> {
 
 /* --------------------------------------------------------- documents --- */
 
-/** Sending FREEZES the document. A template edit after this makes a new
- *  version; it never changes what somebody already signed. */
-export function sendAgreement(memberId: string, kind: string, title: string): Result<Agreement> {
+/** SENDING FREEZES THE DOCUMENT — and now there is a document to freeze. The
+ *  body is copied in, not referenced: a template edit afterwards makes a new
+ *  version and never rewrites what is already out there, which is the rule this
+ *  function has claimed since before templates existed.
+ *
+ *  `version` is the TEMPLATE's version at the moment of sending, so an agreement
+ *  can say which draft of the NDA somebody actually signed. */
+export function sendAgreement(
+  memberId: string, kind: string, title: string,
+  from?: { templateId: string; body: string; version: number },
+): Result<Agreement> {
   if (!title.trim()) return err("validation_failed", "A title is required.");
   if (!readMember(memberId)) return err("member_not_found", "No such member.");
   const a: Agreement = {
-    agreementId: nextId("AG"), memberId, kind, title: title.trim(), version: 1,
+    agreementId: nextId("AG"), memberId, kind, title: title.trim(),
+    templateId: from ? from.templateId : null,
+    body: from ? from.body : "",
+    version: from ? from.version : 1,
     state: "sent", sentAt: new Date(now()).toISOString(), sentById: meId(),
     viewedAt: null, signedAt: null, signedName: null, signerIp: null,
     expiresAt: addDays(TODAY, 7), token: "tok_" + nextId("t").toLowerCase(),
@@ -1691,36 +1760,36 @@ export function revokeAgreement(agreementId: string): Result<Agreement> {
   return ok(a);
 }
 
-export function addResource(memberId: string, kind: string, label: string): Result<Resource> {
+export function addDocument(memberId: string, kind: string, label: string): Result<MemberDocument> {
   if (!label.trim()) return err("validation_failed", "A label is required.");
-  const r: Resource = {
-    resourceId: nextId("RS"), memberId, kind, label: label.trim(),
+  const r: MemberDocument = {
+    documentId: nextId("DOC"), memberId, kind, label: label.trim(),
     fileName: label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-") + ".pdf",
     sizeKb: 240, uploadedAt: new Date(now()).toISOString(), uploadedById: memberId,
     verifiedById: null, verifiedAt: null,
   };
-  snap.resources = snap.resources.concat([r]);
+  snap.documents = snap.documents.concat([r]);
   emit();
   return ok(r);
 }
 
 /** The member may delete what they handed over. That is the half that travels
  *  member → company, and it is theirs. */
-export function deleteResource(resourceId: string): Result<string> {
-  const before = snap.resources.length;
-  snap.resources = snap.resources.filter((r) => r.resourceId !== resourceId);
-  if (snap.resources.length === before) return err("resource_not_found", "No such document.");
+export function deleteDocument(documentId: string): Result<string> {
+  const before = snap.documents.length;
+  snap.documents = snap.documents.filter((r) => r.documentId !== documentId);
+  if (snap.documents.length === before) return err("document_not_found", "No such document.");
   emit();
-  return ok(resourceId);
+  return ok(documentId);
 }
 
-export function verifyResource(resourceId: string): Result<Resource> {
-  const list = snap.resources.slice();
-  const r = list.filter((x) => x.resourceId === resourceId)[0];
-  if (!r) return err("resource_not_found", "No such document.");
+export function verifyDocument(documentId: string): Result<MemberDocument> {
+  const list = snap.documents.slice();
+  const r = list.filter((x) => x.documentId === documentId)[0];
+  if (!r) return err("document_not_found", "No such document.");
   r.verifiedById = meId();
   r.verifiedAt = new Date(now()).toISOString();
-  snap.resources = list;
+  snap.documents = list;
   emit();
   return ok(r);
 }
@@ -1802,6 +1871,73 @@ export function decideLeave(leaveId: string, state: LeaveState, byId: string, no
   snap.leave = list;
   emit();
   return ok(l);
+}
+
+/* ------------------------------------------------- checklist and links --- */
+
+/** THE ONE STORED THING IN A DERIVED MODULE. A tick is an act somebody
+ *  performed and there is nothing to compute it from — unlike delay, progress
+ *  and stage, which are all read from other facts. It writes the item's own
+ *  row, so the board, the list and the bar all move together. */
+function withItem(itemId: string, fn: (i: WorkItem) => string | null): Result<WorkItem> {
+  const list = snap.items.slice();
+  const i = list.filter((x) => x.itemId === itemId)[0];
+  if (!i) return err("item_not_found", "No such item.");
+  const why = fn(i);
+  if (why) return err("validation_failed", why);
+  i.rowVersion = (i.rowVersion || 0) + 1;
+  snap.items = list;
+  emit();
+  return ok(i);
+}
+
+export function addCheckLine(itemId: string, text: string): Result<WorkItem> {
+  return withItem(itemId, (i) => {
+    if (!text.trim()) return "Write the step first.";
+    i.checklist = (i.checklist || []).concat([
+      { lineId: nextId("CK"), text: text.trim(), done: false },
+    ]);
+    return null;
+  });
+}
+
+export function toggleCheckLine(itemId: string, lineId: string): Result<WorkItem> {
+  return withItem(itemId, (i) => {
+    const line = (i.checklist || []).filter((l) => l.lineId === lineId)[0];
+    if (!line) return "No such step.";
+    line.done = !line.done;
+    return null;
+  });
+}
+
+export function removeCheckLine(itemId: string, lineId: string): Result<WorkItem> {
+  return withItem(itemId, (i) => {
+    i.checklist = (i.checklist || []).filter((l) => l.lineId !== lineId);
+    return null;
+  });
+}
+
+/** A LINK NEEDS A NAME. `addLink` above is a different thing entirely — it
+ *  relates two ITEMS to each other; this attaches a URL to one. Six bare URLs in a panel is six things nobody clicks,
+ *  so the label is required and the URL is checked for a scheme — a link
+ *  saved as `docs.google.com/…` resolves against this panel's own origin and
+ *  404s, which looks like a broken document rather than a typo. */
+export function addResourceLink(itemId: string, label: string, url: string): Result<WorkItem> {
+  return withItem(itemId, (i) => {
+    if (!label.trim()) return "Give the link a name.";
+    const u = url.trim();
+    if (!u) return "Paste the address.";
+    if (!/^https?:\/\//i.test(u)) return "The address needs to start with http:// or https://.";
+    i.links = (i.links || []).concat([{ linkId: nextId("LN"), label: label.trim(), url: u }]);
+    return null;
+  });
+}
+
+export function removeResourceLink(itemId: string, linkId: string): Result<WorkItem> {
+  return withItem(itemId, (i) => {
+    i.links = (i.links || []).filter((l) => l.linkId !== linkId);
+    return null;
+  });
 }
 
 export function createItem(input: Partial<WorkItem> & { title: string; assigneeId: string; kind: WorkKind }): Result<WorkItem> {
@@ -2057,7 +2193,7 @@ export function adoptRoster(people: LivePerson[]): void {
     ...a, memberId: map[a.memberId],
     sentById: a.sentById ? re(a.sentById) : a.sentById,
   }));
-  const resources = snap.resources.filter((r) => mapped(r.memberId)).map((r) => ({
+  const documents = snap.documents.filter((r) => mapped(r.memberId)).map((r) => ({
     ...r, memberId: map[r.memberId],
     uploadedById: re(r.uploadedById) as string,
     verifiedById: r.verifiedById ? re(r.verifiedById) : r.verifiedById,
@@ -2066,7 +2202,7 @@ export function adoptRoster(people: LivePerson[]): void {
     .map((p) => ({ ...p, memberId: map[p.memberId] }));
 
   adoptedMe = meNew;
-  snap = { ...snap, members, days, items, tags, plans, reports, leave, agreements, resources, pay };
+  snap = { ...snap, members, days, items, tags, plans, reports, leave, agreements, documents, pay };
   emit();
 }
 
@@ -2084,7 +2220,7 @@ export function useLeave(): LeaveRequest[] { useVersion(); return snap.leave; }
 export function usePlans(): DailyPlan[] { useVersion(); return snap.plans; }
 export function useReports(): DailyReport[] { useVersion(); return snap.reports; }
 export function useAgreements(): Agreement[] { useVersion(); return snap.agreements; }
-export function useResources(): Resource[] { useVersion(); return snap.resources; }
+export function useDocuments(): MemberDocument[] { useVersion(); return snap.documents; }
 export function useLinks(): WorkLink[] { useVersion(); return snap.links; }
 export function useItems(): WorkItem[] { useVersion(); return snap.items; }
 export function useReview(date: string, scope: Scope): ReviewRow[] { useVersion(); return reviewRows(date, scope); }

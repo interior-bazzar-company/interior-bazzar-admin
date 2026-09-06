@@ -45,6 +45,17 @@ src/content/users/
   audit.json            → GET /admin/users/{id}/timeline
   vocabularies.json     → GET /admin/users/vocabularies
 
+src/content/agreements/
+  templates.json       → GET /admin/agreements/templates and /{id}
+                         (the AGREEMENTS themselves are Module 7's
+                          team/agreements.json — one list, not two)
+
+src/content/resources/
+  forms.json            → GET /admin/resources and /admin/resources/{id}
+  responses.json        → GET /admin/resources/{id}/responses
+                          and /admin/resources/responses?memberId=
+  vocabularies.json     → GET /admin/resources/vocabularies
+
 src/content/team/
   members.json          → GET /admin/team/members  (the team-WIDE read; the live
                           endpoint returns only self-created members)

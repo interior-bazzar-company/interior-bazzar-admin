@@ -71,6 +71,15 @@ export const MEMBER_OPS: MemberOp[] = [
     viewers: ["self", "admin"],
   },
   {
+    key: "resources", label: "Resources", icon: "flag",
+    blurb: "The forms the company has asked them for, and what they answered.",
+    /* SELF AND ADMIN, not senior — the same line agreements and documents draw.
+       A reporting line is about the work; an onboarding pack carries a PAN name
+       and a signed offer letter, and a senior having one does not make it their
+       business. */
+    viewers: ["self", "admin"],
+  },
+  {
     key: "pay", label: "Pay", icon: "cash",
     blurb: "Salary, payslips and incentives — read from Finance, never written here.",
     viewers: ["self", "admin"],

@@ -16,7 +16,7 @@ import { useState } from "react";
 import { Icon, Notice } from "../../../ui";
 import { useShell } from "../../../shell/ShellContext";
 import {
-  AGREEMENT_KIND, LEAVE_KIND, RESOURCE_KIND, TODAY, VOCAB, addDays, addResource, createTag,
+  AGREEMENT_KIND, LEAVE_KIND, DOCUMENT_KIND, TODAY, VOCAB, addDays, addDocument, createTag,
   datesIn, decideLeave, fmtDate, labelOf, leaveClash, leaveOverlap, meId, renameTag, requestLeave,
   sendAgreement, signAgreement,
 } from "../store";
@@ -308,17 +308,17 @@ export function SignAgreementModal({ a }: { a: Agreement }) {
 
 /* ---------------------------------------------------------- documents --- */
 
-export function AddResourceModal({ memberId, kind: seed }: { memberId: string; kind?: string }) {
+export function AddDocumentModal({ memberId, kind: seed }: { memberId: string; kind?: string }) {
   const shell = useShell();
   const [kind, setKind] = useState(seed || "pan");
-  const [label, setLabel] = useState(labelOf(RESOURCE_KIND, seed || "pan"));
+  const [label, setLabel] = useState(labelOf(DOCUMENT_KIND, seed || "pan"));
   const save = () => {
-    const r = addResource(memberId, kind, label);
+    const r = addDocument(memberId, kind, label);
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
     shell.closeLayer();
     shell.toast("Added.");
   };
-  const kinds = (VOCAB.resourceKinds as { key: string }[]).map((k) => k.key);
+  const kinds = (VOCAB.documentKinds as { key: string }[]).map((k) => k.key);
   return (
     <>
       <Head title="Add a document" />
@@ -326,8 +326,8 @@ export function AddResourceModal({ memberId, kind: seed }: { memberId: string; k
         <div className="fg">
           <label htmlFor="rsKind">What is it</label>
           <select id="rsKind" className="inp" value={kind}
-            onChange={(e) => { setKind(e.target.value); setLabel(labelOf(RESOURCE_KIND, e.target.value)); }}>
-            {kinds.map((k) => <option key={k} value={k}>{labelOf(RESOURCE_KIND, k)}</option>)}
+            onChange={(e) => { setKind(e.target.value); setLabel(labelOf(DOCUMENT_KIND, e.target.value)); }}>
+            {kinds.map((k) => <option key={k} value={k}>{labelOf(DOCUMENT_KIND, k)}</option>)}
           </select>
         </div>
         <div className="fg">

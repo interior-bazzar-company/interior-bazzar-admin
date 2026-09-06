@@ -47,13 +47,13 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { ShellProvider } from "../src/admin/shell/ShellContext";
 import Work from "../src/admin/views/Team/Work";
-import Attendance, { TopClock } from "../src/admin/views/Team/Attendance";
+import Attendance from "../src/admin/views/Team/Attendance";
 import Reports from "../src/admin/views/Team/Reports";
 import { FaceMenu, NewItemModal } from "../src/admin/views/Team/Work";
 import MemberPage from "../src/admin/views/Team/MemberPage";
 import { MEMBER_OPS, opsFor } from "../src/admin/views/Team/member/ops";
 import {
-  AddResourceModal, LeaveDecideModal, LeaveRequestModal, NewTagModal, SendAgreementModal,
+  AddDocumentModal, LeaveDecideModal, LeaveRequestModal, NewTagModal, SendAgreementModal,
   SignAgreementModal,
 } from "../src/admin/views/Team/member/modals";
 import { EodModal, PlanModal } from "../src/admin/views/Team/member/reportForms";
@@ -119,17 +119,63 @@ resetStore();
 /* ------------------------------------------------------------- the faces -- */
 /* Each names a class only it draws, so a face that renders an empty shell
    instead of itself is a failure here rather than a surprise in the browser. */
-renders("the calendar face draws its rail and its month grid", () => at("/work"),
+/* THREE FACES NOW — Tasks, Timeline, Analysis — and the three ways of looking
+   at the set (list, board, calendar) moved inside the first as a view
+   switcher. They were never three questions; they were three answers to one. */
+renders("the calendar view draws its rail and its month grid", () => at("/work?view=calendar"),
   ["tm-shell", "tm-rail", "tm-cal", "tm-day", "tm-calbar"]);
-renders("the board draws five columns", () => at("/work?face=board"),
+renders("the board draws five columns", () => at("/work?view=board"),
   ["tm-boardwrap", "tm-board", "tm-col"]);
-renders("the list draws a table", () => at("/work?face=list"), ["tbl", "dls-body"]);
+renders("the list is the default view", () => at("/work"), ["tbl", "dls-body"]);
+
+/* OLD LINKS STILL RESOLVE. `?face=board` and `?face=calendar` are addresses
+   people have; they land on Tasks with that view rather than 404-ing or
+   silently showing something else. */
+(() => {
+  ok("an old ?face=board link lands on the board",
+    at("/work?face=board").indexOf("tm-board") >= 0);
+  ok("…and an old ?face=calendar link on the month",
+    at("/work?face=calendar").indexOf("tm-cal") >= 0);
+})();
+
+/* THE VIEW SWITCHER, on the Tasks face and nowhere else — Timeline and
+   Analysis are not three ways of looking at anything. */
+(() => {
+  const tasks = at("/work");
+  ok("the tasks face carries a view switcher",
+    tasks.indexOf("tm-views") >= 0 && tasks.indexOf("role=\"tablist\"") >= 0);
+  ok("…offering all three views",
+    [">List<", ">Board<", ">Calendar<"].every((v) => tasks.indexOf(v) >= 0));
+  ok("the timeline has no view switcher",
+    at("/work?face=timeline").indexOf("tm-views") < 0);
+})();
 renders("the timeline draws lanes", () => at("/work?face=timeline"), ["tm-tl", "tm-tl-lane"]);
 
-const cal = at("/work");
+/* THE THIRD FACE, and the one that did not exist. It reads the rows on screen
+   rather than the whole table, so every filter above it applies — a chart that
+   ignored the filter band would be a chart nobody could trust against the list
+   beside it. */
+renders("analysis draws the three questions", () => at("/work?face=analysis"),
+  ["tm-an", "dls-stat", "Where the work is", "Who is carrying what", "Steps ticked off"]);
+
+(() => {
+  const html = at("/work?face=analysis");
+  ok("…as bar rows, from the panel's own chart kit",
+    html.indexOf("ch-rows") >= 0 && html.indexOf("ch-row") >= 0);
+  ok("…counting the checklist steps it can see",
+    html.indexOf("steps") >= 0);
+  /* THE FILTER APPLIES. This is the assertion that fails if the face ever
+     reaches past `rows` to the whole table. */
+  const all = at("/work?face=analysis");
+  const one = at("/work?face=analysis&q=zzzznothingmatches");
+  ok("…and every filter above it applies",
+    one.indexOf("Nothing to analyse") >= 0 && all.indexOf("Nothing to analyse") < 0);
+})();
+
+const cal = at("/work?view=calendar");
 ok("the calendar has no filter band", cal.indexOf("dls-cmd") < 0);
-["board", "list", "timeline"].forEach((f) => {
-  ok("the " + f + " keeps its filter band", at("/work?face=" + f).indexOf("dls-cmd") >= 0);
+["board", "list"].forEach((v) => {
+  ok("the " + v + " keeps its filter band", at("/work?view=" + v).indexOf("dls-cmd") >= 0);
 });
 
 /* ATTENDANCE HAS FOUR FACES NOW and each answers a different question, so each
@@ -167,8 +213,11 @@ ok("…and a future day cannot be asked for",
    directly above it, and the scope note repeated a count the strip carries. */
 ok("the day heading is gone from the table", at("/attendance").indexOf("tm-daterow") < 0);
 ok("the scope note is gone from the tab row", at("/attendance").indexOf("tm-scope\"") < 0);
-renders("the clock, in the topbar slot", () => node(<TopClock />, "/attendance"),
-  ["tm-tclock", "tm-tclock-a"]);
+/* The clock that used to be asserted here is gone — it is the member
+   dashboard's, not the admin panel's. Nothing replaces the assertion: this
+   harness renders modules, and chrome is published to a shell it never
+   mounts, so the block was only ever reachable by rendering the component
+   directly. tsc is what now catches a reference to it. */
 
 /* REPORTS IS THREE TABS NOW. The record, the queue, and the shape of a window —
    each named by something only it draws, so a tab that renders an empty shell
@@ -205,9 +254,14 @@ renders("reports · analytics", () => at("/reports?face=analytics"),
 ok("the attendance day table is not welded either",
   at("/attendance").indexOf("dls-body tm-pane") >= 0);
 
-const menu = node(<FaceMenu face="calendar" goto={() => {}} />);
-["Calendar", "Board", "List", "Timeline"].forEach((l) =>
+const menu = node(<FaceMenu face="tasks" goto={() => {}} />);
+/* THREE FACES IN THE SWITCHER. List, Board and Calendar left it for the view
+   switcher on the Tasks face — they are three ways of looking at one set, and
+   a face menu that offered six entries said they were six questions. */
+["Tasks", "Timeline", "Analysis"].forEach((l) =>
   ok("the switcher offers " + l, menu.indexOf(">" + l + "<") >= 0));
+ok("…and no longer offers a view as if it were a face",
+  menu.indexOf(">Board<") < 0 && menu.indexOf(">List<") < 0);
 ok("…and marks the one you are in", menu.indexOf("mi on") >= 0);
 
 try {
@@ -296,7 +350,7 @@ const dialogs: [string, React.ReactNode][] = [
   ["refuse leave", <LeaveDecideModal l={lv} state="rejected" />],
   ["send an agreement", <SendAgreementModal memberId={REPORT} />],
   ["sign an agreement", <SignAgreementModal a={ag} />],
-  ["add a document", <AddResourceModal memberId={REPORT} />],
+  ["add a document", <AddDocumentModal memberId={REPORT} />],
   ["new tag", <NewTagModal ownerId={MINE} />],
   /* They moved off `#/reports` and onto the member's own page as dialogs. */
   ["today's plan", <PlanModal m={readMember(MINE)!} />],

@@ -31,7 +31,7 @@ import type { Member, Ops, Role } from "../teamShared";
 import { ListSkeleton } from "../../ui";
 import MemberPage from "./MemberPage";
 import { adoptPeople } from "./adopt";
-import { RESOURCE_KIND, labelOf, missingDocs, readMember, readMembers, useMembers, useResources } from "./store";
+import { DOCUMENT_KIND, labelOf, missingDocs, readMember, readMembers, useMembers, useDocuments } from "./store";
 import { opOf } from "./member/ops";
 import { MemberNewModal } from "./memberModals";
 import AccessRequests, { pendingRequests } from "./AccessRequests";
@@ -62,7 +62,7 @@ export default function Team() {
   }, [closeLayer, toast, modal, go]);
 
   useMembers();
-  useResources();
+  useDocuments();
 
   useEffect(() => {
     let cancelled = false;
@@ -85,7 +85,11 @@ export default function Team() {
 
   /* ------------------------------------------------------------ chrome -- */
   const crumbs = useMemo(() => {
-    if (!id) return <span className="tb-title">Team</span>;
+    /* "Members", matching the sidebar row that opens this — see LABEL_OVERRIDE
+       in shell/modules.ts. The crumb is written out here rather than read from
+       the module item because this page also renders the member and operation
+       crumbs below, and one source for all three is what keeps them a chain. */
+    if (!id) return <span className="tb-title">Members</span>;
     const u = (rows || []).find((x) => String(x.id) === id);
     const name = u ? u.name : readMember(id)?.name || "Member";
     /* ON AN OPERATION PAGE THE CRUMB SAYS BOTH. The name is the way back to the
@@ -311,7 +315,7 @@ function DocsCell({ id }: { id: string }) {
   return (
     <>
       <Pill text={missing.length + " missing"} tone="warn" />
-      <span className="cell-2">{missing.map((k) => labelOf(RESOURCE_KIND, k)).join(", ")}</span>
+      <span className="cell-2">{missing.map((k) => labelOf(DOCUMENT_KIND, k)).join(", ")}</span>
     </>
   );
 }

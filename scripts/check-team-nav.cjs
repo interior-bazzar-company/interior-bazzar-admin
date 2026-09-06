@@ -27,7 +27,7 @@ const SERVER_MODULES = [
   { key: "invoices", label: "Invoices", groupLabel: "Sales", displayOrder: 30, actions: ["view"] },
   { key: "business-enquiries", label: "Business enquiries", groupLabel: "Client Ops", displayOrder: 40, actions: ["view"] },
   { key: "plans", label: "Plans", groupLabel: "Catalogue", displayOrder: 50, actions: ["view"] },
-  { key: "team", label: "Members", groupLabel: "Settings", displayOrder: 60, actions: ["view"] },
+  { key: "team", label: "Team", groupLabel: "Settings", displayOrder: 60, actions: ["view"] },
   { key: "roles", label: "Roles", groupLabel: "Settings", displayOrder: 70, actions: ["view"] },
   { key: "audit", label: "Audit log", groupLabel: "Settings", displayOrder: 80, actions: ["view"] },
   { key: "design", label: "Design system", groupLabel: "Settings", displayOrder: 90, actions: ["view"] },
@@ -108,20 +108,54 @@ esbuild.build({
   const groups = A.getModules();
   const names = groups.map((g) => g.group);
   const of = (n) => (groups.find((g) => g.group === n) || { items: [] }).items.map((i) => i.key);
+  const items0 = A.getItems();
 
   /* Business Ops and Finance are here because `users` and `finance` are proto
      rows too — this is the whole sidebar, not just Team's slice of it. */
   eq("group order", names,
-    ["Sales", "Client Ops", "Business Ops", "Team", "Finance", "Catalogue", "Settings"]);
+    ["Sales", "Client Ops", "Business Ops", "Team", "Resources", "Finance", "Catalogue", "Settings"]);
   ok("Team sits above Catalogue and Settings", names.indexOf("Team") < names.indexOf("Settings"));
+  /* Resources was a group of one and is now two: Resources and Agreements. Both
+     are a document the company sends a member and gets something back on — a
+     form's answers, or a signature — and the assertion is that they stay
+     TOGETHER and stay OUT of Team. Filing either under Team is the tidy-up most
+     likely to be attempted, and it would make the module about the person
+     rather than about the document. */
+  eq("Resources holds the two document modules, in order",
+    of("Resources"), ["resources", "agreements"]);
+  ok("…and neither is filed under Team",
+    of("Team").indexOf("resources") < 0 && of("Team").indexOf("agreements") < 0);
+  ok("agreements is proto-gated", A.PROTO_MODULES.has("agreements"));
+  ok("…and it sits between Team and Finance",
+    names.indexOf("Resources") === names.indexOf("Team") + 1
+    && names.indexOf("Resources") < names.indexOf("Finance"));
+  ok("resources is proto-gated", A.PROTO_MODULES.has("resources"));
 
   eq("Team group members, in the order of a working day",
     of("Team"), ["team", "roles", "attendance", "work", "reports"]);
   ok("no `me` row — the member dashboard is `#/team/:id`, not a module",
     of("Team").indexOf("me") < 0);
-  eq("the Work row reads Calendar — label only, the key does not move",
+  /* It was Work, then Calendar — named after one of its four faces, which is
+     why nobody could find the task board in it. Label only, still: the key,
+     the route and the grant are all unmoved, which is what keeps every
+     existing link and the member's own Work page working. */
+  eq("the Work row reads Tasks — label only, the key does not move",
     (groups.filter((g) => g.group === "Team")[0].items
-      .filter((i) => i.key === "work")[0] || {}).label, "Calendar");
+      .filter((i) => i.key === "work")[0] || {}).label, "Tasks");
+  eq("…and the route is still `work`",
+    (groups.filter((g) => g.group === "Team")[0].items
+      .filter((i) => i.key === "work")[0] || {}).route, "work");
+  /* The server sends "Team" for this row, inside a group also called Team, so
+     the sidebar read Team ▸ Team and the roster was named after its section.
+     LABEL_OVERRIDE renames it and nothing else: assert both halves, because a
+     rename that also moved the route would break every existing link. */
+  eq("the Members row reads Members, not Team",
+    (groups.filter((g) => g.group === "Team")[0].items
+      .filter((i) => i.key === "team")[0] || {}).label, "Members");
+  eq("…and it is a label only — the key and the route do not move",
+    [items0.team.key, items0.team.route], ["team", "team"]);
+  ok("the group is still called Team",
+    names.indexOf("Team") >= 0);
   eq("Settings keeps only what stayed", of("Settings"), ["audit"]);
   ok("design is hidden, not filed", of("Settings").indexOf("design") < 0);
   eq("Sales is untouched", of("Sales"), ["deals", "quotations", "invoices"]);

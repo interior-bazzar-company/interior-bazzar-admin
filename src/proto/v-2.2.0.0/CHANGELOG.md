@@ -4,6 +4,766 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ---
 
+## 2026-09-07
+
+### Calendar becomes Tasks, and a task can finally say how far in it is
+
+**Area:** sidebar → Team · `#/work` · `#/work?face=timeline` · `#/work?face=analysis`
+
+**Files:** `src/admin/views/Team/Work.tsx`, `src/admin/views/Team/store.ts`,
+`src/admin/views/Team/team.css`, `src/content/team/work.json`,
+`src/content/team/vocabularies.json`, `src/admin/shell/modules.ts`,
+`scripts/check-team-derivation.cjs`, `scripts/check-team-nav.cjs`, `scripts/tm-smoke.tsx`
+
+**What changed**
+
+**The task module already existed and was called Calendar.** `#/work` has carried
+`WorkItem` — assignee, creator, title, description, start date, due date, tags, derived
+progress, status, priority, a board, a list, a month and a timeline — since Module 7. It was
+named after one of its four faces, which is why nobody could find the task board in it. **The
+label is now Tasks, and the label is still the whole change**: the route is `work`, the entity
+is `WorkItem`, the grant is `team.work.*`, so every link, bookmark and `?item=` drawer URL
+keeps working and the member's own Work page reads the same rows it always did.
+
+Building a second `#/tasks` beside it was the alternative and it was the wrong one: two task
+lists, two boards and two timelines, both claiming to say what somebody is doing, while the
+member page and the nudges on their record kept pointing at the old one.
+
+**Three faces, not four.** *Tasks*, *Timeline*, *Analysis* — three questions: what is there,
+when is it, how is it going. List, Board and Calendar were three of the four tabs and they
+were never three questions; they are three ways of looking at one set, which is what a view
+switcher is for, so they moved inside Tasks as a segmented control. **The old `?face=board`
+and `?face=calendar` links still resolve** — they land on Tasks with that view selected
+rather than 404-ing or silently showing something else.
+
+### What a task can hold now
+
+**Checkable bullet points.** A task's description says what it is; the checklist says what is
+left of it. It is **the one stored thing in a module that derives almost everything else** —
+delay, stage and progress are all read from other facts, but a tick is an act somebody
+performed and there is nothing to compute it from.
+
+What it buys is the progress bar: a task used to be binary, 0 or 100, and is now its ticked
+lines over its total. **Except when it is completed, which is 100 whatever the lines say** —
+somebody closing a task with two lines open has decided those lines did not matter, and a bar
+reading 60% on a finished task argues with them. The open lines stay on the record; the
+percentage is not the place to make the point.
+
+**Resource links.** A named URL out of the panel — the brief, the folder, the board. The name
+is required and the address is checked for a scheme, because a link saved as
+`docs.google.com/…` resolves against *this panel's* origin and 404s, which reads as a broken
+document rather than as a typo. It is deliberately a third thing: `attachments` are files
+this panel holds, item↔item links are relationships between records, and these are addresses
+— three different things that all read as "links", so `addResourceLink` is named apart from
+the `addLink` that already existed.
+
+**A fourth priority.** `urgent` sits **above** `high` rather than replacing it — a scale whose
+top value is also its common value has no top value, and every existing item keeps what it
+was given. `high` stepped down from the loudest tone to a warning at the same time, because
+two values cannot both be the loudest thing on a board. `medium` reads as **Normal**: it was
+always the default and never the middle of anything anybody thought about.
+
+### Analysis
+
+The face that genuinely did not exist. Three questions, in the order somebody asks them:
+where the work is, what is open by priority, and **who is carrying what** — ordered by what
+is late rather than by volume, because eight on time is a working week and two overdue is a
+conversation. Under them, the tasks that carry a checklist, sorted least-finished first.
+
+**It reads the rows on screen, not the whole table.** Every filter above it applies, so
+"Analysis" of one member's marketing tasks is the same three questions asked of a smaller
+set rather than a different screen. A chart that ignored the filter band would be a chart
+nobody could trust against the list beside it.
+
+**No new chart library.** `BarRows` is the panel's own kit and both questions here are
+magnitudes across classes, which is what a bar row is for. A donut of five stages would have
+been the template answer and reads worse at every size. Priority takes the kit's **ordinal**
+steps rather than four unrelated hues, because it is a ranked scale and the order should be
+visible without reading the labels.
+
+The completion figure counts finished over everything **not cancelled** — a cancelled task is
+not a failure to finish, it is a decision not to, and counting it would make cancelling look
+like slipping.
+
+**Temp data** `work.json` gains `checklist[]` on four tasks (part-done, so a bar has something
+to say) and `links[]` on three, and one item becomes `urgent` so the new top of the scale is
+visible. `vocabularies.json` gains the fourth priority and relabels two.
+
+**Backend needed**
+
+- Two columns on `WorkItem`: `checklist[]` of `{lineId, text, done}` and `links[]` of `{linkId, label, url}`.
+- `POST /admin/team/work/{id}/checklist` · `PATCH …/{lineId}` · `DELETE …/{lineId}`.
+- `POST /admin/team/work/{id}/links` · `DELETE …/{linkId}`. **Validate the scheme server-side** — the client check is a convenience.
+- `urgent` in the `priorities` vocabulary, rank 0.
+
+**Open decisions**
+
+| ID | Question | What the screens assume |
+| --- | --- | --- |
+| **TK-OD-01** | Does ticking every line complete the task? | **No.** The bar reaches 100 and the status does not move — closing a task is a decision, and a checklist finishing itself would make that decision for somebody. |
+| **TK-OD-02** | Who may tick a line? | Anybody who can see the task. A per-line owner is a second assignment model on top of the one the item already has, and no case has asked for it. |
+| **TK-OD-03** | Should `low` go, now that Normal is the default? | Left alone. Four values that are each used is not a problem; removing one is a migration for tidiness. |
+
+**Verified**
+
+`check:team` gained **23 assertions** across three new sections. The ones that matter: a
+task's progress is exactly its ticked lines over its total, a task with no checklist is still
+binary, adding an unticked step moves the bar down **and completing it reads 100 anyway**, a
+link without a scheme is refused, and only `urgent` carries the loudest tone. `check:team-nav`
+asserts the row reads Tasks **and that the route is still `work`** — the label was the whole
+change and an assertion that only checked the label would not have caught a rename that moved
+it. `check:team-render` gained the Analysis face, the view switcher, and that **the old
+`?face=board` and `?face=calendar` links still land where they meant**.
+
+Four existing assertions failed on the restructure and all four were the checks working:
+the nav label, the calendar's URL, the calendar's filter band, and the face menu offering
+three faces instead of six. Every other suite passes unchanged — 17 in total. `tsc -b` clean ·
+eslint 0 errors on every touched file, whole-repo count unchanged from HEAD ·
+`vite build --mode prod` green.
+
+**Not checked:** the Analysis face and the view switcher were **never opened in a browser**.
+The bar rows come from a kit that is used elsewhere so they are likely fine, but the
+segmented control is new markup in this module and the two-up chart grid has only been
+reasoned about. Nothing about the checklist has been clicked — `toggleCheckLine` is exercised
+from the store in `check:team` and has no UI in this pass: **the checklist and the links are
+in the record and on the analysis face, but the task drawer does not yet edit them.** That is
+the obvious next commit and it is not in this one.
+## 2026-09-06
+
+### Agreements — the wording written once, and what can be proven about a signature
+
+**Area:** sidebar → Resources · `#/agreements` · `#/agreements?face=sent` ·
+`#/agreements/new` · `#/agreements/TPL-NDA/edit` · `#/agreements/AG-02`
+
+**Files:** `src/content/agreements/templates.json` *(new)*,
+`src/admin/views/Agreements/store.ts` *(new)*, `index.tsx` *(new)*, `Editor.tsx` *(new)*,
+`bits.tsx` *(new)*, `agreements.css` *(new)*, `src/admin/views/Team/store.ts`,
+`src/content/team/agreements.json`, `src/admin/shell/modules.ts`, `src/admin/auth/session.ts`,
+`src/admin/views/registry.tsx`, `scripts/check-agreements.cjs` *(new)*,
+`scripts/ag-smoke.tsx` *(new)*, `scripts/build-ag-smoke.cjs` *(new)*,
+`scripts/check-team-nav.cjs`, `package.json`
+
+**What changed**
+
+**Half of this already existed, and it was not the half anybody would guess.** `Agreement`
+has been in `views/Team/store.ts` since the Team module shipped — a full lifecycle, sent →
+opened → signed → revoked, with a token, an expiry, the typed name and the signer's IP,
+reachable from a member's own record at `#/team/:id/agreements`. What was missing was the
+**template**: `sendAgreement` took a title and a kind and had no document body to freeze,
+and its own comment said *"a template edit after this makes a new version"* about a
+template that did not exist.
+
+So this module fills in that half rather than starting a second one. **It writes through
+Team's store.** Two lists of the same signed documents is the one thing it must never
+become — they would both render perfectly and disagree — and it is the same call the
+Resources module made about the roster. `#/team/:id/agreements` is untouched and still
+shows the same rows.
+
+**Two tabs.** *Templates* is the wording, written once; *Sent* is every copy and where each
+one stopped. A template row leads with how many of its copies came back signed, because a
+document nobody has sent and one with three signatures behind it are different objects and
+the title does not say which — and clicking it filters Sent to that template, since
+"sent 3 times" is only useful next to *which three*.
+
+**A template is not an agreement.** The clauses are written once and **copied into** each
+copy at the moment it goes out. That copy is the whole module: **a signature over a body
+that can still change is not a signature.** Editing the clauses of a template that has been
+sent bumps its version and leaves every copy already out exactly as it was; editing only the
+title or the purpose does not bump, because nobody signed a title.
+
+**Two placeholders, and only two.** `{{name}}` and `{{date}}` resolve from the member and
+the day, into the frozen body. Anything else in braces is left exactly as typed rather than
+silently blanked — **a hole in a document is worse than a stray brace, because only the
+second is obvious to whoever proof-reads it.** The editor's preview fills them against a
+real name from the roster and says whose it borrowed: a document that reads correctly with
+braces in it can still read badly with a name in it.
+
+### The deed, and the evidence
+
+`#/agreements/AG-02` is one copy, and it is the page this module is for. The document sits
+on the left at reading width — clauses, numbered, because a clause is cited *by* number,
+which is the one case where numbering is the content rather than decoration — with the
+signature line at the foot exactly where one goes on paper. An unsigned copy gets the rule
+and nothing, which is what an unsigned document looks like.
+
+**Beside it is the evidence block, and it is the one thing this module spends its boldness
+on.** An agreement is the only record in this panel whose entire value is that it can be
+proven, so the block that proves it is monospaced and ruled between every row: who typed
+what, when, from where, over which version, under which token. It is deliberately the
+plainest thing on the page — a record should not look designed. Two readings of one fact:
+the signature line is what the member agreed to, the evidence block is why anybody else
+should believe it.
+
+**Unsigned shows the same rows, empty.** What is missing is the point — an operator chasing
+a signature can see exactly what they are still waiting for.
+
+**Expiry is derived, never stored.** A link running out is a fact about today; a stored
+state would be wrong between sweeps and nothing would throw. Same reading attendance uses
+for an unclosed day.
+
+**Simulated writes**, as everywhere on this branch: sending, signing and revoking land in
+the tab and are discarded on reload.
+
+**Temp data**
+
+`src/content/agreements/templates.json` — **placeholder records**, four templates and 13
+clauses, real wording rather than lorem so the sheet can be judged. `team/agreements.json`
+gains `templateId` and `body` on its six rows; the bodies are empty and the screen **says
+so** rather than passing today's wording off as what was signed.
+
+**Backend needed**
+
+- `GET /admin/agreements/templates` · `/{id}` → the wording, `clauses[]` ordered.
+- `POST /admin/agreements/templates` · `PATCH /{id}` · `POST /{id}/activate` · `/retire` · `DELETE /{id}`.
+- `POST /admin/agreements/templates/{id}/send` → body `{memberId}`; **renders and freezes the body server-side** and returns the Agreement.
+- `GET /sign/{token}` and its POST → the member-facing page. **Not this panel's.**
+- Two columns on the existing `Agreement`: `templateId` and `body`.
+
+**Open decisions**
+
+| ID | Question | What the screens assume |
+| --- | --- | --- |
+| **AG-OD-01** | One live copy per person per template? | **Yes.** A second is refused, naming them, and revoking the first is the way to send a fresh one. Two links to one obligation and no rule for which signature counts is not an audit trail. |
+| **AG-OD-02** | Is a typed name a signature? | It is what this panel captures, with the time and the address beside it. Whether that satisfies a given jurisdiction is a legal question nobody here has answered, and the evidence block is built so the answer can be checked rather than assumed. |
+| **AG-OD-03** | Should `closed`-style bulk send exist? | Not yet. Sending is one person at a time, from a roster that shows who already has it — the cases seen so far are one joiner at a time. |
+| **AG-OD-04** | Where does the signing page live? | The member dashboard, with Resources' upload page. Until it ships every link this module hands out resolves to nothing, and the screen says so. |
+
+**Verified**
+
+`check:agreements` — 55 assertions, aimed at what cannot throw. The one that matters most:
+**send a copy, edit the template underneath it, and assert the copy did not move.** That is
+the assertion that fails if `body` is ever read through to the template instead of copied,
+and nothing else in the system would notice — every screen would keep rendering, showing
+today's wording as what was agreed to. Alongside it: the version bumps only when the clauses
+changed *and* it has been sent, `{{other}}` survives while `{{name}}` and `{{date}}` are
+filled, expiry is nowhere in a stored state, and every refusal — a second live copy, revoking
+a signature, signing twice, sending a draft, deleting a template that has been sent.
+
+`check:agreements-render` — 40 assertions over every surface, including the signed and the
+unsigned deed side by side, and an **end-to-end pass**: send a copy, render it unsigned,
+sign it, render it again and assert the signature, its evidence and the disappearance of
+Revoke. `check:team-nav` gained three: the Resources group now holds both document modules,
+in order, and **neither is filed under Team** — that is the tidy-up most likely to be
+attempted, and it would make the module about the person rather than about the document.
+
+Both are in `npm run check`, which now runs 18. Every other suite passes unchanged. `tsc -b`
+clean · eslint 0 problems on every new file, whole-repo count unchanged from HEAD ·
+`vite build --mode prod` green.
+
+**Two of my own assertions were wrong before they were right**, and both the same way: I
+guessed a value instead of reading it. `fmtDate` renders "6 Sep 2026" and not "06 Sep 2026",
+and TPL-NDA has three copies in the seed rather than two. The second is now read from the
+store and compared against itself, which is what the assertion meant in the first place —
+*retiring does not change how many copies exist*.
+
+**Not checked:** two things.
+
+**Nothing was opened in a browser.** The deed page is the one thing here that most needs it:
+the sheet's measure, the evidence block's rules and the signature line are the whole design
+and they are reasoned rather than seen. The print stylesheet is entirely unexercised.
+
+**The signing page does not exist**, so no member has ever followed one of these links. The
+whole lifecycle is driven from the admin side in the checks — `signAgreement` called
+directly — which proves the store and proves nothing about what a person on a phone would
+meet. It is `AG-OD-04`, and it is the same gap Resources has for uploads.
+
+---
+
+### Resources — a form, the rule for who owes it, and the answers that come back
+
+**Area:** `#/resources` · `#/resources?form=RES-01` · `#/resources/new` · `#/resources/:id/edit` · `#/team/:id/resources` · sidebar → **Resources** (a new group)
+
+**Files:** `src/content/team/resources.json` → `documents.json` *(renamed)*,
+`src/admin/views/Team/store.ts`, `member/DocumentsPage.tsx`, `member/modals.tsx`,
+`member/AgreementsPage.tsx`, `src/content/team/vocabularies.json`,
+`scripts/check-team-derivation.cjs`, `scripts/tm-smoke.tsx`,
+`src/content/resources/forms.json` *(new)*, `responses.json` *(new)*,
+`vocabularies.json` *(new)*, `src/admin/views/Resources/store.ts` *(new)*, `index.tsx` *(new)*,
+`Builder.tsx` *(new)*, `bits.tsx` *(new)*, `resources.css` *(new)*,
+`src/admin/views/Team/member/ResourcesPage.tsx` *(new)*, `src/admin/views/Team/member/ops.ts`,
+`src/admin/views/Team/MemberPage.tsx`, `src/admin/shell/modules.ts`, `src/admin/auth/session.ts`,
+`src/admin/views/registry.tsx`, `scripts/check-resources.cjs` *(new)*, `scripts/rs-smoke.tsx` *(new)*,
+`scripts/build-rs-smoke.cjs` *(new)*, `scripts/check-team-nav.cjs`, `package.json`
+
+**What changed**
+
+**A new section in the sidebar, and a module under it.** A *resource* is a form plus the
+condition that says who has to fill it in. Both halves are one record on purpose: "the
+onboarding pack" and "every Sales joiner since January" are one thing somebody sets up
+once, not a template plus a distribution list anybody has to remember to re-send.
+
+**Three tabs, and they are three questions.** *Resources* is what forms exist and what each
+holds; *Responses* is what has come in; *Member data* is who has not sent it yet.
+
+The third is the only one with a row for something that has **not** happened, which is why
+it cannot be folded into the second — and the strip is fixed at three for the reason the
+per-form strip was removed: **chrome that grows with the data is chrome that is never in the
+same place twice.** Three labelled questions is a strip; N titles is a list pretending to be
+one.
+
+**1 · Resources** — the inventory, every state included. The response count leads the row,
+because it is the reason to open one: a form with nothing in it and a form with nine answers
+are different objects and a title does not say which. Then title and description, tags,
+who it goes to, and its state. **Copy link** is a button because it is the daily press;
+everything else is behind **More** — open the form, edit, duplicate, close or reopen, mark
+outdated, delete. Copy link on a row copies the link for the first person who still owes it,
+and is dead when nobody does rather than handing over a link to a finished form.
+
+**Clicking a row filters Responses to it.** The question anybody has after reading “1 of 3”
+is *which one*, and that question is the next tab — so the row goes there with the filter
+already set instead of to a third place that would have to repeat it.
+
+**2 · Responses** — every submission in one table, newest first: member, form and version,
+when, the files themselves as openable chips, and **size**. The size column is there because
+deleting is: space is the reason anybody removes a submission, so the number that justifies
+it is on the row and the strip totals it. A row opens the submission, and the detail view's
+one write is **Delete** — edit is absent rather than disabled, because a submitted answer is
+what somebody said and correcting it here would make it a record of what an admin wishes
+they had said.
+
+**Member data is gone as a tab.** Who has *not* sent one in is a question about a FORM, and
+it is answered on that form's own face, where the audience and its links already live — a
+third place for it was a third place to keep in step. Two labelled questions, and the strip
+stays fixed.
+
+### The dropdown was not behind anything — it was cut off
+
+`.ib-menu-pop` was `position: absolute`, and the row menu's first use inside a table put it
+in `.dls-body`, which scrolls. **No z-index reaches out of an overflow box**; raising it
+would have changed nothing. It is `position: fixed` now, with coordinates measured from its
+own button in `ui/menu.tsx`, so it leaves the scroll container entirely. The cost of fixed
+is that it cannot follow the button, so scroll and resize **close** it rather than letting
+it drift somewhere wrong, and it flips above the button when there is no room below —
+a menu whose last two items are under the fold is a menu with two items.
+
+This is a fix to the **shared** primitive, so every other MoreMenu in the panel gets it.
+They all sit in page headers today, which is why none of them had hit it yet.
+
+### The row menu, and the header
+
+**Copy link is now Link.** **Open the form**, **Duplicate** and **Close it** are out of the
+menu: the first repeated the row's own click, and neither of the others was reached. What is
+left is **Edit · Outdated · Delete** — *Mark outdated* renamed to just **Outdated**.
+
+**Reopen stays, and appears only once a resource is not open.** Removing Close without it
+would have made Outdated a one-way door, and a form retired by mistake would need
+rebuilding. `closeResource` is still on the form's own face, which is where the full set of
+state changes belongs; the row menu is the short list.
+
+**The header is two bands now, the way the enquiries list splits them** — the first is *what
+you do* (search, Create resource), the second is *what you are looking at* (state, tag, goes
+to) as a **grid** of equal cells. One flex row of a search box, three selects and a button
+wraps differently at every width and moves the primary action somewhere new each time; a
+grid lines a wrapped row up under the one above it. Both tabs use it.
+
+### A submission is a place
+
+`#/resources/RSP-01` — its own address, so it can be sent to whoever has to look at it; its
+own crumb, so the way back is the module rather than *close*; and room for the answers to be
+read rather than skimmed. A modal sized for a table row is the wrong shape for eight fields
+and three files.
+
+Files lead when there are any, each named by **the question it answers** — "is the PAN card
+in" is not answered by a list of filenames. The typed answers follow, and a side panel
+carries the form, its state, its tags, who it goes to and what it is holding. The one write
+is Delete; edit is absent, not disabled.
+
+The id segment now carries two kinds of record, told apart by prefix — `RES-` a form, `RSP-`
+a submission. Small cleverness, and it earns its keep: a submission is a record somebody
+sends a link to, and a page under the module it belongs to beats a second route invented to
+keep ids in separate namespaces.
+
+### The builder
+
+**Department is a chip field, and it is not bound to the roster.** It was a single-value
+combobox, which quietly said a form could only go to one department — `departments[]` now,
+and a member in **any** of them is in the audience. It shares one control with Tags, because
+they are the same kind of answer: a short list of words somebody types. Suggestions come from
+the roster and from departments other resources already name, but a name on neither is
+accepted — a department can exist before anybody is filed under it.
+
+**Choice options are a list you can see.** They were one comma-separated text box, which is a
+serialisation format and not a control: you could not tell how many there were without
+counting commas, could not remove the third without editing around it, and a trailing comma
+silently made an option called nothing. Each is a numbered row now with its own remove and
+reorder, plus an add box that commits on Enter — the same gesture the chip fields use, so
+there is one way to build a list on this page rather than three.
+
+**Each field type reads as itself.** The mark beside the number carries a tint per type, from
+tokens already in the theme, at the weight of a label rather than a status — a hint, never
+the only signal, since the type is also named in the select and drawn in the preview. And the
+preview stopped drawing a long-text field at single-line height, which was the one thing it
+exists to disprove; number and date fields are narrow, because a full-width box for a
+quantity tells the member to write a sentence in it.
+
+### Two more states, and two different deletes
+
+**`outdated` joins draft, open and closed.** Closed is *we finished collecting* — a round
+that ended and might be reopened. Outdated is *this form is wrong now* — superseded, kept
+for the record, never to be sent again. Both refuse submissions and both keep every answer;
+they differ in what somebody does next, which is the only thing that earns a state. It sorts
+last, its links stop working, and reopening undoes it, because a form retired by mistake
+should not need rebuilding. **If that distinction stops being used in practice, collapse
+them** — two states nobody can tell apart are worse than one.
+
+**Duplicate** sits beside it, because the commonest reason a resource goes outdated is that
+a new version is needed. The copy is a draft on version 1 carrying every field, the tags and
+the department — and **not** the responses, which belong to the form that was answered.
+
+**Deleting a resource** now works on any unanswered one rather than drafts only: an open form
+nobody ever answered is a mistake to clear away, not a record to keep. One that *has* answers
+still cannot go, and the refusal counts them and names both ways out — delete them first, or
+mark it outdated. A cascade that quietly took nine submissions with one click is not a delete
+button, it is a trap.
+
+**Deleting a submission is how space is freed** — the only thing in this module that destroys
+evidence. It returns what it reclaimed in kilobytes and the toast says the number; the
+confirmation counts the files, states the size, and says the honest consequence out loud:
+the member goes back to pending and their link starts working again. A confirmation that
+only asks “are you sure” has told the reader nothing they did not already know.
+
+**Creating a resource now lands it `open`**, which is the change that makes the above work:
+a new resource shows up as pending rows the moment it exists. It was created as a draft for
+the first day on the reasoning that nothing should go out by accident — but nothing goes out
+at all. There is no notification path and there is not going to be one; the only thing that
+reaches anybody is a link a person copies and sends. A draft state in front of that was a
+step with nothing behind it, and it made a brand-new resource invisible on the one table the
+module has. `draft` still exists and `closeResource` still works; nothing arrives in `draft`
+by default any more.
+
+**A single form still has its own face** — its audience, its links, its Edit and Close, and
+a header saying what it is, who it is for and what it asks people to upload. It is reached
+from the resource named on any row, from the filter, or from a pasted link.
+
+### The record, reshaped
+
+**`purpose` is `description`**, and it is a textarea rather than a one-line input — it was
+always going to run to two lines.
+
+**`kind` is `tags`, and tags are free text.** It was a five-value dropdown, and a dropdown is
+a promise that the list is complete; it never was. Type a tag and press Enter, or a comma —
+somebody pasting "onboarding, sales" means two tags, and pressing Enter twice is a rule they
+would have to be taught. Backspace on an empty box takes the last chip back, because its
+absence is the thing that makes a tag field feel broken. Suggestions sit under it and drop
+away once used; `vocabularies.json` seeds them and **the server must not validate against
+them**. Tags render as plain outlined labels everywhere else, never toned: colour in this
+panel means a state, and a word somebody typed must not borrow a signal the system
+understands.
+
+**The audience is one department.** `audience` carried four axes — departments, designations,
+a joined-after date and a list of named people — and every one of them worked. Between them
+they made the commonest job, *send this to Sales*, a four-control decision. It is now a
+single `department`, offered as the roster's own departments through a `datalist` and still
+**accepting a name that is not on it**, because a department can exist before anybody is
+filed under it.
+
+**Empty means everyone**, and the field says so under itself rather than leaving it to be
+inferred — the difference between a company-wide form and one that reaches nobody is an empty
+string, which is exactly the sort of thing an interface has to say out loud. The line is
+live and computed by the same `audienceOf` the table runs: *"Only Sales — 3 people right now,
+and anyone who joins it later."*
+
+The narrower rules are recoverable if a real case turns up. Four controls waiting for that
+case were not free. **One consequence worth naming:** the Sales onboarding pack used to be
+*Sales, joined after 2025-01-01* and is now *Sales* — so its audience went from two people to
+three, and the Sales Head is inside it. That is the rule anybody would have written first.
+
+### A max size on every upload
+
+A `file` field now carries **`maxMb`** beside its `accept` list, defaulting to 10 MB — big
+enough for a scanned PDF or a phone photograph, small enough that somebody on a phone
+connection finds out before they wait for it. `null` is *no limit* and is a real choice rather
+than an unset value.
+
+**It is enforced, not merely printed.** A cap shown on a form and not checked on the way in is
+a suggestion; `submitResponse` refuses an oversized file and the refusal names the field, the
+cap and the actual size — *"Passport photograph takes files up to 5 MB. That one is 9.0 MB."*
+The member reads both rules in the preview **before** they open a file picker, because an
+error afterwards is not the same thing as a rule beforehand. The server has to check it too.
+
+### The builder, rebuilt
+
+Two halves that are not equal: controls on the left, the artifact on the right. **Details**
+(title, description, tags, department) then **Form** — renamed from "What it asks", and the
+subtitle explaining the order is gone because the page now shows it.
+
+**The spine is the one device the page spends its boldness on.** The fields are numbered down
+a continuous rule, drawn on the list rather than on each card so it stays unbroken through
+the gaps, with each number punched out of it. It is an `<ol>`, so the order survives without
+CSS. Numbering is usually decoration — it is earned here because **order is the content**:
+this is the sequence the member meets the questions in, and moving a field is a thing people
+do. Everything around it is deliberately the quiet system already in the panel.
+
+Each field is one card with its rows split by frequency rather than importance: label and
+type on the first row, then required and help text under a hairline, then whatever the type
+needs. A file field's two extra decisions are grouped and inset so they read as belonging to
+the field above rather than as two more loose rows. The preview is a sheet under its own
+label, with a slightly stronger edge than a control card, and it says who the form goes to.
+
+**Create resource** is a page, not a modal: title, purpose, kind, then the condition, then
+the fields — text, long text, number, date, choice, yes/no and file — added, reordered and
+removed in a list, with a **live preview of the form the member will meet** beside it. The
+preview renders from the same field array the editor writes, so it cannot drift, and every
+control in it is disabled: a preview you can type into is a second place the same answer
+could be entered.
+
+**The condition is a rule, not a list.** Department, role, joined-after, plus named people
+added on top. The builder states the answer in names as you build it — "Matches 2 members:
+Rahul Menon, Priya Iyer" — computed by the same function the table runs, because a builder
+that could promise a number the module then disagrees with is worse than one that promised
+nothing. The onboarding example works out of the box: Sales, joined after 2025-01-01,
+matches the two joiners and correctly excludes the Sales Head who joined in 2024.
+
+**The link you send.** A pending row is a person who has not sent something in, and the only
+thing this panel can do about that is hand you the link. Every pending row carries one, and
+a form's own face collapses all of its outstanding links into one list — sending five people
+the same form is one job, not five. It uses the OS share sheet where there is one and the
+clipboard where there is not, so the reader never leaves the list they are working down.
+
+**The link carries BOTH ids — the resource and the member.** A link that named only the form
+would come back as an answer from nobody, and attributing it afterwards is guesswork dressed
+as a record. One link, one member, one submission, and the profile link is free. A submitted
+row has no link: there is nothing to send, and the module refuses a second submission anyway.
+A draft or closed resource offers none either — handing somebody a link that will refuse them
+is worse than telling them it is not ready.
+
+**The page that link opens is not built.** It is the member dashboard's, and the screen says
+so in as many words rather than implying otherwise. The token here is derived from the two
+ids so a link is stable across reloads of a fixture, which is what makes it testable — the
+real one is minted server-side, single-use and expiring, and it is on the work-list as
+exactly that. **Nothing in this panel treats that string as authorisation.**
+
+**What comes back is often a file.** A `file` field's answer is a `FileAnswer` —
+`{fileName, mimeType, sizeKb, url}` — and not a filename string, so a row about a PAN card
+lets you open the PAN card, and says what it is and how big before you commit to a download.
+Fields carry an `accept` list (PDF · image · document · spreadsheet, empty meaning any file),
+set in the builder, printed on the form's face for whoever is sending the link, and shown in
+the preview where the member will read it — **before** they open a file picker, not in an
+error afterwards. A required upload is answered by its file: typing a filename into the box
+beside it does not count, and the refusal names the upload that is missing.
+
+The seed grows three more file fields to match — the onboarding pack now asks for a signed
+offer letter, a PAN card and an optional photograph, and the asset handover takes a photo at
+handover, because the whole point of recording a condition is being able to disagree about
+it later.
+
+**The link back to the profile.** `#/team/:id/resources` is a new member operation with its
+own page and its own URL, listing what that person has been asked for and what they
+answered. The launcher card and the "needs you" nudge on their record both read the same
+exported derivation, so three places that say what somebody still owes cannot drift apart.
+It reads and never writes — opening, closing, editing and submitting all live in the module.
+
+**Two rules carried over rather than invented.** *Pending has no record* — it is the
+audience minus the responses, derived at read time, exactly as attendance derives `absent`
+from the roster minus the days that exist. And *a submitted answer is frozen*: editing the
+fields of a form somebody has answered bumps its **version** and leaves the old answer
+alone, and each answer stores the label it was given, so it still reads correctly two edits
+later. `RSP-03` in the seed is a live instance of that — answered on v1 of the asset
+handover, when its third field was still called "Condition".
+
+**Simulated writes.** Creating, editing, opening, closing and submitting all land in the
+browser tab and are discarded on reload. Nothing here reaches a server.
+
+**One rename came first, to make room for the word.** `Resource` already meant something in
+Team — the identity papers a member hands over, PAN and Aadhaar and a bank passbook — and
+two meanings for one word in one store layer is how a codebase stops being readable. The
+Team type is now **`MemberDocument`**, which only aligns the code with the UI: that tab has
+always been called Documents, and the member operation has always been `documents`. It is a
+rename and nothing else — `Resource` → `MemberDocument`, `resourceId` → `documentId`,
+`RESOURCE_KIND` → `DOCUMENT_KIND`, `addResource`/`deleteResource`/`verifyResource` →
+`add`/`delete`/`verifyDocument`, `AddResourceModal` → `AddDocumentModal`,
+`content/team/resources.json` → `documents.json` with its `resourceKinds` vocabulary now
+`documentKinds`, and the seed ids `RS-0x` → `DOC-0x`. Behaviour is untouched and
+`check:team` and `check:team-render` pass unchanged, which is the only reason a rename this
+wide was safe to do in one commit. The endpoint it stands in for moved with it —
+`GET /admin/team/resources` → `/admin/team/documents` — which costs nothing, because it does
+not exist yet.
+
+**Temp data**
+
+`src/content/resources/forms.json` (4 resources, 15 fields) and `responses.json` (9
+submissions) — **placeholder records**, both. `vocabularies.json` is **static copy**:
+kinds, states and the field-type list. `fieldTypes` is the one list in it that is not
+config — it is the set of inputs this panel can render, and it is noted as such in the file.
+
+**Backend needed**
+
+- `GET /admin/resources` · `GET /admin/resources/{id}` → the definitions, `fields[]` ordered.
+- `GET /admin/resources/{id}/responses` · `GET /admin/resources/responses?memberId=` → the submissions.
+- `GET /admin/resources/vocabularies` → the four label lists.
+- `POST /admin/resources` · `PATCH /admin/resources/{id}` · `POST …/open` · `…/close` · `DELETE …/{id}` · `POST …/{id}/responses`.
+- A `Module` row for `resources`, group label **Resources**, and `resources` out of `PROTO_MODULES` in the same commit.
+
+Full contract, invariants and error codes: [BACKEND-INTEGRATION.md](BACKEND-INTEGRATION.md)
+§ Module 8. The invariant worth repeating here is the second one — **an empty audience axis
+means no constraint**, so an all-empty audience is everyone. Read the other way, every
+company-wide form silently addresses nobody and renders as a perfectly healthy empty table.
+
+**Open decisions**
+
+Five, all recorded in § Module 8: `RS-OD-01` no second submission from the same member,
+`RS-OD-02` self and admin may read a submission but a senior may not, `RS-OD-03` opening a
+resource notifies nobody — this panel states who is outstanding and does not chase,
+`RS-OD-04` a `file` answer is a filename until private objects exist, `RS-OD-05` there is
+no member-facing way to submit yet; that belongs to the member dashboard.
+
+**Verified**
+
+`check:resources` — 117 assertions over the store, and they are aimed at what cannot throw:
+that the four audience axes AND together (the assertion that fails if they are ever OR-ed
+is the Sales Head, who matches the department and not the date), that an all-empty audience
+is everyone, that a named pick adds and never narrows, that **the tab's count and the
+table's rows are one derivation** for all four resources, that a v1 answer keeps its v1
+label while the definition moves on, that editing a title does not bump a version but
+editing a field does, and every write refusal — second submission, delete over answers,
+submit to a closed form, and the four things the builder will not create.
+
+`check:resources-render` — 79 assertions, every surface: both tabs, a submission page, a form face, the builder
+creating and editing, a stale id, a submission sheet, the preview, and both member pages. It
+asserts a bare `#/resources/RES-01` lands on that resource rather than on All, that a stale
+`?face=` behind one loses to it, that the version warning does **not** appear before anything
+has changed, that the frozen sheet prints "Condition" and not "Condition at handover", and
+that all five controls in the preview are disabled.
+
+Some of those guard the shape rather than the render: that there is **no tab strip at all**
+(the regression to catch is any of the three previous versions coming back, because chrome
+that grows with the data reads as a feature rather than as a fault), that the table draws 18
+rows — 2 + 8 + 8, the three open resources over their audiences — so the table and the
+derivation cannot drift apart, that a pending row has a share control and a submitted one
+does not, that a draft offers no link, that an uploaded file renders as a file with its size
+and a `rel="noreferrer"`, and that **a newly created resource appears on the table with a
+link ready to send** — which is the whole reason `createResource` lands open.
+
+**Two of those assertions were wrong before they were right**, and the way they were wrong is
+worth keeping: both read the whole rendered page, and the toolbar above the table names every
+resource and every state as filter `<option>`s. "Is the draft absent" and "does pending sort
+first" were being answered by the select boxes rather than by the rows. They read the
+`<tbody>` now. An assertion that passes by reading the wrong element is worse than none.
+
+Both are in `npm run check`, which now runs 16. `check:team-nav` gained three assertions —
+that Resources is its own group, that it sits between Team and Finance, and that it is
+proto-gated — and its `group order` expectation was updated, which is the check catching the
+change rather than being loosened for it. Every other suite passes unchanged: `check:team` ·
+`check:team-render` · `check:users` · `check:users-render` · `check:finance` ·
+`check:finance-nav` · `check:finance-render` · `check:export` · `check:clock` ·
+`check:share` · `check:wiring` · `check:match`. `tsc -b` clean · eslint 0 problems on every
+new and touched file, whole-repo count unchanged from HEAD · `vite build --mode prod` green.
+
+**Two things the checks caught, worth naming.** The member launcher reads `stat[o.key]`
+unconditionally, so adding an operation with no figure took the **whole launcher** down with
+`Cannot read properties of undefined` — the fix was the figure, not a guard. And the member
+page rendered without `tm-oph`, because it had not been wrapped in the `OpHead` every other
+operation page draws; a page that titles itself only when it has content looks broken when
+it does not.
+
+**Not checked:** three things.
+
+`check:enquiries` was not run — it fetches from a live backend and none is running here. It
+is unrelated and fails identically on HEAD.
+
+**Nothing was opened in a browser.** The renders above are `renderToStaticMarkup` against a
+DOM stub, which proves a surface renders and not that it looks right. The tab strip in
+particular is the piece to look at first: it is the one thing here that grows without a
+bound, it scrolls rather than wraps, and the truncation on a long title has been reasoned
+about but not seen.
+
+**The audience is evaluated in the browser**, against a roster that is itself a fixture.
+That is correct for a frontend-first module and wrong the moment there is a real team
+behind it — it is on the work-list as the third row of § Module 8's "not an endpoint"
+table, and it is the row most likely to be skipped, because the client evaluating a rule
+looks like it works right up until the roster is bigger than one page.
+
+---
+### The clock leaves the panel, and the roster is called Members
+
+**Area:** `#/attendance` (topbar) · sidebar → Team
+
+**Files:** `src/admin/views/Team/Attendance.tsx`, `src/admin/views/Team/team.css`,
+`src/admin/views/Team/index.tsx`, `src/admin/shell/modules.ts`,
+`src/admin/shell/ShellContext.tsx`, `scripts/tm-smoke.tsx`,
+`scripts/check-team-nav.cjs`, `BACKEND-INTEGRATION.md`
+
+**What changed**
+
+**The clock is gone from the Attendance topbar.** The block that read
+`Working · 5h 11m · of 8h expected · in at 9:04am · 12m break` with Break and End day
+beside it is removed — state pill, worked total, progress bar, caption and all four
+buttons. It is the one thing on this screen that was about the *reader* rather than the
+team, and it belongs to the member dashboard, which is the next thing being built. It
+moves there rather than being drawn in both places: **one open day with two places to
+close it is two chances for the panel to disagree with itself mid-request**, which is the
+same argument that kept these buttons off the member page when the block was first put
+up here.
+
+Nothing else on the screen changes. Attendance still reads every member's day — the strip,
+the table, History and Analytics are untouched — it just no longer writes one. The write
+API the dashboard will need (`openDay` · `startBreak` · `resumeDay` · `endDay`) stays in
+`store.ts` exactly as it is, unused by any screen for now and still covered by
+`check:team`, so the dashboard inherits a tested surface rather than a rewritten one.
+
+**The sidebar's `team` row now reads Members.** It read "Team", inside a group also called
+Team, so the sidebar printed Team ▸ Team and the row that opens the roster was named after
+its section instead of after what is on it. Every other row in the group is named by its
+own noun — Attendance, Calendar, Reports — and the module's own page already calls its tab
+Members.
+
+The label arrives from the server, so this is a client-side `LABEL_OVERRIDE` in
+`shell/modules.ts`, mirroring the `GROUP_OVERRIDE` directly above it and documented the
+same way: **a stand-in, not the design.** The real fix is a Module-row update, at which
+point the map empties and the sidebar does not change. **Label only** — the key is still
+`team`, the route is still `#/team`, the grant is still `team.*` and the member dashboard
+is still `#/team/:id`, which is the same restraint that renamed `work` to Calendar without
+moving its route. The group heading stays "Team". The `G then T` hint in the keyboard
+sheet follows the destination's new name.
+
+**Two labels the rename would otherwise have left behind.** The roster page publishes its
+own topbar crumb, hardcoded — it said "Team" and would have disagreed with the row that
+opens it, which is the failure mode a breadcrumb exists to prevent. It says Members. The
+keyboard sheet is the other. Neither is the module item's label read at render time,
+because this page also builds the member and operation crumbs and one source for the whole
+chain is what keeps it a chain; the crumb now carries a pointer to `LABEL_OVERRIDE`
+instead.
+
+**Temp data** none. This changes what is drawn and what a nav row is called; no content
+file is read differently.
+
+**Backend needed**
+
+- `none` for the removal.
+- One Module-row update, listed in [BACKEND-INTEGRATION.md](BACKEND-INTEGRATION.md)
+  alongside the `groupLabel` correction it sits beside: send `label: "Members"` for the
+  `team` module and `LABEL_OVERRIDE` empties.
+
+**Open decisions** none. Where the clock goes was decided — the member dashboard — and the
+work is sequenced behind this entry rather than assumed by it.
+
+**Verified**
+
+`check:team-nav` gained three assertions, and its server stub was corrected first: it
+claimed the server already sends "Members", which it does not, and a stub that pre-applies
+a fix cannot fail when the fix is removed. It now sends "Team" and asserts the row renders
+as Members, that the key and route both stay `team`, and that the group is still called
+Team. `check:team` · `check:team-render` · `check:users` · `check:users-render` ·
+`check:finance` · `check:finance-nav` · `check:finance-render` · `check:export` ·
+`check:clock` · `check:share` · `check:wiring` · `check:match` all pass. `tsc -b` clean ·
+eslint unchanged from HEAD on the whole repo and 0 problems on the six touched files ·
+`vite build --mode prod` green.
+
+**Not checked:** two things.
+
+`check:enquiries` was not run — it fetches
+`/admin/business-enquiries/vocabularies/` from a live backend and none is running here. It
+is unrelated to this change and fails identically on HEAD.
+
+The removal has **no render assertion**, deliberately. `tm-smoke` renders modules, and
+chrome is published to a shell that harness never mounts, so the clock was only ever
+reachable there by rendering the component directly — asserting its absence from the page
+body would pass whether or not the block still existed. The import and the assertion are
+removed and the reason is written where the assertion was; `tsc` is what now catches a
+reference to it. The screen itself was not opened in a browser.
+
+---
+
 ## 2026-09-05
 
 ### The tables get their air back, and a footnote goes

@@ -232,7 +232,7 @@ export function ShellProvider({ children }: { children: ReactNode }) {
       ["⌘ K  /  Ctrl K", "Open search"],
       ["G then D", "Deals"],
       ["G then S", "Subscriptions & Plans"],
-      ["G then T", "Team"],
+      ["G then T", "Members"],
       ["[", "Collapse or expand the sidebar"],
       ["Esc", "Close the topmost layer"],
       ["?", "This list"],

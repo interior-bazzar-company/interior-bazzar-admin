@@ -1590,8 +1590,13 @@ a.lk:hover{ border-color:var(--brand); background:var(--brand-tint) }
 /* The panel-wide More menu (ui/menu.tsx) — Finance's `.fin-menu` pattern,
    promoted. The shell only positions the popover; the rows are `.mi`. */
 .ib-menu{ position:relative; display:inline-flex }
+/* FIXED, not absolute: an absolutely positioned popup is clipped by any
+   ancestor with overflow set, and this menu now opens inside scrolling table
+   bodies. The coordinates come from ui/menu.tsx, which measures the button —
+   no z-index reaches out of an overflow box, so this is the fix and the
+   z-index below is only about what it sits over once it is free. */
 .ib-menu-pop{
-  position:absolute; z-index:45; top:calc(100% + 4px); right:0;
+  position:fixed; z-index:var(--z-pop); top:0; left:0;
   display:flex; flex-direction:column; min-width:168px; padding:var(--space-1);
   background:var(--surface-raised); border:1px solid var(--line);
   border-radius:var(--radius-xl); box-shadow:var(--shadow-lg);

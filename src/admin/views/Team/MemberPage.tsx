@@ -38,7 +38,7 @@ import {
 import {
   ATT_STATE, TODAY, agreementsFor, dayRows, eodDue, fmtDate, fmtHM, isDelayed, isTerminal, labelOf,
   leaveFor, meId, missingDocs, payFor, planFor, progressOf, readItems, readMember, reportFor,
-  timePct, useAgreements, useLeave, useMembers, useResources, workedOf,
+  timePct, useAgreements, useLeave, useMembers, useDocuments, workedOf,
 } from "./store";
 import type { Member } from "./store";
 import { MemberStrip, OpHead, OpNav, OpRefused, memberHref, rupees, workHref } from "./member/frame";
@@ -47,6 +47,7 @@ import type { Viewer } from "./member/ops";
 import AgreementsPage from "./member/AgreementsPage";
 import AttendancePage from "./member/AttendancePage";
 import DocumentsPage from "./member/DocumentsPage";
+import MemberResourcesPage, { outstandingFor } from "./member/ResourcesPage";
 import LeavePage from "./member/LeavePage";
 import PayPage from "./member/PayPage";
 import ReportsPage from "./member/ReportsPage";
@@ -127,6 +128,7 @@ function OpBody({ op, m, viewer }: { op: string; m: Member; viewer: Viewer }) {
   if (op === "reports") return <ReportsPage m={m} viewer={viewer} />;
   if (op === "agreements") return <AgreementsPage m={m} viewer={viewer} />;
   if (op === "documents") return <DocumentsPage m={m} viewer={viewer} />;
+  if (op === "resources") return <MemberResourcesPage m={m} />;
   if (op === "pay") return <PayPage m={m} />;
   return null;
 }
@@ -209,10 +211,14 @@ interface Nudge { tone: string; op: string; title: string; note: string; act?: s
  *  access". A row that named an unsigned NDA would announce a document the
  *  Agreements page just refused to show this reader. */
 function NeedsYou({ m, viewer }: { m: Member; viewer: Viewer }) {
-  useLeave(); useAgreements(); useResources();
+  useLeave(); useAgreements(); useDocuments();
   const rows: Nudge[] = [];
 
   const report = reportFor(m.memberId, TODAY);
+  /* Same derivation the Resources page and the launcher card run — three
+     readings of "what does this person still owe" that could drift apart is
+     precisely what one exported function prevents. */
+  const owed = outstandingFor(m.memberId);
   if (eodDue(TODAY, m) && !(report && report.submittedAt)) {
     rows.push({
       tone: "bad", op: "reports", title: "No end-of-day report for today",
@@ -269,6 +275,18 @@ function NeedsYou({ m, viewer }: { m: Member; viewer: Viewer }) {
       tone: "warn", op: "documents",
       title: missing.length + " required document" + (missing.length > 1 ? "s" : "") + " missing",
       note: "Nothing in the panel blocks on it — it is a nudge and stays one.",
+    });
+  }
+
+  if (owed.length) {
+    rows.push({
+      tone: "warn", op: "resources",
+      title: owed.length === 1
+        ? "“" + owed[0].title + "” has not been filled in"
+        : owed.length + " resources have not been filled in",
+      note: owed.length === 1
+        ? "It is open and their name is in its audience."
+        : owed.map((r) => r.title).join(", ") + ".",
     });
   }
 
@@ -336,6 +354,10 @@ function OpGrid({ m, viewer }: { m: Member; viewer: Viewer }) {
   const pay = payFor(m.memberId);
   const day = dayRows(TODAY, "all").filter((r) => r.member.memberId === m.memberId)[0];
   const report = reportFor(m.memberId, TODAY);
+  /* Same derivation the member's Resources page runs, called rather than
+     re-implemented — a card that counted differently from the page it opens is
+     the exact failure the single-source rule exists to stop. */
+  const owed = outstandingFor(m.memberId);
 
   const stat: Record<string, { v: string; s: string; tone?: string }> = {
     attendance: {
@@ -363,6 +385,11 @@ function OpGrid({ m, viewer }: { m: Member; viewer: Viewer }) {
       v: missing ? missing + " missing" : "complete",
       s: "required documents",
       tone: missing ? "warn" : "",
+    },
+    resources: {
+      v: owed.length ? owed.length + " outstanding" : "nothing owed",
+      s: owed.length ? owed[0].title : "forms the company asked for",
+      tone: owed.length ? "warn" : "",
     },
     pay: {
       v: pay && pay.annualCtc ? rupees(Math.round(pay.annualCtc / 12)) : "—",

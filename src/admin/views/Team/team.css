@@ -51,9 +51,9 @@
 }
 
 /* ------------------------------------------------------------- the clock -- */
-/* The clock card that used to live at the top of the body is gone: the day now
-   sits in the topbar slot on this route. Its rules moved with it and are at the
-   bottom of this file under `.tm-tclock`. */
+/* Nothing here. The clock was a card at the top of this body, then a block in
+   the topbar slot; it is the member dashboard's now, and its rules went with
+   it. This screen reads days, it does not open or close one. */
 
 /* --------------------------------------------------------------- day bar -- */
 
@@ -256,7 +256,7 @@
 /* ----------------------------------------------------------------- print -- */
 
 @media print {
-  .tm-datenav, .dls-cmd, .dls-chips, .tm-tclock { display: none !important }
+  .tm-datenav, .dls-cmd, .dls-chips { display: none !important }
   .tm-attn-c, .tm-card, .tm-col { break-inside: avoid }
   .tm-bar-work, .tm-bar-break { print-color-adjust: exact; -webkit-print-color-adjust: exact }
 }
@@ -973,49 +973,10 @@
 }
 
 /* =========================================================================
-   ATTENDANCE — the clock in the topbar, and the analytics face.
+   ATTENDANCE — the analytics face.
    -------------------------------------------------------------------------
    Tokens only. No hex, no rgba: dark mode here is a token swap.
    ========================================================================= */
-
-/* ---- the clock, in the topbar slot -------------------------------------- */
-/* It earned the slot. As a card it cost a whole band of vertical space on a
-   screen that is otherwise a table, and put the one control anybody presses
-   twice a day below the fold on a laptop. */
-.tm-tclock {
-  display: flex; align-items: center; gap: var(--space-3);
-  min-width: 0;
-}
-.tm-tclock-n { display: flex; flex-direction: column; gap: 3px; min-width: 62px }
-.tm-tclock-n b {
-  font-size: var(--text-base); line-height: 1;
-  font-weight: var(--weight-semibold); color: var(--text);
-}
-.tm-tclock-bar {
-  display: block; height: 3px; width: 100%;
-  border-radius: var(--radius-full); background: var(--bg-active); overflow: hidden;
-}
-.tm-tclock-bar > i {
-  display: block; height: 100%; border-radius: var(--radius-full);
-  background: var(--ok-solid); transition: width var(--duration) var(--ease);
-}
-.tm-tclock.on_break .tm-tclock-bar > i { background: var(--info-solid) }
-.tm-tclock.unclosed .tm-tclock-bar > i { background: var(--warn-solid) }
-.tm-tclock.absent .tm-tclock-bar > i,
-.tm-tclock.not_started .tm-tclock-bar > i { background: var(--neutral-line) }
-
-.tm-tclock-k {
-  font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--text-3);
-  white-space: nowrap;
-}
-.tm-tclock-a { display: flex; align-items: center; gap: var(--space-2) }
-.tm-tclock-x { font-size: var(--text-sm); color: var(--text-3); white-space: nowrap }
-
-/* The topbar is shared chrome and it is finite. The caption is the first thing
-   to go, then the bar; the state, the total and the buttons never go, because
-   they are the reason the block is up there. */
-@media (max-width: 1180px) { .tm-tclock-k { display: none } }
-@media (max-width: 900px) { .tm-tclock-bar { display: none } }
 
 /* ---- analytics: the day-by-day stack ------------------------------------ */
 .tm-an-days {
@@ -1126,3 +1087,54 @@
 }
 .tm-tabrow .tabs { margin-bottom: 0; border-bottom: 0; flex: 0 1 auto }
 .tm-tabrow .tm-datenav { margin-bottom: var(--space-2) }
+
+
+/* =========================================================================
+   TASKS — the view switcher and the analysis face
+   -------------------------------------------------------------------------
+   The module has three faces now — Tasks, Timeline, Analysis — and the three
+   ways of looking at one set that used to be tabs (list, board, calendar)
+   moved inside the first. They were never three questions.
+   ========================================================================= */
+
+/* ---- the view switcher --------------------------------------------------- */
+/* A SEGMENTED CONTROL, not a second tab strip. Tabs change the question; this
+   changes the answer's shape, and the two must not look alike or the reader
+   has to work out which one they pressed. It sits in the chip band because
+   that is where the things that shape the list already live. */
+.tm-views { padding-top: 0 }
+.tm-views .seg {
+  display: inline-flex; align-items: center; gap: 2px;
+  padding: 2px; border-radius: var(--radius-md);
+  background: var(--bg-inset); border: 1px solid var(--line);
+}
+.tm-views .seg button {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: var(--control-sm); padding: 0 var(--space-3);
+  border: 0; border-radius: var(--radius-sm); background: none;
+  font-size: var(--text-md); color: var(--text-2); cursor: pointer;
+  white-space: nowrap;
+}
+.tm-views .seg button:hover { color: var(--text); background: var(--bg-hover) }
+.tm-views .seg button:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px }
+.tm-views .seg button.on {
+  background: var(--surface-raised); color: var(--text);
+  font-weight: var(--weight-medium); box-shadow: var(--shadow-xs);
+}
+.tm-views .seg button .ic { color: var(--text-3) }
+.tm-views .seg button.on .ic { color: var(--text) }
+
+/* ---- the analysis face --------------------------------------------------- */
+.tm-an > * + * { margin-top: var(--space-4) }
+/* Two questions of the same weight, side by side; below a laptop they stack
+   rather than shrinking into two unreadable charts. */
+.tm-an-pair {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--space-4);
+}
+.tm-an-steps { margin-bottom: var(--space-3); max-width: 420px }
+
+@media (max-width: 720px) {
+  .tm-an-pair { grid-template-columns: minmax(0, 1fr) }
+  .tm-views .seg button { padding: 0 var(--space-2) }
+}
