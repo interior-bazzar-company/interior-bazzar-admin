@@ -120,6 +120,11 @@ export function adaptDeal(row: DealRow): any {
     expected_close_date: dateOnly(row.expectedClose),
     next_action: row.nextActionDate ? { date: row.nextActionDate, note: row.nextActionNote || "" } : null,
     enquiry_id: row.enquiryRef,
+    // The stored intake form, still the JSON STRING the wire sent. Not parsed
+    // here: this adapter renames fields, and a parse that can throw is not a
+    // rename — the one component that reads it parses it where a failure can
+    // be shown instead of taking the whole deal list down with it.
+    submission: row.submission || "",
     is_stalled: !!row.stalled,
     close_reason: row.lostReason || null,
     tags: row.tags || [],

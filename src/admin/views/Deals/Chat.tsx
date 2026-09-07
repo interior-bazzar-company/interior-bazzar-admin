@@ -856,22 +856,32 @@ function ChatActions({ dl, p, docs }: { dl: any; p: Params; docs: DealDocsState 
       <div className="dws-pair">
         <button className="btn" data-act="dl-edit" data-ref={dl.deal_id} onClick={() => acts.edit(dl.deal_id)}>
           <Icon name="doc" />Edit deal</button>
-        <button className="btn gated" data-act="dl-gate" title={RESPONSE_GATE.title}
-          onClick={(e) => pop(e, <GateBody gate={RESPONSE_GATE} />, { width: 264, cls: "pop-views" })}>
-          <Icon name="quote" />View response</button>
+        {/* Real on a deal that arrived through a funnel, gated on one that did
+            not. The test is the STORED FORM, not the enquiry ref: a ref is a
+            string somebody can type into Edit deal, and gating on it would
+            offer an empty dialog on every hand-keyed deal that happens to
+            carry one. */}
+        {dl.submission
+          ? <button className="btn" data-act="dl-response" data-ref={dl.deal_id}
+              title="The intake form this deal was created from"
+              onClick={() => acts.response(dl.deal_id)}>
+              <Icon name="quote" />View response</button>
+          : <button className="btn gated" data-act="dl-gate" title={RESPONSE_GATE.title}
+              onClick={(e) => pop(e, <GateBody gate={RESPONSE_GATE} />, { width: 264, cls: "pop-views" })}>
+              <Icon name="quote" />View response</button>}
       </div>
     </>
   );
 }
 
-/* View response is ALWAYS gated, and that is a statement about the data rather
-   than a placeholder. `Deal.enquiryRef` is a plain string identifying a
-   submission in whatever collected it — not a foreign key, and no submitted
-   form is stored on this side. There is nothing to open, on any deal, so the
-   button says so instead of opening an empty dialog. It becomes real the day
-   intake submissions are stored against the deal. */
+/* What is left of the old always-on gate, and it is still a statement about
+   the data rather than a placeholder. Funnel intake now stores the submitted
+   form on `Deal.submission`, so the button opens it — but only deals that
+   CAME THROUGH a funnel have one. A deal keyed in by hand was typed by the
+   person reading this screen; there was never a form, and saying so beats
+   opening a dialog with nothing in it. */
 const RESPONSE_GATE = {
   title: "No stored submission",
-  body: "The enquiry reference on this deal points at whatever intake collected it — it is a " +
-        "reference, not a record we hold. There is no submitted form on this side to show.",
+  body: "This deal was created by hand rather than from an intake form, so there is no " +
+        "submitted response to show. Deals that arrive through a funnel open theirs here.",
 };

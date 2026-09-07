@@ -13,16 +13,16 @@
 
    WHAT LEFT, and why it is not hiding in a menu somewhere: log payment,
    reverse payment, raise invoice, create quotation, co-assignment splits and
-   the funnel-response viewer. Every one of them read or wrote a browser-side
-   store with no model behind it — there is no payment, invoice, quotation,
-   split or enquiry table server-side. They were operating on seed data that
+   and co-assignment splits. Every one of them read or wrote a browser-side
+   store with no model behind it — there is no payment, invoice, quotation or
+   split table server-side. They were operating on seed data that
    the real deal list never contained, so on any live deal they either did
    nothing or wrote a record nobody else could ever see. They come back when
    the models do.
    ============================================================================= */
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { Field, Icon, Notice } from "../../ui";
+import { Field, Icon, KvList, Notice } from "../../ui";
 import { go } from "../../ui/nav";
 import { can } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
@@ -71,6 +71,10 @@ export function useActs(p: Params) {
       modal(<CreateModal onClose={close} done={done} />);
     },
     edit,
+    /* Read-only, so no permission check and no `done` — it writes nothing and
+       there is nothing for the list to re-fetch afterwards. Anyone who can
+       already open the deal can read the form that created it. */
+    response(ref: string) { modal(<ResponseModal dealRef={ref} onClose={close} />, "wide"); },
 
     /* ---------------------------------------------------------- remarks */
     remark(ref: string) { modal(<RemarkModal dealRef={ref} onClose={close} done={done} />); },
@@ -456,6 +460,103 @@ function EditModal({ dealRef, onClose, done }: {
         <button className="btn" data-close="1" onClick={onClose}>Cancel</button>
         <button className="btn pri" data-act="dl-edit-go" data-ref={dealRef} disabled={busy} onClick={save}>
           {busy ? "Saving…" : "Save changes"}</button>
+      </div>
+    </>
+  );
+}
+
+/* ==========================================================================
+   FUNNEL RESPONSE — what they actually filled in
+   ====================================================================== */
+
+/* Deal.submission is a JSON OBJECT serialised to a string. Parsed here and
+   nowhere else, because this is the only place a parse failure can be SHOWN:
+   doing it in the adapter would mean one malformed row taking down the whole
+   deal list, and doing it on the server would mean picking a shape for
+   questions that differ per funnel and change without telling this panel.
+
+   Values are already strings by the time they are stored (see _raw in
+   FunnelIntakeController), but String() is applied anyway — this parses text
+   from the wire, and a `null` rendered as the word "null" is the kind of thing
+   nobody notices until a rep reads it out on a call. */
+function parseSubmission(raw: string): Record<string, string> | null {
+  try {
+    const obj = JSON.parse(raw);
+    if (!obj || typeof obj !== "object" || Array.isArray(obj)) return null;
+    const out: Record<string, string> = {};
+    for (const k of Object.keys(obj)) out[k] = obj[k] === null || obj[k] === undefined ? "" : String(obj[k]);
+    return out;
+  } catch { return null; }
+}
+
+/* `contact_name` -> `contact name`. Mechanical and reversible — it swaps
+   separators for spaces and nothing else. Deliberately NOT a lookup table of
+   pretty labels: the two funnels name their own fields and add new ones
+   without asking, so a table would render half the form under a friendly name
+   and the other half raw, and the friendly half would be the one that goes
+   stale. The raw block below shows the keys exactly as sent either way. */
+const humanKey = (k: string) => k.replace(/[_-]+/g, " ").trim() || k;
+
+function ResponseModal({ dealRef, onClose }: { dealRef: string; onClose: () => void }) {
+  const { dl, loading } = useDeal(dealRef);
+  if (loading) return <><div className="md-h"><h3>Funnel response</h3><p className="mono">{dealRef}</p><MdX onClose={onClose} /></div><Loading /></>;
+  if (!dl) return <Gone title="Funnel response" dealRef={dealRef} onClose={onClose} />;
+
+  const answers = parseSubmission(dl.submission || "");
+  const keys = answers ? Object.keys(answers) : [];
+
+  return (
+    <>
+      <div className="md-h md-hero">
+        <span className="md-ic"><Icon name="quote" /></span>
+        <div><h3>Funnel response</h3><p className="mono">{dealRef} · {dl.customer_name}</p></div>
+        <MdX onClose={onClose} />
+      </div>
+
+      <div className="md-b">
+        <div className="fset"><div className="fset-h">What they submitted</div>
+          {/* Which form, and when. A caption rather than the first answer —
+              the same submission read six months later has to say which funnel
+              asked these questions, because the funnel has moved on since. */}
+          <div className="dws-form-meta">
+            {dl.enquiry_id ? <>Received through <span className="mono">{dl.enquiry_id}</span></> : "Received through the intake form"}
+            {dl.created_at ? <> on {D.fmtDate(dl.created_at)}</> : null}
+            . These are the visitor's own answers, exactly as submitted — nothing here is editable,
+            and correcting the deal's own fields on Edit deal does not change this record.
+          </div>
+
+          {/* THREE OUTCOMES, ALL SAID OUT LOUD. Stored and readable is the
+              ordinary one. Stored but unparseable must not render as "no
+              response" — that would claim we hold nothing when we hold
+              something broken, and the raw block is then the only way to
+              recover the lead's answers. An empty object is a form that posted
+              nothing, which is different again from a deal that never had a
+              form (that one never reaches this dialog — see Chat's gate). */}
+          {answers === null
+            ? <Notice tone="bad" text={<>
+                <b>This response could not be read.</b> It was stored, but it is not the JSON object
+                this dialog expects, so there is nothing to lay out as questions and answers. The raw
+                text below is exactly what we hold — it is the whole record, so nothing is lost.
+              </>} />
+            : keys.length === 0
+              ? <Notice text={<>The form was submitted with no answers on it. That is what we hold —
+                  the deal itself carries the name and number it was created from.</>} />
+              : <KvList cls="kv-resp" pairs={keys.map((k) => [humanKey(k), answers[k]] as [ReactNode, ReactNode])} />}
+
+          {/* Folded, and always present. "What did they ACTUALLY send" is a
+              rare question, but when the table above looks wrong this is the
+              only thing that settles it — including the keys under their real
+              names, which humanKey above rewrites. */}
+          <details className="dws-raw">
+            <summary>Raw payload</summary>
+            <pre>{dl.submission || ""}</pre>
+          </details>
+        </div>
+      </div>
+
+      <div className="md-f">
+        <span className="spacer"></span>
+        <button className="btn" data-close="1" onClick={onClose}>Close</button>
       </div>
     </>
   );

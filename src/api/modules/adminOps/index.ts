@@ -249,6 +249,12 @@ export interface DealRow {
   nextActionNote: string;
   expectedClose: string | null;
   enquiryRef: string;
+  /** The intake form as it was submitted: a JSON OBJECT serialised to a
+   *  string, keys and order the funnel's own. `string` and not a typed shape
+   *  on purpose — the funnels ask different questions and gain new ones
+   *  without telling this panel, so anything declared here would be a promise
+   *  the wire does not keep. Empty on every deal keyed in by hand. */
+  submission: string;
   stalled: boolean;
   lostReason: string;
   tags: DealTagVocab[];
