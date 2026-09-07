@@ -108,7 +108,7 @@ function Workspace({ deepLink }: { deepLink: string | null }) {
   const current = wanted && resourceOf(wanted) ? wanted : "";
 
   usePageChrome({
-    crumbs: <TbTitle label="Resources" to={ROUTE} />,
+    crumbs: <TbTitle label="Data Forms" to={ROUTE} />,
   }, current + "/" + (p.q || "") + (p.state || ""));
 
   const goto = useCallback((patch: Record<string, string | undefined>) => {
@@ -163,7 +163,7 @@ function Workspace({ deepLink }: { deepLink: string | null }) {
    has come in. Who still owes one is a question about a FORM, and it is
    answered on that form's own face. */
 const FACES = [
-  { k: "resources", label: "Resources", icon: "doc" },
+  { k: "resources", label: "Data Forms", icon: "doc" },
   { k: "responses", label: "Responses", icon: "inbox" },
 ];
 
@@ -839,7 +839,7 @@ function ResponsePage({ responseId }: { responseId: string }) {
   usePageChrome({
     crumbs: (
       <>
-        <TbTitle label="Resources" to={ROUTE} />
+        <TbTitle label="Data Forms" to={ROUTE} />
         <span className="tb-sep">/</span>
         <span className="tb-title is-here">{r ? r.title : "Submission"}</span>
       </>

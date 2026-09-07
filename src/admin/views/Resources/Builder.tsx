@@ -60,7 +60,7 @@ export default function Builder({ mode, resourceId }: {
   usePageChrome({
     crumbs: (
       <>
-        <TbTitle label="Resources" to={ROUTE} />
+        <TbTitle label="Data Forms" to={ROUTE} />
         <span className="tb-sep">/</span>
         <span className="tb-title is-here">{existing ? "Edit" : "New resource"}</span>
       </>

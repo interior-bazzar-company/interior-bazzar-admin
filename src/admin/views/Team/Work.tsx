@@ -118,6 +118,11 @@ export default function Work() {
   const all = useWork({}, scope);
   const tags = useTags();
   const shell = useShell();
+  /* The layer callbacks are the stable half of the shell — both are
+     `useCallback(…, [])` — while the context value itself is rebuilt whenever
+     the layer changes. The drawer effect below depends on these two and never
+     on `shell`. */
+  const { drawer: openDrawer, closeLayer } = shell;
   const open = useItem(p.item || null);
   const me = meId();
 
@@ -144,17 +149,51 @@ export default function Work() {
      No scope line beside the title any more: "47 items" was a second rendering
      of the strip's own first cell, sitting where you cannot click it. */
   usePageChrome({
-    crumbs: <><TbTitle label="Calendar" to="#/work" /><WorkStats p={p} /></>,
+    crumbs: <><TbTitle label="Tasks" to="#/work" /><WorkStats p={p} /></>,
     right: <FaceSwitch face={face} goto={goto} />,
   }, face);
 
-  /* The drawer is the record, and it closes by dropping the param — the same
-     arrangement `#/team` uses, so Back and the scrim agree with the URL. */
+  /* THE DRAWER IS THE RECORD AND THE URL SAYS WHICH ONE, so this effect has to
+     run in BOTH directions. Opening was never the broken half: `if (!open)
+     return` meant Back dropped `?item=` and left the drawer sitting over a
+     list that had already moved on, because nothing else in this app closes a
+     layer on navigation.
+
+     THE DEPENDENCIES WERE THE OTHER HALF, and they are why the drawer misbehaved
+     while it was open rather than only on the way out. `all` is a fresh array
+     from `workRows()` on every render, and `shell` is rebuilt every time the
+     layer changes — so an effect that pushed a layer and then listed both re-ran
+     because of what it had just done, pushed again, and looped until React gave
+     up with "Maximum update depth exceeded". Deals has the same shape and dodges
+     it with an eslint-disable over a hand-written dep list; that hides the loop
+     rather than removing it.
+
+     So the drawer takes an ID and subscribes to the store itself. What this
+     effect watches is WHICH RECORD IS OPEN and nothing else: `openId` is a
+     string, and `openDrawer`/`closeLayer` are the shell's two dependency-free
+     callbacks. Data changes reach the drawer through its own hooks, which is
+     also why ticking a checklist no longer re-pushes the whole layer and throws
+     away focus. */
+  const gotoRef = useRef(goto);
+  useEffect(() => { gotoRef.current = goto; }, [goto]);
+
+  /* Ours, so a modal somebody else opened is never closed from here. */
+  const ownsDrawer = useRef(false);
+  const openId = open ? open.itemId : null;
   useEffect(() => {
-    if (!open) return;
-    shell.drawer(<ItemDrawer item={open} all={all} tags={tags}
-      onClose={() => goto({ item: undefined })} onOpen={openItem} />);
-  }, [open, all, tags, shell, goto, openItem]);
+    if (openId) {
+      ownsDrawer.current = true;
+      const close = () => gotoRef.current({ item: undefined });
+      openDrawer(
+        <ItemDrawer itemId={openId} onClose={close}
+          onOpen={(id) => gotoRef.current({ item: id })} />,
+        /* The scrim and Escape drop the param too, not just the layer. */
+        close,
+      );
+      return;
+    }
+    if (ownsDrawer.current) { ownsDrawer.current = false; closeLayer(); }
+  }, [openId, openDrawer, closeLayer]);
 
   return (
     <div className="dls">
@@ -1306,11 +1345,39 @@ function List({ rows, all, onOpen }: { rows: WorkItem[]; all: WorkItem[]; onOpen
 
 /* --------------------------------------------------------------- drawer --- */
 
-function ItemDrawer({ item, all, tags, onClose, onOpen }: {
-  item: WorkItem; all: WorkItem[]; tags: Tag[]; onClose: () => void; onOpen: (id: string) => void;
+/* IT TAKES AN ID, NOT A RECORD. Handed `item`, `all` and `tags` as props, the
+   drawer was a snapshot, and the only way to keep it current was for the page to
+   push a new one every time the store moved — which is the loop described at the
+   effect that opens it. Reading the store here costs the same three hooks and
+   makes the layer a live view of the record instead of a copy of it. */
+function ItemDrawer({ itemId, onClose, onOpen }: {
+  itemId: string; onClose: () => void; onOpen: (id: string) => void;
 }) {
   const shell = useShell();
   useLinks();
+  const item = useItem(itemId);
+  const all = useWork({}, "all");
+  const tags = useTags();
+
+  /* The record can go while the drawer is over it — somebody else's delete, or
+     one made in another tab. Saying so beats an empty panel or a crash. */
+  if (!item) {
+    return (
+      <>
+        <div className="dw-h">
+          <span className="tm-dw-t"><b>Item not found</b></span>
+          <span className="spacer" />
+          <button className="btn icon sm" aria-label="Close" onClick={onClose}>
+            <Icon name="x" size="sm" />
+          </button>
+        </div>
+        <div className="dw-b">
+          <Notice tone="warn" text="This item was removed while the drawer was open." />
+        </div>
+      </>
+    );
+  }
+
   const links = linksOf(item.itemId);
   const m = readMember(item.assigneeId);
   const parent = parentOf(item, all);

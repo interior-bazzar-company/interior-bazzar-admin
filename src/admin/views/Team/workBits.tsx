@@ -16,7 +16,7 @@
 import type { ReactNode } from "react";
 import { Icon, Pill } from "../../ui";
 import {
-  TODAY, WORK_STATUS, addDays, blockerOf, childrenOf, fmtDate, isDelayed, isTerminal,
+  TODAY, WORK_STATUS, addDays, blockerOf, checkCount, childrenOf, fmtDate, isDelayed, isTerminal,
   labelOf, membersInScope, progressOf, readMember, readItems, stageOf, tagsOf, timePct, toneOf,
 } from "./store";
 import type { WorkItem, WorkKind, WorkStage } from "./store";
@@ -122,8 +122,9 @@ export const noteOf = (i: WorkItem): string => {
 export function TaskRow({ item, onOpen, who }: { item: WorkItem; onOpen: (id: string) => void; who?: boolean }) {
   const m = who ? readMember(item.assigneeId) : null;
   const late = isDelayed(item);
+  const ck = checkCount(item);
   return (
-    <button className="tm-tk" onClick={() => onOpen(item.itemId)}>
+    <button className={"tm-tk" + (late ? " late" : "")} onClick={() => onOpen(item.itemId)}>
       <i className="tm-tk-box" />
       <span className="tm-tk-t">
         <b>{item.title}</b>
@@ -139,6 +140,16 @@ export function TaskRow({ item, onOpen, who }: { item: WorkItem; onOpen: (id: st
               : item.dueDate === TODAY ? "due today" : "due " + fmtDate(item.dueDate)}
           </span>
           <WaitFlag item={item} />
+          {/* The steps, when there are steps. A task closed with lines still
+              open is not this block's problem — it is not an open task. */}
+          {ck.total ? (
+            <span className="tm-tk-ck" title={ck.done + " of " + ck.total + " steps ticked"}>
+              <span className="tm-tk-ck-bar">
+                <i style={{ width: Math.round((ck.done / ck.total) * 100) + "%" }} />
+              </span>
+              <span className="tnum">{ck.done}/{ck.total}</span>
+            </span>
+          ) : null}
           <TagChips item={item} />
         </span>
       </span>

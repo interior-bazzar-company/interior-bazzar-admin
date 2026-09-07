@@ -343,9 +343,31 @@
   border: 0; border-top: 1px solid var(--line); padding: var(--space-2) 0;
 }
 .tm-tk:hover { background: var(--bg-hover) }
+/* A MARKER, NOT A CHECKBOX. It was a 13px bordered square — the exact shape of
+   an unticked checkbox — at the head of a row whose click opens the drawer and
+   ticks nothing. Every row in this block is an OPEN task by construction, so
+   the box could never have been drawn ticked even in principle: it promised an
+   action the row does not have, on a control that could not have a state. A dot
+   marks the row and claims nothing, and takes the delay tone the row is sorted
+   by. */
 .tm-tk-box {
-  flex: none; width: 13px; height: 13px; margin-top: 2px; border-radius: var(--radius-xs);
-  border: 1px solid var(--line-2); background: var(--bg);
+  flex: none; width: 6px; height: 6px; margin-top: 6px;
+  border-radius: var(--radius-full); background: var(--line-3);
+}
+.tm-tk.late .tm-tk-box { background: var(--warn-solid) }
+
+/* WHAT THE ROW COULD NOT SAY BEFORE. A task carrying a checklist has a real
+   fraction — ticked lines over total — and it was legible only inside the
+   drawer, though it is the one number on the row that moves day to day. A task
+   with no checklist draws nothing here rather than an honest-looking 0/0. */
+.tm-tk-ck { display: inline-flex; gap: var(--space-2); align-items: center }
+.tm-tk-ck-bar {
+  width: 34px; height: 4px; border-radius: var(--radius-full); overflow: hidden;
+  background: var(--bg-inset); box-shadow: inset 0 0 0 1px var(--line);
+}
+.tm-tk-ck-bar > i {
+  display: block; height: 100%; background: var(--text-2);
+  border-radius: var(--radius-full);
 }
 .tm-tk-t { min-width: 0; flex: 1 }
 .tm-tk-t b { display: block; font-weight: 400; font-size: var(--text-xs); color: var(--text); line-height: var(--lh-xs) }
@@ -1138,3 +1160,24 @@
   .tm-an-pair { grid-template-columns: minmax(0, 1fr) }
   .tm-views .seg button { padding: 0 var(--space-2) }
 }
+
+/* -------------------------------------------------- keyboard focus pass --- */
+
+/* EVERY ROW IN THIS MODULE IS A <button>, and most of them showed nothing at
+   all while they held focus. `.tm-card`, the day-add and the operation tiles
+   carried the outline; the task row, the milestone row, a calendar event, its
+   "+n more", a timeline bar and a tag in the picker did not — so tabbing
+   through three of the Tasks faces moved a cursor nobody could see. It is the
+   same outline the rest of the panel already uses, so this adds no new visual
+   language, only the states that were missing from it.
+
+   The two inset offsets are geometry rather than preference: a calendar event
+   sits flush against its neighbours in a scrolling cell, and a timeline bar is
+   absolutely positioned over the grid, so an outward outline on either is
+   clipped by the scroller that contains it. */
+.tm-tk:focus-visible,
+.tm-mk:focus-visible,
+.tm-more:focus-visible,
+.tm-pick:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px }
+.tm-ev:focus-visible,
+.tm-tlbar:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px }

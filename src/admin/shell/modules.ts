@@ -97,6 +97,16 @@ const GROUP_OVERRIDE: Record<string, string> = {
    server said, so a new server module still appears under its own name. */
 const LABEL_OVERRIDE: Record<string, string> = {
   team: "Members",
+  /* Data Forms. UNREACHABLE TODAY AND DELIBERATELY PRESENT: `resources` has no
+     server Module row, so the sidebar reads its label from PROTO_ROWS below.
+     The day the API ships that row, PROTO_ROWS stops being reached and the
+     server's own `Resources` would take the nav back without anybody editing a
+     line — a rename that undoes itself on somebody else's migration.
+
+     This map is the one place that outlives the stand-in, so the label lives
+     here too. Same treatment as `team`, and the same fix: a Module-row update
+     on the server, after which both entries go. */
+  resources: "Data Forms",
 };
 
 /* ---------------------------------------------------------- proto rows ---
@@ -179,7 +189,19 @@ const PROTO_ROWS: { key: string; label: string; group: string }[] = [
      of a section that has one surface in it rather than a reason to hide that
      surface somewhere it does not belong — the same call Business Ops made when
      Users Management arrived alone. */
-  { key: "resources", label: "Resources", group: "Resources" },
+  /* THE LABEL IS THE WHOLE CHANGE, the same call Tasks made. The row reads
+     `Data Forms` because `Resources` inside a group called `Resources` named
+     the section twice and the surface not at all — and because `resource` is
+     the one word in this panel that already means several other things: a file
+     on a response, a named link on a task, a company asset. `Data Forms` says
+     what the module actually is — a form the company sends out, and the
+     answers that come back.
+
+     The key is still `resources`, the route is still `#/resources` and the
+     grant is still `resources.*`, so every link, bookmark and `?form=` deep
+     link keeps working, and the per-member page at `#/team/:id/resources`
+     reads the same rows it always did. */
+  { key: "resources", label: "Data Forms", group: "Resources" },
 
   /* Agreements · beside Resources, and the pairing is the point. Both are a
      document the company sends a member and gets something back on; they

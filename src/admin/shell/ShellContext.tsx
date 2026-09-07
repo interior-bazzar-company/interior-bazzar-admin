@@ -88,14 +88,14 @@ export function bootAppearance() {
 
 /* ================================================================ TYPES === */
 type LayerKind = "drawer" | "modal" | "cmdk";
-type Layer = { kind: LayerKind; node: ReactNode; size?: string } | null;
+type Layer = { kind: LayerKind; node: ReactNode; size?: string; onDismiss?: () => void } | null;
 type Toast = { id: number; msg: ReactNode; tone?: string };
 type Banner = { msg: ReactNode; tone?: string } | null;
 type PopOpts = { width?: number; align?: "left" | "right"; above?: boolean; cls?: string };
 type Pop = { anchor: HTMLElement; node: ReactNode; opts: PopOpts } | null;
 
 export type ShellServices = {
-  drawer: (node: ReactNode) => void;
+  drawer: (node: ReactNode, onDismiss?: () => void) => void;
   modal: (node: ReactNode, size?: string) => void;
   closeLayer: () => void;
   layerKind: LayerKind | null;
@@ -153,13 +153,25 @@ export function ShellProvider({ children }: { children: ReactNode }) {
   const { pathname, search } = useLocation();
   const dismiss = useCallback(() => {
     closeLayer();
+    /* A DRAWER THAT NAMES ITS RECORD IN THE QUERY HAS TO SAY SO. The rule
+       below reads the id out of the PATH, which is right for `/deals/D-1` and
+       does nothing at all for `/work?item=W-K04` — there the layer went away
+       and the URL went on naming a record that was no longer on screen, which
+       is the same complaint this block was written to fix, one URL shape
+       later. A drawer may now hand in the line that closes it, and its own X,
+       the scrim and Escape then all do the same thing rather than three
+       nearly-alike things. */
+    if (layer && layer.onDismiss) { layer.onDismiss(); return; }
     const seg = pathname.split("/").filter(Boolean);
     if (seg.length > 1) navigate("/" + seg[0] + search, { replace: true });
-  }, [closeLayer, navigate, pathname, search]);
+  }, [closeLayer, layer, navigate, pathname, search]);
 
-  const drawer = useCallback((node: ReactNode) => {
+  /* `onDismiss` is optional and the callback stays dependency-free, so it is
+     still the same stable identity an effect can depend on without re-running
+     because of the layer it just opened. */
+  const drawer = useCallback((node: ReactNode, onDismiss?: () => void) => {
     lastFocus.current = document.activeElement;
-    setLayer({ kind: "drawer", node });
+    setLayer({ kind: "drawer", node, onDismiss });
   }, []);
 
   const modal = useCallback((node: ReactNode, size?: string) => {

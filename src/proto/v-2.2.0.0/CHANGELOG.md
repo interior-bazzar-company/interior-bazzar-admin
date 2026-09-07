@@ -6,6 +6,219 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-07
 
+### The task drawer stops fighting the URL
+
+**Area:** sidebar → Team · `#/work?item=…` (all four faces) · every drawer in the panel
+
+**Files:** `src/admin/views/Team/Work.tsx`, `src/admin/shell/ShellContext.tsx`
+
+**What changed**
+
+Opening a task and pressing **Back** left the drawer on screen over a list that had
+already moved on, and the drawer misbehaved the whole time it was open. Both came from
+one effect, and they were two different faults.
+
+**Back never closed it.** The effect read `if (!open) return`, so it had an opening half
+and no closing half. Dropping `?item=` changed the URL and nothing told the layer — and
+nothing else in this app closes a layer on navigation, so it simply stayed. It now runs
+in both directions, and closes only a drawer it opened itself, so a modal somebody else
+put up is never pulled down from here.
+
+**The dependency list was a render loop.** The effect pushed a layer and then listed
+`all` and `shell` among the things it watched. `all` is a fresh array out of `workRows()`
+on every render and `shell` is rebuilt every time the layer changes, so the effect re-ran
+because of what it had just done, pushed again, and kept going until React gave up with
+"Maximum update depth exceeded". That is the answer to why an open drawer dropped focus,
+reset scroll and lost half-typed input. Deals carries the same shape and hides it behind
+an eslint-disable over a hand-written dep list; this removes the cause instead.
+
+**So the drawer takes an ID and reads the store itself.** `ItemDrawer` was handed `item`,
+`all` and `tags` as props, which made it a snapshot that only stayed current because the
+page kept pushing a new one — the loop, restated. It now calls `useItem`, `useWork` and
+`useTags` for the same three hooks and is a live view of the record instead of a copy of
+one. What the effect watches is which record is open and nothing else, so ticking a
+checklist no longer re-pushes the layer. The record disappearing under an open drawer
+says so, rather than rendering an empty panel.
+
+**A drawer can now say how it closes.** The scrim and Escape went through a shell rule
+that reads the record id out of the **path** — right for `/deals/D-1`, and a no-op for
+`/work?item=W-K04`, where the layer went away and the URL went on naming a record that
+was no longer on screen. That is the same complaint the rule was written to fix, one URL
+shape later. `drawer()` takes an optional dismiss callback, so a query-param drawer hands
+in the line that closes it and its X, the scrim and Escape all do one thing. Drawers that
+pass nothing keep the path behaviour exactly, which is every other drawer in the panel.
+
+**Temp data**
+
+`src/content/team/*.json` — untouched. Nothing here is a record; it is layer lifecycle.
+
+**Backend needed**
+
+`none`. No read, no write, no payload.
+
+**Open decisions**
+
+Deals has the same effect shape and still relies on its eslint-disable. It is not broken
+today because its dep list happens to exclude the two moving values, which is a comment
+away from being reintroduced. Converting it to the same ID-and-subscribe arrangement is
+the obvious follow-up and was left out of a Tasks fix on purpose.
+
+**Verified**
+
+`npx tsc -b` clean. `npx eslint` on the touched files clean, and the repo-wide count is
+**255 problems before and after** — all pre-existing, in `src/types`, `src/utils`,
+`src/hooks` and `src/context`. `check:team`, `check:team-nav`, `check:team-render`,
+`check:resources`, `check:resources-render`, `check:agreements*`, `check:users*` and
+`check:finance*` all pass; `vite build --mode dev` succeeds.
+
+**Not verified, and it is the important gap:** none of the three faults above is caught
+by a test, and this change does not add one. `tm-smoke` swaps `ShellContext` for a no-op
+stub precisely because there is no DOM in the harness, so the drawer's open/close
+lifecycle — the thing that was broken — is the one part of the module nothing exercises.
+The reasoning is from reading the code and it is not a substitute for opening the panel
+and pressing Back. A real check needs a DOM (`jsdom` is not installed) and is worth
+adding before the next change to this effect.
+
+---
+
+### Tasks: the states you could not see
+
+**Area:** sidebar → Team · `#/work` (Tasks, Timeline, Calendar) · `#/team/:id` · `#/reports`
+
+**Files:** `src/admin/views/Team/team.css`, `src/admin/views/Team/workBits.tsx`,
+`src/admin/views/Team/Work.tsx`
+
+**What changed**
+
+**Keyboard focus, on the rows that had none.** Every row in this module is a `<button>`
+and most of them drew nothing at all while focused: the task row, the milestone row, a
+calendar event, its "+n more", a timeline bar and a tag in the picker. `.tm-card` and the
+operation tiles already had the outline, so tabbing through three of the four faces moved
+a cursor nobody could see. Same outline the rest of the panel uses — no new visual
+language, only the states missing from it. The two inset offsets are geometry: a calendar
+event sits flush in a scrolling cell and a timeline bar is positioned over the grid, so an
+outward outline on either is clipped by its own scroller.
+
+**The checkbox that could not be checked is gone.** A task row opened with a 13px
+bordered square — the exact shape of an unticked checkbox — on a row whose click opens the
+drawer and ticks nothing. Worse, the block it appears in lists only *open* tasks, so the
+box could not have been drawn ticked even in principle: it promised an action the row does
+not have, on a control that could not have a state. It is a dot now. It marks the row,
+takes the delay tone the rows are sorted by, and claims nothing.
+
+**The steps, on the row.** A task carrying a checklist has a real fraction and it was
+legible only inside the drawer, though it is the one number on the row that moves day to
+day. Rows with a checklist now carry a small bar and `3/5`. A task without one draws
+nothing rather than an honest-looking `0/0`.
+
+**And the breadcrumb finally says Tasks.** The rename of 2026-09-07 moved the sidebar and
+left `usePageChrome` naming the page **Calendar**, so the nav and the page disagreed one
+click apart. Superseded here; the route, the entity and the grant are still `work`.
+
+**Temp data**
+
+`src/content/team/work.json` — read, not changed. `checklist[]` already existed; this only
+draws it in a second place.
+
+**Backend needed**
+
+`none`. `checkCount()` is derived client-side from `checklist[]`, which
+`GET /admin/team/work` already has to return.
+
+**Open decisions**
+
+None assumed. Note what was deliberately *not* done: the row hover is still a full-bleed
+square fill rather than an inset shape, because that change cannot be judged without
+looking at it and this branch has no way to render the panel. Same reason nothing else
+purely visual was touched.
+
+**Verified**
+
+`npx tsc -b` clean, touched files lint clean, repo-wide lint count unchanged at 255.
+`check:team`, `check:team-nav` and `check:team-render` pass, as do the users, finance,
+resources and agreements suites; `vite build --mode dev` succeeds.
+
+**Not verified:** every claim above is about how something *looks*, and nothing here was
+seen. `tm-smoke` renders to a string, so it proves these surfaces still render and proves
+nothing about the result. The focus outlines and the dot are low-risk because they reuse
+tokens already in the theme, but the checklist bar on a narrow column has not been looked
+at on a screen.
+
+### Resources becomes Data Forms in the sidebar
+
+**Area:** sidebar → Resources · `#/resources` · `#/resources/:id` · `#/resources/:id/edit`
+
+**Files:** `src/admin/shell/modules.ts`, `src/admin/views/Resources/index.tsx`,
+`src/admin/views/Resources/Builder.tsx`, `scripts/rs-smoke.tsx`
+
+**What changed**
+
+The nav row inside the Resources group read **Resources**, so the sidebar said
+Resources ▸ Resources — the section named twice and the surface not at all. It now
+reads **Data Forms**, which is what the module is: a form the company sends out, and
+the answers that come back. `resource` was also the one word in this panel already
+carrying several meanings — a file on a response, a named link on a task, a company
+asset — so it identified the module least well of any word available.
+
+**THE LABEL IS THE WHOLE CHANGE**, the same call Tasks made a day earlier. The key is
+still `resources`, the route is still `#/resources` and the grant is still
+`resources.*`, so every link, bookmark and `?form=` deep link keeps working and
+`#/team/:id/resources` reads the same rows it always did. **The group is still called
+Resources**: it holds Data Forms and Agreements, and renaming the section was neither
+asked for nor free — it would have re-filed Agreements as a side effect.
+
+The rename covers the three places the module names itself: the nav row, the page
+breadcrumb (both `#/resources` and the submission sheet) and the first face of the tab
+strip. Doing the nav row alone would have left the panel disagreeing with itself one
+click in — which is the state `#/work` is in right now, where the sidebar says Tasks and
+the breadcrumb still says Calendar. That is a separate entry to write, not this one.
+
+**The half that is not cosmetic** is `LABEL_OVERRIDE`. `resources` has no server
+`Module` row, so the sidebar reads its label from `PROTO_ROWS`; the day the API ships
+that row, `PROTO_ROWS` stops being reached and the server's own "Resources" takes the
+nav back without anybody editing a line. `LABEL_OVERRIDE` is the one place that outlives
+the stand-in, so the label is written there too — unreachable today, and deliberately so.
+
+**Left alone, deliberately.** The entity noun did not move: "Create resource", "No
+resources yet" and the `Resource` column header all still say resource, because the
+record is still a resource and only the module's name changed. The per-member tab at
+`#/team/:id/resources` also still reads **Resources** — a different surface in a
+different nav (the member's own ops list), and out of scope here.
+
+**Temp data**
+
+`src/content/resources/*.json` — untouched. No record and no vocabulary label moved. The
+module's name is a nav row in `shell/modules.ts`, not content, because it names a
+surface rather than a record; rule 6 puts vocabulary *labels* in content, and this is
+not one.
+
+**Backend needed**
+
+- `none` for the rename itself — no read, no write, no payload changes shape.
+- On the list, not new work: when the `Module` row for `resources` ships (Module 8 →
+  *Not an endpoint*), its `label` must be **Data Forms**. A row shipped saying
+  "Resources" reverts the sidebar silently, and `LABEL_OVERRIDE` is what stops it doing
+  so in the meantime. Recorded in [BACKEND-INTEGRATION.md](BACKEND-INTEGRATION.md).
+
+**Open decisions**
+
+Whether the entity noun follows the module. If "resource" reads as the wrong word on the
+screens now that the module is Data Forms, that is a copy pass over `views/Resources/`
+and it is worth doing in one go rather than drifting into it a string at a time. Nothing
+on screen assumes an answer either way today.
+
+**Verified**
+
+Each of the seven edits was applied by exact-string match and asserted to hit exactly
+once, so no sibling literal was caught by accident. `scripts/rs-smoke.tsx` asserts the
+tab strip by rendered text and was updated to expect "Data Forms" beside "Responses".
+`scripts/check-team-nav.cjs` asserts the Resources **group** and its item **keys** —
+neither moved — so it is unaffected by design rather than by luck.
+
+`npx tsc -b` clean, `check:resources` and `check:resources-render` pass, and
+`vite build --mode dev` succeeds. Repo-wide `eslint` sits at 255 problems, the same count
+as before this change, all of them pre-existing and none in a file touched here.
+
 ### Calendar becomes Tasks, and a task can finally say how far in it is
 
 **Area:** sidebar → Team · `#/work` · `#/work?face=timeline` · `#/work?face=analysis`

@@ -109,7 +109,7 @@ resetStore();
 (() => {
   const html = at("/resources");
   ok("two tabs, and Member data is not one of them",
-    html.indexOf("Resources") >= 0 && html.indexOf("Responses") >= 0
+    html.indexOf("Data Forms") >= 0 && html.indexOf("Responses") >= 0
     && html.indexOf("Member data") < 0);
   ok("…none of them a form's title",
     ["IT asset handover", "Leave policy 2026", "Exit checklist"]
