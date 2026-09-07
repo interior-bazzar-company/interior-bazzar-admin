@@ -2333,7 +2333,7 @@ export function requestRefund(paymentId: string, ground: string, detail: string)
      ledger objecting. What blocks a new request is ANY refund standing against
      that payment. `declined` is the only state that releases it, because a
      decline is the ledger saying the money is not going back. */
-  const standing = snap.refunds.filter((r) => r.paymentId === paymentId && r.state !== "declined")[0];
+  const standing = refundStanding(paymentId);
   if (standing)
     return {
       error: standing.state === "paid"
@@ -2668,4 +2668,12 @@ export function filterValueLabel(key: string, value: string): string {
     return value;
   }
   return value;
+}
+
+/** THE REFUND STANDING AGAINST A PAYMENT, if any — requested, approved or paid.
+ *  Only `declined` releases a payment. `requestRefund` refuses on this and the
+ *  picker hides on it, from one definition, so the list cannot offer a payment
+ *  the store then turns down. */
+export function refundStanding(paymentId: string): Refund | null {
+  return snap.refunds.filter((r) => r.paymentId === paymentId && r.state !== "declined")[0] || null;
 }

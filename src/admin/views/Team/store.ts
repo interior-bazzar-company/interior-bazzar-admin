@@ -341,6 +341,9 @@ export const now = () => NOW + (Date.now() - LOADED_AT);
  *  client — that is the off-by-one that puts a Friday evening's work on
  *  Saturday for anybody west of the office. */
 export const TODAY = plusDays(membersDoc.asOf.slice(0, 10), SHIFT_DAYS);
+/** A day from a URL, clamped to today. The picker's `max` stops the mouse, not
+ *  a hand-edited address, and a future day must never be asked who was absent. */
+export const clampDay = (d?: string): string => (d && d <= TODAY ? d : TODAY);
 
 export const ts = (iso: string | null | undefined) => (iso ? new Date(iso).getTime() : NaN);
 
@@ -608,7 +611,7 @@ export function isUnclosed(d: AttendanceDay, m: Member | null, at = now()): bool
  *  two records answering "was this person in" disagree inside a month — so the
  *  suppression happens here, at read, and only when no day was opened. A member
  *  who came in anyway has a row, and the row wins. */
-export function stateOf(d: AttendanceDay | null, m: Member | null, at = now(), date?: string): AttendanceState {
+export function stateOf(d: AttendanceDay | null, m: Member | null, at: number, date: string): AttendanceState {
   const on = d ? null : onLeave(m ? m.memberId : "", date || "");
   if (on) return "on_leave";
   if (!d) {
@@ -1072,9 +1075,11 @@ export const agreementsFor = (memberId: string): Agreement[] =>
   snap.agreements.filter((a) => a.memberId === memberId)
     .slice().sort((a, b) => (b.sentAt || "").localeCompare(a.sentAt || ""));
 
+/** By kind, and NEWEST FIRST within a kind — so the first row of a kind is the
+ *  latest upload, which is what every reader of `[0]` was assuming. */
 export const documentsFor = (memberId: string): MemberDocument[] =>
   snap.documents.filter((r) => r.memberId === memberId)
-    .slice().sort((a, b) => a.kind.localeCompare(b.kind));
+    .slice().sort((a, b) => a.kind.localeCompare(b.kind) || b.uploadedAt.localeCompare(a.uploadedAt));
 
 /** Which of the required documents this member has not handed over. Derived
  *  from the vocabulary, so the answer changes with the list and not with a
@@ -1751,7 +1756,8 @@ export function markViewed(agreementId: string): Result<Agreement> {
   const list = snap.agreements.slice();
   const a = list.filter((x) => x.agreementId === agreementId)[0];
   if (!a) return err("not_found", "No such agreement.");
-  if (a.state !== "sent") return ok(a);
+  /* Only a copy that can still be signed: an expired link records nothing. */
+  if (a.state !== "sent" || (a.expiresAt && (a.expiresAt as string) < TODAY)) return ok(a);
   a.state = "viewed";
   a.viewedAt = new Date(now()).toISOString();
   snap.agreements = list;
@@ -1790,28 +1796,15 @@ export function revokeAgreement(agreementId: string): Result<Agreement> {
 
 export function addDocument(memberId: string, kind: string, label: string): Result<MemberDocument> {
   if (!label.trim()) return err("validation_failed", "A label is required.");
-  const fileName = label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-") + ".pdf";
-  /* A REQUIRED DOCUMENT IS ONE ROW PER KIND, so "Replace" has to replace. This
-     appended unconditionally while the page reads the FIRST row of a kind — so
-     a replaced PAN card went on file invisibly and the old one kept showing as
-     handed over and checked. Overwriting in place keeps the id every reference
-     holds, and drops the verification: nobody has checked the new file. */
-  const existing = REQUIRED_DOCS.indexOf(kind) >= 0
-    ? snap.documents.filter((x) => x.memberId === memberId && x.kind === kind)[0] : null;
-  if (existing) {
-    const list = snap.documents.slice();
-    const next: MemberDocument = {
-      ...existing, label: label.trim(), fileName, sizeKb: 240,
-      uploadedAt: new Date(now()).toISOString(), uploadedById: memberId,
-      verifiedById: null, verifiedAt: null,
-    };
-    list[list.indexOf(existing)] = next;
-    snap.documents = list;
-    emit();
-    return ok(next);
-  }
+  /* ONE ROW PER UPLOAD, AND THE READ SHOWS THE NEWEST. "Replace" used to append
+     while the page read the OLDEST row of a kind, so a replaced PAN card went on
+     file invisibly and the stale one kept showing as handed over and checked.
+     The fix is on the read (`documentsFor` is newest-first), not an overwrite:
+     an identity document that was checked on Monday and replaced on Tuesday
+     keeps Monday's row — who verified what, and when — as the audit trail. */
   const r: MemberDocument = {
-    documentId: nextId("DOC"), memberId, kind, label: label.trim(), fileName,
+    documentId: nextId("DOC"), memberId, kind, label: label.trim(),
+    fileName: label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-") + ".pdf",
     sizeKb: 240, uploadedAt: new Date(now()).toISOString(), uploadedById: memberId,
     verifiedById: null, verifiedAt: null,
   };
@@ -1938,6 +1931,40 @@ function withItem(itemId: string, fn: (i: WorkItem) => string | null): Result<Wo
   return ok(i);
 }
 
+/** WHO MAY ROLL UP UNDER WHOM — depth 3, target ▸ milestone ▸ task — written
+ *  once. It was in four places (both dialogs, createItem, updateItem) and had
+ *  already drifted: the store let a milestone sit under a milestone while the
+ *  dialogs never offered it. `selfId` is the item being re-parented; a new
+ *  item has no descendants, so without it the loop check is skipped. */
+export function parentError(kind: WorkKind, parentId: string | null | undefined, selfId?: string): string | null {
+  if (!parentId) return null;
+  if (selfId && parentId === selfId) return "An item cannot roll up to itself.";
+  const p = readItem(parentId);
+  if (!p) return "No such parent.";
+  if (p.kind === "task") return "A task cannot hold children.";
+  if (kind === "target") return "A target is always top level.";
+  if (kind === "milestone" && p.kind !== "target") return "A milestone rolls up to a target.";
+  if (selfId) {
+    /* Walk UP from the proposed parent: if this item is one of its ancestors
+       the new edge closes a loop. Depth-bounded — no subtree is enumerated —
+       and the visited set guards a tree that is already broken. */
+    const seen = new Set<string>();
+    for (let cur: WorkItem | null = p; cur && !seen.has(cur.itemId); cur = cur.parentId ? readItem(cur.parentId) : null) {
+      if (cur.itemId === selfId) return "That would make the item roll up to itself.";
+      seen.add(cur.itemId);
+    }
+  }
+  return null;
+}
+/** The parents a dialog may offer an item of `kind`: open, of a kind that may
+ *  hold it, never itself and never anything under it — the same rule the
+ *  store applies on save, so the list cannot offer what the store refuses. */
+export function parentOptions(kind: WorkKind, all: WorkItem[], selfId?: string): WorkItem[] {
+  return all.filter((i) => !isTerminal(i.status) && i.itemId !== selfId
+    && (kind === "task" ? i.kind !== "task" : i.kind === "target")
+    && !(selfId && parentError(kind, i.itemId, selfId)));
+}
+
 /** EDITING WHAT WAS CREATED. Nothing could change after creation — a typo in
  *  the title, a wrong due date, the wrong person — was permanent. The rules are
  *  createItem's. The kind is not among them: a kind decides what may sit under
@@ -1950,40 +1977,40 @@ export interface ItemPatch {
 }
 export function updateItem(itemId: string, patch: ItemPatch): Result<WorkItem> {
   return withItem(itemId, (i) => {
-    if (patch.title !== undefined) {
-      if (!patch.title.trim()) return "A title is required.";
-      i.title = patch.title.trim();
-    }
-    if (patch.assigneeId !== undefined && patch.assigneeId !== i.assigneeId) {
-      const m = readMember(patch.assigneeId);
+    /* EVERY CHECK BEFORE ANY WRITE. `withItem` hands over the live record, and
+       a refusal after a field was already set left a half-applied edit on an
+       item the screen went on showing — reassigned and de-tagged, under a
+       toast saying nothing had happened. A finished item is not edited either:
+       every other verb on the drawer is gated the same way, and a completed
+       item re-dated or re-parented moves a rollup somebody already signed off. */
+    if (isTerminal(i.status)) return "It is " + labelOf(WORK_STATUS, i.status).toLowerCase() + ". Reopen or restore it first.";
+    const title = patch.title !== undefined ? patch.title.trim() : i.title;
+    if (!title) return "A title is required.";
+    const assigneeId = patch.assigneeId !== undefined ? patch.assigneeId : i.assigneeId;
+    if (assigneeId !== i.assigneeId) {
+      const m = readMember(assigneeId);
       if (!m) return "No such member.";
       if (m.status !== "active") return "That member is not active.";
-      i.assigneeId = patch.assigneeId;
-      const theirs = tagsOwnedBy(patch.assigneeId).map((t) => t.tagId);
+    }
+    const start = patch.startDate !== undefined ? patch.startDate : i.startDate;
+    const due = patch.dueDate !== undefined ? patch.dueDate : i.dueDate;
+    if (start && due && start > due) return "It cannot be due before it starts.";
+    const parentId = patch.parentId !== undefined ? patch.parentId : i.parentId;
+    if (parentId !== i.parentId) {
+      const bad = parentError(i.kind, parentId, i.itemId);
+      if (bad) return bad;
+    }
+    i.title = title;
+    if (assigneeId !== i.assigneeId) {
+      i.assigneeId = assigneeId;
+      const theirs = tagsOwnedBy(assigneeId).map((t) => t.tagId);
       const kept = (i.tagIds || []).filter((t) => theirs.indexOf(t) >= 0);
       i.tagIds = kept.length ? kept : undefined;
     }
     if (patch.priority !== undefined) i.priority = patch.priority;
-    const start = patch.startDate !== undefined ? patch.startDate : i.startDate;
-    const due = patch.dueDate !== undefined ? patch.dueDate : i.dueDate;
-    if (start && due && start > due) return "It cannot be due before it starts.";
-    if (patch.startDate !== undefined) i.startDate = patch.startDate;
-    if (patch.dueDate !== undefined) i.dueDate = patch.dueDate;
-    if (patch.parentId !== undefined && patch.parentId !== i.parentId) {
-      if (patch.parentId) {
-        if (patch.parentId === i.itemId) return "An item cannot roll up to itself.";
-        const p = readItem(patch.parentId);
-        if (!p) return "No such parent.";
-        if (p.kind === "task") return "A task cannot hold children.";
-        if (i.kind === "target") return "A target is always top level.";
-        if (i.kind === "milestone" && p.kind !== "target") return "A milestone rolls up to a target.";
-        /* No loops: the new parent may not already roll up to this item. */
-        const under = (id: string): boolean =>
-          childrenOf(id).some((k) => k.itemId === patch.parentId || under(k.itemId));
-        if (under(i.itemId)) return "That would make the item roll up to itself.";
-      }
-      i.parentId = patch.parentId;
-    }
+    i.startDate = start;
+    i.dueDate = due;
+    i.parentId = parentId;
     return null;
   });
 }
@@ -2046,14 +2073,8 @@ export function createItem(input: Partial<WorkItem> & {
   const assignee = readMember(input.assigneeId);
   if (!assignee) return err("member_not_found", "No such member.");
   if (assignee.status !== "active") return err("assignee_inactive", "That member is not active.");
-  if (input.parentId) {
-    const p = readItem(input.parentId);
-    if (!p) return err("invalid_parent", "No such parent.");
-    /* Depth 3, target ▸ milestone ▸ task. A fourth level is a project tool,
-       and this is not one. */
-    if (p.kind === "task") return err("invalid_parent", "A task cannot hold children.");
-    if (input.kind === "target") return err("invalid_parent", "A target is always top level.");
-  }
+  const badParent = parentError(input.kind, input.parentId);
+  if (badParent) return err("invalid_parent", badParent);
   const item: WorkItem = {
     itemId: nextId("W"),
     kind: input.kind,
@@ -2338,7 +2359,7 @@ export function useMyDay(date = TODAY): { day: AttendanceDay | null; state: Atte
   useVersion();
   const m = readMember(meId());
   const day = dayFor(meId(), date);
-  return { day, state: stateOf(day, m), worked: workedOf(day, m), breakMins: breakOf(day) };
+  return { day, state: stateOf(day, m, now(), date), worked: workedOf(day, m), breakMins: breakOf(day) };
 }
 export function usePlan(memberId: string, date = TODAY): DailyPlan | null { useVersion(); return planFor(memberId, date); }
 export function useReport(memberId: string, date = TODAY): DailyReport | null { useVersion(); return reportFor(memberId, date); }

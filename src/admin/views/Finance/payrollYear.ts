@@ -322,13 +322,13 @@ export interface EmployeeTotal {
   incentiveSharePct: number | null;
 }
 
-/* A name that already leads with an initial — "A. Sharma", which is how the
-   roster writes five of its eight — is as short as it gets; squeezing it to
-   "A. S." made the axis a row of initials nobody could tell apart. */
+/* SHORTENED BY WIDTH, NOT BY SHAPE. The band fits about twelve characters;
+   a name inside that — "A. Sharma", "Priya Iyer" — is left whole, because
+   squeezing it to "A. S." made the axis a row of initials nobody could tell
+   apart. Only a name that would not fit is abbreviated. */
 const shorten = (name: string): string => {
   const bits = name.trim().split(/\s+/);
-  const initial = bits[0].length === 2 && bits[0].endsWith(".");
-  return bits.length < 2 || initial ? name : bits[0] + " " + bits[bits.length - 1][0] + ".";
+  return bits.length < 2 || name.length <= 12 ? name : bits[0] + " " + bits[bits.length - 1][0] + ".";
 };
 
 export function employeeTotals(year: string): EmployeeTotal[] {

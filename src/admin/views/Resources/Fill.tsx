@@ -12,10 +12,10 @@
    else, and the dialog says so — an identity document must never be put on a
    public URL by this panel, and there is no private store to put it in yet.
    ============================================================================= */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Icon, Notice } from "../../ui";
 import { useShell } from "../../shell/ShellContext";
-import { acceptAttr, acceptLine, submitResponse } from "./store";
+import { acceptAttr, acceptLine, answered, submitResponse } from "./store";
 import type { FileAnswer, Resource, ResourceField } from "./store";
 
 export function FillModal({ r, memberId }: { r: Resource; memberId: string }) {
@@ -23,8 +23,18 @@ export function FillModal({ r, memberId }: { r: Resource; memberId: string }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [files, setFiles] = useState<Record<string, FileAnswer>>({});
   const set = (id: string, v: string) => setValues((o) => ({ ...o, [id]: v }));
+  /* An object URL lives until it is revoked. Replacing or clearing a pick
+     revokes the old one; leaving the dialog revokes every one that was not
+     handed to the store — those it keeps, because the record points at them. */
+  const latest = useRef(files);
+  useEffect(() => { latest.current = files; }, [files]);
+  const kept = useRef(false);
+  useEffect(() => () => {
+    if (!kept.current) Object.values(latest.current).forEach((a) => URL.revokeObjectURL(a.url));
+  }, []);
   const pick = (f: ResourceField, file: File | null) => setFiles((o) => {
     const next = { ...o };
+    if (next[f.fieldId]) URL.revokeObjectURL(next[f.fieldId].url);
     if (!file) { delete next[f.fieldId]; return next; }
     next[f.fieldId] = {
       fileName: file.name, mimeType: file.type || "application/octet-stream",
@@ -32,13 +42,12 @@ export function FillModal({ r, memberId }: { r: Resource; memberId: string }) {
     };
     return next;
   });
-  /* The store's own definition of "answered", so the button and the refusal
-     cannot disagree about which fields are still empty. */
-  const given = (f: ResourceField) => f.type === "file" ? !!files[f.fieldId] : !!(values[f.fieldId] || "").trim();
-  const missing = r.fields.filter((f) => f.required && !given(f)).length;
+  /* The store's own `answered`, so the button and the refusal cannot disagree. */
+  const missing = r.fields.filter((f) => f.required && !answered(f, values, files)).length;
   const save = () => {
     const x = submitResponse(r.resourceId, memberId, values, files);
     if (!x.ok) { shell.toast(x.message, "bad"); return; }
+    kept.current = true;
     shell.closeLayer();
     shell.toast("Submitted. It is on your record.");
   };

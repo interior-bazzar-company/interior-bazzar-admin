@@ -39,7 +39,10 @@ export default function PayPage({ m }: { m: Member }) {
   /* Finance keys a salary account by the member it belongs to, as a number.
      No match is the honest answer for somebody Finance has never opened an
      account for, and it is what this draws rather than an invented zero. */
-  const account = readSalaryAccounts().filter((a) => String(a.memberId) === m.memberId)[0] || null;
+  /* The OPEN account first: Finance appends a re-opened account after the
+     closed one, and a member's pay is whichever is still being paid. */
+  const account = readSalaryAccounts().filter((a) => String(a.memberId) === m.memberId)
+    .sort((a, b) => Number(b.active) - Number(a.active))[0] || null;
 
   /* THE INCENTIVES STAY TEAM'S. The work item one was earned against is a Team
      record and the pay record is where the basis is written down. Null is

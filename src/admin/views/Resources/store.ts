@@ -569,6 +569,14 @@ export function deleteResponse(id: string): Result<number> {
   return ok(freedKb);
 }
 
+/** WHAT COUNTS AS ANSWERED, written once. A file field is answered by its
+ *  file, not by the text beside it; anything else by non-blank text. The
+ *  submit refusal and the fill dialog's button both read this, so they cannot
+ *  disagree about which fields are still empty. */
+export function answered(f: ResourceField, values: Record<string, string>, files?: Record<string, FileAnswer>): boolean {
+  return f.type === "file" ? !!(files && files[f.fieldId]) : !!String(values[f.fieldId] || "").trim();
+}
+
 export function submitResponse(
   resourceId: string, memberId: string, values: Record<string, string>,
   files?: Record<string, FileAnswer>,
@@ -582,10 +590,7 @@ export function submitResponse(
     return err("already_submitted", "That member has already submitted this one.");
   /* A file field is answered by its FILE, not by the text beside it — a required
      upload with a filename typed into it and nothing attached is not answered. */
-  const given = (f: ResourceField) => (f.type === "file"
-    ? !!(files && files[f.fieldId])
-    : !!String(values[f.fieldId] || "").trim());
-  const missing = r.fields.filter((f) => f.required && !given(f)).map((f) => f.label);
+  const missing = r.fields.filter((f) => f.required && !answered(f, values, files)).map((f) => f.label);
   /* THE CAP IS ENFORCED, not merely printed. A limit shown on the form and not
      checked on the way in is a suggestion, and the server has to check it too —
      this one only stops an honest mistake reaching the store. */

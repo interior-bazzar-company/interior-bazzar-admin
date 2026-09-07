@@ -38,7 +38,7 @@ import {
 import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import {
-  LEAVE_KIND, TODAY, addDays, attendanceTotals, datesIn, dayFor, fmtDate, fmtDayName,
+  LEAVE_KIND, TODAY, addDays, attendanceTotals, clampDay, datesIn, dayFor, fmtDate, fmtDayName,
   labelOf, leaveOverlap, leaveQueue, fmtHM, fmtTime, meId, readMember,
   arrivalSpread, earliestAttendance, scopeOf, spanDays, spanRows, spanTotals,
   stateOf,
@@ -62,9 +62,7 @@ export default function Attendance() {
   }, [sp]);
 
   const face = FACES.some((f) => f.k === p.face) ? (p.face as string) : "today";
-  /* Clamped, as Reports already does: the picker's `max` stops the mouse, not
-     a hand-edited URL, and a future day must never be asked who was absent. */
-  const date = p.date && p.date <= TODAY ? p.date : TODAY;
+  const date = clampDay(p.date);
   const scope = scopeOf("attendance");
   const rows = useDayRows(date, scope);
   const members = useMembers();

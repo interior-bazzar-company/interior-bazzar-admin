@@ -222,7 +222,7 @@ export function SendAgreementModal({ memberId }: { memberId: string }) {
         )}
         <p className="tm-foot">The wording is frozen at send. The link is single-use and expires on {fmtDate(addDays(TODAY, 7))}.</p>
       </div>
-      <Foot label="Send" disabled={!templateId} onSave={save} />
+      <Foot label="Send" disabled={!t} onSave={save} />
     </>
   );
 }

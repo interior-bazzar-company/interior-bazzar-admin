@@ -6,6 +6,60 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-07
 
+### The review pass — what the finders caught, and what this log had left out
+
+**Area:** Tasks · Members · Attendance and Reports · Agreements · Data Forms · Finance
+
+**Files:** `src/admin/views/Team/{store.ts,Work.tsx,Attendance.tsx,Reports.tsx,MemberPage.tsx}`,
+`src/admin/views/Team/member/{modals.tsx,PayPage.tsx}`, `src/admin/views/Resources/{store.ts,Fill.tsx}`,
+`src/admin/views/Finance/{store.ts,RefundModals.tsx,payrollYear.ts}`, `scripts/check-finance-ledger.cjs`
+
+**What changed**
+
+**Two real defects in today's own work.** `updateItem` wrote title, assignee and tags onto
+the live record *before* the later checks ran, so a refused save half-applied under a toast
+saying nothing had happened; every check now runs before any write. And the Edit button
+ignored terminal state while every other drawer verb respects it — a signed-off item could
+be re-dated into another milestone's rollup. Both closed.
+
+**One rule, written once.** Who may roll up under whom lived in four places and had
+drifted (the store let a milestone sit under a milestone; the dialogs never offered it).
+`parentError`/`parentOptions` in the store serve both dialogs, `createItem` and
+`updateItem`; the loop check walks up instead of enumerating a subtree; the parent an item
+*has* stays in the picker even when the rule would not choose it now. Likewise
+`answered()` (store and fill dialog), `refundStanding()` (guard and picker), `clampDay()`
+(both date pages), and a per-module label table instead of a `team` special case.
+
+**A correction to this morning's Members entry.** It said a replaced document "overwrites in
+place". That destroyed the audit trail of a KYC document — Monday's verified row gone on
+Tuesday's mis-click. Reverted: one row per upload, and `documentsFor` reads newest-first,
+which is the fix the page needed all along. **The earlier entry's claim is superseded here.**
+
+**Smaller.** `stateOf` takes the day as a required argument and `useMyDay` forwards it — a
+member on leave today read "not started" on their own strip. `markViewed` records nothing on
+an expired link. Object URLs in the fill dialog are revoked. The refund picker is computed
+once, not per keystroke. Names shorten by width, not by shape. The pay page prefers the open
+account; the member overview tile reads Finance instead of `pay.json`, so it and the Pay tab
+agree. Send is disabled when its template is gone. A ledger assertion implied by the line
+above it is folded in.
+
+**Simulated writes, named — as three entries today should have.** `updateItem`, Restore,
+`markViewed`, `addDocument` and `submitResponse` all land in the in-memory store and are
+gone on reload, as everywhere on this branch. **Omitted from earlier Files lines:**
+`Team/store.ts` lost `lastPayslip`, and `scripts/check-team-derivation.cjs` dropped that
+assertion and its pinned read list — the pay page takes its slips from Finance now.
+
+**Deferred, and logged as such:** a layer stack in the shell (Deals, Plans and Roles share
+the drawer-after-modal gap `Work.tsx` works around); `pay.json`'s dead payslip fields and
+the `Pay` type; the ledger harness mutating `readRefund()` to pass four-eyes; an assertion
+on `slipsOf` order that the "Last paid" tile now depends on.
+
+**Temp data** — none. **Backend needed** — nothing new; `PATCH /admin/team/work/{id}` must
+refuse a terminal item, added to the TM-T30 row's refusals by reference.
+
+**Verified** — `npx tsc -b` clean, lint clean on every touched tree, all eleven `check:*`
+suites pass, `vite build --mode dev` succeeds. Nothing seen on a screen.
+
 ### The seed is one company now
 
 **Area:** every screen that reads `src/content/**` — Finance's five faces, `#/team/:id/pay`,

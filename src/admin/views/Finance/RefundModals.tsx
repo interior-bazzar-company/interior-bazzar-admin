@@ -4,13 +4,13 @@
    transfer that actually sends the money. Every submit renders the store's
    own refusal text inside the dialog rather than closing on a failed write.
    ============================================================================= */
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Cancel, Dlg, Field, Fs, Pick, RupeeInput, toPaise } from "./dialog";
 import type { Done } from "./dialog";
 import { Check, Money, OriginTag } from "./bits";
 import {
   ACCOUNTS, MODES, REFUND_GROUNDS, REFUND_POLICY,
-  createManualRefund, decideRefund, fmtDate, inr, readPayment, readPayments, readRefunds, recordRefundTransfer,
+  createManualRefund, decideRefund, fmtDate, inr, readPayment, readPayments, recordRefundTransfer, refundStanding,
   refundPolicyCheck, requestRefund,
 } from "./store";
 import type { Refund } from "./store";
@@ -26,9 +26,12 @@ export function RequestRefundModal({ onClose, onDone }: { onClose: () => void; o
      picker that lists a payment already sent back invites somebody to choose
      it and then reads its own refusal as a fault. Declined refunds release
      the payment, so those rows stay on the list. */
-  const claimed = new Set(readRefunds().filter((r) => r.state !== "declined").map((r) => r.paymentId));
-  const payments = readPayments().filter((hit) => !claimed.has(hit.pay.paymentId))
-    .sort((a, b) => b.pay.valueDate.localeCompare(a.pay.valueDate));
+  /* Once: the dialog is a one-shot layer and the ledger cannot move under
+     it, so flattening and sorting every installment on each keystroke in the
+     reason box bought nothing. */
+  const payments = useMemo(() => readPayments()
+    .filter((hit) => !refundStanding(hit.pay.paymentId))
+    .sort((a, b) => b.pay.valueDate.localeCompare(a.pay.valueDate)), []);
   const [paymentId, setPaymentId] = useState<string | null>(null);
   const [ground, setGround] = useState<string>(REFUND_GROUNDS[0]?.key || "other");
   const [detail, setDetail] = useState("");

@@ -1107,10 +1107,8 @@ S.resetStore();
   const paidIn = new Set(S.readRuns().flatMap((r) => r.slips)
     .filter((sl) => sl.month.startsWith(FY) && sl.paidAt)
     .map((sl) => S.readSalaryAccount(sl.salaryAccountId).department));
-  ok("every department paid in that year appears, and no other",
+  ok("every department paid in that year appears, and no other — the chart is the year's payroll, not the org chart",
     dept.map((d) => d.department).sort(), Array.from(paidIn).sort());
-  ok("...so the chart is the year's payroll, not the org chart",
-    dept.some((d) => !paidIn.has(d.department)), false);
   /* THE INVARIANT: the chart's total is exactly the year's paid total — one
      derivation read twice, so a bar and the tile above it cannot disagree. */
   ok("...and their sum is exactly that year's paid figure",

@@ -41,6 +41,7 @@ import {
   timePct, useAgreements, useLeave, useMembers, useDocuments, workedOf,
 } from "./store";
 import type { Member } from "./store";
+import { inr, readSalaryAccounts } from "../Finance/store";
 import { MemberStrip, OpHead, OpNav, OpRefused, memberHref, rupees, workHref } from "./member/frame";
 import { MEMBER_OPS, opAllowed, opOf, opsFor } from "./member/ops";
 import type { Viewer } from "./member/ops";
@@ -351,7 +352,6 @@ function OpGrid({ m, viewer }: { m: Member; viewer: Viewer }) {
   const ags = agreementsFor(m.memberId);
   const unsigned = ags.filter((a) => a.state !== "signed" && a.state !== "revoked").length;
   const missing = missingDocs(m.memberId).length;
-  const pay = payFor(m.memberId);
   const day = dayRows(TODAY, "all").filter((r) => r.member.memberId === m.memberId)[0];
   const report = reportFor(m.memberId, TODAY);
   /* Same derivation the member's Resources page runs, called rather than
@@ -392,8 +392,10 @@ function OpGrid({ m, viewer }: { m: Member; viewer: Viewer }) {
       tone: owed.length ? "warn" : "",
     },
     pay: {
-      v: pay && pay.annualCtc ? rupees(Math.round(pay.annualCtc / 12)) : "—",
-      s: pay && pay.annualCtc ? "a month, from Finance" : "no salary account",
+      ...((s) => ({
+        v: s ? inr(s.monthlyGrossPaise) : "—",
+        s: s ? "a month, from Finance" : "no salary account",
+      }))(salaryOf(m.memberId)),
     },
   };
 
@@ -464,6 +466,12 @@ function IdentityBlock({ live: u, roles, showAccess }: {
 
 /* The keys are the server's own (ModuleAction.key), so anything unlisted falls
    back to the key itself rather than disappearing. */
+/* THE OVERVIEW TILE READS FINANCE, as the Pay tab does. It quoted pay.json's
+   annualCtc — the second payroll this branch stopped rendering — so the tile
+   and the Pay tab two clicks away disagreed about one person's salary. */
+const salaryOf = (memberId: string) =>
+  readSalaryAccounts().filter((a) => a.active && String(a.memberId) === memberId)[0] || null;
+
 const ACTION_LABEL: Record<string, string> = {
   view: "View", create: "Create", edit: "Edit", stage: "Change stage",
   payment: "Log payment", close: "Close", export: "Export", record: "Record",
@@ -471,13 +479,17 @@ const ACTION_LABEL: Record<string, string> = {
   pricing: "Set pricing", status: "Activate", archive: "Archive", roles: "Manage roles",
 };
 
-/* ONE VERB, TWO CONSEQUENCES, on Team alone. `status` is what the server gates
-   suspend and reactivate on — and, on `#/team/:id`, permanent deletion as well:
-   "Delete member" sits behind `can("team", "status")` above. A role holder
-   reading "Activate" here was never told that. Until the server has a verb of
-   its own for delete, the label says both, and only on this module. */
+/* WHERE A VERB MEANS MORE ON ONE MODULE THAN ITS NAME SAYS. On Team, `status`
+   is what the server gates suspend and reactivate on — and, on `#/team/:id`,
+   permanent deletion as well: "Delete member" sits behind `can("team", "status")`
+   above. A role holder reading "Activate" was never told that. A table rather
+   than a special case, so the next module that overloads a verb adds a row
+   here instead of a branch. The real fix is a `delete` verb on the server. */
+const MODULE_ACTION_LABEL: Record<string, Record<string, string>> = {
+  team: { status: "Activate · Delete" },
+};
 const labelFor = (moduleKey: string, act: string) =>
-  moduleKey === "team" && act === "status" ? "Activate · Delete" : (ACTION_LABEL[act] || act);
+  (MODULE_ACTION_LABEL[moduleKey] || {})[act] || ACTION_LABEL[act] || act;
 
 /** A member's grants: the UNION of the verbs their roles tick — the same
     resolution resolve_grants() does server-side. Inactive roles contribute

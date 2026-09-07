@@ -45,12 +45,12 @@ import {
   createItem, createTag, eventsOn, fmtDate, fmtMonth, gridDays, isDelayed, isTerminal, labelOf,
   lanesOf, leaveOn, linkLabelOf, linksOf, monthStep,
   meId, membersInScope, parentOf, progressOf, readMember, removeLink, setBlockedBy,
-  removeCheckLine, removeResourceLink, setItemStatus, stageOf, toggleCheckLine, updateItem,
+  parentOptions, removeCheckLine, removeResourceLink, setItemStatus, stageOf, toggleCheckLine, updateItem,
   normaliseUrl, tagItem, tagsOf, tagsOwnedBy, toneOf, useItem, useLinks, useMembers, useTags,
   useWork, workTotals,
 } from "./store";
 import type {
-  Attachment, CalEvent, LinkRelation, Member, Priority, Tag, WorkItem, WorkStage, WorkStatus,
+  Attachment, CalEvent, LinkRelation, Member, Priority, Tag, WorkItem, WorkKind, WorkStage, WorkStatus,
 } from "./store";
 import { ensureAdopted } from "./adopt";
 import { KindMark, Meter, PriorityChip, Who, ago } from "./bits";
@@ -470,10 +470,9 @@ function WorkStats({ p }: { p: Record<string, string> }) {
      the crumb said 47 over a table of six. `status` is left out because every
      cell here IS a status filter: scoping the counts by it would zero every
      other cell the moment one was clicked. */
-  const t = workTotals(useWork({
-    member: p.member, kind: p.kind, priority: p.priority, due: p.due,
-    q: p.q, parent: p.parent, tag: p.tag, wait: p.wait,
-  }, "all"));
+  const sansStatus = { ...p };
+  delete sansStatus.status;
+  const t = workTotals(useWork(sansStatus, "all"));
 
   const route = (key?: string, val?: string) => {
     const next: Record<string, string> = { ...p };
@@ -855,10 +854,8 @@ export function NewItemModal({ kind: initial, members, all, date }: {
      carry the last person's tags with it. */
   const assign = (id: string) => { setWho(id); setTags([]); };
 
-  /* Depth 3, target ▸ milestone ▸ task. A target is always top level; a task
-     may sit under either, and nothing sits under a task. */
-  const parents = all.filter((i) => !isTerminal(i.status)
-    && (kind === "task" ? i.kind !== "task" : i.kind === "target"));
+  /* Depth 3, target ▸ milestone ▸ task — the store's rule, not a copy of it. */
+  const parents = parentOptions(kind as WorkKind, all);
 
   const save = () => {
     const r = createItem({
@@ -1477,13 +1474,16 @@ function EditItemModal({ item, all }: { item: WorkItem; all: WorkItem[] }) {
   const [start, setStart] = useState(item.startDate || "");
   const [due, setDue] = useState(item.dueDate || "");
   const [parent, setParent] = useState(item.parentId || "");
-  /* The create dialog's rule, minus this item and everything that already
-     rolls up to it — a parent under its own child is a loop. */
-  const below = new Set<string>();
-  const walk = (id: string) => childrenOf(id, all).forEach((k) => { below.add(k.itemId); walk(k.itemId); });
-  walk(item.itemId);
-  const parents = all.filter((i) => !isTerminal(i.status) && i.itemId !== item.itemId
-    && !below.has(i.itemId) && (item.kind === "task" ? i.kind !== "task" : i.kind === "target"));
+  /* The store's own rule — never itself, never anything under it — and
+     memoised, because it does not change with a keystroke in the title. */
+  const parents = useMemo(() => {
+    const opts = parentOptions(item.kind, all, item.itemId);
+    /* The parent it HAS stays on the list even when the rule would not offer
+       it now — completed, say — or the select shows "Nothing" over a state
+       that still holds the old id, and what is read is not what is saved. */
+    const cur = item.parentId ? all.filter((i) => i.itemId === item.parentId)[0] : null;
+    return cur && !opts.some((o) => o.itemId === cur.itemId) ? [cur].concat(opts) : opts;
+  }, [item.kind, item.itemId, item.parentId, all]);
   const save = () => {
     const r = updateItem(item.itemId, {
       title, assigneeId: who, priority: pri as Priority,
@@ -1632,7 +1632,9 @@ function ItemDrawer({ itemId, onClose, onOpen }: {
         <StagePill item={item} />
         <span className="spacer" />
         {/* Nothing about an item could change after creation. Now it can. */}
-        <button className="btn sm" onClick={() => shell.modal(<EditItemModal item={item} all={all} />, "sm")}>Edit</button>
+        {!isTerminal(item.status)
+          ? <button className="btn sm" onClick={() => shell.modal(<EditItemModal item={item} all={all} />, "sm")}>Edit</button>
+          : null}
         <button className="btn icon sm" aria-label="Close" onClick={onClose}><Icon name="x" size="sm" /></button>
       </div>
       <div className="dw-b">

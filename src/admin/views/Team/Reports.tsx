@@ -38,7 +38,7 @@ import { Icon, Notice, SectionHead, StatStrip, Table, TbTitle, Tiles, qs } from 
 import { go } from "../../ui/nav";
 import type { StatCell } from "../../ui";
 import {
-  TODAY, acknowledgeReport, addDays, attentionOf, fmtDate, fmtDayName, fmtHM, fmtTime,
+  TODAY, acknowledgeReport, addDays, attentionOf, clampDay, fmtDate, fmtDayName, fmtHM, fmtTime,
   meId, pendingLeave, readMember, reportSpanDays, reportSpanRows, reportSpanTotals, scopeOf,
   unopenedAgreements, useAgreements, useLeave, useReports, useReview,
 } from "./store";
@@ -59,7 +59,7 @@ export default function Reports() {
   }, [sp]);
 
   const face = FACES.some((f) => f.k === p.face) ? (p.face as string) : "reports";
-  const date = p.date && p.date <= TODAY ? p.date : TODAY;
+  const date = clampDay(p.date);
   const scope = scopeOf("reports");
   const rows = useReview(date, scope);
 
