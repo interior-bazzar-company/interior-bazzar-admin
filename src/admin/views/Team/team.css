@@ -1255,3 +1255,10 @@
   flex: none; width: 13px; height: 13px; margin-top: 3px;
   border-radius: var(--radius-xs); border: 1px solid var(--line-2); background: var(--bg);
 }
+
+/* ------------------------------------------------------ history: leave --- */
+
+/* A leave day in the week grid. It was drawn as "—" with an "absent" title —
+   identical to a real absence — so the cell says the word, in the info tone
+   the Today strip already uses for the same state. */
+.tm-hist-leave { color: var(--info); font-size: var(--text-2xs); font-weight: 600; letter-spacing: .04em }

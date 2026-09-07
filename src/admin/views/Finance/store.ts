@@ -557,12 +557,13 @@ export const ENGAGEMENTS = [
    two that drift. It becomes `AdminOpsService.users()` in the same commit that
    retires those two.
 
-   ⚠ THE TWO FIXTURES DO NOT JOIN TODAY. Finance's seeded salary accounts carry
-   memberIds 1-9 and Team's members are 41-86: different casts, written
-   independently, so `memberId` on every existing account resolves to nobody.
-   The picker below is correct and new accounts join properly; the seven
-   historical ones do not, and that is a seed defect rather than a code one.
-   Fixing it means deciding whose cast is real, which is a product question. */
+   THE TWO FIXTURES JOIN. They did not until 2026-09-07: Finance's seeded
+   accounts carried memberIds 1-12 and Team's members are 41-86 — two casts
+   written independently, so no historical account resolved to anybody and
+   the pay page had to read a third fixture of its own. Team's cast is the
+   real one; every open account is now one of its eight, and the two closed
+   accounts name people who have left, which an active roster has no row for.
+   `check-finance-ledger.cjs` asserts both halves of that. */
 
 export interface SalaryMemberOption {
   memberId: number;
@@ -2325,8 +2326,22 @@ export function requestRefund(paymentId: string, ground: string, detail: string)
   if (!hit) return { error: "That payment is not in the ledger.", refundId: null };
   if (!groundMeta(ground)) return { error: "Pick a ground.", refundId: null };
   if (!detail.trim()) return { error: "Say what happened — the approver reads this, and so does the audit.", refundId: null };
-  if (snap.refunds.some((r) => r.paymentId === paymentId && (r.state === "requested" || r.state === "approved")))
-    return { error: "There is already an open refund on " + paymentId + ". (duplicate_request)", refundId: null };
+  /* ONE PAYMENT, ONE REFUND. This guard named `requested` and `approved` and
+     stopped there, so the moment a transfer was recorded the payment went back
+     to looking refundable — and the second request could be approved and paid
+     exactly like the first, sending the money out twice with nothing in the
+     ledger objecting. What blocks a new request is ANY refund standing against
+     that payment. `declined` is the only state that releases it, because a
+     decline is the ledger saying the money is not going back. */
+  const standing = snap.refunds.filter((r) => r.paymentId === paymentId && r.state !== "declined")[0];
+  if (standing)
+    return {
+      error: standing.state === "paid"
+        ? paymentId + " has already been refunded — " + standing.refundId + " sent "
+          + inr(standing.amountPaise) + " back. (duplicate_request)"
+        : "There is already an open refund on " + paymentId + " (" + standing.refundId + "). (duplicate_request)",
+      refundId: null,
+    };
 
   const a = actor();
   const id = nextId("RF");

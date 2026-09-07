@@ -548,7 +548,9 @@ require("esbuild").build({
      was actually asserting is that the module has no verb that CHANGES money,
      so that is what it asserts now: every pay-shaped export is a read, and the
      write verbs Finance owns are absent by name. */
-  const PAY_READS = ["payFor", "incentiveTotal", "lastPayslip"];
+  /* `lastPayslip` went on 2026-09-07: the pay page reads its slips from Finance
+     now, and Team keeps only the incentive side of pay. */
+  const PAY_READS = ["payFor", "incentiveTotal"];
   const payish = Object.keys(S).filter((k) =>
     typeof S[k] === "function" && /pay|payslip|incentive|salary|ctc/i.test(k));
   ok("every pay-shaped export is a read",
@@ -577,12 +579,11 @@ require("esbuild").build({
   })();
 
   /* A payslip carries the incentive that went out with it, so the payslip list
-     and the incentive ledger cannot disagree about a month. */
+     and the incentive ledger cannot disagree about a month. (The "newest slip"
+     assertion went with `lastPayslip` on 2026-09-07 — the pay page takes its
+     slips from Finance now, and which slip is newest is Finance's to assert.) */
   (() => {
     const p52 = S.payFor("52");
-    ok("the last payslip is the newest one, whatever order the seed is in",
-      S.lastPayslip(p52).month === p52.payslips
-        .map((x) => x.month).sort().reverse()[0]);
     ok("every slip's net is its base plus whatever incentive it carried",
       p52.payslips.every((x) => x.net === x.base + (x.incentive || 0)));
     ok("a member with no salary account has no slips to disagree with",

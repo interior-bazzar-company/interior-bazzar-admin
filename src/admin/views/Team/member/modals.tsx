@@ -12,14 +12,16 @@
    a second tab never saw it — so every refusal drawn here is also a rule in
    store.ts, and the store's is the one that decides.
    ============================================================================= */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Icon, Notice } from "../../../ui";
 import { useShell } from "../../../shell/ShellContext";
 import {
   AGREEMENT_KIND, LEAVE_KIND, DOCUMENT_KIND, TODAY, VOCAB, addDays, addDocument, createTag,
-  datesIn, decideLeave, fmtDate, labelOf, leaveClash, leaveOverlap, meId, renameTag, requestLeave,
-  sendAgreement, signAgreement,
+  datesIn, decideLeave, fmtDate, labelOf, leaveClash, leaveOverlap, markViewed, meId, renameTag,
+  requestLeave, signAgreement,
 } from "../store";
+import { bodyOf, sendTemplate, useTemplates } from "../../Agreements/store";
+import { Sheet } from "../../Agreements/bits";
 import type { Agreement, LeaveRequest, LeaveState, Tag } from "../store";
 
 /* ------------------------------------------------------------- chrome --- */
@@ -189,37 +191,38 @@ export function LeaveDecideModal({ l, state }: { l: LeaveRequest; state: LeaveSt
 
 export function SendAgreementModal({ memberId }: { memberId: string }) {
   const shell = useShell();
-  const [kind, setKind] = useState("nda");
-  const [title, setTitle] = useState(labelOf(AGREEMENT_KIND, "nda") + " 2026");
+  /* THROUGH A TEMPLATE, OR NOT AT ALL. This took a kind and a free-text title
+     and called the raw `sendAgreement` — no template, an empty body, and none
+     of the one-live-copy guard `sendTemplate` carries — so the member page
+     could send a second "NDA" beside the first with nothing in it to sign. It
+     is the Agreements module's own send now, pointed at one person. */
+  const templates = useTemplates().filter((t) => t.state === "active");
+  const [templateId, setTemplateId] = useState(templates.length ? templates[0].templateId : "");
+  const t = templates.filter((x) => x.templateId === templateId)[0] || null;
   const save = () => {
-    const r = sendAgreement(memberId, kind, title);
+    const r = sendTemplate(templateId, memberId);
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
     shell.closeLayer();
     shell.toast("Sent. The link expires in seven days.");
   };
-  const kinds = (VOCAB.agreementKinds as { key: string }[]).map((k) => k.key);
   return (
     <>
       <Head title="Send an agreement" />
       <div className="md-b">
-        <div className="fg">
-          <label htmlFor="agKind">Kind</label>
-          <select id="agKind" className="inp" value={kind}
-            onChange={(e) => { setKind(e.target.value); setTitle(labelOf(AGREEMENT_KIND, e.target.value) + " 2026"); }}>
-            {kinds.map((k) => <option key={k} value={k}>{labelOf(AGREEMENT_KIND, k)}</option>)}
-          </select>
-          <span className="help">One entity, several kinds. Two documents that are sent, viewed,
-            signed and revoked identically are not two tables.</span>
-        </div>
-        <div className="fg">
-          <label htmlFor="agTitle">Title <b className="req">*</b></label>
-          <input id="agTitle" className="inp" value={title} onChange={(e) => setTitle(e.target.value)} />
-          <span className="help">Frozen at send. Editing the template afterwards makes a new version;
-            it never rewrites what somebody already read.</span>
-        </div>
-        <p className="tm-foot">The link is single-use and expires on {fmtDate(addDays(TODAY, 7))}.</p>
+        {templates.length ? (
+          <div className="fg">
+            <label htmlFor="agTpl">Template</label>
+            <select id="agTpl" className="inp" value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
+              {templates.map((x) => <option key={x.templateId} value={x.templateId}>{x.title} · v{x.version}</option>)}
+            </select>
+            {t ? <span className="help">{t.purpose}</span> : null}
+          </div>
+        ) : (
+          <Notice tone="warn" text="No active template to send. Write one under Agreements first — a document with nothing in it cannot be signed." />
+        )}
+        <p className="tm-foot">The wording is frozen at send. The link is single-use and expires on {fmtDate(addDays(TODAY, 7))}.</p>
       </div>
-      <Foot label="Send" disabled={!title.trim()} onSave={save} />
+      <Foot label="Send" disabled={!templateId} onSave={save} />
     </>
   );
 }
@@ -235,6 +238,11 @@ export function SignAgreementModal({ a }: { a: Agreement }) {
 
   const expired = a.state !== "signed" && !!a.expiresAt && (a.expiresAt as string) < TODAY;
   const closed = a.state === "signed" || a.state === "revoked" || expired;
+  const body = bodyOf(a);
+
+  /* Opening the document is the reading. Recorded once, and only while it can
+     still be signed — a revoked or expired link records nothing. */
+  useEffect(() => { if (!closed) markViewed(a.agreementId); }, [a.agreementId, closed]);
 
   const save = () => {
     const r = signAgreement(a.agreementId, name);
@@ -278,11 +286,14 @@ export function SignAgreementModal({ a }: { a: Agreement }) {
     <>
       <Head title={a.title} sub={labelOf(AGREEMENT_KIND, a.kind) + " v" + a.version} />
       <div className="md-b">
-        <div className="tm-doc">
-          <b>Interior Bazzar</b>
-          <p>The document body as it was frozen at send. Nothing about it changes after this point,
-            which is what makes a signature against it mean anything.</p>
-        </div>
+        {/* THE DOCUMENT ITSELF. This box held two lines of boilerplate and never
+            the clauses, so a member "read and agreed" to text that was not the
+            NDA. It is the same frozen body the deed page shows, from one read. */}
+        {body.clauses.length ? (
+          <Sheet title={a.title} clauses={body.clauses} />
+        ) : (
+          <Notice tone="warn" ico="alert" text="This copy has no frozen wording — it was sent without a template. Revoke it and send a fresh copy from one." />
+        )}
 
         {/* THE DISCLOSURE SITS ABOVE THE BOX, not under the button. Recording an
             address against a legal signature is something the signer is
@@ -316,7 +327,7 @@ export function AddDocumentModal({ memberId, kind: seed }: { memberId: string; k
     const r = addDocument(memberId, kind, label);
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
     shell.closeLayer();
-    shell.toast("Added.");
+    shell.toast("On file. It goes back to the unchecked queue.");
   };
   const kinds = (VOCAB.documentKinds as { key: string }[]).map((k) => k.key);
   return (

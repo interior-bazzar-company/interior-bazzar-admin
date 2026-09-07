@@ -10,7 +10,7 @@ import type { Done } from "./dialog";
 import { Check, Money, OriginTag } from "./bits";
 import {
   ACCOUNTS, MODES, REFUND_GROUNDS, REFUND_POLICY,
-  createManualRefund, decideRefund, fmtDate, inr, readPayment, readPayments, recordRefundTransfer,
+  createManualRefund, decideRefund, fmtDate, inr, readPayment, readPayments, readRefunds, recordRefundTransfer,
   refundPolicyCheck, requestRefund,
 } from "./store";
 import type { Refund } from "./store";
@@ -21,7 +21,14 @@ import type { Refund } from "./store";
  *  picker IS the validation: whatever is chosen here is the whole of what
  *  gets refunded — there is no separate amount field to disagree with it. */
 export function RequestRefundModal({ onClose, onDone }: { onClose: () => void; onDone: Done }) {
-  const payments = readPayments().slice().sort((a, b) => b.pay.valueDate.localeCompare(a.pay.valueDate));
+  /* A PAYMENT THAT ALREADY CARRIES A REFUND IS NOT OFFERED HERE. The store
+     refuses the second request anyway — one payment, one refund — but a
+     picker that lists a payment already sent back invites somebody to choose
+     it and then reads its own refusal as a fault. Declined refunds release
+     the payment, so those rows stay on the list. */
+  const claimed = new Set(readRefunds().filter((r) => r.state !== "declined").map((r) => r.paymentId));
+  const payments = readPayments().filter((hit) => !claimed.has(hit.pay.paymentId))
+    .sort((a, b) => b.pay.valueDate.localeCompare(a.pay.valueDate));
   const [paymentId, setPaymentId] = useState<string | null>(null);
   const [ground, setGround] = useState<string>(REFUND_GROUNDS[0]?.key || "other");
   const [detail, setDetail] = useState("");
@@ -50,7 +57,7 @@ export function RequestRefundModal({ onClose, onDone }: { onClose: () => void; o
               <span className="s mono">{hit.pay.reference} · {fmtDate(hit.pay.valueDate)}</span>
               <span className="a"><Money paise={hit.pay.amountPaise} /></span>
             </button>
-          )) : <p className="fin-fine">No installment payment is recorded yet — there is nothing to refund against.</p>}
+          )) : <p className="fin-fine">Nothing here to refund against — every installment payment in the ledger already carries a refund, or none is recorded yet.</p>}
         </div>
       </Fs>
 

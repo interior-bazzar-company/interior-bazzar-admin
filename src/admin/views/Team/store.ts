@@ -616,7 +616,16 @@ export function stateOf(d: AttendanceDay | null, m: Member | null, at = now(), d
     /* Absent is only answerable once the day is over. At 10am a member who is
        not in yet is Not started — calling them absent is a verdict the clock
        has not earned. */
-    const over = at > atClock(TODAY, m.autoCloseAt || "20:00");
+    /* THE CUTOFF IS THE DAY BEING ASKED ABOUT, not today's. This compared `at`
+       against TODAY's 20:00 whatever `date` was, so a day last week read as
+       "not started" until this evening — and `dayRows` faked its way round it
+       with a `+ DAY` on `at`, a workaround the other two call sites never
+       applied. That is why History drew an approved leave day as absent and
+       Reports called a past absence "Not started". A day that has not happened
+       yet owes nothing, so it is never absent either. */
+    const ref = date || TODAY;
+    if (ref > TODAY) return "not_started";
+    const over = at > atClock(ref, m.autoCloseAt || "20:00");
     return over ? "absent" : "not_started";
   }
   if (isUnclosed(d, m, at)) return "unclosed";
@@ -667,7 +676,7 @@ export function dayRows(date: string, scope: Scope, at = now()): DayRow[] {
       return {
         member: m,
         day,
-        state: date === TODAY ? stateOf(day, m, at, date) : stateOf(day, m, at + DAY, date),
+        state: stateOf(day, m, at, date),
         worked: workedOf(day, m, at),
         breakMins: breakOf(day, at),
       };
@@ -1097,11 +1106,6 @@ export const payFor = (memberId: string): Pay | null =>
 export const incentiveTotal = (p: Pay | null, state?: string): number =>
   (p ? p.incentives : []).filter((i) => !state || i.state === state)
     .reduce((a, i) => a + i.amount, 0);
-
-/** The most recent slip. The seed is newest-first; sorting here rather than
- *  trusting that is one line and removes a way for a reordered seed to lie. */
-export const lastPayslip = (p: Pay | null): Payslip | null =>
-  (p ? p.payslips : []).slice().sort((a, b) => b.month.localeCompare(a.month))[0] || null;
 
 /** THE ONLY WAY A TYPED ADDRESS BECOMES A STORED ONE.
  *
@@ -1738,6 +1742,23 @@ export function sendAgreement(
 
 /** The signature is the member's, so the name they type is stored beside the
  *  time and the address it came from. A signed agreement is never editable. */
+/** OPENING IS A MOMENT ON THE RECORD. `viewedAt` was read in four places and
+ *  written in none, so every unsigned agreement stayed "not opened" forever and
+ *  the member page's nudge about it was always true. The stand-in sign dialog
+ *  is the only place a member reads the document today, so it is what records
+ *  the reading; the real link page will call the same thing. */
+export function markViewed(agreementId: string): Result<Agreement> {
+  const list = snap.agreements.slice();
+  const a = list.filter((x) => x.agreementId === agreementId)[0];
+  if (!a) return err("not_found", "No such agreement.");
+  if (a.state !== "sent") return ok(a);
+  a.state = "viewed";
+  a.viewedAt = new Date(now()).toISOString();
+  snap.agreements = list;
+  emit();
+  return ok(a);
+}
+
 export function signAgreement(agreementId: string, name: string): Result<Agreement> {
   const list = snap.agreements.slice();
   const a = list.filter((x) => x.agreementId === agreementId)[0];
@@ -1769,9 +1790,28 @@ export function revokeAgreement(agreementId: string): Result<Agreement> {
 
 export function addDocument(memberId: string, kind: string, label: string): Result<MemberDocument> {
   if (!label.trim()) return err("validation_failed", "A label is required.");
+  const fileName = label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-") + ".pdf";
+  /* A REQUIRED DOCUMENT IS ONE ROW PER KIND, so "Replace" has to replace. This
+     appended unconditionally while the page reads the FIRST row of a kind — so
+     a replaced PAN card went on file invisibly and the old one kept showing as
+     handed over and checked. Overwriting in place keeps the id every reference
+     holds, and drops the verification: nobody has checked the new file. */
+  const existing = REQUIRED_DOCS.indexOf(kind) >= 0
+    ? snap.documents.filter((x) => x.memberId === memberId && x.kind === kind)[0] : null;
+  if (existing) {
+    const list = snap.documents.slice();
+    const next: MemberDocument = {
+      ...existing, label: label.trim(), fileName, sizeKb: 240,
+      uploadedAt: new Date(now()).toISOString(), uploadedById: memberId,
+      verifiedById: null, verifiedAt: null,
+    };
+    list[list.indexOf(existing)] = next;
+    snap.documents = list;
+    emit();
+    return ok(next);
+  }
   const r: MemberDocument = {
-    documentId: nextId("DOC"), memberId, kind, label: label.trim(),
-    fileName: label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-") + ".pdf",
+    documentId: nextId("DOC"), memberId, kind, label: label.trim(), fileName,
     sizeKb: 240, uploadedAt: new Date(now()).toISOString(), uploadedById: memberId,
     verifiedById: null, verifiedAt: null,
   };
@@ -1896,6 +1936,56 @@ function withItem(itemId: string, fn: (i: WorkItem) => string | null): Result<Wo
   snap.items = list;
   emit();
   return ok(i);
+}
+
+/** EDITING WHAT WAS CREATED. Nothing could change after creation — a typo in
+ *  the title, a wrong due date, the wrong person — was permanent. The rules are
+ *  createItem's. The kind is not among them: a kind decides what may sit under
+ *  an item, so changing it would orphan children without saying so. Handing an
+ *  item to somebody else drops the tags the last person owned, the rule the
+ *  create dialog already applies. */
+export interface ItemPatch {
+  title?: string; assigneeId?: string; priority?: Priority;
+  startDate?: string | null; dueDate?: string | null; parentId?: string | null;
+}
+export function updateItem(itemId: string, patch: ItemPatch): Result<WorkItem> {
+  return withItem(itemId, (i) => {
+    if (patch.title !== undefined) {
+      if (!patch.title.trim()) return "A title is required.";
+      i.title = patch.title.trim();
+    }
+    if (patch.assigneeId !== undefined && patch.assigneeId !== i.assigneeId) {
+      const m = readMember(patch.assigneeId);
+      if (!m) return "No such member.";
+      if (m.status !== "active") return "That member is not active.";
+      i.assigneeId = patch.assigneeId;
+      const theirs = tagsOwnedBy(patch.assigneeId).map((t) => t.tagId);
+      const kept = (i.tagIds || []).filter((t) => theirs.indexOf(t) >= 0);
+      i.tagIds = kept.length ? kept : undefined;
+    }
+    if (patch.priority !== undefined) i.priority = patch.priority;
+    const start = patch.startDate !== undefined ? patch.startDate : i.startDate;
+    const due = patch.dueDate !== undefined ? patch.dueDate : i.dueDate;
+    if (start && due && start > due) return "It cannot be due before it starts.";
+    if (patch.startDate !== undefined) i.startDate = patch.startDate;
+    if (patch.dueDate !== undefined) i.dueDate = patch.dueDate;
+    if (patch.parentId !== undefined && patch.parentId !== i.parentId) {
+      if (patch.parentId) {
+        if (patch.parentId === i.itemId) return "An item cannot roll up to itself.";
+        const p = readItem(patch.parentId);
+        if (!p) return "No such parent.";
+        if (p.kind === "task") return "A task cannot hold children.";
+        if (i.kind === "target") return "A target is always top level.";
+        if (i.kind === "milestone" && p.kind !== "target") return "A milestone rolls up to a target.";
+        /* No loops: the new parent may not already roll up to this item. */
+        const under = (id: string): boolean =>
+          childrenOf(id).some((k) => k.itemId === patch.parentId || under(k.itemId));
+        if (under(i.itemId)) return "That would make the item roll up to itself.";
+      }
+      i.parentId = patch.parentId;
+    }
+    return null;
+  });
 }
 
 export function addCheckLine(itemId: string, text: string): Result<WorkItem> {

@@ -6,30 +6,55 @@
    button leads INTO Finance rather than writing from here. Two modules writing
    salary is two ledgers, and only one of them reconciles.
 
+   AND IT NOW READS THE ONE THAT RECONCILES. The salary and the payslips came
+   off Team's own pay fixture — a second copy of Finance's figures, written by
+   hand, that could disagree with Salaries A/C and had no way of ever learning
+   that it did. The header above claimed Module 6 while the numbers underneath
+   it said otherwise. They come from Finance's store now: the salary account
+   found by `memberId`, the slips off the runs that issued them, in integer
+   paise through Finance's own `inr` — so a figure reads here exactly as it
+   reads on the payslip itself.
+
    `Incentive` is deliberately Finance's entity even though a work item is what
    earned it: Team knows WHY somebody is owed something, Finance decides whether
    it is paid. That split is why the state runs pending → approved → paid and
-   why nothing on this page can advance it.
+   why nothing on this page can advance it. The incentive LEDGER below is still
+   read from Team, because the basis — which target, and how far along it is —
+   is Team's to answer and Finance holds none of it.
 
    This page is hidden from a senior. A reporting line is not a grant to read
    somebody's salary — see ops.ts.
    ============================================================================= */
 import { EmptyState, Icon, KvList, Notice, Pill, Table, Tiles } from "../../../ui";
 import { go } from "../../../ui/nav";
-import { fmtDate, fmtMonth, incentiveTotal, lastPayslip, payFor, readItem } from "../store";
+import { fmtDate, fmtMonth, incentiveTotal, payFor, readItem } from "../store";
 import type { Member } from "../store";
+import { fixedOf, incentiveOf, inr, readSalaryAccounts, slipsOf, useVersion } from "../../Finance/store";
 import { OpHead, rupees } from "./frame";
 
 export default function PayPage({ m }: { m: Member }) {
-  const p = payFor(m.memberId);
+  /* Subscribed to FINANCE's version and not Team's: a salary paid in the other
+     module has to reach this page without anybody reloading it. */
+  useVersion();
+  /* Finance keys a salary account by the member it belongs to, as a number.
+     No match is the honest answer for somebody Finance has never opened an
+     account for, and it is what this draws rather than an invented zero. */
+  const account = readSalaryAccounts().filter((a) => String(a.memberId) === m.memberId)[0] || null;
 
-  if (!p || !p.annualCtc) {
+  /* THE INCENTIVES STAY TEAM'S. The work item one was earned against is a Team
+     record and the pay record is where the basis is written down. Null is
+     ordinary here: somebody Finance pays may have earned nothing. */
+  const pay = payFor(m.memberId);
+  const pending = incentiveTotal(pay, "pending");
+  const approved = incentiveTotal(pay, "approved");
+
+  if (!account) {
     return (
       <>
         <OpHead title="Pay" desc="Read from Finance. Nothing on this page is written by Team." />
         <EmptyState
           icon="cash"
-          title="No salary account"
+          title="No salary account in Finance yet"
           body={"Finance holds no salary record for " + m.name + ". Team cannot create one — the "
             + "account, the amount and the date it takes effect are all Finance's to write."}
           action={<button className="btn" onClick={() => go("#/finance-salaries")}>Open Finance</button>} />
@@ -37,10 +62,11 @@ export default function PayPage({ m }: { m: Member }) {
     );
   }
 
-  const monthly = Math.round(p.annualCtc / 12);
-  const slip = lastPayslip(p);
-  const pending = incentiveTotal(p, "pending");
-  const approved = incentiveTotal(p, "approved");
+  const monthlyPaise = account.monthlyGrossPaise;
+  const slips = slipsOf(account.salaryAccountId);
+  /* The last slip that was actually PAID, which is not the last slip issued: a
+     run still open carries slips nobody has been paid from yet. */
+  const slip = slips.filter((s) => !!s.paidAt)[0] || null;
 
   return (
     <>
@@ -52,18 +78,16 @@ export default function PayPage({ m }: { m: Member }) {
         </button>} />
 
       <Tiles list={[
-        { k: "Monthly", v: rupees(monthly), s: rupees(p.annualCtc) + " a year" },
-        { k: "Last paid", v: slip ? rupees(slip.net) : "—", s: slip ? fmtMonth(slip.month + "-01") : "no payslip yet" },
+        { k: "Monthly", v: inr(monthlyPaise), s: inr(monthlyPaise * 12) + " a year" },
+        { k: "Last paid", v: slip ? inr(slip.netPaise) : "—", s: slip ? fmtMonth(slip.month + "-01") : "no payslip paid yet" },
         { k: "Approved, unpaid", v: rupees(approved), s: approved ? "on the next run" : "nothing waiting" },
         { k: "Awaiting Finance", v: rupees(pending), s: "Team's basis, Finance's call", tone: pending ? "warn" : "" },
       ]} />
 
       <KvList cls="wide" pairs={[
-        ["Salary", <b key="s">{rupees(monthly)}</b>],
-        ["Effective from", fmtDate(p.effectiveFrom)],
-        ["Paid from", p.account
-          ? <>{p.account.bank} <span className="mono cell-2">{p.account.ref}</span></>
-          : <span className="faint">no account named</span>],
+        ["Salary", <b key="s">{inr(monthlyPaise)}</b>],
+        ["Joined", fmtDate(account.joinedAt)],
+        ["Paid from", <>{account.bank.name} <span className="mono cell-2">{account.bank.masked}</span></>],
         ["Department", m.department
           ? <>{m.department} <span className="cell-2">read from the member record, not retyped here</span></>
           : <span className="faint">—</span>],
@@ -78,15 +102,15 @@ export default function PayPage({ m }: { m: Member }) {
           icon: "cash", title: "No payslip yet",
           body: "Nothing has run for this member. The first slip appears after the first pay run that includes them.",
         }}
-        rows={p.payslips.slice().sort((a, b) => b.month.localeCompare(a.month)).map((s) => (
-          <tr key={s.month}>
+        rows={slips.map((s) => (
+          <tr key={s.slipId}>
             <td>{fmtMonth(s.month + "-01", true)}</td>
-            <td className="tnum">{rupees(s.base)}</td>
-            <td className="tnum">{s.incentive
-              ? <span className="u-ok">+ {rupees(s.incentive)}</span>
+            <td className="tnum">{inr(fixedOf(s))}</td>
+            <td className="tnum">{incentiveOf(s)
+              ? <span className="u-ok">+ {inr(incentiveOf(s))}</span>
               : <span className="dim">—</span>}</td>
-            <td className="tnum"><b>{rupees(s.net)}</b></td>
-            <td>{fmtDate(s.paidAt)}</td>
+            <td className="tnum"><b>{inr(s.netPaise)}</b></td>
+            <td>{s.paidAt ? fmtDate(s.paidAt) : <span className="faint">not paid yet</span>}</td>
             <td className="n">
               <button className="btn sm" onClick={() => go("#/finance-salaries")}>
                 <Icon name="download" size="sm" />Finance
@@ -104,7 +128,7 @@ export default function PayPage({ m }: { m: Member }) {
           icon: "star", title: "No incentives",
           body: "Nothing has been proposed against this member's work.",
         }}
-        rows={p.incentives.slice().sort((a, b) => b.month.localeCompare(a.month)).map((i) => {
+        rows={(pay ? pay.incentives : []).slice().sort((a, b) => b.month.localeCompare(a.month)).map((i) => {
           /* An incentive names the work item it was earned against, so the item
              is looked up and its own LIVE progress rides along. Restating the
              number in the pay record would give the panel two answers to "how

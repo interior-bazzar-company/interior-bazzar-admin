@@ -62,7 +62,9 @@ export default function Attendance() {
   }, [sp]);
 
   const face = FACES.some((f) => f.k === p.face) ? (p.face as string) : "today";
-  const date = p.date || TODAY;
+  /* Clamped, as Reports already does: the picker's `max` stops the mouse, not
+     a hand-edited URL, and a future day must never be asked who was absent. */
+  const date = p.date && p.date <= TODAY ? p.date : TODAY;
   const scope = scopeOf("attendance");
   const rows = useDayRows(date, scope);
   const members = useMembers();
@@ -279,16 +281,20 @@ function History({ members, me, scope, date }: {
             let total = 0;
             const tds = week.map((d) => {
               const day = dayFor(m.memberId, d);
-              const st = stateOf(day, m, clockNow());
+              /* `d` is passed: without it stateOf cannot see approved leave, and
+                 this grid drew a leave day exactly like an absence — the one
+                 thing the notice under it promises never happens. */
+              const st = stateOf(day, m, clockNow(), d);
               const w = workedOf(day, m, clockNow());
               if (w != null) total += w;
-              const cls = st === "unclosed" ? "warn" : day && day.isLate ? "warn" : !day ? "dim" : "";
+              const leave = st === "on_leave";
+              const cls = leave ? "tm-hist-leave" : st === "unclosed" ? "warn" : day && day.isLate ? "warn" : !day ? "dim" : "";
               return (
                 <td key={d} className={"n tnum " + cls}
                   title={day
                     ? fmtTime(day.startedAt) + " → " + (day.endedAt ? fmtTime(day.endedAt) : "still open")
-                    : "No record — absent"}>
-                  {w != null ? fmtHM(w) : st === "unclosed" ? "open" : "—"}
+                    : leave ? "On approved leave" : st === "not_started" ? "Not started" : "No record — absent"}>
+                  {w != null ? fmtHM(w) : st === "unclosed" ? "open" : leave ? "leave" : "—"}
                 </td>
               );
             });

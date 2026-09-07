@@ -6,11 +6,13 @@
    Same records, read down the other axis, which is why it is a page on the
    member and not a second copy of the module.
 
-   IT READS, IT DOES NOT WRITE. Opening or closing a resource, editing its
-   fields and submitting an answer all happen in the Resources module. A second
-   place to submit would be a second place the same answer could be entered,
-   and the module already refuses a second submission — so the two would race
-   rather than disagree, which is worse.
+   IT READS, AND IT LETS THE MEMBER ANSWER. Opening or closing a resource and
+   editing its fields happen in the Resources module. Submitting did not happen
+   anywhere: `submitResponse` was built and tested and no screen called it, so
+   a member's link was dead. Until the member dashboard ships, this page is the
+   member's end of the link — the same stand-in the sign dialog is for
+   agreements, gated the same way (`viewer === "self"`). One submission per
+   person per resource is still the store's rule, not this page's.
 
    PENDING IS DERIVED HERE TOO, by the same `rowsFor` the module's table uses,
    filtered to this one person. It is not a query of its own: a member page that
@@ -27,11 +29,15 @@ import {
   useResources, useResponses,
 } from "../../Resources/store";
 import type { Resource, ResourceResponse } from "../../Resources/store";
+import { FillModal } from "../../Resources/Fill";
 import type { Member } from "../store";
+import type { Viewer } from "./ops";
 import { OpHead } from "./frame";
 import "../../Resources/resources.css";
 
-export default function ResourcesPage({ m }: { m: Member }) {
+/* `viewer` is optional only for the smoke, which renders this page bare; the
+   member launcher always passes it. */
+export default function ResourcesPage({ m, viewer = "admin" }: { m: Member; viewer?: Viewer }) {
   const shell = useShell();
   useResources();
   useResponses();
@@ -102,6 +108,11 @@ export default function ResourcesPage({ m }: { m: Member }) {
                 : <Pill text={r.state === "open" ? "Pending" : "Not open"}
                     tone={r.state === "open" ? "warn" : ""} dot />}
               <span className="spacer" />
+              {!x && r.state === "open" && viewer === "self" ? (
+                <button className="btn sm pri" onClick={() => shell.modal(<FillModal r={r} memberId={m.memberId} />)}>
+                  Fill it in
+                </button>
+              ) : null}
               <button className="btn sm" onClick={() => go("#/resources?form=" + r.resourceId)}>
                 <Icon name="ext" size="sm" />The resource
               </button>

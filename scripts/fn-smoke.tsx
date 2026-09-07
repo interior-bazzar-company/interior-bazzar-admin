@@ -526,7 +526,7 @@ hasnt(payDept, "Not yet paid",
 const payPerson = page("salaries · analytics grouped by member",
   "/finance-salaries?tab=analytics&by=member");
 has(payPerson, "Base salary", "...members carry the same split as departments");
-has(payPerson, "Anjali D.", "...named short enough to fit the axis");
+has(payPerson, "A. Sharma", "...named short enough to fit the axis");
 
 const payBadBy = page("salaries · analytics with a nonsense grouping",
   "/finance-salaries?tab=analytics&by=zzzz");
@@ -724,7 +724,7 @@ const newAcc = check("open a salary account", () => modal(
 has(newAcc, "Net every month", "...the net a person actually gets is on screen as it is typed");
 const reviseAcc = check("revise a salary account", () => modal(
   <SalaryAccountModal account={account("SAL-AC-0011")} onClose={noop} onDone={noop} />));
-has(reviseAcc, "Rohit Malhotra", "...revising opens on the account it is revising");
+has(reviseAcc, "V. Shakya", "...revising opens on the account it is revising");
 const closeAcc = check("close a salary account", () => modal(
   <CloseAccountModal account={account("SAL-AC-0011")} onClose={noop} onDone={noop} />));
 has(closeAcc, "The slips already issued stay on the record", "...closing keeps the slips");

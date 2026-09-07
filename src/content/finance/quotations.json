@@ -69,7 +69,7 @@
       "taxablePaise": 27500000,
       "taxPaise": 4950000,
       "grandTotalPaise": 32450000,
-      "issuedBy": "S. Bhat"
+      "issuedBy": "V. Shakya"
     },
     {
       "quotationNumber": "IB-QT-2026-00151",
@@ -157,7 +157,7 @@
       "taxablePaise": 4500000,
       "taxPaise": 810000,
       "grandTotalPaise": 5310000,
-      "issuedBy": "S. Bhat"
+      "issuedBy": "V. Shakya"
     },
     {
       "quotationNumber": "IB-QT-2026-00160",
@@ -192,7 +192,7 @@
       "taxablePaise": 18000000,
       "taxPaise": 3240000,
       "grandTotalPaise": 21240000,
-      "issuedBy": "S. Bhat",
+      "issuedBy": "V. Shakya",
       "$comment": "ALREADY RECORDED as SUB-0111 — the demo of a running installment plan. Three of ₹70,800: the first is paid and receipted, the second is invoiced and waiting, the third has no invoice because the chain has not raised it yet. That is the ordinary mid-life state of an installment subscription and it is the one most screens have to get right."
     },
     {

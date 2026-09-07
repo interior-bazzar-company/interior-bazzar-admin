@@ -164,8 +164,8 @@
         }
       ],
       "account": {
-        "bank": "ICICI payroll",
-        "ref": "ACC-ICICI-8830"
+        "bank": "HDFC current",
+        "ref": "ACC-HDFC-4021"
       },
       "payslips": [
         {
@@ -201,8 +201,8 @@
       "effectiveFrom": "2026-04-01",
       "incentives": [],
       "account": {
-        "bank": "ICICI payroll",
-        "ref": "ACC-ICICI-8830"
+        "bank": "HDFC current",
+        "ref": "ACC-HDFC-4021"
       },
       "payslips": [
         {

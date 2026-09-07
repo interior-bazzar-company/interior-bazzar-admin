@@ -14,14 +14,14 @@
       "state": "requested",
       "policy": null,
       "$comment": "policy is null here, not an empty pass. There is no original payment on this transfer to check against, and an empty RefundPolicy would read as one that passed four checks it never ran. Manual refunds are never scored.",
-      "requestedBy": "K. Iyer",
+      "requestedBy": "S. Raghavan",
       "requestedAt": "2026-08-25T08:30:00+05:30",
       "decidedBy": null,
       "decidedAt": null,
       "decisionNote": null,
       "settlement": null,
       "events": [
-        { "eventId": "RE-0119-1", "type": "REFUND_REQUESTED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-25T08:30:00+05:30", "note": "Manual · unmatched NEFT of ₹22,000, 23 Aug — no deal, invoice or subscription corresponds to it. Returning to sender." }
+        { "eventId": "RE-0119-1", "type": "REFUND_REQUESTED", "actor": "S. Raghavan", "actorRole": "Finance", "at": "2026-08-25T08:30:00+05:30", "note": "Manual · unmatched NEFT of ₹22,000, 23 Aug — no deal, invoice or subscription corresponds to it. Returning to sender." }
       ]
     },
     {
@@ -41,14 +41,14 @@
         "subscriptionActive": true,
         "$comment": "Computed at request time and frozen so the approver sees what the requester saw. The check frames the approval: it does not block it. `originalRecorded` asks only whether the money is in the ledger — there is no verification step it could be waiting on."
       },
-      "requestedBy": "K. Iyer",
+      "requestedBy": "S. Raghavan",
       "requestedAt": "2026-08-24T11:02:00+05:30",
       "decidedBy": null,
       "decidedAt": null,
       "decisionNote": null,
       "settlement": null,
       "events": [
-        { "eventId": "RE-0117-1", "type": "REFUND_REQUESTED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-24T11:02:00+05:30", "note": "Duplicate charge · PAY-4400 confirmed present — same amount, same token, 16 Aug." }
+        { "eventId": "RE-0117-1", "type": "REFUND_REQUESTED", "actor": "S. Raghavan", "actorRole": "Finance", "at": "2026-08-24T11:02:00+05:30", "note": "Duplicate charge · PAY-4400 confirmed present — same amount, same token, 16 Aug." }
       ]
     },
     {
@@ -62,14 +62,14 @@
       "detail": "Rohan Mehta's (DL-2402) third installment was due at ₹42,000; the NEFT that arrived on 21 Aug read ₹50,400 — ₹8,400 over. The installment itself is already recorded and settled in full against the correct amount; this is only the excess, and the excess was never applied to any installment or invoice, so it has no ledger row of its own to reverse. Refunding the difference back to him directly.",
       "state": "requested",
       "policy": null,
-      "requestedBy": "K. Iyer",
+      "requestedBy": "S. Raghavan",
       "requestedAt": "2026-08-23T14:20:00+05:30",
       "decidedBy": null,
       "decidedAt": null,
       "decisionNote": null,
       "settlement": null,
       "events": [
-                { "eventId": "RE-0123-1", "type": "REFUND_REQUESTED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-23T14:20:00+05:30", "note": "Overpayment on DL-2402 installment 3 — ₹8,400 above the amount due, 21 Aug NEFT." }
+                { "eventId": "RE-0123-1", "type": "REFUND_REQUESTED", "actor": "S. Raghavan", "actorRole": "Finance", "at": "2026-08-23T14:20:00+05:30", "note": "Overpayment on DL-2402 installment 3 — ₹8,400 above the amount due, 21 Aug NEFT." }
       ]
     },
     {
@@ -83,15 +83,15 @@
       "detail": "Kavya Menon paid ₹15,000 by UPI directly for a site-visit-only engagement in early August, before any deal or invoice was opened on her. She cancelled after the visit and asked for the money back. There was never a subscription or an invoice on our side to record this against — the whole engagement happened off-platform — so this is a manual entry from the start, not a reversal of anything in the ledger.",
       "state": "approved",
       "policy": null,
-      "requestedBy": "K. Iyer",
+      "requestedBy": "S. Raghavan",
       "requestedAt": "2026-08-22T10:05:00+05:30",
-      "decidedBy": "S. Bhat",
+      "decidedBy": "V. Shakya",
       "decidedAt": "2026-08-23T11:30:00+05:30",
-      "decisionNote": "Nothing to cancel on our side since this never touched the platform — approved on the UPI screenshot and her confirmation alone. Transfer not yet made; K. Iyer to send from ACC-HDFC-4021 once her bank details are confirmed and record the reference here.",
+      "decisionNote": "Nothing to cancel on our side since this never touched the platform — approved on the UPI screenshot and her confirmation alone. Transfer not yet made; S. Raghavan to send from ACC-HDFC-4021 once her bank details are confirmed and record the reference here.",
       "settlement": null,
       "events": [
-        { "eventId": "RE-0125-2", "type": "REFUND_APPROVED", "actor": "S. Bhat", "actorRole": "Super Admin", "at": "2026-08-23T11:30:00+05:30", "note": "Approved on the UPI screenshot alone — no deal or invoice exists to close. Transfer still pending." },
-        { "eventId": "RE-0125-1", "type": "REFUND_REQUESTED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-22T10:05:00+05:30", "note": "Off-platform site visit, paid direct by UPI, cancelled after the visit. No ledger row exists for it." }
+        { "eventId": "RE-0125-2", "type": "REFUND_APPROVED", "actor": "V. Shakya", "actorRole": "Super Admin", "at": "2026-08-23T11:30:00+05:30", "note": "Approved on the UPI screenshot alone — no deal or invoice exists to close. Transfer still pending." },
+        { "eventId": "RE-0125-1", "type": "REFUND_REQUESTED", "actor": "S. Raghavan", "actorRole": "Finance", "at": "2026-08-22T10:05:00+05:30", "note": "Off-platform site visit, paid direct by UPI, cancelled after the visit. No ledger row exists for it." }
       ]
     },
     {
@@ -105,15 +105,15 @@
       "detail": "Rakesh Bhandari paid ₹8,000 by bank transfer for a one-off design consultation booked outside any subscription plan, and says the session never happened. The consultation was never a subscription payment, so there is nothing in the ledger to point at either way — the claim has to be checked against the designer's own records instead.",
       "state": "declined",
       "policy": null,
-      "requestedBy": "K. Iyer",
+      "requestedBy": "S. Raghavan",
       "requestedAt": "2026-08-20T10:15:00+05:30",
-      "decidedBy": "S. Bhat",
+      "decidedBy": "V. Shakya",
       "decidedAt": "2026-08-21T09:40:00+05:30",
       "decisionNote": "The designer's calendar and sign-off note both show the consultation delivered on 14 Aug — the date he says nothing happened. Declined; no service failure is evidenced.",
       "settlement": null,
       "events": [
-        { "eventId": "RE-0121-2", "type": "REFUND_DECLINED", "actor": "S. Bhat", "actorRole": "Super Admin", "at": "2026-08-21T09:40:00+05:30", "note": "Declined — designer's calendar and sign-off note both show the session delivered on 14 Aug." },
-        { "eventId": "RE-0121-1", "type": "REFUND_REQUESTED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-20T10:15:00+05:30", "note": "Claims the 14 Aug consultation never happened. One-off, paid off-plan by bank transfer." }
+        { "eventId": "RE-0121-2", "type": "REFUND_DECLINED", "actor": "V. Shakya", "actorRole": "Super Admin", "at": "2026-08-21T09:40:00+05:30", "note": "Declined — designer's calendar and sign-off note both show the session delivered on 14 Aug." },
+        { "eventId": "RE-0121-1", "type": "REFUND_REQUESTED", "actor": "S. Raghavan", "actorRole": "Finance", "at": "2026-08-20T10:15:00+05:30", "note": "Claims the 14 Aug consultation never happened. One-off, paid off-plan by bank transfer." }
       ]
     },
     {
@@ -127,16 +127,16 @@
       "detail": "Paid for Starter on 30 Jul, asked to cancel on 31 Jul before the membership was activated.",
       "state": "paid",
       "policy": { "groundPermitted": true, "withinWindow": true, "originalRecorded": true, "subscriptionActive": false },
-      "requestedBy": "K. Iyer",
+      "requestedBy": "S. Raghavan",
       "requestedAt": "2026-07-31T15:10:00+05:30",
-      "decidedBy": "S. Bhat",
+      "decidedBy": "V. Shakya",
       "decidedAt": "2026-08-01T10:00:00+05:30",
       "decisionNote": "Pre-activation, within a day. Approved; transfer made 1 Aug from ACC-HDFC-4021, NEFT reference NEFT0001AUG662.",
-      "settlement": { "paidAt": "2026-08-01T11:45:00+05:30", "mode": "NEFT", "reference": "NEFT0001AUG662", "accountId": "ACC-HDFC-4021", "by": "K. Iyer" },
+      "settlement": { "paidAt": "2026-08-01T11:45:00+05:30", "mode": "NEFT", "reference": "NEFT0001AUG662", "accountId": "ACC-HDFC-4021", "by": "S. Raghavan" },
       "events": [
-        { "eventId": "RE-0112-3", "type": "REFUND_PAID", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-08-01T11:45:00+05:30", "note": "Transfer recorded — ₹9,900 via NEFT0001AUG662 from ACC-HDFC-4021 to Priya Nair. RF-0112 closed as paid." },
-        { "eventId": "RE-0112-2", "type": "REFUND_APPROVED", "actor": "S. Bhat", "actorRole": "Super Admin", "at": "2026-08-01T10:00:00+05:30", "note": "Approved. REFUND counter-entry appended to PAY-4381; IB-INV-2026-00071 cancelled, reason 'refunded'." },
-        { "eventId": "RE-0112-1", "type": "REFUND_REQUESTED", "actor": "K. Iyer", "actorRole": "Finance", "at": "2026-07-31T15:10:00+05:30", "note": "Pre-activation cancellation." }
+        { "eventId": "RE-0112-3", "type": "REFUND_PAID", "actor": "S. Raghavan", "actorRole": "Finance", "at": "2026-08-01T11:45:00+05:30", "note": "Transfer recorded — ₹9,900 via NEFT0001AUG662 from ACC-HDFC-4021 to Priya Nair. RF-0112 closed as paid." },
+        { "eventId": "RE-0112-2", "type": "REFUND_APPROVED", "actor": "V. Shakya", "actorRole": "Super Admin", "at": "2026-08-01T10:00:00+05:30", "note": "Approved. REFUND counter-entry appended to PAY-4381; IB-INV-2026-00071 cancelled, reason 'refunded'." },
+        { "eventId": "RE-0112-1", "type": "REFUND_REQUESTED", "actor": "S. Raghavan", "actorRole": "Finance", "at": "2026-07-31T15:10:00+05:30", "note": "Pre-activation cancellation." }
       ]
     }
   ]

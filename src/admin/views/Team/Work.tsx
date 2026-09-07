@@ -45,7 +45,7 @@ import {
   createItem, createTag, eventsOn, fmtDate, fmtMonth, gridDays, isDelayed, isTerminal, labelOf,
   lanesOf, leaveOn, linkLabelOf, linksOf, monthStep,
   meId, membersInScope, parentOf, progressOf, readMember, removeLink, setBlockedBy,
-  removeCheckLine, removeResourceLink, setItemStatus, stageOf, toggleCheckLine,
+  removeCheckLine, removeResourceLink, setItemStatus, stageOf, toggleCheckLine, updateItem,
   normaliseUrl, tagItem, tagsOf, tagsOwnedBy, toneOf, useItem, useLinks, useMembers, useTags,
   useWork, workTotals,
 } from "./store";
@@ -125,7 +125,7 @@ export default function Work() {
      `useCallback(…, [])` — while the context value itself is rebuilt whenever
      the layer changes. The drawer effect below depends on these two and never
      on `shell`. */
-  const { drawer: openDrawer, closeLayer } = shell;
+  const { drawer: openDrawer, closeLayer, layerKind } = shell;
   const open = useItem(p.item || null);
   const me = meId();
 
@@ -182,21 +182,32 @@ export default function Work() {
 
   /* Ours, so a modal somebody else opened is never closed from here. */
   const ownsDrawer = useRef(false);
+  const shownId = useRef<string | null>(null);
   const openId = open ? open.itemId : null;
+  /* THE SHELL HOLDS ONE LAYER. A modal the drawer opens — a reason, a link, an
+     edit — REPLACES the drawer, and when that modal closes the slot is empty
+     while the URL still names the record. So this watches the slot as well as
+     the id: an empty slot with an item in the URL gets its drawer back, and a
+     drawer already showing this item is left alone. */
   useEffect(() => {
     if (openId) {
-      ownsDrawer.current = true;
-      const close = () => gotoRef.current({ item: undefined });
-      openDrawer(
-        <ItemDrawer itemId={openId} onClose={close}
-          onOpen={(id) => gotoRef.current({ item: id })} />,
-        /* The scrim and Escape drop the param too, not just the layer. */
-        close,
-      );
+      const stale = layerKind === "drawer" && shownId.current !== openId;
+      if (layerKind === null || stale) {
+        shownId.current = openId;
+        ownsDrawer.current = true;
+        const close = () => gotoRef.current({ item: undefined });
+        openDrawer(
+          <ItemDrawer itemId={openId} onClose={close}
+            onOpen={(id) => gotoRef.current({ item: id })} />,
+          /* The scrim and Escape drop the param too, not just the layer. */
+          close,
+        );
+      }
       return;
     }
+    shownId.current = null;
     if (ownsDrawer.current) { ownsDrawer.current = false; closeLayer(); }
-  }, [openId, openDrawer, closeLayer]);
+  }, [openId, layerKind, openDrawer, closeLayer]);
 
   return (
     <div className="dls">
@@ -454,7 +465,15 @@ function NewTagField({ ownerId, onMade }: { ownerId: string; onMade: (id: string
  *  "what state is this in", and a strip that could hold both at once would
  *  show two cells lit for one list. */
 function WorkStats({ p }: { p: Record<string, string> }) {
-  const t = workTotals(useWork({}, "all"));
+  /* THE SAME SET AS THE PAGE BELOW, minus the one dimension this strip filters
+     on. It read the whole company while the list under it was filtered, so
+     the crumb said 47 over a table of six. `status` is left out because every
+     cell here IS a status filter: scoping the counts by it would zero every
+     other cell the moment one was clicked. */
+  const t = workTotals(useWork({
+    member: p.member, kind: p.kind, priority: p.priority, due: p.due,
+    q: p.q, parent: p.parent, tag: p.tag, wait: p.wait,
+  }, "all"));
 
   const route = (key?: string, val?: string) => {
     const next: Record<string, string> = { ...p };
@@ -1207,7 +1226,7 @@ function Board({ rows, all, group, goto, onOpen }: {
         <span className="tm-groupnote">
           {group
             ? "A grouping, not a workflow — a drag here would mean a reassignment, which needs a reason."
-            : "Four stored stages take a drop. Delay takes none: there is nothing to write."}
+            : "Open an item to move it between stages. Delay is never set by hand — the due date sets it."}
         </span>
       </div>
       <div className="tm-boardwrap">
@@ -1446,6 +1465,91 @@ function List({ rows, all, onOpen }: { rows: WorkItem[]; all: WorkItem[]; onOpen
   );
 }
 
+/** THE FIELDS THE CREATE DIALOG SET, editable. Same `.fg` rows, same rules,
+ *  and the kind is not among them — a kind decides what may sit under an item,
+ *  so changing it would orphan children without saying so. */
+function EditItemModal({ item, all }: { item: WorkItem; all: WorkItem[] }) {
+  const shell = useShell();
+  const members = useMembers();
+  const [title, setTitle] = useState(item.title);
+  const [who, setWho] = useState(item.assigneeId);
+  const [pri, setPri] = useState<string>(item.priority);
+  const [start, setStart] = useState(item.startDate || "");
+  const [due, setDue] = useState(item.dueDate || "");
+  const [parent, setParent] = useState(item.parentId || "");
+  /* The create dialog's rule, minus this item and everything that already
+     rolls up to it — a parent under its own child is a loop. */
+  const below = new Set<string>();
+  const walk = (id: string) => childrenOf(id, all).forEach((k) => { below.add(k.itemId); walk(k.itemId); });
+  walk(item.itemId);
+  const parents = all.filter((i) => !isTerminal(i.status) && i.itemId !== item.itemId
+    && !below.has(i.itemId) && (item.kind === "task" ? i.kind !== "task" : i.kind === "target"));
+  const save = () => {
+    const r = updateItem(item.itemId, {
+      title, assigneeId: who, priority: pri as Priority,
+      startDate: start || null, dueDate: due || null,
+      parentId: item.kind === "target" ? null : (parent || null),
+    });
+    if (!r.ok) { shell.toast(r.message, "bad"); return; }
+    shell.closeLayer();
+    shell.toast("Saved.");
+  };
+  return (
+    <>
+      <div className="md-h">
+        <h3>Edit {labelOf(KIND, item.kind).toLowerCase()}</h3>
+        <button className="btn icon sm md-x" aria-label="Close" onClick={() => shell.closeLayer()}>
+          <Icon name="x" size="sm" />
+        </button>
+      </div>
+      <div className="md-b">
+        <div className="fg">
+          <label htmlFor="eiTitle">Title <b className="req">*</b></label>
+          <input id="eiTitle" className="inp" autoFocus value={title} onChange={(e) => setTitle(e.target.value)} />
+        </div>
+        <div className="fg">
+          <label htmlFor="eiWho">Assigned to</label>
+          <select id="eiWho" className="inp" value={who} onChange={(e) => setWho(e.target.value)}>
+            {members.filter((m) => m.status === "active" || m.memberId === item.assigneeId)
+              .map((m) => <option key={m.memberId} value={m.memberId}>{m.name}</option>)}
+          </select>
+          {who !== item.assigneeId
+            ? <span className="help">Tags belong to a member. Handing this over drops the last person's.</span>
+            : null}
+        </div>
+        <div className="fg">
+          <label htmlFor="eiPri">Priority</label>
+          <select id="eiPri" className="inp" value={pri} onChange={(e) => setPri(e.target.value)}>
+            {PRIORITY_SCALE.map((k) => <option key={k} value={k}>{labelOf(PRIORITY, k)}</option>)}
+          </select>
+        </div>
+        <div className="fg">
+          <label htmlFor="eiStart">Starts</label>
+          <input id="eiStart" type="date" className="inp" value={start} onChange={(e) => setStart(e.target.value)} />
+        </div>
+        <div className="fg">
+          <label htmlFor="eiDue">Due</label>
+          <input id="eiDue" type="date" className="inp" value={due} onChange={(e) => setDue(e.target.value)} />
+        </div>
+        {item.kind !== "target" ? (
+          <div className="fg">
+            <label htmlFor="eiParent">Rolls up to</label>
+            <select id="eiParent" className="inp" value={parent} onChange={(e) => setParent(e.target.value)}>
+              <option value="">Nothing — it is top level</option>
+              {parents.map((i) => <option key={i.itemId} value={i.itemId}>{i.title}</option>)}
+            </select>
+          </div>
+        ) : null}
+      </div>
+      <div className="md-f">
+        <span className="spacer" />
+        <button className="btn" onClick={() => shell.closeLayer()}>Cancel</button>
+        <button className="btn pri" disabled={!title.trim()} onClick={save}>Save</button>
+      </div>
+    </>
+  );
+}
+
 /* --------------------------------------------------------------- drawer --- */
 
 /* IT TAKES AN ID, NOT A RECORD. Handed `item`, `all` and `tags` as props, the
@@ -1527,6 +1631,8 @@ function ItemDrawer({ itemId, onClose, onOpen }: {
         <span className="tm-dw-t"><KindMark kind={item.kind} /><b>{item.title}</b></span>
         <StagePill item={item} />
         <span className="spacer" />
+        {/* Nothing about an item could change after creation. Now it can. */}
+        <button className="btn sm" onClick={() => shell.modal(<EditItemModal item={item} all={all} />, "sm")}>Edit</button>
         <button className="btn icon sm" aria-label="Close" onClick={onClose}><Icon name="x" size="sm" /></button>
       </div>
       <div className="dw-b">
@@ -1670,6 +1776,10 @@ function ItemDrawer({ itemId, onClose, onOpen }: {
         {item.status === "planned" ? <button className="btn pri" onClick={() => move("in_progress")}>Start</button> : null}
         {item.status === "in_progress" ? <button className="btn pri" onClick={() => move("completed")}>Complete</button> : null}
         {item.status === "completed" ? <button className="btn" onClick={() => askReason("in_progress", "Reopen this item")}>Reopen…</button> : null}
+        {/* The vocabulary has always defined cancelled → planned as "Restore",
+            with a reason, and the store enforces it; the footer simply had no
+            branch for it, so a cancelled item was a dead end. */}
+        {item.status === "cancelled" ? <button className="btn" onClick={() => askReason("planned", "Restore this item")}>Restore…</button> : null}
         {!isTerminal(item.status) ? (
           <button className="btn" onClick={() => shell.modal(
             <WaitModal item={item} all={all} />, "sm")}>

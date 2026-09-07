@@ -6,6 +6,305 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-07
 
+### The seed is one company now
+
+**Area:** every screen that reads `src/content/**` — Finance's five faces, `#/team/:id/pay`,
+`#/attendance`, `#/business-enquiries`
+
+**Files:** `src/content/finance/{salaries,refunds,transactions,bank,subscriptions,invoices,quotations}.json`,
+`src/content/team/{pay,leave}.json`, `src/content/business-enquiries/enquiries.json`,
+`scripts/check-finance-ledger.cjs`, `scripts/fn-smoke.tsx`, `src/admin/views/Finance/payrollYear.ts`,
+`src/admin/views/Finance/store.ts` (a comment)
+
+**What changed**
+
+The panel told three companies' stories. Team had eight people; Finance's payroll had ten
+others on member ids `1–12` that joined nobody; the ledgers were worked by an `S. Bhat`
+signing as Super Admin and a `K. Iyer` signing as Finance, neither of whom existed, while the
+real Finance Admin never appeared in a single finance file.
+
+**Payroll is the team.** Seven open salary accounts now carry the roster's own ids, names,
+designations, departments and derived employee codes, on every slip as well as the account,
+matched to the old cast by pay rank so the Operations Manager out-earns the executives and
+the Founder tops it. Three accounts are closed for people who **left** — a Sales Executive in
+June, a developer and a designer at the end of July — which an active roster has no row for
+and a closed account is precisely for. The two July leavers have no August slip, so the open
+run is seven people, and the Finance Admin's own account is now opened by the Founder rather
+than by himself. **N. Pillai has no account on purpose:** a contract Support Executive is
+not on payroll, and the panel keeps one real person to open an account for.
+
+**The ledgers are worked by real people.** `S. Bhat` → `V. Shakya` on every refund decision;
+`K. Iyer` → `S. Raghavan` on 150-odd transaction, bank and subscription events. One `K. Iyer`
+survives: `K. Iyer Interior Co.` is a **customer**, and the ledger check caught the rename
+before it shipped. `pay.json` paid two people from a bank account that did not exist in
+Finance's chart; it is the HDFC current account now.
+
+**Time reads straight.** A leave decided three weeks after it was asked for — and after the
+fixture's own clock — is decided the next day. Member 79 was on approved leave on a day he
+also clocked a full shift, a combination `requestLeave` refuses; the leave moved to a day
+with no attendance row. Two invoices "issued" after Finance's frozen 25 Aug are dated on and
+before it, in number order.
+
+**Left alone, deliberately.** The `asdf asdf` enquiry is stage `invalid` on a public funnel:
+that is what real funnel spam looks like, and the audit was wrong to flag it. Professional
+Tax on a Delhi entity is wrong but every historical slip's frozen net includes it and the
+July run's total is pinned by test; removing it is a re-issue of twenty runs, not a seed
+tidy. `pay.json` still carries payslips nothing renders now that the pay page reads Finance
+— dropping them takes the `Pay` type and two assertions with it, and is a separate pass.
+
+**Two checks and one shortener followed the data.** The ledger's "the two casts do not join"
+reminder was written to fail the day somebody reconciled them; it now asserts the join. Its
+department pins and August pins moved with the cast. `shorten()` squeezed `A. Sharma` to
+`A. S.` on the analytics axis — five of the eight roster names lead with an initial and are
+already as short as they get.
+
+**Temp data** — this entry *is* the temp data. Nothing here is code behaviour.
+
+**Backend needed** — `none`: every id above resolves against Team's `GET /admin/team/members`
+as the API will. The open ones are on the Module 7 list already.
+
+**Open decisions** — PT on a Delhi payroll (drop it when the runs are re-issued); the
+attachments/links merge; `pay.json`'s dead payslips.
+
+**Verified**
+
+Every `check:*` suite except `check:enquiries` (needs a backend) passes after the final edit,
+`check:finance` at 451 assertions; `npx tsc -b` clean; `vite build --mode dev` succeeds; lint
+on every touched file clean and the repo-wide count unchanged at 255. Seed state re-derived
+by script after the last write: zero open accounts off the roster, zero `S. Bhat`, zero
+`K. Iyer` as an actor, zero `ACC-ICICI`. **Not verified:** any of it on a screen.
+
+### Attendance stops calling approved leave an absence
+
+**Area:** sidebar → Team · `#/attendance?face=history` · `#/reports` on a past day
+
+**Files:** `src/admin/views/Team/store.ts`, `src/admin/views/Team/Attendance.tsx`,
+`src/admin/views/Team/team.css`
+
+**What changed**
+
+**The cutoff is the day being asked about.** `stateOf` decided "absent" by comparing the
+clock against **today's** 20:00 whatever `date` it was handed, so a day last week read as
+"not started" until this evening. `dayRows` faked its way round that with a `+ DAY` on
+the clock — a workaround the other two callers never applied. That is why the History
+grid drew an approved leave day exactly like an absence, under a notice promising that
+never happens, and why Reports called a past absence "Not started". One root-cause
+change; the hack is deleted. A day that has not happened owes nothing, so it is never
+absent either.
+
+**History passes the day and draws leave as leave** — the word, in the info tone the
+Today strip already uses. **And a hand-typed future date is clamped** the way Reports
+already clamps it; the picker's `max` stopped the mouse, not the URL.
+
+**Temp data**
+
+`src/content/team/attendance.json`, `leave.json` — read. The seed's LV-06 (member 79 on
+approved leave on a day they also clocked in) is corrected in the data entry below.
+
+**Backend needed**
+
+`none` — derived at read. Invariant for the API to keep: absence is computed against the
+day asked about, never against the current day; a future day is never absent.
+
+**Open decisions** — none.
+
+**Verified**
+
+`npx tsc -b`, lint on touched files, `check:team`, `check:team-nav`, `check:team-render`
+all pass. **Not verified:** the leave cell on a screen; the derivation is asserted, the
+rendering is only known to compile.
+
+---
+
+### A replaced document replaces, and "Activate" says it can delete
+
+**Area:** `#/team/:id/documents` · `#/team/:id` (effective access)
+
+**Files:** `src/admin/views/Team/store.ts`, `src/admin/views/Team/MemberPage.tsx`,
+`src/admin/views/Team/member/modals.tsx`
+
+**What changed**
+
+**Replace replaced nothing.** `addDocument` appended unconditionally and the Required
+table reads the **first** row of a kind — so a replaced PAN or Aadhaar went on file
+invisibly while the old one kept showing as handed over and checked, and `missingDocs`
+never noticed. A required kind is now one row: the existing row is overwritten in place,
+keeping the id every reference holds, and its verification is dropped because nobody has
+checked the new file. Non-required kinds may still repeat.
+
+**Delete was hidden behind "Activate".** "Delete member" — an irreversible
+`deleteUser` — sits behind `can("team", "status")`, and the effective-access list showed
+that verb to a role holder as "Activate". On the Team module only it now reads
+"Activate · Delete". The gate is unchanged; the label stops lying about it.
+
+**Temp data** — `src/content/team/documents.json`, read.
+
+**Backend needed**
+
+- Documents: a required kind is one record per member — a second upload of the same
+  kind **replaces** and resets `verifiedById`/`verifiedAt`. Recorded in
+  [BACKEND-INTEGRATION.md](BACKEND-INTEGRATION.md).
+- A verb of its own for member deletion on the `team` Module row, so `status` stops
+  granting it.
+
+**Open decisions** — none.
+
+**Verified** — `npx tsc -b`, lint, `check:team`, `check:team-render` pass.
+
+### A task can be edited and restored, and the counts match the list
+
+**Area:** sidebar → Team · `#/work` (all faces) · the item drawer
+
+**Files:** `src/admin/views/Team/store.ts`, `src/admin/views/Team/Work.tsx`
+
+**What changed**
+
+**Nothing could change after creation.** A typo, a wrong due date or the wrong person
+was permanent for the life of the record — the store had every other mutator and no
+`updateItem`. It has one now, and the drawer has an **Edit** button opening the create
+dialog's own fields. The rules are the create dialog's: assignee must be active, a task
+cannot hold children, a target is always top level, a milestone rolls up to a target, no
+loops, and not due before it starts. **The kind is not editable** — a kind decides what
+may sit under an item, so changing it would orphan children without saying so. Handing an
+item to somebody else drops the tags the last person owned, as the create dialog does.
+
+**Cancelled was a dead end.** The vocabulary has always defined cancelled → planned as
+"Restore", with a reason, and the store enforced it; the drawer's footer had no branch
+for it. It has a **Restore…** button.
+
+**The board stopped promising a drop.** Its copy said "four stored stages take a drop";
+there is no drag handler anywhere in the module. The copy now says how a stage actually
+changes. Drag-and-drop itself is a feature, not this fix.
+
+**The header counts read the filtered set.** `WorkStats` read the whole company while
+the list under it was filtered, so the crumb said 47 over a table of six. It applies every
+filter except `status`, because every cell in it *is* a status filter.
+
+**The drawer survives its own modals.** The shell holds one layer; a reason, link or edit
+modal replaced the drawer and left the slot empty with the record still in the URL. The
+drawer effect now watches the slot as well as the id.
+
+**Temp data** — `src/content/team/work.json`, read.
+
+**Backend needed**
+
+`PATCH /admin/team/work/{id}` accepting `title`, `assigneeId`, `priority`, `startDate`,
+`dueDate`, `parentId` with the refusals above; `kind` not accepted. Recorded in
+[BACKEND-INTEGRATION.md](BACKEND-INTEGRATION.md).
+
+**Open decisions** — board drag-and-drop, deferred.
+
+**Verified** — `npx tsc -b`, lint, `check:team`, `check:team-nav`, `check:team-render`
+pass. **Not verified:** the drawer-return behaviour — reasoned from the layer code; no
+DOM in the harness.
+
+---
+
+### The sign dialog shows the agreement, sending uses a template, opening is recorded
+
+**Area:** `#/team/:id/agreements`
+
+**Files:** `src/admin/views/Team/member/modals.tsx`, `src/admin/views/Team/store.ts`
+
+**What changed**
+
+**A member read two lines of boilerplate and "agreed" to them.** The sign dialog never
+rendered the clauses. It shows the same frozen body the deed page shows, through the
+same `bodyOf`, and a copy sent without a template says so instead of pretending.
+
+**The member page could send an agreement with nothing in it.** Its send took a kind and
+a free-text title and called the raw `sendAgreement` — no template, an empty body, and
+none of the one-live-copy guard `sendTemplate` carries, so a second NDA could go out
+beside the first. It is the Agreements module's own send now, pointed at one person.
+
+**"Opened" was never written.** `viewedAt` was read in four places and set in none, so
+the member page's "unopened" nudge was always true. `markViewed` records the first open
+while the copy can still be signed; sent → viewed.
+
+**Temp data** — `src/content/team/agreements.json`, read; AG-04's stored `viewed` is
+now a state a live action reaches.
+
+**Backend needed**
+
+- `POST /admin/team/agreements/{id}/viewed` — or the public `/sign/{token}` GET records
+  it. Idempotent; only from `sent`.
+- No send endpoint without a `templateId`.
+
+**Open decisions** — the raw `sendAgreement` stays exported; no screen calls it now.
+
+**Verified** — `npx tsc -b`, lint, `check:agreements`, `check:agreements-render`,
+`check:team-render` pass.
+
+### A member can answer a form
+
+**Area:** `#/team/:id/resources`, viewing your own record
+
+**Files:** `src/admin/views/Resources/Fill.tsx` (new), `src/admin/views/Team/member/ResourcesPage.tsx`,
+`src/admin/views/Team/MemberPage.tsx`
+
+**What changed**
+
+`submitResponse` was built, tested, and called from nowhere, so a member's share link
+resolved to nothing and this half of Data Forms could not be shown at all. The member
+page now has **Fill it in** on every open, unanswered form when the viewer is the member —
+the same stand-in the sign dialog is for agreements, gated the same way. It renders the
+seven field types and mirrors the store's own "required" rule only so the button can say
+so early; required fields, the size cap and one-submission-per-person stay the store's.
+
+**A file is not uploaded.** It becomes an object URL in this tab and the dialog says so:
+this panel never puts a document on a public address, and there is no private store yet.
+
+**Temp data** — `src/content/resources/forms.json`, `responses.json`, read.
+
+**Backend needed** — `POST /admin/resources/{id}/responses` from the member side (the
+dashboard in RS-OD-05); file answers through the signed-object path Module 8 already
+lists.
+
+**Open decisions** — none new.
+
+**Verified** — `npx tsc -b`, lint, `check:resources`, `check:resources-render`,
+`check:team-render` pass. **Not verified:** the dialog on a screen.
+
+---
+
+### A paid refund cannot be refunded twice, and the pay page reads Finance
+
+**Area:** `#/finance-refunds` · `#/team/:id/pay`
+
+**Files:** `src/admin/views/Finance/store.ts`, `src/admin/views/Finance/RefundModals.tsx`,
+`src/admin/views/Team/member/PayPage.tsx`, `scripts/check-finance-ledger.cjs`
+
+**What changed**
+
+**A payment could be refunded again after its refund was paid.** The duplicate guard in
+`requestRefund` blocked `requested` and `approved` and forgot `paid`, so a second request
+on the same payment could be raised, approved and paid — a double payout, reachable from
+the picker, which offered every payment. Anything but `declined` now blocks, the refusal
+names the refund that already went out, and the picker no longer offers a claimed
+payment. Nine assertions added, including the seed's own PAY-4381 / RF-0112.
+
+**The pay page read a second payroll.** It imported Team's `pay.json` fixture although its
+own header says every figure belongs to Finance — the "two engines, one slip" the backend
+list forbids. It reads Finance's salary accounts and issued slips now, with Finance's own
+formatter and fixed/variable split so it cannot disagree with the payslip. Incentives stay
+Team's. A member with no Finance account gets an honest empty state.
+
+**Temp data** — `src/content/finance/salaries.json`: its accounts carried member ids that
+join nobody on the roster; re-keyed in the data entry below. Until that lands every member
+shows the empty state — which is the truth of the seed, not a bug in the page.
+
+**Backend needed**
+
+- Module 6 invariant: a payment carries at most **one** refund that is not declined.
+- Module 7: Team reads pay from Finance — `GET /admin/finance/salary-accounts?memberId=`
+  and that account's slips. Recorded in [BACKEND-INTEGRATION.md](BACKEND-INTEGRATION.md).
+
+**Open decisions** — subscription renewal as a first-class, linked action: deferred.
+
+**Verified** — by the Finance lane and re-run here: `npx tsc -b`, lint,
+`check:finance` (459 assertions), `check:finance-render`, `check:finance-nav`,
+`check:team-render` pass.
+
 ### A task can be created with its steps, and Urgent can finally be chosen
 
 **Area:** sidebar → Team · `#/work` · the Create dialog · `#/work?item=…`

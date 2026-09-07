@@ -148,7 +148,7 @@
           "channel": "call",
           "direction": "outbound",
           "at": "2026-08-20T08:52:00+05:30",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "outcome": "callback_requested",
           "response": "In a meeting — asked us to call back after 4pm today.",
@@ -159,7 +159,7 @@
           "channel": "call",
           "direction": "outbound",
           "at": "2026-08-20T08:20:00+05:30",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "outcome": "connected",
           "response": "Confirmed she submitted it. Says 4BHK in GK but is not sure yet whether it is the full flat or only the two bedrooms.",
@@ -170,7 +170,7 @@
         {
           "eventId": "ev-0061-rm1",
           "type": "REMARK",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "at": "2026-08-20T08:55:00+05:30",
           "note": "Internal note added · 20 words"
@@ -178,7 +178,7 @@
         {
           "eventId": "ev-0061-3",
           "type": "CONTACT",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "at": "2026-08-20T08:52:00+05:30",
           "note": "Call · Callback requested"
@@ -186,7 +186,7 @@
         {
           "eventId": "ev-0061-tg-requir",
           "type": "TAGGED",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "at": "2026-08-20T08:52:00+05:30",
           "note": "Added Requirement unclear"
@@ -202,7 +202,7 @@
         {
           "eventId": "ev-0061-2",
           "type": "CONTACT",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "at": "2026-08-20T08:20:00+05:30",
           "note": "Call · Connected · tagged contact-made · new-enquiry removed"
@@ -220,7 +220,7 @@
         {
           "remarkId": "rm-0061-2",
           "text": "Her architect is the one who decides. Worth asking for that number on the callback rather than pitching to Ritu.",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "at": "2026-08-20T08:55:00+05:30"
         },
@@ -292,7 +292,7 @@
           "channel": "call",
           "direction": "outbound",
           "at": "2026-08-20T09:15:00+05:30",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "outcome": "no_answer",
           "response": null,
@@ -303,7 +303,7 @@
           "channel": "call",
           "direction": "outbound",
           "at": "2026-08-19T19:02:00+05:30",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "outcome": "no_answer",
           "response": null,
@@ -314,7 +314,7 @@
         {
           "eventId": "ev-0062-3",
           "type": "CONTACT",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "at": "2026-08-20T09:15:00+05:30",
           "note": "Call · No answer · tagged unreachable"
@@ -322,7 +322,7 @@
         {
           "eventId": "ev-0062-2",
           "type": "CONTACT",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "at": "2026-08-19T19:02:00+05:30",
           "note": "Call · No answer · new-enquiry removed"
@@ -443,7 +443,7 @@
           "genuine": true,
           "urgency": true
         },
-        "qualifiedBy": "R. Menon",
+        "qualifiedBy": "Meera Nair",
         "qualifiedByRole": "Operations"
       },
       "status": "qualified",
@@ -480,7 +480,7 @@
         {
           "eventId": "ev-0047-tg-hot",
           "type": "TAGGED",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "at": "2026-08-18T09:14:00+05:30",
           "note": "Added Hot"
@@ -496,7 +496,7 @@
           "channel": "call",
           "direction": "outbound",
           "at": "2026-08-18T09:12:00+05:30",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "outcome": "connected",
           "response": "Confirmed 3BHK in Vasant Kunj, full interiors including false ceiling and wardrobes. Wants work to start by month-end — possession is done, family moves in October.",
@@ -507,7 +507,7 @@
           "channel": "whatsapp",
           "direction": "outbound",
           "at": "2026-08-18T09:02:00+05:30",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "outcome": "replied",
           "response": "Yes this is Priya, I filled the form last night.",
@@ -557,7 +557,7 @@
           "genuine": true,
           "urgency": true
         },
-        "qualifiedBy": "R. Menon",
+        "qualifiedBy": "Meera Nair",
         "qualifiedByRole": "Operations"
       },
       "status": "no_match",
@@ -605,7 +605,7 @@
           "channel": "call",
           "direction": "outbound",
           "at": "2026-08-19T21:58:00+05:30",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "outcome": "connected",
           "response": "L-shaped kitchen for a 2BHK in Gachibowli. Not urgent, wants it done before Diwali.",
@@ -655,7 +655,7 @@
           "genuine": true,
           "urgency": true
         },
-        "qualifiedBy": "R. Menon",
+        "qualifiedBy": "Meera Nair",
         "qualifiedByRole": "Operations"
       },
       "status": "qualified",
@@ -691,7 +691,7 @@
           "channel": "whatsapp",
           "direction": "outbound",
           "at": "2026-08-20T08:38:00+05:30",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "outcome": "replied",
           "response": "Kitchen plus two wardrobes. Handover is in October, so no rush.",
@@ -741,7 +741,7 @@
           "genuine": true,
           "urgency": true
         },
-        "qualifiedBy": "R. Menon",
+        "qualifiedBy": "Meera Nair",
         "qualifiedByRole": "Operations"
       },
       "status": "assigned",
@@ -766,7 +766,7 @@
             "quality": 3
           },
           "ruleVersion": "v3",
-          "assignedBy": "R. Menon",
+          "assignedBy": "Meera Nair",
           "assignedByRole": "Operations",
           "assignedAt": "2026-08-20T07:58:00+05:30",
           "deliveryStatus": "pending",
@@ -780,7 +780,7 @@
         {
           "eventId": "ev-0031-4",
           "type": "ASSIGNED",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "at": "2026-08-20T07:58:00+05:30",
           "note": "Studio Aangan · rank 1 of 4 eligible · score 89 · rule v3 · factors frozen · capacity 4→5"
@@ -819,7 +819,7 @@
           "channel": "call",
           "direction": "outbound",
           "at": "2026-08-20T07:30:00+05:30",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "outcome": "connected",
           "response": "Just the living and dining — kitchen was done two years ago and we are happy with it. Want it looking done before Diwali.",
@@ -869,7 +869,7 @@
           "genuine": true,
           "urgency": true
         },
-        "qualifiedBy": "R. Menon",
+        "qualifiedBy": "Meera Nair",
         "qualifiedByRole": "Operations"
       },
       "status": "assigned",
@@ -894,7 +894,7 @@
             "quality": 2
           },
           "ruleVersion": "v3",
-          "assignedBy": "R. Menon",
+          "assignedBy": "Meera Nair",
           "assignedByRole": "Operations",
           "assignedAt": "2026-08-17T22:14:00+05:30",
           "deliveryStatus": "delivered",
@@ -924,7 +924,7 @@
         {
           "eventId": "ev-0044-3",
           "type": "ASSIGNED",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "at": "2026-08-17T22:14:00+05:30",
           "note": "Terra Interiors · rank 1 of 2 eligible · score 84 · rule v3"
@@ -955,7 +955,7 @@
           "channel": "call",
           "direction": "outbound",
           "at": "2026-08-17T22:12:00+05:30",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "outcome": "connected",
           "response": "Villa in Whitefield, four bedrooms. We get possession on the 12th and I would like work starting the week after.",
@@ -1013,7 +1013,7 @@
           "genuine": true,
           "urgency": true
         },
-        "qualifiedBy": "R. Menon",
+        "qualifiedBy": "Meera Nair",
         "qualifiedByRole": "Operations"
       },
       "status": "assigned",
@@ -1038,7 +1038,7 @@
             "quality": 2
           },
           "ruleVersion": "v3",
-          "assignedBy": "R. Menon",
+          "assignedBy": "Meera Nair",
           "assignedByRole": "Operations",
           "assignedAt": "2026-08-16T11:22:00+05:30",
           "deliveryStatus": "delivered",
@@ -1069,7 +1069,7 @@
         {
           "eventId": "ev-0041-3",
           "type": "ASSIGNED",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "at": "2026-08-16T11:22:00+05:30",
           "note": "Deco Nest Interiors · rank 1 of 2 eligible · score 86 · rule v3"
@@ -1100,7 +1100,7 @@
           "channel": "call",
           "direction": "outbound",
           "at": "2026-08-16T11:18:00+05:30",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "outcome": "connected",
           "response": "2BHK in Powai, renovation not a fresh fit-out. Timeline is open — sometime in the next two to three months.",
@@ -1111,7 +1111,7 @@
           "channel": "call",
           "direction": "outbound",
           "at": "2026-08-16T10:40:00+05:30",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "outcome": "no_answer",
           "response": null,
@@ -1161,7 +1161,7 @@
           "genuine": true,
           "urgency": true
         },
-        "qualifiedBy": "R. Menon",
+        "qualifiedBy": "Meera Nair",
         "qualifiedByRole": "Operations"
       },
       "status": "converted",
@@ -1186,7 +1186,7 @@
             "quality": 1
           },
           "ruleVersion": "v3",
-          "assignedBy": "R. Menon",
+          "assignedBy": "Meera Nair",
           "assignedByRole": "Operations",
           "assignedAt": "2026-08-11T13:40:00+05:30",
           "deliveryStatus": "delivered",
@@ -1225,7 +1225,7 @@
         {
           "eventId": "ev-0038-3",
           "type": "ASSIGNED",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "at": "2026-08-11T13:40:00+05:30",
           "note": "Ambient Works · rank 1 of 1 eligible · score 81 · rule v3"
@@ -1256,7 +1256,7 @@
           "channel": "call",
           "direction": "outbound",
           "at": "2026-08-11T13:02:00+05:30",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "outcome": "connected",
           "response": "Mainly a dining set, six seater. Might add a couple of chairs for the living room if I like them.",
@@ -1306,7 +1306,7 @@
           "genuine": true,
           "urgency": true
         },
-        "qualifiedBy": "R. Menon",
+        "qualifiedBy": "Meera Nair",
         "qualifiedByRole": "Operations"
       },
       "status": "not_converted",
@@ -1331,7 +1331,7 @@
             "quality": 2
           },
           "ruleVersion": "v3",
-          "assignedBy": "R. Menon",
+          "assignedBy": "Meera Nair",
           "assignedByRole": "Operations",
           "assignedAt": "2026-08-08T10:40:00+05:30",
           "deliveryStatus": "delivered",
@@ -1357,7 +1357,7 @@
             "quality": 1
           },
           "ruleVersion": "v3",
-          "assignedBy": "R. Menon",
+          "assignedBy": "Meera Nair",
           "assignedByRole": "Operations",
           "assignedAt": "2026-08-10T09:05:00+05:30",
           "deliveryStatus": "delivered",
@@ -1396,7 +1396,7 @@
         {
           "eventId": "ev-0036-5",
           "type": "ASSIGNED",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "at": "2026-08-10T09:05:00+05:30",
           "note": "Casa Vista Design · rank 2 of 2 eligible · score 74 · rule v3"
@@ -1404,7 +1404,7 @@
         {
           "eventId": "ev-0036-4",
           "type": "REASSIGNED",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "at": "2026-08-10T09:05:00+05:30",
           "note": "From Deco Nest Interiors · reason: Business declined the enquiry · previous assignment closed, not deleted"
@@ -1412,7 +1412,7 @@
         {
           "eventId": "ev-0036-3",
           "type": "ASSIGNED",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "at": "2026-08-08T10:40:00+05:30",
           "note": "Deco Nest Interiors · rank 1 of 2 eligible · score 79 · rule v3"
@@ -1443,7 +1443,7 @@
           "channel": "call",
           "direction": "outbound",
           "at": "2026-08-08T10:15:00+05:30",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "outcome": "connected",
           "response": "Nothing urgent — we are planning for next year, just want to understand what it costs and how long it takes.",
@@ -1528,7 +1528,7 @@
         {
           "eventId": "ev-0035-tg-spam-s",
           "type": "TAGGED",
-          "actor": "R. Menon",
+          "actor": "Meera Nair",
           "actorRole": "Operations",
           "at": "2026-08-08T03:41:00+05:30",
           "note": "Added Spam suspected"

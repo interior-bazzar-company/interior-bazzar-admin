@@ -160,7 +160,7 @@
         {
           "eventId": "SE-0102-4",
           "type": "INSTALLMENT_FAILED",
-          "actor": "S. Bhat",
+          "actor": "V. Shakya",
           "actorRole": "Super Admin",
           "at": "2026-08-23T14:08:00+05:30",
           "note": "Installment 1 cancelled. The UPI credit behind PAY-4402 was recalled by the remitting bank on 23 Aug — mandate dispute, confirmed with HDFC. REV-4402 was appended in the ledger and IB-INV-2026-00087 was cancelled behind it. The ₹59,000 setup fee is back on DL-2396 to be re-billed."
@@ -630,7 +630,7 @@
         {
           "eventId": "SE-0108-3",
           "type": "SUBSCRIPTION_CANCELLED",
-          "actor": "S. Bhat",
+          "actor": "V. Shakya",
           "actorRole": "Super Admin",
           "at": "2026-08-01T10:00:00+05:30",
           "note": "RF-0112 approved — pre-activation cancellation, within a day, ₹9,900 sent back on 1 Aug. IB-INV-2026-00071 cancelled with reason 'refunded'."
@@ -813,7 +813,7 @@
             "reference": "NEFT2026081900622",
             "valueDate": "2026-08-19",
             "accountId": "ACC-HDFC-4021",
-            "recordedBy": "S. Bhat",
+            "recordedBy": "V. Shakya",
             "recordedAt": "2026-08-19T15:05:00+05:30",
             "receipt": {
               "number": "IB-RCP-2026-00313",
@@ -846,7 +846,7 @@
           "failure": null
         }
       ],
-      "soldBy": "S. Bhat",
+      "soldBy": "V. Shakya",
       "events": [
         {
           "eventId": "SE-0111-3",
@@ -859,7 +859,7 @@
         {
           "eventId": "SE-0111-2",
           "type": "INSTALLMENT_PAID",
-          "actor": "S. Bhat",
+          "actor": "V. Shakya",
           "actorRole": "Finance",
           "at": "2026-08-19T15:05:00+05:30",
           "note": "PAY-4407 · ₹70,800 · NEFT2026081900622 · settles IB-INV-2026-00099. Two installments remain."
@@ -867,7 +867,7 @@
         {
           "eventId": "SE-0111-1",
           "type": "SUBSCRIPTION_RECORDED",
-          "actor": "S. Bhat",
+          "actor": "V. Shakya",
           "actorRole": "Finance",
           "at": "2026-08-18T12:25:00+05:30",
           "note": "Signature recorded on IB-INV-2026-00099 · ₹2,12,400 in 3 installments of ₹70,800 · Sales. Read from IB-QT-2026-00161 on DL-2488. The customer is entitled from 2026-08-18."
@@ -875,7 +875,7 @@
       ],
       "invoiceNumber": "IB-INV-2026-00099",
       "paidInFull": false,
-      "recordedBy": "S. Bhat",
+      "recordedBy": "V. Shakya",
       "recordedAt": "2026-08-18T12:25:00+05:30"
     },
     {
@@ -965,7 +965,7 @@
             "reference": "HIST202509002",
             "valueDate": "2025-09-15",
             "accountId": "ACC-HDFC-4021",
-            "recordedBy": "K. Iyer",
+            "recordedBy": "S. Raghavan",
             "recordedAt": "2025-09-15T11:00:00+05:30",
             "receipt": {
               "number": "IB-RCP-HIST-00002",
@@ -978,16 +978,16 @@
           "failure": null
         }
       ],
-      "soldBy": "K. Iyer",
+      "soldBy": "S. Raghavan",
       "invoiceNumber": null,
       "paidInFull": true,
-      "recordedBy": "K. Iyer",
+      "recordedBy": "S. Raghavan",
       "recordedAt": "2025-09-07T10:00:00+05:30",
       "events": [
         {
           "eventId": "SE-0202-1",
           "type": "SUBSCRIPTION_RECORDED",
-          "actor": "K. Iyer",
+          "actor": "S. Raghavan",
           "actorRole": "Sales",
           "at": "2025-09-07T10:00:00+05:30",
           "note": "Recorded from the sales chain. Settled in full on 2025-09-15."
@@ -1139,7 +1139,7 @@
             "reference": "HIST202511005",
             "valueDate": "2025-11-09",
             "accountId": "ACC-HDFC-4021",
-            "recordedBy": "K. Iyer",
+            "recordedBy": "S. Raghavan",
             "recordedAt": "2025-11-09T11:00:00+05:30",
             "receipt": {
               "number": "IB-RCP-HIST-00005",
@@ -1152,16 +1152,16 @@
           "failure": null
         }
       ],
-      "soldBy": "K. Iyer",
+      "soldBy": "S. Raghavan",
       "invoiceNumber": null,
       "paidInFull": true,
-      "recordedBy": "K. Iyer",
+      "recordedBy": "S. Raghavan",
       "recordedAt": "2025-11-07T10:00:00+05:30",
       "events": [
         {
           "eventId": "SE-0205-1",
           "type": "SUBSCRIPTION_RECORDED",
-          "actor": "K. Iyer",
+          "actor": "S. Raghavan",
           "actorRole": "Sales",
           "at": "2025-11-07T10:00:00+05:30",
           "note": "Recorded from the sales chain. Settled in full on 2025-11-09."
@@ -1313,7 +1313,7 @@
             "reference": "HIST202512008",
             "valueDate": "2025-12-09",
             "accountId": "ACC-HDFC-4021",
-            "recordedBy": "K. Iyer",
+            "recordedBy": "S. Raghavan",
             "recordedAt": "2025-12-09T11:00:00+05:30",
             "receipt": {
               "number": "IB-RCP-HIST-00008",
@@ -1326,16 +1326,16 @@
           "failure": null
         }
       ],
-      "soldBy": "K. Iyer",
+      "soldBy": "S. Raghavan",
       "invoiceNumber": null,
       "paidInFull": true,
-      "recordedBy": "K. Iyer",
+      "recordedBy": "S. Raghavan",
       "recordedAt": "2025-12-04T10:00:00+05:30",
       "events": [
         {
           "eventId": "SE-0208-1",
           "type": "SUBSCRIPTION_RECORDED",
-          "actor": "K. Iyer",
+          "actor": "S. Raghavan",
           "actorRole": "Sales",
           "at": "2025-12-04T10:00:00+05:30",
           "note": "Recorded from the sales chain. Settled in full on 2025-12-09."
@@ -1487,7 +1487,7 @@
             "reference": "HIST202602011",
             "valueDate": "2026-02-09",
             "accountId": "ACC-HDFC-4021",
-            "recordedBy": "K. Iyer",
+            "recordedBy": "S. Raghavan",
             "recordedAt": "2026-02-09T11:00:00+05:30",
             "receipt": {
               "number": "IB-RCP-HIST-00011",
@@ -1500,16 +1500,16 @@
           "failure": null
         }
       ],
-      "soldBy": "K. Iyer",
+      "soldBy": "S. Raghavan",
       "invoiceNumber": null,
       "paidInFull": true,
-      "recordedBy": "K. Iyer",
+      "recordedBy": "S. Raghavan",
       "recordedAt": "2026-02-06T10:00:00+05:30",
       "events": [
         {
           "eventId": "SE-0211-1",
           "type": "SUBSCRIPTION_RECORDED",
-          "actor": "K. Iyer",
+          "actor": "S. Raghavan",
           "actorRole": "Sales",
           "at": "2026-02-06T10:00:00+05:30",
           "note": "Recorded from the sales chain. Settled in full on 2026-02-09."
@@ -1661,7 +1661,7 @@
             "reference": "HIST202603014",
             "valueDate": "2026-03-08",
             "accountId": "ACC-HDFC-4021",
-            "recordedBy": "K. Iyer",
+            "recordedBy": "S. Raghavan",
             "recordedAt": "2026-03-08T11:00:00+05:30",
             "receipt": {
               "number": "IB-RCP-HIST-00014",
@@ -1674,16 +1674,16 @@
           "failure": null
         }
       ],
-      "soldBy": "K. Iyer",
+      "soldBy": "S. Raghavan",
       "invoiceNumber": null,
       "paidInFull": true,
-      "recordedBy": "K. Iyer",
+      "recordedBy": "S. Raghavan",
       "recordedAt": "2026-03-02T10:00:00+05:30",
       "events": [
         {
           "eventId": "SE-0214-1",
           "type": "SUBSCRIPTION_RECORDED",
-          "actor": "K. Iyer",
+          "actor": "S. Raghavan",
           "actorRole": "Sales",
           "at": "2026-03-02T10:00:00+05:30",
           "note": "Recorded from the sales chain. Settled in full on 2026-03-08."
@@ -1835,7 +1835,7 @@
             "reference": "HIST202605017",
             "valueDate": "2026-05-07",
             "accountId": "ACC-HDFC-4021",
-            "recordedBy": "K. Iyer",
+            "recordedBy": "S. Raghavan",
             "recordedAt": "2026-05-07T11:00:00+05:30",
             "receipt": {
               "number": "IB-RCP-HIST-00017",
@@ -1848,16 +1848,16 @@
           "failure": null
         }
       ],
-      "soldBy": "K. Iyer",
+      "soldBy": "S. Raghavan",
       "invoiceNumber": null,
       "paidInFull": true,
-      "recordedBy": "K. Iyer",
+      "recordedBy": "S. Raghavan",
       "recordedAt": "2026-05-03T10:00:00+05:30",
       "events": [
         {
           "eventId": "SE-0217-1",
           "type": "SUBSCRIPTION_RECORDED",
-          "actor": "K. Iyer",
+          "actor": "S. Raghavan",
           "actorRole": "Sales",
           "at": "2026-05-03T10:00:00+05:30",
           "note": "Recorded from the sales chain. Settled in full on 2026-05-07."
@@ -2009,7 +2009,7 @@
             "reference": "HIST202606020",
             "valueDate": "2026-06-13",
             "accountId": "ACC-HDFC-4021",
-            "recordedBy": "K. Iyer",
+            "recordedBy": "S. Raghavan",
             "recordedAt": "2026-06-13T11:00:00+05:30",
             "receipt": {
               "number": "IB-RCP-HIST-00020",
@@ -2022,16 +2022,16 @@
           "failure": null
         }
       ],
-      "soldBy": "K. Iyer",
+      "soldBy": "S. Raghavan",
       "invoiceNumber": null,
       "paidInFull": true,
-      "recordedBy": "K. Iyer",
+      "recordedBy": "S. Raghavan",
       "recordedAt": "2026-06-09T10:00:00+05:30",
       "events": [
         {
           "eventId": "SE-0220-1",
           "type": "SUBSCRIPTION_RECORDED",
-          "actor": "K. Iyer",
+          "actor": "S. Raghavan",
           "actorRole": "Sales",
           "at": "2026-06-09T10:00:00+05:30",
           "note": "Recorded from the sales chain. Settled in full on 2026-06-13."

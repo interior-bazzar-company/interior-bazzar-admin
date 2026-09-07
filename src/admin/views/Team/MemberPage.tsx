@@ -128,7 +128,7 @@ function OpBody({ op, m, viewer }: { op: string; m: Member; viewer: Viewer }) {
   if (op === "reports") return <ReportsPage m={m} viewer={viewer} />;
   if (op === "agreements") return <AgreementsPage m={m} viewer={viewer} />;
   if (op === "documents") return <DocumentsPage m={m} viewer={viewer} />;
-  if (op === "resources") return <MemberResourcesPage m={m} />;
+  if (op === "resources") return <MemberResourcesPage m={m} viewer={viewer} />;
   if (op === "pay") return <PayPage m={m} />;
   return null;
 }
@@ -471,6 +471,14 @@ const ACTION_LABEL: Record<string, string> = {
   pricing: "Set pricing", status: "Activate", archive: "Archive", roles: "Manage roles",
 };
 
+/* ONE VERB, TWO CONSEQUENCES, on Team alone. `status` is what the server gates
+   suspend and reactivate on — and, on `#/team/:id`, permanent deletion as well:
+   "Delete member" sits behind `can("team", "status")` above. A role holder
+   reading "Activate" here was never told that. Until the server has a verb of
+   its own for delete, the label says both, and only on this module. */
+const labelFor = (moduleKey: string, act: string) =>
+  moduleKey === "team" && act === "status" ? "Activate · Delete" : (ACTION_LABEL[act] || act);
+
 /** A member's grants: the UNION of the verbs their roles tick — the same
     resolution resolve_grants() does server-side. Inactive roles contribute
     nothing there, so they must contribute nothing here either. */
@@ -518,7 +526,7 @@ function EffectiveAccess({ u, roles }: { u: LiveMember; roles: Role[] }) {
             <span>
               <b>{mod.label}</b>
               <span className="d">{acts.length
-                ? acts.map((a) => ACTION_LABEL[a] || a).join(" · ")
+                ? acts.map((a) => labelFor(mod.key, a)).join(" · ")
                 : "View only"}</span>
             </span>
           </li>

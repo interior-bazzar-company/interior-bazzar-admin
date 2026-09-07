@@ -282,7 +282,7 @@
       "status": "cancelled",
       "paymentStatus": "unpaid",
       "cancelledAt": "2026-08-01T10:00:00+05:30",
-      "cancelledBy": "S. Bhat",
+      "cancelledBy": "V. Shakya",
       "cancellationReason": "refunded",
       "taxablePaise": 838983,
       "cgstPaise": 0,
@@ -364,7 +364,7 @@
       "sgstPaise": 270000,
       "igstPaise": 0,
       "grandTotalPaise": 3540000,
-      "issuedBy": "S. Bhat"
+      "issuedBy": "V. Shakya"
     },
     {
       "invoiceNumber": "IB-INV-2026-00097",
@@ -373,8 +373,8 @@
       "customer": { "name": "Tara Design Collective", "business": "Tara Design Collective", "userId": "IB-U-0944", "city": "Jaipur", "state": "Rajasthan", "gstin": null },
       "description": "Starter — 1 month",
       "placeOfSupply": "Rajasthan (08)",
-      "invoiceDate": "2026-08-26",
-      "dueDate": "2026-09-02",
+      "invoiceDate": "2026-08-24",
+      "dueDate": "2026-08-31",
       "status": "issued",
       "paymentStatus": "unpaid",
       "taxablePaise": 900000,
@@ -418,7 +418,7 @@
       "sgstPaise": 0,
       "igstPaise": 1080000,
       "grandTotalPaise": 7080000,
-      "issuedBy": "S. Bhat"
+      "issuedBy": "V. Shakya"
     },
     {
       "$comment": "INSTALLMENT 2 OF 3 on IB-QT-2026-00161, raised when it fell due. It is carried by SUB-0111 and is therefore NOT attachable — which is the point of it being here: the second installment of a running plan has an invoice, the third does not yet, and a screen that assumes one invoice per subscription gets both wrong.",
@@ -437,7 +437,7 @@
       "sgstPaise": 0,
       "igstPaise": 1080000,
       "grandTotalPaise": 7080000,
-      "issuedBy": "S. Bhat"
+      "issuedBy": "V. Shakya"
     },
     {
       "$comment": "FOR VIKRAM SHETTY, AND FOR A DIFFERENT AMOUNT ON PURPOSE. SUB-0107's second installment is ₹1,18,000 and this invoice is ₹35,400, so attaching it to that installment must be refused. Until 2026-08-31 no customer in this seed held both an unbilled installment and a spare issued invoice of another figure, so the 'one invoice bills one installment, for what that installment is' guard could only be asserted through the picker — check-finance-ledger.cjs carried a note saying to delete it the day a seed row made the write reachable. This is that row.",
@@ -465,8 +465,8 @@
       "customer": { "name": "Pillai Home Studio", "business": "Pillai Home Studio", "userId": "IB-U-1173", "city": "Chennai", "state": "Tamil Nadu", "gstin": null },
       "description": "Starter — 3 months",
       "placeOfSupply": "Tamil Nadu (33)",
-      "invoiceDate": "2026-08-27",
-      "dueDate": "2026-09-03",
+      "invoiceDate": "2026-08-25",
+      "dueDate": "2026-09-01",
       "status": "issued",
       "paymentStatus": "unpaid",
       "taxablePaise": 1500000,

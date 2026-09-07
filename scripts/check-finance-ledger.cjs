@@ -303,8 +303,10 @@ S.resetStore();
       && t.state === "recorded" && inAug(t.valueDate))));
 
   ok("salary cost counts only runs that were actually paid", [o.salaryPaise, o.salaryN], [0, 0]);
-  ok("...the open August run of ₹5,01,000 contributes nothing until someone is paid",
-    S.readRun("RUN-2026-08").state + "/" + S.readRun("RUN-2026-08").totalNetPaise, "open/69450000");
+  /* Seven slips since 2026-09-07: two people left at the end of July, and the
+     August run was opened after they had gone. */
+  ok("...the open August run of ₹5,70,500 contributes nothing until someone is paid",
+    S.readRun("RUN-2026-08").state + "/" + S.readRun("RUN-2026-08").totalNetPaise, "open/57050000");
   ok("...July's paid run is the whole salary cost of July",
     S.overview("2026-07-01", "2026-07-31").salaryPaise, 77854837);
 
@@ -503,7 +505,7 @@ S.resetStore();
       .filter((x) => !(x.p.issuedAt && (x.p.sha256 || "").length === 64)).map((x) => x.p.slipId), []);
   ok("the open run is PART paid, which is the ordinary mid-month state",
     [openSlips.some((x) => x.p.paidAt), openSlips.some((x) => !x.p.paidAt)], [true, true]);
-  ok("...and there are nine of them waiting", openSlips.length, 9);
+  ok("...and there are seven of them waiting", openSlips.length, 7);
   ok("only one run is open at a time", S.readRuns().filter((r) => r.state === "open").length, 1);
 
   /* Karan Sethi was raised from ₹45,000 to ₹52,000 a month. */
@@ -963,16 +965,19 @@ S.resetStore();
   ok("an option knows whether that member already has an account",
     opts.every((o) => typeof o.taken === "boolean"), true);
 
-  /* ⚠ THE SEED DEFECT, asserted so it cannot be forgotten. Finance's salary
-     accounts carry memberIds 1-9 and Team's members are 41-86: two casts
-     written independently, so `memberId` on every existing account resolves to
-     nobody. New accounts join correctly; the historical ones do not. This
-     assertion FAILS the day somebody reconciles them, which is the point —
-     it is a reminder, not a rule. */
-  const joined = S.readSalaryAccounts()
-    .filter((acc) => opts.some((o) => o.memberId === acc.memberId));
-  ok("KNOWN: no seeded salary account joins a seeded team member (see the note)",
-    joined.length, 0);
+  /* THE TWO CASTS JOIN NOW. Finance's accounts carried memberIds 1-12 and
+     Team's members are 41-86 — two fixtures written independently, so no
+     historical account resolved to anybody, and the assertion that stood here
+     was a reminder written to fail the day somebody reconciled them. That day
+     was 2026-09-07. Every account still open is one of the eight; the closed
+     ones name people who have left, and an active roster has no row for them —
+     which is what a closed account is for. */
+  const accounts = S.readSalaryAccounts();
+  ok("every open salary account is somebody on the team",
+    accounts.filter((a) => a.active && !opts.some((o) => o.memberId === a.memberId))
+      .map((a) => a.salaryAccountId), []);
+  ok("...and a closed account names somebody who has left the roster",
+    accounts.filter((a) => !a.active && opts.some((o) => o.memberId === a.memberId)).length, 0);
 }
 
 console.log("\nwrites · salaries are paid PERSON by person, not run by run");
@@ -1093,11 +1098,19 @@ S.resetStore();
      were showing. 2025 is the complete twelve months in the seed. */
   const FY = "2025";
   const dept = S.departmentYear(FY);
-  ok("every department paid in that year appears",
-    dept.map((d) => d.department).sort(),
-    ["Design", "Leadership", "Marketing", "Sales", "Technology"]);
-  ok("...and Operations does not, because nobody in it was on the payroll yet",
-    dept.some((d) => d.department === "Operations"), false);
+  /* DERIVED FROM THE SLIPS, NOT PINNED TO THE ORG CHART. This used to list the
+     departments by hand and assert that Operations was absent, which was a
+     fact about the cast the seed happened to carry — and the cast changed on
+     2026-09-07 when payroll was re-keyed onto the real team. The rule the
+     chart keeps is the one worth asserting: a department is a bar because
+     somebody in it was PAID that year, and for no other reason. */
+  const paidIn = new Set(S.readRuns().flatMap((r) => r.slips)
+    .filter((sl) => sl.month.startsWith(FY) && sl.paidAt)
+    .map((sl) => S.readSalaryAccount(sl.salaryAccountId).department));
+  ok("every department paid in that year appears, and no other",
+    dept.map((d) => d.department).sort(), Array.from(paidIn).sort());
+  ok("...so the chart is the year's payroll, not the org chart",
+    dept.some((d) => !paidIn.has(d.department)), false);
   /* THE INVARIANT: the chart's total is exactly the year's paid total — one
      derivation read twice, so a bar and the tile above it cannot disagree. */
   ok("...and their sum is exactly that year's paid figure",
@@ -1113,7 +1126,7 @@ S.resetStore();
      segment could not show a gradient at all. */
   ok("every department except Leadership earned an incentive",
     dept.filter((d) => d.incentivePaise > 0).map((d) => d.department).sort(),
-    ["Design", "Marketing", "Sales", "Technology"]);
+    ["Design", "Operations", "Sales", "Technology"]);
   ok("...and Leadership earns none, which is modelled rather than missing",
     dept.filter((d) => d.department === "Leadership").map((d) => d.incentivePaise), [0]);
   /* A blank department is a visible gap, never a guess. */
@@ -1494,6 +1507,52 @@ S.resetStore();
   ok("...and it leaves 'approved, not sent' entirely", [owed0, S.overview().refundsOwedPaise], [1500000, 0]);
   ok("...while refunds paid in August grows by that amount",
     S.overview().refundsPaidPaise, 990000 + 1500000);
+}
+
+/* A PAID REFUND STILL BLOCKS THE NEXT ONE. The duplicate guard named only
+   `requested` and `approved`, so recording the transfer handed the payment
+   back to the picker looking untouched — and the second request went through,
+   approved and paid exactly like the first, with nothing in the ledger saying
+   the money had already gone. One payment, one refund; only a decline releases
+   it, because a decline is the ledger saying the money is not going back.
+
+   THE HARNESS RUNS AS ONE PERSON and four eyes is a real rule — asserted just
+   above — so the request is re-keyed to somebody else before it is approved.
+   That is the only way to reach `paid` from here and it changes nothing the
+   guard reads. */
+console.log("\nwrites · refunds — one payment, one refund");
+S.resetStore();
+{
+  const one = S.requestRefund("PAY-4404", "duplicate", "Charged twice on the same handover.");
+  ok("a payment carrying no refund can be requested against", one.error, "");
+  S.readRefund(one.refundId).requestedBy = "A. Requester";
+  ok("...it is approved", S.decideRefund(one.refundId, "approve", "Duplicate confirmed against the statement."), "");
+  ok("...and the transfer recorded, which is the only thing that pays it",
+    S.recordRefundTransfer(one.refundId, "NEFT", "NEFT0901SEP7701", "ACC-HDFC-4021"), "");
+  ok("...leaving it paid", S.readRefund(one.refundId).state, "paid");
+  ok("a second request on that payment is refused now that the money has gone",
+    has(S.requestRefund("PAY-4404", "duplicate", "Asking again.").error, "duplicate_request"), true);
+  ok("...and the refusal says it has already been refunded, naming the refund that sent it",
+    has(S.requestRefund("PAY-4404", "duplicate", "Asking again.").error,
+      "has already been refunded — " + one.refundId), true);
+  ok("...so nothing was raised: the payment still carries exactly one refund",
+    S.readRefunds().filter((r) => r.paymentId === "PAY-4404").length, 1);
+
+  /* THE SEED ALREADY HOLDS THE CASE. PAY-4381 was refunded in full by RF-0112
+     on 1 Aug and closed as paid; before this guard it was requestable again
+     the moment the panel loaded. */
+  ok("the seed's own fully refunded payment is refused just the same",
+    has(S.requestRefund("PAY-4381", "duplicate", "Asking again.").error,
+      "PAY-4381 has already been refunded — RF-0112"), true);
+
+  /* AND THE OTHER HALF OF THE RULE, because a guard that blocked everything
+     would pass every assertion above and be wrong. */
+  const two = S.requestRefund("PAY-4405", "other", "Raised in error.");
+  S.readRefund(two.refundId).requestedBy = "A. Requester";
+  ok("a declined refund releases the payment — nothing went back, so nothing is refunded",
+    [S.decideRefund(two.refundId, "decline", "Not a refundable ground."),
+      S.requestRefund("PAY-4405", "duplicate", "Raised properly this time.").error],
+    ["", ""]);
 }
 
 console.log("\nwrites · the premise is enforced, not documented");
