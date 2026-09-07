@@ -6,6 +6,72 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-07
 
+### A task can be created with its steps, and Urgent can finally be chosen
+
+**Area:** sidebar → Team · `#/work` · the Create dialog · `#/work?item=…`
+
+**Files:** `src/admin/views/Team/store.ts`, `src/admin/views/Team/Work.tsx`,
+`src/admin/views/Team/team.css`
+
+**What changed**
+
+**Steps, in the create dialog.** The description says what a task is; the steps say what
+is left of it, and they are what turns the progress bar from a coin-flip into a fraction.
+Until now they could only be added after the fact, from the drawer, one line at a time.
+The dialog has a Steps field under Details — same list, same row, same add field as the
+drawer's, so what you type here is what you find there. The only difference is the mark,
+which is hollow because nothing can be ticked on a task that does not exist yet.
+
+**Tasks only.** A milestone's progress is its children and a target's is its value, so a
+list on either would be a control that moves nothing. The field appears on the Task tab
+and nowhere else, and the store enforces the same rule on the way in.
+
+**The dialog hands over text; the store mints the lines.** `createItem` takes `steps:
+string[]` and builds `checklist[]` itself, in the shape `addCheckLine` writes one at a
+time. Ids are this file's job, and a dialog that made them up would be a second id
+generator.
+
+**Urgent could not be chosen.** The 2026-09-07 release added `urgent` above `high` and
+the scale had four values from then on — but the create dialog's priority select and the
+list's priority filter were both hand-written lists that stopped at `high`. So the loudest
+value could be seeded and sorted on and never actually set, and a task that *was* urgent
+could not be filtered for. Both now read `PRIORITY_SCALE`, one ordered list exported from
+the store off the vocabulary's own `rank`, as does the Analysis face's breakdown, which had
+its own third copy. The filter's labels come from the vocabulary too: it said "Medium"
+where every other screen says "Normal".
+
+**The drawer, accordingly.** Steps created in the dialog appear in its Steps section with
+nothing further to do — that section reads the same `checklist[]`. Its empty-state line
+now matches the dialog's hint word for word, so the control is named once across both
+screens.
+
+**Temp data**
+
+`src/content/team/vocabularies.json` → `priorities[].rank` — read, not changed. It was
+always the sort order; it is now also the order the pickers list.
+
+**Backend needed**
+
+- `POST /admin/team/work` must accept `checklist[]` on create, not only on `PATCH`.
+  Recorded against the existing Module 7 checklist row in
+  [BACKEND-INTEGRATION.md](BACKEND-INTEGRATION.md).
+
+**Open decisions**
+
+None.
+
+**Verified**
+
+`npx tsc -b` clean, touched files lint clean, repo-wide `eslint` unchanged at 255.
+`check:team` — including its four-priorities block — `check:team-nav`, `check:team-render`,
+`check:users-render` and `check:finance-render` pass; `vite build --mode dev` succeeds.
+
+**Not verified:** that a step typed in the dialog lands in the drawer end-to-end. The
+smoke renders the dialog and the drawer separately as strings; nothing in this harness
+creates an item through the dialog and then opens it. The wiring is one field through
+`createItem` into `checklist[]`, which `CheckList` already reads, but it has not been
+clicked through.
+
 ### The task list stops scrolling sideways
 
 **Area:** sidebar → Team · `#/work` (the List view)

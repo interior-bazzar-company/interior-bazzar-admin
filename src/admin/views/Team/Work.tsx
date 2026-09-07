@@ -40,7 +40,7 @@ import { BarRows } from "../charts";
 import { go } from "../../ui/nav";
 import { useMenuPlacement } from "../../ui/menu";
 import {
-  KIND, PRIORITY, TODAY, WORK_STATUS, addCheckLine, addDays, addLink, addResourceLink,
+  KIND, PRIORITY, PRIORITY_SCALE, TODAY, WORK_STATUS, addCheckLine, addDays, addLink, addResourceLink,
   blockerOf, checkCount, childrenOf,
   createItem, createTag, eventsOn, fmtDate, fmtMonth, gridDays, isDelayed, isTerminal, labelOf,
   lanesOf, leaveOn, linkLabelOf, linksOf, monthStep,
@@ -50,7 +50,7 @@ import {
   useWork, workTotals,
 } from "./store";
 import type {
-  Attachment, CalEvent, LinkRelation, Member, Tag, WorkItem, WorkStage, WorkStatus,
+  Attachment, CalEvent, LinkRelation, Member, Priority, Tag, WorkItem, WorkStage, WorkStatus,
 } from "./store";
 import { ensureAdopted } from "./adopt";
 import { KindMark, Meter, PriorityChip, Who, ago } from "./bits";
@@ -219,7 +219,7 @@ export default function Work() {
           <Select name="tag" label="Tag" value={p.tag} onFilter={onFilter}
             options={slugOptions(tags)} />
           <Select name="priority" label="Priority" value={p.priority} onFilter={onFilter}
-            options={[{ v: "high", l: "High" }, { v: "medium", l: "Medium" }, { v: "low", l: "Low" }]} />
+            options={PRIORITY_SCALE.map((k) => ({ v: k, l: labelOf(PRIORITY, k) }))} />
           <span className="spacer" />
           {/* Create rides this row on the three faces with no rail; the
               calendar carries it at the top of its own. */}
@@ -308,6 +308,49 @@ function bulletSel(
   const next = lines.map((l) => (on ? l.replace(/^\s*-\s/, "") : "- " + l)).join("\n");
   set(value.slice(0, a) + next + value.slice(b));
   requestAnimationFrame(() => { el.focus(); el.setSelectionRange(a + next.length, a + next.length); });
+}
+
+/** THE STEPS AS A DRAFT. Plain strings with no ids yet — the store mints those
+ *  on create — so this cannot share the drawer's CheckList, which writes through
+ *  the store one line at a time. It shares the drawer's classes instead, so the
+ *  two read as one control: what you typed here is what you find there.
+ *
+ *  Enter adds a step and is stopped there, because Enter in the title creates
+ *  the whole item and a list field that fired that would create it half-typed. */
+function StepsField({ steps, onChange }: { steps: string[]; onChange: (v: string[]) => void }) {
+  const [draft, setDraft] = useState("");
+  const add = () => {
+    const t = draft.trim();
+    if (!t) return;
+    onChange(steps.concat([t]));
+    setDraft("");
+  };
+  return (
+    <div className="tm-ck">
+      {steps.length ? (
+        <ul className="tm-ck-l">
+          {steps.map((t, i) => (
+            <li key={i}>
+              {/* A hollow mark, not a checkbox: nothing can be ticked on a task
+                  that does not exist yet. It becomes the real control the
+                  moment the item is created. */}
+              <span className="tm-ck-x tm-ck-draft"><i /><span>{t}</span></span>
+              <button className="btn icon sm" aria-label={"Remove step: " + t}
+                onClick={() => onChange(steps.filter((_, j) => j !== i))}>
+                <Icon name="x" size="sm" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <div className="tm-ck-new">
+        <input className="inp" value={draft} placeholder="Add a step" aria-label="Add a step"
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); add(); } }} />
+        <button className="btn sm" onClick={add} disabled={!draft.trim()}>Add</button>
+      </div>
+    </div>
+  );
 }
 
 /** A list of links, and one row to add another. The address is normalised
@@ -532,7 +575,7 @@ function Analysis({ rows, all, members }: {
   /* AN ORDINAL SCALE, DRAWN AS ONE. Priority is ranked, so it takes the kit's
      ordinal steps rather than four unrelated hues — the reader should be able
      to see the order without reading the labels. */
-  const byPriority = ["urgent", "high", "medium", "low"].map((p, n) => ({
+  const byPriority = PRIORITY_SCALE.map((p, n) => ({
     key: p,
     label: labelOf(PRIORITY, p),
     value: open.filter((i) => i.priority === p).length,
@@ -783,6 +826,7 @@ export function NewItemModal({ kind: initial, members, all, date }: {
   const [tu, setTu] = useState("");
   const [desc, setDesc] = useState("");
   const [links, setLinks] = useState<Attachment[]>([]);
+  const [steps, setSteps] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const ta = useRef<HTMLTextAreaElement | null>(null);
   useTags();
@@ -800,11 +844,12 @@ export function NewItemModal({ kind: initial, members, all, date }: {
   const save = () => {
     const r = createItem({
       title, assigneeId: who, kind: kind as "task" | "milestone" | "target",
-      priority: pri as "high" | "medium" | "low",
+      priority: pri as Priority,
       startDate: start || null, dueDate: due || null,
       parentId: parent || null,
       description: desc.trim() || null,
       attachments: links, tagIds: tags,
+      steps: kind === "task" ? steps : undefined,
       targetValue: kind === "target" && tv ? Number(tv) : undefined,
       targetUnit: kind === "target" ? tu || undefined : undefined,
     });
@@ -861,7 +906,7 @@ export function NewItemModal({ kind: initial, members, all, date }: {
         <div className="fg">
           <label htmlFor="niPri">Priority</label>
           <select id="niPri" className="inp" value={pri} onChange={(e) => setPri(e.target.value)}>
-            {["high", "medium", "low"].map((k) =>
+            {PRIORITY_SCALE.map((k) =>
               <option key={k} value={k}>{labelOf(PRIORITY, k)}</option>)}
           </select>
         </div>
@@ -909,6 +954,19 @@ export function NewItemModal({ kind: initial, members, all, date }: {
             placeholder="What does done look like?"
             onChange={(e) => setDesc(e.target.value)} />
         </div>
+
+        {/* STEPS, WRITTEN BEFORE THE TASK EXISTS. The description says what
+            the task is; this says what is left of it, and it is what turns the
+            progress bar from a coin-flip into a fraction. Tasks only: a
+            milestone's progress is its children and a target's is its value,
+            so a list here on either would move nothing. */}
+        {kind === "task" ? (
+          <div className="fg">
+            <span className="fg-lb">Steps</span>
+            <p className="tm-ck-hint">What has to happen for this to be done. Each one can be ticked off.</p>
+            <StepsField steps={steps} onChange={setSteps} />
+          </div>
+        ) : null}
 
         <div className="fg">
           <span className="fg-lb">Links</span>
@@ -1546,7 +1604,9 @@ function ItemDrawer({ itemId, onClose, onOpen }: {
               desc={ck.total
                 ? ck.done + " of " + ck.total + " ticked" + (item.status === "completed"
                   ? " · completed, so progress reads 100 whatever is left open" : "")
-                : "What is left of the task. Progress is ticked lines over total."} />
+                /* The same line the create dialog shows over its Steps field,
+                   so the control is named once across both screens. */
+                : "What has to happen for this to be done. Each one can be ticked off."} />
             <CheckList item={item} />
           </>
         ) : null}

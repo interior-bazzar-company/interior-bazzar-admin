@@ -1242,3 +1242,16 @@
 .tm-lkbox { display: flex; flex-direction: column; gap: var(--space-2) }
 .tm-lk-new { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap }
 .tm-lk-new .inp { flex: 1; min-width: 120px }
+
+/* ----------------------------------------------------- steps, as a draft --- */
+
+/* The create dialog's copy of the checklist. Same list, same row, same add
+   field as the drawer's, so a step reads the same before and after the task
+   exists — the only difference is the mark, which is hollow here because there
+   is nothing yet to tick. */
+.tm-ck-hint { margin: 0 0 var(--space-2); font-size: var(--text-xs); color: var(--text-3) }
+.tm-ck-draft { cursor: default }
+.tm-ck-draft > i {
+  flex: none; width: 13px; height: 13px; margin-top: 3px;
+  border-radius: var(--radius-xs); border: 1px solid var(--line-2); background: var(--bg);
+}

@@ -474,7 +474,7 @@ of the operation document.
 | Item | Where | What has to happen |
 | --- | --- | --- |
 | `attachments[]` and `links[]` are one idea | server + client | A work item carries both. `attachments` is what the create modal writes; `links` is what `addResourceLink` writes; both are a **named address**, and the drawer now draws them as one list because a reader cannot be asked to know which screen a link was typed on. The API should carry **one** collection — `{id, label, url}` — and the client should write only that. Until it does, neither field may be dropped on a `PATCH`, because each holds links the other screen created. Decide also whether a file this panel HOLDS is the same record as an address pointing out of it; the UI assumes they read alike and does not assume they are one row. |
-| `checklist[]` is writable, and it is the only stored fact | server | `PATCH /admin/team/work/{id}` must accept the full ordered `checklist[]` of `{lineId, text, done}`. Every other progress number in Module 7 is derived; a tick is an act somebody performed and there is nothing to compute it from, so it is the one thing a write can lose. Order is the order they were added and must round-trip as an array. |
+| `checklist[]` is writable, and it is the only stored fact | server | `POST /admin/team/work` and `PATCH /admin/team/work/{id}` must both accept the full ordered `checklist[]` — the create dialog sends it from 2026-09-07 — of `{lineId, text, done}`. Every other progress number in Module 7 is derived; a tick is an act somebody performed and there is nothing to compute it from, so it is the one thing a write can lose. Order is the order they were added and must round-trip as an array. |
 
 ## Module 8 · Resources
 

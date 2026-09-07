@@ -444,6 +444,13 @@ export const linkLabelOf = (key: string, outward: boolean): string => {
 /** Soft cap on a member's active tags — warned past, never blocked (TM-OD-22). */
 export const TAG_CAP = 20;
 export const PRIORITY = toneMap(vocabDoc.priorities as ToneRow[]);
+/** THE SCALE IN ORDER, loudest first. Three screens listed the priorities by
+ *  hand and two of them stopped at `high` — so `urgent` could be seeded and
+ *  sorted on but never chosen in the create dialog or picked in the filter.
+ *  One list, read from the vocabulary's own `rank`, so the next value added
+ *  there appears everywhere at once. */
+export const PRIORITY_SCALE: Priority[] = (vocabDoc.priorities as (ToneRow & { rank: number })[])
+  .slice().sort((a, b) => a.rank - b.rank).map((r) => r.key as Priority);
 export const KIND = toneMap(vocabDoc.workKinds as unknown as ToneRow[]);
 
 export const labelOf = (map: Record<string, ToneRow>, k: string) => (map[k] ? map[k].label : k);
@@ -1940,7 +1947,11 @@ export function removeResourceLink(itemId: string, linkId: string): Result<WorkI
   });
 }
 
-export function createItem(input: Partial<WorkItem> & { title: string; assigneeId: string; kind: WorkKind }): Result<WorkItem> {
+export function createItem(input: Partial<WorkItem> & {
+  title: string; assigneeId: string; kind: WorkKind;
+  /** Plain text, one per line to be. The dialog cannot mint ids. */
+  steps?: string[];
+}): Result<WorkItem> {
   if (!input.title.trim()) return err("validation_failed", "A title is required.");
   const assignee = readMember(input.assigneeId);
   if (!assignee) return err("member_not_found", "No such member.");
@@ -1971,6 +1982,15 @@ export function createItem(input: Partial<WorkItem> & { title: string; assigneeI
     targetUnit: input.targetUnit,
     tagIds: input.tagIds && input.tagIds.length ? input.tagIds : undefined,
     attachments: input.attachments && input.attachments.length ? input.attachments : undefined,
+    /* STEPS ARRIVE AS TEXT AND LEAVE AS LINES. Minting ids is this file's job,
+       so the dialog hands over strings and the lines are built here in the
+       same shape `addCheckLine` writes one at a time. Only a task carries
+       them: `progressOf` reads a milestone's children and a target's value,
+       so steps on either would be a control that moves nothing. */
+    checklist: input.kind === "task" && input.steps && input.steps.length
+      ? input.steps.map((t) => t.trim()).filter(Boolean)
+          .map((t) => ({ lineId: nextId("CK"), text: t, done: false }))
+      : undefined,
     currentValue: input.kind === "target" ? 0 : undefined,
     rowVersion: 1,
     createdAt: new Date(now()).toISOString(),
