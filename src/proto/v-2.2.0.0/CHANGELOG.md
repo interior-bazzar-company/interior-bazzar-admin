@@ -6,6 +6,64 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-07
 
+### The task list stops scrolling sideways
+
+**Area:** sidebar → Team · `#/work` (the List view)
+
+**Files:** `src/admin/views/Team/Work.tsx`
+
+**What changed**
+
+**The floor was 1100px and the content area is not.** Content width is the viewport less
+the nav and the gutters — roughly 990px on a 1280px laptop — so this list sat in permanent
+horizontal scrolling, and because every other column had a fixed width, the one that
+absorbed the squeeze was **Item**: the title, the only column anybody actually reads. The
+floor is 920px now and it fits.
+
+Two columns paid for it, and neither was carrying its width.
+
+**"Rolls up to" moved under the title.** 190px for a fact *about* a row rather than a
+value worth scanning a column of — and the board card already keeps the parent under the
+title, so this is the module's own arrangement rather than a new one. Nothing was lost:
+the same parent, the same `KindMark`, one line down, beside the tags that were already
+there.
+
+**Progress stopped being a column of dashes.** It printed `—` for every `task`, which is
+most rows, on a rule written before the checklist existed. `progressOf` has read ticked
+lines over total for tasks ever since, so the column had a real number to show and was
+refusing to. The dash survives for the one case that genuinely has nothing to say: an open
+task with no steps on it.
+
+The other five columns are unchanged in kind, and Member, Stage and Progress each gave up
+10–20px.
+
+**Temp data**
+
+`src/content/team/work.json` — read, not changed.
+
+**Backend needed**
+
+`none`.
+
+**Open decisions**
+
+None. Note the shape of the fix, though: the numbers above are arithmetic against a 1280px
+laptop, not a judgement about how it looks. If the Item column still reads as cramped at
+920px, the next column to question is Member at 160px — the assignee is already on the
+board card and the drawer — and that would take the floor under 800px.
+
+**Verified**
+
+`npx tsc -b` clean, lint clean on the touched file, `check:team`, `check:team-nav` and
+`check:team-render` pass, `vite build --mode dev` succeeds. `tm-smoke` asserts the list
+view still renders `tbl` and `dls-body`, which is what catches a column count that stops
+matching its cells.
+
+**Not verified:** that it now fits. The widths are arithmetic and the harness has no
+layout — `renderToStaticMarkup` has no viewport, so no test in this repo can measure a
+column. Whether 920px is the right floor for the screens this is actually used on wants a
+look.
+
 ### The Create menu opened in the corner, and the task drawer had no task in it
 
 **Area:** sidebar → Team · `#/work` · `#/work?item=…` · every `.ib-menu-pop` in the panel

@@ -1328,17 +1328,23 @@ const isWeekendDay = (d: string) => {
 
 function List({ rows, all, onOpen }: { rows: WorkItem[]; all: WorkItem[]; onOpen: (id: string) => void }) {
   return (
+    /* 920, NOT 1100. Content width is the viewport less the nav and the
+       gutters — about 990px on a 1280px laptop — so a 1100px floor put this
+       one list into permanent sideways scrolling and squeezed the title, the
+       only column anybody reads, into the narrowest thing on the row. Two
+       columns paid for it: "Rolls up to" moved under the title, where the
+       board card already keeps it, and it was 190px of a fact ABOUT a row
+       rather than a value worth scanning a column of. */
     <Table
-      scroll min="1100px"
+      scroll min="920px"
       cols={[
         { label: "", w: "3px" },
         { label: "Item" },
-        { label: "Member", w: "170px" },
-        { label: "Rolls up to", w: "190px" },
+        { label: "Member", w: "160px" },
         { label: "Stage", w: "130px" },
         { label: "Priority", w: "92px" },
         { label: "Due", w: "128px" },
-        { label: "Progress", w: "140px" },
+        { label: "Progress", w: "120px" },
       ]}
       empty={{ icon: "check", title: "No work matches", body: "Clear the filters, or create the first item." }}
       rows={rows.map((i) => {
@@ -1346,6 +1352,12 @@ function List({ rows, all, onOpen }: { rows: WorkItem[]; all: WorkItem[]; onOpen
         const parent = parentOf(i, all);
         const late = isDelayed(i);
         const rail = late && blockerOf(i) ? "u-bad" : late ? "u-warn" : "";
+        /* A TASK HAS A REAL PERCENTAGE NOW. This column printed a dash for
+           every `task`, which is most rows — the rule predates the checklist,
+           and `progressOf` has read ticked lines over total ever since. The
+           dash is kept for the one case that still has nothing to say: an open
+           task with no steps on it. */
+        const bare = i.kind === "task" && !checkCount(i).total && i.status !== "completed";
         return (
           <tr key={i.itemId} className={"clickable " + rail + (i.status === "cancelled" ? " dim" : "")}
             tabIndex={0} role="link"
@@ -1354,17 +1366,21 @@ function List({ rows, all, onOpen }: { rows: WorkItem[]; all: WorkItem[]; onOpen
             <td className="rail"><i className={rail} /></td>
             <td>
               <span className="tm-title"><KindMark kind={i.kind} /><b>{i.title}</b></span>
-              <span className="cell-2"><TagChips item={i} /><WaitFlag item={i} /></span>
+              <span className="cell-2">
+                {parent ? (
+                  <span className="tm-parent"><KindMark kind={parent.kind} />{parent.title}</span>
+                ) : null}
+                <TagChips item={i} /><WaitFlag item={i} />
+              </span>
             </td>
             <td>{m ? <Who m={m} /> : <span className="dim">—</span>}</td>
-            <td>{parent ? <span className="tm-parent"><KindMark kind={parent.kind} />{parent.title}</span> : <span className="dim">—</span>}</td>
             <td><StagePill item={i} /></td>
             <td><PriorityChip p={i.priority} /></td>
             <td className="tnum">
               {i.dueDate ? fmtDate(i.dueDate) : "—"}
               {i.dueDate ? <span className="cell-2">{ago(i.dueDate, TODAY)}</span> : null}
             </td>
-            <td>{i.kind === "task" ? <span className="dim">—</span> : <ProgressWindow item={i} />}</td>
+            <td>{bare ? <span className="dim">—</span> : <ProgressWindow item={i} />}</td>
           </tr>
         );
       })}
