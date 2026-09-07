@@ -6,6 +6,95 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-07
 
+### The Create menu opened in the corner, and the task drawer had no task in it
+
+**Area:** sidebar → Team · `#/work` · `#/work?item=…` · every `.ib-menu-pop` in the panel
+
+**Files:** `src/admin/ui/menu.tsx`, `src/admin/views/Team/Work.tsx`,
+`src/admin/views/Team/team.css`
+
+**What changed**
+
+**The Create menu opened in the top-left corner of the window.** `.ib-menu-pop` is
+`position: fixed` — fixed so it can escape a scrolling ancestor, which is the whole reason
+it was changed from absolute — and it ships with `top: 0; left: 0`. That means the
+stylesheet cannot place it and the component has to measure its own button. `MoreMenu`
+does. Work's `CreateMenu` rendered the same class and measured nothing, so the menu
+landed at the viewport origin however far down the page the button was.
+
+The rail's copy was worse: `.tm-create-b .ib-menu-pop { min-width: 100% }` was written
+when the class was `absolute`, where `100%` meant the button. On a **fixed** element a
+percentage resolves against the viewport, so that rule made the menu as wide as the
+window. It is gone, and the button hands its measured width over inline instead.
+
+The maths is now `useMenuPlacement`, exported from `ui/menu.tsx` and used by both menus.
+It is exported rather than kept private because a second copy is exactly how this
+happened: any future menu that renders `.ib-menu-pop` and measures nothing lands in the
+same corner.
+
+### The drawer could not show two of the three things the module shipped
+
+**A task's steps had no UI at all.** `checklist` is the one *stored* fact in a module that
+derives everything else. `progressOf` reads it, the Analysis face counts it, and the task
+row now draws it — but the drawer is the only screen that can edit a task and it had no
+checklist in it. **So no line could ever be written**, which means every task's progress
+was stuck at 0 or 100 and the bar the last release added had nothing to report. There is
+now a real checkbox list with add and remove, and the label is the hit area as well as the
+box.
+
+**Saved links were written to a field nothing drew.** The drawer's "Links" block rendered
+`attachments`; `addResourceLink` writes `links`. Two fields, one idea — a named address —
+and the record carries both, so whichever one you looked at, the other was invisible.
+Both are drawn as one list now. Only the `links` half carries a remove button, because
+that is the half with an id and a store function.
+
+**Collapsing those two fields into one is a store change and it is not smuggled in here.**
+It is on the backend list.
+
+**And the facts moved above the fold.** Who has it, what stage it is in, when it is due
+and how loud it is were rows two, three, four and six of an eight-row definition list, so
+the drawer opened on "Kind: Task" — the one thing the title already says, with an icon.
+They are a four-up strip now. What is left of the list is built rather than written out,
+so a fact that is not set costs no row: it used to print "Rolls up to: Nothing — it is top
+level", "Waiting on: Nothing" and "Starts: Not set" at full weight, which is half the
+table spent on absences. One absence earns its place and is now a footnote instead of a
+row — a task with no start date cannot be drawn on the timeline, and that changes what you
+would do next.
+
+**Temp data**
+
+`src/content/team/work.json` — read, not changed. `checklist[]` and `links[]` were already
+in the shape; nothing could write them from the panel until now.
+
+**Backend needed**
+
+- `none` new for the drawer: `PATCH /admin/team/work/{id}` already has to accept
+  `checklist[]` and `links[]`, both of which are in the Module 7 read.
+- **On the list:** `attachments[]` and `links[]` are the same idea under two names, and the
+  create modal writes one while the drawer writes the other. The API should carry **one**
+  named-address collection. Recorded in [BACKEND-INTEGRATION.md](BACKEND-INTEGRATION.md).
+
+**Open decisions**
+
+Which of `attachments` and `links` survives the merge, and whether a file this panel holds
+is the same record as an address pointing out of it. The UI assumes they read alike to a
+person and draws them together; it does **not** assume they are one row, and it does not
+write across them.
+
+**Verified**
+
+`npx tsc -b` clean, the touched files lint clean, repo-wide `eslint` unchanged at 255
+pre-existing problems, `vite build --mode dev` succeeds. `check:team`, `check:team-nav`,
+`check:team-render`, and the users, finance, resources and agreements suites all pass —
+the render suites matter here because `MoreMenu` is used by eight files and was
+refactored onto the shared hook.
+
+**Not verified:** the placement maths and every visual claim above. There is no DOM in
+this harness — `getBoundingClientRect` returns zeroes under `renderToStaticMarkup`, so a
+menu's position cannot be asserted, and `tm-smoke` stubs the shell out entirely. The
+checklist and link controls are proven to render and to typecheck against the store's
+signatures; that they land in the right place on a screen is not proven.
+
 ### The task drawer stops fighting the URL
 
 **Area:** sidebar → Team · `#/work?item=…` (all four faces) · every drawer in the panel

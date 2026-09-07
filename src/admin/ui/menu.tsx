@@ -25,20 +25,33 @@
    above the button when there is no room below, because a menu whose last two
    items are under the fold is a menu with two items.
    ============================================================================= */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { CSSProperties, RefObject } from "react";
+import { useCallback, useLayoutEffect, useEffect, useRef, useState } from "react";
 import { Icon } from "./index";
 
-/** One entry behind the More button. */
-export interface MenuItem {
-  icon: string; label: string; act: () => void;
-  disabled?: boolean; title?: string; tone?: string;
-}
+/* ------------------------------------------------------------ placement --- */
 
-export function MoreMenu({ items, small }: { items: MenuItem[]; small?: boolean }) {
-  const [open, setOpen] = useState(false);
-  const box = useRef<HTMLSpanElement | null>(null);
-  const pop = useRef<HTMLSpanElement | null>(null);
-  const [at, setAt] = useState<{ top: number; left: number } | null>(null);
+/** WHERE A `.ib-menu-pop` GOES, for every menu that renders one.
+ *
+ *  The class is `position: fixed` — the only thing that escapes an ancestor
+ *  with `overflow`, which is why it is fixed at all — and it ships with
+ *  `top: 0; left: 0`. That means the STYLESHEET CANNOT PLACE IT and something
+ *  has to measure the button. This is that something, and it is exported
+ *  rather than kept private because the alternative has already happened once:
+ *  `#/work`'s Create button rendered the class on its own, nothing measured
+ *  anything, and the menu opened in the top-left corner of the window. A second
+ *  copy of this maths is how that comes back.
+ *
+ *  Returns the style to spread on the popup, plus the button's measured width
+ *  for menus that want to match it. Until it has measured, the popup is parked
+ *  off-screen rather than drawn at 0,0 for one frame and then moved. */
+export function useMenuPlacement(
+  open: boolean,
+  box: RefObject<HTMLElement | null>,
+  pop: RefObject<HTMLElement | null>,
+  align: "left" | "right" = "right",
+): { style: CSSProperties; width: number } {
+  const [at, setAt] = useState<{ top: number; left: number; width: number } | null>(null);
 
   /* Measured after layout and before paint, so the menu never renders once at
      the wrong place and then jumps. */
@@ -54,13 +67,43 @@ export function MoreMenu({ items, small }: { items: MenuItem[]; small?: boolean 
        has more room. */
     const below = r.bottom + gap;
     const flip = below + h > window.innerHeight && r.top - gap - h > 0;
+    /* Right-aligned hangs off the button's right edge, which is what a More
+       button at the end of a header row wants; left-aligned hangs off its left,
+       which is what a wide primary button wants. Either is then pulled back
+       inside the window — a menu half off the edge is the other way this
+       fails. */
+    const want = align === "left" ? r.left : r.right - w;
     setAt({
       top: flip ? r.top - gap - h : below,
-      /* Right-aligned to the button, then pulled back inside the window — a
-         menu half off the right edge is the other way this fails. */
-      left: Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)),
+      left: Math.max(8, Math.min(want, window.innerWidth - w - 8)),
+      width: r.width,
     });
-  }, []);
+  }, [align, box, pop]);
+
+  useLayoutEffect(() => {
+    if (!open) { setAt(null); return; }
+    place();
+  }, [open, place]);
+
+  return {
+    style: at
+      ? { top: at.top, left: at.left, right: "auto" }
+      : { top: -9999, left: -9999, right: "auto" },
+    width: at ? at.width : 0,
+  };
+}
+
+/** One entry behind the More button. */
+export interface MenuItem {
+  icon: string; label: string; act: () => void;
+  disabled?: boolean; title?: string; tone?: string;
+}
+
+export function MoreMenu({ items, small }: { items: MenuItem[]; small?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLSpanElement | null>(null);
+  const pop = useRef<HTMLSpanElement | null>(null);
+  const { style: popStyle } = useMenuPlacement(open, box, pop);
 
   useEffect(() => {
     if (!open) return;
@@ -89,18 +132,13 @@ export function MoreMenu({ items, small }: { items: MenuItem[]; small?: boolean 
     };
   }, [open]);
 
-  useLayoutEffect(() => { if (open) place(); }, [open, place]);
-
   return (
     <span className="ib-menu" ref={box}>
       <button type="button" className={"btn" + (small ? " sm" : "")} aria-haspopup="menu"
         aria-expanded={open} onClick={() => setOpen(!open)}>More</button>
       {open ? (
         <span ref={pop} className="ib-menu-pop" role="menu" aria-label="Actions"
-          /* Hidden until measured rather than drawn at 0,0 for one frame. */
-          style={at
-            ? { top: at.top, left: at.left, right: "auto" }
-            : { top: -9999, left: -9999, right: "auto" }}>
+          style={popStyle}>
           {items.map((it) => (
             <button key={it.label} type="button" role="menuitem"
               className={"mi" + (it.tone ? " " + it.tone : "")}

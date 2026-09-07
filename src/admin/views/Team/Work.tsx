@@ -26,6 +26,7 @@
 
    NO API YET — src/content/team/*.json through store.ts.
    ============================================================================= */
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { usePageChrome } from "../../shell/AdminShell";
@@ -37,12 +38,14 @@ import {
 import type { StatCell } from "../../ui";
 import { BarRows } from "../charts";
 import { go } from "../../ui/nav";
+import { useMenuPlacement } from "../../ui/menu";
 import {
-  KIND, PRIORITY, TODAY, WORK_STATUS, addDays, addLink, blockerOf, checkCount, childrenOf,
+  KIND, PRIORITY, TODAY, WORK_STATUS, addCheckLine, addDays, addLink, addResourceLink,
+  blockerOf, checkCount, childrenOf,
   createItem, createTag, eventsOn, fmtDate, fmtMonth, gridDays, isDelayed, isTerminal, labelOf,
   lanesOf, leaveOn, linkLabelOf, linksOf, monthStep,
   meId, membersInScope, parentOf, progressOf, readMember, removeLink, setBlockedBy,
-  setItemStatus, stageOf,
+  removeCheckLine, removeResourceLink, setItemStatus, stageOf, toggleCheckLine,
   normaliseUrl, tagItem, tagsOf, tagsOwnedBy, toneOf, useItem, useLinks, useMembers, useTags,
   useWork, workTotals,
 } from "./store";
@@ -685,9 +688,21 @@ function Analysis({ rows, all, members }: {
 /** One control, three kinds. All three open the same form with `kind`
  *  prefilled — they are one WorkItem with a kind, and a target only adds two
  *  fields to it. Three buttons become three forms, then three lists. */
+/* IT OPENED IN THE CORNER OF THE WINDOW. `.ib-menu-pop` is `position: fixed`
+   with `top: 0; left: 0` — fixed so it can escape a scrolling ancestor, which
+   means the stylesheet cannot place it and the component has to measure its own
+   button. This one rendered the class and measured nothing, so the menu sat at
+   the viewport's top-left corner however far down the page the button was.
+   `useMenuPlacement` is the maths MoreMenu was already doing, exported so this
+   is the last menu that has to know about it.
+
+   Left-aligned, not right: Create is a wide primary button and a menu that
+   hangs off its right edge reads as belonging to whatever is beside it. */
 function CreateMenu({ onPick, big }: { onPick: (k: string) => void; big?: boolean }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLSpanElement | null>(null);
+  const pop = useRef<HTMLSpanElement | null>(null);
+  const { style: popStyle, width } = useMenuPlacement(open, box, pop, "left");
   useEffect(() => {
     if (!open) return;
     const away = (e: MouseEvent) => {
@@ -698,11 +713,20 @@ function CreateMenu({ onPick, big }: { onPick: (k: string) => void; big?: boolea
       e.stopPropagation();
       setOpen(false);
     };
+    /* Fixed coordinates cannot follow the button, so anything that moves it
+       closes the menu rather than leaving it stranded beside nothing. `true`
+       catches scrolls on inner containers, which is where this happens — the
+       rail and the list body, not the window. */
+    const shut = () => setOpen(false);
     document.addEventListener("mousedown", away);
     document.addEventListener("keydown", esc, true);
+    window.addEventListener("scroll", shut, true);
+    window.addEventListener("resize", shut);
     return () => {
       document.removeEventListener("mousedown", away);
       document.removeEventListener("keydown", esc, true);
+      window.removeEventListener("scroll", shut, true);
+      window.removeEventListener("resize", shut);
     };
   }, [open]);
   return (
@@ -712,7 +736,12 @@ function CreateMenu({ onPick, big }: { onPick: (k: string) => void; big?: boolea
         <Icon name="plus" size={big ? undefined : "sm"} />Create
       </button>
       {open ? (
-        <span className="ib-menu-pop" role="menu" aria-label="Create">
+        <span ref={pop} className="ib-menu-pop" role="menu" aria-label="Create"
+          /* The full-width rail button hands its own width to its menu. A
+             stylesheet cannot: `min-width: 100%` on a FIXED element resolves
+             against the viewport, so the rule that used to be here made the
+             menu as wide as the window. */
+          style={big && width ? { ...popStyle, minWidth: width } : popStyle}>
           {["task", "milestone", "target"].map((k) => (
             <button key={k} role="menuitem" className="mi"
               onClick={() => { setOpen(false); onPick(k); }}>
@@ -1387,6 +1416,27 @@ function ItemDrawer({ itemId, onClose, onOpen }: {
   const st = stageOf(item);
   const mine = tagsOwnedBy(item.assigneeId);
   const on = (item.tagIds || []);
+  const ck = checkCount(item);
+
+  /* BUILT, NOT WRITTEN INLINE, so a fact that is not set costs no row at all
+     rather than a row saying it is not set. Kind is here only for a milestone
+     or a target: on a task the title already carries the mark. */
+  const facts: [ReactNode, ReactNode][] = [];
+  if (item.kind !== "task") {
+    facts.push(["Kind",
+      <span className="tm-title"><KindMark kind={item.kind} />{labelOf(KIND, item.kind)}</span>]);
+  }
+  if (parent) {
+    facts.push(["Rolls up to",
+      <a data-go={"#/work?item=" + parent.itemId}
+        onClick={() => onOpen(parent.itemId)}>{parent.title}</a>]);
+  }
+  if (item.startDate) facts.push(["Starts", fmtDate(item.startDate)]);
+  if (blocker) {
+    facts.push(["Waiting on",
+      <a data-go={"#/work?item=" + blocker.itemId}
+        onClick={() => onOpen(blocker.itemId)}>{blocker.title}</a>]);
+  }
 
   const move = (to: WorkStatus, reason?: string) => {
     const r = setItemStatus(item.itemId, to, reason);
@@ -1415,24 +1465,51 @@ function ItemDrawer({ itemId, onClose, onOpen }: {
         {item.status === "cancelled" && item.cancelledReason
           ? <Notice text={item.cancelledReason} /> : null}
 
-        <SectionHead title="The item" />
-        <KvList cls="wide" pairs={[
-          ["Kind", <span className="tm-title" key="k"><KindMark kind={item.kind} />{labelOf(KIND, item.kind)}</span>],
-          ["Assigned to", m ? m.name + " · " + m.designation : "—"],
-          ["Stage", <span key="s">{labelOf(WORK_STATUS, st)}{st === "delayed"
-            ? <span className="cell-2">derived · stored stage is {labelOf(WORK_STATUS, item.status)}</span> : null}</span>],
-          ["Priority", labelOf(PRIORITY, item.priority)],
-          ["Rolls up to", parent
-            ? <a key="p" data-go={"#/work?item=" + parent.itemId}
-                onClick={() => onOpen(parent.itemId)}>{parent.title}</a>
-            : <span key="p" className="dim">Nothing — it is top level</span>],
-          ["Starts", item.startDate ? fmtDate(item.startDate) : <span key="st" className="dim">Not set — it cannot be drawn on the timeline</span>],
-          ["Due", item.dueDate ? fmtDate(item.dueDate) + " · " + ago(item.dueDate, TODAY) : "—"],
-          ["Waiting on", blocker
-            ? <a key="b" data-go={"#/work?item=" + blocker.itemId}
-                onClick={() => onOpen(blocker.itemId)}>{blocker.title}</a>
-            : <span key="b" className="dim">Nothing</span>],
-        ]} />
+        {/* THE FOUR FACTS YOU OPENED IT FOR, ABOVE EVERYTHING ELSE. Who has
+            it, what stage it is in, when it is due and how loud it is were rows
+            two, three, four and six of an eight-row table — so the drawer
+            opened on "Kind: Task", which is the one thing the title already
+            said with an icon. They are a strip now and they are read, not
+            scanned. */}
+        <div className="tm-dw-sum">
+          <span className="tm-dw-f">
+            <b>Assigned to</b>
+            {m ? <Who m={m} /> : <span className="dim">Nobody</span>}
+          </span>
+          <span className="tm-dw-f">
+            <b>Stage</b>
+            <span>
+              <StagePill item={item} />
+              {st === "delayed" ? (
+                <span className="cell-2">derived · stored is {labelOf(WORK_STATUS, item.status)}</span>
+              ) : null}
+            </span>
+          </span>
+          <span className="tm-dw-f">
+            <b>Due</b>
+            {item.dueDate ? (
+              <span className={late ? "u-warn-t" : ""}>
+                {fmtDate(item.dueDate)}<span className="cell-2">{ago(item.dueDate, TODAY)}</span>
+              </span>
+            ) : <span className="dim">No date</span>}
+          </span>
+          <span className="tm-dw-f">
+            <b>Priority</b>
+            <span>{labelOf(PRIORITY, item.priority)}</span>
+          </span>
+        </div>
+
+        {/* ONLY WHAT IS ACTUALLY SET. The list this replaces printed "Rolls up
+            to: Nothing — it is top level", "Waiting on: Nothing" and "Starts:
+            Not set" at the same weight as the facts, so half of it was
+            absences the reader had to sift out. An absence earns a line only
+            where it changes what you would do next, and exactly one does: a
+            task with no start date cannot be drawn on the timeline, so that one
+            stays, as a footnote rather than a row. */}
+        {facts.length ? <KvList cls="wide" pairs={facts} /> : null}
+        {!item.startDate ? (
+          <p className="tm-foot">No start date, so it cannot be drawn on the timeline.</p>
+        ) : null}
 
         {item.description ? (
           <>
@@ -1441,24 +1518,30 @@ function ItemDrawer({ itemId, onClose, onOpen }: {
           </>
         ) : null}
 
-        {(item.attachments || []).length ? (
+        {/* THE STEPS — and until now there was nowhere to see or tick one.
+            `checklist` is the single stored fact in a module that derives
+            almost everything, `progressOf` reads it, the Analysis face counts
+            it and the task row draws it — but the drawer is the only screen
+            that can EDIT a task and it had no checklist UI at all, so no line
+            could ever be written and every bar was stuck at 0 or 100. */}
+        {item.kind === "task" ? (
           <>
-            <SectionHead title="Links" desc="Opens in a new tab." />
-            <ul className="tm-lk">
-              {(item.attachments || []).map((l, i) => (
-                <li key={l.url + i}>
-                  <Icon name="ext" size="sm" />
-                  <span className="tm-lk-t">
-                    {/* noreferrer as well as noopener: the target must not be
-                        handed this panel's URL in its referrer. */}
-                    <a href={l.url} target="_blank" rel="noopener noreferrer">{l.label}</a>
-                    <span className="cell-2">{l.url}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <SectionHead title="Steps"
+              desc={ck.total
+                ? ck.done + " of " + ck.total + " ticked" + (item.status === "completed"
+                  ? " · completed, so progress reads 100 whatever is left open" : "")
+                : "What is left of the task. Progress is ticked lines over total."} />
+            <CheckList item={item} />
           </>
         ) : null}
+
+        {/* WHERE THE WORK LIVES. This block used to render `attachments` —
+            files this panel holds — under the heading "Links", while
+            `addResourceLink` wrote to `links`, a different field entirely. So
+            a saved link went into the record and was never drawn anywhere, and
+            there was no control to save one to begin with. */}
+        <SectionHead title="Links" desc="The brief, the folder, the board. Opens in a new tab." />
+        <LinkList item={item} />
 
         <SectionHead title="Tags" desc="A tag is a record its owner holds. Two members may both hold Call." />
         <TagPicker item={item} mine={mine} on={on} tags={tags} />
@@ -1522,6 +1605,127 @@ function ItemDrawer({ itemId, onClose, onOpen }: {
           ? <button className="btn dgr" onClick={() => askReason("cancelled", "Why is it cancelled?")}>Cancel…</button> : null}
       </div>
     </>
+  );
+}
+
+/** THE ONE STORED THING, AND THE ONE PLACE IT CAN BE WRITTEN.
+ *
+ *  Ticking is an act somebody performs; delay, stage and progress are all read
+ *  off other facts. So this is a real control and not a read-out — a checkbox
+ *  that toggles, a line that can be dropped, and one field that adds.
+ *
+ *  It did not exist. `checklist` shipped with the store, `progressOf` reads it,
+ *  the Analysis face counts it and the task row draws it, but the drawer is the
+ *  only screen that can edit a task and it had no checklist in it — so a line
+ *  could never be written and every task's bar was stuck at 0 or 100. */
+function CheckList({ item }: { item: WorkItem }) {
+  const shell = useShell();
+  const [draft, setDraft] = useState("");
+  const lines = item.checklist || [];
+  const add = () => {
+    const r = addCheckLine(item.itemId, draft);
+    if (!r.ok) { shell.toast(r.message, "bad"); return; }
+    setDraft("");
+  };
+  return (
+    <div className="tm-ck">
+      {lines.length ? (
+        <ul className="tm-ck-l">
+          {lines.map((l) => (
+            <li key={l.lineId} className={l.done ? "done" : ""}>
+              {/* A LABEL, so the words are the hit area too. A 13px box is a
+                  hard target and the text beside it is the obvious thing to
+                  press. */}
+              <label className="tm-ck-x">
+                <input type="checkbox" checked={l.done}
+                  onChange={() => toggleCheckLine(item.itemId, l.lineId)} />
+                <span>{l.text}</span>
+              </label>
+              <button className="btn icon sm" aria-label={"Remove step: " + l.text}
+                onClick={() => removeCheckLine(item.itemId, l.lineId)}>
+                <Icon name="x" size="sm" />
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : <p className="tm-foot">No steps yet — so its progress can only be 0 or 100.</p>}
+      <div className="tm-ck-new">
+        <input className="inp" value={draft} placeholder="Add a step" aria-label="Add a step"
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} />
+        <button className="btn sm" onClick={add} disabled={!draft.trim()}>Add</button>
+      </div>
+    </div>
+  );
+}
+
+/** A URL WITH A NAME ON IT — the brief, the folder, the board.
+ *
+ *  Three different things in this module read as "links" and the store names
+ *  them apart on purpose: `attachments` are files this panel holds, an
+ *  item↔item link is a relationship between records, and these are addresses
+ *  out of the panel. The drawer used to draw `attachments` under the heading
+ *  "Links" while `addResourceLink` wrote `links`, so a saved address went into
+ *  the record and was never seen — and nothing could save one anyway.
+ *
+ *  The name is required and the scheme is checked in the store, because
+ *  `docs.google.com/…` with no scheme resolves against THIS panel's origin and
+ *  404s, which reads as a broken document rather than a typo. */
+function LinkList({ item }: { item: WorkItem }) {
+  const shell = useShell();
+  const [label, setLabel] = useState("");
+  const [url, setUrl] = useState("");
+  const add = () => {
+    const r = addResourceLink(item.itemId, label, url);
+    if (!r.ok) { shell.toast(r.message, "bad"); return; }
+    setLabel(""); setUrl("");
+  };
+
+  /* TWO FIELDS, ONE IDEA — AND THE READER MUST NOT PAY FOR THAT. The create
+     modal's link field writes `attachments`; `addResourceLink` writes `links`.
+     They hold the same thing, a named address, and the record carries both, so
+     drawing only one of them loses whatever was typed on the other screen —
+     which is what the old block did, from the opposite side. They are drawn as
+     one list here. Only the `links` half can be removed, because that is the
+     half with an id and a store function; collapsing the two into one field is
+     a store change and it is on the backend list, not smuggled into a drawer. */
+  const rows = (item.attachments || []).map((a, i) => ({
+    key: "att-" + i, label: a.label, url: a.url, drop: null as null | (() => void),
+  })).concat((item.links || []).map((l) => ({
+    key: l.linkId, label: l.label, url: l.url,
+    drop: () => { removeResourceLink(item.itemId, l.linkId); },
+  })));
+
+  return (
+    <div className="tm-lkbox">
+      {rows.length ? (
+        <ul className="tm-lk">
+          {rows.map((l) => (
+            <li key={l.key}>
+              <Icon name="ext" size="sm" />
+              <span className="tm-lk-t">
+                {/* noreferrer as well as noopener: the target must not be
+                    handed this panel's URL in its referrer. */}
+                <a href={l.url} target="_blank" rel="noopener noreferrer">{l.label}</a>
+                <span className="cell-2">{l.url}</span>
+              </span>
+              {l.drop ? (
+                <button className="btn icon sm" aria-label={"Remove link: " + l.label}
+                  onClick={l.drop}><Icon name="x" size="sm" /></button>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      ) : <p className="tm-foot">Nothing linked yet.</p>}
+      <div className="tm-lk-new">
+        <input className="inp" value={label} placeholder="Name" aria-label="Link name"
+          onChange={(e) => setLabel(e.target.value)} />
+        <input className="inp" value={url} placeholder="https://…" aria-label="Link address"
+          onChange={(e) => setUrl(e.target.value)} />
+        <button className="btn sm" onClick={add}
+          disabled={!label.trim() || !url.trim()}>Add</button>
+      </div>
+    </div>
   );
 }
 

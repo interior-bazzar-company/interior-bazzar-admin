@@ -305,7 +305,11 @@
   height: var(--control-lg); border-radius: var(--radius-full);
   font-size: var(--text-md); box-shadow: var(--shadow-sm);
 }
-.tm-create-b .ib-menu-pop { left: 0; right: auto; min-width: 100% }
+/* NO POSITIONING RULE HERE, deliberately. `.ib-menu-pop` is `position: fixed`,
+   so `left: 0` means the left edge of the WINDOW and `min-width: 100%` means
+   the width of the window — this rule was written when the class was absolute
+   and quietly became the bug it looks like it prevents. The menu is placed by
+   `useMenuPlacement`, and the button hands over its own width inline. */
 
 /* --------------------------------------------------------------- blocks -- */
 
@@ -1181,3 +1185,60 @@
 .tm-pick:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px }
 .tm-ev:focus-visible,
 .tm-tlbar:focus-visible { outline: 2px solid var(--brand); outline-offset: -2px }
+
+/* ------------------------------------------------------- the record, up top --- */
+
+/* THE FOUR FACTS AS A STRIP, not as the first four rows of a table. Who has it,
+   what stage it is in, when it is due and how loud it is are the reason the
+   drawer gets opened, and they were rows two, three, four and six of an
+   eight-row definition list — under "Kind: Task", which the title already says
+   with an icon.
+
+   `auto-fit` rather than a fixed four, because this panel is 720px at most and
+   a phone gets it full width: the same four facts wrap to two columns and then
+   one without a breakpoint naming any of them. */
+.tm-dw-sum {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--space-3) var(--space-4);
+  padding: var(--space-3) 0 var(--space-4);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: var(--space-4);
+}
+.tm-dw-f { display: flex; flex-direction: column; gap: 3px; min-width: 0 }
+.tm-dw-f > b {
+  font-size: var(--text-2xs); text-transform: uppercase; letter-spacing: .07em;
+  color: var(--text-3); font-weight: 600;
+}
+.tm-dw-f > span { font-size: var(--text-sm); color: var(--text); min-width: 0 }
+
+/* --------------------------------------------------------------- steps --- */
+
+/* A REAL CHECKBOX THIS TIME. The one on a task ROW is a marker that claims
+   nothing, because that row opens a drawer; this one is the control the marker
+   was pretending to be, and it is the only stored fact in the module. */
+.tm-ck { display: flex; flex-direction: column; gap: var(--space-2) }
+.tm-ck-l { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column }
+.tm-ck-l li {
+  display: flex; gap: var(--space-2); align-items: flex-start;
+  padding: var(--space-2) 0; border-bottom: 1px solid var(--line);
+}
+.tm-ck-l li:last-child { border-bottom: none }
+/* The words are the hit area as well as the box — 13px is a hard target, and
+   the text beside it is what anybody actually aims at. */
+.tm-ck-x {
+  flex: 1; min-width: 0; display: flex; gap: var(--space-2); align-items: flex-start;
+  cursor: pointer; font-size: var(--text-sm); line-height: var(--lh-sm); color: var(--text);
+}
+.tm-ck-x input { flex: none; margin-top: 3px; accent-color: var(--brand); cursor: pointer }
+.tm-ck-x input:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px }
+/* Struck AND quieter: strike-through alone is hard to see at this size, and
+   colour alone does not survive a greyscale print of the board. */
+.tm-ck-l li.done .tm-ck-x span { color: var(--text-3); text-decoration: line-through }
+.tm-ck-new { display: flex; gap: var(--space-2); align-items: center }
+.tm-ck-new .inp { flex: 1; min-width: 0 }
+
+/* --------------------------------------------------------------- links --- */
+
+.tm-lkbox { display: flex; flex-direction: column; gap: var(--space-2) }
+.tm-lk-new { display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap }
+.tm-lk-new .inp { flex: 1; min-width: 120px }
