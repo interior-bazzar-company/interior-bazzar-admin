@@ -16,40 +16,112 @@
 import type { ReactNode } from "react";
 import { Icon, Pill } from "../../ui";
 import {
-  TODAY, WORK_STATUS, addDays, blockerOf, checkCount, childrenOf, fmtDate, isDelayed, isTerminal,
-  labelOf, membersInScope, progressOf, readMember, readItems, stageOf, tagsOf, timePct, toneOf,
+  TODAY, WORK_STATUS, blockerOf, checkCount, childrenOf, fmtDate, isDelayed, isTerminal,
+  labelOf, membersInScope, normaliseUrl, progressOf, readMember, readItems, stageOf, tagsOf,
+  timePct, toneOf,
 } from "./store";
 import type { WorkItem, WorkKind, WorkStage } from "./store";
 
 /* ----------------------------------------------------------- rich text --- */
 
-/** BOLD AND BULLETS, PARSED — NEVER INJECTED.
+/** THE MARKS, PARSED — NEVER INJECTED.
  *
- *  `innerHTML` is banned in this panel (see ui/index.tsx), and a description
- *  box is exactly where that rule earns its keep: it is the one field where a
+ *  `innerHTML` is banned in this panel (see ui/index.tsx), and a description box
+ *  is exactly where that rule earns its keep: it is the one field where a
  *  person's own typing would be handed back to the browser as markup. So the
- *  editor writes plain text with two marks in it — `**bold**` and `- ` — and
- *  this turns them into real elements. Nothing else is a mark, so nothing else
- *  can be smuggled in: an angle bracket is an angle bracket.
+ *  editor writes plain text with marks in it and this turns those marks, and
+ *  only those marks, into real elements. An angle bracket stays an angle
+ *  bracket.
+ *
+ *  SIX MARKS, AND THE TOOLBAR WRITES EXACTLY THESE SIX. `**bold**`, `_italic_`,
+ *  `[label](url)`, `- bullets`, `1. numbers` and `- [ ] boxes`. A button in
+ *  Work.tsx with no branch here would write characters that render as
+ *  themselves, which is worse than no button.
  *
  *  Deals reached the same answer for the same reason (views/Deals/bits.tsx). */
+
+/* ONE ALTERNATION, so the marks cannot overlap: a `**bold**` inside a link's
+   label is part of the label, not a second parse of the same characters. A
+   run that does not close is not a mark and comes back as what was typed. */
+const INLINE = /(\*\*[^*\n]+?\*\*|_[^_\n]+?_|\[[^\]\n]+?\]\([^)\s]+?\))/g;
+
 const inline = (s: string): ReactNode[] =>
-  s.split(/(\*\*[\s\S]+?\*\*)/g).map((part, i) =>
-    part.length > 4 && part.slice(0, 2) === "**" && part.slice(-2) === "**"
-      ? <b key={i}>{part.slice(2, -2)}</b>
-      : part);
+  s.split(INLINE).map((part, i) => {
+    if (part.length > 4 && part.slice(0, 2) === "**" && part.slice(-2) === "**") {
+      return <b key={i}>{part.slice(2, -2)}</b>;
+    }
+    if (part.length > 2 && part[0] === "_" && part.slice(-1) === "_") {
+      return <i key={i}>{part.slice(1, -1)}</i>;
+    }
+    const link = /^\[([^\]]+)\]\(([^)\s]+)\)$/.exec(part);
+    if (link) {
+      /* THE ONE PLACE A PERSON'S TYPING BECOMES AN href, so it is the one
+         place the scheme has to be checked. `normaliseUrl` allows http and
+         https and nothing else — `javascript:…` comes back null and the mark
+         renders as the literal text somebody typed rather than as a link that
+         runs it. noreferrer as well as noopener: the target must not be handed
+         this panel's URL. */
+      const href = normaliseUrl(link[2]);
+      return href
+        ? <a key={i} href={href} target="_blank" rel="noopener noreferrer">{link[1]}</a>
+        : <span key={i}>{part}</span>;
+    }
+    return part;
+  });
+
+type Run = { kind: "ul" | "ol" | "ck"; lines: string[] };
 
 export function RichText({ text }: { text: string }) {
   const out: ReactNode[] = [];
-  let bullets: string[] = [];
+  /* ONE RUN OF SAME-KIND LINES AT A TIME. A bulleted line under a numbered one
+     is two lists, not one list with a stray row in it — which is what a single
+     `bullets` array gave you the moment there was more than one kind of line. */
+  let run: Run | null = null;
+
   const flush = (key: string) => {
-    if (!bullets.length) return;
-    const rows = bullets;
-    bullets = [];
-    out.push(<ul key={key}>{rows.map((l, i) => <li key={i}>{inline(l)}</li>)}</ul>);
+    if (!run) return;
+    const { kind, lines } = run;
+    run = null;
+    if (kind === "ck") {
+      out.push(
+        <ul key={key} className="tm-rt-ck">
+          {lines.map((l, i) => {
+            const done = /^\[[xX]\]/.test(l);
+            return (
+              <li key={i} className={done ? "done" : ""}>
+                {/* DRAWN, NOT TICKED. A box here is prose describing the work;
+                    the boxes that MOVE are the item's own Steps, which are a
+                    stored fact with a control of their own in the drawer. Two
+                    tickable lists on one panel disagreeing about progress is
+                    the thing this module exists to avoid. */}
+                <i className={done ? "on" : ""} aria-hidden="true" />
+                <span>{inline(l.replace(/^\[[ xX]\]\s*/, ""))}</span>
+              </li>
+            );
+          })}
+        </ul>,
+      );
+      return;
+    }
+    const rows = lines.map((l, i) => <li key={i}>{inline(l)}</li>);
+    out.push(kind === "ol" ? <ol key={key}>{rows}</ol> : <ul key={key}>{rows}</ul>);
   };
+
+  const push = (kind: Run["kind"], line: string, i: number) => {
+    if (run && run.kind !== kind) flush("f" + i);
+    if (!run) run = { kind, lines: [] };
+    run.lines.push(line);
+  };
+
   text.split("\n").forEach((line, i) => {
-    if (/^\s*[-*]\s+/.test(line)) { bullets.push(line.replace(/^\s*[-*]\s+/, "")); return; }
+    /* Checklist before bullet: `- [ ] x` matches both, and it is the more
+       specific of the two. */
+    const ck = /^\s*[-*]\s+(\[[ xX]\]\s.*)$/.exec(line);
+    if (ck) { push("ck", ck[1], i); return; }
+    const ul = /^\s*[-*]\s+(.*)$/.exec(line);
+    if (ul) { push("ul", ul[1], i); return; }
+    const ol = /^\s*\d+[.)]\s+(.*)$/.exec(line);
+    if (ol) { push("ol", ol[1], i); return; }
     flush("u" + i);
     if (line.trim()) out.push(<p key={"p" + i}>{inline(line)}</p>);
   });
@@ -70,7 +142,7 @@ export function TagChips({ item }: { item: WorkItem }) {
   return (
     <>
       {tags.map((t) => (
-        <span key={t.tagId} className={"pill xs tag-" + (t.colourToken || "slate")}>{t.label}</span>
+        <span key={t.tagId} className={"pill xs tm-tag tag-" + (t.colourToken || "slate")}>{t.label}</span>
       ))}
     </>
   );
@@ -137,7 +209,10 @@ export function TaskRow({ item, onOpen, who }: { item: WorkItem; onOpen: (id: st
           <span className={late ? "u-warn-t tm-over" : ""}>
             {late
               ? <><Icon name="alert" size="sm" />{daysOver(item)}d over</>
-              : item.dueDate === TODAY ? "due today" : "due " + fmtDate(item.dueDate)}
+              : item.dueDate === TODAY ? "due today"
+                /* `fmtDate(null)` is an em dash, so an undated task used to
+                   read "due —". It could not reach this row before. */
+                : item.dueDate ? "due " + fmtDate(item.dueDate) : "no date"}
           </span>
           <WaitFlag item={item} />
           {/* The steps, when there are steps. A task closed with lines still
@@ -227,18 +302,50 @@ function Block({ title, chip, children }: { title: string; chip?: string; childr
 
 const empty = (t: string) => <p className="tm-blk-e">{t}</p>;
 
-/** Overdue first, then due today, then the next three days. Overdue above
- *  today, because a day list that hides what is already late loses it. */
-export function TasksBlock({ who, withTeam, onOpen }: {
-  who: string; withTeam?: boolean; onOpen: (id: string) => void;
+/** WHAT IS ASSIGNED TO YOU — all of it, urgent end first.
+ *
+ *  IT WAS CALLED "TASKS" AND SHOWED A THREE-DAY WINDOW. Anything due later, and
+ *  anything with no date at all, was dropped without a word — so a member
+ *  carrying twelve tasks read a panel headed "Tasks · 3", and the count was a
+ *  count of the window rather than of the work. The window is still how the
+ *  list is ORDERED, because overdue above today above later is the order you
+ *  would work in; it is no longer what the list contains.
+ *
+ *  UNDATED WORK LANDS IN "Later" RATHER THAN NOWHERE. A task nobody dated is
+ *  the easiest kind to lose, which is the opposite of what a block like this is
+ *  for.
+ *
+ *  `limit` is the rail's, not the page's: 248px of sidebar that also has to
+ *  hold milestones and targets cannot be a full backlog, and what it cuts is
+ *  named rather than silently dropped — the same bargain `MarksBlock` makes. */
+export function TasksBlock({ who, withTeam, onOpen, limit }: {
+  who: string; withTeam?: boolean; onOpen: (id: string) => void; limit?: number;
 }) {
   const ids = withTeam ? membersInScope("team", who).map((m) => m.memberId) : [who];
   const open = readItems().filter((i) =>
     i.kind === "task" && ids.indexOf(i.assigneeId) >= 0 && !isTerminal(i.status));
+
   const over = open.filter((i) => isDelayed(i));
   const now = open.filter((i) => !isDelayed(i) && i.dueDate === TODAY);
-  const soon = open.filter((i) => !!i.dueDate && (i.dueDate as string) > TODAY
-    && (i.dueDate as string) <= addDays(TODAY, 3));
+  /* Everything else, dated or not — soonest first, and the undated last
+     because there is no date to sort them by, not because they matter least. */
+  const later = open
+    .filter((i) => !isDelayed(i) && i.dueDate !== TODAY)
+    .sort((x, y) => (x.dueDate || "9999").localeCompare(y.dueDate || "9999"));
+
+  /* The cap is spent from the top, so it can never hide something overdue in
+     order to show something undated. */
+  let left = limit ?? Infinity;
+  const take = (list: WorkItem[]) => {
+    const n = Math.max(0, Math.min(list.length, left));
+    left -= n;
+    return list.slice(0, n);
+  };
+  const groups: [string, WorkItem[]][] = [
+    ["Overdue", take(over)], ["Due today", take(now)], ["Later", take(later)],
+  ];
+  const shown = groups.reduce((n, g) => n + g[1].length, 0);
+  const rest = open.length - shown;
 
   const sec = (label: string, list: WorkItem[]) => (list.length ? (
     <div key={label}>
@@ -248,13 +355,16 @@ export function TasksBlock({ who, withTeam, onOpen }: {
   ) : null);
 
   return (
-    /* The chip is a COUNT on all three blocks. It said "derived" on two of them
-       and a date on the third — the first is this module's vocabulary rather
-       than the reader's, and the second named a day the block does not show. */
-    <Block title="Tasks" chip={String(over.length + now.length + soon.length)}>
-      {over.length || now.length || soon.length ? (
-        <>{sec("Overdue", over)}{sec("Due today", now)}{sec("Next 3 days", soon)}</>
-      ) : empty("Nothing open in the next three days.")}
+    /* The chip counts everything assigned, not everything drawn — a heading
+       that agrees with the list but not with the workload is the bug this
+       block had. */
+    <Block title="Assigned" chip={String(open.length)}>
+      {open.length ? (
+        <>
+          {groups.map(([label, list]) => sec(label, list))}
+          {rest > 0 ? <p className="tm-blk-e">{rest} more on the board.</p> : null}
+        </>
+      ) : empty(withTeam ? "Nothing open across the team." : "Nothing assigned to you.")}
     </Block>
   );
 }

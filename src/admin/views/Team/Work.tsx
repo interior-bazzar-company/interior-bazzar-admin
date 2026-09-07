@@ -26,13 +26,12 @@
 
    NO API YET — src/content/team/*.json through store.ts.
    ============================================================================= */
-import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import {
-  EmptyState, FilterChips, Icon, KvList, Notice, SearchField, SectionHead, Select, StatStrip,
+  EmptyState, FilterChips, Icon, Notice, SearchField, SectionHead, Select, StatStrip,
   Table, Tabs, TbTitle, cap, qs,
 } from "../../ui";
 import type { StatCell } from "../../ui";
@@ -40,22 +39,23 @@ import { BarRows } from "../charts";
 import { go } from "../../ui/nav";
 import { useMenuPlacement } from "../../ui/menu";
 import {
-  KIND, PRIORITY, PRIORITY_SCALE, TODAY, WORK_STATUS, addCheckLine, addDays, addLink, addResourceLink,
-  blockerOf, checkCount, childrenOf,
-  createItem, createTag, eventsOn, fmtDate, fmtMonth, gridDays, isDelayed, isTerminal, labelOf,
-  lanesOf, leaveOn, linkLabelOf, linksOf, monthStep,
-  meId, membersInScope, parentOf, progressOf, readMember, removeLink, setBlockedBy,
-  parentOptions, removeCheckLine, removeResourceLink, setItemStatus, stageOf, toggleCheckLine, updateItem,
-  normaliseUrl, tagItem, tagsOf, tagsOwnedBy, toneOf, useItem, useLinks, useMembers, useTags,
-  useWork, workTotals,
+  KIND, PRIORITY, PRIORITY_SCALE, TODAY, WORK_STATUS, addDays,
+  blockerOf, checkCount, createItem, createTag, eventsOn, fmtDate, fmtMonth, gridDays,
+  isDelayed, isTerminal, labelOf, lanesOf, leaveOn, meId, membersInScope, monthStep, normaliseUrl,
+  parentOf, progressOf, readMember, stageOf, tagsOf, tagsOwnedBy, toneOf,
+  useItem, useMembers, useTags, useWork, workTotals,
 } from "./store";
 import type {
-  Attachment, CalEvent, LinkRelation, Member, Priority, Tag, WorkItem, WorkKind, WorkStage, WorkStatus,
+  Attachment, CalEvent, Member, Priority, Tag, WorkItem, WorkStage,
 } from "./store";
 import { ensureAdopted } from "./adopt";
-import { KindMark, Meter, PriorityChip, Who, ago } from "./bits";
+import { MarkBar } from "./marks";
+import { ItemDrawer } from "./Detail";
+import { StatusPicker } from "./status";
+import { TodayPlanMenu } from "./TodayPlan";
+import { KindMark, Meter, PriorityChip, TagTypePicker, Who, ago } from "./bits";
 import {
-  MarksBlock, ProgressWindow, RichText, StagePill, TagChips, TasksBlock, WaitFlag, daysOver, noteOf,
+  MarksBlock, ProgressWindow, TagChips, TasksBlock, WaitFlag, noteOf,
 } from "./workBits";
 import "./team.css";
 
@@ -77,18 +77,31 @@ const FACES = [
 /** The three ways of looking at one set. A view, not a face — the question is
  *  the same in all three. */
 const VIEWS = [
-  { k: "list", l: "List", i: "doc" },
-  { k: "board", l: "Board", i: "menu" },
-  { k: "calendar", l: "Calendar", i: "calendar" },
+  { k: "list", l: "List", i: "doc", d: "Every item as a row, with its progress" },
+  { k: "board", l: "Board", i: "menu", d: "Columns by stage, or by whatever you group on" },
+  { k: "calendar", l: "Calendar", i: "calendar", d: "The month, and what falls on each day" },
 ];
 
+/** CALENDAR IS WHAT `#/work` OPENS ON. The month is the shape most of this
+ *  module's questions are actually asked in — what is due, what is late, what
+ *  is coming — and it is the only view that answers them without being read
+ *  row by row. List and Board are a click away in the switcher.
+ *
+ *  NAMED ONCE, because the default is two facts that must agree: which view a
+ *  bare URL resolves to, and which view the menu writes as a bare URL. Split
+ *  across two literals they drift, and the symptom is a menu row that never
+ *  looks selected. */
+const DEFAULT_VIEW = "calendar";
+
 /** A face from the URL, with the three old tab values folded into the view
- *  they became. A link somebody sent last week still lands where it meant. */
+ *  they became. A link somebody sent last week still lands where it meant —
+ *  including `?view=list`, which is now a real destination rather than the
+ *  value you got by leaving the parameter off. */
 function readFace(p: Record<string, string>): { face: string; view: string } {
   const raw = p.face || "";
   if (VIEWS.some((v) => v.k === raw)) return { face: "tasks", view: raw };
   const face = FACES.some((x) => x.k === raw) ? raw : "tasks";
-  const view = VIEWS.some((v) => v.k === p.view) ? p.view : "list";
+  const view = VIEWS.some((v) => v.k === p.view) ? p.view : DEFAULT_VIEW;
   return { face, view };
 }
 /** Lifecycle order, not the order the five were listed in: Delay is work that
@@ -153,8 +166,12 @@ export default function Work() {
      of the strip's own first cell, sitting where you cannot click it. */
   usePageChrome({
     crumbs: <><TbTitle label="Tasks" to="#/work" /><WorkStats p={p} /></>,
-    right: <FaceSwitch face={face} goto={goto} />,
-  }, face);
+    right: <FaceSwitch face={face} view={view} goto={goto} />,
+    /* The button now names the VIEW as well as the face, so the key that
+       republishes the chrome has to know about both. `here` happens to carry
+       `?view=` and would have covered it; a control's own inputs should not
+       depend on that. */
+  }, face + ":" + view);
 
   /* THE DRAWER IS THE RECORD AND THE URL SAYS WHICH ONE, so this effect has to
      run in BOTH directions. Opening was never the broken half: `if (!open)
@@ -232,9 +249,13 @@ export default function Work() {
           <Select name="priority" label="Priority" value={p.priority} onFilter={onFilter}
             options={PRIORITY_SCALE.map((k) => ({ v: k, l: labelOf(PRIORITY, k) }))} />
           <span className="spacer" />
+          {/* THE DAY BEFORE THE WORK. It sits left of Create because it is the
+              thing you do first, and because Create is the primary and keeps
+              the end of the row. */}
+          <TodayPlanMenu />
           {/* Create rides this row on the three faces with no rail; the
               calendar carries it at the top of its own. */}
-          <CreateMenu onPick={(k) => shell.modal(<NewItemModal kind={k} members={members} all={all} />)} />
+          <CreateMenu onPick={(k) => shell.modal(<NewItemModal kind={k} members={members} />)} />
         </div>
       )}
 
@@ -252,25 +273,12 @@ export default function Work() {
         </div>
       ) : null}
 
-      {face === "tasks" ? (
-        <div className="dls-chips tm-views">
-          <div className="seg" role="tablist" aria-label="How to look at them">
-            {VIEWS.map((v) => (
-              <button key={v.k} role="tab" aria-selected={v.k === view}
-                className={v.k === view ? "on" : ""}
-                onClick={() => goto({ face: undefined, view: v.k === "list" ? undefined : v.k })}>
-                <Icon name={v.i} size="sm" />{v.l}
-              </button>
-            ))}
-          </div>
-        </div>
-      ) : null}
 
       <div className={"dls-body tm-pane"
         + (face === "tasks" && view === "calendar" ? " tm-body" : "")}>
         {face === "timeline" ? <Timeline rows={rows} onOpen={openItem} />
           : face === "analysis" ? <Analysis rows={rows} all={all} members={members} />
-            : view === "calendar" ? <CalendarFace rows={rows} me={me} p={p} goto={goto} onOpen={openItem} members={members} all={all} />
+            : view === "calendar" ? <CalendarFace rows={rows} me={me} p={p} goto={goto} onOpen={openItem} members={members} />
               : view === "board" ? <Board rows={rows} all={all} group={p.group || ""} goto={goto} onOpen={openItem} />
                 : <List rows={rows} all={all} onOpen={openItem} />}
       </div>
@@ -284,89 +292,25 @@ const slugOptions = (tags: Tag[]) => {
   return Object.keys(seen).sort().map((s) => ({ v: s, l: seen[s] }));
 };
 
-/** Wrap the selection in a mark, or drop one in and put the caret inside it.
- *  The selection is restored afterwards so a second press is an undo rather
- *  than a second pair of asterisks somewhere else. */
-function wrapSel(
-  ref: React.RefObject<HTMLTextAreaElement | null>, value: string,
-  set: (v: string) => void, mark: string,
-) {
-  const el = ref.current;
-  if (!el) return;
-  const a = el.selectionStart, b = el.selectionEnd;
-  const sel = value.slice(a, b);
-  const wrapped = sel.slice(0, mark.length) === mark && sel.slice(-mark.length) === mark;
-  const next = wrapped ? sel.slice(mark.length, -mark.length) : mark + (sel || "bold") + mark;
-  set(value.slice(0, a) + next + value.slice(b));
-  requestAnimationFrame(() => {
-    el.focus();
-    const from = wrapped ? a : a + mark.length;
-    el.setSelectionRange(from, from + (wrapped ? next.length : (sel || "bold").length));
-  });
-}
+/* STEPS ARE WRITTEN ON THE RECORD, NOT BEFORE IT. The create dialog used to
+   carry its own draft checklist — plain strings, no ids, minted by the store on
+   save. It is gone: creating a task is naming it and handing it to somebody,
+   and a second list to fill in before the thing exists is a form standing
+   between that and Create. The steps themselves are untouched — `checklist` is
+   still the one stored fact the module derives progress from, and the drawer's
+   CheckList is now the single place it is written. */
 
-/** Toggle "- " on every line the selection touches, whole lines at a time. */
-function bulletSel(
-  ref: React.RefObject<HTMLTextAreaElement | null>, value: string, set: (v: string) => void,
-) {
-  const el = ref.current;
-  if (!el) return;
-  const a = value.lastIndexOf("\n", Math.max(0, el.selectionStart - 1)) + 1;
-  const end = value.indexOf("\n", el.selectionEnd);
-  const b = end < 0 ? value.length : end;
-  const lines = (value.slice(a, b) || "item").split("\n");
-  const on = lines.every((l) => /^\s*-\s/.test(l));
-  const next = lines.map((l) => (on ? l.replace(/^\s*-\s/, "") : "- " + l)).join("\n");
-  set(value.slice(0, a) + next + value.slice(b));
-  requestAnimationFrame(() => { el.focus(); el.setSelectionRange(a + next.length, a + next.length); });
-}
-
-/** THE STEPS AS A DRAFT. Plain strings with no ids yet — the store mints those
- *  on create — so this cannot share the drawer's CheckList, which writes through
- *  the store one line at a time. It shares the drawer's classes instead, so the
- *  two read as one control: what you typed here is what you find there.
+/** A LINK IS ONE THING, SO IT IS ONE ROW.
  *
- *  Enter adds a step and is stopped there, because Enter in the title creates
- *  the whole item and a list field that fired that would create it half-typed. */
-function StepsField({ steps, onChange }: { steps: string[]; onChange: (v: string[]) => void }) {
-  const [draft, setDraft] = useState("");
-  const add = () => {
-    const t = draft.trim();
-    if (!t) return;
-    onChange(steps.concat([t]));
-    setDraft("");
-  };
-  return (
-    <div className="tm-ck">
-      {steps.length ? (
-        <ul className="tm-ck-l">
-          {steps.map((t, i) => (
-            <li key={i}>
-              {/* A hollow mark, not a checkbox: nothing can be ticked on a task
-                  that does not exist yet. It becomes the real control the
-                  moment the item is created. */}
-              <span className="tm-ck-x tm-ck-draft"><i /><span>{t}</span></span>
-              <button className="btn icon sm" aria-label={"Remove step: " + t}
-                onClick={() => onChange(steps.filter((_, j) => j !== i))}>
-                <Icon name="x" size="sm" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      <div className="tm-ck-new">
-        <input className="inp" value={draft} placeholder="Add a step" aria-label="Add a step"
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); add(); } }} />
-        <button className="btn sm" onClick={add} disabled={!draft.trim()}>Add</button>
-      </div>
-    </div>
-  );
-}
-
-/** A list of links, and one row to add another. The address is normalised
- *  before it can be added, so what lands on the item is always a real http(s)
- *  URL and never a `javascript:` one. */
+ *  This was six elements for one idea: a label over an address, a refusal under
+ *  it, a label over a name, the name, and a button of its own — a form inside a
+ *  field, on a dialog whose whole job is a title and a date. It is the row the
+ *  drawer already uses: paste, name it or don't, Add. Same control, same order,
+ *  same fallback on both screens, so a link is attached the same way wherever
+ *  you are.
+ *
+ *  The address is normalised before it can be added, so what lands on the item
+ *  is a real http(s) URL and never a `javascript:` one. */
 function LinkField({ links, onChange }: {
   links: Attachment[]; onChange: (v: Attachment[]) => void;
 }) {
@@ -395,44 +339,39 @@ function LinkField({ links, onChange }: {
           ))}
         </ul>
       ) : null}
-      {/* The address and the name are two questions, so they are two lines. The
-          refusal is tied to the field it is about with aria-describedby — an
-          error somewhere else on the form is an error nobody can act on. */}
-      <div className="tm-lk-add">
-        <label className="tm-ni-sub" htmlFor="niUrl">Address</label>
+      <div className="tm-lk-new">
         <input id="niUrl" className={"inp" + (bad ? " bad" : "")} value={url}
-          placeholder="docs.google.com/…" aria-describedby={bad ? "niUrlErr" : undefined}
+          placeholder="Paste a link" aria-label="Link address"
+          aria-describedby={bad ? "niUrlErr" : undefined}
           onChange={(e) => setUrl(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} />
-        {bad ? (
-          <p id="niUrlErr" className="help bad">That is not a web address — links have to be http or https.</p>
-        ) : null}
-
-        <label className="tm-ni-sub" htmlFor="niUrlName">Name <span className="tm-opt">optional</span></label>
-        <input id="niUrlName" className="inp" value={label} placeholder="The brief"
+        <input className="inp" value={label} placeholder="Name — optional" aria-label="Link name"
           onChange={(e) => setLabel(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} />
-
-        <button className="btn tm-lk-btn" disabled={!ok} onClick={add}>
-          <Icon name="plus" size="sm" />Add link
-        </button>
+        <button className="btn sm" disabled={!ok} onClick={add}>Add</button>
       </div>
+      {/* Tied to the field it is about, and only once there is something to
+          refuse — an empty box is not an error. */}
+      {bad ? (
+        <p id="niUrlErr" className="help bad">That is not a web address — links have to be http or https.</p>
+      ) : null}
     </>
   );
 }
 
 const hostOf = (u: string) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; } };
 
-/** A tag is born here as it is in the drawer — one field, one keystroke. It is
- *  a record of its own, so it survives this dialog being cancelled. */
+/** A tag is born here as it is in the drawer — a name, a type, one keystroke.
+ *  It is a record of its own, so it survives this dialog being cancelled. */
 function NewTagField({ ownerId, onMade }: { ownerId: string; onMade: (id: string) => void }) {
   const shell = useShell();
   const [draft, setDraft] = useState("");
+  const [tone, setTone] = useState("slate");
   const add = () => {
-    const r = createTag(ownerId, draft);
+    const r = createTag(ownerId, draft, tone);
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
     onMade(r.data.tagId);
-    setDraft("");
+    setDraft(""); setTone("slate");
   };
   return (
     <>
@@ -445,6 +384,12 @@ function NewTagField({ ownerId, onMade }: { ownerId: string; onMade: (id: string
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} />
         <button className="btn" disabled={!draft.trim()} onClick={add}>Create</button>
+      </div>
+      {/* The type is shown as what it will look like, next to the swatches that
+          set it — so the choice is read rather than remembered. */}
+      <div className="tm-tagtype-row">
+        <span className={"pill xs tm-tag tag-" + tone}>{draft.trim() || "Preview"}</span>
+        <TagTypePicker tone={tone} onPick={setTone} />
       </div>
     </>
   );
@@ -508,17 +453,38 @@ function WorkStats({ p }: { p: Record<string, string> }) {
  *  toggle-to-close branch could never fire, and pressing the button a second
  *  time re-opened the menu instead of shutting it. Reading the shell inside the
  *  component reads it at click time, which is when the answer matters. */
-function FaceSwitch({ face, goto }: {
-  face: string; goto: (q: Record<string, string | undefined>) => void;
+export function FaceSwitch({ face, view, goto }: {
+  face: string; view: string; goto: (q: Record<string, string | undefined>) => void;
 }) {
   const shell = useShell();
-  const cur = FACES.filter((f) => f.k === face)[0] || FACES[0];
+  /* THE BUTTON NAMES WHERE YOU ARE, not which family it belongs to. It said
+     "Tasks" on all three of List, Board and Calendar — so the one control that
+     is supposed to answer "where am I" answered it for two of the five
+     destinations and shrugged at the other three. */
+  const cur = face === "tasks"
+    ? (VIEWS.filter((v) => v.k === view)[0] || VIEWS[0])
+    : (FACES.filter((f) => f.k === face)[0] || FACES[0]);
   return (
-    <button className="btn tb-view-btn" aria-haspopup="menu"
+    /* `data-act` IS LOAD-BEARING AND THIS BUTTON NEVER HAD IT. The shell's
+       popover dismisses on any document click that is not inside `.pop` and not
+       on a `[data-act]` element — and React 18 flushes a discrete click
+       synchronously, so `openPop` mounts the popover and registers that
+       listener BEFORE the very click that opened it has finished bubbling to
+       `document`. Without the attribute the menu opened and closed in one tick,
+       which looks exactly like a button that does nothing.
+
+       It was broken from the day it shipped and did not matter, because List,
+       Board and Calendar had a segmented row of their own; the menu only held
+       Timeline and Analysis. Folding the views into it made the one control
+       that could not open the only way to change view.
+
+       Every other trigger in the panel carries this — `dl-view`, `in-more`,
+       `qt-more` — and Invoices and Quotations both say so in a comment. */
+    <button className="btn tb-view-btn" data-act="tm-view" aria-haspopup="menu"
       onClick={(e) => {
         const el = e.currentTarget;
         if (shell.popAnchor === el) { shell.closePop(); return; }
-        shell.openPop(el, <FaceMenu face={face} goto={goto} />,
+        shell.openPop(el, <FaceMenu face={face} view={view} goto={goto} />,
           { width: 268, align: "right", cls: "pop-views" });
       }}>
       <Icon name={cur.i} />{cur.l}<Icon name="chev" size="sm" />
@@ -526,19 +492,38 @@ function FaceSwitch({ face, goto }: {
   );
 }
 
-/** The four faces, one per row, each saying what it is for. `on` marks the one
- *  you are in — a switcher that cannot answer "where am I" is a switcher you
- *  have to open to read. */
-export function FaceMenu({ face, goto }: {
-  face: string; goto: (q: Record<string, string | undefined>) => void;
+/** EVERY DESTINATION, IN ONE MENU, IN TWO GROUPS.
+ *
+ *  List, Board and Calendar were a segmented row in the body and Timeline and
+ *  Analysis were in this dropdown, so getting from the board to the timeline
+ *  meant using two different controls in two different places to answer one
+ *  question. They are one list now.
+ *
+ *  STILL TWO GROUPS, THOUGH, because the distinction is real and flattening it
+ *  would lose it: the first three are three SHAPES of the same question — what
+ *  work is there — and the last two are different questions. The heading says
+ *  which is which; the rows are the same rows either way. */
+export function FaceMenu({ face, view, goto }: {
+  face: string; view: string; goto: (q: Record<string, string | undefined>) => void;
 }) {
   const shell = useShell();
+  const pick = (q: Record<string, string | undefined>) => { shell.closePop(); goto(q); };
   return (
     <div className="pop-b">
-      {FACES.map((f) => (
+      <p className="pop-grp">The work, three ways</p>
+      {VIEWS.map((v) => (
+        <button key={v.k} className={"mi" + (face === "tasks" && v.k === view ? " on" : "")}
+          onClick={() => pick({ face: undefined, view: v.k === DEFAULT_VIEW ? undefined : v.k })}>
+          <Icon name={v.i} />
+          <span><b>{v.l}</b><span className="d">{v.d}</span></span>
+          {face === "tasks" && v.k === view
+            ? <span className="r"><Icon name="check" size="sm" /></span> : null}
+        </button>
+      ))}
+      <p className="pop-grp">Other questions</p>
+      {FACES.filter((f) => f.k !== "tasks").map((f) => (
         <button key={f.k} className={"mi" + (f.k === face ? " on" : "")}
-          onClick={() => { shell.closePop(); goto({
-            face: f.k === "tasks" ? undefined : f.k, view: undefined }); }}>
+          onClick={() => pick({ face: f.k, view: undefined })}>
           <Icon name={f.i} />
           <span><b>{f.l}</b><span className="d">{f.d}</span></span>
           {f.k === face ? <span className="r"><Icon name="check" size="sm" /></span> : null}
@@ -827,8 +812,8 @@ function CreateMenu({ onPick, big }: { onPick: (k: string) => void; big?: boolea
  *  are one record with a `kind`, and a target only adds two fields to the same
  *  five. Enter in the title creates, because for most of these the title IS the
  *  whole entry. */
-export function NewItemModal({ kind: initial, members, all, date }: {
-  kind: string; members: Member[]; all: WorkItem[]; date?: string;
+export function NewItemModal({ kind: initial, members, date }: {
+  kind: string; members: Member[]; date?: string;
 }) {
   const shell = useShell();
   const [kind, setKind] = useState(initial);
@@ -839,12 +824,10 @@ export function NewItemModal({ kind: initial, members, all, date }: {
      lands on the day somebody pointed at rather than near it. */
   const [start, setStart] = useState(date || "");
   const [due, setDue] = useState(date || addDays(TODAY, 3));
-  const [parent, setParent] = useState("");
   const [tv, setTv] = useState("");
   const [tu, setTu] = useState("");
   const [desc, setDesc] = useState("");
   const [links, setLinks] = useState<Attachment[]>([]);
-  const [steps, setSteps] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const ta = useRef<HTMLTextAreaElement | null>(null);
   useTags();
@@ -854,18 +837,21 @@ export function NewItemModal({ kind: initial, members, all, date }: {
      carry the last person's tags with it. */
   const assign = (id: string) => { setWho(id); setTags([]); };
 
-  /* Depth 3, target ▸ milestone ▸ task — the store's rule, not a copy of it. */
-  const parents = parentOptions(kind as WorkKind, all);
+  /* ROLLS UP TO IS NOT A CREATE-TIME QUESTION. Naming a task, handing it to
+     somebody and saying when it is due is the whole of making one; which
+     milestone it belongs under is a decision about the SHAPE of the work, and
+     it is one you usually make after the task exists. It lives on Edit, where
+     `parentOptions` still enforces target ▸ milestone ▸ task, so rollup, the
+     timeline lanes and milestone progress are untouched — an item simply
+     starts top level and is filed afterwards. */
 
   const save = () => {
     const r = createItem({
       title, assigneeId: who, kind: kind as "task" | "milestone" | "target",
       priority: pri as Priority,
       startDate: start || null, dueDate: due || null,
-      parentId: parent || null,
       description: desc.trim() || null,
       attachments: links, tagIds: tags,
-      steps: kind === "task" ? steps : undefined,
       targetValue: kind === "target" && tv ? Number(tv) : undefined,
       targetUnit: kind === "target" ? tu || undefined : undefined,
     });
@@ -891,7 +877,7 @@ export function NewItemModal({ kind: initial, members, all, date }: {
 
       <div className="md-b tm-ni">
         <Tabs items={["task", "milestone", "target"].map((k) => ({ k, label: labelOf(KIND, k) }))}
-          cur={kind} onPick={(k) => { setKind(k); if (k === "target") setParent(""); }} />
+          cur={kind} onPick={setKind} />
 
         {/* THE PANEL'S OWN FIELD, NOT A SECOND ONE. `.fg` puts a bold label over
             a full-width `.inp` with a real border, and it is what every other
@@ -940,49 +926,22 @@ export function NewItemModal({ kind: initial, members, all, date }: {
                 onChange={(e) => setTu(e.target.value)} />
             </div>
           </>
-        ) : (
-          <div className="fg">
-            <label htmlFor="niParent">Rolls up to</label>
-            <select id="niParent" className="inp" value={parent}
-              onChange={(e) => setParent(e.target.value)}>
-              <option value="">Nothing — it is top level</option>
-              {parents.map((i) => <option key={i.itemId} value={i.itemId}>{i.title}</option>)}
-            </select>
-          </div>
-        )}
+        ) : null}
 
         <div className="tm-ni-sep" />
 
-        {/* DESCRIPTION — plain text with two marks in it. The buttons write the
+        {/* DESCRIPTION — plain text with marks in it. The buttons write the
             marks so nobody has to know them; see RichText for why this is not
             a contentEditable. */}
         <div className="fg">
           <div className="tm-fgh">
             <label htmlFor="niDesc">Details</label>
-            <span className="tm-rt-bar">
-              <button className="tm-rt-b" title="Bold" aria-label="Bold"
-                onClick={() => wrapSel(ta, desc, setDesc, "**")}><b>B</b></button>
-              <button className="tm-rt-b" title="Bulleted list" aria-label="Bulleted list"
-                onClick={() => bulletSel(ta, desc, setDesc)}><Icon name="menu" size="sm" /></button>
-            </span>
+            <MarkBar ta={ta} value={desc} set={setDesc} />
           </div>
           <textarea id="niDesc" ref={ta} className="inp tm-ni-ta" rows={3} value={desc}
             placeholder="What does done look like?"
             onChange={(e) => setDesc(e.target.value)} />
         </div>
-
-        {/* STEPS, WRITTEN BEFORE THE TASK EXISTS. The description says what
-            the task is; this says what is left of it, and it is what turns the
-            progress bar from a coin-flip into a fraction. Tasks only: a
-            milestone's progress is its children and a target's is its value,
-            so a list here on either would move nothing. */}
-        {kind === "task" ? (
-          <div className="fg">
-            <span className="fg-lb">Steps</span>
-            <p className="tm-ck-hint">What has to happen for this to be done. Each one can be ticked off.</p>
-            <StepsField steps={steps} onChange={setSteps} />
-          </div>
-        ) : null}
 
         <div className="fg">
           <span className="fg-lb">Links</span>
@@ -994,7 +953,7 @@ export function NewItemModal({ kind: initial, members, all, date }: {
           <div className="tm-tagrow">
             {mine.map((t) => (
               <button key={t.tagId}
-                className={"pill xs tm-pick" + (tags.indexOf(t.tagId) >= 0 ? " on" : "")
+                className={"pill xs tm-tag tm-pick" + (tags.indexOf(t.tagId) >= 0 ? " on" : "")
                   + " tag-" + (t.colourToken || "slate")}
                 aria-pressed={tags.indexOf(t.tagId) >= 0}
                 onClick={() => setTags(tags.indexOf(t.tagId) >= 0
@@ -1026,10 +985,10 @@ export function NewItemModal({ kind: initial, members, all, date }: {
  *  seven-column grid whose cells are equal and whose TODAY is marked on the
  *  number — never as a wash over the whole square, which reads as a warning in
  *  a panel where a tinted row means something is wrong. */
-function CalendarFace({ rows, me, p, goto, onOpen, members, all }: {
+function CalendarFace({ rows, me, p, goto, onOpen, members }: {
   rows: WorkItem[]; me: string; p: Record<string, string>;
   goto: (q: Record<string, string | undefined>) => void; onOpen: (id: string) => void;
-  members: Member[]; all: WorkItem[];
+  members: Member[];
 }) {
   const shell = useShell();
   const mode = p.cal === "week" ? "week" : "month";
@@ -1042,7 +1001,7 @@ function CalendarFace({ rows, me, p, goto, onOpen, members, all }: {
     on: mode === "week" ? addDays(anchor, n * 7) : monthStep(anchor, n),
   });
   const create = (kind: string, date?: string) =>
-    shell.modal(<NewItemModal kind={kind} members={members} all={all} date={date} />);
+    shell.modal(<NewItemModal kind={kind} members={members} date={date} />);
 
   return (
     <div className="tm-shell">
@@ -1173,8 +1132,18 @@ function Rail({ me, anchor, rows, onCreate, onOpen }: {
       {/* Create PINS; the blocks scroll under it. It is the control somebody
           reaches for at any scroll position, and a sidebar that scrolls its own
           Create button away has lost the plot. */}
+      {/* Create PINS; the blocks scroll under it. It is the control somebody
+          reaches for at any scroll position, and a sidebar that scrolls its own
+          Create button away has lost the plot.
+
+          TODAY'S PLAN PINS BESIDE IT, because the calendar is the default view
+          now and the calendar hides the filter toolbar — which is where the
+          note's button lives on the other two. Making the month the landing
+          screen would otherwise have stranded the one control you are meant to
+          reach before the day starts. */}
       <div className="tm-rail-t">
         <CreateMenu big onPick={onCreate} />
+        <TodayPlanMenu />
       </div>
 
       <div className="tm-rail-b">
@@ -1192,7 +1161,10 @@ function Rail({ me, anchor, rows, onCreate, onOpen }: {
           </p>
         </section>
 
-        <TasksBlock who={me} onOpen={onOpen} />
+        {/* Capped here and nowhere else: the rail is 248px that also has to
+            hold milestones and targets, while the member page and Reports have
+            a column to themselves and show the lot. */}
+        <TasksBlock who={me} onOpen={onOpen} limit={6} />
         <MarksBlock kind="milestone" who={me} onOpen={onOpen} compact />
         {/* ONE target. It is the number the quarter is judged on, and a column
             of four of them is a list, not an indicator. */}
@@ -1409,16 +1381,34 @@ function List({ rows, all, onOpen }: { rows: WorkItem[]; all: WorkItem[]; onOpen
        columns paid for it: "Rolls up to" moved under the title, where the
        board card already keeps it, and it was 190px of a fact ABOUT a row
        rather than a value worth scanning a column of. */
+    <div className="tm-list">
     <Table
       scroll min="920px"
       cols={[
         { label: "", w: "3px" },
-        { label: "Item" },
-        { label: "Member", w: "160px" },
-        { label: "Stage", w: "130px" },
-        { label: "Priority", w: "92px" },
-        { label: "Due", w: "128px" },
-        { label: "Progress", w: "120px" },
+        /* PERCENTAGES, NOT PIXELS, FOR EVERY COLUMN BUT THE RAIL. Item was the
+           only one without a width, so it absorbed the whole surplus: at 1900px
+           the title ended around 340 and Progress began around 1200, with a
+           long empty track between. Capping the table fixed the track and left
+           a blank slab down the right instead — the same problem moved. Shares
+           spread the surplus across all six, so the table fills the glass and
+           no single column collects the slack. */
+        { label: "Item", w: "32%" },
+        /* PROGRESS SITS BESIDE THE THING IT IS ABOUT. Last in the row it was
+           the far end of a 920px scan from the title, and 120px is a track
+           barely wider than the "100%" beside it — the bar had ~50px to draw a
+           fill AND the today marker in, which is not a reading. It is second
+           now, at 180px, so the two facts everybody opens this list for — what
+           it is and how far along it is — are read together.
+
+           MEMBER MOVED TO THE END for the same reason, from the other side: it
+           is who to ask, not what to scan, and it was standing between the
+           title and every fact about the work. */
+        { label: "Progress", w: "14%" },
+        { label: "Stage", w: "12%" },
+        { label: "Priority", w: "10%" },
+        { label: "Due", w: "13%" },
+        { label: "Member", w: "18%" },
       ]}
       empty={{ icon: "check", title: "No work matches", body: "Clear the filters, or create the first item." }}
       rows={rows.map((i) => {
@@ -1447,637 +1437,41 @@ function List({ rows, all, onOpen }: { rows: WorkItem[]; all: WorkItem[]; onOpen
                 <TagChips item={i} /><WaitFlag item={i} />
               </span>
             </td>
-            <td>{m ? <Who m={m} /> : <span className="dim">—</span>}</td>
-            <td><StagePill item={i} /></td>
-            <td><PriorityChip p={i.priority} /></td>
-            <td className="tnum">
+            {/* THE NUMBER LEADS AND THE BAR SITS UNDER IT. A column of bars
+                is a column of shapes you have to compare against each other
+                to read; a column of tabular percentages is one you read
+                straight down, and the bar is then the shape confirming it. */}
+            <td>{bare ? <span className="dim">—</span> : (
+              <span className="tml-prog">
+                <b className="tnum">{progressOf(i) ?? 0}%</b>
+                <ProgressWindow item={i} bare />
+              </span>
+            )}</td>
+            {/* THE STATUS IS CHANGED WHERE IT IS READ. It was a read-only
+                pill, and moving a task meant opening the panel to reach five
+                buttons in its footer — for the one field people touch most,
+                on the screen that already lists it. Same control as the
+                panel's, and it stops the click reaching the row so changing a
+                status does not also open the drawer behind the menu. */}
+            <td><StatusPicker item={i} sm /></td>
+            {/* STAGE IS FILLED, PRIORITY IS OUTLINED. Delay and High are both
+                warn-toned, so as two filled pills side by side they were the
+                same amber object twice, a column apart, meaning two unrelated
+                things. Same palette, different weight: the stage is what the
+                row IS, the priority only modifies it. */}
+            <td className="tml-pri"><PriorityChip p={i.priority} /></td>
+            {/* `tm-due`, because `.cell-2` is an inline span: the date and the
+                "8 days ago" under it ran together into "27 Aug 20268 days ago"
+                here for the same reason they did in the drawer. */}
+            <td className="tnum tm-due">
               {i.dueDate ? fmtDate(i.dueDate) : "—"}
               {i.dueDate ? <span className="cell-2">{ago(i.dueDate, TODAY)}</span> : null}
             </td>
-            <td>{bare ? <span className="dim">—</span> : <ProgressWindow item={i} />}</td>
+            <td>{m ? <Who m={m} /> : <span className="dim">—</span>}</td>
           </tr>
         );
       })}
     />
-  );
-}
-
-/** THE FIELDS THE CREATE DIALOG SET, editable. Same `.fg` rows, same rules,
- *  and the kind is not among them — a kind decides what may sit under an item,
- *  so changing it would orphan children without saying so. */
-function EditItemModal({ item, all }: { item: WorkItem; all: WorkItem[] }) {
-  const shell = useShell();
-  const members = useMembers();
-  const [title, setTitle] = useState(item.title);
-  const [who, setWho] = useState(item.assigneeId);
-  const [pri, setPri] = useState<string>(item.priority);
-  const [start, setStart] = useState(item.startDate || "");
-  const [due, setDue] = useState(item.dueDate || "");
-  const [parent, setParent] = useState(item.parentId || "");
-  /* The store's own rule — never itself, never anything under it — and
-     memoised, because it does not change with a keystroke in the title. */
-  const parents = useMemo(() => {
-    const opts = parentOptions(item.kind, all, item.itemId);
-    /* The parent it HAS stays on the list even when the rule would not offer
-       it now — completed, say — or the select shows "Nothing" over a state
-       that still holds the old id, and what is read is not what is saved. */
-    const cur = item.parentId ? all.filter((i) => i.itemId === item.parentId)[0] : null;
-    return cur && !opts.some((o) => o.itemId === cur.itemId) ? [cur].concat(opts) : opts;
-  }, [item.kind, item.itemId, item.parentId, all]);
-  const save = () => {
-    const r = updateItem(item.itemId, {
-      title, assigneeId: who, priority: pri as Priority,
-      startDate: start || null, dueDate: due || null,
-      parentId: item.kind === "target" ? null : (parent || null),
-    });
-    if (!r.ok) { shell.toast(r.message, "bad"); return; }
-    shell.closeLayer();
-    shell.toast("Saved.");
-  };
-  return (
-    <>
-      <div className="md-h">
-        <h3>Edit {labelOf(KIND, item.kind).toLowerCase()}</h3>
-        <button className="btn icon sm md-x" aria-label="Close" onClick={() => shell.closeLayer()}>
-          <Icon name="x" size="sm" />
-        </button>
-      </div>
-      <div className="md-b">
-        <div className="fg">
-          <label htmlFor="eiTitle">Title <b className="req">*</b></label>
-          <input id="eiTitle" className="inp" autoFocus value={title} onChange={(e) => setTitle(e.target.value)} />
-        </div>
-        <div className="fg">
-          <label htmlFor="eiWho">Assigned to</label>
-          <select id="eiWho" className="inp" value={who} onChange={(e) => setWho(e.target.value)}>
-            {members.filter((m) => m.status === "active" || m.memberId === item.assigneeId)
-              .map((m) => <option key={m.memberId} value={m.memberId}>{m.name}</option>)}
-          </select>
-          {who !== item.assigneeId
-            ? <span className="help">Tags belong to a member. Handing this over drops the last person's.</span>
-            : null}
-        </div>
-        <div className="fg">
-          <label htmlFor="eiPri">Priority</label>
-          <select id="eiPri" className="inp" value={pri} onChange={(e) => setPri(e.target.value)}>
-            {PRIORITY_SCALE.map((k) => <option key={k} value={k}>{labelOf(PRIORITY, k)}</option>)}
-          </select>
-        </div>
-        <div className="fg">
-          <label htmlFor="eiStart">Starts</label>
-          <input id="eiStart" type="date" className="inp" value={start} onChange={(e) => setStart(e.target.value)} />
-        </div>
-        <div className="fg">
-          <label htmlFor="eiDue">Due</label>
-          <input id="eiDue" type="date" className="inp" value={due} onChange={(e) => setDue(e.target.value)} />
-        </div>
-        {item.kind !== "target" ? (
-          <div className="fg">
-            <label htmlFor="eiParent">Rolls up to</label>
-            <select id="eiParent" className="inp" value={parent} onChange={(e) => setParent(e.target.value)}>
-              <option value="">Nothing — it is top level</option>
-              {parents.map((i) => <option key={i.itemId} value={i.itemId}>{i.title}</option>)}
-            </select>
-          </div>
-        ) : null}
-      </div>
-      <div className="md-f">
-        <span className="spacer" />
-        <button className="btn" onClick={() => shell.closeLayer()}>Cancel</button>
-        <button className="btn pri" disabled={!title.trim()} onClick={save}>Save</button>
-      </div>
-    </>
-  );
-}
-
-/* --------------------------------------------------------------- drawer --- */
-
-/* IT TAKES AN ID, NOT A RECORD. Handed `item`, `all` and `tags` as props, the
-   drawer was a snapshot, and the only way to keep it current was for the page to
-   push a new one every time the store moved — which is the loop described at the
-   effect that opens it. Reading the store here costs the same three hooks and
-   makes the layer a live view of the record instead of a copy of it. */
-function ItemDrawer({ itemId, onClose, onOpen }: {
-  itemId: string; onClose: () => void; onOpen: (id: string) => void;
-}) {
-  const shell = useShell();
-  useLinks();
-  const item = useItem(itemId);
-  const all = useWork({}, "all");
-  const tags = useTags();
-
-  /* The record can go while the drawer is over it — somebody else's delete, or
-     one made in another tab. Saying so beats an empty panel or a crash. */
-  if (!item) {
-    return (
-      <>
-        <div className="dw-h">
-          <span className="tm-dw-t"><b>Item not found</b></span>
-          <span className="spacer" />
-          <button className="btn icon sm" aria-label="Close" onClick={onClose}>
-            <Icon name="x" size="sm" />
-          </button>
-        </div>
-        <div className="dw-b">
-          <Notice tone="warn" text="This item was removed while the drawer was open." />
-        </div>
-      </>
-    );
-  }
-
-  const links = linksOf(item.itemId);
-  const m = readMember(item.assigneeId);
-  const parent = parentOf(item, all);
-  const kids = childrenOf(item.itemId, all);
-  const late = isDelayed(item);
-  const blocker = blockerOf(item, all);
-  const st = stageOf(item);
-  const mine = tagsOwnedBy(item.assigneeId);
-  const on = (item.tagIds || []);
-  const ck = checkCount(item);
-
-  /* BUILT, NOT WRITTEN INLINE, so a fact that is not set costs no row at all
-     rather than a row saying it is not set. Kind is here only for a milestone
-     or a target: on a task the title already carries the mark. */
-  const facts: [ReactNode, ReactNode][] = [];
-  if (item.kind !== "task") {
-    facts.push(["Kind",
-      <span className="tm-title"><KindMark kind={item.kind} />{labelOf(KIND, item.kind)}</span>]);
-  }
-  if (parent) {
-    facts.push(["Rolls up to",
-      <a data-go={"#/work?item=" + parent.itemId}
-        onClick={() => onOpen(parent.itemId)}>{parent.title}</a>]);
-  }
-  if (item.startDate) facts.push(["Starts", fmtDate(item.startDate)]);
-  if (blocker) {
-    facts.push(["Waiting on",
-      <a data-go={"#/work?item=" + blocker.itemId}
-        onClick={() => onOpen(blocker.itemId)}>{blocker.title}</a>]);
-  }
-
-  const move = (to: WorkStatus, reason?: string) => {
-    const r = setItemStatus(item.itemId, to, reason);
-    if (!r.ok) { shell.toast(r.message, "bad"); return; }
-    shell.toast(item.title + " → " + labelOf(WORK_STATUS, to));
-  };
-  const askReason = (to: WorkStatus, title: string) => {
-    shell.modal(<ReasonModal title={title} onSubmit={(reason) => { shell.closeLayer(); move(to, reason); }} />, "sm");
-  };
-
-  return (
-    <>
-      <div className="dw-h">
-        <span className="tm-dw-t"><KindMark kind={item.kind} /><b>{item.title}</b></span>
-        <StagePill item={item} />
-        <span className="spacer" />
-        {/* Nothing about an item could change after creation. Now it can. */}
-        {!isTerminal(item.status)
-          ? <button className="btn sm" onClick={() => shell.modal(<EditItemModal item={item} all={all} />, "sm")}>Edit</button>
-          : null}
-        <button className="btn icon sm" aria-label="Close" onClick={onClose}><Icon name="x" size="sm" /></button>
-      </div>
-      <div className="dw-b">
-        {late ? (
-          <Notice tone="warn" text={"Due " + fmtDate(item.dueDate) + " — " + daysOver(item) + " days over. Delay is derived from the date; the stored stage is still " + labelOf(WORK_STATUS, item.status) + "."} />
-        ) : null}
-        {blocker ? (
-          <Notice tone="bad" text={(item.blockedReason || "Waiting on another item.") + " → " + blocker.title} />
-        ) : null}
-        {item.status === "cancelled" && item.cancelledReason
-          ? <Notice text={item.cancelledReason} /> : null}
-
-        {/* THE FOUR FACTS YOU OPENED IT FOR, ABOVE EVERYTHING ELSE. Who has
-            it, what stage it is in, when it is due and how loud it is were rows
-            two, three, four and six of an eight-row table — so the drawer
-            opened on "Kind: Task", which is the one thing the title already
-            said with an icon. They are a strip now and they are read, not
-            scanned. */}
-        <div className="tm-dw-sum">
-          <span className="tm-dw-f">
-            <b>Assigned to</b>
-            {m ? <Who m={m} /> : <span className="dim">Nobody</span>}
-          </span>
-          <span className="tm-dw-f">
-            <b>Stage</b>
-            <span>
-              <StagePill item={item} />
-              {st === "delayed" ? (
-                <span className="cell-2">derived · stored is {labelOf(WORK_STATUS, item.status)}</span>
-              ) : null}
-            </span>
-          </span>
-          <span className="tm-dw-f">
-            <b>Due</b>
-            {item.dueDate ? (
-              <span className={late ? "u-warn-t" : ""}>
-                {fmtDate(item.dueDate)}<span className="cell-2">{ago(item.dueDate, TODAY)}</span>
-              </span>
-            ) : <span className="dim">No date</span>}
-          </span>
-          <span className="tm-dw-f">
-            <b>Priority</b>
-            <span>{labelOf(PRIORITY, item.priority)}</span>
-          </span>
-        </div>
-
-        {/* ONLY WHAT IS ACTUALLY SET. The list this replaces printed "Rolls up
-            to: Nothing — it is top level", "Waiting on: Nothing" and "Starts:
-            Not set" at the same weight as the facts, so half of it was
-            absences the reader had to sift out. An absence earns a line only
-            where it changes what you would do next, and exactly one does: a
-            task with no start date cannot be drawn on the timeline, so that one
-            stays, as a footnote rather than a row. */}
-        {facts.length ? <KvList cls="wide" pairs={facts} /> : null}
-        {!item.startDate ? (
-          <p className="tm-foot">No start date, so it cannot be drawn on the timeline.</p>
-        ) : null}
-
-        {item.description ? (
-          <>
-            <SectionHead title="Description" />
-            <RichText text={item.description} />
-          </>
-        ) : null}
-
-        {/* THE STEPS — and until now there was nowhere to see or tick one.
-            `checklist` is the single stored fact in a module that derives
-            almost everything, `progressOf` reads it, the Analysis face counts
-            it and the task row draws it — but the drawer is the only screen
-            that can EDIT a task and it had no checklist UI at all, so no line
-            could ever be written and every bar was stuck at 0 or 100. */}
-        {item.kind === "task" ? (
-          <>
-            <SectionHead title="Steps"
-              desc={ck.total
-                ? ck.done + " of " + ck.total + " ticked" + (item.status === "completed"
-                  ? " · completed, so progress reads 100 whatever is left open" : "")
-                /* The same line the create dialog shows over its Steps field,
-                   so the control is named once across both screens. */
-                : "What has to happen for this to be done. Each one can be ticked off."} />
-            <CheckList item={item} />
-          </>
-        ) : null}
-
-        {/* WHERE THE WORK LIVES. This block used to render `attachments` —
-            files this panel holds — under the heading "Links", while
-            `addResourceLink` wrote to `links`, a different field entirely. So
-            a saved link went into the record and was never drawn anywhere, and
-            there was no control to save one to begin with. */}
-        <SectionHead title="Links" desc="The brief, the folder, the board. Opens in a new tab." />
-        <LinkList item={item} />
-
-        <SectionHead title="Tags" desc="A tag is a record its owner holds. Two members may both hold Call." />
-        <TagPicker item={item} mine={mine} on={on} tags={tags} />
-
-        <SectionHead title="Linked items"
-          desc="Soft edges. The parent and the waiting-on links live above; an edge here never touches rollup."
-          right={<button className="btn sm" onClick={() => shell.modal(<LinkModal item={item} all={all} />, "sm")}>Link…</button>} />
-        {links.length ? (
-          <ul className="tm-kids">
-            {links.map(({ link, other, outward }) => (
-              <li key={link.linkId}>
-                <a data-go={"#/work?item=" + other.itemId} onClick={() => onOpen(other.itemId)}>
-                  <span className="tm-lk">{linkLabelOf(link.relation, outward)}</span>
-                  <KindMark kind={other.kind} />{other.title}
-                </a>
-                <button className="btn icon sm" aria-label="Remove this link"
-                  onClick={() => removeLink(link.linkId)}><Icon name="x" size="sm" /></button>
-              </li>
-            ))}
-          </ul>
-        ) : <p className="tm-foot">Nothing linked.</p>}
-
-        {item.kind !== "task" ? (
-          <>
-            <SectionHead title="Progress" desc={item.kind === "target"
-              ? "Current value ÷ target. Nothing types the percentage."
-              : "Completed children ÷ total. The marker is where today sits in the window."} />
-            <ProgressWindow item={item} showNote />
-            <p className="tm-target tnum">{noteOf(item)}</p>
-          </>
-        ) : null}
-
-        {kids.length ? (
-          <>
-            <SectionHead title={"Inside this " + item.kind} desc={kids.length + " items"} />
-            <ul className="tm-kids">
-              {kids.map((k) => (
-                <li key={k.itemId} className={k.status === "completed" ? "done" : ""}>
-                  <a data-go={"#/work?item=" + k.itemId} onClick={() => onOpen(k.itemId)}>
-                    <KindMark kind={k.kind} />{k.title}
-                  </a>
-                  <StagePill item={k} />
-                </li>
-              ))}
-            </ul>
-          </>
-        ) : null}
-      </div>
-      <div className="dw-f">
-        {item.status === "planned" ? <button className="btn pri" onClick={() => move("in_progress")}>Start</button> : null}
-        {item.status === "in_progress" ? <button className="btn pri" onClick={() => move("completed")}>Complete</button> : null}
-        {item.status === "completed" ? <button className="btn" onClick={() => askReason("in_progress", "Reopen this item")}>Reopen…</button> : null}
-        {/* The vocabulary has always defined cancelled → planned as "Restore",
-            with a reason, and the store enforces it; the footer simply had no
-            branch for it, so a cancelled item was a dead end. */}
-        {item.status === "cancelled" ? <button className="btn" onClick={() => askReason("planned", "Restore this item")}>Restore…</button> : null}
-        {!isTerminal(item.status) ? (
-          <button className="btn" onClick={() => shell.modal(
-            <WaitModal item={item} all={all} />, "sm")}>
-            {blocker ? "Waiting on…" : "Waiting on…"}
-          </button>
-        ) : null}
-        <span className="spacer" />
-        {!isTerminal(item.status)
-          ? <button className="btn dgr" onClick={() => askReason("cancelled", "Why is it cancelled?")}>Cancel…</button> : null}
-      </div>
-    </>
-  );
-}
-
-/** THE ONE STORED THING, AND THE ONE PLACE IT CAN BE WRITTEN.
- *
- *  Ticking is an act somebody performs; delay, stage and progress are all read
- *  off other facts. So this is a real control and not a read-out — a checkbox
- *  that toggles, a line that can be dropped, and one field that adds.
- *
- *  It did not exist. `checklist` shipped with the store, `progressOf` reads it,
- *  the Analysis face counts it and the task row draws it, but the drawer is the
- *  only screen that can edit a task and it had no checklist in it — so a line
- *  could never be written and every task's bar was stuck at 0 or 100. */
-function CheckList({ item }: { item: WorkItem }) {
-  const shell = useShell();
-  const [draft, setDraft] = useState("");
-  const lines = item.checklist || [];
-  const add = () => {
-    const r = addCheckLine(item.itemId, draft);
-    if (!r.ok) { shell.toast(r.message, "bad"); return; }
-    setDraft("");
-  };
-  return (
-    <div className="tm-ck">
-      {lines.length ? (
-        <ul className="tm-ck-l">
-          {lines.map((l) => (
-            <li key={l.lineId} className={l.done ? "done" : ""}>
-              {/* A LABEL, so the words are the hit area too. A 13px box is a
-                  hard target and the text beside it is the obvious thing to
-                  press. */}
-              <label className="tm-ck-x">
-                <input type="checkbox" checked={l.done}
-                  onChange={() => toggleCheckLine(item.itemId, l.lineId)} />
-                <span>{l.text}</span>
-              </label>
-              <button className="btn icon sm" aria-label={"Remove step: " + l.text}
-                onClick={() => removeCheckLine(item.itemId, l.lineId)}>
-                <Icon name="x" size="sm" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : <p className="tm-foot">No steps yet — so its progress can only be 0 or 100.</p>}
-      <div className="tm-ck-new">
-        <input className="inp" value={draft} placeholder="Add a step" aria-label="Add a step"
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} />
-        <button className="btn sm" onClick={add} disabled={!draft.trim()}>Add</button>
-      </div>
     </div>
   );
 }
-
-/** A URL WITH A NAME ON IT — the brief, the folder, the board.
- *
- *  Three different things in this module read as "links" and the store names
- *  them apart on purpose: `attachments` are files this panel holds, an
- *  item↔item link is a relationship between records, and these are addresses
- *  out of the panel. The drawer used to draw `attachments` under the heading
- *  "Links" while `addResourceLink` wrote `links`, so a saved address went into
- *  the record and was never seen — and nothing could save one anyway.
- *
- *  The name is required and the scheme is checked in the store, because
- *  `docs.google.com/…` with no scheme resolves against THIS panel's origin and
- *  404s, which reads as a broken document rather than a typo. */
-function LinkList({ item }: { item: WorkItem }) {
-  const shell = useShell();
-  const [label, setLabel] = useState("");
-  const [url, setUrl] = useState("");
-  const add = () => {
-    const r = addResourceLink(item.itemId, label, url);
-    if (!r.ok) { shell.toast(r.message, "bad"); return; }
-    setLabel(""); setUrl("");
-  };
-
-  /* TWO FIELDS, ONE IDEA — AND THE READER MUST NOT PAY FOR THAT. The create
-     modal's link field writes `attachments`; `addResourceLink` writes `links`.
-     They hold the same thing, a named address, and the record carries both, so
-     drawing only one of them loses whatever was typed on the other screen —
-     which is what the old block did, from the opposite side. They are drawn as
-     one list here. Only the `links` half can be removed, because that is the
-     half with an id and a store function; collapsing the two into one field is
-     a store change and it is on the backend list, not smuggled into a drawer. */
-  const rows = (item.attachments || []).map((a, i) => ({
-    key: "att-" + i, label: a.label, url: a.url, drop: null as null | (() => void),
-  })).concat((item.links || []).map((l) => ({
-    key: l.linkId, label: l.label, url: l.url,
-    drop: () => { removeResourceLink(item.itemId, l.linkId); },
-  })));
-
-  return (
-    <div className="tm-lkbox">
-      {rows.length ? (
-        <ul className="tm-lk">
-          {rows.map((l) => (
-            <li key={l.key}>
-              <Icon name="ext" size="sm" />
-              <span className="tm-lk-t">
-                {/* noreferrer as well as noopener: the target must not be
-                    handed this panel's URL in its referrer. */}
-                <a href={l.url} target="_blank" rel="noopener noreferrer">{l.label}</a>
-                <span className="cell-2">{l.url}</span>
-              </span>
-              {l.drop ? (
-                <button className="btn icon sm" aria-label={"Remove link: " + l.label}
-                  onClick={l.drop}><Icon name="x" size="sm" /></button>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      ) : <p className="tm-foot">Nothing linked yet.</p>}
-      <div className="tm-lk-new">
-        <input className="inp" value={label} placeholder="Name" aria-label="Link name"
-          onChange={(e) => setLabel(e.target.value)} />
-        <input className="inp" value={url} placeholder="https://…" aria-label="Link address"
-          onChange={(e) => setUrl(e.target.value)} />
-        <button className="btn sm" onClick={add}
-          disabled={!label.trim() || !url.trim()}>Add</button>
-      </div>
-    </div>
-  );
-}
-
-/** Own tags first, then the suggestions, then create. This is the only place a
- *  tag is born — a separate screen would be a second entry point to a record
- *  with six fields. */
-function TagPicker({ item, mine, on, tags }: { item: WorkItem; mine: Tag[]; on: string[]; tags: Tag[] }) {
-  const shell = useShell();
-  const [draft, setDraft] = useState("");
-  const add = () => {
-    const r = createTag(item.assigneeId, draft);
-    if (!r.ok) { shell.toast(r.message, "bad"); return; }
-    tagItem(item.itemId, r.data.tagId, true);
-    setDraft("");
-  };
-  const others = tags.filter((t) => t.ownerId !== item.assigneeId && !t.archivedAt
-    && !mine.some((x) => x.slug === t.slug));
-  return (
-    <div className="tm-tagpick">
-      <div className="tm-tagrow">
-        {mine.map((t) => (
-          <button key={t.tagId}
-            className={"pill xs tm-pick" + (on.indexOf(t.tagId) >= 0 ? " on" : "") + " tag-" + (t.colourToken || "slate")}
-            onClick={() => tagItem(item.itemId, t.tagId, on.indexOf(t.tagId) < 0)}>
-            {t.label}
-          </button>
-        ))}
-        {mine.length ? null : <span className="dim">No tags yet.</span>}
-      </div>
-      <div className="tm-tagnew">
-        <input className="inp sm" placeholder="New tag" value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") add(); }} />
-        <button className="btn sm" disabled={!draft.trim()} onClick={add}>Create</button>
-      </div>
-      {others.length ? (
-        <p className="cell-2">{others.length} more tags exist on other members. Cross-member views group by slug.</p>
-      ) : null}
-    </div>
-  );
-}
-
-function WaitModal({ item, all }: { item: WorkItem; all: WorkItem[] }) {
-  const shell = useShell();
-  const [pick, setPick] = useState(item.blockedByItemId || "");
-  const [why, setWhy] = useState(item.blockedReason || "");
-  const options = all.filter((i) => i.itemId !== item.itemId && !isTerminal(i.status));
-  const save = (clear?: boolean) => {
-    const r = setBlockedBy(item.itemId, clear ? null : pick || null, why);
-    if (!r.ok) { shell.toast(r.message, "bad"); return; }
-    shell.closeLayer();
-    shell.toast(clear ? "No longer waiting." : "Waiting on another item.");
-  };
-  return (
-    <>
-      <div className="md-h">
-        <h3>Waiting on</h3>
-        <button className="btn icon sm md-x" aria-label="Close" onClick={() => shell.closeLayer()}>
-          <Icon name="x" size="sm" />
-        </button>
-      </div>
-      <div className="md-b">
-        <div className="fg">
-          <label htmlFor="tmWaitOn">Item</label>
-          <select id="tmWaitOn" className="inp" value={pick} onChange={(e) => setPick(e.target.value)}>
-            <option value="">—</option>
-            {options.map((i) => <option key={i.itemId} value={i.itemId}>{i.title}</option>)}
-          </select>
-        </div>
-        <div className="fg">
-          <label htmlFor="tmWaitWhy">Reason <b className="req">*</b></label>
-          <input id="tmWaitWhy" className="inp" value={why} onChange={(e) => setWhy(e.target.value)}
-            placeholder="What it is waiting for." />
-          <span className="help">The stage does not move. Waiting is a relationship, not a stage.</span>
-        </div>
-      </div>
-      <div className="md-f">
-        {item.blockedByItemId ? <button className="btn" onClick={() => save(true)}>Clear</button> : null}
-        <span className="spacer" />
-        <button className="btn" onClick={() => shell.closeLayer()}>Cancel</button>
-        <button className="btn pri" disabled={!pick} onClick={() => save()}>Save</button>
-      </div>
-    </>
-  );
-}
-
-/** One picker, one relation. The list already excludes the parent and the
- *  blocker — those are the strong links, and the store refuses them anyway. */
-function LinkModal({ item, all }: { item: WorkItem; all: WorkItem[] }) {
-  const shell = useShell();
-  const [pick, setPick] = useState("");
-  const [rel, setRel] = useState<LinkRelation>("relates_to");
-  const options = all.filter((i) => i.itemId !== item.itemId
-    && i.itemId !== item.parentId && i.parentId !== item.itemId
-    && i.itemId !== item.blockedByItemId);
-  const save = () => {
-    const r = addLink(item.itemId, pick, rel);
-    if (!r.ok) { shell.toast(r.message, "bad"); return; }
-    shell.closeLayer();
-    shell.toast("Linked.");
-  };
-  return (
-    <>
-      <div className="md-h">
-        <h3>Link an item</h3>
-        <button className="btn icon sm md-x" aria-label="Close" onClick={() => shell.closeLayer()}>
-          <Icon name="x" size="sm" />
-        </button>
-      </div>
-      <div className="md-b">
-        <div className="fg">
-          <label htmlFor="lkRel">Relation</label>
-          <select id="lkRel" className="inp" value={rel}
-            onChange={(e) => setRel(e.target.value as LinkRelation)}>
-            {(["relates_to", "duplicates", "follows"] as LinkRelation[]).map((k) =>
-              <option key={k} value={k}>{linkLabelOf(k, true)}</option>)}
-          </select>
-        </div>
-        <div className="fg">
-          <label htmlFor="lkTo">Item</label>
-          <select id="lkTo" className="inp" value={pick} onChange={(e) => setPick(e.target.value)}>
-            <option value="">—</option>
-            {options.map((i) => <option key={i.itemId} value={i.itemId}>{i.title}</option>)}
-          </select>
-          <span className="help">Gates nothing. A follows edge draws a sequence; it never blocks the work.</span>
-        </div>
-      </div>
-      <div className="md-f">
-        <span className="spacer" />
-        <button className="btn" onClick={() => shell.closeLayer()}>Cancel</button>
-        <button className="btn pri" disabled={!pick} onClick={save}>Link</button>
-      </div>
-    </>
-  );
-}
-
-/** Every transition that changes what a reader would conclude asks for a
- *  sentence. A cancellation with no reason cannot answer the question it will
- *  be asked. */
-function ReasonModal({ title, onSubmit }: { title: string; onSubmit: (reason: string) => void }) {
-  const shell = useShell();
-  const [v, setV] = useState("");
-  return (
-    <>
-      <div className="md-h">
-        <h3>{title}</h3>
-        <button className="btn icon sm md-x" aria-label="Close" onClick={() => shell.closeLayer()}>
-          <Icon name="x" size="sm" />
-        </button>
-      </div>
-      <div className="md-b">
-        <div className="fg">
-          <label htmlFor="tmReason">Reason <b className="req">*</b></label>
-          <textarea id="tmReason" className="inp" rows={3} autoFocus value={v}
-            onChange={(e) => setV(e.target.value)} />
-          <span className="help">Stored on the item and shown wherever its stage is.</span>
-        </div>
-      </div>
-      <div className="md-f">
-        <span className="spacer" />
-        <button className="btn" onClick={() => shell.closeLayer()}>Cancel</button>
-        <button className="btn pri" disabled={!v.trim()} onClick={() => onSubmit(v)}>Save</button>
-      </div>
-    </>
-  );
-}
-

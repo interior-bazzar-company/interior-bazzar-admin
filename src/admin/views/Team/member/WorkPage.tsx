@@ -36,7 +36,7 @@ export default function WorkPage({ m, viewer }: { m: Member; viewer: Viewer }) {
     <>
       <OpHead
         title="Work"
-        desc="Tasks, then milestones, then targets. Every bar is derived from its own children — nothing on this page was typed."
+        desc="What is assigned, then milestones, then targets. Every bar is derived from its own children — nothing on this page was typed."
         right={<button className="btn" onClick={() => go(workHref(m.memberId))}>
           <Icon name="calendar" size="sm" />Open their board
         </button>} />
@@ -97,7 +97,7 @@ function TagManager({ m }: { m: Member }) {
         rows={mine.map((t) => (
           <tr key={t.tagId} className={t.archivedAt ? "dim" : ""}>
             <td>
-              <span className={"pill xs tag-" + (t.colourToken || "slate")}>{t.label}</span>
+              <span className={"pill xs tm-tag tag-" + (t.colourToken || "slate")}>{t.label}</span>
               {t.archivedAt
                 ? <span className="cell-2">archived {fmtDate(t.archivedAt.slice(0, 10))}</span>
                 : null}
@@ -143,7 +143,7 @@ function TheirTags({ m }: { m: Member }) {
       </div>
       <div className="tm-tagrow">
         {mine.length ? mine.map((t) => (
-          <span key={t.tagId} className={"pill xs tag-" + (t.colourToken || "slate")}>
+          <span key={t.tagId} className={"pill xs tm-tag tag-" + (t.colourToken || "slate")}>
             {t.label}<span className="dim"> {tagCount(t)}</span>
           </span>
         )) : <span className="dim">None yet.</span>}

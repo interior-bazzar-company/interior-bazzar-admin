@@ -818,20 +818,66 @@ head("A task says how far in it is");
     ok("…and removed", S.removeCheckLine(task.itemId, line.lineId).ok === true);
   })();
 
-head("A link needs a name and a scheme");
+head("A link needs an address, and it is completed rather than refused");
 
-  /* A bare URL saved as `docs.google.com/...` resolves against THIS panel's
-     origin and 404s, which reads as a broken document rather than a typo. */
-  ok("a link needs a name", S.addResourceLink(task.itemId, "", "https://x.com").ok === false);
-  ok("…and an address", S.addResourceLink(task.itemId, "Brief", "  ").ok === false);
-  ok("…and a scheme on that address",
-    S.addResourceLink(task.itemId, "Brief", "docs.google.com/d/1").ok === false);
+  /* A bare URL saved AS TYPED resolves against THIS panel's origin and 404s,
+     which reads as a broken document rather than a typo — so it is normalised
+     on the way in. Refusing it outright was the other half of that bug: the
+     create dialog's link field has always normalised, so the same paste was
+     accepted on one screen and rejected on the other. */
+  ok("an address is required", S.addResourceLink(task.itemId, "Brief", "  ").ok === false);
+  ok("…and the scheme has to be http or https",
+    S.addResourceLink(task.itemId, "Brief", "javascript:alert(1)").ok === false);
+  ok("…a bare host is completed, not refused", (() => {
+    const r = S.addResourceLink(task.itemId, "Brief", "docs.google.com/d/1");
+    if (!r.ok) return false;
+    const t = S.readItems().filter((i) => i.itemId === task.itemId)[0];
+    return t.links[t.links.length - 1].url === "https://docs.google.com/d/1";
+  })());
+  ok("…the name is optional, and falls back to the host", (() => {
+    const r = S.addResourceLink(task.itemId, "", "https://www.figma.com/file/9");
+    if (!r.ok) return false;
+    const t = S.readItems().filter((i) => i.itemId === task.itemId)[0];
+    return t.links[t.links.length - 1].label === "figma.com";
+  })());
   ok("…and then it saves",
     S.addResourceLink(task.itemId, "Brief", "https://docs.google.com/d/1").ok === true);
   ok("…and can be removed", (() => {
     const t = S.readItems().filter((i) => i.itemId === task.itemId)[0];
     return S.removeResourceLink(task.itemId, t.links[t.links.length - 1].linkId).ok === true;
   })());
+  S.resetStore();
+
+head("The status menu can only offer what the store accepts");
+
+  /* A control that offers a move the store refuses is a control that lies, and
+     the drawer's old footer hard-coded its buttons — which is how a cancelled
+     item became a dead end the store would have let out of. `transitionsFrom`
+     reads the same vocabulary row `setItemStatus` enforces with, so the two
+     cannot drift; this proves it rather than assuming it. */
+  ["planned", "in_progress", "completed", "cancelled"].forEach((from) => {
+    const offered = S.transitionsFrom(from).map((t) => t.to);
+    ok(from + " offers at least one move", offered.length > 0);
+    offered.forEach((to) => {
+      S.resetStore();
+      /* AN ITEM ALREADY IN `from`, not one driven there. Seeding by transition
+         cannot reach `planned` from anywhere the seed happens to start, and the
+         first draft skipped those cases silently — so the planned row, which is
+         the one every new task begins in, was never actually exercised. */
+      const it = S.readItems().filter((i) => i.kind === "task" && i.status === from)[0];
+      ok("  a seeded item exists in " + from, !!it);
+      if (!it) return;
+      const r = S.setItemStatus(it.itemId, to, "because");
+      ok("  " + from + " → " + to + " is accepted",
+        r.ok === true, r.ok ? "" : r.message);
+    });
+  });
+  ok("no row offers a move to Delay, which is derived and never stored",
+    ["planned", "in_progress", "completed", "cancelled"]
+      .every((f) => S.transitionsFrom(f).every((t) => t.to !== "delayed")));
+  ok("reopen and restore both ask for a reason",
+    S.transitionsFrom("completed").every((t) => t.requiresReason)
+    && S.transitionsFrom("cancelled").every((t) => t.requiresReason));
   S.resetStore();
 
 head("Four priorities, and only one of them shouts");

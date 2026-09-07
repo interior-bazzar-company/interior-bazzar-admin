@@ -155,7 +155,17 @@ export function EodModal({ m }: { m: Member }) {
     return fromPlan.concat(alsoDone);
   }, [plan, mine]);
 
-  const [lines, setLines] = useState(seedLines);
+  /* THE LINES ARE READ, NOT TICKED. This was editable state seeded from the
+     board — a checkbox list you completed work from, plus a button for anything
+     that was not on the plan. Both are gone, and what is left is the record the
+     day already wrote: the plan's lines, plus anything else finished today,
+     each shown against what the BOARD says about it.
+
+     Ticking happens on the work itself, which is the only place it ever really
+     happened: `submitReport` completes a ticked line's item, so a line that is
+     done here is done because the item is already terminal, and that loop is
+     now a no-op. One writer, and it is the board. */
+  const lines = seedLines;
   const [pending, setPending] = useState("");
   const [win, setWin] = useState("");
   const [help, setHelp] = useState("");
@@ -164,7 +174,12 @@ export function EodModal({ m }: { m: Member }) {
 
   const undone = lines.filter((l) => !l.done).length;
   const named = lines.filter((l) => l.title.trim());
-  const blocked = (!!undone && !pending.trim()) || !named.length;
+  /* A REPORT WITH NO LINES IS STILL A REPORT. Submit used to require at least
+     one, which was reachable only because you could add one by hand; with the
+     lines derived, a member who planned nothing and closed nothing could never
+     file. The store has never demanded lines — only a reason for unticked
+     ones — so this asks exactly that and nothing more. */
+  const blocked = !!undone && !pending.trim();
 
   const save = () => {
     const r = submitReport(m.memberId, {
@@ -198,42 +213,26 @@ export function EodModal({ m }: { m: Member }) {
 
   return (
     <>
-      <Head title="End of day" sub="Ticking a line completes that work item" />
+      <Head title="End of day" sub="What moved today, read from the board" />
       <div className="md-b">
         {!plan || !plan.submittedAt ? (
-          <Notice tone="warn" text="No plan went in this morning, so there is nothing pre-filled. Add what you did below." />
+          <Notice tone="warn" text="No plan went in this morning, so this lists only what was closed today." />
         ) : null}
 
-        <ul className="tm-eod">
+        {/* WHAT THE DAY ACTUALLY DID, read off the board. Ticks are not
+            controls here — they are the item's own status, drawn. */}
+        <ul className="tm-eod read">
           {lines.map((l, i) => (
-            <li key={i}>
-              <label className="check">
-                <input type="checkbox" checked={l.done}
-                  onChange={(e) => setLines(lines.map((x, n) => (n === i ? { ...x, done: e.target.checked } : x)))} />
-                <span></span>
-                <b>{l.title || "Untitled"}</b>
-              </label>
+            <li key={i} className={l.done ? "done" : ""}>
+              <i className={l.done ? "on" : ""} aria-hidden="true" />
+              <b>{l.title || "Untitled"}</b>
               {l.workItemId ? (
                 <button className="lnk" onClick={() => openWork(l.workItemId as string)}>open</button>
               ) : null}
             </li>
           ))}
-          {!lines.length ? <li className="dim">Nothing on today's plan.</li> : null}
+          {!lines.length ? <li className="dim">Nothing planned, and nothing closed today.</li> : null}
         </ul>
-        <button className="btn sm"
-          onClick={() => setLines(lines.concat([{ workItemId: null, title: "", done: true }]))}>
-          <Icon name="plus" size="sm" />Something not on the plan
-        </button>
-
-        {lines.some((l) => !l.title.trim()) ? (
-          <div className="fg">
-            <label htmlFor="tmExtra">What was it? <b className="req">*</b></label>
-            <input id="tmExtra" className="inp" autoFocus
-              placeholder="The unplanned thing that took the afternoon"
-              onChange={(e) => setLines(lines.map((l) =>
-                (l.title.trim() ? l : { ...l, title: e.target.value })))} />
-          </div>
-        ) : null}
 
         {undone ? (
           <div className="fg">

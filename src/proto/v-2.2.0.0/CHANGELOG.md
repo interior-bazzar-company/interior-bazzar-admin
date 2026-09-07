@@ -6,6 +6,679 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-07
 
+### Today's plan — the checklist-note pattern, and three bugs only a browser could show
+
+**Area:** Today's plan, the note on `#/work`
+**Files:** `src/admin/views/Team/{TodayPlan.tsx,team.css}`,
+`scripts/{check-browser.cjs,browser-check-entry.tsx,tm-smoke.tsx}`
+
+**This reverses the entry above it.** Adding a task from the note was removed yesterday on
+the argument that work invented while planning a morning has no owner, kind, dates or
+parent. That argument was wrong about this module: `submitPlan` has always matched a typed
+line against what is open and assigned to you and LINKED if it finds one, and otherwise
+minted a task due today in your name. A typed line was never a loose note. Quick capture is
+back, in the shape it should have had.
+
+**What changed**
+
+**The checklist note, properly.** One list, no section headings — what is assigned to you and
+what you just typed are the same kind of row, and the small note on each says which. At the
+bottom sits a ghost row: click it and it becomes the next line, in place, same left edge and
+same box as the rows above. **Enter commits and leaves a fresh row open underneath**, which is
+the whole of the pattern: a plan is typed in one pass rather than a click per item. Blur
+commits whatever is in the row, because losing what somebody just typed is worse than an
+extra line they can remove. What this replaces — a labelled field with an Add button beside
+it — is a form: you fill it in, press the button, and look to see whether anything happened.
+
+**Escape now backs out of one thing at a time.** The note's dismiss listener is registered in
+the CAPTURE phase, so it beat the input's own handler to every Escape and closed the whole
+note mid-sentence, losing the line being typed and the ticks above it. The row is the
+innermost thing open, so it goes first; a second Escape closes the note.
+
+**A stray `pick` class was laying the checklist out sideways.** `.pick` is a global chip in
+admin-theme.css — `display:flex`, pill radius, a border — and it was on the `<ul>`, left
+over from an earlier draft. The rows rendered as a row of overlapping lozenges. This is the
+third class-name collision in this module and the first that no existence check could have
+caught, because `.pick` has a rule: the guard asks whether a class is styled, not whether it
+is the module's to use.
+
+**And the browser harness had been running unstyled.** Its two stylesheet imports were spliced
+out by an over-wide revert in the previous entry and nothing failed, because every assertion
+in it is structural — a selector matches or it does not, styled or not. The screenshots are
+the half that notices, and they were of an unstyled page.
+
+**Temp data**
+`none`.
+
+**Backend needed**
+`none` — `submitPlan` again, from the same screen.
+
+**Open decisions**
+`TodayPlanMenu` takes an optional `who`, defaulting to the signed-in member, and no screen
+passes it. It exists so the browser check can open the note BEFORE a plan is in — the seeded
+viewer's is already submitted. The same seam was proposed and rejected yesterday, correctly:
+then it would have proved an absence, which source already proves. Now it proves continuous
+entry, focus retention and Escape ordering, which only a browser can. The scope moved from
+`"self"` to `"all"` with it, which is not a concession — the filter is already `member: me`,
+so the two are the same set for the real caller.
+
+**Verified**
+`check:browser` drives the real note: opens the add row, types, presses Enter, and asserts the
+line committed AND the next row is open and empty AND a second line needs no further clicking;
+that Escape closes the row without adding an empty line; and that the footer count includes
+them. It also asserts the rows STACK and each takes the note's full width — the assertion that
+would have caught the `pick` collision, and the kind no structural check can make. `tm-smoke`
+covers the shape from source. `tsc -b`, `eslint`, `check:popovers` and a prod `vite build` are
+clean; all 17 other suites exit 0. Every claim above was checked against a screenshot as well
+as an assertion, which is how the sideways list and the unstyled harness were found at all.
+
+
+### Team — the plan is picked and the report is read; neither creates work
+
+**Area:** Today's plan (the note on `#/work`) and End of day (`#/team/:id/reports`)
+**Files:** `src/admin/views/Team/{TodayPlan.tsx,member/reportForms.tsx,team.css}`,
+`scripts/{tm-smoke.tsx,check-browser.cjs,browser-check-entry.tsx}`
+
+**What changed**
+
+**The note's free-text row is gone.** It had a line under the list for anything not already
+assigned to you. A task invented while planning a morning is a task with no owner but you,
+no kind, no dates and no parent — Create is where those questions get asked. The note now
+only picks from what is already yours.
+
+**The EOD's checkbox list and "Something not on the plan" are gone with it.** The lines are
+derived — the plan's lines plus anything else closed today — and drawn read-only against
+what the board says, so the report states the day rather than being the place you complete
+it. This is what the note has been telling people for two entries: *tick them off on the
+board, the end-of-day report reads what actually moved*. It is now true. `submitReport` still
+completes a ticked line's item, but a derived line is only ticked because the item is already
+terminal, so that loop is a no-op and the board is the single writer.
+
+**A member with nothing on the board can file a report again.** Submit required at least one
+line, which was only ever reachable by adding one by hand — so deriving the lines would have
+left anyone who planned nothing and closed nothing permanently unable to file. The store has
+never demanded lines, only a reason for unticked ones, so the form now asks exactly that.
+
+**Temp data**
+`src/content/team/*.json` — unchanged. Plans and reports keep the same shape; only who may
+write a line changed.
+
+**Backend needed**
+`none` — fewer callers of the same two writes, not new ones.
+
+**Open decisions**
+An EOD can now be submitted with no lines at all, which is a genuinely empty record for a day
+somebody worked. The clock note beneath it still says what the hours were, so it is not
+silent — but whether an empty report should be refused is a product question nobody has
+been asked.
+
+**Verified**
+`check:team-render` asserts the report has no checkboxes and no add-a-line control, that it
+reads the board, that a member with nothing on the board reaches Submit, and that an unticked
+line still gates it — the last two picked by searching the seed for members in those states
+rather than hard-coding ids. `check:browser` opens the note for real and asserts nothing in it
+takes typing. **Two of these checks were vacuous before they were fixed**, which is the part
+worth recording: the browser assertion first required inputs to exist, and the seeded viewer's
+plan is already submitted so the note renders its read-back half with none; and reaching the
+other half needed a `who` prop on `TodayPlanMenu`, which then did not work because
+`useWork(…, "self")` scopes to the signed-in member regardless. That seam was reverted rather
+than pushed through — production API existing only to let a test reach a branch, for a fact
+already established by deleted code and a removed CSS rule, is not worth carrying. The branch
+is covered in `tm-smoke` from source instead. `tsc -b`, `eslint`, `check:popovers` and a prod
+`vite build` are clean; all 17 other suites exit 0.
+**Not checked in a browser:** the EOD form's new read-only list — the browser check drives the
+switcher and the note only.
+
+
+### Team — the rail's Tasks block becomes Assigned, and stops hiding most of the work
+
+**Area:** the calendar rail on `#/work`, the member Work page, and Progress on `#/reports`
+**Files:** `src/admin/views/Team/{workBits.tsx,Work.tsx,member/WorkPage.tsx}`,
+`scripts/tm-smoke.tsx`
+
+**What changed**
+
+**It was headed "Tasks" and showed a three-day window.** Anything due later, and anything
+with no date at all, was dropped without a word — so a member carrying twelve open tasks
+read a panel headed "Tasks · 3", and the count was a count of the window rather than of the
+work. It is **Assigned** now and it holds everything open that is assigned to you.
+
+The window survives as the ORDER, not the contents: Overdue, then Due today, then Later,
+because that is the order somebody works in. Undated work lands in Later rather than
+nowhere — a task nobody dated is the easiest kind to lose, which is the opposite of what a
+block like this is for.
+
+**The chip counts the workload, not the drawing.** That is the half that was actually
+misleading: a heading agreeing with the list beneath it but not with what the member is
+carrying.
+
+**Capped in the rail only.** 248px of sidebar that also holds milestones and targets cannot
+be a full backlog, so the rail passes `limit={6}` and names what it cut ("N more on the
+board") — the bargain `MarksBlock` already makes. The member page and Reports have a column
+each and show the lot. The cap is spent from the top, so it can never hide something overdue
+in order to show something merely later.
+
+**Smaller.** `TaskRow` said "due —" for an undated task, because `fmtDate(null)` is an em
+dash; undated work could not reach that row before and now can, so it says "no date". The
+member Work page's heading named the old block and now does not.
+
+**Temp data**
+`src/content/team/*.json` — unchanged.
+
+**Backend needed**
+`none`.
+
+**Open decisions**
+`limit={6}` in the rail is a guess at where a sidebar list stops being scannable. It is one
+number in one call site.
+
+**Verified**
+`check:team-render` picks the busiest seeded member rather than whoever the viewer happens to
+be — the first draft of these assertions ran against a member with three tasks, where the
+cap and the grouping are never exercised and everything passes vacuously. It asserts the
+title, that the chip equals the assigned total, that uncapped draws them all, that capped
+draws the cap and names the remainder, and that the cap is spent on the most urgent group
+first. The chip assertion was mutation-tested: reverting it to count what is drawn fails the
+suite — via the capped case, since uncapped the two numbers are equal, which is itself the
+reason both cases are asserted. While probing this I hit `list.filter(isDelayed)` in my own
+throwaway script, which passes the array index as the function's `today` argument and
+silently miscounts; `grep` confirms no shipped code does that. `tsc -b`, `eslint` on the
+touched files, `check:browser` and a prod `vite build` are clean; all 17 other suites exit 0.
+**Not checked in a browser:** the block's own layout — the browser check drives the view
+switcher only.
+
+
+### Tasks — the view switcher never opened, and now there is a browser to prove it
+
+**Area:** `#/work` — the header switcher (and every shell popover in the panel)
+**Files:** `src/admin/views/Team/Work.tsx`, `scripts/{check-popover-triggers.cjs,check-browser.cjs,browser-check-entry.tsx}`,
+`browser-check.html`, `package.json`
+
+**What changed**
+
+**The switcher button was missing `data-act`, and that attribute is load-bearing.** The
+shell's `PopBox` dismisses on any document click that is not inside `.pop` and not on a
+`[data-act]` element. React 18 flushes a discrete click synchronously, so `openPop` mounts
+the popover and registers that listener BEFORE the very click that opened it has finished
+bubbling to `document` — a trigger without the attribute opens and closes the menu in one
+tick, which looks exactly like a button that does nothing. Invoices and Quotations both carry
+a comment saying so. Tasks never had the attribute.
+
+**It shipped broken and stayed broken.** It did not matter while the menu held only Timeline
+and Analysis, because List, Board and Calendar had a segmented row of their own; nobody
+pressed it. Folding the views into it made the one control that could not open the only way
+to change view.
+
+**This entry corrects the one above it.** Yesterday's note concluded from correct markup, a
+correct bundle and a correct component tree that the browser was serving a stale build. Every
+one of those observations was true and the conclusion was wrong: the markup was never the
+problem. A rendered string cannot show a menu that opens and closes in the same tick, and
+five suites of assertions about that markup all passed while the button did nothing.
+
+**So there is a browser now.** `npm run check:browser` drives the real `ShellProvider` and
+the real `FaceSwitch` in headless Chromium, alongside a copy of the trigger WITHOUT
+`data-act`, and asserts the first does not stay open and the second does and offers all five
+destinations — the failure and the fix observed side by side rather than argued from a diff.
+It is deliberately not in `npm run check`: it needs a browser binary and a dev server, so it
+is opt-in and skips cleanly when Playwright is absent.
+
+**And a static guard, which is in the chain.** `npm run check:popovers` finds every button
+whose own handler calls the shell's `openPop` — parsing the JSX tag properly, because an
+arrow function's `>` is not the end of a tag, and resolving named handlers — and requires
+`data-act` on each. Thirteen triggers, all passing; removing the attribute fails it with the
+offending file and tag. Its first draft took a fixed window of characters after each tag and
+flagged two buttons INSIDE a popover, one of which closes it.
+
+**Temp data**
+`none`.
+
+**Backend needed**
+`none`.
+
+**Open decisions**
+Playwright is a dev dependency now (~90MB of browser on first install). The browser check is
+opt-in for that reason. The better long-term fix is for `PopBox` to ignore the click that
+opened it — by capturing the anchor and skipping it in the dismiss handler — rather than
+requiring every trigger to opt out by attribute; that touches the shell every module uses and
+was not smuggled into a bug fix.
+
+**Verified**
+`check:browser` passes twice in a row from a cold start (the dev server is spawned and killed
+by the script; vite's entry is run through `process.execPath` because `shell: true`
+concatenates arguments and `npx.cmd` without a shell is EINVAL on Windows). `check:popovers`
+passes at 13 triggers and was proven to fail when `data-act` is removed from the switcher.
+`tsc -b`, `eslint` on the touched files and a prod `vite build` are clean — the extra
+`browser-check.html` at the root is not an entry and does not reach `dist`. All 17 other
+suites exit 0.
+
+
+### Tasks — the calendar is what `#/work` opens on
+
+**Area:** `#/work` — sidebar → Team → Tasks
+**Files:** `src/admin/views/Team/{Work.tsx,team.css}`, `scripts/tm-smoke.tsx`
+
+**What changed**
+
+**Calendar is the default view.** The month is the shape most of this module's questions are
+actually asked in — what is due, what is late, what is coming — and it is the only view that
+answers them without being read row by row. `#/work` bare opens it; List and Board are a
+click away in the switcher, and `?view=list` is now a real destination rather than the value
+you got by leaving the parameter off. Old links still land where they meant: `?view=board`,
+`?view=calendar` and the legacy `?face=calendar` all resolve unchanged.
+
+`DEFAULT_VIEW` is named once, because the default is two facts that have to agree — which
+view a bare URL resolves to, and which view the menu writes as a bare URL. Split across two
+literals they drift, and the symptom is a menu row that never looks selected.
+
+**Today's plan moved onto the calendar rail as well.** The calendar deliberately has no
+filter toolbar, and the toolbar is where the note's button lives on the other two views — so
+making the month the landing screen would have stranded the one control you are meant to
+reach before the day starts. It pins beside Create, both full width.
+
+**On the reported missing rows.** Board and Calendar were reported absent from the header
+dropdown. They are not: the menu renders all five destinations, `FaceMenu` was rendered
+through `react-dom/server` and read row by row to confirm it, nothing else publishes chrome
+for this route, and all five row descriptions are present in the built bundle
+(`grep` over `dist/assets/index-*.js`). The build in the browser was stale. No code change
+was made for that half of the report, which is worth recording so the next reader does not
+go looking for a fix that is not there.
+
+**Temp data**
+`src/content/team/*.json` — unchanged.
+
+**Backend needed**
+`none`.
+
+**Open decisions**
+A bare `#/work` used to mean the list and now means the month, so any bookmark or hard-coded
+link that relied on the old default lands somewhere different. Every in-app link was checked;
+anything outside this repo was not.
+
+**Verified**
+`check:team-render` asserts both halves of the default rather than one — a bare URL resolves
+to the calendar AND `?view=list` still reaches the table — which is the pair that drifts if
+the default is written down twice. It also asserts the switcher marks Calendar as current,
+and that the plan note is reachable from the calendar rail as well as the list toolbar. The
+eight assertions that had quietly assumed `#/work` meant the list now name the list's own
+URL. `tsc -b`, `eslint` on the touched files and a prod `vite build` are clean; all 17 other
+suites exit 0. **Not checked in a browser:** as with everything in this module, the rail's
+two stacked buttons and the note opening from a 248px sidebar are verified as markup and CSS
+rules only.
+
+
+### Tasks — one switcher for five destinations, and a task panel rebuilt around its status
+
+**Area:** `#/work` — sidebar → Team → Tasks (the header switcher, the list, the item panel)
+**Files:** `src/admin/views/Team/{Detail.tsx,status.tsx,marks.tsx,Work.tsx,bits.tsx,store.ts,team.css}`,
+`scripts/{tm-smoke.tsx,check-team-derivation.cjs}`
+
+**What changed**
+
+**Every destination is in one menu.** List, Board and Calendar were a segmented row in the
+body while Timeline and Analysis lived in the header dropdown — so getting from the board to
+the timeline meant using two different controls in two different places to answer one
+question. All five are in the dropdown now, in two named groups, because the distinction is
+real and flattening it would lose it: the first three are three SHAPES of "what work is
+there", the last two are different questions. The button also names where you are; it said
+"Tasks" on all three of List, Board and Calendar, so the one control meant to answer "where
+am I" shrugged at three of its five destinations.
+
+**The task panel was deleted and rebuilt.** What it replaced had accreted — a header, a
+notice, a facts strip, a second facts list at another width, six sections each introduced by
+a sentence about the data model, and a footer of five buttons that were the real controls.
+The new shape is four bands in the order the questions are asked: what is it (title, kind,
+the way out) · where is it (the status, as a control, on its own line) · the facts (who,
+when, how loud, what it belongs to) · the work (steps, details, tags, links, related). The
+footer holds the two relationships — waiting-on and link — which were the only things left
+that are neither a fact nor a field, and which had been scattered one in the footer and one
+hung off a section heading.
+
+**One field, one control, in both places it appears.** Status was a read-only pill on the
+row and five buttons in the panel footer — Start / Complete / Reopen… / Restore… / Cancel…,
+five spellings of one field, furthest from the top on the panel people open mainly to change
+it. It is now a chip that opens the moves the store actually allows, and the same control is
+on the table row: a status you can change in one place and only read in another is a status
+people go hunting for. The moves come from `transitionsFrom`, which reads the same
+vocabulary row `setItemStatus` enforces with, so a menu cannot offer something the store will
+refuse — the failure mode the old hard-coded footer already had once, when it carried no
+branch for cancelled → planned and made a cancelled item a dead end the store would have let
+out of. Delay never appears as a move: it is derived from the due date, so the chip shows it
+and the menu says which stored status it is offering moves from.
+
+**The module split.** `Detail.tsx` (the panel and its parts), `status.tsx` (the control and
+the reason dialog) and `marks.tsx` (the description toolbar, shared by both dialogs that
+hold a description) came out of `Work.tsx`, which had reached 2,215 lines and held four
+unrelated surfaces.
+
+**Temp data**
+`src/content/team/*.json` — unchanged. `workTransitions` in `vocabularies.json` was already
+the source of truth for `setItemStatus`; it now feeds the menu as well, rather than being
+restated in JSX.
+
+**Backend needed**
+`none` — no new call. `setItemStatus` gains a second caller; `transitionsFrom` is a read of
+vocabulary already shipped.
+
+**Open decisions**
+The row's status chevron is hidden until the row is hovered, so a column of them reads as
+statuses rather than as a column of controls. That is a judgement about which reading matters
+more at rest and is the first thing to try the other way if the control feels hidden.
+
+**Verified**
+`check:team-derivation` now drives every one of the eight offered transitions against a real
+seeded item in that status and asserts the store accepts it, plus that no row offers Delay
+and that reopen and restore both demand a reason — the offer and the rule are proven to
+agree rather than assumed to. Its first draft seeded by transition and so could never reach
+`planned`, silently skipping the row every new task starts in; it picks an item already in
+the status now. `check:team-render` asserts the body has no second switcher, the dropdown
+carries all five destinations in two groups, the button names the view rather than the
+family, the panel's status is a control and its footer is the two relationships, and the
+table's stage cell is the same control. The switcher had to be exported to be tested at all:
+it reaches the topbar through `usePageChrome`, which needs AdminShell, so the first version
+of that assertion passed vacuously against markup that was never rendered. The class guard
+(217 classes) caught the eight new ones before any of them had CSS. `tsc -b`, `eslint` on the
+touched files and a prod `vite build` are clean; all 17 other suites exit 0.
+**Not checked in a browser:** the panel and the status menu have never been seen on screen —
+the four bands, the chip's hover affordance and the popover's placement are verified as
+markup, tokens and CSS rules only.
+
+
+### Tasks — Today's plan writes from the board, and the row fills the width again
+
+**Area:** `#/work` — sidebar → Team → Tasks (the toolbar, the list)
+**Files:** `src/admin/views/Team/{TodayPlan.tsx,Work.tsx,team.css}`, `scripts/tm-smoke.tsx`
+
+**What changed**
+
+**Today's plan, as a note over the board.** A button beside Create opens a sticky note
+listing the tasks already assigned to you, each tickable, plus a line for anything new.
+It writes through `submitPlan`, which is the same call `#/team/:id/reports` has always
+made — so no model is added, and the interesting behaviour comes for free: a line becomes
+a task due today, and a line matching something already open and assigned to you LINKS to
+that item rather than minting a second copy, which is why the EOD can tick it off later
+and the board agrees with the report. Once the plan is in, the note reads back what has
+moved (`3/7` on the button) and offers **End the day…**, which opens the existing EodModal.
+The member page's dialog is untouched; both are doors to one store call.
+
+What was missing was never the model — it was that a plan could only be written from your
+own member page, having navigated to it, while the tasks you were planning around were on a
+different screen. Here the work the note asks about is in the note. Overdue and due-today
+start ticked, because a note that opens with every box empty asks you to re-decide what the
+dates already decided.
+
+A note rather than a modal: a plan is three ticks and a line of typing, and a modal takes
+the screen for that. The paper is `--tag-amber-*` — the one warm surface in this panel that
+does not mean "warning", since the tag palette is documented as a label the team chose and
+never a state.
+
+**The blank slab on the right is gone, and so is the gap that preceded it.** Item was the
+only column without a width, so it collected the entire surplus: at 1900px the title ended
+around 340px and Progress began around 1200px. Yesterday's cap closed that track and opened
+a blank slab down the right instead — the same surplus, moved rather than solved. Every
+column but the 3px rail is a share now (`32/14/12/10/13/18`) under `table-layout: fixed`,
+so the table fills the width, all six grow together, and the 920px floor still scrolls a
+narrow window instead of crushing the row.
+
+**Temp data**
+`src/content/team/*.json` — unchanged. Plans and reports already seed through
+`plans.json`/`reports.json` and the note reads and writes the same records.
+
+**Backend needed**
+`none` — `submitPlan` and `submitReport` are existing store API with existing endpoints
+owed. This adds a second caller, not a second contract.
+
+**Open decisions**
+The note seeds overdue and due-today as ticked. If a member's backlog is mostly overdue
+that is a plan of fifteen lines by default, which is not a plan — worth watching once real
+volumes exist.
+
+**Verified**
+`check:team-render` asserts the note's entry point renders on the board and that every
+column but the rail is a percentage; the plan→EOD chain it depends on was already proven in
+`check:team-derivation` (a line links an existing open item instead of minting a second, a
+second submit is refused, and an EOD tick completes the work item). The class guard added
+yesterday was extended twice while building this and is the reason it is worth having: it
+first caught the note's CSS missing entirely, then — once taught to read the module's source
+as well as its rendered output, because all fourteen of the note's classes live inside
+`open ? … : null` and a static render never opens it — it went from checking 116 classes to
+210. Two false positives it raised on the way (`data-act="tm-new-go"` hooks that share the
+module prefix) are excluded by name-shape, not by allowlist. `tsc -b`, `eslint` on the
+touched files and a prod `vite build` are clean; every other suite exits 0.
+**Not checked in a browser:** the note has never been opened on screen — its layout, the
+amber paper in dark mode, and the popover's placement against the toolbar button are
+verified as markup, tokens and CSS rules only.
+
+
+### Tasks — correcting yesterday's table: two class-name collisions and a rule deleted by accident
+
+**Area:** `#/work` — sidebar → Team → Tasks (the list, the item drawer)
+**Files:** `src/admin/views/Team/{Work.tsx,bits.tsx,team.css}`, `scripts/tm-smoke.tsx`
+
+**What changed**
+
+**This entry supersedes the table and drawer-header claims in the two entries above it.**
+Both shipped green on every check and both were wrong on screen. The cause was the same
+each time — a class name in `team.css` that was already taken, or a rule removed with the
+block it happened to sit in — and no check in this repo looks at CSS, so nothing failed.
+
+**`.tm-pri` was already a 6px dot.** It is a round marker with a solid background that
+`member/ReportsPage.tsx` still draws. Putting it on a `<td>` gave every priority cell
+`border-radius: var(--radius-full)` and `background: var(--neutral-line)` — a full-height
+grey lozenge behind High, Normal and Urgent alike, which is what the screenshot showed.
+
+**`.tm-prog` was already a row-flex meter**, 1300 lines up, carrying `align-items: center`.
+A second `.tm-prog` set `flex-direction: column` and inherited that centring, which in a
+column flex shrink-wraps every child: the progress bar collapsed to its 60px `min-width` and
+floated in the middle of a 170px cell, and `.tm-prog .tnum` (0,2,0) out-specified
+`.tm-prog > b` (0,1,1) so the percentage rendered at 10px, grey and right-aligned instead of
+14px and leading. Both list-cell classes are `tml-` now, a prefix this file did not use.
+
+**`.tm-dw-h` had been deleted.** The rule that makes the drawer header a row rather than a
+wrapped stack was written beside `.tm-dw-f`, inside the summary-strip block — and when that
+block was replaced wholesale by the facts grid, the header rule went with it. The smoke test
+asserted the CLASS was in the markup, which it still was, so the check stayed green while the
+styling it named no longer existed. Restored, next to `.tm-dw-t`, where what it styles is.
+
+**The row was 850px of nothing.** Item is the only column with no width, so it absorbed
+every spare pixel: on a 1900px screen the title ended around 340px and Progress began around
+1200px, leaving the five facts about a task huddled against the right edge with a long empty
+track between. `.tm-list .tbl` caps at 1360px — no column shrinks, the 920px floor still
+scrolls, and Item simply stops being handed width no title will use. The surplus becomes page
+margin, which is the trade: a row you can read across beats a table that fills the glass.
+
+**And the priority override no longer depends on bundle order.** `.tml-pri .pill` ties with
+`.pill.warn` at 0,2,0 and was winning only because team.css happens to be concatenated after
+admin-theme.css. It is `.tm-list td.tml-pri .pill` now.
+
+**Temp data**
+`src/content/team/*.json` — unchanged.
+
+**Backend needed**
+`none`.
+
+**Open decisions**
+The 1360px cap left-aligns the table on very wide screens rather than stretching it. That is
+a deliberate reading-width choice and the first thing to revisit if it looks wrong in place.
+
+**Verified**
+A new check in `check:team-render` renders seven surfaces (all five faces, the create dialog,
+the drawer), collects every `tm-`/`tml-` class that actually comes out — 115 of them — and
+requires a CSS rule for each. It is the check that was missing: it fails on a deleted rule,
+on a typo, and on a renamed class, none of which the existing assertions could see. Three
+classes are allowlisted by name with reasons (`tm-kind-task` and `tm-col-planned` are
+modifiers that intentionally take the default; `tm-tl` is a bare grouping wrapper), so a
+fourth has to be argued for. Its first draft was itself wrong — a regex assembled from a
+string lost its backslashes, so it matched any character and let `.tm-facts` satisfy a lookup
+for `tm-fact`, passing while testing almost nothing; rewritten with `indexOf`, it immediately
+found `tm-tl`, which the weak version had missed. `tsc -b`, `eslint` on the touched files and
+a prod `vite build` are clean; all 17 other suites exit 0. **Still not checked in a browser:**
+there is no Playwright here, so the 1360px cap and the corrected progress cell are verified
+as markup, CSS rules and cascade order — not as pixels. The three defects above were all
+found from a screenshot, which is the honest measure of what that gap costs.
+
+
+### Tasks — the drawer stops explaining itself, tags get a type, the row stops shouting
+
+**Area:** `#/work` — sidebar → Team → Tasks (the list, the create dialog, the item drawer)
+**Files:** `src/admin/views/Team/{Work.tsx,bits.tsx,workBits.tsx,team.css}`,
+`src/admin/views/Team/member/WorkPage.tsx`, `scripts/tm-smoke.tsx`
+
+**What changed**
+
+**"Rolls up to" left the create dialog.** Naming a task, handing it to somebody and saying
+when it is due is the whole of making one; which milestone it belongs under is a decision
+about the *shape* of the work, and one you usually make after the task exists. It stays on
+Edit, where `parentOptions` still enforces target ▸ milestone ▸ task — rollup, the timeline
+lanes and milestone progress are untouched, an item simply starts top level and is filed
+afterwards.
+
+**A tag can say what type it is.** `createTag` has taken a tone since the day it shipped and
+no screen in Tasks ever passed one, so every tag born here came out `slate` and a wall of
+grey pills carried no information at all — which is the entire point of a tag. Both places
+that make one (the create dialog, the drawer) now offer the eleven `--tag-*` hues as swatches
+with a live preview of the result. Swatches rather than a `<select>`: a colour named in a
+dropdown is a word you have to imagine.
+
+**Attaching a link is one row.** It was six elements for one idea — a label over an address,
+a refusal under it, a label over a name, the name, and a button of its own — a form inside a
+field, on a dialog whose job is a title and a date. It is the row the drawer already uses:
+paste, name it or don't, Add.
+
+**The drawer stopped explaining its own schema.** Four headings each trailed a sentence of
+data-model documentation — "A tag is a record its owner holds", "Soft edges. The parent and
+the waiting-on links live above" — set at the same width as the content and above it, so the
+panel read as a page of prose you scroll past to reach three checkboxes. A heading owes the
+reader how much is under it, so each carries a count instead. Stage was printed twice, in the
+header pill and again one scroll-line down in the summary strip; the header keeps it. The two
+different fact lists (a fixed four-cell strip, then a `KvList` at another width for whatever
+was left) are one grid at one weight, where a fact that is a link spans the row. Sections sit
+at `--space-5` rather than `--space-8`, because 32px above six headings in a 720px panel is
+more drawer given to gaps than to content. The overdue banner says what is wrong — "8 days
+over" — and no longer finishes with a sentence about how Delay is derived.
+
+**The row stopped shouting.** Most tasks are Normal priority, and Normal drew a filled chip
+— a column of identical badges beside a stage pill and an avatar, in which the two
+priorities that *should* stop a reader could not out-shout the one that shouldn't. Normal is
+a quiet word now; High and Urgent keep the chip, outlined, so the filled pill in the Stage
+column is the only filled thing in the row (Delay and High are both warn-toned, so as two
+filled pills they were the same amber object twice, meaning two unrelated things). Row
+padding is symmetric and the height a floor rather than a target, so a task with tags and one
+without are the same shape. The header is a label again rather than a second row of data.
+Progress leads with a tabular percentage over its bar — a column of bars is shapes you
+compare against each other; a column of numbers is one you read straight down.
+
+**Tag pills got room to be read.** `.pill.xs` is 18px tall with 5px of side padding, built
+for a count in a table header and then used for a word in the busiest cell on the list: the
+label touched its own border on both sides and six in a row read as one striped block. Same
+palette, same shape family, with side padding that clears the glyphs and a line-height that
+centres them. The picker's off state was `opacity:.55`, which fades the *label* as well as
+the colour; it keeps full contrast and says on/off with the fill and a ring.
+
+**Temp data**
+`src/content/team/*.json` — unchanged. `colourToken` was already on every seeded tag and
+already read by every pill; nothing here adds a key.
+
+**Backend needed**
+`none` — no new surface and no new field. `createTag`'s third argument (`tone`) is existing
+store API that the UI had simply never called.
+
+**Open decisions**
+Removing "Rolls up to" from create means every task now starts top level. If a team files
+most work under a milestone, that is one extra step per task on the Edit dialog — worth
+watching before it is settled. The swatches are a `role="group"` of `aria-pressed` buttons
+rather than a `radiogroup`: a radiogroup promises arrow-key navigation and a roving tabindex
+that is not implemented, and claiming the stronger role without honouring it is worse than
+claiming the weaker one.
+
+**Verified**
+`check:team`, `check:team-nav`, `check:team-render` pass, with new assertions for each change:
+the create dialog no longer asks what a task rolls up to, attaching a link is one row, a new
+tag can be given a type and there is one swatch per hue, the drawer's facts are one grid, the
+stage is not printed twice, and no heading carries schema prose. The drawer and one list row
+were rendered through `react-dom/server` and read element by element — which is how the two
+adjacent amber pills and the redundant third reading of progress in the Steps heading were
+caught, both after the code was written. `tsc -b`, `eslint` on the touched files and a prod
+`vite build` are clean; all 17 other check suites still exit 0. **Not checked in a browser:**
+there is still no Playwright in this repo, so every layout and colour decision above is
+verified as markup plus CSS rules, not as rendered pixels — the tag pill metrics and the
+swatch ring especially want a real look.
+
+
+### Tasks — the drawer reads as a row, steps move onto the record, six marks, links that save
+
+**Area:** `#/work` — sidebar → Team → Tasks (the list, the create/edit dialogs, the item drawer)
+**Files:** `src/admin/views/Team/{Work.tsx,workBits.tsx,store.ts,team.css}`,
+`scripts/{tm-smoke.tsx,check-team-derivation.cjs}`
+
+**What changed**
+
+**The drawer opened with its own controls on a second line.** `.dw-h` is padding and a rule
+— it is not a flex container, which the other three drawers each work around by wrapping
+their contents in an inline-styled flex div. This one leaned on `.spacer`, and `flex:1 1
+auto` on a child of a block box does nothing, so the title, the stage pill, Edit and the
+close button all sat in the text flow and wrapped. A `tm-dw-h` row fixes it here without
+disturbing the three drawers already laid out against the old behaviour. In the same strip
+the Due cell read "27 Aug 20268 days ago": `.cell-2` is an inline span that only falls below
+because what usually precedes it is a flex box — it is a block in the strip and in the list's
+Due cell now.
+
+**Steps are written on the record, not before it exists.** The create dialog carried a draft
+checklist — plain strings, ids minted by the store on save. Creating a task is naming it and
+handing it to somebody; a second list to fill in first is a form standing between that and
+Create. Gone, along with `StepsField`. The steps themselves are untouched: `checklist` is
+still the one stored fact progress is derived from, and the drawer's CheckList is now its
+single entry point.
+
+**Six marks instead of two, and the description can be edited at all.** Bold and bullets
+became **bold · italic · bulleted · numbered · checklist · link**, written by one `MarkBar`
+that both dialogs share and parsed by one `RichText` that knows exactly those six — a button
+with no branch in the parser writes characters that render as themselves. Still no
+`innerHTML`: a link's href goes through `normaliseUrl`, so `javascript:…` renders as the
+text somebody typed. And `description` is patchable now — it was settable at create and
+nowhere afterwards, so the field holding what the work *is* was write-once and the new marks
+would have been reachable only in the seconds before the item existed.
+
+**Add link did nothing you could act on.** `addResourceLink` demanded a name and a scheme
+outright, so `docs.google.com/brief` — what a person pastes, and exactly what the create
+dialog's own link field accepts, because that one normalises — came back as a rule about
+`http://`. Two fields for one idea, disagreeing about what a link is. Both normalise now;
+http and https are still the only schemes that survive, a bare host is completed rather than
+refused, and the name is optional and falls back to the host.
+
+**The list reads title-first.** Progress was last — the far end of a 920px scan from the
+title — in a 120px column, which leaves the bar about 50px to draw a fill *and* the today
+marker in. It is second now, at 180px. Member went the other way, to the end: it is who to
+ask, not what to scan, and it was standing between the title and every fact about the work.
+
+**Temp data**
+`src/content/team/*.json` — unchanged. No key added, read or dropped by this entry; the
+description marks and the resource links are fields the seed already carries.
+
+**Backend needed**
+`none` — no new surface. Two existing store writes changed their contract and the API will
+have to match when it lands: `updateItem` accepts `description`, and `addResourceLink`
+normalises rather than rejects and defaults the label to the URL's host.
+
+**Open decisions**
+A description checklist is **drawn, not tickable** — the boxes that move are the item's own
+Steps. Two tickable lists on one panel disagreeing about progress is what this module exists
+to avoid, but nobody has been asked whether prose boxes should tick.
+
+**Verified**
+`npm run check:team`, `check:team-nav`, `check:team-render` — all pass, with new assertions
+for each change: the drawer header carries its row class, the create dialog no longer asks
+for steps, the bar offers all six marks, a link needs only an address, and the column order
+is `Item|Progress|Stage|Priority|Due|Member`. The old link contract in
+`check-team-derivation.cjs` ("a link needs a name", "…and a scheme") asserted the behaviour
+this entry deliberately changed and was rewritten to the new one. `RichText` was rendered
+through `react-dom/server` against all six marks plus an unclosed mark, a raw `<script>` and
+a `javascript:` href — the last two come back escaped and as plain text. `tsc -b`, `eslint`
+on the touched files and a prod `vite build` are clean; every other check suite still exits
+0. **Not checked in a browser:** there is no Playwright in this repo and installing one was
+outside the ask, so the two layout fixes are verified as markup and CSS rules, not as
+rendered pixels.
+
+
 ### The review pass — what the finders caught, and what this log had left out
 
 **Area:** Tasks · Members · Attendance and Reports · Agreements · Data Forms · Finance

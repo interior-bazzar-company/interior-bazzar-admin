@@ -1124,6 +1124,13 @@ export const incentiveTotal = (p: Pay | null, state?: string): number =>
  *  · A bare `docs.google.com/…` is treated as https, because a link somebody
  *    pastes without a scheme is still a link and `//` is not a thing anybody
  *    should have to remember. */
+/** The host, for a link nobody bothered to name. Never throws: it is handed
+ *  URLs that have already been through `normaliseUrl`, and a fallback beats a
+ *  crash for the one that has not. */
+export function hostOf(u: string): string {
+  try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; }
+}
+
 export function normaliseUrl(raw: string): string | null {
   const v = (raw || "").trim();
   if (!v) return null;
@@ -1585,6 +1592,32 @@ export function endDay(memberId: string): Result<AttendanceDay> {
   return ok(d);
 }
 
+/** WHERE THIS ITEM MAY GO NEXT, read from the same vocabulary row that
+ *  `setItemStatus` enforces with. A control that offers a move the store will
+ *  refuse is a control that lies, and hard-coding the four rows into a menu is
+ *  how the offer and the rule drift apart — which already happened once in this
+ *  module, when the drawer's footer had no branch for cancelled → planned and a
+ *  cancelled item became a dead end the store would have allowed out of.
+ *
+ *  DELAY IS NOT IN HERE AND CANNOT BE. It is derived from the due date, nothing
+ *  writes it, and there is no row for it: an item in Delay is offered the moves
+ *  its STORED status allows. */
+export interface Transition { to: WorkStatus; requiresReason: boolean; label: string }
+
+export function transitionsFrom(from: WorkStatus): Transition[] {
+  const rows = vocabDoc.workTransitions as
+    { from: string; to: string[]; requiresReason?: boolean; label?: string }[];
+  const row = rows.filter((t) => t.from === from)[0];
+  if (!row) return [];
+  return row.to.map((to) => ({
+    to: to as WorkStatus,
+    requiresReason: !!row.requiresReason || to === "cancelled",
+    /* The row's own verb when it has one — "Reopen", "Restore" — because
+       "Completed → In progress" is not what a person calls that. */
+    label: row.label || labelOf(WORK_STATUS, to),
+  }));
+}
+
 export function setItemStatus(itemId: string, to: WorkStatus, reason?: string): Result<WorkItem> {
   const items = snap.items.slice();
   const i = items.filter((x) => x.itemId === itemId)[0];
@@ -1974,6 +2007,10 @@ export function parentOptions(kind: WorkKind, all: WorkItem[], selfId?: string):
 export interface ItemPatch {
   title?: string; assigneeId?: string; priority?: Priority;
   startDate?: string | null; dueDate?: string | null; parentId?: string | null;
+  /** Plain text with the description marks in it — see workBits/RichText.
+   *  It was settable at create and nowhere afterwards, so the one field on the
+   *  record that holds what the work actually IS was write-once. */
+  description?: string | null;
 }
 export function updateItem(itemId: string, patch: ItemPatch): Result<WorkItem> {
   return withItem(itemId, (i) => {
@@ -2008,6 +2045,7 @@ export function updateItem(itemId: string, patch: ItemPatch): Result<WorkItem> {
       i.tagIds = kept.length ? kept : undefined;
     }
     if (patch.priority !== undefined) i.priority = patch.priority;
+    if (patch.description !== undefined) i.description = patch.description;
     i.startDate = start;
     i.dueDate = due;
     i.parentId = parentId;
@@ -2041,18 +2079,29 @@ export function removeCheckLine(itemId: string, lineId: string): Result<WorkItem
   });
 }
 
-/** A LINK NEEDS A NAME. `addLink` above is a different thing entirely — it
- *  relates two ITEMS to each other; this attaches a URL to one. Six bare URLs in a panel is six things nobody clicks,
- *  so the label is required and the URL is checked for a scheme — a link
- *  saved as `docs.google.com/…` resolves against this panel's own origin and
- *  404s, which looks like a broken document rather than a typo. */
+/** A URL ATTACHED TO ONE ITEM. `addLink` above is a different thing entirely
+ *  — that one relates two ITEMS to each other.
+ *
+ *  IT NORMALISES, IT DOES NOT REFUSE. This used to demand a scheme outright,
+ *  which is why Add did nothing you could act on: `docs.google.com/brief` —
+ *  what a person actually pastes, and exactly what the create dialog's own link
+ *  field accepts, because that one runs `normaliseUrl` — came back as "the
+ *  address needs to start with http://". Two fields for one idea, disagreeing
+ *  about what a link is. Now both go through `normaliseUrl`, so http and https
+ *  are still the only schemes that survive and a bare host is completed rather
+ *  than rejected.
+ *
+ *  AND THE NAME IS OPTIONAL. Refusing to save a pasted URL because nobody typed
+ *  a word for it is the same refusal from the other side; the host is a name,
+ *  and it is the one the create dialog already falls back to. */
 export function addResourceLink(itemId: string, label: string, url: string): Result<WorkItem> {
   return withItem(itemId, (i) => {
-    if (!label.trim()) return "Give the link a name.";
-    const u = url.trim();
-    if (!u) return "Paste the address.";
-    if (!/^https?:\/\//i.test(u)) return "The address needs to start with http:// or https://.";
-    i.links = (i.links || []).concat([{ linkId: nextId("LN"), label: label.trim(), url: u }]);
+    if (!url.trim()) return "Paste the address.";
+    const u = normaliseUrl(url);
+    if (!u) return "That is not a web address — links have to be http or https.";
+    i.links = (i.links || []).concat([
+      { linkId: nextId("LN"), label: label.trim() || hostOf(u), url: u },
+    ]);
     return null;
   });
 }
@@ -2111,6 +2160,64 @@ export function createItem(input: Partial<WorkItem> & {
   return ok(item);
 }
 
+/** ONE LINE OF A PLAN, minted the one way. Pulled out of `submitPlan` so that
+ *  appending to a plan already in uses exactly the same rule — two copies of
+ *  "link if it exists, otherwise create" is how the second copy comes to forget
+ *  the linking half.
+ *
+ *  Link an existing open item with the same title rather than minting a second
+ *  copy of it: a plan that quietly forks a task is how one piece of work becomes
+ *  two that each look half-done. `items` is mutated — the caller owns the
+ *  snapshot copy and commits it. */
+function makePlanLine(
+  items: WorkItem[], memberId: string, rawTitle: string, priority: Priority, ordinal: number,
+): PlanLine {
+  const title = rawTitle.trim();
+  const match = items.filter((i) =>
+    i.assigneeId === memberId && !isTerminal(i.status) &&
+    i.title.trim().toLowerCase() === title.toLowerCase())[0];
+  const lineId = nextId("PL");
+  if (match) return { lineId, ordinal, title, priority, workItemId: match.itemId };
+  const made: WorkItem = {
+    itemId: nextId("W"), kind: "task", title, description: null,
+    assigneeId: memberId, createdById: memberId, parentId: null, status: "planned",
+    priority, startDate: TODAY, dueDate: TODAY, completedAt: null,
+    expectedOutcome: null, sourcePlanLineId: lineId, rowVersion: 1,
+    createdAt: new Date(now()).toISOString(),
+  };
+  items.push(made);
+  return { lineId, ordinal, title: made.title, priority, workItemId: made.itemId };
+}
+
+/** ADD ONE MORE THING TO TODAY, whether or not the plan has gone in.
+ *
+ *  `submitPlan` refuses a second submit and tells you to change the work items
+ *  instead, which is true of the RECORD and useless as an answer: the note is
+ *  where somebody is standing when they think of the next thing, and until now
+ *  it went read-only the moment the plan was filed. A day is not sealed at
+ *  9am. This appends — same minting rule, same linking — and leaves
+ *  `submittedAt` alone, because the plan was still filed when it was filed. */
+export function addPlanLine(
+  memberId: string, title: string, priority: Priority = "medium",
+): Result<DailyPlan> {
+  if (!title.trim()) return err("validation_failed", "Give it a name.");
+  const existing = planFor(memberId, TODAY);
+  const items = snap.items.slice();
+  const line = makePlanLine(items, memberId, title, priority,
+    (existing ? existing.lines.length : 0) + 1);
+  const plan: DailyPlan = existing
+    ? { ...existing, lines: existing.lines.concat([line]) }
+    : {
+      planId: nextId("PLAN"), memberId, businessDate: TODAY,
+      expectedOutcome: null, blockers: null, notes: null,
+      submittedAt: null, lines: [line],
+    };
+  snap.items = items;
+  snap.plans = snap.plans.filter((p) => p.planId !== plan.planId).concat([plan]);
+  emit();
+  return ok(plan);
+}
+
 export function submitPlan(memberId: string, input: {
   lines: { title: string; priority: Priority }[];
   expectedOutcome?: string; blockers?: string;
@@ -2122,25 +2229,8 @@ export function submitPlan(memberId: string, input: {
   if (!lines.length) return err("validation_failed", "Add at least one line.");
 
   const items = snap.items.slice();
-  const planLines: PlanLine[] = lines.map((l, n) => {
-    /* Link an existing open item with the same title rather than minting a
-       second copy of it — a plan that quietly forks a task is how one piece of
-       work becomes two that each look half-done. */
-    const match = items.filter((i) =>
-      i.assigneeId === memberId && !isTerminal(i.status) &&
-      i.title.trim().toLowerCase() === l.title.trim().toLowerCase())[0];
-    const lineId = nextId("PL");
-    if (match) return { lineId, ordinal: n + 1, title: l.title.trim(), priority: l.priority, workItemId: match.itemId };
-    const made: WorkItem = {
-      itemId: nextId("W"), kind: "task", title: l.title.trim(), description: null,
-      assigneeId: memberId, createdById: memberId, parentId: null, status: "planned",
-      priority: l.priority, startDate: TODAY, dueDate: TODAY, completedAt: null,
-      expectedOutcome: null, sourcePlanLineId: lineId, rowVersion: 1,
-      createdAt: new Date(now()).toISOString(),
-    };
-    items.push(made);
-    return { lineId, ordinal: n + 1, title: made.title, priority: l.priority, workItemId: made.itemId };
-  });
+  const planLines: PlanLine[] = lines.map((l, n) =>
+    makePlanLine(items, memberId, l.title, l.priority, n + 1));
 
   const plan: DailyPlan = {
     planId: existing ? existing.planId : nextId("PLAN"),

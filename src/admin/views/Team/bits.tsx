@@ -12,7 +12,7 @@
    one per component that eventually disagree.
    ============================================================================= */
 import type { ReactNode } from "react";
-import { Icon, Pill, initials, avatarTone } from "../../ui";
+import { Icon, Pill, cap, initials, avatarTone } from "../../ui";
 import type {
   AttendanceState, DayRow, Member, Priority, WorkItem, WorkStatus,
 } from "./store";
@@ -46,9 +46,15 @@ export function StatusPill({ status }: { status: WorkStatus }) {
 }
 
 export function PriorityChip({ p }: { p: Priority }) {
-  /* Low prints nothing. Three chips on every row is three chips nobody reads,
-     and "not urgent" is the default rather than a claim worth making. */
+  /* LOUD ONLY WHEN IT IS LOUD. Low printed nothing already — "not urgent" is
+     the default rather than a claim worth making — but Normal, which is also
+     the default, printed a filled chip. On a list where most rows are Normal
+     that is a column of identical badges saying nothing, sitting beside a stage
+     pill and an avatar, and it is what turned the row into confetti: the two
+     priorities that SHOULD stop a reader could not out-shout the one that
+     shouldn't. Normal is a quiet word now; High and Urgent keep the chip. */
   if (p === "low") return null;
+  if (p === "medium") return <span className="tml-pri-q">{labelOf(PRIORITY, p)}</span>;
   return <Pill text={labelOf(PRIORITY, p)} tone={toneOf(PRIORITY, p)} />;
 }
 
@@ -199,4 +205,39 @@ export function ago(dateIso: string | null | undefined, todayIso: string): strin
   if (n === 1) return "tomorrow";
   if (n === -1) return "yesterday";
   return n > 0 ? "in " + n + " days" : n * -1 + " days ago";
+}
+
+/* ------------------------------------------------------------ tag type --- */
+
+/** THE ELEVEN TYPES A TAG CAN BE.
+ *
+ *  `--tag-*` is the panel's own palette and it is deliberately not the status
+ *  palette: a tag is a label the team chose, never a state. The store has taken
+ *  a tone since the day it shipped and no screen in Tasks ever passed one, so
+ *  every tag born here came out `slate` and a wall of grey pills carried no
+ *  information at all — which is the whole point of a tag.
+ *
+ *  SWATCHES, NOT A `<select>`. A colour named in a dropdown is a word you have
+ *  to imagine; eleven 16px dots are the thing itself, and they cost one row. */
+export const TAG_TYPES = [
+  "slate", "red", "orange", "amber", "lime", "green",
+  "teal", "cyan", "blue", "violet", "pink",
+];
+
+export function TagTypePicker({ tone, onPick }: { tone: string; onPick: (t: string) => void }) {
+  return (
+    /* `group` with pressed buttons, NOT `radiogroup` with `radio`. A radiogroup
+       promises arrow-key navigation and a roving tabindex to anybody driving
+       this from a keyboard or a screen reader; these are eleven ordinary
+       buttons you reach with Tab. Claiming the stronger role and not honouring
+       it is worse than claiming the weaker one. */
+    <div className="tm-tagtype" role="group" aria-label="Tag type">
+      {TAG_TYPES.map((t) => (
+        <button key={t} type="button" aria-pressed={t === tone}
+          title={cap(t)} aria-label={cap(t)}
+          className={"tm-swatch tag-" + t + (t === tone ? " on" : "")}
+          onClick={() => onPick(t)} />
+      ))}
+    </div>
+  );
 }
