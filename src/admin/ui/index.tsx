@@ -28,7 +28,60 @@
       produced. Pass a `key` if a view needs a field to reset.
    ============================================================================= */
 import { Fragment, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { FC, ReactNode } from "react";
+import { AlertTriangle } from "@untitledui/icons/AlertTriangle";
+import { Announcement01 } from "@untitledui/icons/Announcement01";
+import { ArrowRight } from "@untitledui/icons/ArrowRight";
+import { BarChart01 } from "@untitledui/icons/BarChart01";
+import { Bell01 } from "@untitledui/icons/Bell01";
+import { Briefcase01 } from "@untitledui/icons/Briefcase01";
+import { Building01 } from "@untitledui/icons/Building01";
+import { Building02 } from "@untitledui/icons/Building02";
+import { Calendar } from "@untitledui/icons/Calendar";
+import { Check } from "@untitledui/icons/Check";
+import { ChevronDown } from "@untitledui/icons/ChevronDown";
+import { ChevronLeft } from "@untitledui/icons/ChevronLeft";
+import { ChevronRight } from "@untitledui/icons/ChevronRight";
+import { Clock } from "@untitledui/icons/Clock";
+import { ClockRewind } from "@untitledui/icons/ClockRewind";
+import { Coins01 } from "@untitledui/icons/Coins01";
+import { CoinsSwap01 } from "@untitledui/icons/CoinsSwap01";
+import { CurrencyRupeeCircle } from "@untitledui/icons/CurrencyRupeeCircle";
+import { DotsVertical } from "@untitledui/icons/DotsVertical";
+import { Download01 } from "@untitledui/icons/Download01";
+import { Eye } from "@untitledui/icons/Eye";
+import { File02 } from "@untitledui/icons/File02";
+import { File05 } from "@untitledui/icons/File05";
+import { FilterLines } from "@untitledui/icons/FilterLines";
+import { Flag01 } from "@untitledui/icons/Flag01";
+import { Home01 } from "@untitledui/icons/Home01";
+import { Inbox01 } from "@untitledui/icons/Inbox01";
+import { LifeBuoy01 } from "@untitledui/icons/LifeBuoy01";
+import { Link01 } from "@untitledui/icons/Link01";
+import { LinkExternal01 } from "@untitledui/icons/LinkExternal01";
+import { Lock01 } from "@untitledui/icons/Lock01";
+import { LockUnlocked01 } from "@untitledui/icons/LockUnlocked01";
+import { LogOut01 } from "@untitledui/icons/LogOut01";
+import { Menu01 } from "@untitledui/icons/Menu01";
+import { Plus } from "@untitledui/icons/Plus";
+import { Receipt } from "@untitledui/icons/Receipt";
+import { RefreshCcw01 } from "@untitledui/icons/RefreshCcw01";
+import { ReverseLeft } from "@untitledui/icons/ReverseLeft";
+import { Route } from "@untitledui/icons/Route";
+import { SearchLg } from "@untitledui/icons/SearchLg";
+import { Shield01 } from "@untitledui/icons/Shield01";
+import { Star01 } from "@untitledui/icons/Star01";
+import { Stars02 } from "@untitledui/icons/Stars02";
+import { Tag01 } from "@untitledui/icons/Tag01";
+import { User01 } from "@untitledui/icons/User01";
+import { Users01 } from "@untitledui/icons/Users01";
+import { UserSquare } from "@untitledui/icons/UserSquare";
+import { XClose } from "@untitledui/icons/XClose";
+import { Badge, BadgeWithDot } from "@/components/base/badges/badges";
+import type { BadgeColor } from "@/components/base/badges/badges";
+import { InputBase } from "@/components/base/input/input";
+import { NativeSelect } from "@/components/base/select/select-native";
+import { EmptyState as UiEmptyState } from "@/components/application/empty-state/empty-state";
 import { go } from "./nav";
 import { fmtDate } from "./format";
 import config from "../../config";
@@ -93,14 +146,86 @@ export const ICONS: Record<string, string> = {
   eye:'<path d="M2.4 12S6.2 5.6 12 5.6 21.6 12 21.6 12 17.8 18.4 12 18.4 2.4 12 2.4 12z"/><circle cx="12" cy="12" r="3.1"/>'
 };
 
+/* =============================================================== ICONS ======
+   THE SET IS UNTITLED UI's, from @untitledui/icons — the same drawings as the
+   component library, on a 24 grid with round caps and one stroke weight. The
+   panel's own 44 hand-drawn paths above are kept as the FALLBACK: a name with
+   no entry in the map below still renders, so adding an icon is a one-line
+   change here and never a broken screen.
+
+   Imported one file at a time (`@untitledui/icons/Home01`) rather than from
+   the package root. The root is a barrel of 1,180 modules; the subpath export
+   pulls exactly what is used, which keeps the bundle honest and the dev
+   server's first start fast.
+
+   The names are the panel's vocabulary, not the library's — a view asks for
+   `deal` or `refund` and does not need to know which drawing that is today. */
+
+const UI: Record<string, FC<{ className?: string }>> = {
+  home: Home01,
+  deal: Briefcase01,
+  quote: File05,
+  invoice: Receipt,
+  chart: BarChart01,
+  route: Route,
+  users: UserSquare,
+  store: Building02,
+  tag: Tag01,
+  /* ₹, not $ — the panel's money is rupees and the set has the glyph. */
+  cash: CurrencyRupeeCircle,
+  out: CoinsSwap01,
+  recon: RefreshCcw01,
+  refund: ReverseLeft,
+  coin: Coins01,
+  mega: Announcement01,
+  doc: File02,
+  flag: Flag01,
+  life: LifeBuoy01,
+  team: Users01,
+  shield: Shield01,
+  history: ClockRewind,
+  search: SearchLg,
+  bell: Bell01,
+  chev: ChevronDown,
+  chevr: ChevronRight,
+  chevl: ChevronLeft,
+  alert: AlertTriangle,
+  clock: Clock,
+  calendar: Calendar,
+  lock: Lock01,
+  unlock: LockUnlocked01,
+  arrow: ArrowRight,
+  ext: LinkExternal01,
+  menu: Menu01,
+  x: XClose,
+  plus: Plus,
+  filter: FilterLines,
+  download: Download01,
+  check: Check,
+  dots: DotsVertical,
+  inbox: Inbox01,
+  sparkle: Stars02,
+  logout: LogOut01,
+  user: User01,
+  building: Building01,
+  link: Link01,
+  star: Star01,
+  eye: Eye,
+};
+
 export function Icon({ name, size, className }: { name: string; size?: "sm" | "lg"; className?: string }) {
-  const p = ICONS[name] || ICONS.doc;
+  const cls = "ic" + (size ? " " + size : "") + (className ? " " + className : "");
+  const Glyph = UI[name];
+  /* `.ic` owns the box and the stroke — a CSS property beats an SVG
+     presentation attribute, so the library's own width/height/stroke-width
+     defaults do not fight the panel's five icon sizes. */
+  if (Glyph) return <Glyph className={cls} />;
   return (
     <svg
-      className={"ic" + (size ? " " + size : "") + (className ? " " + className : "")}
+      className={cls}
       viewBox="0 0 24 24"
       aria-hidden="true"
-      dangerouslySetInnerHTML={{ __html: p }}
+      dangerouslySetInnerHTML={{ __html: ICONS[name] || ICONS.doc }}
     />
   );
 }
@@ -270,15 +395,31 @@ export function richText(s: string): ReactNode[] {
 /* --- small render helpers every view shares ------------------------------ */
 /* `text` is the prototype's first argument; `children` is the same slot spelt
    the way JSX callers reach for. Both render in the one place the text went. */
+/* PILL IS UNTITLED UI's BADGE for the tones the library has a name for —
+   the four statuses, brand, and neutral. The tag palette (eleven hues that
+   mean nothing, by contract) and the three shapes the library does not draw
+   (`solid`, `line`, `dead`) stay on the panel's own .pill, as does any tone
+   the maps in the views hand in that is not one of the six. */
+const BADGE_TONE: Record<string, BadgeColor<"pill-color">> = {
+  ok: "success", warn: "warning", bad: "error", info: "blue", brand: "brand", neutral: "gray",
+};
 export function Pill({ text, tone, lg, title, dot, children }: {
   text?: ReactNode; tone?: string; lg?: boolean; title?: string; dot?: boolean; children?: ReactNode;
 }) {
-  return (
-    <span className={"pill" + (tone ? " " + tone : "") + (lg ? " lg" : "")} title={title}>
-      {dot ? <span className="dot"></span> : null}
-      {text}{children}
-    </span>
-  );
+  const t = tone || "";
+  if (t !== "" && !BADGE_TONE[t])
+    return (
+      <span className={"pill " + t + (lg ? " lg" : "")} title={title}>
+        {dot ? <span className="dot"></span> : null}
+        {text}{children}
+      </span>
+    );
+  const color = BADGE_TONE[t] || "gray";
+  const size = lg ? "md" : "sm";
+  const badge = dot
+    ? <BadgeWithDot type="pill-color" size={size} color={color}>{text}{children}</BadgeWithDot>
+    : <Badge type="pill-color" size={size} color={color}>{text}{children}</Badge>;
+  return title ? <span className="contents" title={title}>{badge}</span> : badge;
 }
 
 export interface TileProps {
@@ -366,12 +507,19 @@ export interface EmptyStateProps {
   action?: ReactNode;
 }
 export function EmptyState(o: EmptyStateProps) {
+  /* the panel names an icon; the library wants the component — same map */
+  const Glyph = UI[o.icon || "inbox"] || UI.inbox;
   return (
-    <div className="empty">
-      <div className="g"><Icon name={o.icon || "inbox"} size="lg" /></div>
-      <h3>{o.title}</h3><p>{o.body}</p>
-      {o.action}
-    </div>
+    <UiEmptyState size="sm" className="py-10">
+      <UiEmptyState.Header pattern="none">
+        <UiEmptyState.FeaturedIcon icon={Glyph} color="gray" theme="modern" />
+      </UiEmptyState.Header>
+      <UiEmptyState.Content>
+        <UiEmptyState.Title>{o.title}</UiEmptyState.Title>
+        {o.body ? <UiEmptyState.Description>{o.body}</UiEmptyState.Description> : null}
+      </UiEmptyState.Content>
+      {o.action ? <UiEmptyState.Footer className="flex-col items-center">{o.action}</UiEmptyState.Footer> : null}
+    </UiEmptyState>
   );
 }
 
@@ -572,15 +720,17 @@ export function Toolbar({ children }: { children?: ReactNode }) {
   return <div className="toolbar">{children}</div>;
 }
 
+/* Untitled UI's input group with a leading search glyph. `data-filter` rides
+   on the real <input> — Plans, Roles and Team read it back with
+   querySelector('input[data-filter="q"]'). */
 export function SearchField({ ph, val, name, onFilter }: {
   ph?: string; val?: string; name?: string; onFilter?: (name: string, value: string) => void;
 }) {
   return (
-    <div className="field grow">
-      <Icon name="search" />
-      <input type="search" placeholder={ph} defaultValue={val || ""} data-filter={name || "q"} autoComplete="off"
-        onChange={(e) => onFilter && onFilter(name || "q", e.target.value)} />
-    </div>
+    <InputBase size="sm" icon={SearchLg} type="search" placeholder={ph} defaultValue={val || ""}
+      autoComplete="off" wrapperClassName="min-w-0 max-w-90 flex-[1_1_220px]"
+      data-filter={name || "q"}
+      onChange={(e) => onFilter && onFilter(name || "q", e.target.value)} />
   );
 }
 
@@ -592,18 +742,18 @@ export function Select({ name, label, options, value, onFilter }: {
   onFilter?: (name: string, value: string) => void;
 }) {
   const on = value !== undefined && value !== null && value !== "";
+  /* the library's styled native select: still a <select>, still `data-filter`
+     on it, so nothing that reads the DOM changes — only the drawing does */
+  const opts = [
+    { label: label || "", value: "" },
+    ...options.map((o) => (typeof o === "string" ? { label: o, value: o } : { label: o.l, value: o.v })),
+  ];
   return (
-    <div className={"selectbox" + (on ? " on" : "")}>
-      <select data-filter={name} defaultValue={String(value === undefined || value === null ? "" : value)}
-        onChange={(e) => onFilter && onFilter(name, e.target.value)}>
-        <option value="">{label}</option>
-        {options.map((o, i) => {
-          const v = typeof o === "string" ? o : o.v;
-          const l = typeof o === "string" ? o : o.l;
-          return <option key={i} value={v}>{l}</option>;
-        })}
-      </select>
-    </div>
+    <NativeSelect size="sm" options={opts} data-filter={name} aria-label={label || name}
+      className="w-auto min-w-36"
+      selectClassName={"pr-8" + (on ? " ring-brand text-brand-secondary" : "")}
+      defaultValue={String(value === undefined || value === null ? "" : value)}
+      onChange={(e) => onFilter && onFilter(name, e.target.value)} />
   );
 }
 

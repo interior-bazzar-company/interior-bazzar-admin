@@ -32,6 +32,7 @@ import { getModules, getGroupOf, getItems, moduleLabel, HOME_ROUTE } from "./mod
 import { can, canWrite, clearSession, getSession, grantsOf } from "../auth/session";
 import { LS, currentDensity, currentTheme, setDensity, setTheme, useShell } from "./ShellContext";
 import { CommandPalette } from "./CommandPalette";
+import { ButtonGroup, ButtonGroupItem } from "@/components/base/button-group/button-group";
 import ErrorBoundary from "../../components/shared/ErrorBoundary";
 
 /* ------------------------------------------------------------------- gate */
@@ -673,26 +674,30 @@ function AccountButton({ session }: { session: MePermissions | null }) {
       return;
     }
     const grants: string[] = session ? grantsOf(session) : [];
+    /* Untitled UI's ButtonGroup — a react-aria ToggleButtonGroup in single-
+       selection mode, so the arrow keys move between the three and the chosen
+       one is announced as selected, which the hand-rolled row never did. */
     const swatch = (act: "theme" | "density", opts: [string, string][], cur: string) => (
-      <div className="btn-group" style={{ width: "100%" }}>
+      <ButtonGroup
+        size="sm"
+        className="w-full *:flex-1 *:justify-center"
+        aria-label={act === "theme" ? "Theme" : "Density"}
+        selectedKeys={[cur]}
+        disallowEmptySelection
+        onSelectionChange={(keys) => {
+          const v = String([...keys][0] || cur);
+          if (act === "theme") setTheme(v);
+          else setDensity(v);
+          force((n) => n + 1);
+          shell.closePop();
+        }}
+      >
         {opts.map((o) => (
-          <button
-            key={o[0]}
-            style={{ flex: 1, justifyContent: "center" }}
-            className={cur === o[0] ? "on" : ""}
-            data-act={act}
-            data-v={o[0]}
-            onClick={() => {
-              if (act === "theme") setTheme(o[0]);
-              else setDensity(o[0]);
-              force((n) => n + 1);
-              shell.closePop();
-            }}
-          >
+          <ButtonGroupItem key={o[0]} id={o[0]} data-act={act} data-v={o[0]}>
             {o[1]}
-          </button>
+          </ButtonGroupItem>
         ))}
-      </div>
+      </ButtonGroup>
     );
     const item = (to: string, ico: string, label: string, right?: string) => (
       <button
@@ -775,7 +780,7 @@ function AccountButton({ session }: { session: MePermissions | null }) {
             <div className="faint" style={{ fontSize: "var(--text-xs)", fontWeight: 600, marginBottom: 6 }}>
               THEME
             </div>
-            {swatch("theme", [["light", "Light"], ["dark", "Dark"]], currentTheme())}
+            {swatch("theme", [["light", "Light"], ["dark", "Dark"], ["system", "System"]], currentTheme())}
             <div className="faint" style={{ fontSize: "var(--text-xs)", fontWeight: 600, margin: "10px 0 6px" }}>
               DENSITY
             </div>
@@ -790,7 +795,7 @@ function AccountButton({ session }: { session: MePermissions | null }) {
           </span>
         </div>
       </>,
-      { width: 288, above: true }
+      { width: 288, above: true, cls: "pop-account" }
     );
   };
 

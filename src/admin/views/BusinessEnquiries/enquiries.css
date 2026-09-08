@@ -798,7 +798,7 @@
   flex: 0 0 auto; display: grid; place-items: center;
   min-width: 18px; height: 18px; padding: 0 5px;
   border-radius: var(--radius-full);
-  background: var(--indigo-9); color: var(--sand-1);
+  background: var(--info-bg); color: var(--info); box-shadow: inset 0 0 0 1px var(--info-line);
   font-size: var(--text-2xs); font-weight: var(--weight-semibold); line-height: 1;
 }
 /* Nothing live. It stays on the row rather than disappearing — "this business
@@ -823,7 +823,7 @@
    TWO AXES, because eight distinct hues would be eight things to memorise and
    the palette has five:
 
-     HUE  says which part of the pipeline    sand → amber → indigo → green/rust
+     HUE  says which part of the pipeline    ink → amber → indigo → green/rust
      FILL says whose move it is              solid = ours · ring = theirs, or ended
 
    So Assigned is a hollow indigo of the same hue as Qualified — the same work,
@@ -832,26 +832,26 @@
    rust: that one we did on purpose. */
 .be-dot {
   flex: 0 0 auto; width: 8px; height: 8px; border-radius: var(--radius-full);
-  background: var(--sand-9);
+  background: var(--line-control);
 }
 /* ours to move */
-.be-dot.s-generated  { background: var(--sand-9) }
-.be-dot.s-processing { background: var(--amber-9) }
-.be-dot.s-qualified  { background: var(--indigo-9) }
+.be-dot.s-generated  { background: var(--line-control) }
+.be-dot.s-processing { background: var(--warn-solid) }
+.be-dot.s-qualified  { background: var(--info-solid) }
 /* waiting on somebody else, or blocked */
-.be-dot.s-assigned   { background: transparent; box-shadow: inset 0 0 0 2px var(--indigo-9) }
-.be-dot.s-no_match   { background: transparent; box-shadow: inset 0 0 0 2px var(--rust-9) }
+.be-dot.s-assigned   { background: transparent; box-shadow: inset 0 0 0 2px var(--info-solid) }
+.be-dot.s-no_match   { background: transparent; box-shadow: inset 0 0 0 2px var(--bad-solid) }
 /* ended */
-.be-dot.s-converted     { background: var(--green-9) }
-.be-dot.s-not_converted { background: transparent; box-shadow: inset 0 0 0 2px var(--sand-9) }
-.be-dot.s-invalid       { background: var(--rust-9) }
+.be-dot.s-converted     { background: var(--ok-solid) }
+.be-dot.s-not_converted { background: transparent; box-shadow: inset 0 0 0 2px var(--line-control) }
+.be-dot.s-invalid       { background: var(--bad-solid) }
 
 /* URGENCY IS ORDINAL, so it looks ordinal: a heat ramp from soonest to latest.
    "Browsing" is hollow because it is not a date — it is the absence of one. */
-.be-dot.u-within_30d { background: var(--rust-9) }
-.be-dot.u-30_90d     { background: var(--amber-9) }
-.be-dot.u-90_plus    { background: var(--indigo-9) }
-.be-dot.u-browsing   { background: transparent; box-shadow: inset 0 0 0 2px var(--sand-8) }
+.be-dot.u-within_30d { background: var(--bad-solid) }
+.be-dot.u-30_90d     { background: var(--warn-solid) }
+.be-dot.u-90_plus    { background: var(--info-solid) }
+.be-dot.u-browsing   { background: transparent; box-shadow: inset 0 0 0 2px var(--line-control) }
 
 /* On a pill the dot sits inside a tinted background, so it needs to hold its
    own edge against it. */

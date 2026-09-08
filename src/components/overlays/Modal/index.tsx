@@ -1,8 +1,11 @@
-import styles from "./Modal.module.css";
-import { useEffect, useRef, type ReactNode } from "react";
-import { createPortal } from "react-dom";
-import { FiX } from "react-icons/fi";
-
+/* The content modal behind useModal(), on Untitled UI's Modal. The previous
+   version re-implemented a focus trap, `inert` on the rest of the page and an
+   exit animation by hand; React Aria's ModalOverlay does all of that, and the
+   enter/exit animation is the library's own. */
+import type { ReactNode } from "react";
+import { XClose } from "@untitledui/icons/XClose";
+import { Dialog as UiDialog, Modal as UiModal, ModalOverlay } from "@/components/application/modals/modal";
+import { Button } from "@/components/base/buttons/button";
 
 interface ModalProps {
     onClose: () => void;
@@ -11,118 +14,17 @@ interface ModalProps {
     maxWidth?: string;
 }
 
-const Modal: React.FC<ModalProps> = ({ onClose, children, width, maxWidth }) => {
-    const contentRef = useRef<HTMLDivElement>(null);
-    const backdropRef = useRef<HTMLDivElement>(null);
-    const previouslyFocusedElement = useRef<HTMLElement | null>(null);
-
-    useEffect(() => {
-        document.addEventListener("keydown", handleKeyDown);
-        blockOutsideAccess();
-
-        // Save the currently focused element to restore later
-        previouslyFocusedElement.current = document.activeElement as HTMLElement;
-
-        // Move focus to the modal
-        const focusable = getFocusableElements();
-        focusable[0]?.focus();
-
-        return () => {
-            unBlockOutsideAccess();
-            document.removeEventListener("keydown", handleKeyDown);
-            previouslyFocusedElement.current?.focus(); // Restore focus
-        };
-    }, []);
-
-    const getFocusableElements = () => {
-        if (!contentRef.current) return [];
-        return Array.from(
-            contentRef.current.querySelectorAll<HTMLElement>(
-                'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-            )
-        ).filter((el) => !el.hasAttribute("disabled") && !el.getAttribute("aria-hidden"));
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-        if (e.key === "Escape") {
-            handleClose();
-        }
-
-        if (e.key === "Tab") {
-            const focusableEls = getFocusableElements();
-            if (focusableEls.length === 0) return;
-
-            const first = focusableEls[0];
-            const last = focusableEls[focusableEls.length - 1];
-
-            if (e.shiftKey) {
-                if (document.activeElement === first) {
-                    e.preventDefault();
-                    last.focus();
-                }
-            } else {
-                if (document.activeElement === last) {
-                    e.preventDefault();
-                    first.focus();
-                }
-            }
-        }
-    };
-
-    const blockOutsideAccess = () => {
-        const body = document.body;
-        [...body.children].forEach((el) => {
-            if (!el.getAttribute("data-dialog")) {
-                el.setAttribute("aria-hidden", "true");
-                el.setAttribute("inert", "");
-            }
-        });
-    };
-
-    const unBlockOutsideAccess = () => {
-        const body = document.body;
-        [...body.children].forEach((el) => {
-            if (!el.getAttribute("data-dialog")) {
-                el.removeAttribute("aria-hidden");
-                el.removeAttribute("inert");
-            }
-        });
-    };
-
-    const handleClose = () => {
-        if (contentRef.current) {
-            contentRef.current.classList.add(styles.hideModal);
-        }
-
-        if (backdropRef.current) {
-            backdropRef.current.classList.add(styles.hideModal);
-        }
-
-        contentRef.current?.addEventListener(
-            "animationend",
-            () => {
-                onClose();
-            },
-            { once: true }
-        );
-    };
-
-
-    return createPortal(
-        <div data-dialog="true" className={styles.modal}>
-            <div
-                ref={backdropRef}
-                className={styles.modalBackdrop}
-            />
-            <div ref={contentRef} className={styles.modalContent} tabIndex={-1} style={{ width: width || undefined, maxWidth: maxWidth || undefined }}>
-                <button onClick={handleClose} className={styles.modalClose}>
-                    <FiX size={24} />
-                </button>
-                {children}
-            </div>
-        </div>,
-        document.body
-    );
-};
+const Modal = ({ onClose, children, width, maxWidth }: ModalProps) => (
+    <ModalOverlay isOpen isDismissable onOpenChange={(open) => { if (!open) onClose(); }}>
+        <UiModal className={maxWidth ? undefined : "max-w-3xl"} style={{ width, maxWidth }}>
+            <UiDialog>
+                <div className="relative w-full rounded-2xl bg-primary p-8 shadow-xl ring-1 ring-secondary">
+                    <Button color="tertiary" size="sm" className="absolute top-3 right-3" aria-label="Close" iconLeading={XClose} onClick={onClose} />
+                    {children}
+                </div>
+            </UiDialog>
+        </UiModal>
+    </ModalOverlay>
+);
 
 export default Modal;

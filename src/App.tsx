@@ -5,6 +5,7 @@ import ParentContextProvider from "./context";
 import { BrowserRouter as Router } from "react-router-dom";
 import ErrorBoundary from "./components/shared/ErrorBoundary";
 import { ShellProvider } from "./admin/shell/ShellContext";
+import { RouteProvider } from "./providers/router-provider";
 
 function App() {
   return (
@@ -12,9 +13,14 @@ function App() {
       <ParentContextProvider>
         <Provider store={store}>
           <Router>
-            <ShellProvider>
-              <UserRoutes />
-            </ShellProvider>
+            {/* Untitled UI's links and menu items call the router through
+                react-aria's RouterProvider; without it an <a> inside a
+                library component would hard-navigate. */}
+            <RouteProvider>
+              <ShellProvider>
+                <UserRoutes />
+              </ShellProvider>
+            </RouteProvider>
           </Router>
         </Provider>
       </ParentContextProvider>

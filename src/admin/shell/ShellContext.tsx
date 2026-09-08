@@ -47,18 +47,37 @@ export const LS = {
 /* =========================================================== APPEARANCE === */
 /* Two attributes on <html> drive the whole system. No class sweep, no reload:
    the ramps and the scales are re-read by every component at once.          */
-export function setTheme(v: string) {
+/* Two selectors, one state. `data-theme` is the panel's own; `dark-mode` /
+   `light-mode` is Untitled UI's, so a library component reads the theme with
+   no translation layer. "System" is resolved here from prefers-color-scheme —
+   the way Untitled UI's ThemeProvider does it — and re-resolved when the OS
+   flips, so the sheet needs exactly one dark block. Kept in one function so
+   the two selectors can never disagree. */
+let systemWatch: (() => void) | null = null;
+function applyTheme(v: string) {
   const r = document.documentElement;
-  if (v === "system") r.removeAttribute("data-theme");
-  else r.setAttribute("data-theme", v);
-  LS.set("ib_admin_theme", v === "system" ? null : v);
+  if (systemWatch) { systemWatch(); systemWatch = null; }
+  const paint = (dark: boolean) => {
+    r.classList.remove("dark-mode", "light-mode");
+    r.classList.add(dark ? "dark-mode" : "light-mode");
+    r.setAttribute("data-theme", dark ? "dark" : "light");
+  };
   if (v === "system") {
-    try {
-      localStorage.removeItem("ib_admin_theme");
-    } catch {
-      /* nothing to remove */
-    }
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    paint(mq.matches);
+    r.setAttribute("data-theme-pref", "system");
+    const on = (e: MediaQueryListEvent) => paint(e.matches);
+    mq.addEventListener("change", on);
+    systemWatch = () => mq.removeEventListener("change", on);
+    return;
   }
+  r.removeAttribute("data-theme-pref");
+  paint(v === "dark");
+}
+
+export function setTheme(v: string) {
+  applyTheme(v);
+  LS.set("ib_admin_theme", v);
 }
 export function setDensity(v: string) {
   const r = document.documentElement;
@@ -72,7 +91,12 @@ export function setDensity(v: string) {
     }
   } else LS.set("ib_admin_density", v);
 }
-export const currentTheme = () => document.documentElement.getAttribute("data-theme") || "system";
+/* What the person CHOSE, not what is painted: with "system" chosen the
+   attribute says light or dark, and the switch has to show System. */
+export const currentTheme = () =>
+  document.documentElement.getAttribute("data-theme-pref") === "system"
+    ? "system"
+    : document.documentElement.getAttribute("data-theme") || "system";
 export const currentDensity = () =>
   document.documentElement.getAttribute("data-density") || "comfortable";
 
@@ -80,9 +104,9 @@ export const currentDensity = () =>
     <head> script did — so the panel never flashes the wrong theme. */
 export function bootAppearance() {
   const r = document.documentElement;
-  const t = LS.get<string | null>("ib_admin_theme", null);
+  const t = LS.get<string | null>("ib_admin_theme", null) || "dark";
   const d = LS.get<string | null>("ib_admin_density", null);
-  r.setAttribute("data-theme", t ? t : "dark");
+  applyTheme(t);
   if (d) r.setAttribute("data-density", d);
 }
 

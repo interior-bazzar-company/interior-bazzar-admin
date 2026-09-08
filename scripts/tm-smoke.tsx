@@ -24,6 +24,9 @@ const doc = { ...el(), documentElement: el(), body: el(), createElement: el, act
 g.document = doc;
 g.window = {
   document: doc,
+  /* react-aria's focus-visible setup sees a `window` and reads
+     HTMLElement.prototype.focus; the class only has to exist. */
+  HTMLElement: class { focus() {} }, Element: class {}, Node: class {},
   addEventListener: () => {}, removeEventListener: () => {},
   matchMedia: () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }),
   localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
@@ -266,8 +269,17 @@ renders("attendance requests", () => at("/attendance?face=requests"), ["dls-body
   ok("...in the order Today, Requests, History, Analytics",
     at_.every((i, n) => n === 0 || at_[n - 1] < i));
   /* The icon is inside the button, and `.ic` only lays out in a flex box — as
-     inline text it hangs below the label. */
-  ok("each tab carries its icon", (html.match(/<button[^>]*>\s*<svg class="ic sm"/g) || []).length >= 4);
+     inline text it hangs below the label.
+
+     `class` IS NOT ASSERTED AS THE FIRST ATTRIBUTE any more, and the reason is
+     worth writing down. Icon renders an @untitledui/icons component now, and
+     those spread the caller's props AFTER their own, so the class lands last:
+     `<svg viewBox=… stroke-width="2" … class="ic sm">`. Both things this line
+     exists to prove are unchanged — the svg is still the button's first child,
+     and it still carries `ic sm` — so only the attribute ORDER, which was
+     incidental to the hand-rolled markup, has moved. Matching on order would
+     make this a test of which library draws the icon. */
+  ok("each tab carries its icon", (html.match(/<button[^>]*>\s*<svg[^>]*\sclass="ic sm"/g) || []).length >= 4);
 })();
 ok("the leave queue left the middle of the day table",
   at("/attendance").indexOf("tm-inbox") < 0);

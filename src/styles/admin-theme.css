@@ -1,16 +1,20 @@
+@import "./tokens.css";
+
 /* =============================================================================
-   Interior bazzar — Admin Access · design system  v2
+   Interior bazzar — Admin Access · design system  v3 · Ink & Signal
    =============================================================================
 
    HOW TO READ THIS FILE
    ---------------------
    Three layers, in order. Never skip a layer.
 
-     1. PRIMITIVES   raw 12-step colour ramps + the numeric scales.
-                     You almost never use these directly.
-     2. SEMANTIC     what a thing MEANS: --surface, --border, --text-2, --ok.
-                     This is what you write in a component.
-     3. COMPONENT    the classes: .btn, .card, .tbl, .pill …
+     1. PRIMITIVES   the Ink ramp, the Signal hues, the numeric scales.
+                     Never used directly — see tokens.css.
+     2. SEMANTIC     what a thing MEANS: --color-surface, --color-border,
+                     --color-text-2, --color-success — and their legacy
+                     aliases --bg, --line, --text-2, --ok that this file and
+                     the module sheets already write. See tokens.css.
+     3. COMPONENT    the classes: .btn, .card, .tbl, .pill … — this file.
 
    Change a ramp in layer 1 and the whole product moves, in both themes,
    at both densities, without touching a single component.
@@ -38,7 +42,7 @@
 
    MODES
    -----
-     [data-theme="dark"]        · also follows prefers-color-scheme
+     [data-theme="dark"] / .dark-mode   · "system" is resolved in JS before paint
      [data-density="compact"]   · ~15% tighter; same system, more rows on screen
 
    INSPIRED BY
@@ -57,428 +61,12 @@
 
 
 /* ============================================================================
-   LAYER 1 · PRIMITIVES
+   LAYERS 1 + 2 · THE TOKEN SHEET
+   Ink & Signal lives in ./tokens.css: the Ink ramp and the Signal hues, the
+   --color-* semantic set for light and dark, the chart tokens, density, and
+   the legacy names (--bg, --brand, --ok, --line …) as aliases of the semantic
+   set. Nothing below this line names a colour that is not a token.
    ========================================================================== */
-:root{
-  /* ---- SLATE · the cool neutral the whole product sits on ---------------
-     Replaces the warm SAND. Faintly teal-tinted so neutrals and brand belong to
-     one family rather than two. Step 8 is the CONTROL border and is contrast-
-     verified at 3.50:1 on white — the old sand-8 measured 2.43:1 and failed. */
-  --sand-1:#fbfcfc;  --sand-2:#f6f9f8;  --sand-3:#eef3f2;  --sand-4:#e2eae8;
-  --sand-5:#d3dedb;  --sand-6:#bfcecb;  --sand-7:#a3b6b2;  --sand-8:#6d8580;
-  --sand-9:#556c68;  --sand-10:#3f5451; --sand-11:#2e403d; --sand-12:#081110;
-
-  /* ---- GREEN · the brand, now teal. Step 7 #0c6b57 is the light-mode solid
-     and sits a few degrees from the original #085041, so the two read as one
-     family. White on it measures 6.45:1. --------------------------------- */
-  --green-1:#f4faf8;  --green-2:#eaf6f2;  --green-3:#d5ece5;  --green-4:#bcddd3;
-  --green-5:#9dcdbf;  --green-6:#75b8a6;  --green-7:#0c6b57;  --green-8:#0e876c;
-  --green-9:#0c6b57;  --green-10:#095646; --green-11:#0a6152; --green-12:#04241d;
-
-  /* ---- AMBER · attention. step 11 is the AA-verified ink ---------------- */
-  --amber-1:#fefbf5;  --amber-2:#fdf6e9;  --amber-3:#fbedd3;  --amber-4:#f7e2bb;
-  --amber-5:#f0d5a3;  --amber-6:#e6c383;  --amber-7:#d8a955;  --amber-8:#bf8722;
-  --amber-9:#b8770e;  --amber-10:#9c630b; --amber-11:#8a5510; --amber-12:#43280a;
-
-  /* ---- RUST · stop. warm red, not a fire-engine red -------------------- */
-  --rust-1:#fefaf8;   --rust-2:#fdf0eb;   --rust-3:#fadfd5;   --rust-4:#f5cbbc;
-  --rust-5:#eeb4a1;   --rust-6:#e29881;   --rust-7:#d0745a;   --rust-8:#bd5334;
-  --rust-9:#b3401f;   --rust-10:#98351a;  --rust-11:#9c3a1c;  --rust-12:#4a1c0e;
-
-  /* ---- INDIGO · internal / provenance ---------------------------------- */
-  --indigo-1:#f8fafd;  --indigo-2:#eef2fa;  --indigo-3:#dde5f4;  --indigo-4:#c8d5ec;
-  --indigo-5:#aec1e1;  --indigo-6:#8fa8d3;  --indigo-7:#6a89c0;  --indigo-8:#3f63a0;
-  --indigo-9:#1a3a6e;  --indigo-10:#132c54; --indigo-11:#264b83; --indigo-12:#0e1f3c;
-
-  /* ---- SPACE · ×4 ------------------------------------------------------- */
-  --space-0:0;    --space-px:1px;
-  --space-1:4px;  --space-2:8px;  --space-3:12px; --space-4:16px;
-  --space-5:20px; --space-6:24px; --space-8:32px; --space-10:40px;
-  --space-12:48px; --space-16:64px;
-
-  /* ---- TEXT · ten sizes, each with a job ------------------------------- */
-  --text-2xs:10px;  --lh-2xs:14px;   /* uppercase micro-labels only          */
-  --text-xs:11px;   --lh-xs:16px;    /* badges, table meta, keyboard hints   */
-  --text-sm:12px;   --lh-sm:16px;    /* captions, secondary cell lines       */
-  --text-md:13px;   --lh-md:18px;    /* dense UI: nav, chips, toolbar        */
-  --text-base:14px; --lh-base:20px;  /* body, table cells, form controls     */
-  --text-lg:16px;   --lh-lg:24px;    /* card titles, drawer headings         */
-  --text-xl:18px;   --lh-xl:26px;    /* section titles                       */
-  --text-2xl:22px;  --lh-2xl:30px;   /* record titles                        */
-  --text-3xl:28px;  --lh-3xl:34px;   /* page titles, hero figures            */
-  --text-4xl:36px;  --lh-4xl:42px;   /* the greeting, and nothing else       */
-
-  --weight-normal:400; --weight-medium:500; --weight-semibold:600; --weight-bold:700;
-  --tracking-tight:-.02em; --tracking-normal:0; --tracking-wide:.02em;
-
-  /* ---- CONTROL HEIGHTS · the single biggest consistency lever ---------- */
-  --control-xs:22px; --control-sm:26px; --control-md:32px;
-  --control-lg:38px; --control-xl:44px;
-  --control-pad-xs:8px; --control-pad-sm:10px; --control-pad-md:12px;
-  --control-pad-lg:16px; --control-pad-xl:20px;
-  --nav-item-h:34px;    /* .sb-item — a hair taller than --control-md so its
-                            larger touch target reads intentional, not sloppy */
-
-  /* ---- RADIUS ---------------------------------------------------------- */
-  --radius-xs:3px; --radius-sm:4px; --radius-md:6px;
-  --radius-lg:8px; --radius-xl:12px; --radius-2xl:16px; --radius-full:9999px;
-
-  /* ---- ICON ------------------------------------------------------------ */
-  --icon-xs:12px; --icon-sm:14px; --icon-md:16px; --icon-lg:20px; --icon-xl:28px;
-
-  /* ---- MOTION ---------------------------------------------------------- */
-  --ease:cubic-bezier(.4,0,.2,1);
-  --ease-out:cubic-bezier(.16,1,.3,1);
-  --duration-fast:.1s; --duration:.15s; --duration-slow:.24s;
-
-  /* ---- LAYOUT ---------------------------------------------------------- */
-  --nav-w:248px; --rail-w:56px; --top-h:52px;
-  --page-max:1180px; --page-max-wide:1440px; --page-pad:32px;
-  --row-h:44px;
-
-  /* THE STACKING LADDER, in one place and with gaps between the rungs.
-     Two rungs were missing and both were being improvised with bare numbers in
-     the middle of a component: a sticky table header at 2, and the band above
-     it at 3. One apart is not a decision, it is a coincidence waiting to be
-     re-broken by the next person who needs "just above the rows" — and it HAD
-     broken once, when a cell tooltip picked 2 as well and lost the tie to the
-     header on document order alone.
-       0-4   rows, cells, the ordinary content plane, and the small dropdowns
-             that hang off a row (`.tgr-pop` is one, at 3)
-       stick the sticky table header, above the rows it scrolls under. Held at
-             its original 2 ON PURPOSE: raising it would push those row-level
-             dropdowns behind the header they currently sit over.
-       band  a command band and anything hanging out of it (cell tooltips)
-       bandpop  a band that opens a PANEL - a filter listbox - which has to
-             clear the other bands below it, not just the rows
-       topbar / nav   page chrome, above all content
-       pop / layer    popovers, drawers, modals
-       toast          above everything, including modals                     */
-  --z-stick:2; --z-band:10; --z-bandpop:12;
-  --z-nav:20; --z-topbar:15; --z-pop:100; --z-layer:101; --z-toast:200;
-}
-
-
-/* ============================================================================
-   LAYER 2 · SEMANTIC — light
-   Everything a component should ever reference.
-   ========================================================================== */
-:root{
-  /* surfaces */
-  --bg:#ffffff;                 /* the content plane — the only white       */
-  --bg-shell:var(--sand-2);     /* chrome around the content                */
-  /* Chat's faded backdrop — a scatter of currency glyphs (this is a sales
-     ledger, not a doodle wallpaper) at low opacity. Baked as fixed colour +
-     opacity per theme, since a data: URI can't read a CSS custom property. */
-  --chat-pattern:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='%238a7550' opacity='0.16' font-family='Arial,Helvetica,sans-serif' font-weight='700'%3E%3Ctext x='10' y='36' font-size='24' transform='rotate(-14 10 36)'%3E%E2%82%B9%3C/text%3E%3Ctext x='92' y='18' font-size='17' transform='rotate(9 92 18)'%3E%24%3C/text%3E%3Ctext x='128' y='68' font-size='21' transform='rotate(-7 128 68)'%3E%E2%82%B9%3C/text%3E%3Ctext x='34' y='92' font-size='15' transform='rotate(13 34 92)'%3E%E2%82%AC%3C/text%3E%3Ctext x='72' y='128' font-size='23' transform='rotate(-16 72 128)'%3E%24%3C/text%3E%3Ctext x='138' y='142' font-size='16' transform='rotate(6 138 142)'%3E%C2%A5%3C/text%3E%3Ctext x='4' y='150' font-size='17' transform='rotate(-11 4 150)'%3E%E2%82%B9%3C/text%3E%3C/g%3E%3C/svg%3E");
-  /* A light theme only wash — a bit of WhatsApp's cream in the same warm
-     token the amber scale already carries, so it needed no new colour. Dark
-     stays on --bg-shell (see both dark blocks below): unchanged on purpose,
-     "yellowish" was asked for light mode specifically. */
-  --chat-bg:var(--amber-2);
-  --bg-nav:var(--sand-3);       /* the nav rail, deliberately deeper than the shell */
-  --bg-inset:var(--sand-3);     /* wells: inputs at rest, code, sub-headers */
-  --bg-hover:var(--sand-3);
-  --bg-active:var(--sand-4);
-  --bg-selected:var(--green-3);
-  /* Dedicated, not borrowed from --bg-hover: that token is tuned against the
-     white content plane, and in light mode it happens to equal --bg-nav
-     exactly (both sand-3) — a sidebar tab hovered over produced no visible
-     change at all. The active tab gets the same tint a selected row/card
-     gets elsewhere (--bg-selected) rather than a plain grey, so "which
-     section am I in" reads as the same brand-tinted signal everywhere. */
-  --sidebar-hover:var(--sand-4);
-  --sidebar-active:var(--bg-selected);
-  --surface-raised:#ffffff;
-
-  /* skeleton — the resting bar and the light that sweeps across it. Two
-     tokens, because the sweep must be BRIGHTER than the bar in both themes
-     and no single ramp step is on the right side of that in both. */
-  --sk:var(--sand-4);
-  --sk-sheen:var(--sand-2);
-
-  /* text */
-  --text:var(--sand-12);
-  --text-2:var(--sand-11);
-  --text-3:var(--sand-10);          /* 6.73:1 — was sand-9, which failed AA in dark */
-  --text-inverse:#ffffff;
-
-  /* borders — TWO jobs, so two tokens.
-     --line is a hairline that groups; it may be quiet.
-     --line-control is the boundary that IDENTIFIES an input, select or button
-     and must reach 3:1 under WCAG 1.4.11. One value cannot do both, which is
-     exactly why the single old --line measured 1.35:1 in dark mode. */
-  --line:var(--sand-5);
-  --line-2:var(--sand-6);
-  --line-3:var(--sand-7);
-  --line-control:var(--sand-8);     /* 3.50:1 on white */
-  --line-strong:var(--sand-8);
-
-  /* brand */
-  --brand:var(--green-9);
-  --brand-hover:var(--green-10);
-  --brand-ink:#ffffff;              /* light: white on #0c6b57 = 6.45:1 */
-  --brand-text:var(--green-11);
-  --brand-tint:var(--green-2);
-  --brand-tint-2:var(--green-3);
-  --brand-line:var(--green-5);
-  --brand-mint:#9fe1cb;
-
-  /* status — every one of the four has the same four slots */
-  --ok:var(--green-11);   --ok-bg:var(--green-2);   --ok-line:var(--green-4);   --ok-solid:var(--green-9);
-  --warn:var(--amber-11); --warn-bg:var(--amber-2); --warn-line:var(--amber-4); --warn-solid:var(--amber-9);
-  --bad:var(--rust-11);   --bad-bg:var(--rust-2);   --bad-line:var(--rust-4);   --bad-solid:var(--rust-9);
-  --info:var(--indigo-11);--info-bg:var(--indigo-2);--info-line:var(--indigo-4);--info-solid:var(--indigo-9);
-  --neutral:var(--sand-11); --neutral-bg:var(--sand-3); --neutral-line:var(--sand-6);
-
-  /* --- the channel palette -------------------------------------------------
-     Two outbound channels, one pattern: a deep saturated fill of the channel's
-     own hue, carrying a pale ink of that SAME hue. Four slots each, the same
-     four the status tokens use, so a channel is swapped by name and never by
-     rewriting a rule.
-
-     What this replaced was broken, and broken differently in each theme.
-     WhatsApp was `--green-10` with a hard-coded `#fff`; email was `--brand`
-     with `--brand-ink`. In light both happened to work. In dark the ramp
-     brightens — `--green-10` becomes a LIGHT green — so WhatsApp kept white ink
-     on a light fill at **2.70:1**, a straight accessibility failure, while
-     email's ink flipped to near-black. One component, two opposite rules, and
-     one of them unreadable.
-
-     Now the fill is deep in BOTH themes and the ink is pale in both, so the
-     pattern does not change when the theme does — only the hue tells the two
-     channels apart. Worst text pair is 6.07:1. */
-  --ch-wa:#0b6b52;   --ch-wa-ink:#effaf6;   --ch-wa-bg:#dcf1e9;   --ch-wa-text:#0a5943;
-  --ch-em:#20508f;   --ch-em-ink:#eef4fc;   --ch-em-bg:#e0eafa;   --ch-em-text:#1d4880;
-
-  /* --- the tag palette -----------------------------------------------------
-     Eleven hues that mean NOTHING. Everywhere else in this product colour is
-     status — green passed, amber needs a human, rust stopped — and a tag is the
-     one thing that breaks that rule, because the colour is whatever the team
-     decided it is. So tags get their own palette rather than borrowing the
-     status one: a tag used to render green through `--ok`, which said "success"
-     in a system where nothing about the tag was a success, and a grey one came
-     out struck through because `.pill.dead` means cancelled.
-
-     Nothing outside a tag may use these. That is the whole contract: a token
-     named `--tag-*` in a component is a component that should have picked a
-     status token instead.
-
-     Three slots each, not twelve, because a pill is all any of them will ever
-     draw: text, its tint, its hairline. Every pair below clears WCAG AA on its
-     own background — worst case 5.60:1 in light, 5.61:1 in dark. They were
-     solved for contrast rather than set to one lightness, because a yellow-
-     green and a violet at the same L are nowhere near the same readability.
-     The twelfth option is no colour at all, which uses `--neutral-*`. */
-  --tag-slate:#536379;  --tag-slate-bg:#f4f6f8;  --tag-slate-line:#d8dde3;
-  --tag-red:#b03429;    --tag-red-bg:#fdf1f0;    --tag-red-line:#f0cfcc;
-  --tag-orange:#8c5721; --tag-orange-bg:#fdf6f0; --tag-orange-line:#f0decc;
-  --tag-amber:#74621b;  --tag-amber-bg:#fdfaf0;  --tag-amber-line:#f0e9cc;
-  --tag-lime:#4c6d1c;   --tag-lime-bg:#f7fcf0;   --tag-lime-line:#e1efcd;
-  --tag-green:#1d7145;  --tag-green-bg:#f0fcf6;  --tag-green-line:#cdefdd;
-  --tag-teal:#1a706d;   --tag-teal-bg:#f0fdfc;   --tag-teal-line:#ccf0ef;
-  --tag-cyan:#206988;   --tag-cyan-bg:#f0f9fd;   --tag-cyan-line:#cce5f0;
-  --tag-blue:#2b59b6;   --tag-blue-bg:#f0f4fd;   --tag-blue-line:#ccd8f0;
-  --tag-violet:#702eb2; --tag-violet-bg:#f6f0fc; --tag-violet-line:#decdef;
-  --tag-pink:#b02968;   --tag-pink-bg:#fdf0f6;   --tag-pink-line:#f0ccdd;
-
-  /* type stacks */
-  --font:"DM Sans",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
-  --font-display:"DM Serif Display",Georgia,"Times New Roman",serif;
-  --font-mono:"DM Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-
-  /* elevation — layered, ambient + direct. Never one hard drop. */
-  --shadow-xs:0 1px 2px rgba(33,32,28,.05);
-  --shadow-sm:0 1px 2px rgba(33,32,28,.05), 0 2px 6px rgba(33,32,28,.05);
-  --shadow-md:0 2px 4px rgba(33,32,28,.05), 0 6px 16px rgba(33,32,28,.07);
-  --shadow-lg:0 4px 8px rgba(33,32,28,.05), 0 14px 34px rgba(33,32,28,.11);
-  --shadow-xl:0 6px 12px rgba(33,32,28,.06), 0 28px 64px rgba(33,32,28,.15);
-  --ring:0 0 0 3px rgba(12,107,87,.16);
-  /* Same idea as --ring but for an invalid field — tuned per theme like --ring
-     is, rather than one alpha value that only reads correctly in light mode. */
-  --bad-ring:0 0 0 3px rgba(179,64,31,.13);
-  /* Chevron for <select class="inp">. A select cannot carry a pseudo-element,
-     so unlike .selectbox::after it has to be painted as a background image —
-     which means the stroke colour is baked in and must be swapped per theme.
-     Kept at --sand-10/--text-3 parity with .selectbox::after. */
-  --chevron:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233f5451' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
-
-  --scrim:rgba(33,32,28,.34);
-  --skeleton:linear-gradient(90deg,var(--sand-3) 25%,var(--sand-4) 38%,var(--sand-3) 62%);
-
-  color-scheme:light;
-}
-
-
-/* ============================================================================
-   DARK — the same twelve steps, read from the other end.
-   ========================================================================== */
-@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){ color-scheme:dark } }
-:root[data-theme="dark"]{ color-scheme:dark }
-
-/* This block is the no-JS fallback only — the boot script in admin-access.html
-   sets data-theme="dark" explicitly before first paint, so :root[data-theme="dark"]
-   below is what every real session actually renders. Kept identical to it (not
-   left on the pre-teal palette) so the two can never drift apart again. */
-@media (prefers-color-scheme:dark){
-  :root:not([data-theme="light"]){
-    --sand-1:#080b0b;  --sand-2:#0e1413;  --sand-3:#151d1c;  --sand-4:#1a2423;
-    --sand-5:#202c2a;  --sand-6:#293735;  --sand-7:#33443f;  --sand-8:#455a56;
-    --sand-9:#5e7571;  --sand-10:#8ca29e; --sand-11:#afc2bf; --sand-12:#eaf2f0;
-
-    --green-1:#04140f; --green-2:#06201a; --green-3:#062e26; --green-4:#043b30;
-    --green-5:#04473a; --green-6:#095646; --green-7:#0c6b57; --green-8:#0e876c;
-    --green-9:#12a594; --green-10:#1fbfa8; --green-11:#5ce0c6; --green-12:#bcf5e6;
-
-    --amber-1:#17130a; --amber-2:#1f180b; --amber-3:#30240d; --amber-4:#3e2e0d;
-    --amber-5:#4b380f; --amber-6:#5d4715; --amber-7:#785d1c; --amber-8:#a17c22;
-    --amber-9:#c48a15; --amber-10:#d99b20; --amber-11:#e8b155; --amber-12:#f8e3bb;
-
-    --rust-1:#1a100d; --rust-2:#24130e; --rust-3:#381a12; --rust-4:#472016;
-    --rust-5:#56271a; --rust-6:#6b3120; --rust-7:#8a3f28; --rust-8:#b04f2f;
-    --rust-9:#c9552f; --rust-10:#dc6440; --rust-11:#f28d68; --rust-12:#ffd9c8;
-
-    --indigo-1:#0d1119; --indigo-2:#111726; --indigo-3:#16223b; --indigo-4:#1a2b4c;
-    --indigo-5:#1f345c; --indigo-6:#264070; --indigo-7:#31548f; --indigo-8:#3f6db8;
-    --indigo-9:#4a7fd0; --indigo-10:#5c8ede; --indigo-11:#8fb2ee; --indigo-12:#d6e4fb;
-
-    --bg:var(--sand-2); --bg-shell:var(--sand-1); --bg-inset:var(--sand-3);
-    --bg-nav:#040606;
-    --chat-pattern:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='%23cfe0dc' opacity='0.05' font-family='Arial,Helvetica,sans-serif' font-weight='700'%3E%3Ctext x='10' y='36' font-size='24' transform='rotate(-14 10 36)'%3E%E2%82%B9%3C/text%3E%3Ctext x='92' y='18' font-size='17' transform='rotate(9 92 18)'%3E%24%3C/text%3E%3Ctext x='128' y='68' font-size='21' transform='rotate(-7 128 68)'%3E%E2%82%B9%3C/text%3E%3Ctext x='34' y='92' font-size='15' transform='rotate(13 34 92)'%3E%E2%82%AC%3C/text%3E%3Ctext x='72' y='128' font-size='23' transform='rotate(-16 72 128)'%3E%24%3C/text%3E%3Ctext x='138' y='142' font-size='16' transform='rotate(6 138 142)'%3E%C2%A5%3C/text%3E%3Ctext x='4' y='150' font-size='17' transform='rotate(-11 4 150)'%3E%E2%82%B9%3C/text%3E%3C/g%3E%3C/svg%3E");
-    --chat-bg:var(--bg-shell);
-    --bg-hover:var(--sand-4); --bg-active:var(--sand-5); --bg-selected:var(--green-4);
-    --sidebar-hover:var(--sand-4); --sidebar-active:var(--bg-selected);
-    --surface-raised:var(--sand-3);
-    --sk-sheen:var(--sand-6);   /* dark: the sweep is a LIGHTER step, not sand-2 */
-    --brand-mint:var(--green-11);
-    --line-control:var(--sand-9);
-    --brand-ink:#04140f;
-    --shadow-xs:0 1px 2px rgba(0,0,0,.4);
-    --shadow-sm:0 1px 2px rgba(0,0,0,.4), 0 2px 6px rgba(0,0,0,.3);
-    --shadow-md:0 2px 4px rgba(0,0,0,.4), 0 6px 16px rgba(0,0,0,.35);
-    --shadow-lg:0 4px 8px rgba(0,0,0,.4), 0 14px 34px rgba(0,0,0,.45);
-    --shadow-xl:0 6px 12px rgba(0,0,0,.45), 0 28px 64px rgba(0,0,0,.55);
-    --ring:0 0 0 3px rgba(47,157,124,.25);
-    --bad-ring:0 0 0 3px rgba(201,85,47,.28);
-    --chevron:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238ca29e' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
-    --scrim:rgba(0,0,0,.6);
-    --skeleton:linear-gradient(90deg,var(--sand-3) 25%,var(--sand-5) 38%,var(--sand-3) 62%);
-
-    /* the channel palette, dark. Deeper fills, paler inks — the same pattern,
-       which is the whole point of it being a pattern. */
-    --ch-wa:#0f5f4c;   --ch-wa-ink:#d9f5eb;   --ch-wa-bg:#123329;   --ch-wa-text:#7fdcbd;
-    --ch-em:#1e3f73;   --ch-em-ink:#dde9fb;   --ch-em-bg:#182742;   --ch-em-text:#9dbcf0;
-
-    /* the tag palette, dark. Same eleven hues, same three slots. */
-    --tag-slate:#98a4b6;  --tag-slate-bg:#262b30;  --tag-slate-line:#424951;
-    --tag-red:#dd8880;    --tag-red-bg:#3c1e1b;    --tag-red-line:#633531;
-    --tag-orange:#d59c62; --tag-orange-bg:#3c2b1b; --tag-orange-line:#634a31;
-    --tag-amber:#d4bc5e;  --tag-amber-bg:#3c351b;  --tag-amber-line:#635931;
-    --tag-lime:#a2d161;   --tag-lime-bg:#2e3b1c;   --tag-lime-line:#4e6232;
-    --tag-green:#61d195;  --tag-green-bg:#1c3b2a;  --tag-green-line:#326248;
-    --tag-teal:#5ed4d0;   --tag-teal-bg:#1b3c3b;   --tag-teal-line:#316361;
-    --tag-cyan:#60b2d5;   --tag-cyan-bg:#1b323c;   --tag-cyan-line:#315463;
-    --tag-blue:#7e9edd;   --tag-blue-bg:#1b263c;   --tag-blue-line:#314263;
-    --tag-violet:#b388dd; --tag-violet-bg:#2b1c3b; --tag-violet-line:#4a3262;
-    --tag-pink:#dd80ac;   --tag-pink-bg:#3c1b2a;   --tag-pink-line:#633148;
-  }
-}
-:root[data-theme="dark"]{
-  /* Near-black, cool, faintly teal-tinted. Step 9 is the CONTROL border:
-     3.78:1 on the content plane — the old sand-5 hairline measured 1.35:1 and
-     left the interface structurally invisible. Step 10 is muted TEXT at 6.89:1;
-     the old sand-9 measured 3.40:1 and failed AA. */
-  --sand-1:#080b0b;  --sand-2:#0e1413;  --sand-3:#151d1c;  --sand-4:#1a2423;
-  --sand-5:#202c2a;  --sand-6:#293735;  --sand-7:#33443f;  --sand-8:#455a56;
-  --sand-9:#5e7571;  --sand-10:#8ca29e; --sand-11:#afc2bf; --sand-12:#eaf2f0;
-
-  /* Dark mode has always brightened the brand — #085041 became #2f9d7c. This
-     keeps that step and shifts its hue a few degrees to teal. */
-  --green-1:#04140f; --green-2:#06201a; --green-3:#062e26; --green-4:#043b30;
-  --green-5:#04473a; --green-6:#095646; --green-7:#0c6b57; --green-8:#0e876c;
-  --green-9:#12a594; --green-10:#1fbfa8; --green-11:#5ce0c6; --green-12:#bcf5e6;
-
-  --amber-1:#17130a; --amber-2:#1f180b; --amber-3:#30240d; --amber-4:#3e2e0d;
-  --amber-5:#4b380f; --amber-6:#5d4715; --amber-7:#785d1c; --amber-8:#a17c22;
-  --amber-9:#c48a15; --amber-10:#d99b20; --amber-11:#e8b155; --amber-12:#f8e3bb;
-
-  --rust-1:#1a100d; --rust-2:#24130e; --rust-3:#381a12; --rust-4:#472016;
-  --rust-5:#56271a; --rust-6:#6b3120; --rust-7:#8a3f28; --rust-8:#b04f2f;
-  --rust-9:#c9552f; --rust-10:#dc6440; --rust-11:#f28d68; --rust-12:#ffd9c8;
-
-  --indigo-1:#0d1119; --indigo-2:#111726; --indigo-3:#16223b; --indigo-4:#1a2b4c;
-  --indigo-5:#1f345c; --indigo-6:#264070; --indigo-7:#31548f; --indigo-8:#3f6db8;
-  --indigo-9:#4a7fd0; --indigo-10:#5c8ede; --indigo-11:#8fb2ee; --indigo-12:#d6e4fb;
-
-  --bg:var(--sand-2); --bg-shell:var(--sand-1); --bg-inset:var(--sand-3);
-  --bg-nav:#040606;
-  --chat-pattern:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='%23cfe0dc' opacity='0.05' font-family='Arial,Helvetica,sans-serif' font-weight='700'%3E%3Ctext x='10' y='36' font-size='24' transform='rotate(-14 10 36)'%3E%E2%82%B9%3C/text%3E%3Ctext x='92' y='18' font-size='17' transform='rotate(9 92 18)'%3E%24%3C/text%3E%3Ctext x='128' y='68' font-size='21' transform='rotate(-7 128 68)'%3E%E2%82%B9%3C/text%3E%3Ctext x='34' y='92' font-size='15' transform='rotate(13 34 92)'%3E%E2%82%AC%3C/text%3E%3Ctext x='72' y='128' font-size='23' transform='rotate(-16 72 128)'%3E%24%3C/text%3E%3Ctext x='138' y='142' font-size='16' transform='rotate(6 138 142)'%3E%C2%A5%3C/text%3E%3Ctext x='4' y='150' font-size='17' transform='rotate(-11 4 150)'%3E%E2%82%B9%3C/text%3E%3C/g%3E%3C/svg%3E");
-  --chat-bg:var(--bg-shell);
-  --bg-hover:var(--sand-4); --bg-active:var(--sand-5); --bg-selected:var(--green-4);
-  --sidebar-hover:var(--sand-4); --sidebar-active:var(--bg-selected);
-  --surface-raised:var(--sand-3);
-  --sk-sheen:var(--sand-6);     /* dark: the sweep is a LIGHTER step, not sand-2 */
-  --brand-mint:var(--green-11);
-  --line-control:var(--sand-9);     /* 3.78:1 on the content plane */
-  --brand-ink:#04140f;              /* dark: near-black on #12a594 = 6.15:1.
-                                       White on it is 3.07:1 and would fail. */
-  --shadow-xs:0 1px 2px rgba(0,0,0,.4);
-  --shadow-sm:0 1px 2px rgba(0,0,0,.4), 0 2px 6px rgba(0,0,0,.3);
-  --shadow-md:0 2px 4px rgba(0,0,0,.4), 0 6px 16px rgba(0,0,0,.35);
-  --shadow-lg:0 4px 8px rgba(0,0,0,.4), 0 14px 34px rgba(0,0,0,.45);
-  --shadow-xl:0 6px 12px rgba(0,0,0,.45), 0 28px 64px rgba(0,0,0,.55);
-  --ring:0 0 0 3px rgba(47,157,124,.25);
-  --bad-ring:0 0 0 3px rgba(201,85,47,.28);
-  --chevron:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238ca29e' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
-  --scrim:rgba(0,0,0,.6);
-  --skeleton:linear-gradient(90deg,var(--sand-3) 25%,var(--sand-5) 38%,var(--sand-3) 62%);
-
-  /* the channel palette, dark. Deeper fills, paler inks — the same pattern,
-     which is the whole point of it being a pattern. */
-  --ch-wa:#0f5f4c;   --ch-wa-ink:#d9f5eb;   --ch-wa-bg:#123329;   --ch-wa-text:#7fdcbd;
-  --ch-em:#1e3f73;   --ch-em-ink:#dde9fb;   --ch-em-bg:#182742;   --ch-em-text:#9dbcf0;
-
-  /* the tag palette, dark. Same eleven hues, same three slots. */
-  --tag-slate:#98a4b6;  --tag-slate-bg:#262b30;  --tag-slate-line:#424951;
-  --tag-red:#dd8880;    --tag-red-bg:#3c1e1b;    --tag-red-line:#633531;
-  --tag-orange:#d59c62; --tag-orange-bg:#3c2b1b; --tag-orange-line:#634a31;
-  --tag-amber:#d4bc5e;  --tag-amber-bg:#3c351b;  --tag-amber-line:#635931;
-  --tag-lime:#a2d161;   --tag-lime-bg:#2e3b1c;   --tag-lime-line:#4e6232;
-  --tag-green:#61d195;  --tag-green-bg:#1c3b2a;  --tag-green-line:#326248;
-  --tag-teal:#5ed4d0;   --tag-teal-bg:#1b3c3b;   --tag-teal-line:#316361;
-  --tag-cyan:#60b2d5;   --tag-cyan-bg:#1b323c;   --tag-cyan-line:#315463;
-  --tag-blue:#7e9edd;   --tag-blue-bg:#1b263c;   --tag-blue-line:#314263;
-  --tag-violet:#b388dd; --tag-violet-bg:#2b1c3b; --tag-violet-line:#4a3262;
-  --tag-pink:#dd80ac;   --tag-pink-bg:#3c1b2a;   --tag-pink-line:#633148;
-}
-
-
-/* ============================================================================
-   DENSITY — same system, ~15% tighter. Nothing but scale values change.
-   ========================================================================== */
-:root[data-density="compact"]{
-  --control-xs:20px; --control-sm:24px; --control-md:28px;
-  --control-lg:32px; --control-xl:38px;
-  --nav-item-h:30px;
-  --top-h:46px; --row-h:36px; --page-pad:24px;
-  --text-base:13px; --lh-base:18px;
-  --text-3xl:24px;  --lh-3xl:30px;
-  --text-4xl:30px;  --lh-4xl:36px;
-}
-
-
-/* ============================================================================
-   COMPATIBILITY ALIASES
-   Older shorthand that view code already writes. Keep them — they cost one
-   line each and they mean a token rename never breaks a view.
-   ========================================================================== */
-:root{
-  --r-xs:var(--radius-xs); --r-sm:var(--radius-sm); --r-md:var(--radius-md);
-  --r-lg:var(--radius-lg); --r-xl:var(--radius-xl); --r-pill:var(--radius-full);
-  --sh-1:var(--shadow-xs); --sh-2:var(--shadow-sm);
-  --sh-3:var(--shadow-lg); --sh-4:var(--shadow-xl);
-  --t:var(--duration) var(--ease);
-}
 
 
 /* ============================================================================
@@ -502,7 +90,8 @@ b,strong{ font-weight:var(--weight-semibold) }
 
 /* utilities */
 .mono{ font-family:var(--font-mono); font-size:.94em; letter-spacing:-.01em; font-variant-ligatures:none }
-.serif{ font-family:var(--font-display); font-style:italic; font-weight:var(--weight-normal) }
+.serif{ font-family:var(--font-display); font-variation-settings:var(--display-wdth);
+        font-weight:var(--weight-semibold); letter-spacing:var(--tracking-tight) }
 .tnum{ font-variant-numeric:tabular-nums }
 .muted{ color:var(--text-2) }
 .faint{ color:var(--text-3) }
@@ -518,8 +107,18 @@ b,strong{ font-weight:var(--weight-semibold) }
 }
 
 /* icons — one stroke weight, five sizes */
-.ic{ width:var(--icon-md); height:var(--icon-md); stroke:currentColor; fill:none;
-     stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round; flex:0 0 var(--icon-md) }
+/* Untitled UI's icons are drawn for a 2px stroke on a 24 grid. The CSS wins
+   over the presentation attributes the components ship with, so this is the
+   one place the whole set's weight is set. 1.8 rather than a flat 2: at the
+   16px this panel uses in nav and toolbars, a full 2 reads as bold. */
+.ic{ display:inline; width:var(--icon-md); height:var(--icon-md); stroke:currentColor; fill:none;
+     stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; flex:0 0 var(--icon-md) }
+/* Tailwind's preflight makes every svg `display:block` and strips list markers
+   and heading sizes. The panel's icons sit inline beside text, its numbered
+   terms are numbered, and its headings carry their own sizes — restored here,
+   once, where the base layer would otherwise take them. */
+.qdoc ol{ list-style:decimal }
+.qdoc ul{ list-style:disc }
 .ic.xs{ width:var(--icon-xs); height:var(--icon-xs); flex-basis:var(--icon-xs) }
 .ic.sm{ width:var(--icon-sm); height:var(--icon-sm); flex-basis:var(--icon-sm) }
 .ic.lg{ width:var(--icon-lg); height:var(--icon-lg); flex-basis:var(--icon-lg) }
@@ -528,9 +127,9 @@ b,strong{ font-weight:var(--weight-semibold) }
 /* scrollbars — present, nearly invisible */
 *::-webkit-scrollbar{ width:10px; height:10px }
 *::-webkit-scrollbar-track{ background:transparent }
-*::-webkit-scrollbar-thumb{ background:var(--sand-7); border-radius:var(--radius-md);
+*::-webkit-scrollbar-thumb{ background:var(--line-3); border-radius:var(--radius-md);
                             border:3px solid transparent; background-clip:content-box }
-*::-webkit-scrollbar-thumb:hover{ background:var(--sand-8); background-clip:content-box }
+*::-webkit-scrollbar-thumb:hover{ background:var(--line-control); background-clip:content-box }
 
 
 /* ============================================================================
@@ -611,7 +210,7 @@ b,strong{ font-weight:var(--weight-semibold) }
    prefix is the difference between a class and a coincidence. */
 .sb-item{
   display:flex; align-items:center; gap:var(--space-2); width:100%;
-  height:var(--nav-item-h); margin:1px 0; padding:0 var(--space-2); border-radius:var(--radius-md);
+  height:var(--nav-item-h); margin:1px 0; padding:0 var(--space-2); border-radius:var(--radius-sm);
   color:var(--text-2); font-size:var(--text-md); font-weight:var(--weight-medium);
   position:relative; transition:background var(--duration) var(--ease), color var(--duration) var(--ease);
 }
@@ -621,7 +220,8 @@ b,strong{ font-weight:var(--weight-semibold) }
 .sb-item:hover{ background:var(--sidebar-hover); color:var(--text) }
 .sb-item .ic{ color:var(--text-3); transition:color var(--duration) var(--ease) }
 .sb-item:hover .ic{ color:var(--text-2) }
-.sb-item.on{ background:var(--sidebar-active); color:var(--text); font-weight:var(--weight-semibold) }
+.sb-item.on{ background:var(--sidebar-active); color:var(--text); font-weight:var(--weight-semibold);
+             box-shadow:var(--nav-active-glow) }
 .sb-item.on::before{ transform:scaleY(1) }
 .sb-item.on .ic{ color:var(--brand-text) }
 .sb-item .lb{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
@@ -677,7 +277,7 @@ b,strong{ font-weight:var(--weight-semibold) }
 /* A collapsed rail widens on hover into the full labelled sidebar, so someone
    who cannot place an icon recovers the words without committing to a click. */
 .app.rail .sidebar:hover{ width:var(--nav-w); flex-basis:var(--nav-w);
-                          box-shadow:var(--shadow-lg); z-index:calc(var(--z-nav) + 1) }
+                          box-shadow:var(--shadow-lg), var(--surface-sheen); z-index:calc(var(--z-nav) + 1) }
 .app.rail .sidebar:hover .rail-hide{ display:revert }
 .app.rail .sidebar:hover .sb-search,.app.rail .sidebar:hover .sb-item,
 .app.rail .sidebar:hover .sb-user,.app.rail .sidebar:hover .sb-toggle{
@@ -872,7 +472,7 @@ button.tb-stat:hover{ background:var(--bg-hover) }
 .ph .acts{ margin-left:auto; display:flex; align-items:center; gap:var(--space-2);
            flex-wrap:wrap; padding-top:var(--space-1) }
 
-.hello{ font-family:var(--font-display); font-style:italic; font-weight:var(--weight-normal);
+.hello{ font-family:var(--font-display); font-variation-settings:var(--display-wdth); font-weight:var(--weight-bold);
         font-size:var(--text-4xl); line-height:var(--lh-4xl); letter-spacing:var(--tracking-tight) }
 
 .sh{ display:flex; align-items:baseline; gap:var(--space-3); margin:var(--space-8) 0 var(--space-3) }
@@ -890,7 +490,8 @@ button.tb-stat:hover{ background:var(--bg-hover) }
   display:inline-flex; align-items:center; justify-content:center; gap:var(--space-2);
   height:var(--control-md); padding:0 var(--control-pad-md);
   border:1px solid var(--line-control); border-radius:var(--radius-md); background:var(--bg);
-  font-size:var(--text-md); font-weight:var(--weight-medium); color:var(--text);
+  box-shadow:var(--shadow-xs);
+  font-size:var(--text-md); font-weight:var(--weight-semibold); color:var(--text);
   white-space:nowrap; user-select:none;
   transition:background var(--duration-fast) var(--ease), border-color var(--duration-fast) var(--ease),
              color var(--duration-fast) var(--ease), box-shadow var(--duration-fast) var(--ease);
@@ -899,18 +500,33 @@ button.tb-stat:hover{ background:var(--bg-hover) }
 .btn:active{ background:var(--bg-active) }
 .btn .ic{ color:var(--text-2) }
 
-.btn.pri{ background:var(--brand); border-color:var(--brand); color:var(--brand-ink);
-          font-weight:var(--weight-semibold); box-shadow:var(--shadow-xs) }
-.btn.pri:hover{ background:var(--brand-hover); border-color:var(--brand-hover) }
+/* THE PRIMARY ACTION IS INK, not the brand — near-black in light, near-white
+   in dark, inverting wholesale. Untitled UI drives this from the brand colour;
+   here brand green is the thread through the chrome and the one loud button on
+   a screen is monochrome, which is what "primary is black and white" means in
+   practice. `.btn.brand` below is the forest-filled button, for the rare place
+   an action IS the brand (the portal link, the plan upsell). */
+.btn.pri{ background:var(--ink-solid); border-color:var(--ink-solid); color:var(--ink-on-solid);
+          box-shadow:var(--shadow-xs) }
+.btn.pri:hover{ background:var(--ink-solid-hover); border-color:var(--ink-solid-hover) }
 .btn.pri .ic{ color:currentColor }
+.btn.brand{ background:var(--brand); border-color:var(--brand); color:var(--brand-ink);
+            box-shadow:var(--shadow-xs) }
+.btn.brand:hover{ background:var(--brand-hover); border-color:var(--brand-hover) }
+.btn.brand .ic{ color:currentColor }
 .btn.dgr{ color:var(--bad); border-color:var(--bad-line) }
 .btn.dgr:hover{ background:var(--bad-bg); border-color:var(--bad-solid) }
 .btn.dgr .ic{ color:currentColor }
 .btn.ok{ color:var(--ok); border-color:var(--ok-line) }
 .btn.ok:hover{ background:var(--ok-bg); border-color:var(--ok-solid) }
 .btn.ok .ic{ color:currentColor }
-.btn.ghost{ border-color:transparent; background:none; color:var(--text-2) }
+.btn.ghost{ border-color:transparent; background:none; color:var(--text-2); box-shadow:none }
 .btn.ghost:hover{ background:var(--bg-hover); border-color:transparent; color:var(--text) }
+/* Untitled UI's focus is the control's own border plus a 4px halo — the border
+   carries the 3:1, the halo carries the emphasis. It replaces the global
+   outline on buttons so the ring follows the button's radius. */
+.btn:focus-visible{ outline:none; box-shadow:var(--ring); border-color:var(--brand) }
+.btn.dgr:focus-visible{ box-shadow:var(--bad-ring); border-color:var(--bad-solid) }
 
 .btn.xs{ height:var(--control-xs); padding:0 var(--control-pad-xs); font-size:var(--text-xs); gap:var(--space-1) }
 .btn.sm{ height:var(--control-sm); padding:0 var(--control-pad-sm); font-size:var(--text-sm); gap:5px }
@@ -924,14 +540,15 @@ button.tb-stat:hover{ background:var(--bg-hover) }
 .btn.full{ width:100% }
 .btn:disabled{ opacity:.45; cursor:not-allowed; pointer-events:none }
 
-.btn-group{ display:inline-flex; height:var(--control-md); border:1px solid var(--line-control);
-            border-radius:var(--radius-md); overflow:hidden }
+.btn-group{ display:inline-flex; height:var(--control-md); border:1px solid var(--line);
+            border-radius:var(--radius-md); background:var(--bg-inset); padding:3px; gap:2px }
 .btn-group button{ display:flex; align-items:center; gap:5px; padding:0 var(--control-pad-md);
-                   font-size:var(--text-md); font-weight:var(--weight-medium); color:var(--text-2);
-                   transition:background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease) }
-.btn-group button+button{ border-left:1px solid var(--line-2) }
-.btn-group button:hover{ background:var(--bg-hover); color:var(--text) }
-.btn-group button.on{ background:var(--bg-active); color:var(--text); font-weight:var(--weight-semibold) }
+                   border-radius:calc(var(--radius-md) - 3px);
+                   font-size:var(--text-md); font-weight:var(--weight-semibold); color:var(--text-3);
+                   transition:background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease),
+                              box-shadow var(--duration-fast) var(--ease) }
+.btn-group button:hover{ color:var(--text) }
+.btn-group button.on{ background:var(--bg); color:var(--text); box-shadow:var(--shadow-xs) }
 
 .kbd{ display:inline-flex; align-items:center; height:18px; padding:0 5px;
       font-family:var(--font-mono); font-size:var(--text-2xs); line-height:1;
@@ -943,7 +560,7 @@ button.tb-stat:hover{ background:var(--bg-hover) }
    SURFACES
    ========================================================================== */
 .card{ background:var(--surface-raised); border:1px solid var(--line);
-       border-radius:var(--radius-xl); overflow:hidden }
+       border-radius:var(--radius-xl); overflow:hidden; box-shadow:var(--shadow-xs) }
 .card.flat{ border-radius:var(--radius-lg) }
 .card-h{ display:flex; align-items:center; gap:var(--space-3);
          padding:var(--space-3) var(--space-4); border-bottom:1px solid var(--line) }
@@ -982,8 +599,8 @@ button.tile:hover{ border-color:var(--line-3); background:var(--bg-shell) }
 .tile .v{ font-size:var(--text-2xl); line-height:1.15; font-weight:var(--weight-semibold);
           letter-spacing:var(--tracking-tight); font-variant-numeric:tabular-nums;
           margin-top:var(--space-2) }
-.tile .v.serif{ font-family:var(--font-display); font-style:italic;
-                font-weight:var(--weight-normal); font-size:var(--text-3xl) }
+.tile .v.serif{ font-family:var(--font-display); font-variation-settings:var(--display-wdth);
+                font-weight:var(--weight-bold); font-size:var(--text-3xl) }
 .tile .s{ font-size:var(--text-sm); color:var(--text-3); margin-top:3px }
 .tile.on{ border-color:var(--brand); background:var(--brand-tint);
           box-shadow:inset 0 0 0 1px var(--brand) }
@@ -997,7 +614,7 @@ button.tile:hover{ border-color:var(--line-3); background:var(--bg-shell) }
    STATUS · PILL · DOT · CHIP
    ========================================================================== */
 .pill{ display:inline-flex; align-items:center; gap:5px; height:var(--control-xs);
-       padding:0 var(--space-2); border:1px solid transparent; border-radius:var(--radius-sm);
+       padding:0 10px; border:1px solid transparent; border-radius:var(--radius-full);
        background:var(--neutral-bg); color:var(--text-2);
        font-size:var(--text-sm); font-weight:var(--weight-medium); white-space:nowrap }
 .pill.ok{ background:var(--ok-bg); color:var(--ok); border-color:var(--ok-line) }
@@ -1094,7 +711,7 @@ button.tile:hover{ border-color:var(--line-3); background:var(--bg-shell) }
 
 .field{ display:flex; align-items:center; gap:var(--space-2); height:var(--control-md);
         padding:0 var(--space-3); border:1px solid var(--line-control); border-radius:var(--radius-md);
-        background:var(--bg);
+        background:var(--bg); box-shadow:var(--shadow-xs);
         transition:border-color var(--duration) var(--ease), box-shadow var(--duration) var(--ease) }
 .field:hover{ border-color:var(--line-3) }
 .field:focus-within{ border-color:var(--brand); box-shadow:var(--ring) }
@@ -1174,10 +791,9 @@ select.inp::-ms-expand{ display:none }
      overflow:hidden; background:var(--surface-raised) }
 .tw.scroll{ overflow-x:auto }
 .tbl th{ position:sticky; top:0; z-index:var(--z-stick); text-align:left; white-space:nowrap;
-         padding:var(--space-2) var(--space-4); background:var(--bg-inset);
-         border-bottom:1px solid var(--line-2); font-size:var(--text-xs);
-         font-weight:var(--weight-semibold); letter-spacing:var(--tracking-wide);
-         color:var(--text-2); text-transform:uppercase }
+         padding:var(--space-3) var(--space-4); background:var(--bg-inset);
+         border-bottom:1px solid var(--line); font-size:var(--text-xs);
+         font-weight:var(--weight-semibold); color:var(--text-3) }
 .tbl td{ height:var(--row-h); padding:var(--space-3) var(--space-4);
          border-bottom:1px solid var(--line); font-size:var(--text-base); vertical-align:middle }
 .tbl tbody tr:last-child td{ border-bottom:none }
@@ -1191,6 +807,7 @@ select.inp::-ms-expand{ display:none }
    same as the cells beside it. */
 .tbl td:first-child .cell-1{ font-weight:var(--weight-semibold) }
 .tbl tbody tr.on{ background:var(--brand-tint) }
+.tbl tbody tr.on td:first-child{ box-shadow:inset 2px 0 0 var(--brand) }
 .tbl tbody tr.dim td{ color:var(--text-3) }
 .tbl th.n,.tbl td.n{ text-align:right; font-variant-numeric:tabular-nums }
 .tbl th.c,.tbl td.c{ text-align:center }
@@ -1269,10 +886,10 @@ select.inp::-ms-expand{ display:none }
 .av.sm{ width:22px; height:22px; flex-basis:22px; font-size:var(--text-2xs) }
 .av.lg{ width:38px; height:38px; flex-basis:38px; font-size:var(--text-base) }
 .av.xl{ width:56px; height:56px; flex-basis:56px; font-size:var(--text-xl) }
-.av.n1{ background:var(--indigo-3); color:var(--indigo-11) }
-.av.n2{ background:var(--sand-4);   color:var(--sand-11) }
-.av.n3{ background:var(--amber-3);  color:var(--amber-11) }
-.av.n4{ background:var(--green-3);  color:var(--green-11) }
+.av.n1{ background:var(--info-bg); color:var(--info) }
+.av.n2{ background:var(--bg-active); color:var(--text-2) }
+.av.n3{ background:var(--warn-bg); color:var(--warn) }
+.av.n4{ background:var(--ok-bg); color:var(--ok) }
 
 .bar{ display:flex; height:7px; border-radius:var(--radius-full);
       background:var(--bg-inset); overflow:hidden }
@@ -1311,8 +928,8 @@ a.lk:hover{ border-color:var(--brand); background:var(--brand-tint) }
 .flow .st{ flex:1 1 0; min-width:112px; text-align:center;
            padding:var(--space-3); border:1px solid var(--line);
            border-radius:var(--radius-lg); background:var(--surface-raised) }
-.flow .st .v{ font-family:var(--font-display); font-style:italic;
-              font-size:var(--text-2xl); line-height:1 }
+.flow .st .v{ font-family:var(--font-display); font-variation-settings:var(--display-wdth);
+              font-weight:var(--weight-bold); font-size:var(--text-2xl); line-height:1 }
 .flow .st .k{ font-size:var(--text-sm); color:var(--text-2); margin-top:var(--space-1) }
 .flow .sep{ display:grid; place-items:center; flex:0 0 auto;
             padding:0 var(--space-2); color:var(--line-3) }
@@ -1517,7 +1134,7 @@ a.lk:hover{ border-color:var(--brand); background:var(--brand-tint) }
         width:min(560px,calc(100vw - 32px)); max-height:calc(100vh - 128px);
         display:flex; flex-direction:column; z-index:var(--z-layer);
         background:var(--surface-raised); border:1px solid var(--line);
-        border-radius:var(--radius-2xl); box-shadow:var(--shadow-xl);
+        border-radius:var(--radius-2xl); box-shadow:var(--shadow-xl), var(--surface-sheen);
         animation:panel-in 260ms var(--ease-out) }
 .modal.wide{ width:min(720px,calc(100vw - 32px)) }
 .modal.sm{ width:min(440px,calc(100vw - 32px)) }
@@ -1568,7 +1185,7 @@ a.lk:hover{ border-color:var(--brand); background:var(--brand-tint) }
 
 .drawer{ position:fixed; inset:0 0 0 auto; width:min(720px,100vw);
          display:flex; flex-direction:column; z-index:var(--z-layer);
-         background:var(--bg); box-shadow:var(--shadow-xl);
+         background:var(--bg); box-shadow:var(--shadow-xl), var(--surface-sheen);
          animation:slide var(--duration-slow) var(--ease-out) }
 .dw-h{ flex:0 0 auto; padding:var(--space-4) var(--space-5);
        border-bottom:1px solid var(--line) }
@@ -1579,11 +1196,16 @@ a.lk:hover{ border-color:var(--brand); background:var(--brand-tint) }
 
 .pop{ position:fixed; z-index:var(--z-layer); min-width:200px; overflow:hidden;
       background:var(--surface-raised); border:1px solid var(--line);
-      border-radius:var(--radius-xl); box-shadow:var(--shadow-lg);
+      border-radius:var(--radius-xl); box-shadow:var(--shadow-lg), var(--surface-sheen);
       animation:rise var(--duration) var(--ease-out) }
 .pop-h{ display:flex; align-items:center; gap:var(--space-2);
         padding:var(--space-3) var(--space-4); border-bottom:1px solid var(--line) }
 .pop-b{ padding:var(--space-1); max-height:min(440px,70vh); overflow-y:auto }
+/* The account menu carries two switches and Sign out below them; the
+   library's toggle buttons are taller than the row they replaced, and at the
+   default cap the last switch was clipped and Sign out hidden behind a
+   scroll. It gets its own cap; it opens upward and still fits a laptop. */
+.pop.pop-account .pop-b{ max-height:min(640px,84vh) }
 .pop-f{ display:flex; align-items:center; gap:var(--space-2);
         padding:var(--space-2) var(--space-4); border-top:1px solid var(--line);
         background:var(--bg-shell); font-size:var(--text-md); color:var(--text-2) }
@@ -1599,7 +1221,7 @@ a.lk:hover{ border-color:var(--brand); background:var(--brand-tint) }
   position:fixed; z-index:var(--z-pop); top:0; left:0;
   display:flex; flex-direction:column; min-width:168px; padding:var(--space-1);
   background:var(--surface-raised); border:1px solid var(--line);
-  border-radius:var(--radius-xl); box-shadow:var(--shadow-lg);
+  border-radius:var(--radius-xl); box-shadow:var(--shadow-lg), var(--surface-sheen);
   animation:rise var(--duration) var(--ease-out);
 }
 .ib-menu-pop .mi{ white-space:nowrap }
@@ -1629,7 +1251,7 @@ a.lk:hover{ border-color:var(--brand); background:var(--brand-tint) }
        width:min(640px,calc(100vw - 32px)); max-height:min(520px,calc(100vh - 140px));
        display:flex; flex-direction:column; overflow:hidden; z-index:var(--z-layer);
        background:var(--surface-raised); border:1px solid var(--line);
-       border-radius:var(--radius-2xl); box-shadow:var(--shadow-xl);
+       border-radius:var(--radius-2xl); box-shadow:var(--shadow-xl), var(--surface-sheen);
        animation:rise var(--duration-slow) var(--ease-out) }
 .cmdk-q{ flex:0 0 auto; display:flex; align-items:center; gap:var(--space-3);
          padding:var(--space-4) var(--space-5); border-bottom:1px solid var(--line) }
@@ -1661,13 +1283,13 @@ a.lk:hover{ border-color:var(--brand); background:var(--brand-tint) }
          gap:var(--space-2); align-items:center; pointer-events:none }
 .toast{ display:flex; align-items:center; gap:var(--space-3);
         padding:var(--space-3) var(--space-4); border-radius:var(--radius-xl);
-        background:var(--sand-12); color:var(--sand-1); font-size:var(--text-base);
-        box-shadow:var(--shadow-lg); pointer-events:auto;
+        background:var(--toast-bg); color:var(--toast-fg); font-size:var(--text-base);
+        box-shadow:var(--shadow-lg), var(--surface-sheen); pointer-events:auto;
         max-width:min(520px,calc(100vw - 32px)); animation:rise var(--duration-slow) var(--ease-out) }
-.toast .ic{ color:var(--brand-mint) }
-.toast.bad .ic{ color:var(--rust-11) }
+.toast .ic{ color:var(--toast-ok) }
+.toast.bad .ic{ color:var(--toast-bad) }
 .toast button{ margin-left:var(--space-2); font-size:var(--text-md);
-               font-weight:var(--weight-semibold); color:var(--brand-mint) }
+               font-weight:var(--weight-semibold); color:var(--toast-action) }
 
 
 /* ============================================================================
@@ -1782,7 +1404,7 @@ button.dls-stat:hover{ background:var(--bg-hover) }
   width:min(520px, calc(100% - var(--page-pad) * 2));
   margin-top:6px; padding:var(--space-3) var(--space-4);
   background:var(--surface-raised); border:1px solid var(--line);
-  border-radius:var(--radius-lg); box-shadow:var(--shadow-lg);
+  border-radius:var(--radius-lg); box-shadow:var(--shadow-lg), var(--surface-sheen);
   font-size:var(--text-sm); line-height:1.5; color:var(--text-2);
   /* The band sets nowrap for the cells; a paragraph must undo it. */
   white-space:normal; text-align:left;
@@ -2077,7 +1699,7 @@ button.dls-stat:hover{ background:var(--bg-hover) }
           grid-template-columns:repeat(6,auto); gap:var(--space-2);
           padding:var(--space-3);
           border:1px solid var(--line); border-radius:var(--radius-lg);
-          background:var(--surface-raised); box-shadow:var(--shadow-lg);
+          background:var(--surface-raised); box-shadow:var(--shadow-lg), var(--surface-sheen);
           animation:rise var(--duration-fast) var(--ease-out) }
 .tgr-col.on .tgr-pop{ display:grid }
 /* A tail, so it reads as belonging to the dot above it rather than floating. */
@@ -2154,7 +1776,7 @@ button.dls-stat:hover{ background:var(--bg-hover) }
           animation:fade var(--duration) var(--ease) }
 .pop-why-c{ width:100%; background:var(--surface-raised); border:1px solid var(--bad-line);
             border-radius:var(--radius-md); padding:var(--space-3);
-            box-shadow:var(--shadow-lg) }
+            box-shadow:var(--shadow-lg), var(--surface-sheen) }
 .pop-why-h{ display:flex; align-items:center; gap:var(--space-2); color:var(--bad);
             font-size:var(--text-md); margin-bottom:5px }
 .pop-why-h .ic{ width:15px; height:15px; flex:0 0 auto }
@@ -2249,7 +1871,7 @@ button.dls-stat:hover{ background:var(--bg-hover) }
    the dot beside "Slot Booked" in the menu is the identical blue the stage
    pill shows on the row — one colour language, not two. */
 .dws-odot{ flex:0 0 auto; width:7px; height:7px; border-radius:var(--radius-full);
-           background:var(--sand-8) }
+           background:var(--line-control) }
 .dws-odot.ok{ background:var(--ok) }
 .dws-odot.warn{ background:var(--warn) }
 .dws-odot.bad{ background:var(--bad) }
@@ -2301,7 +1923,7 @@ button.dls-stat:hover{ background:var(--bg-hover) }
 /* Same tone vocabulary as every pill/dot in the app (D.STAGES[n].tone), not a
    bespoke palette of its own — Installment used to read as blue everywhere
    except here, where it fell through to the neutral default. */
-.dws-sdot{ width:6px; height:6px; border-radius:var(--radius-full); background:var(--sand-8); flex:0 0 auto }
+.dws-sdot{ width:6px; height:6px; border-radius:var(--radius-full); background:var(--line-control); flex:0 0 auto }
 .dws-sdot.warn{ background:var(--warn-solid) }
 .dws-sdot.info{ background:var(--info-solid) }
 .dws-sdot.ok{ background:var(--ok-solid) }
@@ -2324,7 +1946,7 @@ button.dls-stat:hover{ background:var(--bg-hover) }
 /* The avatar carries its channel's colour, so which line went out over which
    channel is answerable without reading the label beside it. Same two token
    pairs the bubble uses, at their tint weight. */
-.dws-badge.sys{ background:var(--sand-4); color:var(--text-3) }
+.dws-badge.sys{ background:var(--bg-active); color:var(--text-3) }
 .dws-badge.rmk{ background:var(--neutral-bg); color:var(--text-2) }
 .dws-badge.wa{ background:var(--ch-wa-bg); color:var(--ch-wa-text) }
 .dws-badge.em{ background:var(--ch-em-bg); color:var(--ch-em-text) }
@@ -2443,7 +2065,7 @@ button.dls-stat:hover{ background:var(--bg-hover) }
 .dws-chain-ic.q{ background:var(--info-bg); color:var(--info) }
 .dws-chain-ic.ok{ background:var(--ok-bg); color:var(--ok) }
 .dws-chain-ic.warn{ background:var(--warn-bg); color:var(--warn) }
-.dws-chain-ic.dead{ background:var(--sand-3); color:var(--text-3) }
+.dws-chain-ic.dead{ background:var(--bg-inset); color:var(--text-3) }
 .dws-chain-body{ min-width:0; flex:1 }
 .dws-chain-body .t1{ font-size:var(--text-sm); font-weight:var(--weight-semibold); font-family:var(--font-mono);
                      overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
@@ -2539,7 +2161,7 @@ button.dls-stat:hover{ background:var(--bg-hover) }
 }
 @media (max-width:1180px){
   .sidebar{ position:fixed; inset:0 auto 0 0; z-index:120;
-            box-shadow:var(--shadow-xl); transform:translateX(-100%);
+            box-shadow:var(--shadow-xl), var(--surface-sheen); transform:translateX(-100%);
             transition:transform var(--duration-slow) var(--ease-out) }
   .app.nav-open .sidebar{ transform:none }
   .app.rail .sidebar{ width:var(--nav-w); flex-basis:var(--nav-w) }
@@ -2856,10 +2478,10 @@ button.dls-stat:hover{ background:var(--bg-hover) }
              background:var(--bg-shell) }
 
 .qdoc{
-  --ink:#111111; --ink-2:#3d3d3d; --ink-3:#6b6b6b;
-  --rule:#d9d9d9; --rule-2:#9a9a9a; --paper:#ffffff; --accent:#0c6b57; --gold:#f2a93b;
+  --qd-ink:#111111; --qd-ink-2:#3d3d3d; --qd-ink-3:#6b6b6b;
+  --qd-rule:#d9d9d9; --qd-rule-2:#9a9a9a; --qd-paper:#ffffff; --qd-accent:#111113; --qd-gold:#f2a93b; --qd-bad:#9d3820;
   position:relative; width:210mm; min-height:297mm; padding:16mm 15mm 14mm;
-  background:var(--paper); color:var(--ink);
+  background:var(--qd-paper); color:var(--qd-ink);
   font-family:var(--font); font-size:9.6pt; line-height:1.5;
   box-shadow:0 1px 2px rgba(0,0,0,.18), 0 12px 40px rgba(0,0,0,.22);
   box-sizing:border-box;
@@ -2869,46 +2491,46 @@ button.dls-stat:hover{ background:var(--bg-hover) }
 .qdoc .mono{ font-family:var(--font-mono); font-size:.92em; letter-spacing:-.01em }
 .qdoc h1,.qdoc h2,.qdoc h3{ margin:0; font-weight:var(--weight-semibold) }
 .qdoc p{ margin:0 }
-.qd-tbd{ color:var(--ink-3) }
-.qd-bad{ color:#b3401f; font-weight:var(--weight-semibold) }
+.qd-tbd{ color:var(--qd-ink-3) }
+.qd-bad{ color:var(--qd-bad); font-weight:var(--weight-semibold) }
 
 /* --- letterhead: the mark and the word, and the numbers that identify it --- */
 .qd-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:14mm;
-          padding-bottom:5mm; border-bottom:2px solid var(--ink) }
+          padding-bottom:5mm; border-bottom:2px solid var(--qd-ink) }
 .qd-brand{ display:flex; gap:5mm; align-items:flex-start; min-width:0 }
 .qd-brand h1{ font-size:13pt; letter-spacing:-.01em; line-height:1.25 }
-.qd-brand p{ margin-top:1.5mm; font-size:8.2pt; line-height:1.55; color:var(--ink-2) }
+.qd-brand p{ margin-top:1.5mm; font-size:8.2pt; line-height:1.55; color:var(--qd-ink-2) }
 /* The legal entity, under the brand. Smaller than the brand and heavier than
    the address, because it is the name on the transfer and not a line of it. */
 .qd-legal-nm{ margin-top:.5mm; font-size:8.6pt; font-weight:var(--weight-semibold);
-              color:var(--ink-2); letter-spacing:.01em }
+              color:var(--qd-ink-2); letter-spacing:.01em }
 .qd-title{ text-align:right; flex:0 0 auto }
-/* The serif italic is the brand's signature and this is what it is FOR — one
-   word, once, on the document that carries the company's name. */
-.qd-title h2{ font-family:var(--font-display); font-style:italic; font-weight:400;
-              font-size:26pt; line-height:1; color:var(--accent); letter-spacing:.01em }
+/* The wide display face is the brand's signature and this is what it is FOR —
+   one word, once, on the document that carries the company's name. */
+.qd-title h2{ font-family:var(--font-display); font-variation-settings:var(--display-wdth); font-weight:600;
+              font-size:26pt; line-height:1; color:var(--qd-accent); letter-spacing:.01em }
 .qd-meta{ margin-top:3mm; margin-left:auto; border-collapse:collapse; font-size:8.6pt }
-.qd-meta th{ text-align:left; font-weight:var(--weight-normal); color:var(--ink-3);
+.qd-meta th{ text-align:left; font-weight:var(--weight-normal); color:var(--qd-ink-3);
              padding:.6mm 4mm .6mm 0; white-space:nowrap }
 .qd-meta td{ text-align:right; font-weight:var(--weight-semibold); white-space:nowrap }
 
 /* --- who, and where it is being supplied ---------------------------------- */
 .qd-parties{ display:grid; grid-template-columns:1.35fr 1fr; gap:10mm;
-             padding:5mm 0; border-bottom:1px solid var(--rule) }
+             padding:5mm 0; border-bottom:1px solid var(--qd-rule) }
 .qd-parties h3{ font-size:7.4pt; text-transform:uppercase; letter-spacing:.09em;
-                color:var(--ink-3); margin-bottom:1.5mm }
+                color:var(--qd-ink-3); margin-bottom:1.5mm }
 .qd-parties p{ font-size:9.4pt; line-height:1.55 }
 
 /* --- the goods ------------------------------------------------------------ */
 .qd-items{ width:100%; border-collapse:collapse; margin-top:5mm; font-size:9pt }
 .qd-items thead th{ font-size:7.4pt; text-transform:uppercase; letter-spacing:.07em;
-                    color:var(--ink-3); font-weight:var(--weight-semibold);
-                    text-align:left; padding:0 2.5mm 2mm 0; border-bottom:1px solid var(--rule-2);
+                    color:var(--qd-ink-3); font-weight:var(--weight-semibold);
+                    text-align:left; padding:0 2.5mm 2mm 0; border-bottom:1px solid var(--qd-rule-2);
                     white-space:nowrap }
-.qd-items tbody td{ padding:3mm 2.5mm 3mm 0; border-bottom:1px solid var(--rule);
+.qd-items tbody td{ padding:3mm 2.5mm 3mm 0; border-bottom:1px solid var(--qd-rule);
                     vertical-align:top }
-.qd-items tbody tr:last-child td{ border-bottom:1px solid var(--rule-2) }
-.qd-items .qd-i{ width:7mm; color:var(--ink-3); padding-right:1mm }
+.qd-items tbody tr:last-child td{ border-bottom:1px solid var(--qd-rule-2) }
+.qd-items .qd-i{ width:7mm; color:var(--qd-ink-3); padding-right:1mm }
 .qd-items .qd-c{ text-align:center; white-space:nowrap }
 /* Money is tabular and right-aligned everywhere, so the column reads as a
    column of numbers rather than a column of strings that happen to be digits. */
@@ -2916,59 +2538,59 @@ button.dls-stat:hover{ background:var(--bg-hover) }
   text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap }
 .qd-items th.qd-n{ padding-right:0 }
 .qd-items td.qd-n:last-child,.qd-items th.qd-n:last-child{ padding-right:0 }
-.qd-sub{ display:block; font-size:7.8pt; color:var(--ink-3); font-weight:var(--weight-normal);
+.qd-sub{ display:block; font-size:7.8pt; color:var(--qd-ink-3); font-weight:var(--weight-normal);
          line-height:1.45; margin-top:.6mm }
 /* What the plan includes, in full. Two columns so a ten-item list is four lines
    rather than ten, and a marker small enough to read as texture rather than as
    a bullet fighting the row above it. */
 .qd-feat{ margin:1.2mm 0 0; padding:0; list-style:none; columns:2; column-gap:6mm;
-          font-size:7.8pt; line-height:1.5; color:var(--ink-2);
+          font-size:7.8pt; line-height:1.5; color:var(--qd-ink-2);
           font-weight:var(--weight-normal) }
 .qd-feat li{ padding-left:3mm; position:relative; break-inside:avoid }
 .qd-feat li::before{ content:""; position:absolute; left:0; top:.72em;
                      width:1.4mm; height:1.4mm; border-radius:50%;
-                     background:var(--rule-2) }
+                     background:var(--qd-rule-2) }
 
 /* --- the money block ------------------------------------------------------ */
 .qd-foot{ display:grid; grid-template-columns:1fr 78mm; gap:10mm; margin-top:5mm;
           align-items:start }
-.qd-foot h3{ font-size:7.4pt; text-transform:uppercase; letter-spacing:.09em; color:var(--ink-3) }
+.qd-foot h3{ font-size:7.4pt; text-transform:uppercase; letter-spacing:.09em; color:var(--qd-ink-3) }
 .qd-words p{ font-size:9.2pt; font-weight:var(--weight-semibold); line-height:1.5; margin-top:1.5mm }
 .qd-sched{ width:100%; border-collapse:collapse; margin-top:2mm; font-size:8.6pt }
-.qd-sched th{ text-align:left; font-weight:var(--weight-normal); color:var(--ink-2); padding:1.2mm 0 }
-.qd-sched td{ padding:1.2mm 0 1.2mm 4mm; color:var(--ink-2) }
+.qd-sched th{ text-align:left; font-weight:var(--weight-normal); color:var(--qd-ink-2); padding:1.2mm 0 }
+.qd-sched td{ padding:1.2mm 0 1.2mm 4mm; color:var(--qd-ink-2) }
 .qd-totals{ width:100%; border-collapse:collapse; font-size:9.4pt }
-.qd-totals th{ text-align:left; font-weight:var(--weight-normal); color:var(--ink-2); padding:1.4mm 0 }
+.qd-totals th{ text-align:left; font-weight:var(--weight-normal); color:var(--qd-ink-2); padding:1.4mm 0 }
 .qd-totals td{ padding:1.4mm 0; font-weight:var(--weight-medium) }
-.qd-totals .qd-rule th,.qd-totals .qd-rule td{ border-top:1px solid var(--rule); padding-top:2.2mm }
+.qd-totals .qd-rule th,.qd-totals .qd-rule td{ border-top:1px solid var(--qd-rule); padding-top:2.2mm }
 /* The one figure the reader is looking for, given the weight to be found. */
 .qd-totals .qd-grand th,.qd-totals .qd-grand td{
-  border-top:2px solid var(--ink); padding-top:2.4mm; font-size:12pt;
-  font-weight:var(--weight-semibold); color:var(--ink) }
+  border-top:2px solid var(--qd-ink); padding-top:2.4mm; font-size:12pt;
+  font-weight:var(--weight-semibold); color:var(--qd-ink) }
 
 /* --- the small print ------------------------------------------------------ */
 .qd-terms{ display:grid; grid-template-columns:1.35fr 1fr; gap:10mm; margin-top:7mm;
-           padding-top:5mm; border-top:1px solid var(--rule) }
+           padding-top:5mm; border-top:1px solid var(--qd-rule) }
 .qd-terms h3{ font-size:7.4pt; text-transform:uppercase; letter-spacing:.09em;
-              color:var(--ink-3); margin-bottom:1.5mm }
-.qd-terms ol{ margin:0; padding-left:4.5mm; font-size:8.4pt; line-height:1.6; color:var(--ink-2) }
+              color:var(--qd-ink-3); margin-bottom:1.5mm }
+.qd-terms ol{ margin:0; padding-left:4.5mm; font-size:8.4pt; line-height:1.6; color:var(--qd-ink-2) }
 .qd-terms li{ padding-left:1mm; margin-bottom:.8mm }
-.qd-terms p,.qd-plain{ font-size:8.4pt; line-height:1.6; color:var(--ink-2) }
+.qd-terms p,.qd-plain{ font-size:8.4pt; line-height:1.6; color:var(--qd-ink-2) }
 /* Terms arrive as typed text, newlines and all. An invoice's are a paragraph
    rather than the quotation's numbered list, so they keep their own breaks. */
 .qd-plain{ white-space:pre-line }
 .qd-bank{ width:100%; border-collapse:collapse; font-size:8.4pt }
-.qd-bank th{ text-align:left; font-weight:var(--weight-normal); color:var(--ink-3);
+.qd-bank th{ text-align:left; font-weight:var(--weight-normal); color:var(--qd-ink-3);
              padding:1mm 4mm 1mm 0; white-space:nowrap; vertical-align:top }
-.qd-bank td{ padding:1mm 0; color:var(--ink) }
+.qd-bank td{ padding:1mm 0; color:var(--qd-ink) }
 /* A signature block with room to actually sign in. */
-.qd-sign{ margin-top:12mm; font-size:8.2pt; color:var(--ink-3); line-height:1.5 }
-.qd-sign span{ display:block; width:52mm; border-top:1px solid var(--rule-2); margin-bottom:1.5mm }
-.qd-sign b{ color:var(--ink) }
+.qd-sign{ margin-top:12mm; font-size:8.2pt; color:var(--qd-ink-3); line-height:1.5 }
+.qd-sign span{ display:block; width:52mm; border-top:1px solid var(--qd-rule-2); margin-bottom:1.5mm }
+.qd-sign b{ color:var(--qd-ink) }
 
-.qd-legal{ margin-top:6mm; padding-top:3mm; border-top:1px solid var(--rule);
-           font-size:7.6pt; line-height:1.55; color:var(--ink-3) }
-.qd-legal span{ display:block; margin-top:1.5mm; color:var(--ink-2) }
+.qd-legal{ margin-top:6mm; padding-top:3mm; border-top:1px solid var(--qd-rule);
+           font-size:7.6pt; line-height:1.55; color:var(--qd-ink-3) }
+.qd-legal span{ display:block; margin-top:1.5mm; color:var(--qd-ink-2) }
 
 /* --- what this document IS, if it is not simply valid --------------------- */
 .qd-mark{ position:absolute; inset:0; display:grid; place-items:center;

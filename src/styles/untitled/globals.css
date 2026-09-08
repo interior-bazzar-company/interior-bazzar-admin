@@ -1,0 +1,68 @@
+/* Untitled UI's globals.css, adapted. Imported FIRST from main.tsx, before
+   admin-theme.css.
+
+   `important`, AND WHY. The panel's CSS is unlayered and reaches elements by
+   name — `*{margin:0;padding:0}`, `button{background:none;border:none}`,
+   `.card h3`, `.um-rec p`. An unlayered rule beats a layered one whatever its
+   specificity, and Tailwind's utilities live in @layer utilities, so without
+   this the library's Button rendered as bare text and its Input had no
+   padding: the panel's reset was winning on the library's own elements.
+   Tailwind ships this switch for exactly that situation — every utility
+   becomes !important, so a library component is styled by its classes on any
+   surface — while preflight (a base layer, not a utility) still loses to the
+   panel's CSS, which keeps the panel's own look exactly as it was. */
+@import "tailwindcss" important;
+@import "./theme.css";
+@import "./typography.css";
+
+@plugin "@tailwindcss/typography";
+@plugin "tailwindcss-react-aria-components";
+@plugin "tailwindcss-animate";
+
+/* Dark is selected by Untitled UI's class OR the panel's attribute. */
+@custom-variant dark (&:where(.dark-mode, .dark-mode *, [data-theme="dark"], [data-theme="dark"] *));
+@custom-variant label (& [data-label]);
+@custom-variant focus-input-within (&:has(input:focus));
+
+@utility scrollbar-hide {
+    &::-webkit-scrollbar {
+        display: none;
+        -webkit-appearance: none;
+    }
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+@utility transition-inherit-all {
+    transition-property: inherit;
+    transition-duration: inherit;
+    transition-timing-function: inherit;
+}
+
+html,
+body {
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-font-variant-ligatures: contextual;
+    font-variant-ligatures: contextual;
+    -webkit-font-kerning: normal;
+    font-kerning: normal;
+}
+
+details summary::-webkit-details-marker {
+    display: none;
+}
+
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+input[type="search"]::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+}

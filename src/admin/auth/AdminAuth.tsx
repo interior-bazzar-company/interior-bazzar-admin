@@ -62,6 +62,11 @@ import { AuthService } from "../../api/modules/auth";
 import { TokenService } from "../../api/apiService/authHelper/TokenService";
 import type { LoginFormResponse } from "../../types/global";
 import { clearSession, grantsOf, isZeroAccess, loadSession, sessionUnreachable } from "./session";
+import { currentTheme, setTheme } from "../shell/ShellContext";
+import { ArrowRight } from "@untitledui/icons/ArrowRight";
+import { Button } from "@/components/base/buttons/button";
+import { ButtonGroup, ButtonGroupItem } from "@/components/base/button-group/button-group";
+import { Input } from "@/components/base/input/input";
 import "../../styles/admin-theme.css";
 import "./admin-auth.css";
 
@@ -140,6 +145,34 @@ const SIGNED_OUT_BANNER: Banner = {
   body: "Your session has been cleared on this device.",
 };
 
+/* The same three choices the panel's account menu offers — Light, Dark and
+   System — on the door itself. Appearance is a device preference, not a
+   session one, so it is legitimately settable before anybody has signed in,
+   and it reads back through the same attribute the shell will boot from. */
+function AppearanceSwitch() {
+  const [cur, setCur] = useState(currentTheme);
+  return (
+    <div className="auth-appearance">
+      <span className="k">Theme</span>
+      <ButtonGroup
+        size="sm"
+        aria-label="Theme"
+        selectedKeys={[cur]}
+        disallowEmptySelection
+        onSelectionChange={(keys) => {
+          const v = String([...keys][0] || cur);
+          setTheme(v);
+          setCur(v);
+        }}
+      >
+        <ButtonGroupItem id="light">Light</ButtonGroupItem>
+        <ButtonGroupItem id="dark">Dark</ButtonGroupItem>
+        <ButtonGroupItem id="system">System</ButtonGroupItem>
+      </ButtonGroup>
+    </div>
+  );
+}
+
 export default function AdminAuth() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -148,10 +181,8 @@ export default function AdminAuth() {
   const [banner, setBanner] = useState<Banner | null>(null);
   const [who, setWho] = useState("");
   const [pass, setPass] = useState("");
-  const [showPass, setShowPass] = useState(false);
   const [busy, setBusy] = useState(false);
   const [user, setUser] = useState<Identity | null>(null);
-  const passRef = useRef<HTMLInputElement>(null);
   const booted = useRef(false);
 
   function enterPanel() {
@@ -202,7 +233,6 @@ export default function AdminAuth() {
     void AuthService.signout().catch(() => {});
     clearSession();
     setPass("");
-    setShowPass(false);
     setUser(null);
     setStep("login");
     setBanner(null);
@@ -290,6 +320,7 @@ export default function AdminAuth() {
 
       {/* -------------------------------------------------------------- form */}
       <section className="formside">
+        <AppearanceSwitch />
         <div className="box">
 
           {/* ---------------------------------------------------------- LOGIN */}
@@ -310,32 +341,18 @@ export default function AdminAuth() {
               ) : null}
             </div>
 
-            <div className="fg">
-              <label htmlFor="loginEmail">Username or work email</label>
-              <input className="inp" type="text" id="loginEmail" autoComplete="username"
-                     placeholder="you@interiorbazzar.com" value={who}
-                     onChange={(e) => setWho(e.target.value)} onKeyDown={onKey} />
-              <div className="err" id="err-loginEmail" />
+            <div className="auth-fields">
+              <Input label="Username or work email" id="loginEmail" type="text" size="lg"
+                     autoComplete="username" placeholder="you@interiorbazzar.com"
+                     value={who} onChange={setWho} onKeyDown={onKey} />
+              <Input label="Password" id="loginPass" type="password" size="lg"
+                     autoComplete="current-password" placeholder="••••••••"
+                     value={pass} onChange={setPass} onKeyDown={onKey} />
             </div>
 
-            <div className="fg">
-              <label htmlFor="loginPass">Password</label>
-              <div className="pw">
-                <input className="inp" type={showPass ? "text" : "password"} id="loginPass"
-                       autoComplete="current-password"
-                       placeholder="••••••••" ref={passRef} value={pass}
-                       onChange={(e) => setPass(e.target.value)} onKeyDown={onKey} />
-                <button type="button" className="tlink" onClick={() => setShowPass((v) => !v)}
-                        aria-label={(showPass ? "Hide" : "Show") + " password"}>
-                  {showPass ? "Hide" : "Show"}
-                </button>
-              </div>
-              <div className="err" id="err-loginPass" />
-            </div>
-
-            <button className="btn pri lg full" onClick={handleLogin} disabled={busy}>
+            <Button color="ink" size="lg" className="w-full" isLoading={busy} showTextWhileLoading onClick={handleLogin}>
               {busy ? "Signing in…" : "Sign in"}
-            </button>
+            </Button>
 
             <div className="foot">
               Accounts are created by an admin — there is no public sign-up. Lost your password? Ask an admin
@@ -363,7 +380,7 @@ export default function AdminAuth() {
                 number in their <span className="mono">Team</span> badge right now.
               </div>
             </div>
-            <button className="btn lg full" onClick={handleLogout} style={{ marginTop: 18 }}>Sign out</button>
+            <Button color="secondary" size="lg" className="mt-4.5 w-full" onClick={handleLogout}>Sign out</Button>
           </div>
 
           {/* --------------------------------------------------------- ACTIVE */}
@@ -383,9 +400,11 @@ export default function AdminAuth() {
                 <span className="chip" key={g}>{g}</span>
               ))}
             </div>
-            <button className="btn pri lg full" id="continueBtn" onClick={enterPanel}>Continue to the panel →</button>
+            <Button color="ink" size="lg" className="w-full" id="continueBtn" iconTrailing={ArrowRight} onClick={enterPanel}>
+              Continue to the panel
+            </Button>
             <div className="foot">
-              <button className="tlink" onClick={handleLogout}>Not you? Sign out</button>
+              <Button color="link-gray" size="sm" onClick={handleLogout}>Not you? Sign out</Button>
             </div>
           </div>
 

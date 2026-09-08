@@ -20,6 +20,9 @@ const doc = { ...el(), documentElement: el(), body: el(), createElement: el, act
 g.document = doc;
 g.window = {
   document: doc,
+  /* react-aria's focus-visible setup sees a `window` and reads
+     HTMLElement.prototype.focus; the class only has to exist. */
+  HTMLElement: class { focus() {} }, Element: class {}, Node: class {},
   addEventListener: () => {}, removeEventListener: () => {},
   matchMedia: () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }),
   localStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },

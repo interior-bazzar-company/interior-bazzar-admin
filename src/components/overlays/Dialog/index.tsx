@@ -1,6 +1,10 @@
-// Dialog.tsx
-import styles from "./Dialog.module.css";
-import { useEffect, useRef } from "react";
+/* The confirm dialog behind useDialog() / useConfirm(), on Untitled UI's Modal.
+   React Aria owns what the hand-rolled version used to do by hand — focus
+   trap, focus return, Escape, click-away, aria-modal — and the surface is the
+   library's own: rounded-2xl card on the raised plane, shadow-xl, a hairline.
+   The primary action is INK, per the panel's rule; the escape is secondary. */
+import { Dialog as UiDialog, Modal, ModalOverlay } from "@/components/application/modals/modal";
+import { Button } from "@/components/base/buttons/button";
 
 interface DialogProps {
     title?: string;
@@ -11,37 +15,31 @@ interface DialogProps {
     onCancel: () => void;
 }
 
-const Dialog = ({ title, message, confirmText = "OK", cancelText = "Cancel", onConfirm, onCancel }: DialogProps) => {
-    const dialogRef = useRef<HTMLDivElement>(null);
-
-    // Focus trap: Move focus to modal on open
-    useEffect(() => {
-        const previouslyFocused = document.activeElement as HTMLElement;
-        dialogRef.current?.focus();
-
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === "Escape") onCancel();
-        };
-
-        document.addEventListener("keydown", handleKeyDown);
-        return () => {
-            document.removeEventListener("keydown", handleKeyDown);
-            previouslyFocused?.focus();
-        };
-    }, [onCancel]);
-
-    return (
-        <div className={styles.overlay} role="dialog" aria-modal="true" aria-labelledby="dialog-title" aria-describedby="dialog-message">
-            <div className={styles.dialog} ref={dialogRef} tabIndex={-1}>
-                {title && <h2 id="dialog-title" className={styles.title}>{title}</h2>}
-                <p id="dialog-message" className={styles.message}>{message}</p>
-                <div className={styles.actions}>
-                    <button className={styles.cancel} onClick={onCancel}>{cancelText}</button>
-                    <button className={styles.confirm} onClick={onConfirm} autoFocus>{confirmText}</button>
+const Dialog = ({ title, message, confirmText = "OK", cancelText = "Cancel", onConfirm, onCancel }: DialogProps) => (
+    <ModalOverlay isOpen isDismissable onOpenChange={(open) => { if (!open) onCancel(); }}>
+        <Modal className="max-w-md">
+            <UiDialog role="alertdialog" aria-labelledby="dialog-title" aria-describedby="dialog-message">
+                <div className="w-full rounded-2xl bg-primary p-6 shadow-xl ring-1 ring-secondary">
+                    {title && (
+                        <h2 id="dialog-title" className="text-lg font-semibold text-primary">
+                            {title}
+                        </h2>
+                    )}
+                    <p id="dialog-message" className="mt-2 text-sm text-tertiary">
+                        {message}
+                    </p>
+                    <div className="mt-6 flex justify-end gap-3">
+                        <Button color="secondary" size="md" onClick={onCancel}>
+                            {cancelText}
+                        </Button>
+                        <Button color="ink" size="md" onClick={onConfirm} autoFocus>
+                            {confirmText}
+                        </Button>
+                    </div>
                 </div>
-            </div>
-        </div>
-    );
-};
+            </UiDialog>
+        </Modal>
+    </ModalOverlay>
+);
 
 export default Dialog;

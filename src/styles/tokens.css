@@ -1,0 +1,256 @@
+/* =============================================================================
+   Interior bazzar — Admin · the BRIDGE
+   =============================================================================
+
+   Colour, shadow and font tokens come from src/styles/untitled/theme.css —
+   Untitled UI's own theme, emitted by Tailwind to :root. This file does two
+   jobs and nothing else:
+
+     1. THE SCALES the panel is built on — control heights, the ten type names,
+        radius, layout, motion, z-index.
+     2. THE LEGACY VOCABULARY. Nine module sheets and 2,600 lines of component
+        CSS write --bg, --text-2, --brand, --ok-bg, --line-control. Every one of
+        those names is defined here as an alias of an Untitled UI token, so the
+        whole product re-skins without a single module sheet being edited.
+
+   TWO SCALES, DELIBERATELY. Untitled UI names its steps --text-sm (14) and
+   --radius-lg (8); this panel has written --text-sm to mean 12 and
+   --radius-md to mean its control radius since its first build, thousands of
+   times. The library's values are baked into its utilities (`@theme inline`),
+   so the names below are free for the panel's meaning without the two ever
+   colliding. Nothing invents a value between Untitled UI's steps.
+
+   SIZE. Untitled UI's smallest button is 36 and its default is 40, sized for
+   marketing pages. This is a CRM: a toolbar above a 40-row table cannot spend
+   40px on every control. The panel's `md` is their `sm` (36), its `lg` their
+   `md` (40) — their steps, shifted one notch denser. Compact takes ~12% off.
+   ========================================================================== */
+
+:root{
+  /* ---- SPACE · ×4 ------------------------------------------------------- */
+  --space-0:0;    --space-px:1px;
+  --space-1:4px;  --space-2:8px;  --space-3:12px; --space-4:16px;
+  --space-5:20px; --space-6:24px; --space-8:32px; --space-10:40px;
+  --space-12:48px; --space-16:64px;
+
+  /* ---- TYPE · the panel's ten names on Untitled UI's steps -------------- */
+  --text-2xs:11px;  --lh-2xs:16px;   /* tracked uppercase micro-labels only  */
+  --text-xs:12px;   --lh-xs:18px;    /* badges, table heads, meta            */
+  --text-sm:12px;   --lh-sm:18px;    /* captions, secondary cell lines       */
+  --text-md:14px;   --lh-md:20px;    /* dense UI: nav, chips, toolbar        */
+  --text-base:14px; --lh-base:20px;  /* body, table cells, form controls     */
+  --text-lg:16px;   --lh-lg:24px;    /* card titles, drawer headings         */
+  --text-xl:18px;   --lh-xl:28px;    /* section titles                       */
+  --text-2xl:20px;  --lh-2xl:30px;   /* record titles                        */
+  --text-3xl:24px;  --lh-3xl:32px;   /* page titles  (display-xs)            */
+  --text-4xl:30px;  --lh-4xl:38px;   /* the greeting (display-sm)            */
+
+  --weight-normal:400; --weight-medium:500; --weight-semibold:600; --weight-bold:700;
+  --tracking-tight:-.02em; --tracking-normal:0; --tracking-wide:.02em;
+  --tracking-label:.06em;
+
+  /* ---- RADIUS · the panel's meaning: md is every control (8), xl a card -- */
+  --radius-none:0px;  --radius-xxs:2px; --radius-xs:4px; --radius-sm:6px;
+  --radius-md:8px;    --radius-lg:10px; --radius-xl:12px; --radius-2xl:16px;
+  --radius-3xl:20px;  --radius-full:9999px;
+
+  /* ---- CONTROL HEIGHTS -------------------------------------------------- */
+  --control-xs:24px; --control-sm:32px; --control-md:36px;
+  --control-lg:40px; --control-xl:44px;
+  --control-pad-xs:8px;  --control-pad-sm:10px; --control-pad-md:12px;
+  --control-pad-lg:14px; --control-pad-xl:18px;
+  --nav-item-h:36px;
+
+  /* ---- ICON ------------------------------------------------------------- */
+  --icon-xs:12px; --icon-sm:14px; --icon-md:16px; --icon-lg:20px; --icon-xl:28px;
+
+  /* ---- MOTION ----------------------------------------------------------- */
+  --ease:cubic-bezier(.4,0,.2,1);
+  --ease-out:cubic-bezier(.16,1,.3,1);
+  --duration-fast:.1s; --duration:.15s; --duration-slow:.25s;
+
+  /* ---- LAYOUT ----------------------------------------------------------- */
+  --nav-w:260px; --rail-w:56px; --top-h:56px;
+  --page-max:1180px; --page-max-wide:1440px; --page-pad:32px;
+  --row-h:44px;
+
+  /* ---- THE STACKING LADDER, unchanged ----------------------------------- */
+  --z-stick:2; --z-band:10; --z-bandpop:12;
+  --z-nav:20; --z-topbar:15; --z-pop:100; --z-layer:101; --z-toast:200;
+
+
+  /* ======================================================================
+     THE LEGACY VOCABULARY — aliases, defined once.
+     ==================================================================== */
+
+  /* ---- surfaces · --bg is the plane, --bg-shell the ground; in dark the
+     plane is the lighter of the two and that inversion lives in theme.css -- */
+  --bg:var(--color-bg-primary);
+  --bg-shell:var(--color-bg-secondary);
+  --bg-nav:var(--color-bg-nav);
+  --bg-inset:var(--color-bg-tertiary);
+  --bg-hover:var(--color-bg-primary_hover);
+  --bg-active:var(--color-bg-active);
+  --bg-selected:var(--color-bg-selected);
+  /* the nav is already a step off the plane, so its hover is the ACTIVE step */
+  --sidebar-hover:var(--color-bg-active);
+  --sidebar-active:var(--color-bg-selected);
+  --surface:var(--color-bg-primary);
+  --surface-raised:var(--color-bg-raised);
+  --sk:var(--color-skeleton);
+  --sk-sheen:var(--color-skeleton-sheen);
+  --skeleton:linear-gradient(90deg,var(--sk) 25%,var(--sk-sheen) 38%,var(--sk) 62%);
+
+  /* ---- text · --text-3 is TERTIARY: quaternary fails 4.5:1 on the inset
+     ground that table heads use, and table heads are written in --text-3 --- */
+  --text:var(--color-text-primary);
+  --text-2:var(--color-text-secondary);
+  --text-3:var(--color-text-tertiary);
+  --text-4:var(--color-text-quaternary);
+  --text-disabled:var(--color-text-disabled);
+  --text-inverse:var(--color-text-white);
+
+  /* ---- borders · a hairline GROUPS, a control edge IDENTIFIES ----------- */
+  --line:var(--color-border-secondary);
+  --line-2:var(--color-border-primary);
+  --line-3:var(--color-border-primary);
+  --line-control:var(--color-border-control);
+  --line-strong:var(--color-border-control);
+
+  /* ---- brand · FOREST, the thread, not the button ----------------------- */
+  --brand:var(--color-bg-brand-solid);
+  --brand-hover:var(--color-bg-brand-solid_hover);
+  --brand-ink:var(--color-text-white);
+  --brand-text:var(--color-text-brand-secondary);
+  --brand-tint:var(--color-bg-brand-primary);
+  --brand-tint-2:var(--color-bg-brand-secondary);
+  --brand-line:var(--color-border-brand-subtle);
+  --brand-mint:var(--color-brand-300);
+
+  /* ---- the primary action · INK, inverting wholesale -------------------- */
+  --ink-solid:var(--color-ink-solid);
+  --ink-solid-hover:var(--color-ink-solid_hover);
+  --ink-on-solid:var(--color-on-ink);
+
+  /* ---- status · text · soft ground · edge · solid fill ------------------ */
+  --ok:var(--color-text-success-primary);   --ok-bg:var(--color-bg-success-primary);
+  --ok-line:var(--color-border-success);    --ok-solid:var(--color-bg-success-solid);
+  --warn:var(--color-text-warning-primary); --warn-bg:var(--color-bg-warning-primary);
+  --warn-line:var(--color-border-warning);  --warn-solid:var(--color-bg-warning-solid);
+  --bad:var(--color-text-error-primary);    --bad-bg:var(--color-bg-error-primary);
+  --bad-line:var(--color-border-error-subtle); --bad-solid:var(--color-bg-error-solid);
+  --info:var(--color-text-info-primary);    --info-bg:var(--color-bg-info-primary);
+  --info-line:var(--color-border-info);     --info-solid:var(--color-bg-info-solid);
+  --neutral:var(--color-text-secondary);    --neutral-bg:var(--color-bg-tertiary);
+  --neutral-line:var(--color-border-primary);
+  --accent:var(--color-bg-info-solid);
+  --accent-text:var(--color-text-info-primary);
+  --accent-bg:var(--color-bg-info-primary);
+
+  /* ---- elevation · xs … 2xl come from theme.css ------------------------- */
+  --ring:var(--focus-ring);
+  --bad-ring:var(--focus-ring-error);
+  --focus-ring-danger:var(--focus-ring-error);
+  --scrim:var(--color-bg-overlay);
+
+  /* ---- type stacks ------------------------------------------------------ */
+  --font:var(--font-body);
+  --display-wdth:normal;
+
+  /* ---- the chevron a bare <select> paints; stroke = --text-3 ------------- */
+  --chevron:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23525252' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
+
+  /* ---- chat's faded backdrop — currency glyphs in ink ------------------- */
+  --chat-bg:var(--color-bg-secondary);
+  --chat-pattern:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='%23737373' opacity='0.09' font-family='Arial,Helvetica,sans-serif' font-weight='700'%3E%3Ctext x='10' y='36' font-size='24' transform='rotate(-14 10 36)'%3E%E2%82%B9%3C/text%3E%3Ctext x='92' y='18' font-size='17' transform='rotate(9 92 18)'%3E%24%3C/text%3E%3Ctext x='128' y='68' font-size='21' transform='rotate(-7 128 68)'%3E%E2%82%B9%3C/text%3E%3Ctext x='34' y='92' font-size='15' transform='rotate(13 34 92)'%3E%E2%82%AC%3C/text%3E%3Ctext x='72' y='128' font-size='23' transform='rotate(-16 72 128)'%3E%24%3C/text%3E%3Ctext x='138' y='142' font-size='16' transform='rotate(6 138 142)'%3E%C2%A5%3C/text%3E%3Ctext x='4' y='150' font-size='17' transform='rotate(-11 4 150)'%3E%E2%82%B9%3C/text%3E%3C/g%3E%3C/svg%3E");
+
+  /* ---- toast · the same dark slab in both themes ------------------------ */
+  --toast-bg:var(--color-neutral-900);
+  --toast-fg:var(--color-neutral-50);
+  --toast-action:var(--color-neutral-200);
+  --toast-ok:var(--color-green-400);
+  --toast-bad:var(--color-red-400);
+
+  /* ---- the channel palette — WhatsApp green and email blue mean the
+     CHANNEL, which is a signal, so they keep their hue ------------------- */
+  --ch-wa:#0b6b52;  --ch-wa-ink:#effaf6;  --ch-wa-bg:#dcf1e9;  --ch-wa-text:#0a5943;
+  --ch-em:#20508f;  --ch-em-ink:#eef4fc;  --ch-em-bg:#e0eafa;  --ch-em-text:#1d4880;
+
+  /* ---- the tag palette — eleven hues that mean NOTHING, by contract ----- */
+  --tag-slate:#536379;  --tag-slate-bg:#f4f6f8;  --tag-slate-line:#d8dde3;
+  --tag-red:#b03429;    --tag-red-bg:#fdf1f0;    --tag-red-line:#f0cfcc;
+  --tag-orange:#8c5721; --tag-orange-bg:#fdf6f0; --tag-orange-line:#f0decc;
+  --tag-amber:#74621b;  --tag-amber-bg:#fdfaf0;  --tag-amber-line:#f0e9cc;
+  --tag-lime:#4c6d1c;   --tag-lime-bg:#f7fcf0;   --tag-lime-line:#e1efcd;
+  --tag-green:#1d7145;  --tag-green-bg:#f0fcf6;  --tag-green-line:#cdefdd;
+  --tag-teal:#1a706d;   --tag-teal-bg:#f0fdfc;   --tag-teal-line:#ccf0ef;
+  --tag-cyan:#206988;   --tag-cyan-bg:#f0f9fd;   --tag-cyan-line:#cce5f0;
+  --tag-blue:#2b59b6;   --tag-blue-bg:#f0f4fd;   --tag-blue-line:#ccd8f0;
+  --tag-violet:#702eb2; --tag-violet-bg:#f6f0fc; --tag-violet-line:#decdef;
+  --tag-pink:#b02968;   --tag-pink-bg:#fdf0f6;   --tag-pink-line:#f0ccdd;
+
+  /* ---- names the spec introduced, kept so a rule pastes unchanged ------- */
+  --size-xs:var(--control-xs); --size-sm:var(--control-sm); --size-md:var(--control-md);
+  --size-lg:var(--control-lg); --size-xl:var(--control-xl);
+  --font-2xs:var(--text-2xs); --font-xs:var(--text-xs); --font-sm:var(--text-sm);
+  --font-md:var(--text-md);   --font-base:var(--text-base); --font-lg:var(--text-lg);
+  --font-xl:var(--text-xl);   --font-2xl:var(--text-2xl); --font-3xl:var(--text-3xl);
+  --font-4xl:var(--text-4xl);
+  --weight-regular:var(--weight-normal);
+  --track-tight:var(--tracking-tight); --track-wide:var(--tracking-wide);
+  --track-label:var(--tracking-label);
+  --radius-pill:var(--radius-full);
+  --motion-instant:var(--duration-fast); --motion-fast:var(--duration);
+  --motion-slow:var(--duration-slow);
+  --ease-standard:var(--ease); --ease-exit:var(--ease-out);
+  --layout-nav:var(--nav-w); --layout-rail:var(--rail-w); --layout-top:var(--top-h);
+  --layout-row:var(--row-h); --layout-max:var(--page-max-wide);
+  --layout-max-read:var(--page-max); --layout-pad:var(--page-pad);
+  --z-sticky:var(--z-stick); --z-top:var(--z-topbar); --z-overlay:var(--z-layer);
+
+  /* ---- older shorthand that view code already writes -------------------- */
+  --r-xs:var(--radius-xs); --r-sm:var(--radius-sm); --r-md:var(--radius-md);
+  --r-lg:var(--radius-lg); --r-xl:var(--radius-xl); --r-pill:var(--radius-full);
+  --sh-1:var(--shadow-xs); --sh-2:var(--shadow-sm);
+  --sh-3:var(--shadow-lg); --sh-4:var(--shadow-xl);
+  --t:var(--duration) var(--ease);
+}
+
+
+/* ---- dark: the chevron, the chat glyphs, and the two palettes that carry
+   their own hue. One block, the same two selectors as theme.css. --------- */
+.dark-mode, :root[data-theme="dark"]{
+  --chevron:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a3a3a3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
+  --chat-pattern:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='%23d4d4d4' opacity='0.05' font-family='Arial,Helvetica,sans-serif' font-weight='700'%3E%3Ctext x='10' y='36' font-size='24' transform='rotate(-14 10 36)'%3E%E2%82%B9%3C/text%3E%3Ctext x='92' y='18' font-size='17' transform='rotate(9 92 18)'%3E%24%3C/text%3E%3Ctext x='128' y='68' font-size='21' transform='rotate(-7 128 68)'%3E%E2%82%B9%3C/text%3E%3Ctext x='34' y='92' font-size='15' transform='rotate(13 34 92)'%3E%E2%82%AC%3C/text%3E%3Ctext x='72' y='128' font-size='23' transform='rotate(-16 72 128)'%3E%24%3C/text%3E%3Ctext x='138' y='142' font-size='16' transform='rotate(6 138 142)'%3E%C2%A5%3C/text%3E%3Ctext x='4' y='150' font-size='17' transform='rotate(-11 4 150)'%3E%E2%82%B9%3C/text%3E%3C/g%3E%3C/svg%3E");
+  --toast-bg:var(--color-neutral-800);
+
+  --ch-wa:#0f5f4c;  --ch-wa-ink:#d9f5eb;  --ch-wa-bg:#123329;  --ch-wa-text:#7fdcbd;
+  --ch-em:#1e3f73;  --ch-em-ink:#dde9fb;  --ch-em-bg:#182742;  --ch-em-text:#9dbcf0;
+
+  --tag-slate:#98a4b6;  --tag-slate-bg:#262b30;  --tag-slate-line:#424951;
+  --tag-red:#dd8880;    --tag-red-bg:#3c1e1b;    --tag-red-line:#633531;
+  --tag-orange:#d59c62; --tag-orange-bg:#3c2b1b; --tag-orange-line:#634a31;
+  --tag-amber:#d4bc5e;  --tag-amber-bg:#3c351b;  --tag-amber-line:#635931;
+  --tag-lime:#a2d161;   --tag-lime-bg:#2e3b1c;   --tag-lime-line:#4e6232;
+  --tag-green:#61d195;  --tag-green-bg:#1c3b2a;  --tag-green-line:#326248;
+  --tag-teal:#5ed4d0;   --tag-teal-bg:#1b3c3b;   --tag-teal-line:#316361;
+  --tag-cyan:#60b2d5;   --tag-cyan-bg:#1b323c;   --tag-cyan-line:#315463;
+  --tag-blue:#7e9edd;   --tag-blue-bg:#1b263c;   --tag-blue-line:#314263;
+  --tag-violet:#b388dd; --tag-violet-bg:#2b1c3b; --tag-violet-line:#4a3262;
+  --tag-pink:#dd80ac;   --tag-pink-bg:#3c1b2a;   --tag-pink-line:#633148;
+}
+
+
+/* ============================================================================
+   DENSITY — the same system, ~12% tighter. Nothing but scale values change.
+   ========================================================================== */
+:root[data-density="compact"]{
+  --control-xs:22px; --control-sm:28px; --control-md:32px;
+  --control-lg:36px; --control-xl:40px;
+  --nav-item-h:32px;
+  --top-h:48px; --row-h:36px; --page-pad:24px;
+  --text-md:13px;   --lh-md:18px;
+  --text-base:13px; --lh-base:18px;
+  --text-3xl:20px;  --lh-3xl:28px;
+  --text-4xl:24px;  --lh-4xl:32px;
+}

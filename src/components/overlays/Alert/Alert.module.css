@@ -35,34 +35,29 @@
 /* Alert box style */
 .alert {
   display: flex;
-  color: #000000;
-  background-color: #ffffff;
-  border: 2px solid #000000;
+  color: var(--text);
+  background-color: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-left-width: 3px;
+  box-shadow: var(--shadow-lg), var(--surface-sheen);
   align-items: center;
   justify-content: space-between;
   min-width: 300px;
   max-width: 500px;
   padding: 12px 20px;
-  border-radius: 0;
-  font-weight: 700;
+  border-radius: var(--radius-md);
+  font-weight: var(--weight-medium);
   gap: 12px;
   animation-duration: 0.3s;
   animation-fill-mode: both;
 }
 
-/* Alert types */
-.success, .error, .warning, .info {
-  background-color: #ffffff;
-  border-color: #000000;
-}
-
-.error {
-  border-width: 4px;
-}
-
-.warning {
-  border-style: dashed;
-}
+/* Alert types — tone is the 3px left stripe plus the soft ground, the same
+   grammar as the panel's .notice */
+.success { background-color: var(--ok-bg);   border-color: var(--ok-line);   border-left-color: var(--ok-solid);   color: var(--ok) }
+.error   { background-color: var(--bad-bg);  border-color: var(--bad-line);  border-left-color: var(--bad-solid);  color: var(--bad) }
+.warning { background-color: var(--warn-bg); border-color: var(--warn-line); border-left-color: var(--warn-solid); color: var(--warn) }
+.info    { background-color: var(--info-bg); border-color: var(--info-line); border-left-color: var(--info-solid); color: var(--info) }
 
 /* Basic Positions for All Alerts */
 .top-center,
@@ -216,9 +211,9 @@
 .closeButton {
   background: transparent;
   border: none;
-  color: #000000;
+  color: inherit;
   font-size: 20px;
-  font-weight: 900;
+  font-weight: var(--weight-semibold);
   cursor: pointer;
   padding: 0;
   line-height: 1;

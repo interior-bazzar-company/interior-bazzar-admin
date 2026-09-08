@@ -1,32 +1,12 @@
 /* =============================================================================
    Users Management — chart styles.
    -----------------------------------------------------------------------------
-   THE PALETTE WAS COMPUTED, NOT CHOSEN. Every set below was run through the
-   data-viz palette validator against this panel's own ramps and its own
-   surfaces, in both modes, before any chart code existed. Results:
-
-     categorical, 3 slots — the growth chart's three series
-       light  #3f63a0 indigo-8 · #1d7145 tag-green · #b8770e amber-9
-              on #ffffff — worst adjacent CVD dE 9.5, normal-vision 16.9,
-              all >= 3:1 contrast .............................. ALL PASS
-       dark   #4a7fd0 indigo-9 · #12a594 green-9  · #a17c22 amber-8
-              on #151d1c (sand-3, the raised surface) — worst adjacent
-              CVD dE 12.9, normal-vision 16.4 .................. ALL PASS
-
-     ordinal, 3 steps — funnel stages (indigo, one hue)
-       light  #8fa8d3 · #3f63a0 · #1a3a6e ....................... ALL PASS
-       dark   #31548f · #4a7fd0 · #8fb2ee ....................... ALL PASS
-
-     ordinal / sequential, 3 steps — plan tiers and cohort retention (green)
-       light  #75b8a6 · #0e876c · #095646 ....................... ALL PASS
-       dark   #0e876c · #12a594 · #1fbfa8 ....................... ALL PASS
-
-   The dark steps are a SELECTION, not a flip: the same hues re-stepped for the
-   dark surface and validated against it. Several obvious picks failed, recorded
-   here so nobody re-picks them — green-9 #0c6b57 sits below the chroma floor
-   and reads gray; tag-green #61d195 and amber-10 #d99b20 sit above the dark
-   lightness band; indigo-6 #264070 misses the light-end contrast floor as a
-   ramp anchor on the dark surface.
+   THE PALETTE IS THE THEME'S. Every slot below reads a --chart-* token from
+   src/styles/tokens.css (Ink & Signal, validated per theme there), so this file
+   names no colour of its own. The rules that made the old hand-picked sets
+   safe still apply and are enforced by the token sheet: categorical hues are
+   none of the status colours, the sequential ramp is one hue (here, none),
+   and every mark clears 3:1 against its own surface in both modes.
 
    Three rules this file keeps:
      · colour follows the ENTITY, never its rank — slots are assigned in fixed
@@ -59,52 +39,32 @@
    Users' slots are UNCHANGED here on purpose: the same reorder is owed to
    them, but their slots carry different series and re-colouring that module
    silently is not this change. */
-.um, .um-rec {
-  --s1: #3f63a0; --s2: #1d7145; --s3: #9a6512;
-  --o1: #8fa8d3; --o2: #3f63a0; --o3: #1a3a6e;
-  --h1: #75b8a6; --h2: #0e876c; --h3: #095646;
-  /* Per step: the lightest fill takes dark ink — white on #75b8a6 was 2.3:1. */
-  --heat-ink-1: #04140f; --heat-ink: #ffffff;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .um,
-  :root:not([data-theme="light"]) .um-rec {
-    --s1: #4a7fd0; --s2: #34b39f; --s3: #a17c22;
-    --o1: #31548f; --o2: #4a7fd0; --o3: #8fb2ee;
-    --h1: #0e876c; --h2: #12a594; --h3: #1fbfa8;
-    --heat-ink-1: #ffffff; --heat-ink: #04140f;
-  }
-}
-:root[data-theme="dark"] .um,
-:root[data-theme="dark"] .um-rec {
-  --s1: #4a7fd0; --s2: #12a594; --s3: #a17c22;
-  --o1: #31548f; --o2: #4a7fd0; --o3: #8fb2ee;
-  --h1: #0e876c; --h2: #12a594; --h3: #1fbfa8;
-  --heat-ink: #04140f;
-}
+/* INK & SIGNAL. The slots read the theme's own --chart-* tokens now, which
+   are validated per theme in src/styles/tokens.css — nothing in this file names
+   a hex any more, so a palette change is a token change.
 
-/* Finance: money in first, and the strongest mark on the page. Validated
-   light (#0e876c, #3f63a0, #9a6512) and dark (#12a594, #4a7fd0, #a17c22) —
-   worst adjacent pair ΔE 13.4 deutan, 15.8 normal, both modes. */
-.fin {
-  --s1: #0e876c; --s2: #3f63a0; --s3: #9a6512;
-  --o1: #8fa8d3; --o2: #3f63a0; --o3: #1a3a6e;
-  --h1: #75b8a6; --h2: #0e876c; --h3: #095646;
-  --heat-ink-1: #04140f; --heat-ink: #ffffff;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .fin {
-    --s1: #12a594; --s2: #4a7fd0; --s3: #a17c22;
-    --o1: #31548f; --o2: #4a7fd0; --o3: #8fb2ee;
-    --h1: #0e876c; --h2: #12a594; --h3: #1fbfa8;
-    --heat-ink-1: #ffffff; --heat-ink: #04140f;
-  }
-}
-:root[data-theme="dark"] .fin {
-  --s1: #12a594; --s2: #4a7fd0; --s3: #a17c22;
-  --o1: #31548f; --o2: #4a7fd0; --o3: #8fb2ee;
-  --h1: #0e876c; --h2: #12a594; --h3: #1fbfa8;
-  --heat-ink: #04140f;
+     categorical  --chart-1 (blue) · --chart-2 (olive) · --chart-3 (brick) —
+                  three hues that are none of the four status colours and
+                  none of the primary, which in this scheme is ink.
+     ordinal      the funnel's one-hue ramp is the SEQUENTIAL ramp, which in
+                  Ink & Signal has no hue at all — three ink steps.
+     sequential   plan tiers and cohort retention: the same ink steps.
+
+   The heat ink is picked by the fill's luminance, per theme: the lightest
+   step takes the text colour, the darkest takes the inverse, and the middle
+   step is the one that flips between them. */
+.um, .um-rec, .fin {
+  --s1: var(--chart-1); --s2: var(--chart-2); --s3: var(--chart-3);
+  --o1: var(--chart-seq-2); --o2: var(--chart-seq-3); --o3: var(--chart-seq-4);
+  --h1: var(--chart-seq-2); --h2: var(--chart-seq-3); --h3: var(--chart-seq-4);
+  /* THE HEAT INK FALLS OUT OF THE THEME, so there is no dark-mode block here
+     any more. The two lighter steps always take the theme's own text colour
+     (near-black in light, near-white in dark) and the darkest step always
+     takes the plane's colour, which is the exact inverse. Both directions are
+     correct in both modes because the ramp itself inverts with the theme. */
+  --heat-ink-1: var(--color-text-primary);
+  --heat-ink-2: var(--color-text-primary);
+  --heat-ink: var(--color-bg-primary);
 }
 
 /* THE SLOT FILLS, AND `.ch-col` WAS MISSING FROM THEM.
@@ -179,8 +139,13 @@
 /* Rounded at the DATA end only, in both directions — the baseline end stays
    square so a bar's length is never visually exaggerated. */
 .ch-sgnbar { position: absolute; left: 0; right: 0; min-height: 2px }
-.ch-sgnbar.up { background: var(--ok-solid); border-radius: var(--radius-xs) var(--radius-xs) 0 0 }
-.ch-sgnbar.dn { background: var(--bad-solid); border-radius: 0 0 var(--radius-xs) var(--radius-xs) }
+/* A MONTH THAT LOST MONEY IS NOT AN ERROR STATE. These read --chart-pos /
+   --chart-neg, not the status solids: status tokens are reserved for status,
+   and the chart pair is the one the theme tunes per mode — so eighteen
+   negative months in dark mode are a legible red, not eighteen error banners.
+   Same rule as the categorical slots: colour follows the datum. */
+.ch-sgnbar.up { background: var(--chart-pos); border-radius: var(--radius-xs) var(--radius-xs) 0 0 }
+.ch-sgnbar.dn { background: var(--chart-neg); border-radius: 0 0 var(--radius-xs) var(--radius-xs) }
 .ch-sgnbar em { position: absolute; left: 50%; transform: translateX(-50%);
                 white-space: nowrap; font-style: normal; font-size: var(--text-2xs);
                 font-weight: var(--weight-semibold) }
@@ -321,7 +286,7 @@
 /* The ink is picked by the fill's luminance, so a label inside a coloured cell
    always clears contrast — the one place text may sit on a data colour. */
 .ch-cell.h1 { background: var(--h1); color: var(--heat-ink-1) }
-.ch-cell.h2 { background: var(--h2); color: var(--heat-ink) }
+.ch-cell.h2 { background: var(--h2); color: var(--heat-ink-2) }
 .ch-cell.h3 { background: var(--h3); color: var(--heat-ink) }
 .ch-cell.none { background: none; color: var(--text-3) }
 .ch-heatkey { display: flex; gap: var(--space-4); flex-wrap: wrap; margin-top: var(--space-3);
