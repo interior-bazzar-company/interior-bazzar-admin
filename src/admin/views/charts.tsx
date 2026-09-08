@@ -417,14 +417,16 @@ export function FunnelChart({ stages, unit }: { stages: Stage[]; unit: string })
       <div className="ch-rows funnel">
         {stages.map((s, i) => (
           <div className="ch-row" key={s.key} tabIndex={0}
-            aria-label={s.label + ": " + s.value + (i ? ", " + Math.round((s.value / stages[i - 1].value) * 100) + "% of the stage before" : "")}>
+            aria-label={s.label + ": " + s.value + (i && stages[i - 1].value ? ", " + Math.round((s.value / stages[i - 1].value) * 100) + "% of the stage before" : "")}>
             <span className="lab">{s.label}</span>
             <span className="track">
               <i className={"fill o" + (i + 1)} style={{ width: pctOf(s.value, top) + "%" }} />
             </span>
             <span className="val tnum">{s.value.toLocaleString("en-IN")}</span>
+            {/* An empty previous stage has no ratio: 3 ÷ 0 printed "Infinity%
+                of previous", which is a number nobody can act on. */}
             <span className="delta">
-              {i ? Math.round((s.value / stages[i - 1].value) * 100) + "% of previous" : "—"}
+              {i ? (stages[i - 1].value ? Math.round((s.value / stages[i - 1].value) * 100) + "% of previous" : "previous stage empty") : "—"}
             </span>
             {s.note ? <span className="ch-tip" role="tooltip">{s.note}</span> : null}
           </div>

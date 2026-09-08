@@ -64,6 +64,12 @@ src/content/team/
   plans.json            → GET /admin/team/plans?date=
   reports.json          → GET /admin/team/reports?date=
   vocabularies.json     → GET /admin/team/vocabularies
+
+src/content/overview/
+  metrics.json          → STATIC COPY, no endpoint: the definitions behind every ⓘ
+                          on #/overview. The page owns no records — it reads the
+                          other modules' stores and hooks (see Module 10 in
+                          BACKEND-INTEGRATION.md).
 ```
 
 `src/content/team/` is worth reading for rule 6. Most of it is placeholder

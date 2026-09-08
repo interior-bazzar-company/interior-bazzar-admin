@@ -53,9 +53,14 @@
    The heat ink is picked by the fill's luminance, per theme: the lightest
    step takes the text colour, the darkest takes the inverse, and the middle
    step is the one that flips between them. */
-.um, .um-rec, .fin {
+.um, .um-rec, .fin, .ov {
   --s1: var(--chart-1); --s2: var(--chart-2); --s3: var(--chart-3);
   --o1: var(--chart-seq-2); --o2: var(--chart-seq-3); --o3: var(--chart-seq-4);
+  /* Two more ordinal steps, for a funnel with five stages. The deal pipeline
+     has five (New → Followup → Slot → Installment → Won); the ramp runs to the
+     darkest step and holds there rather than wrapping back to the lightest,
+     because a fifth bar paler than the fourth would read as a fall. */
+  --o4: var(--chart-seq-5); --o5: var(--chart-seq-5);
   --h1: var(--chart-seq-2); --h2: var(--chart-seq-3); --h3: var(--chart-seq-4);
   /* THE HEAT INK FALLS OUT OF THE THEME, so there is no dark-mode block here
      any more. The two lighter steps always take the theme's own text colour
@@ -85,6 +90,8 @@
 .ch-chart .fill.o1 { background: var(--o1) }
 .ch-chart .fill.o2 { background: var(--o2) }
 .ch-chart .fill.o3 { background: var(--o3) }
+.ch-chart .fill.o4 { background: var(--o4) }
+.ch-chart .fill.o5 { background: var(--o5) }
 /* Reserved status steps. A membership state means something; it is not
    "series 4", and every bar wearing one carries its own status pill. */
 .ch-chart .fill.st-ok { background: var(--ok-solid) }

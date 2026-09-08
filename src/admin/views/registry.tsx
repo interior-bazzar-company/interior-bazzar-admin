@@ -11,11 +11,12 @@
    ============================================================================= */
 import type { ComponentType } from "react";
 import { EmptyState, Notice } from "../ui";
-import { getItems } from "../shell/modules";
+import { getItems, HOME_ROUTE } from "../shell/modules";
 import type { ModuleItem } from "../shell/modules";
 import { can, useNav } from "../shell/AdminShell";
 import { useLocation } from "react-router-dom";
 
+import Overview from "./Overview";
 import Audit from "./Audit";
 import Plans from "./Plans";
 import Team from "./Team";
@@ -34,6 +35,11 @@ import TeamReports from "./Team/Reports";
 
 /** route key → the component that owns that workspace. */
 export const VIEWS: Record<string, ComponentType> = {
+  /* The landing page. Frontend-only by nature — it reads the other modules'
+     stores and API hooks and owns no records — so its key sits in
+     PROTO_MODULES and its row in PROTO_ROWS like the rest of the
+     frontend-first surfaces. See views/Overview/index.tsx. */
+  overview: Overview,
   audit: Audit,
   plans: Plans,
   team: Team,
@@ -122,8 +128,8 @@ function NotFound({ route }: { route: string }) {
           </>
         }
         action={
-          <button className="btn pri" data-go="#/deals" onClick={() => go("#/deals")}>
-            Back to Deals
+          <button className="btn pri" data-go={"#/" + HOME_ROUTE} onClick={() => go("#/" + HOME_ROUTE)}>
+            Back to Overview
           </button>
         }
       />

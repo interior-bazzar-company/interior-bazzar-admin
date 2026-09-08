@@ -676,6 +676,44 @@ is one copy of it sent to one member with the body **copied in** at send.
 
 ---
 
+## Module 10 · Overview
+
+> **Nothing here is a stand-in.** The Overview (`#/overview`, the landing page) owns no
+> records and imports no seed. It reads the Deals list and the enquiry counts live, and the
+> Finance and Team stores exactly as their own screens do — so its backend work is those
+> modules' backend work, listed above. Consumer is `src/admin/views/Overview/store.ts`;
+> the arithmetic is `src/admin/views/Overview/derive.ts`; what each figure means is
+> `src/content/overview/metrics.json` (static copy, permanent).
+
+### Reads
+
+| Content file | Status | Endpoint it stands in for | Must return |
+| --- | --- | --- | --- |
+| `metrics.json` | static copy | **none** | The definition behind every ⓘ — `label, what, how, includes, period` per metric key. Not a payload; a vocabulary. If a server-side overview ever exists it must compute each metric exactly as `how` says, or the tile and the module it drills into will disagree. |
+
+### Writes
+
+None. Every action on the page is a link into a module, or the module's own create modal
+(`useActs().create()` from Deals, `NewItemModal` from Tasks).
+
+### Optional — a server-side overview
+
+Not required by anything on the screen. Worth building the day one of these bites:
+
+| Endpoint | Why | Must return |
+| --- | --- | --- |
+| `GET /admin/overview?period=30d\|7d\|3m\|6m\|12m\|custom&from&to&owner` | The deal half of the page is computed over `GET /admin/deals/?pageSize=500` — the same single read the Deals module makes, and the same cap: past 500 deals the page silently counts a subset. A scoped session already sees only its own deals, which is right; a server figure would be right at any size. | Per period, on ONE clock: `pipeline{open, openValuePaise, unquoted, stalled, stalledValuePaise}`, `won{n, valuePaise}`, `lost{n}`, `prev{won, lost}`, `conversionPct`, `flow[]` by day/week/month (`created, won, lost`), `byStage[]` (`key, n, valuePaise`), `byOwner[]` (`ownerId, name, open, valuePaise, won`), `atRisk[]` (`ref, reason: stalled\|next_overdue\|close_passed, days, valuePaise`), `closingSoon[]`, `expectedThisMonth{n, valuePaise}`. Won and Lost by the date the deal reached that stage; conversion = won ÷ (won + lost). |
+
+### Not an endpoint — but on this list
+
+| Item | Where | What has to happen |
+| --- | --- | --- |
+| `Module` row for `overview` | server | Create it with `view` only — the page has no write. Then remove the key from `PROTO_MODULES` in `src/admin/auth/session.ts` and the row from `PROTO_ROWS` in `src/admin/shell/modules.ts`. Until then every signed-in member can open the page; each SECTION is already gated on its own source module, so nothing leaks that the nav would not also show. The row's `groupLabel` should be empty (or a group named for the home) so it stays the first, unlabelled row. |
+| The owner join | server | The page joins a deal's owner to a Team member by `owner.id` (from the deals vocabulary) and, before the roster is adopted, by name. When `GET /admin/team/members` (Module 7) lands, the join is by id only — nothing to build, but the name fallback in `store.ts` comes out with the Team seed. |
+| Clocks | — | Finance and Team sections stamp their seed `asOf`; Deals and Enquiries stamp the real date. Each seed clock leaves with its module's stand-ins (Modules 6 and 7), and the stamps collapse to one the day the last one goes. |
+
+---
+
 ## Everything else in the panel
 
 No stand-ins. Deals, Plans, Audit, Quotations and Invoices all read `AdminOpsService`

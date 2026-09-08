@@ -33,6 +33,7 @@ export type ModuleGroup = {
 /** Icon names verified against ICONS in admin/ui/index.tsx. A key with no
  * entry here falls through to Icon's own "doc" default rather than guessing. */
 const ICON_OF: Record<string, string> = {
+  overview: "home",
   deals: "deal",
   plans: "tag",
   team: "team",
@@ -119,6 +120,16 @@ const LABEL_OVERRIDE: Record<string, string> = {
    `group` matches an existing server group label so the module lands in the
    sidebar where it belongs rather than in a section of one. */
 const PROTO_ROWS: { key: string; label: string; group: string }[] = [
+  /* Overview · THE LANDING PAGE, and a row with no group heading over it. It
+     is not filed under Sales or Team or Finance because it reads all of them:
+     a group of one would have named a section the row does not belong to,
+     and an empty group label renders as nothing, which is what a home row
+     wants — the first thing in the sidebar, above every section.
+
+     It has no server Module row and never needs one for data: it owns no
+     records. It still needs a row so a grant can hold it or withhold it, and
+     until that lands it carries the proto gate like the rest of this list. */
+  { key: "overview", label: "Overview", group: "" },
   /* business-enquiries removed: the server sends its own Module row now
      (backend migration 0024), so the stand-in would never have been reached —
      PROTO_MODULES no longer holds the key, which is the second half of the
@@ -235,6 +246,8 @@ const Q_OF: Record<string, string> = {
    A group not named here keeps its arrival order, after the named ones: a new
    server group appears rather than silently vanishing. */
 const GROUP_ORDER = [
+  /* The unlabelled group: the Overview row, above everything. */
+  "",
   "Sales",
   "Client Ops",
   "Business Ops",
@@ -314,8 +327,8 @@ export const moduleLabel = (k: string) => {
   return it ? it.label : k;
 };
 
-/** The default landing route. The prototype boots to #/deals. Kept static:
- * it is where "/" redirects to, not a permission — a member without `deals`
- * access still lands there and ViewHost shows the Denied state, same as any
- * other route it cannot see. */
-export const HOME_ROUTE = "deals";
+/** The default landing route. The prototype booted to #/deals; the panel now
+ * lands on the Overview, which every signed-in member can open (it is proto-
+ * gated) and which says, per section, what is and is not in their access.
+ * Kept static: it is where "/" redirects to, not a permission. */
+export const HOME_ROUTE = "overview";

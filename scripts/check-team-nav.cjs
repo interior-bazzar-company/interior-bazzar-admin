@@ -112,8 +112,11 @@ esbuild.build({
 
   /* Business Ops and Finance are here because `users` and `finance` are proto
      rows too — this is the whole sidebar, not just Team's slice of it. */
+  /* The unlabelled group is the Overview row — the landing page, above every
+     section, with no heading over it. See PROTO_ROWS in shell/modules.ts. */
   eq("group order", names,
-    ["Sales", "Client Ops", "Business Ops", "Team", "Resources", "Finance", "Catalogue", "Settings"]);
+    ["", "Sales", "Client Ops", "Business Ops", "Team", "Resources", "Finance", "Catalogue", "Settings"]);
+  eq("the unlabelled group holds the Overview row and nothing else", of(""), ["overview"]);
   ok("Team sits above Catalogue and Settings", names.indexOf("Team") < names.indexOf("Settings"));
   /* Resources was a group of one and is now two: Resources and Agreements. Both
      are a document the company sends a member and gets something back on — a

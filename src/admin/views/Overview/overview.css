@@ -1,0 +1,217 @@
+/* =============================================================================
+   Overview — the module sheet. `.ov-*` only; every shared part (tile, card,
+   chart frame, pill, table, button, eyebrow) is drawn by admin-theme.css and
+   nothing here re-declares one. Colour comes from tokens, never a literal.
+   The chart palette is scoped in charts.css, where `.ov` sits beside `.fin`.
+   ============================================================================= */
+
+/* ---- sections: the reading order ---------------------------------------- */
+.ov-sec{ scroll-margin-top:calc(var(--top-h) + var(--space-4)) }
+.ov-sec > .sh h2{ display:inline-flex; align-items:center; gap:var(--space-2) }
+.ov-sec .sh .r{ gap:var(--space-3) }
+
+/* ---- the filter row ------------------------------------------------------ */
+.ov-filters{ display:flex; align-items:center; gap:var(--space-2); flex-wrap:wrap;
+             padding:var(--space-2) 0 var(--space-3); border-bottom:1px solid var(--line);
+             margin-bottom:var(--space-2) }
+.ov-clock{ display:inline-flex; align-items:center; gap:5px; font-size:var(--text-sm); color:var(--text-3) }
+
+/* ---- the attention jump in the page header ------------------------------- */
+.ov-jump{ display:inline-flex; align-items:center; gap:5px; margin-left:var(--space-3);
+          padding:0 var(--space-2); height:var(--control-xs); border:1px solid var(--warn-line);
+          border-radius:var(--radius-full); background:var(--warn-bg); color:var(--warn);
+          font:inherit; font-size:var(--text-sm); font-weight:var(--weight-medium); cursor:pointer }
+.ov-jump.bad{ border-color:var(--bad-line); background:var(--bad-bg); color:var(--bad) }
+.ov-jump:hover{ border-color:currentColor }
+.ov-jump:focus-visible{ outline:none; box-shadow:var(--ring) }
+
+/* ---- clock stamps -------------------------------------------------------- */
+.ov-stamp{ display:inline-flex; align-items:center; gap:5px; font-family:var(--font-mono);
+           font-size:var(--text-2xs); letter-spacing:.06em; text-transform:uppercase; color:var(--text-3);
+           white-space:nowrap }
+.ov-stamp i{ width:6px; height:6px; border-radius:var(--radius-full); background:var(--text-4) }
+.ov-stamp.live i{ background:var(--accent) }
+.ov-stamp.seed i{ background:var(--system-solid) }
+
+/* ---- tiles: the shared .tile does the drawing; this is only layout -------- */
+.ov-tiles{ margin-bottom:var(--space-3) }
+/* THE OVERLAY LINK. First sibling, under the tile, full size — see Kpi in
+   bits.tsx. The ⓘ and any button in the foot are lifted above it so they stay
+   their own targets; the tile's ticks are pointer-events:none already. */
+.ov-kpi{ position:relative; min-width:0 }
+.ov-kpi-link{ position:absolute; inset:0; z-index:1; padding:0; border:0; background:none;
+              border-radius:var(--radius-lg); cursor:pointer }
+.ov-kpi-link:focus-visible{ outline:none }
+.ov-kpi-link:hover ~ .tile{ border-color:var(--line-3); background:var(--bg-shell) }
+.ov-kpi-link:focus-visible ~ .tile{ box-shadow:var(--ring); border-color:var(--brand) }
+.ov-kpi .i-wrap,.ov-kpi .foot .btn{ position:relative; z-index:2 }
+.ov-kpi .tile{ height:100% }
+.ov-tbl tr.clickable:focus-visible{ outline:none; box-shadow:inset 0 0 0 2px var(--brand) }
+.ov-risk tr.clickable:focus-visible{ outline:none; box-shadow:inset 0 0 0 2px var(--brand) }
+.ov-tiles .tile .v .u{ font-size:var(--text-md) }
+.ov-tiles .tile .foot .ch-spark{ margin-left:auto }
+.ov-sk{ width:64%; height:22px; margin-top:var(--space-2) }
+.ov-arrow{ font-variant-numeric:tabular-nums }
+
+/* ---- health strip -------------------------------------------------------- */
+.ov-health{ display:grid; grid-template-columns:auto repeat(4,minmax(0,1fr)); align-items:stretch;
+            gap:var(--space-2); margin-top:var(--space-2) }
+.ov-health-k{ display:inline-flex; align-items:center; gap:var(--space-2); padding:0 var(--space-3);
+              font-size:var(--text-2xs); font-weight:var(--weight-semibold); letter-spacing:var(--tracking-label);
+              text-transform:uppercase; color:var(--text-3) }
+.ov-health-c{ display:grid; grid-template-columns:auto auto 1fr; align-items:center; column-gap:var(--space-2);
+              min-width:0; padding:var(--space-2) var(--space-3); border:1px solid var(--line);
+              border-radius:var(--radius-lg); background:var(--surface-raised); text-align:left;
+              font:inherit; color:var(--text-2); cursor:pointer;
+              transition:border-color var(--duration) var(--ease) }
+.ov-health-c b{ font-size:var(--text-md); color:var(--text) }
+.ov-health-c span{ font-size:var(--text-sm); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.ov-health-c:hover{ border-color:var(--line-3) }
+.ov-health-c:focus-visible{ outline:none; box-shadow:var(--ring); border-color:var(--brand) }
+
+.ov-dot{ display:inline-block; width:8px; height:8px; flex:0 0 8px; border-radius:var(--radius-full);
+         background:var(--text-4) }
+.ov-dot.ok{ background:var(--ok-solid) }
+.ov-dot.warn{ background:var(--warn-solid) }
+.ov-dot.bad{ background:var(--bad-solid) }
+.ov-dot.info{ background:var(--info) }
+
+/* ---- grids --------------------------------------------------------------- */
+.ov-2col{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-3); margin-bottom:var(--space-3) }
+.ov-3col{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:var(--space-3) }
+.ov-plot-sk{ height:200px; border-radius:var(--radius-sm); background:var(--sk) }
+.ov-plot-sk.tall{ height:280px }
+
+/* ---- states ---------------------------------------------------------------- */
+.ov-gone{ display:flex; align-items:center; gap:var(--space-2); padding:var(--space-3) var(--space-4);
+          border:1px dashed var(--line-2); border-radius:var(--radius-lg); background:var(--bg-inset);
+          color:var(--text-2); font-size:var(--text-md) }
+.ov-gone .ic{ color:var(--text-3) }
+.ov-empty{ display:flex; flex-direction:column; gap:3px; padding:var(--space-4);
+           border:1px dashed var(--line-2); border-radius:var(--radius-lg); background:var(--bg-inset);
+           font-size:var(--text-md); color:var(--text-2) }
+.ov-empty b{ color:var(--text) }
+.ov-empty span{ font-size:var(--text-sm); color:var(--text-3) }
+.ov-empty.ok{ border-style:solid; border-color:var(--ok-line); background:var(--ok-bg) }
+.ov-empty.ok b{ color:var(--ok) }
+
+/* ---- the ⓘ body ------------------------------------------------------------ */
+.ov-tip-row{ display:block; margin-top:var(--space-2); padding-top:var(--space-2); border-top:1px solid var(--line) }
+.ov-tip-row em{ display:block; font-style:normal; font-family:var(--font-mono); font-size:var(--text-2xs);
+                letter-spacing:.06em; text-transform:uppercase; color:var(--text-3); margin-bottom:1px }
+.ov-th{ display:inline-flex; align-items:center; gap:4px }
+
+/* ---- tables --------------------------------------------------------------- */
+.ov-tbl td{ vertical-align:middle }
+.ov-deal{ display:flex; flex-direction:column; min-width:0; line-height:1.3 }
+.ov-deal b{ font-weight:var(--weight-medium); color:var(--text) }
+.ov-deal span{ font-size:var(--text-sm); color:var(--text-3) }
+.ov-owner{ display:inline-flex; align-items:center; gap:var(--space-2); min-width:0; max-width:100% }
+.ov-signal{ font-size:var(--text-sm); white-space:nowrap }
+.ov-signal .bad{ color:var(--bad) } .ov-signal .warn{ color:var(--warn) }
+.ov-lens .card-h h3{ display:inline-flex; align-items:center; gap:var(--space-2) }
+.ov-lens .btn-group .ct{ margin-left:4px }
+.ov-team td.n .ok{ color:var(--ok) } .ov-team td.n .bad{ color:var(--bad) } .ov-team td.n .warn{ color:var(--warn) }
+.ov-load{ min-width:120px }
+.ov-load .meter{ display:inline-block; width:calc(100% - 34px); vertical-align:middle; margin-right:var(--space-2) }
+.ov-legend{ padding:var(--space-2) var(--space-3); font-size:var(--text-sm); color:var(--text-3);
+            border-top:1px solid var(--line) }
+
+/* ---- finance risk table ---------------------------------------------------- */
+.ov-risk td{ padding-top:var(--space-2); padding-bottom:var(--space-2) }
+.ov-rail{ display:inline-block; width:3px; height:14px; margin-right:var(--space-2); vertical-align:middle;
+          border-radius:var(--radius-xs); background:var(--text-4) }
+.ov-rail.bad{ background:var(--bad-solid) } .ov-rail.warn{ background:var(--warn-solid) }
+.ov-risk .bad{ color:var(--bad) } .ov-risk .warn{ color:var(--warn) }
+.ov-nowrap{ white-space:nowrap }
+.ov-chev{ width:24px; color:var(--text-3) }
+.ov-payroll{ display:flex; align-items:center; gap:var(--space-3); flex-wrap:wrap; margin-top:var(--space-3);
+             padding-top:var(--space-3); border-top:1px solid var(--line); font-size:var(--text-md); color:var(--text-2) }
+.ov-payroll .eyebrow{ display:inline-flex }
+.ov-payroll .ok{ color:var(--ok) }
+.ov-payroll.mute{ color:var(--text-3) }
+.ov-payroll .ov-go{ margin-left:auto }
+
+/* ---- operations lists ------------------------------------------------------- */
+.ov-list{ display:flex; flex-direction:column; gap:2px; padding:var(--space-3) var(--space-4);
+          border:1px solid var(--line); border-radius:var(--radius-xl); background:var(--surface-raised) }
+.ov-list .eyebrow{ margin-bottom:var(--space-2) }
+.ov-line{ display:flex; align-items:center; justify-content:space-between; gap:var(--space-3);
+          width:100%; padding:5px var(--space-2); margin:0 calc(-1 * var(--space-2)); border:0;
+          border-radius:var(--radius-sm); background:none; font:inherit; font-size:var(--text-md);
+          color:var(--text); text-align:left; cursor:pointer }
+.ov-line b{ font-weight:var(--weight-semibold) }
+.ov-line.zero{ color:var(--text-3) }
+.ov-line.zero b{ color:var(--text-4); font-weight:var(--weight-medium) }
+.ov-line .ok{ color:var(--ok) } .ov-line .warn{ color:var(--warn) } .ov-line .bad{ color:var(--bad) }
+.ov-line:hover{ background:var(--bg-hover) }
+.ov-line:focus-visible{ outline:none; box-shadow:var(--ring) }
+
+/* ---- needs attention --------------------------------------------------------- */
+.ov-attn{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column;
+          border:1px solid var(--line); border-radius:var(--radius-xl); background:var(--surface-raised); overflow:hidden }
+.ov-attn-i{ display:grid; grid-template-columns:auto 1fr auto auto; align-items:center; gap:var(--space-3);
+            padding:var(--space-2) var(--space-4); border-top:1px solid var(--line); min-height:var(--row-h) }
+.ov-attn-i:first-child{ border-top:0 }
+.ov-attn-i.bad{ box-shadow:inset 3px 0 0 var(--bad-solid) }
+.ov-attn-i.warn{ box-shadow:inset 3px 0 0 var(--warn-solid) }
+.ov-attn-t{ display:flex; flex-direction:column; min-width:0; line-height:1.3 }
+.ov-attn-t b{ font-weight:var(--weight-medium); color:var(--text) }
+.ov-attn-t span{ font-size:var(--text-sm); color:var(--text-3) }
+.ov-attn-m{ font-size:var(--text-sm); color:var(--text-2); white-space:nowrap }
+.ov-more{ margin-top:var(--space-2) }
+
+/* ---- planning signals --------------------------------------------------------- */
+.ov-signals{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:var(--space-3) }
+.ov-sig{ display:flex; flex-direction:column; gap:var(--space-1); padding:var(--space-3) var(--space-4);
+         border:1px solid var(--line); border-radius:var(--radius-xl); background:var(--surface-raised) }
+.ov-sig-v{ display:flex; align-items:center; gap:var(--space-3); font-family:var(--font-display);
+           font-variation-settings:var(--display-wdth); font-weight:var(--weight-bold);
+           font-size:var(--text-2xl); line-height:1.15; letter-spacing:var(--tracking-tight); color:var(--text) }
+.ov-sig.ok .ov-sig-v{ color:var(--ok) }
+.ov-sig.warn .ov-sig-v{ color:var(--warn) }
+.ov-sig.mute .ov-sig-v{ color:var(--text-3); font-weight:var(--weight-medium) }
+.ov-sig p{ margin:0; font-size:var(--text-sm); color:var(--text-2); line-height:1.5 }
+.ov-sig .ov-go{ margin-top:auto; align-self:flex-start }
+
+/* ---- a row that goes somewhere ----------------------------------------------- */
+.ov-go{ display:inline-flex; align-items:center; gap:3px; padding:0; border:0; background:none;
+        font:inherit; font-size:var(--text-sm); font-weight:var(--weight-medium); color:var(--brand-text); cursor:pointer }
+.ov-go:hover{ text-decoration:underline; text-underline-offset:2px }
+.ov-go:focus-visible{ outline:none; box-shadow:var(--ring); border-radius:var(--radius-xs) }
+.ov-go.warn{ color:var(--warn) }
+
+/* ---- responsive: 1180 / 900 / 640, the panel's own four --------------------- */
+@media (max-width:1180px){
+  .ov-health{ grid-template-columns:repeat(2,minmax(0,1fr)) }
+  .ov-health-k{ grid-column:1 / -1; padding:0 }
+  .ov-signals{ grid-template-columns:repeat(2,minmax(0,1fr)) }
+}
+@media (max-width:900px){
+  .ov-2col,.ov-3col{ grid-template-columns:1fr }
+  .ov-filters .spacer{ display:none }
+  .ov-clock{ width:100% }
+  .ov-team th:nth-child(5),.ov-team td:nth-child(5){ display:none }
+}
+@media (max-width:640px){
+  /* A section head is one row on a desk and two on a phone: the title and
+     its note, then the clock stamps and the link under them. Without this the
+     stamps were squeezed beside the title into a column of single words. */
+  .ov-sec > .sh{ flex-wrap:wrap; row-gap:var(--space-1) }
+  .ov-sec > .sh .r{ margin-left:0; flex-basis:100%; flex-wrap:wrap; gap:var(--space-2) var(--space-3) }
+  .ov-health{ grid-template-columns:1fr }
+  .ov-signals{ grid-template-columns:1fr }
+  .ov-attn-i{ grid-template-columns:auto 1fr; row-gap:var(--space-1) }
+  .ov-attn-m{ grid-column:2 }
+  .ov-attn-i .btn{ grid-column:2; justify-self:start }
+  /* The deal table keeps Deal · Value · Signal; the stage is a colour of the
+     signal anyway and the owner has a row of their own in Team. */
+  .ov-tbl th:nth-child(2),.ov-tbl td:nth-child(2),
+  .ov-tbl th:nth-child(4),.ov-tbl td:nth-child(4){ display:none }
+  .ov-signal{ white-space:normal }
+  /* The team table keeps Member · Deals · Tasks · Load. */
+  .ov-team th:nth-child(3),.ov-team td:nth-child(3){ display:none }
+  .ov-load{ min-width:88px }
+  .ov-jump{ margin-left:0; margin-top:var(--space-2) }
+  .ov-filters .btn-group{ flex-wrap:wrap; height:auto }
+}

@@ -37,6 +37,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 /* Every route the registry knows, in sidebar order. `groupLabel` is what the
    sidebar prints; `actions` is what `can()` reads. */
 const ROUTES = [
+  ["overview", "Overview", ""],
   ["deals", "Deals", "Sales"],
   ["quotations", "Quotations", "Sales"],
   ["invoices", "Invoices", "Sales"],

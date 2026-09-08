@@ -2429,7 +2429,10 @@ export function adoptRoster(people: LivePerson[]): void {
 
 /* ============================================================== hooks === */
 
-const useVersion = () => useSyncExternalStore(subscribe, getVersion, getVersion);
+/** Exported for the Overview, which reads this store through the plain
+ *  readers and needs only the subscription — the same arrangement Finance
+ *  makes with its own `useVersion`. */
+export const useVersion = () => useSyncExternalStore(subscribe, getVersion, getVersion);
 
 export function useMembers(): Member[] { useVersion(); return snap.members; }
 export function useMe(): Member | null { useVersion(); return readMember(meId()); }

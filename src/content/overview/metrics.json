@@ -1,0 +1,166 @@
+{
+  "$comment": "STATIC COPY, not placeholder records — there is no GET /admin/overview/vocabularies to build. These are the definitions behind every ⓘ on #/overview: what a figure means, how it is computed, what it includes and which clock it runs on. The Overview stores NOTHING of its own: every number is derived in src/admin/views/Overview/store.ts from the Deals API, the Finance store, the Team store and the Enquiries API. When a server-side GET /admin/overview lands (see BACKEND-INTEGRATION.md § Module 10) it must compute each metric exactly as `how` says, or the tile and the module it drills into will disagree.",
+  "metrics": {
+    "collected": {
+      "label": "Collected",
+      "what": "Money that actually arrived in the period — subscription installments plus other income.",
+      "how": "Σ installment payments by value date + Σ incoming company transactions, inside the period. Refunds paid out are not subtracted here; they show under Out.",
+      "includes": "Finance → Subscriptions and Other Transaction. Never deal values.",
+      "period": "The selected period, on the Finance clock. Compared with the same number of days immediately before it."
+    },
+    "pipeline": {
+      "label": "Pipeline value",
+      "what": "The total value of every deal that is still open.",
+      "how": "Σ deal value over deals whose stage is before Won. A deal with no value yet is counted in the number of deals but adds nothing to the value.",
+      "includes": "Every deal the signed-in session can see. A scoped session sees its own pipeline, not the company's.",
+      "period": "Right now — not a period figure. Live from the Deals API."
+    },
+    "won": {
+      "label": "Won",
+      "what": "Deals that reached Won in the period, and what they were worth.",
+      "how": "Count and Σ value of deals whose current stage is Won and whose stage-since date falls in the period.",
+      "includes": "Only deals still at Won today. A won deal later moved back is not counted.",
+      "period": "The selected period, on the live clock. Compared with the period before it."
+    },
+    "conversion": {
+      "label": "Conversion",
+      "what": "Of the deals that closed in the period, the share that closed as Won.",
+      "how": "Won ÷ (Won + Lost) × 100, both counted by the date they reached that stage. Shows — when nothing closed.",
+      "includes": "Closed deals only. Open deals do not lower the rate.",
+      "period": "The selected period, on the live clock. Compared with the period before it."
+    },
+    "outstanding": {
+      "label": "Receivable",
+      "what": "Subscription money that has been agreed and has not arrived.",
+      "how": "Σ installments still due + Σ installments that failed to pay, across every subscription.",
+      "includes": "Finance → Subscriptions. Deal values with no subscription behind them are not receivable yet.",
+      "period": "All time, as of the Finance clock."
+    },
+    "team": {
+      "label": "Team",
+      "what": "Active members, and how many have opened their day so far.",
+      "how": "Members with status active. Present = a member with an attendance row today, whatever state it is in now.",
+      "includes": "The Team roster. Founder included.",
+      "period": "Today, on the Team clock."
+    },
+    "overdue": {
+      "label": "Overdue tasks",
+      "what": "Open work items past their due date.",
+      "how": "Items that are not completed or cancelled and whose due date is before today. Derived, never stored — the same rule the Tasks board uses.",
+      "includes": "Tasks, milestones and targets, across the whole team.",
+      "period": "Right now, on the Team clock."
+    },
+    "enquiries": {
+      "label": "Enquiries",
+      "what": "New business enquiries received in the last seven days.",
+      "how": "Counted by the server over everything received in the last 7 days, regardless of any filter set in the Enquiries queue.",
+      "includes": "Every source — website, calls, walk-ins. Live.",
+      "period": "The last 7 days, always. This tile ignores the period picker because the API counts fixed windows."
+    },
+    "health": {
+      "label": "Health",
+      "what": "Four yes-or-no reads on the parts of the business that fail quietly.",
+      "how": "Pipeline: share of open deals flagged stalled (under 15% ok, under 35% watch). Collections: any failed installment is a problem, any overdue installment is a watch. Team: on-time arrivals over the period (85% ok, 65% watch). Delivery: share of open tasks that are overdue (under 10% ok, under 30% watch).",
+      "includes": "One read per area. It is not a score and is not averaged.",
+      "period": "Mixed — each read names its own window behind its dot."
+    },
+    "dealflow": {
+      "label": "Deal flow",
+      "what": "How many deals were created, won and lost in each slice of the period.",
+      "how": "Created by created date. Won and Lost by the date the deal reached that stage. Grouped by day, week or month depending on how long the period is.",
+      "includes": "Every deal the session can see. Lost is counted so a quiet chart is not mistaken for a good one.",
+      "period": "The selected period, on the live clock."
+    },
+    "moneyflow": {
+      "label": "Money in and out",
+      "what": "What arrived and what left in each slice of the period.",
+      "how": "In = installments collected + other income. Out = salaries paid + other outgoing + refunds paid. Each slice uses the same arithmetic as Finance → Analytics for that date range.",
+      "includes": "Finance records only. Tax-excluded transactions are counted apart, as they are in Finance.",
+      "period": "The selected period, on the Finance clock."
+    },
+    "funnel": {
+      "label": "Pipeline by stage",
+      "what": "Where the open deals sit right now, and what each stage is worth.",
+      "how": "Count and Σ value of deals currently at each stage. Won is every deal at Won today, not only this period's.",
+      "includes": "Lost is left off the funnel — it is the exit, not a stage.",
+      "period": "Right now. Live."
+    },
+    "byowner": {
+      "label": "By owner",
+      "what": "Who is carrying the open pipeline.",
+      "how": "Open deals grouped by owner: count, Σ value, and how many they won in the period.",
+      "includes": "Owner only — a co-owner is not credited here.",
+      "period": "Open now; won in the selected period."
+    },
+    "lens": {
+      "label": "Deals that need a look",
+      "what": "Four ways to rank the open pipeline.",
+      "how": "At risk: stalled, next action overdue, or expected close in the past — biggest first. Closing soon: expected close within 14 days. Highest value: by value. Longest in stage: by days since the stage changed.",
+      "includes": "Open deals only.",
+      "period": "Right now. Live."
+    },
+    "teamtable": {
+      "label": "Team performance",
+      "what": "One row per member: their deals, what their deals have collected, their tasks and their attendance.",
+      "how": "Deals: open deals owned. Collected: Σ revenue collected on deals they own, all time — the Deals API carries no payment dates. Tasks: completed in the period ÷ open now ÷ overdue now. On time: arrivals not marked late over working days in the period.",
+      "includes": "Active members. Attendance and tasks come from the Team store; deals and money from the Deals API, joined on the owner.",
+      "period": "Tasks completed and attendance use the selected period; deals and load are as of now."
+    },
+    "load": {
+      "label": "Load",
+      "what": "How much open work a member is carrying, against the busiest person on the team.",
+      "how": "Open items ÷ the highest open count on the team. Red when three or more of theirs are overdue.",
+      "includes": "Tasks, milestones and targets assigned to them.",
+      "period": "Right now."
+    },
+    "net": {
+      "label": "Net",
+      "what": "Cash movement for the period: what came in minus what went out.",
+      "how": "Collected + other income − salaries paid − other outgoing − refunds paid. Cash, not profit.",
+      "includes": "The same records Finance → Analytics reads.",
+      "period": "The selected period, on the Finance clock. Compared with the period before it."
+    },
+    "duesoon": {
+      "label": "Due in 30 days",
+      "what": "Installments that fall due in the next thirty days.",
+      "how": "Σ amount of installments with status due and a due date between today and today + 30.",
+      "includes": "Active and defaulting subscriptions.",
+      "period": "Forward-looking from the Finance clock."
+    },
+    "payroll": {
+      "label": "Payroll owed",
+      "what": "Salary that has been run and not paid.",
+      "how": "Σ net of slips in runs that are still open, plus any slip held back.",
+      "includes": "Only shown to a session holding Salaries A/C access.",
+      "period": "As of the Finance clock."
+    },
+    "ops": {
+      "label": "Operations",
+      "what": "Where execution is blocked on a person.",
+      "how": "Each line is a count from the Team store: overdue and due-this-week tasks, today's attendance states, plans and end-of-day reports still owed, reports not yet read, leave waiting on a decision, agreements sent and not opened, onboarding documents missing.",
+      "includes": "The founder is excluded from plan and report counts, as in Reports.",
+      "period": "Today on the Team clock; tasks completed use the selected period."
+    },
+    "attention": {
+      "label": "Needs attention",
+      "what": "Everything on this page that is a problem, in one ranked list.",
+      "how": "Rules, not opinions: a stalled deal, an overdue next action, a passed close date, a failed installment, a refund owed, an unexplained bank line, an overdue urgent task, a member with three or more late items, a missing plan or report, an unclosed day, leave waiting, an agreement about to expire, collections or conversion falling by a fifth against the previous period. Ranked by severity, then by money at stake.",
+      "includes": "Only areas in the session's access.",
+      "period": "Mixed — each item says which clock it is on."
+    },
+    "signals": {
+      "label": "Planning signals",
+      "what": "What the next few weeks look like from today's records.",
+      "how": "Expected to close: open deals whose expected close date is this calendar month. Trajectory: the last three months of net cash. Obligations: installments due in 30 days and payroll open. Workload: open items due in the next 7 days, by member. Capacity: approved leave starting in the next 14 days.",
+      "includes": "Forecasts from dated records only. Nothing here is a projection.",
+      "period": "Forward from each source's clock."
+    },
+    "clock": {
+      "label": "Clocks",
+      "what": "Why sections on this page carry different dates.",
+      "how": "Deals and Enquiries are live and run on the real clock. Finance and Team are frontend-first seeds and run on their own fixed clocks, so the same period lands on different calendar dates in each. A custom range is absolute and applies to every source as written.",
+      "includes": "Each section stamps its own clock beside its title.",
+      "period": "—"
+    }
+  }
+}

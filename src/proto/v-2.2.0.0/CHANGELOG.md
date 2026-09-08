@@ -6,6 +6,88 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-08
 
+### The Overview — a command centre, and the new landing page
+
+**Area:** `#/overview`, sidebar → the unlabelled first row; `/` now redirects here
+**Files:** `src/admin/views/Overview/{index,top,deals,team,money,decide,bits}.tsx`,
+`src/admin/views/Overview/{derive,store}.ts`, `src/admin/views/Overview/overview.css`,
+`src/content/overview/metrics.json`, `src/admin/views/registry.tsx`, `src/admin/shell/modules.ts`,
+`src/admin/auth/session.ts`, `src/admin/shell/AdminShell.tsx`, `src/admin/views/charts.{tsx,css}`,
+`src/admin/views/Team/store.ts`, `scripts/check-overview.cjs`, `scripts/check-overview-nav.cjs`,
+`scripts/shoot-overview.cjs`, `scripts/check-team-nav.cjs`, `scripts/shoot-modules.cjs`, `package.json`
+
+**What changed**
+
+- **The panel lands on an Overview** instead of the deal list. One page, eight sections in the
+  order an admin reads: what happened (executive snapshot, performance), what is happening
+  (deals, team, finance, operations), what needs me (needs attention), what next (planning
+  signals). Every tile, chart row and list item drills into the module that owns the record.
+- **It owns no records and adds no endpoint.** Every figure is derived in `derive.ts` from the
+  modules' own stores and hooks — the Deals list (`useDealsApi`, live), the Finance and Team
+  snapshots (seed, synchronous), and the two enquiry counts the topbar already makes — by
+  calling THEIR derivations (`overview()`, `subTotals()`, `atRisk()`, `workTotals()`,
+  `isDelayed()`, `attentionOf()` …) so a number here cannot disagree with the screen it opens.
+  The only new arithmetic is a period window, the comparison with the window before it, the
+  deal-owner → member join, and the ranked attention list.
+- **Four clocks, stated.** Deals and Enquiries are live and run on the real clock; Finance and
+  Team are seeds with their own `asOf`. Every section stamps the clock it ran on (`live · 8 Sep
+  2026` / `seed · as of 25 Aug 2026`) rather than pretending one, and the ⓘ next to the filter
+  row explains why the same "30 days" lands on different dates.
+- **Needs Attention is rules, not opinions:** stalled deals and late next actions ranked by
+  money, failed and past-due installments, refunds approved and unpaid, unexplained bank lines,
+  urgent and high-priority overdue tasks, a member with three or more late items, plans and
+  end-of-day reports owed, unclosed days, leave waiting, agreements about to expire, and
+  collections or conversion falling by a fifth. Severity first, money second; one action each.
+- **Every complex figure carries the shared ⓘ** (`InfoDot`), with its definition in
+  `content/overview/metrics.json`: what it means, how it is computed, what it includes, which
+  clock. Static copy, written once.
+- **Filters live in the URL** — `?period=7d|30d|3m|6m|12m` or `?period=custom&from=&to=`,
+  `?owner=<id>` (deal reads, full-access sessions only), `?dept=` (team reads). A period is
+  charted by day, week or month depending on its length.
+- **Gated per source, not per page.** `overview` itself is proto-gated so every signed-in member
+  can open it; each section renders only when its source module is in the session's access and
+  says so otherwise. Payroll figures never reach the page without `finance-salaries`.
+- **Three shared parts were touched on the way:** `FunnelChart` no longer prints
+  `Infinity% of previous` when a stage before it is empty; `charts.css` scopes the chart palette
+  to `.ov` beside `.um`/`.fin` and gains two ordinal steps (`o4`, `o5`); the Team store exports
+  its `useVersion`, as Finance already did, so a reader outside the module can subscribe.
+- **Nothing is fetched twice.** Finance and Team are read through the counters they already
+  keep; the deal list is the same single read the Deals module makes. Quick actions open the
+  real create modals (`useActs().create()`, `NewItemModal`), not copies.
+
+**Temp data** — `src/content/overview/metrics.json` → `metrics{}`: **static copy**, permanent —
+the definitions behind the ⓘ. No placeholder records: the page reads the other modules' seeds
+through their own stores and imports no JSON of its own.
+
+**Backend needed**
+
+- `none` for the page to work — it reads `GET /admin/deals/` (live), the enquiry counts (live),
+  and the Finance and Team stores (their stand-ins are listed under Modules 6 and 7).
+- A `Module` row for `overview` so a role can withhold the page; then the key comes out of
+  `PROTO_MODULES` and the row out of `PROTO_ROWS`.
+- Optional, later: `GET /admin/overview?period=` computing the same metrics server-side, so the
+  deal figures stop depending on a 500-row client read. Specified in BACKEND-INTEGRATION.md
+  § Module 10; not required by anything on the screen today.
+
+**Open decisions** — OV-OD-01: the Team table's "Collected" is all-time, because the Deals API
+carries no payment dates — said on the table's own footer and in its ⓘ. OV-OD-02: "big" for
+ranking a deal in Needs Attention is the top quarter of the open pipeline by value; a threshold
+in rupees would go stale. OV-OD-03: the health strip is four reads, not a score — a composite
+would be an invented number.
+
+**Verified** — `tsc -b`, `eslint` on every touched file (clean), `vite build --mode dev`,
+`check:overview` (the derivations against a ten-deal fixture and the real Finance and Team
+stores on their pinned clocks), `check:overview-nav`, `check:team-nav` (updated for the
+unlabelled first group), `check:finance-nav`, `check:team`, `check:tokens`, `check:dupes`,
+`check:contrast`, and the render smokes. `scripts/shoot-overview.cjs` boots the real shell
+against a fourteen-deal fixture and photographs the page at 1440 in both themes, at 1024 and at
+390 — every shot rendered with no page error and no `NaN`/`undefined` in the DOM; the nested
+`<button>` React warned about on the first pass is gone (the KPI link is an overlay now).
+NOT checked: a live backend — the deal figures were only ever read from the fixture, and the
+owner filter's server parameter was not exercised against a real `GET /admin/deals/?owner=`.
+
+---
+
 ### The chat thread gets a warm ground
 
 **Area:** Deals → Chat, the message thread

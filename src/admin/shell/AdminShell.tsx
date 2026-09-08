@@ -224,6 +224,7 @@ export default function AdminShell() {
 
       if (chord === "g") {
         const map: Record<string, string> = {
+          o: "overview",
           d: "deals",
           s: "plans",
           t: "team",
