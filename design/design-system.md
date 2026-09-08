@@ -249,6 +249,31 @@ lightness** — muted enough to live on a black-and-white interface, distinct en
 apart at chip size. All eleven names survive, so every stored tag keeps the colour its
 owner chose.
 
+**The numbers, because "same chroma" only means something if it is a number.** Every step
+of both chip families is solved in OKLCh at a fixed lightness and chroma, with hue the only
+thing that varies:
+
+| | fill | edge | ink |
+|---|---|---|---|
+| **Status** — a state the system assigned | L 0.948 / C 0.042 | L 0.826 / C 0.088 | L 0.470 / C 0.118 |
+| **Tag** — a label a person typed | L 0.962 / C 0.026 | L 0.864 / C 0.050 | L 0.502 / C 0.100 |
+
+Chroma backs off only where a hue runs out of sRGB, and `slate` keeps a fifth of it on
+purpose — it is the "no particular colour" tag and has to stay legibly grey.
+
+**The rung between the two rows is the load-bearing part.** A status has to win when it
+shares a row with a tag, because one is a fact the product decided and the other is a word
+somebody typed into a text box. That ordering inverted once already: a pass that rescued the
+tags from invisibility stepped them clean past the statuses, and every contrast pair still
+passed, because a contrast floor says a chip is READABLE and cannot say which chip is READ
+FIRST. `check:contrast` asserts the ordering directly now — the quietest status against the
+loudest tag, in both themes, measured as distance from the page so that it reads correctly in
+each direction: a status is **darker** than a tag in light and **lighter** than one in dark.
+
+Four hues sit a few degrees off where they started, only where a tag landed on top of the
+status of the same name — `tag-green` was 5° from success-green, `tag-red` 9° from
+danger-rust, which is inside the range where two chips look like a bug rather than a choice.
+
 Avatars draw from this set too, for exactly the same reason: an avatar **identifies**, it
 never judges. Their four tints used to be info-blue, neutral, warning-amber and
 success-green, chosen by the character sum of a person's name — so whether somebody's
@@ -521,7 +546,15 @@ This is the map, and `check:dupes` is what keeps a module from adding a second r
 | Tabs | `Tabs` — icon, link (`to`), count, quiet count | `.tabs` |
 | Status chip (a state) | `Pill`; `LeadStatus` / `DealStatus` / `Priority` for the CRM's own | `.pill` — **rounded** |
 | Tag chip (a label) | `Tag` / `Tags`, or `Pill` with `is-tag` | `.pill.is-tag`, `.pill[class*="tag-"]` — **square** |
+| Filter chip (a choice the operator made) | rendered by the filter band | `.chip`, `.chip.on` — **rounded**, forest edge |
 | Count badge | `<span className="ct">` | `.ct` |
+
+Those three are the whole chip vocabulary, and they are ranked. A **status** is the loudest
+because the product decided it; a **tag** is quieter because a person typed it; a **filter
+chip** is the only one that may wear the brand, because it marks a choice the operator made
+rather than anything about the data. A selected filter carries that on its **edge** rather
+than its fill — a filled one would put a green block across the top of every list the moment
+somebody switched on more than a couple, which is exactly what the brand is not allowed to do.
 
 ### The `i` affordance
 

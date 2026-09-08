@@ -201,7 +201,7 @@ export function TagChip({ k, big }: { k: string; big?: boolean }) {
   return (
     <span className={"fin-cat k-" + (t?.kind || "none") + (big ? " big" : "") + (t && !t.active ? " off" : "")}
       title={kind ? kind.label + " — lands in " + kind.landsIn : undefined}>
-      <i />{t?.label || k}{t && !t.active ? <em> · inactive</em> : null}
+      {t?.label || k}{t && !t.active ? <em> · inactive</em> : null}
     </span>
   );
 }

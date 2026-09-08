@@ -195,8 +195,61 @@ PAIRS.push(
      on the card, before anything is picked — so the full-strength channel has
      to hold up against the surface it sits on, not only against its own tint. */
   ["--ch-wa", "--color-surface", EDGE, "a WhatsApp chip's edge and dot"],
-  ["--ch-em", "--color-surface", EDGE, "an email chip's edge and dot"]
+  ["--ch-em", "--color-surface", EDGE, "an email chip's edge and dot"],
+
+  /* A SELECTED FILTER CHIP CARRIES ITS WHOLE STATE ON ITS EDGE, so that edge is
+     an operable boundary in the 1.4.11 sense rather than decoration: if it
+     drops below 3:1 the only thing separating an active filter from an
+     inactive one is a 1.1 tint, which is what it used to be. */
+  ["--brand", "--color-bg", EDGE, "a selected filter chip's edge"],
+  ["--brand-text", "--brand-tint", TEXT, "a selected filter chip's label"]
 );
+
+/* --------------------------------------------------------- the hierarchy --
+   Contrast floors say every chip is READABLE. They cannot say a chip is
+   READ FIRST, and that ordering is the thing that actually broke: a pass that
+   rescued the tag palette from invisibility stepped it clean past the status
+   palette, so "Premium" — a word somebody typed into a text box — sat heavier
+   on the page than "Overdue". Every pair still passed.
+
+   A status is a fact the system decided; a tag is a label a person chose. The
+   status has to win when they share a row, and "winning" is distance from the
+   page: darker than the page in light, lighter than it in dark. Contrast
+   against the surface measures that in one number in both directions, which is
+   why the rule below is written once rather than per theme.
+
+   Compared as WORST-CASE against WORST-CASE — the quietest status must still
+   beat the loudest tag — because a row mixes hues and the reader only ever
+   sees the pair actually in front of them. */
+const HIER = [
+  ["--ok-bg",   "the quietest status fill", "--tag-*-bg",   "the loudest tag fill"],
+  ["--ok-line", "the quietest status edge", "--tag-*-line", "the loudest tag edge"],
+];
+const STATUS_BG = ["--ok-bg", "--warn-bg", "--bad-bg", "--info-bg"];
+const STATUS_LN = ["--ok-line", "--warn-line", "--bad-line", "--info-line"];
+
+function hierarchy(theme, surface) {
+  const spread = (names) => names
+    .map((nm) => ({ nm, c: ratio(resolve(nm, theme), surface) }))
+    .sort((a, b) => a.c - b.c);
+  const tagBg = spread(TAGS.map((t) => `--tag-${t}-bg`));
+  const tagLn = spread(TAGS.map((t) => `--tag-${t}-line`));
+  const rows = [
+    ["chip fill", spread(STATUS_BG)[0], tagBg[tagBg.length - 1]],
+    ["chip edge", spread(STATUS_LN)[0], tagLn[tagLn.length - 1]],
+  ];
+  let failed = 0;
+  for (const [what, weakStatus, loudTag] of rows) {
+    const ok = weakStatus.c > loudTag.c;
+    if (!ok) failed++;
+    console.log(
+      `${ok ? "ok  " : "FAIL"} ${(what + ": status outranks tag").padEnd(34)} ` +
+      `${weakStatus.c.toFixed(3)} > ${loudTag.c.toFixed(3)}` +
+      `  (${weakStatus.nm} vs ${loudTag.nm})`
+    );
+  }
+  return failed;
+}
 
 /* ------------------------------------------------------------------ run -- */
 let bad = 0, missing = 0, n = 0;
@@ -221,6 +274,9 @@ for (const theme of ["light", "dark"]) {
       `  (floor ${floor.toFixed(1)})  ${fg} on ${bg}`
     );
   }
+  const surface = resolve("--color-surface", theme);
+  if (surface) { n += 2; bad += hierarchy(theme, surface); }
+  else { missing += 2; console.log("MISS --color-surface does not resolve in " + theme); }
 }
 
 console.log(

@@ -704,13 +704,17 @@ button.tile:hover{ border-color:var(--line-3); background:var(--bg-shell) }
 .pill.mute{ background:transparent; color:var(--text-3); border-color:var(--line) }
 .pill.stop{ background:var(--bad-bg); color:var(--bad); border-color:var(--bad-solid);
             border-style:dashed }
-.pill.sys{ background:var(--system-bg); color:var(--system); border-color:var(--system) }
+/* `sys` and `live` drew their border from their own INK while the four
+   statuses above draw theirs from the edge step, so these two sat a full weight
+   heavier than everything they shared a row with — the loudest chips in the
+   product marked the least urgent facts in it. They take the edge step now. */
+.pill.sys{ background:var(--system-bg); color:var(--system); border-color:var(--system-line) }
 .pill.pri{ background:var(--ink-solid); color:var(--ink-on-solid); border-color:var(--ink-solid) }
 /* `neutral` is the base pill named explicitly, so a component that computes a
    tone can pass "neutral" instead of an empty string and read the same. */
 .pill.neutral{ background:var(--neutral-bg); color:var(--text-2); border-color:var(--neutral-line) }
 /* the LIVE accent, as a tone rather than only as the `.pill-live` compound */
-.pill.live{ background:var(--accent-bg); color:var(--accent-text); border-color:var(--accent) }
+.pill.live{ background:var(--accent-bg); color:var(--accent-text); border-color:var(--accent-line) }
 /* ============================================================================
    SHAPE SAYS WHAT KIND OF THING IT IS
    ----------------------------------------------------------------------------
@@ -757,7 +761,23 @@ button.tile:hover{ border-color:var(--line-3); background:var(--bg-shell) }
        background:var(--bg); font-size:var(--text-sm); color:var(--text-2);
        transition:background var(--duration) var(--ease), border-color var(--duration) var(--ease) }
 .chip:hover{ background:var(--bg-hover) }
-.chip.on{ background:var(--brand-tint); border-color:var(--brand-line);
+/* SELECTED IS CARRIED BY THE EDGE, NOT BY THE FILL. This was the faintest
+   forest tint behind the faintest forest line — 1.10 and 1.53 against the page
+   — which is right for a selected table ROW, where a whole band moves and the
+   tint only confirms it. A chip is 100px wide with nothing beside it to compare
+   against, so at that weight "Status Processing" looked the same on as off and
+   the only honest signal was the × appearing.
+
+   Filling it instead is the obvious fix and the wrong one: eight active filters
+   would put a green block across the top of every list, which is the thing the
+   brand is specifically not allowed to do. A full-strength forest EDGE is
+   unmistakable at a glance and costs almost no coloured area, so a filter bar
+   reads as switched-on rather than as decorated.
+
+   This is also the one chip that may wear the brand at all. It marks a choice
+   the OPERATOR made; a status and a tag both describe the DATA, which is why
+   neither ever gets the forest hue. */
+.chip.on{ background:var(--brand-tint); border-color:var(--brand);
           color:var(--brand-text); font-weight:var(--weight-medium) }
 /* THE FILTER CHIP, in two parts. `.k` is the field being filtered and `.v` is
    the value. They were one text node at one weight, which made "Status:
@@ -3643,7 +3663,7 @@ input[type="checkbox"]:disabled,input[type="radio"]:disabled{
 /* THE SYSTEM'S OWN ENTRIES ARE MARKED AS THE SYSTEM'S. A derived event and a
    person's decision look identical in a flat list, and telling them apart is
    most of what an audit trail is for. */
-.tl-d.sys{ background:var(--system); box-shadow:0 0 0 1px var(--system) }
+.tl-d.sys{ background:var(--system-solid); box-shadow:0 0 0 1px var(--system-solid) }
 .tl-d.bad{ background:var(--bad-solid); box-shadow:0 0 0 1px var(--bad-line) }
 .tl-d.ok{ background:var(--ok-solid); box-shadow:0 0 0 1px var(--ok-line) }
 .tl-t{ font-size:var(--text-md); color:var(--text) }

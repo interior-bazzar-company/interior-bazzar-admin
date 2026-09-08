@@ -86,23 +86,25 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
 }
 .fin-role.sa { border-color: var(--bad-line); color: var(--bad) }
 .btn:disabled .fin-role { opacity: .7 }
+/* A TRANSACTION'S CATEGORY IS A TAG, so it is drawn as one: SQUARE, per the
+   shape rule in admin-theme.css, and wearing its hue in the WORD.
+
+   It was the fourth tag drawing in the product and the odd one out on both
+   counts. Rounded, it claimed to be a state the system had decided, when
+   "Ads & marketing" is a label somebody typed into a text box. And its label
+   was `--text-2` grey with the colour banished to a 7px square, so the one
+   thing that made two categories tell apart at a glance was smaller than the
+   full stop at the end of this sentence. The tint now carries the hue, the ink
+   matches it, and the dot is gone as redundant.
+
+   Eleven `.fin-cat.tag-*` rules sat here too, one per hue in the tag palette,
+   and nothing has ever emitted them: the only call site writes `k-<kind>`.
+   Deleted rather than wired up, because the kind is what a reader needs. */
 .fin-cat {
-  display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 8px; border-radius: var(--radius-full);
+  display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 8px; border-radius: var(--radius-sm);
   font-size: var(--text-xs); color: var(--text-2); background: var(--bg); border: 1px solid var(--line-2); white-space: nowrap;
 }
-.fin-cat i { width: 7px; height: 7px; border-radius: 2px; background: var(--text-3); display: inline-block }
 .fin-cat.big { height: var(--control-md); padding: 0 var(--space-3); font-size: var(--text-md) }
-.fin-cat.tag-blue i { background: var(--tag-blue) } .fin-cat.tag-blue { background: var(--tag-blue-bg); border-color: var(--tag-blue-line) }
-.fin-cat.tag-amber i { background: var(--tag-amber) } .fin-cat.tag-amber { background: var(--tag-amber-bg); border-color: var(--tag-amber-line) }
-.fin-cat.tag-violet i { background: var(--tag-violet) } .fin-cat.tag-violet { background: var(--tag-violet-bg); border-color: var(--tag-violet-line) }
-.fin-cat.tag-teal i { background: var(--tag-teal) } .fin-cat.tag-teal { background: var(--tag-teal-bg); border-color: var(--tag-teal-line) }
-.fin-cat.tag-red i { background: var(--tag-red) } .fin-cat.tag-red { background: var(--tag-red-bg); border-color: var(--tag-red-line) }
-.fin-cat.tag-slate i { background: var(--tag-slate) } .fin-cat.tag-slate { background: var(--tag-slate-bg); border-color: var(--tag-slate-line) }
-.fin-cat.tag-cyan i { background: var(--tag-cyan) } .fin-cat.tag-cyan { background: var(--tag-cyan-bg); border-color: var(--tag-cyan-line) }
-.fin-cat.tag-lime i { background: var(--tag-lime) } .fin-cat.tag-lime { background: var(--tag-lime-bg); border-color: var(--tag-lime-line) }
-.fin-cat.tag-orange i { background: var(--tag-orange) } .fin-cat.tag-orange { background: var(--tag-orange-bg); border-color: var(--tag-orange-line) }
-.fin-cat.tag-pink i { background: var(--tag-pink) } .fin-cat.tag-pink { background: var(--tag-pink-bg); border-color: var(--tag-pink-line) }
-.fin-cat.tag-green i { background: var(--tag-green) } .fin-cat.tag-green { background: var(--tag-green-bg); border-color: var(--tag-green-line) }
 .fin-cat.sel, .fin-cat.big.sel { border-color: var(--brand); box-shadow: inset 0 0 0 1px var(--brand); color: var(--text) }
 .fin-catpick { display: flex; flex-wrap: wrap; gap: var(--space-2) }
 .fin-catpick button { font: inherit; cursor: pointer }
@@ -361,14 +363,10 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
 /* --------------------------------------------------------- tag chips --- */
 /* The chip wears its KIND, not an arbitrary colour: two tags that land in the
    same place look alike, which is the only thing a reader needs from it. */
-.fin-cat.k-fixed i { background: var(--tag-slate) }
-.fin-cat.k-fixed { background: var(--tag-slate-bg); border-color: var(--tag-slate-line) }
-.fin-cat.k-reinvestment i { background: var(--tag-violet) }
-.fin-cat.k-reinvestment { background: var(--tag-violet-bg); border-color: var(--tag-violet-line) }
-.fin-cat.k-variable i { background: var(--tag-cyan) }
-.fin-cat.k-variable { background: var(--tag-cyan-bg); border-color: var(--tag-cyan-line) }
-.fin-cat.k-excluded i { background: var(--tag-orange) }
-.fin-cat.k-excluded { background: var(--tag-orange-bg); border-color: var(--tag-orange-line) }
+.fin-cat.k-fixed { background: var(--tag-slate-bg); border-color: var(--tag-slate-line); color: var(--tag-slate) }
+.fin-cat.k-reinvestment { background: var(--tag-violet-bg); border-color: var(--tag-violet-line); color: var(--tag-violet) }
+.fin-cat.k-variable { background: var(--tag-cyan-bg); border-color: var(--tag-cyan-line); color: var(--tag-cyan) }
+.fin-cat.k-excluded { background: var(--tag-orange-bg); border-color: var(--tag-orange-line); color: var(--tag-orange) }
 .fin-cat.off { opacity: .6 }
 .fin-cat.off em { font-style: normal; color: var(--text-3); font-size: var(--text-2xs) }
 

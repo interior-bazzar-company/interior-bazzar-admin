@@ -85,23 +85,33 @@
   /* ---- LIVE — the accent. Cyan, and it means "happening right now" -------
      A running session, an open shift, a figure still being counted. Never a
      status, never a chart series, never a button. */
-  --live-2:#e2f6fb; --live-3:#bee9f3; --live-7:#0e8fb5; --live-8:#0a6a86;
-  --live-11:#45dcf0;
+  --live-2:#d3f4ff; --live-3:#81d4ee; --live-7:#007e99; --live-8:#00657c;
+  --live-11:#12cbf5;
 
   /* ---- PULSE — secondary. The SYSTEM acted: automation, derivation, audit  */
-  --pulse-2:#eceffb; --pulse-3:#d8def6; --pulse-7:#4457c9; --pulse-9:#33449f;
-  --pulse-11:#8b9bff;
+  --pulse-2:#e8edff; --pulse-3:#b2c3ff; --pulse-7:#5769bd; --pulse-9:#44549c;
+  --pulse-11:#9eb3ff;
 
   /* ---- STATUS — deliberately NOT the brand hue -------------------------
      Success is a blue-leaning green so that "this succeeded" can never be read
      as "this is Interior bazzar". They sit far enough apart to survive being
-     side by side in the same table cell. */
-  --green-2:#e8f5ec; --green-3:#cde9d6; --green-7:#1f7a44; --green-9:#166035;
-  --green-11:#4fd07a;
-  --amber-2:#fdf3e0; --amber-3:#f7e3bd; --amber-7:#a86a00; --amber-9:#8a5600;
-  --amber-11:#e8a83c;
-  --rust-2:#fdeee9;  --rust-3:#f8d5c9;  --rust-7:#c0492b;  --rust-9:#9d3820;
-  --rust-11:#ff8a63;
+     side by side in the same table cell.
+
+     ONE LIGHTNESS AND ONE CHROMA PER STEP, HUE THE ONLY VARIABLE. Every `-2`
+     below is L 0.948 / C 0.042 in OKLCh, every `-3` is L 0.826 / C 0.088,
+     every `-7` is L 0.548 / C 0.132 and every `-9` is L 0.470 / C 0.118 —
+     backed off only where a hue runs out of sRGB. Picked by eye instead, the
+     five drifted badly: warning's fill was the palest of the set at the
+     highest chroma, so "Overdue" read weaker than "Paid" while shouting more,
+     and info's text sat 0.07 lighter than success's. Perceptual lightness is
+     the axis that decides which chip wins a glance, so it is the one that is
+     pinned; the sRGB hex values are just where those coordinates land. */
+  --green-2:#daf7e1; --green-3:#9ad7ab; --green-7:#1a864a; --green-9:#086d39;
+  --green-11:#68d18c;
+  --amber-2:#ffead2; --amber-3:#ebbc87; --amber-7:#9c6200; --amber-9:#7f4f00;
+  --amber-11:#f0a646;
+  --rust-2:#ffe8e1;  --rust-3:#f9b29f;  --rust-7:#b05036;  --rust-9:#913e27;
+  --rust-11:#ff977b;
 
   /* ---- CHANNEL — WhatsApp green and email blue mean the CHANNEL, which is
      an identity somebody recognises at a glance, so they keep their own hue in
@@ -128,36 +138,52 @@
 
      They are LAYER 1 and no component may name one directly — the module
      sheets read the `--tag-*` semantic names below. --------------------- */
-  /* THE FILL AND THE EDGE ARE ONE STEP UP from where they started. They were
-     tuned so a row of tags could not shout, and overshot: at a 20px chip on a
-     white plane the fill was within 1.05 of the page and the edge within 1.2,
-     so a tag read as grey text with a faint outline and its colour -- the whole
-     point of a tag -- did nothing. Every fill below still clears 4.5:1 against
-     its own ink (`check:contrast` asserts all eleven), and the set still sits
-     at one chroma and one lightness, so a row of them still reads as a set. */
-  --t-slate-7:#5b6675;  --t-slate-2:#eaedf0;  --t-slate-3:#c9d0d8;
-  --t-red-7:#a8443c;    --t-red-2:#f9e9e7;    --t-red-3:#e4bdb8;
-  --t-orange-7:#8f5c2e; --t-orange-2:#f8eee4; --t-orange-3:#e2c8ad;
-  --t-amber-7:#7a6524;  --t-amber-2:#f6f0dd;  --t-amber-3:#ddd0a8;
-  --t-lime-7:#546c2b;   --t-lime-2:#eef4e2;   --t-lime-3:#c9dbaf;
-  --t-green-7:#2c6f4c;  --t-green-2:#e6f2ea;  --t-green-3:#b9d8c6;
-  --t-teal-7:#266d6a;   --t-teal-2:#e3f1f0;   --t-teal-3:#b3d6d4;
-  --t-cyan-7:#2a6685;   --t-cyan-2:#e5eef4;   --t-cyan-3:#b6cfdd;
-  --t-blue-7:#3a5a9e;   --t-blue-2:#e8edf7;   --t-blue-3:#bcc9e6;
-  --t-violet-7:#6a459c; --t-violet-2:#eee8f7; --t-violet-3:#cbbce6;
-  --t-pink-7:#9c4370;   --t-pink-2:#f7e6ef;   --t-pink-3:#e2b9cf;
+  /* SOLVED ON THE SAME GRID AS STATUS, ONE RUNG QUIETER. Every `-2` is
+     L 0.962 / C 0.026, every `-3` is L 0.864 / C 0.050, every `-7` is
+     L 0.502 / C 0.100 — against status's 0.948 / 0.826 / 0.548 at roughly
+     half again the chroma.
+
+     THE RUNG IS THE POINT. A status is a fact the system decided and a tag is
+     a word somebody typed, so the status has to win when they share a row. It
+     had been the other way round: the previous pass stepped the tags up to
+     rescue them from invisibility and overshot past the statuses, leaving
+     "Premium" heavier on the page than "Overdue".
+
+     ONE LIGHTNESS AND ONE CHROMA IS ALSO WHAT MAKES ELEVEN HUES A SET. Chosen
+     by eye they ranged from C 0.070 (teal) to C 0.138 (violet), so violet, pink
+     and red shouted while teal and green whispered and the row read as an
+     accident. Slate keeps a fifth of the chroma on purpose — it is the "no
+     particular colour" tag and has to stay legibly grey.
+
+     Four hues moved a few degrees, only where a tag sat on top of the status of
+     the same name: tag-green was 5° from success-green and tag-red 9° from
+     danger-rust, which is inside the range where two chips look like a bug.
+
+     `check:contrast` asserts every fill against its own ink, and every ink
+     again as an avatar face, in both themes. ------------------------------ */
+  --t-slate-7:#5c6571;  --t-slate-2:#f0f3f6;  --t-slate-3:#ced3da;
+  --t-red-7:#944a4e;    --t-red-2:#ffeeed;    --t-red-3:#f2c6c6;
+  --t-orange-7:#905228; --t-orange-2:#ffefe5; --t-orange-3:#eecab5;
+  --t-amber-7:#74630a;  --t-amber-2:#f7f3df;  --t-amber-3:#dbd3ae;
+  --t-lime-7:#536e2b;   --t-lime-2:#edf6e4;   --t-lime-3:#c9d9b6;
+  --t-green-7:#0f7556;  --t-green-2:#e3f8ee;  --t-green-3:#b4ddcb;
+  --t-teal-7:#007370;   --t-teal-2:#e0f8f7;   --t-teal-3:#addddb;
+  --t-cyan-7:#166c95;   --t-cyan-2:#e5f5ff;   --t-cyan-3:#b4d8ef;
+  --t-blue-7:#46629d;   --t-blue-2:#ecf3ff;   --t-blue-3:#c2d3f4;
+  --t-violet-7:#6e5594; --t-violet-2:#f5efff; --t-violet-3:#d7cbef;
+  --t-pink-7:#8d4a6d;   --t-pink-2:#ffedf5;   --t-pink-3:#edc6d7;
   /* the dark row — re-mixed against near-black, never the light row faded */
-  --t-slate-d:#a2adbb;  --t-slate-db:#22262b;  --t-slate-dl:#3a4048;
-  --t-red-d:#d9938c;    --t-red-db:#2b1a18;    --t-red-dl:#4a2f2b;
-  --t-orange-d:#cfa172; --t-orange-db:#2b2118; --t-orange-dl:#4a3a2b;
-  --t-amber-d:#c9b871;  --t-amber-db:#282418;  --t-amber-dl:#464029;
-  --t-lime-d:#a6c078;   --t-lime-db:#222718;   --t-lime-dl:#3b452a;
-  --t-green-d:#79c69f;  --t-green-db:#16291f;  --t-green-dl:#2a4836;
-  --t-teal-d:#74c5c1;   --t-teal-db:#152827;   --t-teal-dl:#294644;
-  --t-cyan-d:#7bb6d1;   --t-cyan-db:#16252d;   --t-cyan-dl:#2a4150;
-  --t-blue-d:#93aee0;   --t-blue-db:#1a2030;   --t-blue-dl:#303a55;
-  --t-violet-d:#b79ce0; --t-violet-db:#231b31; --t-violet-dl:#3e3157;
-  --t-pink-d:#dc9bba;   --t-pink-db:#2b1a22;   --t-pink-dl:#4a2e3c;
+  --t-slate-d:#a9b3bf;  --t-slate-db:#222427;  --t-slate-dl:#3c4045;
+  --t-red-d:#e7999b;    --t-red-db:#301f1f;    --t-red-dl:#563636;
+  --t-orange-d:#e2a17a; --t-orange-db:#2f2017; --t-orange-dl:#533929;
+  --t-amber-d:#c2b26a;  --t-amber-db:#282414;  --t-amber-dl:#464023;
+  --t-lime-d:#a0bd7c;   --t-lime-db:#202718;   --t-lime-dl:#39442a;
+  --t-green-d:#74c5a4;  --t-green-db:#162821;  --t-green-dl:#26483a;
+  --t-teal-d:#61c5c1;   --t-teal-db:#132827;   --t-teal-dl:#1e4746;
+  --t-cyan-d:#74bbe6;   --t-cyan-db:#162630;   --t-cyan-dl:#264455;
+  --t-blue-d:#93b1ee;   --t-blue-db:#1d2432;   --t-blue-dl:#334058;
+  --t-violet-d:#bca4e4; --t-violet-db:#262130; --t-violet-dl:#443a54;
+  --t-pink-d:#df99bb;   --t-pink-db:#2e1e26;   --t-pink-dl:#523644;
 }
 
 
@@ -333,8 +359,16 @@
   --color-accent:var(--live-7);
   --color-accent-text:var(--live-8);
   --color-accent-soft:var(--live-2);
-  --color-secondary:var(--pulse-7);
+  --color-accent-border:var(--live-3);
+  /* THE TEXT STEP, LIKE EVERY OTHER SEMANTIC INK. This named `--pulse-7`, the
+     SOLID step, while `--color-info` one line up named `--pulse-9` — so the
+     system chip drew its label two steps lighter than every other chip in the
+     product and was the one pair `check:contrast` could not clear. `-solid` is
+     the fill/dot step and is now spelled out rather than borrowed. */
+  --color-secondary:var(--pulse-9);
+  --color-secondary-solid:var(--pulse-7);
   --color-secondary-soft:var(--pulse-2);
+  --color-secondary-border:var(--color-info-border);
 
   /* ---- channel ---------------------------------------------------------- */
   --color-wa:var(--wa-7);
@@ -469,21 +503,31 @@
   --color-disabled-bg:#1a1a1d;
   --color-tick:#4a4a52;
 
-  --color-success:var(--green-11); --color-success-solid:#2f9e5a;
-  --color-success-soft:#0e2a1a;    --color-success-border:#1d4a30;
-  --color-warning:var(--amber-11); --color-warning-solid:#b8801a;
-  --color-warning-soft:#2c2008;    --color-warning-border:#553f10;
-  --color-danger:var(--rust-11);   --color-danger-solid:#c3512f;
-  --color-danger-soft:#2e150f;     --color-danger-border:#57281c;
-  --color-info:var(--pulse-11);    --color-info-solid:#5468d8;
-  --color-info-soft:#161c3a;       --color-info-border:#2b3564;
+  /* THE DARK SOFT STEP RISES ABOVE THE TAG FILL RATHER THAN SINKING BELOW IT.
+     In light, a status outranks a tag by being DARKER than it; the same
+     coordinates in dark would put the status nearer the page than the tag and
+     quietly invert the very hierarchy they exist to state. Presence on a
+     near-black plane is distance from black. So these sit at L 0.270 against
+     the tag row's 0.258, and the borders at 0.392 against 0.368 —
+     `check:contrast` asserts that ordering in BOTH themes now. */
+  --color-success:var(--green-11); --color-success-solid:#2f9658;
+  --color-success-soft:#132d1b;    --color-success-border:#1b5230;
+  --color-warning:var(--amber-11); --color-warning-solid:#b06f00;
+  --color-warning-soft:#35220a;    --color-warning-border:#613c05;
+  --color-danger:var(--rust-11);   --color-danger-solid:#c15f45;
+  --color-danger-soft:#3a1e16;     --color-danger-border:#6a3425;
+  --color-info:var(--pulse-11);    --color-info-solid:#6578ce;
+  --color-info-soft:#1f253d;       --color-info-border:#364271;
   --color-neutral-soft:#1d1d21;    --color-neutral-border:#28282c;
 
   --color-accent:var(--live-11);
   --color-accent-text:var(--live-11);
-  --color-accent-soft:#0a2b34;
+  --color-accent-soft:#042b36;
+  --color-accent-border:#004e60;
   --color-secondary:var(--pulse-11);
-  --color-secondary-soft:#161c3a;
+  --color-secondary-solid:#6578ce;
+  --color-secondary-soft:#1f253d;
+  --color-secondary-border:var(--color-info-border);
 
   --color-wa:var(--wa-11);
   --color-mail:var(--mail-11);
@@ -644,8 +688,11 @@
   --accent:var(--color-accent);
   --accent-text:var(--color-accent-text);
   --accent-bg:var(--color-accent-soft);
+  --accent-line:var(--color-accent-border);
   --system:var(--color-secondary);
+  --system-solid:var(--color-secondary-solid);
   --system-bg:var(--color-secondary-soft);
+  --system-line:var(--color-secondary-border);
 
   /* ---- focus and scrim -------------------------------------------------- */
   --ring:var(--focus-ring);

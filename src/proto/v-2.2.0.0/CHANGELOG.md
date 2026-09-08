@@ -6,6 +6,74 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-08
 
+### Chips solved on one grid, so a status outranks a tag again
+
+**Area:** the whole product — every status pill, tag and filter chip
+**Files:** `src/styles/tokens.css`, `src/styles/admin-theme.css`, `design/ramp.cjs`,
+`src/admin/views/Finance/finance.css`, `src/admin/views/Finance/bits.tsx`
+
+**What changed**
+
+- **Every chip step is now one perceptual lightness and one chroma, with hue the only
+  variable.** Status fills sit at L 0.948 / C 0.042 in OKLCh, status edges at 0.826 / 0.088,
+  tag fills at 0.962 / 0.026, tag edges at 0.864 / 0.050. Picked by eye instead, the eleven
+  tag hues had ranged from C 0.070 to C 0.138, so violet, pink and red shouted while teal and
+  green whispered and a row of them read as an accident rather than as a set.
+- **A status outranks a tag again.** The previous pass stepped the tag palette up to rescue it
+  from invisibility and overshot clean past the status palette: tag fills measured 1.125–1.199
+  against the page where status fills measured 1.099–1.147, so "Premium" — a word somebody
+  typed into a text box — sat heavier than "Overdue". A state the system decided has to win
+  when the two share a row. Every contrast pair passed throughout; contrast floors say a chip
+  is READABLE and cannot say which chip is READ FIRST.
+- **`check:contrast` asserts that ordering now**, in both themes and in the right direction for
+  each: presence is distance from the page, so a status is darker than a tag in light and
+  lighter than one in dark. The dark soft step had to be raised above the tag row rather than
+  dropped below it, which the light coordinates would have got backwards.
+- **Four tag hues moved a few degrees** — only where a tag sat on top of the status of the same
+  name. `tag-green` was 5° from success-green and `tag-red` 9° from danger-rust, which is
+  inside the range where two chips look like a bug.
+- **The `sys` and `live` pills drew their border from their own ink** while the four statuses
+  beside them draw theirs from the edge step, so the two chips marking the least urgent facts
+  in the product were the loudest things in any row they appeared in. Both take an edge step
+  now; `--color-accent-border` and `--color-secondary-border` are spelled out rather than
+  borrowed.
+- **`--color-secondary` named the SOLID step while `--color-info` named the text step**, so the
+  system chip drew its label two steps lighter than every other chip and was the one pair the
+  guard could not clear. It names the text step now, with `--color-secondary-solid` added for
+  the timeline dot, which is a fill and wants the fill step.
+- **A selected filter chip carries its state on its edge.** It was the faintest forest tint
+  behind the faintest forest line — 1.10 and 1.53 against the page — which is right behind a
+  selected table ROW, where a whole band moves, but on a 100px chip standing alone it looked
+  the same on as off and the only honest signal was the × appearing. Filling it is the obvious
+  fix and the wrong one: eight active filters would put a green block across the top of every
+  list, which is the thing the brand is specifically not allowed to do. A full-strength forest
+  EDGE is unmistakable and costs almost no coloured area. This is also the only chip that may
+  wear the brand at all — it marks a choice the OPERATOR made, where a status and a tag both
+  describe the DATA.
+- **Finance's transaction category was the fourth tag drawing and the odd one out.** Rounded,
+  it claimed to be a state the system had decided, when "Ads & marketing" is a label somebody
+  typed; and its label was grey with the colour banished to a 7px square. It is square now,
+  wears its hue in the word, and has lost the redundant dot. Eleven `.fin-cat.tag-*` rules
+  went with it — one per hue, and nothing has ever emitted them, because the only call site
+  writes `k-<kind>`.
+
+**Temp data** — `none`. **Backend needed** — `none`.
+
+**Open decisions** — `.fin-dir` (the Credit/Debit badge) is square but describes a fact derived
+from the row rather than a typed label, so by the shape rule it should be rounded. Left alone:
+it is internally consistent, sits in its own column, and mirrors the bank-statement vocabulary
+the ledger reconciles against.
+
+**Verified** — `tsc`, build, `check:tokens` (435 properties), `check:contrast` (150 pairs
+across 2 themes, up from 142 — 4 new hierarchy assertions and 2 for the selected chip),
+`check:dupes`, and the render smokes for users, finance, team, resources, agreements, popovers,
+wiring and the appearance menu. The hierarchy guard was negative-tested by paling `--green-2`
+back toward its old value, which fails it. All 38 module screenshots re-shot in both themes and
+every route rendered; the three families were also driven in Chromium as a gallery, reading
+back computed styles rather than judging pixels.
+
+---
+
 ### Bold and a bullet list, in the marker the channel actually reads
 
 **Area:** Deals → Chat, the composer head
