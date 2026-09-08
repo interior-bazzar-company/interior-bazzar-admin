@@ -508,8 +508,13 @@ function TagRow({ dl, p }: { dl: any; p: Params }) {
 /* Starts at one line and grows with what's typed — a pasted email or a long
    remark should be readable while it's written, not a one-line window onto a
    wall of text. Caps out and scrolls internally past COMPOSER_MAX so a very
-   long draft cannot push the send button off the bottom of the pane. */
-const COMPOSER_MAX = 160;
+   long draft cannot push the send button off the bottom of the pane.
+
+   The cap is generous because the box has more room than it used to: once
+   there is a draft the hint bar under it is gone (it describes an EMPTY box,
+   and by then you are past needing it) and Send has moved up beside the
+   channel chips, so the height that bar was holding goes to the writing. */
+const COMPOSER_MAX = 260;
 
 // One placeholder per channel — what the box hints depends on how the text
 // is about to go out, same three strings the prototype used.
@@ -529,6 +534,11 @@ function Composer({ dl, p }: { dl: any; p: Params }) {
   // re-renders this composer — the prototype's `var CHAN` had a whole page
   // re-render to lean on; React needs its own trigger.
   const [chan, setChanLocal] = useState(chanOf());
+  /* Is there a draft? The textarea is uncontrolled — it holds the text, React
+     does not — so this is the one bit of it React needs, and it is a boolean,
+     not the value: it decides where Send is and whether the hint bar is there,
+     and nothing about the box re-renders per keystroke. */
+  const [drafting, setDrafting] = useState(false);
 
   const grow = () => {
     const el = ta.current; if (!el) return;
@@ -537,7 +547,12 @@ function Composer({ dl, p }: { dl: any; p: Params }) {
     el.style.height = h + "px";
     el.style.overflowY = el.scrollHeight > COMPOSER_MAX ? "auto" : "hidden";
   };
+  const type = () => { grow(); setDrafting(!!(ta.current && ta.current.value.trim())); };
   useEffect(grow, []);
+  /* Re-measured AFTER the class lands: the first character both grows the box
+     and drops the hint bar, and `drafting` raises the textarea's min-height —
+     measuring in the same tick as the keystroke would measure the old one. */
+  useEffect(grow, [drafting]);
 
   const pick = (ch: string) => { setChan(ch); setChanLocal(ch); };
 
@@ -551,12 +566,17 @@ function Composer({ dl, p }: { dl: any; p: Params }) {
       setBusy(false);
       if (!ok) return;
       if (ta.current) { ta.current.value = ""; grow(); }
+      setDrafting(false);
       setChanLocal(chanOf());   // acts.send resets the module state to manual
     });
   };
 
   return (
-    <div className={"dws-composer " + chanCls(chan)}>
+    <div className={"dws-composer " + chanCls(chan) + (drafting ? " drafting" : "")}>
+      {/* The head is the channel row, and once there is something to send it is
+          also where Send is — top right, beside the channel it will go out on,
+          the way every chat client puts the send next to what you are writing
+          rather than under a bar at the bottom of it. */}
       <div className="dws-chans">
         {["manual", "whatsapp", "email"].map((ch) => (
           <button key={ch} type="button"
@@ -565,18 +585,27 @@ function Composer({ dl, p }: { dl: any; p: Params }) {
             {CHAN_LABEL[ch]}
           </button>
         ))}
+        {drafting && (
+          <button className="dws-send top" data-act="dl-send" data-ref={dl.deal_id}
+            disabled={busy} onClick={send}>
+            {busy ? "Sending" : "Send"}<Icon name="arrow" size="sm" />
+          </button>
+        )}
       </div>
       <textarea id="dwsComposerText" rows={1} ref={ta}
-        placeholder={CHAN_PLACEHOLDER[chan]} onInput={grow} />
-      <div className="dws-composer-foot">
-        <span className="hint">
-          {chan === "manual" ? "Appended to the deal timeline · clears the stalled flag"
-            : "Logged to the deal timeline · opens " + CHAN_LABEL[chan] + " to actually send it"}
-        </span>
-        <button className="dws-send" data-act="dl-send" data-ref={dl.deal_id} disabled={busy} onClick={send}>
-          {busy ? "Sending" : "Send"}<Icon name="arrow" size="sm" />
-        </button>
-      </div>
+        placeholder={CHAN_PLACEHOLDER[chan]} onInput={type} />
+      {/* The hint describes what an EMPTY box will do with what you write. Once
+          it is written the sentence has been read or it never will be, and the
+          bar it sits in is height the draft could be using — so it goes, and
+          takes the second copy of Send with it. */}
+      {!drafting && (
+        <div className="dws-composer-foot">
+          <span className="hint">
+            {chan === "manual" ? "Appended to the deal timeline · clears the stalled flag"
+              : "Logged to the deal timeline · opens " + CHAN_LABEL[chan] + " to actually send it"}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

@@ -6,6 +6,38 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-08
 
+### Send moves up the moment there is something to send
+
+**Area:** Deals → Chat, the composer at the foot of the conversation
+**Files:** `src/admin/views/Deals/Chat.tsx`, `src/styles/admin-theme.css`
+
+**What changed**
+
+- **Send sits top-right, beside the channel chips, as soon as a draft exists.** It was
+  parked in a bar under the box, which is the one place a chat client never puts it: the
+  button belongs next to the channel the message is about to go out on, in the corner the
+  eye is already in after picking one.
+- **The hint bar is gone while writing.** "Appended to the deal timeline · clears the
+  stalled flag" describes what an EMPTY box will do; by the time there is a draft the
+  sentence has been read or it never will be. It comes back the moment the box is empty
+  again, and it no longer carries a second copy of Send.
+- **The writing area opens to four lines on the first character** and grows to 260px before
+  it scrolls internally (it was 160px). The height the hint bar was holding goes to the
+  draft — a call summary or a pasted email is now readable while it is written.
+- **`drafting` is a boolean, not the text.** The textarea stays uncontrolled — it holds what
+  was typed, React does not — so nothing re-renders per keystroke; the flag only decides
+  where Send is and whether the hint bar is there. `grow()` is re-run in an effect keyed on
+  it, because the class that raises the min-height lands after the keystroke that set it.
+
+**Temp data** — `none`. **Backend needed** — `none`.
+
+**Verified** — `tsc`, build, `check:tokens`, `check:contrast` (142), `check:dupes`. Driven
+in Chromium: a real draft typed into the box and photographed idle, drafting, and drafting
+on the WhatsApp channel, in both themes.
+
+---
+
+
 ### The channel chips carry their channel — a dot at rest, a fill when picked
 
 **Area:** Deals → Chat, the Remark / WhatsApp / Email chips on the composer

@@ -2225,7 +2225,8 @@ button.dls-stat:hover{ background:var(--bg-hover) }
 .dws-composer:focus-within{ border-color:var(--comp-accent);
                             box-shadow:0 0 0 3px color-mix(in srgb,var(--comp-accent) 22%,transparent),
                                        var(--shadow-lg), var(--surface-sheen) }
-.dws-chans{ display:flex; gap:5px; padding:var(--space-2) var(--space-2) 0 }
+/* Channels left, Send right — one row, and the row is the composer's head. */
+.dws-chans{ display:flex; align-items:center; gap:5px; padding:var(--space-2) var(--space-2) 0 }
 /* ONE chip rule, three variables — the same shape as .dws-bubble above. A
    channel class sets --chip / --chip-line / --chip-ink and nothing else, so
    picked, hovered and at-rest are one description of a chip in three states
@@ -2255,6 +2256,10 @@ button.dls-stat:hover{ background:var(--bg-hover) }
 .dws-composer textarea{ width:100%; border:0; background:none; resize:none; font:inherit; font-size:var(--text-base);
                          color:var(--text); padding:var(--space-2) var(--space-3) 4px; outline:0; min-height:20px }
 .dws-composer textarea::placeholder{ color:var(--text-3) }
+/* A draft gets the room the hint bar was holding, and a floor of its own: the
+   box opens to four lines on the first character instead of creeping down one
+   line at a time, which is what made a long remark feel like a slot. */
+.dws-composer.drafting textarea{ min-height:96px; padding-bottom:var(--space-3) }
 /* Sunk so the action bar reads as the floor of the box and the send button has
    something to sit on, rather than floating under a hairline. */
 .dws-composer-foot{ display:flex; align-items:center; gap:var(--space-3);
@@ -2268,6 +2273,12 @@ button.dls-stat:hover{ background:var(--bg-hover) }
 .dws-send:hover{ background:var(--brand-hover); box-shadow:var(--shadow-md) }
 .dws-send:active{ transform:translateY(1px); box-shadow:var(--shadow-sm) }
 .dws-send:disabled{ opacity:.6; cursor:default; box-shadow:none; transform:none }
+/* Send, where it lives once there is something to send: pushed to the right of
+   the channel row and sized to it, so the head reads channel-channel-channel →
+   send rather than a button parked on its own line. */
+.dws-send.top{ height:26px; margin-left:auto; animation:dws-send-in .16s ease-out }
+@keyframes dws-send-in{ from{ opacity:0; transform:translateY(-2px) scale(.94) } to{ opacity:1 } }
+@media (prefers-reduced-motion:reduce){ .dws-send.top{ animation:none } }
 
 /* -- right: context -- */
 /* Context pane, tightened: it is a reference column read at a glance beside the
