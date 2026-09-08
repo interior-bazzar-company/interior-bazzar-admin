@@ -6,6 +6,50 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-08
 
+### The deal tile — a face, a stage ring, and a selection you can see past
+
+**Area:** Deals → Chat, the deal list on the left; avatars everywhere
+**Files:** `src/admin/views/Deals/Chat.tsx`, `src/admin/ui/index.tsx`,
+`src/admin/shell/AdminShell.tsx`, `src/styles/admin-theme.css`
+
+**What changed**
+
+- **Every tile leads with a face** — the customer's initials in one of eight tag tints,
+  derived from the name so the same customer is the same colour on every screen. Twelve
+  tiles of identical text blocks are hard to tell apart at a glance; a colour you recognise
+  before you read is what makes "the one I was just in" findable coming back to the list.
+- **A ring on the face is the stage.** Same tone vocabulary as every pill and dot in the
+  product. The pill below still carries the WORD; the ring carries the colour, so a column
+  of tiles answers "where is everything" in one sweep — which is the thing a salesperson
+  scans for and the tile could not previously give.
+- **Selected is a rail, not a wash.** It was a forest tint across the whole tile, which on a
+  column of them read as one green block and drowned the pills and tags it sat behind. The
+  brand still marks where you are — a 2px rail on the leading edge, the same mark a selected
+  table row carries — over a plain raised surface and a hairline.
+
+**Three fixes fell out of it**
+
+- **Eight avatar buckets, not five.** Four tints plus an untinted fallback meant a column of
+  twelve showed the same three or four faces, so the avatar identified nothing.
+- **The hash needed an avalanche.** `% 8` reads only djb2's low three bits, which it mixes
+  weakly: the raw hash put three of nine visible names on one colour and left three of the
+  eight unused. One murmur-style finaliser spreads every character across the whole word.
+- **`initials()` split on whitespace only**, so `Jaswant_Kaul` and `priya.nair` got one
+  letter while every other row had two. It splits on `._-` as well now.
+- **The shell carried its own copy of `avatarTone`** — five buckets, its own hash — so the
+  face in the account menu could be a different colour from the same person's face in a
+  list. Removed; it imports the shared one.
+
+**Temp data** — `none`. **Backend needed** — `none`.
+
+**Verified** — `tsc`, build, `check:tokens` (424), `check:contrast` (116), `check:dupes`,
+six render smokes. The list was driven in Chromium against a mocked `deals` payload in the
+real `DealRow` shape and photographed in both themes; that shot is what caught the ring
+being sliced into a quarter-moon by `.av`'s `overflow:hidden`, and the single-letter
+initials.
+
+---
+
 ### Every table is one table — and the light greys can be seen
 
 **Area:** every list page; the table head, hover and active states everywhere; the canvas

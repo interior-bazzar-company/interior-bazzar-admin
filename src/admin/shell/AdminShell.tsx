@@ -22,7 +22,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from "react";
 import { Link, Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import IB_ICON from "../../assets/images/IB_Icon.png";
-import { Icon, Segmented } from "../ui";
+import { Icon, Segmented, avatarTone } from "../ui";
 import { go as uiGo, setGo } from "../ui/nav";
 import config from "../../config";
 import { AuthService } from "../../api/modules/auth";
@@ -862,9 +862,6 @@ export function remember(route: string, id: string) {
   LS.set("ib_admin_recents", list.slice(0, 12));
 }
 
-function avatarTone(name: string) {
-  let n = 0;
-  const s = String(name || "");
-  for (let i = 0; i < s.length; i++) n += s.charCodeAt(i);
-  return ["", "n1", "n2", "n3", "n4"][n % 5];
-}
+/* `avatarTone` is `ui/index`'s. The shell carried its own copy, so the face in
+   the account menu could be a different colour from the same person's face in a
+   list — two hashes, two answers, one person. */

@@ -183,14 +183,40 @@ export function TbTitle({ label, to }: { label: ReactNode; to: string }) {
 /* =============================================================== HELPERS === */
 /* esc() is deliberately absent: JSX escapes text. */
 export function initials(name?: string | null) {
-  const p = String(name || "").trim().split(/\s+/);
+  /* Split on any separator a name actually arrives with, not just spaces:
+     usernames come through as `Jaswant_Kaul` and `priya.nair`, and a
+     whitespace-only split gave those a single letter while every other row
+     had two. */
+  const p = String(name || "").trim().split(/[\s._\-]+/).filter(Boolean);
   return ((p[0] || "")[0] || "").toUpperCase() + ((p[1] || "")[0] || "").toUpperCase();
 }
+/* THE FACE'S COLOUR IS DERIVED FROM THE NAME, so the same person is the same
+   colour on every screen — never picked per render, which is what makes a list
+   look like it reshuffled itself every time you scroll back to it.
+
+   EIGHT BUCKETS, NOT FIVE. Four tints plus an untinted fallback meant a column
+   of twelve deals showed the same three or four faces over and over, so the
+   avatar identified nothing — which is the only job it has. Eight is what the
+   tag ramp can give while every hue stays distinct at 26px.
+
+   The mix is djb2 rather than a sum of character codes. A plain sum collides on
+   anything that is an anagram or merely the same letters in another order, and
+   it clusters hard by name LENGTH: "Sonu saifi" and "Ashish vishwakarma" landed
+   two apart, which at five buckets is a coin toss between the same two colours.
+   Shifting per character spreads them. */
 export function avatarTone(name?: string | null) {
-  let n = 0;
   const s = String(name || "");
-  for (let i = 0; i < s.length; i++) n += s.charCodeAt(i);
-  return ["", "n1", "n2", "n3", "n4"][n % 5];
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  /* THE AVALANCHE IS NOT DECORATION. `% 8` reads only the low three bits, and
+     djb2 mixes its low bits weakly — the raw hash put three of nine visible
+     names on one colour and left three of the eight unused. One murmur-style
+     finaliser spreads the change from every character across the whole word,
+     so a bucket depends on the name rather than on its last letter. */
+  h ^= h >>> 16; h = Math.imul(h, 2246822507);
+  h ^= h >>> 13; h = Math.imul(h, 3266489909);
+  h ^= h >>> 16;
+  return "n" + ((h >>> 0) % 8 + 1);
 }
 export function qs(obj: Record<string, string | number | null | undefined>) {
   const p: string[] = [];

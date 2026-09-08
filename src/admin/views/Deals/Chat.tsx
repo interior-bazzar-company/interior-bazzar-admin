@@ -255,6 +255,14 @@ function Row({ d, activeRef, p }: { d: any; activeRef: string; p: Params }) {
   const to = "#/deals/" + d.deal_id + qs(p);
   return (
     <a className={"dws-row" + (activeRef === d.deal_id ? " on" : "")} data-go={to} onClick={() => go(to)}>
+      {/* The face identifies the customer; the ring on it is the stage. Both
+          are `aria-hidden` — the name is the next element and the stage is
+          spelled out in the pill below, so a screen reader would otherwise
+          hear the same two facts three times. */}
+      <span className={"av dws-face " + avatarTone(d.customer_name)} aria-hidden="true">
+        {initials(d.customer_name)}
+        <i className={"dws-stage " + (D.STAGES[d.stage].tone || "")} />
+      </span>
       <div className="l1">
         <span className={"name" + (u ? " " + u.cls : "")} title={u ? u.why : ""}>{d.customer_name}</span>
         {/* The deal's own value — the only money on the record. Null means
@@ -547,7 +555,7 @@ function Composer({ dl, p }: { dl: any; p: Params }) {
   };
 
   return (
-    <div className="dws-composer">
+    <div className={"dws-composer " + chanCls(chan)}>
       <div className="dws-chans">
         {["manual", "whatsapp", "email"].map((ch) => (
           <button key={ch} type="button"

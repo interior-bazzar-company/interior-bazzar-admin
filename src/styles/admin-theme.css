@@ -1020,6 +1020,10 @@ select.inp::-ms-expand{ display:none }
 .av.n2{ background:var(--tag-slate-bg);  color:var(--tag-slate);  border:1px solid var(--tag-slate-line) }
 .av.n3{ background:var(--tag-violet-bg); color:var(--tag-violet); border:1px solid var(--tag-violet-line) }
 .av.n4{ background:var(--tag-teal-bg);   color:var(--tag-teal);   border:1px solid var(--tag-teal-line) }
+.av.n5{ background:var(--tag-orange-bg); color:var(--tag-orange); border:1px solid var(--tag-orange-line) }
+.av.n6{ background:var(--tag-pink-bg);   color:var(--tag-pink);   border:1px solid var(--tag-pink-line) }
+.av.n7{ background:var(--tag-lime-bg);   color:var(--tag-lime);   border:1px solid var(--tag-lime-line) }
+.av.n8{ background:var(--tag-cyan-bg);   color:var(--tag-cyan);   border:1px solid var(--tag-cyan-line) }
 
 .bar{ display:flex; height:7px; border-radius:var(--radius-full);
       background:var(--bg-inset); overflow:hidden }
@@ -2081,11 +2085,50 @@ button.dls-stat:hover{ background:var(--bg-hover) }
 .pop-chip .mi .r{ margin-left:auto; display:flex; align-items:center; color:var(--brand-text) }
 .pop-chip .mi .ic{ width:13px; height:13px }
 .dws-list-scroll{ flex:1; overflow-y:auto; padding:2px var(--space-2) var(--space-3) }
-.dws-row{ display:flex; flex-direction:column; gap:5px; padding:var(--space-2) var(--space-3);
-          border-radius:var(--radius-lg); cursor:pointer; border:1px solid transparent; margin-bottom:2px;
-          text-decoration:none; color:inherit }
+/* THE DEAL TILE. A face on the left, the deal on the right.
+   The face is the customer's initials in one of eight tag tints, derived from
+   the name — twelve tiles of identical text blocks are hard to tell apart at a
+   glance, and a colour you recognise before you read is what makes "the one I
+   was just in" findable when you come back to the list.
+
+   THE RING ON THE FACE IS THE STAGE, and it is the only thing in the tile that
+   can be scanned without reading. The pill below still carries the WORD; this
+   carries the colour, so a column of tiles answers "where is everything" in one
+   sweep. Same tone vocabulary as every pill and dot in the product. */
+.dws-row{ display:grid; grid-template-columns:auto minmax(0,1fr); gap:var(--space-1) var(--space-3);
+          padding:var(--space-2) var(--space-3);
+          border-radius:var(--radius-md); cursor:pointer; margin-bottom:2px;
+          border:1px solid transparent; box-shadow:inset 2px 0 0 transparent;
+          text-decoration:none; color:inherit;
+          transition:background var(--duration-fast) var(--ease),
+                     border-color var(--duration-fast) var(--ease) }
 .dws-row:hover{ background:var(--bg-hover) }
-.dws-row.on{ background:var(--bg-selected); border-color:var(--brand-line) }
+/* SELECTED IS A RAIL, NOT A WASH. It was a forest tint across the whole tile,
+   which on a column of them read as one green block and drowned the tags and
+   pills it was meant to sit behind. The brand still marks where you are — the
+   2px rail on the leading edge, the same mark a selected table row carries —
+   over a plain raised surface and a hairline. */
+.dws-row.on{ background:var(--surface-raised); border-color:var(--line-2);
+             box-shadow:inset 2px 0 0 var(--brand), var(--shadow-xs) }
+.dws-row.on .name{ color:var(--text) }
+/* the face spans the tile's rows, so the text block keeps its own rhythm */
+/* `overflow:visible` OVERRIDES `.av`, which clips to a circle so a photo can
+   be square. The ring hangs off the edge by design, and inheriting the clip
+   sliced it into a quarter-moon stuck to the face. */
+.dws-face{ grid-row:1 / span 4; position:relative; align-self:start; margin-top:1px;
+           overflow:visible }
+.dws-face .dws-stage{ position:absolute; right:-2px; bottom:-2px;
+                      width:10px; height:10px; border-radius:var(--radius-full);
+                      background:var(--line-control);
+                      box-shadow:0 0 0 2px var(--bg) }
+.dws-row:hover .dws-face .dws-stage{ box-shadow:0 0 0 2px var(--bg-hover) }
+.dws-row.on .dws-face .dws-stage{ box-shadow:0 0 0 2px var(--surface-raised) }
+.dws-face .dws-stage.warn{ background:var(--warn-solid) }
+.dws-face .dws-stage.info{ background:var(--info-solid) }
+.dws-face .dws-stage.ok{ background:var(--ok-solid) }
+.dws-face .dws-stage.dead{ background:var(--line-3) }
+/* every line of the tile sits in the second column, beside the face */
+.dws-row > :not(.dws-face){ grid-column:2 }
 .dws-row .l1{ display:flex; align-items:center; justify-content:space-between; gap:var(--space-2) }
 .dws-row .name{ color:var(--text); font-size:var(--text-base); font-weight:var(--weight-semibold);
                 overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
@@ -2171,12 +2214,33 @@ button.dls-stat:hover{ background:var(--bg-hover) }
                color:var(--bub-line, var(--text-3)); text-decoration:none }
 .dws-openchan:hover{ text-decoration:underline }
 
-.dws-composer{ margin:var(--space-3) var(--space-5) var(--space-4); background:var(--bg);
-               border:1px solid var(--line-2); border-radius:var(--radius-xl); box-shadow:var(--shadow-sm); flex:0 0 auto }
-.dws-chans{ display:flex; gap:5px; padding:var(--space-2) var(--space-2) 0 }
+/* The composer is where every entry on this timeline gets written, so it does
+   not sit in the pane as one more flat panel. It carries a channel-coloured
+   rail along its top edge, a firmer border than a card, and a real lift — the
+   one surface in this view that is asking to be used rather than read. */
+.dws-composer{ --comp-accent:var(--brand);
+               position:relative; margin:var(--space-3) var(--space-5) var(--space-4);
+               background:var(--bg); border:1px solid var(--line-control);
+               border-radius:var(--radius-xl); overflow:hidden;
+               box-shadow:var(--shadow-md), var(--surface-sheen); flex:0 0 auto;
+               transition:border-color .15s ease, box-shadow .15s ease }
+/* The rail wears the colour the send will come out in — same wa/em tokens the
+   bubbles and the channel chips already read, so the whole box previews the
+   send instead of only the picked chip doing it. */
+.dws-composer::before{ content:""; position:absolute; inset:0 0 auto 0; height:3px;
+                       background:var(--comp-accent) }
+.dws-composer.wa{ --comp-accent:var(--ch-wa) }
+.dws-composer.em{ --comp-accent:var(--ch-em) }
+/* Typing is the point, so focus lifts the whole box: the textarea inside is
+   borderless and has nothing of its own to ring. */
+.dws-composer:focus-within{ border-color:var(--comp-accent);
+                            box-shadow:0 0 0 3px color-mix(in srgb,var(--comp-accent) 22%,transparent),
+                                       var(--shadow-lg), var(--surface-sheen) }
+.dws-chans{ display:flex; gap:5px; padding:var(--space-3) var(--space-2) 0 }
 .dws-chanbtn{ height:24px; padding:0 var(--space-3); border-radius:var(--radius-full);
               border:1px solid var(--line-2); background:var(--bg); font-size:var(--text-sm); color:var(--text-2);
               display:flex; align-items:center; gap:5px; cursor:pointer }
+.dws-chanbtn:hover{ border-color:var(--line-control); color:var(--text) }
 /* The picked channel wears the colour the bubble will come out in, so the
    composer is a preview of the send rather than a separate green for all three.
    Same tokens again — a third place the pattern holds without a third rule. */
@@ -2187,13 +2251,19 @@ button.dls-stat:hover{ background:var(--bg-hover) }
 .dws-composer textarea{ width:100%; border:0; background:none; resize:none; font:inherit; font-size:var(--text-base);
                          color:var(--text); padding:var(--space-2) var(--space-3) 4px; outline:0; min-height:20px }
 .dws-composer textarea::placeholder{ color:var(--text-3) }
+/* Sunk so the action bar reads as the floor of the box and the send button has
+   something to sit on, rather than floating under a hairline. */
 .dws-composer-foot{ display:flex; align-items:center; gap:var(--space-3);
-                     padding:6px 8px 8px var(--space-3); border-top:1px solid var(--line); margin-top:6px }
+                     padding:6px 8px 8px var(--space-3); border-top:1px solid var(--line);
+                     margin-top:6px; background:var(--bg-inset) }
 .dws-composer-foot .hint{ font-size:var(--text-2xs); color:var(--text-3); margin-right:auto }
 .dws-send{ height:28px; padding:0 var(--space-3); border-radius:var(--radius-full); border:0;
            background:var(--brand); color:var(--brand-ink); font-size:var(--text-sm); font-weight:var(--weight-semibold);
-           display:flex; align-items:center; gap:5px; cursor:pointer }
-.dws-send:hover{ background:var(--brand-hover) }
+           display:flex; align-items:center; gap:5px; cursor:pointer;
+           box-shadow:var(--shadow-sm); transition:background .15s ease, box-shadow .15s ease, transform .15s ease }
+.dws-send:hover{ background:var(--brand-hover); box-shadow:var(--shadow-md) }
+.dws-send:active{ transform:translateY(1px); box-shadow:var(--shadow-sm) }
+.dws-send:disabled{ opacity:.6; cursor:default; box-shadow:none; transform:none }
 
 /* -- right: context -- */
 /* Context pane, tightened: it is a reference column read at a glance beside the
