@@ -18,7 +18,7 @@
    real, instead of retyping it in a second app.
    ============================================================================= */
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import type { KeyboardEvent as ReactKeyEvent, MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { EmptyState, Icon, KvList, PaneLoading, Pill, SearchField, avatarTone, cap, initials, qs } from "../../ui";
 import { go } from "../../ui/nav";
 import { can } from "../../shell/AdminShell";
@@ -524,6 +524,36 @@ const CHAN_PLACEHOLDER: Record<string, string> = {
 };
 const CHAN_LABEL: Record<string, string> = { manual: "Remark", whatsapp: "WhatsApp", email: "Email" };
 
+/* ------------------------------------------------------- composer marks ---
+   Bold and a bullet list, applied to whatever is selected in the box. They are
+   TEXT MARKS, not rich text: a remark is a string on the wire, and the marker
+   written is the one the destination reads back — WhatsApp bolds *one
+   asterisk*, markdown and every other reader want **two**, and "- " opens a
+   list in both. So the button writes what the picked channel understands. */
+const boldMark = (chan: string) => (chan === "whatsapp" ? "*" : "**");
+
+/* Written through execCommand where the browser still has it, because that is
+   what keeps the edit on the native undo stack — assigning `el.value` throws
+   away every ctrl+Z the person had, which on a half-written call summary is
+   the one place you cannot afford it. setRangeText is the fallback. */
+function writeInto(el: HTMLTextAreaElement, start: number, end: number, text: string, selFrom: number, selTo: number) {
+  el.focus();
+  el.setSelectionRange(start, end);
+  let ok = false;
+  try { ok = document.execCommand("insertText", false, text); } catch { ok = false; }
+  if (!ok) el.setRangeText(text, start, end, "end");
+  el.setSelectionRange(selFrom, selTo);
+}
+
+/* The word the caret sits in, so a click with nothing selected bolds something
+   rather than dropping two asterisks in the middle of a sentence. */
+function wordAt(v: string, at: number): [number, number] {
+  let a = at, b = at;
+  while (a > 0 && !/\s/.test(v[a - 1])) a--;
+  while (b < v.length && !/\s/.test(v[b])) b++;
+  return [a, b];
+}
+
 function Composer({ dl, p }: { dl: any; p: Params }) {
   const acts = useActs(p);
   const shell = useShell();
@@ -547,6 +577,52 @@ function Composer({ dl, p }: { dl: any; p: Params }) {
     el.style.overflowY = el.scrollHeight > COMPOSER_MAX ? "auto" : "hidden";
   };
   const type = () => { grow(); setDrafting(!!(ta.current && ta.current.value.trim())); };
+
+  /* Both marks run on the SELECTION, and both toggle: a second click on
+     something already bold takes the markers off rather than doubling them. */
+  const bold = () => {
+    const el = ta.current; if (!el) return;
+    const m = boldMark(chan), v = el.value;
+    let a = el.selectionStart, b = el.selectionEnd;
+    if (a === b) [a, b] = wordAt(v, a);
+    const sel = v.slice(a, b);
+    // Already wrapped — either the markers sit just outside the selection
+    // (the usual case, re-clicking after bolding) or inside it (dragged over
+    // the asterisks too). Both come off.
+    if (v.slice(Math.max(0, a - m.length), a) === m && v.slice(b, b + m.length) === m)
+      return writeInto(el, a - m.length, b + m.length, sel, a - m.length, b - m.length), type();
+    if (sel.length > 2 * m.length && sel.startsWith(m) && sel.endsWith(m))
+      return writeInto(el, a, b, sel.slice(m.length, -m.length), a, b - 2 * m.length), type();
+    // Nothing to bold and no word under the caret: leave the markers with the
+    // caret between them, which is what every editor does with an empty click.
+    writeInto(el, a, b, m + sel + m, a + m.length, a + m.length + sel.length);
+    type();
+  };
+
+  /* Whole lines, never part of one — the selection is widened to the lines it
+     touches first, so half-selecting two lines still bullets both of them. */
+  const bullet = () => {
+    const el = ta.current; if (!el) return;
+    const v = el.value;
+    const a = v.lastIndexOf("\n", Math.max(0, el.selectionStart - 1)) + 1;
+    const nl = v.indexOf("\n", el.selectionEnd);
+    const b = nl === -1 ? v.length : nl;
+    const lines = v.slice(a, b).split("\n");
+    const on = lines.every((l) => !l.trim() || /^\s*- /.test(l));
+    const next = lines.map((l) => (!l.trim() ? l : on ? l.replace(/^(\s*)- /, "$1") : "- " + l)).join("\n");
+    writeInto(el, a, b, next, a, a + next.length);
+    type();
+  };
+
+  /* Ctrl/⌘+B, because a toolbar button that has no shortcut is a button people
+     stop reaching for. */
+  const keys = (e: ReactKeyEvent<HTMLTextAreaElement>) => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === "b" || e.key === "B")) { e.preventDefault(); bold(); }
+  };
+
+  /* Keeps the textarea's selection alive while a toolbar button is pressed —
+     without this the mousedown blurs the box and the mark lands on nothing. */
+  const holdSel = (e: ReactMouseEvent) => e.preventDefault();
   useEffect(grow, []);
   /* Re-measured AFTER the class lands: the first character both grows the box
      and drops the hint bar, and `drafting` raises the textarea's min-height —
@@ -584,6 +660,11 @@ function Composer({ dl, p }: { dl: any; p: Params }) {
             {CHAN_LABEL[ch]}
           </button>
         ))}
+        <span className="dws-sep" aria-hidden="true" />
+        <button type="button" className="dws-fmt bold" title="Bold (Ctrl+B)" aria-label="Bold"
+          onMouseDown={holdSel} onClick={bold}>B</button>
+        <button type="button" className="dws-fmt" title="Bullet list" aria-label="Bullet list"
+          onMouseDown={holdSel} onClick={bullet}><Icon name="list" size="sm" /></button>
         {drafting && (
           <button className="dws-send top" data-act="dl-send" data-ref={dl.deal_id}
             disabled={busy} onClick={send}>
@@ -596,7 +677,7 @@ function Composer({ dl, p }: { dl: any; p: Params }) {
           height taken from the one thing in this box anybody uses. What it said
           the placeholder above says per channel, in the box being typed in. */}
       <textarea id="dwsComposerText" rows={1} ref={ta}
-        placeholder={CHAN_PLACEHOLDER[chan]} onInput={type} />
+        placeholder={CHAN_PLACEHOLDER[chan]} onInput={type} onKeyDown={keys} />
     </div>
   );
 }

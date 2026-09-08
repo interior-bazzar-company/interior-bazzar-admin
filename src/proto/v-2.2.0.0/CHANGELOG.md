@@ -6,6 +6,44 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-08
 
+### Bold and a bullet list, in the marker the channel actually reads
+
+**Area:** Deals → Chat, the composer head
+**Files:** `src/admin/views/Deals/Chat.tsx`, `src/styles/admin-theme.css`
+
+**What changed**
+
+- **Two marks after the channel chips, behind a rule** — a serif **B** and a bullet-list
+  button. The separator is doing real work: the chips CHOOSE where a line goes, the marks DO
+  something to what is written, and without a divider the row read as five buttons of one
+  kind.
+- **They write the marker the destination reads back.** A remark is a string on the wire,
+  not rich text, so bold is `**this**` for a remark or an email — markdown, which is what
+  every reader of the timeline understands — and `*this*` on WhatsApp, which is what
+  WhatsApp itself bolds. `- ` opens a list in both, so the list button writes one marker.
+- **Both toggle and both work on the selection.** A second click on something already
+  bold takes the markers off instead of doubling them, whether they sit just outside the
+  selection or inside it. With nothing selected, Bold takes the word the caret is in rather
+  than dropping two asterisks mid-sentence. The list button widens the selection to whole
+  lines first, so half-selecting two lines still bullets both.
+- **Ctrl/⌘+B** does the same as the button — a toolbar button with no shortcut is one people
+  stop reaching for.
+- **Edits go through `execCommand("insertText")` where the browser still has it**, because
+  that is what keeps them on the native undo stack. Assigning `el.value` throws away every
+  ctrl+Z the person had, which on a half-written call summary is the one place it matters;
+  `setRangeText` is the fallback. The buttons hold the selection with a `mousedown`
+  preventDefault, or the click would blur the box and the mark would land on nothing.
+
+**Temp data** — `none`. **Backend needed** — `none`.
+
+**Verified** — `tsc`, build, `check:tokens`, `check:contrast` (142), `check:dupes`. Driven in
+Chromium in both themes, asserting the text the box actually holds: bold wraps
+(`Revise**d quote sent**`), a second click unwraps it exactly, the list button bullets all
+three lines, and on the WhatsApp channel the same button writes a single `*`.
+
+---
+
+
 ### Shape says what kind of thing it is: a state is rounded, a label is square
 
 **Area:** every chip in the panel — Deals, Team, Users, Resources, Business Enquiries

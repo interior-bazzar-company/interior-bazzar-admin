@@ -2270,6 +2270,19 @@ button.dls-stat:hover{ background:var(--bg-hover) }
    composer is a preview of the send rather than a separate green for all three. */
 .dws-chanbtn.on{ background:var(--chip); border-color:var(--chip-line); color:var(--chip-ink);
                  font-weight:var(--weight-semibold) }
+/* Channels, then a rule, then the two marks. The rule is doing real work: the
+   chips CHOOSE something and the marks DO something, and without a divider the
+   row read as five buttons of the same kind. */
+.dws-sep{ width:1px; height:16px; background:var(--line-2); margin:0 4px; flex:0 0 auto }
+.dws-fmt{ width:26px; height:24px; flex:0 0 auto; display:grid; place-items:center;
+          border:0; border-radius:var(--radius-md); background:none; color:var(--text-2);
+          font-size:var(--text-md); cursor:pointer; transition:background .15s ease, color .15s ease }
+/* The serif B is the convention every editor uses for this button, and it is
+   the sheet's own --font-serif, not a face invented here. */
+.dws-fmt.bold{ font-family:var(--font-serif); font-weight:var(--weight-bold); font-size:var(--text-base) }
+.dws-fmt:hover{ background:var(--bg-hover); color:var(--text) }
+.dws-fmt:active{ background:var(--bg-active) }
+
 /* The whole box below the chips is the writing surface — there is no bar under
    it any more, so the height it held is min-height here. Three lines at rest,
    because a one-line slot under a two-line header read as a search field and
