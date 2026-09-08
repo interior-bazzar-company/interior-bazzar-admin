@@ -18,7 +18,7 @@
    ===================================================================== */
 import { useState } from "react";
 import type { PlanRow } from "../../../api/modules/adminOps";
-import { Icon, Notice, PaneLoading } from "../../ui";
+import { ModalHead, Notice, PaneLoading } from "../../ui";
 import { inr } from "../../ui/format";
 import { planLabel } from "./helpers";
 
@@ -70,11 +70,7 @@ export default function PlanModal({ plans, loading, current, currentMonths, onCl
 
   return (
     <>
-      <div className="md-h">
-        <h3>Change plan</h3>
-        <p>Single select — choosing another tier swaps it</p>
-        <button className="md-x" data-close="1" aria-label="Close" onClick={onClose}><Icon name="x" /></button>
-      </div>
+      <ModalHead title="Change plan" sub="Single select — choosing another tier swaps it" onClose={onClose} />
 
       <div className="md-b">
         {loading && !plans.length ? <PaneLoading label="Loading the catalogue…" /> : null}

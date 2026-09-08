@@ -33,7 +33,7 @@
    will guess at, which is worse than an empty one.
    ============================================================================= */
 import { useMemo, useState } from "react";
-import { Icon, Notice } from "../../ui";
+import { Icon, ModalHead, Notice } from "../../ui";
 import { InfoNote, VocabInput } from "./bits";
 import {
   MANUAL_VIA, SOURCES, STATES, VOCAB, createEnquiry, findEarlierFrom, knownCategory, knownCity,
@@ -88,11 +88,7 @@ export default function NewEnquiryModal({ onClose, onDone }: {
 
   return (
     <>
-      <div className="md-h">
-        <h3>Add an enquiry</h3>
-        <p>For a call, a walk-in or a referral — anything that did not come through a form.</p>
-        <button className="md-x" data-close="1" aria-label="Close" onClick={onClose}><Icon name="x" /></button>
-      </div>
+      <ModalHead title="Add an enquiry" sub="For a call, a walk-in or a referral — anything that did not come through a form." onClose={onClose} />
 
       <div className="md-b">
         {/* ------------------------------------------------------- source --- */}

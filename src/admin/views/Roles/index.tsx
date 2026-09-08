@@ -21,7 +21,7 @@ import { useParams, useSearchParams } from "react-router-dom";
 import AdminOpsService from "../../../api/modules/adminOps";
 import { errMessage } from "../../../api/apiService";
 import type { RolesModuleDef } from "../../../api/modules/adminOps";
-import { EmptyState, FilterChips, Icon, Pill, SearchField, StatStrip, qs } from "../../ui";
+import { EmptyState, FilterChips, Icon, ListTable, Pill, qs, SearchField, StatStrip } from "../../ui";
 import type { StatCell } from "../../ui";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { HIDDEN_MODULES } from "../../auth/session";
@@ -162,14 +162,10 @@ export default function Roles() {
 
       <div className="dls-body">
         {rows.length ? (
-          <table className="tbl dls-tbl">
-            <thead>
-              <tr>
+          <ListTable head={<tr>
                 <th style={{ width: "3px" }}></th><th>Role</th><th>Status</th><th>Modules granted</th>
                 <th className="n">Members</th><th className="c">Edit</th>
-              </tr>
-            </thead>
-            <tbody>
+              </tr>}>
               {rows.map((r) => {
                 const editable = can("roles", "edit") && !r.isSystem;
                 return (
@@ -202,8 +198,7 @@ export default function Roles() {
                   </tr>
                 );
               })}
-            </tbody>
-          </table>
+            </ListTable>
         ) : (
           <EmptyState icon="shield" title="No roles match"
                       body="A role is a named set of capabilities. Create one and assign it to members." />

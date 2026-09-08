@@ -28,7 +28,7 @@
    ============================================================================= */
 import type { ReactNode } from "react";
 import { useMemo, useRef, useState } from "react";
-import { Icon, Notice, SectionHead } from "../../ui";
+import { Icon, ModalHead, Notice, SectionHead } from "../../ui";
 import { useShell } from "../../shell/ShellContext";
 import {
   KIND, PRIORITY, PRIORITY_SCALE, TODAY, addCheckLine, addLink, addResourceLink,
@@ -293,12 +293,7 @@ function EditItemModal({ item, all }: { item: WorkItem; all: WorkItem[] }) {
   };
   return (
     <>
-      <div className="md-h">
-        <h3>Edit {labelOf(KIND, item.kind).toLowerCase()}</h3>
-        <button className="btn icon sm md-x" aria-label="Close" onClick={() => shell.closeLayer()}>
-          <Icon name="x" size="sm" />
-        </button>
-      </div>
+      <ModalHead title={<>Edit {labelOf(KIND, item.kind).toLowerCase()}</>} onClose={() => shell.closeLayer()} />
       <div className="md-b">
         <div className="fg">
           <label htmlFor="eiTitle">Title <b className="req">*</b></label>
@@ -549,12 +544,7 @@ function WaitModal({ item, all }: { item: WorkItem; all: WorkItem[] }) {
   };
   return (
     <>
-      <div className="md-h">
-        <h3>Waiting on</h3>
-        <button className="btn icon sm md-x" aria-label="Close" onClick={() => shell.closeLayer()}>
-          <Icon name="x" size="sm" />
-        </button>
-      </div>
+      <ModalHead title="Waiting on" onClose={() => shell.closeLayer()} />
       <div className="md-b">
         <div className="fg">
           <label htmlFor="tmWaitOn">Item</label>
@@ -597,12 +587,7 @@ function LinkModal({ item, all }: { item: WorkItem; all: WorkItem[] }) {
   };
   return (
     <>
-      <div className="md-h">
-        <h3>Link an item</h3>
-        <button className="btn icon sm md-x" aria-label="Close" onClick={() => shell.closeLayer()}>
-          <Icon name="x" size="sm" />
-        </button>
-      </div>
+      <ModalHead title="Link an item" onClose={() => shell.closeLayer()} />
       <div className="md-b">
         <div className="fg">
           <label htmlFor="lkRel">Relation</label>

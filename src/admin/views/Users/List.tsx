@@ -12,7 +12,7 @@
    it is the default sort for exactly that reason.
    ============================================================================= */
 import { useShell } from "../../shell/ShellContext";
-import { EmptyState, FilterChips, Icon, Pagination, SearchField, Select, StatStrip } from "../../ui";
+import { EmptyState, FilterChips, Icon, ListTable, Pagination, SearchField, Select, StatStrip } from "../../ui";
 import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import { Frame } from "./Frame";
@@ -111,9 +111,7 @@ export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, 
       </>}>
 
       {page.rows.length ? (
-        <table className="tbl dls-tbl um-tbl">
-          <thead>
-            <tr>
+        <ListTable cls="um-tbl" head={<tr>
               <th className="rail" />
               <th>User</th>
               <th>Account</th>
@@ -121,12 +119,9 @@ export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, 
               <th>Registered</th>
               <th>Last seen</th>
               <th className="tight" />
-            </tr>
-          </thead>
-          <tbody>
+            </tr>}>
             {page.rows.map((r) => <Row key={r.user.userId} r={r} p={p} />)}
-          </tbody>
-        </table>
+          </ListTable>
       ) : (
         <EmptyState icon={narrowed ? "search" : "inbox"}
           title={narrowed ? "Nothing matches those filters" : "No registered users yet"}

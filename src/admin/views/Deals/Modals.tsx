@@ -22,7 +22,7 @@
    ============================================================================= */
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { Field, Icon, Notice } from "../../ui";
+import { Field, Icon, ModalHead, Notice } from "../../ui";
 import { go } from "../../ui/nav";
 import { can } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
@@ -37,10 +37,6 @@ import { TagsModal } from "./Tags";
 
 /* A modal's own close button. The shell owns the layer; every dialog closes
    the same way. */
-function MdX({ onClose }: { onClose: () => void }) {
-  return <button className="md-x" data-close="1" aria-label="Close" onClick={onClose}><Icon name="x" /></button>;
-}
-
 /* ==========================================================================
    THE ACTION TABLE
    ====================================================================== */
@@ -199,7 +195,7 @@ function Loading() {
 function Gone({ title, dealRef, onClose }: { title: string; dealRef: string; onClose: () => void }) {
   return (
     <>
-      <div className="md-h"><h3>{title}</h3><p className="mono">{dealRef}</p><MdX onClose={onClose} /></div>
+      <ModalHead title={title} sub={dealRef} mono onClose={onClose} />
       <div className="md-b">
         <Notice tone="bad" text={<>
           <b>This deal is no longer available.</b> It may have been deleted, or reassigned to
@@ -269,11 +265,7 @@ function CreateModal({ onClose, done }: { onClose: () => void; done: (m: string,
 
   return (
     <>
-      <div className="md-h md-hero">
-        <span className="md-ic"><Icon name="deal" /></span>
-        <div><h3>New deal</h3><p>Off-funnel business — an inbound call, a walk-in, a referral.</p></div>
-        <MdX onClose={onClose} />
-      </div>
+      <ModalHead ico="deal" title="New deal" sub="Off-funnel business — an inbound call, a walk-in, a referral." onClose={onClose} />
 
       <div className="md-b">
         <ErrSlot err={err} />
@@ -367,7 +359,7 @@ function EditModal({ dealRef, onClose, done }: {
     if (f) setTimeout(() => { f.focus(); f.select(); }, 60);
   }, [loading]);
 
-  if (loading) return <><div className="md-h"><h3>Edit deal</h3><p className="mono">{dealRef}</p><MdX onClose={onClose} /></div><Loading /></>;
+  if (loading) return <><ModalHead title="Edit deal" sub={dealRef} mono onClose={onClose} /><Loading /></>;
   if (!dl) return <Gone title="Edit deal" dealRef={dealRef} onClose={onClose} />;
   const prioNow = prio === null ? String(dl.priority) : prio;
   const closed = dl.stage >= STAGE.WON;
@@ -399,11 +391,7 @@ function EditModal({ dealRef, onClose, done }: {
 
   return (
     <>
-      <div className="md-h md-hero">
-        <span className="md-ic"><Icon name="deal" /></span>
-        <div><h3>Edit deal</h3><p className="mono">{dealRef} · {dl.customer_name}</p></div>
-        <MdX onClose={onClose} />
-      </div>
+      <ModalHead ico="deal" title="Edit deal" sub={<>{dealRef} · {dl.customer_name}</>} mono onClose={onClose} />
 
       <div className="md-b">
         <ErrSlot err={err} />
@@ -477,7 +465,7 @@ function RemarkModal({ dealRef, onClose, done }: {
   };
   return (
     <>
-      <div className="md-h"><h3>Add remark</h3><p>{dealRef} · appended, never edited</p><MdX onClose={onClose} /></div>
+      <ModalHead title="Add remark" sub={<>{dealRef} · appended, never edited</>} onClose={onClose} />
       <div className="md-b">
         <ErrSlot err={err} />
         <Field id="rText" label="What happened" req type="textarea"
@@ -509,8 +497,7 @@ function StageModal({ dealRef, from, onClose, onPick }: {
   };
   return (
     <>
-      <div className="md-h"><h3>Change stage</h3>
-        <p>{dealRef} · currently {D.STAGES[from].label}</p><MdX onClose={onClose} /></div>
+      <ModalHead title="Change stage" sub={<>{dealRef} · currently {D.STAGES[from].label}</>} onClose={onClose} />
       <div className="md-b">
         <ErrSlot err={err} />
         {targets.map((t) => (
@@ -557,7 +544,7 @@ function StageRemarkModal({ dealRef, to, from, onClose, done }: {
   };
   return (
     <>
-      <div className="md-h"><h3>Change stage</h3><p>{dealRef} · a remark is required</p><MdX onClose={onClose} /></div>
+      <ModalHead title="Change stage" sub={<>{dealRef} · a remark is required</>} onClose={onClose} />
       <div className="md-b">
         <ErrSlot err={err} />
         {/* Both stages on one line, in the order the deal moves through them, so
@@ -594,7 +581,7 @@ function ValueModal({ dealRef, onClose, done }: {
   const { dl, loading } = useDeal(dealRef);
   const [err, setErr] = useState<Refusal | null>(null);
   const [busy, setBusy] = useState(false);
-  if (loading) return <><div className="md-h"><h3>Set deal value</h3><p>{dealRef}</p><MdX onClose={onClose} /></div><Loading /></>;
+  if (loading) return <><ModalHead title="Set deal value" sub={dealRef} onClose={onClose} /><Loading /></>;
   if (!dl) return <Gone title="Set deal value" dealRef={dealRef} onClose={onClose} />;
   const save = () => {
     const typed = val("vAmt").trim();
@@ -607,7 +594,7 @@ function ValueModal({ dealRef, onClose, done }: {
   };
   return (
     <>
-      <div className="md-h"><h3>Set deal value</h3><p>{dealRef} · the agreed total</p><MdX onClose={onClose} /></div>
+      <ModalHead title="Set deal value" sub={<>{dealRef} · the agreed total</>} onClose={onClose} />
       <div className="md-b">
         <ErrSlot err={err} />
         <Field id="vAmt" label="Total agreed deal value" ph="8,85,000"
@@ -632,7 +619,7 @@ function CloseModal({ dealRef, onClose, done }: {
   const { dl, loading } = useDeal(dealRef);
   const [err, setErr] = useState<Refusal | null>(null);
   const [busy, setBusy] = useState(false);
-  if (loading) return <><div className="md-h"><h3>Close deal</h3><p>{dealRef}</p><MdX onClose={onClose} /></div><Loading /></>;
+  if (loading) return <><ModalHead title="Close deal" sub={dealRef} onClose={onClose} /><Loading /></>;
   if (!dl) return <Gone title="Close deal" dealRef={dealRef} onClose={onClose} />;
 
   const commit = () => {
@@ -649,7 +636,7 @@ function CloseModal({ dealRef, onClose, done }: {
   };
   return (
     <>
-      <div className="md-h"><h3>Close deal</h3><p>{dealRef} · Won or Lost, and reversible either way</p><MdX onClose={onClose} /></div>
+      <ModalHead title="Close deal" sub={<>{dealRef} · Won or Lost, and reversible either way</>} onClose={onClose} />
       <div className="md-b">
         <ErrSlot err={err} />
         {dl.stage !== STAGE.WON
@@ -726,7 +713,7 @@ function ReassignModal({ dealRef, onClose, done }: {
     return () => { cancelled = true; };
   }, []);
 
-  if (loading) return <><div className="md-h"><h3>Reassign</h3><p>{dealRef}</p><MdX onClose={onClose} /></div><Loading /></>;
+  if (loading) return <><ModalHead title="Reassign" sub={dealRef} onClose={onClose} /><Loading /></>;
   if (!dl) return <Gone title="Reassign" dealRef={dealRef} onClose={onClose} />;
 
   const commit = () => {
@@ -756,8 +743,7 @@ function ReassignModal({ dealRef, onClose, done }: {
   const coOwnerNow = dl.co_owner_id || "none";
   return (
     <>
-      <div className="md-h"><h3>Reassign</h3>
-        <p>{dealRef} · owner {ownerNow} · co-owner {coOwnerNow}</p><MdX onClose={onClose} /></div>
+      <ModalHead title="Reassign" sub={<>{dealRef} · owner {ownerNow} · co-owner {coOwnerNow}</>} onClose={onClose} />
       <div className="md-b">
         <ErrSlot err={err} />
         {people === null ? <div className="faint">Loading the team…</div> : null}

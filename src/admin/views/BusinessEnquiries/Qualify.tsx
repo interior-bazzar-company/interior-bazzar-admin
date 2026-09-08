@@ -224,7 +224,7 @@ export function QualifyPanel({ e, onQualified }: { e: Enquiry; onQualified: (msg
             {TAGS.map((t) => {
               const on = e.tags.indexOf(t.slug) >= 0;
               return (
-                <button key={t.slug} className={"be-tag pick " + (t.tone || "") + (on ? " on" : "")}
+                <button key={t.slug} className={"pill xs pick " + (t.tone || "") + (on ? " on" : "")}
                   disabled={!writes} aria-pressed={on}
                   aria-label={t.label + " — " + t.help + (t.auto ? " Set automatically from the contact log." : "")}
                   title={t.help + (t.auto ? " · set automatically from the contact log" : "")}

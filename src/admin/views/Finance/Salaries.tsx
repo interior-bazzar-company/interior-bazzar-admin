@@ -23,7 +23,7 @@
    ============================================================================= */
 import { useShell } from "../../shell/ShellContext";
 import { can } from "../../shell/AdminShell";
-import { EmptyState, FilterChips, Icon, SearchField, Select, StatStrip, avatarTone, initials } from "../../ui";
+import { avatarTone, EmptyState, FilterChips, Icon, initials, ListTable, SearchField, Select, StatStrip } from "../../ui";
 import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import { Frame, ViewBand } from "./Frame";
@@ -266,26 +266,21 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
         <SalaryTransactions p={p} onUnfilter={onUnfilter} />
       ) : (<>
       {filtered.length ? (
-        <table className="tbl dls-tbl fin-tbl">
-          <thead>
-            <tr>
+        <ListTable cls="fin-tbl" head={<tr>
               <th className="rail" />
               <th>Person</th>
               <th>Engagement</th>
-              <th className="num">Monthly net</th>
+              <th className="n">Monthly net</th>
               <th>This month</th>
-              <th className="num">Due now</th>
+              <th className="n">Due now</th>
               <th>Last paid</th>
               <th className="tight" />
-            </tr>
-          </thead>
-          <tbody>
+            </tr>}>
             {filtered.map((r) => (
               <PersonRow key={r.a.salaryAccountId} r={r} p={p}
                 onPay={writable ? pay : null} />
             ))}
-          </tbody>
-        </table>
+          </ListTable>
       ) : (
         <EmptyState icon={narrowed ? "search" : "team"}
           title={narrowed ? "Nobody matches those filters" : "No salary account has been opened"}
@@ -335,7 +330,7 @@ function PersonRow({ r, p, onPay }: {
         <span className="pill">{eng ? eng.label : a.engagement}</span>
         {a.active ? null : <div className="cell-2">account closed</div>}
       </td>
-      <td className="num"><Money paise={r.monthlyNetPaise} strong /></td>
+      <td className="n"><Money paise={r.monthlyNetPaise} strong /></td>
 
       {/* THE STATE, AND THE MONTH IT IS ABOUT. A tag on its own would not say
           which month it means, and on a row that can be two months behind that
@@ -367,7 +362,7 @@ function PersonRow({ r, p, onPay }: {
       {/* ARREARS PLUS THE CURRENT MONTH, as one figure, because that is what
           the transfer will be. The breakdown is underneath so the number is
           never a total nobody can take apart. */}
-      <td className="num">
+      <td className="n">
         {d.pendingPaise ? (
           <>
             <Money paise={d.pendingPaise} strong />

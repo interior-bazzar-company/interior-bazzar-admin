@@ -419,27 +419,16 @@
 /* Kept whole so a wrapped reference line breaks BETWEEN the id and the number,
    never inside the number. */
 .be-list .be-tbl .cell-2 .nowrap { white-space: nowrap }
-.be-tag {
-  display: inline-flex; align-items: center; gap: 4px; height: 18px; padding: 0 7px;
-  border: 1px solid var(--line-2); border-radius: var(--radius-full);
-  font-size: var(--text-2xs); line-height: 1; color: var(--text-2); background: var(--bg);
-  white-space: nowrap;
-}
-.be-tag.ok   { border-color: var(--ok-line);   color: var(--ok);   background: var(--ok-bg) }
-.be-tag.warn { border-color: var(--warn-line); color: var(--warn); background: var(--warn-bg) }
-.be-tag.bad  { border-color: var(--bad-line);  color: var(--bad);  background: var(--bad-bg) }
-.be-tag.more { color: var(--text-3); border-style: dashed }
-/* The dotted leader marks a tag the system owns. An operator needs to know
-   which of their tags the next logged call is about to recompute. */
-.be-tag .auto {
-  width: 5px; height: 5px; border-radius: var(--radius-full);
-  border: 1px dotted currentColor; flex: 0 0 5px;
-}
-.be-tag.pick { height: 24px; padding: 0 9px; font-size: var(--text-xs); cursor: pointer }
-.be-tag.pick:hover:not(:disabled) { border-color: var(--line-control) }
-.be-tag.pick:disabled { opacity: .5; cursor: not-allowed }
-.be-tag.pick.on { border-color: currentColor; box-shadow: inset 0 0 0 1px currentColor }
-.be-tag.pick.on:not(.ok):not(.warn):not(.bad) { background: var(--bg-active); color: var(--text) }
+/* THE TAG CHIP IS `.pill.xs` -- the panel's one chip. `.be-tag` drew a third
+   one here, 18px with its own tone rules and a dotted marker for a system
+   tag; the pill's `is-auto` dashed edge and sparkle say the same thing. */
+/* A PICKABLE tag in the qualification checklist: the panel's pill, as a
+   toggle. `pick` is behaviour, not a second drawing. */
+.pill.pick { height: 24px; padding: 0 9px; font-size: var(--text-xs); cursor: pointer; border: 1px solid var(--line-2) }
+.pill.pick:hover:not(:disabled) { border-color: var(--line-control) }
+.pill.pick:disabled { opacity: .5; cursor: not-allowed }
+.pill.pick.on { border-color: currentColor; box-shadow: inset 0 0 0 1px currentColor }
+.pill.pick.on:not(.ok):not(.warn):not(.bad) { background: var(--bg-active); color: var(--text) }
 .be-tagpick { display: flex; flex-wrap: wrap; gap: 5px }
 
 /* ---------------------------------------------------------- the panel ----- */
@@ -756,154 +745,31 @@
 }
 .be-sortslot .selectbox select { width: 100% }
 
-/* ============================================================================
-   THE FILTER LISTBOX
-   ----------------------------------------------------------------------------
-   Replaces the native <select> in the filter band. Everything below styles a
-   control the browser used to draw for us — the price of being able to style
-   the OPEN list at all, which no amount of CSS on a <select> can do.
-   ========================================================================== */
-.be-fsel { position: relative; display: block }
-
-/* THE CLOSED CONTROL. At rest it is a well with a hairline, because ten of them
-   at full contrast is a form to fill in rather than a set of optional
-   narrowings. Set, it takes the brand fill and carries the contrast alone. */
-.be-fsel-t {
-  display: flex; align-items: center; gap: var(--space-2);
-  width: 100%; height: var(--control-md);
-  padding: 0 var(--space-2) 0 var(--space-3);
-  border: 1px solid var(--line-2); border-radius: var(--radius-md);
-  background: var(--bg-inset); color: var(--text-2);
-  font: inherit; font-size: var(--text-md); text-align: left; cursor: pointer;
-  transition: border-color var(--duration) var(--ease), background var(--duration) var(--ease);
-}
-.be-fsel-t > .l { flex: 1 1 auto; min-width: 0; overflow: hidden;
-                  text-overflow: ellipsis; white-space: nowrap }
-.be-fsel-t:hover { border-color: var(--line-control); background: var(--bg); color: var(--text) }
-.be-fsel-t:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px }
-.be-fsel.on > .be-fsel-t {
-  border-color: var(--brand); background: var(--brand-tint);
-  color: var(--brand-text); font-weight: var(--weight-medium);
-}
-.be-fsel-caret { flex: 0 0 auto; opacity: .55; transition: transform var(--duration) var(--ease) }
-.be-fsel.open .be-fsel-caret { transform: rotate(180deg) }
-
-/* THE BUSINESS LOAD BALL. A notification-style count beside the business a row
-   went to: how many live enquiries that business is holding right now.
-
-   It repeats on every row for the same business, and that is the point — the
-   number you want is not "this row" but "how buried are they", and it should be
-   readable from whichever row you happen to be looking at. Counted across the
-   whole queue rather than the filtered rows, or filtering by city would quietly
-   change what the mark means. */
-.be-biz { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0 }
-.be-biz > .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
-.be-biz > .ct {
-  flex: 0 0 auto; display: grid; place-items: center;
-  min-width: 18px; height: 18px; padding: 0 5px;
-  border-radius: var(--radius-full);
-  background: var(--info-bg); color: var(--info); box-shadow: inset 0 0 0 1px var(--info-line);
-  font-size: var(--text-2xs); font-weight: var(--weight-semibold); line-height: 1;
-}
-/* Nothing live. It stays on the row rather than disappearing — "this business
-   is free" is worth knowing when you are deciding where the next one goes — but
-   it is hollow, because a notification ball reading zero as loudly as one
-   reading three is not a notification, it is decoration. */
-.be-biz > .ct.zero {
-  background: transparent; color: var(--text-3);
-  box-shadow: inset 0 0 0 1px var(--line-2); font-weight: var(--weight-normal);
-}
-
-/* ============================================================================
-   THE IDENTITY DOT
-   ----------------------------------------------------------------------------
-   One mark per status, and per urgency band — used by the filter list AND by the
-   status pill on every row, so the colour is worth learning.
-
-   It replaced four SEMANTIC tones (ok / warn / bad / info) shared across eight
-   statuses, which put three amber dots and two grey ones in one list. A legend
-   with duplicates is not a legend.
-
-   TWO AXES, because eight distinct hues would be eight things to memorise and
-   the palette has five:
-
-     HUE  says which part of the pipeline    ink → amber → indigo → green/rust
-     FILL says whose move it is              solid = ours · ring = theirs, or ended
-
-   So Assigned is a hollow indigo of the same hue as Qualified — the same work,
-   now sitting with somebody else — and No match yet is a hollow rust rather
-   than a solid one, because it is blocked, not killed. Rejected is the solid
-   rust: that one we did on purpose. */
-.be-dot {
-  flex: 0 0 auto; width: 8px; height: 8px; border-radius: var(--radius-full);
-  background: var(--line-control);
-}
+/* THE FILTER LISTBOX LEFT THIS FILE. It was `.be-fsel*`, drawn here for one
+   screen while sixteen other filter rows used the operating system's list.
+   It is `.sel` in admin-theme.css now, behind the shared `Select`, and this
+   module renders that. What stays is the identity dot's COLOURS -- the
+   lifecycle ramp is this module's, the dot's shape is the panel's. */
 /* ours to move */
-.be-dot.s-generated  { background: var(--line-control) }
-.be-dot.s-processing { background: var(--warn-solid) }
-.be-dot.s-qualified  { background: var(--info-solid) }
+.id-dot.s-generated  { background: var(--line-control) }
+.id-dot.s-processing { background: var(--warn-solid) }
+.id-dot.s-qualified  { background: var(--info-solid) }
 /* waiting on somebody else, or blocked */
-.be-dot.s-assigned   { background: transparent; box-shadow: inset 0 0 0 2px var(--info-solid) }
-.be-dot.s-no_match   { background: transparent; box-shadow: inset 0 0 0 2px var(--bad-solid) }
+.id-dot.s-assigned   { background: transparent; box-shadow: inset 0 0 0 2px var(--info-solid) }
+.id-dot.s-no_match   { background: transparent; box-shadow: inset 0 0 0 2px var(--bad-solid) }
 /* ended */
-.be-dot.s-converted     { background: var(--ok-solid) }
-.be-dot.s-not_converted { background: transparent; box-shadow: inset 0 0 0 2px var(--line-control) }
-.be-dot.s-invalid       { background: var(--bad-solid) }
+.id-dot.s-converted     { background: var(--ok-solid) }
+.id-dot.s-not_converted { background: transparent; box-shadow: inset 0 0 0 2px var(--line-control) }
+.id-dot.s-invalid       { background: var(--bad-solid) }
 
 /* URGENCY IS ORDINAL, so it looks ordinal: a heat ramp from soonest to latest.
    "Browsing" is hollow because it is not a date — it is the absence of one. */
-.be-dot.u-within_30d { background: var(--bad-solid) }
-.be-dot.u-30_90d     { background: var(--warn-solid) }
-.be-dot.u-90_plus    { background: var(--info-solid) }
-.be-dot.u-browsing   { background: transparent; box-shadow: inset 0 0 0 2px var(--line-control) }
+.id-dot.u-within_30d { background: var(--bad-solid) }
+.id-dot.u-30_90d     { background: var(--warn-solid) }
+.id-dot.u-90_plus    { background: var(--info-solid) }
+.id-dot.u-browsing   { background: transparent; box-shadow: inset 0 0 0 2px var(--line-control) }
 
-/* On a pill the dot sits inside a tinted background, so it needs to hold its
-   own edge against it. */
-.pill .be-dot { margin-right: 1px }
-.be-fsel-badge {
-  flex: 0 0 auto; display: grid; place-items: center;
-  width: 17px; height: 17px; border-radius: var(--radius-sm);
-  border: 1px solid var(--line-2); background: var(--bg);
-  font-size: var(--text-2xs); font-weight: var(--weight-semibold); color: var(--text-2);
-}
 
-/* THE OPEN LIST. Anchored to the control, above the band's own stacking rung so
-   it clears the table, and capped so a long list scrolls instead of running off
-   the fold. */
-.be-fsel-list {
-  position: absolute; top: calc(100% + 4px); left: 0; z-index: 2;
-  min-width: 100%; width: max-content; max-width: 280px;
-  max-height: 320px; overflow-y: auto;
-  padding: var(--space-1);
-  background: var(--surface-raised); border: 1px solid var(--line);
-  border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
-}
-.be-fsel-o {
-  display: flex; align-items: center; gap: var(--space-2);
-  width: 100%; padding: var(--space-2) var(--space-2);
-  border: 0; border-radius: var(--radius-md); background: none;
-  font: inherit; font-size: var(--text-md); color: var(--text);
-  text-align: left; cursor: pointer;
-}
-.be-fsel-o > .l { flex: 1 1 auto; min-width: 0 }
-/* A chip option carries its own shape, so it takes the row's flexible space in
-   place of the text span it replaces. */
-.be-fsel-o > .be-tag, .be-fsel-t > .be-tag { flex: 0 1 auto; min-width: 0 }
-.be-fsel-t > .be-tag { margin-right: auto }
-.be-fsel-o:hover { background: var(--bg-hover) }
-/* Focus is how the keyboard shows position here, so it must read as strongly as
-   hover does — a focus ring alone on a list this dense is easy to lose. */
-.be-fsel-o:focus-visible { outline: none; background: var(--bg-active);
-                           box-shadow: inset 0 0 0 2px var(--brand) }
-.be-fsel-o.sel { color: var(--brand-text); font-weight: var(--weight-medium) }
-.be-fsel-o.sel .ic { color: var(--brand) }
-/* "any" is the clear, and sits apart from the values it clears. */
-.be-fsel-o.any { color: var(--text-3) }
-.be-fsel-o.any + .be-fsel-o { margin-top: var(--space-1); position: relative }
-.be-fsel-o.any + .be-fsel-o::before {
-  content: ""; position: absolute; left: var(--space-2); right: var(--space-2);
-  top: calc(var(--space-1) * -0.5); height: 1px; background: var(--line-2);
-}
 
 /* THE COUNT BADGE ITSELF IS `.ct` IN admin-theme.css. This block used to
    restate every one of its declarations — the size, the radius, the type, the

@@ -15,7 +15,7 @@
    ============================================================================= */
 import { useShell } from "../../shell/ShellContext";
 import { can } from "../../shell/AdminShell";
-import { EmptyState, FilterChips, Icon, qs, SearchField, Select, StatStrip } from "../../ui";
+import { EmptyState, FilterChips, Icon, ListTable, qs, SearchField, Select, StatStrip } from "../../ui";
 import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import { Frame, ViewBand } from "./Frame";
@@ -275,15 +275,13 @@ function TxnTable({ p, writable, sa, onRecord, onUnfilter, onCancel, onCopied }:
     );
   }
   return (
-    <table className="tbl dls-tbl fin-tbl">
-      <thead>
-        <tr>
+    <ListTable cls="fin-tbl" head={<tr>
           <th className="rail" />
           <th>Transaction</th>
           <th>What</th>
           <th>Tag</th>
           <th>Direction</th>
-          <th className="num">Amount</th>
+          <th className="n">Amount</th>
           <th>Value date</th>
           <th>State</th>
           {/* THE ACTIONS COLUMN, where the chevron was. The chevron said the
@@ -291,14 +289,11 @@ function TxnTable({ p, writable, sa, onRecord, onUnfilter, onCancel, onCopied }:
               lighting under the cursor; what it could not say is that anything
               can be DONE from here, and until now nothing could. */}
           <th className="tight" />
-        </tr>
-      </thead>
-      <tbody>
+        </tr>}>
         {filtered.map((r) => (
           <TxnLine key={r.t.txnId} r={r} p={p} sa={writable && sa} onCancel={onCancel} onCopied={onCopied} />
         ))}
-      </tbody>
-    </table>
+      </ListTable>
   );
 }
 
@@ -330,7 +325,7 @@ function TxnLine({ r, p, sa, onCancel, onCopied }: {
       </td>
       <td><TagChip k={t.tagKey} /></td>
       <td><Dir d={t.direction} /></td>
-      <td className="num"><Money paise={t.amountPaise} sign={t.direction === "in"} strong /></td>
+      <td className="n"><Money paise={t.amountPaise} sign={t.direction === "in"} strong /></td>
       <td>
         <div className="cell-1">{fmtDate(t.valueDate)}</div>
         <div className="cell-2">{ago(t.valueDate)}</div>
@@ -367,24 +362,19 @@ function TagsTab({ writable, onBudget, onDeactivate }: {
           above. A caution over a table is read once and then looked past; the
           same sentence on the figure it governs is read at the moment somebody
           doubts the figure, which is the only moment it does any work. */}
-      <table className="tbl dls-tbl fin-tbl">
-        <thead>
-          <tr>
+      <ListTable cls="fin-tbl" head={<tr>
             <th>Tag</th>
             <th>Rolls up to</th>
             <th>Origin</th>
-            <th className="num">Spend · {PERIOD.label}</th>
+            <th className="n">Spend · {PERIOD.label}</th>
             <th>Budget</th>
             <th>Bill</th>
             <th className="tight" />
-          </tr>
-        </thead>
-        <tbody>
+          </tr>}>
           {rows.map((r) => (
             <TagLine key={r.tag.tagKey} r={r} writable={writable} onBudget={onBudget} onDeactivate={onDeactivate} />
           ))}
-        </tbody>
-      </table>
+        </ListTable>
     </>
   );
 }
@@ -403,7 +393,7 @@ function TagLine({ r, writable, onBudget, onDeactivate }: {
         <div className="cell-2">lands in {kind?.landsIn || "—"}</div>
       </td>
       <td>{t.custom ? <span className="pill info">Custom</span> : <span className="pill mute">Shipped</span>}</td>
-      <td className="num">
+      <td className="n">
         <Money paise={r.spentPaise} />
         {r.n ? <div className="cell-2">{r.n} row{r.n === 1 ? "" : "s"}</div> : null}
       </td>

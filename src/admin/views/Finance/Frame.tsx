@@ -4,7 +4,8 @@
    controls. The view band changes WHICH RECORD you are looking at; the filters
    narrow it, so the band produces no filter chip.
    ============================================================================= */
-import { useEffect, useRef, useState } from "react";
+import { MoreMenu } from "../../ui/menu";
+import type { MenuItem } from "../../ui/menu";
 import type { ReactNode } from "react";
 import { Icon } from "../../ui";
 import { go } from "../../ui/nav";
@@ -117,57 +118,10 @@ export function Block({ title, desc, right, wide, foot, children }: {
 export function Blocks({ children }: { children: ReactNode }) { return <div className="fin-blocks">{children}</div>; }
 
 /** One entry behind a More button. */
-export interface MenuItem {
-  icon: string; label: string; act: () => void;
-  disabled?: boolean; title?: string; tone?: string;
-}
-
-/** A row's actions behind one plain button, in the module's own `fin-menu`
- *  popover — the same shell and `.mi` rows the transactions table's dots menu
- *  uses, so the panel's menus cannot drift apart in look. The record pages
- *  use it whenever the right side would otherwise hold more than two
- *  controls: two stay buttons, three collapse. */
-export function MoreMenu({ items, small }: { items: MenuItem[]; small?: boolean }) {
-  const [open, setOpen] = useState(false);
-  const box = useRef<HTMLSpanElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const away = (e: MouseEvent) => {
-      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
-    };
-    const esc = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.stopPropagation();
-      setOpen(false);
-    };
-    document.addEventListener("mousedown", away);
-    document.addEventListener("keydown", esc, true);
-    return () => {
-      document.removeEventListener("mousedown", away);
-      document.removeEventListener("keydown", esc, true);
-    };
-  }, [open]);
-
-  return (
-    <span className="fin-menu" ref={box}>
-      <button type="button" className={"btn" + (small ? " sm" : "")} aria-haspopup="menu"
-        aria-expanded={open} onClick={() => setOpen(!open)}>More</button>
-      {open ? (
-        <span className="fin-menu-pop" role="menu" aria-label="Actions">
-          {items.map((it) => (
-            <button key={it.label} type="button" role="menuitem"
-              className={"mi" + (it.tone ? " " + it.tone : "")}
-              disabled={it.disabled} title={it.title}
-              onClick={() => { setOpen(false); it.act(); }}>
-              <Icon name={it.icon} size="sm" />{it.label}
-            </button>
-          ))}
-        </span>
-      ) : null}
-    </span>
-  );
-}
+/* THE MORE MENU IS `ui/menu`. A copy lived here -- the same rows, the same
+   `.mi`, the same handlers -- differing only in that its popup was
+   position:absolute, which is clipped by any scrolling ancestor. The shared
+   one measures its button and positions fixed. Slip.tsx imports that. */
 
 /** The record screen wrapper — the same chrome on all four detail pages.
  *  The slip page's pattern: the id leads, a thin rule sets the status pills

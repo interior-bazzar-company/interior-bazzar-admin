@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { inr, fmtDate } from "../../ui/format";
-import { EmptyState, FilterChips, Notice, Pill, SearchField, Select, StatStrip, TbTitle, qs, Icon } from "../../ui";
+import { EmptyState, FilterChips, Icon, ListTable, Notice, Pill, qs, SearchField, Select, StatStrip, TbTitle } from "../../ui";
 import type { StatCell } from "../../ui";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { getSession } from "../../auth/session";
@@ -250,10 +250,10 @@ function InvoicesTable({ rows, p, go, onUnfilter, openPick }: {
           : null} />;
 
   return (
-    <table className="tbl dls-tbl"><thead><tr>
+    <ListTable head={<tr>
       <th style={{ width: "3px" }}></th><th>Invoice</th><th>Status</th><th>Chain</th>
       <th className="n">Amount · received</th><th>Due</th><th>Owner</th>
-    </tr></thead><tbody>
+    </tr>}>
       {rows.map((inv) => {
         const to = "#/invoices/" + inv.id;
         const over = isOverdue(inv);
@@ -287,7 +287,7 @@ function InvoicesTable({ rows, p, go, onUnfilter, openPick }: {
           </tr>
         );
       })}
-    </tbody></table>
+    </ListTable>
   );
 }
 

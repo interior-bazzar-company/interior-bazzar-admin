@@ -3,7 +3,7 @@
    never reaches it. Same header/error/footer shape as Plans' ConfirmModal,
    with a textarea instead of a canned notice. */
 import { useState } from "react";
-import { Icon, Notice } from "../../ui";
+import { ModalHead, Notice } from "../../ui";
 import { errMessage } from "../../../api/apiService";
 
 export default function ReasonModal({
@@ -26,11 +26,7 @@ export default function ReasonModal({
 
   return (
     <>
-      <div className="md-h">
-        <h3>{heading}</h3>
-        <p>{sub}</p>
-        <button className="md-x" data-close="1" onClick={onClose}><Icon name="x" /></button>
-      </div>
+      <ModalHead title={heading} sub={sub} onClose={onClose} />
       <div className="md-b">
         {err ? <Notice tone="bad" text={<b>{err}</b>} /> : null}
         <div className="fg">

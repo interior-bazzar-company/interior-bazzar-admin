@@ -20,9 +20,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import AdminOpsService from "../../../api/modules/adminOps";
 import { errMessage } from "../../../api/apiService";
-import {
-  EmptyState, FilterChips, Icon, Pill, SearchField, Select, StatStrip, TbTitle, qs,
-} from "../../ui";
+import { EmptyState, FilterChips, Icon, ListTable, Pill, qs, SearchField, Select, StatStrip, Tabs, TbTitle } from "../../ui";
 import type { StatCell } from "../../ui";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
@@ -185,14 +183,10 @@ export default function Team() {
       {/* Two collections behind one module: the people, and the people asking
           to get back in. Same `?tab=` convention the Platform surfaces use. */}
       <div className="dls-chips">
-        <div className="tabs">
-          <button className={tab === "members" ? "on" : ""} data-go={tabTo("members")}
-                  onClick={() => go(tabTo("members"))}>Members<span className="n">{rows.length}</span></button>
-          <button className={tab === "requests" ? "on" : ""} data-go={tabTo("requests")}
-                  onClick={() => go(tabTo("requests"))}>
-            Access requests{waiting ? <span className="n">{waiting}</span> : null}
-          </button>
-        </div>
+        <Tabs cur={tab} items={[
+          { k: "members", label: "Members", n: rows.length, quiet: true, to: tabTo("members") },
+          { k: "requests", label: "Access requests", n: waiting, to: tabTo("requests") },
+        ]} />
       </div>
 
       {tab === "members" ? (
@@ -232,16 +226,12 @@ export default function Team() {
 
           <div className="dls-body">
             {list.length ? (
-              <table className="tbl dls-tbl">
-                <thead>
-                  <tr>
+              <ListTable head={<tr>
                     <th style={{ width: "3px" }}></th><th>Member</th>
                     <th style={{ width: "220px" }}>Reports to</th>
                     <th style={{ width: "230px" }}>Role</th>
                     <th style={{ width: "190px" }}>Documents</th>
-                  </tr>
-                </thead>
-                <tbody>
+                  </tr>}>
                   {list.map((u) => (
                     <tr key={u.id} className={"clickable" + (u.roles.length ? "" : " u-warn")}
                         data-go={"#/team/" + u.id} onClick={() => go("#/team/" + u.id)}>
@@ -260,8 +250,7 @@ export default function Team() {
                       <td><DocsCell id={String(u.id)} /></td>
                     </tr>
                   ))}
-                </tbody>
-              </table>
+                </ListTable>
             ) : (
               <EmptyState
                 icon="team"

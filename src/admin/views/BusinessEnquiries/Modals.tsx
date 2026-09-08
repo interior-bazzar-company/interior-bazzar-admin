@@ -15,7 +15,7 @@
    ============================================================================= */
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { Icon, Notice } from "../../ui";
+import { Icon, ModalHead, Notice } from "../../ui";
 import { BusinessSearch, InfoNote } from "./bits";
 import {
   RULES, VOCAB, assign, businessById, invalidate, needsOverrideReason,
@@ -30,11 +30,7 @@ function Frame({ heading, sub, children, footer, onClose }: {
 }) {
   return (
     <>
-      <div className="md-h">
-        <h3>{heading}</h3>
-        {sub ? <p>{sub}</p> : null}
-        <button className="md-x" data-close="1" aria-label="Close" onClick={onClose}><Icon name="x" /></button>
-      </div>
+      <ModalHead title={heading} sub={sub} onClose={onClose} />
       <div className="md-b">{children}</div>
       <div className="md-f"><span className="spacer"></span>{footer}</div>
     </>

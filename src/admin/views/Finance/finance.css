@@ -115,12 +115,8 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
 
 /* ------------------------------------------------------------- tables --- */
 .fin-tbl { min-width: 1020px }
-.fin-tbl th.rail, .fin-tbl td.rail { width: 3px; padding: 0 }
-.fin-tbl td.rail i { display: block; width: 3px; height: 52px; background: transparent; border-radius: 0 2px 2px 0 }
-.fin-tbl td.rail i.warn { background: var(--warn-solid) }
-.fin-tbl td.rail i.bad { background: var(--bad-solid) }
-.fin-tbl td.rail i.ok { background: var(--ok-solid) }
-.fin-tbl td.num, .fin-tbl th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap }
+/* the exception rail is drawn once, in admin-theme.css (`.dls-tbl td.rail`) */
+/* a figure column is `.n`, as it is in every other list -- see `.tbl td.n` */
 .fin-tbl tr.dim td { color: var(--text-3) }
 .fin-tbl tr.dim .fin-money { text-decoration: line-through; color: var(--text-3) }
 /* `.fin-pager` is gone — it had no call site left, and the panel's pager is
@@ -509,21 +505,7 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
    buttons; what matters here is that it opens LEFT of the button — the button
    sits in the table's last column, and a menu opening rightward would leave
    the viewport. */
-.fin-menu { position: relative; display: inline-flex }
-/* The items are the theme's own `.mi` rows; this shell only positions the
-   popover — same surface, radius and shadow as the panel's other menus. */
-.fin-menu-pop {
-  position: absolute; z-index: 45; top: calc(100% + 4px); right: 0;
-  display: flex; flex-direction: column; min-width: 168px; padding: var(--space-1);
-  background: var(--surface-raised); border: 1px solid var(--line);
-  border-radius: var(--radius-xl); box-shadow: var(--shadow-lg);
-  animation: rise var(--duration) var(--ease-out);
-}
-.fin-menu-pop .mi { white-space: nowrap }
-.fin-menu-pop .mi:disabled { color: var(--text-3); cursor: default; background: none }
-.fin-menu-pop .mi.bad { color: var(--bad) }
-.fin-menu-pop .mi.bad .ic { color: var(--bad) }
-.fin-menu-pop .mi.bad:hover:not(:disabled) { background: var(--bad-bg) }
+/* `.fin-menu*` is gone -- the More menu is `.ib-menu` in admin-theme.css. */
 
 /* The role pill inside a PRIMARY button was the badge's own warn/bad colours
    on the button's green — unreadable, and worse when disabled. Inside a

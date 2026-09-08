@@ -12,7 +12,7 @@
    whether it is going to say yes.
    ===================================================================== */
 import { useState } from "react";
-import { Icon, KvList, Notice } from "../../ui";
+import { KvList, ModalHead, Notice } from "../../ui";
 import { inr, fmtDate } from "../../ui/format";
 import { errMessage } from "../../../api/apiService";
 import { blockersOf, planItemOf } from "./helpers";
@@ -37,11 +37,7 @@ export default function IssueModal({ inv, onClose, run }: {
 
   return (
     <>
-      <div className="md-h">
-        <h3>Issue invoice</h3>
-        <p>{inr(inv.grandTotalPaise)} · due {fmtDate(inv.dueDate)}</p>
-        <button className="md-x" data-close="1" aria-label="Close" onClick={onClose}><Icon name="x" /></button>
-      </div>
+      <ModalHead title="Issue invoice" sub={<>{inr(inv.grandTotalPaise)} · due {fmtDate(inv.dueDate)}</>} onClose={onClose} />
 
       <div className="md-b">
         {err ? <Notice tone="bad" text={<b>{err}</b>} /> : null}

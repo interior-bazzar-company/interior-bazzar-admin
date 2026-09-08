@@ -31,10 +31,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
-import {
-  EmptyState, FilterChips, Icon, Notice, SearchField, SectionHead, Select, StatStrip, Table,
-  TbTitle, Tiles, qs,
-} from "../../ui";
+import { EmptyState, FilterChips, Icon, Notice, qs, SearchField, SectionHead, Select, StatStrip, Table, Tabs, TbTitle, Tiles } from "../../ui";
 import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import {
@@ -95,15 +92,10 @@ export default function Attendance() {
   return (
     <div className="dls">
       <div className="dls-chips">
-        <div className="tabs">
-          {FACES.map((f) => (
-            <button key={f.k} className={face === f.k ? "on" : ""}
-              onClick={() => goto({ face: f.k === "today" ? undefined : f.k })}>
-              <Icon name={f.icon} size="sm" />{f.label}
-              {f.k === "requests" && waiting ? <span className="n">{waiting}</span> : null}
-            </button>
-          ))}
-        </div>
+        <Tabs cur={face}
+          items={FACES.map((f) => ({ k: f.k, label: f.label, icon: f.icon,
+            n: f.k === "requests" ? waiting : undefined }))}
+          onPick={(k) => goto({ face: k === "today" ? undefined : k })} />
       </div>
 
       {face === "today" || face === "history" ? (

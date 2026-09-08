@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { inr, fmtDate } from "../../ui/format";
-import { EmptyState, FilterChips, Notice, Pill, SearchField, Select, StatStrip, TbTitle, qs, Icon } from "../../ui";
+import { EmptyState, FilterChips, Icon, ListTable, Notice, Pill, qs, SearchField, Select, StatStrip, TbTitle } from "../../ui";
 import type { StatCell } from "../../ui";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
@@ -219,10 +219,10 @@ function QuotationsTable({ rows, p, go, onUnfilter, openPick }: {
           : null} />;
 
   return (
-    <table className="tbl dls-tbl"><thead><tr>
+    <ListTable head={<tr>
       <th style={{ width: "3px" }}></th><th>Quotation</th><th>Status</th><th>Deal</th>
       <th className="n">Value</th><th>Valid until</th><th>Owner</th>
-    </tr></thead><tbody>
+    </tr>}>
       {rows.map((q) => {
         const to = "#/quotations/" + q.id;
         return (
@@ -246,7 +246,7 @@ function QuotationsTable({ rows, p, go, onUnfilter, openPick }: {
           </tr>
         );
       })}
-    </tbody></table>
+    </ListTable>
   );
 }
 

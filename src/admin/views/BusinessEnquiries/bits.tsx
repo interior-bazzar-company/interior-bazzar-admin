@@ -141,7 +141,7 @@ export function StatusPill({ status, lg }: { status: string; lg?: boolean }) {
   const s = statusOf(status);
   return (
     <Pill tone={s.tone} lg={lg} title={s.meaning}
-      text={<><span className={"be-dot s-" + status} />{s.label}</>} />
+      text={<><span className={"id-dot s-" + status} />{s.label}</>} />
   );
 }
 
@@ -188,12 +188,13 @@ export function TagChips({ tags, max }: { tags: string[]; max?: number }) {
       {show.map((slug) => {
         const t = tagOf(slug);
         return (
-          <span key={slug} className={"be-tag " + (t.tone || "")} title={t.help}>
-            {t.auto ? <i className="auto" /> : null}{t.label}
+          <span key={slug} className={"pill xs" + (t.tone ? " " + t.tone : "") + (t.auto ? " is-auto" : "")}
+            title={t.help}>
+            {t.auto ? <Icon name="sparkle" size="xs" /> : null}{t.label}
           </span>
         );
       })}
-      {rest > 0 ? <span className="be-tag more">+{rest}</span> : null}
+      {rest > 0 ? <span className="pill xs mute">+{rest}</span> : null}
     </span>
   );
 }

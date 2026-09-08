@@ -546,16 +546,38 @@ export function Notice({ text, tone, ico, children }: { text?: ReactNode; tone?:
 /* The prototype's `.tabs` row — the theme already carries the styling, only the
    component was missing. `n` is a count badge; a zero prints nothing rather than
    a "0" nobody needs to read. */
-export function Tabs({ items, cur, onPick }: {
-  items: { k: string; label: string; n?: number }[];
+/* THE TAB ROW. Five modules hand-rolled `<div className="tabs">` with their own
+   buttons to get three things this component did not offer: an icon in the
+   label, a link-style tab that carries `data-go`, and a count that is a plain
+   figure rather than a demand. All three are props now.
+
+   `n` shows only when it means somebody owes something -- "3 waiting". A count
+   that is merely a size, like how many responses arrived, is `quiet`, so it
+   does not read as a to-do. */
+export function Tabs({ items, cur, onPick, cls }: {
+  items: {
+    k: string; label: ReactNode; icon?: string;
+    n?: number | null; quiet?: boolean;
+    /** a LINK tab: carries `data-go` and routes through `go()` */
+    to?: string;
+  }[];
   cur: string;
-  onPick: (k: string) => void;
+  onPick?: (k: string) => void;
+  cls?: string;
 }) {
   return (
-    <div className="tabs">
+    <div className={"tabs" + (cls ? " " + cls : "")} role="tablist">
       {items.map((t) => (
-        <button key={t.k} className={t.k === cur ? "on" : ""} onClick={() => onPick(t.k)}>
-          {t.label}{t.n ? <span className="n">{t.n}</span> : null}
+        <button key={t.k} type="button" role="tab"
+          aria-selected={t.k === cur}
+          data-go={t.to}
+          onClick={() => { if (onPick) onPick(t.k); if (t.to) go(t.to); }}
+          className={t.k === cur ? "on" : ""}>
+          {t.icon ? <Icon name={t.icon} size="sm" /> : null}
+          {t.label}
+          {typeof t.n === "number" && t.n > 0
+            ? <span className={"n" + (t.quiet ? " is-quiet" : "")}>{t.n}</span>
+            : null}
         </button>
       ))}
     </div>
@@ -625,6 +647,36 @@ export function Table(o: TableProps) {
    Pass the string "sep" for a hairline. The trailing spacer packs the row
    left, so a strip of four cells and a strip of eight both start at the same
    x as the command row above them.                                          */
+/* THE LIST TABLE. Twelve list pages wrote `<table className="tbl dls-tbl">`
+   by hand -- Users added `um-tbl`, Finance added `fin-tbl` and called its
+   figure column `num` where everybody else said `n`, and the exception rail in
+   column one was drawn three ways at two heights. `Table` above is the CARD
+   table, framed in `.tw` with its head in a well, which is right for a record's
+   sub-list and wrong for a queue: a queue sits flat on the page with its head
+   on the plane, and its rows are two lines tall.
+
+   The rows are still the caller's -- a queue's row is the whole module -- but
+   the frame, the head, the rail column and the figure columns are one drawing.
+   `head` is the `<tr>` of `<th>`s, so a migration is the wrapper only. */
+export function ListTable({ head, children, cls, min }: {
+  head: ReactNode; children: ReactNode; cls?: string; min?: string;
+}) {
+  return (
+    <table className={"tbl dls-tbl" + (cls ? " " + cls : "")}
+      style={min ? { minWidth: min } : undefined}>
+      <thead>{head}</thead>
+      <tbody>{children}</tbody>
+    </table>
+  );
+}
+
+/* The exception stripe in a list row's first column: 3px in a status colour,
+   findable without reading. `tone` is the row's judgement -- the caller decides
+   whether "overdue" is `bad` or `warn`; the stripe only paints it. */
+export function Rail({ tone, title }: { tone?: string; title?: string }) {
+  return <td className="rail"><i className={tone || undefined} title={title} /></td>;
+}
+
 export interface StatCell {
   k?: ReactNode;
   v?: ReactNode;
@@ -713,37 +765,14 @@ export function SearchField({ ph, val, name, onFilter }: {
   );
 }
 
-/* THE FILTER SELECT. A real <select>, on purpose: it opens with the platform's
-   own list, so it is correct on a phone, correct with a screen reader, correct
-   under a hundred options, and needs no positioning inside a toolbar that is
-   already wrapping. The chevron is painted by CSS from `--chevron`.
-
-   AN ACTIVE FILTER LOOKS ACTIVE. `.on` gives the control a brand edge and
-   brand text, because a filter you cannot see is a filter you cannot clear —
-   and this is the one control on the page whose value silently changes what
-   every number below it means. */
-export function Select({ name, label, options, value, onFilter }: {
-  name: string;
-  label?: string;
-  options: (string | { v: string; l: string })[];
-  value?: string | number;
-  onFilter?: (name: string, value: string) => void;
-}) {
-  const on = value !== undefined && value !== null && value !== "";
-  return (
-    <select className={"sel" + (on ? " on" : "")}
-      data-filter={name} aria-label={label || name}
-      defaultValue={String(value === undefined || value === null ? "" : value)}
-      onChange={(e) => onFilter && onFilter(name, e.target.value)}>
-      <option value="">{label || "All"}</option>
-      {options.map((o) => {
-        const v = typeof o === "string" ? o : o.v;
-        const l = typeof o === "string" ? o : o.l;
-        return <option key={v} value={v}>{l}</option>;
-      })}
-    </select>
-  );
-}
+/* THE FILTER SELECT IS THE LISTBOX IN ./select.tsx. A native <select> lived
+   here -- "a real <select>, on purpose" -- and it was the wrong purpose: the
+   closed control took the panel's paint, the OPEN list was the operating
+   system's, and sixteen filter rows ended in a rectangle of system blue while
+   Business Enquiries drew its own and looked like the product. One dropdown
+   now, and it is that one. The prop shape is unchanged, so no caller moved. */
+export { Select } from "./select";
+export type { SelectOption, SelectOptionLike } from "./select";
 
 /* =============================================================================
    CHIP INPUT — several values in one field
@@ -1110,7 +1139,7 @@ export function FormField({ id, label, req, hint, err, children, cls }: {
       {children}
       {err
         ? <span className="fg-err" role="alert"><Icon name="alert" size="xs" />{err}</span>
-        : hint ? <span className="fg-hint">{hint}</span> : null}
+        : hint ? <span className="help">{hint}</span> : null}
     </div>
   );
 }
@@ -1325,12 +1354,12 @@ export function MultiSelect({ options, value, onChange, label, sm, max }: {
         const el = box.current;
         if (el && !el.contains(e.relatedTarget as Node)) setOpen(false);
       }}>
-      <button type="button" className={"sel-btn" + (sm ? " sm" : "") + (value.length ? " on" : "")}
+      <button type="button" className={"sel-t" + (sm ? " sm" : "") + (value.length ? " on" : "")}
         aria-expanded={open} aria-haspopup="listbox"
         onClick={() => setOpen((o) => !o)}>
-        <span className="trunc">{label || "Select"}</span>
+        <span className="l">{label || "Select"}</span>
         {value.length ? <span className="ct tnum">{value.length}</span> : null}
-        <Icon name="chev" size="sm" />
+        <Icon name="chev" size="sm" className="sel-caret" />
       </button>
       {open ? (
         <div className="menu" role="listbox" aria-multiselectable="true">
@@ -1425,23 +1454,66 @@ export function FileUpload({ id, accept, multiple, hint, disabled, onFiles }: {
    where the eye finishes and where the pointer already is. The destructive one
    is pulled to the far LEFT so it is never the button beside the one somebody
    meant to press. */
-export function ModalShell({ title, sub, children, actions, danger, onClose }: {
-  title?: ReactNode; sub?: ReactNode; children?: ReactNode;
+/* THE MODAL HEAD. Twenty-six files drew this by hand -- `<div className="md-h">`,
+   an `<h3>`, a `<p>` (sometimes `.mono`, sometimes not), and a close button
+   drawn three different ways: a module-local `MdX`, a raw `.md-x` with an
+   Icon, a raw `.md-x` with an inline SVG. Fifty-five heads, one shape, four
+   drawings, and two competing `.md-x` rules in the stylesheet -- one absolute,
+   one flex -- because each drawing needed a different one.
+
+   One component now. `sub` is the line under the title; `mono` sets it in the
+   data face for an id; `ico` is the hero variant, where an icon anchors the
+   dialog so it reads as a thing that opened rather than a page that swapped. */
+export function ModalHead({ title, sub, mono, ico, onClose }: {
+  title: ReactNode; sub?: ReactNode; mono?: boolean; ico?: string; onClose?: () => void;
+}) {
+  return (
+    <div className={"md-h" + (ico ? " md-hero" : "")}>
+      {ico ? <span className="md-ic"><Icon name={ico} /></span> : null}
+      <div className="min-0">
+        <h3>{title}</h3>
+        {sub ? <p className={mono ? "mono" : undefined}>{sub}</p> : null}
+      </div>
+      {onClose ? (
+        <button type="button" className="md-x" data-close="1" aria-label="Close" onClick={onClose}>
+          <Icon name="x" />
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+/* THE DRAWER HEAD, the same object one layer over: a drawer inspects a record
+   while the list it came from stays on screen, so its head carries the
+   record's identity -- an avatar or a mark -- where a modal's carries a
+   question. */
+export function DrawerHead({ title, sub, mark, onClose, right }: {
+  title: ReactNode; sub?: ReactNode; mark?: ReactNode; onClose?: () => void; right?: ReactNode;
+}) {
+  return (
+    <div className="dw-h">
+      {mark}
+      <div className="min-0">
+        <h3>{title}</h3>
+        {sub ? <div className="dw-sub">{sub}</div> : null}
+      </div>
+      {right}
+      {onClose ? (
+        <button type="button" className="dw-x" aria-label="Close" onClick={onClose}>
+          <Icon name="x" size="sm" />
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+export function ModalShell({ title, sub, mono, ico, children, actions, danger, onClose }: {
+  title?: ReactNode; sub?: ReactNode; mono?: boolean; ico?: string; children?: ReactNode;
   actions?: ReactNode; danger?: ReactNode; onClose?: () => void;
 }) {
   return (
     <>
-      <div className="md-h">
-        <div className="min-0">
-          {title ? <h3>{title}</h3> : null}
-          {sub ? <div className="md-sub">{sub}</div> : null}
-        </div>
-        {onClose ? (
-          <button type="button" className="md-x" aria-label="Close" onClick={onClose}>
-            <Icon name="x" size="sm" />
-          </button>
-        ) : null}
-      </div>
+      {title ? <ModalHead title={title} sub={sub} mono={mono} ico={ico} onClose={onClose} /> : null}
       <div className="md-b">{children}</div>
       {actions || danger ? (
         <div className="md-f">
@@ -1491,17 +1563,7 @@ export function DrawerShell({ title, sub, children, actions, onClose }: {
 }) {
   return (
     <>
-      <div className="dw-h">
-        <div className="min-0">
-          {title ? <h3>{title}</h3> : null}
-          {sub ? <div className="dw-sub">{sub}</div> : null}
-        </div>
-        {onClose ? (
-          <button type="button" className="dw-x" aria-label="Close" onClick={onClose}>
-            <Icon name="x" size="sm" />
-          </button>
-        ) : null}
-      </div>
+      {title ? <DrawerHead title={title} sub={sub} onClose={onClose} /> : null}
       <div className="dw-b">{children}</div>
       {actions ? <div className="dw-f">{actions}</div> : null}
     </>

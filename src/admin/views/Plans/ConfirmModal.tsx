@@ -9,7 +9,7 @@
    ===================================================================== */
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { Icon, Notice } from "../../ui";
+import { ModalHead, Notice } from "../../ui";
 import { errMessage } from "../../../api/apiService";
 
 export default function ConfirmModal({
@@ -30,11 +30,7 @@ export default function ConfirmModal({
   const [busy, setBusy] = useState(false);
   return (
     <>
-      <div className="md-h">
-        <h3>{heading}</h3>
-        <p>{sub}</p>
-        <button className="md-x" data-close="1" onClick={onClose}><Icon name="x" /></button>
-      </div>
+      <ModalHead title={heading} sub={sub} onClose={onClose} />
       <div className="md-b">
         <div id="plErr">
           {err ? <Notice tone="bad" text={<b>{err}</b>} /> : null}

@@ -7,7 +7,7 @@
    RefundModals) and they all build from here.
    ============================================================================= */
 import type { ReactNode } from "react";
-import { Icon, Notice } from "../../ui";
+import { ModalHead, Notice } from "../../ui";
 
 export type Done = (msg: string, tone?: string) => void;
 
@@ -18,11 +18,7 @@ export function Dlg({ title, sub, onClose, footer, err, children }: {
 }) {
   return (
     <>
-      <div className="md-h">
-        <h3>{title}</h3>
-        {sub ? <p>{sub}</p> : null}
-        <button className="md-x" data-close="1" onClick={onClose} aria-label="Close"><Icon name="x" /></button>
-      </div>
+      <ModalHead title={title} sub={sub} onClose={onClose} />
       <div className="md-b fin-form">
         {err ? <Notice tone="bad" text={<b>{err}</b>} /> : null}
         {children}

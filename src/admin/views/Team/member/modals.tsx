@@ -13,7 +13,7 @@
    store.ts, and the store's is the one that decides.
    ============================================================================= */
 import { useEffect, useState } from "react";
-import { Icon, Notice } from "../../../ui";
+import { Icon, ModalHead, Notice } from "../../../ui";
 import { useShell } from "../../../shell/ShellContext";
 import {
   AGREEMENT_KIND, LEAVE_KIND, DOCUMENT_KIND, TODAY, VOCAB, addDays, addDocument, createTag,
@@ -29,12 +29,7 @@ import type { Agreement, LeaveRequest, LeaveState, Tag } from "../store";
 function Head({ title, sub }: { title: string; sub?: string }) {
   const shell = useShell();
   return (
-    <div className="md-h">
-      <h3>{title}{sub ? <span className="md-sub">{sub}</span> : null}</h3>
-      <button className="btn icon sm md-x" aria-label="Close" onClick={() => shell.closeLayer()}>
-        <Icon name="x" size="sm" />
-      </button>
-    </div>
+    <ModalHead title={<>{title}{sub ? <span className="md-sub">{sub}</span> : null}</>} onClose={() => shell.closeLayer()} />
   );
 }
 

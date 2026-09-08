@@ -818,18 +818,19 @@ console.log("\nthe filter chips name what is applied and can clear it");
     return html;
   });
   check("the controls are keyed on their value, so clearing a chip clears the box", () => {
-    /* The option is always in the list; what must follow the URL is which one
-       is SELECTED. SearchField and Select are uncontrolled, so without the key
-       the old choice stayed in the dropdown after its chip was cleared. */
-    if (html.indexOf('value="Mumbai" selected=""') < 0) {
+    /* What must follow the URL is which option is SELECTED. `Select` is the
+       shared listbox now: its list exists only while open, so a string render
+       reads the CLOSED control, whose accessible label names the current
+       value -- "City: Mumbai" -- and "City: any" once the chip is cleared. */
+    if (html.indexOf('aria-label="City: Mumbai"') < 0) {
       throw new Error("the applied city is not the selected option");
     }
     const cleared = at("/users");
-    if (cleared.indexOf('value="Mumbai" selected=""') >= 0) {
+    if (cleared.indexOf('aria-label="City: Mumbai"') >= 0) {
       throw new Error("a stale selection survived the clear");
     }
     const city = cleared.slice(cleared.indexOf('data-filter="city"'), cleared.indexOf('data-filter="src"'));
-    if (city.indexOf('<option value="" selected="">City</option>') < 0) {
+    if (city.indexOf('aria-label="City: any"') < 0) {
       throw new Error("the City box did not fall back to its own placeholder");
     }
     /* And the search box empties with it. */
@@ -838,19 +839,19 @@ console.log("\nthe filter chips name what is applied and can clear it");
     return cleared;
   });
   check("the Account dropdown offers exactly the two classifications", () => {
+    /* The listbox names its option set, in order, on the closed control --
+       `data-options` -- which is what "exactly these" is asserted against. */
     const sel = html.slice(html.indexOf('data-filter="status"'), html.indexOf('data-filter="city"'));
-    ["Active", "Deactivated"].forEach((t) => {
-      if (sel.indexOf(">" + t + "<") < 0) throw new Error("no " + t + " option");
-    });
-    if ((sel.match(/<option/g) || []).length !== 3) {
-      throw new Error((sel.match(/<option/g) || []).length + " options, expected 3 with the placeholder");
+    if (sel.indexOf('data-options="Active|Deactivated"') < 0) {
+      throw new Error("the Account dropdown does not offer exactly Active and Deactivated");
     }
     return sel;
   });
   check("the Sort dropdown offers what applySort implements, and nothing withdrawn", () => {
     const sel = html.slice(html.indexOf('data-filter="sort"'));
+    const offered = (sel.match(/data-options="([^"]*)"/) || ["", ""])[1].split("|");
     ["Recently registered", "Last activity", "Name A to Z"].forEach((t) => {
-      if (sel.indexOf(">" + t + "<") < 0) throw new Error("no " + t + " option");
+      if (offered.indexOf(t) < 0) throw new Error("no " + t + " option");
     });
     if (sel.indexOf("Ending soonest") >= 0) throw new Error("a membership sort is still offered");
     if (sel.indexOf("Needs action first") < 0) throw new Error("the default is not named");

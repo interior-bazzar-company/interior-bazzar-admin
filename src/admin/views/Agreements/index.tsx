@@ -22,10 +22,7 @@ import { useCallback, useMemo } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
-import {
-  EmptyState, FilterChips, Icon, KvList, Notice, SearchField, Select, StatStrip,
-  Table, TbTitle, qs, shareOrCopy,
-} from "../../ui";
+import { EmptyState, FilterChips, Icon, KvList, ModalHead, Notice, qs, SearchField, Select, shareOrCopy, StatStrip, Table, Tabs, TbTitle } from "../../ui";
 import type { StatCell } from "../../ui";
 import { MoreMenu } from "../../ui/menu";
 import type { MenuItem } from "../../ui/menu";
@@ -96,18 +93,13 @@ function Workspace({ deepLink }: { deepLink: string | null }) {
   return (
     <div className="dls">
       <div className="dls-chips ag-tabwrap">
-        <div className="tabs">
-          {FACES.map((x) => (
-            <button key={x.k} className={face === x.k ? "on" : ""}
-              onClick={() => goto({ face: x.k === "templates" ? undefined : x.k,
-                q: undefined, state: undefined, tpl: undefined })}>
-              <Icon name={x.icon} size="sm" />{x.label}
-              {/* A number means somebody has not signed yet. Nothing else here
-                  is waiting on anybody. */}
-              {x.k === "sent" && waiting ? <span className="n">{waiting}</span> : null}
-            </button>
-          ))}
-        </div>
+        {/* A number means somebody has not signed yet. Nothing else here is
+            waiting on anybody. */}
+        <Tabs cur={face}
+          items={FACES.map((x) => ({ k: x.k, label: x.label, icon: x.icon,
+            n: x.k === "sent" ? waiting : undefined }))}
+          onPick={(k) => goto({ face: k === "templates" ? undefined : k,
+            q: undefined, state: undefined, tpl: undefined })} />
       </div>
 
       {face === "sent"
@@ -274,10 +266,8 @@ function SendModal({ t }: { t: Template }) {
 
   return (
     <>
-      <div className="md-h">
-        <h3>Send “{t.title}”</h3>
-        <p>Version {t.version}. The wording is copied into their copy as it stands now.</p>
-      </div>
+      <ModalHead title={<>Send “{t.title}”</>}
+        sub={<>Version {t.version}. The wording is copied into their copy as it stands now.</>} />
       <div className="md-b">
         <div className="ag-send">
           {roster.map((m) => {

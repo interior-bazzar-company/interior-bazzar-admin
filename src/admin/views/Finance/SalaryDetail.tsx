@@ -218,15 +218,15 @@ export default function SalaryDetail({ id, p, onParams }: {
               <thead>
                 <tr>
                   <th>Month</th>
-                  <th className="num">Paid days</th>
-                  <th className="num">Gross</th>
+                  <th className="n">Paid days</th>
+                  <th className="n">Gross</th>
                   {/* WHAT VARIED, beside the gross that contains it. Without this
                       column a month reads as an unexplained jump: the gross is
                       right, the salary did not change, and nothing on the row
                       says which of the two is true. */}
-                  <th className="num">of which earned</th>
-                  <th className="num">Deductions</th>
-                  <th className="num">Net</th>
+                  <th className="n">of which earned</th>
+                  <th className="n">Deductions</th>
+                  <th className="n">Net</th>
                   <th>Paid</th>
                   <th>Evidenced by</th>
                   <th className="tight" />
@@ -273,16 +273,16 @@ function SlipRow({ s, p }: { s: Payslip; p: Params }) {
         <div className="cell-1">{fmtMonth(s.month)}</div>
         <div className="cell-2 mono">{s.slipId}</div>
       </td>
-      <td className="num">
+      <td className="n">
         <span className="tnum">{s.paidDays}</span>
         {s.lopDays ? <div className="cell-2">{s.lopDays} day{s.lopDays === 1 ? "" : "s"} loss of pay</div> : null}
       </td>
-      <td className="num tnum">{inr(s.grossPaise)}</td>
-      <td className="num tnum">{incentiveOf(s)
+      <td className="n tnum">{inr(s.grossPaise)}</td>
+      <td className="n tnum">{incentiveOf(s)
         ? inr(incentiveOf(s))
         : <span className="faint">—</span>}</td>
-      <td className="num tnum">{s.deductionsPaise ? "−" + inr(s.deductionsPaise) : <span className="faint">none</span>}</td>
-      <td className="num"><Money paise={s.netPaise} strong /></td>
+      <td className="n tnum">{s.deductionsPaise ? "−" + inr(s.deductionsPaise) : <span className="faint">none</span>}</td>
+      <td className="n"><Money paise={s.netPaise} strong /></td>
       <td>
         {s.paidAt
           ? <><div className="cell-1">{fmtDate(s.paidAt)}</div><div className="cell-2">{ago(s.paidAt)}</div></>

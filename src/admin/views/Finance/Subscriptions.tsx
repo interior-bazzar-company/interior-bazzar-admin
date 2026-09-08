@@ -19,7 +19,7 @@
    ============================================================================= */
 import { useShell } from "../../shell/ShellContext";
 import { can } from "../../shell/AdminShell";
-import { EmptyState, FilterChips, Icon, SearchField, Select, StatStrip } from "../../ui";
+import { EmptyState, FilterChips, Icon, ListTable, SearchField, Select, StatStrip } from "../../ui";
 import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import { Frame, ViewBand } from "./Frame";
@@ -215,24 +215,19 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
         <SubAnalytics year={p.year || ""}
           onQueue={(flag) => onParams({ tab: undefined, year: undefined, flag })} />
       ) : shown.length ? (
-        <table className="tbl dls-tbl fin-tbl">
-          <thead>
-            <tr>
+        <ListTable cls="fin-tbl" head={<tr>
               <th className="rail" />
               <th>Subscription</th>
               <th>Plan</th>
-              <th className="num">Total</th>
+              <th className="n">Total</th>
               <th>Schedule</th>
               <th>What is next</th>
               <th>Source</th>
               <th>Status</th>
               <th className="tight" />
-            </tr>
-          </thead>
-          <tbody>
+            </tr>}>
             {shown.map((r) => <Row key={r.s.subscriptionId} r={r} p={p} />)}
-          </tbody>
-        </table>
+          </ListTable>
       ) : (
         <EmptyState icon={narrowed ? "search" : "cash"}
           title={narrowed ? "Nothing matches those filters" : "No subscription has been recorded yet"}
@@ -334,7 +329,7 @@ function Row({ r, p }: { r: SubRow; p: Params }) {
         <div className="cell-1">{s.planName}</div>
         <div className="cell-2">{s.cycleMonths} months · from {fmtDate(s.startDate)}</div>
       </td>
-      <td className="num">
+      <td className="n">
         <div className="cell-1"><Money paise={s.totalPaise} /></div>
         <div className="cell-2">{inr(r.paidPaise)} collected</div>
       </td>

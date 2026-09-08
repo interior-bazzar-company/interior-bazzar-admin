@@ -18,7 +18,7 @@
    broken: you opened "Delay" and were offered "Complete".
    ============================================================================= */
 import { useEffect, useRef, useState } from "react";
-import { Icon, Pill } from "../../ui";
+import { Icon, ModalHead, Pill } from "../../ui";
 import { useShell } from "../../shell/ShellContext";
 import { useMenuPlacement } from "../../ui/menu";
 import {
@@ -36,12 +36,7 @@ export function ReasonModal({ title, onSubmit }: {
   const [v, setV] = useState("");
   return (
     <>
-      <div className="md-h">
-        <h3>{title}</h3>
-        <button className="btn icon sm md-x" aria-label="Close" onClick={() => shell.closeLayer()}>
-          <Icon name="x" size="sm" />
-        </button>
-      </div>
+      <ModalHead title={title} onClose={() => shell.closeLayer()} />
       <div className="md-b">
         <div className="fg">
           <label htmlFor="tmReason">Reason <b className="req">*</b></label>

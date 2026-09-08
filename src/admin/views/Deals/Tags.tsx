@@ -11,7 +11,7 @@
    whatever is half-typed in the other four rows.
    ============================================================================= */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { EmptyState, Field, Icon, Notice, qs } from "../../ui";
+import { EmptyState, Field, Icon, ListTable, ModalHead, Notice, qs } from "../../ui";
 import { go } from "../../ui/nav";
 import { useShell } from "../../shell/ShellContext";
 import AdminOpsService, { call } from "../../../api/modules/adminOps";
@@ -82,9 +82,7 @@ export function TagsView({ p }: { p: Params }) {
       </div>
       <div className="dls-body">
         {all.length
-          ? <table className="tbl dls-tbl">
-              <thead><tr><th>List</th><th>Slug</th><th>Status</th><th className="n">Deals</th><th></th></tr></thead>
-              <tbody>
+          ? <ListTable head={<tr><th>List</th><th>Slug</th><th>Status</th><th className="n">Deals</th><th></th></tr>}>
                 {all.map((t) => {
                   const to = "#/deals" + qs(merge(omit(p, ["view"]), { tag: t.slug }));
                   return (
@@ -103,8 +101,7 @@ export function TagsView({ p }: { p: Params }) {
                     </tr>
                   );
                 })}
-              </tbody>
-            </table>
+              </ListTable>
           : <EmptyState icon="tag" title="No lists yet"
               body="Make one for whatever your team actually sorts by — a campaign, a city push, a follow-up batch."
               action={<button className="btn pri" data-act="tg-new" onClick={newList}>New list</button>} />}
@@ -155,11 +152,7 @@ function ToneModal({ kind, tag, onClose, after }: {
   };
   return (
     <>
-      <div className="md-h">
-        <h3>{kind === "new" ? "New list" : "Rename list"}</h3>
-        <p>{kind === "new" ? "Yours to apply and remove freely" : (tag ? tag.label : "")}</p>
-        <button className="md-x" data-close="1" onClick={onClose}><Icon name="x" /></button>
-      </div>
+      <ModalHead title={kind === "new" ? "New list" : "Rename list"} sub={kind === "new" ? "Yours to apply and remove freely" : (tag ? tag.label : "")} onClose={onClose} />
       <div className="md-b">
         <ErrSlot err={err} />
         <Field id="tgName" label="Name" req
@@ -194,8 +187,7 @@ function DeleteListModal({ tag, onClose, after }: { tag: DealTagRow; onClose: ()
   };
   return (
     <>
-      <div className="md-h"><h3>Delete list</h3><p>{tag.label}</p>
-        <button className="md-x" data-close="1" onClick={onClose}><Icon name="x" /></button></div>
+      <ModalHead title="Delete list" sub={tag.label} onClose={onClose} />
       <div className="md-b">
         <ErrSlot err={err} />
         <Notice tone={tag.count ? "warn" : "bad"} text={tag.count
@@ -359,8 +351,7 @@ export function TagsModal({ dealRef, onClose, onSaved }: {
 
   return (
     <div onKeyDownCapture={onKeyDown}>
-      <div className="md-h"><h3>Lists</h3><p className="mono">{dealRef}</p>
-        <button className="md-x" data-close="1" onClick={onClose}><Icon name="x" /></button></div>
+      <ModalHead title="Lists" sub={dealRef} mono onClose={onClose} />
       <div className="md-b">
         <ErrSlot err={err} />
         <div className="tgtile" id="tgEdit" data-ref={dealRef} ref={host}>

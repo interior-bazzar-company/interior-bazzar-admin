@@ -6,6 +6,79 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-08
 
+### One table, one dropdown, one modal head — the parts the screens still drew for themselves
+
+**Area:** every list page (Deals, Quotations, Invoices, Plans, Roles, Members, Users, the five
+Finance lists, Business Enquiries), every modal in the panel, the filter row on all of them
+**Files:** `src/admin/ui/select.tsx` (new), `src/admin/ui/index.tsx`, `src/styles/admin-theme.css`,
+`src/admin/views/BusinessEnquiries/{List,Qualify,bits}.tsx`, `enquiries.css`
+(`FilterSelect.tsx` deleted), `src/admin/views/Finance/{Frame,Slip,dialog}.tsx`, `finance.css`,
+`src/admin/views/Users/{List,EditProfile}.tsx`, `users.css`, `src/admin/views/Team/{index,Attendance,Reports}.tsx`,
+`src/admin/views/{Agreements,Resources}/index.tsx`, and the 23 files that carried a hand-rolled
+modal head (see **Verified**), `scripts/um-smoke.tsx`, `scripts/appearance-entry.tsx`
+
+**What changed**
+
+The design system existed; the screens were not all built from it. Four parts were still being
+drawn per screen, and the differences were the inconsistency a person sees moving between modules:
+
+- **The dropdown.** Sixteen filter rows used a native `<select>` — the closed control took the
+  panel's paint, the OPEN list was the operating system's. Business Enquiries had built its own
+  listbox and was the one screen whose dropdown looked like the product. That listbox is now
+  **the** `Select`, in `ui/select.tsx`: keyboard-complete, options can carry a mark (identity dot,
+  badge, tag chip), and it positions itself fixed through `useMenuPlacement` so a list opening
+  above a scrolling table body is never clipped. The prop shape did not change, so the sixteen
+  callers moved without an edit. `MultiSelect` shares its closed control. Native selects stay
+  where a native select is right — a form answer, a year switch with no "any" — and those now
+  share one drawing with `.inp.sel` instead of painting their own chevron.
+- **The list table.** Twelve list pages wrote `<table className="tbl dls-tbl">` by hand; Users
+  added `um-tbl`, Finance added `fin-tbl` and called its figure column `num` where everyone else
+  said `n`, and the exception rail in column one was drawn three ways at two heights. `ListTable`
+  owns the frame now; the rows are still the module's. The rail fills whatever row it is in and
+  answers both tone contracts, so no module changed what it writes.
+- **The modal head.** 26 files drew `.md-h` + `<h3>` + `<p>` + a close button by hand, with the
+  close drawn three ways and two competing `.md-x` rules in the stylesheet to serve them.
+  `ModalHead` is the one head — 50 heads migrated, one hand-rolled one remains (Tasks' quick-add,
+  whose title is an input). `DrawerHead` is the same object one layer over.
+- **The tab row.** Five modules hand-rolled `<div className="tabs">` to get an icon, a link tab or a
+  quiet count. `Tabs` takes all three now.
+- **One More menu.** Finance's `MoreMenu` was a copy of `ui/menu`'s minus the fixed positioning
+  that stops it being clipped by a scrolling ancestor. Gone; Slip imports the shared one.
+- **One tag chip.** Business Enquiries' `.be-tag` was a third chip drawing. It is `.pill.xs`.
+
+**Temp data** — `none`. **Backend needed** — `none`; presentation only.
+
+**Open decisions**
+
+- **Five drawer heads stay hand-built** (Deals, Plans, Roles, Team ×2). Each carries a record
+  title with status pills and an avatar in its own arrangement; `DrawerHead` exists for the next
+  one, but forcing these five through it would have been five special cases in one component.
+- **Form selects stay native.** A filter needs an "any" row and an active state; a form answer
+  needs neither, and the platform's own list is right on a phone and with a screen reader.
+
+**Verified**
+
+- `tsc` clean; `npm run build` clean (1.79 MB / 450 KB gz). Every offline check in `npm run
+  check` passes: 18 module checks, `check:tokens` (422), `check:contrast` (110 pairs × 2 themes),
+  `check:dupes` (no duplicate selector, no colour outside `tokens.css`). `check:menu` passes in
+  Chromium.
+- The three migrations were scripted transforms with a per-file assertion, not hand edits:
+  14 tables (13 files), 50 modal heads (25 files: 46 by the general pattern, 4 close-less
+  confirm heads by hand), 5 tab rows.
+- `scripts/shoot-modules.cjs`: **38/38 routes rendered** in both themes; reviewed Finance,
+  Business Enquiries, Users, the gallery's list card and modal, and the dropdown OPEN. Two bugs
+  found by looking and fixed before this landed: the `.ct` count badge's base rule had been cut
+  with the old multi-select block (the badge rendered as a 28px green bar), and `MultiSelect`'s
+  label was not taking the flexible space (its caret was clipped).
+- Four assertions in `check:users-render` asserted the native `<option>` markup; they now read
+  the listbox's closed control — its accessible label names the current value, and a new
+  `data-options` attribute names the option set in order, which is what "offers exactly these"
+  is asserted against.
+
+**Not verified:** `check:enquiries` (needs a live backend). No real-backend drive.
+
+---
+
 ### Ink & Signal — one design system, one component system, two themes
 
 **Area:** the whole panel — every route, the sign-in door, and both overlays

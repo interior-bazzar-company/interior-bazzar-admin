@@ -21,7 +21,7 @@
    ===================================================================== */
 import { useState } from "react";
 import AdminOpsService from "../../../api/modules/adminOps";
-import { Field, Icon, Notice, SectionHead } from "../../ui";
+import { Field, Icon, ModalHead, Notice, SectionHead } from "../../ui";
 import { can } from "../../shell/AdminShell";
 import { val } from "../teamShared";
 import { call, rupees } from "./api";
@@ -164,13 +164,7 @@ export default function PlanModal({ plan, families, onClose, onDone }: {
 
   return (
     <>
-      <div className="md-h">
-        <h3>{isNew ? "Create plan" : "Edit plan"}</h3>
-        <p className={isNew ? undefined : "mono"}>
-          {isNew ? "Everything about the plan, on one form" : "#" + pl.id + " · " + familyLabel(pl.family)}
-        </p>
-        <button className="md-x" data-close="1" onClick={onClose}><Icon name="x" /></button>
-      </div>
+      <ModalHead title={isNew ? "Create plan" : "Edit plan"} sub={isNew ? "Everything about the plan, on one form" : "#" + pl.id + " · " + familyLabel(pl.family)} mono={!isNew} onClose={onClose} />
 
       <div className="md-b">
         <div id="plErr">

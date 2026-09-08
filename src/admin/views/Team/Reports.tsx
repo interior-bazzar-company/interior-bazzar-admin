@@ -34,7 +34,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
-import { Icon, Notice, SectionHead, StatStrip, Table, TbTitle, Tiles, qs } from "../../ui";
+import { Icon, Notice, qs, SectionHead, StatStrip, Table, Tabs, TbTitle, Tiles } from "../../ui";
 import { go } from "../../ui/nav";
 import type { StatCell } from "../../ui";
 import {
@@ -88,15 +88,10 @@ export default function Reports() {
           the queue and the window all read the same day — so it belongs beside
           what it scopes rather than in a toolbar under one of them. */}
       <div className="dls-chips tm-tabrow">
-        <div className="tabs">
-          {FACES.map((f) => (
-            <button key={f.k} className={face === f.k ? "on" : ""}
-              onClick={() => goto({ face: f.k === "reports" ? undefined : f.k })}>
-              <Icon name={f.icon} size="sm" />{f.label}
-              {f.k === "actions" && pending ? <span className="n">{pending}</span> : null}
-            </button>
-          ))}
-        </div>
+        <Tabs cur={face}
+          items={FACES.map((f) => ({ k: f.k, label: f.label, icon: f.icon,
+            n: f.k === "actions" ? pending : undefined }))}
+          onPick={(k) => goto({ face: k === "reports" ? undefined : k })} />
         <span className="spacer" />
         {face === "analytics" ? null : (
           <DateNav date={date} onPick={(d) => goto({ date: d === TODAY ? undefined : d })} />

@@ -20,7 +20,7 @@
    qualification gate) are kept by the FORM rather than by the button not
    existing, which is what they always needed to be.
    ============================================================================= */
-import { EmptyState, FilterChips, Icon, ListSkeleton, SearchField, StatStrip, qs } from "../../ui";
+import { EmptyState, FilterChips, Icon, ListSkeleton, qs, SearchField, Select, StatStrip } from "../../ui";
 import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import { useShell } from "../../shell/ShellContext";
@@ -36,7 +36,6 @@ import {
   isWorking,
   lastResponse, place, receivedLabel, resetStore, statusOf,
 } from "./store";
-import { FilterSelect } from "./FilterSelect";
 import type { Counts, Enquiry, PageState, Params } from "./store";
 
 const ROUTE = "#/business-enquiries";
@@ -250,33 +249,33 @@ export default function List({ all, page, onPage, p, sel, onFilter, onSearch, on
         <div className="be-filters-grid">
           {/* A status carries its own tone, so the list can be scanned by
               colour — and it is the same dot the rows use. */}
-          <FilterSelect name="status" label="Status" value={p.status} onFilter={onFilter}
+          <Select name="status" label="Status" value={p.status} onFilter={onFilter}
             options={VOCAB.statuses.map((x) => ({ v: x.key, l: x.label, dot: "s-" + x.key }))} />
-          <FilterSelect name="category" label="Category" value={p.category} onFilter={onFilter}
+          <Select name="category" label="Category" value={p.category} onFilter={onFilter}
             options={VOCAB.categories.map((x) => ({ v: x, l: x }))} />
-          <FilterSelect name="city" label="City" value={p.city} onFilter={onFilter}
+          <Select name="city" label="City" value={p.city} onFilter={onFilter}
             options={VOCAB.cities.map((x) => ({ v: x, l: x }))} />
-          <FilterSelect name="state" label="State" value={p.state} onFilter={onFilter}
+          <Select name="state" label="State" value={p.state} onFilter={onFilter}
             options={STATES.map((x) => ({ v: x, l: x }))} />
           {/* A ramp, not four arbitrary colours: the sooner they want to start,
               the hotter the dot, and "browsing" is hollow because it is not a
               date at all. Ordinal data should look ordinal. */}
-          <FilterSelect name="urgency" label="Urgency" value={p.urgency} onFilter={onFilter}
+          <Select name="urgency" label="Urgency" value={p.urgency} onFilter={onFilter}
             options={VOCAB.urgency.map((u) => ({ v: u.key, l: u.label, dot: "u-" + u.key }))} />
-          <FilterSelect name="tier" label="Tier" value={p.tier} onFilter={onFilter}
+          <Select name="tier" label="Tier" value={p.tier} onFilter={onFilter}
             options={TIERS.map((t) => ({ v: t.key, l: t.label, badge: t.key }))} />
-          <FilterSelect name="source" label="From" value={p.source} onFilter={onFilter}
+          <Select name="source" label="From" value={p.source} onFilter={onFilter}
             options={SOURCES.map((x) => ({ v: x.key, l: x.label }))} />
           {/* Tags are chips everywhere else in the module; a list of plain
               words would have been the one place they are not. */}
-          <FilterSelect name="tag" label="Tag" value={p.tag} onFilter={onFilter}
+          <Select name="tag" label="Tag" value={p.tag} onFilter={onFilter}
             options={TAGS.map((t) => ({ v: t.slug, l: t.label, chip: { tone: t.tone, auto: t.auto } }))} />
           {/* Business is a filter and never a column you can sort a leaderboard
               by: it answers "what have we given them lately?", which is a
               fairness question, and fairness is a scoring factor. */}
-          <FilterSelect name="business" label="Business" value={p.business} onFilter={onFilter}
+          <Select name="business" label="Business" value={p.business} onFilter={onFilter}
             options={businesses.map((b) => ({ v: b, l: b }))} />
-          <FilterSelect name="received" label="Received" value={p.received} onFilter={onFilter}
+          <Select name="received" label="Received" value={p.received} onFilter={onFilter}
             options={RECEIVED_RANGES.map((r) => ({ v: r.key, l: r.label }))} />
           {/* The two ends of a custom window appear only when one is asked for,
               and take a full grid cell each so they line up with the selects
@@ -303,7 +302,7 @@ export default function List({ all, page, onPage, p, sel, onFilter, onSearch, on
               not would be a menu entry that silently does nothing — and the
               first row is the default order, which is where the closed control
               gets its own label. */}
-          <FilterSelect name="sort" label={"Sort: " + (SORT_OPTIONS[0]?.label || "")}
+          <Select name="sort" label={"Sort: " + (SORT_OPTIONS[0]?.label || "")}
             value={p.sort} onFilter={onFilter}
             options={SORT_OPTIONS.slice(1).map((o) => ({ v: o.key, l: o.label }))} />
         </div>

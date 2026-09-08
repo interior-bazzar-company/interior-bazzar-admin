@@ -15,7 +15,7 @@
    export where it is one slip away.
    ============================================================================= */
 import { useState } from "react";
-import { Icon, Notice } from "../../ui";
+import { Icon, ModalHead, Notice } from "../../ui";
 import { InfoNote } from "./bits";
 import { can } from "../../shell/AdminShell";
 import { GROUPS, buildCsv, columnCount, downloadCsv, fileNameFor, scopeSentence } from "./exportCsv";
@@ -57,11 +57,7 @@ export default function ExportModal({ filtered, all, p, onClose, onDone }: {
 
   return (
     <>
-      <div className="md-h">
-        <h3>Export enquiries</h3>
-        <p>A CSV of what is on screen, in the order it is on screen.</p>
-        <button className="md-x" data-close="1" aria-label="Close" onClick={onClose}><Icon name="x" /></button>
-      </div>
+      <ModalHead title="Export enquiries" sub="A CSV of what is on screen, in the order it is on screen." onClose={onClose} />
 
       <div className="md-b">
         {/* ------------------------------------------------------- scope --- */}

@@ -13,7 +13,7 @@
                       survives.
    ============================================================================= */
 import { useState } from "react";
-import { Icon, Notice } from "../../ui";
+import { Icon, ModalHead, Notice } from "../../ui";
 
 import { TAGS, VOCAB, addNote, setTags, setUserStatus } from "./store";
 import type { UserRow } from "./store";
@@ -27,11 +27,7 @@ export function NoteModal({ row, onClose, onDone }: {
   const [err, setErr] = useState<string | null>(null);
   return (
     <>
-      <div className="md-h">
-        <h3>Add an internal note</h3>
-        <p>{row.user.identity.name} · <span className="mono">{row.user.userId}</span></p>
-        <button className="md-x" data-close="1" onClick={onClose} aria-label="Close"><Icon name="x" /></button>
-      </div>
+      <ModalHead title="Add an internal note" sub={<>{row.user.identity.name} · <span className="mono">{row.user.userId}</span></>} onClose={onClose} />
       <div className="md-b um-form">
         {err ? <Notice tone="bad" text={<b>{err}</b>} /> : null}
         <textarea className="inp" rows={5} autoFocus value={text}
@@ -65,11 +61,7 @@ export function TagsModal({ row, onClose, onDone }: {
     setSlugs((v) => (v.indexOf(s) >= 0 ? v.filter((x) => x !== s) : v.concat([s])));
   return (
     <>
-      <div className="md-h">
-        <h3>Operational tags</h3>
-        <p>{row.user.identity.name} · internal segmentation, not profile content</p>
-        <button className="md-x" data-close="1" onClick={onClose} aria-label="Close"><Icon name="x" /></button>
-      </div>
+      <ModalHead title="Operational tags" sub={<>{row.user.identity.name} · internal segmentation, not profile content</>} onClose={onClose} />
       <div className="md-b um-form">
         <div className="um-tagpicker">
           {TAGS.map((t) => (
@@ -109,11 +101,7 @@ export function DeactivateModal({ row, onClose, onDone }: {
   const [err, setErr] = useState<string | null>(null);
   return (
     <>
-      <div className="md-h">
-        <h3>{off ? "Reactivate this account" : "Deactivate this account"}</h3>
-        <p>{row.user.identity.name} · <span className="mono">{row.user.userId}</span></p>
-        <button className="md-x" data-close="1" onClick={onClose} aria-label="Close"><Icon name="x" /></button>
-      </div>
+      <ModalHead title={off ? "Reactivate this account" : "Deactivate this account"} sub={<>{row.user.identity.name} · <span className="mono">{row.user.userId}</span></>} onClose={onClose} />
       <div className="md-b um-form">
         {err ? <Notice tone="bad" text={<b>{err}</b>} /> : null}
 

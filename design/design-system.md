@@ -502,6 +502,26 @@ progress bars, sparklines.
 **Content** — card, section head, accordion, timeline / activity feed (person actions in
 primary, system actions in secondary, failures in danger), avatar, badge, tag, user menu.
 
+### Where each part lives
+
+The contract above is only true if a screen renders the part rather than drawing its own.
+This is the map, and `check:dupes` is what keeps a module from adding a second row to it.
+
+| Part | Render this | Drawn by |
+| --- | --- | --- |
+| Filter dropdown | `Select` (`ui/select.tsx`) — a listbox, keyboard-complete, options carry a dot / badge / chip | `.sel`, `.sel-t`, `.sel-list`, `.sel-o` |
+| Several from a list | `MultiSelect` | same closed control, `.menu` open |
+| Form select | native `<select className="inp sel">` or `SelectInput`; `.selectbox` wraps one | `.inp.sel`, `.selectbox select` — one chevron |
+| List table | `ListTable` + `Rail` for the exception stripe; rows are the module's | `.tbl.dls-tbl`, `.dls-tbl td.rail` |
+| Card table | `Table` | `.tw .tbl` |
+| Filter band | `.dls-cmd` with `SearchField`, `Select`, `FilterChips` | `.dls-cmd`, `.chiprow.filters` |
+| Modal | `ModalShell`, or `ModalHead` + `.md-b` + `.md-f`; `ConfirmModal` to ask | `.modal`, `.md-*` |
+| Drawer | `DrawerShell`, or `DrawerHead` + `.dw-b` + `.dw-f` | `.drawer`, `.dw-*` |
+| More menu | `MoreMenu` (`ui/menu.tsx`) — fixed-positioned, never clipped | `.ib-menu-pop`, `.mi` |
+| Tabs | `Tabs` — icon, link (`to`), count, quiet count | `.tabs` |
+| Status / tag chip | `Pill`; `LeadStatus` / `DealStatus` / `Priority` for the CRM's own | `.pill` and its tones |
+| Count badge | `<span className="ct">` | `.ct` |
+
 ### The `i` affordance
 
 A 16px hairline circle immediately after the label it explains. It opens a popover with a
@@ -860,6 +880,11 @@ Aria — three colour schemes, a compact density, six appearances.
 
 **Pass 3 — the consolidation (this one).** All of pass 2 removed, and the system that was
 left standing made single.
+
+**Pass 4 — the screens onto the system.** The parts four screens were still drawing for
+themselves — the filter dropdown, the list table, the modal head, the tab row — became the
+shared ones, and 12 list pages, 25 modal files and 5 tab rows were migrated by scripted
+transform. Business Enquiries' listbox became the panel's `Select`.
 
 ### What is true now
 

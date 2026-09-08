@@ -15,7 +15,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useShell } from "../../shell/ShellContext";
 import { can } from "../../shell/AdminShell";
-import { EmptyState, Icon, avatarTone, initials } from "../../ui";
+import { avatarTone, EmptyState, Icon, initials, ListTable } from "../../ui";
 import { go } from "../../ui/nav";
 import { Money } from "./bits";
 import { Cancel, Dlg, Field } from "./dialog";
@@ -198,19 +198,15 @@ export default function SalaryTransactions({ p, onUnfilter }: {
   return (
     <>
       {rows.length ? (
-        <table className="tbl dls-tbl fin-tbl">
-          <thead>
-            <tr>
+        <ListTable cls="fin-tbl" head={<tr>
               <th className="rail" />
               <th>Slip</th>
               <th>Person</th>
-              <th className="num">Net</th>
+              <th className="n">Net</th>
               <th>Status</th>
               <th>Paid on</th>
               <th className="tight" />
-            </tr>
-          </thead>
-          <tbody>
+            </tr>}>
             {rows.map((x) => {
               const s = x.s;
               const state = stateOf(s);
@@ -241,7 +237,7 @@ export default function SalaryTransactions({ p, onUnfilter }: {
                       </span>
                     </div>
                   </td>
-                  <td className="num">
+                  <td className="n">
                     <Money paise={s.netPaise} strong />
                     {s.lopDays ? <div className="cell-2">{s.lopDays} day LOP</div> : null}
                   </td>
@@ -286,8 +282,7 @@ export default function SalaryTransactions({ p, onUnfilter }: {
                 </tr>
               );
             })}
-          </tbody>
-        </table>
+          </ListTable>
       ) : (
         <EmptyState icon={narrowed ? "search" : "doc"}
           title={narrowed ? "No slip matches those filters" : "No slip has been issued"}

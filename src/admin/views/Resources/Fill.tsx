@@ -13,7 +13,7 @@
    public URL by this panel, and there is no private store to put it in yet.
    ============================================================================= */
 import { useEffect, useRef, useState } from "react";
-import { Icon, Notice } from "../../ui";
+import { ModalHead, Notice } from "../../ui";
 import { useShell } from "../../shell/ShellContext";
 import { acceptAttr, acceptLine, answered, submitResponse } from "./store";
 import type { FileAnswer, Resource, ResourceField } from "./store";
@@ -79,10 +79,7 @@ export function FillModal({ r, memberId }: { r: Resource; memberId: string }) {
   };
   return (
     <>
-      <div className="md-h">
-        <h3>{r.title}</h3>
-        <button className="btn icon sm md-x" aria-label="Close" onClick={() => shell.closeLayer()}><Icon name="x" size="sm" /></button>
-      </div>
+      <ModalHead title={r.title} onClose={() => shell.closeLayer()} />
       <div className="md-b">
         {r.description ? <p className="cell-2">{r.description}</p> : null}
         {r.fields.some((f) => f.type === "file") ? (

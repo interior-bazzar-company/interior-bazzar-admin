@@ -20,9 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import AdminOpsService from "../../../api/modules/adminOps";
 import { errMessage } from "../../../api/apiService";
-import {
-  EmptyState, FilterChips, Icon, Notice, Pill, SearchField, Select, StatStrip, TbTitle, qs
-} from "../../ui";
+import { EmptyState, FilterChips, Icon, ListTable, Notice, Pill, qs, SearchField, Select, StatStrip, TbTitle } from "../../ui";
 import type { StatCell } from "../../ui";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
@@ -265,10 +263,10 @@ function PlansTable({ rows, p, act, go, onUnfilter }: {
           : null} />;
 
   return (
-    <table className="tbl dls-tbl"><thead><tr>
+    <ListTable head={<tr>
       <th style={{ width: "3px" }}></th><th>Plan</th><th>Family</th><th>Durations</th>
       <th className="n">Price</th><th>Status</th><th className="n">Tier</th>
-    </tr></thead><tbody>
+    </tr>}>
       {rows.map((pl) => {
         const u = urgency(pl);
         const rng = rangeOf(pl);
@@ -292,7 +290,7 @@ function PlansTable({ rows, p, act, go, onUnfilter }: {
           </tr>
         );
       })}
-    </tbody></table>
+    </ListTable>
   );
 }
 

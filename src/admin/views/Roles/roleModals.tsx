@@ -5,7 +5,7 @@
 import { useState } from "react";
 import AdminOpsService from "../../../api/modules/adminOps";
 import type { RolesModuleDef } from "../../../api/modules/adminOps";
-import { Field, Icon, Notice, SectionHead } from "../../ui";
+import { Field, ModalHead, Notice, SectionHead } from "../../ui";
 import { ActionMatrix, ErrSlot, errOf, readActionMatrix, val } from "../teamShared";
 import type { EngineErr, Ops, Role } from "../teamShared";
 
@@ -35,11 +35,7 @@ export function RoleModal({ role, mods, ops }: { role: Role | null; mods: RolesM
 
   return (
     <>
-      <div className="md-h">
-        <h3>{isNew ? "Create role" : "Edit role"}</h3>
-        <p>{isNew ? "A name, and what it may do" : "#" + role!.id}</p>
-        <button className="md-x" data-close="1" onClick={ops.closeLayer}><Icon name="x" /></button>
-      </div>
+      <ModalHead title={isNew ? "Create role" : "Edit role"} sub={isNew ? "A name, and what it may do" : "#" + role!.id} onClose={ops.closeLayer} />
       <div className="md-b">
         <ErrSlot err={err} />
         <SectionHead title="Role" />
@@ -89,11 +85,7 @@ export function RoleDeleteModal({ role, ops }: { role: Role; ops: Ops }) {
 
   return (
     <>
-      <div className="md-h">
-        <h3>Delete role</h3>
-        <p>{role.name}</p>
-        <button className="md-x" data-close="1" onClick={ops.closeLayer}><Icon name="x" /></button>
-      </div>
+      <ModalHead title="Delete role" sub={role.name} onClose={ops.closeLayer} />
       <div className="md-b">
         <ErrSlot err={err} />
         {role.userCount ? (

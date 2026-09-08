@@ -14,7 +14,7 @@
    ===================================================================== */
 import { useState } from "react";
 import AdminOpsService from "../../../api/modules/adminOps";
-import { Field, Icon, Notice, SectionHead } from "../../ui";
+import { Field, ModalHead, Notice, SectionHead } from "../../ui";
 import { ErrSlot, RolePicks, errOf, readRolePicks, val } from "../teamShared";
 import type { EngineErr, Member, Ops, Role } from "../teamShared";
 
@@ -43,11 +43,7 @@ export function MemberNewModal({ roles, ops }: { roles: Role[]; ops: Ops }) {
 
   return (
     <>
-      <div className="md-h">
-        <h3>Add team member</h3>
-        <p>You set the username and password; pass them on yourself</p>
-        <button className="md-x" data-close="1" onClick={ops.closeLayer}><Icon name="x" /></button>
-      </div>
+      <ModalHead title="Add team member" sub="You set the username and password; pass them on yourself" onClose={ops.closeLayer} />
       <div className="md-b">
         <ErrSlot err={err} />
         <SectionHead title="Team member" />
@@ -95,11 +91,7 @@ export function MemberEditModal({ u, ops }: { u: Member; ops: Ops }) {
   }
   return (
     <>
-      <div className="md-h">
-        <h3>Edit member</h3>
-        <p className="mono">{u.username || u.id}</p>
-        <button className="md-x" data-close="1" onClick={ops.closeLayer}><Icon name="x" /></button>
-      </div>
+      <ModalHead title="Edit member" sub={u.username || u.id} mono onClose={ops.closeLayer} />
       <div className="md-b">
         <ErrSlot err={err} />
         <Field id="tmName" label="Name" req value={u.name} />
@@ -140,11 +132,7 @@ export function MemberRolesModal({ u, roles, ops }: { u: Member; roles: Role[]; 
   }
   return (
     <>
-      <div className="md-h">
-        <h3>Roles</h3>
-        <p>{u.name} · what they may access</p>
-        <button className="md-x" data-close="1" onClick={ops.closeLayer}><Icon name="x" /></button>
-      </div>
+      <ModalHead title="Roles" sub={<>{u.name} · what they may access</>} onClose={ops.closeLayer} />
       <div className="md-b">
         <ErrSlot err={err} />
         <RolePicks roles={roles} held={held} />
@@ -185,11 +173,7 @@ export function MemberSendCredentialsModal({ u, ops }: { u: Member; ops: Ops }) 
   }
   return (
     <>
-      <div className="md-h">
-        <h3>Send new credentials</h3>
-        <p>{u.name}</p>
-        <button className="md-x" data-close="1" onClick={ops.closeLayer}><Icon name="x" /></button>
-      </div>
+      <ModalHead title="Send new credentials" sub={u.name} onClose={ops.closeLayer} />
       <div className="md-b">
         <ErrSlot err={err} />
         <Notice ico="lock" text={
@@ -228,11 +212,7 @@ export function MemberDeleteModal({ u, ops }: { u: Member; ops: Ops }) {
   }
   return (
     <>
-      <div className="md-h">
-        <h3>Delete member</h3>
-        <p>{u.name}</p>
-        <button className="md-x" data-close="1" onClick={ops.closeLayer}><Icon name="x" /></button>
-      </div>
+      <ModalHead title="Delete member" sub={u.name} onClose={ops.closeLayer} />
       <div className="md-b">
         <ErrSlot err={err} />
         <Notice tone="bad" ico="alert" text={

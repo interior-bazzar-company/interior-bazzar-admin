@@ -53,10 +53,7 @@ import { useCallback, useMemo } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
-import {
-  EmptyState, FilterChips, Icon, KvList, Notice, SearchField, Select, ShareLine,
-  StatStrip, Table, TbTitle, qs, shareOrCopy,
-} from "../../ui";
+import { EmptyState, FilterChips, Icon, KvList, ModalHead, Notice, qs, SearchField, Select, ShareLine, shareOrCopy, StatStrip, Table, Tabs, TbTitle } from "../../ui";
 import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import Builder from "./Builder";
@@ -137,19 +134,14 @@ function Workspace({ deepLink }: { deepLink: string | null }) {
           primary action — it was here as well for one revision, which drew it
           twice on every tab. */}
       <div className="dls-chips rs-tabwrap">
-        <div className="tabs rs-tabs">
-          {FACES.map((x) => (
-            <button key={x.k} className={face === x.k ? "on" : ""}
-              onClick={() => goto({ form: undefined, res: undefined, q: undefined,
-                state: undefined, face: x.k === "resources" ? undefined : x.k })}>
-              <Icon name={x.icon} size="sm" />{x.label}
-              {/* A number on a tab means something is WAITING. Responses carries a
-                  plain count instead, because a submission that arrived is not a
-                  thing anybody owes you. */}
-              {x.k === "responses" && answers ? <span className="n is-quiet">{answers}</span> : null}
-            </button>
-          ))}
-        </div>
+        {/* A number on a tab means something is WAITING. Responses carries a
+            plain count instead, because a submission that arrived is not a thing
+            anybody owes you. */}
+        <Tabs cls="rs-tabs" cur={face}
+          items={FACES.map((x) => ({ k: x.k, label: x.label, icon: x.icon,
+            n: x.k === "responses" ? answers : undefined, quiet: true }))}
+          onPick={(k) => goto({ form: undefined, res: undefined, q: undefined,
+            state: undefined, face: k === "resources" ? undefined : k })} />
       </div>
 
       {resource ? <FormFace r={resource} p={p} onFilter={onFilter} />
@@ -410,10 +402,8 @@ function ConfirmDeleteResource({ r }: { r: Resource }) {
   const shell = useShell();
   return (
     <>
-      <div className="md-h">
-        <h3>Delete “{r.title}”?</h3>
-        <p>Nobody has answered it, so nothing is lost but the form itself.</p>
-      </div>
+      <ModalHead title={<>Delete “{r.title}”?</>}
+        sub="Nobody has answered it, so nothing is lost but the form itself." />
       <div className="md-f">
         <span className="spacer" />
         <button className="btn" onClick={() => shell.closeLayer()}>Keep it</button>
@@ -560,10 +550,8 @@ function ConfirmDeleteResponse({ r, x }: { r: Resource; x: ResourceResponse }) {
   const files = x.answers.filter((a) => a.file).length;
   return (
     <>
-      <div className="md-h">
-        <h3>Delete this submission?</h3>
-        <p>{m ? m.name : x.memberId} · {r.title} · {fmtDate(x.submittedAt)}</p>
-      </div>
+      <ModalHead title="Delete this submission?"
+        sub={<>{m ? m.name : x.memberId} · {r.title} · {fmtDate(x.submittedAt)}</>} />
       <div className="md-b">
         <Notice tone="warn">
           <b>This cannot be undone.</b>{" "}
@@ -980,13 +968,9 @@ export function ResponseSheet({ r, x }: { r: Resource; x: ResourceResponse }) {
   const kb = sizeOfResponse(x);
   return (
     <div className="rs-sheet">
-      <div className="md-h">
-        <h3>{r.title}</h3>
-        <p>
-          {m ? m.name : x.memberId} · submitted {fmtDate(x.submittedAt)}
-          {" · "}<span className="mono">v{x.version}</span>
-        </p>
-      </div>
+      <ModalHead title={r.title}
+        sub={<>{m ? m.name : x.memberId} · submitted {fmtDate(x.submittedAt)}
+          {" · "}<span className="mono">v{x.version}</span></>} />
       <div className="md-b">
         {stale ? (
           <Notice tone="info">

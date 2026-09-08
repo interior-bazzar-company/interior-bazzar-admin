@@ -9,7 +9,7 @@
    state what will and will not change, not to ask "are you sure?".
    ===================================================================== */
 import { useState } from "react";
-import { Icon, Notice } from "../../ui";
+import { ModalHead, Notice } from "../../ui";
 import { errMessage } from "../../../api/apiService";
 import type { QuotationRow } from "./api";
 
@@ -28,11 +28,7 @@ export default function ReviseModal({ q, onClose, run }: {
 
   return (
     <>
-      <div className="md-h">
-        <h3>Revise {accepted ? "an accepted quotation" : "quotation"}</h3>
-        <p>from {q.quotationNumber || "draft"} v{q.version}</p>
-        <button className="md-x" data-close="1" aria-label="Close" onClick={onClose}><Icon name="x" /></button>
-      </div>
+      <ModalHead title={<>Revise {accepted ? "an accepted quotation" : "quotation"}</>} sub={<>from {q.quotationNumber || "draft"} v{q.version}</>} onClose={onClose} />
 
       <div className="md-b">
         {err ? <Notice tone="bad" text={<b>{err}</b>} /> : null}

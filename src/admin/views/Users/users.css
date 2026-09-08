@@ -149,14 +149,7 @@
 
 /* -------------------------------------------------------------- table --- */
 .um-tbl { min-width: 880px }
-.um-tbl th.rail, .um-tbl td.rail { width: 3px; padding: 0 }
-/* ONE STATE. The rail is the only place a row raises its voice, and there is
-   one thing left worth raising it for: a live account with an unfinished
-   profile. A colour per state turns the table into a paint chart nobody can
-   scan. */
-.um-tbl td.rail i { display: block; width: 3px; height: 52px; background: transparent;
-                    border-radius: 0 2px 2px 0 }
-.um-tbl td.rail i.warn { background: var(--warn-solid) }
+/* the exception rail is drawn once, in admin-theme.css (`.dls-tbl td.rail`) */
 .um-date {
   height: var(--control-md); padding: 0 var(--space-3);
   border: 1px solid var(--line-control); border-radius: var(--radius-md);

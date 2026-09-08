@@ -812,19 +812,24 @@ button.tile:hover{ border-color:var(--line-3); background:var(--bg-shell) }
 .field input::placeholder{ color:var(--text-3) }
 .field.grow{ flex:1 1 220px; max-width:360px }
 
-.selectbox{ position:relative; display:inline-flex }
-.selectbox select{ appearance:none; height:var(--control-md);
+/* THE NATIVE FORM SELECT, wrapped. A picker whose value must be one of its
+   options -- a year switch, a payment mode -- is correctly native: there is
+   no "any" to offer, and the platform's own list is right on a phone and with
+   a screen reader. It is the SAME drawing as `.inp.sel`: it used to paint its
+   own chevron with a rotated `::after` and its own border, so the form select
+   in Finance and the form select everywhere else were two controls. One
+   chevron now, from `--chevron`, and `.selectbox` is only the wrapper. */
+.selectbox{ position:relative; display:inline-flex; max-width:100% }
+.selectbox select{ appearance:none; height:var(--control-md); width:100%;
                    padding:0 30px 0 var(--space-3); border:1px solid var(--line-control);
-                   border-radius:var(--radius-md); background:var(--bg);
+                   border-radius:var(--radius-md); background-color:var(--bg);
+                   background-image:var(--chevron); background-repeat:no-repeat;
+                   background-position:right var(--space-2) center; background-size:14px;
                    font-size:var(--text-md); color:var(--text); cursor:pointer;
-                   transition:border-color var(--duration) var(--ease) }
+                   box-shadow:var(--shadow-xs);
+                   transition:border-color var(--duration) var(--ease), box-shadow var(--duration) var(--ease) }
 .selectbox select:hover{ border-color:var(--line-3) }
-.selectbox::after{ content:""; position:absolute; right:11px; top:50%; width:6px; height:6px;
-                   border-right:1.6px solid var(--text-3); border-bottom:1.6px solid var(--text-3);
-                   transform:translateY(-70%) rotate(45deg); pointer-events:none }
-.selectbox.on select{ border-color:var(--brand); background:var(--brand-tint);
-                      color:var(--brand-text); font-weight:var(--weight-medium) }
-.selectbox.on::after{ border-color:var(--brand-text) }
+.selectbox select:focus-visible{ outline:none; border-color:var(--brand); box-shadow:var(--ring) }
 
 /* `min-width:0` is not cosmetic: a grid cell holding a control that refuses to
    shrink pushes its neighbour off the row instead of wrapping, which is how a
@@ -1301,10 +1306,10 @@ a.lk:hover{ border-color:var(--brand); background:var(--brand-tint) }
 .md-h h3{ font-size:var(--text-lg); font-weight:var(--weight-semibold);
           letter-spacing:var(--tracking-tight) }
 .md-h p{ font-size:var(--text-md); color:var(--text-2); margin-top:3px }
-.md-x{ position:absolute; top:var(--space-3); right:var(--space-3);
-       width:var(--control-md); height:var(--control-md); border-radius:var(--radius-md);
-       display:grid; place-items:center; color:var(--text-3) }
-.md-x:hover{ background:var(--bg-hover); color:var(--text) }
+/* `.md-x` is defined once, beside `.dw-x` in the overlay block below. A
+   second, absolutely-positioned rule lived here for the heads whose h3, p and
+   close button were three flex siblings; every head renders `ModalHead` now,
+   which wraps the text, so the close sits at the end of the row. */
 /* Hero header: an icon anchors the dialog so it reads as a thing that opened,
    not a page that swapped. */
 .md-h.md-hero{ display:flex; align-items:flex-start; gap:var(--space-3);
@@ -1610,12 +1615,20 @@ button.dls-stat:hover{ background:var(--bg-hover) }
 .dls-tbl{ width:100% }
 .dls-tbl th{ background:var(--bg) }
 .dls-tbl td{ height:auto; padding:var(--space-2) var(--space-3) }
-.dls-tbl td.rail{ width:3px; padding:0 }
-.dls-tbl td.rail i{ display:block; width:3px; height:40px; border-radius:0 2px 2px 0;
-                    background:transparent }
-.dls-tbl tr.u-bad td.rail i{ background:var(--bad) }
-.dls-tbl tr.u-warn td.rail i{ background:var(--warn) }
-.dls-tbl tr.u-info td.rail i{ background:var(--info) }
+/* THE EXCEPTION RAIL -- column one of a list whose rows can need somebody.
+   3px in a status colour, findable without reading. It was drawn three times
+   at two heights: 40px here, 52px in Users and again in Finance, each with its
+   own tone contract. It FILLS THE ROW now, whatever height the row is, and
+   answers to both contracts -- the row's own `tr.u-*` (Deals, Plans) and the
+   stripe's `i.ok|warn|bad|info` (Users, Finance) -- so no module had to
+   change which one it writes. */
+.dls-tbl th.rail,.dls-tbl td.rail{ width:3px; padding:0; position:relative }
+.dls-tbl td.rail i{ position:absolute; top:4px; bottom:4px; left:0; width:3px;
+                    border-radius:0 2px 2px 0; background:transparent }
+.dls-tbl tr.u-bad td.rail i,.dls-tbl td.rail i.bad{ background:var(--bad-solid) }
+.dls-tbl tr.u-warn td.rail i,.dls-tbl td.rail i.warn{ background:var(--warn-solid) }
+.dls-tbl tr.u-info td.rail i,.dls-tbl td.rail i.info{ background:var(--info-solid) }
+.dls-tbl tr.u-ok td.rail i,.dls-tbl td.rail i.ok{ background:var(--ok-solid) }
 
 .dls-money .amt{ font-weight:var(--weight-semibold) }
 .dls-money .bar{ height:3px; border-radius:2px; background:var(--bg-inset);
@@ -3108,10 +3121,8 @@ td.num,th.num,.num{ text-align:right; font-family:var(--font-mono);
    the widths this panel is used at, and a wrapped label pushes its own field
    out of the row it was supposed to line up with. */
 /* ONE SLOT FOR THE HINT OR THE ERROR, never both — see FormField. */
-.fg-hint,.fg-err{ display:flex; align-items:center; gap:5px;
+.fg-err{ display:flex; align-items:center; gap:5px; color:var(--bad);
                   font-size:var(--text-sm); line-height:1.45; margin-top:5px }
-.fg-hint{ color:var(--text-3) }
-.fg-err{ color:var(--bad) }
 .fg-err .ic{ color:var(--bad) }
 
 .inp.sm{ height:var(--control-sm); font-size:var(--text-md); padding:0 var(--space-2) }
@@ -3121,7 +3132,7 @@ textarea.inp,.inp.ta{ height:auto; min-height:calc(var(--control-lg) * 2);
 /* A SELECT IS A FIELD WITH A CHEVRON. The glyph is painted from `--chevron`
    rather than drawn as an element, so the control stays one node and the
    platform's own option list still opens from it. */
-.inp.sel,.sel{ appearance:none; padding-right:30px;
+.inp.sel{ appearance:none; padding-right:30px;
                background-image:var(--chevron);
                background-repeat:no-repeat;
                background-position:right var(--space-2) center;
@@ -3131,23 +3142,95 @@ textarea.inp,.inp.ta{ height:auto; min-height:calc(var(--control-lg) * 2);
 .inp.date::-webkit-calendar-picker-indicator{ cursor:pointer; opacity:.55 }
 .inp.date:hover::-webkit-calendar-picker-indicator{ opacity:1 }
 
-/* THE TOOLBAR FILTER SELECT. Same drawing as `.inp.sel` at toolbar height, and
-   one state the form select does not have: `.on`.
-   AN ACTIVE FILTER MUST LOOK ACTIVE. This is the only control on a list page
-   whose value silently changes what every number below it means, so when it is
-   narrowing anything it carries the brand edge — a filter you cannot see is a
-   filter you cannot clear. */
-.sel{ height:var(--control-md); min-width:140px; max-width:220px;
-      padding:0 30px 0 var(--space-3);
-      border:1px solid var(--line-control); border-radius:var(--radius-md);
-      background-color:var(--bg); color:var(--text);
-      font-size:var(--text-md); box-shadow:var(--shadow-xs);
-      transition:border-color var(--duration) var(--ease),
-                 box-shadow var(--duration) var(--ease), color var(--duration) var(--ease) }
-.sel:hover{ border-color:var(--line-3) }
-.sel:focus-visible{ outline:none; border-color:var(--brand); box-shadow:var(--ring) }
-.sel.on{ border-color:var(--brand); color:var(--brand-text);
-         font-weight:var(--weight-medium); background-color:var(--brand-tint) }
+/* ============================================================================
+   THE FILTER SELECT -- a listbox, ours end to end
+   ----------------------------------------------------------------------------
+   Replaces the native <select> in every filter row. Everything below styles a
+   control the browser used to draw for us -- the price of being able to style
+   the OPEN list at all, which no amount of CSS on a <select> can do. It came
+   whole from Business Enquiries, which had the only dropdown in the panel that
+   looked like the panel.
+
+   THE CLOSED CONTROL, `.sel-t`, is one drawing for the filter select AND the
+   multi-select: at rest a well with a hairline, because ten of them at full
+   contrast is a form to fill in rather than a set of optional narrowings. Set,
+   it takes the brand fill and carries the contrast alone -- a filter you
+   cannot see is a filter you cannot clear.
+
+   THE OPEN LIST, `.sel-list`, is position:fixed and placed by ui/menu's
+   `useMenuPlacement`: an absolutely positioned list is clipped by any ancestor
+   with overflow set, and a filter row sits above a scrolling table body.
+   ========================================================================== */
+.sel{ position:relative; display:inline-block; min-width:0; max-width:100% }
+.sel-t{ display:flex; align-items:center; gap:var(--space-2);
+        width:100%; min-width:140px; max-width:240px; height:var(--control-md);
+        padding:0 var(--space-2) 0 var(--space-3);
+        border:1px solid var(--line-2); border-radius:var(--radius-md);
+        background:var(--bg-inset); color:var(--text-2);
+        font:inherit; font-size:var(--text-md); text-align:left; cursor:pointer;
+        transition:border-color var(--duration) var(--ease),
+                   background var(--duration) var(--ease), color var(--duration) var(--ease) }
+.sel-t > .l{ flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.sel-t > .pill{ flex:0 1 auto; min-width:0; margin-right:auto }
+.sel-t:hover{ border-color:var(--line-control); background:var(--bg); color:var(--text) }
+.sel-t:focus-visible,.sel-t[aria-expanded="true"]{ outline:none; border-color:var(--brand);
+        box-shadow:var(--ring) }
+.sel.on > .sel-t,.sel-t.on{ border-color:var(--brand); background:var(--brand-tint);
+        color:var(--brand-text); font-weight:var(--weight-medium) }
+.sel.sm .sel-t,.sel-t.sm{ height:var(--control-sm); font-size:var(--text-sm); min-width:110px }
+.sel-caret{ flex:0 0 auto; margin-left:auto; opacity:.55;
+            transition:transform var(--duration) var(--ease) }
+.sel.open .sel-caret{ transform:rotate(180deg) }
+/* THE COUNT BADGE -- how many a closed multi-select holds, how many rows an
+   export will take. It rides inside a control because that is the only thing
+   you need from it while reading the table underneath. */
+.ct{ display:inline-flex; align-items:center; justify-content:center;
+     min-width:18px; height:18px; padding:0 5px; border-radius:var(--radius-full);
+     background:var(--bg-active); color:var(--text-2);
+     font-size:var(--text-2xs); font-weight:var(--weight-semibold);
+     font-variant-numeric:tabular-nums; line-height:1 }
+.sel-t .ct{ flex:0 0 auto; align-self:center }
+.sel.on .ct,.sel-t.on .ct,.btn.pri .ct{ background:var(--brand); color:var(--brand-ink) }
+
+.sel-list{ position:fixed; top:0; left:0; z-index:var(--z-pop);
+           width:max-content; max-width:300px; max-height:min(340px,60vh); overflow-y:auto;
+           padding:var(--space-1);
+           background:var(--surface-raised); border:1px solid var(--line);
+           border-radius:var(--radius-lg); box-shadow:var(--shadow-lg), var(--surface-sheen);
+           animation:rise var(--duration) var(--ease-out) }
+.sel-o{ display:flex; align-items:center; gap:var(--space-2);
+        width:100%; padding:var(--space-2) var(--space-2);
+        border:0; border-radius:var(--radius-md); background:none;
+        font:inherit; font-size:var(--text-md); color:var(--text);
+        text-align:left; cursor:pointer }
+.sel-o > .l{ flex:1 1 auto; min-width:0 }
+.sel-o > .pill{ flex:0 1 auto; min-width:0; margin-right:auto }
+.sel-o:hover{ background:var(--bg-hover) }
+/* Focus is how the keyboard shows position here, so it must read as strongly
+   as hover does -- a ring alone on a list this dense is easy to lose. */
+.sel-o:focus-visible{ outline:none; background:var(--bg-active);
+                      box-shadow:inset 0 0 0 2px var(--brand) }
+.sel-o.sel{ color:var(--brand-text); font-weight:var(--weight-medium) }
+.sel-o.sel .ic{ color:var(--brand) }
+/* "any" is the clear, and sits apart from the values it clears */
+.sel-o.any{ color:var(--text-3) }
+.sel-o.any + .sel-o{ margin-top:var(--space-1); position:relative }
+.sel-o.any + .sel-o::before{ content:""; position:absolute; left:var(--space-2); right:var(--space-2);
+                             top:calc(var(--space-1) * -0.5); height:1px; background:var(--line-2) }
+/* the two marks an option may carry */
+.sel-badge{ flex:0 0 auto; display:grid; place-items:center; width:17px; height:17px;
+            border-radius:var(--radius-sm); border:1px solid var(--line-2); background:var(--bg);
+            font-size:var(--text-2xs); font-weight:var(--weight-semibold); color:var(--text-2) }
+/* THE IDENTITY DOT -- one mark per state, painted by the module that owns the
+   state (`.id-dot.s-qualified` in enquiries.css). The base shape is shared so
+   a filter option and the row's own status pill carry the same mark. */
+.id-dot{ flex:0 0 auto; width:8px; height:8px; border-radius:var(--radius-full);
+         background:var(--line-control) }
+/* the four semantic tones, so any module can mark an option `dot="ok"` without
+   first writing an identity ramp of its own */
+.id-dot.ok{ background:var(--ok-solid) }     .id-dot.warn{ background:var(--warn-solid) }
+.id-dot.bad{ background:var(--bad-solid) }   .id-dot.info{ background:var(--info-solid) }
+.pill .id-dot{ margin-right:1px }
 
 /* ---- CHECKBOX AND RADIO ------------------------------------------------
    DRAWN, NOT `accent-color`. `accent-color` tints the platform's own control
@@ -3262,29 +3345,8 @@ input[type="checkbox"]:disabled,input[type="radio"]:disabled{
    the control right above it, inside the field's own stacking context. Two
    different jobs, and they share `.mi` for the rows so a menu row is one
    drawing whichever surface it lands on. */
-.msel{ position:relative; display:inline-block; min-width:0; max-width:100% }
-.sel-btn{ display:inline-flex; align-items:center; gap:var(--space-2);
-          height:var(--control-md); min-width:140px; max-width:240px;
-          padding:0 var(--space-2) 0 var(--space-3);
-          border:1px solid var(--line-control); border-radius:var(--radius-md);
-          background:var(--bg); color:var(--text); font-size:var(--text-md);
-          box-shadow:var(--shadow-xs);
-          transition:border-color var(--duration) var(--ease),
-                     box-shadow var(--duration) var(--ease) }
-.sel-btn.sm{ height:var(--control-sm); font-size:var(--text-sm) }
-.sel-btn .ic{ color:var(--text-3); margin-left:auto }
-.sel-btn:hover{ border-color:var(--line-3) }
-.sel-btn:focus-visible,.sel-btn[aria-expanded="true"]{ outline:none;
-          border-color:var(--brand); box-shadow:var(--ring) }
-.sel-btn.on{ border-color:var(--brand); color:var(--brand-text); background:var(--brand-tint) }
-/* the count rides in the button because it is the only thing you need from a
-   closed multi-select while you are reading the table under it */
-.ct{ display:inline-flex; align-items:center; justify-content:center;
-     min-width:18px; height:18px; padding:0 5px; border-radius:var(--radius-full);
-     background:var(--bg-active); color:var(--text-2);
-     font-size:var(--text-2xs); font-weight:var(--weight-semibold);
-     font-variant-numeric:tabular-nums }
-.sel-btn.on .ct,.btn.pri .ct{ background:var(--brand); color:var(--brand-ink) }
+.msel{ position:relative; display:inline-flex; min-width:0; max-width:100%; flex:0 1 auto }
+/* the multi-select's closed control is `.sel-t`, above */
 
 .menu{ position:absolute; top:calc(100% + 4px); left:0; z-index:var(--z-pop);
        min-width:100%; max-width:320px; max-height:min(360px,60vh); overflow-y:auto;

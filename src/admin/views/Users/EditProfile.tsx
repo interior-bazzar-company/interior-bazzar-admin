@@ -37,7 +37,7 @@
    carries what somebody filling it in can act on.
    ============================================================================= */
 import { useMemo, useState } from "react";
-import { Icon, Notice } from "../../ui";
+import { Icon, ModalHead, Notice } from "../../ui";
 import { Completeness } from "./bits";
 import AreaRows from "./AreaRows";
 import FacetPicker from "./FacetPicker";
@@ -220,7 +220,7 @@ export default function EditProfile({ row, onClose, onDone }: {
          six words pick faster than six sentences. */
       const v = String(draft[f.key] || "");
       return (
-        <div className={"selectbox" + (v ? " on" : "")}>
+        <div className="selectbox">
           <select value={v} disabled={!f.editable}
             aria-label={f.label}
             onChange={(e) => set(f.key, e.target.value)}>
@@ -254,11 +254,7 @@ export default function EditProfile({ row, onClose, onDone }: {
 
   return (
     <>
-      <div className="md-h">
-        <h3>Edit profile</h3>
-        <p>{row.user.identity.name} · <span className="mono">{row.user.userId}</span></p>
-        <button className="md-x" onClick={close} aria-label="Close"><Icon name="x" /></button>
-      </div>
+      <ModalHead title="Edit profile" sub={<>{row.user.identity.name} · <span className="mono">{row.user.userId}</span></>} onClose={close} />
 
       <div className="md-b um-form">
         {err ? <Notice tone="bad" text={<b>{err}</b>} /> : null}

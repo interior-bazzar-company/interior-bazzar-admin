@@ -1,9 +1,7 @@
 /* =============================================================================
    Deals — LIST. The command row, the attention strip, the table and the board.
    ============================================================================= */
-import {
-  EmptyState, FilterChips, Icon, Notice, Pill, SearchField, Select, StatStrip, qs
-} from "../../ui";
+import { EmptyState, FilterChips, Icon, ListTable, Notice, Pill, qs, SearchField, Select, StatStrip } from "../../ui";
 import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import { can } from "../../shell/AdminShell";
@@ -240,12 +238,10 @@ function DealsTable({ list, sel, p, onCreate, onClearFilters }: {
   );
 
   return (
-    <table className="tbl dls-tbl">
-      <thead><tr>
+    <ListTable head={<tr>
         <th style={{ width: "3px" }}></th><th>Deal</th><th>Stage</th><th>Chain</th>
         <th className="n">Deal value</th><th>Owner</th><th>Next action</th>
-      </tr></thead>
-      <tbody>
+      </tr>}>
         {list.map((d: any) => {
           const u = urgency(d);
           const to = dealHash(d.deal_id, p);
@@ -279,8 +275,7 @@ function DealsTable({ list, sel, p, onCreate, onClearFilters }: {
             </tr>
           );
         })}
-      </tbody>
-    </table>
+      </ListTable>
   );
 }
 

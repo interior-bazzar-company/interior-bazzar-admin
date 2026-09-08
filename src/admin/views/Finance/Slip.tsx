@@ -18,7 +18,7 @@
 import { useShell } from "../../shell/ShellContext";
 import { useNav } from "../../shell/AdminShell";
 import { EmptyState, Icon } from "../../ui";
-import { MoreMenu } from "./Frame";
+import { MoreMenu } from "../../ui/menu";
 import { PaySalaryModal } from "./SalaryModals";
 import LOGO from "../../../assets/images/IB_Icon.png";
 import {
@@ -202,9 +202,9 @@ export default function Slip({ id, p }: {
           <thead>
             <tr>
               <th>Earnings</th>
-              <th className="num">Amount</th>
+              <th className="n">Amount</th>
               <th>Deductions</th>
-              <th className="num">Amount</th>
+              <th className="n">Amount</th>
             </tr>
           </thead>
           <tbody>
@@ -215,17 +215,17 @@ export default function Slip({ id, p }: {
               return (
                 <tr key={i}>
                   <td>{e ? e.label : ""}{earned ? <span className="fin-earned">earned</span> : null}</td>
-                  <td className="num tnum">{e ? inr(e.amountPaise) : ""}</td>
+                  <td className="n tnum">{e ? inr(e.amountPaise) : ""}</td>
                   <td>{d ? d.label : ""}</td>
-                  <td className="num tnum">{d ? inr(d.amountPaise) : ""}</td>
+                  <td className="n tnum">{d ? inr(d.amountPaise) : ""}</td>
                 </tr>
               );
             })}
             <tr className="tot">
               <td>Gross earnings</td>
-              <td className="num tnum">{inr(gross)}</td>
+              <td className="n tnum">{inr(gross)}</td>
               <td>Total deductions</td>
-              <td className="num tnum">{ded ? inr(ded) : inr(0)}</td>
+              <td className="n tnum">{ded ? inr(ded) : inr(0)}</td>
             </tr>
           </tbody>
         </table>

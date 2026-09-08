@@ -24,7 +24,7 @@
    ============================================================================= */
 import { useShell } from "../../shell/ShellContext";
 import { can } from "../../shell/AdminShell";
-import { EmptyState, FilterChips, Icon, SearchField, Select, StatStrip, qs } from "../../ui";
+import { EmptyState, FilterChips, Icon, ListTable, qs, SearchField, Select, StatStrip } from "../../ui";
 import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import { Frame } from "./Frame";
@@ -146,26 +146,21 @@ export default function Refunds({ p, onFilter, onSearch, onUnfilter }: FaceProps
       </>}>
 
       {shown.length ? (
-        <table className="tbl dls-tbl fin-tbl">
-          <thead>
-            <tr>
+        <ListTable cls="fin-tbl" head={<tr>
               <th className="rail" />
               <th>Refund</th>
               <th>Payee</th>
               <th>Why</th>
-              <th className="num">Amount</th>
+              <th className="n">Amount</th>
               <th>State</th>
               <th>Raised</th>
               <th className="tight" />
-            </tr>
-          </thead>
-          <tbody>
+            </tr>}>
             {shown.map((x) => (
               <RefundLine key={x.r.refundId} x={x} p={p}
                 onRecord={writable && x.r.state === "approved" ? () => openRecord(x) : null} />
             ))}
-          </tbody>
-        </table>
+          </ListTable>
       ) : (
         <EmptyState icon={narrowed ? "search" : "refund"}
           title={narrowed ? "Nothing matches those filters" : "No refund has been raised"}
@@ -215,7 +210,7 @@ function RefundLine({ x, p, onRecord }: {
         <div className="cell-1">{groundMeta(r.ground)?.label || r.ground}</div>
         {r.decisionNote ? <div className="cell-2 fin-heldnote" title={r.decisionNote}>{r.decisionNote}</div> : null}
       </td>
-      <td className="num"><Money paise={r.amountPaise} strong /></td>
+      <td className="n"><Money paise={r.amountPaise} strong /></td>
       <td><RefundPill k={r.state} /></td>
       <td className="fin-c-when">
         <div className="cell-1">{fmtDate(r.requestedAt)}</div>

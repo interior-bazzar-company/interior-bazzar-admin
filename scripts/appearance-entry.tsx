@@ -31,7 +31,7 @@ import {
   ConfirmModal, DateRange, DealStatus, Delta, DrawerShell, EmptyState, Eyebrow,
   FileUpload, FormField, Icon, InfoDot, Input, InputGroup, LeadStatus, Legend,
   ListSkeleton, MenuDivider, MenuItem, MenuSection, Meter, MultiSelect,
-  Pagination, Person, Pill, Pipeline, Priority, Radio, Segmented, SelectInput,
+  Pagination, Person, Pill, Select, Pipeline, Priority, Radio, Segmented, SelectInput,
   Table, Tabs, Tags, Textarea, Tiles, Timeline, Toggle, Tooltip,
 } from "../src/admin/ui";
 
@@ -350,12 +350,8 @@ function Board() {
             <Icon name="search" size="sm" />
             <input type="search" placeholder="Search name, reference or phone…" aria-label="Search" />
           </span>
-          <select className="sel on" aria-label="Status" defaultValue="qualified">
-            <option value="">Status</option><option value="qualified">Qualified</option>
-          </select>
-          <select className="sel" aria-label="City" defaultValue="">
-            <option value="">City</option><option value="pune">Pune</option>
-          </select>
+          <Select name="status" label="Status" value="qualified" options={[{ v: "qualified", l: "Qualified", dot: "ok" }, { v: "new", l: "New" }]} />
+          <Select name="city" label="City" options={["Pune", "Mumbai", "Nashik"]} />
           <MultiSelect label="Teams" options={TEAMS} value={multi} onChange={setMulti} sm />
           <span className="spacer" />
           <button className="btn sm"><Icon name="download" />Export</button>
