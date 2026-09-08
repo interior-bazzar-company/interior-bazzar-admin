@@ -6,6 +6,42 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-08
 
+### The composer stands up — a channel rail, an edge, and a floor under the send
+
+**Area:** Deals → Chat, the write box at the foot of the conversation
+**Files:** `src/styles/admin-theme.css`, `src/admin/views/Deals/Chat.tsx`
+
+**What changed**
+
+- **It reads as a surface now, not a hairline rectangle.** The box every entry on a deal's
+  timeline is written in sat on `--line-2` with `--shadow-sm` — the same weight as a
+  reference card, on the one control in the pane that is meant to be used rather than read.
+  It takes `--line-control`, `--shadow-md` and the sheen: it lifts off the pane instead of
+  being drawn on it.
+- **A 3px rail along the top carries the channel.** Forest for a remark, `--ch-wa` for
+  WhatsApp, `--ch-em` for email — the same tokens the bubbles and the channel chips already
+  read, so the whole box previews what the send will look like, not just the picked chip.
+  The channel class is on the composer root (`chanCls(chan)`), which is the only React
+  change here.
+- **Focus lifts the box.** The textarea inside is borderless and has nothing of its own to
+  ring, so `:focus-within` colours the border with the channel accent and paints a 3px ring
+  in the same colour at 22% — the `.field` / `.chips-input` pattern, in a channel colour.
+- **The action bar has a floor.** The foot sat on `--bg` under a hairline, so the Send
+  button floated at the bottom edge; it takes `--bg-inset`, which is what makes the row read
+  as the bottom of the box.
+- **Send behaves like a button.** Shadow at rest, a heavier one on hover, a 1px press, and a
+  real disabled look while a send is in flight — it was a flat pill with a hover colour and
+  nothing else.
+
+**Temp data** — `none`. **Backend needed** — `none`.
+
+**Verified** — `tsc`, build, `check:tokens` (424), `check:contrast` (116), `check:dupes`.
+Driven in Chromium against a mocked deal detail: the workspace was opened, the composer
+photographed at rest, focused, and on the WhatsApp channel, in both themes.
+
+---
+
+
 ### The deal tile — a face, a stage ring, and a selection you can see past
 
 **Area:** Deals → Chat, the deal list on the left; avatars everywhere
