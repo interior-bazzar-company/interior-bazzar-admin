@@ -6,6 +6,45 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-08
 
+### The chat thread gets a warm ground
+
+**Area:** Deals → Chat, the message thread
+**Files:** `src/styles/tokens.css`, `src/styles/admin-theme.css`, `design/ramp.cjs`
+
+**What changed**
+
+- **The thread is cream instead of neutral grey**, and it is the only warm plane in the
+  product. Every other surface comes off the ink ramp, which is right for tables and forms
+  and wrong for a conversation: the thread is the one place somebody reads for minutes
+  rather than scans for seconds, and the ground says "this is talk" before a word of it is
+  read.
+- **Solved on the same OKLCh grid as the chips** — L 0.955 at C 0.030, which is exactly the
+  lightness the neutral sunken step already had. Only the hue changed, so the thread sits at
+  the same depth it always did: a well between the shell behind it and the bubbles on it.
+  White bubbles still lift off it at 1.14. Two neighbouring strengths were rendered and
+  compared; a step softer stopped reading as yellow at all, a step stronger tipped into
+  legal-pad.
+- **Dark gets the same warmth at a fraction of the chroma**, at the lightness its neutral
+  sunken step had. A genuinely yellow dark panel reads as sepia damage rather than as a warm
+  room.
+- **The currency watermark is warm now too** — it was a neutral grey that read as dirt on a
+  cream ground rather than as a mark on it.
+- **Two things that sit directly on that ground had been getting away with a coincidence.**
+  The day divider knocks a hole in the rule behind it and was painted in the SHELL's colour,
+  which only ever worked because the two greys were within 0.01 of each other. The system log
+  row's bubble was the inset grey, invisible for the same reason. The divider takes the chat
+  ground and the log bubble is transparent, which is what it always meant.
+
+**Temp data** — `none`. **Backend needed** — `none`.
+
+**Verified** — `tsc`, build, `check:tokens` (436), `check:contrast` (154 pairs across 2 themes
+— the warm ground carries text with nothing behind it, so it is measured as a text background:
+the log line at 9.90 and the day divider at 5.81 in light, 10.88 and 6.33 in dark),
+`check:dupes`, and the render smokes. The thread was driven in Chromium in both themes with the
+real stylesheet, reading back computed styles rather than judging pixels.
+
+---
+
 ### Chips solved on one grid, so a status outranks a tag again
 
 **Area:** the whole product — every status pill, tag and filter chip

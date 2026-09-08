@@ -201,6 +201,11 @@ PAIRS.push(
      an operable boundary in the 1.4.11 sense rather than decoration: if it
      drops below 3:1 the only thing separating an active filter from an
      inactive one is a 1.1 tint, which is what it used to be. */
+  /* The chat's warm ground carries two pieces of text with nothing behind them
+     — the day divider and a system log line — so it is a text background like
+     any other and is measured as one. */
+  ["--color-text-2", "--color-chat", TEXT, "a system log line in the thread"],
+  ["--color-text-muted", "--color-chat", TEXT, "the day divider over the thread"],
   ["--brand", "--color-bg", EDGE, "a selected filter chip's edge"],
   ["--brand-text", "--brand-tint", TEXT, "a selected filter chip's label"]
 );

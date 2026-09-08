@@ -297,6 +297,15 @@
      staying a visibly distinct plane inside a white card. `check:contrast`
      measures it from this file, so a nudge here is caught rather than assumed. */
   --color-surface-sunken:#f2f2f4;
+  /* THE CHAT GROUND IS WARM, and it is the only warm plane in the product.
+     Every other surface is a neutral grey off the ink ramp, which is right for
+     tables and forms and wrong for a conversation: the thread is the one place
+     somebody reads for minutes rather than scans for seconds, and a cream
+     ground says "this is talk" before a word of it is read. Solved on the same
+     OKLCh grid as everything else — L 0.955 at C 0.030, so it sits at exactly
+     the lightness the neutral sunken step had and differs only in hue. White
+     bubbles still lift off it at 1.14. */
+  --color-chat:#f7f0da;
   /* THE TABLE HEAD, and any band that only holds labels. Darker than the well
      because nothing with an edge sits on it -- muted text still clears 5.4:1 --
      and dark enough to read as a band at a glance, which #f2f2f4 did not. */
@@ -464,6 +473,11 @@
   --color-surface:#141416;
   --color-surface-raised:#1c1c1f;
   --color-surface-sunken:#0e0e10;
+  /* The same warmth at the same lightness the neutral sunken step has, so the
+     thread stays a well between the shell behind it and the bubbles on it.
+     Dark gets a fraction of the light theme's chroma on purpose: a genuinely
+     yellow dark panel reads as sepia damage rather than as a warm room. */
+  --color-chat:#100e09;
   --color-surface-head:var(--color-surface-sunken);
   --color-surface-nav:#0c0c0e;
 
@@ -706,8 +720,8 @@
   --chevron:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235c5c65' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m6 9 6 6 6-6'/></svg>");
 
   /* ---- chat's faded backdrop — currency glyphs in ink ------------------- */
-  --chat-bg:var(--color-surface-sunken);
-  --chat-pattern:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='%23737373' opacity='0.09' font-family='Arial,Helvetica,sans-serif' font-weight='700'%3E%3Ctext x='10' y='36' font-size='24' transform='rotate(-14 10 36)'%3E%E2%82%B9%3C/text%3E%3Ctext x='92' y='18' font-size='17' transform='rotate(9 92 18)'%3E%24%3C/text%3E%3Ctext x='128' y='68' font-size='21' transform='rotate(-7 128 68)'%3E%E2%82%B9%3C/text%3E%3Ctext x='34' y='92' font-size='15' transform='rotate(13 34 92)'%3E%E2%82%AC%3C/text%3E%3Ctext x='72' y='128' font-size='23' transform='rotate(-16 72 128)'%3E%24%3C/text%3E%3Ctext x='138' y='142' font-size='16' transform='rotate(6 138 142)'%3E%C2%A5%3C/text%3E%3Ctext x='4' y='150' font-size='17' transform='rotate(-11 4 150)'%3E%E2%82%B9%3C/text%3E%3C/g%3E%3C/svg%3E");
+  --chat-bg:var(--color-chat);
+  --chat-pattern:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cg fill='%238a7f5c' opacity='0.10' font-family='Arial,Helvetica,sans-serif' font-weight='700'%3E%3Ctext x='10' y='36' font-size='24' transform='rotate(-14 10 36)'%3E%E2%82%B9%3C/text%3E%3Ctext x='92' y='18' font-size='17' transform='rotate(9 92 18)'%3E%24%3C/text%3E%3Ctext x='128' y='68' font-size='21' transform='rotate(-7 128 68)'%3E%E2%82%B9%3C/text%3E%3Ctext x='34' y='92' font-size='15' transform='rotate(13 34 92)'%3E%E2%82%AC%3C/text%3E%3Ctext x='72' y='128' font-size='23' transform='rotate(-16 72 128)'%3E%24%3C/text%3E%3Ctext x='138' y='142' font-size='16' transform='rotate(6 138 142)'%3E%C2%A5%3C/text%3E%3Ctext x='4' y='150' font-size='17' transform='rotate(-11 4 150)'%3E%E2%82%B9%3C/text%3E%3C/g%3E%3C/svg%3E");
 }
 
 :root[data-theme="dark"]{

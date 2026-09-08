@@ -2190,7 +2190,10 @@ button.dls-stat:hover{ background:var(--bg-hover) }
                    background-color:var(--chat-bg); background-image:var(--chat-pattern); background-repeat:repeat;
                    display:flex; flex-direction:column; gap:3px }
 .dws-daydiv{ text-align:center; margin:var(--space-4) 0 var(--space-3); position:relative }
-.dws-daydiv span{ background:var(--bg-shell); padding:0 var(--space-3); color:var(--text-3);
+/* The day label knocks a hole in the rule behind it, so it has to be painted
+   in the CHAT's ground rather than the shell's — they were within 0.01 of each
+   other while both were neutral grey and the difference never showed. */
+.dws-daydiv span{ background:var(--chat-bg); padding:0 var(--space-3); color:var(--text-3);
                    font-size:var(--text-2xs); font-weight:var(--weight-semibold); text-transform:uppercase;
                    letter-spacing:.04em; position:relative; z-index:1 }
 .dws-daydiv::before{ content:""; position:absolute; left:0; right:0; top:50%; height:1px; background:var(--line-2) }
@@ -2233,7 +2236,10 @@ button.dls-stat:hover{ background:var(--bg-hover) }
 .dws-msg.em{ --bub:var(--ch-em); --bub-ink:var(--ch-em-ink); --bub-line:var(--ch-em) }
 /* A system entry is not a message anybody sent, so it stays uncoloured and
    drops a size — the one row in this list that is deliberately not a bubble. */
-.dws-msg.log{ --bub:var(--bg-inset); --bub-ink:var(--text-2); --bub-line:transparent }
+/* Transparent, not the inset grey. It was the inset grey, which was invisible
+   only because it happened to equal the ground behind it; on a warm ground the
+   same value is a cool grey patch. Transparent is what it always meant. */
+.dws-msg.log{ --bub:transparent; --bub-ink:var(--text-2); --bub-line:transparent }
 .dws-msg.log .dws-bubble{ font-size:var(--text-md) }
 
 /* The real send. Rides the same --bub-line variable the bubble above it set,
