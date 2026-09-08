@@ -272,7 +272,7 @@ function ResourcesFace({ list, p, onFilter }: {
       </div>
 
       <div className="dls-body rs-pane">
-        <Table
+        <Table list
           cols={[
             { label: "Responses", cls: "n", w: "110px" },
             { label: "Resource" },
@@ -487,7 +487,7 @@ function ResponsesFace({ list, p, onFilter }: {
       </div>
 
       <div className="dls-body rs-pane">
-        <Table
+        <Table list
           cols={[
             { label: "Member" },
             { label: "Resource" },
@@ -704,7 +704,7 @@ function FormFace({ r, p, onFilter }: {
           </Notice>
         ) : null}
 
-        <Table
+        <Table list
           cols={[
             { label: "Member" },
             { label: "State", w: "130px" },

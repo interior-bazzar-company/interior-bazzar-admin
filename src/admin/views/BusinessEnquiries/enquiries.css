@@ -27,18 +27,14 @@
    the table needs and forced a horizontal scrollbar on a 1280px laptop for no
    reason. 960px is the measured natural width of the ten columns that remain. */
 .be-list .be-tbl { width: 100%; min-width: 960px }
-.be-list .be-tbl th { background: var(--bg) }
-.be-list .be-tbl td { height: auto; padding: var(--space-2) var(--space-3) }
-.be-list .be-tbl td.rail { width: 3px; padding: 0 }
-.be-list .be-tbl td.rail i {
-  display: block; width: 3px; height: 42px; border-radius: 0 2px 2px 0; background: transparent;
-}
+/* head, cells and the rail are `.tbl` / `.dls-tbl`'s; only the two row tones
+   below are this module's */
 /* The rail is the only place a row shouts, and after ownership, callbacks and
    the SLA were removed it has two states rather than four: "no match yet" is
    amber because it is a supply gap and not a failure, and Qualified is
    neutral-strong because it is simply next. There is no red left — nothing in
    the module is late any more, because nothing is owed by a time. */
-.be-list .be-tbl tr.be-r-warn td.rail i { background: var(--warn) }
+.be-list .be-tbl tr.be-r-warn td.rail i { background: var(--warn-solid) }
 .be-list .be-tbl tr.be-r-rd td.rail i { background: var(--line-strong) }
 /* Fourteen cells do not fit a laptop, and the shared strip scrolls
    horizontally — which put Converted and Rejected permanently off the right

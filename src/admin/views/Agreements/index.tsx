@@ -161,7 +161,7 @@ function TemplatesFace({ p, onFilter }: {
       </div>
 
       <div className="dls-body ag-pane">
-        <Table
+        <Table list
           cols={[
             { label: "Sent", cls: "n", w: "110px" },
             { label: "Document" },
@@ -362,7 +362,7 @@ function SentFace({ p, onFilter }: {
       </div>
 
       <div className="dls-body ag-pane">
-        <Table
+        <Table list
           cols={[
             { label: "Member" },
             { label: "Document" },

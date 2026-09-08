@@ -1382,7 +1382,7 @@ function List({ rows, all, onOpen }: { rows: WorkItem[]; all: WorkItem[]; onOpen
        board card already keeps it, and it was 190px of a fact ABOUT a row
        rather than a value worth scanning a column of. */
     <div className="tm-list">
-    <Table
+    <Table list
       scroll min="920px"
       cols={[
         { label: "", w: "3px" },

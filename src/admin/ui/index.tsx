@@ -614,11 +614,14 @@ export interface TableProps {
   empty?: EmptyStateProps;
   scroll?: boolean;
   min?: string;
+  /** a LIST PAGE's table: flat on the page, no card frame. Same head, same
+   *  cells, same hover as the framed one -- the frame is the only difference. */
+  list?: boolean;
 }
 export function Table(o: TableProps) {
   return (
-    <div className={"tw" + (o.scroll ? " scroll" : "")}>
-      <table className="tbl" style={o.min ? { minWidth: o.min } : undefined}>
+    <div className={"tw" + (o.list ? " flat" : "") + (o.scroll ? " scroll" : "")}>
+      <table className={"tbl" + (o.list ? " dls-tbl" : "")} style={o.min ? { minWidth: o.min } : undefined}>
         <thead>
           <tr>{o.cols.map((c, i) => <th key={i} className={c.cls || ""} style={c.w ? { width: c.w } : undefined}>{c.label}</th>)}</tr>
         </thead>

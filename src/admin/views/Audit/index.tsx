@@ -198,7 +198,7 @@ export default function Audit() {
       ) : null}
 
       <div className="dls-body">
-        <Table
+        <Table list
           scroll
           min="900px"
           cols={[{ label: "When" }, { label: "Module" }, { label: "Action" }, { label: "Detail" }, { label: "Actor" }]}

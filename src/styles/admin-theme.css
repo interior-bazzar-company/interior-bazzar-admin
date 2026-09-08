@@ -306,17 +306,11 @@ details summary::-webkit-details-marker{ display:none }
 .app.rail .sidebar:hover .sb-item.sb-q::after{ display:none }
 
 /* ---------------------------------------------------------------- content */
-/* THE CANVAS, AND THE GRID ON IT. Both come from layer 2: `--canvas` is the
-   ground this scheme wants behind the work, and `--texture-grid` is the 32px
-   rule drawn on it — transparent in Portal, so Portal is exactly the flat plane
-   it always was, and a faint graph-paper ground everywhere else. A panel paints
-   its own opaque surface over the grid, so the texture only ever shows in the
-   space BETWEEN things, which is the only place it means anything. */
+/* THE CANVAS. `--canvas` is the ground behind the work, and it is a flat
+   plane: a 32px graph-paper grid used to be drawn on it, and on a screen full
+   of tables the grid read as more lines behind the lines. Gone. */
 .content{ flex:1; min-width:0; display:flex; flex-direction:column;
-          background:var(--canvas); position:relative; overflow:hidden;
-          background-image:linear-gradient(var(--texture-grid) 1px,transparent 1px),
-                           linear-gradient(90deg,var(--texture-grid) 1px,transparent 1px);
-          background-size:32px 32px }
+          background:var(--canvas); position:relative; overflow:hidden }
 
 /* Same deeper surface as the nav rail: together they form one continuous band
    of chrome around the content, instead of the topbar reading as the first
@@ -894,6 +888,10 @@ select.inp::-ms-expand{ display:none }
 .tw{ border:1px solid var(--line); border-radius:var(--radius-xl);
      overflow:hidden; background:var(--surface-raised) }
 .tw.scroll{ overflow-x:auto }
+/* A LIST PAGE'S TABLE SITS FLAT ON THE PAGE; a table inside a card or a
+   drawer keeps the hairline frame. That is the only difference left between
+   the two -- head, cells, hover and rail are one drawing. */
+.tw.flat{ border:0; border-radius:0; background:none }
 /* THE COLUMN HEAD IS A TRACKED MONO MICRO-LABEL, which is where most of this
    system's voice actually lives. A column head is not prose — it is the NAME
    of a measurement, exactly like the label on a metric tile, and setting the
@@ -903,12 +901,12 @@ select.inp::-ms-expand{ display:none }
    Uppercase BY THE TYPE SYSTEM, never typed in capitals, so the string is
    still searchable, exportable and read aloud correctly. */
 .tbl th{ position:sticky; top:0; z-index:var(--z-stick); text-align:left; white-space:nowrap;
-         padding:var(--space-3) var(--space-4); background:var(--bg-inset);
+         padding:var(--space-3) var(--space-4); background:var(--bg-head);
          border-bottom:1px solid var(--line);
          font-family:var(--font-mono); font-size:var(--text-2xs);
          letter-spacing:.1em; text-transform:uppercase;
          font-weight:var(--weight-medium); color:var(--text-3) }
-.tbl td{ height:var(--row-h); padding:var(--space-3) var(--space-4);
+.tbl td{ height:var(--row-h); padding:var(--space-2) var(--space-4);
          border-bottom:1px solid var(--line); font-size:var(--text-base); vertical-align:middle }
 .tbl tbody tr:last-child td{ border-bottom:none }
 .tbl tbody tr{ transition:background var(--duration-fast) var(--ease) }
@@ -1613,8 +1611,9 @@ button.dls-stat:hover{ background:var(--bg-hover) }
 /* .tbl th is already position:sticky — inside .dls-body it finally has a real
    scroll container to stick to, so the header row survives scrolling. */
 .dls-tbl{ width:100% }
-.dls-tbl th{ background:var(--bg) }
-.dls-tbl td{ height:auto; padding:var(--space-2) var(--space-3) }
+/* the list table's head and cells are `.tbl`'s -- they used to be a white
+   head and tighter cells here, a well head and looser cells in `.tw`, and a
+   third rhythm in Team, so the same list looked different per module */
 /* THE EXCEPTION RAIL -- column one of a list whose rows can need somebody.
    3px in a status colour, findable without reading. It was drawn three times
    at two heights: 40px here, 52px in Users and again in Finance, each with its

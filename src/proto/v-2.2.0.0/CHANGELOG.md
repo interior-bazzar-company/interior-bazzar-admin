@@ -6,6 +6,39 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-08
 
+### Every table is one table — and the light greys can be seen
+
+**Area:** every list page; the table head, hover and active states everywhere; the canvas
+**Files:** `src/styles/tokens.css`, `src/styles/admin-theme.css`, `src/admin/ui/index.tsx`,
+`src/admin/views/Team/team.css`, `src/admin/views/BusinessEnquiries/enquiries.css`,
+`src/admin/views/{Resources,Agreements,Audit}/index.tsx`, `src/admin/views/Team/{Attendance,Reports,Work}.tsx`,
+`design/ramp.cjs`
+
+**What changed**
+
+- **Three table structures became one.** Finance and the other queues rendered the flat
+  `.dls-tbl` with a WHITE head and 8px cells; Resources, Agreements, Attendance, Reports,
+  Audit and the Tasks list rendered the card `Table` — a bordered, rounded frame with the
+  head in a well and 12px cells; Team then overrode the head and cells a third way. Now
+  `.tbl` has one head, one cell rhythm and one hover, and `Table` takes `list` to drop the
+  card frame on a list page. The frame is the only difference left, and it is reserved for a
+  table inside a card or a drawer.
+- **The light-theme greys were a shade off white.** Table heads sat on `#f2f2f4`, hover on
+  `#f8f8fa`. The head gets its own token — `--color-surface-head: #e9e9ed` — because the
+  sunken well cannot go darker (an input's edge has to hold 3:1 on it); nothing operable
+  sits on a table head, so it is free to be a real band. Hover is `#f0f0f3`, active `#e3e3e8`.
+  Dark moved a step too so the same relationships hold.
+- **The 32px grid texture on the canvas is gone.** On a screen full of tables it read as
+  more lines behind the lines.
+
+**Temp data** — `none`. **Backend needed** — `none`.
+
+**Verified** — `tsc`, build, `check:tokens` (423), `check:contrast` (**116 pairs**: the head
+and hover pairs were added, both themes), `check:dupes`, six render smokes; 38/38 routes
+photographed; Resources, Finance and Tasks reviewed by eye.
+
+---
+
 ### One table, one dropdown, one modal head — the parts the screens still drew for themselves
 
 **Area:** every list page (Deals, Quotations, Invoices, Plans, Roles, Members, Users, the five

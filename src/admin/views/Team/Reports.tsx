@@ -173,7 +173,7 @@ function TheDay({ rows }: { rows: ReviewRow[] }) {
             three, over a table whose columns are already labelled, is a line
             nobody reads twice. The count of what needs moving lives on the
             Actions tab, which carries it as a badge. */}
-        <Table
+        <Table list
           scroll min="1040px"
           cols={[
             { label: "", w: "3px" },
@@ -460,7 +460,7 @@ function Analytics({ scope, span, onSpan }: {
 
         <SectionHead title="Per member"
           desc="Counts, and one ratio made of two of them. Every column sorts and nothing adds up to a rating." />
-        <Table
+        <Table list
           scroll min="940px"
           cols={[col("name", "Member"), col("plans", "Plans", "110px"), col("eods", "Reports", "120px"),
             col("unread", "Unread", "110px"), col("planned", "Lines planned", "140px"),

@@ -1469,18 +1469,10 @@ tr:focus-within .tm-st-b.sm > .ic,
 .tm-list .tm-who b, .tm-list .tm-parent {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
 }
-.tm-list .tbl td { height: auto; min-height: var(--row-h); padding: var(--space-3) var(--space-4) }
 
-/* ONLY WHAT DIFFERS FROM THE SHARED HEAD. `.tbl th` in admin-theme.css is now
-   the tracked mono micro-label — 10px, uppercase, muted — so the six
-   declarations that said exactly that have gone. What is genuinely local is
-   that this list's head sits on the PLANE rather than in a well, over a
-   stronger rule, and is tighter vertically because its rows are two-line. */
-.tm-list .tbl th {
-  overflow: hidden; text-overflow: ellipsis;
-  padding-top: var(--space-2); padding-bottom: var(--space-2);
-  background: var(--bg); border-bottom: 1px solid var(--line-2);
-}
+/* the head and the cells are `.tbl`'s own -- this list used to set a white
+   head, a stronger rule and its own padding, which is why it did not look
+   like the list one module over */
 
 /* THE TITLE IS THE ROW. It shares its cell with the meta line and was set at
    the same size as the four cells beside it, so nothing in the row led. */

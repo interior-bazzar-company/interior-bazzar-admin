@@ -181,7 +181,7 @@ function Today({ rows, p, onFilter }: {
       {/* The day heading used to supply this gap. `.dls-body` has none of its
           own, so without the pane the table welds itself to the filter chips. */}
       <div className="dls-body tm-pane">
-        <Table
+        <Table list
           scroll min="980px"
           cols={[
             { label: "", w: "3px" },
@@ -262,7 +262,7 @@ function History({ members, me, scope, date }: {
         <span className="dim">{week.length} working days · weekends are not counted (leave and holidays are out of v1)</span>
       </div>
       {inScope.length ? (
-        <Table
+        <Table list
           scroll min="840px"
           cols={[{ label: "Member" } as { label: string; cls?: string; w?: string }]
             .concat(week.map((d) => ({ label: fmtDayName(d) + " " + d.slice(8), cls: "n", w: "96px" })))
@@ -465,7 +465,7 @@ function Analytics({ scope, span, onSpan }: {
 
         <SectionHead title="Per member"
           desc="Counts and totals. Every column sorts and none of them add up to a score — that is the point." />
-        <Table
+        <Table list
           scroll min="960px"
           cols={[col("name", "Member"), col("present", "In", "100px"), col("late", "Late", "110px"),
             col("absent", "Absent", "100px"), col("unclosed", "Unclosed", "110px"),
