@@ -885,13 +885,19 @@ select.inp::-ms-expand{ display:none }
 /* ============================================================================
    TABLE
    ========================================================================== */
-.tw{ border:1px solid var(--line); border-radius:var(--radius-xl);
+/* THE TABLE FRAME: a hairline and a control-sized radius, on every table. It
+   was a card -- a 12px corner on the plane -- for a record's sub-list and
+   nothing at all for a list page, so the same rows had two silhouettes. One
+   frame now, the reference's: thin, 6px, the head on the well inside it. */
+.tw{ border:1px solid var(--line); border-radius:var(--radius-md);
      overflow:hidden; background:var(--surface-raised) }
 .tw.scroll{ overflow-x:auto }
 /* A LIST PAGE'S TABLE SITS FLAT ON THE PAGE; a table inside a card or a
    drawer keeps the hairline frame. That is the only difference left between
    the two -- head, cells, hover and rail are one drawing. */
-.tw.flat{ border:0; border-radius:0; background:none }
+/* a list page's table keeps the same hairline frame; it only sits on the
+   plane rather than on a raised surface */
+.tw.flat{ background:var(--bg) }
 /* THE COLUMN HEAD IS A TRACKED MONO MICRO-LABEL, which is where most of this
    system's voice actually lives. A column head is not prose — it is the NAME
    of a measurement, exactly like the label on a metric tile, and setting the
@@ -901,13 +907,13 @@ select.inp::-ms-expand{ display:none }
    Uppercase BY THE TYPE SYSTEM, never typed in capitals, so the string is
    still searchable, exportable and read aloud correctly. */
 .tbl th{ position:sticky; top:0; z-index:var(--z-stick); text-align:left; white-space:nowrap;
-         padding:var(--space-3) var(--space-4); background:var(--bg-head);
+         padding:var(--space-2) var(--space-3); background:var(--bg-head);
          border-bottom:1px solid var(--line);
          font-family:var(--font-mono); font-size:var(--text-2xs);
          letter-spacing:.1em; text-transform:uppercase;
          font-weight:var(--weight-medium); color:var(--text-3) }
-.tbl td{ height:var(--row-h); padding:var(--space-2) var(--space-4);
-         border-bottom:1px solid var(--line); font-size:var(--text-base); vertical-align:middle }
+.tbl td{ height:var(--row-h); padding:var(--space-2) var(--space-3);
+         border-bottom:1px solid var(--line); font-size:var(--text-md); vertical-align:middle }
 .tbl tbody tr:last-child td{ border-bottom:none }
 .tbl tbody tr{ transition:background var(--duration-fast) var(--ease) }
 .tbl tbody tr.clickable{ cursor:pointer }

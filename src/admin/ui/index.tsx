@@ -665,11 +665,13 @@ export function ListTable({ head, children, cls, min }: {
   head: ReactNode; children: ReactNode; cls?: string; min?: string;
 }) {
   return (
-    <table className={"tbl dls-tbl" + (cls ? " " + cls : "")}
-      style={min ? { minWidth: min } : undefined}>
-      <thead>{head}</thead>
-      <tbody>{children}</tbody>
-    </table>
+    <div className="tw flat scroll">
+      <table className={"tbl dls-tbl" + (cls ? " " + cls : "")}
+        style={min ? { minWidth: min } : undefined}>
+        <thead>{head}</thead>
+        <tbody>{children}</tbody>
+      </table>
+    </div>
   );
 }
 
