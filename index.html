@@ -21,8 +21,9 @@
   </noscript>
 
   <script>
-    // Pre-paint so the panel never flashes the wrong theme. ShellContext re-runs
-    // the same resolution; this one exists only to beat the first paint.
+    // Pre-paint so the panel never flashes the wrong APPEARANCE — theme AND
+    // scheme. ShellContext re-runs the same resolution; this one exists only to
+    // beat the first paint.
     //
     // Two selectors, one state: `data-theme` is the panel's own; `dark-mode` /
     // `light-mode` is how Untitled UI selects a theme, so a component from
@@ -42,6 +43,15 @@
         r.setAttribute("data-theme", dark ? "dark" : "light");
         if (t === "system") r.setAttribute("data-theme-pref", "system");
         if (d) r.setAttribute("data-density", JSON.parse(d));
+        // The scheme, on the same terms: the default carries NO attribute, so
+        // only a stored non-default is written. Without this a browser that
+        // chose Portal or Beacon painted one frame of Console on every load —
+        // a whole-page colour flash, and the one appearance bug a person sees
+        // every single morning.
+        var sc = localStorage.getItem("ib_admin_scheme");
+        sc = sc ? JSON.parse(sc) : null;
+        if (sc === "portal" || sc === "beacon") r.setAttribute("data-scheme", sc);
+        else r.removeAttribute("data-scheme");
       } catch (e) { }
     })();
   </script>

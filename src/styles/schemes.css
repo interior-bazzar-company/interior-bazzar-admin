@@ -103,6 +103,13 @@
    and they finally have two different answers.
    ========================================================================== */
 :root:not([data-scheme]){
+  /* THE CANVAS — what the content area paints, and the one token that decides
+     whether this scheme reads as "a page" or as "a workbench". Console puts the
+     GROUND there and lets panels stand on it as surfaces; Portal keeps the
+     plane it always had. It is a token rather than a scheme-aware component
+     rule, so the component layer never learns a scheme exists. */
+  --color-canvas:var(--ink-2);
+
   --color-bg:var(--ink-2);
   --color-surface:#ffffff;
   --color-surface-raised:#ffffff;
@@ -204,11 +211,18 @@
    is a border plus a 1px inner highlight rather than a shadow a dark ground
    cannot show, and the status hues get LIGHTER rather than only brighter. */
 :root[data-theme="dark"]:not([data-scheme]){
-  --color-bg:#0a0a0b;
-  --color-surface:#141416;
-  --color-surface-raised:#1c1c1f;
-  --color-surface-sunken:#111113;
-  --color-surface-nav:#0c0c0e;
+  --color-canvas:#08080a;
+
+  /* THE THREE PLANES ARE THREE PLANES. A dark scheme that steps 10 → 20 → 28
+     is one flat grey with borders drawn on it: the panels stop reading as
+     panels, and on the theme this panel boots into that is most of the screen.
+     The ground drops, the plane rises, and the raised step rises further, so
+     elevation is legible before a border is. */
+  --color-bg:#08080a;
+  --color-surface:#16161a;
+  --color-surface-raised:#202027;
+  --color-surface-sunken:#0f0f12;
+  --color-surface-nav:#0b0b0e;
 
   --color-text:var(--ink-2);
   --color-text-2:#c2c2c8;
@@ -299,8 +313,8 @@
    bug a person notices every single morning. */
 @media (prefers-color-scheme:dark){
   :root:not([data-theme="light"]):not([data-scheme]){
-    --color-bg:#0a0a0b; --color-surface:#141416; --color-surface-raised:#1c1c1f;
-    --color-surface-sunken:#111113; --color-surface-nav:#0c0c0e;
+    --color-bg:#08080a; --color-surface:#16161a; --color-surface-raised:#202027;
+    --color-surface-sunken:#0f0f12; --color-surface-nav:#0b0b0e;
     --color-text:var(--ink-2); --color-text-2:#c2c2c8; --color-text-muted:#93939b;
     --color-text-off:#6a6a72; --color-text-inverse:var(--ink-12);
     --color-border:#28282c; --color-border-strong:#3a3a40; --color-control-edge:#70707a;
@@ -331,6 +345,9 @@
    the previous appearance rather than a copy of it that can drift away from it.
    ========================================================================== */
 :root[data-scheme="portal"]{
+  /* the plane, exactly as before — Portal has no canvas of its own */
+  --color-canvas:var(--color-bg-primary);
+
   --color-bg:var(--color-bg-secondary);
   --color-surface:var(--color-bg-primary);
   --color-surface-raised:var(--color-bg-raised);
@@ -434,6 +451,8 @@
    one of them.
    ========================================================================== */
 :root[data-scheme="beacon"]{
+  --color-canvas:var(--slate-2);
+
   --color-bg:var(--slate-2);
   --color-surface:#ffffff;
   --color-surface-raised:#ffffff;
@@ -521,6 +540,8 @@
   color-scheme:light;
 }
 :root[data-scheme="beacon"][data-theme="dark"]{
+  --color-canvas:#080e11;
+
   --color-bg:#080e11;
   --color-surface:#111a1e;
   --color-surface-raised:#17242a;

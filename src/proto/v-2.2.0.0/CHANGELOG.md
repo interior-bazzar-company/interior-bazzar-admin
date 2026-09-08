@@ -6,6 +6,86 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-08
 
+### "The scheme is not updating" — what was actually wrong, and the check that would have caught it
+
+**Area:** the account menu, the pre-paint script, and the difference between two schemes
+**Files:** `src/admin/shell/AdminShell.tsx`, `index.html`, `src/styles/schemes.css`,
+`src/styles/tokens.css`, `src/styles/admin-theme.css`, `design/ramp.cjs`,
+`scripts/check-appearance-menu.cjs` (new), `package.json`
+
+**What changed**
+
+The report was that choosing a scheme did nothing. Driven end to end in a real
+browser, the switch was in fact writing the attribute, repainting, and
+persisting — so the honest finding is that **three separate things made a
+working control look broken**, and all three are fixed.
+
+**1 · The menu was a photograph of itself.** `openPop` takes a NODE, so the
+account popover holds whatever markup was handed to it when it opened. A
+`force()` re-render of `AccountButton` does not reach inside it. The page
+repainted, but the line under the picker went on describing the scheme you had
+just left and the theme group went on showing the old selection — which reads as
+"nothing happened" while you are looking straight at the control that did
+something. `open()` now takes a `rebuild` flag and both switches call it, so the
+popover is rebuilt in place against the same anchor. The theme buttons stop
+CLOSING the menu to prove they worked, too — that was the same question one step
+later.
+
+**2 · The pre-paint script never knew about schemes.** `index.html` writes the
+theme before first paint so the panel cannot flash; it did not write the scheme,
+so a browser that had chosen Portal or Beacon painted one frame of Console on
+every single load. It now writes both, on the same terms — the default carries
+no attribute, so only a stored non-default is written.
+
+**3 · Console and Portal were nearly the same colour, which is the real
+complaint.** This panel was already ink-and-forest, so a scheme that is *also*
+ink-and-forest differed by a handful of RGB points: in dark, ground `#0a0a0b` vs
+`#0a0a0a` and plane `#141416` vs `#171717`. The switch worked and there was
+nothing to see. Two changes give Console an identity a person can name:
+
+- **`--color-canvas`** — a new layer-2 token: what the content area paints.
+  Console and Beacon put the GROUND there and let panels stand on it as
+  surfaces; Portal keeps the flat plane it always had. It is a token rather than
+  a scheme-aware rule, so the component layer still does not know a scheme
+  exists. `--texture-grid` is finally spent: a 32px rule on that canvas, drawn
+  in a token that is `transparent` in Portal — so Portal is untouched, and
+  everywhere else there is a faint graph-paper ground showing only in the space
+  BETWEEN things.
+- **Console dark's three planes are three planes.** `08080a → 16161a → 202027`
+  instead of `0a0a0b → 141416 → 1c1c1f`. A dark scheme that steps by six points
+  is one flat grey with borders drawn on it, and on the theme this panel boots
+  into that was most of the screen. Re-measured: all 96 contrast pairs still
+  pass, the tightest being muted-on-raised at 5.31:1 against a 4.5 floor.
+
+**`npm run check:menu` is new**, and it is the check that would have settled this
+in a minute instead of an afternoon. It drives the REAL panel in a browser with
+`me/permissions/` mocked at the network boundary — no stub module, no aliased
+import, nothing about the app changed to make it testable — and asserts that the
+menu carries the picker, that a choice writes the attribute AND repaints AND is
+stored, that it survives a reload, that the menu's own line follows the choice,
+and that the theme half of the same menu still works. It also leaves a
+screenshot of the open menu in `.tmp/appearance/`.
+
+Two things it taught while being written, both now stated in the file so the
+next person does not spend the same twenty minutes: a Playwright route glob
+written around the word "api" also matches `/src/api/apiService/index.ts`, which
+the dev server serves as a module — answering that with JSON kills the page
+before React starts, and the only symptom is an empty `<div id="root">`. And
+routes match LAST-registered-first, so a catch-all must be registered before the
+specific one it would otherwise swallow.
+
+**Verified**
+
+`npx tsc -b` clean · `npx eslint` clean on every changed file ·
+`npm run check:tokens` — all 407 properties defined ·
+`npm run check:contrast` — 96 pairs, 0 fail · `npm run check:menu` — all checks
+pass · `npx vite build` succeeds · `npm run shots` re-photographed all six
+appearances plus the panel itself in each scheme.
+
+---
+
+## 2026-09-08
+
 ### The scheme layer — three appearances, one component layer, and the parts that came with it
 
 **Area:** the whole panel — every module re-skins from one attribute on `<html>`

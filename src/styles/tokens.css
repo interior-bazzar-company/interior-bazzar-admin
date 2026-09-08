@@ -111,6 +111,8 @@
   /* the nav is already a step off the plane, so its hover is the ACTIVE step */
   --sidebar-hover:var(--color-active);
   --sidebar-active:var(--color-selected);
+  /* the content area's own ground — see --color-canvas in schemes.css */
+  --canvas:var(--color-canvas);
   --surface:var(--color-surface);
   --surface-raised:var(--color-surface-raised);
   --sk:var(--color-sk);

@@ -126,7 +126,7 @@ const C = {
   badT: "#9d3820", badBg: "#fdeee9", infoT: "#33449f", infoBg: "#eceffb",
   accentT: "#0a6a86", accentBg: "#e2f6fb",
   /* dark */
-  dBg: "#0a0a0b", dSurface: "#141416", dRaised: "#1c1c1f", dSunken: "#111113",
+  dBg: "#08080a", dSurface: "#16161a", dRaised: "#202027", dSunken: "#0f0f12",
   dText: "#f4f4f5", dText2: "#c2c2c8", dMuted: "#93939b", dEdge: "#70707a",
   dPrimary: "#f4f4f5", dPrimaryInk: "#0b0b0d",
   dBrand: "#218a62", dBrandText: "#74c39f", dSelected: "#0f2a20",

@@ -287,8 +287,17 @@ b,strong{ font-weight:var(--weight-semibold) }
 .app.rail .sidebar:hover .sb-item.sb-q::after{ display:none }
 
 /* ---------------------------------------------------------------- content */
+/* THE CANVAS, AND THE GRID ON IT. Both come from layer 2: `--canvas` is the
+   ground this scheme wants behind the work, and `--texture-grid` is the 32px
+   rule drawn on it — transparent in Portal, so Portal is exactly the flat plane
+   it always was, and a faint graph-paper ground everywhere else. A panel paints
+   its own opaque surface over the grid, so the texture only ever shows in the
+   space BETWEEN things, which is the only place it means anything. */
 .content{ flex:1; min-width:0; display:flex; flex-direction:column;
-          background:var(--bg); position:relative; overflow:hidden }
+          background:var(--canvas); position:relative; overflow:hidden;
+          background-image:linear-gradient(var(--texture-grid) 1px,transparent 1px),
+                           linear-gradient(90deg,var(--texture-grid) 1px,transparent 1px);
+          background-size:32px 32px }
 
 /* Same deeper surface as the nav rail: together they form one continuous band
    of chrome around the content, instead of the topbar reading as the first

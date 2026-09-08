@@ -36,7 +36,8 @@
     "check:agreements-render": "node scripts/build-ag-smoke.cjs && node node_modules/.tmp/ag-smoke.cjs",
     "check:tokens": "node scripts/check-tokens.cjs",
     "check:contrast": "node design/ramp.cjs",
-    "shots": "node scripts/shoot-appearance.cjs"
+    "shots": "node scripts/shoot-appearance.cjs",
+    "check:menu": "node scripts/check-appearance-menu.cjs"
   },
   "dependencies": {
     "@internationalized/date": "^3.12.4",

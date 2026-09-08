@@ -680,10 +680,19 @@ function AccountButton({ session }: { session: MePermissions | null }) {
   const user = session ? session.user : null;
   const roleLabel = session ? session.role || "Pending role" : "—";
 
-  const open = () => {
+  /* THE MENU IS REBUILT ON EVERY CHANGE, NOT RE-RENDERED.
+     `openPop` takes a NODE, so the popover holds whatever markup was handed to
+     it when it opened — a `force()` re-render of this component does not reach
+     inside it. The page repainted (the attributes drive the CSS) but the menu
+     went on printing the old scheme's name and the old theme's selection, which
+     reads as "nothing happened" while looking straight at the control that just
+     did something. `paint()` builds the menu from the appearance as it is NOW
+     and re-opens it against the same anchor, so the popover stays exactly where
+     it is and the state inside it is true. */
+  const open = (rebuild?: boolean) => {
     const el = ref.current;
     if (!el) return;
-    if (shell.popAnchor === el) {
+    if (!rebuild && shell.popAnchor === el) {
       shell.closePop();
       return;
     }
@@ -701,7 +710,7 @@ function AccountButton({ session }: { session: MePermissions | null }) {
         onSelectionChange={(keys) => {
           setTheme(String([...keys][0] || cur));
           force((n) => n + 1);
-          shell.closePop();
+          open(true);
         }}
       >
         {opts.map((o) => (
@@ -805,6 +814,7 @@ function AccountButton({ session }: { session: MePermissions | null }) {
                 onChange={(e) => {
                   setScheme(e.target.value);
                   force((n) => n + 1);
+                  open(true);
                   shell.toast(
                     (SCHEMES.find((x) => x.id === e.target.value) || SCHEMES[0]).label +
                       " — saved for this browser."
@@ -838,7 +848,7 @@ function AccountButton({ session }: { session: MePermissions | null }) {
   };
 
   return (
-    <button ref={ref} className="sb-user" data-act="account" onClick={open}>
+    <button ref={ref} className="sb-user" data-act="account" onClick={() => open()}>
       <span className={"av " + avatarTone(user ? user.name : "")} id="meAvatar">
         {user ? user.initials : ""}
       </span>
