@@ -267,7 +267,7 @@
   /* THE TABLE HEAD, and any band that only holds labels. Darker than the well
      because nothing with an edge sits on it -- muted text still clears 5.4:1 --
      and dark enough to read as a band at a glance, which #f2f2f4 did not. */
-  --color-surface-head:#e9e9ed;
+  --color-surface-head:var(--color-surface-sunken);
   --color-surface-nav:#f0f1f3;
 
   --color-text:var(--ink-12);
@@ -305,8 +305,8 @@
      Selection is BRAND-tinted and hover is neutral, on purpose: hover is
      transient and must not look like a decision, selection is a decision and
      must be visible from across the table. */
-  --color-hover:#f0f0f3;
-  --color-active:#e3e3e8;
+  --color-hover:#f8f8fa;
+  --color-active:#e6e7ec;
   --color-selected:var(--forest-1);
   --color-focus:var(--forest-7);
   --color-disabled-bg:var(--ink-3);
@@ -423,7 +423,7 @@
   --color-surface:#141416;
   --color-surface-raised:#1c1c1f;
   --color-surface-sunken:#0e0e10;
-  --color-surface-head:#1b1b1f;
+  --color-surface-head:var(--color-surface-sunken);
   --color-surface-nav:#0c0c0e;
 
   --color-text:var(--ink-2);
@@ -455,8 +455,8 @@
   --color-brand-border:var(--forest-d-border);
   --color-brand-accent:var(--forest-4);
 
-  --color-hover:#202025;
-  --color-active:#2b2b31;
+  --color-hover:#1d1d21;
+  --color-active:#27272c;
   --color-selected:var(--forest-d-soft);
   --color-focus:var(--forest-4);
   --color-disabled-bg:#1a1a1d;
