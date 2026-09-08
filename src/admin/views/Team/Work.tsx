@@ -953,7 +953,7 @@ export function NewItemModal({ kind: initial, members, date }: {
           <div className="tm-tagrow">
             {mine.map((t) => (
               <button key={t.tagId}
-                className={"pill xs tm-tag tm-pick" + (tags.indexOf(t.tagId) >= 0 ? " on" : "")
+                className={"pill xs is-tag tm-tag tm-pick" + (tags.indexOf(t.tagId) >= 0 ? " on" : "")
                   + " tag-" + (t.colourToken || "slate")}
                 aria-pressed={tags.indexOf(t.tagId) >= 0}
                 onClick={() => setTags(tags.indexOf(t.tagId) >= 0

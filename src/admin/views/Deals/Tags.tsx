@@ -87,7 +87,7 @@ export function TagsView({ p }: { p: Params }) {
                   const to = "#/deals" + qs(merge(omit(p, ["view"]), { tag: t.slug }));
                   return (
                     <tr key={t.slug} className="clickable" data-go={to} onClick={() => go(to)}>
-                      <td><span className={"pill" + toneClass(t.tone)}>{t.label}</span></td>
+                      <td><span className={"pill is-tag" + toneClass(t.tone)}>{t.label}</span></td>
                       <td className="mono cell-2">{t.slug}</td>
                       <td className="cell-2">{t.isActive ? "Active" : "Archived"}</td>
                       <td className="n"><b>{t.count}</b></td>

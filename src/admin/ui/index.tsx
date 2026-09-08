@@ -370,10 +370,21 @@ export function richText(s: string): ReactNode[] {
    which is the exact failure a status chip exists to prevent.
 
    Now there is one element and one class, and the tone is a modifier on it.
-   A status, a stage, a priority, a tier and a tag are all THIS, so the eye
-   learns the shape once and reads the colour after. `Pill` is also the only
-   place any of them are drawn: a module that wants a status renders a Pill and
-   cannot accidentally invent a seventh way to say "pending".
+   A status, a stage, a priority, a tier and a tag are all THIS. `Pill` is the
+   only place any of them are drawn: a module that wants a status renders a
+   Pill and cannot accidentally invent a seventh way to say "pending".
+
+   ONE ELEMENT, TWO SHAPES, AND THE SHAPE IS NOT DECORATION.
+   A STATE the system assigned is ROUNDED — Qualified, Overdue, Paid. Closed
+   vocabulary, tone decided by the product, and you cannot type a new one.
+   A LABEL a person typed is SQUARE — "kitchen", "Generic funnel", "Premium".
+   Open vocabulary, colour picked by whoever made it, meaningless to the
+   system. `is-tag` marks one, and every `tag-<hue>` squares its own pill.
+
+   They used to be one shape differing only by hue, so telling a state from a
+   label meant already knowing the vocabulary — "Qualified" and "kitchen" were
+   the same object in two colours. Shape carries the KIND now, which frees
+   colour to carry identity, which is what the tag palette was always for.
 
    THE TONES, and what each one is allowed to mean:
      ok warn bad info      the four statuses. Nothing else may use them.
@@ -1985,7 +1996,7 @@ export function Tag({ label, tone, auto, onRemove }: {
   label: ReactNode; tone?: string; auto?: boolean; onRemove?: () => void;
 }) {
   return (
-    <span className={"pill xs" + (tone ? " tag-" + tone : "") + (auto ? " is-auto" : "")}>
+    <span className={"pill xs is-tag" + (tone ? " tag-" + tone : "") + (auto ? " is-auto" : "")}>
       {auto ? <Icon name="sparkle" size="xs" /> : null}
       {label}
       {onRemove ? (
@@ -2011,7 +2022,7 @@ export function Tags({ items, max }: {
   return (
     <span className="chiprow">
       {shown.map((t, i) => <Tag key={i} label={t.label} tone={t.tone} auto={t.auto} />)}
-      {rest > 0 ? <span className="pill xs" title={items.slice(shown.length).map((t) => t.label).join(", ")}>+{rest}</span> : null}
+      {rest > 0 ? <span className="pill xs is-tag" title={items.slice(shown.length).map((t) => t.label).join(", ")}>+{rest}</span> : null}
     </span>
   );
 }

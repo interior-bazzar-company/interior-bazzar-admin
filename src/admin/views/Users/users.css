@@ -163,9 +163,11 @@
 /* The tag palette means NOTHING — the one place in the product where colour is
    not status. Nothing outside a tag may use these tokens. */
 .um-tags { display: inline-flex; gap: 4px; flex-wrap: wrap; margin-top: 3px }
+/* SQUARE, because it is a label somebody typed rather than a state -- see the
+   shape rule in admin-theme.css. */
 .um-tag {
   display: inline-flex; align-items: center; gap: 4px; height: 18px; padding: 0 7px;
-  border: 1px solid var(--line-2); border-radius: var(--radius-full);
+  border: 1px solid var(--line-2); border-radius: var(--radius-sm);
   font-size: var(--text-2xs); line-height: 1; color: var(--text-2); background: var(--bg);
   white-space: nowrap;
 }

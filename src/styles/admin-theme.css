@@ -711,9 +711,26 @@ button.tile:hover{ border-color:var(--line-3); background:var(--bg-shell) }
 .pill.neutral{ background:var(--neutral-bg); color:var(--text-2); border-color:var(--neutral-line) }
 /* the LIVE accent, as a tone rather than only as the `.pill-live` compound */
 .pill.live{ background:var(--accent-bg); color:var(--accent-text); border-color:var(--accent) }
-/* A TAG pill. Its colour is a label the team chose, never a state, so it draws
-   from the tag palette and shares nothing with the four status pills above.
-   `.pill` on its own — no `tag-*` class — is the twelfth option: no colour. */
+/* ============================================================================
+   SHAPE SAYS WHAT KIND OF THING IT IS
+   ----------------------------------------------------------------------------
+   ROUNDED is a STATE the system assigned — Qualified, Overdue, Paid. Its
+   vocabulary is closed, its tone is decided by the product, and you cannot
+   type a new one.
+
+   SQUARE is a LABEL a person typed — "kitchen", "Generic funnel", "Premium".
+   Its vocabulary is open, its colour is picked by whoever made it, and it
+   means nothing to the system.
+
+   They were the same shape and differed only by hue, so telling a state from a
+   label meant already knowing the vocabulary: "Qualified" and "kitchen" were
+   one object in two colours. Shape carries the distinction now and colour is
+   free to carry identity, which is what the tag palette was always for.
+
+   Every tag hue squares its own pill, so a chip that carries `tag-<hue>` is
+   already correct wherever it is rendered; `is-tag` squares an UNCOLOURED tag,
+   which is where most tags start and where many of them stay. */
+.pill.is-tag,.pill[class*="tag-"]{ border-radius:var(--radius-sm) }
 .pill.tag-slate{ background:var(--tag-slate-bg); color:var(--tag-slate); border-color:var(--tag-slate-line) }
 .pill.tag-red{ background:var(--tag-red-bg); color:var(--tag-red); border-color:var(--tag-red-line) }
 .pill.tag-orange{ background:var(--tag-orange-bg); color:var(--tag-orange); border-color:var(--tag-orange-line) }

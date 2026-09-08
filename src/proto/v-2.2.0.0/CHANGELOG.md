@@ -6,6 +6,47 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-08
 
+### Shape says what kind of thing it is: a state is rounded, a label is square
+
+**Area:** every chip in the panel — Deals, Team, Users, Resources, Business Enquiries
+**Files:** `src/styles/admin-theme.css`, `src/admin/ui/index.tsx`,
+`src/admin/views/Deals/{bits,Chat,Tags}.tsx`, `src/admin/views/BusinessEnquiries/bits.tsx`,
+`src/admin/views/Team/{Detail,Work}.tsx`, `src/admin/views/Users/users.css`,
+`src/admin/views/Resources/resources.css`, `design/design-system.md`
+
+**What changed**
+
+A **state** the system assigned stays ROUNDED — Qualified, Overdue, Paid. Closed
+vocabulary, tone decided by the product, and nobody can type a new one.
+
+A **label** a person typed is now SQUARE — "kitchen", "Generic funnel", "Premium". Open
+vocabulary, colour picked by whoever made it, and it means nothing to the system.
+
+They were one shape differing only by hue, so telling a state from a label meant already
+knowing the vocabulary: "Qualified" and "kitchen" were the same object in two colours. That
+is the inconsistency this fixes — and it is worth more than consistency alone, because
+shape now carries the KIND, which frees colour to carry identity, which is what the tag
+palette was always for.
+
+It is **two rules**, not a rewrite: `.pill.is-tag` squares an uncoloured tag, and
+`.pill[class*="tag-"]` squares any chip already carrying a tag hue — so Deals, Team and the
+shared `Tag` were correct wherever they render without their call sites being touched.
+Users' `.um-tag` and Resources' `.rs-tagm` are their own drawings and were squared directly.
+
+**Temp data** — `none`. **Backend needed** — `none`.
+
+**Open decisions**
+
+- **`.tag` — the mono badge in the activity feed and the Audit table — was already square
+  and stays.** It carries an action NAME (`deal.created`), which is a code rather than a
+  state, so the shape it already had turns out to have been right.
+
+**Verified** — `tsc`, build, `check:tokens`, `check:contrast` (142), `check:dupes`, four
+render smokes; 38/38 routes photographed. The gallery's Status card was reviewed in both
+themes: four rows of states rounded, the tag row square, side by side.
+
+---
+
 ### The composer is nothing but writing space now
 
 **Area:** Deals → Chat, the composer at the foot of the conversation

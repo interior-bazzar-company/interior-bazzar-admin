@@ -519,7 +519,8 @@ This is the map, and `check:dupes` is what keeps a module from adding a second r
 | Drawer | `DrawerShell`, or `DrawerHead` + `.dw-b` + `.dw-f` | `.drawer`, `.dw-*` |
 | More menu | `MoreMenu` (`ui/menu.tsx`) — fixed-positioned, never clipped | `.ib-menu-pop`, `.mi` |
 | Tabs | `Tabs` — icon, link (`to`), count, quiet count | `.tabs` |
-| Status / tag chip | `Pill`; `LeadStatus` / `DealStatus` / `Priority` for the CRM's own | `.pill` and its tones |
+| Status chip (a state) | `Pill`; `LeadStatus` / `DealStatus` / `Priority` for the CRM's own | `.pill` — **rounded** |
+| Tag chip (a label) | `Tag` / `Tags`, or `Pill` with `is-tag` | `.pill.is-tag`, `.pill[class*="tag-"]` — **square** |
 | Count badge | `<span className="ct">` | `.ct` |
 
 ### The `i` affordance

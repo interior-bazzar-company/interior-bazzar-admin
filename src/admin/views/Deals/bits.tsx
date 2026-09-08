@@ -82,11 +82,11 @@ export function TagChips({ max, tags }: { max?: number; tags?: any[] }) {
   return (
     <span className="dls-tags">
       {shown.map((t: any) => (
-        <span key={t.slug} className={"pill" + toneClass(t.tone) + " xs"} title={"List · " + t.label}>
+        <span key={t.slug} className={"pill is-tag" + toneClass(t.tone) + " xs"} title={"List · " + t.label}>
           {t.label}
         </span>
       ))}
-      {all.length > cap ? <span className="pill xs faint">+{all.length - cap}</span> : null}
+      {all.length > cap ? <span className="pill xs is-tag faint">+{all.length - cap}</span> : null}
     </span>
   );
 }

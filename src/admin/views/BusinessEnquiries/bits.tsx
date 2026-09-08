@@ -188,13 +188,13 @@ export function TagChips({ tags, max }: { tags: string[]; max?: number }) {
       {show.map((slug) => {
         const t = tagOf(slug);
         return (
-          <span key={slug} className={"pill xs" + (t.tone ? " " + t.tone : "") + (t.auto ? " is-auto" : "")}
+          <span key={slug} className={"pill xs is-tag" + (t.tone ? " " + t.tone : "") + (t.auto ? " is-auto" : "")}
             title={t.help}>
             {t.auto ? <Icon name="sparkle" size="xs" /> : null}{t.label}
           </span>
         );
       })}
-      {rest > 0 ? <span className="pill xs mute">+{rest}</span> : null}
+      {rest > 0 ? <span className="pill xs is-tag mute">+{rest}</span> : null}
     </span>
   );
 }

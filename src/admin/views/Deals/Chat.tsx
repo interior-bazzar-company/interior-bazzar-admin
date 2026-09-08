@@ -489,7 +489,7 @@ function TagRow({ dl, p }: { dl: any; p: Params }) {
     <div className="dws-tagrow">
       {tags.length
         ? tags.map((t: any) => (
-            <span key={t.slug} className={"pill" + toneClass(t.tone)} title={t.label + " · × removes it from this deal"}>
+            <span key={t.slug} className={"pill is-tag" + toneClass(t.tone)} title={t.label + " · × removes it from this deal"}>
               {t.label}
               <button className="tag-x" data-act="dl-untag" data-ref={dl.deal_id} data-slug={t.slug}
                 title={"Remove " + t.label} aria-label={"Remove " + t.label}

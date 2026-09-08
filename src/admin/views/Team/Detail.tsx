@@ -506,7 +506,7 @@ function TagPicker({ item, mine, on, tags }: { item: WorkItem; mine: Tag[]; on: 
         {mine.map((t) => (
           <button key={t.tagId} type="button"
             aria-pressed={on.indexOf(t.tagId) >= 0}
-            className={"pill xs tm-tag tm-pick" + (on.indexOf(t.tagId) >= 0 ? " on" : "")
+            className={"pill xs is-tag tm-tag tm-pick" + (on.indexOf(t.tagId) >= 0 ? " on" : "")
               + " tag-" + (t.colourToken || "slate")}
             onClick={() => tagItem(item.itemId, t.tagId, on.indexOf(t.tagId) < 0)}>
             {t.label}
