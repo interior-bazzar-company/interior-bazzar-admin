@@ -255,13 +255,14 @@ function Row({ d, activeRef, p }: { d: any; activeRef: string; p: Params }) {
   const to = "#/deals/" + d.deal_id + qs(p);
   return (
     <a className={"dws-row" + (activeRef === d.deal_id ? " on" : "")} data-go={to} onClick={() => go(to)}>
-      {/* The face identifies the customer; the ring on it is the stage. Both
-          are `aria-hidden` — the name is the next element and the stage is
-          spelled out in the pill below, so a screen reader would otherwise
-          hear the same two facts three times. */}
+      {/* The face identifies the customer, and nothing else: it carried a
+          stage ring in its corner, which put the same fact in two places --
+          the pill below already carries the stage in the tone every pill in
+          the product uses -- and a 10px disc with a 2px cut-out ring read as a
+          fold in the circle rather than as a mark on it.
+          `aria-hidden` because the name is the very next element. */}
       <span className={"av dws-face " + avatarTone(d.customer_name)} aria-hidden="true">
         {initials(d.customer_name)}
-        <i className={"dws-stage " + (D.STAGES[d.stage].tone || "")} />
       </span>
       <div className="l1">
         <span className={"name" + (u ? " " + u.cls : "")} title={u ? u.why : ""}>{d.customer_name}</span>

@@ -1010,20 +1010,26 @@ select.inp::-ms-expand{ display:none }
 .av.sm{ width:22px; height:22px; flex-basis:22px; font-size:var(--text-2xs) }
 .av.lg{ width:38px; height:38px; flex-basis:38px; font-size:var(--text-base) }
 .av.xl{ width:56px; height:56px; flex-basis:56px; font-size:var(--text-xl) }
-/* THE FOUR TINTS COME FROM THE TAG PALETTE, NOT THE STATUS PALETTE.
-   They used to be info-blue, neutral, warning-amber and success-green — so
-   whether somebody's initials came out amber or green was decided by the sum
-   of the character codes in their name, and a row of faces read as a row of
-   states. An avatar identifies; it never judges. The tag hues are the set that
-   means nothing by contract, which is exactly what is wanted here. */
-.av.n1{ background:var(--tag-blue-bg);   color:var(--tag-blue);   border:1px solid var(--tag-blue-line) }
-.av.n2{ background:var(--tag-slate-bg);  color:var(--tag-slate);  border:1px solid var(--tag-slate-line) }
-.av.n3{ background:var(--tag-violet-bg); color:var(--tag-violet); border:1px solid var(--tag-violet-line) }
-.av.n4{ background:var(--tag-teal-bg);   color:var(--tag-teal);   border:1px solid var(--tag-teal-line) }
-.av.n5{ background:var(--tag-orange-bg); color:var(--tag-orange); border:1px solid var(--tag-orange-line) }
-.av.n6{ background:var(--tag-pink-bg);   color:var(--tag-pink);   border:1px solid var(--tag-pink-line) }
-.av.n7{ background:var(--tag-lime-bg);   color:var(--tag-lime);   border:1px solid var(--tag-lime-line) }
-.av.n8{ background:var(--tag-cyan-bg);   color:var(--tag-cyan);   border:1px solid var(--tag-cyan-line) }
+/* A SOLID DISC, NOT A TINT. The hue still comes from the tag palette -- those
+   are the eight that mean NOTHING by contract, and an avatar identifies rather
+   than judges, which is why it must never draw from the status set. What
+   changed is the WEIGHT: a pale fill with matching ink and a hairline is a
+   chip, and at 26px in a column of twelve it disappeared into the page. The
+   solid step with inverse ink is the same eight identities, legible from
+   across the desk.
+
+   `--text-inverse` rather than white, and that is what makes one rule work in
+   both themes: light fills are the deep step and take white ink (5.6-7.1:1),
+   dark fills are the light step and take near-black (8.3-9.8:1). No border --
+   a disc that carries its own contrast does not need an edge to find itself. */
+.av.n1{ background:var(--tag-blue);   color:var(--text-inverse) }
+.av.n2{ background:var(--tag-slate);  color:var(--text-inverse) }
+.av.n3{ background:var(--tag-violet); color:var(--text-inverse) }
+.av.n4{ background:var(--tag-teal);   color:var(--text-inverse) }
+.av.n5{ background:var(--tag-orange); color:var(--text-inverse) }
+.av.n6{ background:var(--tag-pink);   color:var(--text-inverse) }
+.av.n7{ background:var(--tag-lime);   color:var(--text-inverse) }
+.av.n8{ background:var(--tag-cyan);   color:var(--text-inverse) }
 
 .bar{ display:flex; height:7px; border-radius:var(--radius-full);
       background:var(--bg-inset); overflow:hidden }
@@ -2098,35 +2104,22 @@ button.dls-stat:hover{ background:var(--bg-hover) }
 .dws-row{ display:grid; grid-template-columns:auto minmax(0,1fr); gap:var(--space-1) var(--space-3);
           padding:var(--space-2) var(--space-3);
           border-radius:var(--radius-md); cursor:pointer; margin-bottom:2px;
-          border:1px solid transparent; box-shadow:inset 2px 0 0 transparent;
+          border:1px solid transparent;
           text-decoration:none; color:inherit;
           transition:background var(--duration-fast) var(--ease),
                      border-color var(--duration-fast) var(--ease) }
 .dws-row:hover{ background:var(--bg-hover) }
-/* SELECTED IS A RAIL, NOT A WASH. It was a forest tint across the whole tile,
-   which on a column of them read as one green block and drowned the tags and
-   pills it was meant to sit behind. The brand still marks where you are — the
-   2px rail on the leading edge, the same mark a selected table row carries —
-   over a plain raised surface and a hairline. */
-.dws-row.on{ background:var(--surface-raised); border-color:var(--line-2);
-             box-shadow:inset 2px 0 0 var(--brand), var(--shadow-xs) }
+/* SELECTED IS A SURFACE AND AN EDGE, AND NO COLOUR AT ALL. It was a forest
+   tint across the whole tile, then a forest rail down its leading edge; both
+   put the brand on a row of twelve where it competed with the stage colours
+   the tile exists to show. The tile lifts instead -- the plane, a stronger
+   hairline, a shadow -- which is the same "this one is open" the drawer and
+   the modal use, and leaves every colour in the tile meaning what it says. */
+.dws-row.on{ background:var(--surface-raised); border-color:var(--line-control);
+             box-shadow:var(--shadow-sm) }
 .dws-row.on .name{ color:var(--text) }
 /* the face spans the tile's rows, so the text block keeps its own rhythm */
-/* `overflow:visible` OVERRIDES `.av`, which clips to a circle so a photo can
-   be square. The ring hangs off the edge by design, and inheriting the clip
-   sliced it into a quarter-moon stuck to the face. */
-.dws-face{ grid-row:1 / span 4; position:relative; align-self:start; margin-top:1px;
-           overflow:visible }
-.dws-face .dws-stage{ position:absolute; right:-2px; bottom:-2px;
-                      width:10px; height:10px; border-radius:var(--radius-full);
-                      background:var(--line-control);
-                      box-shadow:0 0 0 2px var(--bg) }
-.dws-row:hover .dws-face .dws-stage{ box-shadow:0 0 0 2px var(--bg-hover) }
-.dws-row.on .dws-face .dws-stage{ box-shadow:0 0 0 2px var(--surface-raised) }
-.dws-face .dws-stage.warn{ background:var(--warn-solid) }
-.dws-face .dws-stage.info{ background:var(--info-solid) }
-.dws-face .dws-stage.ok{ background:var(--ok-solid) }
-.dws-face .dws-stage.dead{ background:var(--line-3) }
+.dws-face{ grid-row:1 / span 4; align-self:start; margin-top:1px }
 /* every line of the tile sits in the second column, beside the face */
 .dws-row > :not(.dws-face){ grid-column:2 }
 .dws-row .l1{ display:flex; align-items:center; justify-content:space-between; gap:var(--space-2) }
@@ -2233,17 +2226,32 @@ button.dls-stat:hover{ background:var(--bg-hover) }
                             box-shadow:0 0 0 3px color-mix(in srgb,var(--comp-accent) 22%,transparent),
                                        var(--shadow-lg), var(--surface-sheen) }
 .dws-chans{ display:flex; gap:5px; padding:var(--space-2) var(--space-2) 0 }
-.dws-chanbtn{ height:24px; padding:0 var(--space-3); border-radius:var(--radius-full);
+/* ONE chip rule, three variables — the same shape as .dws-bubble above. A
+   channel class sets --chip / --chip-line / --chip-ink and nothing else, so
+   picked, hovered and at-rest are one description of a chip in three states
+   rather than a rule per channel per state, which is what drifted before. */
+.dws-chanbtn{ --chip:var(--neutral-bg); --chip-line:var(--line-control); --chip-ink:var(--text);
+              height:24px; padding:0 10px 0 8px; border-radius:var(--radius-full);
               border:1px solid var(--line-2); background:var(--bg); font-size:var(--text-sm); color:var(--text-2);
-              display:flex; align-items:center; gap:5px; cursor:pointer }
-.dws-chanbtn:hover{ border-color:var(--line-control); color:var(--text) }
+              display:flex; align-items:center; gap:6px; cursor:pointer;
+              transition:background .15s ease, border-color .15s ease, color .15s ease }
+/* The dot is the channel at rest. Three identical grey pills said nothing
+   until one of them was picked; the colour that the send will come out in is
+   readable on all three before anything is chosen. */
+.dws-chanbtn::before{ content:""; width:6px; height:6px; border-radius:var(--radius-full);
+                      background:var(--chip-line); flex:0 0 auto }
+/* Remark is the brand — it was the one channel wearing a flat grey, which read
+   as "disabled" beside two coloured ones rather than as the default. */
+.dws-chanbtn.rmk{ --chip:var(--brand-tint); --chip-line:var(--brand); --chip-ink:var(--brand-text) }
+.dws-chanbtn.wa{ --chip:var(--ch-wa-bg); --chip-line:var(--ch-wa); --chip-ink:var(--ch-wa-text) }
+.dws-chanbtn.em{ --chip:var(--ch-em-bg); --chip-line:var(--ch-em); --chip-ink:var(--ch-em-text) }
+/* Hover previews the pick in the chip's own colour — an edge, not a fill, so
+   hovering the row does not look like three selected chips. */
+.dws-chanbtn:hover{ border-color:var(--chip-line); color:var(--chip-ink) }
 /* The picked channel wears the colour the bubble will come out in, so the
-   composer is a preview of the send rather than a separate green for all three.
-   Same tokens again — a third place the pattern holds without a third rule. */
-.dws-chanbtn.on{ background:var(--neutral-bg); border-color:var(--line-control);
-                 color:var(--text); font-weight:var(--weight-semibold) }
-.dws-chanbtn.on.wa{ background:var(--ch-wa-bg); border-color:var(--ch-wa); color:var(--ch-wa-text) }
-.dws-chanbtn.on.em{ background:var(--ch-em-bg); border-color:var(--ch-em); color:var(--ch-em-text) }
+   composer is a preview of the send rather than a separate green for all three. */
+.dws-chanbtn.on{ background:var(--chip); border-color:var(--chip-line); color:var(--chip-ink);
+                 font-weight:var(--weight-semibold) }
 .dws-composer textarea{ width:100%; border:0; background:none; resize:none; font:inherit; font-size:var(--text-base);
                          color:var(--text); padding:var(--space-2) var(--space-3) 4px; outline:0; min-height:20px }
 .dws-composer textarea::placeholder{ color:var(--text-3) }

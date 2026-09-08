@@ -179,6 +179,9 @@ const TAGS = ["slate", "red", "orange", "amber", "lime", "green",
   "teal", "cyan", "blue", "violet", "pink"];
 for (const t of TAGS) {
   PAIRS.push([`--tag-${t}`, `--tag-${t}-bg`, TEXT, `the ${t} tag on its own tint`]);
+  /* the avatar is the SOLID step carrying inverse ink -- the one place a tag
+     hue is a fill rather than a tint, so it is measured as one */
+  PAIRS.push([`--color-text-inverse`, `--tag-${t}`, TEXT, `initials on a ${t} face`]);
 }
 
 /* THE CHANNEL PAIRS — WhatsApp and email keep their own hue, so they get their
@@ -187,7 +190,12 @@ PAIRS.push(
   ["--ch-wa-text", "--ch-wa-bg", TEXT, "a WhatsApp chip"],
   ["--ch-em-text", "--ch-em-bg", TEXT, "an email chip"],
   ["--ch-wa-ink", "--ch-wa", EDGE, "the label on a WhatsApp fill"],
-  ["--ch-em-ink", "--ch-em", EDGE, "the label on an email fill"]
+  ["--ch-em-ink", "--ch-em", EDGE, "the label on an email fill"],
+  /* The composer's channel chips carry their colour as an edge and a 6px dot
+     on the card, before anything is picked — so the full-strength channel has
+     to hold up against the surface it sits on, not only against its own tint. */
+  ["--ch-wa", "--color-surface", EDGE, "a WhatsApp chip's edge and dot"],
+  ["--ch-em", "--color-surface", EDGE, "an email chip's edge and dot"]
 );
 
 /* ------------------------------------------------------------------ run -- */

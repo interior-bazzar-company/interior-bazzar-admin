@@ -6,6 +6,44 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-08
 
+### The face is a solid disc, the tags carry their colour, and selection has none
+
+**Area:** avatars panel-wide; tag chips panel-wide; Deals → Chat, the deal tile
+**Files:** `src/styles/tokens.css`, `src/styles/admin-theme.css`,
+`src/admin/views/Deals/Chat.tsx`, `design/ramp.cjs`
+
+**What changed**
+
+- **The avatar is a solid disc.** It was a pale tag tint with matching ink and a hairline —
+  which is a *chip*, and at 26px in a column of twelve it disappeared into the page. It is
+  the tag palette's solid step now, carrying `--color-text-inverse`. The hue still comes
+  from the eight that mean nothing by contract, because an avatar identifies and must never
+  draw from the status set; only the weight changed.
+  One rule works in both themes because `--color-text-inverse` inverts with them: light
+  fills are the deep step and take white ink (5.6–7.1:1), dark fills are the light step and
+  take near-black (8.3–9.8:1).
+- **The stage ring came off the face.** It put the same fact in two places — the pill below
+  already carries the stage in the tone every pill in the product uses — and a 10px disc
+  with a 2px cut-out ring read as a fold in the circle rather than a mark on it.
+- **The tag fill and edge are one step up.** They had been tuned so a row of tags could not
+  shout and overshot: the fill sat within 1.05 of a white page and the edge within 1.2, so a
+  tag read as grey text with a faint outline and its colour did nothing. All eleven still
+  clear 4.5:1 against their own ink, and the set still sits at one chroma and one lightness.
+- **Selection has no colour at all.** It was a forest wash, then a forest rail; both put the
+  brand on a row of twelve where it competed with the stage colours the tile exists to show.
+  The tile lifts instead — the plane, a stronger hairline, a shadow — the same "this one is
+  open" the drawer and the modal use.
+
+**Temp data** — `none`. **Backend needed** — `none`.
+
+**Verified** — `tsc`, build, `check:tokens` (424), `check:dupes`, six render smokes;
+38/38 routes photographed. `check:contrast` is at **138 pairs**: the eleven avatar fills
+were added, since that is the one place a tag hue is a fill rather than a tint. The deal
+list was driven in Chromium against a mocked `deals` payload and reviewed in both themes,
+as were the gallery's tag row and faces.
+
+---
+
 ### The composer stands up — an edge, a lift, and a floor under the send
 
 **Area:** Deals → Chat, the write box at the foot of the conversation

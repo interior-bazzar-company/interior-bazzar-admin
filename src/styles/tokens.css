@@ -128,17 +128,24 @@
 
      They are LAYER 1 and no component may name one directly — the module
      sheets read the `--tag-*` semantic names below. --------------------- */
-  --t-slate-7:#5b6675;  --t-slate-2:#f2f4f6;  --t-slate-3:#dce0e5;
-  --t-red-7:#a8443c;    --t-red-2:#fbf1f0;    --t-red-3:#eed6d3;
-  --t-orange-7:#8f5c2e; --t-orange-2:#fbf4ee; --t-orange-3:#eeddcd;
-  --t-amber-7:#7a6524;  --t-amber-2:#faf7ec;  --t-amber-3:#ebe4c9;
-  --t-lime-7:#546c2b;   --t-lime-2:#f3f7ec;   --t-lime-3:#dbe6c9;
-  --t-green-7:#2c6f4c;  --t-green-2:#eef6f1;  --t-green-3:#cee3d7;
-  --t-teal-7:#266d6a;   --t-teal-2:#edf6f6;   --t-teal-3:#cbe3e2;
-  --t-cyan-7:#2a6685;   --t-cyan-2:#eef4f8;   --t-cyan-3:#cddfe9;
-  --t-blue-7:#3a5a9e;   --t-blue-2:#eff2f9;   --t-blue-3:#d2dbef;
-  --t-violet-7:#6a459c; --t-violet-2:#f3effa; --t-violet-3:#ded2ef;
-  --t-pink-7:#9c4370;   --t-pink-2:#faeff4;   --t-pink-3:#efd0de;
+  /* THE FILL AND THE EDGE ARE ONE STEP UP from where they started. They were
+     tuned so a row of tags could not shout, and overshot: at a 20px chip on a
+     white plane the fill was within 1.05 of the page and the edge within 1.2,
+     so a tag read as grey text with a faint outline and its colour -- the whole
+     point of a tag -- did nothing. Every fill below still clears 4.5:1 against
+     its own ink (`check:contrast` asserts all eleven), and the set still sits
+     at one chroma and one lightness, so a row of them still reads as a set. */
+  --t-slate-7:#5b6675;  --t-slate-2:#eaedf0;  --t-slate-3:#c9d0d8;
+  --t-red-7:#a8443c;    --t-red-2:#f9e9e7;    --t-red-3:#e4bdb8;
+  --t-orange-7:#8f5c2e; --t-orange-2:#f8eee4; --t-orange-3:#e2c8ad;
+  --t-amber-7:#7a6524;  --t-amber-2:#f6f0dd;  --t-amber-3:#ddd0a8;
+  --t-lime-7:#546c2b;   --t-lime-2:#eef4e2;   --t-lime-3:#c9dbaf;
+  --t-green-7:#2c6f4c;  --t-green-2:#e6f2ea;  --t-green-3:#b9d8c6;
+  --t-teal-7:#266d6a;   --t-teal-2:#e3f1f0;   --t-teal-3:#b3d6d4;
+  --t-cyan-7:#2a6685;   --t-cyan-2:#e5eef4;   --t-cyan-3:#b6cfdd;
+  --t-blue-7:#3a5a9e;   --t-blue-2:#e8edf7;   --t-blue-3:#bcc9e6;
+  --t-violet-7:#6a459c; --t-violet-2:#eee8f7; --t-violet-3:#cbbce6;
+  --t-pink-7:#9c4370;   --t-pink-2:#f7e6ef;   --t-pink-3:#e2b9cf;
   /* the dark row — re-mixed against near-black, never the light row faded */
   --t-slate-d:#a2adbb;  --t-slate-db:#22262b;  --t-slate-dl:#3a4048;
   --t-red-d:#d9938c;    --t-red-db:#2b1a18;    --t-red-dl:#4a2f2b;
