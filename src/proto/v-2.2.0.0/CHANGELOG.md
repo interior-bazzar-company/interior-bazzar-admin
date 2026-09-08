@@ -6,6 +6,39 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-08
 
+### The channel chips carry their channel — a dot at rest, a fill when picked
+
+**Area:** Deals → Chat, the Remark / WhatsApp / Email chips on the composer
+**Files:** `src/styles/admin-theme.css`, `design/ramp.cjs`
+
+**What changed**
+
+- **Three identical grey pills said nothing until one was picked.** Each chip now carries a
+  6px dot in its own channel colour at rest — forest, `--ch-wa`, `--ch-em` — so which three
+  ways a line can go out is readable before anything is chosen, the same way the stage dots
+  on the Deals header read.
+- **Remark stopped looking disabled.** It was the one channel wearing a flat `--neutral-bg`
+  grey when picked, beside two coloured ones; it takes the brand tint, edge and text — the
+  same trio a selected row wears, and the same forest the composer's focus ring already used
+  for a remark.
+- **One chip rule, three variables.** `--chip` / `--chip-line` / `--chip-ink`, set by the
+  channel class and read by rest, hover and picked — the shape `.dws-bubble` above it
+  already had. It replaces a rule per channel per state, which is what let the picked greys
+  and the channel colours drift apart in the first place.
+- **Hover previews the pick as an edge, not a fill**, so running the mouse across the row
+  does not look like three selected chips.
+- **`check:contrast` gained the two pairs this introduced** — the full-strength channel
+  colour as an edge and a dot on the card surface, which was only ever measured against its
+  own tint before. Both clear the 3:1 edge floor in both themes.
+
+**Temp data** — `none`. **Backend needed** — `none`.
+
+**Verified** — build, `check:tokens`, `check:contrast`, `check:dupes`. The composer was
+driven in Chromium and photographed at rest and on the WhatsApp channel, both themes.
+
+---
+
+
 ### The face is a solid disc, the tags carry their colour, and selection has none
 
 **Area:** avatars panel-wide; tag chips panel-wide; Deals → Chat, the deal tile
