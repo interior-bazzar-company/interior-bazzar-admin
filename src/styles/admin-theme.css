@@ -2215,20 +2215,16 @@ button.dls-stat:hover{ background:var(--bg-hover) }
 .dws-openchan:hover{ text-decoration:underline }
 
 /* The composer is where every entry on this timeline gets written, so it does
-   not sit in the pane as one more flat panel. It carries a channel-coloured
-   rail along its top edge, a firmer border than a card, and a real lift — the
-   one surface in this view that is asking to be used rather than read. */
+   not sit in the pane as one more flat panel: a firmer border than a card and a
+   real lift — the one surface in this view that is asking to be used rather
+   than read. The channel colour is carried on FOCUS, not as a rail across the
+   top; a permanent green line above the tabs read as a stray divider. */
 .dws-composer{ --comp-accent:var(--brand);
                position:relative; margin:var(--space-3) var(--space-5) var(--space-4);
                background:var(--bg); border:1px solid var(--line-control);
                border-radius:var(--radius-xl); overflow:hidden;
                box-shadow:var(--shadow-md), var(--surface-sheen); flex:0 0 auto;
                transition:border-color .15s ease, box-shadow .15s ease }
-/* The rail wears the colour the send will come out in — same wa/em tokens the
-   bubbles and the channel chips already read, so the whole box previews the
-   send instead of only the picked chip doing it. */
-.dws-composer::before{ content:""; position:absolute; inset:0 0 auto 0; height:3px;
-                       background:var(--comp-accent) }
 .dws-composer.wa{ --comp-accent:var(--ch-wa) }
 .dws-composer.em{ --comp-accent:var(--ch-em) }
 /* Typing is the point, so focus lifts the whole box: the textarea inside is
@@ -2236,7 +2232,7 @@ button.dls-stat:hover{ background:var(--bg-hover) }
 .dws-composer:focus-within{ border-color:var(--comp-accent);
                             box-shadow:0 0 0 3px color-mix(in srgb,var(--comp-accent) 22%,transparent),
                                        var(--shadow-lg), var(--surface-sheen) }
-.dws-chans{ display:flex; gap:5px; padding:var(--space-3) var(--space-2) 0 }
+.dws-chans{ display:flex; gap:5px; padding:var(--space-2) var(--space-2) 0 }
 .dws-chanbtn{ height:24px; padding:0 var(--space-3); border-radius:var(--radius-full);
               border:1px solid var(--line-2); background:var(--bg); font-size:var(--text-sm); color:var(--text-2);
               display:flex; align-items:center; gap:5px; cursor:pointer }

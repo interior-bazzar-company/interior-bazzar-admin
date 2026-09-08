@@ -6,7 +6,7 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-08
 
-### The composer stands up — a channel rail, an edge, and a floor under the send
+### The composer stands up — an edge, a lift, and a floor under the send
 
 **Area:** Deals → Chat, the write box at the foot of the conversation
 **Files:** `src/styles/admin-theme.css`, `src/admin/views/Deals/Chat.tsx`
@@ -18,14 +18,14 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
   reference card, on the one control in the pane that is meant to be used rather than read.
   It takes `--line-control`, `--shadow-md` and the sheen: it lifts off the pane instead of
   being drawn on it.
-- **A 3px rail along the top carries the channel.** Forest for a remark, `--ch-wa` for
-  WhatsApp, `--ch-em` for email — the same tokens the bubbles and the channel chips already
-  read, so the whole box previews what the send will look like, not just the picked chip.
-  The channel class is on the composer root (`chanCls(chan)`), which is the only React
-  change here.
-- **Focus lifts the box.** The textarea inside is borderless and has nothing of its own to
-  ring, so `:focus-within` colours the border with the channel accent and paints a 3px ring
-  in the same colour at 22% — the `.field` / `.chips-input` pattern, in a channel colour.
+- **Focus lifts the box, in the channel's colour.** The textarea inside is borderless and
+  has nothing of its own to ring, so `:focus-within` colours the border and paints a 3px
+  ring at 22% — the `.field` / `.chips-input` pattern — in forest for a remark, `--ch-wa`
+  for WhatsApp, `--ch-em` for email. Those are the tokens the bubbles and the channel chips
+  already read, so the box previews what the send will look like while it is being written.
+  The channel class on the composer root (`chanCls(chan)`) is the only React change here.
+  A first pass carried the same accent as a permanent 3px rail across the top; above the
+  channel tabs it read as a stray divider, so the colour only appears on focus.
 - **The action bar has a floor.** The foot sat on `--bg` under a hairline, so the Send
   button floated at the bottom edge; it takes `--bg-inset`, which is what makes the row read
   as the bottom of the box.
