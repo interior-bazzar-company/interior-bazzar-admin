@@ -6,6 +6,33 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-08
 
+### The composer is nothing but writing space now
+
+**Area:** Deals → Chat, the composer at the foot of the conversation
+**Files:** `src/admin/views/Deals/Chat.tsx`, `src/styles/admin-theme.css`
+
+**What changed**
+
+- **The bar under the box is gone entirely** — "Appended to the deal timeline · clears the
+  stalled flag" and the sunken strip it sat in. It said the same sentence on every deal
+  forever, and what it said the placeholder already says per channel, inside the box being
+  typed in. `.dws-composer-foot` and its `.hint` rule are deleted, not hidden.
+- **All of that height goes to the textarea.** Three lines at rest (66px, up from one), six
+  once there is a draft (132px), and it grows to 300px before scrolling internally. A
+  one-line slot under a two-line header read as a search field, not as somewhere a call gets
+  written up.
+- **Send is the only control below the chips**, top-right where it landed in the previous
+  entry, so the composer is now exactly two things: the channel, and what you are writing.
+
+**Temp data** — `none`. **Backend needed** — `none`.
+
+**Verified** — `tsc`, build, `check:tokens`, `check:contrast` (142), `check:dupes`. Driven
+in Chromium with a real draft: idle and drafting photographed in both themes, and the whole
+workspace checked to confirm the taller box does not crowd the timeline above it.
+
+---
+
+
 ### Send moves up the moment there is something to send
 
 **Area:** Deals → Chat, the composer at the foot of the conversation

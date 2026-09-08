@@ -2253,19 +2253,18 @@ button.dls-stat:hover{ background:var(--bg-hover) }
    composer is a preview of the send rather than a separate green for all three. */
 .dws-chanbtn.on{ background:var(--chip); border-color:var(--chip-line); color:var(--chip-ink);
                  font-weight:var(--weight-semibold) }
+/* The whole box below the chips is the writing surface — there is no bar under
+   it any more, so the height it held is min-height here. Three lines at rest,
+   because a one-line slot under a two-line header read as a search field and
+   not as somewhere a call gets written up. */
 .dws-composer textarea{ width:100%; border:0; background:none; resize:none; font:inherit; font-size:var(--text-base);
-                         color:var(--text); padding:var(--space-2) var(--space-3) 4px; outline:0; min-height:20px }
+                         color:var(--text); padding:var(--space-2) var(--space-3) var(--space-3);
+                         outline:0; min-height:66px }
 .dws-composer textarea::placeholder{ color:var(--text-3) }
-/* A draft gets the room the hint bar was holding, and a floor of its own: the
-   box opens to four lines on the first character instead of creeping down one
-   line at a time, which is what made a long remark feel like a slot. */
-.dws-composer.drafting textarea{ min-height:96px; padding-bottom:var(--space-3) }
-/* Sunk so the action bar reads as the floor of the box and the send button has
-   something to sit on, rather than floating under a hairline. */
-.dws-composer-foot{ display:flex; align-items:center; gap:var(--space-3);
-                     padding:6px 8px 8px var(--space-3); border-top:1px solid var(--line);
-                     margin-top:6px; background:var(--bg-inset) }
-.dws-composer-foot .hint{ font-size:var(--text-2xs); color:var(--text-3); margin-right:auto }
+/* A draft opens the box to six lines on the first character rather than
+   creeping down one line at a time, which is what made a long remark — a call
+   summary, a pasted email — feel like it was being typed through a slot. */
+.dws-composer.drafting textarea{ min-height:132px }
 .dws-send{ height:28px; padding:0 var(--space-3); border-radius:var(--radius-full); border:0;
            background:var(--brand); color:var(--brand-ink); font-size:var(--text-sm); font-weight:var(--weight-semibold);
            display:flex; align-items:center; gap:5px; cursor:pointer;

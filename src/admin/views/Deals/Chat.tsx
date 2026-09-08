@@ -510,11 +510,10 @@ function TagRow({ dl, p }: { dl: any; p: Params }) {
    wall of text. Caps out and scrolls internally past COMPOSER_MAX so a very
    long draft cannot push the send button off the bottom of the pane.
 
-   The cap is generous because the box has more room than it used to: once
-   there is a draft the hint bar under it is gone (it describes an EMPTY box,
-   and by then you are past needing it) and Send has moved up beside the
-   channel chips, so the height that bar was holding goes to the writing. */
-const COMPOSER_MAX = 260;
+   The cap is generous because the box is now nothing but writing space: the
+   bar under it is gone and Send lives up beside the channel chips, so every
+   pixel the composer occupies is a pixel you can type into. */
+const COMPOSER_MAX = 300;
 
 // One placeholder per channel — what the box hints depends on how the text
 // is about to go out, same three strings the prototype used.
@@ -592,20 +591,12 @@ function Composer({ dl, p }: { dl: any; p: Params }) {
           </button>
         )}
       </div>
+      {/* Everything under the textarea is gone — the bar that explained where a
+          remark lands said the same sentence on every deal forever, and it was
+          height taken from the one thing in this box anybody uses. What it said
+          the placeholder above says per channel, in the box being typed in. */}
       <textarea id="dwsComposerText" rows={1} ref={ta}
         placeholder={CHAN_PLACEHOLDER[chan]} onInput={type} />
-      {/* The hint describes what an EMPTY box will do with what you write. Once
-          it is written the sentence has been read or it never will be, and the
-          bar it sits in is height the draft could be using — so it goes, and
-          takes the second copy of Send with it. */}
-      {!drafting && (
-        <div className="dws-composer-foot">
-          <span className="hint">
-            {chan === "manual" ? "Appended to the deal timeline · clears the stalled flag"
-              : "Logged to the deal timeline · opens " + CHAN_LABEL[chan] + " to actually send it"}
-          </span>
-        </div>
-      )}
     </div>
   );
 }
