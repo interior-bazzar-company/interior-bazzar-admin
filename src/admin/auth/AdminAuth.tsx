@@ -55,7 +55,7 @@
        a fabricated count, per guardrail 6.
    ========================================================================== */
 import { useEffect, useRef, useState } from "react";
-import type { KeyboardEvent, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AppExceptions, isServiceError } from "../../api/apiService";
 import { AuthService } from "../../api/modules/auth";
@@ -63,10 +63,7 @@ import { TokenService } from "../../api/apiService/authHelper/TokenService";
 import type { LoginFormResponse } from "../../types/global";
 import { clearSession, grantsOf, isZeroAccess, loadSession, sessionUnreachable } from "./session";
 import { currentTheme, setTheme } from "../shell/ShellContext";
-import { ArrowRight } from "@untitledui/icons/ArrowRight";
-import { Button } from "@/components/base/buttons/button";
-import { ButtonGroup, ButtonGroupItem } from "@/components/base/button-group/button-group";
-import { Input } from "@/components/base/input/input";
+import { Alert, FormField, Icon, Input, Segmented } from "../ui";
 import "../../styles/admin-theme.css";
 import "./admin-auth.css";
 
@@ -83,7 +80,7 @@ function nextPath(n: string | null): string {
 }
 
 const LOCKED_BANNER: Banner = {
-  kind: "err2",
+  kind: "bad",
   title: "Account locked",
   body: (
     <>
@@ -100,7 +97,7 @@ const LOCKED_BANNER: Banner = {
    argument, so this is inert until something supplies a real number. */
 function invalidBanner(attemptsRemaining?: number): Banner {
   return {
-    kind: "err2",
+    kind: "bad",
     title: "That email or password isn’t right",
     body: (
       <>
@@ -117,7 +114,7 @@ function invalidBanner(attemptsRemaining?: number): Banner {
 }
 const INVALID_BANNER = invalidBanner();
 const WITHDRAWN_BANNER: Banner = {
-  kind: "err2",
+  kind: "bad",
   title: "Access withdrawn",
   body: "This account is suspended, deactivated or locked. Contact an Admin.",
 };
@@ -126,7 +123,7 @@ const WITHDRAWN_BANNER: Banner = {
    WITHDRAWN_BANNER above (a session that didn't resolve at all). Wired to
    RequireSession's `?blocked=gate` (session.gateOk === false). */
 const GATE_BLOCKED_BANNER: Banner = {
-  kind: "err2",
+  kind: "bad",
   title: "Access withdrawn",
   body: "This account can no longer sign in. Contact an Admin.",
 };
@@ -135,12 +132,12 @@ const GATE_BLOCKED_BANNER: Banner = {
    INVALID_BANNER: telling somebody their password is wrong when the server is
    simply down sends them to reset a credential that was never the problem. */
 const SERVICE_BANNER: Banner = {
-  kind: "err2",
+  kind: "bad",
   title: "Something went wrong",
   body: "We couldn’t reach the service just now. Please try again in a moment.",
 };
 const SIGNED_OUT_BANNER: Banner = {
-  kind: "ok2",
+  kind: "ok",
   title: "Signed out",
   body: "Your session has been cleared on this device.",
 };
@@ -154,21 +151,13 @@ function AppearanceSwitch() {
   return (
     <div className="auth-appearance">
       <span className="k">Theme</span>
-      <ButtonGroup
-        size="sm"
-        aria-label="Theme"
-        selectedKeys={[cur]}
-        disallowEmptySelection
-        onSelectionChange={(keys) => {
-          const v = String([...keys][0] || cur);
-          setTheme(v);
-          setCur(v);
-        }}
-      >
-        <ButtonGroupItem id="light">Light</ButtonGroupItem>
-        <ButtonGroupItem id="dark">Dark</ButtonGroupItem>
-        <ButtonGroupItem id="system">System</ButtonGroupItem>
-      </ButtonGroup>
+      <Segmented
+        sm
+        label="Theme"
+        value={cur}
+        options={[{ v: "light", l: "Light" }, { v: "dark", l: "Dark" }, { v: "system", l: "System" }]}
+        onPick={(v) => { setTheme(v); setCur(v); }}
+      />
     </div>
   );
 }
@@ -238,9 +227,8 @@ export default function AdminAuth() {
     setBanner(null);
   }
 
-  function onKey(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") handleLogin();
-  }
+  /* Enter submits — `Input` takes that as `onEnter`, so the local keydown
+     handler this page carried is gone with the raw <input> it was bound to. */
 
   /* ---------- boot ---------- */
   useEffect(() => {
@@ -331,28 +319,35 @@ export default function AdminAuth() {
               signing in.
             </p>
             <div id="loginBanner" style={{ marginTop: 20 }}>
+              {/* THE PANEL'S OWN ALERT. This page drew its own `.banner`, with
+                  its own four tone names suffixed `2` — `err2`, `ok2`, `warn2`,
+                  `info2` — precisely BECAUSE `.banner` was already taken by the
+                  shell's docked strip and the plain tone names collided with
+                  it. Two alert drawings, and the door had the one nobody else
+                  ever saw. It is `Alert` now, which is `.notice`: the same soft
+                  ground, hairline and 3px tone stripe, defined once. */}
               {banner ? (
-                <div className={"banner " + banner.kind}>
-                  <div>
-                    <b>{banner.title}</b>
-                    {banner.body}
-                  </div>
-                </div>
+                <Alert tone={banner.kind as "ok" | "warn" | "bad" | "info"} title={banner.title}>
+                  {banner.body}
+                </Alert>
               ) : null}
             </div>
 
             <div className="auth-fields">
-              <Input label="Username or work email" id="loginEmail" type="text" size="lg"
-                     autoComplete="username" placeholder="you@interiorbazzar.com"
-                     value={who} onChange={setWho} onKeyDown={onKey} />
-              <Input label="Password" id="loginPass" type="password" size="lg"
-                     autoComplete="current-password" placeholder="••••••••"
-                     value={pass} onChange={setPass} onKeyDown={onKey} />
+              <FormField id="loginEmail" label="Username or work email">
+                <Input id="loginEmail" type="text" ph="you@interiorbazzar.com" value={who}
+                       onChange={setWho} onEnter={handleLogin} />
+              </FormField>
+              <FormField id="loginPass" label="Password">
+                <Input id="loginPass" type="password" ph="••••••••" value={pass}
+                       onChange={setPass} onEnter={handleLogin} />
+              </FormField>
             </div>
 
-            <Button color="ink" size="lg" className="w-full" isLoading={busy} showTextWhileLoading onClick={handleLogin}>
+            <button type="button" className="btn pri lg block" disabled={busy} onClick={handleLogin}>
+              {busy ? <span className="spinner" /> : null}
               {busy ? "Signing in…" : "Sign in"}
-            </Button>
+            </button>
 
             <div className="foot">
               Accounts are created by an admin — there is no public sign-up. Lost your password? Ask an admin
@@ -370,17 +365,15 @@ export default function AdminAuth() {
             <p className="lede" id="pendingMsg">
               {user ? "You’re signed in as " + user.name + ". Dashboard access is awaiting Admin assignment." : ""}
             </p>
-            <div className="banner warn2" style={{ marginTop: 20 }}>
-              <svg className="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
-                <path d="M12 3.4 21.2 20H2.8z" /><path d="M12 9.4v4.8M12 17.2h.01" />
-              </svg>
-              <div>
-                <b>This is not an error</b>A successful sign-in never implies access to anything. Your account
-                holds <b>zero permissions by construction</b> until an Admin assigns a role — you are the
-                number in their <span className="mono">Team</span> badge right now.
-              </div>
+            <div style={{ marginTop: 20 }}>
+              <Alert tone="warn" title="This is not an error">
+                A successful sign-in never implies access to anything. Your account holds{" "}
+                <b>zero permissions by construction</b> until an Admin assigns a role — you are
+                the number in their <span className="mono">Team</span> badge right now.
+              </Alert>
             </div>
-            <Button color="secondary" size="lg" className="mt-4.5 w-full" onClick={handleLogout}>Sign out</Button>
+            <button type="button" className="btn lg block" style={{ marginTop: 18 }}
+                    onClick={handleLogout}>Sign out</button>
           </div>
 
           {/* --------------------------------------------------------- ACTIVE */}
@@ -400,11 +393,11 @@ export default function AdminAuth() {
                 <span className="chip" key={g}>{g}</span>
               ))}
             </div>
-            <Button color="ink" size="lg" className="w-full" id="continueBtn" iconTrailing={ArrowRight} onClick={enterPanel}>
-              Continue to the panel
-            </Button>
+            <button type="button" className="btn pri lg block" id="continueBtn" onClick={enterPanel}>
+              Continue to the panel<Icon name="arrow" size="sm" />
+            </button>
             <div className="foot">
-              <Button color="link-gray" size="sm" onClick={handleLogout}>Not you? Sign out</Button>
+              <button type="button" className="tlink" onClick={handleLogout}>Not you? Sign out</button>
             </div>
           </div>
 

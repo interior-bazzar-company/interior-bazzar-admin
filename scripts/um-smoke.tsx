@@ -756,11 +756,15 @@ console.log("\nthe empty states say what is true, not just that there is nothing
     }
     return none;
   });
+  /* `pager-bar` rather than `um-pager`: the module's hand-built Previous/Next
+     pair was replaced by the shared `Pagination` component, which keeps the
+     range this printed and adds a numbered window. The assertion is unchanged
+     — a pager belongs on a multi-page list and nowhere else. */
   check("the pager appears only when there is more than one page", () => {
     const p1 = at("/users");
-    if (p1.indexOf("um-pager") < 0) throw new Error("no pager on a multi-page list");
+    if (p1.indexOf("pager-bar") < 0) throw new Error("no pager on a multi-page list");
     const one = at("/users?q=zzzznothing");
-    if (one.indexOf("um-pager") >= 0) throw new Error("a pager on an empty list");
+    if (one.indexOf("pager-bar") >= 0) throw new Error("a pager on an empty list");
     return p1;
   });
   check("...and a page past the end lands on the last one rather than on nothing", () => {

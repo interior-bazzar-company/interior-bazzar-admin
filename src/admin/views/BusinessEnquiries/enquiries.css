@@ -66,7 +66,6 @@
   background: var(--warn-bg); color: var(--warn);
   font-size: var(--text-sm); line-height: var(--lh-sm);
 }
-.be-proto { flex-wrap: wrap; row-gap: var(--space-2) }
 .be-proto .ic { flex: 0 0 auto }
 .be-proto span { flex: 1 1 auto; min-width: 240px }
 /* Both scaffolding buttons stay together at the end when the banner wraps,
@@ -347,7 +346,12 @@
   letter-spacing: .04em; padding: 2px 6px; border-radius: var(--radius-xs);
   background: var(--bg-active); color: var(--text-2); align-self: flex-start;
 }
-.be-ev .ty.sys { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn-line) }
+/* SYSTEM IS --system, NOT WARN. This said "the system did it" in amber while
+   Finance said the same thing in blue, so the one fact a person most needs
+   from an audit line — was this a decision or a derivation — was a different
+   colour depending on which module they were reading. The tone is defined once
+   in admin-theme.css (`.pill.sys`) and this is the same value. */
+.be-ev .ty.sys { background: var(--system-bg); color: var(--system); border: 1px solid var(--system) }
 .be-ev .ty.biz { background: var(--info-bg); color: var(--info); border: 1px solid var(--info-line) }
 .be-ev .w { flex: 0 0 auto; font-size: var(--text-xs); color: var(--text-3); white-space: nowrap }
 
@@ -901,12 +905,11 @@
   top: calc(var(--space-1) * -0.5); height: 1px; background: var(--line-2);
 }
 
-.be-exportbtn .ct {
-  display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px;
-  margin-left: 2px; border-radius: var(--radius-full);
-  font-size: var(--text-2xs); font-weight: var(--weight-semibold);
-  background: var(--bg-active); color: var(--text-2);
-}
+/* THE COUNT BADGE ITSELF IS `.ct` IN admin-theme.css. This block used to
+   restate every one of its declarations — the size, the radius, the type, the
+   neutral fill — and then the rule below overrode the two that differ. Only
+   the two that differ are local now; the shape is shared, so a count badge in
+   this toolbar and one in a multi-select are the same object. */
 
 /* EXPORT IS THE LOUD ONE HERE, and deliberately louder than its old plain
    button: it is the only control on this screen that produces a file of

@@ -27,7 +27,12 @@
 
 /* The strip wrap both mature modules carry: a long strip wraps to a second
    line instead of scrolling off the pane edge. */
-.dls-attn { flex-wrap: wrap; overflow-x: visible }
+/* SCOPED TO THIS MODULE. `.dls-attn` is the attention strip every list screen
+   in the panel renders; declared bare in a module sheet, this changed how it
+   behaves on Finance, Users and Business Enquiries too. Team wants its own
+   strip to wrap rather than scroll; nobody else asked for that. */
+.tm-list .dls-attn,
+.tm-page .dls-attn { flex-wrap: wrap; overflow-x: visible }
 
 .tm-datenav { display: inline-flex; gap: var(--space-2); align-items: center; font-size: var(--text-xs) }
 /* The date is a field, not a label between two chevrons. Fixed width so the
@@ -507,8 +512,8 @@
 
 .tm-tagpick { display: flex; flex-direction: column; gap: var(--space-3) }
 .tm-tagrow { display: flex; gap: var(--space-1); flex-wrap: wrap; align-items: center }
-.tm-tagnew { display: flex; gap: var(--space-2); align-items: center }
-.tm-tagnew .inp { max-width: 200px }
+.tm-tagnew { display: flex; gap: var(--space-2); align-items: center; margin-top: var(--space-3) }
+.tm-tagnew .inp { flex: 1; min-width: 0; max-width: 200px }
 
 /* ELEVEN SWATCHES AND A PREVIEW OF THE RESULT, on one row. A colour named in a
    dropdown is a word you have to imagine; the dot is the thing itself. */
@@ -556,13 +561,8 @@
   font-size: var(--text-2xl); line-height: 1; font-weight: var(--weight-medium);
   color: var(--text); margin: 0 0 0 var(--space-2);
 }
-.tm-seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: var(--radius-md); overflow: hidden }
-.tm-seg button {
-  font: inherit; font-size: var(--text-xs); padding: 3px 10px; border: 0;
-  border-left: 1px solid var(--line); background: var(--bg); color: var(--text-2); cursor: pointer;
-}
-.tm-seg button:first-child { border-left: 0 }
-.tm-seg button.on { background: var(--bg-active); color: var(--text); font-weight: var(--weight-semibold) }
+/* THE SEGMENTED CONTROL LIVES IN admin-theme.css AS `.btn-group` — see the
+   note in finance.css. Work.tsx renders that class now. */
 .tm-legend { display: inline-flex; gap: var(--space-2); align-items: center; font-size: var(--text-2xs); color: var(--text-3) }
 .tm-legend i { width: 7px; height: 7px; border-radius: var(--radius-full); background: var(--line-2) }
 .tm-legend .k-info { background: var(--info-solid) }
@@ -842,8 +842,6 @@
 .tm-lk-add .inp { width: 100%; min-width: 0 }
 .tm-lk-add .help { margin-top: var(--space-1) }
 .tm-lk-btn { align-self: flex-start; margin-top: var(--space-3) }
-.tm-tagnew { margin-top: var(--space-3) }
-.tm-tagnew .inp { flex: 1; min-width: 0 }
 
 .tm-ni-note {
   margin: var(--space-4) 0 0;
@@ -884,11 +882,12 @@
 /* two fields on a row */
 .tm-fg2 { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3) }
 
-/* the drawer's linked-items relation prefix */
-.tm-lk {
-  font-size: var(--text-2xs); color: var(--text-3);
-  min-width: 84px; display: inline-block;
-}
+/* THE RELATION PREFIX IS `.tm-lk-rel`, and it is defined further down beside
+   the rest of the linked-items parts. A rule for it was written HERE under the
+   name `.tm-lk` — which is the linked-items <ul> itself — so the list stopped
+   being a flex column and became an 84px-wide inline-block at 10px, in both
+   the member drawer and the task drawer. Two components, one class, and the
+   later rule won. Removed; nothing referenced this one. */
 .tm-gap-b { margin-bottom: var(--space-5) }
 
 /* the member page header */
@@ -1252,15 +1251,22 @@
 /* ---- the analysis face --------------------------------------------------- */
 .tm-an > * + * { margin-top: var(--space-4) }
 /* Two questions of the same weight, side by side; below a laptop they stack
-   rather than shrinking into two unreadable charts. */
-.tm-an-pair {
+   rather than shrinking into two unreadable charts.
+
+   RENAMED FROM `.tm-an-pair`, WHICH WAS ALREADY TAKEN. That class is the
+   two-bar plan/report chart 40 lines above — a `<span>` holding two `<i>`
+   bars — and this grid, being later in the file, was winning on `display`.
+   The result was that every day-column in the Reports analytics chart rendered
+   as a CSS grid rather than as a pair of bars, which is to say the chart did
+   not draw. Two components cannot share a class; this one is `.tm-an-two`. */
+.tm-an-two {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: var(--space-4);
 }
 .tm-an-steps { margin-bottom: var(--space-3); max-width: 420px }
 
 @media (max-width: 720px) {
-  .tm-an-pair { grid-template-columns: minmax(0, 1fr) }
+  .tm-an-two { grid-template-columns: minmax(0, 1fr) }
 }
 
 /* -------------------------------------------------- keyboard focus pass --- */
@@ -1458,27 +1464,28 @@ tr:focus-within .tm-st-b.sm > .ic,
    column and shoving everything right, which is what `auto` does. */
 .tm-list .tbl { width: 100%; table-layout: fixed }
 /* Fixed layout will not wrap a header, so a long one would spill its cell. */
-.tm-list .tbl th { overflow: hidden; text-overflow: ellipsis }
 /* A title is the one thing allowed to take two lines; everything else stays on
    one and truncates, so a row keeps its shape. */
-.tm-list .tm-title b { overflow-wrap: anywhere }
 .tm-list .tm-who b, .tm-list .tm-parent {
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
 }
 .tm-list .tbl td { height: auto; min-height: var(--row-h); padding: var(--space-3) var(--space-4) }
 
-/* The header labels a column; it is not a row to be read. It was the same
-   weight and nearly the same size as the data under it. */
+/* ONLY WHAT DIFFERS FROM THE SHARED HEAD. `.tbl th` in admin-theme.css is now
+   the tracked mono micro-label — 10px, uppercase, muted — so the six
+   declarations that said exactly that have gone. What is genuinely local is
+   that this list's head sits on the PLANE rather than in a well, over a
+   stronger rule, and is tighter vertically because its rows are two-line. */
 .tm-list .tbl th {
+  overflow: hidden; text-overflow: ellipsis;
   padding-top: var(--space-2); padding-bottom: var(--space-2);
-  font-size: var(--text-2xs); line-height: var(--lh-2xs); letter-spacing: .07em;
-  text-transform: uppercase; color: var(--text-3);
   background: var(--bg); border-bottom: 1px solid var(--line-2);
 }
 
 /* THE TITLE IS THE ROW. It shares its cell with the meta line and was set at
    the same size as the four cells beside it, so nothing in the row led. */
-.tm-list .tm-title b { font-size: var(--text-base); font-weight: var(--weight-semibold) }
+.tm-list .tm-title b { overflow-wrap: anywhere;
+                       font-size: var(--text-base); font-weight: var(--weight-semibold) }
 /* The meta line — parent, tags, waiting. Context for the title, so it is
    quieter, and it is a flex row because `.cell-2`'s 2px top margin was written
    for a line of text, not for a row of chips that need space between them. */

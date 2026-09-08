@@ -15,7 +15,13 @@ export const useShell = () => ({
 export const ShellProvider = ({ children }: { children: ReactNode }) => <>{children}</>;
 export const LS = { get: (_k: string, d: unknown) => d, set: noop, del: noop };
 export const setTheme = noop;
-export const setDensity = noop;
-export const currentTheme = () => "system";
-export const currentDensity = () => "cosy";
+export const currentTheme = () => "dark";
+export const resolvedTheme = () => "dark";
+/* AdminShell imports this at module scope to build the theme switch. The real
+   list lives in ShellContext; a stand-in only has to have the same shape. */
+export const THEMES = [
+  { id: "light", label: "Light", hint: "Ink on paper" },
+  { id: "dark", label: "Dark", hint: "Ink inverted" },
+  { id: "system", label: "System", hint: "Follow the operating system" },
+];
 export const bootAppearance = noop;

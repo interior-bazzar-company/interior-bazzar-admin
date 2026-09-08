@@ -20,7 +20,6 @@
   min-width: 0;
 }
 .rs-tabs { flex: 1 1 auto; min-width: 0; margin-bottom: 0 }
-.rs-new { flex: 0 0 auto }
 
 /* A count that is not a queue. The badge on Member data means somebody owes you
    something; the one on Responses is just how many arrived, and it must not

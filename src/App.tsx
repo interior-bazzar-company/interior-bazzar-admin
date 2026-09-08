@@ -5,7 +5,6 @@ import ParentContextProvider from "./context";
 import { BrowserRouter as Router } from "react-router-dom";
 import ErrorBoundary from "./components/shared/ErrorBoundary";
 import { ShellProvider } from "./admin/shell/ShellContext";
-import { RouteProvider } from "./providers/router-provider";
 
 function App() {
   return (
@@ -13,14 +12,14 @@ function App() {
       <ParentContextProvider>
         <Provider store={store}>
           <Router>
-            {/* Untitled UI's links and menu items call the router through
-                react-aria's RouterProvider; without it an <a> inside a
-                library component would hard-navigate. */}
-            <RouteProvider>
-              <ShellProvider>
-                <UserRoutes />
-              </ShellProvider>
-            </RouteProvider>
+            {/* No RouterProvider: the panel's own navigation goes through
+                ui/nav.ts and react-router's own <Link>. The react-aria
+                RouterProvider that used to sit here existed only so that an
+                <a> inside an Untitled UI component would route instead of
+                hard-navigating, and there are no such components any more. */}
+            <ShellProvider>
+              <UserRoutes />
+            </ShellProvider>
           </Router>
         </Provider>
       </ParentContextProvider>

@@ -47,7 +47,7 @@ export function SubTabs({ items, cur, onPick, right }: {
 }) {
   return (
     <div className="fin-subtabs">
-      <div className="fin-seg" role="tablist">
+      <div className="btn-group" role="tablist">
         {items.map((t) => (
           <button key={t.k} type="button" role="tab" aria-selected={t.k === cur}
             className={t.k === cur ? "on" : ""} onClick={() => onPick(t.k)}>

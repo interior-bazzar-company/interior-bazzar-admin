@@ -635,7 +635,7 @@ function Analysis({ rows, all, members }: {
         </Notice>
       ) : null}
 
-      <div className="tm-an-pair">
+      <div className="tm-an-two">
         <section className="tm-card">
           <SectionHead title="Where the work is"
             desc="Every item in view, by the stage it is actually in." />
@@ -1294,7 +1294,7 @@ function Timeline({ rows, onOpen }: { rows: WorkItem[]; onOpen: (id: string) => 
         <button className="btn icon sm" aria-label="Previous" onClick={() => setFrom(addDays(from, -7 * weeks))}><Icon name="chevl" size="sm" /></button>
         <b>{fmtDate(days[0])} – {fmtDate(days[days.length - 1])}</b>
         <button className="btn icon sm" aria-label="Next" onClick={() => setFrom(addDays(from, 7 * weeks))}><Icon name="chevr" size="sm" /></button>
-        <span className="tm-seg">
+        <span className="btn-group">
           {[2, 4, 13].map((w) => (
             <button key={w} className={weeks === w ? "on" : ""} onClick={() => setWeeks(w)}>
               {w === 13 ? "Quarter" : w + "w"}

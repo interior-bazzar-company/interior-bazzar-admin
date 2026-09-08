@@ -45,25 +45,28 @@ export const LS = {
 };
 
 /* =========================================================== APPEARANCE === */
-/* Two attributes on <html> drive the whole system — data-scheme and
-   data-theme. No class sweep, no reload, no context provider: the browser
-   re-reads the custom properties and repaints, and every component in the
-   panel is correct in all six states at once.                              */
-/* Two selectors, one state. `data-theme` is the panel's own; `dark-mode` /
-   `light-mode` is Untitled UI's, so a library component reads the theme with
-   no translation layer. "System" is resolved here from prefers-color-scheme —
-   the way Untitled UI's ThemeProvider does it — and re-resolved when the OS
-   flips, so the sheet needs exactly one dark block. Kept in one function so
-   the two selectors can never disagree. */
+/* ONE ATTRIBUTE ON <html> DRIVES THE WHOLE DESIGN SYSTEM: `data-theme`, and it
+   is "light" or "dark" and never anything else. No class sweep, no reload, no
+   context provider — the browser re-reads the custom properties in tokens.css
+   and repaints, and every component in the panel is correct in both states at
+   once.
+
+   THERE IS NO SCHEME AND NO DENSITY. The panel used to carry three colour
+   schemes and a compact spacing variant. Both are gone: a design system that
+   ships six appearances is six design systems that have to be checked, and in
+   practice five of them were never looked at again after the week they landed.
+   Two themes are two things to keep honest, and `check:contrast` can hold
+   both.
+
+   "System" is a PREFERENCE, not a third theme. It is resolved here from
+   prefers-color-scheme and RE-resolved when the OS flips, so the stylesheet
+   needs exactly one dark block rather than a block plus a media query that can
+   drift out of agreement with the attribute. */
 let systemWatch: (() => void) | null = null;
 function applyTheme(v: string) {
   const r = document.documentElement;
   if (systemWatch) { systemWatch(); systemWatch = null; }
-  const paint = (dark: boolean) => {
-    r.classList.remove("dark-mode", "light-mode");
-    r.classList.add(dark ? "dark-mode" : "light-mode");
-    r.setAttribute("data-theme", dark ? "dark" : "light");
-  };
+  const paint = (dark: boolean) => r.setAttribute("data-theme", dark ? "dark" : "light");
   if (v === "system") {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     paint(mq.matches);
@@ -77,71 +80,43 @@ function applyTheme(v: string) {
   paint(v === "dark");
 }
 
+/** The three things a person can choose. `system` resolves to one of the other
+    two; it is not a third appearance and nothing in CSS knows about it. */
+export const THEMES: { id: string; label: string; hint: string }[] = [
+  { id: "light", label: "Light", hint: "Ink on paper" },
+  { id: "dark", label: "Dark", hint: "Ink inverted" },
+  { id: "system", label: "System", hint: "Follow the operating system" },
+];
+
 export function setTheme(v: string) {
   applyTheme(v);
   LS.set("ib_admin_theme", v);
 }
 
-/* ---------------------------------------------------------------- scheme */
-/* THE SCHEMES, and what each one is for. `console` is the default and carries
-   no attribute at all — the absence IS the value, which is why schemes.css
-   writes it behind `:not([data-scheme])` and why a browser with no stored
-   preference paints the new system rather than a fallback of it.
-
-   `portal` is the panel as it was before the scheme layer existed: its whole
-   layer-2 block is aliases of the Untitled UI tokens the legacy vocabulary
-   used to read, so it restores the previous appearance instead of
-   approximating it. Nothing was removed to make room for the new default. */
-export const SCHEMES: { id: string; label: string; hint: string }[] = [
-  { id: "console", label: "Console", hint: "Ink & forest — the current system" },
-  { id: "portal", label: "Portal classic", hint: "The panel as it was" },
-  { id: "beacon", label: "Beacon", hint: "Teal on slate — for a floor screen" },
-];
-
-function applyScheme(v: string) {
-  const r = document.documentElement;
-  if (v === "console") r.removeAttribute("data-scheme");
-  else r.setAttribute("data-scheme", v);
-}
-
-export function setScheme(v: string) {
-  applyScheme(v);
-  if (v === "console") {
-    try {
-      localStorage.removeItem("ib_admin_scheme");
-    } catch {
-      /* nothing to remove */
-    }
-  } else LS.set("ib_admin_scheme", v);
-}
-
-export const currentScheme = () =>
-  document.documentElement.getAttribute("data-scheme") || "console";
-
-export const schemeLabel = (id: string) =>
-  (SCHEMES.find((s) => s.id === id) || SCHEMES[0]).label;
 /* What the person CHOSE, not what is painted: with "system" chosen the
    attribute says light or dark, and the switch has to show System. */
 export const currentTheme = () =>
   document.documentElement.getAttribute("data-theme-pref") === "system"
     ? "system"
-    : document.documentElement.getAttribute("data-theme") || "system";
+    : document.documentElement.getAttribute("data-theme") || "dark";
+
+/** What is actually on screen right now — "light" or "dark", never "system".
+    Charts and canvas drawings need the resolved answer, not the preference. */
+export const resolvedTheme = () =>
+  document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
 
 /** Runs before first paint from main.tsx, the way the prototype's inline
     <head> script did — so the panel never flashes the wrong theme. */
 export function bootAppearance() {
-  const r = document.documentElement;
   const t = LS.get<string | null>("ib_admin_theme", null) || "dark";
   applyTheme(t);
-  /* Scheme before paint, for the same reason theme is: applying it from a
-     React effect ships one frame of the wrong appearance, and on a machine
-     that had chosen Portal that frame is a whole-page colour flash. */
-  const sc = LS.get<string | null>("ib_admin_scheme", null);
-  applyScheme(sc && SCHEMES.some((x) => x.id === sc) ? sc : "console");
-  /* Density is no longer a choice — comfortable is the only spacing, so a
-     stale "compact" from an earlier session is cleared rather than honoured. */
-  r.removeAttribute("data-density");
+  /* The retired appearance keys, cleared rather than ignored: a browser that
+     stored `portal` or `compact` in an earlier build should not carry a dead
+     preference around forever. index.html does the same thing before this
+     runs; doing it in both places costs nothing and means neither entry point
+     depends on the other having been reached. */
   try {
+    localStorage.removeItem("ib_admin_scheme");
     localStorage.removeItem("ib_admin_density");
   } catch {
     /* nothing to remove */

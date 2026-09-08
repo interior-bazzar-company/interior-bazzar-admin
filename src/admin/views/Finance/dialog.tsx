@@ -82,8 +82,13 @@ export function toPaise(v: string): number | null {
 export function Pick<T extends string>({ value, onChange, options }: {
   value: T; onChange: (v: T) => void; options: { key: T; label: string; help?: string }[];
 }) {
+  /* `.btn-group` IS THE PANEL'S SEGMENTED CONTROL. This drew its own —
+     `.fin-seg` — and Team drew a third, so the same "pick one of these" sat at
+     three heights with three corner radii in three modules. The markup below
+     is unchanged apart from the class, so every role, state and handler here
+     behaves exactly as it did. */
   return (
-    <div className="fin-seg" role="radiogroup">
+    <div className="btn-group" role="radiogroup">
       {options.map((o) => (
         <button key={o.key} type="button" role="radio" aria-checked={o.key === value} title={o.help}
           className={o.key === value ? "on" : ""} onClick={() => onChange(o.key)}>{o.label}</button>

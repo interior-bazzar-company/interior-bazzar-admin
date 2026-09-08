@@ -82,17 +82,16 @@ body{ background:var(--bg); overflow-x:hidden }
 .phone .cc{ display:grid; place-items:center; padding:0 11px; background:var(--bg-inset);
             border-right:1px solid var(--line-2); font-size:var(--text-md); color:var(--text-2) }
 .phone input{ flex:1; border:none; outline:none; padding:0 11px; height:34px; font-size:var(--text-md); background:none }
-/* the banner is the panel's alert grammar: soft ground, hairline, 3px stripe */
-.banner{ display:flex; gap:10px; padding:11px 13px; border-radius:var(--r-md); font-size:var(--text-md);
-         line-height:1.5; margin-bottom:18px; border:1px solid; border-left-width:3px }
-.banner b{ display:block; margin-bottom:2px }
-.banner.err2{ background:var(--bad-bg); border-color:var(--bad-line); border-left-color:var(--bad-solid); color:var(--bad) }
-.banner.warn2{ background:var(--warn-bg); border-color:var(--warn-line); border-left-color:var(--warn-solid); color:var(--warn) }
-.banner.ok2{ background:var(--ok-bg); border-color:var(--ok-line); border-left-color:var(--ok-solid); color:var(--ok) }
-.banner.info2{ background:var(--info-bg); border-color:var(--info-line); border-left-color:var(--info-solid); color:var(--info) }
+/* THE ALERT IS `.notice`, IN admin-theme.css. This page drew its own under the
+   name `.banner` — which the shell's docked strip already owned — and had to
+   suffix its four tones `err2`, `ok2`, `warn2`, `info2` to get around the
+   collision. That suffix was the tell: two drawings of one part, and the door
+   had the copy nobody else ever looked at. AdminAuth renders `Alert` now. */
 .linkrow{ display:flex; align-items:center; justify-content:space-between; margin-top:-8px; margin-bottom:16px }
-.tlink{ font-size:var(--text-sm); color:var(--brand-text); font-weight:500 }
-.tlink:hover{ text-decoration:underline }
+/* `.tlink` is shared too — see admin-theme.css. The copy here was the same
+   colour and weight without the underline or the focus ring, so the door's
+   text links were the one place in the product where a link was distinguished
+   by colour alone. */
 /* Show/hide sits INSIDE the field — a password nobody can read back is how a
    typo becomes "wrong credentials". Reuses .tlink; only the placement is new. */
 .pw{ position:relative }

@@ -10,48 +10,45 @@
   <meta name="description"
     content="Interior bazzar Admin — the single operating workspace for every module." />
 
-  <!-- Brand faces. Local-first with a graceful system fallback; nothing here blocks paint. -->
+  <!-- THE THREE FACES OF INK & SIGNAL. Archivo carries the display line (it is
+       variable-width, so a heading tightens without a second face); IBM Plex
+       Sans is the interface; IBM Plex Mono is every id, figure, timestamp and
+       tracked micro-label. Loaded non-blocking with a real system fallback in
+       the stack, so a cold cache or a blocked CDN costs weight, never paint. -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" media="print" onload="this.media = 'all'"
-    href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400..700;1,14..32,400&family=Roboto+Mono:wght@400;500&display=swap" />
+    href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" />
   <noscript>
     <link rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" />
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" />
   </noscript>
 
   <script>
-    // Pre-paint so the panel never flashes the wrong APPEARANCE — theme AND
-    // scheme. ShellContext re-runs the same resolution; this one exists only to
-    // beat the first paint.
+    // Pre-paint so the panel never flashes the wrong theme.
     //
-    // Two selectors, one state: `data-theme` is the panel's own; `dark-mode` /
-    // `light-mode` is how Untitled UI selects a theme, so a component from
-    // their library reads the same state with no translation layer. "System"
-    // is resolved HERE, from prefers-color-scheme, the way Untitled UI's own
-    // ThemeProvider does it — so the stylesheet needs one dark block, not
-    // three. Nothing stored means dark, the panel's default since the first build.
+    // ONE ATTRIBUTE, TWO VALUES. `data-theme` is "light" or "dark" and is never
+    // anything else — there is no scheme, no density, and no third appearance.
+    // "System" is a PREFERENCE, not a theme: it is resolved HERE from
+    // prefers-color-scheme, which is why the stylesheet needs one dark block
+    // rather than a block plus a media query that can disagree with it.
+    // ShellContext re-runs exactly this resolution and keeps watching the OS;
+    // this copy exists only to beat the first paint.
+    //
+    // Nothing stored means DARK, the panel's default since its first build.
     (function () {
       try {
         var r = document.documentElement,
-          t = localStorage.getItem("ib_admin_theme"),
-          d = localStorage.getItem("ib_admin_density");
+          t = localStorage.getItem("ib_admin_theme");
         t = t ? JSON.parse(t) : "dark";
         var dark = t === "dark" || (t === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-        r.classList.remove("dark-mode", "light-mode");
-        r.classList.add(dark ? "dark-mode" : "light-mode");
         r.setAttribute("data-theme", dark ? "dark" : "light");
         if (t === "system") r.setAttribute("data-theme-pref", "system");
-        if (d) r.setAttribute("data-density", JSON.parse(d));
-        // The scheme, on the same terms: the default carries NO attribute, so
-        // only a stored non-default is written. Without this a browser that
-        // chose Portal or Beacon painted one frame of Console on every load —
-        // a whole-page colour flash, and the one appearance bug a person sees
-        // every single morning.
-        var sc = localStorage.getItem("ib_admin_scheme");
-        sc = sc ? JSON.parse(sc) : null;
-        if (sc === "portal" || sc === "beacon") r.setAttribute("data-scheme", sc);
-        else r.removeAttribute("data-scheme");
+        // Appearance keys retired with the design-system consolidation. Cleared
+        // rather than ignored, so a browser that stored one in an earlier build
+        // does not carry a dead preference around forever.
+        localStorage.removeItem("ib_admin_scheme");
+        localStorage.removeItem("ib_admin_density");
       } catch (e) { }
     })();
   </script>

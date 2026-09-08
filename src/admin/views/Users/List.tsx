@@ -12,7 +12,7 @@
    it is the default sort for exactly that reason.
    ============================================================================= */
 import { useShell } from "../../shell/ShellContext";
-import { EmptyState, FilterChips, Icon, SearchField, Select, StatStrip } from "../../ui";
+import { EmptyState, FilterChips, Icon, Pagination, SearchField, Select, StatStrip } from "../../ui";
 import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import { Frame } from "./Frame";
@@ -138,20 +138,20 @@ export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, 
             : null} />
       )}
 
-      {page.pages > 1 ? (
-        <div className="um-pager">
-          <button className="btn sm" disabled={page.pageNo <= 1} onClick={() => onPage(page.pageNo - 1)}>
-            <Icon name="chevl" size="sm" />Previous
-          </button>
-          <span className="tnum">
-            {(page.pageNo - 1) * page.pageSize + 1}–{(page.pageNo - 1) * page.pageSize + page.rows.length}
-            {" of "}{page.total}
-          </span>
-          <button className="btn sm" disabled={page.pageNo >= page.pages} onClick={() => onPage(page.pageNo + 1)}>
-            Next<Icon name="chevr" size="sm" />
-          </button>
-        </div>
-      ) : null}
+      {/* THE SHARED PAGER. This was a hand-built Previous/Next pair with its
+          own `.um-pager` rule — one of three pagers in the panel, and the only
+          one that could not jump to a page. `Pagination` keeps the range it
+          printed ("21–40 of 241") and adds the numbered window, so nothing is
+          lost and the control is the same one every other list will use. */}
+      <Pagination
+        page={page.pageNo}
+        pages={page.pages}
+        total={page.total}
+        pageSize={page.pageSize}
+        shown={page.rows.length}
+        unit="users"
+        onPage={onPage}
+      />
     </Frame>
   );
 }

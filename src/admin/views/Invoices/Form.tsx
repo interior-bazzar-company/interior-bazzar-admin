@@ -13,7 +13,7 @@ import type { CSSProperties, ReactNode } from "react";
 import AdminOpsService from "../../../api/modules/adminOps";
 import type { InvoiceSaveInput } from "../../../api/modules/adminOps";
 import { CommonService } from "../../../api/modules/common";
-import { Field, Icon, Notice, Table } from "../../ui";
+import { Field, Icon, Notice, Table, Timeline } from "../../ui";
 import { inr, inrWords, fmtDate } from "../../ui/format";
 import { useNav } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
@@ -522,19 +522,11 @@ export function ProofsBlock({ inv, onChanged }: { inv: InvoiceRow; onChanged: ()
 
 export function EventLog({ events }: { events: NonNullable<InvoiceRow["events"]> }) {
   return (
-    <div className="tl">
-      {events.map((e) => (
-        <div key={e.id} className="ti">
-          <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
-            <span className="pill xs">{e.eventType}</span>
-            <span className="faint" style={{ fontSize: "var(--text-sm)", marginLeft: "auto" }}>{fmtDate(e.createdAt)}</span>
-          </div>
-          {e.detail ? <div style={{ fontSize: "var(--text-base)", marginTop: "4px" }}>{e.detail}</div> : null}
-          <div className="faint" style={{ fontSize: "var(--text-sm)", marginTop: "2px" }}>
-            {e.actor ? e.actor.name : e.actorRole || "System"}
-          </div>
-        </div>
-      ))}
-    </div>
+    /* the shared timeline — see the note in Deals/Drawer.tsx */
+    <Timeline items={events.map((e) => ({
+      title: <><span className="pill xs">{e.eventType}</span><span className="tl-when">{fmtDate(e.createdAt)}</span></>,
+      body: e.detail || null,
+      meta: e.actor ? e.actor.name : e.actorRole || "System",
+    }))} />
   );
 }

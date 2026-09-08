@@ -22,7 +22,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from "react";
 import { Link, Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
 import IB_ICON from "../../assets/images/IB_Icon.png";
-import { Icon } from "../ui";
+import { Icon, Segmented } from "../ui";
 import { go as uiGo, setGo } from "../ui/nav";
 import config from "../../config";
 import { AuthService } from "../../api/modules/auth";
@@ -30,9 +30,8 @@ import AdminOpsService, { call } from "../../api/modules/adminOps";
 import type { AuditEntry, MePermissions } from "../../api/modules/adminOps";
 import { getModules, getGroupOf, getItems, moduleLabel, HOME_ROUTE } from "./modules";
 import { can, canWrite, clearSession, getSession, grantsOf } from "../auth/session";
-import { LS, SCHEMES, currentScheme, currentTheme, setScheme, setTheme, useShell } from "./ShellContext";
+import { LS, THEMES, currentTheme, setTheme, useShell } from "./ShellContext";
 import { CommandPalette } from "./CommandPalette";
-import { ButtonGroup, ButtonGroupItem } from "@/components/base/button-group/button-group";
 import ErrorBoundary from "../../components/shared/ErrorBoundary";
 
 /* ------------------------------------------------------------------- gate */
@@ -697,29 +696,6 @@ function AccountButton({ session }: { session: MePermissions | null }) {
       return;
     }
     const grants: string[] = session ? grantsOf(session) : [];
-    /* Untitled UI's ButtonGroup — a react-aria ToggleButtonGroup in single-
-       selection mode, so the arrow keys move between the three and the chosen
-       one is announced as selected, which the hand-rolled row never did. */
-    const swatch = (opts: [string, string][], cur: string) => (
-      <ButtonGroup
-        size="sm"
-        className="w-full *:flex-1 *:justify-center"
-        aria-label="Theme"
-        selectedKeys={[cur]}
-        disallowEmptySelection
-        onSelectionChange={(keys) => {
-          setTheme(String([...keys][0] || cur));
-          force((n) => n + 1);
-          open(true);
-        }}
-      >
-        {opts.map((o) => (
-          <ButtonGroupItem key={o[0]} id={o[0]} data-act="theme" data-v={o[0]}>
-            {o[1]}
-          </ButtonGroupItem>
-        ))}
-      </ButtonGroup>
-    );
     const item = (to: string, ico: string, label: string, right?: string) => (
       <button
         className="mi"
@@ -795,44 +771,37 @@ function AccountButton({ session }: { session: MePermissions | null }) {
             Keyboard shortcuts<span className="r">?</span>
           </button>
           <div className="msep" />
-          <div className="ap" style={{ padding: "8px 10px 10px" }}>
-            <div className="ap-k">APPEARANCE</div>
-            {/* THE SCHEME PICKER. A dropdown rather than a third button group:
-                the two switches above it are 2 and 3 options wide and read at a
-                glance, and a list that will grow is the one control in this
-                menu that should not have to be redrawn when it does. It is a
-                real <select>, so it opens with the platform's own list, works
-                on a phone, and needs no positioning inside a popover that is
-                already positioned. */}
-            <label className="ap-row" htmlFor="apScheme">
-              <span className="ap-l">Scheme</span>
-              <select
-                id="apScheme"
-                className="ap-select"
-                data-act="scheme"
-                defaultValue={currentScheme()}
-                onChange={(e) => {
-                  setScheme(e.target.value);
-                  force((n) => n + 1);
-                  open(true);
-                  shell.toast(
-                    (SCHEMES.find((x) => x.id === e.target.value) || SCHEMES[0]).label +
-                      " — saved for this browser."
-                  );
-                }}
-              >
-                {SCHEMES.map((sc) => (
-                  <option key={sc.id} value={sc.id}>
-                    {sc.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+          {/* APPEARANCE — one control, because there is one thing to choose.
+              This block used to hold a scheme picker above the theme switch,
+              and the scheme picker offered three colour systems. They are gone:
+              the panel has ONE design system and two themes of it, so the only
+              question left is light or dark, and "System" is how you decline to
+              answer it rather than a third appearance.
+
+              A segmented control rather than a select: three fixed options that
+              will not grow, read at a glance, and switch in one press instead
+              of two. */}
+          <div className="ap" style={{ padding: "10px 12px 12px" }}>
+            <div className="ap-k">Appearance</div>
+            <Segmented
+              label="Theme"
+              value={currentTheme()}
+              options={THEMES.map((t) => ({ v: t.id, l: t.label }))}
+              onPick={(v) => {
+                setTheme(v);
+                force((n) => n + 1);
+                /* REBUILT, NOT RE-RENDERED. `openPop` takes a NODE, so the
+                   popover holds the markup it was handed; a re-render of this
+                   component never reaches inside it, and the switch would go
+                   on showing the theme you just left while the page around it
+                   repainted — which reads as "nothing happened" while you are
+                   looking straight at the control that did something. */
+                open(true);
+              }}
+            />
             <div className="ap-hint">
-              {(SCHEMES.find((x) => x.id === currentScheme()) || SCHEMES[0]).hint}
+              {(THEMES.find((x) => x.id === currentTheme()) || THEMES[0]).hint} · saved for this browser.
             </div>
-            <div className="ap-k" style={{ marginTop: 10 }}>THEME</div>
-            {swatch([["light", "Light"], ["dark", "Dark"], ["system", "System"]], currentTheme())}
           </div>
           <div className="msep" />
           <SignOut onDone={() => shell.closePop()} />

@@ -1,26 +1,32 @@
 @import "./tokens.css";
 
 /* =============================================================================
-   Interior bazzar — Admin Access · design system  v3 · Ink & Signal
+   Interior bazzar — Admin · INK & SIGNAL · LAYER 3, the component system
    =============================================================================
+
+   THIS IS THE ONLY COMPONENT STYLESHEET IN THE PRODUCT. There is one design
+   system, one component layer, and two themes. A module sheet may hold what is
+   genuinely local to one screen and nothing else; if a second module would
+   want it, it belongs here.
 
    HOW TO READ THIS FILE
    ---------------------
    Three layers, in order. Never skip a layer.
 
-     1. PRIMITIVES   the Ink ramp, the Signal hues, the numeric scales.
-                     Never used directly — see tokens.css.
-     2. SEMANTIC     what a thing MEANS: --color-surface, --color-border,
-                     --color-text-2, --color-success — and their legacy
-                     aliases --bg, --line, --text-2, --ok that this file and
-                     the module sheets already write. See tokens.css.
-     3. COMPONENT    the classes: .btn, .card, .tbl, .pill … — this file.
+     1. PRIMITIVE   the Ink ramp, Forest, the Signal hues, the numeric scales.
+                    Never used directly — see tokens.css.
+     2. SEMANTIC    what a thing MEANS: --color-surface, --color-border,
+                    --color-text-2, --color-success — and their legacy aliases
+                    --bg, --line, --text-2, --ok that this file and the module
+                    sheets already write. Also tokens.css.
+     3. COMPONENT   the classes: .btn, .card, .tbl, .pill … — this file.
 
    Change a ramp in layer 1 and the whole product moves, in both themes,
-   at both densities, without touching a single component.
+   without touching a single component. Nothing below this line names a colour
+   that is not a token: `npm run check:tokens` is the machine that enforces it.
 
-   THE 12-STEP RAMP (borrowed from Radix — the clearest system in the field)
-   ------------------------------------------------------------------------
+   THE 12-STEP RAMP (Radix's, and the clearest system in the field)
+   ---------------------------------------------------------------
      1   app background            7   border · focus ring
      2   subtle background         8   strong border · hover border
      3   component background      9   SOLID fill (the pure colour)
@@ -28,45 +34,44 @@
      5   component active         11   low-contrast text  (AA on 1–3)
      6   subtle border            12   high-contrast text (AAA on 1–3)
 
-   Once you know those twelve meanings you can compose any component without
-   inventing a value, and dark mode is free — the same step numbers, new hexes.
-
    THE SCALES — everything snaps to these. No half-pixels. No one-offs.
    --------------------------------------------------------------------
-     space    4 8 12 16 20 24 32 40 48 64        (×4, the Tailwind scale)
-     text     10 11 12 13 14 16 18 22 28 36      (10 sizes, each named by role)
-     control  22 26 32 38 44                     (xs sm md lg xl — every
-                                                  button, input, select, chip)
-     radius   3 4 6 8 12 16 full
-     shadow   xs sm md lg xl                     (layered, never a hard drop)
+     space    4 8 12 16 20 24 32 40 48 64
+     text     10 11 12 13 14 16 19 23 29 38     (10 sizes, each named by role)
+     control  22 26 32 38 44                    (xs sm md lg xl — every
+                                                 button, input, select, chip)
+     radius   3 4 6 8 12 16 full                (6 is a control, 8 a card,
+                                                 12 an overlay. Nothing else.)
+     shadow   xs sm md lg xl                    (layered, never a hard drop)
 
-   MODES
-   -----
-     [data-theme="dark"] / .dark-mode   · "system" is resolved in JS before paint
-     [data-density="compact"]   · ~15% tighter; same system, more rows on screen
+   THE TWO THEMES, AND NOTHING ELSE
+   --------------------------------
+     :root[data-theme="light"]   ·   :root[data-theme="dark"]
 
-   INSPIRED BY
-   -----------
-     Linear      density that still breathes · restrained motion · keyboard-first
-     Stripe      the best money UI there is — tabular numerals, status colour
-                 used only for status, detail-over-list
-     Vercel      a disciplined spacing rhythm and real negative space
-     Radix       the 12-step ramp and the semantic layer above it
-     Notion      hierarchy from whitespace · hover as fill, not border
-     Polaris     accessible defaults, documented in the file that ships
+   "System" is resolved to one of the two in JS before first paint. There is no
+   scheme attribute, no density attribute, and no third appearance anywhere in
+   configuration.
 
-   Not copied: their palettes, their type, their metaphors. Interior bazzar is
-   a system of record — it needs tables, money and status.
+   THE FIVE DEVICES THE CHARACTER LIVES IN, and nothing else
+   ---------------------------------------------------------
+     ticks    two 9px corner marks on an INSTRUMENT surface — a KPI tile, a
+              chart frame. Never on a row, an input or a menu.
+     live     the cyan accent, reserved for "right now" — a running session, an
+              open shift, a streaming figure. Never a status, never a series.
+     mono     10–11px tracked uppercase micro-labels, for metric names, column
+              heads and section keys. The panel's whole voice sits in these.
+     glow     dark mode only, behind the active nav row.
+     sheen    a 1px inner highlight — how dark says "raised" where a shadow on
+              a dark ground shows nothing.
+
+   WHERE THE GREEN GOES
+   --------------------
+   The interface is black and white. Forest marks WHERE YOU ARE and WHAT IS
+   YOURS: active nav, selection, links, focus, progress, the CRM's own signals,
+   the first chart series. The primary BUTTON is ink, not forest — the thing
+   you press should be the highest-contrast object on screen and never compete
+   with a status. If a screen reads as green, that screen is wrong.
    ============================================================================= */
-
-
-/* ============================================================================
-   LAYERS 1 + 2 · THE TOKEN SHEET
-   Ink & Signal lives in ./tokens.css: the Ink ramp and the Signal hues, the
-   --color-* semantic set for light and dark, the chart tokens, density, and
-   the legacy names (--bg, --brand, --ok, --line …) as aliases of the semantic
-   set. Nothing below this line names a colour that is not a token.
-   ========================================================================== */
 
 
 /* ============================================================================
@@ -79,6 +84,7 @@ body{
   color:var(--text); background:var(--bg-shell);
   -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
   font-feature-settings:"kern" 1; text-rendering:optimizeLegibility;
+  font-variant-ligatures:contextual; font-kerning:normal;
 }
 a{ color:inherit; text-decoration:none }
 button,input,select,textarea{ font:inherit; color:inherit }
@@ -88,9 +94,27 @@ svg{ flex:0 0 auto }
 b,strong{ font-weight:var(--weight-semibold) }
 ::selection{ background:var(--brand-tint-2); color:var(--text) }
 
+/* A HEADING IS THE DISPLAY FACE. Archivo is variable-width, so a title can be
+   tightened toward its own measure instead of a second face being loaded to do
+   it. `text-wrap:balance` because a two-line record title that breaks one word
+   before the end reads as a mistake. */
+h1,h2,h3,h4{ font-family:var(--font-display);
+             font-variation-settings:"wdth" var(--display-wdth);
+             letter-spacing:var(--tracking-tight); line-height:var(--lh-tight);
+             text-wrap:balance }
+
+/* The number spinners and the search-field clear button are the browser's own
+   controls and are drawn by the platform, not by this system — so they are the
+   two places a themed panel shows a piece of unthemed chrome. */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0 }
+input[type="number"]{ -moz-appearance:textfield }
+input[type="search"]::-webkit-search-cancel-button{ -webkit-appearance:none }
+details summary::-webkit-details-marker{ display:none }
+
 /* utilities */
 .mono{ font-family:var(--font-mono); font-size:.94em; letter-spacing:-.01em; font-variant-ligatures:none }
-.serif{ font-family:var(--font-display); font-variation-settings:var(--display-wdth);
+.serif{ font-family:var(--font-display); font-variation-settings:"wdth" var(--display-wdth);
         font-weight:var(--weight-semibold); letter-spacing:var(--tracking-tight) }
 .tnum{ font-variant-numeric:tabular-nums }
 .muted{ color:var(--text-2) }
@@ -101,22 +125,17 @@ b,strong{ font-weight:var(--weight-semibold) }
 .trunc{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0 }
 .sr{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap }
 
-/* focus — keyboard only */
+/* focus — keyboard only. FOREST, in both themes: focus is a "where am I"
+   answer, which is exactly what the brand colour is for. */
 :where(a,button,input,select,textarea,[tabindex],[role="button"]):focus-visible{
   outline:2px solid var(--brand); outline-offset:2px; border-radius:var(--radius-sm);
 }
 
-/* icons — one stroke weight, five sizes */
-/* Untitled UI's icons are drawn for a 2px stroke on a 24 grid. The CSS wins
-   over the presentation attributes the components ship with, so this is the
-   one place the whole set's weight is set. 1.8 rather than a flat 2: at the
-   16px this panel uses in nav and toolbars, a full 2 reads as bold. */
+/* icons — one stroke weight, five sizes. The set is drawn for a 2px stroke on
+   a 24 grid; 1.8 rather than a flat 2 because at the 16px this panel uses in
+   nav and toolbars a full 2 reads as bold. */
 .ic{ display:inline; width:var(--icon-md); height:var(--icon-md); stroke:currentColor; fill:none;
      stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; flex:0 0 var(--icon-md) }
-/* Tailwind's preflight makes every svg `display:block` and strips list markers
-   and heading sizes. The panel's icons sit inline beside text, its numbered
-   terms are numbered, and its headings carry their own sizes — restored here,
-   once, where the base layer would otherwise take them. */
 .qdoc ol{ list-style:decimal }
 .qdoc ul{ list-style:disc }
 .ic.xs{ width:var(--icon-xs); height:var(--icon-xs); flex-basis:var(--icon-xs) }
@@ -419,7 +438,7 @@ button.tb-stat:hover{ background:var(--bg-hover) }
 .pop-views .mi > span{ display:flex; flex-direction:column; gap:1px; min-width:0 }
 .pop-views .mi .d{ font-size:var(--text-sm); color:var(--text-3) }
 .pop-views .mi .r{ margin-left:auto; color:var(--brand-text); display:flex; align-items:center }
-.pop-views .mi.on{ background:var(--brand-tint) }
+.pop-views .mi.on{ background:var(--brand-tint); cursor:default }
 .pop-views .mi.on b,.pop-views .mi.on .ic{ color:var(--brand-text) }
 
 .tb-actions{ margin-left:auto; display:flex; align-items:center; gap:2px }
@@ -509,12 +528,18 @@ button.tb-stat:hover{ background:var(--bg-hover) }
 .btn:active{ background:var(--bg-active) }
 .btn .ic{ color:var(--text-2) }
 
-/* THE PRIMARY ACTION IS INK, not the brand — near-black in light, near-white
-   in dark, inverting wholesale. Untitled UI drives this from the brand colour;
-   here brand green is the thread through the chrome and the one loud button on
-   a screen is monochrome, which is what "primary is black and white" means in
-   practice. `.btn.brand` below is the forest-filled button, for the rare place
-   an action IS the brand (the portal link, the plan upsell). */
+/* THE PRIMARY ACTION IS INK, NOT THE BRAND — near-black in light, near-white
+   in dark, inverting wholesale.
+
+   That is the single decision this whole palette turns on. The thing you press
+   should be the highest-contrast object on the screen, and a green button
+   competes with every green status beside it; forest is spent instead on where
+   you ARE — active nav, the selected row, links, focus, progress, the current
+   pipeline stage. One loud monochrome button per screen is what "primary is
+   black and white, forest is the accent" means in practice.
+
+   `.btn.brand` below is the forest-filled button, for the rare action that IS
+   the brand: the portal link, the plan upsell. It is not a second primary. */
 .btn.pri{ background:var(--ink-solid); border-color:var(--ink-solid); color:var(--ink-on-solid);
           box-shadow:var(--shadow-xs) }
 .btn.pri:hover{ background:var(--ink-solid-hover); border-color:var(--ink-solid-hover) }
@@ -531,9 +556,11 @@ button.tb-stat:hover{ background:var(--bg-hover) }
 .btn.ok .ic{ color:currentColor }
 .btn.ghost{ border-color:transparent; background:none; color:var(--text-2); box-shadow:none }
 .btn.ghost:hover{ background:var(--bg-hover); border-color:transparent; color:var(--text) }
-/* Untitled UI's focus is the control's own border plus a 4px halo — the border
-   carries the 3:1, the halo carries the emphasis. It replaces the global
-   outline on buttons so the ring follows the button's radius. */
+/* FOCUS IS THE BORDER PLUS A HALO: the border carries the 3:1 that WCAG 1.4.11
+   asks of an operable boundary, the halo carries the emphasis. It replaces the
+   global outline on buttons so the ring follows the button's own radius rather
+   than boxing a rounded control in a rectangle. Both are forest, because focus
+   is a "where am I" answer and that is what the brand colour is for. */
 .btn:focus-visible{ outline:none; box-shadow:var(--ring); border-color:var(--brand) }
 .btn.dgr:focus-visible{ box-shadow:var(--bad-ring); border-color:var(--bad-solid) }
 
@@ -657,6 +684,39 @@ button.tile:hover{ border-color:var(--line-3); background:var(--bg-shell) }
 .pill.line{ background:var(--bg); border-color:var(--line-2); color:var(--text-2) }
 .pill.dead{ background:var(--bg-inset); color:var(--text-3); text-decoration:line-through }
 .pill.solid{ background:var(--text); color:var(--bg); border-color:var(--text) }
+/* ---------------------------------------------------------------------------
+   THE FOUR TONES THE DATA USES THAT THIS FILE DID NOT DRAW.
+
+   `mute`, `stop` and `sys` appear in the shipped vocabularies — finance's and
+   users' `vocabularies.json` assign them to real states — and there was no
+   `.pill.*` rule for any of them, so every chip carrying one rendered as the
+   bare neutral pill. Three distinct meanings, one drawing, and nobody could
+   see the difference.
+
+   Worse, the two modules that DID draw them disagreed: `.be-ev .ty.sys` was
+   amber and `.fin-ev .ty.sys` was blue, so "the system did this" was a warning
+   in Business Enquiries and information in Finance. That is the exact failure
+   §7 of the redesign brief is about — the same semantic status with two
+   visual treatments in two modules — and it is fixed by the tone being defined
+   HERE, once, and the module sheets deferring to it.
+
+     mute   true, and not worth your attention: a derived total, a zero
+     stop   halted by a rule — blocked, not merely failed
+     sys    the SYSTEM acted: automation, derivation, an audit entry. Its
+            colour is --system (pulse), which is that meaning everywhere in
+            this panel, including the timeline dot.
+     pri    the primary action's tone, for a chip that mirrors one
+   ------------------------------------------------------------------------ */
+.pill.mute{ background:transparent; color:var(--text-3); border-color:var(--line) }
+.pill.stop{ background:var(--bad-bg); color:var(--bad); border-color:var(--bad-solid);
+            border-style:dashed }
+.pill.sys{ background:var(--system-bg); color:var(--system); border-color:var(--system) }
+.pill.pri{ background:var(--ink-solid); color:var(--ink-on-solid); border-color:var(--ink-solid) }
+/* `neutral` is the base pill named explicitly, so a component that computes a
+   tone can pass "neutral" instead of an empty string and read the same. */
+.pill.neutral{ background:var(--neutral-bg); color:var(--text-2); border-color:var(--neutral-line) }
+/* the LIVE accent, as a tone rather than only as the `.pill-live` compound */
+.pill.live{ background:var(--accent-bg); color:var(--accent-text); border-color:var(--accent) }
 /* A TAG pill. Its colour is a label the team chose, never a state, so it draws
    from the tag palette and shares nothing with the four status pills above.
    `.pill` on its own — no `tag-*` class — is the twelfth option: no colour. */
@@ -727,10 +787,9 @@ button.tile:hover{ border-color:var(--line-3); background:var(--bg-shell) }
 .chip-clear::before{ content:""; width:1px; height:16px; margin-right:var(--space-3);
                      background:var(--line-2) }
 
-.chiprow{ display:flex; align-items:center; gap:var(--space-2); flex-wrap:wrap }
+.chiprow{ display:flex; align-items:center; gap:var(--space-2); row-gap:var(--space-2); flex-wrap:wrap }
 /* A wrapped row of chips needs breathing space between its lines, or the second
    line reads as a different control group. */
-.chiprow{ row-gap:var(--space-2) }
 /* The margin used to be an inline style on the component, which meant every
    page that used it inherited a number nobody could override. */
 .chiprow.filters{ margin:-4px 0 var(--space-3) }
@@ -767,12 +826,16 @@ button.tile:hover{ border-color:var(--line-3); background:var(--bg-shell) }
                       color:var(--brand-text); font-weight:var(--weight-medium) }
 .selectbox.on::after{ border-color:var(--brand-text) }
 
-.fg{ margin-bottom:var(--space-4) }
+/* `min-width:0` is not cosmetic: a grid cell holding a control that refuses to
+   shrink pushes its neighbour off the row instead of wrapping, which is how a
+   date range came to overlap the field beside it. */
+.fg{ margin-bottom:var(--space-4); min-width:0 }
+.fg > label{ display:flex; align-items:center; gap:5px }
 /* `.fg-lb` is the same label for a control that is a GROUP of buttons (the tag
    swatches) and so cannot carry a `for`. Same selector, never a second copy. */
 .fg > label,.fg > .fg-lb{ display:block; font-size:var(--text-md); font-weight:var(--weight-medium);
              color:var(--text-2); margin-bottom:var(--space-1) }
-.fg > label .req{ color:var(--bad) }
+.fg > label .req{ color:var(--bad); font-weight:var(--weight-bold) }
 .inp{ display:block; width:100%; height:var(--control-lg); padding:0 var(--space-3);
       border:1px solid var(--line-control); border-radius:var(--radius-md); background:var(--bg);
       font-size:var(--text-base); outline:none;
@@ -812,8 +875,12 @@ select.inp::-ms-expand{ display:none }
 
 .check{ display:flex; align-items:flex-start; gap:var(--space-2);
         font-size:var(--text-md); color:var(--text-2); cursor:pointer }
-.check input{ width:16px; height:16px; flex:0 0 16px; margin-top:1px;
-              accent-color:var(--brand); cursor:pointer }
+/* NO `accent-color`. The box is drawn by this system — see the
+   `appearance:none` block in the library — and `accent-color` only tints the
+   PLATFORM's control, leaving its size, radius, focus ring and disabled
+   treatment to the browser. Setting both meant the form's box and the table
+   header's box were visibly different shapes on Windows. */
+.check input{ margin-top:2px; cursor:pointer }
 
 
 /* ============================================================================
@@ -822,10 +889,20 @@ select.inp::-ms-expand{ display:none }
 .tw{ border:1px solid var(--line); border-radius:var(--radius-xl);
      overflow:hidden; background:var(--surface-raised) }
 .tw.scroll{ overflow-x:auto }
+/* THE COLUMN HEAD IS A TRACKED MONO MICRO-LABEL, which is where most of this
+   system's voice actually lives. A column head is not prose — it is the NAME
+   of a measurement, exactly like the label on a metric tile, and setting the
+   two the same way is what makes a table and a KPI row read as parts of one
+   instrument rather than as a heading above a list.
+
+   Uppercase BY THE TYPE SYSTEM, never typed in capitals, so the string is
+   still searchable, exportable and read aloud correctly. */
 .tbl th{ position:sticky; top:0; z-index:var(--z-stick); text-align:left; white-space:nowrap;
          padding:var(--space-3) var(--space-4); background:var(--bg-inset);
-         border-bottom:1px solid var(--line); font-size:var(--text-xs);
-         font-weight:var(--weight-semibold); color:var(--text-3) }
+         border-bottom:1px solid var(--line);
+         font-family:var(--font-mono); font-size:var(--text-2xs);
+         letter-spacing:.1em; text-transform:uppercase;
+         font-weight:var(--weight-medium); color:var(--text-3) }
 .tbl td{ height:var(--row-h); padding:var(--space-3) var(--space-4);
          border-bottom:1px solid var(--line); font-size:var(--text-base); vertical-align:middle }
 .tbl tbody tr:last-child td{ border-bottom:none }
@@ -834,13 +911,19 @@ select.inp::-ms-expand{ display:none }
 .tbl tbody tr.clickable:hover{ background:var(--bg-hover) }
 /* The money column is the one a reader scans straight down. Give it the weight
    and full-strength ink; everything beside it can stay quieter. */
-.tbl td.n{ font-weight:var(--weight-medium); color:var(--text) }
+.tbl td.n{ font-weight:var(--weight-medium); color:var(--text);
+           font-family:var(--font-mono); font-size:var(--text-md); letter-spacing:-.01em }
 /* The leading cell carries the identity of the row and should not weigh the
    same as the cells beside it. */
 .tbl td:first-child .cell-1{ font-weight:var(--weight-semibold) }
 .tbl tbody tr.on{ background:var(--brand-tint) }
 .tbl tbody tr.on td:first-child{ box-shadow:inset 2px 0 0 var(--brand) }
 .tbl tbody tr.dim td{ color:var(--text-3) }
+/* A FIGURE COLUMN COMPARES BY EYE OR IT IS NOT A FIGURE COLUMN. Right-aligned
+   so the units line up, tabular so the digits do, and MONO so ₹4,20,000 and
+   ₹11,80,000 are the same width per character — in a proportional face the
+   longer number is not reliably the wider one, which is the whole reason a
+   column of money is hard to scan. */
 .tbl th.n,.tbl td.n{ text-align:right; font-variant-numeric:tabular-nums }
 .tbl th.c,.tbl td.c{ text-align:center }
 .tbl td.tight{ width:1%; white-space:nowrap }
@@ -918,10 +1001,16 @@ select.inp::-ms-expand{ display:none }
 .av.sm{ width:22px; height:22px; flex-basis:22px; font-size:var(--text-2xs) }
 .av.lg{ width:38px; height:38px; flex-basis:38px; font-size:var(--text-base) }
 .av.xl{ width:56px; height:56px; flex-basis:56px; font-size:var(--text-xl) }
-.av.n1{ background:var(--info-bg); color:var(--info) }
-.av.n2{ background:var(--bg-active); color:var(--text-2) }
-.av.n3{ background:var(--warn-bg); color:var(--warn) }
-.av.n4{ background:var(--ok-bg); color:var(--ok) }
+/* THE FOUR TINTS COME FROM THE TAG PALETTE, NOT THE STATUS PALETTE.
+   They used to be info-blue, neutral, warning-amber and success-green — so
+   whether somebody's initials came out amber or green was decided by the sum
+   of the character codes in their name, and a row of faces read as a row of
+   states. An avatar identifies; it never judges. The tag hues are the set that
+   means nothing by contract, which is exactly what is wanted here. */
+.av.n1{ background:var(--tag-blue-bg);   color:var(--tag-blue);   border:1px solid var(--tag-blue-line) }
+.av.n2{ background:var(--tag-slate-bg);  color:var(--tag-slate);  border:1px solid var(--tag-slate-line) }
+.av.n3{ background:var(--tag-violet-bg); color:var(--tag-violet); border:1px solid var(--tag-violet-line) }
+.av.n4{ background:var(--tag-teal-bg);   color:var(--tag-teal);   border:1px solid var(--tag-teal-line) }
 
 .bar{ display:flex; height:7px; border-radius:var(--radius-full);
       background:var(--bg-inset); overflow:hidden }
@@ -1030,7 +1119,7 @@ a.lk:hover{ border-color:var(--brand); background:var(--brand-tint) }
    arrive and nothing jumps. A spinner in the middle of an empty plane says
    "wait"; this says "here is the shape of what is coming". */
 .sk{ display:block; position:relative; overflow:hidden; flex:0 0 auto;
-     background:var(--sk); border-radius:var(--radius-md) }
+     height:11px; background:var(--sk); border-radius:var(--radius-sm) }
 .sk::after{ content:""; position:absolute; inset:0; transform:translateX(-100%);
             background:linear-gradient(90deg,transparent,var(--sk-sheen),transparent);
             animation:sheen 1.3s linear infinite }
@@ -1054,16 +1143,20 @@ a.lk:hover{ border-color:var(--brand); background:var(--brand-tint) }
           color:var(--text-3); padding:var(--space-3) 0 var(--space-1) }
 .dayline:first-child{ padding-top:var(--space-1) }
 
-.tl{ position:relative; padding-left:var(--space-6) }
-.tl::before{ content:""; position:absolute; left:6px; top:6px; bottom:6px;
-             width:1px; background:var(--line-2) }
-.tl .ti{ position:relative; padding:var(--space-2) 0 }
-.tl .ti::before{ content:""; position:absolute; left:-21px; top:15px; width:7px; height:7px;
-                 border-radius:var(--radius-full); background:var(--line-3);
-                 box-shadow:0 0 0 3px var(--bg) }
-.tl .ti.ok::before{ background:var(--ok-solid) }
-.tl .ti.bad::before{ background:var(--bad-solid) }
-.tl .ti.warn::before{ background:var(--warn-solid) }
+/* THE TIMELINE IS DRAWN ONCE, in the component-library block at the foot of
+   this file, behind the shared `Timeline`. There were two under this same
+   class: this one drew a rail with `.tl::before` spanning the whole list and
+   hung its dots off `.tl .ti`; the other draws the rail per item so it STOPS
+   at the last entry rather than trailing off under it, which is what says
+   "this is the end of the record" instead of "there is more below".
+
+   Both matched every `.tl`, so a list rendered through either one got the
+   other's rail as well. Deals, Invoices, Plans and Quotations each hand-built
+   the `.ti` version out of inline styles; all four now render `Timeline`.
+   What remains here is the ONE rule the four call sites still need: the date
+   pushed to the end of the title row. */
+.tl-when{ margin-left:auto; padding-left:var(--space-2);
+          font-size:var(--text-sm); color:var(--text-3); white-space:nowrap }
 
 
 /* ============================================================================
@@ -1098,7 +1191,26 @@ a.lk:hover{ border-color:var(--brand); background:var(--brand-tint) }
 /* ============================================================================
    EMPTY · SKELETON · NOTICE
    ========================================================================== */
-.empty{ text-align:center; padding:var(--space-16) var(--space-6) }
+/* IT SIZES ITSELF TO WHAT IT IS INSIDE. 64px of padding is right for an empty
+   PAGE and absurd inside a 300px card, where it produced a card four times
+   taller than the one beside it holding actual content. The dashed edge is the
+   message — "a thing goes here and there is not one yet" — and it needs to be
+   visible as a shape, which it is not when it runs off the bottom of the
+   viewport. */
+/* A PAGE-LEVEL EMPTY STATE IS THE WHOLE SCREEN, so it keeps the room it always
+   had and draws no frame: there is nothing beside it for a frame to separate
+   it from, and a dashed rectangle around an entire content area reads as a
+   drop target rather than as an explanation. */
+.empty{ display:flex; flex-direction:column; align-items:center; justify-content:center;
+        text-align:center; gap:var(--space-2);
+        padding:var(--space-16) var(--space-6) }
+/* INSIDE A CARD IT IS A SLOT, and there the dashed edge IS the message —
+   "a thing goes here and there is not one yet". 64px of padding is right for a
+   page and absurd in a 300px card, where it produced a card four times taller
+   than the one beside it holding actual content, so the room is given back. */
+.card .empty,.card-b .empty,.dw-b .empty,.md-b .empty{
+  padding:clamp(var(--space-5),5vh,var(--space-10)) var(--space-4);
+  border:1px dashed var(--line-2); border-radius:var(--radius-lg) }
 .empty .g{ width:44px; height:44px; margin:0 auto var(--space-3);
            border-radius:var(--radius-xl); background:var(--bg-inset);
            display:grid; place-items:center; color:var(--text-3) }
@@ -1106,19 +1218,33 @@ a.lk:hover{ border-color:var(--brand); background:var(--brand-tint) }
 .empty p{ font-size:var(--text-base); line-height:1.55; color:var(--text-2);
           max-width:48ch; margin:0 auto var(--space-4) }
 
-.sk{ height:11px; border-radius:var(--radius-xs);
-     background:var(--skeleton); background-size:400% 100%; animation:shim 1.4s linear infinite }
-@keyframes shim{ from{ background-position:100% 0 } to{ background-position:-100% 0 } }
+/* THE SKELETON BAR IS DEFINED ONCE, ABOVE. There were two `.sk` rules in this
+   file — one sweeping a highlight with a `::after` transform, the other
+   animating a gradient's background-position — and because both matched every
+   bar, BOTH animations ran on all of them at two different speeds. The one
+   that survives is the `::after` sweep: it is the one that stops under
+   `prefers-reduced-motion`, and it reads its two colours from `--sk` and
+   `--sk-sheen` rather than from a composed gradient token that nothing else
+   could reuse. The only thing this block contributed was a default height, and
+   that has moved up beside it.
+
+   `--skeleton` in tokens.css was this rule's gradient and has no reader left;
+   it stays defined there as part of the legacy vocabulary, costing nothing,
+   in case a module sheet is written against it before anybody notices. */
 
 .notice{ display:flex; align-items:flex-start; gap:var(--space-3);
          padding:var(--space-3) var(--space-4); border:1px solid var(--line);
          border-radius:var(--radius-lg); background:var(--bg-shell);
          font-size:var(--text-md); line-height:1.5 }
 .notice .ic{ margin-top:1px; color:var(--text-3) }
-.notice.ok{ background:var(--ok-bg); border-color:var(--ok-line) }     .notice.ok .ic{ color:var(--ok) }
-.notice.warn{ background:var(--warn-bg); border-color:var(--warn-line) } .notice.warn .ic{ color:var(--warn) }
-.notice.bad{ background:var(--bad-bg); border-color:var(--bad-line) }   .notice.bad .ic{ color:var(--bad) }
-.notice.info{ background:var(--info-bg); border-color:var(--info-line) } .notice.info .ic{ color:var(--info) }
+.notice.ok{ background:var(--ok-bg); border-color:var(--ok-line);
+              border-left:3px solid var(--ok-solid) }     .notice.ok .ic{ color:var(--ok) }
+.notice.warn{ background:var(--warn-bg); border-color:var(--warn-line);
+              border-left:3px solid var(--warn-solid) } .notice.warn .ic{ color:var(--warn) }
+.notice.bad{ background:var(--bad-bg); border-color:var(--bad-line);
+              border-left:3px solid var(--bad-solid) }   .notice.bad .ic{ color:var(--bad) }
+.notice.info{ background:var(--info-bg); border-color:var(--info-line);
+              border-left:3px solid var(--info-solid) } .notice.info .ic{ color:var(--info) }
 
 /* The one global, docked alert — a full-width strip pinned below the topbar
    (see admin-access.html), same tone vocabulary as .notice but flush and
@@ -1170,7 +1296,8 @@ a.lk:hover{ border-color:var(--brand); background:var(--brand-tint) }
         animation:panel-in 260ms var(--ease-out) }
 .modal.wide{ width:min(720px,calc(100vw - 32px)) }
 .modal.sm{ width:min(440px,calc(100vw - 32px)) }
-.md-h{ flex:0 0 auto; padding:var(--space-4) var(--space-5) var(--space-3) }
+.md-h{ flex:0 0 auto; display:flex; align-items:flex-start; gap:var(--space-3);
+       padding:var(--space-4) var(--space-5); border-bottom:1px solid var(--line) }
 .md-h h3{ font-size:var(--text-lg); font-weight:var(--weight-semibold);
           letter-spacing:var(--tracking-tight) }
 .md-h p{ font-size:var(--text-md); color:var(--text-2); margin-top:3px }
@@ -1211,20 +1338,27 @@ a.lk:hover{ border-color:var(--brand); background:var(--brand-tint) }
 .pick.bad.on{ background:var(--bad-bg); border-color:var(--bad-line); color:var(--bad) }
 
 .md-b{ flex:1 1 auto; overflow-y:auto; padding:var(--space-1) var(--space-5) var(--space-4) }
-.md-f{ flex:0 0 auto; display:flex; align-items:center; gap:var(--space-2);
+/* THE PRIMARY IS LAST because that is where the eye finishes; the destructive
+   one is pulled to the far left by `.md-f .left` so it is never the button
+   beside the one somebody meant to press. */
+.md-f{ flex:0 0 auto; display:flex; align-items:center; justify-content:flex-end;
+       gap:var(--space-2); flex-wrap:wrap;
        padding:var(--space-3) var(--space-5); border-top:1px solid var(--line);
-       background:var(--bg-shell); border-radius:0 0 var(--radius-2xl) var(--radius-2xl) }
+       background:var(--bg-inset); border-radius:0 0 var(--radius-2xl) var(--radius-2xl) }
 
 .drawer{ position:fixed; inset:0 0 0 auto; width:min(720px,100vw);
          display:flex; flex-direction:column; z-index:var(--z-layer);
          background:var(--bg); box-shadow:var(--shadow-xl), var(--surface-sheen);
          animation:slide var(--duration-slow) var(--ease-out) }
-.dw-h{ flex:0 0 auto; padding:var(--space-4) var(--space-5);
-       border-bottom:1px solid var(--line) }
+.dw-h{ flex:0 0 auto; position:sticky; top:0; z-index:1;
+       display:flex; align-items:center; gap:var(--space-3);
+       padding:var(--space-4) var(--space-5);
+       background:var(--bg); border-bottom:1px solid var(--line) }
 .dw-b{ flex:1; overflow-y:auto; padding:var(--space-5) var(--space-5) var(--space-8) }
-.dw-f{ flex:0 0 auto; display:flex; align-items:center; gap:var(--space-2); flex-wrap:wrap;
+.dw-f{ flex:0 0 auto; display:flex; align-items:center; justify-content:flex-end;
+       gap:var(--space-2); flex-wrap:wrap;
        padding:var(--space-3) var(--space-5); border-top:1px solid var(--line);
-       background:var(--bg-shell) }
+       background:var(--bg-inset) }
 
 .pop{ position:fixed; z-index:var(--z-layer); min-width:200px; overflow:hidden;
       background:var(--surface-raised); border:1px solid var(--line);
@@ -1272,7 +1406,7 @@ a.lk:hover{ border-color:var(--brand); background:var(--brand-tint) }
      transition:background var(--duration-fast) var(--ease), color var(--duration-fast) var(--ease) }
 .mi:hover{ background:var(--bg-hover); color:var(--text) }
 .mi .ic{ color:var(--text-3) } .mi:hover .ic{ color:var(--text-2) }
-.mi .r{ margin-left:auto; font-size:var(--text-sm); color:var(--text-3) }
+/* a shortcut or a count, in mono so a column of them lines up */
 .mi.on{ background:var(--brand-tint); color:var(--brand-text); font-weight:var(--weight-medium) }
 .mi.on .ic{ color:var(--brand-text) }
 .mi.dgr{ color:var(--bad) } .mi.dgr:hover{ background:var(--bad-bg) } .mi.dgr .ic{ color:var(--bad) }
@@ -1347,7 +1481,8 @@ a.lk:hover{ border-color:var(--brand); background:var(--brand-tint) }
 
 /* the attention strip: the five tiles and the six funnel segments, collapsed
    into one line. Same numbers, same clicks, a fraction of the height. */
-.dls-attn{ display:flex; align-items:center; flex:0 0 auto; overflow-x:auto;
+.dls-attn{ position:relative; z-index:var(--z-band);
+           display:flex; align-items:center; flex:0 0 auto; overflow-x:auto;
            padding:0 var(--page-pad);
            border-top:1px solid var(--line); border-bottom:1px solid var(--line) }
 /* One cell of the strip, built like a table cell: same vertical rhythm, ruled
@@ -1430,7 +1565,6 @@ button.dls-stat:hover{ background:var(--bg-hover) }
    Visually inert everywhere else: the band and the body never overlap in normal
    flow, and `--z-band` is below `--z-topbar` and `--z-nav`, so everything meant
    to cover the band still does. */
-.dls-attn{ position:relative; z-index:var(--z-band) }
 .dls-tip{
   position:absolute; top:100%; left:var(--page-pad); z-index:1;
   width:min(520px, calc(100% - var(--page-pad) * 2));
@@ -1533,7 +1667,9 @@ button.dls-stat:hover{ background:var(--bg-hover) }
 .dls-col-h .cap i{ display:block; height:100%; background:var(--brand); opacity:.75 }
 .dls-col-b{ padding:0 var(--space-2) var(--space-2); display:flex; flex-direction:column; gap:6px;
             flex:1; min-height:0; overflow-y:auto }
-.dls-settled{ align-self:start }
+.dls-settled{ align-self:start; border:1px dashed var(--line);
+              border-radius:var(--radius-lg); padding:var(--space-3);
+              display:flex; flex-direction:column; gap:var(--space-2) }
 
 .dls-card{ position:relative; display:block; width:100%; text-align:left;
            background:var(--bg); border:1px solid var(--line); border-radius:var(--radius-md);
@@ -1556,8 +1692,6 @@ button.dls-stat:hover{ background:var(--bg-hover) }
                 overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .dls-card .age .flag{ color:var(--bad); font-weight:var(--weight-medium) }
 
-.dls-settled{ border:1px dashed var(--line); border-radius:var(--radius-lg);
-              padding:var(--space-3); display:flex; flex-direction:column; gap:var(--space-2) }
 .dls-settled h4{ font-size:var(--text-xs); font-weight:var(--weight-bold);
                  text-transform:uppercase; letter-spacing:.05em; color:var(--text-3) }
 .dls-srow{ display:flex; align-items:center; gap:7px; width:100%; text-align:left;
@@ -1816,7 +1950,6 @@ button.dls-stat:hover{ background:var(--bg-hover) }
             color:var(--text-2); line-height:1.5 }
 .pop-why .btn{ width:100% }
 /* The current stage: not a refusal, just nowhere to go. */
-.pop-views .mi.on{ cursor:default }
 .pop-views .mi.on:hover{ background:var(--brand-tint) }
 .pop-views .mi.dgr b{ color:var(--bad) }
 .pop-views .mi .dws-sdot{ margin-top:5px }
@@ -1936,7 +2069,7 @@ button.dls-stat:hover{ background:var(--bg-hover) }
 .dws-row:hover{ background:var(--bg-hover) }
 .dws-row.on{ background:var(--bg-selected); border-color:var(--brand-line) }
 .dws-row .l1{ display:flex; align-items:center; justify-content:space-between; gap:var(--space-2) }
-.dws-row .name{ font-size:var(--text-base); font-weight:var(--weight-semibold);
+.dws-row .name{ color:var(--text); font-size:var(--text-base); font-weight:var(--weight-semibold);
                 overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .dws-row .amt{ font-size:var(--text-sm); font-weight:var(--weight-semibold); flex:0 0 auto }
 .dws-row .l2{ display:flex; align-items:center; gap:6px; color:var(--text-3); font-size:var(--text-sm) }
@@ -1951,7 +2084,6 @@ button.dls-stat:hover{ background:var(--bg-hover) }
 .dws-row .time.u-info{ color:var(--info) }
 /* The name itself never takes the urgency colour — it is the row's identity,
    so it stays --text while the time/pills/tags carry the signal. */
-.dws-row .name{ color:var(--text) }
 /* Same tone vocabulary as every pill/dot in the app (D.STAGES[n].tone), not a
    bespoke palette of its own — Installment used to read as blue everywhere
    except here, where it fell through to the neutral default. */
@@ -2509,13 +2641,13 @@ button.dls-stat:hover{ background:var(--bg-hover) }
 .qdoc-stage{ display:flex; justify-content:center; padding:var(--space-4) 0 var(--space-8);
              background:var(--bg-shell) }
 
+/* The `--qd-*` paper set is defined in tokens.css beside every other value in
+   the product; it is theme-independent on purpose, which is documented there. */
 .qdoc{
-  --qd-ink:#111111; --qd-ink-2:#3d3d3d; --qd-ink-3:#6b6b6b;
-  --qd-rule:#d9d9d9; --qd-rule-2:#9a9a9a; --qd-paper:#ffffff; --qd-accent:#111113; --qd-gold:#f2a93b; --qd-bad:#9d3820;
   position:relative; width:210mm; min-height:297mm; padding:16mm 15mm 14mm;
   background:var(--qd-paper); color:var(--qd-ink);
   font-family:var(--font); font-size:9.6pt; line-height:1.5;
-  box-shadow:0 1px 2px rgba(0,0,0,.18), 0 12px 40px rgba(0,0,0,.22);
+  box-shadow:var(--qd-shadow);
   box-sizing:border-box;
 }
 .qdoc-embed{ box-shadow:none; width:100%; min-height:0; padding:0 }
@@ -2628,7 +2760,7 @@ button.dls-stat:hover{ background:var(--bg-hover) }
 .qd-mark{ position:absolute; inset:0; display:grid; place-items:center;
           pointer-events:none; overflow:hidden }
 .qd-mark span{ font-size:64pt; font-weight:var(--weight-bold); letter-spacing:.06em;
-               color:rgba(17,17,17,.07); transform:rotate(-24deg); white-space:nowrap }
+               color:var(--qd-mark); transform:rotate(-24deg); white-space:nowrap }
 
 /* --- the version rail ----------------------------------------------------- */
 /* Present on every quotation screen, because the version history IS the
@@ -2664,14 +2796,14 @@ button.dls-stat:hover{ background:var(--bg-hover) }
    ========================================================================== */
 @media print{
   @page{ size:A4; margin:0 }
-  html,body{ background:#fff !important; height:auto !important }
+  html,body{ background:var(--qd-paper) !important; height:auto !important }
   /* Everything that is interface disappears. The document is not inside any of
      it — it only happens to be rendered next to it. */
   .sidebar,.topbar,.tb-slot,.ph,.qvrail,.tabs,.toasts,.scrim,.modal,.drawer,
   .nav-scrim,.notice,.card-f{ display:none !important }
   .app,.main,.workspace,.page,.qpage,.qdoc-stage{
     display:block !important; overflow:visible !important; padding:0 !important;
-    margin:0 !important; background:#fff !important; height:auto !important;
+    margin:0 !important; background:var(--qd-paper) !important; height:auto !important;
     max-width:none !important; width:auto !important }
   .qdoc{ box-shadow:none !important; width:auto !important; min-height:0 !important;
          margin:0 !important; padding:14mm 13mm !important }
@@ -2682,7 +2814,7 @@ button.dls-stat:hover{ background:var(--bg-hover) }
   .qd-items tr{ page-break-inside:avoid }
   .qd-feat{ columns:2 }
   .qd-foot,.qd-terms,.qd-legal{ page-break-inside:avoid }
-  .qd-mark span{ color:rgba(17,17,17,.09) !important; -webkit-print-color-adjust:exact;
+  .qd-mark span{ color:var(--qd-mark-print) !important; -webkit-print-color-adjust:exact;
                  print-color-adjust:exact }
   .qdoc,.qdoc *{ -webkit-print-color-adjust:exact; print-color-adjust:exact }
 }
@@ -2694,3 +2826,750 @@ button.dls-stat:hover{ background:var(--bg-hover) }
   .page{ max-width:none; padding:0 }
   .card,.tw{ break-inside:avoid; box-shadow:none }
 }
+
+
+/* #############################################################################
+   ###                                                                       ###
+   ###   THE SHARED PARTS — merged in from the former components.css.        ###
+   ###                                                                       ###
+   #############################################################################
+
+   These used to be a SECOND component stylesheet, imported after this one so
+   that a rule in it refined a rule in here. Two files meant two answers to
+   "where does a shared part go", and the answer drifted: `.tile` lived here
+   and its `.delta` lived there, so a change to the metric card was two edits
+   in two files with two different comment styles.
+
+   They are now one file, in the order the cascade already had them, so the
+   behaviour is unchanged and the question is closed. Anything shared by two
+   modules belongs below this line or beside its component above it — never in
+   a module sheet, and never in a third file.
+   ========================================================================== */
+
+
+/* ============================================================================
+   THE SKIP LINK — first in the tab order, on every page.
+   ========================================================================== */
+.skip{ position:absolute; left:-9999px; top:0; z-index:calc(var(--z-toast) + 10);
+       background:var(--ink-solid); color:var(--ink-on-solid);
+       padding:10px 14px; border-radius:0 0 var(--radius-md) 0;
+       font-size:var(--text-md); font-weight:var(--weight-semibold) }
+.skip:focus{ left:0 }
+
+
+/* ============================================================================
+   APPEARANCE — the theme switch in the account menu, and nothing else.
+   ----------------------------------------------------------------------------
+   This block used to hold a SCHEME PICKER as well: a <select> offering three
+   colour systems, above the theme switch. Both the picker and its two extra
+   schemes are gone — the panel has one design system and two themes of it, so
+   the only question left is light or dark and it fits in one segmented
+   control. The two rules that survive are the section key and the line under
+   the control that says what the current choice is.
+   ========================================================================== */
+.ap-k{ font-size:var(--text-2xs); font-weight:var(--weight-semibold);
+       letter-spacing:var(--tracking-label); text-transform:uppercase;
+       color:var(--text-3); margin-bottom:var(--space-2) }
+.ap .btn-group{ width:100% }
+.ap .btn-group button{ flex:1; justify-content:center }
+.ap-hint{ font-size:var(--text-sm); color:var(--text-3); margin-top:6px; line-height:1.45 }
+
+
+/* ============================================================================
+   INSTRUMENT DEVICES
+   ========================================================================== */
+
+/* ---- the tracked micro-label. A metric NAME, a column head, a section key.
+   Set uppercase by the type system rather than typed uppercase, so the string
+   can still be searched, exported and read aloud correctly. ------------- */
+.eyebrow{ display:flex; align-items:center; gap:var(--space-2);
+          font-size:var(--text-2xs); font-weight:var(--weight-semibold);
+          letter-spacing:var(--tracking-label); text-transform:uppercase;
+          color:var(--text-3) }
+.eyebrow::after{ content:""; flex:1; height:1px; background:var(--line) }
+.eyebrow.bare::after{ display:none }
+
+/* ---- corner ticks — defined once, in the component-library block at the
+   foot of this file. They were declared here as well until the two sheets
+   merged, at two different corner radii, so a card and a tile wearing the
+   same device did not quite match. ------------------------------------- */
+
+/* ---- LIVE. The one thing on screen allowed to pulse, and it pulses because
+   it is genuinely changing while you look at it. --------------------------- */
+.live-dot{ width:7px; height:7px; border-radius:var(--radius-full); flex:0 0 auto;
+           background:var(--accent); box-shadow:0 0 0 0 var(--accent);
+           animation:ping 2.4s var(--ease) infinite }
+@keyframes ping{
+  0%   { box-shadow:0 0 0 0 color-mix(in srgb,var(--accent) 55%,transparent) }
+  70%  { box-shadow:0 0 0 6px transparent }
+  100% { box-shadow:0 0 0 0 transparent }
+}
+.pill-live{ background:var(--accent-bg); border-color:var(--accent);
+            color:var(--accent-text) }
+
+/* ---- the exception stripe — column one of a table that has rows needing
+   somebody. 3px in a status colour, findable without reading. ------------ */
+.sev{ display:inline-block; width:3px; height:20px; border-radius:2px;
+      vertical-align:middle; background:var(--line-2) }
+.sev.bad{ background:var(--bad-solid) }
+.sev.warn{ background:var(--warn-solid) }
+.sev.ok{ background:var(--ok-solid) }
+.sev.live{ background:var(--accent) }
+
+
+/* ============================================================================
+   CHIP INPUT — several values in one field
+   ----------------------------------------------------------------------------
+   The component this system was asked for by name. A text box that holds a
+   comma-separated string looks like one value and behaves like several: you
+   cannot see where one ends, you cannot remove the third without re-reading
+   the whole line, and a stray comma silently creates an empty entry. Each
+   value becomes a chip the moment it is committed — Enter, comma or blur —
+   and Backspace on an empty box takes the last one back.
+   ========================================================================== */
+.chips-input{ display:flex; flex-wrap:wrap; align-items:center; gap:6px;
+              width:100%; min-height:var(--control-lg);
+              padding:5px var(--space-2); background:var(--bg);
+              border:1px solid var(--line-control); border-radius:var(--radius-md);
+              box-shadow:var(--shadow-xs); cursor:text;
+              transition:border-color var(--duration) var(--ease),
+                         box-shadow var(--duration) var(--ease) }
+.chips-input:hover{ border-color:var(--line-3) }
+.chips-input:focus-within{ border-color:var(--brand); box-shadow:var(--ring) }
+.chips-input.bad{ border-color:var(--bad-solid) }
+.chips-input.bad:focus-within{ box-shadow:var(--bad-ring) }
+.chips-input.is-disabled{ background:var(--color-disabled-bg); cursor:not-allowed }
+.chips-input input{ flex:1 1 90px; min-width:90px; height:24px; border:none;
+                    outline:none; background:none; font-size:var(--text-md);
+                    color:var(--text) }
+.chips-input input::placeholder{ color:var(--text-3) }
+/* the chip inside the field is the SAME chip as a filter chip — one part, one
+   drawing. Only its height changes, because it sits inside a control. */
+.chips-input .chip{ height:24px; padding:0 4px 0 var(--space-2);
+                    font-size:var(--text-sm) }
+.chips-input .chip.bad{ background:var(--bad-bg); border-color:var(--bad-line);
+                        color:var(--bad) }
+.chips-hint{ display:flex; gap:var(--space-2); align-items:center;
+             font-size:var(--text-sm); color:var(--text-3); margin-top:4px }
+
+
+/* ============================================================================
+   THE METRIC TILE'S TWO PARTS
+   ----------------------------------------------------------------------------
+   The tile itself is `.tile` in admin-theme.css — it was already the panel's
+   metric card, so it was upgraded in place rather than duplicated here under a
+   second name. A second class would have meant two tiles in the product and a
+   month of deciding which one a new screen should use.
+   ========================================================================== */
+
+/* THE DELTA IS COLOURED, THE VALUE IS NOT. Up is not always good — rising
+   unclosed days is bad — so the judgement is made per metric by the caller and
+   spent on the small number, never on the figure itself. */
+.delta{ display:inline-flex; align-items:center; gap:3px;
+        font-family:var(--font-mono); font-size:var(--text-sm);
+        font-weight:var(--weight-medium); font-variant-numeric:tabular-nums }
+.delta.up{ color:var(--ok) }
+.delta.down{ color:var(--bad) }
+.delta.flat{ color:var(--text-3) }
+
+.meter{ height:6px; border-radius:3px; overflow:hidden; background:var(--bg-inset) }
+.meter i{ display:block; height:100%; border-radius:3px; background:var(--brand) }
+.meter.ok i{ background:var(--ok-solid) }
+.meter.warn i{ background:var(--warn-solid) }
+.meter.bad i{ background:var(--bad-solid) }
+
+
+/* ============================================================================
+   THE FILTER BAND and THE BULK BAR
+   ----------------------------------------------------------------------------
+   The bulk bar sits ABOVE the table head, never floating over the rows: a bar
+   that covers the rows hides the very things it is about to act on, and the
+   count it prints is the only reason anybody reads it.
+   ========================================================================== */
+.filterband{ display:flex; align-items:center; gap:var(--space-2); flex-wrap:wrap;
+             padding:var(--space-2) var(--space-3); margin-bottom:var(--space-3);
+             background:var(--bg-inset); border:1px solid var(--line);
+             border-radius:var(--radius-lg) }
+.filterband .spacer{ flex:1 1 auto }
+
+.bulkbar{ display:flex; align-items:center; gap:var(--space-2); flex-wrap:wrap;
+          padding:7px var(--space-3); margin-bottom:var(--space-2);
+          background:var(--brand-tint); border:1px solid var(--brand-line);
+          border-radius:var(--radius-lg) }
+.bulkbar .n{ font-size:var(--text-md); font-weight:var(--weight-semibold);
+             color:var(--brand-text) }
+.bulkbar .spacer{ flex:1 1 auto }
+
+
+/* ============================================================================
+   TABLE — the three refinements the scheme layer forced
+   ----------------------------------------------------------------------------
+   A selected row used to be a tint and nothing else. In a scheme whose primary
+   is ink there is no tint strong enough to carry a state on its own, so
+   selection is now the fill PLUS a 2px bar on the first cell — and the other
+   two schemes take it as well, because a state that was quietly relying on
+   colour alone was relying on it everywhere.
+   ========================================================================== */
+tbody tr[aria-selected="true"]{ background:var(--bg-selected) }
+tbody tr[aria-selected="true"] > td:first-child,
+.tbl tbody tr.sel > td:first-child{ box-shadow:inset 2px 0 0 var(--brand) }
+th.sortable,.tbl th[aria-sort]{ cursor:pointer }
+th.sortable:hover{ color:var(--text) }
+/* a figure column compares by eye or it is not a figure column */
+td.num,th.num,.num{ text-align:right; font-family:var(--font-mono);
+                    font-variant-numeric:tabular-nums }
+/* MISSING IS "—", NEVER 0. Zero hours and no record are different facts, and
+   writing one where the other belongs is a data bug in a typography costume. */
+.none{ color:var(--text-3) }
+
+
+/* ============================================================================
+   OVERLAYS — a toast confirms · a modal decides · a drawer inspects
+   ========================================================================== */
+
+/* ---- the modal header and footer stay put while the body scrolls. A long
+   form used to scroll its own title away, so the question a person was
+   answering left the screen before their answer did. ---------------------- */
+.modal .md-h{ position:sticky; top:0; z-index:1; background:var(--surface-raised);
+              border-radius:var(--radius-2xl) var(--radius-2xl) 0 0 }
+.modal .md-h.md-hero{ border-radius:var(--radius-2xl) var(--radius-2xl) 0 0 }
+/* the destructive action sits APART, on the left, so it is never the button
+   beside the one somebody meant to press */
+.md-f .left{ margin-right:auto }
+.modal.full{ width:min(960px,calc(100vw - 32px)) }
+
+/* ---- the drawer INSPECTS: the list it came from stays on screen behind it,
+   which is the entire reason it is not a modal. Four widths, because a person
+   record and a document preview are not the same object. ------------------ */
+.drawer.sm{ width:min(380px,100vw) }
+.drawer.md{ width:min(480px,100vw) }
+.drawer.lg{ width:min(720px,100vw) }
+.drawer.xl{ width:min(960px,100vw) }
+.dw-h h3{ font-size:var(--text-lg); font-weight:var(--weight-semibold);
+          letter-spacing:var(--tracking-tight); min-width:0;
+          overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.dw-h .dw-x{ margin-left:auto; flex:0 0 auto; width:var(--control-md);
+             height:var(--control-md); border-radius:var(--radius-md);
+             display:grid; place-items:center; color:var(--text-3) }
+.dw-h .dw-x:hover{ background:var(--bg-hover); color:var(--text) }
+.dw-sub{ font-size:var(--text-sm); color:var(--text-3); margin-top:2px }
+
+/* Motion carries direction: a drawer arrives from the edge it lives on, a
+   modal rises. Under prefers-reduced-motion the final state renders at once —
+   the rule for that lives beside the keyframes in admin-theme.css. */
+@keyframes drawer-in{ from{ transform:translateX(24px); opacity:.4 } to{ transform:none; opacity:1 } }
+.drawer{ animation:drawer-in var(--duration-slow) var(--ease-out) }
+
+
+/* ============================================================================
+   RESPONSIVE — four widths, and only two of them change the shell
+   ----------------------------------------------------------------------------
+   1440 xl · 1180 lg · 900 md · 640 sm. The panel had seven ad-hoc widths, so
+   the same panel reflowed at a different size in different modules. Anything
+   added from here on picks one of the four.
+   ========================================================================== */
+@media (max-width:900px){
+  .filterband{ padding:var(--space-2) }
+  .kpi{ padding:var(--space-3) }
+}
+@media (max-width:640px){
+  /* Controls that reach a phone are 44px with 8px between them. Desktop
+     density is exempt; the phone layout is not. */
+  .chips-input{ min-height:var(--control-xl) }
+  .drawer.sm,.drawer.md,.drawer.lg,.drawer.xl{ width:100vw }
+}
+
+
+/* #############################################################################
+   ###                                                                       ###
+   ###   THE COMPONENT LIBRARY — the drawings behind src/admin/ui/index.tsx  ###
+   ###                                                                       ###
+   #############################################################################
+
+   Everything below is a part the library renders. Where the panel already had
+   a drawing — `.btn`, `.inp`, `.check`, `.pill`, `.tile`, `.mi`, `.card`,
+   `.empty`, `.notice` — the component wraps THAT and these rules only extend
+   it. Nothing here is a second version of something above it.
+
+   NOT ONE COLOUR LITERAL. Every value is a token from tokens.css, so all of it
+   is correct in both themes without a single theme-aware rule.
+   ========================================================================== */
+
+
+/* ============================================================================
+   FORM CONTROLS
+   ----------------------------------------------------------------------------
+   `.inp` is the field. Everything that takes typing or picking is `.inp` plus
+   a modifier, so a text box, a select, a date and a textarea are one control
+   with one border, one focus ring, one disabled state and one error state.
+   ========================================================================== */
+
+/* THE LABEL SITS ABOVE, ALWAYS. Beside-the-field labels wrap unpredictably at
+   the widths this panel is used at, and a wrapped label pushes its own field
+   out of the row it was supposed to line up with. */
+/* ONE SLOT FOR THE HINT OR THE ERROR, never both — see FormField. */
+.fg-hint,.fg-err{ display:flex; align-items:center; gap:5px;
+                  font-size:var(--text-sm); line-height:1.45; margin-top:5px }
+.fg-hint{ color:var(--text-3) }
+.fg-err{ color:var(--bad) }
+.fg-err .ic{ color:var(--bad) }
+
+.inp.sm{ height:var(--control-sm); font-size:var(--text-md); padding:0 var(--space-2) }
+textarea.inp,.inp.ta{ height:auto; min-height:calc(var(--control-lg) * 2);
+                      padding:var(--space-2) var(--space-3); resize:vertical;
+                      line-height:var(--lh-base) }
+/* A SELECT IS A FIELD WITH A CHEVRON. The glyph is painted from `--chevron`
+   rather than drawn as an element, so the control stays one node and the
+   platform's own option list still opens from it. */
+.inp.sel,.sel{ appearance:none; padding-right:30px;
+               background-image:var(--chevron);
+               background-repeat:no-repeat;
+               background-position:right var(--space-2) center;
+               background-size:14px; cursor:pointer }
+/* the browser paints the date field's own picker button; give it the panel's
+   ink rather than the platform's blue-grey */
+.inp.date::-webkit-calendar-picker-indicator{ cursor:pointer; opacity:.55 }
+.inp.date:hover::-webkit-calendar-picker-indicator{ opacity:1 }
+
+/* THE TOOLBAR FILTER SELECT. Same drawing as `.inp.sel` at toolbar height, and
+   one state the form select does not have: `.on`.
+   AN ACTIVE FILTER MUST LOOK ACTIVE. This is the only control on a list page
+   whose value silently changes what every number below it means, so when it is
+   narrowing anything it carries the brand edge — a filter you cannot see is a
+   filter you cannot clear. */
+.sel{ height:var(--control-md); min-width:140px; max-width:220px;
+      padding:0 30px 0 var(--space-3);
+      border:1px solid var(--line-control); border-radius:var(--radius-md);
+      background-color:var(--bg); color:var(--text);
+      font-size:var(--text-md); box-shadow:var(--shadow-xs);
+      transition:border-color var(--duration) var(--ease),
+                 box-shadow var(--duration) var(--ease), color var(--duration) var(--ease) }
+.sel:hover{ border-color:var(--line-3) }
+.sel:focus-visible{ outline:none; border-color:var(--brand); box-shadow:var(--ring) }
+.sel.on{ border-color:var(--brand); color:var(--brand-text);
+         font-weight:var(--weight-medium); background-color:var(--brand-tint) }
+
+/* ---- CHECKBOX AND RADIO ------------------------------------------------
+   DRAWN, NOT `accent-color`. `accent-color` tints the platform's own control
+   and leaves its size, corner radius, focus ring and disabled treatment to the
+   browser — which is why the box next to a form label and the box in a table
+   header used to be visibly different shapes on Windows. This is one control,
+   at 16px, in both themes, everywhere.
+
+   The tick is a clip-path rather than a glyph so it cannot pick up a font, and
+   the indeterminate bar is a real state rather than a third image: "some of
+   these rows" is a genuine answer and drawing it as "all of them" is a lie the
+   header checkbox told for a long time. */
+input[type="checkbox"],input[type="radio"]{
+  appearance:none; width:16px; height:16px; margin:0; flex:0 0 16px;
+  border:1px solid var(--line-control); border-radius:var(--radius-xs);
+  background:var(--bg); display:grid; place-content:center; cursor:pointer;
+  transition:background var(--duration-fast) var(--ease),
+             border-color var(--duration-fast) var(--ease) }
+input[type="radio"]{ border-radius:var(--radius-full) }
+input[type="checkbox"]:hover:not(:disabled),
+input[type="radio"]:hover:not(:disabled){ border-color:var(--text-3) }
+/* CHECKED IS BRAND, not ink: a ticked box is a SELECTION, and selection is
+   what the portal's colour marks throughout this panel. The primary button
+   stays ink; these are not buttons. */
+input[type="checkbox"]:checked,input[type="radio"]:checked,
+input[type="checkbox"]:indeterminate{ background:var(--brand); border-color:var(--brand) }
+input[type="checkbox"]:checked::after{
+  content:""; width:9px; height:9px; background:var(--brand-ink);
+  clip-path:polygon(14% 46%,0 60%,40% 100%,100% 22%,86% 8%,38% 70%) }
+input[type="radio"]:checked::after{
+  content:""; width:6px; height:6px; border-radius:var(--radius-full);
+  background:var(--brand-ink) }
+input[type="checkbox"]:indeterminate::after{
+  content:""; width:8px; height:2px; border-radius:1px; background:var(--brand-ink) }
+input[type="checkbox"]:focus-visible,input[type="radio"]:focus-visible{
+  outline:none; box-shadow:var(--ring); border-color:var(--brand) }
+input[type="checkbox"]:disabled,input[type="radio"]:disabled{
+  background:var(--color-disabled-bg); border-color:var(--line); cursor:not-allowed }
+
+/* NOT SCOPED TO `.check`. The label-and-hint pair belongs to the checkbox, the
+   radio AND the toggle, and while it was written as `.check .ck-t` the toggle
+   got neither the column direction nor the hint's smaller size — so its two
+   lines ran together into "Auto-assign new enquiriesApplies the moment it
+   moves." A shared part has to be declared where all three can reach it. */
+.ck-t{ display:flex; flex-direction:column; gap:1px; min-width:0 }
+.ck-h{ font-size:var(--text-sm); color:var(--text-3); line-height:1.45 }
+.check.is-disabled{ opacity:.55; cursor:not-allowed }
+
+/* ---- TOGGLE -------------------------------------------------------------
+   34×20, and BRAND when on for the same reason a checkbox is: it is a state,
+   not an action. The knob is `--brand-ink` rather than white so it stays
+   legible on the dark theme's lighter green. */
+.sw{ position:relative; width:34px; height:20px; flex:0 0 34px;
+     border-radius:var(--radius-full); background:var(--line-2); border:none;
+     cursor:pointer; transition:background var(--duration) var(--ease) }
+.sw::after{ content:""; position:absolute; top:2px; left:2px; width:16px; height:16px;
+            border-radius:var(--radius-full); background:var(--bg);
+            box-shadow:var(--shadow-sm);
+            transition:transform var(--duration) var(--ease-out),
+                       background var(--duration) var(--ease) }
+.sw[aria-checked="true"]{ background:var(--brand) }
+.sw[aria-checked="true"]::after{ transform:translateX(14px); background:var(--brand-ink) }
+.sw:focus-visible{ outline:none; box-shadow:var(--ring) }
+.sw:disabled{ opacity:.5; cursor:not-allowed }
+.sw-row{ display:flex; align-items:flex-start; gap:var(--space-3);
+         font-size:var(--text-md); color:var(--text-2) }
+.sw-row.is-disabled{ opacity:.55 }
+
+/* ---- INPUT GROUP --------------------------------------------------------
+   ONE BORDER AROUND THE WHOLE THING. The affix is inside the control's box, so
+   the focus ring surrounds the value AND its unit — which is correct, because
+   "2000" and "₹2000/mo" are the same answer and only one of them is complete. */
+.affix{ display:flex; align-items:center; width:100%; min-width:0;
+        height:var(--control-lg); overflow:hidden;
+        border:1px solid var(--line-control); border-radius:var(--radius-md);
+        background:var(--bg); box-shadow:var(--shadow-xs);
+        transition:border-color var(--duration) var(--ease),
+                   box-shadow var(--duration) var(--ease) }
+.affix:hover{ border-color:var(--line-3) }
+.affix:focus-within{ border-color:var(--brand); box-shadow:var(--ring) }
+.affix .inp{ height:100%; border:none; border-radius:0; box-shadow:none; background:none }
+.affix .inp:focus{ box-shadow:none }
+.affix .cap{ display:flex; align-items:center; align-self:stretch; white-space:nowrap;
+             padding:0 var(--space-3); background:var(--bg-inset); color:var(--text-3);
+             font-family:var(--font-mono); font-size:var(--text-sm);
+             border-right:1px solid var(--line) }
+.affix .cap.r{ border-right:none; border-left:1px solid var(--line) }
+.affix .btn{ height:100%; border-radius:0; border:none;
+             border-left:1px solid var(--line); box-shadow:none }
+
+/* ---- DATE RANGE ---------------------------------------------------------
+   The en dash between them is the whole affordance: it says these two fields
+   are ONE answer, which is what stops somebody filling in the first and
+   walking away. */
+/* `flex` RATHER THAN `inline-flex`, and a real min-width on the children.
+   As an inline-flex box with `flex:1 1 130px` fields it refused to shrink
+   below its content and overlapped the control in the next grid cell — a flex
+   child's default `min-width:auto` is the single most common cause of that,
+   and a date field's intrinsic width is large. */
+.daterange{ display:flex; align-items:center; gap:var(--space-2);
+            min-width:0; width:100% }
+.daterange .inp{ width:auto; min-width:0; flex:1 1 0 }
+.daterange .dash{ color:var(--text-3); flex:0 0 auto }
+/* the same defence for every form group: a grid cell holding a control that
+   will not shrink pushes its neighbour off the row rather than wrapping */
+.fg > .inp,.fg > .affix,.fg > .msel,.fg > .daterange{ max-width:100% }
+
+
+/* ---- MULTI-SELECT and the anchored MENU ---------------------------------
+   `.pop` is the SHELL's popover: position-fixed, placed by openPop, for a menu
+   that outlives its trigger. `.menu` is the other kind — a list anchored to
+   the control right above it, inside the field's own stacking context. Two
+   different jobs, and they share `.mi` for the rows so a menu row is one
+   drawing whichever surface it lands on. */
+.msel{ position:relative; display:inline-block; min-width:0; max-width:100% }
+.sel-btn{ display:inline-flex; align-items:center; gap:var(--space-2);
+          height:var(--control-md); min-width:140px; max-width:240px;
+          padding:0 var(--space-2) 0 var(--space-3);
+          border:1px solid var(--line-control); border-radius:var(--radius-md);
+          background:var(--bg); color:var(--text); font-size:var(--text-md);
+          box-shadow:var(--shadow-xs);
+          transition:border-color var(--duration) var(--ease),
+                     box-shadow var(--duration) var(--ease) }
+.sel-btn.sm{ height:var(--control-sm); font-size:var(--text-sm) }
+.sel-btn .ic{ color:var(--text-3); margin-left:auto }
+.sel-btn:hover{ border-color:var(--line-3) }
+.sel-btn:focus-visible,.sel-btn[aria-expanded="true"]{ outline:none;
+          border-color:var(--brand); box-shadow:var(--ring) }
+.sel-btn.on{ border-color:var(--brand); color:var(--brand-text); background:var(--brand-tint) }
+/* the count rides in the button because it is the only thing you need from a
+   closed multi-select while you are reading the table under it */
+.ct{ display:inline-flex; align-items:center; justify-content:center;
+     min-width:18px; height:18px; padding:0 5px; border-radius:var(--radius-full);
+     background:var(--bg-active); color:var(--text-2);
+     font-size:var(--text-2xs); font-weight:var(--weight-semibold);
+     font-variant-numeric:tabular-nums }
+.sel-btn.on .ct,.btn.pri .ct{ background:var(--brand); color:var(--brand-ink) }
+
+.menu{ position:absolute; top:calc(100% + 4px); left:0; z-index:var(--z-pop);
+       min-width:100%; max-width:320px; max-height:min(360px,60vh); overflow-y:auto;
+       padding:var(--space-1); background:var(--surface-raised);
+       border:1px solid var(--line); border-radius:var(--radius-lg);
+       box-shadow:var(--shadow-lg),var(--surface-sheen);
+       animation:menu-in var(--duration) var(--ease-out) }
+@keyframes menu-in{ from{ opacity:0; transform:translateY(-4px) } to{ opacity:1; transform:none } }
+.menu-note{ padding:var(--space-2) var(--space-3); font-size:var(--text-sm);
+            color:var(--text-3) }
+.mi-sec{ padding:var(--space-2) var(--space-3) var(--space-1);
+         font-size:var(--text-2xs); font-weight:var(--weight-semibold);
+         letter-spacing:var(--tracking-label); text-transform:uppercase;
+         color:var(--text-3) }
+.mi.is-disabled,.mi:disabled{ opacity:.45; cursor:not-allowed; pointer-events:none }
+.mi > .min-0{ display:flex; flex-direction:column; gap:1px; min-width:0; flex:1 }
+.mi > .min-0 > b{ font-weight:var(--weight-normal) }
+.mi .d{ font-size:var(--text-sm); color:var(--text-3) }
+.mi .r{ margin-left:auto; flex:0 0 auto; font-family:var(--font-mono);
+        font-size:var(--text-2xs); color:var(--text-3) }
+.mi.on .r{ color:var(--brand-text) }
+
+/* ---- FILE UPLOAD --------------------------------------------------------
+   DASHED, because the border is the message: a solid box says "here is a
+   thing", a dashed one says "a thing goes here". It brightens to brand on
+   drag-over so the drop target is unambiguous while a file is in the air. */
+.dropzone{ display:flex; flex-direction:column; align-items:center; gap:var(--space-2);
+           padding:var(--space-6) var(--space-4); text-align:center;
+           border:1px dashed var(--line-2); border-radius:var(--radius-lg);
+           background:var(--bg-inset); color:var(--text-3);
+           transition:border-color var(--duration) var(--ease),
+                      background var(--duration) var(--ease) }
+.dropzone .ic{ color:var(--text-3) }
+.dropzone.is-over{ border-color:var(--brand); background:var(--brand-tint);
+                   border-style:solid }
+.dropzone.is-over .ic{ color:var(--brand) }
+.dropzone.is-disabled{ opacity:.55 }
+.dz-t{ font-size:var(--text-md); color:var(--text-2) }
+.dz-h{ font-size:var(--text-sm); color:var(--text-3) }
+
+/* THE TEXT LINK — an action that is a word rather than a button. It is
+   underlined, and that is not decoration: colour alone is not an affordance
+   for anybody who cannot see the difference between forest and ink. */
+.tlink{ color:var(--brand-text); font-weight:var(--weight-medium);
+        text-decoration:underline; text-underline-offset:2px;
+        text-decoration-color:color-mix(in srgb,var(--brand) 40%,transparent);
+        transition:text-decoration-color var(--duration) var(--ease) }
+.tlink:hover{ text-decoration-color:currentColor }
+.tlink:focus-visible{ outline:2px solid var(--brand); outline-offset:2px;
+                      border-radius:var(--radius-xs) }
+.tlink:disabled{ opacity:.5; cursor:not-allowed; text-decoration:none }
+
+/* the flex-child escape hatch this system needs everywhere: without an
+   explicit min-width a flex child refuses to shrink below its content, which
+   is why a long name used to push a table's action column off the screen */
+.min-0{ min-width:0 }
+
+
+/* ============================================================================
+   OVERLAYS — the parts inside a modal and a drawer
+   ========================================================================== */
+.md-sub{ font-size:var(--text-sm); color:var(--text-3); margin-top:2px }
+.md-x,.dw-x{ flex:0 0 auto; margin-left:auto;
+             width:var(--control-md); height:var(--control-md);
+             border-radius:var(--radius-md); display:grid; place-items:center;
+             color:var(--text-3);
+             transition:background var(--duration) var(--ease), color var(--duration) var(--ease) }
+.md-x:hover,.dw-x:hover{ background:var(--bg-hover); color:var(--text) }
+.md-p{ font-size:var(--text-base); line-height:1.55; color:var(--text-2) }
+/* THE FOOTER IS A SUNKEN BAND, so the actions read as a separate register from
+   the question above them rather than as the last row of it. */
+
+/* ---- TOOLTIP ------------------------------------------------------------
+   The dark slab in BOTH themes, on purpose: a tooltip is not part of the page
+   it is floating over, and restating the page's theme makes it read as one
+   more panel rather than as an annotation. */
+.tt-wrap{ position:relative; display:inline-flex; align-items:center }
+.tt{ position:absolute; left:50%; z-index:var(--z-pop); display:none;
+     transform:translateX(-50%);
+     max-width:260px; width:max-content; padding:5px var(--space-2);
+     background:var(--toast-bg); color:var(--toast-fg);
+     border-radius:var(--radius-sm); box-shadow:var(--shadow-md);
+     font-size:var(--text-sm); line-height:1.4; font-weight:var(--weight-normal);
+     text-transform:none; letter-spacing:normal; pointer-events:none }
+.tt.top{ bottom:calc(100% + 6px) }
+.tt.bottom{ top:calc(100% + 6px) }
+.tt[data-open="true"]{ display:block; animation:menu-in var(--duration-fast) var(--ease-out) }
+
+/* ---- THE INFO AFFORDANCE ------------------------------------------------
+   A PRESS, NOT A HOVER, because this explains rather than labels and an
+   explanation has to stay still long enough to be read. The popover is ruled
+   on its left edge in brand — the one place in the system a brand rule means
+   "the panel is telling you something about itself". */
+.i-wrap{ position:relative; display:inline-flex; vertical-align:middle }
+.i-btn{ width:16px; height:16px; flex:0 0 16px; padding:0; display:inline-grid;
+        place-content:center; border-radius:var(--radius-full);
+        border:1px solid var(--line-control); background:none; color:var(--text-3);
+        font-family:var(--font-mono); font-size:10px; font-weight:var(--weight-semibold);
+        line-height:1; cursor:pointer;
+        transition:border-color var(--duration) var(--ease), color var(--duration) var(--ease),
+                   background var(--duration) var(--ease) }
+.i-btn:hover,.i-btn[aria-expanded="true"]{ border-color:var(--brand);
+        color:var(--brand-text); background:var(--brand-tint) }
+.i-btn:focus-visible{ outline:none; box-shadow:var(--ring); border-color:var(--brand) }
+.i-pop{ position:absolute; top:calc(100% + 6px); left:-8px; z-index:var(--z-pop);
+        display:none; width:252px; padding:var(--space-3);
+        background:var(--surface-raised); border:1px solid var(--line);
+        border-left:2px solid var(--brand); border-radius:var(--radius-md);
+        box-shadow:var(--shadow-lg); color:var(--text-2);
+        font-size:var(--text-sm); line-height:1.5; font-weight:var(--weight-normal);
+        text-align:left; text-transform:none; letter-spacing:normal }
+.i-pop[data-open="true"]{ display:block; animation:menu-in var(--duration) var(--ease-out) }
+.i-pop b{ display:block; margin-bottom:3px; color:var(--text); font-size:var(--text-md) }
+
+/* ---- ALERT (.notice) — the parts the library added ---------------------- */
+.notice b{ display:block; margin-bottom:1px; color:var(--text);
+           font-size:var(--text-md); font-weight:var(--weight-semibold) }
+.notice p{ color:var(--text-2); font-size:var(--text-sm); line-height:1.5 }
+/* THE LEFT RULE IS THE TONE, so the KIND of message is legible before a word
+   of it is read — which is the only reason to interrupt somebody at all. */
+.nt-act{ display:flex; align-items:center; gap:var(--space-2);
+         margin-left:auto; padding-left:var(--space-2); flex:0 0 auto }
+.nt-x{ width:var(--control-sm); height:var(--control-sm); border-radius:var(--radius-md);
+       display:grid; place-items:center; color:var(--text-3); flex:0 0 auto }
+.nt-x:hover{ background:var(--bg-active); color:var(--text) }
+
+
+/* ============================================================================
+   CONTENT
+   ========================================================================== */
+
+/* CORNER TICKS AS AN OPT-IN. `.tile` carries them unconditionally because a
+   metric tile is always an instrument; `.card` and `.chartframe` take them
+   only when what is inside was MEASURED. Spending them on a box of links is
+   how they stop meaning anything. */
+.ticks{ position:relative }
+.ticks::before,.ticks::after{ content:""; position:absolute; width:9px; height:9px;
+                              border:1px solid var(--color-tick); pointer-events:none }
+.ticks::before{ top:-1px; left:-1px; border-right:0; border-bottom:0;
+                border-top-left-radius:var(--radius-lg) }
+.ticks::after{ bottom:-1px; right:-1px; border-left:0; border-top:0;
+               border-bottom-right-radius:var(--radius-lg) }
+
+/* A PERSON, as one object — face, name, and what they are. One drawing in a
+   table cell, a menu, an assignment and a feed row, so a person always looks
+   like the same kind of thing. */
+.who{ display:inline-flex; align-items:center; gap:var(--space-2); min-width:0;
+      max-width:100% }
+.who-t{ display:flex; flex-direction:column; gap:0; line-height:1.3 }
+.who-s{ font-size:var(--text-sm); color:var(--text-3) }
+.who.is-link{ border-radius:var(--radius-sm) }
+.who.is-link:hover .who-t > .trunc{ color:var(--brand-text);
+      text-decoration:underline; text-underline-offset:2px }
+.who.is-link:focus-visible{ outline:2px solid var(--brand); outline-offset:2px }
+/* UNASSIGNED IS A STATE, NOT A BLANK. An empty cell reads as missing data; this
+   reads as work waiting for a decision, which is what it is. */
+.unassigned{ display:inline-flex; align-items:center; gap:5px;
+             font-size:var(--text-md); color:var(--text-3); font-style:italic }
+.unassigned .ic{ color:var(--text-4) }
+
+/* ---- TIMELINE -----------------------------------------------------------
+   The rail is drawn by the ITEM rather than by the container, so the line
+   stops at the last entry instead of trailing off under it — a rail that runs
+   past the final event says there is more below and there is not. */
+.tl{ display:flex; flex-direction:column }
+.tl-i{ position:relative; display:grid; grid-template-columns:14px 1fr;
+       gap:var(--space-3); padding-bottom:var(--space-3) }
+.tl-i::before{ content:""; position:absolute; left:6px; top:14px; bottom:0; width:1px;
+               background:var(--line) }
+.tl-i:last-child{ padding-bottom:0 }
+.tl-i:last-child::before{ display:none }
+.tl-d{ width:9px; height:9px; margin-top:5px; border-radius:var(--radius-full);
+       background:var(--brand); border:2px solid var(--bg);
+       box-shadow:0 0 0 1px var(--brand-line) }
+/* THE SYSTEM'S OWN ENTRIES ARE MARKED AS THE SYSTEM'S. A derived event and a
+   person's decision look identical in a flat list, and telling them apart is
+   most of what an audit trail is for. */
+.tl-d.sys{ background:var(--system); box-shadow:0 0 0 1px var(--system) }
+.tl-d.bad{ background:var(--bad-solid); box-shadow:0 0 0 1px var(--bad-line) }
+.tl-d.ok{ background:var(--ok-solid); box-shadow:0 0 0 1px var(--ok-line) }
+.tl-t{ font-size:var(--text-md); color:var(--text) }
+.tl-body{ font-size:var(--text-sm); color:var(--text-2); margin-top:2px; line-height:1.5 }
+.tl-m{ font-size:var(--text-sm); color:var(--text-3); font-family:var(--font-mono);
+       margin-top:2px }
+
+/* the feed's icon variant, for an entry with no person behind it */
+.fd-ic{ width:26px; height:26px; flex:0 0 26px; border-radius:var(--radius-full);
+        display:grid; place-items:center; background:var(--bg-inset); color:var(--text-3) }
+
+/* ---- PIPELINE -----------------------------------------------------------
+   EVERY STAGE IS ON SCREEN — passed, current and still ahead — because "where
+   is this and how far is left" is one question, and a bar showing only the
+   current step answers half of it. */
+.pipe{ display:flex; align-items:center; gap:var(--space-2); flex-wrap:wrap;
+       list-style:none; min-width:0 }
+.pipe-s{ display:inline-flex; align-items:center; gap:6px; min-width:0;
+         font-size:var(--text-md); color:var(--text-3) }
+.pipe-s + .pipe-s::before{ content:""; width:20px; height:1px; background:var(--line);
+                           flex:0 0 20px; margin-right:var(--space-2) }
+.pipe-n{ width:20px; height:20px; flex:0 0 20px; border-radius:var(--radius-full);
+         display:grid; place-items:center; border:1px solid var(--line-control);
+         font-family:var(--font-mono); font-size:var(--text-2xs); color:var(--text-3) }
+.pipe-s.done{ color:var(--text-2) }
+.pipe-s.done .pipe-n{ background:var(--ok-solid); border-color:var(--ok-solid);
+                      color:var(--text-inverse) }
+.pipe-s.done .pipe-n .ic{ color:currentColor }
+/* THE CURRENT STAGE IS BRAND AND BOLD — "where you are" is exactly what the
+   portal's colour marks throughout this panel. */
+.pipe-s.now{ color:var(--text); font-weight:var(--weight-semibold) }
+.pipe-s.now .pipe-n{ background:var(--brand); border-color:var(--brand);
+                     color:var(--brand-ink) }
+.pipe.compact .pipe-l{ position:absolute; width:1px; height:1px; overflow:hidden;
+                       clip:rect(0 0 0 0); white-space:nowrap }
+.pipe.compact .pipe-s + .pipe-s::before{ width:12px; flex-basis:12px;
+                       margin-right:var(--space-1) }
+
+/* a tag the SYSTEM applied rather than a person — "who decided this" is the
+   first question anybody asks about a tag they did not expect */
+.pill.is-auto{ border-style:dashed }
+.pill .x{ display:grid; place-items:center; width:14px; height:14px; margin-left:2px;
+          margin-right:-3px; border-radius:var(--radius-full); color:inherit; opacity:.6 }
+.pill .x:hover{ opacity:1; background:color-mix(in srgb,currentColor 16%,transparent) }
+.pill .x:focus-visible{ opacity:1; outline:2px solid currentColor; outline-offset:1px }
+
+
+/* ============================================================================
+   PAGINATION
+   ----------------------------------------------------------------------------
+   THE COUNT AND THE PAGES ARE ONE BAND, at opposite ends. They answer
+   different questions — "how much is there" and "where am I" — and putting
+   them together is what lets somebody working a queue read both in one glance
+   without moving their eyes twice.
+   ========================================================================== */
+.pager-bar{ display:flex; align-items:center; gap:var(--space-3); flex-wrap:wrap;
+            padding-top:var(--space-3); margin-top:var(--space-3);
+            border-top:1px solid var(--line) }
+.pager-n{ font-size:var(--text-md); color:var(--text-3) }
+.pager-n b{ color:var(--text); font-weight:var(--weight-semibold) }
+.pager{ display:flex; align-items:center; gap:2px }
+.pager button{ min-width:var(--control-md); height:var(--control-md); padding:0 var(--space-2);
+               border:1px solid transparent; border-radius:var(--radius-md);
+               background:none; color:var(--text-2);
+               font-family:var(--font-mono); font-size:var(--text-md);
+               font-variant-numeric:tabular-nums;
+               transition:background var(--duration) var(--ease), color var(--duration) var(--ease) }
+.pager button:hover:not([aria-current]):not(:disabled){ background:var(--bg-hover); color:var(--text) }
+/* THE CURRENT PAGE IS INK, not brand: it is not a selection you made, it is
+   where the list happens to be, and brand is reserved for the former. */
+.pager button[aria-current="page"]{ background:var(--ink-solid); color:var(--ink-on-solid);
+               border-color:var(--ink-solid); font-weight:var(--weight-semibold) }
+.pager button:disabled{ opacity:.35; cursor:not-allowed }
+.pager button:focus-visible{ outline:none; box-shadow:var(--ring); border-color:var(--brand) }
+.pg-step .ic{ color:currentColor }
+.pg-gap{ padding:0 var(--space-1); color:var(--text-3); font-family:var(--font-mono) }
+
+
+/* ============================================================================
+   ANALYTICS FURNITURE
+   ----------------------------------------------------------------------------
+   The charts are drawn in views/charts.tsx from the `--chart-*` tokens; this
+   is the frame around one, so a chart in Finance and a chart in Team are
+   titled, plotted and keyed identically.
+   ========================================================================== */
+.chartframe{ background:var(--surface-raised); border:1px solid var(--line);
+             border-radius:var(--radius-lg); padding:var(--space-4);
+             box-shadow:var(--surface-sheen); min-width:0 }
+.cf-h{ display:flex; align-items:baseline; gap:var(--space-3); margin-bottom:var(--space-3) }
+.cf-h h4{ font-size:var(--text-md); font-weight:var(--weight-semibold);
+          font-family:var(--font); letter-spacing:0 }
+.cf-h .r{ margin-left:auto; flex:0 0 auto; display:flex; align-items:center;
+          gap:var(--space-2) }
+.cf-plot{ min-width:0 }
+.cf-plot svg{ display:block; width:100%; height:auto }
+.cf-note{ font-size:var(--text-sm); color:var(--text-3); margin-top:var(--space-2) }
+/* THE KEY IS A SQUARE, not a line: a 9px line disappears at a glance, and the
+   legend is the only thing saying what the colours mean. */
+.legend{ display:flex; gap:var(--space-4); flex-wrap:wrap; margin-top:var(--space-3) }
+.legend span{ display:inline-flex; align-items:center; gap:6px;
+              font-size:var(--text-sm); color:var(--text-2) }
+.legend i{ width:9px; height:9px; flex:0 0 9px; border-radius:2px }
+
+/* the comparison line's period, beside the delta */
+.delta-of{ font-size:var(--text-sm); color:var(--text-3) }
+
+/* a full-width action — a form's submit, the sign-in button */
+.btn.block{ width:100%; justify-content:center }
+.btn-group.sm{ height:var(--control-sm) }
+.btn-group.sm button{ font-size:var(--text-sm); padding:0 var(--control-pad-sm) }

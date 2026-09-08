@@ -317,8 +317,13 @@ renders("the builder · a stale id says so, rather than rendering an empty form"
 /* THE FOUR DETAILS, in the order they are decided. */
 (() => {
   const html = at("/resources/RES-01/edit");
+  /* `rs-tag` rather than `rs-tagbox`: the chip BOX was promoted out of this
+     module's stylesheet into the shared `.chips-input` some time ago, and this
+     assertion went on looking for the class it used to carry — so it had been
+     failing on a control that was present and working. It looks for the
+     field's own id now, which is what actually identifies it. */
   ok("Details carries title, description, tags and department",
-    ["rs-title-in", "rs-desc", "rs-tagbox", "rs-dept"].every((c) => html.indexOf(c) >= 0));
+    ["rs-title-in", "rs-desc", "rs-tag", "rs-dept"].every((c) => html.indexOf(c) >= 0));
   ok("…and the section is called Form, not 'What it asks'",
     html.indexOf(">Form<") >= 0 && html.indexOf("What it asks") < 0);
   ok("…with no audience editor anywhere",
@@ -344,7 +349,7 @@ renders("the builder · a stale id says so, rather than rendering an empty form"
 (() => {
   const html = at("/resources/RES-01/edit");
   ok("the department is a chip field, not a single-value box",
-    html.split("rs-tagbox").length === 3);  /* tags + departments */
+    html.split("chips-input").length === 3);  /* tags + departments */
   ok("…carrying the resource's own department as a chip",
     html.indexOf("Remove Sales") >= 0);
   ok("…offering the roster's departments as suggestions",

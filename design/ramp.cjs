@@ -1,16 +1,43 @@
-/* Forest brand ramp + contrast verification against the Untitled UI semantic map,
-   using the panel's real surface model:
+/* =============================================================================
+   INK & SIGNAL — the contrast guard
+   =============================================================================
 
-     ground (--bg-shell)   light neutral-50   dark neutral-950   the plane behind
-     plane  (--bg)         light white        dark neutral-900   panels, rows
-     raised (menus/modals) light white        dark neutral-800
-     inset  (--bg-inset)   light neutral-100  dark neutral-950
+   IT READS THE REAL STYLESHEET. This used to be a hand-kept copy of the
+   palette with the ratios asserted against it, which meant the guard could
+   pass while the product failed: somebody retunes a token in tokens.css, the
+   copy in here still holds the old hex, and the check goes on saying "ok" about
+   a colour that is no longer in the build.
 
-   In dark the plane is LIGHTER than the ground, which is how a dark UI says
-   "raised" — so every dark pair below is checked against neutral-900, not 950. */
+   So it parses `src/styles/tokens.css`, resolves the `var()` chains the way a
+   browser would, per theme, and measures the pairs below against what the
+   panel will actually paint. A token that moves moves here too, and a token
+   that is deleted fails loudly instead of silently.
 
+   TWO THEMES, ONE FLOOR SET
+   -------------------------
+     4.5:1   text on the surface it sits on            (WCAG 1.4.3, AA)
+     3.0:1   an operable boundary or a large figure    (WCAG 1.4.11)
+
+   There is no third theme and no scheme, so this walks light and dark and
+   nothing else. That is the whole reason the file is now a third of its former
+   length: it used to check three colour systems, two of which nobody had
+   looked at since the week they landed.
+
+   WHAT IS DELIBERATELY NOT CHECKED
+   --------------------------------
+   The eleven tag hues. They are a palette a PERSON chooses from for their own
+   labels, and every one is used as chip text on its own matched tint — which
+   is a pair the loop below does check, once, through `--tag-*` on
+   `--tag-*-bg`. What is not asserted is any tag colour against any other
+   ground, because a tag is never drawn on one.
+   ========================================================================== */
+const fs = require("fs");
+const path = require("path");
+
+/* ---------------------------------------------------------------- colour -- */
 const hex = (h) => {
-  h = h.replace("#", "");
+  h = String(h).trim().replace("#", "");
+  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
   return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16));
 };
 const lum = (h) => {
@@ -25,200 +52,168 @@ const ratio = (a, b) => {
   return (l1 + 0.05) / (l2 + 0.05);
 };
 
-const N = {
-  25: "#fcfcfc", 50: "#fafafa", 100: "#f5f5f5", 200: "#e5e5e5", 300: "#d4d4d4",
-  400: "#a3a3a3", 500: "#737373", 600: "#525252", 700: "#404040", 800: "#262626",
-  900: "#171717", 950: "#0a0a0a",
-};
-const B = {
-  25: "#f6fbf8", 50: "#ecf7f1", 100: "#d3ede0", 200: "#a9dcc3", 300: "#74c39f",
-  400: "#43a67d", 500: "#218a62", 600: "#14704e", 700: "#0f5a3f", 800: "#0e4834",
-  900: "#0d3b2c", 950: "#06231a",
-};
-const R = { 50: "#fef3f2", 100: "#fee4e2", 300: "#fda29b", 400: "#f97066", 500: "#f04438", 600: "#d92d20", 700: "#b42318", 950: "#55160c" };
-const Y = { 50: "#fffaeb", 100: "#fef0c7", 300: "#fec84b", 400: "#fdb022", 500: "#f79009", 600: "#dc6803", 700: "#b54708", 950: "#4e1d09" };
-const G = { 50: "#ecfdf3", 100: "#dcfae6", 300: "#75e0a7", 400: "#47cd89", 500: "#17b26a", 600: "#079455", 700: "#067647", 950: "#053321" };
-const U = { blue600: "#175cd3", blue50: "#eff8ff", blue400: "#53b1fd", blue950: "#102a56" };
-
-/* the two deviations from Untitled UI, both for WCAG 1.4.11 (3:1 on an
-   operable boundary). Untitled UI ships border-primary at neutral-300, which
-   measures 1.55:1 on white — fine as a decorative hairline, not as the edge
-   that identifies an input. */
-const CTRL_LIGHT = "#8c8c8c";
-const CTRL_DARK = "#757575";
-
-/* dark brand tint for a selected row — Untitled UI dark maps bg-brand-primary
-   to brand-500, a full fill, which is wrong for a row. */
-const SEL_DARK = "#102a20";
-
-const LP = "#ffffff", LG = N[50], LI = N[100];      // light plane / ground / inset
-const DP = N[900], DG = N[950], DR = N[800];        // dark plane / ground / raised
-
-const pairs = [
-  ["LIGHT text-primary on plane", N[900], LP, 4.5],
-  ["LIGHT text-secondary on plane", N[700], LP, 4.5],
-  ["LIGHT text-tertiary on plane", N[600], LP, 4.5],
-  ["LIGHT text-quaternary on plane", N[500], LP, 4.5],
-  ["LIGHT text-tertiary on inset", N[600], LI, 4.5],
-  ["LIGHT text-tertiary on ground", N[600], LG, 4.5],
-  ["LIGHT placeholder on plane", N[500], LP, 4.5],
-  ["LIGHT white on ink-solid (primary btn)", LP, N[900], 4.5],
-  ["LIGHT white on brand-solid (forest)", LP, B[600], 4.5],
-  ["LIGHT text-brand-primary on plane", B[900], LP, 4.5],
-  ["LIGHT text-brand-secondary on brand tint", B[700], B[50], 4.5],
-  ["LIGHT fg-brand on plane", B[600], LP, 3.0],
-  ["LIGHT text-success on success tint", G[700], G[50], 4.5],
-  ["LIGHT text-warning on warning tint", Y[700], Y[50], 4.5],
-  ["LIGHT text-error on error tint", R[700], R[50], 4.5],
-  ["LIGHT text-info on info tint", U.blue600, U.blue50, 4.5],
-  ["LIGHT white on error-solid", LP, R[600], 4.5],
-  ["LIGHT border-control on plane", CTRL_LIGHT, LP, 3.0],
-  ["LIGHT border-control on ground", CTRL_LIGHT, LG, 3.0],
-  ["LIGHT border-control on inset", CTRL_LIGHT, LI, 3.0],
-  ["LIGHT border-brand on plane", B[500], LP, 3.0],
-  ["LIGHT text on brand tint (selected row)", N[900], B[50], 4.5],
-
-  ["DARK  text-primary on plane", N[50], DP, 4.5],
-  ["DARK  text-secondary on plane", N[300], DP, 4.5],
-  ["DARK  text-tertiary on plane", N[400], DP, 4.5],
-  ["DARK  text-tertiary on ground", N[400], DG, 4.5],
-  ["DARK  text-tertiary on raised", N[400], DR, 4.5],
-  ["DARK  placeholder on plane", N[400], DP, 4.5],
-  ["DARK  ink on white-solid (primary btn)", N[900], N[50], 4.5],
-  ["DARK  white on brand-solid (forest)", LP, B[600], 4.5],
-  ["DARK  text-brand on plane", B[300], DP, 4.5],
-  ["DARK  fg-brand on plane", B[400], DP, 3.0],
-  ["DARK  text-success on success tint", G[400], G[950], 4.5],
-  ["DARK  text-warning on warning tint", Y[400], Y[950], 4.5],
-  ["DARK  text-error on error tint", R[400], R[950], 4.5],
-  ["DARK  text-info on info tint", U.blue400, U.blue950, 4.5],
-  ["DARK  text-success on plane", G[400], DP, 4.5],
-  ["DARK  text-warning on plane", Y[400], DP, 4.5],
-  ["DARK  text-error on plane", R[400], DP, 4.5],
-  ["DARK  border-control on plane", CTRL_DARK, DP, 3.0],
-  ["DARK  border-control on ground", CTRL_DARK, DG, 3.0],
-  ["DARK  border-control on raised", CTRL_DARK, DR, 3.0],
-  ["DARK  border-brand on plane", B[400], DP, 3.0],
-  ["DARK  text on brand tint (selected row)", N[50], SEL_DARK, 4.5],
-  ["DARK  text-brand on brand tint (selected)", B[300], SEL_DARK, 4.5],
-];
-
-/* ============================================================================
-   THE OTHER TWO SCHEMES — measured, not asserted.
-
-   The pairs above are the PORTAL scheme, whose values are Untitled UI's. Every
-   scheme in styles/schemes.css has to clear the same floors or it is not a
-   scheme, it is a skin with a contrast bug — and the two below are the ones a
-   person can now switch to from the account menu. Same floors, same method:
-   4.5:1 for text, 3:1 for an operable edge (WCAG 1.4.11).
-
-   CONSOLE is the default: ink builds the interface, forest is the thread.
-   Its control edge is ink-7, which is where it is because ink-6 measures 2.7
-   on white and fails — that step is load-bearing, not chosen for looks.
-   ========================================================================== */
-const C = {
-  /* light */
-  bg: "#f4f4f5", surface: "#ffffff", sunken: "#f2f2f4", nav: "#f0f1f3",
-  text: "#0b0b0d", text2: "#3a3a41", muted: "#5c5c65", edge: "#8b8b94",
-  primary: "#111113", primaryInk: "#ffffff",
-  brand: "#14704e", brandText: "#0f5a3f", selected: "#ecf7f1", brandBorder: "#a9dcc3",
-  okT: "#166035", okBg: "#e8f5ec", warnT: "#8a5600", warnBg: "#fdf3e0",
-  badT: "#9d3820", badBg: "#fdeee9", infoT: "#33449f", infoBg: "#eceffb",
-  accentT: "#0a6a86", accentBg: "#e2f6fb",
-  /* dark */
-  dBg: "#08080a", dSurface: "#16161a", dRaised: "#202027", dSunken: "#0f0f12",
-  dText: "#f4f4f5", dText2: "#c2c2c8", dMuted: "#93939b", dEdge: "#70707a",
-  dPrimary: "#f4f4f5", dPrimaryInk: "#0b0b0d",
-  dBrand: "#218a62", dBrandText: "#74c39f", dSelected: "#0f2a20",
-  dOkT: "#4fd07a", dOkBg: "#0e2a1a", dWarnT: "#e8a83c", dWarnBg: "#2c2008",
-  dBadT: "#ff8a63", dBadBg: "#2e150f", dInfoT: "#8b9bff", dInfoBg: "#161c3a",
-  dAccentT: "#45dcf0", dAccentBg: "#0a2b34",
-};
-const BC = {
-  bg: "#eef2f3", surface: "#ffffff", sunken: "#edf1f2",
-  text: "#0c1618", text2: "#3a4c50", muted: "#4e6469", edge: "#788d93",
-  primary: "#007863", primaryInk: "#ffffff", primaryText: "#054a40", selected: "#e0f5f0",
-  dSurface: "#111a1e", dRaised: "#17242a", dBg: "#080e11",
-  dText: "#e8f1f2", dText2: "#adc0c3", dMuted: "#879ca0", dEdge: "#5d757c",
-  dPrimary: "#2fd6b4", dPrimaryInk: "#04191a", dPrimaryText: "#57ddc0", dSelected: "#0d2f2a",
-};
-
-pairs.push(
-  ["CONSOLE L text on surface", C.text, C.surface, 4.5],
-  ["CONSOLE L text-2 on surface", C.text2, C.surface, 4.5],
-  ["CONSOLE L muted on surface", C.muted, C.surface, 4.5],
-  ["CONSOLE L muted on sunken", C.muted, C.sunken, 4.5],
-  ["CONSOLE L muted on nav", C.muted, C.nav, 4.5],
-  ["CONSOLE L primary-ink on primary", C.primaryInk, C.primary, 4.5],
-  ["CONSOLE L brand-ink on brand (button)", "#ffffff", C.brand, 4.5],
-  ["CONSOLE L brand-text on selected", C.brandText, C.selected, 4.5],
-  ["CONSOLE L text on selected (row)", C.text, C.selected, 4.5],
-  ["CONSOLE L control edge on surface", C.edge, C.surface, 3.0],
-  ["CONSOLE L control edge on ground", C.edge, C.bg, 3.0],
-  ["CONSOLE L control edge on sunken", C.edge, C.sunken, 3.0],
-  ["CONSOLE L brand border on surface", C.brand, C.surface, 3.0],
-  ["CONSOLE L success on success tint", C.okT, C.okBg, 4.5],
-  ["CONSOLE L warning on warning tint", C.warnT, C.warnBg, 4.5],
-  ["CONSOLE L danger on danger tint", C.badT, C.badBg, 4.5],
-  ["CONSOLE L info on info tint", C.infoT, C.infoBg, 4.5],
-  ["CONSOLE L live on live tint", C.accentT, C.accentBg, 4.5],
-
-  ["CONSOLE D text on surface", C.dText, C.dSurface, 4.5],
-  ["CONSOLE D text-2 on surface", C.dText2, C.dSurface, 4.5],
-  ["CONSOLE D muted on surface", C.dMuted, C.dSurface, 4.5],
-  ["CONSOLE D muted on raised", C.dMuted, C.dRaised, 4.5],
-  ["CONSOLE D muted on ground", C.dMuted, C.dBg, 4.5],
-  ["CONSOLE D primary-ink on primary", C.dPrimaryInk, C.dPrimary, 4.5],
-  ["CONSOLE D brand-ink on brand (button)", "#04150f", "#43a67d", 4.5],
-  ["CONSOLE D brand-text on surface", C.dBrandText, C.dSurface, 4.5],
-  ["CONSOLE D brand-text on selected", C.dBrandText, C.dSelected, 4.5],
-  ["CONSOLE D text on selected (row)", C.dText, C.dSelected, 4.5],
-  ["CONSOLE D control edge on surface", C.dEdge, C.dSurface, 3.0],
-  ["CONSOLE D control edge on raised", C.dEdge, C.dRaised, 3.0],
-  ["CONSOLE D control edge on ground", C.dEdge, C.dBg, 3.0],
-  ["CONSOLE D brand on surface", C.dBrandText, C.dSurface, 3.0],
-  ["CONSOLE D success on success tint", C.dOkT, C.dOkBg, 4.5],
-  ["CONSOLE D warning on warning tint", C.dWarnT, C.dWarnBg, 4.5],
-  ["CONSOLE D danger on danger tint", C.dBadT, C.dBadBg, 4.5],
-  ["CONSOLE D info on info tint", C.dInfoT, C.dInfoBg, 4.5],
-  ["CONSOLE D live on live tint", C.dAccentT, C.dAccentBg, 4.5],
-
-  ["BEACON  L text on surface", BC.text, BC.surface, 4.5],
-  ["BEACON  L muted on surface", BC.muted, BC.surface, 4.5],
-  ["BEACON  L muted on sunken", BC.muted, BC.sunken, 4.5],
-  ["BEACON  L primary-ink on primary", BC.primaryInk, BC.primary, 4.5],
-  ["BEACON  L primary text on selected", BC.primaryText, BC.selected, 4.5],
-  ["BEACON  L control edge on surface", BC.edge, BC.surface, 3.0],
-  ["BEACON  L control edge on ground", BC.edge, BC.bg, 3.0],
-  ["BEACON  D text on surface", BC.dText, BC.dSurface, 4.5],
-  ["BEACON  D muted on surface", BC.dMuted, BC.dSurface, 4.5],
-  ["BEACON  D muted on raised", BC.dMuted, BC.dRaised, 4.5],
-  ["BEACON  D primary-ink on primary", BC.dPrimaryInk, BC.dPrimary, 4.5],
-  ["BEACON  D primary text on selected", BC.dPrimaryText, BC.dSelected, 4.5],
-  ["BEACON  D control edge on surface", BC.dEdge, BC.dSurface, 3.0],
-  ["BEACON  D control edge on raised", BC.dEdge, BC.dRaised, 3.0]
+/* ------------------------------------------------------------- the sheet -- */
+const SRC = fs.readFileSync(
+  path.resolve(__dirname, "..", "src", "styles", "tokens.css"),
+  "utf8"
 );
 
-/* THE ONE COMBINATION THE SYSTEM REJECTS. It is listed rather than quietly
-   omitted: text-quaternary on the inset ground measures 4.35:1, so nothing is
-   written in it — table heads and wells use text-tertiary, which is what
-   Untitled UI's own table does. If a future palette change makes this pass,
-   the rule can be relaxed; until then this line is why it exists. */
-const excluded = [["LIGHT text-quaternary on inset", N[500], LI, 4.5]];
+/* Every `--name:value` declaration, bucketed by which selector block it is in.
+   Only three buckets matter: the unscoped `:root` rules, the light block and
+   the dark block. A declaration in `:root,:root[data-theme="light"]` lands in
+   both base and light, which is exactly how the browser reads it. */
+function collect() {
+  const base = new Map(), light = new Map(), dark = new Map();
+  /* selector { … } — non-greedy, and the sheet has no nested blocks outside
+     @media, which this file no longer contains for colour. */
+  const blocks = SRC.matchAll(/([^{}]+)\{([^{}]*)\}/g);
+  for (const b of blocks) {
+    const sel = b[1].replace(/\/\*[\s\S]*?\*\//g, "").trim();
+    const body = b[2];
+    if (!sel.includes(":root")) continue;
+    const targets = [];
+    if (/:root\s*(,|$)/.test(sel) || /:root\{/.test(sel + "{")) targets.push(base);
+    if (sel.includes('[data-theme="light"]')) targets.push(light);
+    if (sel.includes('[data-theme="dark"]')) targets.push(dark);
+    if (!targets.length) targets.push(base);
+    for (const d of body.matchAll(/(--[a-zA-Z0-9_-]+)\s*:\s*([^;]+);/g)) {
+      const name = d[1], value = d[2].trim();
+      for (const t of targets) t.set(name, value);
+    }
+  }
+  return { base, light, dark };
+}
+const { base, light, dark } = collect();
 
-let bad = 0;
-for (const [label, fg, bg, floor] of pairs) {
-  const r = ratio(fg, bg);
-  const ok = r >= floor;
-  if (!ok) bad++;
-  console.log(
-    `${ok ? "ok  " : "FAIL"} ${label.padEnd(42)} ${r.toFixed(2).padStart(6)}:1  (floor ${floor})  ${fg} on ${bg}`
-  );
+/* Resolve a token the way the cascade would: the theme's own value wins over
+   the unscoped one, and a `var(--x)` chain is followed to a literal. */
+function resolve(name, theme, seen) {
+  seen = seen || new Set();
+  if (seen.has(name)) return null;          // a cycle is a bug, not a colour
+  seen.add(name);
+  const map = theme === "dark" ? dark : light;
+  let v = map.has(name) ? map.get(name) : base.get(name);
+  if (v === undefined) return null;
+  v = v.trim();
+  const m = v.match(/^var\(\s*(--[a-zA-Z0-9_-]+)\s*\)$/);
+  if (m) return resolve(m[1], theme, seen);
+  return /^#[0-9a-fA-F]{3,8}$/.test(v) ? v : null;
 }
-for (const [label, fg, bg, floor] of excluded) {
-  console.log(
-    `EXCL ${label.padEnd(42)} ${ratio(fg, bg).toFixed(2).padStart(6)}:1  (floor ${floor})  ${fg} on ${bg}  — not used anywhere; see the note above`
-  );
+
+/* ------------------------------------------------------------- the pairs -- */
+/* [ token, ground, floor, what it is ] — named by TOKEN, so the table reads as
+   a statement about the design system rather than about a list of hexes. */
+const TEXT = 4.5, EDGE = 3.0;
+const PAIRS = [
+  /* the interface, on each of the three planes it is drawn on */
+  ["--color-text", "--color-surface", TEXT, "body text on a card"],
+  ["--color-text", "--color-bg", TEXT, "body text on the ground"],
+  ["--color-text-2", "--color-surface", TEXT, "secondary text on a card"],
+  ["--color-text-2", "--color-surface-sunken", TEXT, "secondary text in a well"],
+  ["--color-text-muted", "--color-surface", TEXT, "muted text on a card"],
+  ["--color-text-muted", "--color-surface-sunken", TEXT, "column heads in a table head"],
+  ["--color-text-muted", "--color-bg", TEXT, "muted text on the ground"],
+  ["--color-text-muted", "--color-surface-nav", TEXT, "muted text in the sidebar"],
+  ["--color-text-muted", "--color-surface-raised", TEXT, "muted text in a menu"],
+
+  /* the primary action — ink, and it inverts wholesale between the themes */
+  ["--color-primary-ink", "--color-primary", TEXT, "the label on a primary button"],
+
+  /* the brand — FOREST. These are the pairs that decide whether the portal's
+     colour can carry text at all, which is what makes it usable as a link. */
+  ["--color-brand-ink", "--color-brand", TEXT, "the label on a brand fill"],
+  ["--color-brand-text", "--color-surface", TEXT, "a link on a card"],
+  ["--color-brand-text", "--color-selected", TEXT, "brand text on a selected row"],
+  ["--color-text", "--color-selected", TEXT, "body text on a selected row"],
+  ["--color-brand", "--color-surface", EDGE, "the brand edge on a card"],
+  ["--color-brand", "--color-bg", EDGE, "the brand edge on the ground"],
+
+  /* the operable boundaries. `--color-control-edge` is where it is in the ramp
+     BECAUSE of this line: one step lighter measures 2.7 and fails. */
+  ["--color-control-edge", "--color-surface", EDGE, "an input's edge on a card"],
+  ["--color-control-edge", "--color-bg", EDGE, "an input's edge on the ground"],
+  ["--color-control-edge", "--color-surface-sunken", EDGE, "an input's edge in a well"],
+  ["--color-control-edge", "--color-surface-raised", EDGE, "an input's edge in a menu"],
+
+  /* the four statuses, each on its own soft ground — the chip pairs */
+  ["--color-success", "--color-success-soft", TEXT, "success chip"],
+  ["--color-warning", "--color-warning-soft", TEXT, "warning chip"],
+  ["--color-danger", "--color-danger-soft", TEXT, "danger chip"],
+  ["--color-info", "--color-info-soft", TEXT, "info chip"],
+  ["--color-accent-text", "--color-accent-soft", TEXT, "the live chip"],
+  ["--color-secondary", "--color-secondary-soft", TEXT, "a system-acted chip"],
+  /* …and on a plain card, because a status is also written as bare text in a
+     cell, not only inside a chip */
+  ["--color-success", "--color-surface", TEXT, "success text on a card"],
+  ["--color-warning", "--color-surface", TEXT, "warning text on a card"],
+  ["--color-danger", "--color-surface", TEXT, "danger text on a card"],
+  ["--color-info", "--color-surface", TEXT, "info text on a card"],
+  /* the solid status fills carry white in light and near-black in dark; both
+     are `--color-text-inverse`, which is the point of that token */
+  ["--color-text-inverse", "--color-success-solid", EDGE, "a solid success fill"],
+  ["--color-text-inverse", "--color-danger-solid", EDGE, "a solid danger fill"],
+
+  /* the toast is the same dark slab in BOTH themes, so it is checked once per
+     theme against the same pair and must pass in both */
+  ["--toast-fg", "--toast-bg", TEXT, "toast text"],
+  ["--toast-action", "--toast-bg", TEXT, "the toast's action"],
+
+  /* the sign-in hero */
+  ["--color-hero-ink", "--color-hero", TEXT, "hero text"],
+  ["--color-hero-accent", "--color-hero", EDGE, "the hero's forest thread"],
+
+  /* charts. The axis labels are read as text; the grid is not, and is exempt
+     by design — a gridline that met 3:1 would be louder than the data. */
+  ["--chart-axis", "--color-surface", EDGE, "a chart's axis labels"],
+  ["--chart-1", "--color-surface", EDGE, "the first series (brand) on a card"],
+  ["--chart-pos", "--color-surface", EDGE, "a positive series"],
+  ["--chart-neg", "--color-surface", EDGE, "a negative series"],
+];
+
+/* THE TAG PALETTE, generated rather than typed: eleven names × two, so a hue
+   added to the ramp is checked without this file being edited. */
+const TAGS = ["slate", "red", "orange", "amber", "lime", "green",
+  "teal", "cyan", "blue", "violet", "pink"];
+for (const t of TAGS) {
+  PAIRS.push([`--tag-${t}`, `--tag-${t}-bg`, TEXT, `the ${t} tag on its own tint`]);
 }
-console.log(`\n${bad} failing pair(s) of ${pairs.length}, ${excluded.length} documented exclusion(s)`);
-process.exit(bad ? 1 : 0);
+
+/* THE CHANNEL PAIRS — WhatsApp and email keep their own hue, so they get their
+   own line rather than riding on the status set. */
+PAIRS.push(
+  ["--ch-wa-text", "--ch-wa-bg", TEXT, "a WhatsApp chip"],
+  ["--ch-em-text", "--ch-em-bg", TEXT, "an email chip"],
+  ["--ch-wa-ink", "--ch-wa", EDGE, "the label on a WhatsApp fill"],
+  ["--ch-em-ink", "--ch-em", EDGE, "the label on an email fill"]
+);
+
+/* ------------------------------------------------------------------ run -- */
+let bad = 0, missing = 0, n = 0;
+for (const theme of ["light", "dark"]) {
+  console.log(`\n── ${theme.toUpperCase()} ${"─".repeat(64)}`);
+  for (const [fgName, bgName, floor, what] of PAIRS) {
+    const fg = resolve(fgName, theme);
+    const bg = resolve(bgName, theme);
+    n++;
+    if (!fg || !bg) {
+      missing++;
+      console.log(
+        `MISS ${what.padEnd(34)} ${!fg ? fgName : bgName} does not resolve to a colour in ${theme}`
+      );
+      continue;
+    }
+    const r = ratio(fg, bg);
+    const ok = r >= floor;
+    if (!ok) bad++;
+    console.log(
+      `${ok ? "ok  " : "FAIL"} ${what.padEnd(34)} ${r.toFixed(2).padStart(6)}:1` +
+      `  (floor ${floor.toFixed(1)})  ${fg} on ${bg}`
+    );
+  }
+}
+
+console.log(
+  `\n${bad} failing pair(s) and ${missing} unresolved token(s) of ${n} checked, ` +
+  `across 2 themes.`
+);
+process.exit(bad + missing ? 1 : 0);

@@ -6,6 +6,140 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-08
 
+### Ink & Signal — one design system, one component system, two themes
+
+**Area:** the whole panel — every route, the sign-in door, and both overlays
+**Files:** `src/styles/tokens.css`, `src/styles/admin-theme.css` (component layer;
+absorbed `src/styles/components.css`), `src/admin/ui/index.tsx`,
+`src/admin/shell/ShellContext.tsx`, `src/admin/shell/AdminShell.tsx`,
+`src/admin/auth/AdminAuth.tsx`, `src/admin/auth/admin-auth.css`, `src/App.tsx`,
+`src/main.tsx`, `index.html`, `vite.config.ts`, `tsconfig.app.json`, `package.json`,
+`src/components/overlays/{Modal,Dialog}/index.tsx`,
+`src/admin/views/{Deals/Drawer,Invoices/Form,Plans/PlanDrawer,Quotations/Detail}.tsx`,
+`src/admin/views/{Finance/dialog,Finance/Frame,Team/Work,Users/List}.tsx`,
+`src/admin/views/{BusinessEnquiries/enquiries,Finance/finance,Team/team,Users/users,Resources/resources}.css`,
+`design/design-system.md`, `design/ramp.cjs`,
+`scripts/{check-dupes,shoot-modules,shoot-appearance,check-appearance-menu,appearance-entry,rs-smoke,um-smoke,um-smoke-shell-stub}.*`
+**Deleted:** `src/components/{base,application,foundations,shared-assets}` (187 files),
+`src/styles/untitled/` (4 sheets), `src/styles/components.css`, `src/utils/cx.ts`,
+`src/utils/is-react-component.ts`, `src/hooks/use-resize-observer.ts`,
+`src/providers/router-provider.tsx`, `design/theme-build.py`
+
+**What changed**
+
+The panel had **six appearances** (three colour schemes × two themes), **two component
+systems** (Untitled UI's and its own), **two icon sets** on the same toolbar, and **two
+component stylesheets** stacked so the second could refine the first. It now has one
+design system, one component system, one stylesheet pair, and **two themes: light and
+dark**.
+
+Nothing about what a screen *does* changed. What changed is that there is now one answer
+to every "where does this live" question, and a machine that fails the build when a second
+answer appears.
+
+- **Untitled UI is gone** — the library, Tailwind, React Aria, and eighteen other
+  dependencies that existed only to serve it. `dependencies` is six packages now. It was
+  imported in three files for eight components, but those eight were Button, Input, Badge,
+  Select and EmptyState, which is to say the five parts every screen is made of.
+- **The icon set is the panel's own**, ninety paths in `admin/ui/index.tsx`. `Icon` used
+  to try the library first and fall back to the hand-drawn map, so which set a glyph came
+  from depended on its name.
+- **`portal` and `beacon` are gone**, along with `[data-density="compact"]`. One attribute
+  drives the system: `data-theme`, light or dark. "System" is a preference, resolved to
+  one of the two before first paint. A value stored for a retired key is **cleared on
+  boot** rather than honoured.
+- **Black, white and Forest Green.** The primary action is ink and inverts wholesale
+  between themes; forest marks where you are — active nav, selection, links, focus,
+  progress, the current pipeline stage, the active filter, chart series 1.
+- **No status is ever the brand.** `new`, `assigned` and `open` used to be, and a row of
+  eight status chips came out with five greens: forest and success-green are ~16° apart
+  in hue, so "Assigned" and "Converted" were the same colour to anybody scanning a column.
+- **Archivo · IBM Plex Sans · IBM Plex Mono**, replacing Inter and Roboto Mono. Column
+  heads and metric-tile labels are now the same tracked mono micro-label, which is what
+  makes a table and a KPI row read as one instrument; a figure column is mono so its
+  digits are the same width.
+- **~60 reusable components** in `admin/ui`, filling the real gaps: Breadcrumbs,
+  Segmented, Pagination, FormField, Input, Textarea, SelectInput, InputGroup, Checkbox,
+  Radio, Toggle, DateInput, DateRange, MultiSelect, FileUpload, ModalShell, ConfirmModal,
+  DrawerShell, MenuItem, Tooltip, InfoDot, Alert, Meter, Delta, Card, Eyebrow, Avatar,
+  Person, Timeline, ActivityFeed, LeadStatus, DealStatus, Priority, Tag, Tags, Pipeline,
+  Assignee, Legend, ChartFrame. Each renders the panel's existing classes — `.fg`, `.inp`,
+  `.check`, `.av`, `.tile`, `.mi`, `.pill` — rather than a parallel set of names.
+
+**Six real bugs fell out of removing the second copy of things**
+
+| Bug | Cause |
+| --- | --- |
+| The Reports analytics chart did not draw | `.tm-an-pair` was a two-bar chart *and* a responsive grid; the grid was later in the file and won on `display` |
+| Linked-items lists rendered as an 84px inline-block | a stale rule for the relation prefix was written under `.tm-lk`, the list's own class |
+| Every skeleton bar ran two shimmer animations at two speeds | `.sk` was declared twice with two different mechanisms; both matched |
+| Finance's derived-value field carried a border its own rule said it must not have | `.fin-derived` written twice — the layout came from one and the border from the other |
+| "The system did this" was amber in Enquiries and blue in Finance | `sys` had no shared definition, so each module invented one |
+| `mute`, `stop` and `sys` all rendered as one neutral chip | three tones in the shipped vocabularies with no `.pill` rule at all |
+
+Also consolidated: three segmented controls into one, three pagers into one (`Users`
+keeps its "21–40 of 241" range and gains a numbered window), five timelines into one, and
+the sign-in door's private `.banner` — whose four tones were suffixed `err2`/`ok2`/`warn2`/
+`info2` *because* `.banner` was already taken — onto the shared `Alert`.
+
+**Temp data**
+
+`none` — no content file was read, written or reshaped. `src/content/**` is untouched.
+
+**Backend needed**
+
+`none` — this is a presentation change end to end. No endpoint, payload, permission or
+business rule was altered.
+
+**Open decisions**
+
+- **The eleven-hue tag palette stays**, retuned to one chroma and lightness. Removing it
+  would have removed a feature — people pick their own label colours from a swatch picker
+  in Team and Users — and it is the one place in the product where colour is deliberately
+  *not* a signal.
+- **`--color-surface-sunken` moved `#eff0f2` → `#f2f2f4`.** The control edge on it
+  measured 2.96:1 and WCAG 1.4.11 wants 3:1 for an operable boundary. This is the lightest
+  step that clears it.
+- **Charts and tags now share one categorical family.** A chart series and a tag are the
+  same kind of thing — an identity with no intrinsic meaning — and two palettes put two
+  sets of the same hues at two saturations on one dashboard.
+
+**Verified**
+
+- `npx tsc -b` clean; `npm run build` clean. Bundle 2.39 MB → **1.80 MB** minified
+  (451 KB gzipped); 273 modules. `npm run lint` 294 → **244** problems, none in any file
+  this change touched (the remainder is pre-existing `any` in `src/api` and `src/utils`).
+- **Every offline check in `npm run check` passes**: enquiry export/clock/share/wiring/
+  match, users + render, finance ledger + nav + render, popovers, team + nav + render,
+  resources + render, agreements + render, `check:tokens` (422 properties), and
+  `check:contrast`.
+- **`check:contrast` was rewritten to parse the real `tokens.css`** rather than assert
+  against a hand-kept copy of the palette — the old version could pass while the product
+  failed. **110 pairs, both themes, zero failures.** It found the sunken-plane failure
+  above.
+- **`check:dupes` is new** and is in `npm run check`: no selector declared twice in one
+  sheet, no module sheet re-declaring a shared class, **no colour literal outside
+  `tokens.css`**. All three clean. Every bug in the table above was found by it.
+- **`check:menu` rewritten and passing (20 assertions, real Chromium):** the theme switch
+  writes `data-theme`, repaints, persists, survives a reload with no flash, follows the OS
+  both ways under "System", and the retired `scheme`/`density` keys — seeded on purpose by
+  the test — are cleared.
+- **`scripts/shoot-modules.cjs` is new:** boots the real shell against a mocked
+  `me/permissions/` and photographs **all 19 routes × 2 themes**, failing if any rendered
+  the error boundary. **38/38 rendered.** All thirty-eight were reviewed by eye; the
+  screenshots are what surfaced the overlapping date-range field, the run-together toggle
+  label, the green status wall, the status-coloured avatars, the over-saturated chart
+  palette and the oversized empty state, all of which are fixed.
+- **`shoot-appearance` rewritten** for two themes and the full library, and the appearance
+  gallery (`scripts/appearance-entry.tsx`) now renders every component in the system.
+
+**Not verified:** `check:enquiries` needs a live backend on `localhost:8000` and was not
+run — it validates a seed against the API and is unrelated to presentation. The panel was
+not driven against a real backend; the module screenshots use the shipped
+`src/content/**` seeds and mocked endpoints.
+
+---
+
 ### "The scheme is not updating" — what was actually wrong, and the check that would have caught it
 
 **Area:** the account menu, the pre-paint script, and the difference between two schemes

@@ -162,8 +162,9 @@
   border: 1px solid var(--line-control); border-radius: var(--radius-md);
   background: var(--bg); color: var(--text); font: inherit; font-size: var(--text-md);
 }
-.um-pager { display: flex; align-items: center; gap: var(--space-3); justify-content: center;
-            padding: var(--space-4) 0; font-size: var(--text-sm); color: var(--text-3) }
+/* THE PAGER LIVES IN admin-theme.css AS `.pager-bar` / `.pager`, and List.tsx
+   renders the shared `Pagination` component. This module drew its own, Finance
+   drew a third, and only one of the three could jump to a page. */
 
 /* --------------------------------------------------------------- tags --- */
 /* The tag palette means NOTHING — the one place in the product where colour is
@@ -271,7 +272,7 @@
 .um-form .inp.ro { display: flex; align-items: center; gap: var(--space-2);
                    background: var(--bg-inset); color: var(--text-2) }
 .um-form textarea.inp { height: auto; padding: var(--space-2) var(--space-3); line-height: var(--lh-base) }
-.um-chips { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-2) }
+.um-chips { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-3) }
 
 .um-consequences { list-style: none; margin: 0 0 var(--space-4); padding: 0;
                    display: flex; flex-direction: column; gap: var(--space-2) }
@@ -314,7 +315,6 @@
 .um-chip-x { display: grid; place-items: center; width: 16px; height: 16px; margin-left: 1px;
              border: none; border-radius: var(--radius-sm); background: none;
              color: currentColor; opacity: .6; cursor: pointer }
-.um-chip-x:hover { opacity: 1; background: var(--bg-hover) }
 .um-chip-x:focus-visible { outline: 2px solid var(--brand); outline-offset: 1px; opacity: 1 }
 
 /* the listbox ------------------------------------------------------------ */
@@ -407,8 +407,6 @@
    auto`), and a picker's placeholder or the handle's host prefix is enough
    content to re-create the overflow one level down. */
 .um-form .um-f2 > * { min-width: 0 }
-.um-handle-in { min-width: 0 }
-.um-handle-in .inp { min-width: 0 }
 .um-form .um-fs .inp { background: var(--surface-raised); border-color: var(--line-2) }
 .um-form .um-fs .inp.ro { background: var(--bg-inset) }
 
@@ -417,7 +415,6 @@
    there — so it should be the loudest thing in the block, not the quietest.
    The neutral `.pill` ground was a grey on a grey and lost every time. Brand
    tint, a real border, and the height of a control rather than a label. */
-.um-chips { gap: var(--space-2); margin-bottom: var(--space-3) }
 /* Under the control (a Target row's cities): the gap moves to the top, and the
    row's two boxes share one baseline. */
 .um-chips.below { margin: var(--space-2) 0 0 }
@@ -453,7 +450,6 @@
 .um-chip.pill.warn {
   background: var(--warn-bg); color: var(--warn); border-color: var(--warn-line);
 }
-.um-chip-x { width: 20px; height: 20px; opacity: .55 }
 .um-chip-x:hover { opacity: 1; background: var(--bg-hover) }
 
 /* --------------------------------------------------- the handle field --- */
@@ -562,7 +558,7 @@
 /* ---------------------------------------------------- deals-in checks --- */
 /* Two options that can combine are two checkboxes — a picker would hide what
    was never worth hiding. Tiles, so the pressed state has somewhere to go. */
-.um-checks { display: flex; gap: var(--space-2) }
+.um-checks { display: flex; gap: var(--space-2); flex-wrap: wrap }
 .um-check {
   display: inline-flex; align-items: center; gap: var(--space-2);
   height: var(--control-lg); padding: 0 var(--space-3);
@@ -576,7 +572,6 @@
 .um-check input { accent-color: var(--brand); margin: 0 }
 .um-check input:disabled { cursor: default }
 .um-check.off { opacity: .45; cursor: default }
-.um-checks { flex-wrap: wrap }
 
 @media print {
   .um-views, .um-proto, .um-idbar .btn { display: none }

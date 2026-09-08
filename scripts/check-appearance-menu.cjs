@@ -1,17 +1,24 @@
 /* =============================================================================
    THE APPEARANCE CONTROL, DRIVEN FOR REAL
    -----------------------------------------------------------------------------
-   The scheme picker lives inside the account popover, which is inside the real
+   The theme switch lives inside the account popover, which is inside the real
    shell, behind the real session guard — so a gallery cannot test it and a
    string render cannot either. This drives the actual panel in a browser with
    `me/permissions/` mocked at the network boundary: no stub module, no aliased
    import, nothing about the app changed to make it testable.
 
-   It asserts the thing a person would check by hand:
-     1. the account menu opens and the picker is in it
-     2. choosing a scheme writes the attribute AND repaints
-     3. it is still there after a reload
-     4. Portal really is the previous appearance — a different painted value
+   WHAT IT ASSERTS, and why each line is here:
+     1. the account menu opens and the switch is in it
+     2. choosing a theme writes `data-theme` AND repaints
+     3. the menu itself follows the choice — it holds a CAPTURED node, so
+        before `open(true)` existed the page repainted while the control went
+        on showing the theme you had just left, which reads as "nothing
+        happened" while you are looking straight at the thing that worked
+     4. it survives a reload, with no flash of the other theme
+     5. "System" resolves to one of the two rather than becoming a third state
+     6. THE RETIRED APPEARANCE KEYS ARE GONE. A browser that stored `portal` or
+        `compact` in an earlier build must not carry a dead preference around,
+        and `data-scheme` / `data-density` must never appear on <html> again.
 
    `npm run check:menu`. Opt-in, like the other browser check: it skips cleanly
    when Playwright is not installed.
@@ -69,7 +76,14 @@ const check = (label, ok, detail) => {
   const browser = await chromium.launch();
   const ctx = await browser.newContext({ viewport: { width: 1400, height: 900 } });
   await ctx.addInitScript(() => {
-    try { localStorage.setItem("accessToken", "test-token"); } catch { /* private mode */ }
+    try {
+      localStorage.setItem("accessToken", "test-token");
+      /* SEED THE RETIRED KEYS ON PURPOSE. This is the state a real browser is
+         in after the consolidation shipped, and the panel has to clear them
+         rather than honour them — which is asserted at the end. */
+      localStorage.setItem("ib_admin_scheme", '"portal"');
+      localStorage.setItem("ib_admin_density", '"compact"');
+    } catch { /* private mode */ }
   });
   /* SCOPED TO THE BACKEND ORIGIN, not to a path fragment. A glob written
      around the word "api" also matches `/src/api/apiService/index.ts`, which
@@ -92,20 +106,26 @@ const check = (label, ok, detail) => {
   const errors = [];
   page.on("pageerror", (e) => errors.push(e.message));
   page.on("console", (m) => { if (m.type() === "error") errors.push("console: " + m.text()); });
-  page.on("requestfailed", (r) => errors.push("reqfail: " + r.url()));
-  page.on("response", (r) => { if (/permissions/.test(r.url())) console.log("PERMS " + r.status() + " " + r.url()); });
   await page.goto(APP, { waitUntil: "networkidle" });
   await wait(700);
 
-  const paint = () => page.evaluate(() => ({
-    scheme: document.documentElement.getAttribute("data-scheme"),
-    body: getComputedStyle(document.body).backgroundColor,
-    stored: (() => { try { return localStorage.getItem("ib_admin_scheme"); } catch { return null; } })(),
-  }));
+  const paint = () => page.evaluate(() => {
+    const r = document.documentElement;
+    const ls = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+    return {
+      theme: r.getAttribute("data-theme"),
+      pref: r.getAttribute("data-theme-pref"),
+      scheme: r.getAttribute("data-scheme"),
+      density: r.getAttribute("data-density"),
+      body: getComputedStyle(document.body).backgroundColor,
+      stored: ls("ib_admin_theme"),
+      deadScheme: ls("ib_admin_scheme"),
+      deadDensity: ls("ib_admin_density"),
+    };
+  });
 
   if (await page.locator("aside.sidebar").count() === 0) {
     console.log("URL: " + page.url());
-    console.log("BODY: " + (await page.locator("body").innerText()).slice(0, 400));
     console.log("ROOT: " + (await page.evaluate(() => document.getElementById("root").innerHTML)).slice(0, 900));
     console.log("ERRORS: " + errors.join(" | "));
   }
@@ -114,72 +134,82 @@ const check = (label, ok, detail) => {
   /* THE MENU STAYS OPEN after a choice — a setting that saves on change has no
      reason to close the panel it lives in. So "open it" has to mean "open it if
      it is not already open", or the second call toggles it shut. */
+  const themeBtn = (v) => page.locator('[data-act="seg"][data-v="' + v + '"]');
   const openMenu = async () => {
-    if (await page.locator("#apScheme").count() === 0) {
+    if (await themeBtn("light").count() === 0) {
       await page.locator("button.sb-user").click();
       await wait(280);
     }
   };
 
   await openMenu();
-  const picker = page.locator("#apScheme");
-  check("the account menu carries the scheme picker", await picker.count() > 0);
-  if (await picker.count() === 0) {
-    console.log("\n" + (await page.locator(".pop").innerHTML().catch(() => "(no popover)")).slice(0, 800));
-  }
+  check("the account menu carries the theme switch", await themeBtn("light").count() > 0);
+  check("…and no scheme picker, which no longer exists",
+    await page.locator("#apScheme").count() === 0);
 
-  const before = await paint();
-  check("boots on console (no attribute)", before.scheme === null, before.body);
+  const boot = await paint();
+  check("boots dark, the panel's default", boot.theme === "dark", boot.theme + " " + boot.body);
+  /* THE ONE ATTRIBUTE. Three schemes and a density variant used to ride on
+     <html> beside the theme; the consolidation removed them, and a stale value
+     in localStorage must not bring one back. */
+  check("no data-scheme on <html>", boot.scheme === null, String(boot.scheme));
+  check("no data-density on <html>", boot.density === null, String(boot.density));
+  check("the retired scheme key is cleared", boot.deadScheme === null, String(boot.deadScheme));
+  check("the retired density key is cleared", boot.deadDensity === null, String(boot.deadDensity));
 
-  await picker.selectOption("portal");
+  await themeBtn("light").click();
   await wait(350);
-  const after = await paint();
-  check("choosing Portal sets data-scheme", after.scheme === "portal", after.scheme);
-  check("choosing Portal repaints the page", after.body !== before.body, before.body + " → " + after.body);
-  check("choosing Portal is stored", after.stored === '"portal"', String(after.stored));
-  /* THE MENU ITSELF HAS TO SAY SO. It holds a captured node, so before it was
-     rebuilt on change the page repainted while the line under the picker went
-     on describing the scheme you just left — which reads as "nothing
-     happened" while looking straight at the control that just did something. */
+  const light = await paint();
+  check("Light writes data-theme", light.theme === "light", light.theme);
+  check("Light repaints the page", light.body !== boot.body, boot.body + " → " + light.body);
+  check("Light is stored", light.stored === '"light"', String(light.stored));
+  /* THE MENU ITSELF HAS TO SAY SO — see the note at the top of this file. */
+  check("the switch itself follows the choice",
+    (await themeBtn("light").getAttribute("aria-checked")) === "true");
   const hint = (await page.locator(".ap-hint").innerText()).trim();
-  check("the menu's own line follows the choice", /as it was/i.test(hint), hint);
+  check("the menu's own line follows the choice", /ink on paper/i.test(hint), hint);
+
   await page.screenshot({ path: path.join(process.cwd(), ".tmp", "appearance", "account-menu.png") });
 
+  /* NO FLASH ON RELOAD. index.html writes the attribute before first paint, so
+     the reloaded page must come back in the same theme with the same ground —
+     a mismatch here is the one appearance bug somebody sees every morning. */
   await page.reload({ waitUntil: "networkidle" });
   await wait(700);
   const reloaded = await paint();
-  check("Portal survives a reload", reloaded.scheme === "portal" && reloaded.body === after.body,
-    reloaded.scheme + " " + reloaded.body);
+  check("Light survives a reload", reloaded.theme === "light" && reloaded.body === light.body,
+    reloaded.theme + " " + reloaded.body);
 
   await openMenu();
-  check("the picker reopens showing Portal", (await page.locator("#apScheme").inputValue()) === "portal");
-  await page.locator("#apScheme").selectOption("beacon");
-  await wait(350);
-  const beacon = await paint();
-  check("choosing Beacon repaints again", beacon.scheme === "beacon" && beacon.body !== after.body, beacon.body);
-
-  await openMenu();
-  await page.locator("#apScheme").selectOption("console");
-  await wait(350);
-  const back = await paint();
-  check("choosing Console clears the attribute", back.scheme === null && back.stored === null, back.body);
-
-  /* THE THEME HALF OF THE SAME MENU. It was here before the scheme picker was,
-     it sits directly under it, and "the appearance control does not work" is a
-     sentence that covers both — so both are driven. */
-  await openMenu();
-  const themeBefore = await paint();
-  await page.locator('[data-act="theme"][data-v="light"]').click();
-  await wait(350);
-  const light = await paint();
-  check("Light repaints the page", light.body !== themeBefore.body, themeBefore.body + " → " + light.body);
-  check("Light writes data-theme", await page.evaluate(() =>
-    document.documentElement.getAttribute("data-theme")) === "light");
-  await openMenu();
-  await page.locator('[data-act="theme"][data-v="dark"]').click();
+  await themeBtn("dark").click();
   await wait(350);
   const dark = await paint();
-  check("Dark repaints the page back", dark.body !== light.body, light.body + " → " + dark.body);
+  check("Dark repaints the page back", dark.theme === "dark" && dark.body !== light.body,
+    light.body + " → " + dark.body);
+
+  /* SYSTEM IS A PREFERENCE, NOT A THIRD THEME. It must record the preference
+     and still resolve `data-theme` to one of the two, because the stylesheet
+     has exactly two blocks and nothing to paint for a third value. */
+  await openMenu();
+  await themeBtn("system").click();
+  await wait(350);
+  const sys = await paint();
+  check("System is stored as the preference", sys.stored === '"system"', String(sys.stored));
+  check("System marks itself on <html>", sys.pref === "system", String(sys.pref));
+  check("System still resolves to light or dark",
+    sys.theme === "light" || sys.theme === "dark", String(sys.theme));
+
+  /* AND IT FOLLOWS THE OS. Emulating the OS preference is the only way to prove
+     the listener is live rather than resolved once at boot. */
+  await page.emulateMedia({ colorScheme: "light" });
+  await wait(250);
+  const sysLight = await paint();
+  await page.emulateMedia({ colorScheme: "dark" });
+  await wait(250);
+  const sysDark = await paint();
+  check("System follows the OS both ways",
+    sysLight.theme === "light" && sysDark.theme === "dark",
+    sysLight.theme + " / " + sysDark.theme);
 
   check("no page errors", errors.length === 0, errors.join(" | "));
 

@@ -123,7 +123,8 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
 .fin-tbl td.num, .fin-tbl th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap }
 .fin-tbl tr.dim td { color: var(--text-3) }
 .fin-tbl tr.dim .fin-money { text-decoration: line-through; color: var(--text-3) }
-.fin-pager { display: flex; align-items: center; gap: var(--space-3); justify-content: center; padding: var(--space-4) 0; font-size: var(--text-sm); color: var(--text-3) }
+/* `.fin-pager` is gone — it had no call site left, and the panel's pager is
+   `.pager-bar` in admin-theme.css behind the shared `Pagination` component. */
 
 /* -------------------------------------------------------------- record --- */
 .fin-rec { padding: var(--space-4) var(--page-pad) var(--space-12); max-width: var(--page-max-wide); container-type: inline-size }
@@ -175,8 +176,13 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
 .fin-ev .ty { font-family: var(--font-mono); font-size: var(--text-2xs); line-height: 16px; padding: 0 6px; border-radius: var(--radius-xs); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: var(--bg-inset); color: var(--text-3); border: 1px solid var(--line) }
 .fin-ev .ty.ok { background: var(--ok-bg); color: var(--ok); border-color: var(--ok-line) }
 .fin-ev .ty.warn { background: var(--warn-bg); color: var(--warn); border-color: var(--warn-line) }
-.fin-ev .ty.stop { background: var(--bad-bg); color: var(--bad); border-color: var(--bad-line) }
-.fin-ev .ty.sys { background: var(--info-bg); color: var(--info); border-color: var(--info-line) }
+/* STOP IS BLOCKED, NOT MERELY BAD — the dashed edge is what separates "a rule
+   halted this" from "this failed", and it matches `.pill.stop`. SYS is
+   --system, the same value Business Enquiries now uses; the two modules used
+   to disagree about what colour "the system did it" is. */
+.fin-ev .ty.stop { background: var(--bad-bg); color: var(--bad);
+                   border-color: var(--bad-solid); border-style: dashed }
+.fin-ev .ty.sys { background: var(--system-bg); color: var(--system); border-color: var(--system) }
 .fin-ev .tx { color: var(--text-2) }
 .fin-ev .tx a { color: var(--brand-text); cursor: pointer }
 .fin-ev .wh, .fin-ev .wn { color: var(--text-3); white-space: nowrap }
@@ -296,7 +302,7 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
    behind the whole sheet. The watermark is the brand name at a whisper --
    text, not an image, so it prints from the same markup, and every child of
    the sheet stacks above it. */
-.fin-slip { position: relative; overflow: hidden }
+.fin-slip { position: relative; overflow: hidden; line-height: var(--lh-lg) }
 .fin-slip > :not(.fin-wm) { position: relative }
 .fin-wm {
   position: absolute; inset: 0; display: grid; place-items: center;
@@ -401,14 +407,11 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
 .fin-rupee { position: relative; display: block }
 .fin-rupee i { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-style: normal; color: var(--text-3); pointer-events: none }
 .fin-rupee .inp { padding-left: 24px }
-.fin-seg { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--line-2); border-radius: var(--radius-sm); background: var(--bg-inset); flex-wrap: wrap }
-.fin-seg button {
-  border: none; background: none; cursor: pointer; font: inherit;
-  padding: 5px var(--space-3); border-radius: var(--radius-xs);
-  font-size: var(--text-sm); color: var(--text-2);
-}
-.fin-seg button:hover { color: var(--text) }
-.fin-seg button.on { background: var(--bg); color: var(--text); font-weight: var(--weight-semibold); box-shadow: var(--shadow-xs) }
+/* THE SEGMENTED CONTROL LIVES IN admin-theme.css AS `.btn-group`.
+   Finance drew its own here and Team drew a third, so "pick one of these" came
+   out at three heights, three radii and three active treatments in three
+   modules. Frame.tsx and dialog.tsx now render `.btn-group`; only the class
+   changed, so every role, state and handler is untouched. */
 
 /* ------------------------------------------------------------ print --- */
 /* Every document in this panel is produced by printing it — there is no PDF
@@ -533,7 +536,6 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
    more air than a receipt, and the net figure has to be findable in a second.
    Printed, never generated: the browser's Save as PDF is the export, which is
    why there is no PDF library anywhere in this bundle. */
-.fin-slip { line-height: var(--lh-lg) }
 .fin-slip-co { font-size: var(--text-sm); line-height: var(--lh-base); color: var(--text-2) }
 .fin-slip-title { font-size: var(--text-lg); font-weight: var(--weight-semibold); letter-spacing: .04em }
 /* The status pill sits in a row of controls, so it takes a control's height,
@@ -675,14 +677,27 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
 .fin-inv .kv dd.b { font-weight: var(--weight-semibold); font-size: var(--text-md) }
 .fin-inv .notice { margin: 0 var(--space-3) var(--space-3) }
 
-/* A figure the person does not type. It reads as a readout, not a field, so
-   nobody tries to correct it in place. */
+/* A VALUE THE PERSON DOES NOT TYPE — the picked member, the plan a quotation
+   already decided, a computed total. It keeps a field's height and inset so it
+   holds its place in a form column, and its edge is DASHED because that is
+   what this system's dashed edge means everywhere else: not editable, filled
+   by something other than you. Nobody tries to correct it in place.
+
+   IT WAS DECLARED TWICE IN THIS FILE, sixty lines apart, by two people solving
+   the same problem — one a centred row with a dashed border, the other a
+   column with none. Neither shipped: the second won on layout and the first
+   went on supplying the border, so what rendered was a column WITH a dashed
+   border, which is what the second rule's own comment said it must not have.
+   One rule now, and it keeps the dashed edge on purpose. */
 .fin-derived {
-  display: flex; align-items: center; min-height: var(--control-md);
-  padding: 0 var(--space-3); border: 1px dashed var(--line-2);
-  border-radius: var(--radius-sm); background: var(--bg-inset); color: var(--text-2);
+  min-height: var(--control-md);
+  display: flex; flex-direction: column; justify-content: center;
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--line-2); border-radius: var(--radius-md);
+  background: var(--bg-inset); color: var(--text-2); font-size: var(--text-sm);
 }
 .fin-derived b { color: var(--text); font-weight: var(--weight-semibold) }
+.fin-derived .fin-fine { margin: 2px 0 0 }
 
 /* ------------------------------------------------ the topbar figure --- */
 /* THERE IS NO CSS HERE ANY MORE, and that is the change.
@@ -732,21 +747,9 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
 
 /* The remark stands off the fieldset above it by the same beat the fieldsets
    keep between themselves. */
-.fin-remark { margin-top: var(--space-4) }
+.fin-remark { display: block; margin-top: var(--space-4);
+              white-space: pre-wrap; line-height: var(--lh-md) }
 
-/* A read-only value where a field would be — the picked member, the plan a
-   quotation already decided. It is a FIELD, so it keeps the height and the
-   inset of one; it is not editable, so it carries no border to invite a
-   click. */
-.fin-derived {
-  min-height: var(--control-md);
-  display: flex; flex-direction: column; justify-content: center;
-  padding: var(--space-2) var(--space-3);
-  background: var(--bg-inset); border-radius: var(--radius-md);
-  color: var(--text-2); font-size: var(--text-sm);
-}
-.fin-derived b { color: var(--text); font-weight: var(--weight-semibold) }
-.fin-derived .fin-fine { margin: 2px 0 0 }
 
 /* ============================================================== payroll ===
    Analytics ▸ Payroll. Two controls and one row state; everything else on the
@@ -774,7 +777,7 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
 
 /* The year switcher sits in the command row where the period line usually is,
    so it inherits `.fin-sum`'s left margin and needs none of its own. */
-.fin-sum .fin-seg { margin-left: var(--space-2) }
+.fin-sum .btn-group { margin-left: var(--space-2) }
 
 /* An incentive line on a payslip, marked as one. It is an EARNING — money
    paid, in the earnings column, inside the gross — and it is not salary,
@@ -861,10 +864,9 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
   font-size: var(--text-2xs); letter-spacing: .06em; text-transform: uppercase;
   color: var(--text-3); font-weight: var(--weight-semibold); white-space: nowrap;
 }
-.fin-picker .selectbox select { height: var(--control-sm) }
+.fin-picker .selectbox select { height: var(--control-sm); font-weight: var(--weight-medium) }
 /* The value carries the weight, not a colour: these are read as "which year"
    and "which cut", and the label beside them already says which is which. */
-.fin-picker .selectbox select { font-weight: var(--weight-medium) }
 
 /* THE ROW AS A BOOKKEEPER WOULD WRITE IT, live under the amount on the record
    dialog. It replaced a paragraph explaining what "money in" means: a sentence
@@ -907,7 +909,6 @@ button.fin-mt:hover { border-color: var(--line-3); background: var(--bg-hover) }
 /* A remark on the record page. It is a sentence, so it wraps — the key-value
    list's other values are all single tokens and would have kept it on one
    line and cut it. */
-.fin-remark { display: block; white-space: pre-wrap; line-height: var(--lh-md) }
 
 /* A row somebody has disputed. Beside the state pill and not instead of it —
    the row is still `recorded` and still counts, and a chip that replaced the

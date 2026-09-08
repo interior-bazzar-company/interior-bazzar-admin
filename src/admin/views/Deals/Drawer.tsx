@@ -12,7 +12,7 @@
    ============================================================================= */
 import { useEffect } from "react";
 import type { ReactNode } from "react";
-import { Icon, KvList, Notice, PaneLoading, Pill, SectionHead } from "../../ui";
+import { Icon, KvList, Notice, PaneLoading, Pill, SectionHead, Timeline } from "../../ui";
 import { go } from "../../ui/nav";
 import { useShell } from "../../shell/ShellContext";
 import {
@@ -192,20 +192,18 @@ function TimelineTab({ dl, ev, p }: { dl: any; ev: { kind: string; tone: string;
             Adding a remark also clears the stalled flag.</div>
         </div>
       </div>
-      <div className="tl">
-        {ev.map((e: any, i: number) => (
-          <div className={"ti " + (e.tone || "")} key={i}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
-              <span className="pill xs">{e.kind}</span>
-              <span className="faint" style={{ fontSize: "var(--text-sm)", marginLeft: "auto" }}>{D.fmtDate(e.at)}</span>
-            </div>
-            <div style={{ fontSize: "var(--text-base)", lineHeight: 1.45, marginTop: "5px" }}>
-              {e.kind === "REMARK" || e.kind === "SYSTEM" ? e.text : <Rich text={e.text} />}
-            </div>
-            <div className="faint" style={{ fontSize: "var(--text-sm)", marginTop: "2px" }}>{e.by}</div>
-          </div>
-        ))}
-      </div>
+      {/* THE SHARED TIMELINE. Four modules each hand-built this out of `.tl`
+          plus `.ti` and a column of inline styles — four copies of one drawing,
+          which is how the dot ended up in three positions and the actor line in
+          two sizes. `Timeline` owns it now: the chip and the date are the
+          title, the text is the body, the actor is the meta, and the rail stops
+          at the last entry instead of running past it. */}
+      <Timeline items={ev.map((e: any) => ({
+        tone: e.tone === "bad" ? "bad" : e.kind === "SYSTEM" ? "sys" : undefined,
+        title: <><span className="pill xs">{e.kind}</span><span className="tl-when">{D.fmtDate(e.at)}</span></>,
+        body: e.kind === "REMARK" || e.kind === "SYSTEM" ? e.text : <Rich text={e.text} />,
+        meta: e.by,
+      }))} />
       <Notice ico="lock" text={<>
         Nothing in this timeline is editable or deletable. <b>There is no PUT and no DELETE endpoint</b>{" "}
         for a remark or a transition — immutability is enforced by the absence of the API, not by a

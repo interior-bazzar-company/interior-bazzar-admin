@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import AdminOpsService from "../../../api/modules/adminOps";
 import type { AuditEntry } from "../../../api/modules/adminOps";
-import { EmptyState, Icon, KvList, Notice, Pill, SectionHead } from "../../ui";
+import { EmptyState, Icon, KvList, Notice, Pill, SectionHead, Timeline } from "../../ui";
 import { can } from "../../shell/AdminShell";
 import { dateLabel, familyLabel, inr, money, monthsLabel } from "./helpers";
 import { rangeOf, savingOf } from "./api";
@@ -194,20 +194,13 @@ function History({ planId }: { planId: number }) {
   if (rows === null) return <div className="faint">Loading…</div>;
   if (!rows.length) return <div className="faint">Nothing yet.</div>;
   return (
-    <div className="tl">
-      {rows.slice(0, 12).map((e) => (
-        <div key={e.id} className={"ti " + (e.action.indexOf("deleted") >= 0 ? "bad" : "ok")}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
-            <span className="pill xs">{e.action.replace(/^plan_/, "")}</span>
-            <span className="faint" style={{ fontSize: "var(--text-sm)", marginLeft: "auto" }}>
-              {dateLabel(e.ts || "")}
-            </span>
-          </div>
-          <div style={{ fontSize: "var(--text-base)", lineHeight: 1.45, marginTop: "5px" }}>{e.detail || "—"}</div>
-          <div className="faint" style={{ fontSize: "var(--text-sm)", marginTop: "2px" }}>{e.actor || "—"}</div>
-        </div>
-      ))}
-    </div>
+    /* the shared timeline — see the note in Deals/Drawer.tsx */
+    <Timeline items={rows.slice(0, 12).map((e) => ({
+      tone: e.action.indexOf("deleted") >= 0 ? "bad" as const : "ok" as const,
+      title: <><span className="pill xs">{e.action.replace(/^plan_/, "")}</span><span className="tl-when">{dateLabel(e.ts || "")}</span></>,
+      body: e.detail || "—",
+      meta: e.actor || "—",
+    }))} />
   );
 }
 
