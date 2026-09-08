@@ -30,7 +30,7 @@ import AdminOpsService, { call } from "../../api/modules/adminOps";
 import type { AuditEntry, MePermissions } from "../../api/modules/adminOps";
 import { getModules, getGroupOf, getItems, moduleLabel, HOME_ROUTE } from "./modules";
 import { can, canWrite, clearSession, getSession, grantsOf } from "../auth/session";
-import { LS, currentDensity, currentTheme, setDensity, setTheme, useShell } from "./ShellContext";
+import { LS, currentTheme, setTheme, useShell } from "./ShellContext";
 import { CommandPalette } from "./CommandPalette";
 import { ButtonGroup, ButtonGroupItem } from "@/components/base/button-group/button-group";
 import ErrorBoundary from "../../components/shared/ErrorBoundary";
@@ -677,23 +677,21 @@ function AccountButton({ session }: { session: MePermissions | null }) {
     /* Untitled UI's ButtonGroup — a react-aria ToggleButtonGroup in single-
        selection mode, so the arrow keys move between the three and the chosen
        one is announced as selected, which the hand-rolled row never did. */
-    const swatch = (act: "theme" | "density", opts: [string, string][], cur: string) => (
+    const swatch = (opts: [string, string][], cur: string) => (
       <ButtonGroup
         size="sm"
         className="w-full *:flex-1 *:justify-center"
-        aria-label={act === "theme" ? "Theme" : "Density"}
+        aria-label="Theme"
         selectedKeys={[cur]}
         disallowEmptySelection
         onSelectionChange={(keys) => {
-          const v = String([...keys][0] || cur);
-          if (act === "theme") setTheme(v);
-          else setDensity(v);
+          setTheme(String([...keys][0] || cur));
           force((n) => n + 1);
           shell.closePop();
         }}
       >
         {opts.map((o) => (
-          <ButtonGroupItem key={o[0]} id={o[0]} data-act={act} data-v={o[0]}>
+          <ButtonGroupItem key={o[0]} id={o[0]} data-act="theme" data-v={o[0]}>
             {o[1]}
           </ButtonGroupItem>
         ))}
@@ -780,11 +778,7 @@ function AccountButton({ session }: { session: MePermissions | null }) {
             <div className="faint" style={{ fontSize: "var(--text-xs)", fontWeight: 600, marginBottom: 6 }}>
               THEME
             </div>
-            {swatch("theme", [["light", "Light"], ["dark", "Dark"], ["system", "System"]], currentTheme())}
-            <div className="faint" style={{ fontSize: "var(--text-xs)", fontWeight: 600, margin: "10px 0 6px" }}>
-              DENSITY
-            </div>
-            {swatch("density", [["comfortable", "Comfortable"], ["compact", "Compact"]], currentDensity())}
+            {swatch([["light", "Light"], ["dark", "Dark"], ["system", "System"]], currentTheme())}
           </div>
           <div className="msep" />
           <SignOut onDone={() => shell.closePop()} />

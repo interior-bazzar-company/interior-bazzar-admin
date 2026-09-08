@@ -79,35 +79,27 @@ export function setTheme(v: string) {
   applyTheme(v);
   LS.set("ib_admin_theme", v);
 }
-export function setDensity(v: string) {
-  const r = document.documentElement;
-  if (v === "comfortable") r.removeAttribute("data-density");
-  else r.setAttribute("data-density", v);
-  if (v === "comfortable") {
-    try {
-      localStorage.removeItem("ib_admin_density");
-    } catch {
-      /* nothing to remove */
-    }
-  } else LS.set("ib_admin_density", v);
-}
 /* What the person CHOSE, not what is painted: with "system" chosen the
    attribute says light or dark, and the switch has to show System. */
 export const currentTheme = () =>
   document.documentElement.getAttribute("data-theme-pref") === "system"
     ? "system"
     : document.documentElement.getAttribute("data-theme") || "system";
-export const currentDensity = () =>
-  document.documentElement.getAttribute("data-density") || "comfortable";
 
 /** Runs before first paint from main.tsx, the way the prototype's inline
     <head> script did — so the panel never flashes the wrong theme. */
 export function bootAppearance() {
   const r = document.documentElement;
   const t = LS.get<string | null>("ib_admin_theme", null) || "dark";
-  const d = LS.get<string | null>("ib_admin_density", null);
   applyTheme(t);
-  if (d) r.setAttribute("data-density", d);
+  /* Density is no longer a choice — comfortable is the only spacing, so a
+     stale "compact" from an earlier session is cleared rather than honoured. */
+  r.removeAttribute("data-density");
+  try {
+    localStorage.removeItem("ib_admin_density");
+  } catch {
+    /* nothing to remove */
+  }
 }
 
 /* ================================================================ TYPES === */

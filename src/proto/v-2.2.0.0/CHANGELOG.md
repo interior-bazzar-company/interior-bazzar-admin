@@ -6,6 +6,34 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-08
 
+### Density switch removed — Comfortable is the only spacing
+
+**Area:** account menu (bottom-left avatar popover), appearance boot
+**Files:** `src/admin/shell/AdminShell.tsx`, `src/admin/shell/ShellContext.tsx`
+
+**What changed**
+The DENSITY heading and its Comfortable / Compact button group are gone from the account
+menu. The menu now ends with THEME, and the panel is always at comfortable spacing.
+
+`setDensity` and `currentDensity` went with it — nothing else called them, and leaving an
+API that can put the panel into a state the UI can no longer undo is worse than deleting
+it. The `swatch` helper lost its `act` argument and is theme-only.
+
+`bootAppearance` now clears `data-density` and removes the `ib_admin_density` key on every
+boot, so anyone who had chosen Compact before this change comes back to Comfortable
+instead of being stuck in a mode with no switch.
+
+The `[data-density="compact"]` block in `src/styles/tokens.css` is left in place: nothing
+sets the attribute any more, so it is inert, and keeping it means the switch can come back
+as a one-line change if it is ever wanted.
+
+**Verified**
+`npx tsc -b` clean, `npx eslint` clean on both changed files.
+
+---
+
+## 2026-09-08
+
 ### Untitled UI React — the component library itself, on React 19
 
 **Area:** `/login` (door), the account menu, every shared primitive under `src/admin/ui`
