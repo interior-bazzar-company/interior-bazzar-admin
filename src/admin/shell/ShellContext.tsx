@@ -45,8 +45,10 @@ export const LS = {
 };
 
 /* =========================================================== APPEARANCE === */
-/* Two attributes on <html> drive the whole system. No class sweep, no reload:
-   the ramps and the scales are re-read by every component at once.          */
+/* Two attributes on <html> drive the whole system — data-scheme and
+   data-theme. No class sweep, no reload, no context provider: the browser
+   re-reads the custom properties and repaints, and every component in the
+   panel is correct in all six states at once.                              */
 /* Two selectors, one state. `data-theme` is the panel's own; `dark-mode` /
    `light-mode` is Untitled UI's, so a library component reads the theme with
    no translation layer. "System" is resolved here from prefers-color-scheme —
@@ -79,6 +81,45 @@ export function setTheme(v: string) {
   applyTheme(v);
   LS.set("ib_admin_theme", v);
 }
+
+/* ---------------------------------------------------------------- scheme */
+/* THE SCHEMES, and what each one is for. `console` is the default and carries
+   no attribute at all — the absence IS the value, which is why schemes.css
+   writes it behind `:not([data-scheme])` and why a browser with no stored
+   preference paints the new system rather than a fallback of it.
+
+   `portal` is the panel as it was before the scheme layer existed: its whole
+   layer-2 block is aliases of the Untitled UI tokens the legacy vocabulary
+   used to read, so it restores the previous appearance instead of
+   approximating it. Nothing was removed to make room for the new default. */
+export const SCHEMES: { id: string; label: string; hint: string }[] = [
+  { id: "console", label: "Console", hint: "Ink & forest — the current system" },
+  { id: "portal", label: "Portal classic", hint: "The panel as it was" },
+  { id: "beacon", label: "Beacon", hint: "Teal on slate — for a floor screen" },
+];
+
+function applyScheme(v: string) {
+  const r = document.documentElement;
+  if (v === "console") r.removeAttribute("data-scheme");
+  else r.setAttribute("data-scheme", v);
+}
+
+export function setScheme(v: string) {
+  applyScheme(v);
+  if (v === "console") {
+    try {
+      localStorage.removeItem("ib_admin_scheme");
+    } catch {
+      /* nothing to remove */
+    }
+  } else LS.set("ib_admin_scheme", v);
+}
+
+export const currentScheme = () =>
+  document.documentElement.getAttribute("data-scheme") || "console";
+
+export const schemeLabel = (id: string) =>
+  (SCHEMES.find((s) => s.id === id) || SCHEMES[0]).label;
 /* What the person CHOSE, not what is painted: with "system" chosen the
    attribute says light or dark, and the switch has to show System. */
 export const currentTheme = () =>
@@ -92,6 +133,11 @@ export function bootAppearance() {
   const r = document.documentElement;
   const t = LS.get<string | null>("ib_admin_theme", null) || "dark";
   applyTheme(t);
+  /* Scheme before paint, for the same reason theme is: applying it from a
+     React effect ships one frame of the wrong appearance, and on a machine
+     that had chosen Portal that frame is a whole-page colour flash. */
+  const sc = LS.get<string | null>("ib_admin_scheme", null);
+  applyScheme(sc && SCHEMES.some((x) => x.id === sc) ? sc : "console");
   /* Density is no longer a choice — comfortable is the only spacing, so a
      stale "compact" from an earlier session is cleared rather than honoured. */
   r.removeAttribute("data-density");
@@ -111,7 +157,10 @@ type PopOpts = { width?: number; align?: "left" | "right"; above?: boolean; cls?
 type Pop = { anchor: HTMLElement; node: ReactNode; opts: PopOpts } | null;
 
 export type ShellServices = {
-  drawer: (node: ReactNode, onDismiss?: () => void) => void;
+  /** `size` is one of sm · md · lg · xl — see the drawer block in
+   *  components.css. Omitted keeps the wide default every existing caller
+   *  already renders into. */
+  drawer: (node: ReactNode, onDismiss?: () => void, size?: string) => void;
   modal: (node: ReactNode, size?: string) => void;
   closeLayer: () => void;
   layerKind: LayerKind | null;
@@ -185,9 +234,9 @@ export function ShellProvider({ children }: { children: ReactNode }) {
   /* `onDismiss` is optional and the callback stays dependency-free, so it is
      still the same stable identity an effect can depend on without re-running
      because of the layer it just opened. */
-  const drawer = useCallback((node: ReactNode, onDismiss?: () => void) => {
+  const drawer = useCallback((node: ReactNode, onDismiss?: () => void, size?: string) => {
     lastFocus.current = document.activeElement;
-    setLayer({ kind: "drawer", node, onDismiss });
+    setLayer({ kind: "drawer", node, onDismiss, size });
   }, []);
 
   const modal = useCallback((node: ReactNode, size?: string) => {
@@ -363,6 +412,10 @@ export function ShellProvider({ children }: { children: ReactNode }) {
   );
 }
 
+const FOCUSABLE =
+  'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),' +
+  'textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+
 function LayerBox({ layer, onClose }: { layer: NonNullable<Layer>; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -375,11 +428,37 @@ function LayerBox({ layer, onClose }: { layer: NonNullable<Layer>; onClose: () =
       || el.querySelector("input,select,textarea,button:not(.md-x),[tabindex]:not(.md-x)")) as HTMLElement | null;
     if (f) window.setTimeout(() => f.focus(), 30);
   }, []);
+  /* THE PAGE BEHIND A LAYER DOES NOT SCROLL. Without this the wheel over a
+     modal's scrim moves the table underneath it, so closing the dialog lands
+     the reader somewhere they never navigated to. */
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       /* A component that handled Escape itself (a listbox, a popover) marks
          the event; the layer must not close on top of it. */
-      if (e.key === "Escape" && !e.defaultPrevented) onClose();
+      if (e.key === "Escape" && !e.defaultPrevented) { onClose(); return; }
+      /* FOCUS IS TRAPPED, and it is trapped here rather than in each of the
+         forty dialogs that open one. Tab off the last control and the ring
+         reappears on the first, instead of walking into the page behind the
+         scrim where nothing can be seen and Escape no longer reads as "leave
+         this dialog". */
+      if (e.key !== "Tab" || e.defaultPrevented) return;
+      const el = ref.current;
+      if (!el) return;
+      const items = Array.prototype.slice
+        .call(el.querySelectorAll(FOCUSABLE))
+        .filter((n) => (n as HTMLElement).offsetParent !== null) as HTMLElement[];
+      if (!items.length) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      const at = document.activeElement;
+      if (!el.contains(at)) { e.preventDefault(); first.focus(); return; }
+      if (e.shiftKey && at === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && at === last) { e.preventDefault(); first.focus(); }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);

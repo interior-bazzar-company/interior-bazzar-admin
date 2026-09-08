@@ -271,25 +271,12 @@
 .rs-card .fg:last-child { margin-bottom: 0 }
 
 /* ---- tags --------------------------------------------------------------- */
-/* The box IS the input: the chips sit inside it and the caret follows them, so
-   there is one target rather than a field beside a list of what the field
-   produced. */
-.rs-tagbox {
-  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
-  min-height: var(--control-lg); padding: 5px var(--space-3);
-  border: 1px solid var(--line-control); border-radius: var(--radius-md);
-  background: var(--surface-raised); cursor: text;
-}
-.rs-tagbox:focus-within {
-  border-color: var(--brand); box-shadow: var(--ring);
-}
-.rs-tag { flex: 0 0 auto }
-.rs-tag-in {
-  flex: 1 1 140px; min-width: 120px;
-  border: 0; outline: 0; background: transparent; color: var(--text);
-  font: inherit; font-size: var(--text-base); height: var(--control-md);
-}
-.rs-tag-in::placeholder { color: var(--text-3) }
+/* THE BOX ITSELF LEFT THIS FILE. `.rs-tagbox` and `.rs-tag-in` were a chip
+   field living in one module's sheet — the exact thing a shared layer exists to
+   prevent — and they are now `.chips-input` in styles/components.css, drawn
+   once for every screen that holds a list. What stays here is the row of
+   suggestions under it, which is genuinely local: no other chip field in the
+   panel offers one. */
 .rs-tag-sug {
   display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2);
   margin-top: var(--space-2);

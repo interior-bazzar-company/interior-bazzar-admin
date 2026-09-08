@@ -46,3 +46,6 @@ AIDOCS/
 # anyone who clones. The blanket rule above was silently swallowing the whole
 # directory, and `git add -f` every time is a rule somebody forgets once.
 !src/content/**/*.json
+
+# screenshots from `npm run shots` — regenerate, never commit
+.tmp

@@ -1,17 +1,26 @@
+@import "./schemes.css";
+
 /* =============================================================================
    Interior bazzar — Admin · the BRIDGE
    =============================================================================
 
-   Colour, shadow and font tokens come from src/styles/untitled/theme.css —
-   Untitled UI's own theme, emitted by Tailwind to :root. This file does two
-   jobs and nothing else:
+   THE STACK, top to bottom:
+
+     schemes.css        L1 ramps · L2 semantic set × 3 schemes × 2 themes
+     tokens.css         THIS FILE — the scales, and the legacy vocabulary
+     admin-theme.css    L3, the components
+     components.css     L3, the parts this system added
+     <module>.css       only what is genuinely local to one screen
+
+   This file does two jobs and nothing else:
 
      1. THE SCALES the panel is built on — control heights, the ten type names,
-        radius, layout, motion, z-index.
+        radius, layout, motion, z-index. No colour, no theme.
      2. THE LEGACY VOCABULARY. Nine module sheets and 2,600 lines of component
-        CSS write --bg, --text-2, --brand, --ok-bg, --line-control. Every one of
-        those names is defined here as an alias of an Untitled UI token, so the
-        whole product re-skins without a single module sheet being edited.
+        CSS write --bg, --text-2, --brand, --ok-bg, --line-control. Every one
+        of those names is an alias of a SEMANTIC token from schemes.css, so the
+        whole product re-skins from one attribute on <html> without a single
+        module sheet being edited.
 
    TWO SCALES, DELIBERATELY. Untitled UI names its steps --text-sm (14) and
    --radius-lg (8); this panel has written --text-sm to mean 12 and
@@ -23,7 +32,7 @@
    SIZE. Untitled UI's smallest button is 36 and its default is 40, sized for
    marketing pages. This is a CRM: a toolbar above a 40-row table cannot spend
    40px on every control. The panel's `md` is their `sm` (36), its `lg` their
-   `md` (40) — their steps, shifted one notch denser. Compact takes ~12% off.
+   `md` (40) — their steps, shifted one notch denser.
    ========================================================================== */
 
 :root{
@@ -80,78 +89,92 @@
 
 
   /* ======================================================================
-     THE LEGACY VOCABULARY — aliases, defined once.
+     THE LEGACY VOCABULARY — aliases onto layer 2, defined once.
+
+     Nine module sheets and 2,600 lines of component CSS write --bg, --text-2,
+     --brand, --ok-bg, --line-control. Every one of those names resolves here
+     to a SEMANTIC token from schemes.css, so choosing a scheme re-skins the
+     whole product — every module, both themes — without one module sheet
+     being edited. This block is the reason a scheme costs a file rather than
+     a quarter.
      ==================================================================== */
 
-  /* ---- surfaces · --bg is the plane, --bg-shell the ground; in dark the
-     plane is the lighter of the two and that inversion lives in theme.css -- */
-  --bg:var(--color-bg-primary);
-  --bg-shell:var(--color-bg-secondary);
-  --bg-nav:var(--color-bg-nav);
-  --bg-inset:var(--color-bg-tertiary);
-  --bg-hover:var(--color-bg-primary_hover);
-  --bg-active:var(--color-bg-active);
-  --bg-selected:var(--color-bg-selected);
+  /* ---- surfaces · --bg is the plane a card sits on, --bg-shell the ground
+     the app sits on. The inversion between them in dark is layer 2's job. -- */
+  --bg:var(--color-surface);
+  --bg-shell:var(--color-bg);
+  --bg-nav:var(--color-surface-nav);
+  --bg-inset:var(--color-surface-sunken);
+  --bg-hover:var(--color-hover);
+  --bg-active:var(--color-active);
+  --bg-selected:var(--color-selected);
   /* the nav is already a step off the plane, so its hover is the ACTIVE step */
-  --sidebar-hover:var(--color-bg-active);
-  --sidebar-active:var(--color-bg-selected);
-  --surface:var(--color-bg-primary);
-  --surface-raised:var(--color-bg-raised);
-  --sk:var(--color-skeleton);
-  --sk-sheen:var(--color-skeleton-sheen);
+  --sidebar-hover:var(--color-active);
+  --sidebar-active:var(--color-selected);
+  --surface:var(--color-surface);
+  --surface-raised:var(--color-surface-raised);
+  --sk:var(--color-sk);
+  --sk-sheen:var(--color-sk-sheen);
   --skeleton:linear-gradient(90deg,var(--sk) 25%,var(--sk-sheen) 38%,var(--sk) 62%);
 
-  /* ---- text · --text-3 is TERTIARY: quaternary fails 4.5:1 on the inset
-     ground that table heads use, and table heads are written in --text-3 --- */
-  --text:var(--color-text-primary);
-  --text-2:var(--color-text-secondary);
-  --text-3:var(--color-text-tertiary);
-  --text-4:var(--color-text-quaternary);
-  --text-disabled:var(--color-text-disabled);
-  --text-inverse:var(--color-text-white);
+  /* ---- text · --text-3 is the MUTED step: column heads, meta, placeholders
+     and axis labels, and it still clears 4.5:1 on the sunken ground they sit
+     on. --text-4 is not a fourth grey to reach for — it is the one inside a
+     disabled control. -------------------------------------------------- */
+  --text:var(--color-text);
+  --text-2:var(--color-text-2);
+  --text-3:var(--color-text-muted);
+  --text-4:var(--color-text-off);
+  --text-disabled:var(--color-text-off);
+  --text-inverse:var(--color-text-inverse);
 
   /* ---- borders · a hairline GROUPS, a control edge IDENTIFIES ----------- */
-  --line:var(--color-border-secondary);
-  --line-2:var(--color-border-primary);
-  --line-3:var(--color-border-primary);
-  --line-control:var(--color-border-control);
-  --line-strong:var(--color-border-control);
+  --line:var(--color-border);
+  --line-2:var(--color-border-strong);
+  --line-3:var(--color-border-strong);
+  --line-control:var(--color-control-edge);
+  --line-strong:var(--color-control-edge);
 
   /* ---- brand · FOREST, the thread, not the button ----------------------- */
-  --brand:var(--color-bg-brand-solid);
-  --brand-hover:var(--color-bg-brand-solid_hover);
-  --brand-ink:var(--color-text-white);
-  --brand-text:var(--color-text-brand-secondary);
-  --brand-tint:var(--color-bg-brand-primary);
-  --brand-tint-2:var(--color-bg-brand-secondary);
-  --brand-line:var(--color-border-brand-subtle);
-  --brand-mint:var(--color-brand-300);
+  --brand:var(--color-brand);
+  --brand-hover:var(--color-brand-hover);
+  --brand-ink:var(--color-brand-ink);
+  --brand-text:var(--color-brand-text);
+  --brand-tint:var(--color-brand-soft);
+  --brand-tint-2:var(--color-brand-soft-2);
+  --brand-line:var(--color-brand-border);
+  --brand-mint:var(--color-brand-accent);
 
   /* ---- the primary action · INK, inverting wholesale -------------------- */
-  --ink-solid:var(--color-ink-solid);
-  --ink-solid-hover:var(--color-ink-solid_hover);
-  --ink-on-solid:var(--color-on-ink);
+  --ink-solid:var(--color-primary);
+  --ink-solid-hover:var(--color-primary-hover);
+  --ink-on-solid:var(--color-primary-ink);
 
   /* ---- status · text · soft ground · edge · solid fill ------------------ */
-  --ok:var(--color-text-success-primary);   --ok-bg:var(--color-bg-success-primary);
-  --ok-line:var(--color-border-success);    --ok-solid:var(--color-bg-success-solid);
-  --warn:var(--color-text-warning-primary); --warn-bg:var(--color-bg-warning-primary);
-  --warn-line:var(--color-border-warning);  --warn-solid:var(--color-bg-warning-solid);
-  --bad:var(--color-text-error-primary);    --bad-bg:var(--color-bg-error-primary);
-  --bad-line:var(--color-border-error-subtle); --bad-solid:var(--color-bg-error-solid);
-  --info:var(--color-text-info-primary);    --info-bg:var(--color-bg-info-primary);
-  --info-line:var(--color-border-info);     --info-solid:var(--color-bg-info-solid);
-  --neutral:var(--color-text-secondary);    --neutral-bg:var(--color-bg-tertiary);
-  --neutral-line:var(--color-border-primary);
-  --accent:var(--color-bg-info-solid);
-  --accent-text:var(--color-text-info-primary);
-  --accent-bg:var(--color-bg-info-primary);
+  --ok:var(--color-success);       --ok-bg:var(--color-success-soft);
+  --ok-line:var(--color-success-border); --ok-solid:var(--color-success-solid);
+  --warn:var(--color-warning);     --warn-bg:var(--color-warning-soft);
+  --warn-line:var(--color-warning-border); --warn-solid:var(--color-warning-solid);
+  --bad:var(--color-danger);       --bad-bg:var(--color-danger-soft);
+  --bad-line:var(--color-danger-border); --bad-solid:var(--color-danger-solid);
+  --info:var(--color-info);        --info-bg:var(--color-info-soft);
+  --info-line:var(--color-info-border);  --info-solid:var(--color-info-solid);
+  --neutral:var(--color-text-2);   --neutral-bg:var(--color-neutral-soft);
+  --neutral-line:var(--color-neutral-border);
+  /* the LIVE accent — a running session, an open shift, a streaming figure.
+     Never a chart series, never a status, never a button. */
+  --accent:var(--color-accent);
+  --accent-text:var(--color-accent-text);
+  --accent-bg:var(--color-accent-soft);
+  /* the SYSTEM acted — automation, derivation, an audit entry */
+  --system:var(--color-secondary);
+  --system-bg:var(--color-secondary-soft);
 
   /* ---- elevation · xs … 2xl come from theme.css ------------------------- */
   --ring:var(--focus-ring);
   --bad-ring:var(--focus-ring-error);
   --focus-ring-danger:var(--focus-ring-error);
-  --scrim:var(--color-bg-overlay);
+  --scrim:var(--color-scrim);
 
   /* ---- type stacks ------------------------------------------------------ */
   --font:var(--font-body);

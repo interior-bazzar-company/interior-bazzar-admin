@@ -433,13 +433,34 @@ export interface TileProps {
   serif?: boolean;
   /* `data-go` hash; a tile without one is a <div>, not a <button> */
   to?: string;
+  /** THE COMPARISON, and it is not optional in spirit: "▲ 11%" on its own is
+   *  unreadable — up against what? `delta.dir` colours the small number and
+   *  `delta.of` names the period beside it. The FIGURE is never coloured by
+   *  trend, because up is not always good: rising unclosed days is bad, and a
+   *  green 11 would say the opposite. The judgement is the caller's, per
+   *  metric, and it is spent on the delta. */
+  delta?: { dir: "up" | "down" | "flat"; text: ReactNode; of?: ReactNode };
+  /** anything else that belongs on the comparison line — a pill, a meter */
+  foot?: ReactNode;
 }
 export function Tile(o: TileProps) {
+  const arrow = o.delta ? (o.delta.dir === "down" ? "▼" : o.delta.dir === "up" ? "▲" : "—") : null;
   const inner = (
     <>
       <div className="k">{o.icon ? <Icon name={o.icon} size="sm" /> : null}{o.k}</div>
       <div className={"v" + (o.serif ? " serif" : "")}>{o.v}</div>
       {o.s ? <div className="s">{o.s}</div> : null}
+      {o.delta || o.foot ? (
+        <div className="foot">
+          {o.delta ? (
+            <span className={"delta " + o.delta.dir}>
+              <span aria-hidden="true">{arrow}</span>{o.delta.text}
+            </span>
+          ) : null}
+          {o.delta && o.delta.of ? <span>{o.delta.of}</span> : null}
+          {o.foot}
+        </div>
+      ) : null}
     </>
   );
   const cls = "tile" + (o.tone ? " " + o.tone : "") + (o.on ? " on" : "");
@@ -754,6 +775,114 @@ export function Select({ name, label, options, value, onFilter }: {
       selectClassName={"pr-8" + (on ? " ring-brand text-brand-secondary" : "")}
       defaultValue={String(value === undefined || value === null ? "" : value)}
       onChange={(e) => onFilter && onFilter(name, e.target.value)} />
+  );
+}
+
+/* =============================================================================
+   CHIP INPUT — several values in one field
+   -----------------------------------------------------------------------------
+   THE CONTROL THIS SYSTEM WAS ASKED FOR BY NAME. A text box holding a
+   comma-separated string looks like one value and behaves like several: you
+   cannot see where one ends, you cannot remove the third without re-reading the
+   whole line, and a stray comma silently creates an empty entry.
+
+   THE BOX IS THE INPUT: the chips sit inside it and the caret follows them, so
+   there is one target rather than a field beside a list of what it produced.
+   Enter commits, and so does a comma — somebody pasting "onboarding, sales"
+   means two, and pressing Enter twice is a rule they would have to be taught.
+   Backspace on an empty box takes the last chip back, because its absence is
+   the thing that makes a chip field feel broken.
+
+   It was Resources' own `ChipField`, module-local in every respect except the
+   idea. Promoted here whole: same behaviour, same markup, `.chips-input` in the
+   shared layer instead of `.rs-tagbox` in one module's sheet — so the next
+   field that holds a list gets it for free instead of growing a fourth version
+   of it that handles Backspace differently.
+
+   `clean` is the caller's, not this component's. Resources folds case, trims
+   and de-duplicates against its own rules and its own cap; a control that
+   guessed at those would be wrong for the next field that has different ones.
+   The default is the honest minimum — trim, drop the empties, drop exact
+   repeats — and nothing more. */
+export function ChipInput({
+  id, value, onChange, placeholder, clean, disabled, invalid, ariaLabel, max,
+}: {
+  id?: string;
+  value: string[];
+  onChange: (v: string[]) => void;
+  placeholder?: string;
+  /** the caller's normaliser — folds case, caps the list, rejects a duplicate */
+  clean?: (v: string[]) => string[];
+  disabled?: boolean;
+  invalid?: boolean;
+  ariaLabel?: string;
+  max?: number;
+}) {
+  const [draft, setDraft] = useState("");
+  const box = useRef<HTMLDivElement>(null);
+  const norm =
+    clean ||
+    ((v: string[]) => {
+      const out: string[] = [];
+      v.forEach((raw) => {
+        const t = String(raw || "").trim();
+        if (t && out.indexOf(t) < 0) out.push(t);
+      });
+      return typeof max === "number" ? out.slice(0, max) : out;
+    });
+
+  const commit = (raw: string) => {
+    const next = norm(value.concat(String(raw).split(",")));
+    if (next.length !== value.length) onChange(next);
+    setDraft("");
+  };
+
+  return (
+    <div
+      ref={box}
+      className={"chips-input" + (invalid ? " bad" : "") + (disabled ? " is-disabled" : "")}
+      /* CLICKING THE BOX FOCUSES THE BOX. The chips are most of its surface, so
+         without this the two-thirds of the control that is chips is dead to a
+         click — the one thing a person tries first when a field looks full. */
+      onMouseDown={(e) => {
+        if (disabled) { e.preventDefault(); return; }
+        if ((e.target as HTMLElement).closest("button,input")) return;
+        e.preventDefault();
+        const el = box.current && box.current.querySelector("input");
+        if (el) (el as HTMLInputElement).focus();
+      }}
+    >
+      {value.map((t) => (
+        <span key={t} className="chip on">
+          {t}
+          {!disabled && (
+            <button type="button" className="x" aria-label={"Remove " + t}
+              onClick={() => onChange(value.filter((y) => y !== t))}>
+              <Icon name="x" size="sm" />
+            </button>
+          )}
+        </span>
+      ))}
+      <input
+        id={id}
+        value={draft}
+        disabled={disabled}
+        aria-label={ariaLabel}
+        placeholder={value.length && !placeholder ? "Add another" : placeholder}
+        onChange={(e) => {
+          if (e.target.value.indexOf(",") >= 0) commit(e.target.value);
+          else setDraft(e.target.value);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && draft.trim()) { e.preventDefault(); commit(draft); }
+          if (e.key === "Backspace" && !draft && value.length) onChange(value.slice(0, -1));
+        }}
+        /* COMMIT ON BLUR. A typed word left in the box when somebody presses
+           Save is a value they believe they entered; dropping it silently is
+           how a form loses an answer without ever saying so. */
+        onBlur={() => { if (draft.trim()) commit(draft); }}
+      />
+    </div>
   );
 }
 

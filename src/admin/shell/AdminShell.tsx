@@ -30,7 +30,7 @@ import AdminOpsService, { call } from "../../api/modules/adminOps";
 import type { AuditEntry, MePermissions } from "../../api/modules/adminOps";
 import { getModules, getGroupOf, getItems, moduleLabel, HOME_ROUTE } from "./modules";
 import { can, canWrite, clearSession, getSession, grantsOf } from "../auth/session";
-import { LS, currentTheme, setTheme, useShell } from "./ShellContext";
+import { LS, SCHEMES, currentScheme, currentTheme, setScheme, setTheme, useShell } from "./ShellContext";
 import { CommandPalette } from "./CommandPalette";
 import { ButtonGroup, ButtonGroupItem } from "@/components/base/button-group/button-group";
 import ErrorBoundary from "../../components/shared/ErrorBoundary";
@@ -272,6 +272,20 @@ export default function AdminShell() {
     <NavCtx.Provider value={{ go, back }}>
       <ChromeCtx.Provider value={setChrome}>
         <div className={"app" + (railed ? " rail" : "") + (navOpen ? " nav-open" : "")} id="app">
+          {/* FIRST IN THE TAB ORDER, on every screen in the panel. Without it
+              a keyboard reaches the page by tabbing the whole sidebar — thirty
+              rows on an admin account — on every navigation. */}
+          <a
+            className="skip"
+            href="#page"
+            onClick={(e) => {
+              e.preventDefault();
+              const el = document.getElementById("page");
+              if (el) { el.setAttribute("tabindex", "-1"); el.focus(); }
+            }}
+          >
+            Skip to content
+          </a>
           {/* ================================================== SIDEBAR === */}
           <aside className="sidebar" aria-label="Modules">
             <div className="sb-top">
@@ -728,9 +742,7 @@ function AccountButton({ session }: { session: MePermissions | null }) {
         </div>
         <div className="pop-b">
           <div style={{ padding: "8px 10px 4px" }}>
-            <div className="faint" style={{ fontSize: 11.5, fontWeight: 600, marginBottom: 7 }}>
-              EFFECTIVE ACCESS · THIS SESSION
-            </div>
+            <div className="ap-k">Effective access · this session</div>
             <div className="chiprow">
               {grants.length ? (
                 grants.map((g) => (
@@ -774,10 +786,42 @@ function AccountButton({ session }: { session: MePermissions | null }) {
             Keyboard shortcuts<span className="r">?</span>
           </button>
           <div className="msep" />
-          <div style={{ padding: "6px 10px 10px" }}>
-            <div className="faint" style={{ fontSize: "var(--text-xs)", fontWeight: 600, marginBottom: 6 }}>
-              THEME
+          <div className="ap" style={{ padding: "8px 10px 10px" }}>
+            <div className="ap-k">APPEARANCE</div>
+            {/* THE SCHEME PICKER. A dropdown rather than a third button group:
+                the two switches above it are 2 and 3 options wide and read at a
+                glance, and a list that will grow is the one control in this
+                menu that should not have to be redrawn when it does. It is a
+                real <select>, so it opens with the platform's own list, works
+                on a phone, and needs no positioning inside a popover that is
+                already positioned. */}
+            <label className="ap-row" htmlFor="apScheme">
+              <span className="ap-l">Scheme</span>
+              <select
+                id="apScheme"
+                className="ap-select"
+                data-act="scheme"
+                defaultValue={currentScheme()}
+                onChange={(e) => {
+                  setScheme(e.target.value);
+                  force((n) => n + 1);
+                  shell.toast(
+                    (SCHEMES.find((x) => x.id === e.target.value) || SCHEMES[0]).label +
+                      " — saved for this browser."
+                  );
+                }}
+              >
+                {SCHEMES.map((sc) => (
+                  <option key={sc.id} value={sc.id}>
+                    {sc.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="ap-hint">
+              {(SCHEMES.find((x) => x.id === currentScheme()) || SCHEMES[0]).hint}
             </div>
+            <div className="ap-k" style={{ marginTop: 10 }}>THEME</div>
             {swatch([["light", "Light"], ["dark", "Dark"], ["system", "System"]], currentTheme())}
           </div>
           <div className="msep" />

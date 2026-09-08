@@ -28,7 +28,7 @@
 import { useMemo, useState } from "react";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
-import { EmptyState, Icon, Notice, TbTitle } from "../../ui";
+import { ChipInput, EmptyState, Icon, Notice, TbTitle } from "../../ui";
 import { go } from "../../ui/nav";
 import { FormPreview } from "./index";
 import { TypeMark } from "./bits";
@@ -261,14 +261,6 @@ function ChipField({ id, label, value, onChange, placeholder, suggest, suggestLa
   help?: string;
   helpTone?: string;
 }) {
-  const [draft, setDraft] = useState("");
-
-  const commit = (raw: string) => {
-    const next = cleanTags(value.concat(raw.split(",")));
-    if (next.length !== value.length) onChange(next);
-    setDraft("");
-  };
-
   const used: Record<string, boolean> = {};
   value.forEach((t) => { used[t.toLowerCase()] = true; });
   /* A suggestion already taken is clutter, so it goes. */
@@ -277,32 +269,25 @@ function ChipField({ id, label, value, onChange, placeholder, suggest, suggestLa
   return (
     <div className="fg">
       <label htmlFor={id}>{label}</label>
-      <div className="rs-tagbox">
-        {value.map((t) => (
-          <span key={t} className="chip on rs-tag">
-            {t}
-            <button type="button" className="x" aria-label={"Remove " + t}
-              onClick={() => onChange(value.filter((y) => y !== t))}>
-              <Icon name="x" size="sm" />
-            </button>
-          </span>
-        ))}
-        <input className="rs-tag-in" id={id} value={draft} placeholder={placeholder}
-          onChange={(e) => {
-            if (e.target.value.indexOf(",") >= 0) commit(e.target.value);
-            else setDraft(e.target.value);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && draft.trim()) { e.preventDefault(); commit(draft); }
-            if (e.key === "Backspace" && !draft && value.length) onChange(value.slice(0, -1));
-          }}
-          onBlur={() => { if (draft.trim()) commit(draft); }} />
-      </div>
+      {/* THE BOX ITSELF IS NOW ui/ChipInput. This wrapper keeps what is
+          genuinely local to Resources — the label, the suggestion row and the
+          help line — and stops owning a chip field that four other screens
+          would each have had to re-invent. `cleanTags` stays the caller's:
+          it is Resources' own rule about case, length and duplicates, and the
+          shared control has no business guessing at it. */}
+      <ChipInput
+        id={id}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        clean={(v) => cleanTags(v)}
+      />
       {offer.length ? (
         <div className="rs-tag-sug">
           <span className="cell-2">{suggestLabel}</span>
           {offer.map((t) => (
-            <button key={t} type="button" className="chip" onClick={() => commit(t)}>{t}</button>
+            <button key={t} type="button" className="chip"
+              onClick={() => onChange(cleanTags(value.concat([t])))}>{t}</button>
           ))}
         </div>
       ) : null}

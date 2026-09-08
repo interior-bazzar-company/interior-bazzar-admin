@@ -6,6 +6,132 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-08
 
+### The scheme layer — three appearances, one component layer, and the parts that came with it
+
+**Area:** the whole panel — every module re-skins from one attribute on `<html>`
+**Files:** `src/styles/schemes.css` (new), `src/styles/components.css` (new),
+`src/styles/tokens.css`, `src/styles/admin-theme.css`, `src/main.tsx`,
+`src/admin/shell/ShellContext.tsx`, `src/admin/shell/AdminShell.tsx`,
+`src/admin/ui/index.tsx`, `src/admin/views/Resources/Builder.tsx`,
+`src/admin/views/Resources/resources.css`, `design/ramp.cjs`, `package.json`,
+`.gitignore`, `appearance.html` (new), `scripts/appearance-entry.tsx` (new),
+`scripts/shoot-appearance.cjs` (new)
+
+**What changed**
+
+The design system that was drafted as a specification is now the panel's actual
+token layer. `styles/schemes.css` holds layer 1 (the ink, forest, slate, beacon,
+live, pulse and status ramps) and layer 2 (the semantic set) for **three schemes
+× two themes**, and `tokens.css` re-points the legacy vocabulary — `--bg`,
+`--text-2`, `--brand`, `--ok-bg`, `--line-control`, forty-odd names that nine
+module sheets and 2,600 lines of component CSS already write — at that semantic
+set. That one indirection is the whole trick: **no module sheet was edited and
+every module re-skins.**
+
+**The three schemes.**
+
+- **Console** — the new default. The primary ACTION is ink (near-black in light,
+  near-white in dark) and the primary IDENTITY is forest: a button you press is
+  monochrome, a thing that is current, selected or navigated-to is green. That
+  is what "primary is black and white, and the rest is our forest" means in
+  practice, and it is why the two were never the same token to begin with.
+- **Portal classic** — the panel exactly as it was. Every token in that block is
+  an ALIAS of the Untitled UI name the legacy vocabulary used to read, and those
+  flip with the theme on their own, so it is the previous appearance rather than
+  a copy of it that can drift. **Nothing was removed to make room for the new
+  default.**
+- **Beacon** — a cyan-biased teal primary on a slate ground, for a floor screen
+  or a dark room. Success is a different green from the brand there on purpose.
+
+**The switch is a dropdown in the account menu**, under APPEARANCE, above the
+existing Light / Dark / System group. A real `<select>`, because it opens with
+the platform's own list, works on a phone, and needs no positioning inside a
+popover that is already positioned — and because it is the one control in that
+menu that will grow. The choice is written before first paint by
+`bootAppearance()`, next to the theme, so a browser that chose Portal never
+flashes Console on the way in.
+
+**Seven token names are also Untitled UI's** — `--color-text-disabled`,
+`--color-border-control`, `--color-skeleton(-sheen)`, `--focus-ring`,
+`--surface-sheen`, `--color-bg-overlay`. Every console and beacon selector
+therefore carries `:not([data-scheme])` or its own attribute rather than sitting
+at a bare `:root`: written at `:root` they would shadow the library's values for
+every scheme, and Portal would be "almost what it was" instead of what it was.
+
+**The components that came with it.**
+
+- **The chip input, promoted.** Resources had a chip field with the right
+  behaviour and the wrong address — `.rs-tagbox` in one module's sheet. It is
+  now `ui/ChipInput` on `.chips-input` in the shared layer: Enter or a comma
+  commits, Backspace on an empty box takes the last chip back, blur commits what
+  is still typed (a word left in the box when somebody presses Save is a value
+  they believe they entered). The normaliser stays the caller's — Resources'
+  rules about case, length and duplicates are Resources'. Its own control now
+  keeps only what is genuinely local: the label, the suggestion row, the help
+  line. The Choice-field editor did NOT move to it: its options are ORDERED and
+  chips cannot be reordered.
+- **The metric tile is a metric tile.** `.tile` gained corner ticks, an 11px
+  tracked metric label, a unit that rides with the figure, and a footer that
+  carries the comparison — plus `delta` on `TileProps`, coloured per metric by
+  the caller. The FIGURE is never coloured by trend: rising unclosed days is
+  bad, and a green 11 would say the opposite. No second `.kpi` class was added,
+  because two tiles in one product is a month of deciding which one to use.
+- **Overlays.** The modal header and footer are sticky, so a long form no longer
+  scrolls its own question off the screen; a destructive action sits apart on the
+  left (`.md-f .left`); the drawer takes a size — `sm` 380 · `md` 480 · `lg` 720
+  · `xl` 960 — and slides from the edge it lives on. Both now **trap focus** and
+  **lock the page behind them**: Tab used to walk off the last control into a
+  page nobody could see, and the wheel over a scrim scrolled the table
+  underneath, so closing a dialog landed the reader somewhere they never
+  navigated to.
+- **A selected table row has three signals**, not one: the fill, a 2px inset
+  primary bar on the first cell, and its checkbox. A scheme with no hue to lean
+  on is the cheapest test there is for a state that was quietly relying on
+  colour alone — Portal and Beacon take the bar too.
+- **Small parts:** `.skip` (a skip link, first in the tab order on every screen),
+  `.eyebrow`, `.live-dot` and `.pill-live` for the live accent, `.sev` for a
+  table's exception stripe, `.filterband`, `.bulkbar`, `.meter`, `.delta`.
+
+**Verified**
+
+`npx tsc -b` clean · `npx eslint` clean on every changed file ·
+`npm run check:tokens` — all 404 custom properties read are defined ·
+`npx vite build` succeeds.
+
+`npm run check:contrast` now measures **96 pairs across all three schemes**
+rather than 45 across one, and 0 fail. The measurement moved two values while it
+was at it: the console dark brand fill is forest-5, not forest-6, because dark
+ink on forest-6 is 4.3:1 and under the floor; and the console control edge is
+ink-7, which is where it is because ink-6 measures 2.7:1 against a 3:1
+obligation. Those are fixes, not preferences.
+
+**`npm run shots`** is new and is how the six appearances were actually looked
+at: it starts Vite on `appearance.html` — a gallery of every shared part, built
+from the real `src/admin/ui` components and the real `ShellProvider` — and
+photographs console/portal/beacon × light/dark plus the modal and the drawer.
+It skips cleanly when Playwright is not installed. Add a part to that page the
+day you add it to the system: a component absent from it is a component nobody
+has seen in dark, in Portal, or in Beacon.
+
+**Every module sheet is already 100% token-driven** — a grep for colour literals
+across `team.css`, `finance.css`, `enquiries.css`, `users.css`, `resources.css`,
+`agreements.css`, `charts.css` and `admin-auth.css` returns **zero**. The only
+literals left in the component layer are the quotation document and the print
+sheet, which are paper-coloured on purpose in every theme.
+
+**Not done, and deliberately not done blind**
+
+The sheets still hold **twelve distinct breakpoints** (1400 · 1280 · 1240 · 1180
+· 1000 · 940 · 900 · 820 · 760 · 720 · 640 · 560) where the system names four.
+Collapsing them is mechanical but it moves where real layouts reflow, and with
+no backend running here not one of those layouts can be seen at the width it
+would change at. It is the next step, per module, against a running API — not a
+find-and-replace at the end of a large commit.
+
+---
+
+## 2026-09-08
+
 ### Density switch removed — Comfortable is the only spacing
 
 **Area:** account menu (bottom-left avatar popover), appearance boot

@@ -4,6 +4,10 @@
    them) is styled entirely by the library. */
 import "./styles/untitled/globals.css";
 import "./styles/admin-theme.css";
+/* LAST, and from here rather than an @import at the foot of admin-theme.css:
+   an @import is only valid at the TOP of a sheet, so one written at the bottom
+   is dropped silently. Import order in this file IS the cascade order. */
+import "./styles/components.css";
 import App from "./App.tsx";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
