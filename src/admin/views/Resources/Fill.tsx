@@ -124,8 +124,11 @@ export function FillModal({ r, memberId }: { r: Resource; memberId: string }) {
           </Alert>
         ) : null}
 
+        {/* `hintInline`: the help below is the form author's own, written for
+            the person answering. They are filling this in once and have no
+            reason to suspect an i hides the sentence that tells them how. */}
         {r.fields.map((f) => (
-          <FormField key={f.fieldId} id={"rf-" + f.fieldId}
+          <FormField key={f.fieldId} id={"rf-" + f.fieldId} hintInline
             label={f.type === "checkbox" ? undefined : f.label}
             req={f.type === "checkbox" ? undefined : f.required}
             hint={f.type === "file" ? undefined : f.help || undefined}>

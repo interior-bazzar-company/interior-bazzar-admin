@@ -6,6 +6,70 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-09
 
+### Form hints fold behind the i — a field asks a question, it does not deliver a lecture
+
+**Area:** every form and modal across the panel — `#/quotations`, `#/invoices`, `#/deals`, `#/finance`, `#/team`, `#/users`, `#/plans`, `#/roles`, `#/resources`, `#/business-enquiries`
+**Files:** added `src/admin/ui/infoDot.tsx`, `src/admin/ui/fields.tsx`, `src/admin/ui/overlays.tsx`, `src/admin/views/Quotations/Form.tsx`, `src/admin/views/Invoices/Form.tsx`, `src/admin/views/Resources/{Builder,Fill}.tsx`, `src/admin/views/Team/Detail.tsx`
+
+**What changed**
+A hint longer than 30 characters no longer prints as a paragraph under its control. It moves
+behind the `i` beside the label — one press, still there, out of the way until somebody wants
+it. Short hints ("Image or PDF", "Full amount only.") stay inline, where reading them costs
+less than revealing them would. This is one rule in `FormField`, so all **63** long hints
+across eleven modules changed at once; no call site was rewritten to get it.
+
+The rule is deliberately narrow. A **ReactNode** hint is never folded — those are status, not
+prose (the Verified tick on a user's email, a live count of unticked lines), and burying a live
+indicator behind a press would hide the one thing the field reports. A field with **no label**
+is never folded either, because there is nowhere to hang the i. Three fields opt out explicitly
+with the new `hintInline` prop, all for the same reason — their hint is live feedback rather
+than reference: the assignee-change warning on a Team item, the "who will actually receive
+this" audience line on a Data Form, and the form author's own per-question help on the member
+fill page.
+
+Two standing paragraphs inside the Quotations and Invoices builders were deleted outright
+("Nothing here is retyped…", "The billing block is a column, not a join…"). Both restated the
+step subtitle three lines above them. One checkbox hint went too: "They cannot submit the form
+without it." under a box labelled **Required**.
+
+`InfoDot` moved out of `ui/overlays` into its own `ui/infoDot` module. `overlays` already
+imports `FormField` from `fields`; the moment `fields` wanted the i back, the two files would
+have imported each other. `overlays` re-exports it, so every existing call site and `ui/index`
+are untouched.
+
+The i sits BESIDE the label rather than inside it — a `<button>` inside a `<label>` is still
+part of that label, so pressing it would also focus the control it explains.
+
+**Temp data**
+none — this is presentation only; no content file, seed or payload is read or written.
+
+**Backend needed**
+none — no endpoint is involved.
+
+**Open decisions**
+The 30-character threshold is a judgement, not a spec. It was set so the two hints named in
+the request ("Defaults to +15 days (QT-OD-02).", "Drives the CGST/SGST ↔ IGST split.") fold
+while one-line constraints stay put. It is one constant, `HINT_INLINE_MAX` in `ui/fields`.
+
+Section-level descriptions were left alone on purpose — `FormSection desc`, Finance's `Fs`
+legend hints (7 of them) and the numbered `StepHead` subtitles (8) still print in full. They
+were out of the scope agreed for this pass, not overlooked.
+
+**Verified**
+`tsc -b` clean and `vite build` green. `eslint` clean on every touched file — the two
+remaining warnings are pre-existing `react-hooks/exhaustive-deps` in `Quotations/api.ts` and
+`Invoices/api.ts`, which this change does not touch.
+
+Rendered and photographed under Playwright against the real Vite pipeline, in an isolated page
+mounting `FormField` directly: long hints folded to an `i`, "Image or PDF" still inline,
+`hintInline` still inline, and an error message still winning the space under the control while
+its reference text stays behind the i. Confirmed by script that pressing the i moves focus into
+the popover and NOT into the input, and that Escape closes it.
+
+The panel's own routes could not be walked: `#/quotations` and the rest sit behind a login that
+returns 401 with no backend running on this machine, so the change is verified at the component
+that renders all 125 hints rather than screen by screen.
+
 ### Quotations, Invoices and Agreements come onto the system — the rebuild is one system now
 
 **Area:** `#/quotations`, `#/invoices` (list · pick · builder · detail · document · every dialog), `#/agreements` (templates · sent · the deed · the template editor)

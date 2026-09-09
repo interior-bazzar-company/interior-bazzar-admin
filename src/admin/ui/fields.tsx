@@ -25,11 +25,28 @@ import { FileTrigger } from "@/components/base/file-upload-trigger/file-upload-t
 import { FeaturedIcon } from "@/components/foundations/featured-icon/featured-icon";
 import { cx } from "@/utils/cx";
 import { Icon } from "./icon";
+import { InfoDot } from "./infoDot";
 import { Tag } from "./status";
 
 /* ------------------------------------------------------------- the group */
+/* HOW LONG A HINT MAY BE BEFORE IT IS FOLDED AWAY.
+   A form is read down the labels; a paragraph under every control turns that
+   scan into a wall and pushes the next question off the screen. Anything past
+   this goes behind the `i` on the label — one press, still there, out of the
+   way until somebody actually wants it. Short hints stay put: "Image or PDF"
+   costs nothing to read and a click to reveal it would be the worse trade. */
+const HINT_INLINE_MAX = 30;
+
+/** A hint is foldable only if it is a plain string. A ReactNode hint is a
+ *  STATUS, not prose — the Verified tick on a user's email, a live count of
+ *  unticked lines — and hiding a live indicator behind a press would bury the
+ *  one thing the field is reporting. */
+function foldableHint(hint: ReactNode): string | null {
+    return typeof hint === "string" && hint.length > HINT_INLINE_MAX ? hint : null;
+}
+
 /* THE WRAPPER EVERY CONTROL SHARES: the label, the control, and then EITHER an
-   error or a hint — never both. */
+   error or a short hint — never both, and never a paragraph. */
 export function FormField({
     id,
     label,
@@ -40,6 +57,7 @@ export function FormField({
     cls,
     className,
     tip,
+    hintInline,
 }: {
     id?: string;
     label?: ReactNode;
@@ -51,19 +69,32 @@ export function FormField({
     className?: string;
     /** a short explanation on the label, behind a help icon */
     tip?: ReactNode;
+    /** keep a long hint under the control — for the rare field whose hint is
+     *  the answer to a question being asked right now, not reference. */
+    hintInline?: boolean;
 }) {
+    /* No label means nowhere to hang the i — HandleField and a few others draw
+       their own heading — so the hint stays under the control rather than
+       disappearing. */
+    const folded = hintInline || !label ? null : foldableHint(hint);
     return (
         <div className={cx("flex w-full min-w-0 flex-col gap-1.5", cls, className)}>
             {label ? (
-                <label htmlFor={id} className="flex items-center gap-1 text-sm font-medium text-secondary">
-                    {label}
-                    {req ? (
-                        <span className="text-brand-tertiary" title="Required">
-                            *
-                        </span>
-                    ) : null}
-                    {tip ? <span className="ml-1 text-xs font-normal text-quaternary">{tip}</span> : null}
-                </label>
+                /* The i sits BESIDE the label, never inside it: a <button> in a
+                   <label> is still part of the label, so pressing it would also
+                   focus — or worse, toggle — the control it explains. */
+                <span className="flex items-center gap-1">
+                    <label htmlFor={id} className="flex items-center gap-1 text-sm font-medium text-secondary">
+                        {label}
+                        {req ? (
+                            <span className="text-brand-tertiary" title="Required">
+                                *
+                            </span>
+                        ) : null}
+                        {tip ? <span className="ml-1 text-xs font-normal text-quaternary">{tip}</span> : null}
+                    </label>
+                    {folded ? <InfoDot label={typeof label === "string" ? "About " + label : undefined}>{folded}</InfoDot> : null}
+                </span>
             ) : null}
             {children}
             {err ? (
@@ -71,7 +102,7 @@ export function FormField({
                     <Icon name="alert" size="xs" />
                     {err}
                 </span>
-            ) : hint ? (
+            ) : hint && !folded ? (
                 <span className="text-sm text-tertiary">{hint}</span>
             ) : null}
         </div>

@@ -232,7 +232,7 @@ export default function Builder({ mode, resourceId }: {
                 suggestions rather than a closed list. EMPTY IS EVERYONE, and
                 the hint says so: the difference between a company-wide form and
                 one that reaches nobody is an empty list. */}
-            <FormField id="rs-dept" label="Department"
+            <FormField id="rs-dept" label="Department" hintInline
               hint={departments.length
                 ? goesTo.length
                   ? "Only " + departments.join(" and ") + " — " + goesTo.length
@@ -364,7 +364,6 @@ function FieldEditor({ f, i, onChange }: {
       </FormField>
 
       <Checkbox id={id + "-r"} checked={f.required} label="Required"
-        hint="They cannot submit the form without it."
         onChange={(v) => onChange({ required: v })} />
 
       {f.type === "select" ? <ChoiceOptions f={f} i={i} onChange={onChange} /> : null}

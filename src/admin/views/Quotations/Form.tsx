@@ -208,10 +208,6 @@ export function BuilderBody({ q, onSaved, detail }: {
                       options={STATES.map((s) => ({ v: s, l: s }))} onChange={mirror("placeOfSupply")} />
                   </FormField>
                 </FieldRow>
-                <p className="text-sm text-tertiary">
-                  Nothing here is retyped. It is snapshotted from the deal at creation and <b className="font-medium text-secondary">frozen
-                  again at issue</b> — a later change to the deal never rewrites a document the customer already holds.
-                </p>
               </FormSection>
             </Card>
           </section>

@@ -151,12 +151,6 @@ export function BuilderBody({ inv, onSaved }: { inv: InvoiceRow; onSaved: () => 
                       options={STATES.map((s) => ({ v: s, l: s }))} />
                   </FormField>
                 </FieldRow>
-                <p className="text-sm text-tertiary">
-                  The billing block is a <b className="font-medium text-secondary">column, not a join</b>.
-                  It is copied from the deal now and <b className="font-medium text-secondary">frozen
-                  again at issue</b>, so a later profile edit cannot reach a document the customer
-                  already holds.
-                </p>
               </FormSection>
             </Card>
           </section>

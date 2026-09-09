@@ -321,7 +321,10 @@ function EditItemModal({ item, all }: { item: WorkItem; all: WorkItem[] }) {
         <FormField id="eiTitle" label="Title" req>
           <Input id="eiTitle" autoFocus value={title} onChange={setTitle} />
         </FormField>
-        <FormField id="eiWho" label="Assigned to"
+        {/* Inline, not behind the i: this appears the moment the assignee is
+            changed, and a consequence nobody opened is a consequence nobody
+            was warned about. */}
+        <FormField id="eiWho" label="Assigned to" hintInline
           hint={who !== item.assigneeId
             ? "Tags belong to a member. Handing this over drops the last person's."
             : undefined}>
