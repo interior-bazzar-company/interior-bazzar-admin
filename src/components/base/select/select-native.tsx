@@ -28,24 +28,34 @@ const styles = {
 };
 
 export const NativeSelect = ({ label, hint, options, className, selectClassName, size = "md", ...props }: NativeSelectProps) => {
-    const id = useId();
-    const selectId = `select-native-${id}`;
-    const hintId = `select-native-hint-${id}`;
+    const gen = useId();
+    /* A CALLER'S `id` IS THE SELECT'S ID. This used to mint its own and drop
+       the one it was handed, so every `<label htmlFor>` aimed at a select
+       pointed at nothing — and the document builders, which read their
+       controls back with getElementById at save time, silently saved "" for
+       place of supply, GST rate, payments, discount unit, payment mode and
+       remark. The generated id is the fallback, not the rule. */
+    const selectId = props.id || `select-native-${gen}`;
+    const labelId = `select-native-label-${gen}`;
+    const hintId = `select-native-hint-${gen}`;
 
     return (
         <div className={cx("w-full in-data-input-wrapper:w-max", className)}>
             {label && (
-                <Label htmlFor={selectId} id={selectId} className="mb-1.5">
+                <Label htmlFor={selectId} id={labelId} className="mb-1.5">
                     {label}
                 </Label>
             )}
 
             <div className="relative grid w-full items-center">
+                {/* aria-labelledby only when this component drew the label:
+                    pointing it at the select itself named the control by its
+                    own text and out-ranked any outer <label htmlFor>. */}
                 <select
                     {...props}
                     id={selectId}
                     aria-describedby={hintId}
-                    aria-labelledby={selectId}
+                    aria-labelledby={label ? labelId : undefined}
                     className={cx(
                         "appearance-none rounded-lg bg-primary font-medium text-primary shadow-xs ring-1 ring-primary outline-hidden transition duration-100 ease-linear ring-inset placeholder:text-fg-quaternary focus-visible:ring-2 focus-visible:ring-brand disabled:cursor-not-allowed disabled:opacity-50",
 

@@ -9,18 +9,16 @@
    reference and the evidence are the two things the issue transaction refuses
    without, and they are entered in the same sitting.
 
-   The four guards and the header are drawn exactly as Quotations/Builder draws
-   them: this is the second half of one workflow, and the two builders must not
-   look like two products.
+   The four guards are drawn exactly as Quotations/Builder draws them, and the
+   header belongs to `BuilderBody` in Form.tsx exactly as the quotation's does:
+   this is the second half of one workflow, and the two builders must not look
+   like two products.
    ===================================================================== */
 import { useCallback, useState } from "react";
-import { Alert, Button, Card, EmptyState, PageHeader, PaneLoading, Pill, TbTitle, qs } from "../../ui";
-import { inr } from "../../ui/format";
+import { Alert, Button, EmptyState, PageHeader, PaneLoading, Pill, TbTitle, qs } from "../../ui";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { STATUS_LABEL, STATUS_TONE, useInvoice } from "./api";
-import type { InvoiceRow } from "./api";
 import { BuilderBody } from "./Form";
-import { planItemOf } from "./helpers";
 
 export default function InvoiceBuilder({ id, params }: {
   id: number; params: Record<string, string>;
@@ -62,48 +60,5 @@ export default function InvoiceBuilder({ id, params }: {
       action={<Button color="primary" onClick={() => go(detail)}>Back to the invoice</Button>} />
   );
 
-  return (
-    <div className="flex min-w-0 flex-col gap-4">
-      <PageHeader
-        eyebrow="Step 2 of 2"
-        title="New invoice"
-        meta={<><Pill dot text="Draft" tone="neutral" /> <span className="font-mono tnum">Number assigned on issue</span></>}
-        back={{ label: "Back to the invoice", to: detail }}
-        actions={<>
-          <Button color="secondary" ico="chevl" onClick={() => go(detail)}>Back</Button>
-          <Button color="primary" onClick={() => go("#/invoices/" + inv.id + "?mode=preview")}>
-            Preview &amp; issue</Button>
-        </>} />
-
-      {/* THE SOURCE STRIP — both links and what this draft is billing, always
-          visible. An invoice that loses sight of its quotation is the one thing
-          the issue guards refuse outright, so the missing case is stated here
-          in the words the guard will use rather than left blank. */}
-      <Card tight>
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-          <Button color="link-color" size="xs" className="font-mono tnum" data-go={"#/deals/" + inv.dealRef}
-            onClick={() => go("#/deals/" + inv.dealRef)}>{inv.dealRef} ↗</Button>
-          {inv.quotationId
-            ? <Button color="link-color" size="xs" className="font-mono tnum" data-go={"#/quotations/" + inv.quotationId}
-                onClick={() => go("#/quotations/" + inv.quotationId)}>
-                {inv.quotationNumber || "quotation"} ↗</Button>
-            : <Pill xs text="quotation_required" tone="bad" />}
-          <span className="ml-auto text-sm">
-            <b className="font-mono tnum">{inr(inv.grandTotalPaise)}</b>
-            <span className="text-quaternary">{" · " + installmentLine(inv)}</span>
-          </span>
-        </div>
-      </Card>
-
-      <BuilderBody inv={inv} onSaved={bump} />
-    </div>
-  );
-}
-
-/* What this draft is billing, in the words the quotation's schedule used. */
-function installmentLine(inv: InvoiceRow): string {
-  const plan = planItemOf(inv);
-  if (plan && plan.installmentCount)
-    return "installment " + plan.installmentSeq + " of " + plan.installmentCount;
-  return "this invoice";
+  return <BuilderBody inv={inv} onSaved={bump} detail={detail} />;
 }

@@ -13,16 +13,16 @@ import AdminOpsService from "../../../api/modules/adminOps";
 import type { InvoiceSaveInput } from "../../../api/modules/adminOps";
 import { CommonService } from "../../../api/modules/common";
 import {
-  Alert, Button, Card, DateInput, FieldRow, FormField, FormSection, Icon, IconButton, Input, Pill,
-  SelectInput, Segmented, Table, Textarea, Timeline,
+  Alert, Button, Card, DateInput, FieldRow, FormField, FormSection, Icon, IconButton, Input, PageHeader, Pill,
+  SectionHead, SelectInput, Table, Textarea, Timeline,
 } from "../../ui";
-import { BuilderLayout, MoneyLine, PartyStrip, ReadyLine, StepHead } from "../Quotations/bits";
-import { inr, inrWords, fmtDate } from "../../ui/format";
+import { BillTo, BuilderLayout, BuilderSummary, FeatureFold, StepHead } from "../Quotations/bits";
+import { inr, fmtDate } from "../../ui/format";
 import { useNav } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import { AppExceptions, SERVICE_MESSAGE, errMessage } from "../../../api/apiService";
 import { usePlanCatalogue } from "../Quotations/api";
-import { GST_RATES, SELLER, STATES, planLabel } from "../Quotations/helpers";
+import { STATES, planLabel } from "../Quotations/helpers";
 import { call, paiseToRupees, rupeesToPaise } from "./api";
 import type { InvoiceRow } from "./api";
 import { addonsOf, blockersOf, planItemOf } from "./helpers";
@@ -37,7 +37,7 @@ const REMARK_PRESETS = ["Slot booking", "Installment 1", "Installment 2",
   "Installment 3", "Installment 4", "Installment 5"];
 
 /* ============================================================== the body === */
-export function BuilderBody({ inv, onSaved }: { inv: InvoiceRow; onSaved: () => void }) {
+export function BuilderBody({ inv, onSaved, detail }: { inv: InvoiceRow; onSaved: () => void; detail: string }) {
   const plan = planItemOf(inv);
   const addons = addonsOf(inv);
   const [err, setErr] = useState<string | null>(null);
@@ -118,27 +118,54 @@ export function BuilderBody({ inv, onSaved }: { inv: InvoiceRow; onSaved: () => 
     call(AdminOpsService.removeInvoiceAddon(inv.id, itemId, rowVersion)));
 
   const dealTo = "#/deals/" + inv.dealRef;
+  const quoteTo = inv.quotationId ? "#/quotations/" + inv.quotationId : null;
+
+  /* The lines above the tax block. Display only — every figure is what the
+     server last computed, and it recomputes them again on save. */
+  const lines = [
+    { k: "Plan" + (plan && plan.installmentCount
+        ? " · installment " + plan.installmentSeq + " of " + plan.installmentCount : ""),
+      v: inr(plan ? plan.amountPaise : 0) },
+    ...(addons.length ? [{ k: "One-off charges", v: inr(addons.reduce((a, i) => a + i.amountPaise, 0)) }] : []),
+    { k: "Subtotal", v: inr(inv.subtotalPaise), rule: true },
+    { k: taxMode !== "not_applicable" ? "Taxable value" : "Amount", v: inr(inv.taxableTotalPaise), rule: true },
+  ];
 
   return (
-    <>
+    <div className="flex min-w-0 flex-col gap-5">
+      {/* The header is the quotation builder's, line for line: same eyebrow,
+          same meta row carrying the record's own links, one primary. The
+          "source strip" card that used to sit under it repeated the deal ref,
+          the quotation number and the total — all three are already on this
+          screen, in the meta, the plan line and the summary. */}
+      <PageHeader
+        eyebrow="Step 2 of 2"
+        title="New invoice"
+        back={{ label: "Back to the invoice", to: detail }}
+        meta={<>
+          <Pill dot text="Draft" />
+          <a href={dealTo} data-go={dealTo} className="font-mono text-brand-secondary tnum"
+            onClick={(e) => { e.preventDefault(); go(dealTo); }}>{inv.dealRef}</a>
+          {quoteTo
+            ? <a href={quoteTo} data-go={quoteTo} className="font-mono text-brand-secondary tnum"
+                onClick={(e) => { e.preventDefault(); go(quoteTo); }}>{inv.quotationNumber || "quotation"}</a>
+            : <Pill xs text="quotation_required" tone="bad" />}
+          <span className="font-mono tnum">Number assigned on issue</span>
+        </>}
+        actions={<Button color="primary" ico="quote" onClick={() => go("#/invoices/" + inv.id + "?mode=preview")}>
+          Preview &amp; issue</Button>} />
+
       {err ? <Alert tone="bad" title="Could not save this invoice.">{err}</Alert> : null}
 
       <BuilderLayout
         form={<>
           <section className="flex min-w-0 flex-col gap-3">
-            <StepHead n={1} title="Who and when" hint="dates, and who it is billed to" />
+            <StepHead n={1} title="Details" hint="from the deal, frozen at issue" />
             <Card>
               <FormSection>
-                <PartyStrip blocks={[
-                  { title: "From",
-                    lines: [SELLER.brand, SELLER.tagline, SELLER.addr,
-                      <span key="gst" className="font-mono tnum">{SELLER.gstin ? "GSTIN " + SELLER.gstin : "CIN " + SELLER.cin}</span>] },
-                  { title: "Bill to",
-                    lines: [inv.billing.name || "—", inv.billing.address || "—",
-                      <span key="ph" className="font-mono tnum">{inv.billing.phone || "—"}</span>],
-                    foot: <Button color="link-color" size="xs" ico="ext" data-go={dealTo}
-                      onClick={() => go(dealTo)}>Edit on the deal</Button> },
-                ]} />
+                <BillTo name={inv.billing.name || "—"} address={inv.billing.address || "—"} phone={inv.billing.phone || "—"}
+                  edit={<Button color="link-color" size="xs" ico="ext" data-go={dealTo}
+                    onClick={() => go(dealTo)}>Edit on the deal</Button>} />
                 <FieldRow cols={3}>
                   <FormField id="nvDate" label="Invoice date">
                     <DateInput id="nvDate" defaultValue={inv.invoiceDate} className="w-full" />
@@ -156,8 +183,7 @@ export function BuilderBody({ inv, onSaved }: { inv: InvoiceRow; onSaved: () => 
           </section>
 
           <section className="flex min-w-0 flex-col gap-3">
-            <StepHead n={2} title="What you're billing"
-              hint="schedule, plan, one-off charges" />
+            <StepHead n={2} title="Plan and charges" />
             <Card flush>
               <PlanBlock inv={inv} plan={plan} />
               <AddonBlock addons={addons} busy={busy} onAdd={addAddon} onRemove={removeAddon} />
@@ -165,8 +191,7 @@ export function BuilderBody({ inv, onSaved }: { inv: InvoiceRow; onSaved: () => 
           </section>
 
           <section className="flex min-w-0 flex-col gap-3">
-            <StepHead n={3} title="Payment received"
-              hint="required before an invoice is raised" />
+            <StepHead n={3} title="Payment received" hint="required before an invoice is raised" />
             <Card>
               <FormSection>
                 <FieldRow cols={3}>
@@ -189,7 +214,7 @@ export function BuilderBody({ inv, onSaved }: { inv: InvoiceRow; onSaved: () => 
           </section>
 
           <section className="flex min-w-0 flex-col gap-3">
-            <StepHead n={4} title="What it says" hint="printed on the document" />
+            <StepHead n={4} title="Notes and terms" />
             <Card>
               <FormSection>
                 <FormField id="nvNotes" label="Notes (customer-facing)">
@@ -204,10 +229,14 @@ export function BuilderBody({ inv, onSaved }: { inv: InvoiceRow; onSaved: () => 
           </section>
         </>}
         rail={
-          <Summary inv={inv} plan={plan} addons={addons} taxMode={taxMode} onTaxMode={setTaxMode}
-            busy={busy} onSave={save} />
+          <BuilderSummary lines={lines}
+            gstId="nvGst" gstRate={inv.gstRate} taxMode={taxMode} onTaxMode={setTaxMode}
+            placeOfSupply={inv.placeOfSupply}
+            cgstPaise={inv.cgstPaise} sgstPaise={inv.sgstPaise} igstPaise={inv.igstPaise}
+            grandTotalPaise={inv.grandTotalPaise} blockers={blockersOf(inv).map((b) => ({ text: b }))}
+            busy={busy} onSave={save} saveLabel="Save changes" saveAct="in-save-all" />
         } />
-    </>
+    </div>
   );
 }
 
@@ -221,58 +250,52 @@ export function BuilderBody({ inv, onSaved }: { inv: InvoiceRow; onSaved: () => 
    renders without them. */
 function PlanBlock({ inv, plan }: { inv: InvoiceRow; plan: ReturnType<typeof planItemOf> }) {
   const { plans } = usePlanCatalogue();
+  /* Which remark is chosen is STATE, because "Other" is the one answer that
+     opens a second field — and a field for an answer nobody gave should not
+     be on screen. `patch()` still reads both controls off the DOM: the select
+     carries its value, and the free-text input exists exactly when it is the
+     one being read. */
+  const stored = plan ? plan.remark || "" : "";
+  const storedIsPreset = REMARK_PRESETS.indexOf(stored) >= 0;
+  const [remark, setRemark] = useState(storedIsPreset ? stored : "other");
   if (!plan) return <p className="p-5 text-sm text-tertiary">No plan block.</p>;
   const cat = plans.find((c) => planLabel(c) === plan.description);
   const feats = cat ? (cat.features || []).map((f) => (typeof f === "string" ? f : f.text)).filter(Boolean) : [];
-  const preset = REMARK_PRESETS.indexOf(plan.remark || "") >= 0;
   return (
     <div className="flex flex-col gap-4 p-5">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <div className="text-lg font-semibold text-primary">{plan.description}</div>
           <div className="mt-0.5 text-sm text-tertiary">
-            From {inv.quotationNumber || "the accepted quotation"} · suggested:{" "}
+            {inv.quotationNumber || "Accepted quotation"} ·{" "}
             {plan.installmentCount
               ? "installment " + plan.installmentSeq + " of " + plan.installmentCount
-              : "the plan's full amount"}
+              : "full amount"}
           </div>
-          {plan.remark
-            ? <div className="mt-1 flex items-center gap-1 text-xs text-tertiary">
-                <Icon name="tag" size="xs" />{plan.remark}</div>
-            : null}
         </div>
         <div className="shrink-0 font-mono text-display-xs font-semibold text-primary tnum">
           {inr(plan.amountPaise)}</div>
       </div>
 
-      {feats.length
-        ? <div>
-            <div className="label-mono">What the plan includes</div>
-            <div className="mt-1.5 flex flex-wrap gap-1">
-              {feats.map((f, i) => <Pill key={i} xs text={f} tone="neutral" title={f} />)}
-            </div>
-            {/* Not snapshotted, unlike the prototype's copy: the line stores the
-                plan NAME, and these are read live from the catalogue by it. The
-                document carries the figures below, never this list. */}
-            <p className="mt-1.5 text-xs text-tertiary">Read from the plan catalogue by the name on
-              this line. The document carries the figures below, not these.</p>
-          </div>
-        : null}
+      {/* Read live from the catalogue by the name on the line, same as the
+          quotation builder — and folded the same way, so the tier's ten chips
+          do not stand between the amount and the field that changes it. */}
+      <FeatureFold feats={feats} />
 
       <FieldRow cols={3}>
         <FormField id="nvAmt" label="Amount ₹">
           <Input id="nvAmt" type="number" defaultValue={paiseToRupees(plan.amountPaise)} mono />
         </FormField>
-        <FormField id="nvRemark" label="Remark" hint="One-click preset, or Other for anything else.">
-          <SelectInput id="nvRemark" defaultValue={preset ? plan.remark || "" : "other"}
-            options={REMARK_PRESETS.map((r) => ({ v: r, l: r }))
-              .concat([{ v: "other", l: "Other (type below)" }])} />
+        <FormField id="nvRemark" label="Remark" req>
+          <SelectInput id="nvRemark" value={remark} onChange={setRemark}
+            options={REMARK_PRESETS.map((r) => ({ v: r, l: r })).concat([{ v: "other", l: "Other…" }])} />
         </FormField>
-        <FormField id="nvRemarkOther" label="Custom remark"
-          hint="Used only when Remark above is Other — mandatory in that case.">
-          <Input id="nvRemarkOther" defaultValue={preset ? "" : plan.remark || ""}
-            ph="e.g. Registration amount, balance payment…" />
-        </FormField>
+        {remark === "other" ? (
+          <FormField id="nvRemarkOther" label="Custom remark" req>
+            <Input id="nvRemarkOther" defaultValue={storedIsPreset ? "" : stored}
+              ph="e.g. Registration amount, balance payment" />
+          </FormField>
+        ) : null}
       </FieldRow>
     </div>
   );
@@ -285,22 +308,16 @@ function AddonBlock({ addons, busy, onAdd, onRemove }: {
   addons: ReturnType<typeof addonsOf>; busy: boolean;
   onAdd: () => void; onRemove: (itemId: number) => void;
 }) {
-  const addBtn = (
-    <Button color="secondary" ico="plus" data-act="in-addon-add" isDisabled={busy} onClick={onAdd}>
-      Add charge</Button>
+  /* The same head the quotation's charges wear — title left, the one entry
+     point right — so the two builders' second cards read as one drawing. */
+  const add = (
+    <Button color="secondary" size="xs" ico="plus" data-act="in-addon-add" isDisabled={busy} onClick={onAdd}>
+      Add a charge</Button>
   );
-  if (!addons.length) return (
-    <div className="flex flex-wrap items-center gap-3 border-t border-secondary p-5">
-      {addBtn}
-      <span className="min-w-0 flex-1 text-sm text-tertiary">
-        Onboarding, a shoot, a custom integration. <b className="font-medium text-secondary">No months
-        and no quantity</b> — a one-off charge has an amount and nothing else.</span>
-    </div>
-  );
-
   return (
-    <div className="flex flex-col gap-3 border-t border-secondary p-5">
-      <Table
+    <div className="flex min-w-0 flex-col gap-3 border-t border-secondary p-5">
+      <SectionHead className="mb-0" title="One-off charges" right={add} />
+      {addons.length ? <Table
         cols={[{ label: "#", w: "36px" }, { label: "Description" }, { label: "HSN / SAC", w: "120px" },
           { label: "Amount ₹", cls: "n", w: "150px" }, { label: "", cls: "acts", w: "44px" }]}
         rows={addons.map((it, ix) => (
@@ -318,91 +335,13 @@ function AddonBlock({ addons, busy, onAdd, onRemove }: {
             </td>
           </tr>
         ))}
-      />
-      <div>{addBtn}</div>
+      /> : null}
     </div>
   );
 }
 
-/* ============================================================= the rail === */
-/* Display only — every figure is what the SERVER last computed, and it
-   recomputes them again on save. The one commit for the whole page lives here,
-   because this is the card that already shows what every field on it adds up
-   to. */
-function Summary({ inv, plan, addons, taxMode, onTaxMode, busy, onSave }: {
-  inv: InvoiceRow; plan: ReturnType<typeof planItemOf>; addons: ReturnType<typeof addonsOf>;
-  taxMode: string; onTaxMode: (m: "applicable" | "not_applicable") => void;
-  busy: boolean; onSave: () => void;
-}) {
-  const applicable = taxMode !== "not_applicable";
-  const intra = inv.placeOfSupply === SELLER.state;
-  const addonGross = addons.reduce((a, i) => a + i.amountPaise, 0);
-  const blockers = blockersOf(inv);
-
-  return (
-    <Card title="Summary" sub="display only — the server recomputes" ticks
-      foot={
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-col gap-1.5">
-            <Button color="primary" ico="check" block data-act="in-save-all" isLoading={busy} onClick={onSave}>
-              Save changes</Button>
-            <span className="text-xs text-tertiary">
-              Writes the dates, the plan, the charges and the payment together.</span>
-          </div>
-          <ReadyLine blockers={blockers.map((b) => ({ text: b }))} verb="issue" />
-        </div>
-      }>
-      <MoneyLine
-        k={"Plan" + (plan && plan.installmentCount
-          ? " · installment " + plan.installmentSeq + " of " + plan.installmentCount : "")}
-        v={inr(plan ? plan.amountPaise : 0)} />
-      {addons.length ? <MoneyLine k="One-off charges" v={inr(addonGross)} /> : null}
-      <MoneyLine k="Subtotal" v={inr(inv.subtotalPaise)} rule />
-      <MoneyLine k={applicable ? "Taxable value" : "Amount"} v={inr(inv.taxableTotalPaise)} rule />
-
-      {/* TAX IS A DECISION ON THIS INVOICE, not a property of the customer —
-          so it is a control in the figures, where its effect is visible. */}
-      <div className="flex items-center justify-between gap-3 py-2">
-        <span className="text-sm text-tertiary">Tax</span>
-        <Segmented sm label="Tax" value={applicable ? "applicable" : "not_applicable"}
-          onPick={(v2) => onTaxMode(v2 as "applicable" | "not_applicable")}
-          options={[{ v: "applicable", l: "Applicable" }, { v: "not_applicable", l: "Not applicable" }]} />
-      </div>
-
-      {applicable
-        ? <>
-            <div className="flex items-center justify-between gap-3 py-1">
-              <label htmlFor="nvGst" className="text-sm text-tertiary">GST rate</label>
-              <SelectInput id="nvGst" defaultValue={String(inv.gstRate)} className="w-28"
-                options={GST_RATES.map((r) => ({ v: String(r), l: r + "%" }))} />
-            </div>
-            {intra
-              ? <>
-                  <MoneyLine k={"CGST (" + inv.gstRate / 2 + "%)"} v={inr(inv.cgstPaise)} />
-                  <MoneyLine k={"SGST (" + inv.gstRate / 2 + "%)"} v={inr(inv.sgstPaise)} />
-                </>
-              : <MoneyLine k={"IGST (" + inv.gstRate + "%)"} v={inr(inv.igstPaise)} />}
-          </>
-        : <p className="mt-2 text-xs text-tertiary">
-            <b className="font-medium text-secondary">Tax not applicable.</b> The grand total excludes
-            GST entirely — an explicit choice for this invoice.
-          </p>}
-
-      <MoneyLine k="Grand total" v={inr(inv.grandTotalPaise)} strong />
-      <p className="mt-1 text-xs text-tertiary">{inrWords(inv.grandTotalPaise)}</p>
-
-      {applicable
-        ? <p className="mt-2 text-xs text-tertiary">
-            {intra
-              ? <><b className="font-medium text-secondary">Intra-state.</b> Place of supply is {inv.placeOfSupply},
-                  the same state as Interior bazzar — so GST splits into CGST + SGST.</>
-              : <><b className="font-medium text-secondary">Inter-state.</b> Place of supply is {inv.placeOfSupply || "not set"} and
-                  Interior bazzar is in {SELLER.state} — so a single IGST applies.</>}
-          </p>
-        : null}
-    </Card>
-  );
-}
+/* The rail is `BuilderSummary` in Quotations/bits now — one drawing for both
+   builders, carrying the figures, the tax decision and the one Save. */
 
 /* ---------------------------------------------------------------- proof --- */
 /* One line, not a section: what the issue transaction is still missing, and

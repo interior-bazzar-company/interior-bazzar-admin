@@ -17,10 +17,10 @@
    ===================================================================== */
 import type { ReactNode } from "react";
 import { cx } from "@/utils/cx";
-import type { InvoiceRow, QuotationRow } from "../../../api/modules/adminOps";
-import { BrandLogo, Icon, Pill, Radio, Timeline } from "../../ui";
+import type { InvoiceRow, QuotationRow, TaxMode } from "../../../api/modules/adminOps";
+import { BrandLogo, Button, Card, Icon, Pill, Radio, Segmented, SelectInput, Timeline } from "../../ui";
 import { inr, inrWords, fmtDate } from "../../ui/format";
-import { SELLER } from "./helpers";
+import { GST_RATES, SELLER } from "./helpers";
 
 /* ------------------------------------------------------------- the ink --- */
 /* The micro-label, in paper's own palette. `label-mono` is the same device
@@ -454,25 +454,83 @@ export function StepHead({ n, title, hint }: { n: number; title: ReactNode; hint
   );
 }
 
-/* THE PARTIES STRIP — reference, not input. Two wells so nobody tries to type
-   in them and then wonders why the page will not let them. */
-export function PartyStrip({ blocks }: { blocks: { title: ReactNode; lines: ReactNode[]; foot?: ReactNode }[] }) {
+/* BILL TO — one line of reference, not input. The seller's own letterhead is
+   not repeated beside it: it is printed on the sheet, and it is the same on
+   every document the company has ever raised. */
+export function BillTo({ name, address, phone, edit }: { name: ReactNode; address: ReactNode; phone: ReactNode; edit?: ReactNode }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
-      {blocks.map((b, i) => (
-        <div key={i} className="min-w-0 rounded-lg bg-secondary p-3 ring-1 ring-secondary ring-inset">
-          <div className="label-mono">{b.title}</div>
-          <div className="mt-1.5 flex flex-col gap-0.5 text-sm">
-            {b.lines.map((l, j) => (
-              <div key={j} className={cx("[overflow-wrap:anywhere]", j === 0 ? "font-medium text-primary" : "text-tertiary")}>
-                {l}
-              </div>
-            ))}
-          </div>
-          {b.foot ? <div className="mt-2">{b.foot}</div> : null}
-        </div>
-      ))}
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg bg-secondary px-3 py-2.5 text-sm ring-1 ring-secondary ring-inset">
+      <span className="label-mono">Bill to</span>
+      <span className="font-medium text-primary [overflow-wrap:anywhere]">{name}</span>
+      <span className="text-tertiary [overflow-wrap:anywhere]">{address}</span>
+      <span className="font-mono text-tertiary tnum">{phone}</span>
+      {edit ? <span className="ml-auto">{edit}</span> : null}
     </div>
+  );
+}
+
+/* THE SUMMARY — every figure the SERVER last computed, the one control that
+   changes them (tax), and the one commit for the whole page. ONE drawing for
+   both builders: the quotation used to print its totals as a full-width card
+   in the form column while the invoice kept them in the rail, and the two
+   "twins" had quietly stopped agreeing about where the money is read. */
+export function BuilderSummary({
+  lines, gstId, gstRate, taxMode, onTaxMode, placeOfSupply,
+  cgstPaise, sgstPaise, igstPaise, grandTotalPaise, blockers, busy, onSave, saveLabel, saveAct,
+}: {
+  lines: { k: ReactNode; v: ReactNode; rule?: boolean; tone?: "warn" | "ok" }[];
+  /** the id `patch()` reads the rate back from — stays per module */
+  gstId: string; gstRate: number; taxMode: string; onTaxMode: (m: TaxMode) => void;
+  placeOfSupply: string; cgstPaise: number; sgstPaise: number; igstPaise: number; grandTotalPaise: number;
+  blockers: { text: string; code?: string }[];
+  busy: boolean; onSave: () => void; saveLabel: string; saveAct: string;
+}) {
+  const applicable = taxMode !== "not_applicable";
+  const intra = placeOfSupply === SELLER.state;
+  return (
+    <Card title="Summary" sub="recomputed on save" ticks
+      foot={
+        <div className="flex flex-col gap-3">
+          <Button color="primary" ico="check" block data-act={saveAct} isLoading={busy} onClick={onSave}>{saveLabel}</Button>
+          <ReadyLine blockers={blockers} verb="issue" />
+        </div>
+      }>
+      <div className="flex min-w-0 flex-col">
+        {lines.map((l, i) => <MoneyLine key={i} k={l.k} v={l.v} rule={l.rule} tone={l.tone} />)}
+      </div>
+
+      {/* TAX IS A DECISION ON THIS DOCUMENT, not a property of the customer —
+          so it is a control in the figures, where its effect is visible. */}
+      <div className="mt-2 flex items-center justify-between gap-3 border-t border-secondary py-2">
+        <span className="text-sm text-tertiary">Tax</span>
+        <Segmented sm label="Tax" value={applicable ? "applicable" : "not_applicable"}
+          onPick={(m) => onTaxMode(m as TaxMode)}
+          options={[{ v: "applicable", l: "Applicable" }, { v: "not_applicable", l: "Not applicable" }]} />
+      </div>
+      {applicable ? (
+        <div className="flex min-w-0 flex-col">
+          <div className="flex items-center justify-between gap-3 py-1">
+            <label htmlFor={gstId} className="text-sm text-tertiary">GST rate</label>
+            <SelectInput id={gstId} defaultValue={String(gstRate)} className="w-24"
+              options={GST_RATES.map((r) => ({ v: String(r), l: r + "%" }))} />
+          </div>
+          {intra
+            ? <>
+                <MoneyLine k={"CGST (" + gstRate / 2 + "%)"} v={inr(cgstPaise)} />
+                <MoneyLine k={"SGST (" + gstRate / 2 + "%)"} v={inr(sgstPaise)} />
+              </>
+            : <MoneyLine k={"IGST (" + gstRate + "%)"} v={inr(igstPaise)} />}
+          <p className="text-xs text-tertiary">
+            {intra
+              ? "Intra-state supply · " + SELLER.state
+              : "Inter-state supply · " + (placeOfSupply || "place of supply not set") + " → " + SELLER.state}
+          </p>
+        </div>
+      ) : <MoneyLine k="GST" v="Not applicable" />}
+
+      <MoneyLine k="Grand total" v={inr(grandTotalPaise)} strong />
+      <p className="mt-1 text-xs text-tertiary italic">{inrWords(grandTotalPaise)}</p>
+    </Card>
   );
 }
 

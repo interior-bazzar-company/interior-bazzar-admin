@@ -30,9 +30,9 @@ import AdminOpsService from "../../../api/modules/adminOps";
 import type { QuotationSaveInput } from "../../../api/modules/adminOps";
 import {
   Alert, Button, Card, DateInput, Eyebrow, FieldRow, FormField, FormSection, Input, PageHeader, Pill,
-  SectionHead, SelectInput, Segmented, Table, Tag, Textarea,
+  SectionHead, SelectInput, Table, Tag, Textarea,
 } from "../../ui";
-import { inr, inrWords } from "../../ui/format";
+import { inr } from "../../ui/format";
 import { useShell } from "../../shell/ShellContext";
 import { useNav } from "../../shell/AdminShell";
 import { errMessage } from "../../../api/apiService";
@@ -42,12 +42,10 @@ import type { PlanPick } from "./PlanModal";
 import type { QuotationRow } from "./api";
 import type { PlanRow } from "../../../api/modules/adminOps";
 import {
-  BuilderLayout, FeatureFold, MoneyLine, PartyStrip, QuotationSheet, ReadyLine, StepHead,
+  BillTo, BuilderLayout, BuilderSummary, FeatureFold, QuotationSheet, StepHead,
 } from "./bits";
 import type { LiveDoc } from "./bits";
-import {
-  GST_RATES, SELLER, STATES, addonsOf, blockersOf, lineNet, planItemOf, planLabel,
-} from "./helpers";
+import { STATES, addonsOf, blockersOf, lineNet, planItemOf, planLabel } from "./helpers";
 
 const DEFAULT_VALIDITY_DAYS = 15;
 const COUNTS = [1, 2, 3, 4, 5];
@@ -158,6 +156,18 @@ export function BuilderBody({ q, onSaved, detail }: {
 
   const dealTo = "#/deals/" + q.dealRef;
 
+  /* The lines above the tax block, in the order the document prints them.
+     Display only — every figure is what the server last computed, and
+     helpers.lineNet reads the discount back off it rather than recomputing. */
+  const addonGross = addons.reduce((a, i) => a + lineNet(i).base, 0);
+  const lines = [
+    { k: "Plan · " + (plan && plan.termMonths ? plan.termMonths + " months" : "—"), v: inr(plan ? lineNet(plan).base : 0) },
+    ...(addons.length ? [{ k: "Add-ons", v: inr(addonGross) }] : []),
+    { k: "Gross amount", v: inr(q.subtotalPaise), rule: true },
+    ...(q.discountAmountPaise ? [{ k: "Discount", v: "−" + inr(q.discountAmountPaise), tone: "warn" as const }] : []),
+    { k: taxMode !== "not_applicable" ? "Taxable value" : "Subtotal", v: inr(q.taxablePaise), rule: true },
+  ];
+
   return (
     <div className="flex min-w-0 flex-col gap-5">
       <PageHeader
@@ -171,30 +181,23 @@ export function BuilderBody({ q, onSaved, detail }: {
             onClick={(e) => { e.preventDefault(); go(dealTo); }}>{q.dealRef}</a>
           <span className="font-mono tnum">Number assigned on issue</span>
         </>}
-        actions={<Button color="primary" ico="check" isLoading={busy} data-act="qt-save-all"
-          onClick={save}>Save draft</Button>}
-        fold={[{ icon: "quote", label: "Preview & issue",
-          act: () => go("#/quotations/" + q.id + "?mode=preview") }]} />
+        actions={<Button color="primary" ico="quote" onClick={() => go("#/quotations/" + q.id + "?mode=preview")}>
+          Preview &amp; issue</Button>} />
 
       {err ? <Alert tone="bad" title="Could not save this quotation.">{err}</Alert> : null}
 
       <BuilderLayout
         form={<>
           <section className="flex min-w-0 flex-col gap-3">
-            <StepHead n={1} title="Who and when" hint="from the deal, frozen at issue" />
+            <StepHead n={1} title="Details" hint="from the deal, frozen at issue" />
             <Card>
               <FormSection>
-                <PartyStrip blocks={[
-                  { title: "From",
-                    lines: [SELLER.brand, SELLER.tagline, SELLER.addr,
-                      <span key="gst" className="font-mono tnum">{SELLER.gstin ? "GSTIN " + SELLER.gstin : "CIN " + SELLER.cin}</span>] },
-                  { title: "Bill to",
-                    lines: [q.party.business ? q.party.name + " · " + q.party.business : q.party.name || "—",
-                      q.party.address || [q.party.city, q.party.state].filter(Boolean).join(", ") || "—",
-                      <span key="ph" className="font-mono tnum">{q.party.phone || "—"}</span>],
-                    foot: <Button color="link-color" size="xs" ico="ext" data-go={dealTo}
-                      onClick={() => go(dealTo)}>Edit on the deal</Button> },
-                ]} />
+                <BillTo
+                  name={q.party.business ? q.party.name + " · " + q.party.business : q.party.name || "—"}
+                  address={q.party.address || [q.party.city, q.party.state].filter(Boolean).join(", ") || "—"}
+                  phone={q.party.phone || "—"}
+                  edit={<Button color="link-color" size="xs" ico="ext" data-go={dealTo}
+                    onClick={() => go(dealTo)}>Edit on the deal</Button>} />
                 <FieldRow cols={3}>
                   <FormField id="qDate" label="Quotation date">
                     <DateInput id="qDate" defaultValue={q.quotationDate} onChange={mirror("date")} className="w-full" />
@@ -213,7 +216,7 @@ export function BuilderBody({ q, onSaved, detail }: {
           </section>
 
           <section className="flex min-w-0 flex-col gap-3">
-            <StepHead n={2} title="What they are buying" hint="one plan, plus anything one-off" />
+            <StepHead n={2} title="Plan and charges" />
             <Card flush>
               <PlanBlock plan={plan} plans={plans} busy={busy} onChange={openPlanPicker}
                 count={count} onCount={setCount} onHsn={mirror("planHsn")} onTerm={mirror("termMonths")} />
@@ -223,14 +226,7 @@ export function BuilderBody({ q, onSaved, detail }: {
           </section>
 
           <section className="flex min-w-0 flex-col gap-3">
-            <StepHead n={3} title="What it comes to" hint="display only — recomputed on save" />
-            <Card>
-              <Totals q={q} plan={plan} addons={addons} taxMode={taxMode} onTaxMode={setTaxMode} />
-            </Card>
-          </section>
-
-          <section className="flex min-w-0 flex-col gap-3">
-            <StepHead n={4} title="What it says" hint="printed under the figures" />
+            <StepHead n={3} title="Notes and terms" />
             <Card>
               <FormSection>
                 <FormField id="qNotes" label="Notes (customer-facing)">
@@ -243,15 +239,28 @@ export function BuilderBody({ q, onSaved, detail }: {
               </FormSection>
             </Card>
           </section>
+
         </>}
-        rail={<>
-          <Eyebrow>The document</Eyebrow>
-          <QuotationSheet q={q} compact live={live} />
-          <p className="text-xs text-tertiary">
-            What you type appears here as you type it. Every figure is the one the server last
-            computed — save to recalculate.
-          </p>
-        </>} />
+        rail={
+          <BuilderSummary lines={lines}
+            gstId="qGst" gstRate={q.gstRate} taxMode={taxMode} onTaxMode={setTaxMode}
+            placeOfSupply={q.placeOfSupply}
+            cgstPaise={q.cgstPaise} sgstPaise={q.sgstPaise} igstPaise={q.igstPaise}
+            grandTotalPaise={q.grandTotalPaise} blockers={blockersOf(q)}
+            busy={busy} onSave={save} saveLabel="Save draft" saveAct="qt-save-all" />
+        } />
+
+      {/* THE LIVE SHEET, at the width a document needs. It used to stand in the
+          rail beside the form, where a 210mm page in a 28rem column was cut off
+          at the fold on a laptop. The rail now holds the figures — the one thing
+          that has to stay in view while typing — and the sheet sits under the
+          form, whole. It is OUTSIDE the two-column grid, padded to the form
+          column's width, so that on a phone the summary and its Save come
+          before it rather than under a page of paper. */}
+      <section className="flex min-w-0 flex-col gap-3 lg:pr-[calc(24rem+1.25rem)] xl:pr-[calc(28rem+1.25rem)]">
+        <Eyebrow>Live preview · figures update on save</Eyebrow>
+        <QuotationSheet q={q} compact live={live} />
+      </section>
     </div>
   );
 }
@@ -301,7 +310,7 @@ function PlanBlock({ plan, plans, busy, onChange, count, onCount, onHsn, onTerm 
       {/* The features are what the tier IS, so they stay — but folded, because
           ten chips between the plan name and the price being negotiated put the
           two things being compared on different screens. */}
-      <FeatureFold feats={feats} note="Snapshotted from the plan catalogue when it was picked. A later edit to the plan sheet cannot rewrite a proposal already sent." />
+      <FeatureFold feats={feats} />
 
       {/* The name is set by the picker, not typed — but it still has to go out
           with the save, and `patch()` reads every field the same way. */}
@@ -312,7 +321,7 @@ function PlanBlock({ plan, plans, busy, onChange, count, onCount, onHsn, onTerm 
           <FormField id="pHsn" label="HSN / SAC">
             <Input id="pHsn" mono defaultValue={plan.hsn} onChange={onHsn} />
           </FormField>
-          <FormField id="pTerm" label="Term (months)" hint="Replaces quantity.">
+          <FormField id="pTerm" label="Term (months)">
             <Input id="pTerm" type="number" defaultValue={String(plan.termMonths || "")} onChange={onTerm} />
           </FormField>
           <FormField id="pTotal" label="Total amount ₹" hint="One negotiated total for the full term.">
@@ -336,15 +345,15 @@ function PlanBlock({ plan, plans, busy, onChange, count, onCount, onHsn, onTerm 
               onChange={(x) => onCount(Number(x))}
               options={COUNTS.map((k) => ({ v: String(k), l: k === 1 ? "1 (full amount)" : k + " payments" }))} />
           </FormField>
-          {count > 1
-            ? <FormField id="pGap" label="Gap between payments"
-                hint="A yearly package can be paid quarterly; a short one, monthly.">
-                <SelectInput id="pGap" defaultValue={String(plan.installmentGapMonths || 1)}
-                  options={COUNTS.map((k) => ({ v: String(k), l: k === 1 ? "Every month" : "Every " + k + " months" }))} />
-              </FormField>
-            : <FormField label="Gap between payments" hint="Paid in full, so there is no gap to set.">
-                <div className="flex h-9 items-center text-sm text-quaternary">—</div>
-              </FormField>}
+          {/* Only when there is a gap to set — a placeholder field holding a
+              dash was a question with no answer, drawn to fill the grid. */}
+          {count > 1 ? (
+            <FormField id="pGap" label="Gap between payments"
+              hint="A yearly package can be paid quarterly; a short one, monthly.">
+              <SelectInput id="pGap" defaultValue={String(plan.installmentGapMonths || 1)}
+                options={COUNTS.map((k) => ({ v: String(k), l: k === 1 ? "Every month" : "Every " + k + " months" }))} />
+            </FormField>
+          ) : null}
         </FieldRow>
       </FormSection>
       {/* ponytail: no schedule strip. The prototype draws the due dates under
@@ -367,11 +376,7 @@ function AddonBlock({ q, addons, busy, onAdd, onRemove, onName }: {
   );
   return (
     <div className="flex min-w-0 flex-col gap-3 border-t border-secondary p-5">
-      <SectionHead className="mb-0" title="One-off charges"
-        desc={addons.length
-          ? addons.length + " on this quotation"
-          : "Onboarding, a shoot, a custom build — no months, no quantity."}
-        right={add} />
+      <SectionHead className="mb-0" title="One-off charges" right={add} />
       {addons.length ? (
         <Table
           min="42rem"
@@ -411,74 +416,5 @@ function AddonBlock({ q, addons, busy, onAdd, onRemove, onName }: {
   );
 }
 
-/* ============================================================ the totals === */
-/* Display only — every figure below is what the SERVER last computed, and it
-   recomputes them again on save. Nothing here is arithmetic this page invented
-   (see helpers.lineNet). Tax lives here because this is the block where the
-   choice changes a number you can see. */
-function Totals({ q, plan, addons, taxMode, onTaxMode }: {
-  q: QuotationRow; plan: ReturnType<typeof planItemOf>; addons: ReturnType<typeof addonsOf>;
-  taxMode: string; onTaxMode: (m: "applicable" | "not_applicable") => void;
-}) {
-  const applicable = taxMode !== "not_applicable";
-  const intra = q.placeOfSupply === SELLER.state;
-  const addonGross = addons.reduce((a, i) => a + lineNet(i).base, 0);
-  const blockers = blockersOf(q);
-
-  return (
-    <div className="flex min-w-0 flex-col gap-4">
-      <div className="flex min-w-0 flex-col">
-        <MoneyLine k={"Plan · " + (plan && plan.termMonths ? plan.termMonths + " months" : "—")}
-          v={inr(plan ? lineNet(plan).base : 0)} />
-        {addons.length ? <MoneyLine k="Add-ons" v={inr(addonGross)} /> : null}
-        <MoneyLine k="Gross amount" v={inr(q.subtotalPaise)} rule />
-        {q.discountAmountPaise
-          ? <MoneyLine k="Discount" v={"−" + inr(q.discountAmountPaise)} tone="warn" />
-          : null}
-        <MoneyLine k={applicable ? "Taxable value" : "Subtotal"} v={inr(q.taxablePaise)} rule />
-      </div>
-
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-secondary p-3 ring-1 ring-secondary ring-inset">
-        <div className="min-w-0">
-          <div className="text-sm font-medium text-secondary">Tax</div>
-          <p className="mt-0.5 text-xs text-tertiary">
-            {applicable
-              ? intra
-                ? "Intra-state — place of supply is " + q.placeOfSupply + ", the same state as Interior bazzar, so GST splits into CGST + SGST."
-                : "Inter-state — place of supply is " + (q.placeOfSupply || "not set") + " and Interior bazzar is in " + SELLER.state + ", so a single IGST applies."
-              : "The grand total excludes GST entirely — the Sales Team's explicit choice on this quotation, for a client paying with no tax."}
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {applicable
-            ? <SelectInput id="qGst" ariaLabel="GST rate" className="w-24" defaultValue={String(q.gstRate)}
-                options={GST_RATES.map((r) => ({ v: String(r), l: r + "%" }))} />
-            : null}
-          <Segmented label="Tax" value={applicable ? "applicable" : "not_applicable"}
-            onPick={(m) => onTaxMode(m as "applicable" | "not_applicable")}
-            options={[{ v: "applicable", l: "Applicable" }, { v: "not_applicable", l: "Not applicable" }]} />
-        </div>
-      </div>
-
-      {applicable ? (
-        <div className="flex min-w-0 flex-col">
-          {intra
-            ? <>
-                <MoneyLine k={"CGST (" + q.gstRate / 2 + "%)"} v={inr(q.cgstPaise)} />
-                <MoneyLine k={"SGST (" + q.gstRate / 2 + "%)"} v={inr(q.sgstPaise)} />
-              </>
-            : <MoneyLine k={"IGST (" + q.gstRate + "%)"} v={inr(q.igstPaise)} />}
-        </div>
-      ) : null}
-
-      <div className="flex min-w-0 flex-col">
-        <MoneyLine k="Grand total" v={inr(q.grandTotalPaise)} strong />
-        <div className="mt-1 text-sm text-tertiary italic">{inrWords(q.grandTotalPaise)}</div>
-      </div>
-
-      <div className="border-t border-secondary pt-4">
-        <ReadyLine blockers={blockers} verb="issue" />
-      </div>
-    </div>
-  );
-}
+/* The totals are `BuilderSummary` in ./bits now, in the rail — one drawing
+   shared with the invoice builder, where they had always lived. */

@@ -6,6 +6,70 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-09
 
+### The two document builders become one drawing — and every select starts saving what it shows
+
+**Area:** `#/quotations/<id>?mode=edit`, `#/invoices/<id>?mode=edit` — the quotation and invoice builders; and, through one shared control, every `<select>` in the panel
+**Files:** `src/admin/views/Quotations/{Form,bits}.tsx`, `src/admin/views/Invoices/{Form,Builder}.tsx`, `src/components/base/select/select-native.tsx`
+
+**What changed**
+The quotation and invoice builders were written as twins and had drifted: the quotation printed
+its totals as a full-width card in the form column with Save in the header and the paper in the
+rail; the invoice kept its totals in the rail with Save under them and no paper at all. They now
+share one skeleton. The header carries one primary (Preview & issue) and the record's own links in
+its meta row. The rail is a single `BuilderSummary` — figures, the tax decision, grand total, the
+ready-to-issue check and the one Save — sticky, so the money and the commit stay in view while
+typing. The quotation's form column lost ~750px; the invoice page lost its "source strip" card,
+whose three facts (deal, quotation, total) were already on the screen twice each.
+
+Inside the cards: the seller's own letterhead well is gone from step 1 (it is printed on the sheet
+and is the same on every document ever raised), and Bill-to is one line. The plan's feature list
+folds the same way on both builders. The quotation no longer draws a placeholder "Gap between
+payments" holding a dash when there is no gap to set. The invoice's **Custom remark** field exists
+only while Remark is *Other* — it used to sit permanently beside a select that made it irrelevant.
+Step titles are plain nouns (Details · Plan and charges · Payment received · Notes and terms).
+
+The quotation's live sheet moved from the rail to under the form, at the width a document needs,
+outside the two-column grid — on a phone the summary and its Save now come before it rather than
+under a page of paper.
+
+**The bug the screenshot found.** `NativeSelect` minted its own id and dropped the one it was
+handed. Every `<label htmlFor>` aimed at a select pointed at nothing, and both builders — which
+read their controls back with `getElementById` at save time — silently saved `""` for place of
+supply, GST rate, payments, gap, discount unit, payment mode and remark. On the invoice that meant a
+preset remark could never satisfy the "remark required" guard. `NativeSelect` now honours a passed
+`id`, gives its own optional label a separate id, and sets `aria-labelledby` only when it drew that
+label — pointing the select at itself had out-ranked any outer `<label>`. This reaches all 37
+id-bearing `SelectInput`s in the panel.
+
+**Temp data**
+none — presentation and one base control; no content file, seed or payload changed. The mock rows
+used to render the builders lived in a throwaway harness and are not in the tree.
+
+**Backend needed**
+none. The save payloads are unchanged in shape; several fields simply carry a value now instead of
+an empty string.
+
+**Open decisions**
+Save moved out of the quotation header into the sticky summary, matching the invoice. If a header
+Save is wanted back, `BuilderSummary` takes `onSave` from the page, so the header can call the same
+function — nothing would need to move again.
+
+**Verified**
+`tsc -b` clean, `vite build` green, `eslint` 0 errors (2 pre-existing `exhaustive-deps` warnings in
+the two `api.ts` files, untouched).
+
+Both builders were mounted with mock rows under Playwright on the real Vite pipeline, inside
+`MemoryRouter` + `ShellProvider`, before and after. Checked by script, not by eye: every select id
+now resolves to a `<select>` and `label.control` is that select; `selectOption` changes the value
+`patch()` will read; the tax toggle removes and restores the GST rate control and prints "GST · Not
+applicable"; choosing *Other* reveals the custom remark and choosing a preset removes it; pressing
+Save on each builder reaches `save()` (the "Could not save" alert appears, there being no API in the
+harness); at 390px the quotation's Save sits above the sheet and nothing scrolls sideways.
+
+Not verified: an actual round-trip save, which needs the backend. The claim that place of supply,
+GST rate and the rest now persist rests on the DOM reads returning real values where they returned
+`""` before, which the script confirms, plus the save payload code being unchanged.
+
 ### Chat takes the whole window, Send moves into the box, and the filter row gets a bar to drag
 
 **Area:** `#/deals?view=` (Chat), and the shell page frame every module renders into
