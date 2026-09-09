@@ -110,14 +110,38 @@ export function FormField({
 }
 
 /* A FORM SECTION — a titled group of fields. Progressive disclosure is a
-   section with `open={false}`. */
-export function FormSection({ title, desc, children, className }: { title?: ReactNode; desc?: ReactNode; children: ReactNode; className?: string }) {
+   section with `open={false}`.
+
+   THE DESCRIPTION FOLDS ON THE SAME RULE AS A FIELD HINT, and for the same
+   reason: a legend is read to find out which group of questions this is, and a
+   paragraph between it and the first control pushes the questions themselves
+   down the page. A live count ("3 clauses", "Last response Tuesday") is short
+   and stays where it is. */
+export function FormSection({
+    title,
+    desc,
+    descInline,
+    children,
+    className,
+}: {
+    title?: ReactNode;
+    desc?: ReactNode;
+    /** keep a long description under the legend — for the rare section whose
+     *  description is a caution about what is about to be done, not reference. */
+    descInline?: boolean;
+    children: ReactNode;
+    className?: string;
+}) {
+    const folded = descInline ? null : foldableHint(desc);
     return (
         <fieldset className={cx("flex min-w-0 flex-col gap-4", className)}>
             {title ? (
                 <legend className="mb-1 flex flex-col">
-                    <span className="text-sm font-semibold text-primary">{title}</span>
-                    {desc ? <span className="mt-0.5 text-sm text-tertiary">{desc}</span> : null}
+                    <span className="flex items-center gap-1">
+                        <span className="text-sm font-semibold text-primary">{title}</span>
+                        {folded ? <InfoDot label={typeof title === "string" ? "About " + title : undefined}>{folded}</InfoDot> : null}
+                    </span>
+                    {desc && !folded ? <span className="mt-0.5 text-sm text-tertiary">{desc}</span> : null}
                 </legend>
             ) : null}
             {children}

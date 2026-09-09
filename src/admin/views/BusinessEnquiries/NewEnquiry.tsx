@@ -170,8 +170,7 @@ export default function NewEnquiryModal({ onClose, onDone }: {
         </FormSection>
 
         {/* ---------------------------------------------------- requirement --- */}
-        <FormSection title="What they want"
-          desc="Everything here is optional. You are probably still on the call — a field you cannot answer yet is one you will guess at, and a guess is worse than a blank.">
+        <FormSection title="What they want" desc="Everything here is optional.">
           <FieldRow cols={2}>
             <VocabInput id="ne-cat" label="Category" value={f.category}
               options={VOCAB.categories} onChange={set("category")}

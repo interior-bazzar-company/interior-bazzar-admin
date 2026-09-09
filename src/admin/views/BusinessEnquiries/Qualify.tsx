@@ -240,8 +240,12 @@ export function QualifyPanel({ e, onQualified }: { e: Enquiry; onQualified: (msg
         </FormSection>
 
         {/* ------------------------------------------------------------ log --- */}
+        {/* Inline, not behind the i: this is a live reading off the log below,
+            not reference about it. A long date format tips it past the fold
+            threshold, so it says so explicitly rather than by luck. */}
         <FormSection
           title="Contact log"
+          descInline
           desc={last ? "Last response " + dateTimeLabel(last.at) : undefined}
         >
           {e.contactLog.length ? (

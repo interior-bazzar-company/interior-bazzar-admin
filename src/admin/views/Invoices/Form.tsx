@@ -126,7 +126,7 @@ export function BuilderBody({ inv, onSaved }: { inv: InvoiceRow; onSaved: () => 
       <BuilderLayout
         form={<>
           <section className="flex min-w-0 flex-col gap-3">
-            <StepHead n={1} title="Who and when" hint="the invoice's own dates, and who it is billed to" />
+            <StepHead n={1} title="Who and when" hint="dates, and who it is billed to" />
             <Card>
               <FormSection>
                 <PartyStrip blocks={[
@@ -157,7 +157,7 @@ export function BuilderBody({ inv, onSaved }: { inv: InvoiceRow; onSaved: () => 
 
           <section className="flex min-w-0 flex-col gap-3">
             <StepHead n={2} title="What you're billing"
-              hint="the quotation's schedule, the plan, and anything one-off" />
+              hint="schedule, plan, one-off charges" />
             <Card flush>
               <PlanBlock inv={inv} plan={plan} />
               <AddonBlock addons={addons} busy={busy} onAdd={addAddon} onRemove={removeAddon} />
@@ -166,7 +166,7 @@ export function BuilderBody({ inv, onSaved }: { inv: InvoiceRow; onSaved: () => 
 
           <section className="flex min-w-0 flex-col gap-3">
             <StepHead n={3} title="Payment received"
-              hint="required — an invoice is raised only after the client has paid" />
+              hint="required before an invoice is raised" />
             <Card>
               <FormSection>
                 <FieldRow cols={3}>
@@ -189,7 +189,7 @@ export function BuilderBody({ inv, onSaved }: { inv: InvoiceRow; onSaved: () => 
           </section>
 
           <section className="flex min-w-0 flex-col gap-3">
-            <StepHead n={4} title="What it says" hint="notes and terms, printed on the document" />
+            <StepHead n={4} title="What it says" hint="printed on the document" />
             <Card>
               <FormSection>
                 <FormField id="nvNotes" label="Notes (customer-facing)">

@@ -6,6 +6,61 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-09
 
+### Section legends fold on the same rule, and the step subtitles stop truncating
+
+**Area:** every form section and modal legend across the panel — `#/users`, `#/roles`, `#/plans`, `#/finance` (every dialog), `#/business-enquiries`, and the numbered steps in `#/quotations` and `#/invoices`
+**Files:** `src/admin/ui/fields.tsx`, `src/admin/views/Finance/{dialog,SubModals}.tsx`, `src/admin/views/BusinessEnquiries/{NewEnquiry,Qualify}.tsx`, `src/admin/views/Quotations/Form.tsx`, `src/admin/views/Invoices/Form.tsx`
+
+**What changed**
+`FormSection` now folds a long `desc` behind the i on its legend, on the same 30-character rule
+and the same constant as a field hint. A legend is read to find out which group of questions
+this is; a paragraph between it and the first control pushes the questions themselves down the
+page. This reaches Finance's `Fs` for free — it is a `FormSection` underneath — so all eight of
+its legend hints and the six direct `desc` uses changed from one edit.
+
+Two opt out with the new `descInline`, both because the text is a live reading rather than
+reference. Finance's **Billed on** section is the sharper case: once the invoice exists the
+hint is the section's ONLY body, and a legend with nothing under it but an i reads as a section
+that failed to load. The enquiry **Contact log** was caught by the screenshot, not by reading —
+"Last response 8 Sep 2026, 14:20" is 31 characters, so a long date format tipped a status line
+past the threshold by one. It now says it is inline rather than depending on how a date renders.
+
+One description was shortened instead of folded. "What they want" on a new enquiry opened with
+*"Everything here is optional. You are probably still on the call — a field you cannot answer
+yet is one you will guess at, and a guess is worse than a blank."* The first sentence is an
+instruction and stays; the rest was the lecture and is gone.
+
+The eight numbered **StepHead** subtitles were rewritten short rather than folded. That hint
+renders on one `truncate`d line beside the step title, so a long one was already being cut off
+mid-sentence — the worst of both, since it took the space and did not deliver the sentence.
+They are now fragments that fit: "display only — recomputed on save", "from the deal, frozen at
+issue", "required before an invoice is raised". A step header is the wrong place for an i; it
+is one line, and the fix there is fewer words, not a press.
+
+**Temp data**
+none — presentation only; no content file, seed or payload is read or written.
+
+**Backend needed**
+none — no endpoint is involved.
+
+**Open decisions**
+none. This follows the threshold set by the previous entry rather than introducing one.
+
+**Verified**
+`tsc -b` clean, `vite build` green, `eslint src/admin` reports 0 errors — the 50 warnings are
+pre-existing `react-hooks/exhaustive-deps`, none in a file this change touches.
+
+Rendered and photographed under Playwright against the real Vite pipeline, mounting
+`FormSection` directly: long descriptions folded to an i on the legend, short ones inline,
+`descInline` inline. That render is what caught the Contact log case above.
+
+The panel's own routes still could not be walked — login returns 401 with no backend on this
+machine — so this is verified at the component every legend goes through.
+
+A note for whoever edits these files next: `sed -i` on this repo rewrites CRLF to LF for the
+whole file. It was used for the eight StepHead strings here and the endings were restored
+afterwards; git's normalisation meant the diff stayed at the eight intended lines either way.
+
 ### Form hints fold behind the i — a field asks a question, it does not deliver a lecture
 
 **Area:** every form and modal across the panel — `#/quotations`, `#/invoices`, `#/deals`, `#/finance`, `#/team`, `#/users`, `#/plans`, `#/roles`, `#/resources`, `#/business-enquiries`

@@ -501,7 +501,10 @@ export function RecordInstallmentModal({ sub, inst, onClose, onDone }: {
           document should be. The chain raises one invoice per installment as
           each falls due, so this is where a later installment is joined to the
           one raised for it. */}
-      <Fs legend="Billed on"
+      {/* Inline, not behind the i: when the invoice already exists this line is
+          the section's ONLY body, and a legend with nothing under it but an i
+          reads as a section that failed to load. */}
+      <Fs legend="Billed on" hintInline
         hint={already ? "Raised when this installment fell due." : undefined}>
         {already ? null : (
           <Field label={"Invoice · " + sub.customer.name}>

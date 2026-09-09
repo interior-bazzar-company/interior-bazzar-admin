@@ -181,7 +181,7 @@ export function BuilderBody({ q, onSaved, detail }: {
       <BuilderLayout
         form={<>
           <section className="flex min-w-0 flex-col gap-3">
-            <StepHead n={1} title="Who and when" hint="snapshotted from the deal, frozen again at issue" />
+            <StepHead n={1} title="Who and when" hint="from the deal, frozen at issue" />
             <Card>
               <FormSection>
                 <PartyStrip blocks={[
@@ -213,7 +213,7 @@ export function BuilderBody({ q, onSaved, detail }: {
           </section>
 
           <section className="flex min-w-0 flex-col gap-3">
-            <StepHead n={2} title="What they are buying" hint="one plan, and anything one-off beside it" />
+            <StepHead n={2} title="What they are buying" hint="one plan, plus anything one-off" />
             <Card flush>
               <PlanBlock plan={plan} plans={plans} busy={busy} onChange={openPlanPicker}
                 count={count} onCount={setCount} onHsn={mirror("planHsn")} onTerm={mirror("termMonths")} />
@@ -223,14 +223,14 @@ export function BuilderBody({ q, onSaved, detail }: {
           </section>
 
           <section className="flex min-w-0 flex-col gap-3">
-            <StepHead n={3} title="What it comes to" hint="display only — the server recomputes every figure on save" />
+            <StepHead n={3} title="What it comes to" hint="display only — recomputed on save" />
             <Card>
               <Totals q={q} plan={plan} addons={addons} taxMode={taxMode} onTaxMode={setTaxMode} />
             </Card>
           </section>
 
           <section className="flex min-w-0 flex-col gap-3">
-            <StepHead n={4} title="What it says" hint="printed on the document, under the figures" />
+            <StepHead n={4} title="What it says" hint="printed under the figures" />
             <Card>
               <FormSection>
                 <FormField id="qNotes" label="Notes (customer-facing)">

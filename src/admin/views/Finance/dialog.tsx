@@ -40,13 +40,14 @@ export const Cancel = ({ onClose, label }: { onClose: () => void; label?: string
 
 /** A labelled group. `hint` is the sentence under the legend that says what
  *  the field is FOR, not what to type in it. */
-export function Fs({ legend, hint, req, children }: {
-  legend: ReactNode; hint?: ReactNode; req?: boolean; children: ReactNode;
+export function Fs({ legend, hint, req, hintInline, children }: {
+  legend: ReactNode; hint?: ReactNode; req?: boolean; hintInline?: boolean; children: ReactNode;
 }) {
   return (
     <FormSection
       title={<>{legend}{req ? <span className="text-brand-tertiary" title="Required"> *</span> : null}</>}
       desc={hint}
+      descInline={hintInline}
     >
       {children}
     </FormSection>
