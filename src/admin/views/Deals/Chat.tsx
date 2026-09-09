@@ -42,10 +42,15 @@ import { useActs } from "./Modals";
 import { CHIP_LABEL, GateBody, MoreMenu, PrioMenu, StageMenu, selectOptions } from "./menus";
 
 /* The workspace is BOUNDED BY THE VIEWPORT, not by its content: a conversation
-   scrolls inside its own pane, and the page around it never does. The subtrahend
-   is the shell's own chrome — the 56px topbar and the page's vertical padding —
-   so the three panes end exactly where the window does. */
-const FRAME = "flex h-[calc(100dvh-6rem)] min-h-[30rem] flex-col gap-3 md:h-[calc(100dvh-6.5rem)]";
+   scrolls inside its own pane, and the page around it never does.
+
+   No arithmetic any more, and no gutters: the route asks the shell for a `full`
+   page (see usePageChrome in index.tsx), which drops the reading column and its
+   padding and hands this the whole area under the topbar. `h-full` is then
+   exactly that area — three panes that end where the window does, on every
+   breakpoint, without a magic number that goes stale the moment the topbar
+   changes height. */
+const FRAME = "flex h-full min-h-0 flex-col";
 
 /** Which single pane a narrow window is showing. Above `lg` all three are on
  *  screen at once and this is ignored. */
@@ -76,8 +81,11 @@ export function ChatWorkspace({ id, p, api }: {
      yours", not "the pipeline is empty". */
   const mine = !fullAccess();
 
+  /* The empty state is a DOCUMENT, not a workspace — there are no panes to fill
+     the window with — so it brings back the gutters and the reading column the
+     full page dropped. */
   if (!ref && !filtered) return (
-    <div className="flex flex-col gap-4">
+    <div className="mx-auto flex h-full w-full max-w-[1440px] flex-col gap-4 overflow-y-auto px-4 py-5 md:px-6 md:py-6 lg:px-8">
       {/* The page still names itself and still offers its one action: an empty
           workspace is a state of the page, not the absence of one. */}
       <PageHeader title="Deals" meta={<>The conversation view · one deal, its whole history</>}
@@ -109,13 +117,16 @@ export function ChatWorkspace({ id, p, api }: {
      own fetch to resolve. */
   return (
     <div className={FRAME}>
-      <Tabs className="lg:hidden" cur={shown} onPick={(k) => setPane(k as Pane)}
+      <Tabs className="shrink-0 border-b border-secondary px-3 lg:hidden" cur={shown} onPick={(k) => setPane(k as Pane)}
         items={[
           { k: "list", label: "Deals", icon: "list", n: list.length || null, quiet: true },
           { k: "thread", label: "Conversation", icon: "chat" },
           { k: "info", label: "Details", icon: "info" },
         ]} />
-      <div className="flex min-h-0 flex-1 overflow-hidden rounded-xl bg-primary ring-1 ring-secondary">
+      {/* No card any more. A full page has no ground behind it to float on, so
+          the rounding and the ring were an outline drawn a pixel inside the
+          window edge; the panes' own dividers are what separates them. */}
+      <div className="flex min-h-0 flex-1 overflow-hidden bg-primary">
         <ListPane list={list} activeRef={ref || ""} p={p} api={api} cls={only("list")} onPick={() => setPane("thread")} />
         {ref
           ? <DetailPanes dealRef={ref} p={p} thread={only("thread")} info={only("info")} />
@@ -213,10 +224,16 @@ function ListPane({ list, activeRef, p, api, cls, onPick }: {
             : null}
         </div>
         {/* ONE SCROLLING ROW, so the number of filters never changes the pane's
-            layout. Owner is full-access only — see fullAccess() in useDeals.ts:
-            a scoped session's own deals are all it can be shown, so the picker
-            would filter nothing. */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-hide">
+            layout. The bar is VISIBLE (`scrollbar-thin`, not `scrollbar-hide`):
+            in a 320px pane this row is always wider than its box, and a hidden
+            bar made the last picker read as clipped chrome rather than as a
+            control one drag away. `overscroll-x-contain` keeps that drag off
+            the browser's back gesture.
+
+            Owner is full-access only — see fullAccess() in useDeals.ts: a scoped
+            session's own deals are all it can be shown, so the picker would
+            filter nothing. */}
+        <div className="flex items-center gap-1.5 overflow-x-auto overscroll-x-contain pb-1 scrollbar-thin">
           {LIST_FILTERS.map((name) => (name === "owner" && !fullAccess() ? null : (
             <span key={name} className="shrink-0">
               <Select name={name} label={CHIP_LABEL[name] || name} value={p[name]} onFilter={onFilter}
@@ -403,7 +420,11 @@ function ChatPane({ dl, ev: apiEv, p, cls }: {
                 : null}
             </div>
           )}
-          <div className="max-w-full rounded-lg bg-primary px-3 py-2 text-sm whitespace-pre-wrap text-secondary shadow-xs ring-1 ring-secondary">
+          {/* A bubble hugs its text and stops at a READABLE measure. Now that
+              the workspace takes the whole window the pane can be a thousand
+              pixels wide, and `max-w-full` alone would set a paragraph as one
+              unbroken line the eye cannot get back to the start of. */}
+          <div className="max-w-[min(100%,42rem)] rounded-lg bg-primary px-3 py-2 text-sm whitespace-pre-wrap text-secondary shadow-xs ring-1 ring-secondary">
             {e.text}
           </div>
           {openHref
@@ -542,7 +563,7 @@ const CHAN_PLACEHOLDER: Record<string, string> = {
 };
 
 /* The composer is WRITING SPACE and nothing else: the channel picker and the
-   two marks sit above it, Send sits beside them, and the box grows with what
+   two marks sit above it, Send sits INSIDE it, and the box grows with what
    is typed (`field-sizing-content`) up to a third of the pane before it starts
    scrolling itself. No bar underneath explaining where a remark lands — that
    sentence was the same on every deal forever, and it was height taken from
@@ -552,10 +573,25 @@ function Composer({ dl, p }: { dl: any; p: Params }) {
   const shell = useShell();
   const ta = useRef<HTMLTextAreaElement>(null);
   const [busy, setBusy] = useState(false);
+  /* IS THERE ANYTHING TO SEND — the only thing this composer needs from the
+     text, and the reason it is a boolean rather than the value: holding the
+     draft in state would re-render the whole pane on every keystroke to
+     redraw one button. The textarea stays uncontrolled; `ta.current.value` is
+     still the single source of what gets sent. */
+  const [typed, setTyped] = useState(false);
+  const sync = () => setTyped(!!(ta.current && ta.current.value.trim()));
   /* Module state (chanOf/setChan), mirrored locally so picking a channel
      re-renders this composer — the prototype's `var CHAN` had a whole page
      re-render to lean on; React needs its own trigger. */
   const [chan, setChanLocal] = useState(chanOf());
+
+  /* EVERY PROGRAMMATIC WRITE goes through here, so `typed` cannot fall out of
+     step with the box: writeInto's execCommand path fires an input event and
+     React sees it, but the setRangeText fallback fires nothing at all. */
+  const put = (el: HTMLTextAreaElement, start: number, end: number, text: string, selFrom: number, selTo: number) => {
+    writeInto(el, start, end, text, selFrom, selTo);
+    sync();
+  };
 
   /* Both marks run on the SELECTION, and both toggle: a second press on
      something already bold takes the markers off rather than doubling them. */
@@ -569,12 +605,12 @@ function Composer({ dl, p }: { dl: any; p: Params }) {
     // usual case, re-pressing after bolding) or inside it (dragged over the
     // asterisks too). Both come off.
     if (v.slice(Math.max(0, a - m.length), a) === m && v.slice(b, b + m.length) === m)
-      return writeInto(el, a - m.length, b + m.length, sel, a - m.length, b - m.length);
+      return put(el, a - m.length, b + m.length, sel, a - m.length, b - m.length);
     if (sel.length > 2 * m.length && sel.startsWith(m) && sel.endsWith(m))
-      return writeInto(el, a, b, sel.slice(m.length, -m.length), a, b - 2 * m.length);
+      return put(el, a, b, sel.slice(m.length, -m.length), a, b - 2 * m.length);
     // Nothing to bold and no word under the caret: leave the markers with the
     // caret between them, which is what every editor does with an empty press.
-    writeInto(el, a, b, m + sel + m, a + m.length, a + m.length + sel.length);
+    put(el, a, b, m + sel + m, a + m.length, a + m.length + sel.length);
   };
 
   /* Whole lines, never part of one — the selection is widened to the lines it
@@ -588,7 +624,7 @@ function Composer({ dl, p }: { dl: any; p: Params }) {
     const lines = v.slice(a, b).split("\n");
     const on = lines.every((l) => !l.trim() || /^\s*- /.test(l));
     const next = lines.map((l) => (!l.trim() ? l : on ? l.replace(/^(\s*)- /, "$1") : "- " + l)).join("\n");
-    writeInto(el, a, b, next, a, a + next.length);
+    put(el, a, b, next, a, a + next.length);
   };
 
   /* Ctrl/⌘+B, because a toolbar button that has no shortcut is a button people
@@ -612,6 +648,7 @@ function Composer({ dl, p }: { dl: any; p: Params }) {
       setBusy(false);
       if (!ok) return;
       if (ta.current) ta.current.value = "";
+      setTyped(false);          // the box is empty again, so Send goes away again
       setChanLocal(chanOf());   // acts.send resets the module state to manual
     });
   };
@@ -637,7 +674,16 @@ function Composer({ dl, p }: { dl: any; p: Params }) {
           <IconButton ico="list" size="xs" label="Bullet list" onClick={bullet} />
         </span>
       </div>
-      <div className="flex items-end gap-2">
+      {/* SEND LIVES IN THE BOX, at the corner the text is growing towards, and
+          only once there is something to send. An always-present Send on an
+          empty composer is a button whose only outcome is a scolding toast;
+          `pr-14` is the seat it will sit in, held open so the arrow never
+          lands on top of a word the moment it appears.
+
+          It stays icon-only while it sends, too: a button that grows into
+          "Sending…" under the caret would reflow the line somebody is still
+          reading. That state is in the label. */}
+      <div className="relative">
         <TextAreaBase
           id="dwsComposerText"
           ref={ta}
@@ -645,12 +691,17 @@ function Composer({ dl, p }: { dl: any; p: Params }) {
           size="sm"
           aria-label="Write a remark"
           placeholder={CHAN_PLACEHOLDER[chan]}
-          className="field-sizing-content max-h-64 min-h-16 flex-1 resize-none"
+          className="field-sizing-content max-h-64 min-h-16 w-full resize-none pr-14"
           onKeyDown={keys}
+          onChange={sync}
         />
-        <Button color="primary" size="xs" ico="arrow" className="mb-1.5 shrink-0"
-          data-act="dl-send" data-ref={dl.deal_id}
-          isDisabled={busy} onClick={send}>{busy ? "Sending…" : "Send"}</Button>
+        {typed ? (
+          <Button color="primary" size="xs" ico="arrow"
+            className="absolute right-2 bottom-2"
+            aria-label={busy ? "Sending…" : "Send"}
+            data-act="dl-send" data-ref={dl.deal_id}
+            isDisabled={busy} onClick={send} />
+        ) : null}
       </div>
     </div>
   );

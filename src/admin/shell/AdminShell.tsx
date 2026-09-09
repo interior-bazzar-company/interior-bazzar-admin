@@ -54,6 +54,12 @@ type Chrome = {
   right?: ReactNode;
   /** where "up" is from here. `false` means there is no up at all. */
   parent?: string | false | null;
+  /** THE PAGE IS THE VIEWPORT. Drops the reading column and its gutters and
+   *  hands the view the whole area under the topbar, scrolling nothing itself.
+   *  For the one shape that is a workspace rather than a document — Deals'
+   *  Chat, three panes that each scroll on their own. Anything that scrolls as
+   *  a page must leave this off, or it loses the scroller it is scrolling in. */
+  full?: boolean;
 };
 const ChromeCtx = createContext<(c: Chrome) => void>(() => {});
 
@@ -311,8 +317,15 @@ export default function AdminShell() {
 
             <BannerDock />
 
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain" id="scroller" ref={scroller} onScroll={(e) => setStuck(e.currentTarget.scrollTop > 4)}>
-              <div id="page" className="mx-auto w-full max-w-[1440px] px-4 py-5 md:px-6 md:py-6 lg:px-8">
+            <div
+              className={cx("min-h-0 flex-1 overscroll-contain", chrome.full ? "overflow-hidden" : "overflow-y-auto")}
+              id="scroller" ref={scroller} onScroll={(e) => setStuck(e.currentTarget.scrollTop > 4)}
+            >
+              {/* A full page keeps NO gutters and NO reading column: the view
+                  already ends where the window does, and a 1440px cap on a
+                  workspace is 300px of empty desk on either side of it. */}
+              <div id="page" className={cx("w-full",
+                chrome.full ? "h-full" : "mx-auto max-w-[1440px] px-4 py-5 md:px-6 md:py-6 lg:px-8")}>
                 <ErrorBoundary resetKey={here}>
                   <Outlet />
                 </ErrorBoundary>

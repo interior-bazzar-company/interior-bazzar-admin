@@ -130,7 +130,11 @@ export default function Deals() {
     : id ? (view === "chat" ? false : listHash(p))
     : null;
 
-  usePageChrome({ crumbs, right, parent });
+  /* Chat is the one face that is a WORKSPACE, not a document: its three panes
+     each scroll on their own and it is already sized to the viewport, so it
+     takes the whole area under the topbar — no reading column, no gutters.
+     Table and Pipeline stay documents and keep the page's own scroller. */
+  usePageChrome({ crumbs, right, parent, full: view === "chat" });
 
   /* -------------------------------------------------------------- drawer */
   /* Table and Pipeline open the record over the list they were reading it

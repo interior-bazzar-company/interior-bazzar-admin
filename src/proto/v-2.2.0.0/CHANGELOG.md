@@ -6,6 +6,63 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-09
 
+### Chat takes the whole window, Send moves into the box, and the filter row gets a bar to drag
+
+**Area:** `#/deals?view=` (Chat), and the shell page frame every module renders into
+**Files:** `src/admin/shell/AdminShell.tsx`, `src/admin/views/Deals/index.tsx`, `src/admin/views/Deals/Chat.tsx`, `src/styles/globals.css`
+
+**What changed**
+
+**The page can now be the viewport.** `usePageChrome` grows a `full` flag beside `crumbs`,
+`right` and `parent`. A full page drops `#page`'s 1440px reading column and its gutters, and
+`#scroller` stops scrolling — the view has the whole area under the topbar and scrolls its own
+parts. Deals asks for it in Chat and only in Chat: Table and Pipeline are documents and keep
+the page scroller they scroll in.
+
+That deletes the workspace's own arithmetic. `FRAME` was
+`h-[calc(100dvh-6rem)] … md:h-[calc(100dvh-6.5rem)]` — the topbar's height and the page's
+padding, subtracted by hand, in a file that could not see either. It is now `h-full`, which is
+the same answer and stays the same answer when the topbar changes height. The card the three
+panes sat in (`rounded-xl ring-1`) went with it: a full page has no ground behind it to float
+on, so that ring was an outline drawn one pixel inside the window edge. The panes' own dividers
+already separate them.
+
+Two things a wider pane needed. A remark bubble was `max-w-full`, which at 320px was a bubble
+and at 1100px is a paragraph set as one unbroken line; it is now capped at a readable measure
+(`max-w-[min(100%,42rem)]`) and still hugs a short message. And the no-deals-at-all empty state
+brings the gutters and the reading column back for itself — it is a document, not a workspace,
+and there are no panes there to fill a window with.
+
+**Send is in the box, and only when there is something to send.** It was a labelled button
+parked beside the textarea, present and pressable on an empty composer, where its only possible
+outcome was the "Write something before sending." toast. It is now the primary arrow at the
+box's bottom-right corner — the corner the text grows towards — and it appears on the first
+character and leaves when the box empties. The textarea holds `pr-14` open permanently as its
+seat, so the arrow never lands on top of a word at the moment it appears.
+
+The composer stays uncontrolled: what the button watches is a `typed` boolean, not the draft,
+so a keystroke re-renders one button rather than the pane. Both mark buttons write through a
+`put()` wrapper that syncs it — `writeInto`'s `execCommand` path fires an input event that
+React sees, but its `setRangeText` fallback fires nothing, so bolding into an empty box would
+otherwise have produced text with no way to send it.
+
+**The list pane's filter row shows its scrollbar.** The row was already `overflow-x-auto`, but
+under `scrollbar-hide` — so in a 320px pane, where it is always wider than its box, the last
+picker read as clipped chrome rather than as a control one drag away. New `scrollbar-thin`
+utility in `globals.css`: a 6px hairline on the theme's border token, out of the layout's way
+but present. `scrollbar-hide` stays for the rows that scroll by consequence rather than by
+purpose. `overscroll-x-contain` keeps the drag off the browser's back gesture.
+
+**Verified**
+
+`npx tsc -p tsconfig.app.json --noEmit` clean, `npx eslint` clean on all three changed `.tsx`
+files (only the file's pre-existing `no-explicit-any` warnings), `npm run build` succeeds.
+
+**Not verified in a browser** — no backend against this checkout, so `RequireSession` holds
+before the router reaches Deals. The full-bleed height, the arrow's appear/disappear on the
+first and last character, and the filter row's drag have been typed and reasoned about, not
+seen.
+
 ### Section legends fold on the same rule, and the step subtitles stop truncating
 
 **Area:** every form section and modal legend across the panel — `#/users`, `#/roles`, `#/plans`, `#/finance` (every dialog), `#/business-enquiries`, and the numbered steps in `#/quotations` and `#/invoices`

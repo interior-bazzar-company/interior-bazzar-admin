@@ -134,6 +134,30 @@
     scrollbar-width: none;
 }
 
+/* A strip somebody can actually DRAG. `scrollbar-hide` is for rows that scroll
+   by consequence (a nav that happens to be too tall); this is for rows whose
+   whole job is to be scrolled past their own width — a hairline bar, out of
+   the layout's way, but present enough that the overflow reads as "there is
+   more here" rather than "this is cut off". */
+@utility scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border-primary) transparent;
+    &::-webkit-scrollbar {
+        height: 6px;
+        width: 6px;
+    }
+    &::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    &::-webkit-scrollbar-thumb {
+        background: var(--color-border-primary);
+        border-radius: 9999px;
+    }
+    &::-webkit-scrollbar-thumb:hover {
+        background: var(--color-fg-quaternary);
+    }
+}
+
 @utility transition-inherit-all {
     transition-property: inherit;
     transition-duration: inherit;
