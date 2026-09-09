@@ -22,7 +22,7 @@ import type { ReactNode } from "react";
 import AdminOpsService from "../../../api/modules/adminOps";
 import type { QuotationRow } from "../../../api/modules/adminOps";
 import {
-  Alert, Button, Card, EmptyState, Eyebrow, KvList, MoreMenu, PageHeader, PaneLoading, Pill, 
+  Alert, Button, Card, EmptyState, KvList, MoreMenu, PageHeader, PaneLoading, Pill, 
   Table, Tabs, Tag, TbTitle, printHtml, publicDocUrl, qs, shareOrCopy,
 } from "../../ui";
 import type { MenuItem } from "../../ui";
@@ -133,7 +133,6 @@ export default function QuotationDetail({ id, tab, params }: {
     items.push({ icon: "trash", label: "Cancel draft", title: "Consumes no number, so nothing dangles", tone: "bad",
       act: () => doAction("Cancelling", () => call(AdminOpsService.cancelQuotation(q.id))) });
 
-  const dealTo = "#/deals/" + q.dealRef;
   const taxed = q.taxMode !== "not_applicable";
 
   return (
@@ -142,12 +141,11 @@ export default function QuotationDetail({ id, tab, params }: {
         eyebrow="Quotation"
         title={<span className="font-mono tnum">{q.quotationNumber || "Draft"}</span>}
         back={{ label: "Quotations", to: "#/quotations" }}
+        /* The customer and the deal ref moved down to the chain line, which is
+           the row about where this document sits and who it is for. */
         meta={<>
           <Pill dot text={STATUS_LABEL[q.status]} tone={STATUS_TONE[q.status]} />
           <Tag label={"v" + q.version} />
-          <span className="truncate">{partyLine(q)}</span>
-          <a href={dealTo} data-go={dealTo} className="font-mono text-brand-secondary tnum"
-            onClick={(e) => { e.preventDefault(); go(dealTo); }}>{q.dealRef}</a>
           {q.status === "issued" && q.validUntil ? <span>{validity(q.validUntil)}</span> : null}
         </>}
         actions={<>
@@ -174,11 +172,12 @@ export default function QuotationDetail({ id, tab, params }: {
         { k: "Valid until", v: fmtDate(q.validUntil),
           tone: q.status === "issued" && daysUntil(q.validUntil) < 0 ? "bad" : undefined,
           sub: q.status === "issued" ? validity(q.validUntil) : STATUS_LABEL[q.status] },
-        { k: "Owner", v: <span className="text-lg">{q.owner ? q.owner.name : "—"}</span>,
-          sub: q.issuedAt ? "issued " + fmtDate(q.issuedAt) : "made " + fmtDate(q.createdAt) },
+        /* No Owner tile. A person's name is not a figure, and it sat in a row
+           of money reading as one; it is a fact, and it is in Facts — with the
+           made/issued date beside it, where the rest of the dates live. */
       ]} />
 
-      <ChainStrip dealRef={q.dealRef} here="quotation" quotation={q} />
+      <ChainStrip dealRef={q.dealRef} here="quotation" quotation={q} lead={partyLine(q)} />
 
       <VersionRail q={q} onRevise={!isDraft && can("quotations", "edit") ? revise : undefined} />
 
@@ -206,14 +205,12 @@ export default function QuotationDetail({ id, tab, params }: {
           ) : null}
         </div>
 
+        {/* No sheet in the rail. A 210mm document squeezed into a 20rem column
+            was never readable, and the Document tab beside it draws the same
+            sheet at full width — this was the second renderer of a thing the
+            page already had a place for. */}
         <aside className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-0">
           <Card title="Facts" tight><KvList pairs={facts(q, go)} /></Card>
-          {cur !== "document" ? (
-            <div className="flex min-w-0 flex-col gap-2">
-              <Eyebrow>The document</Eyebrow>
-              <QuotationSheet q={q} compact />
-            </div>
-          ) : null}
         </aside>
       </div>
     </div>

@@ -6,6 +6,75 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ## 2026-09-09
 
+### The quotation page loses its furniture, and the document says what the plan includes
+
+**Area:** `#/quotations/<id>` — the detail page; the chain line also appears on `#/invoices/<id>` and the deal chat
+**Files:** `src/admin/views/chainStrip.tsx`, `src/admin/views/Quotations/{Detail,bits,helpers}.tsx`
+
+**What changed**
+Three things came off the page and one went onto the document.
+
+**The chain is a line of text, not four cards.** Deal → Quotation → Invoice → Payment used to be a
+full-width panel of bordered tiles, each with a pill and a sentence — about 90px of chrome above
+every document, restating a status the header already carried, to say a thing that is really a
+breadcrumb. It now reads
+`Shib · Interior hub · Deal DL-0069 · New › Quotation QT-2026-0088 · Issued · v3 › Invoice — › Payment —`
+on one line. The reasons a link is locked ("Quote is Draft, not Accepted") are still there, on
+`title`, which is where an explanation belongs when the answer is usually "not yet". The customer
+and the deal ref moved out of the page header into that line — the header was naming the party, the
+chain's first step was naming the deal, and neither said they were about the same record.
+
+**The sheet is out of the rail.** A 210mm document rendered into a 20rem sticky column was never
+readable, and the Document tab three tabs away draws the same sheet at full width. The rail is now
+the Facts card alone.
+
+**The Owner tile is gone from the figures.** A person's name is not a figure, and it sat fourth in a
+row of money reading as one. Owner is in Facts, next to "Created 09 Sep 2026 by seema", where the
+rest of the dates and the people already were.
+
+**The document now prints what the plan includes.** A quotation asks the customer to agree a price
+for a tier; the tier's contents are the other half of that sentence, and a figure with no statement
+of what it buys is a number to haggle over rather than an offer to accept. The plan line on the
+sheet now carries its features as a two-column tick list (one column would push the money block
+onto a second page). `featuresOf()` in `Quotations/helpers` is the lookup, and `QuotationSheet`
+fetches the catalogue itself rather than taking features as a prop, so the detail page's Document
+tab and the builder's live preview print the same document without either call site remembering to.
+
+This is a LIVE read, not a snapshot: a quotation item stores the plan's NAME and never its features,
+so the only join available is `planLabel()` back against the catalogue. A tier since renamed, or a
+line whose name was typed by hand, prints without the list rather than inventing one — and editing
+the plan sheet changes what an already-issued quotation displays. There is nowhere on the row to
+freeze it; freezing needs a backend field.
+
+**Temp data**
+none — no content file, seed or payload changed.
+
+**Backend needed**
+- `GET v1/admin/quotations/<id>/document/html/` → **the features are NOT in the customer's copy yet.**
+  Print, Download-as-PDF and the public share link all render this server-side HTML, not the React
+  sheet above; the panel's copy and the customer's copy now disagree about this one block. The
+  template must do the same join — plan line name → catalogue row → `features[]` — before the PDF
+  matches the screen. That endpoint is not in the backend checkout at `E:\Programming\interior-bazzar\interior-bazzar-backend`
+  (no `QuotationsController`, no `interior_deals_billing`), so it could not be changed here.
+
+**Open decisions**
+The chain line is shared, so the invoice detail page and the deal chat lost the same four cards.
+That looked like the point — it is one component and one complaint — but it was not asked for
+explicitly. Neither passes the new optional `lead`, so only the quotation page prints the customer
+before the steps.
+
+**Verified**
+`tsc -b` clean, `vite build` green, `eslint src/admin src/components` 0 errors (52 pre-existing
+warnings, none in a touched file).
+
+The detail page was mounted under Playwright on the real Vite pipeline with the five endpoints it
+calls stubbed, and photographed on both the Items and Document tabs. Confirmed by script: the chain
+renders as text with no tile, the Owner tile is absent from the figures while Owner and Created
+remain in Facts, the rail holds only Facts, and all six catalogue features appear on the sheet.
+
+Not verified: the print/share/PDF output, which needs the document endpoint and a backend — and
+which, per the note above, does NOT yet carry the features.
+
 ### The two document builders become one drawing — and every select starts saving what it shows
 
 **Area:** `#/quotations/<id>?mode=edit`, `#/invoices/<id>?mode=edit` — the quotation and invoice builders; and, through one shared control, every `<select>` in the panel

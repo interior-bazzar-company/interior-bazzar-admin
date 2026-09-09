@@ -5,17 +5,27 @@
    yet: a cell with no record is not blank, it says "Quote is Draft, not
    Accepted". Everything is read from the API, in parallel, only on a detail
    page.
+
+   IT IS ONE LINE OF TEXT, not four cards. It used to be a full-width panel
+   of bordered tiles carrying pills and a sentence each — roughly 90px of
+   chrome above every document, restating a status the page header already
+   showed, to say a thing that is really a breadcrumb. The reasons a link is
+   locked did not have to be printed to be available: they are on `title`,
+   where an explanation belongs when the answer is usually "it just isn't
+   there yet".
    ===================================================================== */
 import { Fragment, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { cx } from "@/utils/cx";
 import AdminOpsService from "../../api/modules/adminOps";
 import type { DealRow, DealPaymentRow, InvoiceRow, QuotationRow } from "../../api/modules/adminOps";
-import { Icon, Pill, cap } from "../ui";
+import { Icon, cap } from "../ui";
 import { inr } from "../ui/format";
 import { go } from "../ui/nav";
 
-type Cell = { k: string; v: string | number; route?: string; state: "done" | "here" | "locked"; meta?: ReactNode; why?: string };
+/** `note` is the pill's text, flattened: on one line a coloured pill for a
+ *  status the header already carries is decoration, but the word is not. */
+type Cell = { k: string; v: string | number; route?: string; state: "done" | "here" | "locked"; note?: string; why?: string };
 type ChainData = { deal: DealRow | null; invoices: InvoiceRow[]; payments: DealPaymentRow[]; loading: boolean };
 
 function useChain(dealRef: string): ChainData {
@@ -42,7 +52,12 @@ function useChain(dealRef: string): ChainData {
   return d;
 }
 
-export function ChainStrip({ dealRef, here, quotation }: { dealRef: string; here: "deal" | "quotation" | "invoice" | "payment"; quotation?: QuotationRow | null }) {
+export function ChainStrip({ dealRef, here, quotation, lead }: {
+  dealRef: string; here: "deal" | "quotation" | "invoice" | "payment"; quotation?: QuotationRow | null;
+  /** who this is for, printed before the steps — the one fact the chain is
+   *  about that no step in it carries */
+  lead?: ReactNode;
+}) {
   const { deal, invoices, payments, loading } = useChain(dealRef);
   const cells: Cell[] = [];
 
@@ -50,7 +65,7 @@ export function ChainStrip({ dealRef, here, quotation }: { dealRef: string; here
     loading
       ? { k: "Deal", v: dealRef, state: "locked" }
       : deal
-        ? { k: "Deal", v: dealRef, route: "#/deals/" + dealRef, state: "done", meta: <Pill xs text={deal.stageLabel} tone={deal.stageTone} /> }
+        ? { k: "Deal", v: dealRef, route: "#/deals/" + dealRef, state: "done", note: deal.stageLabel }
         : { k: "Deal", v: dealRef, state: "locked", why: "This deal is not one you can open — it belongs to another owner." },
   );
 
@@ -63,11 +78,7 @@ export function ChainStrip({ dealRef, here, quotation }: { dealRef: string; here
       v: quotation.quotationNumber || "(draft)",
       route: "#/quotations/" + quotation.id,
       state: qStatus === "accepted" ? "done" : "here",
-      meta: (
-        <>
-          <Pill xs text={cap(qStatus)} tone={qStatus === "accepted" ? "ok" : qStatus === "draft" ? "warn" : "dead"} /> <span className="text-xs text-quaternary">v{quotation.version}</span>
-        </>
-      ),
+      note: cap(qStatus) + " · v" + quotation.version,
     });
   }
 
@@ -84,12 +95,7 @@ export function ChainStrip({ dealRef, here, quotation }: { dealRef: string; here
       v: last.invoiceNumber || "(draft)",
       route: "#/invoices/" + last.id,
       state: issued ? "done" : "here",
-      meta: (
-        <>
-          <Pill xs text={cap(last.status)} tone={issued ? "ok" : "warn"} />
-          {live.length > 1 ? <span className="text-xs text-quaternary"> +{live.length - 1} more</span> : null}
-        </>
-      ),
+      note: cap(last.status) + (live.length > 1 ? " · +" + (live.length - 1) + " more" : ""),
     });
   }
 
@@ -101,48 +107,45 @@ export function ChainStrip({ dealRef, here, quotation }: { dealRef: string; here
       k: "Payment",
       v: payments.length + (payments.length === 1 ? " receipt" : " receipts"),
       state: deal && deal.paid ? "done" : "here",
-      meta: <Pill xs text={inr(received) + " received"} tone="ok" />,
+      note: inr(received) + " received",
     });
   }
 
   return (
-    <div className="flex items-stretch gap-1 overflow-x-auto rounded-xl bg-primary p-1.5 ring-1 ring-secondary scrollbar-hide" aria-busy={loading}>
+    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-sm text-tertiary" aria-busy={loading}>
+      {lead ? (
+        <>
+          <span className="min-w-0 truncate font-medium text-secondary">{lead}</span>
+          <span className="text-fg-quaternary" aria-hidden="true">·</span>
+        </>
+      ) : null}
       {cells.map((c, i) => {
-        const isHere = c.k.toLowerCase() === here;
-        const state = isHere ? "here" : c.state;
-        const cls = cx(
-          "flex min-w-40 flex-1 flex-col gap-1 rounded-lg px-3 py-2 text-left transition duration-100",
-          state === "here" && "bg-selected ring-1 ring-selected ring-inset",
-          state === "locked" && "opacity-70",
-          c.route && "cursor-pointer outline-focus-ring hover:bg-primary_hover focus-visible:outline-2 focus-visible:outline-offset-2",
-        );
+        const state = c.k.toLowerCase() === here ? "here" : c.state;
+        /* The step's whole label is the title, so the locked reason is
+           readable without printing a sentence per step. */
+        const title = c.k + (c.note ? " · " + c.note : "") + (c.why ? " — " + c.why : "");
         const body = (
           <>
-            <div className="label-mono flex items-center gap-1.5">
-              {state === "done" ? <Icon name="check" size="xs" className="text-fg-success-primary" /> : state === "locked" ? <Icon name="lock" size="xs" /> : <span className="size-1.5 rounded-full bg-brand-solid" />}
-              {c.k}
-            </div>
-            <div className="flex items-center gap-1.5 text-sm font-medium text-primary">
-              <span className="truncate font-mono tnum">{c.v}</span>
-              {c.route ? <Icon name="ext" size="xs" className="text-fg-quaternary" /> : null}
-            </div>
-            {c.meta ? <div className="flex flex-wrap items-center gap-1">{c.meta}</div> : null}
-            {c.why ? <div className="text-xs leading-snug text-tertiary">{c.why}</div> : null}
+            <span className="text-quaternary">{c.k}</span>{" "}
+            <span className={cx("font-mono tnum", state === "locked" ? "text-quaternary" : state === "here" ? "font-semibold text-primary" : "text-secondary")}>{c.v}</span>
+            {c.note ? <span className="text-quaternary"> · {c.note}</span> : null}
           </>
         );
         return (
           <Fragment key={c.k}>
             {i ? (
-              <span className="flex shrink-0 items-center text-fg-quaternary" aria-hidden="true">
-                <Icon name="chevr" size="sm" />
+              <span className="text-fg-quaternary" aria-hidden="true">
+                <Icon name="chevr" size="xs" />
               </span>
             ) : null}
             {c.route ? (
-              <a className={cls} href={c.route} data-go={c.route} onClick={(e) => { e.preventDefault(); go(c.route as string); }}>
+              <a className="rounded outline-focus-ring hover:underline focus-visible:outline-2 focus-visible:outline-offset-2"
+                href={c.route} data-go={c.route} title={title}
+                onClick={(e) => { e.preventDefault(); go(c.route as string); }}>
                 {body}
               </a>
             ) : (
-              <div className={cls}>{body}</div>
+              <span title={title}>{body}</span>
             )}
           </Fragment>
         );

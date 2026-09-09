@@ -20,7 +20,8 @@ import { cx } from "@/utils/cx";
 import type { InvoiceRow, QuotationRow, TaxMode } from "../../../api/modules/adminOps";
 import { BrandLogo, Button, Card, Icon, Pill, Radio, Segmented, SelectInput, Timeline } from "../../ui";
 import { inr, inrWords, fmtDate } from "../../ui/format";
-import { GST_RATES, SELLER } from "./helpers";
+import { usePlanCatalogue } from "./api";
+import { GST_RATES, SELLER, featuresOf } from "./helpers";
 
 /* ------------------------------------------------------------- the ink --- */
 /* The micro-label, in paper's own palette. `label-mono` is the same device
@@ -63,6 +64,11 @@ export type SheetItem = {
   sub?: ReactNode;
   hsn?: string | null;
   term?: ReactNode;
+  /** What the line INCLUDES, printed under it. The customer is being asked to
+   *  agree a price for a tier; the tier's contents are the other half of that
+   *  sentence, and a figure with no statement of what it buys is a number to
+   *  haggle over rather than an offer to accept. */
+  feats?: string[];
   taxablePaise: number;
   taxRate: number;
   taxPaise: number;
@@ -198,6 +204,19 @@ export function DocSheet({
                           {it.term}
                         </div>
                       ) : null}
+                      {/* Two columns on anything but a phone: a fifteen-item
+                          tier printed as one list pushes the money block onto
+                          a second page for no reason. */}
+                      {it.feats && it.feats.length ? (
+                        <ul className="mt-1.5 grid gap-x-4 gap-y-0.5 text-neutral-600 sm:grid-cols-2">
+                          {it.feats.map((f, i) => (
+                            <li key={i} className="flex gap-1.5 [overflow-wrap:anywhere]">
+                              <span aria-hidden="true" className="text-neutral-400">✓</span>
+                              <span>{f}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
                     </td>
                     {taxed ? <td className="px-2 py-2 text-right font-mono text-neutral-700 tnum">{inr(it.taxablePaise)}</td> : null}
                     {taxed ? (
@@ -286,6 +305,11 @@ export type LiveDoc = {
 const QUOTE_STAMP: Record<string, string> = { draft: "DRAFT", cancelled: "CANCELLED", superseded: "SUPERSEDED", expired: "EXPIRED", rejected: "REJECTED" };
 
 export function QuotationSheet({ q, compact, live, className }: { q: QuotationRow; compact?: boolean; live?: LiveDoc; className?: string }) {
+  /* The catalogue is fetched HERE rather than passed in, so that every place
+     that draws this sheet — the detail page's Document tab, the builder's live
+     preview — prints the same document without each call site remembering to
+     look the features up. */
+  const { plans } = usePlanCatalogue();
   const taxed = q.taxMode !== "not_applicable";
   const plan = q.items.find((i) => i.kind === "plan") || null;
   const addons = q.items.filter((i) => i.kind === "addon");
@@ -325,6 +349,7 @@ export function QuotationSheet({ q, compact, live, className }: { q: QuotationRo
                 key: plan.id,
                 name: (live && live.planName) || plan.name || "No plan chosen yet",
                 sub: plan.description,
+                feats: featuresOf(plans, (live && live.planName) || plan.name),
                 hsn: (live && live.planHsn) || plan.hsn,
                 term: term ? term + " months" + (plan.installments > 1 ? " · " + plan.installments + " payments" : "") : null,
                 taxablePaise: plan.taxableAmountPaise,
