@@ -9,12 +9,13 @@
    `Rec` from Frame.tsx supplies the id bar, the ProtoBar and Back; this file
    supplies only what a company transaction means.
    ============================================================================= */
+import type { ReactNode } from "react";
 import { useShell } from "../../shell/ShellContext";
 import { can } from "../../shell/AdminShell";
-import { EmptyState, Icon, KvList, Notice, Tabs, qs } from "../../ui";
+import { Alert, Button, Card, EmptyState, Icon, KvList, Tabs, qs } from "../../ui";
 import { go } from "../../ui/nav";
-import { Block, Blocks, Rec } from "./Frame";
-import { Dir, EventList, Money, ProtoBar, TagChip, TxnMenu, TxnPill } from "./bits";
+import { Blocks, Rec } from "./Frame";
+import { Dir, EventList, Fine, Money, ProtoBar, TagChip, TxnMenu, TxnPill } from "./bits";
 import { CancelTxnModal } from "./TxnModals";
 import {
   BILL_THRESHOLD_PAISE, CREDIT_KINDS,
@@ -46,11 +47,11 @@ export default function TxnDetail({ id, p, onParams }: {
 
   if (!row) {
     return (
-      <div className="fin-rec">
+      <div className="flex min-w-0 flex-col gap-4">
         <ProtoBar />
         <EmptyState icon="search" title="No transaction at that address"
-          body={<>There is no record for <span className="mono">{id}</span>.</>}
-          action={<button className="btn pri" onClick={() => go(back)}>Back to transactions</button>} />
+          body={<>There is no record for <span className="font-mono tnum">{id}</span>.</>}
+          action={<Button color="primary" onClick={() => go(back)}>Back to transactions</Button>} />
       </div>
     );
   }
@@ -66,7 +67,8 @@ export default function TxnDetail({ id, p, onParams }: {
 
   return (
     <Rec id={t.txnId} back={back}
-      pills={<TxnPill k={t.state} lg />}
+      pills={<><TxnPill k={t.state} lg /><TagChip k={t.tagKey} /></>}
+      sub={<>{fmtDate(t.valueDate)} · {ago(t.valueDate)} · {t.description}</>}
       actions={writable ? (
         /* ONE MENU, NOT A ROW OF BUTTONS. The header carried Attach a bill
            and Reverse side by side, which gave a destructive Super-Admin
@@ -76,120 +78,113 @@ export default function TxnDetail({ id, p, onParams }: {
         <TxnMenu txn={t} sa={sa} onCancel={openCancel} onCopied={(m) => toast(m, "ok")} />
       ) : null}>
 
-      <div className="fin-subline">
-        <TagChip k={t.tagKey} />
-        <span>·</span>
-        <span>{fmtDate(t.valueDate)} · {ago(t.valueDate)}</span>
-      </div>
-
       {/* `tab` here is TxnDetail's own — Transaction / History — a different
          axis from the list's Transactions / Tags tab, even though both
          travel in the same URL key. */}
       <Tabs items={[
         { k: "transaction", label: "Transaction" },
-        { k: "history", label: "History", n: t.events.length },
+        { k: "history", label: "History", n: t.events.length, quiet: true },
       ]} cur={tab} onPick={(k) => onParams({ tab: k === "transaction" ? undefined : k })} />
 
       {tab === "transaction" ? (
-        <div className="fin-cards">
+        <div className="flex min-w-0 flex-col gap-4">
           {/* THE FIGURES BELOW STILL STAND AND NO LONGER COUNT, which is a
               distinction somebody about to act on them has to be given before
               they read a single one. */}
           {t.cancellation ? (
-            <Notice tone="bad" ico="recon" text={<>
-              <b>This row has been cancelled.</b> {t.cancellation.by} · {fmtDateTime(t.cancellation.at)}
+            <Alert tone="bad" ico="recon" title="This row has been cancelled.">
+              {t.cancellation.by} · {fmtDateTime(t.cancellation.at)}
               {" — "}{t.cancellation.reason} <b>Everything below is exactly as posted</b> — nothing on
               the row was edited and nothing was deleted — but it counts towards nothing: it is out
               of the period&rsquo;s figures, out of its tag&rsquo;s total, and out of everything
               derived from them. The correct payment, if there was one, is its own row.
-            </>} />
+            </Alert>
           ) : null}
 
           <Blocks>
-            <Block title="What moved">
+            <Card title="What moved">
               <KvList pairs={[
                 ["Amount", <Money paise={t.amountPaise} sign={t.direction === "in"} strong />],
                 ["Direction", <Dir d={t.direction} />],
                 ["Tag", <>
                   <TagChip k={t.tagKey} big />
-                  {kind ? <div className="fin-fine">{kind.label} · lands in {kind.landsIn}</div> : null}
+                  {kind ? <Fine className="mt-1">{kind.label} · lands in {kind.landsIn}</Fine> : null}
                 </>],
                 /* THE REMARK, which the record page did not show at all. It is
                    the sentence somebody wrote to make this row make sense to a
                    stranger, and it was collected on the dialog and then only
                    ever readable in the list's own truncated column. */
                 ["Remark", t.description
-                  ? <span className="fin-remark">{t.description}</span>
-                  : <span className="faint">—</span>],
+                  ? <span className="[overflow-wrap:anywhere]">{t.description}</span>
+                  : <span className="text-quaternary">—</span>],
                 ["Party", t.party || "—"],
                 ["Mode", t.mode],
-                ["Reference", <span className="mono">{t.reference}</span>],
-                ["Value date", <>{fmtDate(t.valueDate)} <span className="faint">({ago(t.valueDate)})</span></>],
-                ["Account", account ? <>{account.masked}<span className="faint"> · {account.name}</span></> : t.accountId],
+                ["Reference", <span className="font-mono tnum">{t.reference}</span>],
+                ["Value date", <>{fmtDate(t.valueDate)} <span className="text-quaternary">({ago(t.valueDate)})</span></>],
+                ["Account", account ? <>{account.masked}<span className="text-quaternary"> · {account.name}</span></> : t.accountId],
                 ["Recorded by", <>{t.recordedBy} · {fmtDateTime(t.recordedAt)}</>],
                 ...(t.cancellation
-                  ? [["Cancelled by", <>{t.cancellation.by} · {fmtDateTime(t.cancellation.at)}</>] as [string, React.ReactNode]]
+                  ? [["Cancelled by", <>{t.cancellation.by} · {fmtDateTime(t.cancellation.at)}</>] as [ReactNode, ReactNode]]
                   : []),
                 ...(t.direction === "in"
                   ? [["Credit kind", <>
                       {creditKind?.label || t.creditKind}
-                      <div className="fin-fine">Non-revenue. Customer money has exactly one way in — a subscription.</div>
-                    </>] as [string, React.ReactNode]]
+                      <Fine className="mt-1">Non-revenue. Customer money has exactly one way in — a subscription.</Fine>
+                    </>] as [ReactNode, ReactNode]]
                   : []),
                 ...(t.bankLineId
-                  ? [["Matched to bank", <span className="mono">{t.bankLineId}</span>] as [string, React.ReactNode]]
+                  ? [["Matched to bank", <span className="font-mono tnum">{t.bankLineId}</span>] as [ReactNode, ReactNode]]
                   : []),
               ]} />
-            </Block>
+            </Card>
 
-            <Block title="Receipt">
+            <Card title="Receipt">
               {t.bill ? (
                 /* THE FILE, AS A FILE. It was three rows of a key-value list,
                    which is the right shape for facts about the money and the
                    wrong one for a document: what somebody wants here is to
                    see that it is there and to open it. */
                 <>
-                  <div className="fin-receipt">
-                    <span className="ic"><Icon name="invoice" /></span>
-                    <span className="meta">
-                      <b className="mono">{t.bill.filename}</b>
-                      <span className="s">{t.bill.type} · attached {fmtDateTime(t.bill.uploadedAt)}</span>
+                  <div className="flex items-center gap-3 rounded-lg bg-secondary px-3 py-2.5 ring-1 ring-secondary ring-inset">
+                    <Icon name="invoice" size="md" className="shrink-0 text-fg-quaternary" />
+                    <span className="flex min-w-0 flex-col">
+                      <b className="truncate font-mono text-sm font-medium text-primary">{t.bill.filename}</b>
+                      <span className="truncate text-xs text-tertiary">{t.bill.type} · attached {fmtDateTime(t.bill.uploadedAt)}</span>
                     </span>
                   </div>
                   {/* NO FILE BEHIND THE NAME YET, and the page says so rather
                       than offering a download that would do nothing. The
                       filename is the whole record a receipt exists until
                       there is somewhere to put the bytes. */}
-                  <p className="fin-fine">
+                  <Fine className="mt-3">
                     The panel holds the name, not the file. Download arrives with the document
                     store — until then this is the record that a receipt exists.
-                  </p>
+                  </Fine>
                 </>
               ) : row.missingBill ? (
-                <Notice tone="warn" text={<>
-                  <b>No bill attached.</b>{" "}
+                <Alert tone="warn" title="No bill attached.">
                   {tag?.proofRequired
                     ? <>{tag.label} always requires one.</>
                     : <>This crossed {inr(BILL_THRESHOLD_PAISE)}, above which a bill is required.</>}{" "}
                   The period this row falls in cannot close while it is missing.
-                </>} />
+                </Alert>
               ) : (
-                <p className="fin-fine">Not required — under {inr(BILL_THRESHOLD_PAISE)} and {tag?.label || "this tag"} does not demand one on every row.</p>
+                <Fine>Not required — under {inr(BILL_THRESHOLD_PAISE)} and {tag?.label || "this tag"} does not demand one on every row.</Fine>
               )}
-            </Block>
+            </Card>
           </Blocks>
 
-          <Notice tone="info" ico="lock" text={<>
-            <b>A recorded row is never edited or deleted.</b> Nothing here can be changed after
-            the fact. A row that should not stand is cancelled — in the actions menu, Super Admin,
-            with a reason — which leaves every figure on it exactly as posted and stops it counting.
-            The correct figures are a new row, recorded the ordinary way.
-          </>} />
+          <Alert tone="info" ico="lock" title="A recorded row is never edited or deleted.">
+            Nothing here can be changed after the fact. A row that should not stand is cancelled —
+            in the actions menu, Super Admin, with a reason — which leaves every figure on it
+            exactly as posted and stops it counting. The correct figures are a new row, recorded
+            the ordinary way.
+          </Alert>
         </div>
       ) : (
-        <Block title="History" desc="append-only">
+        <Card title="History" sub="append-only">
           <EventList events={t.events} />
-        </Block>
+        </Card>
       )}
     </Rec>
   );

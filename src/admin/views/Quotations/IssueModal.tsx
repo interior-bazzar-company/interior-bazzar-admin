@@ -11,7 +11,7 @@
    says, before you commit, whether it is going to say yes.
    ===================================================================== */
 import { useState } from "react";
-import { KvList, ModalHead, Notice } from "../../ui";
+import { Alert, Button, KvList, ModalShell } from "../../ui";
 import { inr, fmtDate } from "../../ui/format";
 import { errMessage } from "../../../api/apiService";
 import { blockersOf, planItemOf } from "./helpers";
@@ -34,55 +34,57 @@ export default function IssueModal({ q, onClose, run }: {
   };
 
   return (
-    <>
-      <ModalHead title="Issue quotation" sub={<>v{q.version} · {inr(q.grandTotalPaise)}</>} onClose={onClose} />
+    <ModalShell
+      title="Issue quotation"
+      sub={"v" + q.version + " · " + inr(q.grandTotalPaise)}
+      mono
+      ico="check"
+      tone={blockers.length ? "warning" : "brand"}
+      onClose={onClose}
+      actions={<>
+        <Button color="secondary" onClick={onClose} isDisabled={busy}>Cancel</Button>
+        <Button color="primary" data-act="qt-issue-go" isLoading={busy} onClick={submit}>Issue quotation</Button>
+      </>}>
 
-      <div className="md-b">
-        {err ? <Notice tone="bad" text={<b>{err}</b>} /> : null}
+      <div className="flex flex-col gap-3">
+        {err ? <Alert tone="bad" title={err} /> : null}
 
         {blockers.length
-          ? <Notice tone="bad" ico="alert" text={<>
-              <b>These must be fixed first</b>
-              <ul style={{ margin: "6px 0 0 16px" }}>
-                {blockers.map((b) => <li key={b.code + b.text}>{b.text}{" "}
-                  <span className="mono">422 {b.code}</span></li>)}
+          ? <Alert tone="bad" ico="alert" title="These must be fixed first">
+              <ul className="mt-1.5 flex list-disc flex-col gap-1 pl-4">
+                {blockers.map((b) => (
+                  <li key={b.code + b.text}>
+                    {b.text} <span className="font-mono text-xs tnum">422 {b.code}</span>
+                  </li>
+                ))}
               </ul>
-            </>} />
-          : <Notice tone="ok" ico="check" text={<>
-              <b>Validation passed.</b> A plan with a term of {plan && plan.termMonths ? plan.termMonths : 0} months,
-              totals that reconcile, and a validity date in the future.
-            </>} />}
+            </Alert>
+          : <Alert tone="ok" ico="check" title="Validation passed.">
+              A plan with a term of {plan && plan.termMonths ? plan.termMonths : 0} months, totals
+              that reconcile, and a validity date in the future.
+            </Alert>}
 
-        <div style={{ height: "12px" }}></div>
-        <KvList cls="wide" pairs={[
-          ["Number", <span className="faint">assigned by this transaction</span>],
+        <KvList pairs={[
+          ["Number", <span className="text-quaternary">assigned by this transaction</span>],
           ["Version", "v" + q.version],
-          ["Grand total", <b>{inr(q.grandTotalPaise)}</b>],
+          ["Grand total", <b className="font-mono tnum">{inr(q.grandTotalPaise)}</b>],
           ["Valid until", fmtDate(q.validUntil)],
         ]} />
-        <div style={{ height: "12px" }}></div>
 
-        <Notice tone="warn" ico="lock" text={<>
-          <b>Once issued, this quotation cannot be edited.</b> Changes after this create a revision.
-          Five steps commit as one — recalculate, assign the number and version, freeze the content and
-          the customer snapshot, write the document, append the event — or none of them do, and the
-          number is returned so the sequence has no unexplained gaps.
-        </>} />
+        <Alert tone="warn" ico="lock" title="Once issued, this quotation cannot be edited.">
+          Changes after this create a revision. Five steps commit as one — recalculate, assign the
+          number and version, freeze the content and the customer snapshot, write the document,
+          append the event — or none of them do, and the number is returned so the sequence has no
+          unexplained gaps.
+        </Alert>
 
         {q.parentQuotationId
-          ? <Notice ico="history" text={<>
-              This is a revision. <b>The previous version becomes Superseded only after this issue
-              succeeds</b> — never before.
-            </>} />
+          ? <Alert ico="history" title="This is a revision.">
+              <b>The previous version becomes Superseded only after this issue succeeds</b> — never
+              before.
+            </Alert>
           : null}
       </div>
-
-      <div className="md-f">
-        <span className="spacer"></span>
-        <button className="btn" data-close="1" onClick={onClose}>Cancel</button>
-        <button className="btn pri" data-act="qt-issue-go" disabled={busy} onClick={submit}>
-          {busy ? "Issuing…" : "Issue quotation"}</button>
-      </div>
-    </>
+    </ModalShell>
   );
 }

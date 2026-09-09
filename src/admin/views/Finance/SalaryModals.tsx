@@ -20,10 +20,10 @@
    refusal contradicts is still on screen, which is the only way a person can
    see what they got wrong.
    ============================================================================= */
-import { useMemo, useRef, useState } from "react";
-import { Icon, Notice } from "../../ui";
+import { useMemo, useState } from "react";
+import { Alert, Button, DateInput, IconButton, Input, SelectInput, Textarea } from "../../ui";
 import { go } from "../../ui/nav";
-import { Check } from "./bits";
+import { Check, Derived, Fine, Ledger, LedgerRow, PaidReceipt, ProofField } from "./bits";
 import InfoTip from "./InfoTip";
 import { Cancel, Dlg, Field, Fs, RupeeInput, toPaise } from "./dialog";
 import type { Done } from "./dialog";
@@ -89,32 +89,31 @@ function CompEditor({ rows, onRows, addLabel }: {
   const patch = (rid: number, k: "label" | "amt", v: string) =>
     onRows(rows.map((r) => (r.rid === rid ? { ...r, [k]: v } : r)));
   return (
-    <>
+    <div className="flex flex-col gap-2">
       {rows.map((r) => (
-        <div className="fin-comprow" key={r.rid}>
-          <input className="inp" value={r.label} placeholder="What it is called on the slip"
-            aria-label="Component name" onChange={(e) => patch(r.rid, "label", e.target.value)} />
+        <div className="grid grid-cols-[1fr_10rem_auto] items-start gap-2" key={r.rid}>
+          <Input value={r.label} ph="What it is called on the slip"
+            ariaLabel="Component name" onChange={(v) => patch(r.rid, "label", v)} />
           <RupeeInput value={r.amt} onChange={(v) => patch(r.rid, "amt", v)} />
-          <button type="button" className="btn sm" aria-label={"Remove " + (r.label || "this line")}
-            title="Remove this line" onClick={() => onRows(rows.filter((x) => x.rid !== r.rid))}>
-            <Icon name="x" size="sm" />
-          </button>
+          <IconButton ico="x" size="sm" label={"Remove " + (r.label || "this line")}
+            onClick={() => onRows(rows.filter((x) => x.rid !== r.rid))} />
         </div>
       ))}
-      <button type="button" className="btn sm" onClick={() => onRows(rows.concat([blankRow()]))}>
-        <Icon name="plus" size="sm" />{addLabel}
-      </button>
-    </>
+      <span>
+        <Button color="secondary" size="sm" ico="plus"
+          onClick={() => onRows(rows.concat([blankRow()]))}>{addLabel}</Button>
+      </span>
+    </div>
   );
 }
 
 function Totals({ gross, ded }: { gross: number; ded: number }) {
   return (
-    <div className="fin-summary">
-      <div className="row"><span className="l">Gross</span><span className="tnum">{inr(gross)}</span></div>
-      <div className="row"><span className="l">Deductions</span><span className="tnum">−{inr(ded)}</span></div>
-      <div className="row grand"><span className="l">Net every month</span><span className="tnum">{inr(gross - ded)}</span></div>
-    </div>
+    <Ledger>
+      <LedgerRow label="Gross">{inr(gross)}</LedgerRow>
+      <LedgerRow label="Deductions">−{inr(ded)}</LedgerRow>
+      <LedgerRow label="Net every month" grand>{inr(gross - ded)}</LedgerRow>
+    </Ledger>
   );
 }
 
@@ -207,15 +206,15 @@ export function SalaryAccountModal({ account, onClose, onDone }: {
       err={err}
       footer={<>
         <Cancel onClose={onClose} />
-        <button className="btn pri" onClick={submit}>{a ? "Save the revision" : "Open the account"}</button>
+        <Button color="primary" onClick={submit}>{a ? "Save the revision" : "Open the account"}</Button>
       </>}>
 
       {a ? (
-        <Notice tone="warn" ico="lock" text={<>
-          <b>Slips already issued keep their old figures.</b> A slip freezes its own earnings and
-          deductions at issue. This revision reaches the next run and nothing behind it, which is
-          why {a.memberName}'s older slips will not match what you are about to type.
-        </>} />
+        <Alert tone="warn" ico="lock" title="Slips already issued keep their old figures.">
+          A slip freezes its own earnings and deductions at issue. This revision reaches the next
+          run and nothing behind it, which is why {a.memberName}'s older slips will not match what
+          you are about to type.
+        </Alert>
       ) : null}
 
       {/* PICKED, NOT TYPED. The id, the name, the designation and the code
@@ -223,33 +222,26 @@ export function SalaryAccountModal({ account, onClose, onDone }: {
           them, and the id had to match by hand — type it wrong and the salary
           points at the wrong person. One choice sets all four. */}
       <Fs legend="Who this belongs to" req>
-        {/* One field per line, same rhythm as the pay dialog. */}
-        <div className="fin-stack">
-          <Field label="Team member">
-            {a ? (
-              <div className="fin-derived">
-                <b>{a.memberName}</b> · {a.designation} · <span className="mono">{a.employeeCode}</span>
-              </div>
-            ) : (
-              <div className="selectbox">
-                <select value={memberId} onChange={(e) => pickMember(e.target.value)}>
-                  <option value="">Pick a team member…</option>
-                  {members.map((m) => (
-                    <option key={m.memberId} value={String(m.memberId)} disabled={m.taken}>
-                      {m.name} · {m.designation}{m.taken ? " — already has an account" : ""}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </Field>
-          <Field label="Joined">
-            <input type="date" className="inp" value={joinedAt} onChange={(e) => setJoinedAt(e.target.value)} />
-          </Field>
-          {/* DEPARTMENT IS NOT SHOWN AT ALL: picking the member fetches it
-              with the name, designation and code, and it goes on the record
-              from there — the member picker already told the whole story. */}
-        </div>
+        <Field label="Team member">
+          {a ? (
+            <Derived>
+              <b className="font-semibold">{a.memberName}</b>
+              <span className="ml-1">· {a.designation} · <span className="font-mono tnum">{a.employeeCode}</span></span>
+            </Derived>
+          ) : (
+            <SelectInput ariaLabel="Team member" value={memberId} onChange={pickMember}
+              options={[{ v: "", l: "Pick a team member…" }].concat(members.map((m) => ({
+                v: String(m.memberId),
+                l: m.name + " · " + m.designation + (m.taken ? " — already has an account" : ""),
+              })))} />
+          )}
+        </Field>
+        <Field label="Joined">
+          <DateInput value={joinedAt} ariaLabel="Joined" onChange={setJoinedAt} />
+        </Field>
+        {/* DEPARTMENT IS NOT SHOWN AT ALL: picking the member fetches it
+            with the name, designation and code, and it goes on the record
+            from there — the member picker already told the whole story. */}
       </Fs>
 
       <Fs legend="Earnings" req>
@@ -266,33 +258,26 @@ export function SalaryAccountModal({ account, onClose, onDone }: {
       <Totals gross={gross} ded={dedTotal} />
 
       <Fs legend="Where it is paid">
-        <div className="fin-stack">
-          <Field label="Bank account, masked">
-            <input className="inp mono" value={masked} placeholder="HDFC ••••2276"
-              onChange={(e) => setMasked(e.target.value)} />
-          </Field>
-          <Field label="IFSC">
-            <input className="inp mono" value={ifsc} placeholder="HDFC0000123"
-              onChange={(e) => setIfsc(e.target.value)} />
-          </Field>
-          <Field label="Bank">
-            <input className="inp" value={bankName} placeholder="HDFC Bank"
-              onChange={(e) => setBankName(e.target.value)} />
-          </Field>
-          <Field label="UPI id">
-            <input className="inp mono" value={upi} placeholder="anjali@okhdfcbank"
-              onChange={(e) => setUpi(e.target.value)} />
-          </Field>
-          <Field label="PAN">
-            <input className="inp mono" value={pan} placeholder="BKQPD4417L"
-              onChange={(e) => setPan(e.target.value)} />
-          </Field>
-          {/* UAN left blank is a fact — no EPF membership — not a gap. */}
-          <Field label="UAN">
-            <input className="inp mono" value={uan} placeholder="100812345678"
-              onChange={(e) => setUan(e.target.value.replace(/[^0-9]/g, ""))} />
-          </Field>
-        </div>
+        <Field label="Bank account, masked">
+          <Input mono value={masked} ph="HDFC ••••2276" ariaLabel="Bank account, masked" onChange={setMasked} />
+        </Field>
+        <Field label="IFSC">
+          <Input mono value={ifsc} ph="HDFC0000123" ariaLabel="IFSC" onChange={setIfsc} />
+        </Field>
+        <Field label="Bank">
+          <Input value={bankName} ph="HDFC Bank" ariaLabel="Bank" onChange={setBankName} />
+        </Field>
+        <Field label="UPI id">
+          <Input mono value={upi} ph="anjali@okhdfcbank" ariaLabel="UPI id" onChange={setUpi} />
+        </Field>
+        <Field label="PAN">
+          <Input mono value={pan} ph="BKQPD4417L" ariaLabel="PAN" onChange={setPan} />
+        </Field>
+        {/* UAN left blank is a fact — no EPF membership — not a gap. */}
+        <Field label="UAN">
+          <Input mono value={uan} ph="100812345678" ariaLabel="UAN"
+            onChange={(v) => setUan(v.replace(/[^0-9]/g, ""))} />
+        </Field>
       </Fs>
     </Dlg>
   );
@@ -314,14 +299,14 @@ export function CloseAccountModal({ account, onClose, onDone }: {
       onClose={onClose} err={err}
       footer={<>
         <Cancel onClose={onClose} />
-        <button className="btn pri" disabled={!reason.trim()} onClick={() => {
+        <Button color="primary-destructive" isDisabled={!reason.trim()} onClick={() => {
           const e = closeSalaryAccount(account.salaryAccountId, reason);
           if (e) return setErr(e);
           onDone(account.memberName + "'s account is closed. No run picks it up again, and every slip it already carries stays exactly where it is.", "ok");
-        }}>Close the account</button>
+        }}>Close the account</Button>
       </>}>
 
-      <div className="fin-chks">
+      <div className="flex flex-col">
         <Check ok>
           <b>The slips already issued stay on the record.</b> Closing stops the next run picking this
           account up. It touches nothing already paid, and it leaves the account on the list —
@@ -344,9 +329,9 @@ export function CloseAccountModal({ account, onClose, onDone }: {
 
       <Field label="Why it is closing"
         help="It goes on the record verbatim, and it is the sentence somebody reads two years from now.">
-        <textarea className="inp" rows={3} autoFocus value={reason}
-          placeholder="Resigned; last working day 30 Jun 2026. Full and final settled with the June run."
-          onChange={(e) => setReason(e.target.value)} />
+        <Textarea rows={3} autoFocus value={reason} ariaLabel="Why it is closing"
+          ph="Resigned; last working day 30 Jun 2026. Full and final settled with the June run."
+          onChange={setReason} />
       </Field>
     </Dlg>
   );
@@ -392,19 +377,18 @@ export function OpenRunModal({ onClose, onDone }: { onClose: () => void; onDone:
       onClose={onClose} err={err}
       footer={<>
         <Cancel onClose={onClose} />
-        <button className="btn pri" onClick={() => {
+        <Button color="primary" onClick={() => {
           const r = openSalaryRun(month);
           if (r.error) return setErr(r.error);
           onDone(r.runId + " is open · " + active.length + " slips · " + inr(total) + " net. Nobody has been paid yet.", "ok");
-        }}>Open the run</button>
+        }}>Open the run</Button>
       </>}>
 
       <Fs legend="The month" req hint="Pre-filled with the newest month that has no run against it.">
-        <input type="month" className="inp tnum" value={month}
-          onChange={(e) => setMonth(e.target.value)} />
+        <Input type="month" mono value={month} ariaLabel="The month" onChange={setMonth} />
       </Fs>
 
-      <div className="fin-chks">
+      <div className="flex flex-col">
         <Check ok={!clash}>
           {clash
             ? <><b>{clash.runId} already covers {fmtMonth(month)}.</b> One run a month, or the same
@@ -430,18 +414,16 @@ export function OpenRunModal({ onClose, onDone }: { onClose: () => void; onDone:
         </Check>
       </div>
 
-      <div className="fin-summary">
+      <Ledger>
         {active.map((r) => (
-          <div className="row" key={r.a.salaryAccountId}>
-            <span className="l">{r.a.memberName} <span className="faint">· {r.a.designation}</span></span>
-            <span className="tnum">{inr(r.monthlyNetPaise)}</span>
-          </div>
+          <LedgerRow key={r.a.salaryAccountId} label={r.a.memberName} note={"· " + r.a.designation}>
+            {inr(r.monthlyNetPaise)}
+          </LedgerRow>
         ))}
-        <div className="row grand">
-          <span className="l">{active.length} slip{active.length === 1 ? "" : "s"}</span>
-          <span className="tnum">{inr(total)}</span>
-        </div>
-      </div>
+        <LedgerRow label={active.length + " slip" + (active.length === 1 ? "" : "s")} grand>
+          {inr(total)}
+        </LedgerRow>
+      </Ledger>
     </Dlg>
   );
 }
@@ -477,22 +459,21 @@ export function LopModal({ slip, onClose, onDone }: {
       onClose={onClose} err={err}
       footer={<>
         <Cancel onClose={onClose} />
-        <button className="btn pri" disabled={!valid} onClick={() => {
+        <Button color="primary" isDisabled={!valid} onClick={() => {
           const e = setLop(slip.slipId, n);
           if (e) return setErr(e);
           onDone(slip.memberName + " · " + n + " day" + (n === 1 ? "" : "s") + " loss of pay"
             + (preview ? " · net " + inr(preview.net) : "") + ". The run total moved with it.", "ok");
-        }}>Apply loss of pay</button>
+        }}>Apply loss of pay</Button>
       </>}>
 
       <Fs legend="Days not worked and not paid" req
         hint="Zero puts the slip back to a full month. It is the only figure on a slip anybody can change.">
-        <input className="inp tnum" inputMode="numeric" value={days} autoFocus
-          aria-label="Loss of pay days"
-          onChange={(e) => setDays(e.target.value.replace(/[^0-9]/g, ""))} />
+        <Input mono value={days} autoFocus ariaLabel="Loss of pay days"
+          onChange={(v) => setDays(v.replace(/[^0-9]/g, ""))} />
       </Fs>
 
-      <div className="fin-chks">
+      <div className="flex flex-col">
         <Check ok>
           <b>Earnings are pro-rated. Deductions are not.</b> Professional tax is a flat monthly levy
           and does not shrink because somebody was away, and neither does anything else on the
@@ -512,16 +493,14 @@ export function LopModal({ slip, onClose, onDone }: {
       </div>
 
       {preview ? (
-        <div className="fin-summary">
+        <Ledger>
           {preview.earnings.map((e) => (
-            <div className="row" key={e.key}>
-              <span className="l">{e.label}</span><span className="tnum">{inr(e.amountPaise)}</span>
-            </div>
+            <LedgerRow key={e.key} label={e.label}>{inr(e.amountPaise)}</LedgerRow>
           ))}
-          <div className="row"><span className="l">Gross · {preview.worked} of 30 days</span><span className="tnum">{inr(preview.gross)}</span></div>
-          <div className="row"><span className="l">Deductions, untouched</span><span className="tnum">−{inr(preview.ded)}</span></div>
-          <div className="row grand"><span className="l">Net pay</span><span className="tnum">{inr(preview.net)}</span></div>
-        </div>
+          <LedgerRow label={"Gross · " + preview.worked + " of 30 days"}>{inr(preview.gross)}</LedgerRow>
+          <LedgerRow label="Deductions, untouched">−{inr(preview.ded)}</LedgerRow>
+          <LedgerRow label="Net pay" grand>{inr(preview.net)}</LedgerRow>
+        </Ledger>
       ) : null}
     </Dlg>
   );
@@ -548,7 +527,6 @@ export function PaySalaryModal({ row, onClose, onDone }: {
     leaving: number; months: number; slipId: string; via: string; from: string;
   } | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement | null>(null);
   /* "" when this session may do it. Never used to hide the button — a person
      who cannot see the action cannot ask for it either. */
   const gate = superAdminOnly("Paying a salary");
@@ -588,34 +566,26 @@ export function PaySalaryModal({ row, onClose, onDone }: {
       <Dlg title="Paid successfully" sub={<>{row.a.designation} · {row.a.memberName}</>}
         onClose={close}
         footer={<>
-          <button className="btn" onClick={close}>Done</button>
+          <Button color="secondary" onClick={close}>Done</Button>
           {/* Straight to the document. Download there is the browser's print
               dialog, and Save as PDF is how every document in this panel
               becomes a file — one renderer, one definition of the slip. */}
-          <button className="btn pri" onClick={() => {
+          <Button color="primary" ico="download" onClick={() => {
             close();
             go("#/finance-salaries/" + encodeURIComponent(paid.slipId));
-          }}>
-            <Icon name="download" size="sm" />Download slip
-          </button>
+          }}>Download slip</Button>
         </>}>
         {/* A RECEIPT, not a checklist: the figure, then the facts of the
             transfer, each on its own line. */}
-        <div className="fin-paid">
-          <span className="mark"><Icon name="check" /></span>
-          <div className="amt tnum">{inr(paid.leaving)}</div>
-          <div className="to">paid to {row.a.memberName}</div>
-          <div className="facts">
-            <div className="row"><span className="l">Via</span><span>{viaLabel}{from ? " · " + from.masked : ""}</span></div>
-            <div className="row"><span className="l">Covers</span>
-              <span>{paid.months} month{paid.months === 1 ? "" : "s"}, oldest first</span></div>
-            <div className="row"><span className="l">Slip</span><span className="mono">{paid.slipId}</span></div>
-          </div>
-          <p className="fine">
-            Numbered, hashed and frozen — nothing on the slip can change now. Download opens the
-            document; Save as PDF there produces the file.
-          </p>
-        </div>
+        <PaidReceipt
+          amountPaise={paid.leaving}
+          to={"paid to " + row.a.memberName}
+          facts={[
+            ["Via", viaLabel + (from ? " · " + from.masked : "")],
+            ["Covers", paid.months + " month" + (paid.months === 1 ? "" : "s") + ", oldest first"],
+            ["Slip", <span className="font-mono tnum">{paid.slipId}</span>],
+          ]}
+          note="Numbered, hashed and frozen — nothing on the slip can change now. Download opens the document; Save as PDF there produces the file." />
       </Dlg>
     );
   }
@@ -626,7 +596,7 @@ export function PaySalaryModal({ row, onClose, onDone }: {
       onClose={onClose} err={err}
       footer={<>
         <Cancel onClose={onClose} />
-        <button className="btn pri" disabled={!!gate || !proof || overdrawn} title={gate || undefined}
+        <Button color="primary" isDisabled={!!gate || !proof || overdrawn}
           onClick={() => {
             const e = paySalary(row.a.salaryAccountId, {
               via, accountId: payingFrom, proof: proof || { filename: "", mime: "" }, remark,
@@ -640,24 +610,24 @@ export function PaySalaryModal({ row, onClose, onDone }: {
               via, from: payingFrom });
           }}>
           Record payment
-        </button>
+        </Button>
       </>}>
 
       {isSuperAdmin() ? null : (
-        <Notice tone="warn" ico="lock" text={<>
-          <b>This one is Super Admin.</b> It sends {inr(d.pendingPaise)} out of the company and
-          stamps {months.length} document{months.length === 1 ? "" : "s"} in the same write. The
-          button stays where it is so it is clear what exists and who to ask.
-        </>} />
+        <Alert tone="warn" ico="lock" title="This one is Super Admin.">
+          It sends {inr(d.pendingPaise)} out of the company and stamps {months.length} document
+          {months.length === 1 ? "" : "s"} in the same write. The button stays where it is so it is
+          clear what exists and who to ask.
+        </Alert>
       )}
 
       {d.arrears.length ? (
-        <Notice tone="warn" ico="alert" text={<>
-          <b>{row.a.memberName} is owed for {d.arrears.length + 1} months, not one.</b>{" "}
+        <Alert tone="warn" ico="alert"
+          title={row.a.memberName + " is owed for " + (d.arrears.length + 1) + " months, not one."}>
           {inr(d.arrearsPaise)} of that is older than the current month. Everything outstanding is
           paid in this one transfer, oldest first — paying only the newest would leave the older
           debt ageing while the newer one clears.
-        </>} />
+        </Alert>
       ) : null}
 
       {/* THE THREE STANDING NOTES THAT USED TO SIT HERE ARE GONE. They said
@@ -673,57 +643,39 @@ export function PaySalaryModal({ row, onClose, onDone }: {
         {/* One field per line — each of these is answered, then the eye moves
             down. The two-up grid this section opened with read fine on a wide
             dialog and crowded on a narrow one. */}
-        <div className="fin-stack">
-          <Field label="Payment via">
-            <div className="selectbox">
-              <select value={via} onChange={(e) => { setVia(e.target.value); setErr(null); }}>
-                {PAY_VIA.map((v) => <option key={v.key} value={v.key}>{v.label}</option>)}
-              </select>
-            </div>
+        <Field label="Payment via">
+          <SelectInput ariaLabel="Payment via" value={via}
+            onChange={(v) => { setVia(v); setErr(null); }}
+            options={PAY_VIA.map((v) => ({ v: v.key, l: v.label }))} />
+        </Field>
+        {via === "cash" ? (
+          <Field label="Paid from">
+            <Derived faint>Cash account — nothing to choose.</Derived>
           </Field>
-          {via === "cash" ? (
-            <Field label="Paid from">
-              <div className="fin-derived">Cash account — nothing to choose.</div>
-            </Field>
-          ) : (
-            <Field label="Paid from">
-              <div className="selectbox">
-                <select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-                  {ACCOUNTS.filter((a) => a.active).map((a) => (
-                    <option key={a.accountId} value={a.accountId}>{a.masked} · {a.name}</option>
-                  ))}
-                </select>
-              </div>
-            </Field>
-          )}
+        ) : (
+          <Field label="Paid from">
+            <SelectInput ariaLabel="Paid from" value={accountId} onChange={setAccountId}
+              options={ACCOUNTS.filter((a) => a.active)
+                .map((a) => ({ v: a.accountId, l: a.masked + " · " + a.name }))} />
+          </Field>
+        )}
 
-          {/* THE ONLY EVIDENCE THIS PAYMENT HAS, now the reference field is
-              gone, so it is mandatory and it is a real file rather than a
-              typed name. Drawn as a FIELD like everything above it — the box
-              is the whole control, and the filename becomes its value. */}
-          <Field label="Receipt">
-            <button type="button" className={"fin-filebox" + (proof ? " on" : "")}
-              title={proof ? proof.filename : undefined}
-              onClick={() => fileRef.current?.click()}>
-              {proof
-                ? <><Icon name="check" size="sm" /><span className="name">{proof.filename}</span>
-                  <span className="swap">Replace</span></>
-                : <><Icon name="plus" size="sm" /><span className="ph">Attach receipt</span></>}
-            </button>
-            <input ref={fileRef} type="file" accept="image/*,application/pdf" hidden
-              onChange={(e) => {
-                const f = e.target.files && e.target.files[0];
-                if (!f) return;
-                if (!proofAccepted(f.type)) {
-                  setProof(null);
-                  setErr(f.name + " is neither an image nor a PDF.");
-                  return;
-                }
-                setErr(null);
-                setProof({ filename: f.name, mime: f.type, bytes: f.size });
-              }} />
-          </Field>
-        </div>
+        {/* THE ONLY EVIDENCE THIS PAYMENT HAS, now the reference field is
+            gone, so it is mandatory and it is a real file rather than a
+            typed name. */}
+        <Field label="Receipt" help="Mandatory — an image or a PDF.">
+          <ProofField file={proof} onClear={() => setProof(null)}
+            hint="Image or PDF"
+            onFile={(f) => {
+              if (!proofAccepted(f.type)) {
+                setProof(null);
+                setErr(f.name + " is neither an image nor a PDF.");
+                return;
+              }
+              setErr(null);
+              setProof({ filename: f.name, mime: f.type, bytes: f.size });
+            }} />
+        </Field>
       </Fs>
 
       {/* One-off money settled WITH this transfer, ADDED rather than sitting
@@ -732,75 +684,64 @@ export function PaySalaryModal({ row, onClose, onDone }: {
           month's slip and moves its totals — the slip stays the whole story
           of what was paid. */}
       <Fs legend="Adjustments">
-        {adjs.map((r) => (
-          <div className="fin-adjrow" key={r.rid}>
-            <div className="selectbox">
-              <select value={r.kind} aria-label="Adjustment kind"
-                onChange={(e) => setAdjs(adjs.map((x) =>
-                  x.rid === r.rid ? { ...x, kind: e.target.value as "incentive" | "deduction" } : x))}>
-                <option value="incentive" disabled={r.kind !== "incentive" && kindTaken("incentive")}>Incentive</option>
-                <option value="deduction" disabled={r.kind !== "deduction" && kindTaken("deduction")}>Deduction</option>
-              </select>
+        <div className="flex flex-col gap-2">
+          {adjs.map((r) => (
+            <div className="grid grid-cols-[1fr_10rem_auto] items-start gap-2" key={r.rid}>
+              <SelectInput ariaLabel="Adjustment kind" value={r.kind}
+                onChange={(v) => setAdjs(adjs.map((x) =>
+                  x.rid === r.rid ? { ...x, kind: v as "incentive" | "deduction" } : x))}
+                options={[
+                  { v: "incentive", l: "Incentive" },
+                  { v: "deduction", l: "Deduction" },
+                ].filter((o) => o.v === r.kind || !kindTaken(o.v))} />
+              <RupeeInput value={r.amt}
+                onChange={(v) => setAdjs(adjs.map((x) => (x.rid === r.rid ? { ...x, amt: v } : x)))} />
+              <IconButton ico="x" size="sm" label={"Remove the " + r.kind}
+                onClick={() => setAdjs(adjs.filter((x) => x.rid !== r.rid))} />
             </div>
-            <RupeeInput value={r.amt}
-              onChange={(v) => setAdjs(adjs.map((x) => (x.rid === r.rid ? { ...x, amt: v } : x)))} />
-            <button type="button" className="btn sm" aria-label={"Remove the " + r.kind}
-              title="Remove this line"
-              onClick={() => setAdjs(adjs.filter((x) => x.rid !== r.rid))}>
-              <Icon name="x" size="sm" />
-            </button>
-          </div>
-        ))}
-        <button type="button" className="btn sm" onClick={addAdj} disabled={adjs.length >= 2}>
-          <Icon name="plus" size="sm" />Add incentive or deduction
-        </button>
+          ))}
+          <span>
+            <Button color="secondary" size="sm" ico="plus" isDisabled={adjs.length >= 2}
+              onClick={addAdj}>Add incentive or deduction</Button>
+          </span>
+        </div>
       </Fs>
 
       {/* Last, because it is the one thing here that is ABOUT the whole
           payment rather than part of it — written once everything above is
           settled, like a note on the bottom of a voucher. */}
-      <div className="fin-remark">
-        <Field label="Remark">
-          <input className="inp" value={remark} placeholder="Paid a day early — bank holiday on the 1st"
-            onChange={(e) => setRemark(e.target.value)} />
-        </Field>
-      </div>
+      <Field label="Remark">
+        <Input value={remark} ariaLabel="Remark" ph="Paid a day early — bank holiday on the 1st"
+          onChange={setRemark} />
+      </Field>
 
       {overdrawn && newest ? (
-        <Notice tone="bad" ico="alert" text={<>
-          <b>The deduction is bigger than {fmtMonth(newest.month)}'s net{incPaise ? " plus the incentive" : ""}
-          — {inr(newest.netPaise + incPaise)}.</b> A slip cannot go below zero. Recover the rest
-          from a later month.
-        </>} />
+        <Alert tone="bad" ico="alert"
+          title={"The deduction is bigger than " + fmtMonth(newest.month) + "'s net"
+            + (incPaise ? " plus the incentive" : "") + " — " + inr(newest.netPaise + incPaise) + "."}>
+          A slip cannot go below zero. Recover the rest from a later month.
+        </Alert>
       ) : null}
 
-      <div className="fin-summary">
+      <Ledger>
         {months.map((s) => (
-          <div className="row" key={s.slipId}>
-            <span className="l">
-              {fmtMonth(s.month)}
-              {s.lopDays ? <span className="faint"> · {s.lopDays} day loss of pay</span> : null}
-              {s.month !== months[months.length - 1].month ? <span className="faint"> · arrears</span> : null}
-            </span>
-            <span className="tnum">{inr(s.netPaise)}</span>
-          </div>
+          <LedgerRow key={s.slipId} label={fmtMonth(s.month)}
+            note={<>
+              {s.lopDays ? " · " + s.lopDays + " day loss of pay" : ""}
+              {s.month !== months[months.length - 1].month ? " · arrears" : ""}
+            </>}>
+            {inr(s.netPaise)}
+          </LedgerRow>
         ))}
-        {incPaise > 0 ? (
-          <div className="row">
-            <span className="l">Incentive</span>
-            <span className="tnum">+{inr(incPaise)}</span>
-          </div>
-        ) : null}
-        {dedPaise > 0 ? (
-          <div className="row">
-            <span className="l">Deduction</span>
-            <span className="tnum">−{inr(dedPaise)}</span>
-          </div>
-        ) : null}
-        <div className="row grand">
-          <span className="l">Leaving the account</span><span className="tnum">{inr(leaving)}</span>
-        </div>
-      </div>
+        {incPaise > 0 ? <LedgerRow label="Incentive">+{inr(incPaise)}</LedgerRow> : null}
+        {dedPaise > 0 ? <LedgerRow label="Deduction">−{inr(dedPaise)}</LedgerRow> : null}
+        <LedgerRow label="Leaving the account" grand>{inr(leaving)}</LedgerRow>
+      </Ledger>
+
+      <Fine>
+        Every month above is settled in one transfer, oldest first. Each slip is numbered, hashed
+        and frozen by this write.
+      </Fine>
     </Dlg>
   );
 }

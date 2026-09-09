@@ -12,42 +12,47 @@
 
    A role carries an ACTIVE/INACTIVE status (`isActive`). Inactive is not a
    soft delete: the role keeps its name, its matrix and its members, but the
-   server drops it from every permission resolve, so it grants nothing.
-   `isSystem` is separate — it protects every system-seeded role from edit
-   and delete, not just Super Admin.
+   server drops it from every permission resolve, so it grants nothing —
+   which is why an inactive row wears the exception rail. `isSystem` is
+   separate — it protects every system-seeded role from edit and delete, not
+   just Super Admin.
    ===================================================================== */
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import AdminOpsService from "../../../api/modules/adminOps";
 import { errMessage } from "../../../api/apiService";
 import type { RolesModuleDef } from "../../../api/modules/adminOps";
-import { EmptyState, FilterChips, Icon, ListTable, Pill, qs, SearchField, StatStrip } from "../../ui";
+import { Button, EmptyState, FilterBar, FilterChips, ListSkeleton, ListTable, PageHeader, Pill, qs, Rail, SearchField, StatStrip, TbTitle } from "../../ui";
 import type { StatCell } from "../../ui";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { HIDDEN_MODULES } from "../../auth/session";
 import { useShell } from "../../shell/ShellContext";
 import type { Ops, Role } from "../teamShared";
-import { ListSkeleton } from "../../ui";
 import RoleDrawer from "./RoleDrawer";
 import { RoleModal } from "./roleModals";
 
+/* WHAT THIS ROLE CAN REACH, at a glance. `view` is the gate, so a module
+   without it is not granted however many other verbs carry a tick — count
+   what the server would actually honour, and say how many verbs deep the
+   grant goes so "reads Deals" and "runs Deals" do not look identical. */
 function ModuleChips({ role, mods }: { role: Role; mods: RolesModuleDef[] }) {
-  if (role.isFullAccess) return <span className="pill brand xs">everything</span>;
-  /* `view` is the gate, so a module without it is not granted however many
-     other verbs carry a tick — count what the server would actually honour. */
+  if (role.isFullAccess) return <Pill xs tone="brand" text="everything" title="A wildcard: every module, every verb, including ones added later" />;
   const held = mods.filter((m) => (role.modules[m.key] || []).indexOf("view") >= 0);
-  if (!held.length) return <span className="faint">nothing yet</span>;
+  if (!held.length) return <span className="text-sm text-quaternary">nothing yet</span>;
+  const shown = held.slice(0, 5);
   return (
-    <span className="dls-tags">
-      {held.slice(0, 5).map((m) => {
-        const n = (role.modules[m.key] || []).length;
-        return (
-          <span className="pill xs" key={m.key} title={(role.modules[m.key] || []).join(", ")}>
-            {m.label}{n > 1 ? <span className="faint"> ·{n}</span> : null}
-          </span>
-        );
+    <span className="inline-flex flex-wrap items-center gap-1">
+      {shown.map((m) => {
+        const verbs = role.modules[m.key] || [];
+        return <Pill key={m.key} xs tone="neutral" title={verbs.join(", ")}
+          text={verbs.length > 1 ? m.label + " ·" + verbs.length : m.label} />;
       })}
-      {held.length > 5 ? <span className="pill xs faint">+{held.length - 5}</span> : null}
+      {held.length > shown.length
+        ? <span className="inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium text-tertiary ring-1 ring-secondary ring-inset"
+            title={held.slice(shown.length).map((m) => m.label).join(", ")}>
+            +{held.length - shown.length}
+          </span>
+        : null}
     </span>
   );
 }
@@ -79,21 +84,22 @@ export default function Roles() {
          be offerable as a grant either, or the matrix hands out access to a
          page that does not exist. */
       .then((res) => { if (!cancelled) setData({
-        roles: res.data.roles,
-        modules: res.data.modules.filter((m) => !HIDDEN_MODULES.has(m.key)),
+        roles: res.data.roles || [],
+        modules: (res.data.modules || []).filter((m) => !HIDDEN_MODULES.has(m.key)),
       }); })
       .catch((e) => { if (!cancelled) { setData({ modules: [], roles: [] }); toast(errMessage(e), "bad"); } });
     return () => { cancelled = true; };
-  }, [tick]);
+  }, [tick, toast]);
 
-  const crumbs = useMemo(() => (id ? undefined : <span className="tb-title">Roles</span>), [id]);
+  const crumbs = useMemo(() => (id ? undefined : <TbTitle label="Roles" to="#/roles" />), [id]);
   usePageChrome({ crumbs, parent: id ? "#/roles" + qs(p) : null });
 
+  /* Wide, because the matrix inside it is one column per verb. */
   useEffect(() => {
     if (!id || !data) return;
     const r = data.roles.find((x) => String(x.id) === id);
     if (!r) { toast("404 role_not_found.", "bad"); go("#/roles"); return; }
-    drawer(<RoleDrawer role={r} mods={data.modules} ops={ops} />);
+    drawer(<RoleDrawer role={r} mods={data.modules} ops={ops} />, undefined, "xl");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, tick, data]);
 
@@ -129,81 +135,90 @@ export default function Roles() {
   });
 
   const filtered = !!p.q;
+  const inactive = data.roles.filter((r) => !r.isActive).length;
+  const system = data.roles.filter((r) => r.isSystem).length;
   const cells: (StatCell | "sep")[] = [
     { k: "roles", v: data.roles.length },
     "sep",
-    { k: "inactive", v: data.roles.filter((r) => !r.isActive).length,
+    { k: "inactive", v: inactive, dot: inactive ? "warn" : "neutral", tone: inactive ? "warn" : "",
       title: "Deactivated roles — still assigned, but grant nothing" },
     "sep",
-    { k: "protected", v: data.roles.filter((r) => r.isSystem).length,
+    { k: "protected", v: system, dot: "sys",
       title: "System roles — cannot be edited or deleted" },
   ];
 
   return (
-    <div className="dls">
-      <div className="dls-cmd">
-        <SearchField ph="Search role…" val={p.q} onFilter={setSearch} />
-        <span className="spacer"></span>
-        {can("roles", "create") ? (
-          <button className="btn pri" data-act="rl-new"
-                  onClick={() => modal(<RoleModal role={null} mods={data.modules} ops={ops} />, "wide")}>
-            <Icon name="plus" />Create role
-          </button>
-        ) : null}
-      </div>
+    <div className="flex flex-col gap-4">
+      <PageHeader
+        title="Roles"
+        meta={<>
+          <span>{data.roles.length} responsibilit{data.roles.length === 1 ? "y" : "ies"}</span>
+          <span>{data.modules.length} modules to grant</span>
+        </>}
+        actions={can("roles", "create")
+          ? <Button color="primary" ico="plus" data-act="rl-new"
+              onClick={() => modal(<RoleModal role={null} mods={data.modules} ops={ops} />, "xl")}>
+              New role
+            </Button>
+          : null}
+      />
+
+      <FilterBar
+        search={<SearchField ph="Search role…" val={p.q} onFilter={setSearch} />}
+        chips={filtered ? <FilterChips params={p} labels={{ q: "Search" }} onUnfilter={unfilter} /> : null}
+      />
 
       <StatStrip cells={cells} />
 
-      {filtered ? (
-        <div className="dls-chips">
-          <FilterChips params={p} labels={{ q: "Search" }} onUnfilter={unfilter} />
-        </div>
-      ) : null}
-
-      <div className="dls-body">
-        {rows.length ? (
-          <ListTable head={<tr>
-                <th style={{ width: "3px" }}></th><th>Role</th><th>Status</th><th>Modules granted</th>
-                <th className="n">Members</th><th className="c">Edit</th>
-              </tr>}>
-              {rows.map((r) => {
-                const editable = can("roles", "edit") && !r.isSystem;
-                return (
-                  <tr key={r.id} className="clickable"
-                      data-go={"#/roles/" + r.id} onClick={() => go("#/roles/" + r.id)}>
-                    <td className="rail"><i></i></td>
-                    <td>
-                      <div className="cell-1">{r.name}
-                        {r.isSystem ? <> <span className="pill brand xs">protected</span></> : null}
-                      </div>
-                    </td>
-                    <td>{r.isActive
-                      ? <Pill text="Active" tone="ok" />
-                      : <Pill text="Inactive" title="Still assigned, but grants nothing" />}</td>
-                    <td><ModuleChips role={r} mods={data.modules} /></td>
-                    <td className="n tnum">{r.userCount || <span className="faint">—</span>}</td>
-                    <td className="c">
-                      {editable ? (
-                        <button className="btn sm" data-act="rl-edit" data-ref={r.id}
-                                title={"Edit " + r.name}
-                                onClick={(e) => { e.stopPropagation(); modal(<RoleModal role={r} mods={data.modules} ops={ops} />, "wide"); }}>
-                          Edit
-                        </button>
-                      ) : (
-                        <span className="faint" title={r.isSystem
-                          ? "This role is defined by the system"
-                          : "You do not have permission to edit roles"}>—</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </ListTable>
-        ) : (
-          <EmptyState icon="shield" title="No roles match"
-                      body="A role is a named set of capabilities. Create one and assign it to members." />
-        )}
-      </div>
+      {rows.length ? (
+        <ListTable min="52rem" head={<tr>
+          <th className="rail" /><th scope="col">Role</th><th scope="col">Status</th>
+          <th scope="col">Modules granted</th><th scope="col" className="n">Members</th>
+          <th scope="col" className="acts"><span className="sr-only">Actions</span></th>
+        </tr>}>
+          {rows.map((r) => {
+            const editable = can("roles", "edit") && !r.isSystem;
+            const to = "#/roles/" + r.id;
+            return (
+              <tr key={r.id} className="clickable" data-go={to} onClick={() => go(to)}>
+                <Rail tone={r.isActive ? undefined : "warn"}
+                  title={r.isActive ? undefined : "Inactive — the server ignores every tick on it"} />
+                <td className="cell-1">
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    {r.name}
+                    {r.isSystem ? <Pill xs tone="sys" text="protected" title="Defined by the system" /> : null}
+                  </span>
+                </td>
+                <td>{r.isActive
+                  ? <Pill dot tone="ok" text="Active" />
+                  : <Pill dot tone="warn" text="Inactive" title="Still assigned, but grants nothing" />}</td>
+                <td><ModuleChips role={r} mods={data.modules} /></td>
+                <td className="n">{r.userCount || <span className="text-quaternary">—</span>}</td>
+                <td className="acts" onClick={(e) => e.stopPropagation()}>
+                  {editable ? (
+                    <Button color="secondary" size="xs" ico="edit" data-act="rl-edit" data-ref={r.id}
+                      onClick={() => modal(<RoleModal role={r} mods={data.modules} ops={ops} />, "xl")}>
+                      Edit
+                    </Button>
+                  ) : null}
+                </td>
+              </tr>
+            );
+          })}
+        </ListTable>
+      ) : (
+        <EmptyState icon="shield"
+          title={filtered ? "No roles match" : "No roles yet"}
+          body={filtered
+            ? "Nothing matches that name. Clear the search to see them all."
+            : "A role is a named set of capabilities — one row per module, one tick per verb. Create one and assign it to members."}
+          action={filtered
+            ? <Button color="secondary" ico="x" data-unfilter="*" onClick={() => unfilter("*")}>Clear the search</Button>
+            : can("roles", "create")
+              ? <Button color="primary" ico="plus" data-act="rl-new"
+                  onClick={() => modal(<RoleModal role={null} mods={data.modules} ops={ops} />, "xl")}>New role</Button>
+              : null} />
+      )}
     </div>
   );
 }

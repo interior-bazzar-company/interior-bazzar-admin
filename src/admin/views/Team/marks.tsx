@@ -6,8 +6,8 @@
    `RichText` (workBits.tsx) — a mark the parser does not know writes characters
    that render as themselves, which is worse than having no button for it.
    ============================================================================= */
-import type { ReactNode } from "react";
-import { Icon } from "../../ui";
+import type { MouseEvent, ReactNode } from "react";
+import { Button, Icon } from "../../ui";
 
 /** Wrap the selection in a mark, or drop one in and put the caret inside it.
  *  The selection is restored afterwards so a second press is an undo rather
@@ -109,15 +109,24 @@ export function MarkBar({ ta, value, set }: {
   value: string; set: (v: string) => void;
 }) {
   const b = (title: string, on: () => void, kid: ReactNode) => (
-    <button type="button" className="tm-rt-b" title={title} aria-label={title}
-      onMouseDown={(e) => e.preventDefault()} onClick={on}>{kid}</button>
+    <Button
+      color="tertiary"
+      size="xs"
+      title={title}
+      aria-label={title}
+      className="min-w-7 px-1.5 py-1 font-mono"
+      onMouseDown={(e: MouseEvent) => e.preventDefault()}
+      onClick={on}
+    >
+      {kid}
+    </Button>
   );
   return (
-    <span className="tm-rt-bar">
-      {b("Bold", () => wrapSel(ta, value, set, "**", "bold"), <b>B</b>)}
-      {b("Italic", () => wrapSel(ta, value, set, "_", "italic"), <i className="tm-rt-i">I</i>)}
-      {b("Bulleted list", () => lineSel(ta, value, set, "bullet"), <Icon name="menu" size="sm" />)}
-      {b("Numbered list", () => lineSel(ta, value, set, "number"), <span className="tm-rt-n">1.</span>)}
+    <span className="flex flex-wrap items-center gap-0.5 rounded-lg bg-secondary p-0.5 ring-1 ring-secondary ring-inset">
+      {b("Bold", () => wrapSel(ta, value, set, "**", "bold"), <b className="font-semibold">B</b>)}
+      {b("Italic", () => wrapSel(ta, value, set, "_", "italic"), <i className="italic">I</i>)}
+      {b("Bulleted list", () => lineSel(ta, value, set, "bullet"), <Icon name="list" size="sm" />)}
+      {b("Numbered list", () => lineSel(ta, value, set, "number"), <span className="text-xs">1.</span>)}
       {b("Checklist", () => lineSel(ta, value, set, "check"), <Icon name="check" size="sm" />)}
       {b("Link", () => linkSel(ta, value, set), <Icon name="link" size="sm" />)}
     </span>

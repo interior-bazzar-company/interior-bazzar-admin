@@ -7,6 +7,11 @@
    only place in the module where an intention can be checked against an outcome
    without anybody scoring anybody.
 
+   SO THE DAY IS A CARD WITH TWO COLUMNS, not two lists. Meant-to-do on the
+   left, actually-happened on the right, on one baseline — the comparison is
+   the record, and a layout that made you scroll between the halves would have
+   thrown away the only thing this page is for.
+
    MISSING IS NOT LATE UNTIL THE DAY IS OVER. `eodDue` decides that against the
    member's own auto-close time, so a report absent at 14:20 reads as "the day
    is not over" and not as a failure. A band that shouts at half the company
@@ -15,7 +20,8 @@
    Acknowledging is a senior's act and it is the reason the report exists: one
    nobody read is worse than one nobody wrote.
    ============================================================================= */
-import { Icon, Notice, Pill, Tiles } from "../../../ui";
+import { Alert, Button, Card, Icon, Pill, Tiles } from "../../../ui";
+import { cx } from "@/utils/cx";
 import { useShell } from "../../../shell/ShellContext";
 import { EodModal, PlanModal } from "./reportForms";
 import {
@@ -27,6 +33,13 @@ import type { Viewer } from "./ops";
 import { OpHead } from "./frame";
 
 const WINDOW = 7;
+
+const PRI_DOT: Record<string, string> = {
+  urgent: "bg-utility-red-500",
+  high: "bg-utility-yellow-500",
+  medium: "bg-utility-blue-500",
+  low: "bg-utility-neutral-400",
+};
 
 export default function ReportsPage({ m, viewer }: { m: Member; viewer: Viewer }) {
   const shell = useShell();
@@ -73,7 +86,7 @@ export default function ReportsPage({ m, viewer }: { m: Member; viewer: Viewer }
   };
 
   return (
-    <>
+    <div className="flex flex-col gap-5">
       <OpHead
         title="Reports"
         desc={"The last " + WINDOW + " days. Weekends are listed and never counted against anybody."}
@@ -83,14 +96,14 @@ export default function ReportsPage({ m, viewer }: { m: Member; viewer: Viewer }
                 segmented control on `#/reports`, which is a senior's review
                 surface — one screen answering to two different people, with a
                 write control on a page that is otherwise entirely a read. */}
-            <button className={"btn" + (todayPlan ? "" : " pri")}
-              onClick={() => shell.modal(<PlanModal m={m} />, "wide")}>
-              <Icon name="check" size="sm" />{todayPlan ? "Today's plan" : "Write today's plan"}
-            </button>
-            <button className={"btn" + (todayReport || !todayEodDue ? "" : " pri")}
-              onClick={() => shell.modal(<EodModal m={m} />, "wide")}>
-              <Icon name="doc" size="sm" />{todayReport ? "Today's report" : "Submit EOD report"}
-            </button>
+            <Button color={todayPlan ? "secondary" : "primary"} ico="check"
+              onClick={() => shell.modal(<PlanModal m={m} />, "lg")}>
+              {todayPlan ? "Today's plan" : "Write today's plan"}
+            </Button>
+            <Button color={todayReport || !todayEodDue ? "secondary" : "primary"} ico="doc"
+              onClick={() => shell.modal(<EodModal m={m} />, "lg")}>
+              {todayReport ? "Today's report" : "Submit EOD report"}
+            </Button>
           </>
         ) : null} />
 
@@ -102,18 +115,19 @@ export default function ReportsPage({ m, viewer }: { m: Member; viewer: Viewer }
       ]} />
 
       {unread && canAck ? (
-        <Notice tone="warn" ico="inbox" text={
-          <><b>{unread} report{unread > 1 ? "s" : ""} nobody has read.</b> A report that is written and
-            never opened teaches the person writing it that the exercise is paperwork.</>
-        } />
+        <Alert tone="warn" ico="inbox"
+          title={unread + " report" + (unread > 1 ? "s" : "") + " nobody has read"}>
+          A report that is written and never opened teaches the person writing it that the exercise
+          is paperwork.
+        </Alert>
       ) : null}
 
-      <div className="tm-days">
+      <div className="flex flex-col gap-4">
         {days.map((d) => (
           <DayCard key={d} date={d} m={m} canAck={canAck} onAck={ack} />
         ))}
       </div>
-    </>
+    </div>
   );
 }
 
@@ -128,50 +142,97 @@ function DayCard({ date, m, canAck, onAck }: {
   const due = eodDue(date, m);
   const nothing = !plan && !report;
 
-  return (
-    <section className={"tm-day-c" + (weekend ? " we" : "") + (date === TODAY ? " today" : "")}>
-      <header className="tm-day-h">
-        <b>{fmtDayName(date)}</b>
-        <span className="cell-2">{fmtDate(date)}</span>
-        <span className="spacer" />
-        {weekend ? <Pill text="Not a working day" tone="" />
-          : nothing && due ? <Pill text="Nothing written" tone="warn" />
-            : nothing ? <Pill text="The day is not over" tone="" />
-              : null}
-      </header>
+  const stamp = (
+    <span className="flex flex-wrap items-baseline gap-2">
+      <b className="text-sm font-semibold text-primary">{fmtDayName(date)}</b>
+      <span className="text-xs text-tertiary tnum">{fmtDate(date)}</span>
+      {date === TODAY ? <Pill xs tone="brand" text="today" /> : null}
+    </span>
+  );
+  const state = weekend ? <Pill xs tone="neutral" text="Not a working day" />
+    : nothing && due ? <Pill xs dot tone="warn" text="Nothing written" />
+      : nothing ? <Pill xs tone="neutral" text="The day is not over" />
+        : null;
 
-      {weekend || nothing ? null : (
-        <div className="tm-day-b">
-          <PlanHalf plan={plan} />
-          <ReportHalf report={report} due={due} m={m} canAck={canAck} onAck={onAck} />
-        </div>
-      )}
-    </section>
+  /* A DAY WITH NOTHING ON IT IS ONE LINE. Seven cards each holding a heading
+     and the sentence "nothing on the record" is a page that shouts about the
+     absence and buries the two days somebody actually wrote — so an empty day
+     states itself in a row and the week keeps its shape. */
+  if (weekend || nothing) {
+    return (
+      <div className={cx(
+        "flex flex-wrap items-center justify-between gap-3 rounded-xl bg-primary px-4 py-2.5 ring-1 ring-secondary",
+        weekend && "opacity-70",
+        date === TODAY && "ring-2 ring-brand",
+      )}>
+        {stamp}
+        <span className="flex items-center gap-3">
+          <span className="text-xs text-quaternary">
+            {weekend ? "listed so a gap is never mistaken for a missed day" : "nothing on the record"}
+          </span>
+          {state}
+        </span>
+      </div>
+    );
+  }
+
+  return (
+    <Card
+      tight
+      cls={cx(date === TODAY && "ring-2 ring-brand")}
+      title={stamp}
+      right={state}
+    >
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 lg:gap-6">
+        <PlanHalf plan={plan} />
+        <ReportHalf report={report} due={due} m={m} canAck={canAck} onAck={onAck} />
+      </div>
+    </Card>
+  );
+}
+
+function Half({ ico, title, children }: { ico: string; title: string; children: React.ReactNode }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-2">
+      <h4 className="label-mono flex items-center gap-1.5">
+        <Icon name={ico} size="xs" />
+        {title}
+      </h4>
+      {children}
+    </div>
+  );
+}
+
+function Note({ label, body, bad }: { label: string; body: string; bad?: boolean }) {
+  return (
+    <p className={cx("text-sm", bad ? "text-error-primary" : "text-tertiary")}>
+      <b className="font-semibold text-secondary">{label}:</b> {body}
+    </p>
   );
 }
 
 function PlanHalf({ plan }: { plan: DailyPlan | null }) {
   return (
-    <div className="tm-half">
-      <h4><Icon name="check" size="sm" />What they meant to do</h4>
+    <Half ico="check" title="What they meant to do">
       {plan && plan.submittedAt ? (
         <>
-          <ul className="tm-lines">
+          <ul className="flex flex-col gap-1.5">
             {plan.lines.map((l) => (
-              <li key={l.lineId}>
-                <span className={"tm-pri p-" + l.priority} aria-hidden="true" />
-                {l.title}
+              <li key={l.lineId} className="flex items-start gap-2 text-sm text-secondary">
+                <i aria-hidden="true"
+                  className={cx("mt-1.5 size-1.5 shrink-0 rounded-full", PRI_DOT[l.priority] || PRI_DOT.low)} />
+                <span className="min-w-0">{l.title}</span>
               </li>
             ))}
-            {plan.lines.length ? null : <li className="dim">No lines.</li>}
+            {plan.lines.length ? null : <li className="text-sm text-quaternary">No lines.</li>}
           </ul>
-          {plan.expectedOutcome ? <p className="tm-note"><b>Outcome:</b> {plan.expectedOutcome}</p> : null}
-          {plan.blockers ? <p className="tm-note bad"><b>Blocked:</b> {plan.blockers}</p> : null}
+          {plan.expectedOutcome ? <Note label="Outcome" body={plan.expectedOutcome} /> : null}
+          {plan.blockers ? <Note label="Blocked" body={plan.blockers} bad /> : null}
         </>
       ) : (
-        <p className="dim">No plan submitted.</p>
+        <p className="text-sm text-quaternary">No plan submitted.</p>
       )}
-    </div>
+    </Half>
   );
 }
 
@@ -181,45 +242,50 @@ function ReportHalf({ report, due, m, canAck, onAck }: {
 }) {
   const reader = report && report.acknowledgedById ? readMember(report.acknowledgedById) : null;
   return (
-    <div className="tm-half">
-      <h4><Icon name="doc" size="sm" />What actually happened</h4>
+    <Half ico="doc" title="What actually happened">
       {report && report.submittedAt ? (
         <>
-          <ul className="tm-lines">
+          <ul className="flex flex-col gap-1.5">
             {report.lines.map((l) => (
-              <li key={l.lineId} className={l.done ? "done" : ""}>
-                <Icon name={l.done ? "check" : "clock"} size="sm" />
-                {l.title}
-                {l.targetDelta ? <b className="tm-delta">+{l.targetDelta}</b> : null}
+              <li key={l.lineId} className="flex items-start gap-2 text-sm">
+                <Icon name={l.done ? "check" : "clock"} size="sm"
+                  className={cx("mt-0.5 shrink-0", l.done ? "text-fg-success-primary" : "text-fg-quaternary")} />
+                <span className={cx("min-w-0", l.done ? "text-quaternary line-through" : "text-secondary")}>
+                  {l.title}
+                </span>
+                {l.targetDelta
+                  ? <b className="ml-auto shrink-0 font-semibold text-success-primary tnum">+{l.targetDelta}</b>
+                  : null}
               </li>
             ))}
-            {report.lines.length ? null : <li className="dim">No lines.</li>}
+            {report.lines.length ? null : <li className="text-sm text-quaternary">No lines.</li>}
           </ul>
-          {report.achievement ? <p className="tm-note"><b>Achieved:</b> {report.achievement}</p> : null}
+          {report.achievement ? <Note label="Achieved" body={report.achievement} /> : null}
           {report.pendingWork
-            ? <p className="tm-note"><b>Left over:</b> {report.pendingWork}
-              {report.pendingReason ? " — " + report.pendingReason : ""}</p>
+            ? <Note label="Left over"
+              body={report.pendingWork + (report.pendingReason ? " — " + report.pendingReason : "")} />
             : null}
-          {report.blockers ? <p className="tm-note bad"><b>Blocked:</b> {report.blockers}</p> : null}
-          {report.supportNeeded ? <p className="tm-note"><b>Needs:</b> {report.supportNeeded}</p> : null}
+          {report.blockers ? <Note label="Blocked" body={report.blockers} bad /> : null}
+          {report.supportNeeded ? <Note label="Needs" body={report.supportNeeded} /> : null}
 
-          <div className="tm-ack">
+          <div className="mt-1 flex items-center">
             {reader ? (
-              <span className="dim">Read by {reader.name === m.name ? "themselves" : reader.name}</span>
+              <span className="inline-flex items-center gap-1.5 text-xs text-tertiary">
+                <Icon name="eye" size="xs" className="text-fg-quaternary" />
+                Read by {reader.name === m.name ? "themselves" : reader.name}
+              </span>
             ) : canAck ? (
-              <button className="btn sm pri" onClick={() => onAck(report)}>
-                <Icon name="check" size="sm" />Mark as read
-              </button>
+              <Button color="primary" size="xs" ico="check" onClick={() => onAck(report)}>Mark as read</Button>
             ) : (
-              <Pill text="Nobody has read it" tone="info" />
+              <Pill xs dot tone="info" text="Nobody has read it" />
             )}
           </div>
         </>
       ) : due ? (
-        <p className="tm-note bad">Not written, and the day is over.</p>
+        <p className="text-sm text-error-primary">Not written, and the day is over.</p>
       ) : (
-        <p className="dim">The day is not over.</p>
+        <p className="text-sm text-quaternary">The day is not over.</p>
       )}
-    </div>
+    </Half>
   );
 }

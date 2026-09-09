@@ -1,49 +1,49 @@
 /* =====================================================================
-   THE DOCUMENT PAGE — the prototype's preview() screen, for a quotation or
-   an invoice. Full width, the sheet on its stage, the version rail above it,
-   and two controls: the way out, and a kebab holding everything else.
+   THE DOCUMENT PAGE — one screen, two modules: a quotation or an invoice
+   as the customer receives it.
 
-   Back stays a button because it is the one control you reach for without
-   reading — everything else (issue, share, copy, save) goes behind the dots,
-   the same popover the detail pages already use.
+   THE PAPER IS NOT THEMED. Everything else in this panel inverts; a
+   document does not, because the customer's copy is white with black type
+   whatever the agent's monitor is set to. The sheet is fetched from the
+   server and rendered by the same template the public share link serves —
+   two renderers of one document is how the agent's copy and the customer's
+   copy start disagreeing about money — and it is dropped into the sandboxed
+   `DocFrame` (bits.tsx), which is the ONE place the A4 measure is written.
 
-   The sheet itself is NOT re-implemented here. It is fetched from the server,
-   rendered by the same template the customer's share link serves, and dropped
-   into a sandboxed frame. Two renderers of one document is how the agent's copy
-   and the customer's copy start disagreeing about money — and this way "what the
-   customer sees" is not an approximation, it is the same bytes.
-
-   Printing goes to the frame, not the page: the sheet's own stylesheet already
-   has the @page rules, so Ctrl-P inside it produces the PDF with no admin
-   chrome to strip.
+   The chrome around it carries `data-print-hide`, so Ctrl-P on this screen
+   produces the sheet and nothing else; `globals.css` owns the @page rules.
+   Printing goes through the frame's own window, so the sheet's stylesheet
+   does the work and there is no panel chrome to strip.
    ===================================================================== */
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { Icon, Notice, PaneLoading } from "../../ui";
-import { useShell } from "../../shell/ShellContext";
-import { Mi } from "../Deals/bits";
+import { Alert, Button, MoreMenu, PageHeader, PaneLoading } from "../../ui";
+import type { MenuItem } from "../../ui";
 import { errMessage } from "../../../api/apiService";
+import { DocFrame, PaperStage } from "./bits";
 
-export default function DocPage({ label, scope, fetchHtml, back, menu, rail, banner }: {
+export default function DocPage({ kind, label, scope, fetchHtml, back, backLabel, menu, rail, banner }: {
+  /** the eyebrow — "Quotation", "Tax invoice" */
+  kind?: string;
   label: string;
   scope: ReactNode;
   fetchHtml: () => Promise<{ html: string }>;
   /* The way out. The only thing still rendered as a button. */
   back: () => void;
-  /* `<Mi>` rows for the kebab. Save as PDF is appended here, not passed in —
-     it belongs to this component, which owns the frame that prints. */
-  menu: ReactNode;
+  backLabel?: string;
+  /* The kebab's rows. Save as PDF is appended here, not passed in — it
+     belongs to this component, which owns the frame that prints. */
+  menu: MenuItem[];
   rail?: ReactNode;
-  /* Anything that must appear WHERE THE BUTTON WAS PRESSED — the share line, in
-     practice. It used to render after this component, which put it below a
-     full-height sheet: the link was minted, and pressing the button looked like
-     it had done nothing at all. */
+  /* Anything that must appear WHERE THE BUTTON WAS PRESSED — the share line,
+     in practice. It used to render after this component, which put it below a
+     full-height sheet: the link was minted, and pressing the button looked
+     like it had done nothing at all. */
   banner?: ReactNode;
 }) {
   const [html, setHtml] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const frame = useRef<HTMLIFrameElement>(null);
-  const { openPop, closePop, popAnchor } = useShell();
 
   useEffect(() => {
     let live = true;
@@ -59,61 +59,35 @@ export default function DocPage({ label, scope, fetchHtml, back, menu, rail, ban
      sidebar and topbar out of the output without a single print rule here. */
   const print = () => frame.current?.contentWindow?.print();
 
+  const items: MenuItem[] = html
+    ? menu.concat([{ icon: "print", label: "Save as PDF", title: "Prints the sheet itself — no panel chrome", act: print }])
+    : menu;
+
   return (
-    <div className="page qpage">
-      <div className="ph">
-        <div className="ph-t">
-          <h1 className="mono">{label}</h1>
-          <div className="scope">{scope}</div>
-        </div>
-        {/* The record-header pattern: More first, the primary Back closes the
-            row. One press on the anchor opens the menu, a second closes it —
-            the rule the detail pages' menus already follow. The rows close
-            the popover by bubbling: an action that leaves its own menu open
-            over the dialog it just opened is the bug that rule exists for. */}
-        {/* data-act is load-bearing, not decoration: the shell's outside-click
-            listener closes the popover on any click that is neither inside
-            .pop nor on a [data-act] element — and the press that OPENS it
-            reaches document after React has already mounted that listener.
-            Without the attribute the menu opens and shuts on one click. */}
-        <div className="acts">
-          <button className="btn" data-act="doc-more" aria-haspopup="menu"
-            title="Everything this document can do"
-            onClick={(e) => {
-              const el = e.currentTarget as HTMLElement;
-              if (popAnchor === el) return closePop();
-              openPop(el, (
-                <div className="pop-b" onClick={closePop}>
-                  {menu}
-                  {html
-                    ? <Mi ico="download" label="Save as PDF"
-                        hint="Prints the sheet itself — no panel chrome" onClick={print} />
-                    : null}
-                </div>
-              ), { width: 268, cls: "pop-views" });
-            }}>
-            More
-          </button>
-          <button className="btn pri" onClick={back}><Icon name="chevl" />Back</button>
-        </div>
+    <div className="flex min-w-0 flex-col gap-4">
+      <div data-print-hide>
+        <PageHeader
+          eyebrow={kind}
+          title={<span className="font-mono tnum">{label}</span>}
+          meta={scope}
+          actions={<>
+            {items.length
+              ? <MoreMenu items={items} label="Document" data-act="doc-more"
+                  aria-label="Everything this document can do" />
+              : null}
+            <Button color="primary" ico="chevl" onClick={back}>{backLabel || "Back"}</Button>
+          </>}
+        />
+        {rail}
+        {banner}
+        {err ? <Alert tone="bad" title="Could not render the document." className="mt-3">{err}</Alert> : null}
       </div>
-      {rail}
-      {banner}
-      {err ? <Notice tone="bad" ico="alert" text={<><b>Could not render the document.</b> {err}</>} /> : null}
-      <div className="qdoc-stage">
+
+      <PaperStage>
         {html === null
           ? (err ? null : <PaneLoading label="Rendering the document…" />)
-          : <iframe ref={frame} title={label} srcDoc={html} sandbox="allow-same-origin allow-modals"
-              /* Grown to the sheet's real height once it lays out: a document
-                 that runs onto a second page must not end up with its own
-                 scrollbar inside the panel. */
-              onLoad={(e) => {
-                const d = e.currentTarget.contentDocument;
-                if (d) e.currentTarget.style.height = d.documentElement.scrollHeight + "px";
-              }}
-              style={{ width: "210mm", maxWidth: "100%", height: "297mm", border: 0,
-                       background: "#fff", boxShadow: "0 1px 2px rgba(0,0,0,.18), 0 12px 40px rgba(0,0,0,.22)" }} />}
-      </div>
+          : <DocFrame title={label} html={html} frameRef={frame} />}
+      </PaperStage>
     </div>
   );
 }

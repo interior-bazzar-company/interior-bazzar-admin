@@ -5,9 +5,10 @@
    own refusal text inside the dialog rather than closing on a failed write.
    ============================================================================= */
 import { useMemo, useState } from "react";
+import { Button, Input, SelectInput, Textarea } from "../../ui";
 import { Cancel, Dlg, Field, Fs, Pick, RupeeInput, toPaise } from "./dialog";
 import type { Done } from "./dialog";
-import { Check, Money, OriginTag } from "./bits";
+import { Check, Derived, Fine, Money, OriginTag, PickList, PickRow } from "./bits";
 import {
   ACCOUNTS, MODES, REFUND_GROUNDS, REFUND_POLICY,
   createManualRefund, decideRefund, fmtDate, inr, readPayment, readPayments, recordRefundTransfer, refundStanding,
@@ -50,18 +51,21 @@ export function RequestRefundModal({ onClose, onDone }: { onClose: () => void; o
   return (
     <Dlg title="Request a refund" onClose={onClose} err={err}
       sub="Against a payment already in the ledger."
-      footer={<><Cancel onClose={onClose} /><button className="btn pri" onClick={submit}>Request refund</button></>}>
+      footer={<><Cancel onClose={onClose} /><Button color="primary" onClick={submit}>Request refund</Button></>}>
       <Fs legend="Which payment" hint="Full amount only." req>
-        <div className="fin-pick">
-          {payments.length ? payments.map((hit) => (
-            <button key={hit.pay.paymentId} type="button" className={hit.pay.paymentId === paymentId ? "on" : ""}
-              onClick={() => setPaymentId(hit.pay.paymentId)}>
-              <span>{hit.sub.customer.name} · {hit.sub.subscriptionId}</span>
-              <span className="s mono">{hit.pay.reference} · {fmtDate(hit.pay.valueDate)}</span>
-              <span className="a"><Money paise={hit.pay.amountPaise} /></span>
-            </button>
-          )) : <p className="fin-fine">Nothing here to refund against — every installment payment in the ledger already carries a refund, or none is recorded yet.</p>}
-        </div>
+        {payments.length ? (
+          <PickList>
+            {payments.map((hit) => (
+              <PickRow key={hit.pay.paymentId} on={hit.pay.paymentId === paymentId}
+                onPick={() => setPaymentId(hit.pay.paymentId)}
+                id={<>{hit.sub.customer.name} · <span className="font-mono tnum">{hit.sub.subscriptionId}</span></>}
+                sub={hit.pay.reference + " · " + fmtDate(hit.pay.valueDate)}
+                right={inr(hit.pay.amountPaise)} />
+            ))}
+          </PickList>
+        ) : (
+          <Fine>Nothing here to refund against — every installment payment in the ledger already carries a refund, or none is recorded yet.</Fine>
+        )}
       </Fs>
 
       <Fs legend="Ground" req>
@@ -70,7 +74,7 @@ export function RequestRefundModal({ onClose, onDone }: { onClose: () => void; o
       </Fs>
 
       {pc ? (
-        <div className="fin-chks">
+        <div className="flex flex-col">
           <Check ok={pc.groundPermitted} warn={!pc.groundPermitted}>
             {pc.groundPermitted
               ? "Permitted ground."
@@ -87,11 +91,15 @@ export function RequestRefundModal({ onClose, onDone }: { onClose: () => void; o
       ) : null}
 
       <Field label="Amount" help="The payment's own amount.">
-        <div className="inp ro tnum">{paymentId ? inr(readPayment(paymentId)?.pay.amountPaise || 0) : "—"}</div>
+        <Derived faint={!paymentId}>
+          <span className="font-mono tnum">
+            {paymentId ? inr(readPayment(paymentId)?.pay.amountPaise || 0) : "—"}
+          </span>
+        </Derived>
       </Field>
 
       <Field label="What happened" help="The approver reads this.">
-        <textarea className="inp" rows={3} value={detail} onChange={(e) => setDetail(e.target.value)} />
+        <Textarea rows={3} value={detail} ariaLabel="What happened" onChange={setDetail} />
       </Field>
     </Dlg>
   );
@@ -119,10 +127,11 @@ export function ManualRefundModal({ onClose, onDone }: { onClose: () => void; on
   return (
     <Dlg title="Raise a manual refund" onClose={onClose} err={err}
       sub="No ledger row behind this one."
-      footer={<><Cancel onClose={onClose} /><button className="btn pri" onClick={submit}>Raise refund</button></>}>
+      footer={<><Cancel onClose={onClose} /><Button color="primary" onClick={submit}>Raise refund</Button></>}>
       <Fs legend="Payee" req>
         <Field label="Name">
-          <input className="inp" value={payeeName} onChange={(e) => setPayeeName(e.target.value)} placeholder="Full name" />
+          <Input value={payeeName} ariaLabel="Payee name" autoFocus ph="Full name"
+            onChange={setPayeeName} />
         </Field>
       </Fs>
 
@@ -136,7 +145,7 @@ export function ManualRefundModal({ onClose, onDone }: { onClose: () => void; on
       </Fs>
 
       <Field label="What happened" help="No ledger row sits behind this one, so this is the evidence.">
-        <textarea className="inp" rows={4} value={detail} onChange={(e) => setDetail(e.target.value)} />
+        <Textarea rows={4} value={detail} ariaLabel="What happened" onChange={setDetail} />
       </Field>
     </Dlg>
   );
@@ -175,16 +184,16 @@ export function DecideRefundModal({ r, verdict, onClose, onDone }: {
     <Dlg title={(approving ? "Approve " : "Decline ") + r.refundId} onClose={onClose} err={err}
       sub={<><OriginTag k={r.origin} /> {r.payee.name} · <Money paise={r.amountPaise} /></>}
       footer={<><Cancel onClose={onClose} />
-        <button className={"btn " + (approving ? "pri" : "dgr")}
-          disabled={!approving && !note.trim()} onClick={submit}>
+        <Button color={approving ? "primary" : "primary-destructive"}
+          isDisabled={!approving && !note.trim()} onClick={submit}>
           {approving ? "Approve" : "Decline"}
-        </button></>}>
+        </Button></>}>
       <Field label="Note"
         help={approving
           ? "Optional. The requester sees it."
           : "Mandatory. The requester only sees this note."}>
-        <textarea className="inp" rows={3} autoFocus value={note}
-          onChange={(e) => { setNote(e.target.value); setErr(null); }} />
+        <Textarea rows={3} autoFocus value={note} ariaLabel="Note"
+          onChange={(v) => { setNote(v); setErr(null); }} />
       </Field>
     </Dlg>
   );
@@ -210,17 +219,17 @@ export function RecordTransferModal({ r, onClose, onDone }: { r: Refund; onClose
   return (
     <Dlg title={"Record the transfer — " + r.refundId} onClose={onClose} err={err}
       sub={<>Sending <Money paise={r.amountPaise} strong /> to {r.payee.name}.</>}
-      footer={<><Cancel onClose={onClose} /><button className="btn pri" onClick={submit}>Record transfer</button></>}>
+      footer={<><Cancel onClose={onClose} /><Button color="primary" onClick={submit}>Record transfer</Button></>}>
       <Fs legend="Mode" req>
         <Pick value={mode} onChange={setMode} options={MODES.map((m) => ({ key: m, label: m }))} />
       </Fs>
       <Field label="Reference" help="The proof the money left.">
-        <input className="inp mono" value={reference} onChange={(e) => setReference(e.target.value)} placeholder="UTR / transaction id" />
+        <Input mono value={reference} ariaLabel="Reference" ph="UTR / transaction id"
+          onChange={setReference} />
       </Field>
       <Fs legend="Account" req>
-        <select className="inp" value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-          {activeAccounts.map((a) => <option key={a.accountId} value={a.accountId}>{a.name} · {a.masked}</option>)}
-        </select>
+        <SelectInput ariaLabel="Account" value={accountId} onChange={setAccountId}
+          options={activeAccounts.map((a) => ({ v: a.accountId, l: a.name + " · " + a.masked }))} />
       </Fs>
     </Dlg>
   );

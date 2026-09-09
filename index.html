@@ -6,34 +6,33 @@
   <link rel="icon" type="image/x-icon" href="/ib.ico" />
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
   <meta name="color-scheme" content="light dark" />
+  <meta name="theme-color" content="#14704e" />
   <title>Interior bazzar · Admin</title>
   <meta name="description"
     content="Interior bazzar Admin — the single operating workspace for every module." />
 
-  <!-- THE THREE FACES OF INK & SIGNAL. Archivo carries the display line (it is
-       variable-width, so a heading tightens without a second face); IBM Plex
-       Sans is the interface; IBM Plex Mono is every id, figure, timestamp and
-       tracked micro-label. Loaded non-blocking with a real system fallback in
-       the stack, so a cold cache or a blocked CDN costs weight, never paint. -->
+  <!-- TWO FACES. Inter is everything read; JetBrains Mono is everything counted —
+       ids, money, timestamps, axes and the tracked micro-labels. Loaded
+       non-blocking with a real system fallback in the stack (brand.css), so a
+       cold cache or a blocked CDN costs weight, never paint. -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" media="print" onload="this.media = 'all'"
-    href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@100..125,400..800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" />
+    href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400..700;1,14..32,400..700&family=JetBrains+Mono:wght@400;500;600&display=swap" />
   <noscript>
     <link rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" />
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" />
   </noscript>
 
   <script>
     // Pre-paint so the panel never flashes the wrong theme.
     //
-    // ONE ATTRIBUTE, TWO VALUES. `data-theme` is "light" or "dark" and is never
-    // anything else — there is no scheme, no density, and no third appearance.
-    // "System" is a PREFERENCE, not a theme: it is resolved HERE from
-    // prefers-color-scheme, which is why the stylesheet needs one dark block
-    // rather than a block plus a media query that can disagree with it.
-    // ShellContext re-runs exactly this resolution and keeps watching the OS;
-    // this copy exists only to beat the first paint.
+    // ONE PREFERENCE, TWO PAINTS. `ib_admin_theme` is "light", "dark" or
+    // "system"; "system" is resolved HERE from prefers-color-scheme. The
+    // resolved answer is written twice on <html>: `data-theme` (the panel's
+    // attribute) and the `dark-mode` class (Untitled UI's contract — its token
+    // sheet keys on the class). ShellContext re-runs exactly this resolution
+    // and keeps watching the OS; this copy exists only to beat the first paint.
     //
     // Nothing stored means DARK, the panel's default since its first build.
     (function () {
@@ -43,6 +42,7 @@
         t = t ? JSON.parse(t) : "dark";
         var dark = t === "dark" || (t === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
         r.setAttribute("data-theme", dark ? "dark" : "light");
+        r.classList.toggle("dark-mode", dark);
         if (t === "system") r.setAttribute("data-theme-pref", "system");
         // Appearance keys retired with the design-system consolidation. Cleared
         // rather than ignored, so a browser that stored one in an earlier build

@@ -19,19 +19,27 @@
    ============================================================================= */
 import { useShell } from "../../shell/ShellContext";
 import { can } from "../../shell/AdminShell";
-import { EmptyState, FilterChips, Icon, ListTable, SearchField, Select, StatStrip } from "../../ui";
+import {
+  Button, DateInput, EmptyState, FilterBar, FilterChips, ListTable, Pagination, Rail,
+  SearchField, Select, SelectInput, StatStrip,
+} from "../../ui";
 import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import { Frame, ViewBand } from "./Frame";
 import type { FaceProps } from "./Frame";
-import { InstStrip, Money, SourceTag, SubPill } from "./bits";
+import { ActionMenu, InstStrip, Money, SourceTag, SubPill } from "./bits";
 import { RecordSubModal } from "./SubModals";
 import SubAnalytics from "./SubAnalytics";
 import {
   FILTER_LABELS, PERIOD, SUB_SOURCES, SUB_STATUSES,
-  applySubFilters, filterValueLabel, fmtDate, inr, startedOptions, subYears, useOverview, useSubRows,
+  applySubFilters, filterValueLabel, fmtDate, inr, startedOptions, subYears, todayIso,
+  useOverview, useSubRows,
 } from "./store";
 import type { Params, SubRow } from "./store";
+
+/** One screen of rows. `?page=` is already a param every filter helper strips,
+ *  so paging is a position in the list and never a filter. */
+const PAGE_SIZE = 50;
 
 export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onParams }: FaceProps) {
   const { toast, modal, closeLayer } = useShell();
@@ -46,9 +54,7 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
 
      SUBSCRIPTIONS IS THE LANDING TAB: the grain of daily work here is "where
      is every sale and what is failing", and Analytics is one press away
-     carrying ?tab=analytics. It reads the subscriptions and nothing else, so
-     it belongs beside the records it derives from — the same move Salaries
-     A/C made with payroll. */
+     carrying ?tab=analytics. */
   const tab = p.tab === "analytics" ? "analytics" : "subscriptions";
 
   /* `view` is the record type you are looking at and `page` is a position in a
@@ -57,6 +63,9 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
   const narrowed = Object.keys(p).some((k) => p[k] && ["view", "page", "tab"].indexOf(k) < 0);
 
   const activeN = rows.filter((r) => r.s.status === "active").length;
+  const page = Math.max(1, Number(p.page) || 1);
+  const pages = Math.max(1, Math.ceil(shown.length / PAGE_SIZE));
+  const paged = shown.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   /* A queue cell TOGGLES: pressing the filter it already applied clears it,
      because the only other way back is to hunt for the chip. The strip
@@ -73,10 +82,35 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
 
   const onRecord = () => modal(
     <RecordSubModal onClose={closeLayer}
-      onDone={(msg, tone) => { closeLayer(); toast(msg, tone); }} />, "wide");
+      onDone={(msg, tone) => { closeLayer(); toast(msg, tone); }} />, "xl");
+
+  const chips = (
+    <FilterChips
+      params={Object.keys(p)
+        .filter((k) => ["view", "page", "tab"].indexOf(k) < 0 && p[k])
+        .reduce((acc, k) => { acc[k] = filterValueLabel(k, p[k] as string); return acc; },
+          {} as Record<string, string>)}
+      labels={FILTER_LABELS}
+      onUnfilter={onUnfilter} />
+  );
 
   return (
-    <Frame toast={toast}
+    <Frame
+      toast={toast}
+      title="Subscriptions"
+      meta={
+        <>
+          <span className="label-mono">
+            {shown.length === rows.length
+              ? rows.length + (rows.length === 1 ? " sale" : " sales")
+              : shown.length + " of " + rows.length}
+          </span>
+          <span className="label-mono">as of {fmtDate(todayIso())}</span>
+        </>
+      }
+      actions={tab === "subscriptions" && writable
+        ? <Button color="primary" ico="plus" onClick={onRecord}>Record a subscription</Button>
+        : null}
       tabs={
         <ViewBand cur={tab}
           items={[
@@ -98,76 +132,72 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
             year: undefined,
           })} />
       }
-      cmd={tab === "analytics" ? <>
-        {/* THE YEAR IS THE ONLY CONTROL ON THIS TAB, because the year IS the
-            scope here — and it says what the page is showing, which is the job
-            the sentence that stood here was doing in more words. There are no
-            filters beside it: a chart narrowed by a search box is a chart
-            whose total no longer matches its own caption.
+      cmd={tab === "analytics" ? (
+        /* THE YEAR IS THE ONLY CONTROL ON THIS TAB, because the year IS the
+           scope here. There are no filters beside it: a chart narrowed by a
+           search box is a chart whose total no longer matches its own caption.
 
-            Deliberately not the panel's `Select`, which carries a blank first
-            option because it is built for filters, where empty means "not
-            filtering". This always has a value — `All time` is a real answer,
-            not the absence of one. */}
-        <span className="fin-picker">
-          <span className="fin-picker-l">Year</span>
-          <span className="selectbox">
-            <select aria-label="Year" value={p.year || ""}
-              onChange={(e) => onParams({ year: e.target.value || undefined })}>
-              <option value="">All time</option>
-              {subYears(rows).map((y) => <option key={y} value={y}>{y}</option>)}
-            </select>
-          </span>
-        </span>
-        <span className="spacer" />
-      </> : <>
-        {/* KEYED ON THEIR VALUE. SearchField and Select are uncontrolled, so
-            clearing a chip otherwise left the old text in the box. */}
-        <SearchField key={"q" + (p.q || "")} val={p.q} onFilter={onSearch}
-          ph="Customer, subscription ID, deal, plan, UTR or invoice number…" />
-        <Select key={"source" + (p.source || "")} name="source" label="Source" value={p.source}
-          onFilter={onFilter} options={SUB_SOURCES.map((s) => ({ v: s.key, l: s.label }))} />
-        <Select key={"status" + (p.status || "")} name="status" label="Status" value={p.status}
-          onFilter={onFilter} options={SUB_STATUSES.map((s) => ({ v: s.key, l: s.label }))} />
-        <Select key={"flag" + (p.flag || "")} name="flag" label="Queue" value={p.flag}
-          onFilter={onFilter} options={[
-            { v: "failed", l: "Has a failed installment" },
-            { v: "due", l: "Has something still to pay" },
-          ]} />
-        {/* WHEN IT STARTED — one filter, three grains. The dropdown carries the
-            years and their months, read off the records themselves so it can
-            never offer a month nothing was sold in; the date box beside it
-            names one day. Both write the same `started` param, because they
-            are two ways of saying one thing and two params would be two
-            filters that could contradict each other. */}
-        <Select key={"started" + (p.started || "")} name="started" label="Started"
-          value={/^\d{4}(-\d{2})?$/.test(p.started || "") ? p.started : ""}
-          onFilter={onFilter} options={startedOptions(rows)} />
-        <DayPick
-          value={/^\d{4}-\d{2}-\d{2}$/.test(p.started || "") ? (p.started as string) : ""}
-          onPick={(v) => onFilter("started", v)} />
-        <span className="spacer" />
-        {writable
-          ? <button className="btn pri" onClick={onRecord}>
-              <Icon name="plus" size="sm" />Record a subscription
-            </button>
-          : null}
-      </>}
-      bands={tab === "analytics" ? null : <>
-        {/* THE STRIP EVERY LIST IN THIS PANEL CARRIES: a count, its label, the
-            money it stands for — one row, each cell a filter. It replaced three
-            tiles that said the same three things at four times the height and
-            matched no other list in the module.
+           Deliberately not the panel's filter `Select`, which carries a blank
+           first option because empty means "not filtering". This always has a
+           value — `All time` is a real answer, not the absence of one. */
+        <FilterBar
+          filters={
+            <label className="flex items-center gap-2 text-sm font-medium text-secondary">
+              Year
+              <SelectInput
+                ariaLabel="Year"
+                value={p.year || ""}
+                className="w-40"
+                options={[{ v: "", l: "All time" }].concat(subYears(rows).map((y) => ({ v: y, l: y })))}
+                onChange={(v) => onParams({ year: v || undefined })}
+              />
+            </label>
+          }
+        />
+      ) : (
+        <FilterBar
+          /* KEYED ON THEIR VALUE. SearchField and Select are uncontrolled, so
+             clearing a chip otherwise left the old text in the box. */
+          search={<SearchField key={"q" + (p.q || "")} val={p.q} onFilter={onSearch}
+            ph="Customer, ID, deal, plan, UTR or invoice…" />}
+          filters={<>
+            <Select key={"source" + (p.source || "")} name="source" label="Source" value={p.source}
+              onFilter={onFilter} options={SUB_SOURCES.map((s) => ({ v: s.key, l: s.label }))} />
+            <Select key={"status" + (p.status || "")} name="status" label="Status" value={p.status}
+              onFilter={onFilter} options={SUB_STATUSES.map((s) => ({ v: s.key, l: s.label, dot: s.tone }))} />
+            <Select key={"flag" + (p.flag || "")} name="flag" label="Queue" value={p.flag}
+              onFilter={onFilter} options={[
+                { v: "failed", l: "Has a failed installment", dot: "bad" },
+                { v: "due", l: "Has something still to pay", dot: "warn" },
+              ]} />
+            {/* WHEN IT STARTED — one filter, three grains. The dropdown carries
+                the years and their months, read off the records themselves so
+                it can never offer a month nothing was sold in; the date box
+                beside it names one day. Both write the same `started` param,
+                because they are two ways of saying one thing and two params
+                would be two filters that could contradict each other. */}
+            <Select key={"started" + (p.started || "")} name="started" label="Started"
+              value={/^\d{4}(-\d{2})?$/.test(p.started || "") ? p.started : ""}
+              onFilter={onFilter} options={startedOptions(rows)} />
+            <DateInput
+              ariaLabel="Started on one exact day"
+              value={/^\d{4}-\d{2}-\d{2}$/.test(p.started || "") ? (p.started as string) : ""}
+              onChange={(v) => onFilter("started", v)} />
+          </>}
+          chips={chips}
+        />
+      )}
+      bands={tab === "analytics" ? null : (
+        /* THE STRIP EVERY LIST IN THIS PANEL CARRIES: a count, its label, the
+           money it stands for — one row, each cell a filter.
 
-            THE CELL IS THE FILTER now, which is what cost the i buttons: a
-            tile could carry an `i` beside its label because it was a div, and
-            a cell is a button — an i inside it would swallow half its own
-            click target. The definitions moved to `tip`, the strip's own
-            description channel, which is how Salaries A/C carries the same
-            cautions on the same control.
+           THE CELL IS THE FILTER, which is what cost the i buttons: a cell is
+           a button, and an `i` inside it would swallow half its own click
+           target. The definitions ride `tip`, the strip's own description
+           channel.
 
-            EACH CELL IS ONE PERIOD, deliberately unlike the topbar above it,
-            which is all time. The label says which. */}
+           EACH CELL IS ONE PERIOD, deliberately unlike the topbar above it,
+           which is all time. The label says which. */
         <StatStrip cells={([
           { k: <>Collected · {PERIOD.label} <b className="tnum">{inr(o.collectedPaise)}</b></>,
             v: o.collectedN, dot: "ok", on: p.flag === "settled",
@@ -194,20 +224,8 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
                 is written off.</>
               : <>Every installment that fell due has cleared.</> },
         ] as (StatCell | "sep")[])} />
-
-        {/* `.dls-chips` supplies the page gutter and cancels the chiprow's own
-            negative margin, so the chips line up with the row above. */}
-        <div className="dls-chips">
-          <FilterChips
-            params={Object.keys(p)
-              .filter((k) => ["view", "page", "tab"].indexOf(k) < 0 && p[k])
-              .reduce((acc, k) => { acc[k] = filterValueLabel(k, p[k] as string); return acc; },
-                {} as Record<string, string>)}
-            labels={FILTER_LABELS}
-            onUnfilter={onUnfilter} />
-        </div>
-      </>}>
-
+      )}
+    >
       {tab === "analytics" ? (
         /* The strip's queues cross back to the records with that filter
            applied — the charts are never narrowed, so "show only these" goes
@@ -215,19 +233,24 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
         <SubAnalytics year={p.year || ""}
           onQueue={(flag) => onParams({ tab: undefined, year: undefined, flag })} />
       ) : shown.length ? (
-        <ListTable cls="fin-tbl" head={<tr>
-              <th className="rail" />
-              <th>Subscription</th>
-              <th>Plan</th>
-              <th className="n">Total</th>
-              <th>Schedule</th>
-              <th>What is next</th>
-              <th>Source</th>
-              <th>Status</th>
-              <th className="tight" />
-            </tr>}>
-            {shown.map((r) => <Row key={r.s.subscriptionId} r={r} p={p} />)}
+        <>
+          <ListTable min="66rem" head={<tr>
+            <th className="rail" />
+            <th scope="col">Subscription</th>
+            <th scope="col">Plan</th>
+            <th scope="col" className="n">Total</th>
+            <th scope="col">Schedule</th>
+            <th scope="col">What is next</th>
+            <th scope="col">Source</th>
+            <th scope="col">Status</th>
+            <th scope="col" className="acts"><span className="sr-only">Actions</span></th>
+          </tr>}>
+            {paged.map((r) => <Row key={r.s.subscriptionId} r={r} p={p} onCopied={(m) => toast(m, "ok")} />)}
           </ListTable>
+          <Pagination alwaysCount page={page} pages={pages} total={shown.length} unit="subscriptions"
+            pageSize={PAGE_SIZE} shown={paged.length}
+            onPage={(n) => onParams({ page: n > 1 ? String(n) : undefined })} />
+        </>
       ) : (
         <EmptyState icon={narrowed ? "search" : "cash"}
           title={narrowed ? "Nothing matches those filters" : "No subscription has been recorded yet"}
@@ -241,11 +264,9 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
                 gateway credit is recorded against the schedule. Nothing arrives on its own, and
                 nothing here is a forecast — a row exists because a sale happened.</>}
           action={narrowed
-            ? <button className="btn" onClick={() => onUnfilter("*")}>Clear all filters</button>
+            ? <Button color="secondary" onClick={() => onUnfilter("*")}>Clear all filters</Button>
             : writable
-              ? <button className="btn pri" onClick={onRecord}>
-                  <Icon name="plus" size="sm" />Record a subscription
-                </button>
+              ? <Button color="primary" ico="plus" onClick={onRecord}>Record a subscription</Button>
               : null} />
       )}
     </Frame>
@@ -253,39 +274,6 @@ export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onPar
 }
 
 /* -------------------------------------------------------------------------- */
-
-/** THE EXACT-DAY HALF OF THE STARTED FILTER.
- *
- *  A bare `<input type="date">` prints `dd-mm-yyyy` at rest: a placeholder
- *  pretending to be a value, and the widest thing in a command row of
- *  dropdowns that each say one word. So this is a calendar icon until a day
- *  is picked and the day itself once one is, with an ✕ to let go of it.
- *
- *  THE NATIVE INPUT IS STILL THE CONTROL — laid transparent over the icon
- *  rather than replaced by a calendar of our own. The platform's picker, its
- *  keyboard handling, its locale and its accessibility come free, and none of
- *  its chrome is on screen. A hand-rolled month grid would be a second date
- *  picker in a panel that would then have two. */
-function DayPick({ value, onPick }: { value: string; onPick: (v: string) => void }) {
-  const on = !!value;
-  return (
-    <span className={"fin-datepick" + (on ? " on" : "")}
-      title={on ? "Started on " + fmtDate(value) : "Started on one exact day"}>
-      <label className="hit">
-        <Icon name="calendar" size="sm" />
-        {on ? <span className="d">{fmtDate(value)}</span> : null}
-        <input type="date" value={value} aria-label="Started on one exact day"
-          onChange={(e) => onPick(e.target.value)} />
-      </label>
-      {on ? (
-        <button type="button" className="x" aria-label="Clear the day"
-          onClick={() => onPick("")}>
-          <Icon name="x" size="sm" />
-        </button>
-      ) : null}
-    </span>
-  );
-}
 
 /** "due in 4 days" / "6 days overdue". One fragment, and it never says late
  *  about a date that has not passed. */
@@ -296,11 +284,11 @@ function dueWords(days: number): { text: string; tone: string } {
   return { text: "due in " + days + " days", tone: "" };
 }
 
-function Row({ r, p }: { r: SubRow; p: Params }) {
+function Row({ r, p, onCopied }: { r: SubRow; p: Params; onCopied: (m: string) => void }) {
   const s = r.s;
   /* The rail has two states, not one per status: something failed, or nothing
      did. A colour per status turns the table into a paint chart. */
-  const rail = r.needsAttention ? "bad" : s.status === "cancelled" || s.status === "refunded" ? "warn" : "";
+  const rail = r.needsAttention ? "bad" : s.status === "cancelled" || s.status === "refunded" ? "warn" : undefined;
 
   /* THE WHOLE LIST STATE TRAVELS WITH THE LINK, so the record's Back button is
      a return and not a reset. */
@@ -314,26 +302,24 @@ function Row({ r, p }: { r: SubRow; p: Params }) {
   const words = next && r.nextDueInDays !== null ? dueWords(r.nextDueInDays) : null;
 
   return (
-    <tr className={"clickable" + (s.status === "cancelled" ? " dim" : "")}
+    <tr className={s.status === "cancelled" ? "clickable opacity-60" : "clickable"}
       tabIndex={0} role="link" aria-label={"Open " + s.subscriptionId + " · " + s.customer.name}
       onClick={() => go(to)}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(to); } }}>
-      <td className="rail"><i className={rail} /></td>
-      <td>
-        <div className="cell-1">{s.customer.name}</div>
-        <div className="cell-2">
-          <span className="mono">{s.subscriptionId}</span>
-        </div>
+      <Rail tone={rail} />
+      <td className="cell-1">
+        {s.customer.name}
+        <div className="cell-2 font-mono tnum">{s.subscriptionId}</div>
       </td>
-      <td>
-        <div className="cell-1">{s.planName}</div>
-        <div className="cell-2">{s.cycleMonths} months · from {fmtDate(s.startDate)}</div>
+      <td className="cell-1">
+        {s.planName}
+        <div className="cell-2 whitespace-nowrap">{s.cycleMonths} months · from {fmtDate(s.startDate)}</div>
       </td>
-      <td className="n">
-        <div className="cell-1"><Money paise={s.totalPaise} /></div>
+      <td className="n whitespace-nowrap">
+        <Money paise={s.totalPaise} />
         <div className="cell-2">{inr(r.paidPaise)} collected</div>
       </td>
-      <td>
+      <td className="min-w-28">
         {/* One cell per installment, in order, coloured by what happened to it.
             A bar reading "60%" would hide which two failed. */}
         <InstStrip items={s.installments.map((i) => ({
@@ -342,21 +328,33 @@ function Row({ r, p }: { r: SubRow; p: Params }) {
         }))} />
         <div className="cell-2">{r.paidN} of {s.installments.length} paid</div>
       </td>
-      <td>
+      <td className="whitespace-nowrap">
         {next && words ? (
           <>
-            <div className="cell-1"><Money paise={next.amountPaise} /></div>
-            <div className={"cell-2 fin-late" + (words.tone ? " " + words.tone : "")}>
+            <Money paise={next.amountPaise} />
+            <div className={
+              words.tone === "bad" ? "cell-2 text-error-primary!"
+                : words.tone === "warn" ? "cell-2 text-warning-primary!" : "cell-2"
+            }>
               {next.status === "fail_to_pay" ? "failed · " : ""}{words.text}
             </div>
           </>
         ) : (
-          <span className="faint">nothing outstanding</span>
+          <span className="text-sm text-quaternary">nothing outstanding</span>
         )}
       </td>
       <td><SourceTag k={s.source} /></td>
       <td><SubPill k={s.status} /></td>
-      <td className="tight"><Icon name="chevr" size="sm" /></td>
+      <td className="acts">
+        <ActionMenu forWhat={s.subscriptionId} items={[
+          { icon: "invoice", label: "Open the record", act: () => go(to) },
+          { icon: "deal", label: "Open the deal", act: () => go("#/deals?q=" + encodeURIComponent(s.subscriptionId)) },
+          { icon: "copy", label: "Copy subscription id", act: () => {
+            void navigator?.clipboard?.writeText?.(s.subscriptionId);
+            onCopied(s.subscriptionId + " copied.");
+          } },
+        ]} />
+      </td>
     </tr>
   );
 }

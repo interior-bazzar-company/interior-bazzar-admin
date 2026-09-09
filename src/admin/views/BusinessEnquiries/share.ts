@@ -120,7 +120,7 @@ export function shareLine(e: Enquiry): string {
    there is one way documents come out of the admin rather than two.
 
    Colours are literal here on purpose: this file is not styled by
-   enquiries.css and must render the same on a printer as on a screen, in a
+   the panel's stylesheet and must render the same on a printer as on a screen, in a
    frame that never sees the theme tokens. */
 export function enquirySheetHtml(e: Enquiry): string {
   const src = sourceOf(e.source.kind);

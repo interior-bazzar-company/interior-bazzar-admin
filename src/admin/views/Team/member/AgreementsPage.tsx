@@ -16,7 +16,7 @@
    somebody has to remember. The only writes on this page are: send a new one,
    revoke an unsigned one, and sign one — and signing is the member's own act.
    ============================================================================= */
-import { Icon, Notice, Pill, Table } from "../../../ui";
+import { Alert, Button, ListTable, Notice, Pill, Rail } from "../../../ui";
 import { useShell } from "../../../shell/ShellContext";
 import {
   AGREEMENT_KIND, AGREEMENT_STATE, TODAY, agreementsFor, fmtDate, labelOf, readMember,
@@ -35,6 +35,8 @@ const isExpired = (a: Agreement) =>
 
 const liveState = (a: Agreement) => (isExpired(a) ? "expired" : a.state);
 
+const railOf = (st: string) => (st === "expired" ? "bad" : st === "sent" ? "warn" : undefined);
+
 export default function AgreementsPage({ m, viewer }: { m: Member; viewer: Viewer }) {
   const shell = useShell();
   useAgreements();
@@ -50,89 +52,107 @@ export default function AgreementsPage({ m, viewer }: { m: Member; viewer: Viewe
   };
 
   return (
-    <>
+    <div className="flex flex-col gap-5">
       <OpHead
         title="Agreements"
         desc="Company to member. Sent, opened, signed — and every one of those is a moment on the record."
         right={viewer === "admin"
-          ? <button className="btn pri" onClick={() => shell.modal(<SendAgreementModal memberId={m.memberId} />)}>
-            <Icon name="plus" size="sm" />Send an agreement
-          </button>
+          ? (
+            <Button color="primary" ico="plus"
+              onClick={() => shell.modal(<SendAgreementModal memberId={m.memberId} />)}>
+              Send an agreement
+            </Button>
+          )
           : null} />
 
       {unopened.length ? (
-        <Notice tone="warn" ico="clock" text={
-          <><b>{unopened.length} sent and never opened.</b> This is the one thing on the page waiting
-            on a human rather than on work, and nothing else in the panel would ever mention it.</>
-        } />
+        <Alert tone="warn" ico="clock" title={unopened.length + " sent and never opened"}>
+          This is the one thing on the page waiting on a human rather than on work, and nothing else
+          in the panel would ever mention it.
+        </Alert>
       ) : null}
       {expired.length ? (
-        <Notice tone="bad" ico="alert" text={
-          <><b>{expired.length} link{expired.length > 1 ? "s have" : " has"} expired.</b> An expired
-            link shows the recipient why it stopped working and offers a new one — it never shows
-            the document, and it never returns a dead end.</>
-        } />
+        <Alert tone="bad" ico="alert"
+          title={expired.length + " link" + (expired.length > 1 ? "s have" : " has") + " expired"}>
+          An expired link shows the recipient why it stopped working and offers a new one — it never
+          shows the document, and it never returns a dead end.
+        </Alert>
       ) : null}
 
-      <Table
-        cols={[{ label: "Document" }, { label: "State", w: "150px" },
-          { label: "Sent", w: "170px" }, { label: "What happened", w: "260px" },
-          { label: "", w: "210px" }]}
-        empty={{
-          icon: "shield", title: "Nothing sent",
-          body: viewer === "admin"
-            ? "No agreement has gone to this member. Send one and the link expires in seven days."
-            : "The company has not sent you anything to sign.",
-        }}
-        rows={rows.map((a) => {
+      <ListTable min="62rem" head={<tr>
+        <th className="rail" />
+        <th scope="col">Document</th>
+        <th scope="col">State</th>
+        <th scope="col">Sent</th>
+        <th scope="col">What happened</th>
+        <th scope="col" className="acts"><span className="sr-only">Actions</span></th>
+      </tr>}>
+        {rows.map((a) => {
           const st = liveState(a);
           const sender = a.sentById ? readMember(a.sentById) : null;
           const closed = st === "signed" || st === "revoked" || st === "expired";
           return (
-            <tr key={a.agreementId} className={st === "revoked" ? "dim" : ""}>
-              <td>
-                <span className="cell-1"><b>{a.title}</b></span>
-                <span className="cell-2">{labelOf(AGREEMENT_KIND, a.kind)} · version {a.version}</span>
+            <tr key={a.agreementId}>
+              <Rail tone={railOf(st)} title={st === "expired" ? "The link expired" : st === "sent" ? "Waiting on a signature" : undefined} />
+              <td className="cell-1">
+                {a.title}
+                <span className="block cell-2">{labelOf(AGREEMENT_KIND, a.kind)} · version {a.version}</span>
               </td>
-              <td>
-                <Pill text={labelOf(AGREEMENT_STATE, st)} tone={toneOf(AGREEMENT_STATE, st)} />
-              </td>
+              <td><Pill xs dot text={labelOf(AGREEMENT_STATE, st)} tone={toneOf(AGREEMENT_STATE, st)} /></td>
               <td>
                 {a.sentAt ? (
                   <>
-                    <span className="cell-1">{fmtDate(a.sentAt.slice(0, 10))}</span>
-                    {sender ? <span className="cell-2">by {sender.name}</span> : null}
+                    <span className="font-medium text-primary tnum">{fmtDate(a.sentAt.slice(0, 10))}</span>
+                    {sender ? <span className="block cell-2">by {sender.name}</span> : null}
                   </>
-                ) : <span className="dim">not sent</span>}
+                ) : <span className="text-quaternary">not sent</span>}
               </td>
               <td><Trail a={a} st={st} /></td>
-              <td>
-                {!closed && viewer === "self" ? (
-                  <button className="btn pri sm" onClick={() => shell.modal(<SignAgreementModal a={a} />)}>
-                    Open and sign
-                  </button>
-                ) : null}
-                {closed && viewer === "self" ? (
-                  <button className="btn sm" onClick={() => shell.modal(<SignAgreementModal a={a} />)}>
-                    Open
-                  </button>
-                ) : null}
-                {!closed && viewer === "admin" ? (
-                  <button className="btn sm dgr" onClick={() => revoke(a)}>Revoke</button>
-                ) : null}
-                {st === "signed" && viewer === "admin" ? (
-                  <button className="btn sm" onClick={() => shell.modal(<SignAgreementModal a={a} />)}>
-                    View signed
-                  </button>
-                ) : null}
+              <td className="acts">
+                <span className="inline-flex items-center gap-2">
+                  {!closed && viewer === "self" ? (
+                    <Button color="primary" size="xs" onClick={() => shell.modal(<SignAgreementModal a={a} />, "lg")}>
+                      Open and sign
+                    </Button>
+                  ) : null}
+                  {closed && viewer === "self" ? (
+                    <Button color="secondary" size="xs" onClick={() => shell.modal(<SignAgreementModal a={a} />, "lg")}>
+                      Open
+                    </Button>
+                  ) : null}
+                  {!closed && viewer === "admin" ? (
+                    <Button color="secondary-destructive" size="xs" onClick={() => revoke(a)}>Revoke</Button>
+                  ) : null}
+                  {st === "signed" && viewer === "admin" ? (
+                    <Button color="secondary" size="xs" onClick={() => shell.modal(<SignAgreementModal a={a} />, "lg")}>
+                      View signed
+                    </Button>
+                  ) : null}
+                </span>
               </td>
             </tr>
           );
-        })} />
+        })}
+        {rows.length ? null : (
+          <tr>
+            <td colSpan={6} className="p-0!">
+              <div className="px-6 py-10 text-center">
+                <p className="text-sm font-medium text-primary">Nothing sent</p>
+                <p className="mt-1 text-sm text-tertiary">
+                  {viewer === "admin"
+                    ? "No agreement has gone to this member. Send one and the link expires in seven days."
+                    : "The company has not sent you anything to sign."}
+                </p>
+              </div>
+            </td>
+          </tr>
+        )}
+      </ListTable>
 
-      <p className="tm-foot">
+      <p className="text-xs text-quaternary">
         A signed agreement cannot be revoked and cannot be edited. Opening the link is what writes
-        the <b>viewed</b> moment — the recipient's own act, which is what makes it worth recording.
+        the <b className="font-semibold text-tertiary">viewed</b> moment — the recipient's own act,
+        which is what makes it worth recording.
       </p>
 
       {open.length && viewer === "admin" ? (
@@ -141,7 +161,7 @@ export default function AgreementsPage({ m, viewer }: { m: Member; viewer: Viewe
             switches an account on.</>
         } />
       ) : null}
-    </>
+    </div>
   );
 }
 
@@ -152,35 +172,35 @@ function Trail({ a, st }: { a: Agreement; st: string }) {
   if (st === "signed") {
     return (
       <>
-        <span className="cell-1">Signed by {a.signedName}</span>
-        <span className="cell-2">
+        <span className="font-medium text-primary">Signed by {a.signedName}</span>
+        <span className="block cell-2 tnum">
           {fmtDate((a.signedAt || "").slice(0, 10))}
           {a.signerIp ? " · from " + a.signerIp : ""}
         </span>
       </>
     );
   }
-  if (st === "revoked") return <span className="dim">Revoked before it was signed.</span>;
+  if (st === "revoked") return <span className="text-quaternary">Revoked before it was signed.</span>;
   if (st === "expired") {
     return (
       <>
-        <span className="cell-1 u-bad">The link expired</span>
-        <span className="cell-2">{fmtDate(a.expiresAt as string)} · send a new version</span>
+        <span className="font-medium text-error-primary">The link expired</span>
+        <span className="block cell-2 tnum">{fmtDate(a.expiresAt as string)} · send a new version</span>
       </>
     );
   }
   if (a.viewedAt) {
     return (
       <>
-        <span className="cell-1">Opened, not signed</span>
-        <span className="cell-2">{fmtDate(a.viewedAt.slice(0, 10))} · expires {fmtDate(a.expiresAt as string)}</span>
+        <span className="font-medium text-primary">Opened, not signed</span>
+        <span className="block cell-2 tnum">{fmtDate(a.viewedAt.slice(0, 10))} · expires {fmtDate(a.expiresAt as string)}</span>
       </>
     );
   }
   return (
     <>
-      <span className="cell-1 u-warn">Not opened yet</span>
-      <span className="cell-2">expires {a.expiresAt ? fmtDate(a.expiresAt) : "—"}</span>
+      <span className="font-medium text-warning-primary">Not opened yet</span>
+      <span className="block cell-2 tnum">expires {a.expiresAt ? fmtDate(a.expiresAt) : "—"}</span>
     </>
   );
 }

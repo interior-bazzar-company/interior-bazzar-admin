@@ -33,7 +33,10 @@
    will guess at, which is worse than an empty one.
    ============================================================================= */
 import { useMemo, useState } from "react";
-import { Icon, ModalHead, Notice } from "../../ui";
+import {
+  Alert, Button, FieldRow, FormField, FormSection, InfoDot, Input, ModalShell, Pill, Segmented,
+  SelectInput, Textarea,
+} from "../../ui";
 import { InfoNote, VocabInput } from "./bits";
 import {
   MANUAL_VIA, SOURCES, STATES, VOCAB, createEnquiry, findEarlierFrom, knownCategory, knownCity,
@@ -52,7 +55,6 @@ export default function NewEnquiryModal({ onClose, onDone }: {
     projectType: "", intent: "", urgency: "", text: "",
   });
   const [touched, setTouched] = useState(false);
-  const [showHelp, setShowHelp] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
@@ -87,160 +89,160 @@ export default function NewEnquiryModal({ onClose, onDone }: {
   };
 
   return (
-    <>
-      <ModalHead title="Add an enquiry" sub="For a call, a walk-in or a referral — anything that did not come through a form." onClose={onClose} />
+    <ModalShell
+      title="Add an enquiry"
+      sub="For a call, a walk-in or a referral — anything that did not come through a form."
+      ico="plus"
+      tone="brand"
+      onClose={onClose}
+      actions={
+        <>
+          <Button color="secondary" data-close="1" isDisabled={busy} onClick={onClose}>Cancel</Button>
+          <Button color="primary" ico="plus" data-act="be-create-go" isLoading={busy} onClick={submit}>
+            Create enquiry
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-5">
+        {err ? <Alert tone="bad" title="The enquiry was not created.">{err}</Alert> : null}
 
-      <div className="md-b">
-        {/* ------------------------------------------------------- source --- */}
-        {/* Three chips on one line, and the descriptions behind an (i). They
-            were four cards carrying a sentence each — a paragraph of reading
-            before the first field, every time, for a choice that is usually
-            obvious. The explanation still exists for the once it is not. */}
-        <div className="fg">
-          <label>
-            Where did it come from? <span className="req">*</span>
-            <button type="button" className="be-i" aria-expanded={showHelp}
-              aria-label={showHelp ? "Hide the descriptions" : "What do these mean?"}
-              title="What do these mean?"
-              onClick={() => setShowHelp(!showHelp)}>i</button>
-          </label>
-          <div className="be-srcchips" role="radiogroup" aria-label="Source">
-            {SOURCES.map((x) => (
-              <button key={x.key} type="button" role="radio" aria-checked={source === x.key}
-                className={"be-srcchip " + (x.tone || "") + (source === x.key ? " on" : "")}
-                title={x.help}
-                onClick={() => setSource(x.key)}>
-                {x.manual ? <Icon name="user" size="sm" /> : null}{x.label}
-              </button>
-            ))}
-          </div>
-          {showHelp ? (
-            <dl className="be-srchelp">
-              {SOURCES.map((x) => (
-                <div key={x.key}><dt>{x.label}</dt><dd>{x.help}</dd></div>
-              ))}
-            </dl>
-          ) : null}
-        </div>
+        {/* --------------------------------------------------------- source --- */}
+        {/* One control, and the descriptions behind an (i). They were four cards
+            carrying a sentence each — a paragraph of reading before the first
+            field, every time, for a choice that is usually obvious. The
+            explanation still exists for the once it is not. */}
+        <FormSection title="Where did it come from?">
+          <FormField
+            label="Source"
+            req
+            tip={
+              <InfoDot label="What do these mean?">
+                {SOURCES.map((x) => (
+                  <p key={x.key}><b>{x.label}</b> — {x.help}</p>
+                ))}
+              </InfoDot>
+            }
+          >
+            <Segmented
+              label="Source"
+              value={source}
+              onPick={setSource}
+              options={SOURCES.map((x) => ({ v: x.key, l: x.label, ico: x.manual ? "user" : undefined }))}
+            />
+          </FormField>
 
-        {src.manual ? (
-          <div className="fg">
-            <label htmlFor="ne-via">How did it reach us? <span className="req">*</span></label>
-            <select id="ne-via" className="inp" value={via} onChange={(ev) => setVia(ev.target.value)}>
-              {MANUAL_VIA.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
-            </select>
-            <div className="help">
-              “Added by us” on its own is not provenance — it is the absence of it. This is the line that
-              answers “where did this actually come from?” a year from now.
-            </div>
-          </div>
-        ) : (
-          <InfoNote tone="warn" ico="alert"
-            short={<>This channel normally posts to the intake endpoint itself.</>}>
-            Adding one by hand is for a submission that was lost, or that arrived by another route. It
-            will still be marked as typed by you, because it was.
-          </InfoNote>
-        )}
+          {src.manual ? (
+            <FormField id="ne-via" label="How did it reach us?" req
+              hint="“Added by us” on its own is not provenance — it is the absence of it. This is the line that answers “where did this actually come from?” a year from now.">
+              <SelectInput id="ne-via" value={via} onChange={setVia}
+                options={MANUAL_VIA.map((m) => ({ v: m.key, l: m.label }))} />
+            </FormField>
+          ) : (
+            <InfoNote tone="warn" ico="alert"
+              short={<>This channel normally posts to the intake endpoint itself.</>}>
+              Adding one by hand is for a submission that was lost, or that arrived by another route. It
+              will still be marked as typed by you, because it was.
+            </InfoNote>
+          )}
+        </FormSection>
 
-        {/* ------------------------------------------------------ customer --- */}
-        <div className="be-fields" style={{ marginTop: "var(--space-4)" }}>
-        <div className="be-form">
-          <div className="fg">
-            <label htmlFor="ne-name">Customer name <span className="req">*</span></label>
-            <input id="ne-name" className={"inp" + (touched && needsName ? " bad" : "")} value={f.name}
-              autoFocus onChange={(ev) => set("name")(ev.target.value)} />
-          </div>
-          <div className="fg">
-            <label htmlFor="ne-phone">Phone <span className="req">*</span></label>
-            <input id="ne-phone" className={"inp" + (touched && needsPhone ? " bad" : "")} value={f.phone}
-              inputMode="tel" placeholder="+91 …" onChange={(ev) => set("phone")(ev.target.value)} />
-            {touched && needsPhone
-              ? <div className="help bad">Ten digits at least. The phone number is how this customer is identified and de-duplicated.</div>
-              : <div className="help">Matched against every existing enquiry as you type.</div>}
-          </div>
-          <div className="fg">
-            <label htmlFor="ne-email">Email</label>
-            <input id="ne-email" className="inp" value={f.email} placeholder="—"
-              onChange={(ev) => set("email")(ev.target.value)} />
-          </div>
-          <VocabInput id="ne-cat" label="Category" value={f.category}
-            options={VOCAB.categories} onChange={set("category")}
-            known={knownCategory} placeholder="Interior Design, Modular Kitchen…"
-            unknownNote="Not a category the matching rules know. Stage 1 eliminates on this, so it will match nobody until the category list catches up — worth recording anyway, and worth telling whoever maintains that list." />
-          <div className="fg">
-            <label htmlFor="ne-svc">Service</label>
-            <input id="ne-svc" className="inp" value={f.service} placeholder="Full home interiors, bathroom…"
-              onChange={(ev) => set("service")(ev.target.value)} />
-          </div>
-          <VocabInput id="ne-city" label="City" value={f.city}
-            options={VOCAB.cities} onChange={set("city")}
-            known={knownCity} placeholder="New Delhi, Pune…"
-            unknownNote="Not a city we currently match on. The enquiry is still worth recording — it is exactly the evidence that says where coverage is missing." />
-          <VocabInput id="ne-state" label="State" value={f.state}
-            options={STATES} onChange={set("state")} placeholder="Maharashtra…" />
-          <div className="fg">
-            <label htmlFor="ne-loc">Locality</label>
-            <input id="ne-loc" className="inp" value={f.locality}
-              onChange={(ev) => set("locality")(ev.target.value)} />
-          </div>
-          <div className="fg">
-            <label htmlFor="ne-pin">PIN code</label>
-            <input id="ne-pin" className="inp" value={f.pincode} inputMode="numeric" placeholder="—"
-              onChange={(ev) => set("pincode")(ev.target.value)} />
-          </div>
-          <div className="fg">
-            <label htmlFor="ne-proj">Project type</label>
-            <input id="ne-proj" className="inp" value={f.projectType} placeholder="Residential · 3BHK"
-              onChange={(ev) => set("projectType")(ev.target.value)} />
-          </div>
-          <div className="fg">
-            <label htmlFor="ne-urg">Urgency</label>
-            <select id="ne-urg" className="inp" value={f.urgency} onChange={(ev) => set("urgency")(ev.target.value)}>
-              <option value="">— not established yet —</option>
-              {VOCAB.urgency.map((u) => <option key={u.key} value={u.key}>{u.label}</option>)}
-            </select>
-          </div>
-        </div>
-        </div>
+        {/* ------------------------------------------------------- customer --- */}
+        <FormSection title="Who is calling">
+          <FieldRow cols={3}>
+            <FormField id="ne-name" label="Customer name" req
+              err={touched && needsName ? "A name is required." : undefined}>
+              <Input id="ne-name" value={f.name} autoFocus err={touched && needsName}
+                onChange={set("name")} />
+            </FormField>
+            <FormField id="ne-phone" label="Phone" req
+              hint={touched && needsPhone ? undefined : "Matched against every existing enquiry as you type."}
+              err={touched && needsPhone
+                ? "Ten digits at least. The phone number is how this customer is identified and de-duplicated."
+                : undefined}>
+              <Input id="ne-phone" value={f.phone} type="tel" ph="+91 …" mono
+                err={touched && needsPhone} onChange={set("phone")} />
+            </FormField>
+            <FormField id="ne-email" label="Email">
+              <Input id="ne-email" value={f.email} ph="—" onChange={set("email")} />
+            </FormField>
+          </FieldRow>
+        </FormSection>
 
-        <div className="fg">
-          <label htmlFor="ne-text">What did they ask for?</label>
-          <textarea id="ne-text" className="inp" rows={3} value={f.text}
-            placeholder="In their words, as close as you can."
-            onChange={(ev) => set("text")(ev.target.value)} />
-          <div className="help">
-            Everything above except name and phone is optional. You are probably still on the call —
-            a field you cannot answer yet is one you will guess at, and a guess is worse than a blank.
-          </div>
-        </div>
+        {/* ---------------------------------------------------- requirement --- */}
+        <FormSection title="What they want"
+          desc="Everything here is optional. You are probably still on the call — a field you cannot answer yet is one you will guess at, and a guess is worse than a blank.">
+          <FieldRow cols={2}>
+            <VocabInput id="ne-cat" label="Category" value={f.category}
+              options={VOCAB.categories} onChange={set("category")}
+              known={knownCategory} placeholder="Interior Design, Modular Kitchen…"
+              unknownNote="Not a category the matching rules know. Stage 1 eliminates on this, so it will match nobody until the category list catches up — worth recording anyway, and worth telling whoever maintains that list." />
+            <FormField id="ne-svc" label="Service">
+              <Input id="ne-svc" value={f.service} ph="Full home interiors, bathroom…"
+                onChange={set("service")} />
+            </FormField>
+          </FieldRow>
+
+          <FieldRow cols={2}>
+            <VocabInput id="ne-city" label="City" value={f.city}
+              options={VOCAB.cities} onChange={set("city")}
+              known={knownCity} placeholder="New Delhi, Pune…"
+              unknownNote="Not a city we currently match on. The enquiry is still worth recording — it is exactly the evidence that says where coverage is missing." />
+            <VocabInput id="ne-state" label="State" value={f.state}
+              options={STATES} onChange={set("state")} placeholder="Maharashtra…" />
+          </FieldRow>
+
+          <FieldRow cols={3}>
+            <FormField id="ne-loc" label="Locality">
+              <Input id="ne-loc" value={f.locality} onChange={set("locality")} />
+            </FormField>
+            <FormField id="ne-pin" label="PIN code">
+              <Input id="ne-pin" value={f.pincode} ph="—" onChange={set("pincode")} />
+            </FormField>
+            <FormField id="ne-proj" label="Project type">
+              <Input id="ne-proj" value={f.projectType} ph="Residential · 3BHK"
+                onChange={set("projectType")} />
+            </FormField>
+          </FieldRow>
+
+          <FormField id="ne-urg" label="Urgency">
+            <SelectInput id="ne-urg" value={f.urgency} ph="— not established yet —"
+              options={VOCAB.urgency.map((u) => ({ v: u.key, l: u.label }))}
+              onChange={set("urgency")} />
+          </FormField>
+
+          <FormField id="ne-text" label="What did they ask for?">
+            <Textarea id="ne-text" rows={3} value={f.text}
+              ph="In their words, as close as you can." onChange={set("text")} />
+          </FormField>
+        </FormSection>
 
         {/* ------------------------------------------------ their history --- */}
         {/* NOT A DUPLICATE WARNING. A customer who comes back is the best kind
             there is, and a second enquiry from one number is usually a second
             piece of work — a bathroom after a kitchen, a parent's flat after
             their own. This is here so the person on the call knows that, not so
-            they hesitate before recording it. If it really is the same job
-            typed twice, they can say so with the Duplicate suspected tag. */}
+            they hesitate before recording it. If it really is the same job typed
+            twice, they can say so with the Duplicate suspected tag. */}
         {earlier.length ? (
-          /* `be-blk quiet`, not `be-dupes` — that wrapper is painted in the
-             alarm colours (--bad-bg / --bad-line), and a red panel around
-             "this customer has come back" says the opposite of the words in
-             it. Both classes already exist; nothing in the stylesheet changed. */
-          <div className="be-blk quiet">
-            <Notice tone="" ico="info" text={<>
-              <b>This customer has enquired {earlier.length === 1 ? "once" : earlier.length + " times"} before.</b>{" "}
+          <FormSection title="This customer before">
+            <Alert tone="info"
+              title={<>This customer has enquired {earlier.length === 1 ? "once" : earlier.length + " times"} before.</>}>
               Worth knowing on the call. Recording this one is still right — a second enquiry is
               usually a second job, and it goes through qualification like any other.
-            </>} />
-            {earlier.map((x) => (
-              <div className="be-dupe" key={x.enquiryId}>
-                <span className="mono">{x.enquiryId}</span>
-                <span>{x.customer.name} · {x.requirement.category || "—"} · {place(x)}</span>
-                <span className="spacer" />
-                <span className="faint">{statusOf(x.status).label}</span>
-              </div>
-            ))}
-          </div>
+            </Alert>
+            <ul className="flex flex-col divide-y divide-border-secondary rounded-lg bg-secondary px-3">
+              {earlier.map((x) => (
+                <li key={x.enquiryId} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-2.5 text-sm">
+                  <span className="font-mono text-xs text-tertiary">{x.enquiryId}</span>
+                  <span className="min-w-0 flex-1 truncate text-secondary">
+                    {x.customer.name} · {x.requirement.category || "—"} · {place(x)}
+                  </span>
+                  <Pill xs tone="neutral" text={statusOf(x.status).label} />
+                </li>
+              ))}
+            </ul>
+          </FormSection>
         ) : null}
 
         <InfoNote ico="shield"
@@ -250,15 +252,6 @@ export default function NewEnquiryModal({ onClose, onDone }: {
           business is trusting when it accepts the enquiry.
         </InfoNote>
       </div>
-
-      <div className="md-f">
-        {err ? <Notice tone="bad" ico="alert" text={err} /> : null}
-        <span className="spacer" />
-        <button className="btn" data-close="1" onClick={onClose} disabled={busy}>Cancel</button>
-        <button className="btn pri" data-act="be-create-go" onClick={submit} disabled={busy}>
-          <Icon name="plus" />{busy ? "Creating…" : "Create enquiry"}
-        </button>
-      </div>
-    </>
+    </ModalShell>
   );
 }

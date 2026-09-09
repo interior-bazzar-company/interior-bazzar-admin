@@ -6,18 +6,19 @@
    TagModal APPEND a new row; BudgetModal and DeactivateTagModal change a tag's
    own settings, never a transaction that already used it; CancelTxnModal
    changes one thing about a posted row — whether it counts — and not a single
-   figure on it. Nothing here rewrites what a row says, and nothing deletes one. Every refusal from the store renders inside the
-   dialog that produced it — the sentence it contradicts stays on screen.
+   figure on it. Nothing here rewrites what a row says, and nothing deletes one.
+   Every refusal from the store renders inside the dialog that produced it —
+   the sentence it contradicts stays on screen.
    ============================================================================= */
-import { useRef, useState } from "react";
-import { Icon, Notice } from "../../ui";
+import { useState } from "react";
+import { Alert, Button, Checkbox, DateInput, Input, SelectInput, Textarea } from "../../ui";
 import { go } from "../../ui/nav";
 import { Cancel, Dlg, Field, Fs, Pick, RupeeInput, toPaise } from "./dialog";
 import type { Done } from "./dialog";
-import { Check, Money, TagChip } from "./bits";
+import { Check, Fine, Ledger, LedgerRow, Money, PaidReceipt, ProofField, TagChip } from "./bits";
 import {
   ACCOUNTS, CREDIT_KINDS, MODES, TAG_KINDS,
-  PROOF_MAX_BYTES, addTag, cancelTransaction, deactivateTag, fileSize, inr,
+  PROOF_MAX_BYTES, addTag, cancelTransaction, deactivateTag, fileSize,
   isSuperAdmin, proofAccepted, proofTooBig, recordTransaction,
   setBudget as setTagBudget, todayIso, useTagTotals, useTags, useTxnRows,
 } from "./store";
@@ -41,48 +42,42 @@ function TxnFields({ f, set, tags, onErr }: {
   onErr: (m: string) => void;
 }) {
   const isIn = f.direction === "in";
-  const fileRef = useRef<HTMLInputElement | null>(null);
   return (
-    <div className="fin-stack">
+    <>
       {/* DEBIT AND CREDIT, said outright. Direction was two words that only
           mean something to somebody already holding the convention; the
           entry line below says what the row will actually do. */}
       <Field label="Direction">
-        <div className="selectbox">
-          {/* CREDIT FIRST, DEBIT SECOND, in the same order the filter offers
-              them — one ordering across the section, so a person is not
-              re-reading the list every time they meet it. The SELECTED value
-              is still Debit, because most company rows are money out and a
-              default is about the common case rather than the list order.
+        {/* CREDIT FIRST, DEBIT SECOND, in the same order the filter offers
+            them — one ordering across the section, so a person is not
+            re-reading the list every time they meet it. The SELECTED value
+            is still Debit, because most company rows are money out and a
+            default is about the common case rather than the list order.
 
-              MOVING TO DEBIT CLEARS THE CREDIT KIND, because a debit has none
-              and the store nulls it anyway. It does NOT clear the tag: the
-              same tags are offered either way, so clearing it only ever cost
-              somebody the answer they had already given. */}
-          <select value={f.direction} onChange={(e) => {
-            const d = e.target.value as "out" | "in";
+            MOVING TO DEBIT CLEARS THE CREDIT KIND, because a debit has none
+            and the store nulls it anyway. It does NOT clear the tag: the
+            same tags are offered either way, so clearing it only ever cost
+            somebody the answer they had already given. */}
+        <SelectInput ariaLabel="Direction" value={f.direction}
+          options={[{ v: "in", l: "Credit" }, { v: "out", l: "Debit" }]}
+          onChange={(v) => {
+            const d = v as "out" | "in";
             set({ direction: d, creditKind: d === "out" ? "" : f.creditKind });
-          }}>
-            <option value="in">Credit</option>
-            <option value="out">Debit</option>
-          </select>
-        </div>
+          }} />
       </Field>
 
       {isIn ? (
         <Field label="Credit kind">
-          <div className="selectbox">
-            <select value={f.creditKind} onChange={(e) => set({ creditKind: e.target.value })}>
-              <option value="">Pick what this credit is…</option>
-              {CREDIT_KINDS.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
-            </select>
-          </div>
+          <SelectInput ariaLabel="Credit kind" value={f.creditKind}
+            onChange={(v) => set({ creditKind: v })}
+            options={[{ v: "", l: "Pick what this credit is…" }]
+              .concat(CREDIT_KINDS.map((c) => ({ v: c.key, l: c.label })))} />
         </Field>
       ) : null}
 
       {/* GROUPED BY WHERE THE MONEY LANDS, which is the only part of a tag
           that is not free and the only thing worth knowing while picking
-          one. It was a description line under every option; as an optgroup
+          one. It was a description line under every option; as a group label
           it is structure instead of prose — the same fact, read in a glance,
           and the option itself is just the tag's name.
 
@@ -90,24 +85,14 @@ function TxnFields({ f, set, tags, onErr }: {
           the write later, and finding that out at the button is worse than
           reading it here. */}
       <Field label="Tag">
-        <div className="selectbox">
-          <select value={f.tagKey} onChange={(e) => set({ tagKey: e.target.value })}>
-            <option value="">Pick a tag…</option>
-            {TAG_KINDS.map((k) => {
-              const inKind = tags.filter((t) => t.kind === k.key);
-              if (!inKind.length) return null;
-              return (
-                <optgroup key={k.key} label={k.label + " · " + k.landsIn}>
-                  {inKind.map((t) => (
-                    <option key={t.tagKey} value={t.tagKey}>
-                      {t.label}{t.active ? "" : " · inactive"}{t.proofRequired ? " · bill required" : ""}
-                    </option>
-                  ))}
-                </optgroup>
-              );
-            })}
-          </select>
-        </div>
+        <SelectInput ariaLabel="Tag" value={f.tagKey} onChange={(v) => set({ tagKey: v })}
+          options={[{ v: "", l: "Pick a tag…" }].concat(
+            TAG_KINDS.flatMap((k) => tags.filter((t) => t.kind === k.key).map((t) => ({
+              v: t.tagKey,
+              l: k.label + " → " + t.label
+                + (t.active ? "" : " · inactive")
+                + (t.proofRequired ? " · bill required" : ""),
+            }))))} />
       </Field>
 
       <Field label="Amount"><RupeeInput value={f.amount} onChange={(v) => set({ amount: v })} /></Field>
@@ -122,36 +107,29 @@ function TxnFields({ f, set, tags, onErr }: {
           meanings of Credit, is how somebody files a refund as a cost. */}
 
       <Field label="Value date">
-        <input type="date" className="inp" value={f.valueDate} max={todayIso()}
-          onChange={(e) => set({ valueDate: e.target.value })} />
+        <DateInput value={f.valueDate} max={todayIso()} ariaLabel="Value date"
+          onChange={(v) => set({ valueDate: v })} />
       </Field>
       {/* PARTY, and the placeholder says which side it means rather than a
           help line under the box: the word is the same both ways and the
           direction above already decided which. */}
       <Field label="Party">
-        <input className="inp" value={f.party}
-          placeholder={isIn ? "Who it came from" : "Who it was paid to"}
-          onChange={(e) => set({ party: e.target.value })} />
+        <Input value={f.party} ariaLabel="Party"
+          ph={isIn ? "Who it came from" : "Who it was paid to"}
+          onChange={(v) => set({ party: v })} />
       </Field>
       <Field label="Mode">
-        <div className="selectbox">
-          <select value={f.mode} onChange={(e) => set({ mode: e.target.value })}>
-            {MODES.map((m) => <option key={m} value={m}>{m}</option>)}
-          </select>
-        </div>
+        <SelectInput ariaLabel="Mode" value={f.mode} options={MODES.slice()}
+          onChange={(v) => set({ mode: v })} />
       </Field>
       <Field label="Reference">
-        <input className="inp" value={f.reference} placeholder="UTR or bank reference"
-          onChange={(e) => set({ reference: e.target.value })} />
+        <Input mono value={f.reference} ph="UTR or bank reference" ariaLabel="Reference"
+          onChange={(v) => set({ reference: v })} />
       </Field>
       <Field label="Account">
-        <div className="selectbox">
-          <select value={f.accountId} onChange={(e) => set({ accountId: e.target.value })}>
-            {ACCOUNTS.filter((a) => a.active || a.accountId === f.accountId).map((a) => (
-              <option key={a.accountId} value={a.accountId}>{a.masked} · {a.name}</option>
-            ))}
-          </select>
-        </div>
+        <SelectInput ariaLabel="Account" value={f.accountId} onChange={(v) => set({ accountId: v })}
+          options={ACCOUNTS.filter((a) => a.active || a.accountId === f.accountId)
+            .map((a) => ({ v: a.accountId, l: a.masked + " · " + a.name }))} />
       </Field>
 
       {/* THE RECEIPT, MANDATORY — the same control and the same rule as a
@@ -164,21 +142,10 @@ function TxnFields({ f, set, tags, onErr }: {
           fact any more, which is why the missing-bill queue is a closed backlog
           and why a row whose receipt turns out to be wrong is cancelled and
           recorded again with the right one. */}
-      <Field label="Receipt">
-        <button type="button" className={"fin-filebox" + (f.bill ? " on" : "")}
-          title={f.bill ? f.bill.filename : undefined}
-          onClick={() => fileRef.current?.click()}>
-          {f.bill
-            ? <><Icon name="check" size="sm" /><span className="name">{f.bill.filename}</span>
-              <span className="swap">Replace</span></>
-            : <><Icon name="plus" size="sm" />
-              <span className="ph">Attach receipt · image or PDF, up to {fileSize(PROOF_MAX_BYTES)}</span></>}
-        </button>
-        <input ref={fileRef} type="file" accept="image/*,application/pdf" hidden
-          onChange={(e) => {
-            const file = e.target.files && e.target.files[0];
-            e.target.value = "";
-            if (!file) return;
+      <Field label="Receipt" help={"Mandatory — an image or a PDF, up to " + fileSize(PROOF_MAX_BYTES) + "."}>
+        <ProofField file={f.bill} onClear={() => set({ bill: null })}
+          hint={"Image or PDF, up to " + fileSize(PROOF_MAX_BYTES)}
+          onFile={(file) => {
             if (!proofAccepted(file.type)) {
               set({ bill: null });
               onErr(file.name + " is neither an image nor a PDF.");
@@ -206,11 +173,11 @@ function TxnFields({ f, set, tags, onErr }: {
           already agree on, and renaming that would be a migration to make a
           word nicer. */}
       <Field label="Remark">
-        <textarea className="inp" rows={3} value={f.description}
-          placeholder="What it was for — the sentence that has to make sense to somebody else at audit"
-          onChange={(e) => set({ description: e.target.value })} />
+        <Textarea rows={3} value={f.description} ariaLabel="Remark"
+          ph="What it was for — the sentence that has to make sense to somebody else at audit"
+          onChange={(v) => set({ description: v })} />
       </Field>
-    </div>
+    </>
   );
 }
 
@@ -233,7 +200,7 @@ export function TxnModal({ onClose, onDone }: { onClose: () => void; onDone: Don
      one never leaves somebody wondering whether it took. */
   const [done, setDone] = useState<{ txnId: string; paise: number; tag: string } | null>(null);
 
-  const set = (patch: Partial<TxnForm>) => { setF((p) => ({ ...p, ...patch })); setErr(""); };
+  const set = (patch: Partial<TxnForm>) => { setF((prev) => ({ ...prev, ...patch })); setErr(""); };
   const isIn = f.direction === "in";
   const tag = tags.filter((t) => t.tagKey === f.tagKey)[0] || null;
   const account = ACCOUNTS.filter((x) => x.accountId === f.accountId)[0] || null;
@@ -245,23 +212,20 @@ export function TxnModal({ onClose, onDone }: { onClose: () => void; onDone: Don
     return (
       <Dlg title="Recorded" onClose={close}
         footer={<>
-          <button className="btn" onClick={close}>Done</button>
-          <button className="btn pri" onClick={() => {
+          <Button color="secondary" onClick={close}>Done</Button>
+          <Button color="primary" onClick={() => {
             close();
             go("#/finance-transactions/" + encodeURIComponent(done.txnId));
-          }}>Open the record</button>
+          }}>Open the record</Button>
         </>}>
-        <div className="fin-paid">
-          <span className="mark"><Icon name="check" /></span>
-          <div className="amt tnum">{inr(done.paise)}</div>
-          <div className="to">{isIn ? "received into" : "paid from"} {account ? account.masked : "the account"}</div>
-          <div className="facts">
-            <div className="row"><span className="l">Filed as</span>
-              <span>{isIn ? "Credit" : "Debit"} · {done.tag}</span></div>
-            <div className="row"><span className="l">Reference</span><span className="mono">{f.reference}</span></div>
-            <div className="row"><span className="l">Row</span><span className="mono">{done.txnId}</span></div>
-          </div>
-        </div>
+        <PaidReceipt
+          amountPaise={done.paise}
+          to={(isIn ? "received into " : "paid from ") + (account ? account.masked : "the account")}
+          facts={[
+            ["Filed as", (isIn ? "Credit" : "Debit") + " · " + done.tag],
+            ["Reference", <span className="font-mono tnum">{f.reference || "—"}</span>],
+            ["Row", <span className="font-mono tnum">{done.txnId}</span>],
+          ]} />
       </Dlg>
     );
   }
@@ -286,7 +250,7 @@ export function TxnModal({ onClose, onDone }: { onClose: () => void; onDone: Don
       footer={<><Cancel onClose={onClose} />
         {/* Disabled without the receipt, because the store refuses without it —
             a button that is going to say no is better off saying so first. */}
-        <button className="btn pri" disabled={!f.bill} onClick={submit}>Record</button></>}>
+        <Button color="primary" isDisabled={!f.bill} onClick={submit}>Record</Button></>}>
 
       {/* EVERY CHOICE IS A DROPDOWN AND EVERY FIELD IS ON ITS OWN LINE — the
           pay-salary dialog's rhythm. The three segmented pickers this had
@@ -300,7 +264,9 @@ export function TxnModal({ onClose, onDone }: { onClose: () => void; onDone: Don
           true of every write in this module or enforced by the store, which
           refuses and says why at the moment it refuses — which is the moment
           somebody is actually asking. */}
-      <TxnFields f={f} set={set} tags={tags} onErr={setErr} />
+      <Fs legend="What moved" req>
+        <TxnFields f={f} set={set} tags={tags} onErr={setErr} />
+      </Fs>
 
     </Dlg>
   );
@@ -339,15 +305,20 @@ export function CancelTxnModal({ txn, onClose, onDone }: {
       footer={<><Cancel onClose={onClose} />
         {/* Disabled without a reason, because the store refuses without one —
             a button that is going to say no is better off saying so first. */}
-        <button className="btn dgr" disabled={!sa || !reason.trim()}
-          title={sa ? undefined : "Cancelling a transaction is Super Admin only."}
-          onClick={submit}>Cancel the transaction</button></>}>
+        <Button color="primary-destructive" isDisabled={!sa || !reason.trim()}
+          onClick={submit}>Cancel the transaction</Button></>}>
+
+      {sa ? null : (
+        <Alert tone="warn" ico="shield" title="Cancelling a transaction is Super Admin only.">
+          The button stays visible so it is clear the action exists and who to ask.
+        </Alert>
+      )}
 
       <Field label="Reason"
         help="Mandatory, and read at audit — a cancellation with no reason is indistinguishable from a misclick.">
-        <textarea className="inp" rows={3} autoFocus value={reason}
-          placeholder="Why this row should not stand"
-          onChange={(e) => { setReason(e.target.value); setErr(""); }} />
+        <Textarea rows={3} autoFocus value={reason} ariaLabel="Reason"
+          ph="Why this row should not stand"
+          onChange={(v) => { setReason(v); setErr(""); }} />
       </Field>
     </Dlg>
   );
@@ -375,10 +346,10 @@ export function TagModal({ onClose, onDone }: { onClose: () => void; onDone: Don
     <Dlg title="Create a tag"
       sub="Anyone with edit rights can create one. A tag is deactivated later, never deleted or re-kinded — deleting one would silently re-bucket every transaction that already used it."
       onClose={onClose} err={err}
-      footer={<><Cancel onClose={onClose} /><button className="btn pri" onClick={submit}>Create</button></>}>
+      footer={<><Cancel onClose={onClose} /><Button color="primary" onClick={submit}>Create</Button></>}>
 
       <Field label="Label" help="What shows on every row filed under it.">
-        <input className="inp" value={label} onChange={(e) => setLabel(e.target.value)} />
+        <Input value={label} ariaLabel="Label" autoFocus onChange={setLabel} />
       </Field>
 
       <Fs legend="Rolls up to" req hint="The one choice here that is not free — it decides where the money lands in Analytics, chosen now and rarely changed after.">
@@ -386,17 +357,13 @@ export function TagModal({ onClose, onDone }: { onClose: () => void; onDone: Don
           options={TAG_KINDS.map((k) => ({ key: k.key as TagKind, label: k.label + " — " + k.landsIn, help: k.help }))} />
       </Fs>
 
-      <div className="fin-stack">
-        <Field label="Budget" help="Warns at 90% of itself and never blocks.">
-          <RupeeInput value={budget} onChange={setBudgetStr} placeholder="No budget" />
-        </Field>
-        <Field label="Bill">
-          <label>
-            <input type="checkbox" checked={proofRequired} onChange={(e) => setProofRequired(e.target.checked)} />
-            {" "}Required on every row under this tag
-          </label>
-        </Field>
-      </div>
+      <Field label="Budget" help="Warns at 90% of itself and never blocks.">
+        <RupeeInput value={budget} onChange={setBudgetStr} placeholder="No budget" />
+      </Field>
+      <Field label="Bill">
+        <Checkbox checked={proofRequired} onChange={setProofRequired}
+          label="Required on every row under this tag" />
+      </Field>
     </Dlg>
   );
 }
@@ -424,30 +391,27 @@ export function BudgetModal({ tag, onClose, onDone }: { tag: Tag; onClose: () =>
   return (
     <Dlg title={"Budget · " + tag.label} sub="Warns at 90% of itself. It never blocks — the money still has to move."
       onClose={onClose} err={err}
-      footer={<><Cancel onClose={onClose} /><button className="btn pri" onClick={submit}>Save</button></>}>
+      footer={<><Cancel onClose={onClose} /><Button color="primary" onClick={submit}>Save</Button></>}>
 
-      <div className="fin-summary">
-        <div className="row"><span className="l">Spent this period</span><Money paise={spentPaise} /></div>
-        <div className="row"><span className="l">Current budget</span>
-          <span>{tag.budgetPaise ? <Money paise={tag.budgetPaise} /> : <span className="faint">none</span>}</span>
-        </div>
+      <Ledger>
+        <LedgerRow label="Spent this period"><Money paise={spentPaise} /></LedgerRow>
+        <LedgerRow label="Current budget">
+          {tag.budgetPaise ? <Money paise={tag.budgetPaise} /> : <span className="text-quaternary">none</span>}
+        </LedgerRow>
         {proposedPaise !== null ? (
-          <div className="row grand">
-            <span className="l">At the proposed budget</span>
-            <span className="tnum">{pctOfProposed}% spent already</span>
-          </div>
+          <LedgerRow label="At the proposed budget" grand>{pctOfProposed}% spent already</LedgerRow>
         ) : null}
-      </div>
+      </Ledger>
 
       <Field label="New budget" help="Leave blank to remove the budget entirely — the tag is then unlimited and unwatched.">
         <RupeeInput value={budget} onChange={setBudgetStr} placeholder="No budget" />
       </Field>
 
-      <Notice tone="info" text={<>
+      <Alert tone="info">
         A budget warns at 90% of itself and never blocks. Rent still has to be paid in a month
         somebody set its budget too low — this number is a flag for a person, not a limit the
         panel enforces.
-      </>} />
+      </Alert>
     </Dlg>
   );
 }
@@ -472,18 +436,23 @@ export function DeactivateTagModal({ tag, onClose, onDone }: { tag: Tag; onClose
     <Dlg title={"Deactivate " + tag.label} sub="Super Admin." onClose={onClose} err={err}
       footer={<>
         <Cancel onClose={onClose} />
-        <button className="btn dgr" disabled={!sa} title={sa ? undefined : "Deactivating a tag is Super Admin only."} onClick={submit}>
+        <Button color="primary-destructive" isDisabled={!sa} onClick={submit}>
           Deactivate
-        </button>
+        </Button>
       </>}>
-      <Check ok>
-        {n} existing row{n === 1 ? "" : "s"} keep <TagChip k={tag.tagKey} />. Nothing about them changes and
-        nothing is re-bucketed — that is the entire reason this is a deactivation and not a delete.
-      </Check>
-      <Check warn>Nobody will be able to file a new transaction under {tag.label} once this is saved.</Check>
-      <p className="fin-fine">There is no reactivate here. A tag that is needed again is created fresh, under a new key.</p>
+      <div className="flex flex-col">
+        <Check ok>
+          {n} existing row{n === 1 ? "" : "s"} keep <TagChip k={tag.tagKey} />. Nothing about them changes and
+          nothing is re-bucketed — that is the entire reason this is a deactivation and not a delete.
+        </Check>
+        <Check warn>Nobody will be able to file a new transaction under {tag.label} once this is saved.</Check>
+      </div>
+      {sa ? null : (
+        <Alert tone="warn" ico="shield" title="Deactivating a tag is Super Admin only.">
+          The button stays visible so it is clear the action exists and who to ask.
+        </Alert>
+      )}
+      <Fine>There is no reactivate here. A tag that is needed again is created fresh, under a new key.</Fine>
     </Dlg>
   );
 }
-
-

@@ -9,10 +9,10 @@
    ============================================================================= */
 import { useShell } from "../../shell/ShellContext";
 import { can } from "../../shell/AdminShell";
-import { EmptyState, KvList, Notice, Tabs, qs } from "../../ui";
+import { Alert, Button, Card, EmptyState, KvList, Tabs, qs } from "../../ui";
 import { go } from "../../ui/nav";
-import { Block, Blocks, Rec } from "./Frame";
-import { ActionMenu, Check, EventList, Money, OriginTag, ProtoBar, RefundPill } from "./bits";
+import { Blocks, Rec } from "./Frame";
+import { ActionMenu, Check, EventList, Fine, Money, OriginTag, ProtoBar, RefundPill } from "./bits";
 import {
   DecideRefundModal, RecordTransferModal,
 } from "./RefundModals";
@@ -31,11 +31,11 @@ export default function RefundDetail({ id, p, onParams }: {
 
   if (!row) {
     return (
-      <div className="fin-rec">
+      <div className="flex min-w-0 flex-col gap-4">
         <ProtoBar />
         <EmptyState icon="search" title="No refund at that address"
-          body={<>There is no request for <span className="mono">{id}</span>.</>}
-          action={<button className="btn pri" onClick={() => go(back)}>Back to Refunds</button>} />
+          body={<>There is no request for <span className="font-mono tnum">{id}</span>.</>}
+          action={<Button color="primary" onClick={() => go(back)}>Back to Refunds</Button>} />
       </div>
     );
   }
@@ -74,24 +74,26 @@ export default function RefundDetail({ id, p, onParams }: {
   ) : null;
 
   return (
-    <Rec id={r.refundId} pills={<RefundPill k={r.state} lg />} back={back} actions={actions}>
-      <div className="fin-subline">
-        <OriginTag k={r.origin} />
-        {" "}{r.payee.name} · {groundMeta(r.ground)?.label || r.ground} · requested {ago(r.requestedAt)}
-      </div>
+    <Rec id={r.refundId} pills={<><RefundPill k={r.state} lg /><OriginTag k={r.origin} /></>}
+      sub={<>{r.payee.name} · {groundMeta(r.ground)?.label || r.ground} · requested {ago(r.requestedAt)}</>}
+      back={back} actions={actions}>
 
       <Tabs items={[
         { k: "refund", label: "Refund" },
-        { k: "history", label: "History", n: r.events.length },
+        { k: "history", label: "History", n: r.events.length, quiet: true },
       ]} cur={tab} onPick={(k) => onParams({ tab: k === "refund" ? undefined : k })} />
 
-      {tab === "history" ? <EventList events={r.events} /> : (
+      {tab === "history" ? (
+        <Card title="History" sub="append-only · every event on this request">
+          <EventList events={r.events} />
+        </Card>
+      ) : (
         <Blocks>
-          <Block title="What is being returned">
+          <Card title="What is being returned">
             <KvList pairs={[
               ["Amount", <Money key="amt" paise={r.amountPaise} strong />],
               ["Ground", <>{groundMeta(r.ground)?.label || r.ground}
-                <div className="fin-fine">{groundMeta(r.ground)?.help}</div></>],
+                <Fine className="mt-1">{groundMeta(r.ground)?.help}</Fine></>],
               ["Detail", r.detail],
               ["Payee", r.payee.name + (r.payee.userId ? " · " + r.payee.userId : "")],
               ["Origin", <OriginTag key="or" k={r.origin} />],
@@ -99,37 +101,37 @@ export default function RefundDetail({ id, p, onParams }: {
 
             {r.origin === "subscription" ? (
               row.payment ? (
-                <div className="fin-chain" style={{ marginTop: "var(--space-4)" }}>
-                  <div className="seg"><span className="k">Original payment</span>
-                    <span className="v mono">{row.payment.paymentId}</span></div>
-                  <span className="arw">→</span>
-                  <div className="seg"><span className="k">Reference</span>
-                    <span className="v mono">{row.payment.reference}</span></div>
-                  <span className="arw">→</span>
-                  <div className="seg"><span className="k">Value date</span>
-                    <span className="v">{fmtDate(row.payment.valueDate)}</span></div>
-                  {r.subscriptionId ? (
-                    <div className="seg cap">
-                      <a className="v mono" data-go={"#/finance/" + r.subscriptionId}
-                        onClick={() => go("#/finance/" + r.subscriptionId)}>{r.subscriptionId}</a>
-                    </div>
-                  ) : null}
+                <div className="mt-4 border-t border-secondary pt-4">
+                  <h4 className="label-mono mb-2">The payment it reverses</h4>
+                  <KvList pairs={[
+                    ["Original payment", <span className="font-mono tnum">{row.payment.paymentId}</span>],
+                    ["Reference", <span className="font-mono tnum">{row.payment.reference}</span>],
+                    ["Value date", fmtDate(row.payment.valueDate)],
+                    ["Subscription", r.subscriptionId
+                      ? <a href={"#/finance/" + r.subscriptionId} data-go={"#/finance/" + r.subscriptionId}
+                          className="rounded font-mono text-sm text-brand-secondary outline-focus-ring tnum hover:underline focus-visible:outline-2 focus-visible:outline-offset-2"
+                          onClick={(e) => { e.preventDefault(); go("#/finance/" + r.subscriptionId); }}>
+                          {r.subscriptionId}
+                        </a>
+                      : "—"],
+                  ]} />
                 </div>
               ) : (
-                <Notice tone="bad" text={<>The original payment {r.paymentId} is no longer in the ledger.</>} />
+                <Alert tone="bad" className="mt-4">
+                  The original payment {r.paymentId} is no longer in the ledger.
+                </Alert>
               )
             ) : (
-              <Notice tone="info" text={<>
-                <b>No original payment behind this refund.</b> The detail above is the evidence,
-                and the absence is why there is no policy check.
-              </>} />
+              <Alert tone="info" className="mt-4" title="No original payment behind this refund.">
+                The detail above is the evidence, and the absence is why there is no policy check.
+              </Alert>
             )}
-          </Block>
+          </Card>
 
           {r.origin === "subscription" && r.policy ? (
-            <Block title="The policy check"
-              desc={"Frozen at request time. It frames the approval; it never blocks it"}>
-              <div className="fin-chks">
+            <Card title="The policy check"
+              sub="Frozen at request time. It frames the approval; it never blocks it.">
+              <div className="flex flex-col">
                 <Check ok={r.policy.groundPermitted} warn={!r.policy.groundPermitted}>
                   {r.policy.groundPermitted
                     ? <>The ground — {groundMeta(r.ground)?.label || r.ground} — is on the permitted list.</>
@@ -152,36 +154,37 @@ export default function RefundDetail({ id, p, onParams }: {
                     : <>The subscription is not active.</>}
                 </Check>
               </div>
-            </Block>
+            </Card>
           ) : null}
 
-          <Block title="The decision" wide>
+          <Card title="The decision" className="lg:col-span-2">
             {r.decidedBy ? (
               <KvList pairs={[
                 ["Decided by", r.decidedBy + " · " + (r.decidedAt ? fmtDateTime(r.decidedAt) : "—")],
-                ["Note", r.decisionNote || <span className="faint">No note.</span>],
+                ["Note", r.decisionNote || <span className="text-quaternary">No note.</span>],
               ]} />
             ) : (
-              <p className="fin-fine">Not yet decided. {deciding ? "Waiting on Super Admin." : ""}</p>
+              <Fine>Not yet decided. {deciding ? "Waiting on Super Admin." : ""}</Fine>
             )}
 
             {r.state === "approved" && !r.settlement ? (
-              <Notice tone="warn" text={<>
-                <b>{inr(r.amountPaise)} has NOT moved.</b> Approval authorised the transfer. Send it
-                from the bank, then record it here — only that makes this refund <b>paid</b>.
-              </>} />
+              <Alert tone="warn" className="mt-4"
+                title={inr(r.amountPaise) + " has NOT moved."}>
+                Approval authorised the transfer. Send it from the bank, then record it here — only
+                that makes this refund <b>paid</b>.
+              </Alert>
             ) : null}
 
             {r.state === "paid" && r.settlement ? (
-              <KvList pairs={[
+              <KvList cls="mt-4" pairs={[
                 ["Paid", fmtDateTime(r.settlement.paidAt)],
                 ["Mode", r.settlement.mode],
-                ["Reference", <span className="mono">{r.settlement.reference}</span>],
+                ["Reference", <span className="font-mono tnum">{r.settlement.reference}</span>],
                 ["From account", accountOf(r.settlement.accountId)?.masked || r.settlement.accountId],
                 ["Recorded by", r.settlement.by],
               ]} />
             ) : null}
-          </Block>
+          </Card>
         </Blocks>
       )}
     </Rec>

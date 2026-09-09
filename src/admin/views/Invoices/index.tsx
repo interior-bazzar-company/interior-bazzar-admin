@@ -4,8 +4,11 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { inr, fmtDate } from "../../ui/format";
-import { EmptyState, FilterChips, Icon, ListTable, Notice, Pill, qs, SearchField, Select, StatStrip, TbTitle } from "../../ui";
-import type { StatCell } from "../../ui";
+import {
+  Alert, Button, EmptyState, FilterBar, FilterChips, ListTable, Meter, MoreMenu, PageHeader,
+  Pill, qs, Rail, SearchField, Select, StatStrip, TbTitle,
+} from "../../ui";
+import type { MenuItem, StatCell } from "../../ui";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { getSession } from "../../auth/session";
 import { useShell } from "../../shell/ShellContext";
@@ -21,6 +24,7 @@ import PickInvoice from "./PickDeal";
 
 const STATUSES = ["draft", "issued", "cancelled"];
 const NEW_HASH = "#/invoices?new=1";
+const LABELS: Record<string, string> = { q: "Search", status: "Status", owner: "Owner", sort: "Sort" };
 
 /* THE MODULE ROUTER — list / detail / builder / preview, the four screens the
    prototype has (views-invoice.js). No drawer: see Quotations/index.tsx. */
@@ -197,38 +201,47 @@ function InvoicesList() {
   if (loading && !all.length) return <ListSkeleton />;
 
   return (
-    <div className="dls">
-      <div className="dls-cmd">
-        <SearchField ph="Search invoice no, deal, quote or customer…" val={p.q} onFilter={onSearch} />
-        <Select key={"status" + p.status} name="status" label="Status" value={p.status} onFilter={onFilter}
-          options={STATUSES.map((s) => ({ v: s, l: STATUS_LABEL[s] + " (" + (byStatus[s] || 0) + yrs + ")" }))
-            .concat([{ v: "overdue", l: "Overdue (" + overdue + yrs + ")" }])} />
-        {head
-          ? <Select key={"owner" + p.owner} name="owner" label="Owner" value={p.owner}
-              onFilter={onFilter} options={owners} />
-          : null}
-        <Select key={"sort" + p.sort} name="sort" label="Sort" value={p.sort} onFilter={onFilter}
-          options={[{ v: "newest", l: "Newest first" }, { v: "oldest", l: "Oldest first" }]} />
-        <span className="spacer"></span>
-        <button className="btn" data-act="in-export" onClick={exportCsv}><Icon name="download" />Export</button>
-        {can("invoices", "create")
-          ? <button className="btn pri" data-act="inv-new" data-go={NEW_HASH} onClick={openPick}>
-              <Icon name="plus" />Create invoice</button>
-          : null}
-      </div>
+    <div className="flex flex-col gap-4">
+      {/* The same five bands, in the same order, as Quotations — this module
+          is the other half of one workflow and must not read as another
+          product. */}
+      <PageHeader
+        title="Invoices"
+        meta={<>
+          <span className="tnum">{all.length.toLocaleString()} {all.length === 1 ? "invoice" : "invoices"}</span>
+          {overdue ? <span className="tnum text-error-primary">{overdue} overdue</span> : null}
+        </>}
+        actions={<>
+          <Button color="secondary" ico="download" data-act="in-export" onClick={exportCsv}>Export</Button>
+          {can("invoices", "create")
+            ? <Button color="primary" ico="plus" data-act="inv-new" data-go={NEW_HASH} onClick={openPick}>Create invoice</Button>
+            : null}
+        </>}
+      />
+
+      <FilterBar
+        search={<SearchField ph="Search invoice no, deal, quote or customer…" val={p.q} onFilter={onSearch} />}
+        filters={
+          <>
+            <Select key={"status" + p.status} name="status" label="Status" value={p.status} onFilter={onFilter}
+              options={STATUSES.map((s) => ({ v: s, l: STATUS_LABEL[s] + " (" + (byStatus[s] || 0) + yrs + ")", dot: STATUS_TONE[s] || "neutral" }))
+                .concat([{ v: "overdue", l: "Overdue (" + overdue + yrs + ")", dot: "bad" }])} />
+            {head
+              ? <Select key={"owner" + p.owner} name="owner" label="Owner" value={p.owner}
+                  onFilter={onFilter} options={owners} />
+              : null}
+            <Select key={"sort" + p.sort} name="sort" label="Sort" value={p.sort} onFilter={onFilter}
+              options={[{ v: "newest", l: "Newest first" }, { v: "oldest", l: "Oldest first" }]} />
+          </>
+        }
+        chips={chips ? <FilterChips params={params} onUnfilter={onUnfilter} labels={LABELS} /> : null}
+      />
 
       <StatStrip cells={cells} />
 
-      {error ? <Notice tone="bad" ico="alert" text={<><b>Could not load invoices.</b> {error}</>} /> : null}
+      {error ? <Alert tone="bad" title="Could not load invoices." action={<Button color="secondary" size="xs" ico="refresh" onClick={() => go("#/invoices" + qs(params))}>Retry</Button>}>{error}</Alert> : null}
 
-      {chips ? <div className="dls-chips">
-        <FilterChips params={params} onUnfilter={onUnfilter}
-          labels={{ q: "Search", status: "Status", owner: "Owner", sort: "Sort" }} />
-      </div> : null}
-
-      <div className="dls-body">
-        <InvoicesTable rows={rows} p={p} go={go} onUnfilter={onUnfilter} openPick={openPick} />
-      </div>
+      <InvoicesTable rows={rows} p={p} go={go} onUnfilter={onUnfilter} openPick={openPick} />
     </div>
   );
 }
@@ -244,32 +257,45 @@ function InvoicesTable({ rows, p, go, onUnfilter, openPick }: {
       body={filtered ? "Nothing matches. Clear a filter to widen the search."
         : "An invoice is raised against an accepted quotation, once payment has already come in."}
       action={filtered
-        ? <button className="btn" data-unfilter="*" onClick={() => onUnfilter("*")}>Clear all filters</button>
+        ? <Button color="secondary" data-unfilter="*" onClick={() => onUnfilter("*")}>Clear all filters</Button>
         : can("invoices", "create")
-          ? <button className="btn pri" data-act="inv-new" data-go={NEW_HASH} onClick={openPick}>Create invoice</button>
+          ? <Button color="primary" ico="plus" data-act="inv-new" data-go={NEW_HASH} onClick={openPick}>Create invoice</Button>
           : null} />;
 
   return (
-    <ListTable head={<tr>
-      <th style={{ width: "3px" }}></th><th>Invoice</th><th>Status</th><th>Chain</th>
-      <th className="n">Amount · received</th><th>Due</th><th>Owner</th>
+    <ListTable min="62rem" head={<tr>
+      <th className="rail" />
+      <th scope="col">Invoice</th>
+      <th scope="col">Status</th>
+      <th scope="col">Chain</th>
+      <th scope="col" className="n">Amount · received</th>
+      <th scope="col">Due</th>
+      <th scope="col">Owner</th>
+      <th scope="col" className="acts"><span className="sr-only">Actions</span></th>
     </tr>}>
       {rows.map((inv) => {
         const to = "#/invoices/" + inv.id;
         const over = isOverdue(inv);
+        const items: MenuItem[] = [
+          { icon: "invoice", label: inv.status === "draft" ? "Preview & issue" : "View document", act: () => go(to + "?mode=preview") },
+          ...(inv.status === "draft" && can("invoices", "edit")
+            ? [{ icon: "edit", label: "Edit draft", act: () => go(to + "?mode=edit") }]
+            : []),
+          { icon: "deal", label: "Open the deal", act: () => go("#/deals/" + inv.dealRef) },
+        ];
         return (
-          <tr key={inv.id} className={"clickable" + (over ? " u-bad" : "") + (inv.status === "cancelled" ? " dim" : "")}
-            data-go={to} onClick={() => go(to)}>
-            <td className="rail"><i title={over ? "Past its due date and still a draft — never issued" : undefined}></i></td>
-            <td>
-              <div className="cell-1 mono">
-                {inv.invoiceNumber || <span className="faint">Assigned on issue</span>}
-              </div>
+          <tr key={inv.id} className="clickable" data-go={to} onClick={() => go(to)}>
+            <Rail tone={over ? "bad" : inv.status === "issued" ? "ok" : undefined}
+              title={over ? "Past its due date and still a draft — never issued" : undefined} />
+            <td className="cell-1">
+              <span className="font-mono tnum">
+                {inv.invoiceNumber || <span className="font-sans font-normal text-quaternary">Assigned on issue</span>}
+              </span>
               <div className="cell-2">{inv.billing.name || "—"}
-                {lineOf(inv) ? <span className="faint"> · {lineOf(inv)}</span> : null}</div>
+                {lineOf(inv) ? <span className="text-quaternary"> · {lineOf(inv)}</span> : null}</div>
             </td>
             <td>
-              <Pill text={STATUS_LABEL[inv.status]} tone={STATUS_TONE[inv.status]} />
+              <Pill dot text={STATUS_LABEL[inv.status]} tone={STATUS_TONE[inv.status] || "neutral"} />
               <div className="cell-2">{inv.issuedAt
                 ? "issued " + fmtDate(inv.issuedAt)
                 : "made " + fmtDate(inv.invoiceDate || inv.createdAt)}</div>
@@ -277,13 +303,16 @@ function InvoicesTable({ rows, p, go, onUnfilter, openPick }: {
             {/* Deal and quote were two reference columns; one chain cell, the
                 nearer link under the further one. Plain text, not links --
                 both records are one press away from the invoice itself. */}
-            <td>
-              <div className="cell-1 mono">{inv.dealRef}</div>
-              <div className="cell-2 mono faint">{inv.quotationNumber || "—"}</div>
+            <td className="mono">
+              {inv.dealRef}
+              <div className="cell-2 font-mono">{inv.quotationNumber || "—"}</div>
             </td>
-            <td className="n dls-money"><MoneyCell inv={inv} /></td>
+            <td className="n"><MoneyCell inv={inv} /></td>
             <td><DueCell inv={inv} /></td>
-            <td>{inv.owner ? inv.owner.name : <span className="faint">—</span>}</td>
+            <td>{inv.owner ? inv.owner.name : <span className="text-quaternary">—</span>}</td>
+            <td className="acts" onClick={(e) => e.stopPropagation()}>
+              <MoreMenu items={items} small align="right" />
+            </td>
           </tr>
         );
       })}
@@ -319,26 +348,35 @@ function lineOf(inv: InvoiceRow): string {
 function MoneyCell({ inv }: { inv: InvoiceRow }) {
   const amt = inr(inv.grandTotalPaise);
   if (inv.status === "cancelled")
-    return <><div className="amt tnum faint">{amt}</div><div className="sub">cancelled</div></>;
+    return <>
+      <div className="text-quaternary line-through">{amt}</div>
+      <div className="cell-2 text-right">cancelled</div>
+    </>;
   if (inv.status !== "issued")
-    return <><div className="amt tnum">{amt}</div><div className="sub"><b>nothing received</b></div></>;
+    return <>
+      <div>{amt}</div>
+      <div className="cell-2 text-right font-medium">nothing received</div>
+    </>;
+  /* Received is all-or-nothing by construction, so the meter is only ever
+     empty or full — it is here because a column of full bars is read at a
+     glance and a column of the word "received" is not. */
   return <>
-    <div className="amt tnum">{amt}</div>
-    <div className="bar"><i style={{ width: "100%" }}></i></div>
-    <div className="sub">fully received</div>
+    <div>{amt}</div>
+    <Meter value={100} tone="ok" className="mt-1" />
+    <div className="cell-2 text-right">fully received</div>
   </>;
 }
 
 /* The date, and how far off it is from today. Once the money is in, the due
    date is history -- it stays for the record, without the countdown. */
 function DueCell({ inv }: { inv: InvoiceRow }) {
-  if (inv.status === "cancelled") return <span className="faint">—</span>;
-  if (inv.status === "issued") return <span className="faint">{fmtDate(inv.dueDate)}</span>;
+  if (inv.status === "cancelled") return <span className="text-quaternary">—</span>;
+  if (inv.status === "issued") return <span className="text-quaternary tnum">{fmtDate(inv.dueDate)}</span>;
   const n = daysFrom(inv.dueDate);
   return <>
-    {fmtDate(inv.dueDate)}
+    <span className={n < 0 ? "font-medium text-error-primary tnum" : "tnum"}>{fmtDate(inv.dueDate)}</span>
     {n < 0
-      ? <div className="cell-2" style={{ color: "var(--bad)", fontWeight: 500 }}>+{Math.abs(n)}d</div>
+      ? <div className="cell-2 font-medium text-error-primary">+{Math.abs(n)}d</div>
       : <div className="cell-2">{relativeDate(inv.dueDate)}</div>}
   </>;
 }

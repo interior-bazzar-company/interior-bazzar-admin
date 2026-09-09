@@ -18,8 +18,12 @@
    filtered to this one person. It is not a query of its own: a member page that
    computed "outstanding" its own way would eventually disagree with the tab
    that sent the reader here.
+
+   ONE CARD PER RESOURCE, not a table: what came back is a set of question and
+   answer pairs of wildly different lengths, and a row that has to hold a
+   paragraph is a row that holds nothing else legibly.
    ============================================================================= */
-import { EmptyState, Icon, Notice, Pill } from "../../../ui";
+import { Alert, Button, Card, EmptyState, Icon, Pill } from "../../../ui";
 import { go } from "../../../ui/nav";
 import { useShell } from "../../../shell/ShellContext";
 import { AnswerRow, TagChips } from "../../Resources/bits";
@@ -33,7 +37,6 @@ import { FillModal } from "../../Resources/Fill";
 import type { Member } from "../store";
 import type { Viewer } from "./ops";
 import { OpHead } from "./frame";
-import "../../Resources/resources.css";
 
 /* `viewer` is optional only for the smoke, which renders this page bare; the
    member launcher always passes it. */
@@ -59,91 +62,95 @@ export default function ResourcesPage({ m, viewer = "admin" }: { m: Member; view
     <OpHead
       title="Resources"
       desc="Company to member, as a form. What was asked, and what came back."
-      right={
-        <button className="btn" onClick={() => go("#/resources")}>
-          <Icon name="ext" size="sm" />All resources
-        </button>
-      } />
+      right={<Button color="secondary" ico="ext" onClick={() => go("#/resources")}>All resources</Button>} />
   );
 
   if (!mine.length) {
     return (
-      <>
+      <div className="flex flex-col gap-5">
         {head}
-          <EmptyState
+        <EmptyState
           icon="flag"
           title="Nothing has been asked of them"
           body={"No resource's condition matches " + m.name
             + " today, and they have not answered one. A form built for their department or "
             + "role picks them up automatically — nobody has to re-send it."}
-          action={
-            <button className="btn pri" onClick={() => go("#/resources")}>Open Resources</button>
-          }
+          action={<Button color="primary" ico="ext" onClick={() => go("#/resources")}>Open Resources</Button>}
         />
-      </>
+      </div>
     );
   }
 
   return (
-    <>
+    <div className="flex flex-col gap-5">
       {head}
-      <div className="rs-mine">
+
       {outstanding.length ? (
-        <Notice tone="warn">
-          <b>{outstanding.length} still outstanding.</b>{" "}
-          {outstanding.map((r) => r.title).join(", ")} {outstanding.length === 1 ? "is" : "are"}{" "}
-          open and unanswered. Nothing here chases it — this page states it.
-        </Notice>
+        <Alert tone="warn" ico="clock" title={outstanding.length + " still outstanding"}>
+          {outstanding.map((r) => r.title).join(", ")} {outstanding.length === 1 ? "is" : "are"} open
+          and unanswered. Nothing here chases it — this page states it.
+        </Alert>
       ) : null}
 
-      {mine.map((r) => {
-        const x = answeredIds[r.resourceId] || null;
-        return (
-          <div key={r.resourceId} className="rs-mine-card">
-            <div className="rs-mine-h">
-              <b>{r.title}</b>
-              <TagChips tags={r.tags} max={2} />
-              {x
-                ? <Pill text={"Submitted " + fmtDate(x.submittedAt)} tone="ok" dot />
-                : <Pill text={r.state === "open" ? "Pending" : "Not open"}
-                    tone={r.state === "open" ? "warn" : ""} dot />}
-              <span className="spacer" />
-              {!x && r.state === "open" && viewer === "self" ? (
-                <button className="btn sm pri" onClick={() => shell.modal(<FillModal r={r} memberId={m.memberId} />)}>
-                  Fill it in
-                </button>
-              ) : null}
-              <button className="btn sm" onClick={() => go("#/resources?form=" + r.resourceId)}>
-                <Icon name="ext" size="sm" />The resource
-              </button>
-            </div>
-
-            {x ? (
-              <>
-                {x.answers.map((a) => <AnswerRow key={a.fieldId} a={a} />)}
-                <div className="rs-mine-h" style={{ marginTop: "var(--space-3)", marginBottom: 0 }}>
-                  <span className="cell-2">
-                    <Icon name="lock" size="sm" /> Answered on v{x.version}. It cannot be edited.
+      <div className="flex flex-col gap-4">
+        {mine.map((r) => {
+          const x = answeredIds[r.resourceId] || null;
+          return (
+            <Card
+              key={r.resourceId}
+              title={
+                <span className="flex flex-wrap items-center gap-2">
+                  {r.title}
+                  <TagChips tags={r.tags} max={2} />
+                  {x
+                    ? <Pill xs dot tone="ok" text={"Submitted " + fmtDate(x.submittedAt)} />
+                    : <Pill xs dot tone={r.state === "open" ? "warn" : "neutral"}
+                      text={r.state === "open" ? "Pending" : "Not open"} />}
+                </span>
+              }
+              right={
+                <>
+                  {!x && r.state === "open" && viewer === "self" ? (
+                    <Button color="primary" size="xs"
+                      onClick={() => shell.modal(<FillModal r={r} memberId={m.memberId} />, "lg")}>
+                      Fill it in
+                    </Button>
+                  ) : null}
+                  <Button color="secondary" size="xs" ico="ext"
+                    onClick={() => go("#/resources?form=" + r.resourceId)}>
+                    The resource
+                  </Button>
+                </>
+              }
+              foot={x ? (
+                <span className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Icon name="lock" size="xs" className="text-fg-quaternary" />
+                    Answered on v{x.version}. It cannot be edited.
                   </span>
-                  <span className="spacer" />
-                  <button className="btn sm" onClick={() => shell.modal(<ResponseSheet r={r} x={x} />)}>
+                  <Button color="secondary" size="xs" onClick={() => shell.modal(<ResponseSheet r={r} x={x} />, "lg")}>
                     Open it
-                  </button>
-                </div>
-              </>
-            ) : (
-              <span className="cell-2">
-                {r.state === "open"
-                  ? "For " + audienceLine(r.departments).toLowerCase() + ". Nothing submitted yet."
-                  : "For " + audienceLine(r.departments).toLowerCase()
-                    + ". The resource is " + r.state + ", so there is nothing to submit."}
-              </span>
-            )}
-          </div>
-        );
-      })}
+                  </Button>
+                </span>
+              ) : undefined}
+            >
+              {x ? (
+                <dl className="flex flex-col">
+                  {x.answers.map((a) => <AnswerRow key={a.fieldId} a={a} />)}
+                </dl>
+              ) : (
+                <p className="text-sm text-tertiary">
+                  {r.state === "open"
+                    ? "For " + audienceLine(r.departments).toLowerCase() + ". Nothing submitted yet."
+                    : "For " + audienceLine(r.departments).toLowerCase()
+                      + ". The resource is " + r.state + ", so there is nothing to submit."}
+                </p>
+              )}
+            </Card>
+          );
+        })}
       </div>
-    </>
+    </div>
   );
 }
 

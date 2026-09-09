@@ -15,19 +15,25 @@
    ============================================================================= */
 import { useShell } from "../../shell/ShellContext";
 import { can } from "../../shell/AdminShell";
-import { EmptyState, FilterChips, Icon, ListTable, qs, SearchField, Select, StatStrip } from "../../ui";
+import {
+  Button, EmptyState, FilterBar, FilterChips, ListTable, Pagination, Pill, qs, Rail,
+  SearchField, Select, StatStrip,
+} from "../../ui";
 import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import { Frame, ViewBand } from "./Frame";
 import type { FaceProps } from "./Frame";
-import { BudgetBar, Dir, Money, TagChip, TxnMenu, TxnPill } from "./bits";
+import { ActionMenu, BudgetBar, Dir, Fine, Money, TagChip, TxnMenu, TxnPill } from "./bits";
 import { BudgetModal, CancelTxnModal, DeactivateTagModal, TagModal, TxnModal } from "./TxnModals";
 import {
   BILL_THRESHOLD_PAISE, FILTER_LABELS, PERIOD, TAG_KINDS, TXN_STATES,
-  ago, applyTxnFilters, fmtDate, inr, isSuperAdmin, tagKindMeta,
+  ago, applyTxnFilters, fmtDate, inr, isSuperAdmin, tagKindMeta, todayIso,
   useOverview, useTagTotals, useTags, useTxnRows,
 } from "./store";
 import type { CompanyTxn, Params, Tag, TagTotal, TxnRow } from "./store";
+
+/** One screen of rows. `?page=` is a position in the list, never a filter. */
+const PAGE_SIZE = 50;
 
 /** `filterValueLabel` needs the live tag list to turn a `tag` filter's key
  *  into its label. Taking it as an argument, rather than reading the store
@@ -66,7 +72,7 @@ export default function Transactions({ p, onFilter, onSearch, onUnfilter, onPara
   const tags = useTags();
 
   const done = (msg: string, tone?: string) => { closeLayer(); toast(msg, tone); };
-  const openTxnModal = () => modal(<TxnModal onClose={closeLayer} onDone={done} />);
+  const openTxnModal = () => modal(<TxnModal onClose={closeLayer} onDone={done} />, "lg");
   const openTagModal = () => modal(<TagModal onClose={closeLayer} onDone={done} />);
   const openBudget = (t: Tag) => modal(<BudgetModal tag={t} onClose={closeLayer} onDone={done} />);
   const openDeactivate = (t: Tag) => modal(<DeactivateTagModal tag={t} onClose={closeLayer} onDone={done} />);
@@ -83,6 +89,7 @@ export default function Transactions({ p, onFilter, onSearch, onUnfilter, onPara
   const o = useOverview();
   const totals = useTagTotals();
   const missingBillN = txnRows.filter((r) => r.missingBill).length;
+  const filtered = applyTxnFilters(txnRows, p);
 
   /* A CELL TOGGLES: pressing the filter it already applied clears it, because
      the only other way back is to hunt for the chip. It navigates rather than
@@ -135,7 +142,6 @@ export default function Transactions({ p, onFilter, onSearch, onUnfilter, onPara
         blocks the period from closing, which is the whole reason this is a queue and not a
         note.</> },
     { k: <>Excluded spend <b className="tnum">{inr(o.excludedPaise)}</b></>,
-      tone: "mute",
       tip: <>Taxes and statutory payments, filed under tags whose kind is <b>excluded</b>.
         Cash out of the door like any other, and deliberately not part of the operating
         picture — so it is stated here rather than quietly left inside a total.</> },
@@ -168,6 +174,24 @@ export default function Transactions({ p, onFilter, onSearch, onUnfilter, onPara
 
   return (
     <Frame toast={toast}
+      title="Other Transaction"
+      meta={
+        <>
+          <span className="label-mono">
+            {tab === "tags"
+              ? tags.length + (tags.length === 1 ? " tag" : " tags")
+              : filtered.length === txnRows.length
+                ? txnRows.length + (txnRows.length === 1 ? " row" : " rows")
+                : filtered.length + " of " + txnRows.length}
+          </span>
+          <span className="label-mono">as of {fmtDate(todayIso())}</span>
+        </>
+      }
+      actions={writable
+        ? (tab === "transactions"
+          ? <Button color="primary" ico="plus" onClick={openTxnModal}>Record a transaction</Button>
+          : <Button color="primary" ico="plus" onClick={openTagModal}>Create a tag</Button>)
+        : null}
       tabs={
         /* A VIEW BAND ABOVE THE FILTERS, where Subscriptions and Salaries A/C
            already put theirs. It was a segmented `SubTabs` strip BELOW the
@@ -188,112 +212,108 @@ export default function Transactions({ p, onFilter, onSearch, onUnfilter, onPara
           })} />
       }
       cmd={tab === "transactions" ? (
-        <>
-          <SearchField key={"q" + (p.q || "")} ph="Description, party, ID or reference…" val={p.q} onFilter={onSearch} />
-          <Select key={"dir" + (p.dir || "")} name="dir" label="Direction" value={p.dir} onFilter={onFilter}
-            /* CREDIT FIRST. It is the order the record dialog offers them and
-               the order the strip above counts them in — one ordering across
-               the section, so nobody re-reads the list every time they meet
-               it. */
-            options={[{ v: "in", l: "Credit" }, { v: "out", l: "Debit" }]} />
-          <Select key={"tag" + (p.tag || "")} name="tag" label="Tag" value={p.tag} onFilter={onFilter}
-            options={tags.map((t) => ({ v: t.tagKey, l: t.label + (t.active ? "" : " — inactive") }))} />
-          <Select key={"kind" + (p.kind || "")} name="kind" label="Rolls up to" value={p.kind} onFilter={onFilter}
-            options={TAG_KINDS.map((k) => ({ v: k.key, l: k.label }))} />
-          <Select key={"state" + (p.state || "")} name="state" label="State" value={p.state} onFilter={onFilter}
-            options={TXN_STATES.map((s) => ({ v: s.key, l: s.label }))} />
-          <Select key={"range" + (p.range || "")} name="range" label="Period" value={p.range} onFilter={onFilter}
-            options={[{ v: "month", l: PERIOD.label }]} />
-          <Select key={"flag" + (p.flag || "")} name="flag" label="Queue" value={p.flag} onFilter={onFilter}
-            options={[{ v: "nobill", l: "Missing a bill" }]} />
-          <span className="spacer" />
-          {writable ? (
-            <button className="btn pri" onClick={openTxnModal}><Icon name="plus" size="sm" />Record a transaction</button>
-          ) : null}
-        </>
-      ) : (
-        <>
-          <span className="spacer" />
-          {writable ? (
-            <button className="btn pri" onClick={openTagModal}><Icon name="plus" size="sm" />Create a tag</button>
-          ) : null}
-        </>
-      )}
-      bands={<>
-        {/* ONE STRIP STYLE FOR BOTH TABS, which is what every other list in
-            the panel carries: a stated Total, then its parts, each cell a
-            filter. It replaced four `.fin-mt` tiles that said the same four
-            things at four times the height and matched no other list here. */}
-        <StatStrip cells={tab === "transactions" ? txnCells : tagCells} />
-        {tab === "transactions" ? (
-          <div className="dls-chips">
+        <FilterBar
+          search={<SearchField key={"q" + (p.q || "")} ph="Description, party, ID or reference…"
+            val={p.q} onFilter={onSearch} />}
+          filters={<>
+            <Select key={"dir" + (p.dir || "")} name="dir" label="Direction" value={p.dir} onFilter={onFilter}
+              /* CREDIT FIRST. It is the order the record dialog offers them and
+                 the order the strip above counts them in — one ordering across
+                 the section, so nobody re-reads the list every time they meet
+                 it. */
+              options={[{ v: "in", l: "Credit", dot: "ok" }, { v: "out", l: "Debit", dot: "bad" }]} />
+            <Select key={"tag" + (p.tag || "")} name="tag" label="Tag" value={p.tag} onFilter={onFilter}
+              options={tags.map((t) => ({ v: t.tagKey, l: t.label + (t.active ? "" : " — inactive") }))} />
+            <Select key={"kind" + (p.kind || "")} name="kind" label="Rolls up to" value={p.kind} onFilter={onFilter}
+              options={TAG_KINDS.map((k) => ({ v: k.key, l: k.label }))} />
+            <Select key={"state" + (p.state || "")} name="state" label="State" value={p.state} onFilter={onFilter}
+              options={TXN_STATES.map((s) => ({ v: s.key, l: s.label, dot: s.tone }))} />
+            <Select key={"range" + (p.range || "")} name="range" label="Period" value={p.range} onFilter={onFilter}
+              options={[{ v: "month", l: PERIOD.label }]} />
+            <Select key={"flag" + (p.flag || "")} name="flag" label="Queue" value={p.flag} onFilter={onFilter}
+              options={[{ v: "nobill", l: "Missing a bill", dot: "warn" }]} />
+          </>}
+          chips={
             <FilterChips
               params={Object.keys(p)
                 .filter((k) => k !== "tab" && k !== "page" && p[k])
-                .reduce((o, k) => { o[k] = filterValueLabel(k, p[k] as string, tags); return o; }, {} as Record<string, string>)}
+                .reduce((o2, k) => { o2[k] = filterValueLabel(k, p[k] as string, tags); return o2; }, {} as Record<string, string>)}
               labels={FILTER_LABELS}
               onUnfilter={onUnfilter} />
-          </div>
-        ) : null}
-      </>}>
+          } />
+      ) : null}
+      bands={
+        /* ONE STRIP STYLE FOR BOTH TABS, which is what every other list in
+           the panel carries: a stated Total, then its parts, each cell a
+           filter. It replaced four money tiles that said the same four
+           things at four times the height and matched no other list here. */
+        <StatStrip cells={tab === "transactions" ? txnCells : tagCells} />
+      }>
       {tab === "transactions"
-        ? <TxnTable p={p} writable={writable} sa={sa} onRecord={openTxnModal} onUnfilter={onUnfilter}
+        ? <TxnTable rows={filtered} all={txnRows.length} p={p} writable={writable} sa={sa}
+          onRecord={openTxnModal} onUnfilter={onUnfilter} onParams={onParams}
           onCancel={openCancel} onCopied={(m) => toast(m, "ok")} />
         : <TagsTab writable={writable} onBudget={openBudget} onDeactivate={openDeactivate} />}
     </Frame>
   );
 }
 
-/* MONEY TILES STOOD HERE — four `.fin-mt` blocks, each the height of a card,
-   saying what one row of the panel's own strip says. They are `txnCells`
-   above now. Their one real constraint survived the move and is worth
-   restating: a tile could carry an `i` beside its label because it was a div,
-   and a strip cell is a BUTTON — an `i` inside it would swallow half its own
-   click target. The definitions ride `tip` instead, which is the strip's own
-   description channel and the same answer Salaries A/C and Subscriptions
-   reached. */
+/* MONEY TILES STOOD HERE — four blocks, each the height of a card, saying what
+   one row of the panel's own strip says. They are `txnCells` above now. Their
+   one real constraint survived the move and is worth restating: a tile could
+   carry an `i` beside its label because it was a div, and a strip cell is a
+   BUTTON — an `i` inside it would swallow half its own click target. The
+   definitions ride `tip` instead, which is the strip's own description channel
+   and the same answer Salaries A/C and Subscriptions reached. */
 
 /* -------------------------------------------------------------- the table --- */
-function TxnTable({ p, writable, sa, onRecord, onUnfilter, onCancel, onCopied }: {
-  p: Params; writable: boolean; sa: boolean; onRecord: () => void; onUnfilter: (key: string) => void;
+function TxnTable({ rows, all, p, writable, sa, onRecord, onUnfilter, onParams, onCancel, onCopied }: {
+  rows: TxnRow[]; all: number; p: Params; writable: boolean; sa: boolean;
+  onRecord: () => void; onUnfilter: (key: string) => void; onParams: (patch: Params) => void;
   onCancel: (t: CompanyTxn) => void; onCopied: (m: string) => void;
 }) {
-  const rows = useTxnRows();
-  const filtered = applyTxnFilters(rows, p);
   const narrowed = Object.keys(p).some((k) => p[k] && k !== "tab" && k !== "page");
+  const page = Math.max(1, Number(p.page) || 1);
+  const pages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const paged = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  if (!filtered.length) {
+  if (!rows.length) {
     return (
       <EmptyState icon={narrowed ? "search" : "inbox"}
         title={narrowed ? "Nothing matches those filters" : "Nothing recorded yet"}
         body={narrowed
-          ? "Every count in the tiles above is for the whole ledger before any filter."
+          ? "The strip above counts the whole ledger — all " + all + " rows — before any filter."
           : "A row here means money actually moved — rent paid, interest credited, a deposit topped up. Record one to start."}
         action={narrowed
-          ? <button className="btn" onClick={() => onUnfilter("*")}>Clear all filters</button>
-          : (writable ? <button className="btn pri" onClick={onRecord}>Record a transaction</button> : null)} />
+          ? <Button color="secondary" onClick={() => onUnfilter("*")}>Clear all filters</Button>
+          : (writable ? <Button color="primary" ico="plus" onClick={onRecord}>Record a transaction</Button> : null)} />
     );
   }
   return (
-    <ListTable cls="fin-tbl" head={<tr>
-          <th className="rail" />
-          <th>Transaction</th>
-          <th>What</th>
-          <th>Tag</th>
-          <th>Direction</th>
-          <th className="n">Amount</th>
-          <th>Value date</th>
-          <th>State</th>
-          {/* THE ACTIONS COLUMN, where the chevron was. The chevron said the
-              row opens, which the row already says by being a link and by
-              lighting under the cursor; what it could not say is that anything
-              can be DONE from here, and until now nothing could. */}
-          <th className="tight" />
-        </tr>}>
-        {filtered.map((r) => (
+    <>
+      <ListTable min="66rem" head={<tr>
+        <th className="rail" />
+        <th scope="col">Transaction</th>
+        <th scope="col">What</th>
+        <th scope="col">Tag</th>
+        <th scope="col">Direction</th>
+        <th scope="col" className="n">Amount</th>
+        <th scope="col">Value date</th>
+        <th scope="col">State</th>
+        {/* THE ACTIONS COLUMN, where the chevron was. The chevron said the
+            row opens, which the row already says by being a link and by
+            lighting under the cursor; what it could not say is that anything
+            can be DONE from here, and until now nothing could. */}
+        <th scope="col" className="acts"><span className="sr-only">Actions</span></th>
+      </tr>}>
+        {paged.map((r) => (
           <TxnLine key={r.t.txnId} r={r} p={p} sa={writable && sa} onCancel={onCancel} onCopied={onCopied} />
         ))}
       </ListTable>
+      <Pagination alwaysCount page={page} pages={pages} total={rows.length} unit="transactions"
+        pageSize={PAGE_SIZE} shown={paged.length}
+        onPage={(n) => onParams({ page: n > 1 ? String(n) : undefined })} />
+    </>
   );
 }
 
@@ -305,28 +325,27 @@ function TxnLine({ r, p, sa, onCancel, onCopied }: {
   /* A CANCELLED ROW IS NOT CHASED FOR A BILL and is not an alarm either — it is
      the settled one. Rail stays clear; the struck figure and the chip say it. */
   const cancelled = t.state === "cancelled";
-  const rail = r.missingBill ? "warn" : "";
   const to = "#/finance-transactions/" + encodeURIComponent(t.txnId) + qs(carry(p));
   const open = () => go(to);
-  /* THE SAME `dim` A CANCELLED SUBSCRIPTION WEARS — greyed line, struck figure.
-     The module already had a treatment for a row that stands on the record and
-     counts for nothing, and this is exactly that. */
+  /* THE SAME DIMMING A CANCELLED SUBSCRIPTION WEARS. The module already had a
+     treatment for a row that stands on the record and counts for nothing, and
+     this is exactly that. */
   return (
-    <tr className={"clickable" + (cancelled ? " dim" : "")} tabIndex={0} role="link" aria-label={"Open " + t.txnId}
+    <tr className={cancelled ? "clickable opacity-60" : "clickable"} tabIndex={0} role="link"
+      aria-label={"Open " + t.txnId}
       onClick={open} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } }}>
-      <td className="rail"><i className={rail} /></td>
-      <td>
-        <div className="cell-1 mono">{t.txnId}</div>
-        <div className="cell-2">—</div>
+      <Rail tone={r.missingBill ? "warn" : undefined} />
+      <td className="cell-1 whitespace-nowrap">
+        <span className="font-mono tnum">{t.txnId}</span>
       </td>
-      <td>
-        <div className="cell-1 fin-desc" title={t.description}>{t.description}</div>
-        <div className="cell-2 faint fin-desc" title={t.party || undefined}>{t.party || "—"}</div>
+      <td className="max-w-72">
+        <div className="cell-1 truncate" title={t.description}>{t.description}</div>
+        <div className="cell-2 truncate" title={t.party || undefined}>{t.party || "—"}</div>
       </td>
       <td><TagChip k={t.tagKey} /></td>
       <td><Dir d={t.direction} /></td>
       <td className="n"><Money paise={t.amountPaise} sign={t.direction === "in"} strong /></td>
-      <td>
+      <td className="whitespace-nowrap">
         <div className="cell-1">{fmtDate(t.valueDate)}</div>
         <div className="cell-2">{ago(t.valueDate)}</div>
       </td>
@@ -341,7 +360,7 @@ function TxnLine({ r, p, sa, onCancel, onCopied }: {
           ? <div className="cell-2" title={t.cancellation.reason}>by {t.cancellation.by}</div>
           : null}
       </td>
-      <td className="tight">
+      <td className="acts">
         <TxnMenu txn={t} sa={sa} onCancel={() => onCancel(t)} onOpen={open} onCopied={onCopied} />
       </td>
     </tr>
@@ -362,19 +381,19 @@ function TagsTab({ writable, onBudget, onDeactivate }: {
           above. A caution over a table is read once and then looked past; the
           same sentence on the figure it governs is read at the moment somebody
           doubts the figure, which is the only moment it does any work. */}
-      <ListTable cls="fin-tbl" head={<tr>
-            <th>Tag</th>
-            <th>Rolls up to</th>
-            <th>Origin</th>
-            <th className="n">Spend · {PERIOD.label}</th>
-            <th>Budget</th>
-            <th>Bill</th>
-            <th className="tight" />
-          </tr>}>
-          {rows.map((r) => (
-            <TagLine key={r.tag.tagKey} r={r} writable={writable} onBudget={onBudget} onDeactivate={onDeactivate} />
-          ))}
-        </ListTable>
+      <ListTable min="64rem" head={<tr>
+        <th scope="col">Tag</th>
+        <th scope="col">Rolls up to</th>
+        <th scope="col">Origin</th>
+        <th scope="col" className="n">Spend · {PERIOD.label}</th>
+        <th scope="col">Budget</th>
+        <th scope="col">Bill</th>
+        <th scope="col" className="acts"><span className="sr-only">Actions</span></th>
+      </tr>}>
+        {rows.map((r) => (
+          <TagLine key={r.tag.tagKey} r={r} writable={writable} onBudget={onBudget} onDeactivate={onDeactivate} />
+        ))}
+      </ListTable>
     </>
   );
 }
@@ -386,13 +405,13 @@ function TagLine({ r, writable, onBudget, onDeactivate }: {
   const kind = tagKindMeta(t.kind);
   const sa = isSuperAdmin();
   return (
-    <tr className={t.active ? "" : "dim"}>
+    <tr className={t.active ? undefined : "opacity-60"}>
       <td><TagChip k={t.tagKey} big /></td>
       <td>
         <div className="cell-1">{kind?.label || t.kind}</div>
         <div className="cell-2">lands in {kind?.landsIn || "—"}</div>
       </td>
-      <td>{t.custom ? <span className="pill info">Custom</span> : <span className="pill mute">Shipped</span>}</td>
+      <td>{t.custom ? <Pill xs tone="info" text="Custom" /> : <Pill xs tone="neutral" text="Shipped" />}</td>
       <td className="n">
         <Money paise={r.spentPaise} />
         {r.n ? <div className="cell-2">{r.n} row{r.n === 1 ? "" : "s"}</div> : null}
@@ -401,21 +420,22 @@ function TagLine({ r, writable, onBudget, onDeactivate }: {
         <BudgetBar pct={r.pctOfBudget} />
         {t.budgetPaise ? <div className="cell-2">of {inr(t.budgetPaise)}</div> : null}
       </td>
-      <td>{t.proofRequired ? <span className="fin-fine">Bill required</span> : <span className="faint">optional</span>}</td>
-      <td className="tight">
+      <td>{t.proofRequired
+        ? <Fine>Bill required</Fine>
+        : <span className="text-quaternary">optional</span>}</td>
+      <td className="acts">
         {t.active ? (
-          <>
-            {writable ? <button className="btn sm" onClick={() => onBudget(t)}>Budget</button> : null}
-            {" "}
-            {writable ? (
-              <button className="btn sm dgr" disabled={!sa}
-                title={sa ? undefined : "Deactivating a tag is Super Admin only."}
-                onClick={() => onDeactivate(t)}>
-                Deactivate
-              </button>
-            ) : null}
-          </>
-        ) : <span className="pill mute">Inactive</span>}
+          <ActionMenu forWhat={t.label} items={[
+            { icon: "coin", label: "Set a budget", act: () => onBudget(t), disabled: !writable,
+              title: writable ? "A budget warns at 90% of itself and never blocks."
+                : "Setting a budget needs Finance edit rights." },
+            { icon: "lock", label: "Deactivate", act: () => onDeactivate(t), tone: "dgr",
+              disabled: !writable || !sa,
+              title: !writable ? "Deactivating a tag needs Finance edit rights."
+                : sa ? "Existing rows keep the tag; nothing new can be filed under it."
+                  : "Deactivating a tag is Super Admin only." },
+          ]} />
+        ) : <Pill xs tone="neutral" text="Inactive" />}
       </td>
     </tr>
   );

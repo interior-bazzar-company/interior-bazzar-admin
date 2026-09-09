@@ -1,6 +1,7 @@
 // ── ErrorBoundary ── last-resort catch for render-time throws so one broken
 // view can't blank the whole admin console.
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { Button } from "@/components/base/buttons/button";
 
 interface Props {
   children: ReactNode;
@@ -22,8 +23,7 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidUpdate(prev: Props) {
-    if (this.state.hasError && prev.resetKey !== this.props.resetKey)
-      this.setState({ hasError: false });
+    if (this.state.hasError && prev.resetKey !== this.props.resetKey) this.setState({ hasError: false });
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
@@ -33,14 +33,12 @@ class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div role="alert" style={{ minHeight: "60vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, padding: "40px 20px", textAlign: "center", color: "var(--text)" }}>
-          <h1 style={{ fontSize: "var(--text-2xl)", fontWeight: 600, letterSpacing: "-.02em" }}>Something went wrong</h1>
-          <p style={{ color: "var(--text-3)", maxWidth: 420 }}>An unexpected error occurred while showing this page.</p>
-          {/* The panel's own primary button, so the last-resort screen is on
-              the same tokens as everything it stands in for. */}
-          <button type="button" className="btn pri" onClick={() => window.location.reload()}>
+        <div role="alert" className="flex min-h-[60vh] flex-col items-center justify-center gap-3 p-10 text-center">
+          <h1 className="text-xl font-semibold tracking-tight text-primary">Something went wrong</h1>
+          <p className="max-w-md text-sm text-tertiary">An unexpected error occurred while showing this page. Nothing was changed.</p>
+          <Button color="secondary" size="sm" onClick={() => window.location.reload()}>
             Reload page
-          </button>
+          </Button>
         </div>
       );
     }

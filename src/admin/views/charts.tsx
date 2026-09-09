@@ -1,5 +1,5 @@
 /* =============================================================================
-   Users Management — the chart kit.
+   The chart kit.
    -----------------------------------------------------------------------------
    Seven forms, each picked from the data's job rather than from what looks good:
 
@@ -11,35 +11,22 @@
      BarRows        compare magnitude across classes          → ordinal / status
      CohortHeat     a grid of magnitudes                      → sequential
 
-   NO CHART LIBRARY. `recharts` is a declared dependency that nothing imports
-   and that is not in the bundle — pulling it in for four simple forms would add
-   about a hundred kilobytes gzipped to a bundle already over the size warning,
-   and it would theme awkwardly: this panel's colours are CSS custom properties
-   that flip with the viewer's theme, and a library that wants hex props fights
-   that. These are CSS, so they are responsive without viewBox arithmetic and
-   dark mode is a token swap rather than a second palette.
-
-   THE COLOURS ARE NOT EYEBALLED. Every value comes from a token in
-   admin-theme.css and every set was run through the palette validator, in both
-   modes, before any of this was written — see the block at the top of the chart
-   section in users.css for the results. Categorical slots are assigned in fixed
-   order and never cycled; ordered things (funnel stages, plan tiers, retention)
-   take a one-hue ramp so the reader sees the order in the colour; membership
-   states wear the reserved status tokens and always carry their label.
-
-   Every chart ships a legend when it has two or more series, selective direct
-   labels rather than a number on every mark, and a hover/focus tooltip. Bars
-   are capped thin, rounded at the data end and square at the baseline, and
-   separated by a 2px gap in the surface colour rather than by a stroke.
-   ============================================================================= */
-import { useId } from "react";
-import type { ReactNode } from "react";
+   The four that plot against an axis are recharts, on Untitled UI's chart
+   furniture; the three that are really lists (a funnel, ranked bars, a cohort
+   grid) are laid out as lists, because their labels are words and words want
+   the document's own layout. Every colour is a `--color-chart-*` token read
+   through a utility class, so a chart is correct in both themes without
+   knowing a theme exists — slot order is fixed and never cycled, and status
+   colours are never a series.
+   ========================================================================== */
+import { useId, type ReactNode } from "react";
+import { Bar, BarChart, Cell, LabelList, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip as RTooltip, XAxis, YAxis } from "recharts";
+import { ChartTooltipContent } from "@/components/application/charts/charts-base";
+import { cx } from "@/utils/cx";
+import { Tooltip as UITooltip, TooltipTrigger } from "@/components/base/tooltip/tooltip";
 
 /* ------------------------------------------------------------- scaling --- */
-
-/** A round axis maximum and its ticks. Axis ticks carry the values that are not
- *  directly labelled, so they have to land on numbers a reader can hold — 200,
- *  not 187. */
+/** A round axis maximum and its ticks — 200, not 187. */
 export function niceScale(max: number, ticks = 4): { max: number; steps: number[] } {
   if (max <= 0) return { max: 1, steps: [0, 1] };
   const raw = max / ticks;
@@ -53,157 +40,112 @@ export function niceScale(max: number, ticks = 4): { max: number; steps: number[
 }
 
 const pctOf = (n: number, max: number) => (max > 0 ? Math.max(n > 0 ? 1.5 : 0, (n / max) * 100) : 0);
+const fmt = (n: number) => n.toLocaleString("en-IN");
+
+/* the slots, as fill/stroke utilities — never a literal */
+const SLOT_FILL = ["", "fill-chart-1", "fill-chart-2", "fill-chart-3", "fill-chart-4", "fill-chart-5", "fill-chart-6", "fill-chart-7", "fill-chart-8"];
+const SLOT_BG = ["", "bg-chart-1", "bg-chart-2", "bg-chart-3", "bg-chart-4", "bg-chart-5", "bg-chart-6", "bg-chart-7", "bg-chart-8"];
+/* The value axis's width, and the same number as `--chart-gutter` in
+   brand.css — recharts wants an integer, a label row under the plot wants the
+   token. They must not drift apart: a label row that starts anywhere else
+   points at the wrong column. */
+const AXIS_W = 44;
+
+const AXIS_TICK = { className: "fill-text-quaternary font-mono", fontSize: 11 } as const;
+const GRID = "stroke-chart-grid";
 
 /* --------------------------------------------------------- column chart --- */
+export interface Series {
+  key: string;
+  label: string;
+  slot: 1 | 2 | 3;
+}
+export interface ColumnPoint {
+  key: string;
+  label: string;
+  values: Record<string, number>;
+}
 
-export interface Series { key: string; label: string; slot: 1 | 2 | 3 }
-export interface ColumnPoint { key: string; label: string; values: Record<string, number> }
-
-/**
- * Grouped columns: several distinct series over time.
- *
- * Grouped rather than stacked on purpose. Stacking would imply the three
- * quantities sum to something meaningful, and the one thing this module has to
- * keep straight is that renewals are NOT part of first-time members. Side by
- * side off a shared baseline says "compare these", which is the actual job.
- */
-export function ColumnChart({ series, points, unit, labelSeries }: {
-  series: Series[];
-  points: ColumnPoint[];
-  unit: string;
-  /** Direct-label ONE series, in the final group only.
-   *
-   *  Not all three. Three labels over a three-column group are ~20px of text
-   *  each in a group that can be 70px wide at container widths this panel
-   *  actually hits, and a label that will not fit must not be placed — the
-   *  skill's rule and the obvious one. Labelling the tallest series anchors the
-   *  scale without any chance of collision; the tiles under the chart carry the
-   *  current period for all three at a size that cannot collide, and the
-   *  tooltip carries every group. */
-  labelSeries?: string;
-}) {
+/** Grouped columns: several distinct series over time — side by side off a
+ *  shared baseline, so the reader compares rather than sums. */
+export function ColumnChart({ series, points, unit, labelSeries, height = 220 }: { series: Series[]; points: ColumnPoint[]; unit: string; labelSeries?: string; height?: number }) {
   const id = useId();
+  const data = points.map((p) => ({ name: p.label, key: p.key, ...p.values }));
   const peak = Math.max(1, ...points.flatMap((p) => series.map((s) => p.values[s.key] || 0)));
   const scale = niceScale(peak);
-  /* Max at the top. Both the ticks and the rules are positioned from this one
-     reversed list, at the same percentages, so they cannot drift apart. */
-  const ticks = scale.steps.slice().reverse();
-  const at = (i: number) => (ticks.length > 1 ? (i / (ticks.length - 1)) * 100 : 0);
-
+  const last = points.length - 1;
   return (
-    <figure className="ch-chart" aria-labelledby={id + "-cap"}>
-      <Legend series={series} />
-      <div className="ch-chartbody">
-        {/* Ticks and gridlines are absolutely positioned on the SAME
-            percentages and both centred on their own line. Distributing them
-            with two independent `space-between` flex columns looked right and
-            was not: the label boxes have height and the rules do not, so only
-            the middle label ever landed on its rule. */}
-        <div className="ch-yaxis" aria-hidden="true">
-          {ticks.map((v, i) => (
-            <span key={v} className="tnum" style={{ top: at(i) + "%" }}>
-              {v.toLocaleString("en-IN")}
-            </span>
-          ))}
-        </div>
-        <div className="ch-plotarea">
-          {ticks.map((v, i) => <i key={v} className="ch-rule" style={{ top: at(i) + "%" }} />)}
-          <div className="ch-groups">
-            {points.map((p, gi) => (
-              <div className="ch-group" key={p.key} tabIndex={0}
-                aria-label={p.label + ": " + series.map((s) =>
-                  s.label + " " + (p.values[s.key] || 0)).join(", ")}>
-                <div className="ch-cols">
-                  {series.map((s) => {
-                    const v = p.values[s.key] || 0;
-                    const label = labelSeries === s.key && gi === points.length - 1;
-                    return (
-                      <span key={s.key} className={"ch-col s" + s.slot}
-                        style={{ height: pctOf(v, scale.max) + "%" }}>
-                        {label ? <em className="tnum">{v.toLocaleString("en-IN")}</em> : null}
-                      </span>
-                    );
-                  })}
-                </div>
-                <span className="ch-tip" role="tooltip">
-                  <b>{p.label}</b>
-                  {series.map((s) => (
-                    <span key={s.key}>
-                      <i className={"sw s" + s.slot} />
-                      {s.label}
-                      <em className="tnum">{(p.values[s.key] || 0).toLocaleString("en-IN")}</em>
-                    </span>
-                  ))}
-                </span>
-              </div>
+    <figure aria-labelledby={id + "-cap"} className="flex min-w-0 flex-col gap-2">
+      {series.length > 1 ? <ChartLegend items={series.map((s) => ({ label: s.label, cls: SLOT_BG[s.slot] }))} /> : null}
+      <div style={{ height }} className="min-w-0">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 16, right: 8, bottom: 0, left: 0 }} barCategoryGap="28%" barGap={3}>
+            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={AXIS_TICK} interval="preserveStartEnd" />
+            <YAxis axisLine={false} tickLine={false} tick={AXIS_TICK} width={AXIS_W} ticks={scale.steps} domain={[0, scale.max]} tickFormatter={fmt} />
+            <RTooltip cursor={{ className: "fill-bg-secondary" }} content={<ChartTooltipContent />} formatter={(v) => fmt(Number(v))} />
+            {scale.steps.map((s) => (
+              <ReferenceLine key={s} y={s} className={GRID} strokeWidth={1} />
             ))}
-          </div>
-        </div>
+            {series.map((s) => (
+              <Bar key={s.key} dataKey={s.key} name={s.label} className={SLOT_FILL[s.slot]} radius={[3, 3, 0, 0]} maxBarSize={40} isAnimationActive={false}>
+                {labelSeries === s.key ? (
+                  <LabelList
+                    dataKey={s.key}
+                    position="top"
+                    className="fill-text-secondary font-mono"
+                    fontSize={11}
+                    formatter={(v: ReactNode) => fmt(Number(v))}
+                    content={(props) => {
+                      const { x, y, width, value, index } = props as { x?: number; y?: number; width?: number; value?: number; index?: number };
+                      if (index !== last || x === undefined || y === undefined) return null;
+                      return (
+                        <text x={(x || 0) + (width || 0) / 2} y={(y || 0) - 6} textAnchor="middle" className="fill-text-secondary font-mono" fontSize={11}>
+                          {fmt(Number(value || 0))}
+                        </text>
+                      );
+                    }}
+                  />
+                ) : null}
+              </Bar>
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
       </div>
-      <div className="ch-xband" aria-hidden="true">
-        {points.map((p) => <span key={p.key}>{p.label}</span>)}
-      </div>
-      <figcaption id={id + "-cap"} className="ch-unit">{unit}</figcaption>
+      <figcaption id={id + "-cap"} className="label-mono">
+        {unit}
+      </figcaption>
     </figure>
   );
 }
 
-function Legend({ series }: { series: Series[] }) {
-  /* A legend is the dependable identity channel and is always present for two
-     or more series. One series needs none — the section head names it. */
-  if (series.length < 2) return null;
+function ChartLegend({ items }: { items: { label: ReactNode; cls: string }[] }) {
   return (
-    <div className="ch-legend2">
-      {series.map((s) => (
-        <span key={s.key}><i className={"sw s" + s.slot} />{s.label}</span>
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-tertiary">
+      {items.map((s, i) => (
+        <span key={i} className="inline-flex items-center gap-1.5">
+          <i className={cx("block size-2 rounded-[2px]", s.cls)} />
+          {s.label}
+        </span>
       ))}
     </div>
   );
 }
 
 /* ------------------------------------------------------------ waterfall --- */
-
 export interface WaterStep {
   key: string;
   label: string;
-  /** Under the label — a count, a caveat, whatever the row is worth saying. */
   sub?: string;
-  /** SIGNED, in the chart's own unit. `total` steps ignore the sign and are
-   *  drawn from the baseline to the running total instead. */
   value: number;
-  /** What to PRINT, when the plotted number is a scaled one.
-   *
-   *  Geometry and legibility want different units here: an axis gutter is 38px
-   *  and cannot hold `6,77,320`, while a bar's own label has the whole column
-   *  and should carry the exact figure rather than a rounded one. So the
-   *  caller scales `value` for the axis and passes the real amount here. */
   display?: string;
   kind: "in" | "out" | "total";
 }
 
-/**
- * A waterfall: how a period got from nothing to its closing figure.
- *
- * WHY THIS AND NOT A ROW OF TILES. Seven tiles side by side are seven facts
- * with no relationship drawn between them, and the closing figure's own caption
- * has to spell the arithmetic out in words — "collected + other in − salary −
- * spend − refunds". A waterfall IS that sentence, so the sentence comes off.
- *
- * A ZERO STEP IS DRAWN, not skipped. A month whose salary run has not been paid
- * yet is the most important thing on this chart and a tile reading ₹0 buries
- * it: here it is a visible flat span with the connector running straight
- * through, which reads as "nothing happened here" rather than as "nothing is
- * owed".
- *
- * The connectors are what make it legible — without them a floating bar is just
- * a bar at a strange height — so they are drawn from each step's closing level
- * to the next step's opening one, never inferred by the eye.
- */
-export function Waterfall({ steps, unit }: { steps: WaterStep[]; unit: string }) {
+/** How a period got from nothing to its closing figure. A zero step is drawn,
+ *  not skipped; the connectors run from each step's closing level to the next
+ *  one's opening level, so the arithmetic is a picture. */
+export function Waterfall({ steps, unit, height = 240 }: { steps: WaterStep[]; unit: string; height?: number }) {
   const id = useId();
-
-  /* Running totals first: every geometry below is read off these, so the bar,
-     the connector and the tooltip cannot disagree about where a step sits. */
   let run = 0;
   const laid = steps.map((s) => {
     const from = s.kind === "total" ? 0 : run;
@@ -211,314 +153,351 @@ export function Waterfall({ steps, unit }: { steps: WaterStep[]; unit: string })
     if (s.kind !== "total") run = to;
     return { s, from, to, lo: Math.min(from, to), hi: Math.max(from, to) };
   });
-
   const peak = Math.max(1, ...laid.map((l) => l.hi));
   const scale = niceScale(peak);
-  const y = (v: number) => (v / scale.max) * 100;
-  const ticks = scale.steps.slice().reverse();
-  const at = (i: number) => (ticks.length > 1 ? (i / (ticks.length - 1)) * 100 : 0);
-
+  const data = laid.map((l) => ({ name: l.s.label, base: l.lo, delta: Math.max(l.hi - l.lo, 0), kind: l.s.kind, display: l.s.display ?? fmt(l.s.value), sub: l.s.sub }));
+  const fillOf = (k: WaterStep["kind"]) => (k === "in" ? "fill-chart-pos" : k === "out" ? "fill-chart-neg" : "fill-chart-1");
   return (
-    <figure className="ch-chart" aria-labelledby={id + "-cap"}>
-      <div className="ch-chartbody">
-        <div className="ch-yaxis" aria-hidden="true">
-          {ticks.map((v, i) => (
-            <span key={v} className="tnum" style={{ top: at(i) + "%" }}>{v.toLocaleString("en-IN")}</span>
-          ))}
-        </div>
-        <div className="ch-plotarea">
-          {ticks.map((v, i) => <i key={v} className="ch-rule" style={{ top: at(i) + "%" }} />)}
-          <div className="ch-groups ch-wf">
+    <figure aria-labelledby={id + "-cap"} className="flex min-w-0 flex-col gap-2">
+      <div style={{ height }} className="min-w-0">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 18, right: 8, bottom: 0, left: 0 }} barCategoryGap="30%">
+            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={AXIS_TICK} interval={0} />
+            <YAxis axisLine={false} tickLine={false} tick={AXIS_TICK} width={AXIS_W} ticks={scale.steps} domain={[0, scale.max]} tickFormatter={fmt} />
+            {scale.steps.map((s) => (
+              <ReferenceLine key={s} y={s} className={GRID} strokeWidth={1} />
+            ))}
+            {/* the connectors: from this step's closing level to the next step's opening */}
             {laid.map((l, i) => {
               const next = laid[i + 1];
-              return (
-                <div className="ch-group" key={l.s.key} tabIndex={0}
-                  aria-label={l.s.label + ": " + (l.s.display ?? l.s.value.toLocaleString("en-IN"))}>
-                  <div className="ch-wfcol">
-                    {/* The connector leaves at THIS step's closing level and is
-                        the next step's opening level by construction. */}
-                    {next && next.s.kind !== "total"
-                      ? <i className="ch-wfjoin" style={{ bottom: y(l.to) + "%" }} />
-                      : null}
-                    <span className={"ch-wfbar k-" + l.s.kind}
-                      style={{
-                        bottom: y(l.lo) + "%",
-                        height: Math.max(l.hi === l.lo ? 0 : 1.2, y(l.hi) - y(l.lo)) + "%",
-                      }}>
-                      <em className="tnum">{l.s.display ?? l.s.value.toLocaleString("en-IN")}</em>
-                    </span>
-                  </div>
-                  <span className="ch-tip" role="tooltip">
-                    <b>{l.s.label}</b>
-                    <span>
-                      <i className={"sw k-" + l.s.kind} />
-                      {l.s.kind === "total" ? "closing" : l.s.kind === "in" ? "in" : "out"}
-                      <em className="tnum">{l.s.display ?? l.s.value.toLocaleString("en-IN")}</em>
-                    </span>
-                    {/* NO RUNNING TOTAL IN THE TOOLTIP. It was there, and it
-                        printed the SCALED number — `728` where the bar beside
-                        it said ₹7,27,882 — because the running total is
-                        computed from the plotted values and the exact figures
-                        only exist per step. A number with no unit beside one
-                        with a unit is the kind of thing this page removed
-                        elsewhere; the connector already shows where the total
-                        stands, which is what the line was for. */}
-                  </span>
-                </div>
-              );
+              if (!next || next.s.kind === "total") return null;
+              return <ReferenceLine key={"c" + i} segment={[{ x: l.s.label, y: l.to }, { x: next.s.label, y: l.to }]} className="stroke-chart-axis" strokeDasharray="3 3" strokeWidth={1} />;
             })}
-          </div>
+            <RTooltip
+              cursor={{ className: "fill-bg-secondary" }}
+              content={({ active, payload }) => {
+                if (!active || !payload || !payload.length) return null;
+                const d = payload[0].payload as (typeof data)[number];
+                return (
+                  <div className="rounded-lg bg-primary-solid px-3 py-2 shadow-lg">
+                    <p className="text-xs font-semibold text-white">{d.name}</p>
+                    <p className="text-xs text-tooltip-supporting-text">
+                      {d.kind === "total" ? "closing" : d.kind}: {d.display}
+                    </p>
+                  </div>
+                );
+              }}
+            />
+            <Bar dataKey="base" stackId="w" className="fill-transparent" isAnimationActive={false} />
+            <Bar dataKey="delta" stackId="w" radius={[3, 3, 0, 0]} maxBarSize={44} isAnimationActive={false}>
+              {data.map((d, i) => (
+                <Cell key={i} className={fillOf(d.kind as WaterStep["kind"])} />
+              ))}
+              <LabelList
+                dataKey="display"
+                position="top"
+                content={(props) => {
+                  const { x, y, width, value } = props as { x?: number; y?: number; width?: number; value?: string };
+                  return (
+                    <text x={(x || 0) + (width || 0) / 2} y={(y || 0) - 6} textAnchor="middle" className="fill-text-secondary font-mono" fontSize={11}>
+                      {value}
+                    </text>
+                  );
+                }}
+              />
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      {steps.some((s) => s.sub) ? (
+        <div className="grid pl-[var(--chart-gutter)] text-center text-2xs text-quaternary" style={{ gridTemplateColumns: `repeat(${steps.length}, minmax(0, 1fr))` }}>
+          {steps.map((s) => (
+            <span key={s.key} className="truncate px-1">
+              {s.sub}
+            </span>
+          ))}
         </div>
-      </div>
-      <div className="ch-xband ch-wfband" aria-hidden="true">
-        {laid.map((l) => (
-          <span key={l.s.key}>
-            {l.s.label}
-            {l.s.sub ? <em>{l.s.sub}</em> : null}
-          </span>
-        ))}
-      </div>
-      <figcaption id={id + "-cap"} className="ch-unit">{unit}</figcaption>
+      ) : null}
+      <figcaption id={id + "-cap"} className="label-mono">
+        {unit}
+      </figcaption>
     </figure>
   );
 }
 
 /* ------------------------------------------------------ signed columns --- */
-
 export interface SignedPoint {
-  key: string; label: string; value: number;
-  /** As on a waterfall step: what to print when `value` is scaled for the axis. */
+  key: string;
+  label: string;
+  value: number;
   display?: string;
 }
 
-/**
- * One series over time, drawn against a ZERO RULE with negatives below it.
- *
- * THE ONE PLACE COLOUR ENCODES SIGN rather than identity. Everywhere else in
- * the kit a hue means "which series"; here there is only one series and the
- * whole question is which side of nothing it is on, so ok/bad carry it — and
- * the rule itself, the only axis line the kit draws, is what they are read
- * against.
- *
- * A line chart was the obvious alternative and hides the crossing: a polyline
- * passing through zero looks like any other segment, while a column that flips
- * from below the rule to above it is the event the reader came for.
- *
- * DIRECT LABELS ARE SELECTIVE — the extreme in each direction and the last
- * point, never a number on every column, which at twenty months is twenty
- * collisions.
- */
-export function SignedColumns({ points, unit, groups }: {
-  points: SignedPoint[];
-  unit: string;
-  /** Optional spans under the axis: `{label, n}` in order, n = how many points. */
-  groups?: { label: string; n: number }[];
-}) {
+/** One series over time against a ZERO RULE — the one place colour encodes
+ *  sign rather than identity. Labels are selective: the extreme each way and
+ *  the last point. */
+export function SignedColumns({ points, unit, groups, height = 200 }: { points: SignedPoint[]; unit: string; groups?: { label: string; n: number }[]; height?: number }) {
   const id = useId();
-  const hi = Math.max(0, ...points.map((p) => p.value));
-  const lo = Math.min(0, ...points.map((p) => p.value));
-  const span = Math.max(1, hi - lo);
-  /* The zero rule sits where zero actually falls in the range, so a month is
-     never drawn taller than another month of the same size. */
-  const zero = (hi / span) * 100;
+  const data = points.map((p) => ({ name: p.label, value: p.value, display: p.display ?? fmt(p.value) }));
   const idxHi = points.reduce((b, p, i) => (p.value > points[b].value ? i : b), 0);
   const idxLo = points.reduce((b, p, i) => (p.value < points[b].value ? i : b), 0);
-
+  const labelled = new Set([idxHi, idxLo, points.length - 1]);
   return (
-    <figure className="ch-chart" aria-labelledby={id + "-cap"}>
-      <div className="ch-sgn">
-        <i className="ch-sgnzero" style={{ top: zero + "%" }} />
-        {points.map((p, i) => {
-          const up = p.value >= 0;
-          const h = (Math.abs(p.value) / span) * 100;
-          const label = i === idxHi || i === idxLo || i === points.length - 1;
-          return (
-            <div className="ch-sgncol" key={p.key} tabIndex={0}
-              aria-label={p.label + ": " + (p.display ?? p.value.toLocaleString("en-IN"))}>
-              <span className={"ch-sgnbar " + (up ? "up" : "dn")}
-                style={up
-                  ? { bottom: 100 - zero + "%", height: Math.max(1, h) + "%" }
-                  : { top: zero + "%", height: Math.max(1, h) + "%" }}>
-                {label ? <em className={"tnum " + (up ? "up" : "dn")}>{p.display ?? p.value.toLocaleString("en-IN")}</em> : null}
-              </span>
-              <span className="ch-tip" role="tooltip">
-                <b>{p.label}</b>
-                <span><i className={"sw " + (up ? "st-ok" : "st-bad")} />net<em className="tnum">{p.display ?? p.value.toLocaleString("en-IN")}</em></span>
-              </span>
-            </div>
-          );
-        })}
-      </div>
-      <div className="ch-xband" aria-hidden="true">
-        {points.map((p) => <span key={p.key}>{p.label}</span>)}
+    <figure aria-labelledby={id + "-cap"} className="flex min-w-0 flex-col gap-2">
+      <div style={{ height }} className="min-w-0">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 16, right: 8, bottom: 0, left: 0 }} barCategoryGap="30%">
+            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={AXIS_TICK} interval="preserveStartEnd" />
+            <YAxis axisLine={false} tickLine={false} tick={AXIS_TICK} width={AXIS_W} tickFormatter={fmt} />
+            <ReferenceLine y={0} className="stroke-chart-axis" strokeWidth={1} />
+            <RTooltip
+              cursor={{ className: "fill-bg-secondary" }}
+              content={({ active, payload }) => {
+                if (!active || !payload || !payload.length) return null;
+                const d = payload[0].payload as (typeof data)[number];
+                return (
+                  <div className="rounded-lg bg-primary-solid px-3 py-2 shadow-lg">
+                    <p className="text-xs font-semibold text-white">{d.name}</p>
+                    <p className="text-xs text-tooltip-supporting-text">net: {d.display}</p>
+                  </div>
+                );
+              }}
+            />
+            <Bar dataKey="value" radius={[3, 3, 0, 0]} maxBarSize={36} isAnimationActive={false}>
+              {data.map((d, i) => (
+                <Cell key={i} className={d.value >= 0 ? "fill-chart-pos" : "fill-chart-neg"} />
+              ))}
+              <LabelList
+                dataKey="display"
+                content={(props) => {
+                  const { x, y, width, height: h, value, index } = props as { x?: number; y?: number; width?: number; height?: number; value?: string; index?: number };
+                  if (index === undefined || !labelled.has(index)) return null;
+                  const up = (data[index]?.value ?? 0) >= 0;
+                  /* recharts hands a bar below the axis either as (y at the
+                     axis, negative height) or (y at the bar's bottom, positive
+                     height) depending on the version — so the label sits off
+                     whichever edge is the far one, never on the bar itself */
+                  const y0 = y || 0, y1 = (y || 0) + (h || 0);
+                  const ty = up ? Math.min(y0, y1) - 5 : Math.max(y0, y1) + 12;
+                  return (
+                    <text x={(x || 0) + (width || 0) / 2} y={ty} textAnchor="middle" className={cx("font-mono", up ? "fill-text-success-primary" : "fill-text-error-primary")} fontSize={11}>
+                      {value}
+                    </text>
+                  );
+                }}
+              />
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
       </div>
       {groups ? (
-        <div className="ch-sgnbands" aria-hidden="true">
-          {groups.map((g) => <span key={g.label} style={{ flexGrow: g.n }}>{g.label}</span>)}
+        <div className="flex pl-[var(--chart-gutter)] text-center text-2xs text-quaternary" aria-hidden="true">
+          {groups.map((g) => (
+            <span key={g.label} className="border-t border-secondary pt-1" style={{ flexGrow: g.n, flexBasis: 0 }}>
+              {g.label}
+            </span>
+          ))}
         </div>
       ) : null}
-      <figcaption id={id + "-cap"} className="ch-unit">{unit}</figcaption>
+      <figcaption id={id + "-cap"} className="label-mono">
+        {unit}
+      </figcaption>
     </figure>
   );
 }
 
 /* ------------------------------------------------------------- sparkline --- */
-
-/**
- * A metric's shape, at 96×24 with no axis and one end dot.
- *
- * IT IS OMITTED WHERE THERE IS NO HISTORY rather than drawn flat. A single
- * reading rendered as a horizontal line is a claim about stability that the
- * records do not make — the caller passes `null` and the card says "first
- * reading" instead.
- *
- * A delta alone cannot say this: a fall from a one-off spike and a steady
- * decline both print −90.6%, and only the shape tells them apart.
- */
-export function Spark({ values, tone, label }: {
-  values: number[];
-  /** `s1` revenue-ish, `s2` cost-ish — identity, not status. */
-  tone: "s1" | "s2";
-  label: string;
-}) {
+/** A metric's shape at 96×24, no axis, one end dot. Omitted where there is
+ *  no history rather than drawn flat. */
+export function Spark({ values, tone, label, width = 96, height = 24 }: { values: number[]; tone: "s1" | "s2"; label: string; width?: number; height?: number }) {
   if (values.length < 2) return null;
-  const hi = Math.max(...values, 0);
-  const lo = Math.min(...values, 0);
-  const span = Math.max(1, hi - lo);
-  const step = 96 / (values.length - 1);
-  const y = (v: number) => 23 - ((v - lo) / span) * 22;
-  const pts = values.map((v, i) => (i * step).toFixed(1) + "," + y(v).toFixed(1)).join(" ");
-  const last = values[values.length - 1];
+  const data = values.map((v, i) => ({ i, v }));
+  const stroke = tone === "s1" ? "[&_path]:stroke-chart-1" : "[&_path]:stroke-chart-2";
+  const dot = tone === "s1" ? "fill-chart-1" : "fill-chart-2";
   return (
-    <svg className={"ch-spark " + tone} width="96" height="24" viewBox="0 0 96 24"
-      fill="none" role="img" aria-label={label}>
-      <polyline points={pts} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-      <circle cx="96" cy={y(last).toFixed(1)} r="2.5" />
-    </svg>
+    <div style={{ width, height }} role="img" aria-label={label} className="shrink-0">
+      <LineChart width={width} height={height} data={data} margin={{ top: 3, right: 3, bottom: 3, left: 3 }}>
+        <Line type="monotone" dataKey="v" dot={false} strokeWidth={2} isAnimationActive={false} className={stroke} activeDot={false} />
+        <Line
+          dataKey="v"
+          stroke="none"
+          isAnimationActive={false}
+          dot={(p) => {
+            const { cx: x, cy, index } = p as { cx?: number; cy?: number; index?: number };
+            if (index !== data.length - 1) return <g key={index} />;
+            return <circle key={index} cx={x} cy={cy} r={2.5} className={dot} />;
+          }}
+        />
+      </LineChart>
+    </div>
   );
 }
 
 /* --------------------------------------------------------------- funnel --- */
+export interface Stage {
+  key: string;
+  label: string;
+  value: number;
+  note?: string;
+}
+const ORDINAL = ["bg-chart-seq-5", "bg-chart-seq-4", "bg-chart-seq-3", "bg-chart-seq-2", "bg-chart-seq-1"];
 
-export interface Stage { key: string; label: string; value: number; note?: string }
-
-/**
- * Ordered stages, as horizontal bars on an ordinal ramp.
- *
- * Not a tapering funnel graphic: those encode the value in a trapezoid's area,
- * which nobody can read, and the width already carries it. The drop between
- * stages is the number people actually want, so it is stated rather than left
- * to be inferred from two bar lengths.
- */
+/** Ordered stages as horizontal bars on an ordinal ramp; the drop between
+ *  stages is stated rather than inferred. */
 export function FunnelChart({ stages, unit }: { stages: Stage[]; unit: string }) {
   const top = Math.max(1, ...stages.map((s) => s.value));
   return (
-    <figure className="ch-chart">
-      <div className="ch-rows funnel">
-        {stages.map((s, i) => (
-          <div className="ch-row" key={s.key} tabIndex={0}
-            aria-label={s.label + ": " + s.value + (i && stages[i - 1].value ? ", " + Math.round((s.value / stages[i - 1].value) * 100) + "% of the stage before" : "")}>
-            <span className="lab">{s.label}</span>
-            <span className="track">
-              <i className={"fill o" + (i + 1)} style={{ width: pctOf(s.value, top) + "%" }} />
-            </span>
-            <span className="val tnum">{s.value.toLocaleString("en-IN")}</span>
-            {/* An empty previous stage has no ratio: 3 ÷ 0 printed "Infinity%
-                of previous", which is a number nobody can act on. */}
-            <span className="delta">
-              {i ? (stages[i - 1].value ? Math.round((s.value / stages[i - 1].value) * 100) + "% of previous" : "previous stage empty") : "—"}
-            </span>
-            {s.note ? <span className="ch-tip" role="tooltip">{s.note}</span> : null}
-          </div>
-        ))}
-      </div>
-      <figcaption className="ch-unit">{unit}</figcaption>
+    <figure className="flex min-w-0 flex-col gap-2">
+      <ol className="flex flex-col gap-2">
+        {stages.map((s, i) => {
+          const prev = i ? stages[i - 1].value : 0;
+          const delta = i ? (prev ? Math.round((s.value / prev) * 100) + "% of previous" : "previous stage empty") : "—";
+          const row = (
+            <li
+              key={s.key}
+              className="grid grid-cols-[minmax(6rem,10rem)_1fr_auto] items-center gap-3 rounded-md outline-focus-ring focus-visible:outline-2 focus-visible:outline-offset-2"
+              tabIndex={0}
+              aria-label={s.label + ": " + s.value + (i && prev ? ", " + delta : "")}
+            >
+              <span className="truncate text-sm text-secondary">{s.label}</span>
+              <span className="h-5 overflow-hidden rounded-[3px] bg-secondary">
+                <i className={cx("block h-full rounded-r-[3px]", ORDINAL[Math.min(i, ORDINAL.length - 1)])} style={{ width: pctOf(s.value, top) + "%" }} />
+              </span>
+              <span className="flex flex-col items-end leading-tight">
+                <span className="text-sm font-medium text-primary tnum">{fmt(s.value)}</span>
+                <span className="text-2xs text-quaternary">{delta}</span>
+              </span>
+            </li>
+          );
+          return s.note ? (
+            <UITooltip key={s.key} title={s.note} placement="top">
+              <TooltipTrigger className="w-full text-left">{row}</TooltipTrigger>
+            </UITooltip>
+          ) : (
+            row
+          );
+        })}
+      </ol>
+      <figcaption className="label-mono">{unit}</figcaption>
     </figure>
   );
 }
 
 /* ------------------------------------------------------------- bar rows --- */
-
 export interface BarRow {
   key: string;
-  /** Rendered label. A pill, a plan chip or plain text — identity comes from
-   *  the mark beside it, never from colouring the text. */
   label: ReactNode;
   value: number;
-  /** `o1..o3` an ordinal step, `st-ok|warn|bad|mute` a reserved status, or
-   *  omitted for the single-series hue. */
+  /** `o1..o5` an ordinal step, `s1..s8` a slot, `st-ok|warn|bad|mute` a status */
   tone?: string;
   hint?: ReactNode;
   title?: string;
 }
+const ROW_TONE: Record<string, string> = {
+  s1: "bg-chart-1",
+  s2: "bg-chart-2",
+  s3: "bg-chart-3",
+  s4: "bg-chart-4",
+  s5: "bg-chart-5",
+  s6: "bg-chart-6",
+  s7: "bg-chart-7",
+  s8: "bg-chart-8",
+  o1: "bg-chart-seq-5",
+  o2: "bg-chart-seq-4",
+  o3: "bg-chart-seq-3",
+  o4: "bg-chart-seq-2",
+  o5: "bg-chart-seq-1",
+  "st-ok": "bg-utility-green-500",
+  "st-warn": "bg-utility-yellow-500",
+  "st-bad": "bg-utility-red-500",
+  "st-mute": "bg-utility-neutral-400",
+};
 
-/**
- * Horizontal bars for comparing magnitude across classes.
- *
- * Horizontal because the category names are words, not dates — a column chart
- * would rotate them or truncate them. The value rides the tip of each bar; the
- * hint carries the secondary figure, which is a label and not a second axis.
- */
+/** Horizontal bars comparing magnitude across classes — horizontal because the
+ *  category names are words. */
 export function BarRows({ rows, unit, max }: { rows: BarRow[]; unit?: string; max?: number }) {
   const top = max ?? Math.max(1, ...rows.map((r) => r.value));
   return (
-    <figure className="ch-chart">
-      <div className="ch-rows">
-        {rows.map((r) => (
-          <div className="ch-row" key={r.key} tabIndex={r.title ? 0 : undefined}>
-            <span className="lab">{r.label}</span>
-            <span className="track">
-              <i className={"fill " + (r.tone || "s1")} style={{ width: pctOf(r.value, top) + "%" }} />
-            </span>
-            <span className="val tnum">{r.value.toLocaleString("en-IN")}</span>
-            {r.hint ? <span className="delta">{r.hint}</span> : null}
-            {r.title ? <span className="ch-tip" role="tooltip">{r.title}</span> : null}
-          </div>
-        ))}
-      </div>
-      {unit ? <figcaption className="ch-unit">{unit}</figcaption> : null}
+    <figure className="flex min-w-0 flex-col gap-2">
+      <ol className="flex flex-col gap-2">
+        {rows.map((r) => {
+          const row = (
+            <li key={r.key} className="grid grid-cols-[minmax(6rem,11rem)_1fr_auto] items-center gap-3 rounded-md outline-focus-ring focus-visible:outline-2 focus-visible:outline-offset-2" tabIndex={r.title ? 0 : undefined}>
+              <span className="min-w-0 truncate text-sm text-secondary">{r.label}</span>
+              <span className="h-4 overflow-hidden rounded-[3px] bg-secondary">
+                <i className={cx("block h-full rounded-r-[3px]", ROW_TONE[r.tone || "s1"] || ROW_TONE.s1)} style={{ width: pctOf(r.value, top) + "%" }} />
+              </span>
+              <span className="flex flex-col items-end leading-tight">
+                <span className="text-sm font-medium text-primary tnum">{fmt(r.value)}</span>
+                {r.hint ? <span className="text-2xs text-quaternary">{r.hint}</span> : null}
+              </span>
+            </li>
+          );
+          return r.title ? (
+            <UITooltip key={r.key} title={r.title} placement="top">
+              <TooltipTrigger className="w-full text-left">{row}</TooltipTrigger>
+            </UITooltip>
+          ) : (
+            row
+          );
+        })}
+      </ol>
+      {unit ? <figcaption className="label-mono">{unit}</figcaption> : null}
     </figure>
   );
 }
 
 /* ------------------------------------------------------------- heatmap --- */
-
-export interface CohortRow { cohort: string; label: string; size: number; retained: (number | null)[] }
-
-/** Three buckets, not a continuous gradient. A reader cannot decode a
- *  hundred-step ramp to two decimal places, and pretending otherwise is how a
- *  heatmap becomes decoration. `null` is a month that has not happened yet for
- *  that cohort — rendered as an explicit gap, never as a zero. */
+export interface CohortRow {
+  cohort: string;
+  label: string;
+  size: number;
+  retained: (number | null)[];
+}
+/** Three buckets, not a continuous gradient; `null` is a month that has not
+ *  happened yet — an explicit gap, never a zero. */
 const bucket = (v: number) => (v >= 0.95 ? 3 : v >= 0.88 ? 2 : 1);
+const HEAT = ["", "bg-chart-seq-1 text-secondary", "bg-chart-seq-3 text-white", "bg-chart-seq-5 text-white"];
 
 export function CohortHeat({ rows }: { rows: CohortRow[] }) {
   const months = rows[0]?.retained.length || 0;
   return (
-    <figure className="ch-chart">
-      <div className="ch-heatwrap">
-        <table className="ch-heat">
+    <figure className="flex min-w-0 flex-col gap-3">
+      <div className="overflow-x-auto">
+        <table className="w-full border-separate border-spacing-1 text-xs">
           <thead>
-            <tr>
-              <th scope="col">Cohort</th>
-              <th scope="col" className="n">Size</th>
+            <tr className="label-mono">
+              <th scope="col" className="px-1 pb-1 text-left font-medium">
+                Cohort
+              </th>
+              <th scope="col" className="px-1 pb-1 text-right font-medium">
+                Size
+              </th>
               {Array.from({ length: months }, (_, i) => (
-                <th scope="col" key={i} className="n">M{i}</th>
+                <th scope="col" key={i} className="px-1 pb-1 text-center font-medium">
+                  M{i}
+                </th>
               ))}
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => (
               <tr key={r.cohort}>
-                <th scope="row">{r.label}</th>
-                <td className="n tnum">{r.size}</td>
+                <th scope="row" className="px-1 text-left text-sm font-medium whitespace-nowrap text-secondary">
+                  {r.label}
+                </th>
+                <td className="px-1 text-right text-sm text-tertiary tnum">{r.size}</td>
                 {r.retained.map((v, i) => (
-                  <td key={i} className="n">
-                    {v === null
-                      ? <span className="ch-cell none" title="Not reached yet for this cohort">·</span>
-                      : <span className={"ch-cell h" + bucket(v)}
-                          title={r.label + " · month " + i + " · " + Math.round(v * 100) + "% still entitled"}>
-                          <span className="tnum">{Math.round(v * 100)}</span>
-                        </span>}
+                  <td key={i} className="p-0">
+                    {v === null ? (
+                      <span className="flex h-7 w-full items-center justify-center rounded-[3px] bg-secondary text-quaternary" title="Not reached yet for this cohort">
+                        ·
+                      </span>
+                    ) : (
+                      <span className={cx("flex h-7 w-full items-center justify-center rounded-[3px] font-mono tnum", HEAT[bucket(v)])} title={r.label + " · month " + i + " · " + Math.round(v * 100) + "% still entitled"}>
+                        {Math.round(v * 100)}
+                      </span>
+                    )}
                   </td>
                 ))}
               </tr>
@@ -526,14 +505,24 @@ export function CohortHeat({ rows }: { rows: CohortRow[] }) {
           </tbody>
         </table>
       </div>
-      {/* A sequential fill needs its scale stated; without it the reader is
-          guessing what dark means. */}
-      <figcaption className="ch-heatkey">
-        <span>share still entitled</span>
-        <span><i className="sw h1" />under 88%</span>
-        <span><i className="sw h2" />88–94%</span>
-        <span><i className="sw h3" />95% and up</span>
-        <span><i className="sw none" />not reached yet</span>
+      <figcaption className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-tertiary">
+        <span className="label-mono">share still entitled</span>
+        <span className="inline-flex items-center gap-1.5">
+          <i className="block size-2.5 rounded-[2px] bg-chart-seq-1" />
+          under 88%
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <i className="block size-2.5 rounded-[2px] bg-chart-seq-3" />
+          88–94%
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <i className="block size-2.5 rounded-[2px] bg-chart-seq-5" />
+          95% and up
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <i className="block size-2.5 rounded-[2px] bg-secondary" />
+          not reached yet
+        </span>
       </figcaption>
     </figure>
   );

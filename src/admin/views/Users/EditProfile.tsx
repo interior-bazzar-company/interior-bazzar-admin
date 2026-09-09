@@ -35,9 +35,17 @@
    it operable, and together it made the form read as documentation with
    fields in it. The guarantees live here and in the check suite; the screen
    carries what somebody filling it in can act on.
+
+   WHAT IS MISSING IS SAID WHERE IT IS MISSING. A required field left empty
+   wears its own error line as you type, not one sentence at the top of a form
+   you have already scrolled past; the footer repeats the list only because it
+   is the reason Save is refusing.
    ============================================================================= */
 import { useMemo, useState } from "react";
-import { Icon, ModalHead, Notice } from "../../ui";
+import {
+  Button, Checkbox, FieldRow, FormField, FormSection, Icon, Input, ModalShell,
+  Notice, SelectInput, Textarea,
+} from "../../ui";
 import { Completeness } from "./bits";
 import AreaRows from "./AreaRows";
 import FacetPicker from "./FacetPicker";
@@ -106,6 +114,20 @@ const toPatch = (draft: Draft, fields: ProfileField[]): Partial<UserProfile> => 
   return patch as Partial<UserProfile>;
 };
 
+/** The verified/unverified read-out under an identity field. A fact with a
+ *  tone, never a colour on its own. */
+function Verified({ on }: { on: boolean }) {
+  return on ? (
+    <span className="inline-flex items-center gap-1 text-success-primary">
+      <Icon name="check" size="xs" />Verified by Authentication
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1 text-warning-primary">
+      <Icon name="alert" size="xs" />Not verified
+    </span>
+  );
+}
+
 export default function EditProfile({ row, onClose, onDone }: {
   row: UserRow;
   onClose: () => void;
@@ -168,7 +190,7 @@ export default function EditProfile({ row, onClose, onDone }: {
     onDone("Profile saved.", "ok");
   };
 
-  const control = (f: ProfileField) => {
+  const control = (f: ProfileField, id: string) => {
     if (f.type === "areas") {
       return (
         <AreaRows f={f} disabled={!f.editable}
@@ -185,9 +207,9 @@ export default function EditProfile({ row, onClose, onDone }: {
     }
     if (f.type === "textarea") {
       return (
-        <textarea className="inp" rows={3} value={String(draft[f.key] || "")}
-          disabled={!f.editable} aria-label={f.label}
-          onChange={(e) => set(f.key, e.target.value)} />
+        <Textarea id={id} rows={3} value={String(draft[f.key] || "")}
+          disabled={!f.editable} ariaLabel={f.label} maxLength={f.maxLength}
+          onChange={(v) => set(f.key, v)} />
       );
     }
     if (f.type === "checks") {
@@ -199,16 +221,15 @@ export default function EditProfile({ row, onClose, onDone }: {
          click: "up to 2" is enforced by what can still be pressed. */
       const atMax = !!f.max && vals.length >= f.max;
       return (
-        <div className="um-checks" role="group" aria-label={f.label}>
+        <div className="flex min-w-0 flex-wrap items-center gap-x-5 gap-y-2 py-1.5"
+          role="group" aria-label={f.label}>
           {optionsFor(f).map((o) => {
             const on = vals.indexOf(o.key) >= 0;
             return (
-              <label key={o.key} className={"um-check" + (on ? " on" : "") + (!on && atMax ? " off" : "")}>
-                <input type="checkbox" checked={on} disabled={!f.editable || (!on && atMax)}
-                  onChange={() => set(f.key,
-                    on ? vals.filter((v) => v !== o.key) : vals.concat([o.key]))} />
-                <span>{o.label}</span>
-              </label>
+              <Checkbox key={o.key} checked={on} label={o.label}
+                disabled={!f.editable || (!on && atMax)}
+                onChange={() => set(f.key,
+                  on ? vals.filter((v) => v !== o.key) : vals.concat([o.key]))} />
             );
           })}
         </div>
@@ -218,18 +239,11 @@ export default function EditProfile({ row, onClose, onDone }: {
       /* A plain dropdown. The option meanings moved behind the i button next
          to the label, so the rows do not need a search box or hint lines —
          six words pick faster than six sentences. */
-      const v = String(draft[f.key] || "");
       return (
-        <div className="selectbox">
-          <select value={v} disabled={!f.editable}
-            aria-label={f.label}
-            onChange={(e) => set(f.key, e.target.value)}>
-            <option value="">Choose…</option>
-            {optionsFor(f).map((o) => (
-              <option key={o.key} value={o.key}>{o.label}</option>
-            ))}
-          </select>
-        </div>
+        <SelectInput id={id} ph="Choose…" ariaLabel={f.label}
+          value={String(draft[f.key] || "")} disabled={!f.editable}
+          options={optionsFor(f).map((o) => ({ v: o.key, l: o.label }))}
+          onChange={(v) => set(f.key, v)} />
       );
     }
     if (f.type === "single") {
@@ -247,24 +261,51 @@ export default function EditProfile({ row, onClose, onDone }: {
       );
     }
     return (
-      <input className="inp" value={String(draft[f.key] || "")} disabled={!f.editable}
-        aria-label={f.label} onChange={(e) => set(f.key, e.target.value)} />
+      <Input id={id} value={String(draft[f.key] || "")} disabled={!f.editable}
+        ariaLabel={f.label} maxLength={f.maxLength} err={isMissing(f)}
+        onChange={(v) => set(f.key, v)} />
     );
   };
 
   return (
-    <>
-      <ModalHead title="Edit profile" sub={<>{row.user.identity.name} · <span className="mono">{row.user.userId}</span></>} onClose={close} />
-
-      <div className="md-b um-form">
+    <ModalShell
+      title="Edit profile"
+      sub={<>{row.user.identity.name} · <span className="font-mono">{row.user.userId}</span></>}
+      onClose={close}
+      /* The reason Save is refusing, beside Save. It is not a decoration on the
+         left of the footer — it is the sentence that makes a disabled primary
+         button honest. */
+      danger={missingRequired.length ? (
+        <span className="flex min-w-0 items-center gap-1.5 text-xs text-warning-primary">
+          <Icon name="alert" size="xs" className="shrink-0" />
+          <span className="truncate">
+            Required: {missingRequired.map((f) => f.label).join(", ")}
+          </span>
+        </span>
+      ) : undefined}
+      actions={
+        <>
+          <Button color="secondary" data-close="1" onClick={close}>Cancel</Button>
+          <Button color="primary" isLoading={busy}
+            isDisabled={busy || !!facetErr || handleTaken || missingRequired.length > 0}
+            onClick={submit}>
+            Save changes
+          </Button>
+        </>
+      }
+    >
+      <div className="flex min-w-0 flex-col gap-5">
         {err ? <Notice tone="bad" text={<b>{err}</b>} /> : null}
         {!err && facetErr ? <Notice tone="warn" text={facetErr} /> : null}
         {!err && !facetErr && handleTaken
           ? <Notice tone="warn" text="That username belongs to another profile." />
           : null}
 
-        <div className="um-livecomp">
-          <span className="l">Completeness</span>
+        {/* THE NUMBER THE DIRECTORY GRADES ON, live. It is the one figure on
+            this form, so it is on the instrument ground rather than in the
+            flow of the fields. */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg bg-secondary px-3.5 py-2.5 ring-1 ring-secondary ring-inset">
+          <span className="label-mono">Completeness</span>
           <Completeness pct={live.pct} missing={live.missing} />
         </div>
 
@@ -278,77 +319,60 @@ export default function EditProfile({ row, onClose, onDone }: {
              The control keeps its accessible name through aria-label. */
           const solo = mine.length === 1 ? mine[0] : null;
           return (
-            <fieldset className="um-fs" key={g.key}>
-              <legend>
-                {g.label}
-                {solo && solo.required ? <span className="req"> *</span> : null}
-                {solo && solo.info ? <InfoTip f={solo} /> : null}
-                {g.note ? <i>{g.note}</i> : null}
-              </legend>
-              <div className="um-f2">
-                {mine.map((f) => (
-                  /* A picker is not a <label>'s control — it is a composite
-                     with its own labelled input — so those render as a div
-                     with the caption beside it instead. Wrapping one in a
-                     <label> makes clicking a chip focus the search box. */
-                  <div className={"fg" + (isWide(f) ? " um-fg-wide" : "") + (isMissing(f) ? " um-fg-missing" : "")}
-                    key={f.key} aria-invalid={isMissing(f) || undefined}>
-                    {solo ? null : (
-                      <span className="fg-lb">
-                        {f.label}
-                        {f.required ? <span className="req"> *</span> : null}
-                        {/* Right of the label, for every field that has one —
-                            one place to look, whatever the control below is. */}
-                        {f.info ? <InfoTip f={f} /> : null}
-                      </span>
-                    )}
-                    {control(f)}
-                  </div>
-                ))}
-              </div>
-            </fieldset>
+            <FormSection key={g.key} desc={g.note}
+              title={
+                <span className="inline-flex items-center gap-1.5">
+                  {g.label}
+                  {solo && solo.required
+                    ? <span className="text-brand-tertiary" title="Required">*</span>
+                    : null}
+                  {solo && solo.info ? <InfoTip f={solo} /> : null}
+                </span>
+              }>
+              <FieldRow>
+                {mine.map((f) => {
+                  const id = "up-" + f.key;
+                  /* A picker is a composite with its own labelled input, so it
+                     gets the caption and not a `<label for>`: pointing a label
+                     at a combobox makes clicking the caption focus a search
+                     box somebody did not ask to type in. */
+                  const composite = f.type === "areas" || f.type === "handle"
+                    || (f.type === "single" && !f.simple) || (isList(f) && f.type !== "checks");
+                  return (
+                    <FormField
+                      key={f.key}
+                      id={composite ? undefined : id}
+                      label={solo ? undefined : f.label}
+                      req={solo ? undefined : f.required}
+                      tip={!solo && f.info ? <InfoTip f={f} /> : undefined}
+                      err={isMissing(f) ? "Required — Save is waiting for this." : undefined}
+                      className={isWide(f) ? "sm:col-span-2" : undefined}
+                    >
+                      {control(f, id)}
+                    </FormField>
+                  );
+                })}
+              </FieldRow>
+            </FormSection>
           );
         })}
 
         {/* ------------------------------------------------------- identity */}
-        <fieldset className="um-fs">
-          <legend>Identity<i>read-only</i></legend>
-          <div className="um-f2">
-            <div className="fg">
-              <span className="fg-lb">Verified email</span>
-              <div className="inp ro">
-                {row.user.identity.email || "—"}
-                {row.user.identity.emailVerified
-                  ? <Icon name="check" size="sm" />
-                  : <em className="warn"> unverified</em>}
-              </div>
-            </div>
-            <div className="fg">
-              <span className="fg-lb">Verified mobile</span>
-              <div className="inp ro">
-                {row.user.identity.phone || "—"}
-                {row.user.identity.phoneVerified
-                  ? <Icon name="check" size="sm" />
-                  : <em className="warn"> unverified</em>}
-              </div>
-            </div>
-          </div>
-        </fieldset>
+        <FormSection title="Identity" desc="Owned by Authentication — read-only here, and there is no back door.">
+          <FieldRow>
+            <FormField label="Verified email"
+              hint={<Verified on={!!row.user.identity.emailVerified} />}>
+              <Input readOnly ariaLabel="Verified email"
+                value={row.user.identity.email || "—"} />
+            </FormField>
+            <FormField label="Verified mobile"
+              hint={<Verified on={!!row.user.identity.phoneVerified} />}>
+              <Input readOnly mono ariaLabel="Verified mobile"
+                value={row.user.identity.phone || "—"} />
+            </FormField>
+          </FieldRow>
+        </FormSection>
       </div>
-
-      <div className="md-f">
-        {missingRequired.length ? (
-          <span className="um-foot-note">
-            Required: {missingRequired.map((f) => f.label).join(", ")}
-          </span>
-        ) : null}
-        <span className="spacer" />
-        <button className="btn" onClick={close}>Cancel</button>
-        <button className="btn pri" disabled={busy || !!facetErr || handleTaken || missingRequired.length > 0}
-          onClick={submit}>
-          {busy ? "Saving…" : "Save changes"}
-        </button>
-      </div>
-    </>
+    </ModalShell>
   );
 }

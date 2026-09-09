@@ -1,586 +1,381 @@
 /* =============================================================================
-   THE APPEARANCE GALLERY — every shared part, in one screen
+   THE APPEARANCE GALLERY — every shared part, in one screen, both themes
    -----------------------------------------------------------------------------
-   WHY IT EXISTS. There are two themes, and the only honest way to know a change
-   is right in both is to look at both. Every other check in this repo renders
-   to a string; a string cannot tell you that a selected row lost its tint in
-   dark, that a chip inside a field is a different height from a chip beside it,
-   or that an icon-only button came out rectangular.
-
-   It used to photograph SIX appearances — three schemes × two themes. There are
-   two now, which is the point: six appearances is six design systems to keep
-   honest, and in practice four of them were never looked at again after the
-   week they landed.
-
-   It is NOT a page of the product: it renders the real components out of
-   src/admin/ui and the real ShellProvider, with no session, no API and no
-   router beyond a MemoryRouter, so it opens instantly and cannot be affected by
-   what the backend is doing. `npm run shots` drives it and writes the PNGs.
+   It renders the real parts out of src/admin/ui and the real ShellProvider,
+   with no session, no API and no router beyond a MemoryRouter, so it opens
+   instantly and cannot be affected by what the backend is doing. `npm run
+   shots` drives it and writes the PNGs (.tmp/appearance/).
 
    ADD A PART HERE THE DAY YOU ADD IT TO THE SYSTEM. A component absent from
    this page is a component nobody has seen in dark.
-   ============================================================================= */
+   ========================================================================== */
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { MemoryRouter } from "react-router-dom";
+import "../src/styles/globals.css";
+import { ShellProvider, bootAppearance, useShell } from "../src/admin/shell/ShellContext";
 import {
-  ShellProvider, useShell, THEMES, currentTheme, setTheme,
-} from "../src/admin/shell/ShellContext";
-import {
-  ActivityFeed, Alert, Assignee, Avatar, Breadcrumbs, Card, Checkbox, ChipInput,
-  ConfirmModal, DateRange, DealStatus, Delta, DrawerShell, EmptyState, Eyebrow,
-  FileUpload, FormField, Icon, InfoDot, Input, InputGroup, LeadStatus, Legend,
-  ListSkeleton, MenuDivider, MenuItem, MenuSection, Meter, MultiSelect,
-  Pagination, Person, Pill, Select, Pipeline, Priority, Radio, Segmented, SelectInput,
-  Table, Tabs, Tags, Textarea, Tiles, Timeline, Toggle, Tooltip,
+  ActivityFeed, Alert, Assignee, Avatar, Breadcrumbs, Button, Card, ChartFrame, Checkbox, ChipInput, ConfirmModal, DateRange, DealStatus, Delta,
+  DrawerShell, EmptyState, Eyebrow, FieldRow, FilterBar, FilterChips, FormField, FormSection, IconButton, InfoDot, Input, InputGroup, KvList, LeadStatus,
+  ListSkeleton, ListTable, Meter, ModalShell, MoreMenu, MultiSelect, PageHeader, Pagination, PaneLoading, Person, Pill, Pipeline, Priority, Radio, Rail,
+  SearchField, SectionHead, Segmented, Select, SelectInput, StatStrip, Table, Tabs, Tag, Tags, Textarea, Tile, Tiles, Timeline, Toggle, Tooltip,
 } from "../src/admin/ui";
+import { BarRows, ColumnChart, FunnelChart, SignedColumns, Spark, Waterfall } from "../src/admin/views/charts";
 
-import "../src/styles/admin-theme.css";
-
-const STAGES = [
-  { k: "new", label: "New" }, { k: "qualified", label: "Qualified" },
-  { k: "quoted", label: "Quoted" }, { k: "won", label: "Won" },
-];
-const TEAMS = [
-  { v: "sales", l: "Sales" }, { v: "design", l: "Design" },
-  { v: "site", l: "Site" }, { v: "finance", l: "Finance" },
-];
-
-function Board() {
+function Layers() {
   const shell = useShell();
-  const [tags, setTags] = useState(["onboarding", "kitchen", "repeat client"]);
-  const [theme, setThemeState] = useState(currentTheme());
-  const [tab, setTab] = useState("all");
-  const [multi, setMulti] = useState<string[]>(["sales", "design"]);
-  const [on, setOn] = useState(true);
-  const [checked, setChecked] = useState(true);
-  const [page, setPage] = useState(3);
-  const [from, setFrom] = useState("2026-09-01");
-  const [to, setTo] = useState("2026-09-30");
-
-  const openModal = () =>
-    shell.modal(
-      <ConfirmModal
-        title="Remove N. Pillai from Sales?"
-        body={
-          <>
-            <p className="md-p">Their 14 open deals move to unassigned. Attendance history stays.</p>
-            <div style={{ height: 12 }} />
-            <Alert tone="warn" title="Two others in Sales are away this week">
-              A warning, not a block — you can go ahead.
-            </Alert>
-          </>
-        }
-        verb="Remove from team"
-        tone="bad"
-        onConfirm={shell.closeLayer}
-        onClose={shell.closeLayer}
-      />,
-      "sm"
-    );
-
-  const openDrawer = () =>
-    shell.drawer(
-      <DrawerShell
-        title="R. Menon"
-        sub="Design · senior · EMP-0155"
-        onClose={shell.closeLayer}
-        actions={
-          <>
-            <span className="spacer" />
-            <button className="btn" onClick={shell.closeLayer}>Open profile</button>
-            <button className="btn pri" onClick={shell.closeLayer}>Close their day</button>
-          </>
+  return (
+    <div className="flex flex-wrap gap-2">
+      <Button
+        color="secondary"
+        onClick={() =>
+          shell.modal(
+            <ConfirmModal title="Remove N. Pillai from Sales?" body="They keep their account and their history; only the Sales grant is withdrawn. This can be re-granted later." verb="Remove" tone="bad" onConfirm={shell.closeLayer} onClose={shell.closeLayer} />,
+            "sm",
+          )
         }
       >
-        <Eyebrow>Today</Eyebrow>
-        <div style={{ height: 12 }} />
-        <Tiles cols={2} list={[
-          { k: "Hours", v: "6.1", delta: { dir: "up", text: "0.3", of: "vs last week" } },
-          { k: "Tasks closed", v: "2", foot: <Pill tone="warn" text="Break 1h 12m" /> },
-        ]} />
-        <div style={{ height: 18 }} />
-        <Eyebrow>What happened</Eyebrow>
-        <div style={{ height: 12 }} />
-        <Timeline items={[
-          { title: "Shift opened", meta: "09:04 · self", tone: "ok" },
-          { title: "Assigned IB-D-1042", meta: "10:20 · A. Rao" },
-          { title: "Marked absent for 8 Sep", meta: "00:05 · derived from the roster", tone: "sys" },
-        ]} />
-      </DrawerShell>,
-      undefined,
-      "md"
-    );
+        Open modal
+      </Button>
+      <Button
+        color="secondary"
+        onClick={() =>
+          shell.drawer(
+            <DrawerShell title="R. Menon" sub="Sales · joined Mar 2025" mark={<Avatar name="R. Menon" lg />} onClose={shell.closeLayer} actions={<Button color="primary">Save</Button>}>
+              <KvList pairs={[["Role", "Sales executive"], ["Department", "Sales"], ["Phone", <span className="font-mono">+91 98 4500 1122</span>], ["Status", <Pill tone="ok" dot text="Active" />]]} />
+              <SectionHead title="Recent" className="mt-6" />
+              <Timeline items={[{ title: "Closed IB-D-1042", meta: "Today · 11:20", tone: "ok" }, { title: "Stage moved to Followup", meta: "Yesterday", tone: "sys", body: "Automatic — the slot was booked." }]} />
+            </DrawerShell>,
+            undefined,
+            "md",
+          )
+        }
+      >
+        Open drawer
+      </Button>
+      <Button color="secondary" onClick={() => shell.toast("Saved. The change is live.", "ok")}>
+        Toast
+      </Button>
+      <Button color="secondary" onClick={() => shell.banner("The ledger service is slow right now — figures may be a minute behind.", "warn")}>
+        Banner
+      </Button>
+    </div>
+  );
+}
 
+function Gallery() {
+  const [seg, setSeg] = useState("table");
+  const [on, setOn] = useState(true);
+  const [chips, setChips] = useState(["onboarding", "sales"]);
+  const [multi, setMulti] = useState(["north"]);
+  const [range, setRange] = useState<[string, string]>(["2026-09-01", "2026-09-09"]);
   return (
-    <div className="page wide" style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
-      <header style={{ display: "flex", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
-        <div style={{ minWidth: 0 }}>
-          <Breadcrumbs items={[
-            { label: "Admin", to: "#/" }, { label: "Design system" }, { label: "Appearance" },
-          ]} />
-          <h1 style={{ fontSize: "var(--text-3xl)", marginTop: 6 }}>Ink &amp; Signal</h1>
-          <div className="ap-hint" style={{ maxWidth: "62ch" }}>
-            Every shared part, drawn in the theme selected. Black and white build the
-            interface; forest marks where you are and what is yours; everything else is
-            a signal.
-          </div>
-        </div>
-        <span className="spacer" style={{ flex: 1 }} />
-        <div>
-          <div className="ap-k">Theme</div>
-          <Segmented
-            label="Theme"
-            value={theme}
-            options={THEMES.map((t) => ({ v: t.id, l: t.label }))}
-            onPick={(v) => { setTheme(v); setThemeState(v); }}
-          />
-        </div>
-      </header>
+    <div className="mx-auto flex max-w-[1200px] flex-col gap-6 p-8">
+      <PageHeader
+        title="Appearance"
+        eyebrow="Every shared part"
+        meta={
+          <>
+            <span>Both themes · the real components</span>
+            <Pill tone="brand" dot text="live" />
+          </>
+        }
+        actions={
+          <>
+            <Button color="secondary" ico="download">
+              Export
+            </Button>
+            <Button color="primary" ico="plus">
+              New record
+            </Button>
+          </>
+        }
+        tabs={<Tabs items={[{ k: "a", label: "Parts" }, { k: "b", label: "Patterns", n: 3 }, { k: "c", label: "Charts", icon: "chart" }]} cur="a" />}
+      />
 
-      {/* ---------------------------------------------------------- ACTIONS */}
-      <Card title="Actions" sub="One height per row. The primary is ink, never green.">
-        <div className="toolbar">
-          <button className="btn pri">Approve leave</button>
-          <button className="btn brand">Open the portal</button>
-          <button className="btn">Save draft</button>
-          <button className="btn dgr">Delete</button>
-          <button className="btn ghost">Ghost</button>
-          <button className="btn" disabled>Disabled</button>
-          <button className="btn sm">Small</button>
-          <button className="btn lg">Large</button>
-          <button className="btn icon" aria-label="More"><Icon name="dots" /></button>
-          <Tooltip tip="Opens the modal specimen">
-            <button className="btn" onClick={openModal}>Open modal</button>
-          </Tooltip>
-          <button className="btn" onClick={openDrawer}>Open drawer</button>
-          <button className="btn" onClick={() => shell.toast("Leave approved")}>Toast</button>
-          <button className="btn" onClick={() => shell.toast("Could not reach the server.", "bad")}>
-            Toast · bad
-          </button>
+      <Card title="Layers" sub="A toast confirms · a modal decides · a drawer inspects · a banner stays.">
+        <Layers />
+      </Card>
+
+      <Card title="Actions" sub="One primary per view; the rest secondary or tertiary. xs in a row, sm elsewhere, lg on the door.">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button color="primary">Primary</Button>
+          <Button color="secondary">Secondary</Button>
+          <Button color="tertiary">Tertiary</Button>
+          <Button color="link-color">Link</Button>
+          <Button color="primary-destructive">Delete</Button>
+          <Button color="secondary-destructive">Remove</Button>
+          <Button color="primary" isLoading>
+            Saving
+          </Button>
+          <Button color="secondary" isDisabled>
+            Disabled
+          </Button>
+          <Button color="secondary" size="xs" ico="download">
+            xs
+          </Button>
+          <Button color="primary" size="lg" ico="plus">
+            lg
+          </Button>
+          <IconButton ico="edit" label="Edit" />
+          <IconButton ico="trash" label="Delete" color="secondary" />
+          <MoreMenu items={[{ icon: "edit", label: "Edit", act: () => {} }, { icon: "copy", label: "Duplicate", act: () => {} }, { icon: "trash", label: "Delete", act: () => {}, tone: "bad" }]} />
+          <Segmented value={seg} onPick={setSeg} options={[{ v: "table", l: "Table", ico: "list" }, { v: "board", l: "Board", ico: "columns" }, { v: "chat", l: "Chat", ico: "chat" }]} />
         </div>
       </Card>
 
-      {/* ------------------------------------------------------------ FORMS */}
-      <Card title="Form controls" sub="Every one is 38px, so a column of them lines up.">
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(240px,1fr))", gap: 16 }}>
-          <FormField id="g1" label="Member" req hint="As it appears on their contract.">
-            <Input id="g1" defaultValue="N. Pillai" />
+      <Card title="Form controls" sub="Label above, always. Error or hint, never both.">
+        <FormSection>
+          <FieldRow cols={3}>
+            <FormField id="a1" label="Customer" req>
+              <Input id="a1" ph="Full name" />
+            </FormField>
+            <FormField id="a2" label="Phone" hint="Ten digits">
+              <Input id="a2" ph="98 4500 1122" mono />
+            </FormField>
+            <FormField id="a3" label="Email" err="Needs an @ — yours has none.">
+              <Input id="a3" defaultValue="priya.nair" err />
+            </FormField>
+          </FieldRow>
+          <FieldRow cols={3}>
+            <FormField id="a4" label="Amount">
+              <InputGroup pre="₹" post="/mo">
+                <Input id="a4" defaultValue="4,20,000" mono />
+              </InputGroup>
+            </FormField>
+            <FormField id="a5" label="Stage">
+              <SelectInput id="a5" options={["Deal", "Followup", "Slot booked", "Won"]} defaultValue="Followup" />
+            </FormField>
+            <FormField id="a6" label="Period">
+              <DateRange from={range[0]} to={range[1]} onChange={(f, t) => setRange([f, t])} />
+            </FormField>
+          </FieldRow>
+          <FieldRow>
+            <FormField id="a7" label="Tags">
+              <ChipInput id="a7" value={chips} onChange={setChips} placeholder="Add a tag" />
+            </FormField>
+            <FormField label="Regions">
+              <MultiSelect label="Region" options={[{ v: "north", l: "North" }, { v: "south", l: "South" }, { v: "west", l: "West" }]} value={multi} onChange={setMulti} />
+            </FormField>
+          </FieldRow>
+          <FormField id="a8" label="Notes" hint="Visible to the team, never to the customer.">
+            <Textarea id="a8" ph="What was discussed…" rows={3} />
           </FormField>
-          <FormField id="g2" label="Employee ID" hint="Read-only — set when the account was created.">
-            <Input id="g2" defaultValue="EMP-0142" readOnly />
-          </FormField>
-          <FormField id="g3" label="Team">
-            <SelectInput id="g3" ph="Pick a team" defaultValue="design"
-              options={TEAMS.map((t) => ({ v: t.v, l: t.l }))} />
-          </FormField>
-          <FormField id="g4" label="Pincode" err="Needs 6 digits. Yours has 5.">
-            <Input id="g4" defaultValue="41007" err />
-          </FormField>
-          <FormField id="g5" label="Monthly retainer">
-            <InputGroup pre="₹" post="/mo"><Input id="g5" defaultValue="42,000" /></InputGroup>
-          </FormField>
-          <FormField id="g6" label="Reporting window">
-            <DateRange from={from} to={to} onChange={(f, t) => { setFrom(f); setTo(t); }} />
-          </FormField>
-          <FormField label="Also in">
-            <MultiSelect label="Teams" options={TEAMS} value={multi} onChange={setMulti} />
-          </FormField>
-          <FormField id="g8" label="Reason">
-            <Textarea id="g8" rows={2} defaultValue="Family function, out of town" />
-          </FormField>
-          <FormField id="g9" label="Tags" hint="Enter or a comma commits. Backspace takes the last one back.">
-            <ChipInput id="g9" value={tags} onChange={setTags} placeholder="Add another" />
-          </FormField>
-          <FormField label="Attachment">
-            <FileUpload accept=".pdf,.png,.jpg" hint="PDF or an image, up to 8 MB."
-              onFiles={(f) => shell.toast(f.length + " file(s) taken")} />
-          </FormField>
-        </div>
-        <div style={{ height: 16 }} />
-        <div style={{ display: "flex", gap: 32, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <Eyebrow bare>Choices</Eyebrow>
-            <Checkbox id="c1" checked={checked} onChange={setChecked}
-              label="Send them the summary" hint="Once, at 18:00 their time." />
-            <Checkbox id="c2" indeterminate label="Some of the 14 selected" />
-            <Checkbox id="c3" disabled label="Locked by the role" />
+          <div className="flex flex-wrap items-center gap-6">
+            <Checkbox label="Send a copy" hint="To the customer's email" checked={on} onChange={setOn} />
+            <Checkbox label="Some selected" indeterminate />
+            <Radio name="r" value="a" label="Monthly" checked />
+            <Radio name="r" value="b" label="Yearly" />
+            <Toggle on={on} onChange={setOn} label="Auto-renew" />
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <Eyebrow bare>One of</Eyebrow>
-            <Radio id="r1" name="w" value="a" checked label="Whole day" />
-            <Radio id="r2" name="w" value="b" label="Half day" hint="Counts as 0.5 against leave." />
+        </FormSection>
+      </Card>
+
+      <Card title="Status" sub="A state is rounded and carries a dot; a label a person typed is square; the filter chip alone wears the brand.">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Pill tone="ok" dot text="Paid" />
+            <Pill tone="warn" dot text="Overdue" />
+            <Pill tone="bad" dot text="Failed" />
+            <Pill tone="info" dot text="In progress" />
+            <Pill tone="neutral" dot text="Draft" />
+            <Pill tone="brand" text="Current" />
+            <Pill tone="live" dot text="On shift" />
+            <Pill tone="sys" dot text="Automation" />
+            <Pill tone="dead" text="Cancelled" />
+            <LeadStatus status="qualified" />
+            <DealStatus status="won" />
+            <Priority level="urgent" />
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <Eyebrow bare>Takes effect at once</Eyebrow>
-            <Toggle id="t1" on={on} onChange={setOn}
-              label="Auto-assign new enquiries" hint="Applies the moment it moves." />
-            <Toggle id="t2" on={false} disabled onChange={() => {}} label="Disabled" />
+          <div className="flex flex-wrap items-center gap-2">
+            <Tag label="kitchen" tone="teal" />
+            <Tag label="Premium" tone="violet" />
+            <Tag label="Generic funnel" tone="orange" auto />
+            <Tag label="chase this" tone="red" onRemove={() => {}} />
+            <Tags items={[{ label: "a" }, { label: "b", tone: "blue" }, { label: "c" }, { label: "d" }]} max={2} />
           </div>
+          <FilterChips params={{ stage: "Followup", owner: "R. Menon" }} labels={{ stage: "Stage", owner: "Owner" }} onUnfilter={() => {}} />
         </div>
       </Card>
 
-      {/* ----------------------------------------------------------- STATUS */}
-      <Card title="Status" sub="One chip, in the whole product. A module hands in the key, not a colour.">
-        <Eyebrow bare>Lead — the CRM's own lifecycle</Eyebrow>
-        <div style={{ height: 8 }} />
-        <div className="chiprow">
-          {["new", "processing", "qualified", "assigned", "converted", "rejected", "no-match", "duplicate"]
-            .map((s) => <LeadStatus key={s} status={s} />)}
-        </div>
-        <div style={{ height: 16 }} />
-        <Eyebrow bare>Deal, subscription, invoice, task — one map, so "paid" and "won" are one green</Eyebrow>
-        <div style={{ height: 8 }} />
-        <div className="chiprow">
-          {["open", "won", "lost", "stalled", "active", "paused", "paid", "overdue",
-            "refunded", "in-review", "completed", "draft"]
-            .map((s) => <DealStatus key={s} status={s} />)}
-        </div>
-        <div style={{ height: 16 }} />
-        <Eyebrow bare>Priority — a ramp, not a palette</Eyebrow>
-        <div style={{ height: 8 }} />
-        <div className="chiprow">
-          {["critical", "high", "medium", "normal", "low"].map((p) => <Priority key={p} level={p} />)}
-        </div>
-        <div style={{ height: 16 }} />
-        <Eyebrow bare>Tags — hues that mean nothing, by contract</Eyebrow>
-        <div style={{ height: 8 }} />
-        <div className="chiprow">
-          <Tags items={[
-            { label: "kitchen", tone: "teal" },
-            { label: "repeat client", tone: "violet" },
-            { label: "site visit done", tone: "lime" },
-            { label: "high-value", tone: "amber", auto: true },
-            { label: "referred", tone: "pink" },
-            { label: "north zone", tone: "blue" },
-            { label: "urgent-ish", tone: "orange" },
-          ]} max={5} />
-        </div>
-        <div style={{ height: 16 }} />
-        <Eyebrow bare>Shapes and the live accent</Eyebrow>
-        <div style={{ height: 8 }} />
-        <div className="chiprow">
-          <Pill tone="solid" text="Solid" />
-          <Pill tone="line" text="Outline" />
-          <Pill tone="dead" text="Cancelled" />
-          <Pill tone="brand" text="Current" />
-          <Pill text="No tone" />
-          <span className="pill pill-live"><span className="live-dot" /> On shift</span>
-          <span className="chip on">
-            Team: Sales
-            <button className="x" aria-label="Remove"><Icon name="x" size="sm" /></button>
-          </span>
-        </div>
-      </Card>
-
-      {/* ------------------------------------------------------------- CRM */}
       <Card title="CRM" sub="Where the deal is, who owns it, and how far along.">
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(260px,1fr))", gap: 20 }}>
-          <div>
-            <Eyebrow bare>Pipeline</Eyebrow>
-            <div style={{ height: 10 }} />
-            <Pipeline stages={STAGES} current="quoted" />
-          </div>
-          <div>
-            <Eyebrow bare>Assignment</Eyebrow>
-            <div style={{ height: 10 }} />
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <Assignee name="A. Rao" role="Sales · senior" to="#/team/1" />
-              <Assignee />
+        <div className="flex flex-col gap-4">
+          <Pipeline stages={[{ k: "deal", label: "Deal" }, { k: "followup", label: "Followup" }, { k: "slot", label: "Slot booked" }, { k: "won", label: "Won" }]} current="slot" />
+          <div className="flex flex-wrap items-center gap-6">
+            <Person name="Priya Nair" sub="Sales executive" />
+            <Person name="Jaswant Kaul" sub="Ops" sm to="#/team/1" />
+            <Assignee name={null} />
+            <Avatar name="Asha Rao" xl />
+            <div className="w-56">
+              <Meter value={64} />
             </div>
-          </div>
-          <div>
-            <Eyebrow bare>Progress</Eyebrow>
-            <div style={{ height: 10 }} />
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <div>
-                <div className="faint" style={{ fontSize: "var(--text-sm)", marginBottom: 5 }}>
-                  Quota · 68% <Delta value="6" suffix="%" dir="up" />
-                </div>
-                <Meter value={68} label="Quota" />
-              </div>
-              <div>
-                <div className="faint" style={{ fontSize: "var(--text-sm)", marginBottom: 5 }}>
-                  Budget spent · 94%
-                </div>
-                <Meter value={94} tone="bad" label="Budget" />
-              </div>
-            </div>
-          </div>
-          <div>
-            <Eyebrow bare>People</Eyebrow>
-            <div style={{ height: 10 }} />
-            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-              <Person name="N. Pillai" sub="Sales" />
-              <Person name="R. Menon" sub="Design · senior" />
-              <div style={{ display: "flex", gap: 6 }}>
-                <Avatar name="A. Rao" sm /><Avatar name="S. Iyer" sm />
-                <Avatar name="K. Das" sm /><Avatar name="M. Roy" sm />
-              </div>
-            </div>
+            <Delta value="11%" dir="up" of="vs last week" />
+            <Delta value="3 days" dir="up" good={false} of="unclosed" />
           </div>
         </div>
       </Card>
 
-      {/* ----------------------------------------------------------- FIGURES */}
-      <div>
-        <Tiles list={[
-          {
-            k: "On shift now", v: <>28<span className="u">/34</span></>,
-            foot: <span className="pill pill-live"><span className="live-dot" /> live</span>,
-          },
-          { k: "Avg hours / day", v: "7.4", delta: { dir: "up", text: "0.3", of: "vs last week" } },
-          { k: "Unclosed days", v: "11", delta: { dir: "down", text: "4", of: "vs last week" } },
-          {
-            k: "Collection due", v: <>₹22.4<span className="u">L</span></>, serif: true,
-            foot: <Pill tone="warn" text="6 overdue" />,
-          },
-        ]} />
-      </div>
-
-      {/* ------------------------------------------------------------- DATA */}
-      <Card title="A list" sub="Filters, selection, sort, bulk actions and a pager — the five bands.">
-        <Tabs items={[
-          { k: "all", label: "All", n: 241 },
-          { k: "mine", label: "Mine", n: 18 },
-          { k: "flagged", label: "Needs attention", n: 6 },
-        ]} cur={tab} onPick={setTab} />
-        <div className="filterband">
-          <span className="field grow">
-            <Icon name="search" size="sm" />
-            <input type="search" placeholder="Search name, reference or phone…" aria-label="Search" />
-          </span>
-          <Select name="status" label="Status" value="qualified" options={[{ v: "qualified", l: "Qualified", dot: "ok" }, { v: "new", l: "New" }]} />
-          <Select name="city" label="City" options={["Pune", "Mumbai", "Nashik"]} />
-          <MultiSelect label="Teams" options={TEAMS} value={multi} onChange={setMulti} sm />
-          <span className="spacer" />
-          <button className="btn sm"><Icon name="download" />Export</button>
-          <button className="btn pri sm"><Icon name="plus" />Add enquiry</button>
-        </div>
-        <div className="bulkbar">
-          <span className="n">2 selected</span>
-          <span className="spacer" />
-          <button className="btn sm">Assign</button>
-          <button className="btn sm">Export selection</button>
-          <button className="btn sm dgr">Reject</button>
-        </div>
-        <Table
-          cols={[
-            { label: "", w: "26px" },
-            { label: "" , w: "26px" },
-            { label: "Enquiry" },
-            { label: "Stage" },
-            { label: "Owner" },
-            { label: "Tags" },
-            { label: "Value", cls: "n" },
-            { label: "Age", cls: "n" },
-          ]}
-          rows={[
-            <tr key="1" aria-selected="true">
-              <td><span className="sev bad" /></td>
-              <td><Checkbox checked ariaLabel="Select IB-E-2214" /></td>
-              <td>
-                <div className="cell-1">N. Pillai · modular kitchen</div>
-                <div className="cell-2 mono">IB-E-2214 · Pune</div>
-              </td>
-              <td><LeadStatus status="qualified" /></td>
-              <td><Assignee name="A. Rao" /></td>
-              <td><Tags items={[{ label: "kitchen", tone: "teal" }, { label: "repeat", tone: "violet" }]} max={2} /></td>
-              <td className="n">₹4,20,000</td>
-              <td className="n">12d</td>
-            </tr>,
-            <tr key="2">
-              <td><span className="sev warn" /></td>
-              <td><Checkbox ariaLabel="Select IB-E-2215" /></td>
-              <td>
-                <div className="cell-1">S. Iyer · full home</div>
-                <div className="cell-2 mono">IB-E-2215 · Mumbai</div>
-              </td>
-              <td><LeadStatus status="processing" /></td>
-              <td><Assignee /></td>
-              <td><Tags items={[{ label: "high-value", tone: "amber", auto: true }]} /></td>
-              <td className="n">₹11,80,000</td>
-              <td className="n">3d</td>
-            </tr>,
-            <tr key="3">
-              <td><span className="sev" /></td>
-              <td><Checkbox ariaLabel="Select IB-E-2216" /></td>
-              <td>
-                <div className="cell-1">K. Das · wardrobe</div>
-                <div className="cell-2 mono">IB-E-2216 · Nashik</div>
-              </td>
-              <td><LeadStatus status="no-match" /></td>
-              <td><Assignee name="R. Menon" /></td>
-              <td><span className="none">—</span></td>
-              <td className="n"><span className="none">—</span></td>
-              <td className="n">28d</td>
-            </tr>,
-          ]}
-        />
-        <Pagination page={page} pages={9} total={241} unit="enquiries" onPage={setPage} />
-      </Card>
-
-      {/* --------------------------------------------------------- FEEDBACK */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(320px,1fr))", gap: 20 }}>
-        <Card title="Conditions" sub="Still true. A toast is a receipt; this is a state.">
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            <Alert tone="ok" title="Payroll for August is settled">
-              34 of 34 members reconciled.
-            </Alert>
-            <Alert tone="warn" title="Two members are unclosed"
-              action={<button className="btn sm">Review</button>}>
-              Their days will auto-close at midnight.
-            </Alert>
-            <Alert tone="bad" title="Could not reach the ledger service"
-              onClose={() => {}}>
-              Figures below are from 12 minutes ago.
-            </Alert>
-            <Alert tone="info">
-              Absent is computed from the roster and never stored.
-            </Alert>
-          </div>
-        </Card>
-
-        <Card title="Menu" sub="One row, whichever surface it lands on.">
-          <div className="menu" style={{ position: "static", boxShadow: "var(--shadow-md)" }}>
-            <MenuSection>This record</MenuSection>
-            <MenuItem ico="eye" label="Open" right="↵" />
-            <MenuItem ico="edit" label="Edit details" />
-            <MenuItem ico="user" label="Reassign" desc="Moves the 14 open deals too" />
-            <MenuItem ico="copy" label="Duplicate" current />
-            <MenuDivider />
-            <MenuSection>Export</MenuSection>
-            <MenuItem ico="download" label="Download CSV" right="⌘E" />
-            <MenuItem ico="print" label="Print" disabled />
-            <MenuDivider />
-            <MenuItem ico="trash" label="Delete enquiry" danger />
-          </div>
-        </Card>
-
-        <Card title="Explanations" sub="A tooltip labels; the dot explains.">
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span className="faint" style={{ fontSize: "var(--text-md)" }}>Attainment</span>
-              <InfoDot label="What attainment counts">
-                <b>What it counts</b>
-                Closed-won value against the quota set for this quarter.
-                <br /><br />
-                <b>What pressing it does</b>
-                Filters the list to this person's won deals.
-              </InfoDot>
-            </div>
-            <div>
-              <Tooltip tip="Export every matching row, not the page on screen">
-                <button className="btn sm"><Icon name="download" />Export</button>
-              </Tooltip>
-            </div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <Delta value="12" suffix="%" dir="up" of="vs last quarter" />
-              <Delta value="4" suffix="d" dir="down" />
-              <Delta value="0" dir="flat" />
-            </div>
-          </div>
-        </Card>
-
-        <Card title="Waiting, and nothing there" sub="A skeleton keeps the shape; an empty state is dashed.">
-          <ListSkeleton rows={3} />
-          <div style={{ height: 16 }} />
-          <EmptyState
-            icon="inbox"
-            title="No enquiries match those filters"
-            body="Nine hundred are in the queue — these filters just do not reach any of them."
-            action={<button className="btn">Clear all filters</button>}
+      <Card title="A list" sub="Filters, the strip, the table, the pager — the four bands." flush>
+        <div className="flex flex-col gap-4 p-5">
+          <FilterBar
+            search={<SearchField ph="Search deals…" />}
+            filters={
+              <>
+                <Select name="stage" label="Stage" value="followup" options={[{ v: "deal", l: "Deal", dot: "info" }, { v: "followup", l: "Followup", dot: "warn" }, { v: "won", l: "Won", dot: "ok" }]} />
+                <Select name="owner" label="Owner" options={["Priya Nair", "R. Menon"]} />
+                <Select name="tier" label="Tier" options={[{ v: "a", l: "Tier A", badge: "A" }, { v: "b", l: "Tier B", badge: "B" }]} />
+              </>
+            }
+            right={<Segmented sm value={seg} onPick={setSeg} options={[{ v: "table", l: "Table" }, { v: "board", l: "Board" }]} />}
           />
-        </Card>
+          <StatStrip cells={[{ k: "open", v: 24, to: "#/x", on: true }, { k: "followup", v: 9, dot: "warn", to: "#/y" }, { k: "won", v: 12, dot: "ok", to: "#/z" }, "sep", { k: "pipeline", v: "₹42.1L" }, { k: "collected", v: "₹7.4L", tone: "ok" }]} />
+          <ListTable
+            head={
+              <tr>
+                <th className="rail" />
+                <th>Deal</th>
+                <th>Stage</th>
+                <th>Owner</th>
+                <th className="n">Value</th>
+                <th>Next</th>
+                <th className="acts" />
+              </tr>
+            }
+          >
+            {[
+              ["IB-D-1042", "Sharma residence", "followup", "warn", "Priya Nair", "₹4,20,000", "Today"],
+              ["IB-D-1039", "Café Nine, Indiranagar", "won", undefined, "R. Menon", "₹11,80,000", "—"],
+              ["IB-D-1031", "Verma 3BHK", "deal", "bad", "Jaswant Kaul", "₹2,10,000", "3 days late"],
+            ].map((r) => (
+              <tr key={r[0]} className="clickable">
+                <Rail tone={r[3] as string} />
+                <td className="cell-1">
+                  {r[1]}
+                  <div className="cell-2 font-mono">{r[0]}</div>
+                </td>
+                <td>
+                  <DealStatus status={r[2] as string} />
+                </td>
+                <td>
+                  <Person name={r[4] as string} sm />
+                </td>
+                <td className="n">{r[5]}</td>
+                <td className={r[3] === "bad" ? "text-error-primary" : ""}>{r[6]}</td>
+                <td className="acts">
+                  <IconButton ico="dots" label="More" size="xs" />
+                </td>
+              </tr>
+            ))}
+          </ListTable>
+          <Pagination page={2} pages={9} total={241} pageSize={30} onPage={() => {}} />
+        </div>
+      </Card>
 
-        <Card title="What happened" sub="To this record, newest first. The system's own entries are marked.">
-          <Timeline items={[
-            { title: <>Qualified by <b>A. Rao</b></>, meta: "Today · 14:20", tone: "ok" },
-            { title: "Site visit logged", body: "Measurements attached (3 files).", meta: "Yesterday · 11:05" },
-            { title: "Matched to 4 businesses", meta: "8 Sep · automatic", tone: "sys" },
-            { title: "Duplicate check failed", body: "Same phone as IB-E-1990.", meta: "8 Sep · automatic", tone: "bad" },
-          ]} />
-        </Card>
+      <Tiles
+        list={[
+          { k: "Collected", v: "₹7.38L", s: "7 payments in", delta: { dir: "up", text: "150%", of: "vs prev 30d" }, icon: "cash" },
+          { k: "Pipeline", v: "₹42.1L", s: "24 open deals", delta: { dir: "down", text: "4%", of: "vs prev 30d" } },
+          { k: "Unclosed days", v: "3", tone: "warn", delta: { dir: "up", text: "+2", of: "this week", good: false } },
+          { k: "Conversion", v: "38%", to: "#/deals", foot: <Pill xs tone="ok" text="on target" /> },
+        ]}
+      />
 
-        <Card title="Across the panel" sub="Who did what, most recent first.">
-          <ActivityFeed items={[
-            { who: "A. Rao", what: <>assigned <b>IB-E-2214</b> to Design</>, when: "4 min ago" },
-            { who: "S. Iyer", what: <>approved leave for <b>R. Menon</b></>, when: "22 min ago" },
-            { ico: "recon", what: <>Payroll for <b>August</b> was reconciled</>, when: "1 h ago" },
-            { who: "K. Das", what: <>rejected <b>IB-E-2201</b> — out of service area</>, when: "3 h ago" },
-          ]} />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card title="Conditions" sub="Still true. A toast is a receipt; this is a state.">
+          <div className="flex flex-col gap-3">
+            <Alert tone="ok" title="Payroll for August is settled">
+              22 slips issued, none outstanding.
+            </Alert>
+            <Alert tone="warn" title="Two members are unclosed" action={<Button size="xs" color="secondary">Review</Button>}>
+              Yesterday's day is still open for J. Kaul and S. Saifi.
+            </Alert>
+            <Alert tone="bad" title="Could not reach the ledger service" onClose={() => {}}>
+              Nothing was changed. Try again in a moment.
+            </Alert>
+            <Alert tone="info">Seed sections run on their own clock.</Alert>
+          </div>
+        </Card>
+        <Card title="Explanations" sub="A tooltip labels; the dot explains.">
+          <div className="flex flex-wrap items-center gap-6">
+            <Tooltip tip="Refresh the ledger">
+              <IconButton ico="refresh" label="Refresh" />
+            </Tooltip>
+            <span className="inline-flex items-center gap-1.5 text-sm text-secondary">
+              Collected
+              <InfoDot>
+                <b>Collected</b>
+                <p>Every receipt recorded against an invoice in the period, net of reversals.</p>
+              </InfoDot>
+            </span>
+            <Eyebrow>Executive snapshot</Eyebrow>
+            <Breadcrumbs items={[{ label: "Sales", to: "#/deals" }, { label: "Deals", to: "#/deals" }, { label: "IB-D-1042" }]} />
+          </div>
+        </Card>
+        <Card title="Waiting, and nothing there" sub="A skeleton keeps the shape; an empty state is dashed.">
+          <div className="flex flex-col gap-4">
+            <ListSkeleton rows={2} />
+            <PaneLoading label="Loading the record…" />
+            <EmptyState icon="search" title="No enquiries match those filters" body="Try clearing the city filter — it excludes 14." action={<Button color="secondary" size="sm">Clear filters</Button>} />
+          </div>
+        </Card>
+        <Card title="What happened" sub="To a record (timeline) and across the panel (feed).">
+          <div className="grid gap-6 sm:grid-cols-2">
+            <Timeline
+              items={[
+                { title: "Payment received", body: "₹1,20,000 against INV-0091", meta: "Today · 11:20", tone: "ok" },
+                { title: "Stage moved to Followup", meta: "Yesterday", tone: "sys" },
+                { title: "Quotation revised to v2", meta: "3 Sep" },
+                { title: "Delivery failed", body: "Business did not acknowledge", meta: "1 Sep", tone: "bad" },
+              ]}
+            />
+            <ActivityFeed items={[{ who: "Priya Nair", what: "closed IB-D-1042", when: "11:20" }, { who: "Jaswant Kaul", what: "reassigned E-2044 to Studio Kanva", when: "10:02" }, { ico: "sparkle", what: "The matching run found 3 businesses", when: "09:40" }]} />
+          </div>
         </Card>
       </div>
 
-      {/* ------------------------------------------------------------ CHARTS */}
-      <Card title="Data visualisation"
-        sub="The first series is the brand. A single-series chart is therefore forest.">
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 16 }}>
-          <figure className="chartframe ticks">
-            <figcaption className="cf-h"><h4>Enquiries per week</h4></figcaption>
-            <div className="cf-plot">
-              <svg viewBox="0 0 260 90" role="img" aria-label="Enquiries per week, rising">
-                <line x1="0" y1="89" x2="260" y2="89" stroke="var(--chart-grid)" />
-                <line x1="0" y1="45" x2="260" y2="45" stroke="var(--chart-grid)" strokeDasharray="2 3" />
-                {[38, 52, 44, 61, 58, 74, 69, 86].map((v, i) => (
-                  <rect key={i} x={6 + i * 32} y={90 - v} width="20" height={v}
-                    fill="var(--chart-1)" rx="2" />
-                ))}
-              </svg>
+      <Card title="Data visualisation" sub="Series one is the brand; status colours are never a series.">
+        <div className="grid gap-4 lg:grid-cols-2">
+          <ChartFrame title="Members by month" legend={[{ label: "New", color: "var(--color-chart-1)" }, { label: "Renewed", color: "var(--color-chart-2)" }]}>
+            <ColumnChart
+              series={[{ key: "new", label: "New", slot: 1 }, { key: "ren", label: "Renewed", slot: 2 }]}
+              points={["Apr", "May", "Jun", "Jul", "Aug", "Sep"].map((m, i) => ({ key: m, label: m, values: { new: 40 + i * 12, ren: 20 + i * 5 } }))}
+              unit="members"
+              labelSeries="new"
+            />
+          </ChartFrame>
+          <ChartFrame title="August, from nothing to closing">
+            <Waterfall steps={[{ key: "c", label: "Collected", value: 738, kind: "in", display: "₹7.38L" }, { key: "o", label: "Other in", value: 60, kind: "in", display: "₹0.6L" }, { key: "s", label: "Salaries", value: 310, kind: "out", display: "₹3.1L" }, { key: "x", label: "Spend", value: 120, kind: "out", display: "₹1.2L" }, { key: "t", label: "Closing", value: 0, kind: "total", display: "₹3.68L" }]} unit="₹ lakh" />
+          </ChartFrame>
+          <ChartFrame title="Net by month">
+            <SignedColumns points={[12, -4, 18, 22, -9, 31, 14, 27, -3, 40, 36, 44].map((v, i) => ({ key: String(i), label: ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"][i], value: v }))} unit="₹ lakh" />
+          </ChartFrame>
+          <ChartFrame title="Enquiry funnel">
+            <FunnelChart stages={[{ key: "n", label: "New", value: 240 }, { key: "q", label: "Qualified", value: 180 }, { key: "a", label: "Assigned", value: 122 }, { key: "c", label: "Converted", value: 41 }]} unit="enquiries" />
+          </ChartFrame>
+          <ChartFrame title="Deals by owner" ticks={false}>
+            <BarRows rows={[{ key: "p", label: <Person name="Priya Nair" sm />, value: 14, hint: "₹18.2L" }, { key: "r", label: <Person name="R. Menon" sm />, value: 9, hint: "₹11.0L", tone: "s2" }, { key: "j", label: <Person name="Jaswant Kaul" sm />, value: 4, hint: "₹3.1L", tone: "s3" }]} unit="open deals" />
+          </ChartFrame>
+          <Card title="Sparklines" tight>
+            <div className="flex items-center gap-6">
+              <Spark values={[3, 5, 4, 8, 7, 11, 10, 14]} tone="s1" label="Collected, 8 weeks" />
+              <Spark values={[9, 8, 8, 6, 7, 5, 4, 3]} tone="s2" label="Spend, 8 weeks" />
+              <Tile k="Inline" v="₹1.2L" delta={{ dir: "up", text: "8%" }} className="w-44" />
             </div>
-            <Legend items={[{ label: "Enquiries", color: "var(--chart-1)" }]} />
-          </figure>
-
-          <figure className="chartframe ticks">
-            <figcaption className="cf-h"><h4>Source mix</h4></figcaption>
-            <div className="cf-plot">
-              <svg viewBox="0 0 260 90" role="img" aria-label="Source mix by channel">
-                {[
-                  ["var(--chart-1)", 0, 96], ["var(--chart-2)", 96, 64],
-                  ["var(--chart-3)", 160, 44], ["var(--chart-4)", 204, 32],
-                  ["var(--chart-5)", 236, 24],
-                ].map(([c, x, w], i) => (
-                  <rect key={i} x={x as number} y="30" width={w as number} height="30"
-                    fill={c as string} />
-                ))}
-              </svg>
-            </div>
-            <Legend items={[
-              { label: "Portal", color: "var(--chart-1)" },
-              { label: "WhatsApp", color: "var(--chart-2)" },
-              { label: "Referral", color: "var(--chart-3)" },
-              { label: "Walk-in", color: "var(--chart-4)" },
-              { label: "Other", color: "var(--chart-5)" },
-            ]} />
-          </figure>
-
-          <figure className="chartframe ticks">
-            <figcaption className="cf-h"><h4>Conversion by stage</h4></figcaption>
-            <div className="cf-plot">
-              <svg viewBox="0 0 260 90" role="img" aria-label="Conversion, a sequential ramp">
-                {[1, 2, 3, 4, 5].map((n, i) => (
-                  <rect key={n} x={4 + i * 51} y="20" width="46" height="50"
-                    fill={"var(--chart-seq-" + n + ")"} rx="2" />
-                ))}
-              </svg>
-            </div>
-            <div className="cf-note">
-              A ramp encodes magnitude, so it is forest — the panel's own measurement.
-            </div>
-          </figure>
+          </Card>
+        </div>
+        <div className="mt-4">
+          <Table cols={[{ label: "Plan" }, { label: "Members", cls: "n" }, { label: "MRR", cls: "n" }, { label: "Status" }]} rows={[<tr key="1"><td className="t">Starter</td><td className="n">142</td><td className="n">₹2,84,000</td><td><Pill tone="ok" dot text="Active" /></td></tr>, <tr key="2"><td className="t">Growth</td><td className="n">38</td><td className="n">₹3,04,000</td><td><Pill tone="ok" dot text="Active" /></td></tr>, <tr key="3"><td className="t">Legacy</td><td className="n">6</td><td className="n">₹18,000</td><td><Pill tone="dead" text="Retired" /></td></tr>]} />
         </div>
       </Card>
     </div>
   );
 }
 
-/* Mounted with the REAL ShellProvider, so a modal, a drawer, a popover and a
-   toast in here are the same objects the product raises. MemoryRouter because
-   the parts route through ui/nav and nothing in a gallery should navigate. */
+bootAppearance();
 createRoot(document.getElementById("root")!).render(
   <MemoryRouter>
     <ShellProvider>
-      <Board />
+      <Gallery />
     </ShellProvider>
-  </MemoryRouter>
+  </MemoryRouter>,
 );

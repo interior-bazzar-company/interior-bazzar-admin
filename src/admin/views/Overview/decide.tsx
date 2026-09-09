@@ -4,15 +4,17 @@
    one action each. Planning Signals is the last thing read, and looks ahead.
    ============================================================================= */
 import { useState } from "react";
-import { Icon } from "../../ui";
-import { go } from "../../ui/nav";
+import { Button, Tile } from "../../ui";
 import { Spark } from "../charts";
-import { Dot, Empty, Go, Section } from "./bits";
+import { AttnRow, Empty, Go, Section } from "./bits";
 import type { OverviewData } from "./store";
 
 const SHOW = 8;
-const AREA: Record<string, string> = { deals: "Deals", finance: "Finance", team: "Team" };
 
+/* ONE RANKED LIST, SEVERITY FIRST AND MONEY INSIDE IT. Not a table: every row
+   is a different kind of thing, so there is no column they share. What each
+   row does share is the shape — stripe, what it is, what it is worth, one
+   action — and that shape is the only thing the eye has to learn. */
 export function Attention({ d }: { d: OverviewData }) {
   const [all, setAll] = useState(false);
   const items = d.attention;
@@ -27,25 +29,19 @@ export function Attention({ d }: { d: OverviewData }) {
           why="No stalled deal, failed payment, overdue urgent task or unread report across what you can see." />
       ) : (
         <>
-          <ol className="ov-attn">
+          <ol className="flex flex-col gap-2">
             {shown.map((i) => (
-              <li key={i.id} className={"ov-attn-i " + i.severity}>
-                <Dot tone={i.severity} />
-                <div className="ov-attn-t">
-                  <b>{i.title}</b>
-                  <span className="trunc">{AREA[i.area]} · {i.sub}</span>
-                </div>
-                <span className="ov-attn-m mono">{i.metric}</span>
-                <button type="button" className="btn xs" data-go={i.to} onClick={() => go(i.to)}>
-                  {i.toLabel}<Icon name="chevr" size="xs" />
-                </button>
+              <li key={i.id}>
+                <AttnRow item={i} />
               </li>
             ))}
           </ol>
           {items.length > SHOW ? (
-            <button type="button" className="btn ghost sm ov-more" onClick={() => setAll((v) => !v)}>
-              {all ? "Show fewer" : "Show all " + items.length}
-            </button>
+            <div>
+              <Button size="sm" color="link-color" ico={all ? "chevu" : "chev"} onClick={() => setAll((v) => !v)}>
+                {all ? "Show fewer" : "Show all " + items.length}
+              </Button>
+            </div>
           ) : null}
         </>
       )}
@@ -53,22 +49,40 @@ export function Attention({ d }: { d: OverviewData }) {
   );
 }
 
+/* WHAT THE DATED RECORDS SAY ABOUT THE NEXT FEW WEEKS. Every one of these is
+   a forward reading, so none of them is a count of something that already
+   happened — that is what the sections above are for. */
 export function Signals({ d }: { d: OverviewData }) {
   const s = d.signals;
   return (
     <Section id="ov-signals" title="Planning signals" tip="signals" desc="what the dated records say about the next few weeks">
-      {!s.length ? <Empty title="Nothing to plan from." why="Signals appear once deals, finance or team records are in your access." /> : (
-        <div className="ov-signals">
+      {!s.length ? (
+        <Empty title="Nothing to plan from." why="Signals appear once deals, finance or team records are in your access." />
+      ) : (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {s.map((x) => (
-            <div key={x.id} className={"ov-sig" + (x.tone ? " " + x.tone : "")}>
-              <div className="eyebrow bare">{x.title}</div>
-              <div className="ov-sig-v">
-                <span>{x.value}</span>
-                {x.spark && x.spark.length > 1 ? <Spark values={x.spark} tone="s1" label={x.title} /> : null}
-              </div>
-              <p>{x.sub}</p>
-              {x.to ? <Go to={x.to}>{x.toLabel}</Go> : null}
-            </div>
+            <Tile
+              key={x.id}
+              className="h-full"
+              k={x.title}
+              v={x.value}
+              tone={x.tone}
+              /* THE SUB READS FIRST AND IN FULL — these lines carry the names
+                 the reader is looking for ("Kavya 3 · Ravi 2"), so they are
+                 never truncated. The plot and the way out share the line
+                 under it, at the two ends. */
+              foot={
+                <span className="flex w-full flex-col gap-1.5">
+                  <span className="text-xs text-tertiary">{x.sub}</span>
+                  {x.spark || x.to ? (
+                    <span className="flex items-center justify-between gap-3">
+                      {x.spark && x.spark.length > 1 ? <Spark values={x.spark} tone="s1" label={x.title} /> : <span />}
+                      {x.to ? <Go to={x.to}>{x.toLabel}</Go> : null}
+                    </span>
+                  ) : null}
+                </span>
+              }
+            />
           ))}
         </div>
       )}

@@ -6,28 +6,33 @@
      ?tab=notes        internal notes and operational tags
      ?tab=audit        the append-only timeline
 
-   Same furniture as the Business Enquiries record: an id bar carrying the
-   identity and its badges, one subline, then tabs. One workspace rather than
-   four screens, because servicing a customer means holding their profile and
-   their history at once.
+   The panel's record furniture: a `PageHeader` carrying the face, the name,
+   the state pills and the record's actions; the way back is the topbar's own
+   module title, which every record in the panel now uses. Then `Tabs`, then a
+   two-column read — the record's own facts on the left, what the system knows
+   about the identity on the right.
 
    THE MEMBERSHIP TAB IS GONE, with the term, its entitlement snapshot, its
    guarded actions and the per-term history table. What a customer bought is a
    subscription and it is recorded in Finance; this record links to the deal
    and the invoice behind it on the Commercial tab and holds none of it.
    ============================================================================= */
+import type { ReactNode } from "react";
 import { useShell } from "../../shell/ShellContext";
 import { can, useNav } from "../../shell/AdminShell";
-import { EmptyState, Icon, KvList, Notice, Tabs } from "../../ui";
-import { go } from "../../ui/nav";
-import { Assumed, ClassPill, Completeness, EventRow, ProtoBar, TagChips } from "./bits";
+import {
+  Avatar, Button, Card, EmptyState, Icon, KvList, LinkChip, MoreMenu, Notice,
+  PageHeader, Pill, Table, Tabs, Tag, Timeline, ActivityFeed,
+} from "../../ui";
+import { Assumed, ClassPill, Completeness, ProtoBar, TagChips } from "./bits";
 import EditProfile from "./EditProfile";
 import { DeactivateModal, NoteModal, TagsModal } from "./Modals";
 import {
   PROFILE_FIELDS, PROFILE_SCHEMA_VERSION, VOCAB,
-  ago, facetLabel, fmtDate, labelsFor, primaryCityOf, profileUrl, resetStore, useTimeline,
+  ago, facetLabel, fmtDate, fmtDateTime, labelsFor, primaryCityOf, profileUrl,
+  resetStore, useTimeline,
 } from "./store";
-import type { Params, UserRow } from "./store";
+import type { Params, ProfileField, TargetArea, UserRow } from "./store";
 
 const TABS = [
   { k: "profile", label: "Profile" },
@@ -35,6 +40,16 @@ const TABS = [
   { k: "notes", label: "Notes & tags" },
   { k: "audit", label: "Audit" },
 ];
+
+/* The audit vocabulary's tone words → the timeline's. `stop` is this module's
+   spelling of a hard stop, and an untoned event is a plain fact. */
+const DOT: Record<string, "sys" | "bad" | "ok" | "warn" | "info" | "brand"> = {
+  sys: "sys", ok: "ok", warn: "warn", stop: "bad", bad: "bad", info: "info",
+};
+
+/* Everything but the two fields that get their own drawing: the address, which
+   is a link, and the service areas, which are a table. */
+const FACT_FIELDS = PROFILE_FIELDS.filter((f) => f.type !== "handle" && f.type !== "areas");
 
 export default function Detail({ id, p, rows, onParams }: {
   id: string;
@@ -59,187 +74,195 @@ export default function Detail({ id, p, rows, onParams }: {
 
   if (!row) {
     return (
-      <div className="um-rec">
+      <div className="flex flex-col gap-4">
         <ProtoBar />
         <EmptyState icon="search" title="No user at that address"
-          body={<>There is no record for <span className="mono">{id}</span>.</>}
-          action={<button className="btn pri" onClick={() => navGo("#/users")}>Back to the directory</button>} />
+          body={<>There is no record for <span className="font-mono">{id}</span>.</>}
+          action={<Button color="primary" onClick={() => navGo("#/users")}>Back to the directory</Button>} />
       </div>
     );
   }
 
   const u = row.user;
   const writable = can("users", "edit");
+  const off = u.userStatus === "deactivated";
+  const city = primaryCityOf(u.profile);
+
+  const editProfile = () => modal(
+    <EditProfile row={row} onClose={closeLayer}
+      onDone={(m, t) => { closeLayer(); toast(m, t); }} />, "xl");
+
+  /* The record's actions, behind one button — the panel's rule. The account
+     switch is destructive and goes last, below the separator. */
+  const menu = [
+    { icon: "edit", label: "Edit profile", act: editProfile, disabled: !writable },
+    { icon: "note", label: "Add an internal note", disabled: !writable,
+      act: () => modal(<NoteModal row={row} onClose={closeLayer}
+        onDone={(m, t) => { closeLayer(); toast(m, t); }} />) },
+    { icon: "tag", label: "Edit operational tags", disabled: !writable,
+      act: () => modal(<TagsModal row={row} onClose={closeLayer}
+        onDone={(m, t) => { closeLayer(); toast(m, t); }} />) },
+    { icon: "list", label: "Back to the directory", act: () => navGo(back) },
+    {
+      icon: off ? "unlock" : "lock",
+      label: off ? "Reactivate account" : "Deactivate account",
+      tone: off ? undefined : "bad",
+      disabled: !writable,
+      act: () => modal(<DeactivateModal row={row} onClose={closeLayer}
+        onDone={(m, t) => { closeLayer(); toast(m, t); }} />),
+    },
+  ];
 
   return (
-    <div className="um-rec">
+    <div className="flex flex-col gap-4">
       <ProtoBar onReset={() => { resetStore(); toast("Back to the seed."); }} />
 
-      {/* The record-header pattern the whole panel takes now: the name leads,
-          a thin rule sets the status off it, and the right side holds the
-          actions with Back — the one filled control — closing the row. */}
-      <div className="um-idbar">
-        <h2>{u.identity.name}</h2>
-        <span className="vsep" aria-hidden="true" />
-        <ClassPill k={row.classification} lg />
-        {u.userStatus === "deactivated"
-          ? <span className="pill dead lg" title={u.deactivatedReason || ""}>Account off</span>
-          : null}
-        <TagChips slugs={u.tags.map((t) => t.slug)} />
-        <span className="spacer" />
-        {writable
-          ? <button className="btn sm" onClick={() => modal(
-              <DeactivateModal row={row} onClose={closeLayer}
-                onDone={(m, t) => { closeLayer(); toast(m, t); }} />)}>
-              <Icon name={u.userStatus === "deactivated" ? "unlock" : "lock"} size="sm" />
-              {u.userStatus === "deactivated" ? "Reactivate account" : "Deactivate account"}
-            </button>
-          : null}
-        <button className="btn sm pri" onClick={() => navGo(back)}>
-          <Icon name="chevl" size="sm" />Back
-        </button>
-      </div>
-
-      <div className="um-subline">
-        <span className="mono">{u.userId}</span>
-        {u.identity.email ? <> · <span className="mono">{u.identity.email}</span></> : null}
-        {u.identity.phone ? <> · <span className="mono">{u.identity.phone}</span></> : null}
-        {primaryCityOf(u.profile) ? <> · {primaryCityOf(u.profile)}</> : null}
-        {" · registered "}{fmtDate(u.registeredAt)}
-      </div>
-
-      <Tabs items={TABS.map((t) => ({
-        k: t.k, label: t.label,
-        n: t.k === "notes" ? u.notes.length
-          : t.k === "audit" ? timeline.length : undefined,
-      }))} cur={tab}
-        onPick={(k) => onParams({ tab: k === "profile" ? undefined : k })} />
+      {/* The record header: the face leads, the states sit under the name with
+          the identity line, and the actions close the row. Back is the topbar's
+          module title — one way up, panel-wide. */}
+      <PageHeader
+        className="mb-0"
+        eyebrow={<span className="font-mono">{u.userId}</span>}
+        title={
+          <span className="flex min-w-0 items-center gap-3">
+            <Avatar lg name={u.identity.name} />
+            <span className="truncate">{u.identity.name}</span>
+          </span>
+        }
+        meta={
+          <>
+            <ClassPill k={row.classification} />
+            {off ? <Pill tone="dead" text="Account off" title={u.deactivatedReason || ""} /> : null}
+            <TagChips slugs={u.tags.map((t) => t.slug)} max={4} />
+            <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-tertiary">
+              {u.identity.email ? <span className="font-mono">{u.identity.email}</span> : null}
+              {u.identity.phone ? <span className="font-mono tnum">{u.identity.phone}</span> : null}
+              {city ? <span>{city}</span> : null}
+              <span>registered {fmtDate(u.registeredAt)}</span>
+            </span>
+          </>
+        }
+        actions={
+          <>
+            <MoreMenu items={menu} label="Actions" />
+            {writable ? <Button color="primary" ico="edit" onClick={editProfile}>Edit profile</Button> : null}
+          </>
+        }
+        tabs={
+          <Tabs items={TABS.map((t) => ({
+            k: t.k, label: t.label, quiet: true,
+            n: t.k === "notes" ? u.notes.length
+              : t.k === "audit" ? timeline.length : undefined,
+          }))} cur={tab}
+            onPick={(k) => onParams({ tab: k === "profile" ? undefined : k })} />
+        }
+      />
 
       {/* ======================================================== profile === */}
       {tab === "profile" ? (
-        <div className="um-cards">
-          <div className="card">
-            <div className="card-h">
-              <h3>Business profile</h3>
-              <span className="d">{PROFILE_SCHEMA_VERSION}</span>
-              <span className="r">
-                <Completeness pct={row.completeness} missing={row.missingFields} />
-                {writable ? (
-                  <button className="btn sm" onClick={() => modal(
-                    <EditProfile row={row} onClose={closeLayer}
-                      onDone={(m, t) => { closeLayer(); toast(m, t); }} />, "wide")}>
-                    Edit
-                  </button>
-                ) : null}
-              </span>
-            </div>
-            <div className="card-b">
-              <KvList pairs={PROFILE_FIELDS.map((f) => {
-                const v = (u.profile as unknown as Record<string, unknown>)[f.key];
-                /* A facet renders as the chips it is, not as a comma-joined
-                   string. Six segments run together read as one long phrase,
-                   and the count — which is the thing you actually check on a
-                   profile — cannot be seen at all. Keys become labels here;
-                   what is stored is never what is shown. */
-                /* The username is an ADDRESS, so on the record it is the
-                   thing itself — a link somebody can open or copy — not the
-                   string it is made of. */
-                const val = f.type === "handle"
-                  ? (v
-                    ? <a className="um-profile-link" href={profileUrl(String(v))}
-                        target="_blank" rel="noreferrer">
-                        <span className="mono">{String(v)}</span>
-                        <Icon name="ext" size="sm" />
-                      </a>
-                    : "")
-                  : f.type === "areas"
-                  ? ((v as { state: string; cities: string[] }[]).length
-                    ? <span className="um-areas-ro">
-                        {(v as { state: string; cities: string[] }[]).map((t, i) => (
-                          /* One line per row, the state leading its cities —
-                             the same closed/open halves the editor shows. */
-                          <span className="um-chips ro" key={i}>
-                            <span className="pill um-chip tag-slate">{t.state}</span>
-                            {t.cities.map((c, j) => (
-                              <span className={"pill um-chip " + (f.chip || "")} key={j}>{c}</span>
-                            ))}
-                          </span>
-                        ))}
+        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
+          <div className="flex flex-col gap-4 lg:col-span-2">
+            <Card
+              title="Business profile"
+              sub={PROFILE_SCHEMA_VERSION}
+              right={<Completeness pct={row.completeness} missing={row.missingFields} />}
+            >
+              <KvList pairs={([
+                /* The username is an ADDRESS, so on the record it is the thing
+                   itself — a link somebody can open — not the string it is
+                   made of. */
+                ["Public profile", u.profile.username
+                  ? <a className="inline-flex items-center gap-1 rounded font-mono text-sm text-brand-secondary outline-focus-ring hover:underline focus-visible:outline-2 focus-visible:outline-offset-2"
+                      href={profileUrl(u.profile.username)} target="_blank" rel="noreferrer">
+                      {u.profile.username}
+                      <Icon name="ext" size="xs" />
+                    </a>
+                  : ""],
+              ] as [ReactNode, ReactNode][]).concat(
+                FACT_FIELDS.map((f) => [f.label, factOf(f, u.profile as unknown as Record<string, unknown>)]),
+              )} />
+            </Card>
+
+            {/* WHERE THEY TAKE WORK, as the structured rows it is stored as: a
+                closed state per row so claims aggregate, open cities inside it.
+                A comma-joined string cannot be counted and cannot be read. */}
+            <Card title="Service areas" sub="where they take work — one row per state" tight flush>
+              <Table
+                list
+                className="rounded-none ring-0 shadow-none"
+                cols={[{ label: "State", w: "12rem" }, { label: "Cities" }]}
+                empty={{ icon: "pin", title: "No service areas", body: "Nobody has said where this business works. It is a required field on the profile." }}
+                rows={(u.profile.targetAreas || []).map((a: TargetArea, i) => (
+                  <tr key={i}>
+                    <td className="cell-1">{a.state}</td>
+                    <td>
+                      <span className="inline-flex flex-wrap items-center gap-1">
+                        {a.cities.map((c) => <Tag key={c} label={c} tone="tag-teal" />)}
                       </span>
-                    : "")
-                  : Array.isArray(v)
-                  ? (v.length
-                    ? <span className="um-chips ro">
-                        {labelsFor(f, v as string[]).map((l, i) => (
-                          <span className={"pill um-chip " + (f.chip || "")} key={i}>{l}</span>
-                        ))}
-                      </span>
-                    : "")
-                  : f.type === "single" && v
-                    ? <span className={"pill um-chip " + (f.chip || "")}>
-                        {facetLabel(f.vocab || "", String(v))}
-                      </span>
-                    : ((v as string | null) || "");
-                return [
-                  f.label,
-                  val,
-                ] as [React.ReactNode, React.ReactNode];
-              })} />
-            </div>
+                    </td>
+                  </tr>
+                ))}
+              />
+            </Card>
           </div>
 
-          <div className="card">
-            <div className="card-h">
-              <h3>Identity</h3>
-              <span className="d"><Icon name="shield" size="sm" />Authentication · read-only</span>
-            </div>
-            <div className="card-b">
+          <div className="flex flex-col gap-4">
+            <Card title="Identity" sub="authentication · read-only"
+              right={<Icon name="shield" size="sm" className="text-fg-quaternary" />}>
               <KvList pairs={[
-                ["Email", <>{u.identity.email || "—"}{u.identity.emailVerified ? " ✓" : " · unverified"}</>],
-                ["Mobile", <>{u.identity.phone || "—"}{u.identity.phoneVerified ? " ✓" : " · unverified"}</>],
-                ["Auth identity", <span className="mono">{u.authUserId}</span>],
+                ["Email", u.identity.email
+                  ? <span className="flex flex-wrap items-center gap-1.5">
+                      <span className="font-mono">{u.identity.email}</span>
+                      <Pill xs tone={u.identity.emailVerified ? "ok" : "warn"}
+                        text={u.identity.emailVerified ? "verified" : "unverified"} />
+                    </span>
+                  : ""],
+                ["Mobile", u.identity.phone
+                  ? <span className="flex flex-wrap items-center gap-1.5">
+                      <span className="font-mono tnum">{u.identity.phone}</span>
+                      <Pill xs tone={u.identity.phoneVerified ? "ok" : "warn"}
+                        text={u.identity.phoneVerified ? "verified" : "unverified"} />
+                    </span>
+                  : ""],
+                ["Auth identity", <span className="font-mono">{u.authUserId}</span>],
                 ["Registered via", VOCAB.registrationSources.filter((s) => s.key === u.registrationSource)[0]?.label],
-                ["Account", u.userStatus === "deactivated"
-                  ? <>Deactivated {ago(u.deactivatedAt)} — {u.deactivatedReason}</>
+                ["Registered", <span className="tnum">{fmtDate(u.registeredAt)}</span>],
+                ["Last seen", <span className="tnum">{ago(u.lastActivityAt)}</span>],
+                ["Account", off
+                  ? <span className="text-error-primary">Deactivated {ago(u.deactivatedAt)} — {u.deactivatedReason}</span>
                   : "Active"],
-                ["Last edited", <>{u.profile.updatedBy || "—"} · {ago(u.profile.updatedAt)}</>],
+                ["Last edited", <>{u.profile.updatedBy || "—"} · <span className="tnum">{ago(u.profile.updatedAt)}</span></>],
               ]} />
-            </div>
+            </Card>
+            <Assumed id="UM-OD-09" />
           </div>
-          <Assumed id="UM-OD-09" />
         </div>
       ) : null}
 
       {/* ===================================================== commercial === */}
       {tab === "commercial" ? (
-        <div className="um-cards">
-          <div className="card">
-            <div className="card-h">
-              <h3>Linked records</h3>
-              <span className="d"><Icon name="link" size="sm" />read-only</span>
-            </div>
-            <div className="card-b">
-              <KvList pairs={[
-                ["Sales owner", u.commercial.salesOwner || ""],
-                ["Deals", u.commercial.dealRefs.length
-                  ? <span className="chiprow">
-                      {u.commercial.dealRefs.map((d) => (
-                        <a key={d} className="pill line mono" data-go={"#/deals/" + d}
-                          onClick={() => go("#/deals/" + d)}>{d}</a>
-                      ))}
-                    </span>
-                  : ""],
-                ["Invoices", u.commercial.invoiceRefs.length
-                  ? <span className="chiprow">
-                      {u.commercial.invoiceRefs.map((d) => (
-                        <a key={d} className="pill line mono" data-go={"#/invoices/" + d}
-                          onClick={() => go("#/invoices/" + d)}>{d}</a>
-                      ))}
-                    </span>
-                  : ""],
-              ]} />
-            </div>
-          </div>
+        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
+          <Card title="Linked records" sub="pointers into the modules that own them"
+            className="lg:col-span-2"
+            right={<Icon name="link" size="sm" className="text-fg-quaternary" />}>
+            <KvList pairs={[
+              ["Sales owner", u.commercial.salesOwner || ""],
+              ["Deals", u.commercial.dealRefs.length
+                ? <span className="flex flex-wrap items-center gap-1.5">
+                    {u.commercial.dealRefs.map((d) => (
+                      <LinkChip key={d} refText={d} to={"#/deals/" + d} ico="deal" />
+                    ))}
+                  </span>
+                : ""],
+              ["Invoices", u.commercial.invoiceRefs.length
+                ? <span className="flex flex-wrap items-center gap-1.5">
+                    {u.commercial.invoiceRefs.map((d) => (
+                      <LinkChip key={d} refText={d} to={"#/invoices/" + d} ico="invoice" />
+                    ))}
+                  </span>
+                : ""],
+            ]} />
+          </Card>
 
           <Notice tone="info" ico="lock" text={<>
             <b>This module owns no money and no subscription.</b> What this customer bought, what
@@ -252,104 +275,109 @@ export default function Detail({ id, p, rows, onParams }: {
 
       {/* ========================================================== notes === */}
       {tab === "notes" ? (
-        <div className="um-cards">
-          <div className="card">
-            <div className="card-h">
-              <h3>Tags</h3>
-              <span className="d">internal segmentation</span>
-              <span className="r">
-                {writable ? (
-                  <button className="btn sm" onClick={() => modal(
+        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
+          <Card
+            title="Internal notes"
+            sub="append-only · never customer-visible"
+            className="lg:col-span-2"
+            right={writable
+              ? <Button size="xs" color="secondary" ico="plus" onClick={() => modal(
+                  <NoteModal row={row} onClose={closeLayer}
+                    onDone={(m, t) => { closeLayer(); toast(m, t); }} />)}>Add note</Button>
+              : undefined}
+          >
+            {u.notes.length ? (
+              <ActivityFeed items={u.notes.map((n) => ({
+                who: n.author,
+                what: <>
+                  <span className="font-medium text-primary">{n.author}</span>
+                  <span className="text-quaternary"> · {n.authorRole}</span>
+                  <p className="mt-0.5 text-sm text-secondary">{n.text}</p>
+                </>,
+                when: ago(n.at),
+              }))} />
+            ) : (
+              <EmptyState flat icon="note" title="Nothing recorded yet"
+                body="A note is what the next person servicing this account needs to know." />
+            )}
+          </Card>
+
+          <div className="flex flex-col gap-4">
+            <Card title="Tags" sub="internal segmentation"
+              right={writable
+                ? <Button size="xs" color="secondary" ico="edit" onClick={() => modal(
                     <TagsModal row={row} onClose={closeLayer}
-                      onDone={(m, t) => { closeLayer(); toast(m, t); }} />)}>Edit</button>
-                ) : null}
-              </span>
-            </div>
-            <div className="card-b">
-              {u.tags.length
-                ? <div className="um-taglist">
-                    {u.tags.map((t) => (
-                      <span key={t.slug} className="um-tagrow">
-                        <TagChips slugs={[t.slug]} />
-                        <em>{t.assignedBy} · {ago(t.assignedAt)}</em>
-                      </span>
-                    ))}
-                  </div>
-                : <p className="um-fine">No tags.</p>}
-            </div>
-          </div>
-
-          <div className="card">
-            <div className="card-h">
-              <h3>Internal notes</h3>
-              <span className="d">append-only</span>
-              <span className="r">
-                {writable ? (
-                  <button className="btn sm pri" onClick={() => modal(
-                    <NoteModal row={row} onClose={closeLayer}
-                      onDone={(m, t) => { closeLayer(); toast(m, t); }} />)}>
-                    <Icon name="plus" size="sm" />Add
-                  </button>
-                ) : null}
-              </span>
-            </div>
-            <div className="card-b">
-              {u.notes.length ? (
-                <div className="um-notes">
-                  {u.notes.map((n) => (
-                    <article key={n.noteId}>
-                      <header>
-                        <b>{n.author}</b><span className="role">{n.authorRole}</span>
-                        <time title={n.at}>{ago(n.at)}</time>
-                      </header>
-                      <p>{n.text}</p>
-                    </article>
+                      onDone={(m, t) => { closeLayer(); toast(m, t); }} />)}>Edit</Button>
+                : undefined}>
+              {u.tags.length ? (
+                <ul className="flex flex-col gap-2.5">
+                  {u.tags.map((t) => (
+                    <li key={t.slug} className="flex flex-wrap items-center gap-2">
+                      <TagChips slugs={[t.slug]} />
+                      <span className="text-xs text-quaternary">{t.assignedBy} · {ago(t.assignedAt)}</span>
+                    </li>
                   ))}
-                </div>
-              ) : <p className="um-fine">Nothing recorded yet.</p>}
-            </div>
-          </div>
+                </ul>
+              ) : (
+                <p className="text-sm text-quaternary">No tags.</p>
+              )}
+            </Card>
 
-          <Notice tone="info" ico="lock" text={<>
-            <b>Never customer-visible.</b> Notes and tags are excluded from every customer-facing
-            profile response at the contract level. The audit records that a note exists and who
-            added it, never what it says.
-          </>} />
+            <Notice tone="info" ico="lock" text={<>
+              <b>Never customer-visible.</b> Notes and tags are excluded from every customer-facing
+              profile response at the contract level. The audit records that a note exists and who
+              added it, never what it says.
+            </>} />
+          </div>
         </div>
       ) : null}
 
       {/* ========================================================== audit === */}
       {tab === "audit" ? (
-        <div className="um-cards">
-          <div className="card">
-            <div className="card-h">
-              <h3>Timeline</h3>
-              <span className="d"><Icon name="lock" size="sm" />append-only · nothing is ever removed</span>
-            </div>
-            <div className="card-b">
-              {timeline.length === 0 ? (
-                <p className="um-fine">Nothing has happened on this account yet.</p>
-              ) : null}
-              <div className="um-evlist">
-                {/* AN AUDIT IS A HISTORY. Rows written while this module still
-                    ran a membership lifecycle are rows about things that
-                    actually happened, so they are still here and still
-                    labelled — vocabularies.json keeps those event types as
-                    historical for exactly this reason. Dropping them would be
-                    editing the past to match today's feature set. */}
-                {timeline.map((e) => {
-                  const meta = VOCAB.eventTypes.filter((x) => x.key === e.type)[0];
-                  return (
-                    <EventRow key={e.eventId} type={e.type}
-                      label={meta ? meta.label : e.type} tone={meta ? meta.tone : ""}
-                      text={e.note || "—"} who={e.actor + " · " + e.actorRole} when={e.at} />
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
+        <Card title="Timeline" sub="append-only · nothing is ever removed"
+          right={<Icon name="lock" size="sm" className="text-fg-quaternary" />}>
+          {timeline.length ? (
+            /* AN AUDIT IS A HISTORY. Rows written while this module still ran a
+               membership lifecycle are rows about things that actually
+               happened, so they are still here and still labelled —
+               vocabularies.json keeps those event types as historical for
+               exactly this reason. Dropping them would be editing the past to
+               match today's feature set. */
+            <Timeline items={timeline.map((e) => {
+              const meta = VOCAB.eventTypes.filter((x) => x.key === e.type)[0];
+              return {
+                title: meta ? meta.label : e.type,
+                tone: meta && meta.tone ? DOT[meta.tone] : undefined,
+                body: e.note || undefined,
+                meta: <>{e.actor} · {e.actorRole} · <span title={e.at}>{fmtDateTime(e.at)}</span></>,
+              };
+            })} />
+          ) : (
+            <EmptyState flat icon="history" title="Nothing has happened on this account yet"
+              body="Registration, profile edits, tags, notes and account status all land here." />
+          )}
+        </Card>
       ) : null}
     </div>
   );
+}
+
+/* -------------------------------------------------------------------------- */
+
+/** One profile field, rendered as what it IS. A facet is the chips it holds —
+ *  six segments comma-joined read as one long phrase, and the count, which is
+ *  the thing you actually check on a profile, cannot be seen at all. Keys
+ *  become labels here; what is stored is never what is shown. */
+function factOf(f: ProfileField, profile: Record<string, unknown>): ReactNode {
+  const v = profile[f.key];
+  if (Array.isArray(v)) {
+    if (!v.length) return "";
+    return (
+      <span className="inline-flex flex-wrap items-center gap-1">
+        {labelsFor(f, v as string[]).map((l, i) => <Tag key={i} label={l} tone={f.chip} />)}
+      </span>
+    );
+  }
+  if (f.type === "single") return v ? <Tag label={facetLabel(f.vocab || "", String(v))} tone={f.chip} /> : "";
+  return (v as string | null) || "";
 }

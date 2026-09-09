@@ -1,153 +1,121 @@
 /* =============================================================================
-   THE DUPLICATE SELECTOR GUARD
+   THE ONE-SYSTEM GUARD
    -----------------------------------------------------------------------------
-   ONE DESIGN SYSTEM MEANS ONE DEFINITION PER PART. A selector declared twice in
-   the same file is not usually a variant — it is two people's idea of the same
-   component, and the second one wins on properties they happen to share while
-   the first goes on applying the ones it does not. That is how this panel ended
-   up running two shimmer animations on every skeleton bar at once: `.sk` was
-   declared twice, with two different mechanisms, and both matched.
+   ONE DESIGN SYSTEM MEANS ONE PLACE FOR EVERY DECISION. This asserts the
+   structure that keeps it true:
 
-   It is also how a module sheet quietly re-draws a shared part: `.fin-seg`,
-   `.tm-seg` and `.btn-group` were three drawings of one control, and nothing
-   flagged it because they had three different names.
-
-   WHAT THIS CHECKS
-     1. no selector is declared twice inside one stylesheet
-     2. no MODULE sheet declares a selector the component layer already owns
-     3. no colour literal outside tokens.css
-
-   Rule 1 has genuine exceptions — a base rule plus a `@media` override, a rule
-   split for readability — so they are listed in ALLOW below with the reason,
-   rather than the check being loosened.
+     1. no stylesheet outside src/styles — a module has no CSS of its own;
+        every drawing is a component on utilities
+     2. no colour literal outside the two token sheets (theme.css, brand.css) —
+        not in globals.css, not in a `className`, not in a `style={{}}`
+     3. no inline style carrying a colour, font, size, spacing or radius —
+        a computed geometry (`width: pct + "%"`) is allowed, a design value is not
+     4. none of the retired class vocabulary (`btn`, `inp`, `pill`, `tm-*`, …)
+        anywhere in src/admin — the old system cannot creep back one class at
+        a time
 
    `npm run check:dupes`.
-   ============================================================================= */
+   ========================================================================== */
 const fs = require("fs");
 const path = require("path");
 
-const ROOT = path.resolve(__dirname, "..", "src");
-const CORE = path.join(ROOT, "styles", "admin-theme.css");
-const TOKENS = path.join(ROOT, "styles", "tokens.css");
+const ROOT = path.resolve(__dirname, "..");
+const SRC = path.join(ROOT, "src");
+const rel = (p) => path.relative(ROOT, p).split(path.sep).join("/");
+const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "");
 
-/* Selectors that are legitimately declared more than once in one file. Each
-   needs a reason, and the reason has to be about CASCADE, not about tidiness. */
-const ALLOW = new Set([
-  /* print and responsive blocks restate a selector on purpose */
-  ".page", ".card", ".tw", ".sidebar", ".topbar", ".toolbar", ".tabs", ".app",
-  ".content", ".scroller", ".drawer", ".modal", ".qdoc", ".empty",
-  /* tokens.css is ORGANISED as repeated :root blocks, one per documented
-     section — the L1 ramps, the non-colour primitives, the L2 semantic set for
-     each theme, the paper set, the tag and channel sets, the legacy vocabulary,
-     the shorthand. They declare disjoint properties and the file's structure is
-     the reason anybody can find a token in it. Collapsing them into one block
-     would be a 500-line wall with no headings. */
-  ":root", ':root[data-theme="dark"]', ':root, :root[data-theme="light"]',
-]);
-
-function read(file) {
-  return fs.readFileSync(file, "utf8")
-    /* comments hold example selectors; they are not declarations */
-    .replace(/\/\*[\s\S]*?\*\//g, "");
-}
-
-/* Every top-level selector in a sheet, with the line it is on. Rules nested in
-   an at-block (@media, @supports, @keyframes) are skipped — those exist to
-   restate a selector and flagging them would be flagging the feature. */
-function selectors(src) {
-  const out = [];
-  let depth = 0, atDepth = -1, buf = "", line = 1;
-  for (let i = 0; i < src.length; i++) {
-    const c = src[i];
-    if (c === "\n") line++;
-    if (c === "{") {
-      if (depth === 0) {
-        const sel = buf.trim();
-        if (sel.startsWith("@")) atDepth = depth;
-        else if (sel && atDepth < 0) {
-          /* THE WHOLE RULE HEAD, not each selector in it. `button,input,select
-             {font:inherit}` followed by `button{cursor:pointer}` is ordinary
-             CSS — a group that sets what they share, then one that sets what
-             only one of them needs — and comparing the members flagged every
-             such pair as a duplicate. What is worth flagging is the same rule
-             head written twice, which is what put two competing `.sk` rules and
-             two `.ticks` rules in this file. */
-          const norm = sel.split(",").map((x) => x.trim().replace(/\s+/g, " "))
-            .filter(Boolean).sort().join(", ");
-          if (norm) out.push({ sel: norm, line });
-        }
-      }
-      depth++; buf = "";
-      continue;
-    }
-    if (c === "}") {
-      depth--;
-      if (depth === 0 && atDepth === 0) atDepth = -1;
-      buf = "";
-      continue;
-    }
-    if (depth === 0) buf += c;
-  }
-  return out;
-}
-
-let bad = 0;
-const say = (ok, msg) => { if (!ok) bad++; console.log((ok ? "ok   " : "FAIL ") + msg); };
-
-/* ---------------------------------------------- 1 · duplicates within a file */
-const sheets = [];
+const files = [];
 (function walk(d) {
   for (const e of fs.readdirSync(d, { withFileTypes: true })) {
     const p = path.join(d, e.name);
     if (e.isDirectory()) walk(p);
-    else if (e.name.endsWith(".css")) sheets.push(p);
+    else files.push(p);
   }
-})(ROOT);
+})(SRC);
 
-for (const f of sheets) {
-  const rel = path.relative(ROOT, f).split(path.sep).join("/");
-  const seen = new Map();
-  const dupes = [];
-  for (const { sel, line } of selectors(read(f))) {
-    if (ALLOW.has(sel)) continue;
-    if (seen.has(sel)) dupes.push(sel + "  (lines " + seen.get(sel) + " and " + line + ")");
-    else seen.set(sel, line);
+let bad = 0;
+const say = (ok, msg) => { if (!ok) bad++; console.log((ok ? "ok   " : "FAIL ") + msg); };
+
+/* ---------------------------------------------- 1 · stylesheets live in one place */
+const sheets = files.filter((f) => f.endsWith(".css"));
+const stray = sheets.filter((f) => !rel(f).startsWith("src/styles/"));
+say(stray.length === 0, stray.length ? "stylesheets outside src/styles: " + stray.map(rel).join(", ") : "every stylesheet is in src/styles (" + sheets.length + ")");
+const expected = ["src/styles/globals.css", "src/styles/theme.css", "src/styles/brand.css"];
+say(expected.every((e) => sheets.some((f) => rel(f) === e)), "the three sheets exist: " + expected.join(", "));
+
+/* ------------------------------ 2 · colour literals only in the token sheets */
+const COLOUR = /#[0-9a-fA-F]{3,8}\b|\brgba?\([^)]*\)|\bhsla?\([^)]*\)|\boklch\([^)]*\)/g;
+const TOKEN_SHEETS = new Set(["src/styles/theme.css", "src/styles/brand.css"]);
+const LIB = /^src\/components\/(base|application|foundations|shared-assets)\//;
+for (const f of files) {
+  const r = rel(f);
+  if (TOKEN_SHEETS.has(r) || LIB.test(r) || !/\.(css|tsx|ts)$/.test(r)) continue;
+  if (/\/(store|adapter|api|helpers|exportCsv|imageSheet|share|types|payrollYear|derive)\.ts$/.test(r)) continue; // data, not paint
+  if (/^src\/(api|redux|types|utils|config|hooks|content|proto)\//.test(r)) continue;
+  const src = strip(fs.readFileSync(f, "utf8"))
+    .replace(/url\((["']?)data:[^)]*\1\)/g, "url(data)")
+    .replace(/data:image\/svg\+xml[^"'`)]*/g, "data:svg");
+  /* a `#` followed by hex is only a colour when it sits where a value sits —
+     after a quote, a colon, a bracket or a space — never `#page` or `#/deals` */
+  const real = [];
+  for (const m of src.matchAll(/(^|["'`:[(\s])(#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![\w-]))|\brgba?\([^)]*\)|\bhsla?\([^)]*\)|\boklch\([^)]*\)/gm)) {
+    const h = m[2] || m[0];
+    if (/^rgba?\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)$/.test(h)) continue;
+    real.push(h);
   }
-  say(dupes.length === 0,
-    rel.padEnd(44) + (dupes.length ? dupes.length + " duplicate selector(s)" : "no duplicate selectors"));
-  for (const d of dupes) console.log("       " + d);
+  void COLOUR;
+  say(real.length === 0, r.padEnd(60) + (real.length ? real.length + " colour literal(s): " + Array.from(new Set(real)).slice(0, 5).join(" ") : "no colour literals"));
 }
 
-/* -------------------------------- 2 · a module re-declaring a shared part */
-const coreOwned = new Set(
-  selectors(read(CORE)).map((s) => s.sel).filter((s) => /^\.[a-zA-Z][\w-]*$/.test(s))
+/* ------------------------------------------- 3 · inline styles carry no design */
+/* a design KEY with a LITERAL value — `color: "#…"`, `padding: 8`, `fontSize:
+   "13px"`. A computed value (`background: s.color`, `width: pct + "%"`) is
+   geometry the caller owns and passes the gate. */
+const STYLE_KEYS = /\b(color|background|backgroundColor|fontSize|fontFamily|fontWeight|lineHeight|padding[A-Z]?[a-z]*|margin[A-Z]?[a-z]*|borderRadius|border(Color|Width)?|boxShadow|letterSpacing|gap|opacity)\s*:\s*(["'`]|\d)/;
+for (const f of files) {
+  const r = rel(f);
+  if (!/^src\/admin\/.*\.tsx$/.test(r)) continue;
+  const src = strip(fs.readFileSync(f, "utf8"));
+  const offenders = [];
+  for (const m of src.matchAll(/style=\{\{([^}]*)\}\}/g)) if (STYLE_KEYS.test(m[1])) offenders.push(m[1].trim().slice(0, 60));
+  say(offenders.length === 0, r.padEnd(60) + (offenders.length ? offenders.length + " inline design style(s): " + offenders.slice(0, 3).join(" | ") : "no inline design values"));
+}
+
+/* --------------------------------------------- 4 · the retired vocabulary */
+const RETIRED_EXACT = new Set(
+  ("btn inp pill tile tiles tbl tw card card-h card-b card-f fg fg-lb fg-err help page ph ph-t sh kv chip chiprow av req lnk tlink " +
+    "sel-t sel-list sel-o msel menu mi msep notice empty sk tabs crumbs toolbar field check sw sw-row daterange dropzone affix meter " +
+    "delta eyebrow who tl tl-i feed fd pipe legend chartframe dim spacer scrim modal drawer banner toast toasts pop kbd spinner pane-load " +
+    "selectbox btn-group seg pager pager-bar unassigned i-btn i-pop tt tt-wrap chips-input is-tag is-auto ct min-0 trunc faint mono " +
+    "dayline dgr ghost pop-h pop-b pop-f tb-btn tb-title sb-item sb-group sb-label rail-hide").split(/\s+/),
 );
-for (const f of sheets) {
-  const rel = path.relative(ROOT, f).split(path.sep).join("/");
-  if (rel.startsWith("styles/")) continue;
-  const clash = selectors(read(f))
-    .map((s) => s.sel)
-    .filter((s) => /^\.[a-zA-Z][\w-]*$/.test(s) && coreOwned.has(s));
-  say(clash.length === 0,
-    rel.padEnd(44) + (clash.length
-      ? "re-declares " + clash.length + " shared class: " + Array.from(new Set(clash)).join(", ")
-      : "declares nothing the component layer owns"));
+const RETIRED_PREFIX = /^(tm|fin|be|um|rs|ag|ov|dws|ch|dls|md|dw|qd|ib|cmdk|sb|tb|tgr|tml|sel|st|tag)-/;
+/* THE TABLE RHYTHM IS NOT THE RETIRED VOCABULARY. `ui/data`'s CELLS declares a
+   handful of one-word classes a cell may carry — `n`, `mono`, `faint`, `rail`,
+   `cell-1` — and applies them from the table wrapper. They are the system, so
+   they are allowed, but ONLY on a cell: `<span className="mono">` is still the
+   old standalone class and still wrong. */
+const CELL_OK = new Set("n num r amt c t mono faint rail acts cell-1 cell-2 on sel clickable is-link".split(" "));
+const tagOf = (src, i) => {
+  const open = src.lastIndexOf("<", i);
+  return open < 0 ? "" : (src.slice(open + 1, open + 5).match(/^[a-zA-Z]+/) || [""])[0].toLowerCase();
+};
+for (const f of files) {
+  const r = rel(f);
+  if (!/^src\/admin\/.*\.tsx$/.test(r)) continue;
+  const src = strip(fs.readFileSync(f, "utf8"));
+  const found = new Set();
+  for (const m of src.matchAll(/className=\{?\s*["'`]([^"'`]*)["'`]/g)) {
+    const cell = /^(td|th)$/.test(tagOf(src, m.index));
+    for (const tok of m[1].split(/\s+/)) {
+      if (!tok) continue;
+      const t = tok.replace(/^[a-z-]+:/, ""); // drop a variant prefix
+      if (cell && CELL_OK.has(t)) continue;
+      if (RETIRED_EXACT.has(t) || RETIRED_PREFIX.test(t)) found.add(tok);
+    }
+  }
+  say(found.size === 0, r.padEnd(60) + (found.size ? found.size + " retired class(es): " + [...found].slice(0, 6).join(" ") : "on the system"));
 }
 
-/* ------------------------------------- 3 · colour literals outside tokens.css */
-for (const f of sheets) {
-  if (f === TOKENS) continue;
-  const rel = path.relative(ROOT, f).split(path.sep).join("/");
-  const src = read(f)
-    /* a data: URI carries its own encoded colours and cannot read a property */
-    .replace(/url\((["']?)data:[^)]*\1\)/g, "url(data)");
-  const hits = (src.match(/#[0-9a-fA-F]{3,8}\b|\brgba?\([^)]*\)|\bhsla?\([^)]*\)/g) || [])
-    .filter((h) => !/^rgba?\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0\s*\)$/.test(h));
-  say(hits.length === 0,
-    rel.padEnd(44) + (hits.length
-      ? hits.length + " colour literal(s): " + Array.from(new Set(hits)).slice(0, 6).join(" ")
-      : "no colour literals"));
-}
-
-console.log("\n" + (bad ? bad + " problem(s)" : "one definition per part, and no colour outside tokens.css"));
+console.log("\n" + (bad ? bad + " problem(s)" : "one system: one place for stylesheets, one place for colour, no inline design values, no retired classes"));
 process.exit(bad ? 1 : 0);

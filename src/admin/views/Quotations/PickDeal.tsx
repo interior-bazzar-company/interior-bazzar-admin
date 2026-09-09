@@ -12,7 +12,7 @@
    ===================================================================== */
 import { useEffect, useRef, useState } from "react";
 import AdminOpsService from "../../../api/modules/adminOps";
-import { EmptyState, Notice, Pill, SearchField, Table, TbTitle, Toolbar } from "../../ui";
+import { Alert, Button, EmptyState, PageHeader, Pill, SearchField, Table, TbTitle, Toolbar } from "../../ui";
 import { inr } from "../../ui/format";
 import { errMessage } from "../../../api/apiService";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
@@ -92,30 +92,23 @@ export default function PickDeal() {
       .catch((e: unknown) => { setErr(errMessage(e)); setBusy(null); });
   };
 
-  const cancel = <button className="btn" data-go="#/quotations" onClick={() => go("#/quotations")}>Cancel</button>;
-
   if (!can("quotations", "create")) return (
-    <div className="page">
-      <EmptyState icon="lock" title="403 — no quotation-creation access"
-        body="Your role can read quotations but not start one."
-        action={<button className="btn" onClick={() => go("#/quotations")}>Back to quotations</button>} />
-    </div>
+    <EmptyState icon="lock" title="403 — no quotation-creation access"
+      body="Your role can read quotations but not start one."
+      action={<Button color="primary" onClick={() => go("#/quotations")}>Back to quotations</Button>} />
   );
 
   return (
-    <div className="page">
-      <div className="ph">
-        <div className="ph-t">
-          <div className="faint" style={{ fontSize: "var(--text-sm)" }}>Step 1 of 2</div>
-          <h1>Which deal is this for?</h1>
-          <div className="scope">
-            A quotation cannot exist without a deal — closed deals are excluded, reopen the deal first.
-          </div>
-        </div>
-        <div className="acts">{cancel}</div>
-      </div>
+    <div className="flex flex-col gap-4">
+      {/* The eyebrow carries the step. This is half of a two-part act, and a
+          page that does not say so reads as a list somebody landed on. */}
+      <PageHeader
+        eyebrow="Step 1 of 2"
+        title="Which deal is this for?"
+        meta="A quotation cannot exist without a deal — closed deals are excluded, reopen the deal first."
+        actions={<Button color="secondary" data-go="#/quotations" onClick={() => go("#/quotations")}>Cancel</Button>} />
 
-      {err ? <Notice tone="bad" text={<b>{err}</b>} /> : null}
+      {err ? <Alert tone="bad" title={err} /> : null}
 
       <Toolbar>
         <SearchField ph="Search customer, city or deal ref…" val={q} onFilter={(_n, v) => setQ(v)} />
@@ -124,7 +117,7 @@ export default function PickDeal() {
       <Table
         cols={[{ label: "Customer" }, { label: "Deal" }, { label: "Stage" },
           { label: "Deal value", cls: "n" },
-          { label: head ? "Quotations" : "Quotations · yours", cls: "c" }, { label: "", cls: "c" }]}
+          { label: head ? "Quotations" : "Quotations · yours", cls: "c" }, { label: "", cls: "acts" }]}
         empty={list === null
           ? { icon: "deal", title: "Searching…", body: "" }
           : { icon: "deal", title: "No open deals match",
@@ -134,19 +127,19 @@ export default function PickDeal() {
           const n = chains[d.ref] ? chains[d.ref].n : 0;
           return (
             <tr key={d.ref}>
-              <td>
-                <b>{d.contactName}{d.businessName ? " · " + d.businessName : ""}</b>
-                <div className="cell-2">{d.city || <span className="faint">—</span>}</div>
+              <td className="cell-1">
+                {d.contactName}{d.businessName ? " · " + d.businessName : ""}
+                <div className="cell-2">{d.city || "—"}</div>
               </td>
               <td className="mono">{d.ref}</td>
-              <td><Pill text={d.stageLabel} tone={d.stageTone} /></td>
-              <td className="n tnum">{d.valuePaise ? inr(d.valuePaise) : <span className="faint">—</span>}</td>
-              <td className="c">{n || <span className="faint">—</span>}</td>
-              <td className="c">
-                <button className="btn sm pri rowact" data-act="qt-create" data-deal={d.ref}
-                  disabled={!!busy} onClick={() => pick(d.ref)}>
-                  {busy === d.ref ? "Creating…" : "Select"}
-                </button>
+              <td><Pill text={d.stageLabel} tone={d.stageTone} dot /></td>
+              <td className="n">{d.valuePaise ? inr(d.valuePaise) : <span className="text-quaternary">—</span>}</td>
+              <td className="c">{n || <span className="text-quaternary">—</span>}</td>
+              <td className="acts">
+                <Button size="xs" color="primary" data-act="qt-create" data-deal={d.ref}
+                  isDisabled={!!busy} isLoading={busy === d.ref} onClick={() => pick(d.ref)}>
+                  Select
+                </Button>
               </td>
             </tr>
           );

@@ -6,39 +6,44 @@
    with no view here is "coming soon", an unregistered route is a 404, and a
    route the signed-in member cannot see is refused.
 
+   EVERY VIEW IS LAZY. The registry is the single place that knows every route,
+   so it is the single place code-splitting happens: a module's code arrives
+   when its route is first opened, and the entry chunk carries the shell, the
+   library and nothing else. A module that fails to load renders the panel's
+   error state, not a blank page.
+
    Adding a surface is one line here plus one row in shell/modules.ts. There is
    no third place.
-   ============================================================================= */
+   ========================================================================== */
+import { lazy, Suspense } from "react";
 import type { ComponentType } from "react";
-import { EmptyState, Notice } from "../ui";
+import { useLocation } from "react-router-dom";
+import { Button, EmptyState, Notice, PageHeader, PaneLoading } from "../ui";
 import { getItems, HOME_ROUTE } from "../shell/modules";
 import type { ModuleItem } from "../shell/modules";
 import { can, useNav } from "../shell/AdminShell";
-import { useLocation } from "react-router-dom";
 
-import Overview from "./Overview";
-import Audit from "./Audit";
-import Plans from "./Plans";
-import Team from "./Team";
-import Roles from "./Roles";
-import Deals from "./Deals";
-import Quotations from "./Quotations";
-import Invoices from "./Invoices";
-import BusinessEnquiries from "./BusinessEnquiries";
-import Users from "./Users";
-import Finance from "./Finance";
-import Resources from "./Resources";
-import Agreements from "./Agreements";
-import Attendance from "./Team/Attendance";
-import Work from "./Team/Work";
-import TeamReports from "./Team/Reports";
+const Overview = lazy(() => import("./Overview"));
+const Audit = lazy(() => import("./Audit"));
+const Plans = lazy(() => import("./Plans"));
+const Team = lazy(() => import("./Team"));
+const Roles = lazy(() => import("./Roles"));
+const Deals = lazy(() => import("./Deals"));
+const Quotations = lazy(() => import("./Quotations"));
+const Invoices = lazy(() => import("./Invoices"));
+const BusinessEnquiries = lazy(() => import("./BusinessEnquiries"));
+const Users = lazy(() => import("./Users"));
+const Finance = lazy(() => import("./Finance"));
+const Resources = lazy(() => import("./Resources"));
+const Agreements = lazy(() => import("./Agreements"));
+const Attendance = lazy(() => import("./Team/Attendance"));
+const Work = lazy(() => import("./Team/Work"));
+const TeamReports = lazy(() => import("./Team/Reports"));
 
 /** route key → the component that owns that workspace. */
 export const VIEWS: Record<string, ComponentType> = {
   /* The landing page. Frontend-only by nature — it reads the other modules'
-     stores and API hooks and owns no records — so its key sits in
-     PROTO_MODULES and its row in PROTO_ROWS like the rest of the
-     frontend-first surfaces. See views/Overview/index.tsx. */
+     stores and API hooks and owns no records. */
   overview: Overview,
   audit: Audit,
   plans: Plans,
@@ -47,56 +52,26 @@ export const VIEWS: Record<string, ComponentType> = {
   deals: Deals,
   quotations: Quotations,
   invoices: Invoices,
-  /* Frontend-first: no endpoint behind it yet, so its module row is appended
-     client-side in shell/modules.ts rather than arriving from the server.
-     See PROTO_MODULES in auth/session.ts for the whole arrangement, and
-     src/proto/v-2.2.0.0/BACKEND-INTEGRATION.md for what has to land. */
   "business-enquiries": BusinessEnquiries,
-  /* Business Ops · Users Management. Frontend-first: no endpoint behind it yet,
-     so its module row is appended client-side in shell/modules.ts and its key
-     sits in PROTO_MODULES until the API ships both. Everything it renders comes
-     from src/content/users/*.json through views/Users/store.ts — see
-     src/proto/v-2.2.0.0/BACKEND-INTEGRATION.md for the work-list. */
   users: Users,
-  /* Finance · Module 5. Frontend-first like Users: src/content/finance/*.json
-     through views/Finance/store.ts. See BACKEND-INTEGRATION.md. */
   finance: Finance,
   /* The same component five times over, on purpose: Finance is ONE module
      reading ONE store, and the five keys exist so the sidebar can name what
-     is inside it and the server can grant the sections separately. The
-     component reads its own route to know which section it is showing. */
+     is inside it and the server can grant the sections separately. */
   "finance-salaries": Finance,
   "finance-transactions": Finance,
   "finance-refunds": Finance,
   "finance-analytics": Finance,
-  /* Team · the operational half, Module 7. `team` and `roles` above are LIVE
-     and unchanged; these three are frontend-first, reading
-     src/content/team/*.json through views/Team/store.ts. They live under
-     views/Team/ rather than in three folders of their own because they share
-     one data module and one stylesheet — three route keys, one module. Their
-     keys sit in PROTO_MODULES until the API ships, and each comes out in the
-     commit that lands its endpoint. See BACKEND-INTEGRATION.md § Module 7. */
   attendance: Attendance,
   work: Work,
   reports: TeamReports,
-  /* Resources · the form module. Frontend-first like Users and Finance:
-     src/content/resources/*.json through views/Resources/store.ts. Its own
-     sidebar group — see PROTO_ROWS in shell/modules.ts — because a form is not
-     a team surface even when the first one is an onboarding pack. It takes a
-     second and third URL segment (`/new`, `/:id/edit`) for the builder, both
-     already covered by the routes in src/routes/index.tsx. */
   resources: Resources,
-  /* Agreements · the templates are frontend-first
-     (src/content/agreements/templates.json), but the AGREEMENTS themselves are
-     Team's own records — this module reads and writes them through Team's
-     store rather than keeping a second list of the same signed documents. The
-     per-member view at `#/team/:id/agreements` is unchanged. */
   agreements: Agreements,
 };
 
 export function ViewHost() {
   const location = useLocation();
-  const route = (location.pathname.split("/").filter(Boolean)[0] || "deals").toLowerCase();
+  const route = (location.pathname.split("/").filter(Boolean)[0] || HOME_ROUTE).toLowerCase();
   const item = getItems()[route];
 
   if (!item) return <NotFound route={route} />;
@@ -104,59 +79,45 @@ export function ViewHost() {
 
   const View = VIEWS[route];
   if (!View) return <ComingSoon item={item} />;
-  /* KEYED ON THE ROUTE ONLY, never on the record id.
-     It used to be `route + "/" + id`, which made React unmount and remount the
-     whole module every time you opened a different record — so picking another
-     deal in the chat list threw away the list fetch, the vocabularies and the
-     open detail, and the module came back from zero behind a full-page loader.
-     A record change is a change of what a module is SHOWING, not a change of
-     module; every view here already reads `useParams().id` and reacts to it. */
-  return <View key={route} />;
+  /* KEYED ON THE ROUTE ONLY, never on the record id: a record change is a
+     change of what a module is SHOWING, not a change of module. */
+  return (
+    <Suspense fallback={<PaneLoading />}>
+      <View key={route} />
+    </Suspense>
+  );
 }
 
 function NotFound({ route }: { route: string }) {
   const { go } = useNav();
   return (
-    <div className="page">
+    <div className="mx-auto max-w-lg py-10">
       <EmptyState
         icon="search"
         title="Nothing at this address"
         body={
           <>
-            There is no module at <span className="mono">#/{route}</span>. It may have been renamed,
-            or the link is stale.
+            There is no module at <span className="font-mono">/{route}</span>. It may have been renamed, or the link is stale.
           </>
         }
         action={
-          <button className="btn pri" data-go={"#/" + HOME_ROUTE} onClick={() => go("#/" + HOME_ROUTE)}>
+          <Button color="primary" data-go={"#/" + HOME_ROUTE} onClick={() => go("#/" + HOME_ROUTE)}>
             Back to Overview
-          </button>
+          </Button>
         }
       />
     </div>
   );
 }
 
-/* A module the signed-in member HOLDS, that this panel has no surface for.
-   Two things land here now: modules that were never built, and Quotations /
-   Invoices — which were built, but read and wrote a browser-side store with
-   no server behind it. Rendering seeded records that only existed in this
-   tab was worse than rendering nothing, so the screens went and the route
-   stayed. */
+/* A module the signed-in member HOLDS, that this panel has no surface for. */
 function ComingSoon({ item }: { item: ModuleItem }) {
   return (
-    <div className="page">
-      <div className="ph">
-        <div className="ph-t">
-          <h1>{item.label}</h1>
-          <div className="scope">Nothing to show here yet.</div>
-        </div>
-      </div>
+    <div>
+      <PageHeader title={item.label} meta="Nothing to show here yet." />
       <Notice tone="warn">
-        <b>{item.label} is in your access, but this panel has no surface for it yet.</b> Every screen
-        here reads live records from the server, and there is no {item.label.toLowerCase()} API to
-        read. The nav slot stays so the route never dies — the screen comes back when the data behind
-        it is real.
+        <b>{item.label} is in your access, but this panel has no surface for it yet.</b> Every screen here reads live records from the server, and there is no{" "}
+        {item.label.toLowerCase()} API to read. The nav slot stays so the route never dies — the screen comes back when the data behind it is real.
       </Notice>
     </div>
   );
@@ -164,14 +125,14 @@ function ComingSoon({ item }: { item: ModuleItem }) {
 
 function Denied({ item }: { item: ModuleItem }) {
   return (
-    <div className="page">
+    <div className="mx-auto max-w-lg py-10">
       <EmptyState
         icon="shield"
         title="You do not have access to this module"
         body={
           <>
-            {item.label} is not in your effective access for this session. Access is granted by
-            role, not requested per page — ask an Admin to review your role in Settings → Team.
+            {item.label} is not in your effective access for this session. Access is granted by role, not requested per page — ask an Admin to review your role in
+            Settings → Team.
           </>
         }
       />

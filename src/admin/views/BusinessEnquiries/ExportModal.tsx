@@ -15,7 +15,7 @@
    export where it is one slip away.
    ============================================================================= */
 import { useState } from "react";
-import { Icon, ModalHead, Notice } from "../../ui";
+import { Alert, Button, Checkbox, FormSection, ModalShell, Pill, Table } from "../../ui";
 import { InfoNote } from "./bits";
 import { can } from "../../shell/AdminShell";
 import { GROUPS, buildCsv, columnCount, downloadCsv, fileNameFor, scopeSentence } from "./exportCsv";
@@ -56,16 +56,32 @@ export default function ExportModal({ filtered, all, p, onClose, onDone }: {
   };
 
   return (
-    <>
-      <ModalHead title="Export enquiries" sub="A CSV of what is on screen, in the order it is on screen." onClose={onClose} />
-
-      <div className="md-b">
-        {/* ------------------------------------------------------- scope --- */}
-        <div className="be-xscope">
-          <div className="n tnum">{rows.length}</div>
-          <div>
-            <b>{scopeSentence(wholeSet ? {} : p, rows.length, all.length)}</b>
-            <div className="be-xfile mono">{name}</div>
+    <ModalShell
+      title="Export enquiries"
+      sub="A CSV of what is on screen, in the order it is on screen."
+      ico="download"
+      tone={withContact ? "warning" : "brand"}
+      onClose={onClose}
+      actions={
+        <>
+          <span className="mr-2 text-sm text-tertiary tnum">
+            {rows.length} row{rows.length === 1 ? "" : "s"} · {cols} column{cols === 1 ? "" : "s"}
+          </span>
+          <Button color="secondary" data-close="1" onClick={onClose}>Cancel</Button>
+          <Button color={withContact ? "primary-destructive" : "primary"} ico="download"
+            data-act="be-export-go" isDisabled={!rows.length || leakToBusiness} onClick={run}>
+            {withContact ? "Download with contact data" : "Download CSV"}
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-5">
+        {/* ----------------------------------------------------------- scope --- */}
+        <div className="flex items-center gap-4 rounded-xl bg-secondary p-4">
+          <span className="text-display-xs font-semibold text-primary tnum">{rows.length}</span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-primary">{scopeSentence(wholeSet ? {} : p, rows.length, all.length)}</p>
+            <p className="mt-0.5 truncate font-mono text-xs text-tertiary">{name}</p>
           </div>
         </div>
 
@@ -77,52 +93,58 @@ export default function ExportModal({ filtered, all, p, onClose, onDone }: {
         ) : null}
 
         {narrowed ? (
-          <label className="be-ackline" style={{ marginTop: "var(--space-3)" }}>
-            <input type="checkbox" checked={wholeSet} onChange={(ev) => setWholeSet(ev.target.checked)} />
-            <span>
-              Ignore the filters and export <b>all {all.length}</b> instead.
-              <span className="faint"> The file you get will not match the screen you pressed this from.</span>
-            </span>
-          </label>
+          <Checkbox
+            id="be-wholeset"
+            checked={wholeSet}
+            onChange={setWholeSet}
+            label={<>Ignore the filters and export <b className="font-semibold">all {all.length}</b> instead.</>}
+            hint="The file you get will not match the screen you pressed this from."
+          />
         ) : null}
 
-        {/* ----------------------------------------------------- columns --- */}
-        <div className="be-xh">Columns</div>
-        <div className="be-xgroups">
-          {GROUPS.map((g) => {
-            const on = g.key === "core" || groups.indexOf(g.key) >= 0;
-            const locked = g.key === "core";
-            return (
-              <button key={g.key} type="button"
-                className={"be-xgroup" + (on ? " on" : "") + (g.sensitive ? " sens" : "") +
-                  (g.internal ? " intl" : "") + (locked ? " locked" : "")}
-                aria-pressed={on} disabled={locked}
-                onClick={() => toggle(g.key)}>
-                <span className="bx" aria-hidden="true">{on ? <Icon name="check" size="sm" /> : null}</span>
-                <span className="t">
-                  <b>{g.label} <span className="ct">{g.cols.length}</span></b>
-                  <em>{g.note}</em>
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        {/* --------------------------------------------------------- columns --- */}
+        <FormSection title="Columns"
+          desc="Identity and status is always written — a row nobody can identify is not a record.">
+          <div className="flex flex-col gap-3">
+            {GROUPS.map((g) => {
+              const on = g.key === "core" || groups.indexOf(g.key) >= 0;
+              const locked = g.key === "core";
+              return (
+                <Checkbox
+                  key={g.key}
+                  id={"be-xg-" + g.key}
+                  checked={on}
+                  disabled={locked}
+                  onChange={() => toggle(g.key)}
+                  label={
+                    <span className="inline-flex flex-wrap items-center gap-1.5">
+                      {g.label}
+                      <Pill xs tone="neutral" text={String(g.cols.length)} />
+                      {g.sensitive ? <Pill xs tone="bad" text="personal data" /> : null}
+                      {g.internal ? <Pill xs tone="warn" text="internal only" /> : null}
+                      {locked ? <Pill xs tone="neutral" ico="lock" text="always" /> : null}
+                    </span>
+                  }
+                  hint={g.note}
+                />
+              );
+            })}
+          </div>
+        </FormSection>
 
         {leakToBusiness ? (
-          <Notice tone="bad" ico="alert" text={<>
-            <b>Matching internals cannot go to {p.business}.</b> A business that can read the rank and
-            score it was chosen on is a business that can argue with them — and the weight table stops
-            being a rule and becomes a negotiation. Untick <b>Matching internals</b>, or export
-            without the business filter for your own analysis.
-          </>} />
+          <Alert tone="bad" title={"Matching internals cannot go to " + p.business + "."}>
+            A business that can read the rank and score it was chosen on is a business that can argue
+            with them — and the weight table stops being a rule and becomes a negotiation. Untick{" "}
+            <b>Matching internals</b>, or export without the business filter for your own analysis.
+          </Alert>
         ) : null}
 
         {withContact ? (
-          <Notice tone="bad" ico="alert" text={<>
-            <b>This file will contain customer names, phone numbers and email addresses.</b> Once it is
-            downloaded it has left everything this panel can audit or withdraw. Send it to a person, not
-            to a channel, and only if they need to ring the customer.
-          </>} />
+          <Alert tone="bad" title="This file will contain customer names, phone numbers and email addresses.">
+            Once it is downloaded it has left everything this panel can audit or withdraw. Send it to a
+            person, not to a channel, and only if they need to ring the customer.
+          </Alert>
         ) : null}
 
         <InfoNote ico="lock" short={<><b>The contact log is never exported</b>, at any tick.</>}>
@@ -132,41 +154,32 @@ export default function ExportModal({ filtered, all, p, onClose, onDone }: {
           “what can leave” rather than three.
         </InfoNote>
 
-        {/* ---------------------------------------------------- a preview --- */}
+        {/* -------------------------------------------------------- a preview --- */}
         {rows.length ? (
-          <>
-            <div className="be-xh">First rows</div>
-            <div className="be-xprev">
-              {rows.slice(0, 3).map((e) => (
-                <div key={e.enquiryId}>
-                  <span className="mono">{e.enquiryId}</span>
-                  <span>{withContact ? e.customer.name : <em>name withheld</em>}</span>
-                  <span className="faint">{statusOf(e.status).label}</span>
-                </div>
+          <FormSection title="First rows">
+            <Table
+              list
+              min="24rem"
+              cols={[{ label: "Reference" }, { label: "Customer" }, { label: "Status" }]}
+              rows={rows.slice(0, 3).map((e) => (
+                <tr key={e.enquiryId}>
+                  <td className="mono">{e.enquiryId}</td>
+                  <td>{withContact ? e.customer.name : <span className="text-quaternary italic">name withheld</span>}</td>
+                  <td className="faint">{statusOf(e.status).label}</td>
+                </tr>
               ))}
-              {rows.length > 3 ? <div className="faint">…and {rows.length - 3} more</div> : null}
-            </div>
-          </>
+            />
+            {rows.length > 3 ? (
+              <p className="text-xs text-quaternary">…and {rows.length - 3} more</p>
+            ) : null}
+          </FormSection>
         ) : (
-          <Notice tone="warn" ico="alert" text={<>
-            <b>Nothing matches these filters.</b> The file would have a header row and nothing under it.
-          </>} />
+          <Alert tone="warn" title="Nothing matches these filters.">
+            The file would have a header row and nothing under it.
+          </Alert>
         )}
       </div>
-
-      <div className="md-f">
-        <span className="faint" style={{ fontSize: "var(--text-sm)" }}>
-          {rows.length} row{rows.length === 1 ? "" : "s"} · {cols} column{cols === 1 ? "" : "s"}
-        </span>
-        <span className="spacer" />
-        <button className="btn" data-close="1" onClick={onClose}>Cancel</button>
-        <button className={"btn pri" + (withContact ? " dgr" : "")} data-act="be-export-go"
-          disabled={!rows.length || leakToBusiness} onClick={run}>
-          <Icon name="download" />
-          {withContact ? "Download with contact data" : "Download CSV"}
-        </button>
-      </div>
-    </>
+    </ModalShell>
   );
 }
 

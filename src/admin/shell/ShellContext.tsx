@@ -1,29 +1,24 @@
 /* =============================================================================
    Interior bazzar — Admin · shell services
    -----------------------------------------------------------------------------
-   The four things the prototype's shell owned that are not layout: layers
-   (drawer / modal / popover), the toast stack, the docked banner, and
-   appearance. Ported from admin-shell.js — same DOM, same class names, same
-   lifecycles, same reasons.
+   The four things the shell owns that are not layout: layers (drawer / modal
+   / popover), the toast stack, the docked banner, and appearance. They take a
+   ReactNode — a modal's contents are a component, not a string.
 
-   In the prototype every one of these took an HTML string. Here they take a
-   ReactNode, which is the whole point of the port: a modal's contents are a
-   component, not a string a module concatenated.
-   ============================================================================= */
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+   THE OVERLAYS ARE REACT ARIA'S. A modal traps focus, restores it on close,
+   locks the page behind it and answers Escape because the library does those
+   things, once, for every dialog in the product — not because forty dialogs
+   each remembered to. What this file decides is only the panel's rules on top:
+   a drawer dismisses on click-away (it INSPECTS), a modal does not (it DECIDES
+   — losing a half-typed form to a stray click is the whole complaint).
+   ========================================================================== */
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
-import { Icon, Notice, KvList } from "../ui";
+import { Dialog as AriaDialog, Modal as AriaModal, ModalOverlay as AriaModalOverlay, Popover as AriaPopover } from "react-aria-components";
+import { cx } from "@/utils/cx";
+import { Button, Icon, KvList, ModalShell, Notice } from "../ui";
 
 /* ------------------------------------------------------------------ storage */
 export const LS = {
@@ -45,28 +40,24 @@ export const LS = {
 };
 
 /* =========================================================== APPEARANCE === */
-/* ONE ATTRIBUTE ON <html> DRIVES THE WHOLE DESIGN SYSTEM: `data-theme`, and it
-   is "light" or "dark" and never anything else. No class sweep, no reload, no
-   context provider — the browser re-reads the custom properties in tokens.css
-   and repaints, and every component in the panel is correct in both states at
-   once.
-
-   THERE IS NO SCHEME AND NO DENSITY. The panel used to carry three colour
-   schemes and a compact spacing variant. Both are gone: a design system that
-   ships six appearances is six design systems that have to be checked, and in
-   practice five of them were never looked at again after the week they landed.
-   Two themes are two things to keep honest, and `check:contrast` can hold
-   both.
+/* ONE PREFERENCE, TWO PAINTS. `ib_admin_theme` is light, dark or system. The
+   resolved answer is written twice on <html>: `data-theme` (the panel's
+   attribute) and the `dark-mode` class (Untitled UI's contract — its token
+   sheet keys on the class). Both are set together so no rule can disagree.
 
    "System" is a PREFERENCE, not a third theme. It is resolved here from
-   prefers-color-scheme and RE-resolved when the OS flips, so the stylesheet
-   needs exactly one dark block rather than a block plus a media query that can
-   drift out of agreement with the attribute. */
+   prefers-color-scheme and RE-resolved when the OS flips. */
 let systemWatch: (() => void) | null = null;
 function applyTheme(v: string) {
   const r = document.documentElement;
-  if (systemWatch) { systemWatch(); systemWatch = null; }
-  const paint = (dark: boolean) => r.setAttribute("data-theme", dark ? "dark" : "light");
+  if (systemWatch) {
+    systemWatch();
+    systemWatch = null;
+  }
+  const paint = (dark: boolean) => {
+    r.setAttribute("data-theme", dark ? "dark" : "light");
+    r.classList.toggle("dark-mode", dark);
+  };
   if (v === "system") {
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     paint(mq.matches);
@@ -82,10 +73,10 @@ function applyTheme(v: string) {
 
 /** The three things a person can choose. `system` resolves to one of the other
     two; it is not a third appearance and nothing in CSS knows about it. */
-export const THEMES: { id: string; label: string; hint: string }[] = [
-  { id: "light", label: "Light", hint: "Ink on paper" },
-  { id: "dark", label: "Dark", hint: "Ink inverted" },
-  { id: "system", label: "System", hint: "Follow the operating system" },
+export const THEMES: { id: string; label: string; hint: string; ico: string }[] = [
+  { id: "light", label: "Light", hint: "Ink on paper", ico: "sun" },
+  { id: "dark", label: "Dark", hint: "Ink inverted", ico: "moon" },
+  { id: "system", label: "System", hint: "Follow the operating system", ico: "monitor" },
 ];
 
 export function setTheme(v: string) {
@@ -93,28 +84,17 @@ export function setTheme(v: string) {
   LS.set("ib_admin_theme", v);
 }
 
-/* What the person CHOSE, not what is painted: with "system" chosen the
-   attribute says light or dark, and the switch has to show System. */
+/* What the person CHOSE, not what is painted. */
 export const currentTheme = () =>
-  document.documentElement.getAttribute("data-theme-pref") === "system"
-    ? "system"
-    : document.documentElement.getAttribute("data-theme") || "dark";
+  document.documentElement.getAttribute("data-theme-pref") === "system" ? "system" : document.documentElement.getAttribute("data-theme") || "dark";
 
-/** What is actually on screen right now — "light" or "dark", never "system".
-    Charts and canvas drawings need the resolved answer, not the preference. */
-export const resolvedTheme = () =>
-  document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+/** What is actually on screen right now — "light" or "dark", never "system". */
+export const resolvedTheme = () => (document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark");
 
-/** Runs before first paint from main.tsx, the way the prototype's inline
-    <head> script did — so the panel never flashes the wrong theme. */
+/** Runs before first paint from main.tsx. */
 export function bootAppearance() {
   const t = LS.get<string | null>("ib_admin_theme", null) || "dark";
   applyTheme(t);
-  /* The retired appearance keys, cleared rather than ignored: a browser that
-     stored `portal` or `compact` in an earlier build should not carry a dead
-     preference around forever. index.html does the same thing before this
-     runs; doing it in both places costs nothing and means neither entry point
-     depends on the other having been reached. */
   try {
     localStorage.removeItem("ib_admin_scheme");
     localStorage.removeItem("ib_admin_density");
@@ -126,15 +106,13 @@ export function bootAppearance() {
 /* ================================================================ TYPES === */
 type LayerKind = "drawer" | "modal" | "cmdk";
 type Layer = { kind: LayerKind; node: ReactNode; size?: string; onDismiss?: () => void } | null;
-type Toast = { id: number; msg: ReactNode; tone?: string };
+type Toast = { id: number; msg: ReactNode; tone?: string; leaving?: boolean };
 type Banner = { msg: ReactNode; tone?: string } | null;
 type PopOpts = { width?: number; align?: "left" | "right"; above?: boolean; cls?: string };
 type Pop = { anchor: HTMLElement; node: ReactNode; opts: PopOpts } | null;
 
 export type ShellServices = {
-  /** `size` is one of sm · md · lg · xl — see the drawer block in
-   *  components.css. Omitted keeps the wide default every existing caller
-   *  already renders into. */
+  /** `size` is one of sm · md · lg · xl. Omitted is `md`. */
   drawer: (node: ReactNode, onDismiss?: () => void, size?: string) => void;
   modal: (node: ReactNode, size?: string) => void;
   closeLayer: () => void;
@@ -144,10 +122,6 @@ export type ShellServices = {
   popAnchor: HTMLElement | null;
   toast: (msg: ReactNode, tone?: string) => void;
   banner: (msg: ReactNode, tone?: string) => void;
-  /* The banner is DOCKED, not floating: the prototype makes it a sibling of the
-     scroller inside the flex-column .content so it pins below the topbar with
-     no positioning JS. So the state lives here and AdminShell renders it into
-     that exact slot, rather than this provider portalling it somewhere else. */
   bannerState: Banner;
   closeBanner: () => void;
   stub: (what: string, where?: string) => void;
@@ -162,6 +136,9 @@ export function useShell(): ShellServices {
   return v;
 }
 
+const MODAL_W: Record<string, string> = { sm: "max-w-[26rem]", md: "max-w-[34rem]", lg: "max-w-3xl", xl: "max-w-5xl", full: "max-w-[96vw]" };
+const DRAWER_W: Record<string, string> = { sm: "sm:max-w-sm", md: "sm:max-w-md", lg: "sm:max-w-2xl", xl: "sm:max-w-4xl" };
+
 /* =============================================================== PROVIDER === */
 export function ShellProvider({ children }: { children: ReactNode }) {
   const [layer, setLayer] = useState<Layer>(null);
@@ -170,55 +147,33 @@ export function ShellProvider({ children }: { children: ReactNode }) {
   const [bannerState, setBannerState] = useState<Banner>(null);
   const toastN = useRef(0);
   const bannerTimer = useRef<number | null>(null);
-  const lastFocus = useRef<Element | null>(null);
 
-  const closeLayer = useCallback(() => {
-    setLayer(null);
-    const f = lastFocus.current as HTMLElement | null;
-    if (f && f.focus) f.focus();
-  }, []);
-
+  const closeLayer = useCallback(() => setLayer(null), []);
   const closePop = useCallback(() => setPop(null), []);
 
-  /* Closing a DRAWER by hand has to drop the record id from the URL as well.
-     Every drawer's own X already does it (`closeLayer(); go("#/plans")`); the
-     scrim and Escape only nulled the layer, so the URL went on naming a record
-     that was no longer on screen — and clicking that same row then navigated
-     nowhere, which is why the drawer would not re-open until you opened some
-     other record first. Routes are only `/:route` and `/:route/:id`, so "up" is
-     the first segment; the query survives because it is the list's filters.
-     Modals are left alone: they open over Detail PAGES too, and Escape there
-     must close the modal, not leave the record. */
+  /* Closing a DRAWER by hand has to drop the record id from the URL as well:
+     the scrim and Escape used to null the layer while the URL went on naming a
+     record that was no longer on screen. A drawer may hand in its own
+     `onDismiss`; otherwise "up" is the first path segment and the query
+     survives because it is the list's filters. Modals are left alone. */
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
   const dismiss = useCallback(() => {
     closeLayer();
-    /* A DRAWER THAT NAMES ITS RECORD IN THE QUERY HAS TO SAY SO. The rule
-       below reads the id out of the PATH, which is right for `/deals/D-1` and
-       does nothing at all for `/work?item=W-K04` — there the layer went away
-       and the URL went on naming a record that was no longer on screen, which
-       is the same complaint this block was written to fix, one URL shape
-       later. A drawer may now hand in the line that closes it, and its own X,
-       the scrim and Escape then all do the same thing rather than three
-       nearly-alike things. */
-    if (layer && layer.onDismiss) { layer.onDismiss(); return; }
+    if (layer && layer.onDismiss) {
+      layer.onDismiss();
+      return;
+    }
     const seg = pathname.split("/").filter(Boolean);
     if (seg.length > 1) navigate("/" + seg[0] + search, { replace: true });
   }, [closeLayer, layer, navigate, pathname, search]);
 
-  /* `onDismiss` is optional and the callback stays dependency-free, so it is
-     still the same stable identity an effect can depend on without re-running
-     because of the layer it just opened. */
   const drawer = useCallback((node: ReactNode, onDismiss?: () => void, size?: string) => {
-    lastFocus.current = document.activeElement;
     setLayer({ kind: "drawer", node, onDismiss, size });
   }, []);
-
   const modal = useCallback((node: ReactNode, size?: string) => {
-    lastFocus.current = document.activeElement;
     setLayer({ kind: "modal", node, size });
   }, []);
-
   const openPop = useCallback((anchor: HTMLElement, node: ReactNode, opts?: PopOpts) => {
     setPop({ anchor, node, opts: opts || {} });
   }, []);
@@ -226,13 +181,11 @@ export function ShellProvider({ children }: { children: ReactNode }) {
   const toast = useCallback((msg: ReactNode, tone?: string) => {
     const id = ++toastN.current;
     setToasts((t) => [...t, { id, msg, tone }]);
-    window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3200);
+    window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 3600);
   }, []);
 
-  /* ok/info clear themselves, same idea as a toast just slower to read.
-     warn/bad do NOT auto-clear — the entire reason this surface exists is so a
-     real warning is still on screen when the user looks up from what they were
-     doing, not gone in 3.2 seconds like the confirmation toasts. */
+  /* ok/info clear themselves; warn/bad do NOT — the entire reason this surface
+     exists is so a real warning is still on screen when the user looks up. */
   const banner = useCallback((msg: ReactNode, tone?: string) => {
     if (bannerTimer.current) {
       clearTimeout(bannerTimer.current);
@@ -243,45 +196,37 @@ export function ShellProvider({ children }: { children: ReactNode }) {
       return;
     }
     setBannerState({ msg, tone });
-    if (tone !== "warn" && tone !== "bad")
-      bannerTimer.current = window.setTimeout(() => setBannerState(null), 6000);
+    if (tone !== "warn" && tone !== "bad") bannerTimer.current = window.setTimeout(() => setBannerState(null), 6000);
   }, []);
 
   const stub = useCallback(
     (what: string, where?: string) => {
       modal(
-        <>
-          <div className="md-h">
-            <h3>{what}</h3>
-            <p>Not built in this prototype.</p>
-            <button className="md-x" data-close="1" aria-label="Close" onClick={() => setLayer(null)}>
-              <Icon name="x" />
-            </button>
-          </div>
-          <div className="md-b">
-            <Notice tone="info">
-              This action belongs to <b>{where || "its module"}</b> and is designed but not
-              implemented here. The Admin Access build covers the shell, navigation, the user
-              journey and every read surface — write paths land with each module’s own functional
-              phase.
-            </Notice>
-          </div>
-          <div className="md-f">
-            <span className="spacer" />
-            <button className="btn" data-close="1" onClick={() => setLayer(null)}>
+        <ModalShell
+          title={what}
+          sub="Not built in this prototype."
+          onClose={() => setLayer(null)}
+          actions={
+            <Button color="secondary" data-close="1" onClick={() => setLayer(null)}>
               Close
-            </button>
-          </div>
-        </>,
-        "sm"
+            </Button>
+          }
+        >
+          <Notice tone="info">
+            This action belongs to <b>{where || "its module"}</b> and is designed but not implemented here. The Admin Access build covers the shell, navigation, the user
+            journey and every read surface — write paths land with each module’s own functional phase.
+          </Notice>
+        </ModalShell>,
+        "sm",
       );
     },
-    [modal]
+    [modal],
   );
 
   const shortcuts = useCallback(() => {
     const rows: [string, string][] = [
       ["⌘ K  /  Ctrl K", "Open search"],
+      ["G then O", "Overview"],
       ["G then D", "Deals"],
       ["G then S", "Subscriptions & Plans"],
       ["G then T", "Members"],
@@ -290,32 +235,30 @@ export function ShellProvider({ children }: { children: ReactNode }) {
       ["?", "This list"],
     ];
     modal(
-      <>
-        <div className="md-h">
-          <h3>Keyboard</h3>
-          <p>Everything here also works with the mouse.</p>
-          <button className="md-x" data-close="1" aria-label="Close" onClick={() => setLayer(null)}>
-            <Icon name="x" />
-          </button>
-        </div>
-        <div className="md-b">
-          {/* The prototype had to re-inject this markup after render because its
-              kvList escaped the keys. JSX carries the element through directly. */}
-          <KvList pairs={rows.map((r) => [<span className="kbd">{r[0]}</span>, r[1]])} />
-        </div>
-        <div className="md-f">
-          <span className="spacer" />
-          <button className="btn" data-close="1" onClick={() => setLayer(null)}>
+      <ModalShell
+        title="Keyboard"
+        sub="Everything here also works with the mouse."
+        onClose={() => setLayer(null)}
+        actions={
+          <Button color="secondary" data-close="1" onClick={() => setLayer(null)}>
             Close
-          </button>
-        </div>
-      </>,
-      "sm"
+          </Button>
+        }
+      >
+        <KvList
+          pairs={rows.map((r) => [
+            <kbd key={r[0]} className="rounded-md bg-secondary px-1.5 py-0.5 font-mono text-xs font-medium text-secondary ring-1 ring-secondary ring-inset">
+              {r[0]}
+            </kbd>,
+            r[1],
+          ])}
+        />
+      </ModalShell>,
+      "sm",
     );
   }, [modal]);
 
-  /* Escape closes the topmost layer; resize drops the popover, which is
-     positioned against a rect that no longer holds. */
+  /* A popover is positioned against a rect that a resize no longer holds. */
   useEffect(() => {
     const onResize = () => setPop(null);
     window.addEventListener("resize", onResize);
@@ -338,159 +281,153 @@ export function ShellProvider({ children }: { children: ReactNode }) {
       stub,
       shortcuts,
     }),
-    [
-      drawer,
-      modal,
-      closeLayer,
-      layer,
-      openPop,
-      closePop,
-      pop,
-      toast,
-      banner,
-      bannerState,
-      stub,
-      shortcuts,
-    ]
+    [drawer, modal, closeLayer, layer, openPop, closePop, pop, toast, banner, bannerState, stub, shortcuts],
   );
 
   return (
     <Ctx.Provider value={value}>
       {children}
-      {layer &&
-        createPortal(
-          <>
-            {/* Only the drawer dismisses by clicking away. A modal is a
-                commitment — losing a half-typed form to a stray click is the
-                whole complaint. */}
-            <div
-              className="scrim"
-              {...(layer.kind === "drawer" ? { "data-close": "1", onClick: dismiss } : {})}
-            />
-            <LayerBox layer={layer} onClose={layer.kind === "drawer" ? dismiss : closeLayer} />
-          </>,
-          document.body
-        )}
-      {pop && <PopBox pop={pop} onClose={closePop} />}
+
+      {/* ---------------------------------------------------------- the modal */}
+      <AriaModalOverlay
+        isOpen={!!layer && layer.kind === "modal"}
+        onOpenChange={(open) => {
+          if (!open) closeLayer();
+        }}
+        isDismissable={false}
+        className={({ isEntering, isExiting }) =>
+          cx(
+            "fixed inset-0 z-50 flex min-h-dvh w-full items-end justify-center overflow-y-auto bg-overlay/60 px-3 pt-4 pb-[clamp(16px,8vh,64px)] outline-hidden backdrop-blur-[4px] sm:items-center sm:p-8",
+            isEntering && "duration-200 ease-out animate-in fade-in",
+            isExiting && "duration-150 ease-in animate-out fade-out",
+          )
+        }
+      >
+        <AriaModal
+          className={({ isEntering, isExiting }) =>
+            cx(
+              "flex max-h-full w-full flex-col outline-hidden",
+              MODAL_W[(layer && layer.size) || "md"] || MODAL_W.md,
+              isEntering && "duration-200 ease-out animate-in fade-in zoom-in-[0.98] slide-in-from-bottom-2",
+              isExiting && "duration-150 ease-in animate-out fade-out zoom-out-[0.98]",
+            )
+          }
+        >
+          <AriaDialog aria-label="Dialog" className="flex max-h-[calc(100dvh-2rem)] min-h-0 flex-col rounded-2xl bg-primary shadow-xl ring-1 ring-secondary_alt outline-hidden sheen">
+            {layer && layer.kind === "modal" ? layer.node : null}
+          </AriaDialog>
+        </AriaModal>
+      </AriaModalOverlay>
+
+      {/* --------------------------------------------------------- the drawer */}
+      <AriaModalOverlay
+        isOpen={!!layer && layer.kind === "drawer"}
+        onOpenChange={(open) => {
+          if (!open) dismiss();
+        }}
+        isDismissable
+        className={({ isEntering, isExiting }) =>
+          cx(
+            "fixed inset-0 z-50 flex min-h-dvh w-full items-stretch justify-end bg-overlay/50 outline-hidden sm:pl-10",
+            isEntering && "duration-200 ease-out animate-in fade-in",
+            isExiting && "duration-200 ease-in animate-out fade-out",
+          )
+        }
+      >
+        <AriaModal
+          className={({ isEntering, isExiting }) =>
+            cx(
+              "h-full w-full outline-hidden",
+              DRAWER_W[(layer && layer.size) || "md"] || DRAWER_W.md,
+              isEntering && "duration-250 ease-out animate-in slide-in-from-right",
+              isExiting && "duration-200 ease-in animate-out slide-out-to-right",
+            )
+          }
+        >
+          <AriaDialog aria-label="Details" className="flex h-full min-h-0 flex-col bg-primary shadow-xl ring-1 ring-secondary_alt outline-hidden">
+            {layer && layer.kind === "drawer" ? layer.node : null}
+          </AriaDialog>
+        </AriaModal>
+      </AriaModalOverlay>
+
+      {/* -------------------------------------------------------- the popover */}
+      {pop ? <PopBox pop={pop} onClose={closePop} /> : null}
+
+      {/* ---------------------------------------------------------- toasts */}
       {createPortal(
-        <div className="toasts" id="toasts" aria-live="polite">
+        <div className="pointer-events-none fixed right-4 bottom-4 z-[60] flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2" id="toasts" aria-live="polite">
           {toasts.map((t) => (
-            <div className={"toast" + (t.tone ? " " + t.tone : "")} key={t.id}>
-              <Icon name={t.tone === "bad" ? "alert" : "check"} />
-              <span>{t.msg}</span>
+            <div
+              key={t.id}
+              className={cx(
+                "pointer-events-auto flex items-start gap-3 rounded-lg bg-toast px-3.5 py-3 text-sm text-toast shadow-lg ring-1 ring-white/10",
+                "duration-200 ease-out animate-in fade-in slide-in-from-bottom-2",
+              )}
+            >
+              <Icon
+                name={t.tone === "bad" || t.tone === "warn" ? "alert" : "check"}
+                size="sm"
+                className={cx("mt-0.5 shrink-0", t.tone === "bad" ? "text-utility-red-500" : t.tone === "warn" ? "text-utility-yellow-500" : "text-utility-green-500")}
+              />
+              <span className="min-w-0 flex-1">{t.msg}</span>
+              <button
+                type="button"
+                className="-m-1 flex cursor-pointer items-center justify-center rounded p-1 opacity-60 outline-focus-ring hover:opacity-100 focus-visible:outline-2"
+                aria-label="Dismiss"
+                onClick={() => setToasts((list) => list.filter((x) => x.id !== t.id))}
+              >
+                <Icon name="x" size="xs" />
+              </button>
             </div>
           ))}
         </div>,
-        document.body
+        document.body,
       )}
     </Ctx.Provider>
   );
 }
 
-const FOCUSABLE =
-  'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),' +
-  'textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
-
-function LayerBox({ layer, onClose }: { layer: NonNullable<Layer>; onClose: () => void }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    /* The first REAL control. `button` alone matched the close X in every
-       header, so every dialog opened with focus on "close"; and a textarea
-       with `autofocus` lost to the 30 ms timer. */
-    const f = (el.querySelector("[autofocus]")
-      || el.querySelector("input,select,textarea,button:not(.md-x),[tabindex]:not(.md-x)")) as HTMLElement | null;
-    if (f) window.setTimeout(() => f.focus(), 30);
-  }, []);
-  /* THE PAGE BEHIND A LAYER DOES NOT SCROLL. Without this the wheel over a
-     modal's scrim moves the table underneath it, so closing the dialog lands
-     the reader somewhere they never navigated to. */
-  useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
-  }, []);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      /* A component that handled Escape itself (a listbox, a popover) marks
-         the event; the layer must not close on top of it. */
-      if (e.key === "Escape" && !e.defaultPrevented) { onClose(); return; }
-      /* FOCUS IS TRAPPED, and it is trapped here rather than in each of the
-         forty dialogs that open one. Tab off the last control and the ring
-         reappears on the first, instead of walking into the page behind the
-         scrim where nothing can be seen and Escape no longer reads as "leave
-         this dialog". */
-      if (e.key !== "Tab" || e.defaultPrevented) return;
-      const el = ref.current;
-      if (!el) return;
-      const items = Array.prototype.slice
-        .call(el.querySelectorAll(FOCUSABLE))
-        .filter((n) => (n as HTMLElement).offsetParent !== null) as HTMLElement[];
-      if (!items.length) return;
-      const first = items[0];
-      const last = items[items.length - 1];
-      const at = document.activeElement;
-      if (!el.contains(at)) { e.preventDefault(); first.focus(); return; }
-      if (e.shiftKey && at === first) { e.preventDefault(); last.focus(); }
-      else if (!e.shiftKey && at === last) { e.preventDefault(); first.focus(); }
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
-  const cls = layer.kind === "drawer" ? "drawer" : layer.kind === "cmdk" ? "cmdk" : "modal";
+/* A popover the shell positions against an anchor somebody handed it. React
+   Aria places it, flips it when there is no room, closes it on outside press
+   and Escape, and returns focus to the anchor. */
+function PopBox({ pop, onClose }: { pop: NonNullable<Pop>; onClose: () => void }) {
+  const triggerRef = useRef<HTMLElement>(pop.anchor);
+  triggerRef.current = pop.anchor;
+  const placement = pop.opts.above ? (pop.opts.align === "left" ? "top start" : "top end") : pop.opts.align === "left" ? "bottom start" : "bottom end";
   return (
-    <div ref={ref} className={cls + (layer.size ? " " + layer.size : "")} role="dialog" aria-modal="true">
-      {layer.node}
-    </div>
+    <AriaPopover
+      isOpen
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+      triggerRef={triggerRef}
+      placement={placement}
+      offset={6}
+      className={({ isEntering, isExiting }) =>
+        cx(
+          "z-50 origin-(--trigger-anchor-point) rounded-xl bg-primary shadow-lg ring-1 ring-secondary_alt outline-hidden will-change-transform sheen",
+          isEntering && "duration-150 ease-out animate-in fade-in placement-top:slide-in-from-bottom-0.5 placement-bottom:slide-in-from-top-0.5",
+          isExiting && "duration-100 ease-in animate-out fade-out",
+          pop.opts.cls,
+        )
+      }
+      style={{ width: pop.opts.width ? Math.min(pop.opts.width, window.innerWidth - 16) : undefined }}
+    >
+      <AriaDialog aria-label="Menu" className="flex max-h-[min(70vh,36rem)] min-h-0 flex-col outline-hidden">
+        {pop.node}
+      </AriaDialog>
+    </AriaPopover>
   );
 }
 
-function PopBox({ pop, onClose }: { pop: NonNullable<Pop>; onClose: () => void }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [style, setStyle] = useState<{ left: number; top: number } | null>(null);
-
-  useLayoutEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const r = pop.anchor.getBoundingClientRect();
-    const w = pop.opts.width || el.offsetWidth;
-    const left = pop.opts.align === "left" ? r.left : r.right - w;
-    /* Flip above the anchor when opening downward would run off the bottom.
-       The account menu anchors to the very bottom of the sidebar, so it always
-       opened past the fold — its own items were unreachable. */
-    let top = pop.opts.above ? r.top - el.offsetHeight - 6 : r.bottom + 6;
-    if (top + el.offsetHeight > window.innerHeight - 10)
-      top = Math.max(10, r.top - el.offsetHeight - 6);
-    setStyle({ left: Math.max(10, Math.min(left, window.innerWidth - w - 10)), top });
-  }, [pop]);
-
-  useEffect(() => {
-    pop.anchor.classList.add("on");
-    return () => pop.anchor.classList.remove("on");
-  }, [pop.anchor]);
-
-  useEffect(() => {
-    const onDoc = (e: MouseEvent) => {
-      const t = e.target as HTMLElement;
-      if (!t.closest(".pop") && !t.closest("[data-act]")) onClose();
-    };
-    document.addEventListener("click", onDoc);
-    return () => document.removeEventListener("click", onDoc);
-  }, [onClose]);
-
-  return createPortal(
-    <div
-      ref={ref}
-      className={"pop" + (pop.opts.cls ? " " + pop.opts.cls : "")}
-      style={{
-        left: style ? style.left : -9999,
-        top: style ? style.top : -9999,
-        width: pop.opts.width ? pop.opts.width : undefined,
-      }}
-    >
-      {pop.node}
-    </div>,
-    document.body
-  );
+/* The parts a popover's contents are built from — the head, the scrolling
+   body, the foot. One drawing for the bell and the account menu. */
+export function PopHead({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cx("flex items-center gap-2.5 border-b border-secondary px-4 py-3", className)}>{children}</div>;
+}
+export function PopBody({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cx("min-h-0 flex-1 overflow-y-auto", className)}>{children}</div>;
+}
+export function PopFoot({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cx("flex items-center gap-2 border-t border-secondary px-4 py-2.5 text-xs text-tertiary", className)}>{children}</div>;
 }

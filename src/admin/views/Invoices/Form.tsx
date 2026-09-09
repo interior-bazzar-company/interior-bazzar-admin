@@ -9,11 +9,14 @@
    evidence are what the issue transaction refuses without.
    ===================================================================== */
 import { useRef, useState } from "react";
-import type { CSSProperties, ReactNode } from "react";
 import AdminOpsService from "../../../api/modules/adminOps";
 import type { InvoiceSaveInput } from "../../../api/modules/adminOps";
 import { CommonService } from "../../../api/modules/common";
-import { Field, Icon, Notice, Table, Timeline } from "../../ui";
+import {
+  Alert, Button, Card, DateInput, FieldRow, FormField, FormSection, Icon, IconButton, Input, Pill,
+  SelectInput, Segmented, Table, Textarea, Timeline,
+} from "../../ui";
+import { BuilderLayout, MoneyLine, PartyStrip, ReadyLine, StepHead } from "../Quotations/bits";
 import { inr, inrWords, fmtDate } from "../../ui/format";
 import { useNav } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
@@ -114,102 +117,103 @@ export function BuilderBody({ inv, onSaved }: { inv: InvoiceRow; onSaved: () => 
   const removeAddon = (itemId: number) => withQuietSave("Charge removed.", (rowVersion) =>
     call(AdminOpsService.removeInvoiceAddon(inv.id, itemId, rowVersion)));
 
+  const dealTo = "#/deals/" + inv.dealRef;
+
   return (
-    <div className="qbld">
-      <div>
-        {err ? <Notice tone="bad" text={<b>{err}</b>} /> : null}
+    <>
+      {err ? <Alert tone="bad" title="Could not save this invoice.">{err}</Alert> : null}
 
-        <Step n={1} title="Who and when" hint="the invoice's own dates, and who it is billed to" />
-        <div className="card"><div className="card-b">
-          <Parties inv={inv} />
-          <div className="f3" style={{ marginTop: "var(--space-4)" }}>
-            <Field id="nvDate" label="Invoice date" type="date" value={inv.invoiceDate} />
-            <Field id="nvDue" label="Due date" type="date" value={inv.dueDate}
-              help="Drives Overdue on the list." />
-            <Field id="nvPos" label="Place of supply" type="select"
-              options={STATES.map((s) => ({ v: s, l: s, sel: s === inv.placeOfSupply }))}
-              help="Drives the CGST/SGST ↔ IGST split." />
-          </div>
-          <div className="help">
-            The billing block is a <b>column, not a join</b>. It is copied from the deal now and
-            <b> frozen again at issue</b>, so a later profile edit cannot reach a document the
-            customer already holds.
-          </div>
-        </div></div>
+      <BuilderLayout
+        form={<>
+          <section className="flex min-w-0 flex-col gap-3">
+            <StepHead n={1} title="Who and when" hint="the invoice's own dates, and who it is billed to" />
+            <Card>
+              <FormSection>
+                <PartyStrip blocks={[
+                  { title: "From",
+                    lines: [SELLER.brand, SELLER.tagline, SELLER.addr,
+                      <span key="gst" className="font-mono tnum">{SELLER.gstin ? "GSTIN " + SELLER.gstin : "CIN " + SELLER.cin}</span>] },
+                  { title: "Bill to",
+                    lines: [inv.billing.name || "—", inv.billing.address || "—",
+                      <span key="ph" className="font-mono tnum">{inv.billing.phone || "—"}</span>],
+                    foot: <Button color="link-color" size="xs" ico="ext" data-go={dealTo}
+                      onClick={() => go(dealTo)}>Edit on the deal</Button> },
+                ]} />
+                <FieldRow cols={3}>
+                  <FormField id="nvDate" label="Invoice date">
+                    <DateInput id="nvDate" defaultValue={inv.invoiceDate} className="w-full" />
+                  </FormField>
+                  <FormField id="nvDue" label="Due date" hint="Drives Overdue on the list.">
+                    <DateInput id="nvDue" defaultValue={inv.dueDate} className="w-full" />
+                  </FormField>
+                  <FormField id="nvPos" label="Place of supply" hint="Drives the CGST/SGST ↔ IGST split.">
+                    <SelectInput id="nvPos" defaultValue={inv.placeOfSupply}
+                      options={STATES.map((s) => ({ v: s, l: s }))} />
+                  </FormField>
+                </FieldRow>
+                <p className="text-sm text-tertiary">
+                  The billing block is a <b className="font-medium text-secondary">column, not a join</b>.
+                  It is copied from the deal now and <b className="font-medium text-secondary">frozen
+                  again at issue</b>, so a later profile edit cannot reach a document the customer
+                  already holds.
+                </p>
+              </FormSection>
+            </Card>
+          </section>
 
-        <Step n={2} title="What you're billing"
-          hint="the quotation's schedule, the plan, and anything one-off" />
-        <div className="card">
-          <PlanBlock inv={inv} plan={plan} />
-          <AddonBlock addons={addons} busy={busy} onAdd={addAddon} onRemove={removeAddon} />
-        </div>
+          <section className="flex min-w-0 flex-col gap-3">
+            <StepHead n={2} title="What you're billing"
+              hint="the quotation's schedule, the plan, and anything one-off" />
+            <Card flush>
+              <PlanBlock inv={inv} plan={plan} />
+              <AddonBlock addons={addons} busy={busy} onAdd={addAddon} onRemove={removeAddon} />
+            </Card>
+          </section>
 
-        <Step n={3} title="Payment received"
-          hint="required — an invoice is raised only after the client has paid" />
-        <div className="card"><div className="card-b">
-          <div className="f3">
-            <Field id="nvPayDate" label="Date received" type="date" value={inv.paymentDate || ""} />
-            <Field id="nvPayMode" label="Mode" type="select"
-              options={PAY_MODES.concat(inv.paymentMode && PAY_MODES.indexOf(inv.paymentMode) < 0
-                ? [inv.paymentMode] : [])
-                .map((m) => ({ v: m, l: m, sel: m === inv.paymentMode }))} />
-            <Field id="nvPayRef" label="Reference / UTR" req value={inv.paymentReference}
-              ph="NEFT0026JUN4471"
-              help="Mandatory — without it the payment cannot be reconciled against the bank." />
-          </div>
-          <ProofsBlock inv={inv} onChanged={onSaved} />
-        </div></div>
+          <section className="flex min-w-0 flex-col gap-3">
+            <StepHead n={3} title="Payment received"
+              hint="required — an invoice is raised only after the client has paid" />
+            <Card>
+              <FormSection>
+                <FieldRow cols={3}>
+                  <FormField id="nvPayDate" label="Date received">
+                    <DateInput id="nvPayDate" defaultValue={inv.paymentDate || ""} className="w-full" />
+                  </FormField>
+                  <FormField id="nvPayMode" label="Mode">
+                    <SelectInput id="nvPayMode" defaultValue={inv.paymentMode}
+                      options={PAY_MODES.concat(inv.paymentMode && PAY_MODES.indexOf(inv.paymentMode) < 0
+                        ? [inv.paymentMode] : []).map((m) => ({ v: m, l: m }))} />
+                  </FormField>
+                  <FormField id="nvPayRef" label="Reference / UTR" req
+                    hint="Mandatory — without it the payment cannot be reconciled against the bank.">
+                    <Input id="nvPayRef" defaultValue={inv.paymentReference} mono ph="NEFT0026JUN4471" />
+                  </FormField>
+                </FieldRow>
+                <ProofsBlock inv={inv} onChanged={onSaved} />
+              </FormSection>
+            </Card>
+          </section>
 
-        <Step n={4} title="What it says" hint="notes and terms, printed on the document" />
-        <div className="card"><div className="card-b">
-          <Field id="nvNotes" label="Notes (customer-facing)" type="textarea" rows={3} value={inv.notes}
-            ph="Anything the customer should read alongside the figures." />
-          <Field id="nvTerms" label="Payment terms" type="textarea" rows={6} value={inv.terms} />
-        </div></div>
-      </div>
-
-      <div className="qbld-rail">
-        <Summary inv={inv} plan={plan} addons={addons} taxMode={taxMode} onTaxMode={setTaxMode}
-          busy={busy} onSave={save} />
-      </div>
-    </div>
-  );
-}
-
-/* A numbered step rather than a section heading — the quotation builder's own
-   step(), for the same reason: four equal headings read as four things, four
-   numbers read as a sequence you are part way through. */
-function Step({ n, title, hint }: { n: number; title: string; hint?: string }) {
-  return (
-    <div className="qstep">
-      <span className="qstep-n">{n}</span>
-      <div><b>{title}</b>{hint ? <span className="qstep-h">{hint}</span> : null}</div>
-    </div>
-  );
-}
-
-/* Reference, not input: it reads as a strip, not as a form somebody is meant
-   to fill in and then wonders why they cannot. */
-function Parties({ inv }: { inv: InvoiceRow }) {
-  const { go } = useNav();
-  return (
-    <div className="qparties">
-      <div>
-        <span className="qparties-k">From</span>
-        <b>{SELLER.brand}</b><br />
-        <span className="faint">{SELLER.tagline}</span><br />
-        {SELLER.addr}<br />
-        <span className="mono">{SELLER.gstin ? "GSTIN " + SELLER.gstin : "CIN " + SELLER.cin}</span>
-      </div>
-      <div>
-        <span className="qparties-k">Bill to <span className="faint">· from the deal</span></span>
-        <b>{inv.billing.name || "—"}</b><br />
-        {inv.billing.address || "—"}<br />
-        <span className="mono">{inv.billing.phone || "—"}</span>{" "}
-        <a className="lnk" data-go={"#/deals/" + inv.dealRef} onClick={() => go("#/deals/" + inv.dealRef)}>
-          Edit on deal ↗</a>
-      </div>
-    </div>
+          <section className="flex min-w-0 flex-col gap-3">
+            <StepHead n={4} title="What it says" hint="notes and terms, printed on the document" />
+            <Card>
+              <FormSection>
+                <FormField id="nvNotes" label="Notes (customer-facing)">
+                  <Textarea id="nvNotes" rows={3} defaultValue={inv.notes}
+                    ph="Anything the customer should read alongside the figures." />
+                </FormField>
+                <FormField id="nvTerms" label="Payment terms">
+                  <Textarea id="nvTerms" rows={6} defaultValue={inv.terms} />
+                </FormField>
+              </FormSection>
+            </Card>
+          </section>
+        </>}
+        rail={
+          <Summary inv={inv} plan={plan} addons={addons} taxMode={taxMode} onTaxMode={setTaxMode}
+            busy={busy} onSave={save} />
+        } />
+    </>
   );
 }
 
@@ -223,54 +227,59 @@ function Parties({ inv }: { inv: InvoiceRow }) {
    renders without them. */
 function PlanBlock({ inv, plan }: { inv: InvoiceRow; plan: ReturnType<typeof planItemOf> }) {
   const { plans } = usePlanCatalogue();
-  if (!plan) return <div className="card-b faint">No plan block.</div>;
+  if (!plan) return <p className="p-5 text-sm text-tertiary">No plan block.</p>;
   const cat = plans.find((c) => planLabel(c) === plan.description);
   const feats = cat ? (cat.features || []).map((f) => (typeof f === "string" ? f : f.text)).filter(Boolean) : [];
   const preset = REMARK_PRESETS.indexOf(plan.remark || "") >= 0;
   return (
-    <div className="card-b">
-      <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: "var(--text-xl)", fontWeight: 600 }}>{plan.description}</div>
-          <div className="faint" style={{ fontSize: "var(--text-md)" }}>
+    <div className="flex flex-col gap-4 p-5">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-lg font-semibold text-primary">{plan.description}</div>
+          <div className="mt-0.5 text-sm text-tertiary">
             From {inv.quotationNumber || "the accepted quotation"} · suggested:{" "}
             {plan.installmentCount
               ? "installment " + plan.installmentSeq + " of " + plan.installmentCount
               : "the plan's full amount"}
           </div>
           {plan.remark
-            ? <div className="faint" style={{ fontSize: "var(--text-sm)", marginTop: "3px" }}>
-                <Icon name="tag" size="sm" />{plan.remark}</div>
+            ? <div className="mt-1 flex items-center gap-1 text-xs text-tertiary">
+                <Icon name="tag" size="xs" />{plan.remark}</div>
             : null}
         </div>
-        <div className="tnum" style={{ fontSize: "var(--text-2xl)", fontWeight: 600 }}>
+        <div className="shrink-0 font-mono text-display-xs font-semibold text-primary tnum">
           {inr(plan.amountPaise)}</div>
       </div>
 
       {feats.length
-        ? <div style={{ marginTop: "12px" }}>
-            <div className="lbl">What the plan includes</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", marginTop: "6px" }}>
-              {feats.map((f, i) => <span key={i} className="pill xs" title={f}>{f}</span>)}
+        ? <div>
+            <div className="label-mono">What the plan includes</div>
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              {feats.map((f, i) => <Pill key={i} xs text={f} tone="neutral" title={f} />)}
             </div>
             {/* Not snapshotted, unlike the prototype's copy: the line stores the
                 plan NAME, and these are read live from the catalogue by it. The
                 document carries the figures below, never this list. */}
-            <div className="help">Read from the plan catalogue by the name on this line. The document
-              carries the figures below, not these.</div>
+            <p className="mt-1.5 text-xs text-tertiary">Read from the plan catalogue by the name on
+              this line. The document carries the figures below, not these.</p>
           </div>
         : null}
 
-      <div className="f3" style={{ marginTop: "14px" }}>
-        <Field id="nvAmt" label="Amount ₹" type="number" value={paiseToRupees(plan.amountPaise)} />
-        <Field id="nvRemark" label="Remark" type="select"
-          options={REMARK_PRESETS.map((r) => ({ v: r, l: r, sel: plan.remark === r }))
-            .concat([{ v: "other", l: "Other (type below)", sel: !preset }])}
-          help="One-click preset, or Other for anything else." />
-        <Field id="nvRemarkOther" label="Custom remark" value={preset ? "" : plan.remark || ""}
-          ph="e.g. Registration amount, balance payment…"
-          help="Used only when Remark above is Other — mandatory in that case." />
-      </div>
+      <FieldRow cols={3}>
+        <FormField id="nvAmt" label="Amount ₹">
+          <Input id="nvAmt" type="number" defaultValue={paiseToRupees(plan.amountPaise)} mono />
+        </FormField>
+        <FormField id="nvRemark" label="Remark" hint="One-click preset, or Other for anything else.">
+          <SelectInput id="nvRemark" defaultValue={preset ? plan.remark || "" : "other"}
+            options={REMARK_PRESETS.map((r) => ({ v: r, l: r }))
+              .concat([{ v: "other", l: "Other (type below)" }])} />
+        </FormField>
+        <FormField id="nvRemarkOther" label="Custom remark"
+          hint="Used only when Remark above is Other — mandatory in that case.">
+          <Input id="nvRemarkOther" defaultValue={preset ? "" : plan.remark || ""}
+            ph="e.g. Registration amount, balance payment…" />
+        </FormField>
+      </FieldRow>
     </div>
   );
 }
@@ -283,41 +292,40 @@ function AddonBlock({ addons, busy, onAdd, onRemove }: {
   onAdd: () => void; onRemove: (itemId: number) => void;
 }) {
   const addBtn = (
-    <button className="btn" data-act="in-addon-add" disabled={busy} onClick={onAdd}>
-      <Icon name="plus" size="sm" />Add charge</button>
+    <Button color="secondary" ico="plus" data-act="in-addon-add" isDisabled={busy} onClick={onAdd}>
+      Add charge</Button>
   );
   if (!addons.length) return (
-    <div className="card-b" style={{ display: "flex", alignItems: "center", gap: "10px",
-                                     borderTop: "1px solid var(--line)" }}>
+    <div className="flex flex-wrap items-center gap-3 border-t border-secondary p-5">
       {addBtn}
-      <span className="faint" style={{ fontSize: "var(--text-md)" }}>
-        Onboarding, a shoot, a custom integration. <b>No months and no quantity</b> — a one-off
-        charge has an amount and nothing else.</span>
+      <span className="min-w-0 flex-1 text-sm text-tertiary">
+        Onboarding, a shoot, a custom integration. <b className="font-medium text-secondary">No months
+        and no quantity</b> — a one-off charge has an amount and nothing else.</span>
     </div>
   );
 
   return (
-    <div className="card-b" style={{ borderTop: "1px solid var(--line)" }}>
+    <div className="flex flex-col gap-3 border-t border-secondary p-5">
       <Table
         cols={[{ label: "#", w: "36px" }, { label: "Description" }, { label: "HSN / SAC", w: "120px" },
-          { label: "Amount ₹", cls: "n", w: "150px" }, { label: "", w: "44px" }]}
+          { label: "Amount ₹", cls: "n", w: "150px" }, { label: "", cls: "acts", w: "44px" }]}
         rows={addons.map((it, ix) => (
           <tr key={it.id}>
             <td className="faint">{ix + 1}</td>
-            <td><input className="inp sm" id={"a-nm-" + it.id} defaultValue={it.description} /></td>
-            <td><input className="inp sm" id={"a-hs-" + it.id} defaultValue={it.hsn || ""} /></td>
+            <td><Input id={"a-nm-" + it.id} defaultValue={it.description} ariaLabel="Description" /></td>
+            <td><Input id={"a-hs-" + it.id} defaultValue={it.hsn || ""} ariaLabel="HSN or SAC" mono /></td>
             <td className="n">
-              <input className="inp sm n" id={"a-am-" + it.id} type="number"
-                defaultValue={Math.round(it.amountPaise / 100)} />
+              <Input id={"a-am-" + it.id} type="number" ariaLabel="Amount in rupees" mono
+                inputClassName="text-right" defaultValue={String(Math.round(it.amountPaise / 100))} />
             </td>
-            <td className="c">
-              <button className="btn sm icon dgr" data-act="in-addon-del" aria-label="Remove charge"
-                disabled={busy} onClick={() => onRemove(it.id)}><Icon name="x" size="sm" /></button>
+            <td className="acts">
+              <IconButton ico="x" size="xs" label="Remove charge" data-act="in-addon-del"
+                isDisabled={busy} onClick={() => onRemove(it.id)} />
             </td>
           </tr>
         ))}
       />
-      <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>{addBtn}</div>
+      <div>{addBtn}</div>
     </div>
   );
 }
@@ -338,92 +346,67 @@ function Summary({ inv, plan, addons, taxMode, onTaxMode, busy, onSave }: {
   const blockers = blockersOf(inv);
 
   return (
-    <div className="card">
-      <div className="card-h"><h3>Summary</h3>
-        <span className="d">display only — the server recomputes</span></div>
-      <div className="card-b">
-        <Row k={"Plan" + (plan && plan.installmentCount
-          ? " · installment " + plan.installmentSeq + " of " + plan.installmentCount : "")}
-          v={inr(plan ? plan.amountPaise : 0)} />
-        {addons.length ? <Row k="One-off charges" v={inr(addonGross)} /> : null}
-        <Row k={<b>Subtotal</b>} v={<b>{inr(inv.subtotalPaise)}</b>}
-          style={{ borderTop: "1px solid var(--line)", marginTop: "4px" }} />
-        <Row k={applicable ? "Taxable value" : "Amount"} v={inr(inv.taxableTotalPaise)}
-          style={{ borderTop: "1px solid var(--line)" }} />
-
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0" }}>
-          <span>Tax</span>
-          <div className="btn-group">
-            <button className={applicable ? "on" : ""} data-act="in-tax-mode" data-v="applicable"
-              onClick={() => onTaxMode("applicable")}>Applicable</button>
-            <button className={!applicable ? "on" : ""} data-act="in-tax-mode" data-v="not_applicable"
-              onClick={() => onTaxMode("not_applicable")}>Not applicable</button>
+    <Card title="Summary" sub="display only — the server recomputes" ticks
+      foot={
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Button color="primary" ico="check" block data-act="in-save-all" isLoading={busy} onClick={onSave}>
+              Save changes</Button>
+            <span className="text-xs text-tertiary">
+              Writes the dates, the plan, the charges and the payment together.</span>
           </div>
+          <ReadyLine blockers={blockers.map((b) => ({ text: b }))} verb="issue" />
         </div>
+      }>
+      <MoneyLine
+        k={"Plan" + (plan && plan.installmentCount
+          ? " · installment " + plan.installmentSeq + " of " + plan.installmentCount : "")}
+        v={inr(plan ? plan.amountPaise : 0)} />
+      {addons.length ? <MoneyLine k="One-off charges" v={inr(addonGross)} /> : null}
+      <MoneyLine k="Subtotal" v={inr(inv.subtotalPaise)} rule />
+      <MoneyLine k={applicable ? "Taxable value" : "Amount"} v={inr(inv.taxableTotalPaise)} rule />
 
-        {applicable
-          ? <>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0" }}>
-                <span>GST rate</span>
-                <select className="inp sm" id="nvGst" style={{ width: "96px" }} defaultValue={String(inv.gstRate)}>
-                  {GST_RATES.map((r) => <option key={r} value={r}>{r}%</option>)}
-                </select>
-              </div>
-              {intra
-                ? <>
-                    <Row k={"CGST (" + inv.gstRate / 2 + "%)"} v={inr(inv.cgstPaise)} />
-                    <Row k={"SGST (" + inv.gstRate / 2 + "%)"} v={inr(inv.sgstPaise)} />
-                  </>
-                : <Row k={"IGST (" + inv.gstRate + "%)"} v={inr(inv.igstPaise)} />}
-            </>
-          : <div className="help" style={{ marginTop: "10px" }}>
-              <b>Tax not applicable.</b> The grand total excludes GST entirely — an explicit choice
-              for this invoice.
-            </div>}
+      {/* TAX IS A DECISION ON THIS INVOICE, not a property of the customer —
+          so it is a control in the figures, where its effect is visible. */}
+      <div className="flex items-center justify-between gap-3 py-2">
+        <span className="text-sm text-tertiary">Tax</span>
+        <Segmented sm label="Tax" value={applicable ? "applicable" : "not_applicable"}
+          onPick={(v2) => onTaxMode(v2 as "applicable" | "not_applicable")}
+          options={[{ v: "applicable", l: "Applicable" }, { v: "not_applicable", l: "Not applicable" }]} />
+      </div>
 
-        <Row k={<b style={{ fontSize: "var(--text-lg)" }}>Grand total</b>}
-          v={<b style={{ fontSize: "var(--text-lg)" }}>{inr(inv.grandTotalPaise)}</b>}
-          style={{ borderTop: "2px solid var(--line-2)", marginTop: "6px", paddingTop: "9px" }} />
-        <div className="faint" style={{ fontSize: "var(--text-sm)", marginTop: "4px" }}>
-          {inrWords(inv.grandTotalPaise)}
-        </div>
-
-        {applicable
-          ? <div className="help" style={{ marginTop: "10px" }}>
-              {intra
-                ? <><b>Intra-state.</b> Place of supply is {inv.placeOfSupply}, the same state as
-                    Interior bazzar — so GST splits into CGST + SGST.</>
-                : <><b>Inter-state.</b> Place of supply is {inv.placeOfSupply || "not set"} and Interior
-                    bazzar is in {SELLER.state} — so a single IGST applies.</>}
+      {applicable
+        ? <>
+            <div className="flex items-center justify-between gap-3 py-1">
+              <label htmlFor="nvGst" className="text-sm text-tertiary">GST rate</label>
+              <SelectInput id="nvGst" defaultValue={String(inv.gstRate)} className="w-28"
+                options={GST_RATES.map((r) => ({ v: String(r), l: r + "%" }))} />
             </div>
-          : null}
-      </div>
+            {intra
+              ? <>
+                  <MoneyLine k={"CGST (" + inv.gstRate / 2 + "%)"} v={inr(inv.cgstPaise)} />
+                  <MoneyLine k={"SGST (" + inv.gstRate / 2 + "%)"} v={inr(inv.sgstPaise)} />
+                </>
+              : <MoneyLine k={"IGST (" + inv.gstRate + "%)"} v={inr(inv.igstPaise)} />}
+          </>
+        : <p className="mt-2 text-xs text-tertiary">
+            <b className="font-medium text-secondary">Tax not applicable.</b> The grand total excludes
+            GST entirely — an explicit choice for this invoice.
+          </p>}
 
-      <div className="card-f qsave">
-        <button className="btn pri" data-act="in-save-all" disabled={busy} onClick={onSave}>
-          <Icon name="check" />{busy ? "Saving…" : "Save changes"}</button>
-        <span className="qsave-h">Writes the dates, the plan, the charges and the payment together.</span>
-      </div>
+      <MoneyLine k="Grand total" v={inr(inv.grandTotalPaise)} strong />
+      <p className="mt-1 text-xs text-tertiary">{inrWords(inv.grandTotalPaise)}</p>
 
-      <div className="card-f">
-        {blockers.length
-          ? <Notice tone="bad" ico="alert" text={<>
-              <b>Cannot be issued yet</b>
-              <ul style={{ margin: "5px 0 0 16px" }}>
-                {blockers.map((b) => <li key={b}>{b}</li>)}
-              </ul>
-            </>} />
-          : <span style={{ color: "var(--ok)" }}><Icon name="check" size="sm" /> Ready to issue</span>}
-      </div>
-    </div>
-  );
-}
-
-function Row({ k, v, style }: { k: ReactNode; v: ReactNode; style?: CSSProperties }) {
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", ...style }}>
-      <span>{k}</span><span className="tnum">{v}</span>
-    </div>
+      {applicable
+        ? <p className="mt-2 text-xs text-tertiary">
+            {intra
+              ? <><b className="font-medium text-secondary">Intra-state.</b> Place of supply is {inv.placeOfSupply},
+                  the same state as Interior bazzar — so GST splits into CGST + SGST.</>
+              : <><b className="font-medium text-secondary">Inter-state.</b> Place of supply is {inv.placeOfSupply || "not set"} and
+                  Interior bazzar is in {SELLER.state} — so a single IGST applies.</>}
+          </p>
+        : null}
+    </Card>
   );
 }
 
@@ -483,40 +466,42 @@ export function ProofsBlock({ inv, onChanged }: { inv: InvoiceRow; onChanged: ()
   };
 
   return (
-    <>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
-                    flexWrap: "wrap", gap: "8px", marginTop: "6px" }}>
-        <span style={{ fontSize: "var(--text-sm)" }}>
+    <div className="flex flex-col gap-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="min-w-0 text-sm">
+          {/* THE STATE FIRST, then the caveat: whether the issue guard is
+              satisfied is the only thing being asked here. */}
           {proofs.length
-            ? <b style={{ color: "var(--ok)" }}><Icon name="check" size="sm" />
+            ? <b className="inline-flex items-center gap-1 font-medium text-success-primary">
+                <Icon name="check" size="xs" />
                 {proofs.length} proof{proofs.length === 1 ? "" : "s"}{" "}
                 {isDraft ? "attached" : "on file"}</b>
             : isDraft
-              ? <b style={{ color: "var(--bad)" }}><Icon name="alert" size="sm" />
+              ? <b className="inline-flex items-center gap-1 font-medium text-error-primary">
+                  <Icon name="alert" size="xs" />
                   No payment proof attached yet — required to issue</b>
-              : <b className="faint">No proof on file</b>}{" "}
-          <span className="faint">· internal record, never shown to the customer</span>
+              : <b className="font-medium text-quaternary">No proof on file</b>}{" "}
+          <span className="text-tertiary">· internal record, never shown to the customer</span>
         </span>
         {isDraft
           ? <>
-              <button className="btn sm" disabled={busy} onClick={() => fileRef.current?.click()}>
-                <Icon name="plus" size="sm" />
-                {busy ? (pct && pct < 100 ? `Uploading ${pct}%` : "Attaching\u2026") : "Attach payment proof"}</button>
+              <Button color="secondary" size="xs" ico="plus" isDisabled={busy}
+                onClick={() => fileRef.current?.click()}>
+                {busy ? (pct && pct < 100 ? "Uploading " + pct + "%" : "Attaching…") : "Attach payment proof"}</Button>
               <input ref={fileRef} type="file" accept="image/*,application/pdf" hidden onChange={upload} />
             </>
-          : <span className="faint" style={{ fontSize: "var(--text-sm)" }}>
-              Frozen with the invoice at issue</span>}
+          : <span className="text-sm text-tertiary">Frozen with the invoice at issue</span>}
       </div>
       {proofs.length
-        ? <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "10px" }}>
+        ? <div className="flex flex-wrap gap-1.5">
             {proofs.map((p) => (p.url
-              ? <a key={p.id} className="pill xs ok" href={p.url} target="_blank" rel="noreferrer"
-                  title={p.filename}><Icon name="shield" size="sm" />{p.filename}</a>
-              : <span key={p.id} className="pill xs ok" title={p.filename}>
-                  <Icon name="shield" size="sm" />{p.filename}</span>))}
+              ? <a key={p.id} href={p.url} target="_blank" rel="noreferrer" title={p.filename}
+                  className="rounded-md outline-focus-ring focus-visible:outline-2 focus-visible:outline-offset-2">
+                  <Pill xs ico="shield" tone="ok" text={p.filename} /></a>
+              : <Pill key={p.id} xs ico="shield" tone="ok" text={p.filename} title={p.filename} />))}
           </div>
         : null}
-    </>
+    </div>
   );
 }
 
@@ -524,7 +509,10 @@ export function EventLog({ events }: { events: NonNullable<InvoiceRow["events"]>
   return (
     /* the shared timeline — see the note in Deals/Drawer.tsx */
     <Timeline items={events.map((e) => ({
-      title: <><span className="pill xs">{e.eventType}</span><span className="tl-when">{fmtDate(e.createdAt)}</span></>,
+      title: <span className="flex flex-wrap items-center gap-2">
+        <Pill xs text={e.eventType} tone="neutral" />
+        <span className="text-xs text-quaternary tnum">{fmtDate(e.createdAt)}</span>
+      </span>,
       body: e.detail || null,
       meta: e.actor ? e.actor.name : e.actorRole || "System",
     }))} />

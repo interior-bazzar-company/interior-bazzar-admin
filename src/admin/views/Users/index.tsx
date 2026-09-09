@@ -28,15 +28,12 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { hashToPath, usePageChrome } from "../../shell/AdminShell";
-import { qs } from "../../ui";
+import { qs, TbTitle } from "../../ui";
 import type { Params } from "./store";
 import { FILTER_KEYS, countsOf, useAllRows } from "./store";
 import List from "./List";
 import Analytics from "./Analytics";
 import Detail from "./Detail";
-import "./users.css";
-import "../charts.css";
-import "./blocks.css";
 
 const ROUTE = "#/users";
 
@@ -72,36 +69,26 @@ export default function Users() {
   const rows = useAllRows();
 
   /* ------------------------------------------------------------ topbar ---
-     THE SCOPE LIVES HERE, not on the page. Two figures, unfiltered on purpose:
-     how big the base is and how much of it is live. They must not change
-     meaning because somebody narrowed the list below them, which is exactly
-     what would happen if they were counted off the filtered set. */
+     THE TITLE IS THE WAY UP, panel-wide: pressing it returns to this face's
+     default view. On a record it returns to the LIST YOU CAME FROM, filters
+     and all, so Back is a return rather than a reset — and the record id sits
+     beside it the way every other deep route in the panel prints one.
+
+     The scope figures are gone from here on purpose. They now sit in the
+     page header's own meta line, where a count belongs and where it can say
+     what it is counted against; two figures in the topbar were a second,
+     quieter page header. */
   const c = useMemo(() => countsOf(rows), [rows]);
   const crumbs = useMemo(() => (
     <>
-      {/* The title names the FACE and is the way up: pressing it returns to
-          that face's default view — the job the topbar's Back button did
-          before it came off panel-wide. */}
-      <button type="button" className="tb-title" title="Back to the default view"
-        onClick={() => navigate(hashToPath(view === "users" ? ROUTE : ROUTE + qs({ view })), { replace: true })}>
-        {view === "analytics" ? "Analytics" : "Users Management"}
-      </button>
-      <span className="tb-stats">
-        {/* TWO figures, and neither is commercial. How many identities exist
-            and how many of those accounts are live is the whole scope of this
-            module; how many are paying is a Finance figure and reading it here
-            would be this module quoting a number it cannot compute.
-
-            `hi` is emphasis, not state. Total users is the figure this module
-            is a breakdown of, so it carries the tint and Active accounts reads
-            as a qualification of it. `on` would have been the wrong class: it
-            means "this filter is applied" everywhere else in the panel and
-            these chips filter nothing. */}
-        <span className="tb-stat ro hi"><span className="k">Total users</span><span className="v tnum">{c.total}</span></span>
-        <span className="tb-stat ro"><span className="k">Active accounts</span><span className="v tnum">{c.active}</span></span>
-      </span>
+      <TbTitle
+        label={id ? "Users Management" : view === "analytics" ? "Analytics" : "Users Management"}
+        to={id
+          ? listHash(omit(p, ["tab"]))
+          : view === "users" ? ROUTE : ROUTE + qs({ view })} />
+      {id ? <span className="truncate font-mono text-xs text-tertiary tnum">{id}</span> : null}
     </>
-  ), [c.total, c.active, view, navigate]);
+  ), [id, p, view]);
 
   /* Where "up" is: the list you opened the record from, filters and all, so
      Back is a return rather than a reset. */

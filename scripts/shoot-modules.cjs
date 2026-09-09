@@ -29,9 +29,21 @@ try { ({ chromium } = require("playwright")); } catch {
   process.exit(0);
 }
 
-const PORT = 5222;
+/* SHOT_PORT / SHOT_ROUTES / SHOT_OUT let several runs share one machine:
+   `SHOT_PORT=5231 SHOT_ROUTES=deals,quotations node scripts/shoot-modules.cjs`
+
+   SHOT_W / SHOT_H photograph a DIFFERENT WIDTH — the responsive pass. A layout
+   claim ("it works on a tablet") is checked the same way as a visual one: by
+   looking at it. SHOT_FULL=1 captures the whole scroll height, which is what
+   you want on a phone, where the interesting failures are below the fold.
+   `SHOT_W=390 SHOT_FULL=1 SHOT_OUT=phone node scripts/shoot-modules.cjs`
+   SHOT_THEMES=light halves a run when only the layout is in question. */
+const PORT = Number(process.env.SHOT_PORT || 5222);
+const VW = Number(process.env.SHOT_W || 1440);
+const VH = Number(process.env.SHOT_H || 900);
+const FULL = process.env.SHOT_FULL === "1";
 const APP = "http://localhost:" + PORT;
-const OUT = path.join(process.cwd(), ".tmp", "modules");
+const OUT = path.join(process.cwd(), ".tmp", process.env.SHOT_OUT || "modules");
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /* Every route the registry knows, in sidebar order. `groupLabel` is what the
@@ -86,7 +98,7 @@ const ME = {
   if (!up) { vite.kill(); console.error("FAIL — dev server did not start"); process.exit(1); }
 
   const browser = await chromium.launch();
-  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  const ctx = await browser.newContext({ viewport: { width: VW, height: VH } });
   await ctx.addInitScript(() => {
     try { localStorage.setItem("accessToken", "test-token"); } catch { /* private mode */ }
   });
@@ -149,9 +161,12 @@ const ME = {
 
   let n = 0;
   const outcomes = [];
-  for (const theme of ["light", "dark"]) {
+  const only = (process.env.SHOT_ROUTES || "").split(",").map((s) => s.trim()).filter(Boolean);
+  const WANT = only.length ? ROUTES.filter(([r]) => only.indexOf(r) >= 0) : ROUTES;
+  const THEMES = (process.env.SHOT_THEMES || "light,dark").split(",").map((t) => t.trim()).filter(Boolean);
+  for (const theme of THEMES) {
     await ctx.addInitScript(`try{localStorage.setItem("ib_admin_theme",${JSON.stringify(JSON.stringify(theme))})}catch(e){}`);
-    for (const [route] of ROUTES) {
+    for (const [route] of WANT) {
       await page.goto(APP + "/" + route, { waitUntil: "networkidle" });
       /* the theme is written before paint from localStorage, but the context
          script above only applies to pages opened after it was added — so set
@@ -170,7 +185,7 @@ const ME = {
         return "ok";
       });
       if (state !== "ok") outcomes.push(theme + "/" + route + " → " + state);
-      await page.screenshot({ path: path.join(OUT, theme + "-" + route + ".png") });
+      await page.screenshot({ path: path.join(OUT, theme + "-" + route + ".png"), fullPage: FULL });
       n++;
     }
   }

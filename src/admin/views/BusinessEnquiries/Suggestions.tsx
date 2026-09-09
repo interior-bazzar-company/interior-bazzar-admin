@@ -8,24 +8,19 @@
    nothing in this file does arithmetic on a score beyond drawing a bar the
    width of one.
 
-   The excluded half is a link, not a hidden detail. The businesses that are
-   absent are the part of the decision easiest to hide and most often
+   The excluded half is a disclosure, not a hidden detail. The businesses that
+   are absent are the part of the decision easiest to hide and most often
    questioned, and "why is X not here?" is a question an operator gets asked by
    name.
    ============================================================================= */
 import { useState } from "react";
-import { EmptyState, Icon, SectionHead } from "../../ui";
-import { InfoNote } from "./bits";
+import { Button, Card, EmptyState, Icon, Pill, SectionHead, Tag } from "../../ui";
+import { BusinessSearch, CandidateCard, Disclose, FactorTable, InfoNote, PanelNote } from "./bits";
 import { can } from "../../shell/AdminShell";
-import { BusinessSearch, FactorTable, ScoreBar } from "./bits";
 import { RULES, isTerminal, manualCandidate, needsOverrideReason } from "./store";
 import type { Candidate, Enquiry, MatchRun } from "./store";
 
 /* ---------------------------------------------------------- the panel --- */
-/* Header, scrolling body, footer. The three-part shape is not decoration: the
-   panel is pinned and height-capped so its footer cannot be pushed below the
-   fold by a long candidate list or an expanded breakdown. See .be-sp in
-   enquiries.css for what it is fixing. */
 export function SuggestionsPanel({ e, run, onAssign }: {
   e: Enquiry; run: MatchRun | null; onAssign: (c: Candidate) => void;
 }) {
@@ -33,75 +28,74 @@ export function SuggestionsPanel({ e, run, onAssign }: {
   const [showExcluded, setShowExcluded] = useState(false);
   const assignable = !isTerminal(e.status) && !e.activeAssignmentId && can("business-enquiries", "edit");
 
+  /* ---------------------------------------------------- nothing has run --- */
   if (!run) {
     return (
-      <div className="be-sp">
-        <div className="be-sp-h">
-          <b>Business Suggestions</b>
-          <div className="r">No matching run yet</div>
-        </div>
-        <div className="be-sp-scroll">
-          <div className="be-sp-empty">
-            <div className="g" />
-            Matching has not run for this enquiry.<br />
-            <b>Nothing to rank.</b>
-          </div>
+      <Card title="Business suggestions" sub="No matching run yet" tight>
+        <div className="flex flex-col gap-4">
+          <EmptyState
+            flat
+            icon="sparkle"
+            title="Nothing to rank"
+            body="Matching has not run for this enquiry."
+          />
           <ManualPick e={e} onAssign={onAssign} />
-        </div>
-        <div className="be-sp-f">
           <InfoNote ico="sparkle" short={<>Run matching to build the candidate pool.</>}>
             It reads the qualification snapshot and the active rule version — never the live funnel
             form. That is what makes a past ranking reproducible.
           </InfoNote>
         </div>
-      </div>
+      </Card>
     );
   }
 
+  /* ------------------------------------------------- ran, found nobody --- */
   if (!run.eligible.length) {
     return (
-      <div className="be-sp">
-        <div className="be-sp-h">
-          <b>Business Suggestions</b>
-          <div className="r">0 eligible of {run.subscribedCount} subscribed · rule <span className="mono">{run.ruleVersion}</span></div>
-        </div>
-        <div className="be-sp-scroll">
-          <div className="be-sp-empty">
-            <div className="g" />
-            No business passed stage 1.<br />
-            <b>Nothing to rank.</b>
+      <Card
+        title="Business suggestions"
+        sub={<>0 eligible of {run.subscribedCount} subscribed · rule <span className="font-mono">{run.ruleVersion}</span></>}
+        tight
+      >
+        <div className="flex flex-col gap-4">
+          <EmptyState
+            flat
+            icon="alert"
+            title="No business passed stage 1"
+            body="Nothing to rank. The enquiry holds here — it is not invalid."
+          />
+          <div className="flex flex-col gap-3">
+            <Disclose open={showExcluded} onToggle={() => setShowExcluded(!showExcluded)}>
+              See why each of the {run.excluded.length} was excluded
+            </Disclose>
+            {showExcluded ? <ExclusionList run={run} inline /> : null}
           </div>
-          <button className="be-sp-link" aria-expanded={showExcluded}
-            onClick={() => setShowExcluded(!showExcluded)}>
-            See why each of the {run.excluded.length} was excluded
-            <Icon name={showExcluded ? "chev" : "chevr"} size="sm" />
-          </button>
-          {showExcluded ? <ExclusionList run={run} inline /> : null}
           <ManualPick e={e} onAssign={onAssign} />
-        </div>
-        <div className="be-sp-f">
           <InfoNote tone="warn" ico="alert" short={<>This enquiry <b>holds</b> here — it is not invalid.</>}>
             Nothing passed hard eligibility. The customer did nothing wrong and the enquiry is real,
             qualified and wanted; what is missing is <b>supply</b>. Rejecting it would hide a
             coverage gap inside a rejection-rate metric where nobody will look for it.
           </InfoNote>
         </div>
-      </div>
+      </Card>
     );
   }
 
+  /* ------------------------------------------------------- the candidates --- */
   return (
-    <div className="be-sp">
-      <div className="be-sp-h">
-        <b>Business Suggestions</b>
-        <div className="r">
+    <Card
+      title="Business suggestions"
+      sub={
+        <>
           {run.eligible.length} eligible of {run.subscribedCount} subscribed ·{" "}
           {run.ranked ? <>ranked under rule </> : <>stage 1 only, rule </>}
-          <span className="mono">{run.ruleVersion}</span>
-        </div>
-      </div>
-
-      <div className="be-sp-scroll">
+          <span className="font-mono">{run.ruleVersion}</span>
+        </>
+      }
+      right={<Pill xs tone={run.ranked ? "info" : "neutral"} text={run.ranked ? "Ranked" : "Unranked"} />}
+      tight
+    >
+      <div className="flex flex-col gap-3">
         <NotApplied run={run} />
 
         {run.eligible.map((c) => {
@@ -114,49 +108,47 @@ export function SuggestionsPanel({ e, run, onAssign }: {
              business passed every gate, and here is which facts did it. */
           const ranked = run.ranked;
           const needsReason = !ranked || needsOverrideReason(run, c.businessId);
+          const top = ranked && c.rank === 1;
           return (
-            <div key={c.businessId} className={"be-sugg" + (ranked && c.rank === 1 ? " top" : "")}>
-              <div className="be-sugg-r1">
-                {ranked ? <span className="be-rank">{c.rank}</span> : null}
-                <div className="be-sugg-nm">
-                  <div className="nm">{c.name}</div>
-                  <div className="band">{ranked ? c.band : "Eligible · not ranked"}</div>
-                </div>
-                {ranked
-                  ? <span className="be-score tnum" aria-label={c.score + " of 100"}>{c.score}</span>
-                  : null}
-              </div>
-              {ranked ? <ScoreBar score={c.score} top={c.rank === 1} /> : null}
-              <div className="be-why">{c.why}</div>
-              <div className="be-sugg-a">
-                {ranked
-                  ? <button className="btn sm" aria-expanded={isOpen}
+            <CandidateCard
+              key={c.businessId}
+              rank={ranked ? c.rank : null}
+              score={ranked ? c.score : null}
+              top={top}
+              name={c.name}
+              sub={ranked ? c.band : "Eligible · not ranked"}
+              why={c.why}
+              actions={
+                <>
+                  {ranked ? (
+                    <Button color="secondary" size="xs" aria-expanded={isOpen}
                       onClick={() => setOpen(isOpen ? null : c.businessId)}>
                       {isOpen ? "Hide the breakdown" : "Why this score?"}
-                    </button>
-                  : null}
-                {assignable
-                  ? <button className={"btn sm " + (ranked && c.rank === 1 ? "pri" : "")}
-                      onClick={() => onAssign(c)}>
+                    </Button>
+                  ) : null}
+                  {assignable ? (
+                    <Button color={top ? "primary" : "secondary"} size="xs" onClick={() => onAssign(c)}>
                       Assign{needsReason ? " · reason" : ""}
-                    </button>
-                  : null}
-              </div>
+                    </Button>
+                  ) : null}
+                </>
+              }
+            >
               {ranked && isOpen ? (
-                <div className="be-sugg-x">
+                <div className="mt-1 border-t border-secondary pt-3">
                   <FactorTable c={c} />
                 </div>
               ) : null}
-            </div>
+            </CandidateCard>
           );
         })}
 
-        <button className="be-sp-link" aria-expanded={showExcluded}
-          onClick={() => setShowExcluded(!showExcluded)}>
-          Why are {run.excluded.length} businesses missing?
-          <Icon name={showExcluded ? "chev" : "chevr"} size="sm" />
-        </button>
-        {showExcluded ? <ExclusionList run={run} inline /> : null}
+        <div className="flex flex-col gap-3">
+          <Disclose open={showExcluded} onToggle={() => setShowExcluded(!showExcluded)}>
+            Why are {run.excluded.length} businesses missing?
+          </Disclose>
+          {showExcluded ? <ExclusionList run={run} inline /> : null}
+        </div>
 
         {/* HERE TOO, not only when the run found nothing. A run that ranked
             five businesses has not established that one of them should get the
@@ -167,9 +159,7 @@ export function SuggestionsPanel({ e, run, onAssign }: {
             overrule, which is backwards. Same component, same dialog, same
             revalidation, same required reason. */}
         <ManualPick e={e} onAssign={onAssign} />
-      </div>
 
-      <div className="be-sp-f">
         {run.ranked ? (
           <InfoNote ico="shield" short={<><b>Recommendation is not assignment.</b></>}>
             Nothing is routed until an authorised person confirms it. The engine advises; a human
@@ -186,7 +176,7 @@ export function SuggestionsPanel({ e, run, onAssign }: {
           </InfoNote>
         )}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -201,18 +191,17 @@ export function SuggestionsPanel({ e, run, onAssign }: {
 function NotApplied({ run }: { run: MatchRun }) {
   if (!run.notApplied?.length) return null;
   return (
-    <div className="be-qp-sec">
-      <InfoNote tone="warn" ico="alert"
-        short={<>{run.notApplied.length} of the eligibility{" "}
-          {run.notApplied.length === 1 ? "gate was" : "gates were"} <b>not applied</b>.</>}>
-        {run.notApplied.map((n) => (
-          <div key={n.key}><b>{n.label}</b> — {n.reason}</div>
-        ))}
-        <br />
+    <InfoNote tone="warn" ico="alert"
+      short={<>{run.notApplied.length} of the eligibility{" "}
+        {run.notApplied.length === 1 ? "gate was" : "gates were"} <b>not applied</b>.</>}>
+      {run.notApplied.map((n) => (
+        <div key={n.key}><b>{n.label}</b> — {n.reason}</div>
+      ))}
+      <p>
         Everything below passed the gates that <i>were</i> applied. It has not passed these, because
         these did not run.
-      </InfoNote>
-    </div>
+      </p>
+    </InfoNote>
   );
 }
 
@@ -243,11 +232,10 @@ function ManualPick({ e, onAssign }: { e: Enquiry; onAssign: (c: Candidate) => v
   if (!assignable) return null;
 
   return (
-    <div className="be-qp-sec">
-      <button className="be-sp-link" aria-expanded={open} onClick={() => setOpen(!open)}>
+    <div className="flex flex-col gap-3 border-t border-secondary pt-3">
+      <Disclose open={open} onToggle={() => setOpen(!open)}>
         Assign to a business by hand
-        <Icon name={open ? "chev" : "chevr"} size="sm" />
-      </button>
+      </Disclose>
 
       {open ? (
         <>
@@ -276,29 +264,35 @@ function ManualPick({ e, onAssign }: { e: Enquiry; onAssign: (c: Candidate) => v
    "service area is Bengaluru" is a profile-data conversation. */
 export function ExclusionList({ run, inline }: { run: MatchRun; inline?: boolean }) {
   return (
-    <div className={"be-excl" + (inline ? " inline" : "")}>
+    <div className="flex flex-col gap-3">
       {!inline
         ? <SectionHead title="Excluded businesses"
             desc={run.excluded.length + " of " + run.subscribedCount + " subscribed · all failed stage 1"} />
         : null}
-      {run.excluded.map((x) => (
-        <div className="be-exc" key={x.businessId}>
-          <span className="x"><Icon name="x" size="sm" /></span>
-          <div>
-            <div className="nm">{x.name}</div>
-            <div className="rs">{x.reason}</div>
-          </div>
-          <span className="stg">{x.stage}</span>
-        </div>
-      ))}
-      <div className="be-exc-f">
-        <InfoNote ico="shield" short={<>None of these was scored.</>}>
-          They all failed <b>stage 1</b>, and <b>a hard failure is not a low score</b> — no score,
-          however high, can put an excluded business back in the pool. Each reason names something an
-          operator can act on: a lapsed subscription is a renewal call, "at capacity" is a capacity
-          conversation, a wrong service area is a profile-data conversation.
-        </InfoNote>
-      </div>
+
+      {run.excluded.length ? (
+        <ul className="flex flex-col divide-y divide-border-secondary rounded-lg bg-secondary px-3">
+          {run.excluded.map((x) => (
+            <li key={x.businessId} className="flex items-start gap-2.5 py-2.5">
+              <Icon name="xcircle" size="sm" className="mt-0.5 shrink-0 text-fg-error-primary" />
+              <div className="min-w-0 flex-1">
+                <div className="text-sm font-medium text-primary">{x.name}</div>
+                <div className="text-xs text-tertiary">{x.reason}</div>
+              </div>
+              <Tag label={x.stage} tone="neutral" />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <PanelNote>The run excluded nobody — every subscribed business was still in the pool.</PanelNote>
+      )}
+
+      <InfoNote ico="shield" short={<>None of these was scored.</>}>
+        They all failed <b>stage 1</b>, and <b>a hard failure is not a low score</b> — no score,
+        however high, can put an excluded business back in the pool. Each reason names something an
+        operator can act on: a lapsed subscription is a renewal call, "at capacity" is a capacity
+        conversation, a wrong service area is a profile-data conversation.
+      </InfoNote>
     </div>
   );
 }
@@ -316,14 +310,15 @@ export function MatchSnapshot({ e, run }: { e: Enquiry; run: MatchRun | null }) 
     if (!top) return <EmptyState icon="search" title="No match snapshot yet"
       body="Nothing has been assigned, so nothing has been frozen. The candidate snapshot below is live and will be recalculated on the next matching run." />;
     return (
-      <>
+      <div className="flex flex-col gap-4">
         <InfoNote ico="alert" short={<><b>Live candidate row, not a snapshot.</b></>}>
           It is recalculated on every matching run and reflects today's profiles. It becomes history
           only at the moment of assignment.
         </InfoNote>
-        <SectionHead title={top.name} desc={"Rank 1 · score " + top.score + " · rule " + run!.ruleVersion} />
-        <FactorTable c={top} />
-      </>
+        <Card title={top.name} sub={"Rank 1 · score " + top.score + " · rule " + run!.ruleVersion} tight>
+          <FactorTable c={top} />
+        </Card>
+      </div>
     );
   }
 
@@ -335,17 +330,21 @@ export function MatchSnapshot({ e, run }: { e: Enquiry; run: MatchRun | null }) 
   };
 
   return (
-    <>
-      <SectionHead title={a.businessName}
-        desc={"Rank " + a.candidateRank + " of " + a.eligibleCount + " eligible · score " +
-          a.candidateScore + " · rule " + a.ruleVersion} />
-      <FactorTable c={asCandidate} />
+    <div className="flex flex-col gap-4">
+      <Card
+        title={a.businessName}
+        sub={"Rank " + a.candidateRank + " of " + a.eligibleCount + " eligible · score " +
+          a.candidateScore + " · rule " + a.ruleVersion}
+        tight
+      >
+        <FactorTable c={asCandidate} />
+      </Card>
       <InfoNote ico="lock" short={<><b>Copied onto the assignment, not referenced.</b></>}>
         {a.businessName} may change its categories tomorrow and the weight table may move past{" "}
-        <span className="mono">{RULES.ruleVersion}</span> next month. Either would silently rewrite the
+        <span className="font-mono">{RULES.ruleVersion}</span> next month. Either would silently rewrite the
         answer to <i>"why did this go there?"</i> if this block held references instead of values.
         Profile and weight changes affect <b>future</b> matching only.
       </InfoNote>
-    </>
+    </div>
   );
 }

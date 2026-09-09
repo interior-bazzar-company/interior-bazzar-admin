@@ -114,6 +114,7 @@ const check = (label, ok, detail) => {
     const ls = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
     return {
       theme: r.getAttribute("data-theme"),
+      cls: r.classList.contains("dark-mode"),
       pref: r.getAttribute("data-theme-pref"),
       scheme: r.getAttribute("data-scheme"),
       density: r.getAttribute("data-density"),
@@ -124,12 +125,12 @@ const check = (label, ok, detail) => {
     };
   });
 
-  if (await page.locator("aside.sidebar").count() === 0) {
+  if (await page.locator('aside[aria-label="Modules"]').count() === 0) {
     console.log("URL: " + page.url());
     console.log("ROOT: " + (await page.evaluate(() => document.getElementById("root").innerHTML)).slice(0, 900));
     console.log("ERRORS: " + errors.join(" | "));
   }
-  check("the shell rendered (sidebar present)", await page.locator("aside.sidebar").count() > 0);
+  check("the shell rendered (sidebar present)", await page.locator('aside[aria-label="Modules"]').count() > 0);
 
   /* THE MENU STAYS OPEN after a choice — a setting that saves on change has no
      reason to close the panel it lives in. So "open it" has to mean "open it if
@@ -137,7 +138,7 @@ const check = (label, ok, detail) => {
   const themeBtn = (v) => page.locator('[data-act="seg"][data-v="' + v + '"]');
   const openMenu = async () => {
     if (await themeBtn("light").count() === 0) {
-      await page.locator("button.sb-user").click();
+      await page.locator('[data-act="account"]').first().click();
       await wait(280);
     }
   };
@@ -161,12 +162,13 @@ const check = (label, ok, detail) => {
   await wait(350);
   const light = await paint();
   check("Light writes data-theme", light.theme === "light", light.theme);
+  check("Light drops the dark-mode class (the library's contract)", light.cls === false, String(light.cls));
   check("Light repaints the page", light.body !== boot.body, boot.body + " → " + light.body);
   check("Light is stored", light.stored === '"light"', String(light.stored));
   /* THE MENU ITSELF HAS TO SAY SO — see the note at the top of this file. */
   check("the switch itself follows the choice",
-    (await themeBtn("light").getAttribute("aria-checked")) === "true");
-  const hint = (await page.locator(".ap-hint").innerText()).trim();
+    (await themeBtn("light").getAttribute("aria-pressed")) === "true" || (await themeBtn("light").getAttribute("data-selected")) !== null);
+  const hint = (await page.locator("#themeHint").innerText()).trim();
   check("the menu's own line follows the choice", /ink on paper/i.test(hint), hint);
 
   await page.screenshot({ path: path.join(process.cwd(), ".tmp", "appearance", "account-menu.png") });
@@ -186,6 +188,7 @@ const check = (label, ok, detail) => {
   const dark = await paint();
   check("Dark repaints the page back", dark.theme === "dark" && dark.body !== light.body,
     light.body + " → " + dark.body);
+  check("Dark sets the dark-mode class", dark.cls === true, String(dark.cls));
 
   /* SYSTEM IS A PREFERENCE, NOT A THIRD THEME. It must record the preference
      and still resolve `data-theme` to one of the two, because the stylesheet

@@ -1,7 +1,7 @@
 /* =============================================================================
    Reports — #/reports
    -----------------------------------------------------------------------------
-     #/reports                       the record: one day, by member
+     #/reports                       the record: one day, member by member
      #/reports?face=actions          only the things blocked on a person
      #/reports?face=analytics        plans and EODs over a window
 
@@ -10,15 +10,17 @@
    person has not moved, and it carries a count so it can be read from the tab.
    Analytics is the shape of a fortnight.
 
-   THIS PAGE IS A SENIOR'S REVIEW SURFACE AND IT ONLY READS. Writing your own
-   plan and your own EOD moved to `/team/:id/reports`, where a member's records
-   already live — two write controls on a screen that is otherwise entirely a
-   read made the page answer to two different people at once.
+   THE DAY IS A READ, NOT A TABLE. A row of eight columns answers "did they
+   submit" and nothing else; what a senior actually opens this for is the DIFF —
+   what somebody said they would do against what came back — and that is a
+   paragraph beside a paragraph, not two cells a screen apart. So the record is
+   a card per member in a two-column read, with the clock, the plan and the EOD
+   stacked in the order they happened.
 
-   TWO FORMS AND ONE REVIEW, over the same records. A plan line CREATES OR LINKS
-   a work item, and ticking that line in the EOD COMPLETES it — so "what they
-   said they would do" and "what they did" is a diff rather than two paragraphs
-   somebody has to compare by eye.
+   THIS PAGE IS A SENIOR'S REVIEW SURFACE AND IT ONLY READS. Writing your own
+   plan and your own EOD lives at `/team/:id/reports`, where a member's records
+   already are — two write controls on a screen that is otherwise entirely a
+   read made the page answer to two different people at once.
 
    THE HOURS ARE READ, NEVER TYPED. The EOD shows the attendance row and offers
    no field for it. A report that lets a person type their own hours is not a
@@ -31,24 +33,36 @@
    NO API YET — src/content/team/{plans,reports}.json through store.ts.
    ============================================================================= */
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { useSearchParams } from "react-router-dom";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
-import { Icon, Notice, qs, SectionHead, StatStrip, Table, Tabs, TbTitle, Tiles } from "../../ui";
-import { go } from "../../ui/nav";
+import {
+  Alert, Button, Card, ChartFrame, DateInput, EmptyState, Icon, IconButton, ListTable, PageHeader,
+  Pill, Rail, SectionHead, Segmented, StatStrip, Tabs, TbTitle, Tiles, qs,
+} from "../../ui";
 import type { StatCell } from "../../ui";
+import { ColumnChart } from "../charts";
+import { go } from "../../ui/nav";
 import {
   TODAY, acknowledgeReport, addDays, attentionOf, clampDay, fmtDate, fmtDayName, fmtHM, fmtTime,
-  meId, pendingLeave, readMember, reportSpanDays, reportSpanRows, reportSpanTotals, scopeOf,
-  unopenedAgreements, useAgreements, useLeave, useReports, useReview,
+  meId, pendingLeave, readMember, reportSpanDays, reportSpanRows, reportSpanTotals, scopeLabel,
+  scopeOf, unopenedAgreements, useAgreements, useLeave, useReports, useReview,
 } from "./store";
-import type { ReportSpanRow, ReviewRow, WorkItem } from "./store";
+import type { ReportSpanRow, ReviewRow, Scope, WorkItem } from "./store";
 import { Meter, StatePill, Who } from "./bits";
-import { MarksBlock, TasksBlock } from "./workBits";
+import { MarksBlock, SortHead, TasksBlock } from "./workBits";
 import { ensureAdopted } from "./adopt";
-import "./team.css";
 
 const ROUTE = "#/reports";
+
+/* ORDER IS URGENCY. The record is what the page is for, Actions is the only tab
+   that can be waiting on the reader, and the shape of a fortnight comes last. */
+const FACES = [
+  { k: "reports", label: "Day", icon: "doc" },
+  { k: "actions", label: "Actions", icon: "inbox" },
+  { k: "analytics", label: "Analytics", icon: "chart" },
+];
 
 export default function Reports() {
   const [sp] = useSearchParams();
@@ -58,7 +72,12 @@ export default function Reports() {
     return o;
   }, [sp]);
 
-  const face = FACES.some((f) => f.k === p.face) ? (p.face as string) : "reports";
+  /* `?face=` is the parameter this page has always written. `?tab=` is read as
+     an alias and never written back, so a link typed with the panel's other
+     spelling still lands on the right face instead of silently opening the
+     record. */
+  const asked = p.face || p.tab || "";
+  const face = FACES.some((f) => f.k === asked) ? asked : "reports";
   const date = clampDay(p.date);
   const scope = scopeOf("reports");
   const rows = useReview(date, scope);
@@ -69,6 +88,7 @@ export default function Reports() {
 
   const goto = useCallback((patch: Record<string, string | undefined>) => {
     const next: Record<string, string> = { ...p };
+    delete next.tab;
     Object.keys(patch).forEach((k) => {
       const v = patch[k];
       if (v) next[k] = v; else delete next[k];
@@ -82,24 +102,33 @@ export default function Reports() {
   const pending = a.noPlan.length + a.noEod.length + a.unacknowledged.length
     + pendingLeave(scope).length + unopenedAgreements(scope).length;
 
+  const bar = <DateBar date={date} onPick={(d) => goto({ date: d === TODAY ? undefined : d })} />;
+
   return (
-    <div className="dls">
-      {/* THE DAY SITS WITH THE TABS. It scopes the whole page — the record,
-          the queue and the window all read the same day — so it belongs beside
-          what it scopes rather than in a toolbar under one of them. */}
-      <div className="dls-chips tm-tabrow">
-        <Tabs cur={face}
-          items={FACES.map((f) => ({ k: f.k, label: f.label, icon: f.icon,
-            n: f.k === "actions" ? pending : undefined }))}
-          onPick={(k) => goto({ face: k === "reports" ? undefined : k })} />
-        <span className="spacer" />
-        {face === "analytics" ? null : (
-          <DateNav date={date} onPick={(d) => goto({ date: d === TODAY ? undefined : d })} />
-        )}
-      </div>
+    <div className="flex flex-col gap-4">
+      <PageHeader
+        title="Reports"
+        meta={
+          <>
+            <span className="font-medium text-secondary">{fmtDayName(date)} · {fmtDate(date)}</span>
+            <span>{scopeLabel(scope, rows.length)}</span>
+            {date === TODAY ? <Pill xs dot tone="live" text="today" /> : null}
+          </>
+        }
+        /* THE DAY SCOPES THE WHOLE PAGE — the record, the queue and the
+           window all read it — so it sits in the header beside the title
+           rather than inside one face's own toolbar. Analytics reads a
+           window instead and carries its own control. */
+        actions={face === "analytics" ? undefined : bar}
+        tabs={
+          <Tabs cur={face}
+            items={FACES.map((f) => ({ k: f.k, label: f.label, icon: f.icon,
+              n: f.k === "actions" ? pending : undefined }))}
+            onPick={(k) => goto({ face: k === "reports" ? undefined : k })} />
+        }
+      />
 
       {face === "reports" ? <TheDay rows={rows} /> : null}
-
       {face === "actions" ? <Actions rows={rows} /> : null}
       {face === "analytics" ? (
         <Analytics scope={scope} span={p.span || "7"}
@@ -109,31 +138,20 @@ export default function Reports() {
   );
 }
 
-/* ORDER IS URGENCY. The record is what the page is for, Actions is the only tab
-   that can be waiting on the reader, and the shape of a fortnight comes last. */
-const FACES = [
-  { k: "reports", label: "Reports", icon: "doc" },
-  { k: "actions", label: "Actions", icon: "inbox" },
-  { k: "analytics", label: "Analytics", icon: "chart" },
-];
-
-/** Step a day, or pick one. Same control as the attendance toolbar, and `max`
+/** Step a day, or pick one. Same control as the attendance date bar, and `max`
  *  is what refuses a future date rather than a disabled button somebody routes
  *  around by typing the URL. */
-function DateNav({ date, onPick }: { date: string; onPick: (d: string) => void }) {
+function DateBar({ date, onPick }: { date: string; onPick: (d: string) => void }) {
   return (
-    <div className="tm-datenav">
-      <button className="btn icon sm" aria-label="Previous day" onClick={() => onPick(addDays(date, -1))}>
-        <Icon name="chevl" size="sm" />
-      </button>
-      <input type="date" className="inp sm tm-datef" value={date} max={TODAY}
-        aria-label="Show this day"
-        onChange={(e) => { if (e.target.value && e.target.value <= TODAY) onPick(e.target.value); }} />
-      <button className="btn icon sm" aria-label="Next day" disabled={date >= TODAY}
-        onClick={() => onPick(addDays(date, 1))}>
-        <Icon name="chevr" size="sm" />
-      </button>
-      <button className="btn sm" disabled={date === TODAY} onClick={() => onPick(TODAY)}>Today</button>
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center gap-1">
+        <IconButton ico="chevl" color="secondary" label="Previous day" onClick={() => onPick(addDays(date, -1))} />
+        <DateInput value={date} max={TODAY} ariaLabel="Show this day"
+          onChange={(v) => { if (v && v <= TODAY) onPick(v); }} />
+        <IconButton ico="chevr" color="secondary" label="Next day" isDisabled={date >= TODAY}
+          onClick={() => onPick(addDays(date, 1))} />
+      </div>
+      <Button color="secondary" isDisabled={date === TODAY} onClick={() => onPick(TODAY)}>Today</Button>
     </div>
   );
 }
@@ -141,102 +159,174 @@ function DateNav({ date, onPick }: { date: string; onPick: (d: string) => void }
 /* -------------------------------------------------------------- the day --- */
 
 /** THE RECORD, for one day. Who was in, what they said they would do, and what
- *  came back. The two blocks that used to sit on top of it — the attention
- *  cards and "waiting on you" — are the Actions tab now: they are things to DO,
- *  and burying them above a table is how a queue gets missed. */
+ *  came back — one card per person, read down rather than across. The attention
+ *  cards and "waiting on you" are the Actions tab: they are things to DO, and
+ *  burying them above a table is how a queue gets missed. */
 function TheDay({ rows }: { rows: ReviewRow[] }) {
-  const shell = useShell();
   const a = attentionOf(rows);
   const cells: (StatCell | "sep")[] = [
     { k: "in scope", v: rows.length },
     "sep",
-    { k: "no plan", v: a.noPlan.length, dot: a.noPlan.length ? "warn" : "" },
-    { k: "EOD due", v: a.noEod.length, dot: a.noEod.length ? "warn" : "" },
+    { k: "no plan", v: a.noPlan.length, dot: a.noPlan.length ? "warn" : "neutral" },
+    { k: "EOD due", v: a.noEod.length, dot: a.noEod.length ? "warn" : "neutral" },
     "sep",
-    { k: "overdue", v: a.delayed.length, dot: a.delayed.length ? "warn" : "" },
-    { k: "waiting", v: a.waiting.length, dot: a.waiting.length ? "bad" : "" },
+    { k: "overdue", v: a.delayed.length, dot: a.delayed.length ? "warn" : "neutral" },
+    { k: "waiting", v: a.waiting.length, dot: a.waiting.length ? "bad" : "neutral" },
     "sep",
-    { k: "late or absent", v: a.lateOrAbsent.length, dot: a.lateOrAbsent.length ? "warn" : "" },
+    { k: "late or absent", v: a.lateOrAbsent.length, dot: a.lateOrAbsent.length ? "warn" : "neutral" },
     { k: "on leave", v: rows.filter((r) => r.state === "on_leave").length, dot: "info" },
-    { k: "unread reports", v: a.unacknowledged.length, dot: a.unacknowledged.length ? "info" : "" },
+    { k: "unread reports", v: a.unacknowledged.length, dot: a.unacknowledged.length ? "info" : "neutral" },
   ];
 
   return (
     <>
       <StatStrip cells={cells} />
-      {/* `tm-pane` because the strip below the tabs ends in a rule and `.dls-body`
-          carries no top padding by design — without it the table's header sits
-          directly on that line and the two read as one welded band. */}
-      <div className="dls-body tm-pane">
-        {/* No heading and no banner. The tab says Reports, the date sits beside
-            it, and the strip above counts the rows — a title repeating all
-            three, over a table whose columns are already labelled, is a line
-            nobody reads twice. The count of what needs moving lives on the
-            Actions tab, which carries it as a badge. */}
-        <Table list
-          scroll min="1040px"
-          cols={[
-            { label: "", w: "3px" },
-            { label: "Member" },
-            { label: "In", w: "92px" },
-            { label: "Worked", cls: "n", w: "92px" },
-            { label: "Plan", cls: "c", w: "80px" },
-            { label: "Doing now", w: "220px" },
-            { label: "Done", cls: "c", w: "80px" },
-            { label: "EOD", w: "150px" },
-          ]}
-          empty={{ icon: "users", title: "Nobody in scope", body: "You see yourself and the members whose reporting line points at you." }}
-          rows={rows.map((r) => {
-            const rail = r.state === "absent" ? "u-bad"
-              : (r.day && r.day.isLate) || r.delayed || r.waiting ? "u-warn" : "";
-            return (
-              <tr key={r.member.memberId} className={rail}>
-                <td className="rail"><i className={rail} /></td>
-                <td>
-                  <Who m={r.member} />
-                  {r.delayed || r.waiting ? (
-                    <span className="cell-2">
-                      {r.delayed ? r.delayed + " overdue" : null}
-                      {r.delayed && r.waiting ? " · " : null}
-                      {r.waiting ? r.waiting + " waiting" : null}
-                    </span>
-                  ) : null}
-                </td>
-                <td className="tnum">
-                  {r.day ? fmtTime(r.day.startedAt) : <StatePill state={r.state} />}
-                  {r.day && r.day.isLate ? <b className="tm-late">late</b> : null}
-                </td>
-                <td className="n tnum">{r.worked != null ? fmtHM(r.worked) : "—"}</td>
-                <td className="c">
-                  {r.plan && r.plan.submittedAt
-                    ? <span className="pill ok xs" title={"Submitted " + fmtTime(r.plan.submittedAt)}>{r.plan.lines.length}</span>
-                    : r.plan
-                      ? <span className="pill xs" title="Started and not submitted">draft</span>
-                      : <span className="pill warn xs">—</span>}
-                </td>
-                <td>{r.doing
-                  ? <a data-go={"#/work?item=" + r.doing.itemId} className="tm-doing"
-                      onClick={() => openWork((r.doing as WorkItem).itemId)}>{r.doing.title}</a>
-                  : <span className="dim">—</span>}</td>
-                <td className="c tnum">{r.planned ? r.done + "/" + r.planned : "—"}</td>
-                <td>
-                  {r.report && r.report.submittedAt ? (
-                    r.report.acknowledgedById
-                      ? <span className="pill ok xs">read</span>
-                      : <button className="btn sm" onClick={() => {
-                        const res = acknowledgeReport((r.report as { reportId: string }).reportId);
-                        shell.toast(res.ok ? "Marked read" : res.message, res.ok ? undefined : "bad");
-                      }}>Mark read</button>
-                  ) : r.eodDue
-                    ? <span className="pill warn xs">outstanding</span>
-                    : <span className="dim">not due yet</span>}
-                </td>
-              </tr>
-            );
-          })}
-        />
-      </div>
+
+      {rows.length ? (
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          {rows.map((r) => <ReviewCard key={r.member.memberId} r={r} />)}
+        </div>
+      ) : (
+        <EmptyState icon="users" title="Nobody in scope"
+          body="You see yourself and the members whose reporting line points at you." />
+      )}
     </>
+  );
+}
+
+/** ONE PERSON'S DAY. The clock, then the plan, then what came back — in the
+ *  order it happened, so the card is read top to bottom rather than compared
+ *  cell by cell against the row above it. */
+function ReviewCard({ r }: { r: ReviewRow }) {
+  const shell = useShell();
+  const plan = r.plan;
+  const rep = r.report;
+  const late = !!(r.day && r.day.isLate);
+
+  return (
+    <Card tight
+      title={<Who m={r.member} />}
+      right={
+        <span className="flex flex-wrap items-center justify-end gap-1.5">
+          {r.delayed ? <Pill xs tone="warn" text={r.delayed + " overdue"} /> : null}
+          {r.waiting ? <Pill xs tone="bad" text={r.waiting + " waiting"} /> : null}
+          <StatePill state={r.state} />
+        </span>
+      }
+      foot={
+        <span className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="label-mono">In</span>
+            <b className="font-mono font-medium text-secondary tnum">
+              {r.day ? fmtTime(r.day.startedAt) : "—"}
+            </b>
+            {late ? <Pill xs tone="warn" text="late" /> : null}
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="label-mono">Worked</span>
+            <b className="font-mono font-medium text-secondary tnum">
+              {r.worked != null ? fmtHM(r.worked) : "—"}
+            </b>
+          </span>
+          {r.doing ? (
+            <button type="button"
+              className="ml-auto inline-flex min-w-0 max-w-full cursor-pointer items-center gap-1.5 rounded text-brand-secondary outline-focus-ring hover:underline focus-visible:outline-2 focus-visible:outline-offset-2"
+              data-go={"#/work?item=" + r.doing.itemId}
+              onClick={() => openWork((r.doing as WorkItem).itemId)}>
+              <span className="label-mono">Doing now</span>
+              <span className="min-w-0 truncate font-medium">{r.doing.title}</span>
+            </button>
+          ) : null}
+        </span>
+      }
+    >
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <section className="flex min-w-0 flex-col gap-2">
+          <header className="flex items-center gap-2">
+            <h4 className="label-mono">Plan</h4>
+            {plan && plan.submittedAt
+              ? <Pill xs dot tone="ok" text={"in " + fmtTime(plan.submittedAt)} />
+              : plan
+                ? <Pill xs dot tone="neutral" text="draft" title="Started and not submitted" />
+                : <Pill xs dot tone="warn" text="not submitted" />}
+            {r.planned ? (
+              <span className="ml-auto text-xs font-medium text-secondary tnum">{r.done}/{r.planned} done</span>
+            ) : null}
+          </header>
+          {plan && plan.lines.length ? (
+            <>
+              <ol className="flex flex-col gap-1">
+                {plan.lines.slice(0, 5).map((l) => {
+                  const it = r.items.filter((i) => i.itemId === l.workItemId)[0];
+                  const done = !!it && it.status === "completed";
+                  return (
+                    <li key={l.lineId} className="flex items-start gap-2 text-sm">
+                      <span aria-hidden="true"
+                        className={done
+                          ? "mt-0.5 flex size-4 shrink-0 items-center justify-center rounded bg-brand-solid ring-1 ring-brand-solid ring-inset"
+                          : "mt-0.5 size-4 shrink-0 rounded bg-primary ring-1 ring-primary ring-inset"}>
+                        {done ? <Icon name="check" size="xs" className="text-white" /> : null}
+                      </span>
+                      <span className={done ? "min-w-0 text-quaternary line-through" : "min-w-0 text-secondary"}>{l.title}</span>
+                    </li>
+                  );
+                })}
+              </ol>
+              {plan.lines.length > 5 ? (
+                <p className="text-xs text-quaternary">+{plan.lines.length - 5} more lines</p>
+              ) : null}
+              {r.planned ? <Meter value={r.done} of={r.planned} tone={r.done === r.planned ? "ok" : undefined} /> : null}
+            </>
+          ) : (
+            <p className="text-sm text-quaternary">
+              {plan ? "Started, nothing written yet." : "Nothing planned for this day."}
+            </p>
+          )}
+        </section>
+
+        <section className="flex min-w-0 flex-col gap-2">
+          <header className="flex items-center gap-2">
+            <h4 className="label-mono">End of day</h4>
+            {rep && rep.submittedAt
+              ? rep.acknowledgedById
+                ? <Pill xs dot tone="ok" text="read" />
+                : <Pill xs dot tone="info" text="unread" />
+              : r.eodDue
+                ? <Pill xs dot tone="warn" text="outstanding" />
+                : <Pill xs dot tone="neutral" text="not due yet" />}
+          </header>
+          {rep && rep.submittedAt ? (
+            <>
+              {rep.achievement ? <p className="text-sm text-secondary">{rep.achievement}</p> : null}
+              {rep.blockers ? (
+                <p className="text-sm text-warning-primary">
+                  <span className="label-mono mr-1.5">Blocked</span>{rep.blockers}
+                </p>
+              ) : null}
+              {rep.tomorrowPriority ? (
+                <p className="text-sm text-tertiary">
+                  <span className="label-mono mr-1.5">Tomorrow</span>{rep.tomorrowPriority}
+                </p>
+              ) : null}
+              {rep.acknowledgedById ? null : (
+                <div className="mt-auto pt-1">
+                  <Button color="secondary" size="xs" ico="eye" onClick={() => {
+                    const res = acknowledgeReport(rep.reportId);
+                    shell.toast(res.ok ? "Marked read" : res.message, res.ok ? undefined : "bad");
+                  }}>Mark read</Button>
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-quaternary">
+              {r.eodDue
+                ? "Their day is over and nothing has come back."
+                : "Counted only once that member's own day is over."}
+            </p>
+          )}
+        </section>
+      </div>
+    </Card>
   );
 }
 
@@ -244,92 +334,126 @@ const openWork = (id: string) => go("#/work" + qs({ item: id }));
 
 /* ------------------------------------------------------------- actions --- */
 
-/** ONLY THE THINGS BLOCKED ON A PERSON. Every card is one query rather than a
- *  feed, and the tab carries the count so an empty queue does not have to be
- *  opened to be discovered empty.
+interface ActionRow {
+  key: string;
+  kind: string;
+  tone: "warn" | "bad" | "info";
+  what: ReactNode;
+  why: ReactNode;
+  act?: ReactNode;
+}
+
+/** ONE QUEUE, NOT SIX CARDS. Every entry is a filter over the same rows the Day
+ *  tab reads — a count and the list it opens cannot disagree — and every entry
+ *  carries the one control that clears it, so the tab is a place work leaves
+ *  from rather than a place it is announced.
  *
  *  It renders its own empty state rather than nothing: a tab that draws a blank
  *  page reads as broken, and "nothing needs you" is a genuinely useful sentence
  *  at five in the afternoon. */
 function Actions({ rows }: { rows: ReviewRow[] }) {
-  const a = attentionOf(rows);
-  const anything = a.noPlan.length || a.noEod.length || a.delayed.length
-    || a.waiting.length || a.lateOrAbsent.length || a.unacknowledged.length;
-
-  return (
-    <div className="dls-body tm-pane">
-      <SectionHead title="Needs attention"
-        desc="Each card is a filter over the same rows the Reports tab lists — a count and the list it opens cannot disagree." />
-      {anything ? (
-        <div className="tm-attn">
-          <AttnCard title="No plan submitted" tone="warn"
-            names={a.noPlan.map((r) => r.member.name)}
-            note="Anybody with no reporting line is excluded — a number that always shows the founder delinquent is one people learn to ignore." />
-          <AttnCard title="EOD outstanding" tone="warn"
-            names={a.noEod.map((r) => r.member.name)}
-            note="Counted only once that member's own day is over." />
-          <AttnCard title="Overdue work" tone="warn"
-            names={a.delayed.map((i) => i.title)} to="#/work?status=delayed" />
-          <AttnCard title="Waiting on another item" tone="bad"
-            names={a.waiting.map((i: WorkItem) => i.title)} to="#/work?wait=1" />
-          <AttnCard title="Late or absent" tone="warn"
-            names={a.lateOrAbsent.map((r) => r.member.name)} to="#/attendance" />
-          <AttnCard title="Reports nobody has read" tone="info"
-            names={a.unacknowledged.map((r) => r.member.name)}
-            note="A report nobody read is worse than one nobody wrote — the person who wrote it believes it was read." />
-        </div>
-      ) : (
-        <Notice tone="ok" ico="check" text="Nothing needs you. Every plan is in, no work is overdue or blocked, and every report has been read." />
-      )}
-
-      <WaitingOnYou rows={rows} />
-    </div>
-  );
-}
-
-/** §3.12 — not the work, the things only THIS reader can move: a leave request
- *  waits for a decision, a submitted EOD waits to be read, a sent agreement
- *  waits to be opened. Renders only when something is in it. */
-function WaitingOnYou({ rows }: { rows: ReviewRow[] }) {
+  const shell = useShell();
   useLeave(); useAgreements();
   const scope = scopeOf("reports");
+  const a = attentionOf(rows);
   const leave = pendingLeave(scope);
-  const unread = rows.filter((r) => r.report && r.report.submittedAt && !r.report.acknowledgedById);
   const unopened = unopenedAgreements(scope);
-  if (!leave.length && !unread.length && !unopened.length) return null;
+
+  const list: ActionRow[] = [];
+
+  leave.forEach((l) => list.push({
+    key: "lv" + l.leaveId, kind: "Leave", tone: "warn",
+    what: readMember(l.memberId)?.name || l.memberId,
+    why: <>Undecided from {fmtDate(l.fromDate)} — those days read as absent until you answer.</>,
+    act: <Button color="secondary" size="xs" onClick={() => go("#/attendance?face=requests")}>Decide</Button>,
+  }));
+
+  a.unacknowledged.forEach((r) => list.push({
+    key: "un" + r.member.memberId, kind: "Unread EOD", tone: "info",
+    what: r.member.name,
+    why: "A report nobody read is worse than one nobody wrote — the person who wrote it believes it was read.",
+    act: (
+      <Button color="secondary" size="xs" ico="eye" onClick={() => {
+        const res = acknowledgeReport((r.report as { reportId: string }).reportId);
+        shell.toast(res.ok ? "Marked read" : res.message, res.ok ? undefined : "bad");
+      }}>Mark read</Button>
+    ),
+  }));
+
+  a.noEod.forEach((r) => list.push({
+    key: "eo" + r.member.memberId, kind: "EOD due", tone: "warn",
+    what: r.member.name, why: "Their day is over and nothing has come back.",
+    act: <Button color="tertiary" size="xs" onClick={() => go("#/team/" + r.member.memberId + "/reports")}>Open</Button>,
+  }));
+
+  a.noPlan.forEach((r) => list.push({
+    key: "np" + r.member.memberId, kind: "No plan", tone: "warn",
+    what: r.member.name,
+    why: "Anybody with no reporting line is excluded — a number that always shows the founder delinquent is one people learn to ignore.",
+    act: <Button color="tertiary" size="xs" onClick={() => go("#/team/" + r.member.memberId + "/reports")}>Open</Button>,
+  }));
+
+  a.waiting.forEach((i) => list.push({
+    key: "wt" + i.itemId, kind: "Waiting", tone: "bad",
+    what: i.title, why: <>Blocked on another item · {readMember(i.assigneeId)?.name || i.assigneeId}</>,
+    act: <Button color="tertiary" size="xs" onClick={() => openWork(i.itemId)}>Open</Button>,
+  }));
+
+  a.delayed.forEach((i) => list.push({
+    key: "dl" + i.itemId, kind: "Overdue", tone: "warn",
+    what: i.title,
+    why: <>Due {fmtDate(i.dueDate)} · {readMember(i.assigneeId)?.name || i.assigneeId}</>,
+    act: <Button color="tertiary" size="xs" onClick={() => openWork(i.itemId)}>Open</Button>,
+  }));
+
+  a.lateOrAbsent.forEach((r) => list.push({
+    key: "la" + r.member.memberId, kind: "Attendance", tone: "warn",
+    what: r.member.name,
+    why: r.state === "absent" ? "No record for this day at all." : "In late against their own start time.",
+    act: <Button color="tertiary" size="xs" onClick={() => go("#/attendance")}>Open</Button>,
+  }));
+
+  unopened.forEach((ag) => list.push({
+    key: "ag" + ag.agreementId, kind: "Agreement", tone: "warn",
+    what: ag.title, why: <>Sent to {readMember(ag.memberId)?.name || ag.memberId} and never opened.</>,
+    act: (
+      <Button color="tertiary" size="xs"
+        onClick={() => go("#/team/" + ag.memberId + "?tab=documents")}>Open</Button>
+    ),
+  }));
+
   return (
     <>
-      <SectionHead title="Waiting on you" desc="Not the work — the things only you can move." />
-      <div className="tm-attn">
-        {leave.length ? (
-          <div className="tm-attn-c warn">
-            <b>{leave.length} leave request{leave.length > 1 ? "s" : ""}</b>
-            <ul>{leave.slice(0, 4).map((l) => (
-              <li key={l.leaveId}>{readMember(l.memberId)?.name || l.memberId} · {fmtDate(l.fromDate)}</li>
-            ))}</ul>
-            <a data-go="#/attendance" onClick={() => go("#/attendance")}>Decide →</a>
-          </div>
-        ) : null}
-        {unread.length ? (
-          <div className="tm-attn-c info">
-            <b>{unread.length} EOD{unread.length > 1 ? "s" : ""} to read</b>
-            <ul>{unread.slice(0, 4).map((r) => <li key={r.member.memberId}>{r.member.name}</li>)}</ul>
-            <span className="tm-attn-n">Mark read on the table below — the writer believes it was read.</span>
-          </div>
-        ) : null}
-        {unopened.length ? (
-          <div className="tm-attn-c warn">
-            <b>{unopened.length} agreement{unopened.length > 1 ? "s" : ""} never opened</b>
-            <ul>{unopened.slice(0, 4).map((a) => (
-              <li key={a.agreementId}>
-                <a data-go={"#/team/" + a.memberId + "?tab=documents"}
-                  onClick={() => go("#/team/" + a.memberId + "?tab=documents")}>
-                  {readMember(a.memberId)?.name || a.memberId}</a> · {a.title}
-              </li>
-            ))}</ul>
-          </div>
-        ) : null}
-      </div>
+      <SectionHead className="mb-0" title="Needs a person"
+        desc="Not the work — the things that have stopped because somebody has not moved." />
+
+      {list.length ? (
+        <ListTable min="880px"
+          head={
+            <tr>
+              <th className="rail" />
+              <th>What</th>
+              <th>Kind</th>
+              <th>Why it is here</th>
+              <th className="acts" />
+            </tr>
+          }>
+          {list.map((r) => (
+            <tr key={r.key}>
+              <Rail tone={r.tone} />
+              <td className="cell-1">{r.what}</td>
+              <td><Pill xs dot tone={r.tone} text={r.kind} /></td>
+              <td><span className="block max-w-lg text-tertiary">{r.why}</span></td>
+              <td className="acts">{r.act}</td>
+            </tr>
+          ))}
+        </ListTable>
+      ) : (
+        <Alert tone="ok" ico="check" title="Nothing needs you">
+          Every plan is in, no work is overdue or blocked, every report has been read, and no
+          request is waiting on a decision.
+        </Alert>
+      )}
     </>
   );
 }
@@ -352,7 +476,7 @@ const SPANS = [{ v: "7", l: "7 days" }, { v: "14", l: "14 days" }, { v: "30", l:
  *  level wider, and it was on the day view — where it sat between a table of
  *  who submitted what and a queue of things to approve, belonging to neither. */
 function Analytics({ scope, span, onSpan }: {
-  scope: ReturnType<typeof scopeOf>; span: string; onSpan: (v: string) => void;
+  scope: Scope; span: string; onSpan: (v: string) => void;
 }) {
   useReports();
   const [sort, setSort] = useState("eods");
@@ -375,155 +499,129 @@ function Analytics({ scope, span, onSpan }: {
   const sorted = rows.slice().sort((a, b) =>
     (sort === "name" ? 0 : rank(b) - rank(a)) || a.member.name.localeCompare(b.member.name));
 
-  const col = (k: string, label: string, w?: string) => ({
-    label: (
-      <button className={"tm-sort" + (sort === k ? " on" : "")} onClick={() => setSort(k)}
-        aria-pressed={sort === k}>
-        {label}{sort === k ? <Icon name="chev" size="sm" /> : null}
-      </button>
-    ),
-    cls: k === "name" ? "" : "n",
-    w,
-  });
-
   return (
     <>
-      <div className="dls-cmd">
-        <span className="btn-group">
-          {SPANS.map((o) => (
-            <button key={o.v} className={span === o.v ? "on" : ""} onClick={() => onSpan(o.v)}>{o.l}</button>
-          ))}
+      <div className="flex flex-wrap items-center gap-3">
+        <Segmented sm label="Window" value={span} onPick={onSpan}
+          options={SPANS.map((o) => ({ v: o.v, l: o.l }))} />
+        <span className="text-sm text-tertiary">
+          {fmtDate(from)} to {fmtDate(TODAY)} · weekends excluded
         </span>
-        <span className="dim">{fmtDate(from)} to {fmtDate(TODAY)} · weekends excluded</span>
-        <span className="spacer" />
       </div>
 
-      <div className="dls-body">
-        <Tiles list={[
-          {
-            k: "Plans in", v: t.planPct === null ? "\u2014" : t.planPct + "%",
-            s: t.plans + " of " + t.days + " owed",
-            tone: t.planPct !== null && t.planPct < 70 ? "warn" : "",
-          },
-          {
-            k: "Reports in", v: t.eodPct === null ? "\u2014" : t.eodPct + "%",
-            s: t.eods + " of " + t.eodsDue + " due",
-            tone: t.eodPct !== null && t.eodPct < 70 ? "warn" : "",
-          },
-          {
-            k: "Nobody read", v: String(t.unread),
-            s: t.eods ? "of " + t.eods + " submitted" : "nothing submitted",
-            tone: t.unread ? "warn" : "",
-          },
-          {
-            k: "Planned, then done", v: t.keptPct === null ? "\u2014" : t.keptPct + "%",
-            s: t.done + " of " + t.planned + " lines",
-          },
-        ]} />
+      <Tiles list={[
+        {
+          k: "Plans in", v: t.planPct === null ? "—" : t.planPct + "%",
+          s: t.plans + " of " + t.days + " owed",
+          tone: t.planPct !== null && t.planPct < 70 ? "warn" : "",
+        },
+        {
+          k: "Reports in", v: t.eodPct === null ? "—" : t.eodPct + "%",
+          s: t.eods + " of " + t.eodsDue + " due",
+          tone: t.eodPct !== null && t.eodPct < 70 ? "warn" : "",
+        },
+        {
+          k: "Nobody read", v: String(t.unread),
+          s: t.eods ? "of " + t.eods + " submitted" : "nothing submitted",
+          tone: t.unread ? "warn" : "",
+        },
+        {
+          k: "Planned, then done", v: t.keptPct === null ? "—" : t.keptPct + "%",
+          s: t.done + " of " + t.planned + " lines",
+        },
+      ]} />
 
-        {t.unread ? (
-          <Notice tone="warn" ico="inbox" text={
-            <><b>{t.unread} report{t.unread > 1 ? "s" : ""} nobody has opened.</b> The person who
-              wrote each one believes it was read. That is the failure this number exists to
-              surface — it is the only one on the page that is nobody's fault but the reader's.</>
-          } />
-        ) : null}
+      {t.unread ? (
+        <Alert tone="warn" ico="inbox"
+          title={t.unread + " report" + (t.unread > 1 ? "s" : "") + " nobody has opened."}>
+          The person who wrote each one believes it was read. That is the failure this number
+          exists to surface — it is the only one on the page that is nobody's fault but the
+          reader's.
+        </Alert>
+      ) : null}
 
-        <SectionHead title="Day by day"
-          desc="Plans and reports against what was owed. A day with nothing owed — a weekend, or before anybody joined — is not drawn." />
-        <div className="tm-an-days">
-          <div className="tm-an-plot">
-            {daily.map((d) => {
-              const top = Math.max(1, d.owed, d.eodsDue);
-              return (
-                <span key={d.date} className={"tm-an-day" + (d.date === TODAY ? " today" : "")}>
-                  <span className="tm-an-pair" role="img"
-                    aria-label={fmtDate(d.date) + ": " + d.plans + " of " + d.owed + " plans, "
-                      + d.eods + " of " + d.eodsDue + " reports, " + d.unread + " unread"}>
-                    <i className="pl" style={{ height: (d.plans / top) * 100 + "%" }}
-                      title={d.plans + " of " + d.owed + " plans"} />
-                    <i className="eo" style={{ height: (d.eods / top) * 100 + "%" }}
-                      title={d.eods + " of " + d.eodsDue + " reports"} />
-                  </span>
-                  <b>{d.date.slice(8)}</b>
-                  <i>{fmtDayName(d.date).slice(0, 1)}</i>
-                </span>
-              );
-            })}
-          </div>
-          <span className="tm-an-key">
-            <span><i className="pl" />plan submitted</span>
-            <span><i className="eo" />report submitted</span>
-            <span className="dim">against what was owed that day</span>
-          </span>
-        </div>
+      <ChartFrame title="Day by day"
+        note="Plans and reports against what was owed. A day with nothing owed — a weekend, or before anybody joined — is not drawn.">
+        {daily.length ? (
+          <ColumnChart unit="submissions" height={220}
+            series={[{ key: "plans", label: "Plan submitted", slot: 1 }, { key: "eods", label: "Report submitted", slot: 2 }]}
+            points={daily.map((d) => ({
+              key: d.date,
+              label: d.date.slice(8) + " " + fmtDayName(d.date).slice(0, 1),
+              values: { plans: d.plans, eods: d.eods },
+            }))} />
+        ) : (
+          <EmptyState flat icon="calendar" title="Nothing was owed in this window" body="" />
+        )}
+      </ChartFrame>
 
-        <SectionHead title="Per member"
-          desc="Counts, and one ratio made of two of them. Every column sorts and nothing adds up to a rating." />
-        <Table list
-          scroll min="940px"
-          cols={[col("name", "Member"), col("plans", "Plans", "110px"), col("eods", "Reports", "120px"),
-            col("unread", "Unread", "110px"), col("planned", "Lines planned", "140px"),
-            col("done", "Done", "100px"), col("kept", "Of those planned", "200px")]}
-          empty={{ icon: "users", title: "Nobody in scope", body: "You see yourself and the members whose reporting line points at you." }}
-          rows={sorted.map((r) => (
+      <SectionHead title="Per member"
+        desc="Counts, and one ratio made of two of them. Every column sorts and nothing adds up to a rating." />
+      {sorted.length ? (
+        <ListTable min="980px"
+          head={
+            <tr>
+              <th><SortHead k="name" label="Member" cur={sort} onPick={setSort} /></th>
+              <th className="n"><SortHead k="plans" label="Plans" cur={sort} onPick={setSort} /></th>
+              <th className="n"><SortHead k="eods" label="Reports" cur={sort} onPick={setSort} /></th>
+              <th className="n"><SortHead k="unread" label="Unread" cur={sort} onPick={setSort} /></th>
+              <th className="n"><SortHead k="planned" label="Lines planned" cur={sort} onPick={setSort} /></th>
+              <th className="n"><SortHead k="done" label="Done" cur={sort} onPick={setSort} /></th>
+              <th><SortHead k="kept" label="Of those planned" cur={sort} onPick={setSort} /></th>
+            </tr>
+          }>
+          {sorted.map((r) => (
             <tr key={r.member.memberId}>
-              <td><Who m={r.member} /></td>
-              <td className="n tnum">
-                {r.days ? r.plans + " / " + r.days : <span className="dim">not owed</span>}
+              <td className="cell-1"><Who m={r.member} /></td>
+              <td className="n">
+                {r.days ? r.plans + " / " + r.days : <span className="text-quaternary">not owed</span>}
               </td>
-              <td className="n tnum">
-                {r.eodsDue ? r.eods + " / " + r.eodsDue : <span className="dim">not owed</span>}
+              <td className="n">
+                {r.eodsDue ? r.eods + " / " + r.eodsDue : <span className="text-quaternary">not owed</span>}
               </td>
-              <td className={"n tnum" + (r.unread ? " u-warn" : "")}>{r.unread || "\u2014"}</td>
-              <td className="n tnum">{r.planned || "\u2014"}</td>
-              <td className="n tnum">{r.done || "\u2014"}</td>
+              <td className="n">
+                <span className={r.unread ? "font-medium text-warning-primary" : undefined}>{r.unread || "—"}</span>
+              </td>
+              <td className="n">{r.planned || "—"}</td>
+              <td className="n">{r.done || "—"}</td>
               <td>
                 {r.planned
                   ? <Meter value={r.done} of={r.planned}
                       tone={r.done >= r.planned * 0.8 ? "ok" : r.done >= r.planned * 0.5 ? "info" : "warn"}
                       label={<>{r.done} of {r.planned}</>} />
-                  : <span className="dim">nothing planned</span>}
+                  : <span className="text-quaternary">nothing planned</span>}
               </td>
             </tr>
-          ))} />
+          ))}
+        </ListTable>
+      ) : (
+        <EmptyState icon="users" title="Nobody in scope"
+          body="You see yourself and the members whose reporting line points at you." />
+      )}
 
-        <Notice text={
-          "Anybody with no reporting line is owed nothing and reads as \u201cnot owed\u201d rather than as a "
-          + "failure \u2014 a figure that always shows the founder delinquent is a figure people stop reading. "
-          + "An EOD counts as due only once that member's own day is over."} />
+      <Alert tone="info">
+        Anybody with no reporting line is owed nothing and reads as “not owed” rather than as a
+        failure — a figure that always shows the founder delinquent is a figure people stop
+        reading. An EOD counts as due only once that member&rsquo;s own day is over.
+      </Alert>
 
-        <SectionHead title="Progress"
-          desc="The three blocks the calendar rail draws, one level wider — you and your reports. Derived from the children, never typed."
-          right={<button className="btn sm" onClick={() => go("#/work?face=timeline")}>
+      <SectionHead title="Progress" className="mt-2"
+        desc="The three blocks the calendar rail draws, one level wider — you and your reports. Derived from the children, never typed."
+        right={
+          <Button color="secondary" ico="timeline" onClick={() => go("#/work?face=timeline")}>
             Open the milestone timeline
-          </button>} />
-        <div className="tm-cols3 tm-gap-b">
-          <TasksBlock who={meId()} withTeam onOpen={openWork} />
-          <MarksBlock kind="milestone" who={meId()} onOpen={openWork} />
-          <MarksBlock kind="target" who={meId()} onOpen={openWork} />
-        </div>
+          </Button>
+        } />
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <TasksBlock who={meId()} withTeam onOpen={openWork} />
+        <MarksBlock kind="milestone" who={meId()} onOpen={openWork} />
+        <MarksBlock kind="target" who={meId()} onOpen={openWork} />
       </div>
     </>
   );
 }
 
-function AttnCard({ title, tone, names, note, to }: {
-  title: string; tone: string; names: string[]; note?: string; to?: string;
-}) {
-  if (!names.length) return null;
-  return (
-    <div className={"tm-attn-c " + tone}>
-      <b>{names.length} {title.toLowerCase()}</b>
-      <ul>{names.slice(0, 4).map((n, i) => <li key={i}>{n}</li>)}</ul>
-      {names.length > 4 ? <span className="dim">+{names.length - 4} more</span> : null}
-      {to ? <a data-go={to} onClick={() => go(to)}>Open →</a> : null}
-      {note ? <span className="tm-attn-n">{note}</span> : null}
-    </div>
-  );
-}
-
-/* The plan and the EOD forms are not here any more. They write a member's OWN
-   day, and this page is a senior's review surface — one screen answering to two
+/* The plan and the EOD forms are not here. They write a member's OWN day, and
+   this page is a senior's review surface — one screen answering to two
    different people. They live in member/reportForms.tsx and open as dialogs
    from `/team/:id/reports`, beside the records they write into. */

@@ -12,21 +12,28 @@
    it is the default sort for exactly that reason.
    ============================================================================= */
 import { useShell } from "../../shell/ShellContext";
-import { EmptyState, FilterChips, Icon, ListTable, Pagination, SearchField, Select, StatStrip } from "../../ui";
+import {
+  Button, DateRange, EmptyState, FilterChips, ListTable, MoreMenu, Pagination,
+  Rail, SearchField, Select, StatStrip, copyToClipboard,
+} from "../../ui";
 import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import { Frame } from "./Frame";
 import type { FaceProps } from "./Frame";
 import { ClassPill, Completeness, WhoCell } from "./bits";
 import {
-  CITIES, CLASSIFICATIONS, FILTER_LABELS, REGISTERED_RANGES,
+  CITIES, CLASSIFICATIONS, FILTER_LABELS, NOW, REGISTERED_RANGES,
   REGISTRATION_SOURCES, SORT_OPTIONS, TAGS, ago, applyFilters, applySort,
-  bandCounts, countsOf, filterValueLabel, fmtDate, paginate,
+  bandCounts, countsOf, filterValueLabel, fmtDate, paginate, primaryCityOf,
+  profileUrl,
 } from "./store";
-import type { UserRow } from "./store";
+import type { Params, UserRow } from "./store";
 
+/** Where the seed's clock stands. Every relative figure on this page is read
+ *  against it, so the page says so rather than implying "now". */
+const AS_OF = fmtDate(new Date(NOW).toISOString());
 
-export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, onPage }: FaceProps) {
+export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, onPage, onParams }: FaceProps) {
   const { toast } = useShell();
 
   const filtered = applyFilters(rows, p);
@@ -50,7 +57,7 @@ export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, 
     { k: "Active", v: c.active, dot: "ok", on: p.status === "active",
       to: hash(p, { status: off("status", "active") }),
       tip: <>The account works. It says nothing about whether they are paying — that is a Finance question, asked of the subscription that holds the money.</> },
-    { k: "Deactivated", v: c.deactivated, on: p.status === "deactivated",
+    { k: "Deactivated", v: c.deactivated, dot: "neutral", on: p.status === "deactivated",
       to: hash(p, { status: off("status", "deactivated") }),
       tip: <>Administratively disabled. Their profile, commercial links and audit trail are all still here.</> },
     "sep",
@@ -62,66 +69,74 @@ export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, 
   return (
     <Frame view="users" onView={onView} toast={toast}
       counts={bandCounts(rows)}
+      title="Users Management"
+      /* THE SCOPE, UNFILTERED ON PURPOSE: how big the base is and how much of
+         it is live must not change meaning because somebody narrowed the list
+         below them — which is exactly what would happen if they were counted
+         off the filtered set. */
+      meta={<>
+        <span><b className="font-medium text-secondary tnum">{c.total.toLocaleString("en-IN")}</b> registered</span>
+        <span><b className="font-medium text-secondary tnum">{c.active.toLocaleString("en-IN")}</b> active</span>
+        <span>as of {AS_OF}</span>
+      </>}
+      /* KEYED ON THEIR VALUE. SearchField and Select are uncontrolled, so
+         clearing a chip left the old text in the box and the old choice in the
+         dropdown — the pattern Audit and Invoices already use. */
+      search={<SearchField key={"q" + (p.q || "")} ph="Name, email, phone, user ID, business or reference…"
+        val={p.q} onFilter={onSearch} />}
       cmd={<>
-        {/* KEYED ON THEIR VALUE. SearchField and Select are uncontrolled, so
-            clearing a chip left the old text in the box and the old choice in
-            the dropdown — the pattern Audit and Invoices already use. */}
-        <SearchField key={"q" + (p.q || "")} ph="Name, email, phone, user ID, business or reference…"
-          val={p.q} onFilter={onSearch} />
         <Select key={"status" + (p.status || "")} name="status" label="Account" value={p.status} onFilter={onFilter}
-          options={CLASSIFICATIONS.map((x) => ({ v: x.key, l: x.label }))} />
+          options={CLASSIFICATIONS.map((x) => ({ v: x.key, l: x.label, dot: x.key === "active" ? "ok" : "neutral" }))} />
         <Select key={"city" + (p.city || "")} name="city" label="City" value={p.city} onFilter={onFilter}
           options={CITIES.map((x) => ({ v: x.key, l: x.label }))} />
         <Select key={"src" + (p.src || "")} name="src" label="Via" value={p.src} onFilter={onFilter}
           options={REGISTRATION_SOURCES.map((x) => ({ v: x.key, l: x.label }))} />
         <Select key={"tag" + (p.tag || "")} name="tag" label="Tag" value={p.tag} onFilter={onFilter}
-          options={TAGS.map((x) => ({ v: x.slug, l: x.label }))} />
+          options={TAGS.map((x) => ({ v: x.slug, l: x.label, chip: { tone: x.tone } }))} />
         <Select key={"reg" + (p.registered || "")} name="registered" label="Registered" value={p.registered} onFilter={onFilter}
           options={REGISTERED_RANGES.map((x) => ({ v: x.key, l: x.label }))} />
         {p.registered === "custom" ? (
-          <>
-            <input type="date" className="um-date" value={p.from || ""} aria-label="Registered from"
-              onChange={(e) => onFilter("from", e.target.value)} />
-            <input type="date" className="um-date" value={p.to || ""} aria-label="Registered up to"
-              onChange={(e) => onFilter("to", e.target.value)} />
-          </>
+          /* TWO DATES, ONE NAVIGATION. Pushing them through `onFilter` twice
+             navigates twice and the second call reads a stale `p`. */
+          <DateRange from={p.from} to={p.to} labelFrom="Registered from" labelTo="Registered up to"
+            onChange={(from, to) => onParams({ from: from || undefined, to: to || undefined })} />
         ) : null}
-        <span className="spacer" />
-        {/* Sort is not a filter and does not share the grid with the others. */}
-        <Select key={"sort" + (p.sort || "")} name="sort" label={"Sort: " + (SORT_OPTIONS[0]?.label || "")} value={p.sort}
-          onFilter={onFilter} options={SORT_OPTIONS.slice(1).map((o) => ({ v: o.key, l: o.label }))} />
       </>}
-      bands={<>
-        <StatStrip cells={cells} />
-        {/* `.dls-chips` is the band wrapper, not decoration: it supplies the
-            page gutter and cancels the chiprow's own negative margin, so the
-            chips line up with the command row above and the table below. */}
-        <div className="dls-chips">
-          {/* `view`, `sort` and `page` sit in the URL like filters and are not
-              filters. A chip reading "view: analytics" invites somebody to
-              clear the screen they are on. */}
-          <FilterChips
-            params={Object.keys(p)
-              .filter((k) => ["view", "sort", "page", "from", "to"].indexOf(k) < 0 && p[k])
-              .reduce((o, k) => { o[k] = filterValueLabel(k, p[k] as string); return o; },
-                {} as Record<string, string>)}
-            labels={FILTER_LABELS}
-            onUnfilter={(k) => onUnfilter(k === "registered" ? "registered+from+to" : k)} />
-        </div>
-      </>}>
+      /* Sort is not a filter: it does not narrow anything and it produces no
+         chip, so it sits at the far end of the row on its own. */
+      right={
+        <Select key={"sort" + (p.sort || "")} name="sort" label="Sort" value={p.sort}
+          allLabel={SORT_OPTIONS[0]?.label || "Default order"}
+          onFilter={onFilter} options={SORT_OPTIONS.slice(1).map((o) => ({ v: o.key, l: o.label }))} />
+      }
+      chips={
+        /* `view`, `sort` and `page` sit in the URL like filters and are not
+           filters. A chip reading "view: analytics" invites somebody to clear
+           the screen they are on. */
+        <FilterChips
+          params={Object.keys(p)
+            .filter((k) => ["view", "sort", "page", "from", "to"].indexOf(k) < 0 && p[k])
+            .reduce((o, k) => { o[k] = filterValueLabel(k, p[k] as string); return o; },
+              {} as Record<string, string>)}
+          labels={FILTER_LABELS}
+          onUnfilter={(k) => onUnfilter(k === "registered" ? "registered+from+to" : k)} />
+      }
+      bands={<StatStrip cells={cells} />}>
 
       {page.rows.length ? (
-        <ListTable cls="um-tbl" head={<tr>
-              <th className="rail" />
-              <th>User</th>
-              <th>Account</th>
-              <th>Profile</th>
-              <th>Registered</th>
-              <th>Last seen</th>
-              <th className="tight" />
-            </tr>}>
-            {page.rows.map((r) => <Row key={r.user.userId} r={r} p={p} />)}
-          </ListTable>
+        <ListTable min="66rem" head={<tr>
+          <th className="rail" />
+          <th>User</th>
+          <th>Handle</th>
+          <th>Account</th>
+          <th>Profile</th>
+          <th>Works in</th>
+          <th>Registered</th>
+          <th>Last seen</th>
+          <th className="acts" />
+        </tr>}>
+          {page.rows.map((r) => <Row key={r.user.userId} r={r} p={p} toast={toast} />)}
+        </ListTable>
       ) : (
         <EmptyState icon={narrowed ? "search" : "inbox"}
           title={narrowed ? "Nothing matches those filters" : "No registered users yet"}
@@ -129,15 +144,15 @@ export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, 
             ? "The counts in the strip above are for the whole view before any filter."
             : "Users arrive from the website, the portal, campaign funnels and referrals. The registration event creates the record; nobody creates one here."}
           action={narrowed
-            ? <button className="btn" onClick={() => onUnfilter("*")}>Clear all filters</button>
+            ? <Button color="secondary" ico="x" onClick={() => onUnfilter("*")}>Clear all filters</Button>
             : null} />
       )}
 
       {/* THE SHARED PAGER. This was a hand-built Previous/Next pair with its
-          own `.um-pager` rule — one of three pagers in the panel, and the only
-          one that could not jump to a page. `Pagination` keeps the range it
-          printed ("21–40 of 241") and adds the numbered window, so nothing is
-          lost and the control is the same one every other list will use. */}
+          own rule — one of three pagers in the panel, and the only one that
+          could not jump to a page. `Pagination` keeps the range it printed
+          ("21–40 of 241") and adds the numbered window, so nothing is lost and
+          the control is the same one every other list uses. */}
       <Pagination
         page={page.pageNo}
         pages={page.pages}
@@ -163,13 +178,17 @@ function hash(p: Record<string, string | undefined>, extra: Record<string, strin
   return "#/users" + (q ? "?" + q : "");
 }
 
-function Row({ r, p }: { r: UserRow; p: Record<string, string | undefined> }) {
+function Row({ r, p, toast }: {
+  r: UserRow;
+  p: Params;
+  toast: (msg: string, tone?: string) => void;
+}) {
   const u = r.user;
   /* The rail is the only place a row raises its voice, and there is exactly
      one thing left in this module worth raising it for: a live account whose
      profile is not finished, which is the one gap somebody here can close.
      A colour per state would turn the table into a paint chart nobody scans. */
-  const rail = r.classification === "active" && r.completeness < 100 ? "warn" : "";
+  const rail = r.classification === "active" && r.completeness < 100 ? "warn" : undefined;
   /* THE WHOLE LIST STATE TRAVELS WITH THE LINK — every filter, the sort and the
      page — so the record's Back button is a return and not a reset. */
   const carried = Object.keys(p)
@@ -177,21 +196,56 @@ function Row({ r, p }: { r: UserRow; p: Record<string, string | undefined> }) {
     .map((k) => encodeURIComponent(k) + "=" + encodeURIComponent(p[k] as string))
     .join("&");
   const to = "#/users/" + encodeURIComponent(u.userId) + (carried ? "?" + carried : "");
+  const area = u.profile.targetAreas || [];
+  const city = primaryCityOf(u.profile);
+
+  const copy = (text: string, said: string) => {
+    copyToClipboard(text).then((line) => toast(line === "Copied." ? said : line, "ok"));
+  };
+
   return (
-    <tr className={"clickable" + (u.userStatus === "deactivated" ? " dim" : "")}
+    <tr className={"clickable" + (u.userStatus === "deactivated" ? " opacity-70" : "")}
       tabIndex={0} role="link" aria-label={"Open " + u.identity.name}
       onClick={() => go(to)}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(to); } }}>
-      <td className="rail"><i className={rail} /></td>
-      <td><WhoCell r={r} /></td>
+      <Rail tone={rail} title={rail ? "Live account, unfinished profile" : undefined} />
+      <td><WhoCell r={r} to={to} /></td>
+      <td className="mono">
+        {u.profile.username
+          ? <span className="text-secondary">@{u.profile.username}</span>
+          : <span className="text-quaternary">—</span>}
+      </td>
       <td><ClassPill k={r.classification} /></td>
       <td><Completeness pct={r.completeness} missing={r.missingFields} bare /></td>
       <td>
-        <div className="cell-1">{fmtDate(u.registeredAt)}</div>
-        <div className="cell-2">{ago(u.registeredAt)}</div>
+        {city ? (
+          <span className="flex min-w-0 flex-col leading-tight">
+            <span className="truncate text-secondary">{city}</span>
+            {area.length ? (
+              <span className="truncate text-xs text-tertiary">
+                {area.map((a) => a.state).join(", ")}
+                {area.length > 1 ? null : area[0].cities.length > 1 ? " · +" + (area[0].cities.length - 1) + " more" : null}
+              </span>
+            ) : null}
+          </span>
+        ) : <span className="text-quaternary">—</span>}
       </td>
-      <td className="cell-2">{ago(u.lastActivityAt)}</td>
-      <td className="tight"><Icon name="chevr" size="sm" /></td>
+      <td className="mono">
+        <span className="flex min-w-0 flex-col leading-tight">
+          <span>{fmtDate(u.registeredAt)}</span>
+          <span className="text-xs font-sans text-tertiary">{ago(u.registeredAt)}</span>
+        </span>
+      </td>
+      <td className="mono">{ago(u.lastActivityAt)}</td>
+      <td className="acts" onClick={(e) => e.stopPropagation()}>
+        <MoreMenu small align="right" label="" items={[
+          { icon: "user", label: "Open the record", act: () => go(to) },
+          { icon: "note", label: "Open notes & tags", act: () => go(to + (carried ? "&" : "?") + "tab=notes") },
+          { icon: "link", label: "Copy the profile link", disabled: !u.profile.username,
+            act: () => copy(profileUrl(u.profile.username || ""), "Profile link copied.") },
+          { icon: "copy", label: "Copy the user ID", act: () => copy(u.userId, "User ID copied.") },
+        ]} />
+      </td>
     </tr>
   );
 }

@@ -1,0 +1,236 @@
+/* =============================================================================
+   Interior bazzar — Admin · the stylesheet entry
+   -----------------------------------------------------------------------------
+   ONE IMPORT in main.tsx, and this is it. The order is the whole design:
+
+     1. tailwindcss     the utilities every component is written in
+     2. theme.css       Untitled UI's token sheet, VERBATIM (CLI 0.1.64) —
+                        never edited; upgrading the library is a file copy
+     3. brand.css       the panel's decisions: forest brand, the type faces,
+                        the dark planes, the chart slots, the few tokens the
+                        library does not name. Everything Interior bazzar
+                        chose is in that one file.
+
+   There is no component stylesheet and no module stylesheet. A component is
+   a React file composing Tailwind utilities on the semantic tokens; a module
+   that needs a drawing of its own writes a component in its bits.tsx. The
+   five `@utility` devices below are the only hand-written CSS in the product,
+   and each one is a device the design system names (COMPONENT-CONTRACT.md).
+   ========================================================================== */
+@import "tailwindcss";
+@import "./theme.css";
+@import "./brand.css";
+
+@plugin "tailwindcss-react-aria-components";
+@plugin "tailwindcss-animate";
+
+/* Dark is a class on <html> (Untitled UI's contract) AND the panel's own
+   attribute, set together by ShellContext.applyTheme and by the pre-paint
+   script in index.html. Either selector alone is enough for a utility; the
+   token block in theme.css keys on the class. */
+@custom-variant dark (&:where(.dark-mode, .dark-mode *, [data-theme="dark"], [data-theme="dark"] *));
+@custom-variant label (& [data-label]);
+@custom-variant focus-input-within (&:has(input:focus));
+
+/* ---------------------------------------------------------------- devices */
+
+/* THE TRACKED MICRO-LABEL — a metric name, a column head, a section key.
+   Eleven-pixel mono, uppercase by the type system (never typed in capitals,
+   so the string stays searchable and reads aloud correctly), tracked open.
+   This is where the panel's instrument voice lives; it is used for the NAME
+   of a measurement and nowhere else. */
+@utility label-mono {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    line-height: var(--text-2xs--line-height);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 500;
+    color: var(--color-text-quaternary);
+}
+
+/* A FIGURE — money, a count, an id, a timestamp. Tabular numerals so a column
+   compares by eye; the mono face so ₹4,20,000 and ₹11,80,000 are the same
+   width per character. */
+@utility tnum {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1, "cv11" 1;
+}
+@utility figure {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+}
+
+/* CORNER TICKS — two 9px marks that say "what is inside was MEASURED". A KPI
+   tile, a chart frame, an analysis panel. Never on rows, inputs or menus:
+   the marks are a claim, and spending them on a box of links makes them mean
+   nothing anywhere. */
+@utility ticks {
+    position: relative;
+    &::before,
+    &::after {
+        content: "";
+        position: absolute;
+        width: 9px;
+        height: 9px;
+        border-color: var(--color-border-secondary);
+        border-style: solid;
+        pointer-events: none;
+    }
+    &::before {
+        top: 6px;
+        left: 6px;
+        border-width: 1px 0 0 1px;
+    }
+    &::after {
+        right: 6px;
+        bottom: 6px;
+        border-width: 0 1px 1px 0;
+    }
+}
+
+/* THE SHEEN — how dark mode says "raised". A dark ground cannot show a shadow,
+   so a floating surface carries a one-pixel inner highlight instead. In light
+   it is nothing, so a component can list it unconditionally. */
+@utility sheen {
+    box-shadow: var(--surface-sheen);
+}
+
+/* THE EXCEPTION RAIL — a 3px stripe down the left edge of a row or a card in
+   a status colour, so the rows that need a human are findable without
+   reading. Drawn as a pseudo-element rather than a box-shadow so it composes
+   with `ring-*` (which is a box-shadow too) and with any radius the row has.
+   The row itself must not already carry a `::before` of its own. */
+@utility rail-* {
+    position: relative;
+    &::before {
+        content: "";
+        position: absolute;
+        top: 6px;
+        bottom: 6px;
+        left: 0;
+        width: 3px;
+        border-radius: 0 2px 2px 0;
+        pointer-events: none;
+        background: --value(--rail-tone- *);
+    }
+}
+@theme {
+    --rail-tone-ok: var(--color-fg-success-secondary);
+    --rail-tone-warning: var(--color-fg-warning-secondary);
+    --rail-tone-error: var(--color-fg-error-secondary);
+    --rail-tone-info: var(--color-fg-info-primary);
+    --rail-tone-brand: var(--color-fg-brand-primary);
+    --rail-tone-sys: var(--color-utility-indigo-500);
+}
+
+@utility scrollbar-hide {
+    &::-webkit-scrollbar {
+        display: none;
+        -webkit-appearance: none;
+    }
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+@utility transition-inherit-all {
+    transition-property: inherit;
+    transition-duration: inherit;
+    transition-timing-function: inherit;
+}
+
+/* ------------------------------------------------------------------- base */
+html,
+body {
+    font-family: var(--font-body);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-variant-ligatures: contextual;
+    font-kerning: normal;
+    /* Inter's alternates that read as an instrument rather than a document:
+       open digits, a flat-topped 3, single-storey a in the numerals. */
+    font-feature-settings: "cv11" 1, "ss01" 1, "cv02" 1;
+}
+
+html {
+    background-color: var(--color-bg-secondary);
+    color: var(--color-text-primary);
+    color-scheme: light;
+}
+html.dark-mode,
+html[data-theme="dark"] {
+    color-scheme: dark;
+}
+
+body {
+    min-height: 100dvh;
+    background-color: var(--color-bg-secondary);
+}
+
+#root {
+    min-height: 100dvh;
+}
+
+/* Sticky headers must not hide the focused element when the page scrolls it
+   into view. */
+html {
+    scroll-padding-top: 72px;
+}
+
+/* Hide the default expand arrow on Safari. */
+details summary::-webkit-details-marker {
+    display: none;
+}
+
+/* Number inputs draw no spinners; the panel's own affordances do that job. */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+/* Search inputs draw no native clear button. */
+input[type="search"]::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+}
+
+/* No focus rectangle on chart elements — the tooltip is the focus state. */
+.recharts-surface,
+.recharts-surface g,
+.recharts-surface path {
+    outline: none;
+}
+
+/* Motion is subtle, fast and functional. Somebody who asked for less of it
+   gets the final state immediately, everywhere. */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* ------------------------------------------------------------------ print */
+/* The one surface that is paper: a quotation or invoice document. On print
+   the shell is gone and the sheet fills the page. */
+@page {
+    size: A4;
+    margin: 14mm 12mm;
+}
+@media print {
+    html,
+    body {
+        background: white !important;
+    }
+    [data-print-hide] {
+        display: none !important;
+    }
+}

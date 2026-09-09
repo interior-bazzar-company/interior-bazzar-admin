@@ -11,12 +11,12 @@
    ===================================================================== */
 import { useState } from "react";
 import AdminOpsService from "../../../api/modules/adminOps";
-import { EmptyState, PaneLoading, ShareLine, TbTitle, copyToClipboard, publicDocUrl, shareOrCopy, qs } from "../../ui";
+import { Button, EmptyState, PaneLoading, ShareLine, TbTitle, copyToClipboard, publicDocUrl, shareOrCopy, qs } from "../../ui";
+import type { MenuItem } from "../../ui";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import { errMessage } from "../../../api/apiService";
 import { STATUS_LABEL, call, useQuotation } from "./api";
-import { Mi } from "../Deals/bits";
 import { partyLine } from "./helpers";
 import { VersionRail } from "./Detail";
 import DocPage from "./DocPage";
@@ -34,14 +34,12 @@ export default function QuotationPreview({ id, params }: {
   usePageChrome({ crumbs: <TbTitle label="Quotations" to="#/quotations" />, right: null,
                   parent: "#/quotations/" + id });
 
-  if (loading && !quotation) return <div className="page qpage"><PaneLoading /></div>;
+  if (loading && !quotation) return <PaneLoading label="Opening the quotation…" />;
   if (notFound || !quotation) return (
-    <div className="page qpage">
-      <EmptyState icon="quote" title="Quotation not found"
-        body={"Quotation " + id + " could not be opened. It may have been deleted, or it "
-          + "belongs to a deal outside your access."}
-        action={<button className="btn" onClick={() => go("#/quotations")}>Back to quotations</button>} />
-    </div>
+    <EmptyState icon="quote" title="Quotation not found"
+      body={"Quotation " + id + " could not be opened. It may have been deleted, or it "
+        + "belongs to a deal outside your access."}
+      action={<Button color="primary" onClick={() => go("#/quotations")}>Back to quotations</Button>} />
   );
 
   const q = quotation;
@@ -64,34 +62,33 @@ export default function QuotationPreview({ id, params }: {
      whether the four server-side checks currently pass. */
   const issue = () => modal(<IssueModal q={q} onClose={closeLayer}
     run={() => call(AdminOpsService.issueQuotation(q.id))
-      .then((row) => { closeLayer(); toast("Issued as " + (row.quotationNumber || "a numbered quotation") + "."); setTick((t) => t + 1); })} />);
+      .then((row) => { closeLayer(); toast("Issued as " + (row.quotationNumber || "a numbered quotation") + "."); setTick((t) => t + 1); })} />, "lg");
+
+  const menu: MenuItem[] = [];
+  if (isDraft && can("quotations", "issue"))
+    menu.push({ icon: "check", label: "Issue quotation", title: "Spends the number — irreversible", act: issue });
+  if (!isDraft && q.hasDocument)
+    menu.push({ icon: "link", label: share ? "New share link" : "Create share link",
+      title: "An expiring link, logged as SHARED", act: getLink });
+  /* Only once there is a link to copy — the minting row already offers it to
+     the share sheet; this is the second time you want it and the toast is
+     gone. */
+  if (share)
+    menu.push({ icon: "copy", label: "Copy link", title: "The link minted above",
+      act: () => { void copyToClipboard(share.link).then((said) => toast(said)); } });
 
   return (
     <DocPage
-        label={q.quotationNumber || "Draft quotation"}
-        scope={isDraft
-          ? "This is the artefact the customer receives. It is the last point at which anything can change."
-          : "The document exactly as the customer has it. " + partyLine(q) + " · " + STATUS_LABEL[q.status]}
-        fetchHtml={() => call(AdminOpsService.quotationDocHtml(q.id))}
-        rail={<VersionRail q={q} />}
-        banner={share ? <ShareLine link={share.link} expires={share.expires} /> : null}
-        back={() => go(detail)}
-        menu={<>
-          {isDraft && can("quotations", "issue")
-            ? <Mi ico="check" label="Issue quotation"
-                hint="Spends the number — irreversible" onClick={issue} />
-            : null}
-          {!isDraft && q.hasDocument
-            ? <Mi ico="link" label={share ? "New share link" : "Create share link"}
-                hint="An expiring link, logged as SHARED" onClick={getLink} />
-            : null}
-          {/* Only once there is a link to copy — the minting button already
-              offers it to the share sheet, this is the second time you want it
-              and the toast is gone. */}
-          {share
-            ? <Mi ico="doc" label="Copy link" hint="The link minted above"
-                onClick={() => { void copyToClipboard(share.link).then((said) => toast(said)); }} />
-            : null}
-        </>} />
+      kind="Quotation"
+      label={q.quotationNumber || "Draft quotation"}
+      scope={isDraft
+        ? "This is the artefact the customer receives. It is the last point at which anything can change."
+        : "The document exactly as the customer has it. " + partyLine(q) + " · " + STATUS_LABEL[q.status]}
+      fetchHtml={() => call(AdminOpsService.quotationDocHtml(q.id))}
+      rail={<div className="mt-4"><VersionRail q={q} /></div>}
+      banner={share ? <ShareLine link={share.link} expires={share.expires} /> : null}
+      back={() => go(detail)}
+      backLabel="Back to the quotation"
+      menu={menu} />
   );
 }

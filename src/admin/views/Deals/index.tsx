@@ -17,24 +17,44 @@
    ============================================================================= */
 import { useEffect, useMemo } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import { Icon, TbTitle } from "../../ui";
+import { Segmented, TbTitle, qs } from "../../ui";
+import { go } from "../../ui/nav";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import {
-  listHash, omit, paramsOf, useDealsApi, useEngineTick, usePop, viewOf, VIEWS
+  VIEWS, VIEW_ORDER, listHash, merge, omit, paramsOf, useDealsApi, useEngineTick, viewOf
 } from "./useDeals";
 import { DealsList, TbStats } from "./List";
 import { ChatWorkspace } from "./Chat";
 import { TagsView } from "./Tags";
 import { DealDrawer } from "./Drawer";
-import { ViewMenu } from "./menus";
+
+/* THE THREE FACES, in the order they are offered. Each is one press, not a
+   menu: "which view am I in" must be answerable without opening anything, and
+   with three options a segmented control answers it and switches it in the
+   same object. The glyphs are the panel's own — a list, columns, a
+   conversation — so the control reads before the words are.
+
+   The VALUES are `VIEWS[k].param`, never the key: chat owns the empty string
+   (it is the module's default face), and moving which face owns "" moves the
+   default without touching a single link. Lists is deliberately not here — it
+   is not a way of looking at deals, it is a way of filtering them, so its
+   entry point sits beside the List filter on the table's own command row.
+
+   The ORDER is densest read → arrangement → one conversation, which is also
+   the order somebody narrows down in: every deal, then the ones that are
+   stuck, then the one they are about to ring. `VIEW_ORDER` from useDeals is
+   the set; anything it grows that is not named here is appended rather than
+   silently dropped. */
+const FACE_ICON: Record<string, string> = { table: "list", board: "columns", chat: "chat" };
+const FACES = ["table", "board", "chat"].filter((k) => VIEW_ORDER.indexOf(k) >= 0)
+  .concat(VIEW_ORDER.filter((k) => ["table", "board", "chat"].indexOf(k) < 0));
 
 export default function Deals() {
   useEngineTick();
   const routeParams = useParams();
   const [sp] = useSearchParams();
   const shell = useShell();
-  const pop = usePop();
 
   const id = routeParams.id ? decodeURIComponent(routeParams.id) : null;
   const search = sp.toString();
@@ -48,37 +68,49 @@ export default function Deals() {
   const api = useDealsApi(p);
 
   /* ------------------------------------------------------------- topbar */
-  /* Deals claims the breadcrumb slot for its view switcher. The crumb there
-     would have read "Sales › Deals" directly above a heading already reading
-     "Deals" — so the row is better spent on the one control that changes what
-     the page is.
-
-     One control instead of four tabs. It still names the current view — a bare
-     icon would make "which view am I in" a question you can only answer by
-     opening the menu. */
+  /* Deals claims the topbar's right-hand slot for its view switcher. The
+     switch belongs to the module, not to the page body: it changes what the
+     page IS, and putting it in the page would make it move every time the
+     page it switches did. */
   const right = useMemo(() => (
-    <button className="btn tb-view-btn" data-act="dl-view" aria-haspopup="menu"
-      onClick={(e) => pop(e, <ViewMenu p={p} />, { width: 248, cls: "pop-views" })}>
-      <Icon name="eye" />{VIEWS[view].label}<Icon name="chev" size="sm" />
-    </button>
-  ), [view, p, pop]);
+    <Segmented
+      sm
+      label="View"
+      value={VIEWS[view] ? VIEWS[view].param : ""}
+      onPick={(param) => {
+        /* Switching face keeps the record you were reading and every filter
+           you had set — the view is part of the address, not a reset. */
+        const key = FACES.filter((k) => VIEWS[k].param === param)[0] || "chat";
+        go("#/deals" + (id ? "/" + encodeURIComponent(id) : "") + qs(merge(p, { view: VIEWS[key].param })));
+      }}
+      options={FACES.map((k) => ({
+        v: VIEWS[k].param,
+        ico: FACE_ICON[k],
+        /* The label goes at `md`. Below it the glyph is the whole control —
+           three words plus three icons is more topbar than a phone has. */
+        l: <span className="hidden md:inline">{VIEWS[k].label}</span>,
+      }))}
+    />
+    // `p` is derived from `search`, so the two dependencies below cover it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ), [view, search, id]);
 
-  /* No scope line beside the title any more. "15 team deals · 11 open · 3 won"
-     was a third rendering of counts the strip already gives per stage, sitting
-     where you cannot click it.
+  /* THE CRUMB SLOT is the module's title and, in Chat, its live counts.
 
-     Chat is the one view whose body has no room for the strip — three panes
-     already own the width — so it moves up into the bar instead, in one run:
-     the counts beside the title and the money directly after Won, exactly as
-     the table strip now reads. One scope computed once, so the counts and the
-     figures cannot disagree. */
+     Chat is the one view whose body has no room for the funnel strip — three
+     panes already own the width — so the counts move up beside the title as
+     compact mono figures, in the same order the table's strip reads them. The
+     other two faces carry the same numbers in the page's own StatStrip, where
+     they are also the filters, so repeating them here would be a second copy
+     of a control that already exists ten pixels lower. */
   const crumbs = useMemo(() => (
-    view !== "chat"
-      ? <TbTitle label="Deals" to="#/deals" />
-      : <>
-          <TbTitle label="Deals" to="#/deals" />
-          <TbStats p={p} />
-        </>
+    <>
+      {/* `shrink-0`: the title is the one thing in this row that must never be
+          the thing that truncates — the counts beside it scroll and hide by
+          breakpoint, and a module called "De…" is a module you cannot read. */}
+      <span className="shrink-0"><TbTitle label="Deals" to="#/deals" /></span>
+      {view === "chat" ? <TbStats p={p} /> : null}
+    </>
     // TbStats subscribes to the counts itself, so this only has to be rebuilt
     // when the view or the filters change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -102,11 +134,13 @@ export default function Deals() {
 
   /* -------------------------------------------------------------- drawer */
   /* Table and Pipeline open the record over the list they were reading it
-     from; Chat has its own workspace and never opens this. */
+     from; Chat has its own workspace and never opens this. `lg` because a deal
+     is a record with money, facts and a whole timeline on it — at `md` the
+     figures wrap two to a line and the timeline reads as a column of stubs. */
   const wantsDrawer = !!id && view !== "chat" && view !== "tags";
   useEffect(() => {
     if (!wantsDrawer) return;
-    shell.drawer(<DealDrawer dealRef={id as string} p={p} />);
+    shell.drawer(<DealDrawer dealRef={id as string} p={p} />, undefined, "lg");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wantsDrawer, id, search]);
 

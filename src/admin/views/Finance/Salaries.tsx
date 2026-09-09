@@ -23,7 +23,10 @@
    ============================================================================= */
 import { useShell } from "../../shell/ShellContext";
 import { can } from "../../shell/AdminShell";
-import { avatarTone, EmptyState, FilterChips, Icon, initials, ListTable, SearchField, Select, StatStrip } from "../../ui";
+import {
+  Button, EmptyState, FilterBar, FilterChips, Pagination, Person, Pill, Rail, ListTable,
+  SearchField, Select, StatStrip,
+} from "../../ui";
 import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import { Frame, ViewBand } from "./Frame";
@@ -31,15 +34,18 @@ import Payroll, { YearSwitch } from "./Payroll";
 import { resolveYear } from "./payrollYear";
 import type { FaceProps } from "./Frame";
 import SalaryTransactions from "./SalaryTransactions";
-import { Money } from "./bits";
+import { ActionMenu, Money } from "./bits";
 import { MetricTip } from "./InfoTip";
 import { PaySalaryModal, SalaryAccountModal } from "./SalaryModals";
 import {
   ENGAGEMENTS, FILTER_LABELS, applySalaryFilters, dueOf, engagementMeta,
-  filterValueLabel, fmtDate, fmtMonth, inr, isSuperAdmin, superAdminOnly,
+  filterValueLabel, fmtDate, fmtMonth, inr, isSuperAdmin, superAdminOnly, todayIso,
   useRuns, useSalaryRows,
 } from "./store";
 import type { Params, SalaryRow } from "./store";
+
+/** One screen of rows. `?page=` is a position in the list, never a filter. */
+const PAGE_SIZE = 50;
 
 /* THE WHOLE LIST STATE TRAVELS WITH THE LINK, so the record's Back button is a
    return and not a reset. */
@@ -49,13 +55,6 @@ function recHash(id: string, p: Params): string {
     .map((k) => encodeURIComponent(k) + "=" + encodeURIComponent(p[k] as string))
     .join("&");
   return "#/finance-salaries/" + encodeURIComponent(id) + (q ? "?" + q : "");
-}
-
-/** Initials on a tint, the same face the Team module draws. Not `Avatar` from
- *  teamShared: that takes an `AdminUserRow`, and there is no live member here
- *  to hand it — a fabricated one would be a Team record this module invented. */
-function Face({ name }: { name: string }) {
-  return <span className={"av sm " + avatarTone(name)}>{initials(name)}</span>;
 }
 
 export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }: FaceProps) {
@@ -101,6 +100,10 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
   const runs = useRuns();
   const slips = runs.flatMap((run) => run.slips);
   const heldN = slips.filter((x) => x.held && !x.paidAt).length;
+
+  const page = Math.max(1, Number(p.page) || 1);
+  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   /* THE SAME STRIP LOGIC AS EVERY LIST IN THE PANEL: a stated Total, then its
      parts, each cell a filter. It clears or sets `status` and nothing else —
@@ -152,7 +155,7 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
     "sep",
     /* The caution is LOAD-BEARING (FN-OD-06): this is net paid to people,
        not cost to company, and the metric tip is where that stays said. */
-    { k: <>Monthly payroll<MetricTip k="salary_cost" /></>, v: inr(payrollPaise), tone: "ro" },
+    { k: <>Monthly payroll<MetricTip k="salary_cost" /></>, v: inr(payrollPaise) },
   ];
 
   const txCells: (StatCell | "sep")[] = [
@@ -174,11 +177,39 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
   /* Opening only. REVISING happens on the account's own record, where the
      figures being changed are on screen behind the dialog — a raise typed from
      a list is a raise typed without looking at what it replaces. */
-  const openAccount = () => modal(<SalaryAccountModal onClose={closeLayer} onDone={done} />, "wide");
-  const pay = (r: SalaryRow) => modal(<PaySalaryModal row={r} onClose={closeLayer} onDone={done} />, "wide");
+  const openAccount = () => modal(<SalaryAccountModal onClose={closeLayer} onDone={done} />, "lg");
+  const pay = (r: SalaryRow) => modal(<PaySalaryModal row={r} onClose={closeLayer} onDone={done} />, "lg");
+
+  const chips = (
+    <FilterChips
+      params={Object.keys(p)
+        .filter((k) => ["view", "run", "tab", "year", "by", "page"].indexOf(k) < 0 && p[k])
+        .reduce((acc, k) => { acc[k] = filterValueLabel(k, p[k] as string); return acc; },
+          {} as Record<string, string>)}
+      labels={FILTER_LABELS}
+      onUnfilter={onUnfilter} />
+  );
 
   return (
     <Frame toast={toast}
+      title="Salaries A/C"
+      meta={
+        <>
+          <span className="label-mono">
+            {tab === "analytics"
+              ? "January to December " + year
+              : tab === "accounts"
+                ? (filtered.length === rows.length
+                  ? rows.length + (rows.length === 1 ? " account" : " accounts")
+                  : filtered.length + " of " + rows.length)
+                : slips.length + (slips.length === 1 ? " slip" : " slips")}
+          </span>
+          <span className="label-mono">as of {fmtDate(todayIso())}</span>
+        </>
+      }
+      actions={tab !== "analytics" && writable
+        ? <Button color="primary" ico="plus" onClick={openAccount}>Add a salary account</Button>
+        : null}
       tabs={
         <ViewBand cur={tab}
           items={[
@@ -195,92 +226,87 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
                across would narrow a list with a control it does not show —
                and `year`/`emp` are Analytics's own, so they go the same way. */
             q: undefined, status: undefined, month: undefined, due: undefined,
-            engagement: undefined, active: undefined,
+            engagement: undefined, active: undefined, page: undefined,
             /* `year` and `by` are Analytics's own controls and go the same way. */
             year: undefined, by: undefined,
           })} />
       }
-      cmd={tab === "analytics" ? <>
-        {/* THE YEAR SWITCHER TAKES THE COMMAND ROW, because that is where this
+      cmd={tab === "analytics" ? (
+        /* THE YEAR SWITCHER TAKES THE COMMAND ROW, because that is where this
             page's scope controls live and the year IS the scope here. There are
             no filters on this tab: a chart narrowed by a search box is a chart
-            whose total no longer matches its own caption. */}
-        <YearSwitch year={year} onPick={(y) => onParams({ year: y })} />
-        <span className="spacer" />
-        <span className="fin-sum">
-          The salary runs read over one calendar year · January to December
-        </span>
-      </> : tab === "accounts" ? <>
-        {/* KEYED ON THEIR VALUE. SearchField and Select are uncontrolled, so
-            clearing a chip otherwise leaves the old text in the box. */}
-        <SearchField key={"q" + (p.q || "")} ph="Name, employee code, designation…"
-          val={p.q} onFilter={onSearch} />
-        <Select key={"engagement" + (p.engagement || "")} name="engagement" label="Engagement"
-          value={p.engagement} onFilter={onFilter}
-          options={ENGAGEMENTS.map((e) => ({ v: e.key, l: e.label }))} />
-        <Select key={"due" + (p.due || "")} name="due" label="This month" value={p.due}
-          onFilter={onFilter} options={[{ v: "unpaid", l: "Unpaid" }, { v: "paid", l: "Paid" }]} />
-        <Select key={"active" + (p.active || "")} name="active" label="Account" value={p.active}
-          onFilter={onFilter} options={[{ v: "yes", l: "Active" }, { v: "no", l: "Closed" }]} />
-        <span className="spacer" />
-        <button className="btn sm pri" disabled={!writable} onClick={() => openAccount()}
-          title={writable ? undefined : "Opening a salary account needs Finance edit rights."}>
-          <Icon name="plus" size="sm" />Add a salary account
-        </button>
-      </> : <>
-        <SearchField key={"q" + (p.q || "")} ph="Name, slip id, month, designation…"
-          val={p.q} onFilter={onSearch} />
-        <Select key={"status" + (p.status || "")} name="status" label="Status" value={p.status}
-          onFilter={onFilter}
-          options={[{ v: "paid", l: "Paid" }, { v: "unpaid", l: "Unpaid" }, { v: "held", l: "On hold" }]} />
-        <Select key={"month" + (p.month || "")} name="month" label="Month" value={p.month}
-          onFilter={onFilter}
-          options={runs.map((r) => ({ v: r.month, l: fmtMonth(r.month) }))} />
-        <span className="spacer" />
-      </>}
-      bands={tab === "analytics" ? null : <>
-        {/* ONE STRIP STYLE FOR BOTH RECORD TABS. The four tiles that stood here
-            said what the topbar and the strip now say between them, at four
-            times the height, and matched nothing else in the panel.
+            whose total no longer matches its own caption. */
+        <FilterBar
+          filters={<YearSwitch year={year} onPick={(y) => onParams({ year: y })} />}
+          right={<span className="text-sm text-tertiary">The salary runs read over one calendar year</span>} />
+      ) : tab === "accounts" ? (
+        <FilterBar
+          /* KEYED ON THEIR VALUE. SearchField and Select are uncontrolled, so
+             clearing a chip otherwise leaves the old text in the box. */
+          search={<SearchField key={"q" + (p.q || "")} ph="Name, employee code, designation…"
+            val={p.q} onFilter={onSearch} />}
+          filters={<>
+            <Select key={"engagement" + (p.engagement || "")} name="engagement" label="Engagement"
+              value={p.engagement} onFilter={onFilter}
+              options={ENGAGEMENTS.map((e) => ({ v: e.key, l: e.label }))} />
+            <Select key={"due" + (p.due || "")} name="due" label="This month" value={p.due}
+              onFilter={onFilter} options={[{ v: "unpaid", l: "Unpaid" }, { v: "paid", l: "Paid" }]} />
+            <Select key={"active" + (p.active || "")} name="active" label="Account" value={p.active}
+              onFilter={onFilter} options={[{ v: "yes", l: "Active" }, { v: "no", l: "Closed" }]} />
+          </>}
+          chips={chips} />
+      ) : (
+        <FilterBar
+          search={<SearchField key={"q" + (p.q || "")} ph="Name, slip id, month, designation…"
+            val={p.q} onFilter={onSearch} />}
+          filters={<>
+            <Select key={"status" + (p.status || "")} name="status" label="Status" value={p.status}
+              onFilter={onFilter}
+              options={[{ v: "paid", l: "Paid", dot: "ok" }, { v: "unpaid", l: "Unpaid", dot: "warn" }, { v: "held", l: "On hold", dot: "bad" }]} />
+            <Select key={"month" + (p.month || "")} name="month" label="Month" value={p.month}
+              onFilter={onFilter}
+              options={runs.map((r) => ({ v: r.month, l: fmtMonth(r.month) }))} />
+          </>}
+          chips={chips} />
+      )}
+      bands={tab === "analytics" ? null : (
+        /* ONE STRIP STYLE FOR BOTH RECORD TABS. The four tiles that stood here
+           said what the topbar and the strip now say between them, at four
+           times the height, and matched nothing else in the panel.
 
-            ANALYTICS GETS NEITHER. Every cell in the strip is a filter over
-            this month's slips, and the face below is a year — a strip that
-            filtered nothing on screen would be a row of live-looking controls
-            that do not work. Its own figures are in its first block, where
-            each one carries its formula. */}
+           ANALYTICS GETS NEITHER. Every cell in the strip is a filter over
+           this month's slips, and the face below is a year — a strip that
+           filtered nothing on screen would be a row of live-looking controls
+           that do not work. Its own figures are in its first block, where
+           each one carries its formula. */
         <StatStrip cells={tab === "transactions" ? txCells : accCells} />
-        <div className="dls-chips">
-          <FilterChips
-            params={Object.keys(p)
-              .filter((k) => ["view", "run", "tab", "year", "by"].indexOf(k) < 0 && p[k])
-              .reduce((acc, k) => { acc[k] = filterValueLabel(k, p[k] as string); return acc; },
-                {} as Record<string, string>)}
-            labels={FILTER_LABELS}
-            onUnfilter={onUnfilter} />
-        </div>
-      </>}>
+      )}>
 
       {tab === "analytics" ? (
         <Payroll year={year} p={p} onParams={onParams} />
       ) : tab === "transactions" ? (
-        <SalaryTransactions p={p} onUnfilter={onUnfilter} />
-      ) : (<>
-      {filtered.length ? (
-        <ListTable cls="fin-tbl" head={<tr>
-              <th className="rail" />
-              <th>Person</th>
-              <th>Engagement</th>
-              <th className="n">Monthly net</th>
-              <th>This month</th>
-              <th className="n">Due now</th>
-              <th>Last paid</th>
-              <th className="tight" />
-            </tr>}>
-            {filtered.map((r) => (
+        <SalaryTransactions p={p} onUnfilter={onUnfilter} onParams={onParams} />
+      ) : filtered.length ? (
+        <>
+          <ListTable min="64rem" head={<tr>
+            <th className="rail" />
+            <th scope="col">Person</th>
+            <th scope="col">Engagement</th>
+            <th scope="col" className="n">Monthly net</th>
+            <th scope="col">This month</th>
+            <th scope="col" className="n">Due now</th>
+            <th scope="col">Last paid</th>
+            <th scope="col" className="acts"><span className="sr-only">Actions</span></th>
+          </tr>}>
+            {paged.map((r) => (
               <PersonRow key={r.a.salaryAccountId} r={r} p={p}
                 onPay={writable ? pay : null} />
             ))}
           </ListTable>
+          <Pagination alwaysCount page={page} pages={pages} total={filtered.length}
+            unit="salary accounts" pageSize={PAGE_SIZE} shown={paged.length}
+            onPage={(n) => onParams({ page: n > 1 ? String(n) : undefined })} />
+        </>
       ) : (
         <EmptyState icon={narrowed ? "search" : "team"}
           title={narrowed ? "Nobody matches those filters" : "No salary account has been opened"}
@@ -288,10 +314,11 @@ export default function Salaries({ p, onFilter, onSearch, onUnfilter, onParams }
             ? "The figures in the strip above are for the whole payroll, before any filter."
             : "A salary account attaches a monthly figure to a team member and issues them a numbered slip every month. Nothing is derived from a role: a salary is a contract with a person."}
           action={narrowed
-            ? <button className="btn" onClick={() => onUnfilter("*")}>Clear the filters</button>
-            : writable ? <button className="btn pri" onClick={() => openAccount()}>Add a salary account</button> : null} />
+            ? <Button color="secondary" onClick={() => onUnfilter("*")}>Clear the filters</Button>
+            : writable
+              ? <Button color="primary" ico="plus" onClick={openAccount}>Add a salary account</Button>
+              : null} />
       )}
-      </>)}
     </Frame>
   );
 }
@@ -305,29 +332,25 @@ function PersonRow({ r, p, onPay }: {
   const d = dueOf(r);
   const to = recHash(a.salaryAccountId, p);
   const eng = engagementMeta(a.engagement);
+  const gate = superAdminOnly("Paying a salary");
 
   /* The rail speaks once, and about the only thing on this row that needs
      somebody: money owed. Amber for the current month, red once a month older
      than it is still outstanding. */
-  const rail = d.arrears.length ? "bad" : d.pendingPaise ? "warn" : "";
+  const rail = d.arrears.length ? "bad" : d.pendingPaise ? "warn" : undefined;
 
   return (
-    <tr className={"clickable" + (a.active ? "" : " dim")} tabIndex={0} role="link"
+    <tr className={a.active ? "clickable" : "clickable opacity-60"} tabIndex={0} role="link"
       aria-label={"Open " + a.memberName + "'s salary account"}
       onClick={() => go(to)}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(to); } }}>
-      <td className="rail"><i className={rail} /></td>
+      <Rail tone={rail} />
       <td>
-        <div className="fin-who">
-          <Face name={a.memberName} />
-          <span>
-            <span className="cell-1">{a.memberName}</span>
-            <span className="cell-2">{a.designation} · <span className="mono">{a.employeeCode}</span></span>
-          </span>
-        </div>
+        <Person name={a.memberName} sm
+          sub={<>{a.designation} · <span className="font-mono tnum">{a.employeeCode}</span></>} />
       </td>
       <td>
-        <span className="pill">{eng ? eng.label : a.engagement}</span>
+        <Pill xs tone="neutral" text={eng ? eng.label : a.engagement} />
         {a.active ? null : <div className="cell-2">account closed</div>}
       </td>
       <td className="n"><Money paise={r.monthlyNetPaise} strong /></td>
@@ -338,7 +361,7 @@ function PersonRow({ r, p, onPay }: {
       <td>
         {d.state === "unpaid" ? (
           <>
-            <span className="pill warn">Unpaid</span>
+            <Pill dot tone="warn" text="Unpaid" />
             <div className="cell-2">
               {fmtMonth(d.current?.month || "")}
               {d.arrears.length
@@ -348,12 +371,12 @@ function PersonRow({ r, p, onPay }: {
           </>
         ) : d.state === "paid" ? (
           <>
-            <span className="pill ok">Paid</span>
+            <Pill dot tone="ok" text="Paid" />
             <div className="cell-2">nothing outstanding</div>
           </>
         ) : (
           <>
-            <span className="pill">No slip yet</span>
+            <Pill dot tone="neutral" text="No slip yet" />
             <div className="cell-2">no month has been issued</div>
           </>
         )}
@@ -372,23 +395,27 @@ function PersonRow({ r, p, onPay }: {
               </div>
             ) : null}
           </>
-        ) : <span className="faint">—</span>}
+        ) : <span className="text-quaternary">—</span>}
       </td>
 
       <td>
         {r.lastPaidAt
           ? <><div className="cell-1">{fmtDate(r.lastPaidAt)}</div><div className="cell-2">{r.slipsN} slip{r.slipsN === 1 ? "" : "s"} on record</div></>
-          : <span className="faint">never</span>}
+          : <span className="text-quaternary">never</span>}
       </td>
 
-      <td className="tight" onClick={(e) => e.stopPropagation()}>
-        {d.pendingPaise && onPay ? (
-          <button className="btn sm pri" disabled={!isSuperAdmin()}
-            title={superAdminOnly("Paying a salary") || ("Pay " + inr(d.pendingPaise) + " to " + a.memberName)}
-            onClick={() => onPay(r)}>
-            <Icon name="cash" size="sm" />Pay
-          </button>
-        ) : <Icon name="chevr" size="sm" />}
+      <td className="acts">
+        <ActionMenu forWhat={a.memberName + "'s salary account"} items={[
+          d.pendingPaise && onPay
+            ? { icon: "cash", label: "Pay " + inr(d.pendingPaise), act: () => onPay(r),
+                tone: "pri", disabled: !isSuperAdmin(),
+                title: gate || "Pay " + inr(d.pendingPaise) + " to " + a.memberName }
+            : { icon: "cash", label: "Pay", act: () => {}, disabled: true,
+                title: onPay ? "Nothing is outstanding." : "Paying a salary needs Finance edit rights." },
+          { icon: "user", label: "Open the account", act: () => go(to) },
+          { icon: "team", label: "Open the team record",
+            act: () => go("#/team/" + a.memberId) },
+        ]} />
       </td>
     </tr>
   );

@@ -12,7 +12,8 @@
    dates the derivation reads, not from anything stored on a day. What you see
    is what the derivation sees.
    ============================================================================= */
-import { Notice, Pill, Table } from "../../../ui";
+import { Alert, Button, Card, ListTable, Pill } from "../../../ui";
+import { cx } from "@/utils/cx";
 import { useShell } from "../../../shell/ShellContext";
 import {
   LEAVE_KIND, LEAVE_STATE, TODAY, addDays, datesIn, decideLeave, fmtDate, isWeekend, labelOf,
@@ -42,81 +43,106 @@ export default function LeavePage({ m, viewer }: { m: Member; viewer: Viewer }) 
   };
 
   return (
-    <>
+    <div className="flex flex-col gap-5">
       <OpHead
         title="Leave"
         desc="Requested, decided, and the days an approval covers."
         right={viewer === "self"
-          ? <button className="btn pri" onClick={() => shell.modal(<LeaveRequestModal memberId={m.memberId} />)}>
-            Request leave
-          </button>
+          ? (
+            <Button color="primary" ico="plus"
+              onClick={() => shell.modal(<LeaveRequestModal memberId={m.memberId} />)}>
+              Request leave
+            </Button>
+          )
           : null} />
 
       {waiting.length && canDecide ? (
-        <Notice tone="warn" ico="clock" text={
-          <><b>{waiting.length} request{waiting.length > 1 ? "s" : ""} waiting on you.</b> Until you
-            decide, those days still read as absent on {m.name.split(" ")[0]}'s attendance.</>
-        } />
+        <Alert tone="warn" ico="clock"
+          title={waiting.length + " request" + (waiting.length > 1 ? "s" : "") + " waiting on you"}>
+          Until you decide, those days still read as absent on {m.name.split(" ")[0]}'s attendance.
+        </Alert>
       ) : null}
 
       <LeaveStrip m={m} />
 
-      <Table
-        cols={[{ label: "Dates", w: "210px" }, { label: "Kind", w: "120px" },
-          { label: "State", w: "150px" }, { label: "Reason" }, { label: "", w: "200px" }]}
-        empty={{
-          icon: "calendar", title: "No leave on record",
-          body: "Nothing requested and nothing taken. An absence here would be a derived one — a day nobody opened.",
-        }}
-        rows={rows.map((l) => {
+      <ListTable min="56rem" head={<tr>
+        <th className="rail" />
+        <th scope="col">Dates</th>
+        <th scope="col">Kind</th>
+        <th scope="col">State</th>
+        <th scope="col">Reason</th>
+        <th scope="col" className="acts"><span className="sr-only">Decision</span></th>
+      </tr>}>
+        {rows.map((l) => {
           const days = datesIn(l.fromDate, l.toDate).length;
           const decider = l.decidedById ? readMember(l.decidedById) : null;
+          const tone = toneOf(LEAVE_STATE, l.state);
           return (
             <tr key={l.leaveId}>
-              <td>
-                <span className="cell-1">
-                  {fmtDate(l.fromDate)}{l.toDate !== l.fromDate ? " – " + fmtDate(l.toDate) : ""}
+              <td className="rail">
+                <i aria-hidden="true" className={cx(
+                  "absolute inset-y-1.5 left-0 w-[3px] rounded-r-full",
+                  l.state === "requested" ? "bg-utility-yellow-500" : "bg-transparent",
+                )} />
+              </td>
+              <td className="cell-1">
+                {fmtDate(l.fromDate)}{l.toDate !== l.fromDate ? " – " + fmtDate(l.toDate) : ""}
+                <span className="block cell-2 tnum">
+                  {days} day{days === 1 ? "" : "s"} · asked {fmtDate(l.requestedAt.slice(0, 10))}
                 </span>
-                <span className="cell-2">{days} day{days === 1 ? "" : "s"} · asked {fmtDate(l.requestedAt.slice(0, 10))}</span>
               </td>
               <td>{labelOf(LEAVE_KIND, l.kind)}</td>
               <td>
-                <Pill text={labelOf(LEAVE_STATE, l.state)} tone={toneOf(LEAVE_STATE, l.state)} />
-                {decider ? <span className="cell-2">by {decider.name}</span> : null}
+                <Pill xs dot text={labelOf(LEAVE_STATE, l.state)} tone={tone} />
+                {decider ? <span className="block cell-2">by {decider.name}</span> : null}
               </td>
-              <td>
-                <span className="cell-1">{l.reason}</span>
-                {l.decisionNote ? <span className="cell-2">{l.decisionNote}</span> : null}
+              <td className="cell-1">
+                {l.reason}
+                {l.decisionNote ? <span className="block cell-2">{l.decisionNote}</span> : null}
               </td>
-              <td>
+              <td className="acts">
                 {l.state === "requested" && canDecide ? (
-                  <>
-                    <button className="btn sm" onClick={() =>
-                      shell.modal(<LeaveDecideModal l={l} state="rejected" />)}>Refuse…</button>
-                    <button className="btn pri sm" onClick={() =>
-                      shell.modal(<LeaveDecideModal l={l} state="approved" />)}>Approve…</button>
-                  </>
+                  <span className="inline-flex items-center gap-2">
+                    <Button color="secondary" size="xs" onClick={() =>
+                      shell.modal(<LeaveDecideModal l={l} state="rejected" />)}>Refuse…</Button>
+                    <Button color="primary" size="xs" onClick={() =>
+                      shell.modal(<LeaveDecideModal l={l} state="approved" />)}>Approve…</Button>
+                  </span>
                 ) : null}
                 {l.state === "requested" && viewer === "self"
-                  ? <button className="btn sm" onClick={() => withdraw(l)}>Withdraw</button>
+                  ? <Button color="secondary" size="xs" onClick={() => withdraw(l)}>Withdraw</Button>
                   : null}
-                {l.state !== "requested" ? <span className="dim">decided</span> : null}
+                {l.state !== "requested" ? <span className="text-quaternary">decided</span> : null}
               </td>
             </tr>
           );
-        })} />
+        })}
+        {rows.length ? null : (
+          <tr>
+            <td colSpan={6} className="p-0!">
+              <div className="px-6 py-10 text-center">
+                <p className="text-sm font-medium text-primary">No leave on record</p>
+                <p className="mt-1 text-sm text-tertiary">
+                  Nothing requested and nothing taken. An absence here would be a derived one — a day
+                  nobody opened.
+                </p>
+              </div>
+            </td>
+          </tr>
+        )}
+      </ListTable>
 
-      <p className="tm-foot">
+      <p className="text-xs text-quaternary">
         There is no quota. A quota needs an accrual policy, a carry-forward rule and a year-end
         job — the days are recorded here and counted in a report instead.
       </p>
-    </>
+    </div>
   );
 }
 
 /* ------------------------------------------------------------- the strip --- */
 
-/** THE NEXT FORTNIGHT, so an approval has a shape and not just a date range.
+/** THE NEXT THREE WEEKS, so an approval has a shape and not just a date range.
  *  Only APPROVED leave paints a cell: a pending request changes nothing about
  *  whether somebody is absent, and drawing it as though it did would be the
  *  screen deciding on the approver's behalf. */
@@ -124,23 +150,36 @@ function LeaveStrip({ m }: { m: Member }) {
   const days = datesIn(TODAY, addDays(TODAY, 20));
   const any = days.some((d) => !!onLeave(m.memberId, d));
   return (
-    <div className="tm-lvstrip" role="group" aria-label="The next three weeks">
-      {days.map((d) => {
-        const l = onLeave(m.memberId, d);
-        const cls = "tm-lvd" + (l ? " on" : "") + (isWeekend(d) ? " we" : "") + (d === TODAY ? " today" : "");
-        return (
-          <span key={d} className={cls}
-            title={fmtDate(d) + (l ? " · " + labelOf(LEAVE_KIND, l.kind) + " leave"
-              : isWeekend(d) ? " · not a working day" : "")}>
-            <b>{d.slice(8)}</b>
-            <i>{["S", "M", "T", "W", "T", "F", "S"][new Date(d + "T00:00:00").getDay()]}</i>
-          </span>
-        );
-      })}
-      <span className="tm-lvkey">
-        {any ? "Shaded days are covered by an approval." : "Nothing approved in the next three weeks."}
-        {" "}A pending request paints nothing — it changes no derivation until somebody decides it.
-      </span>
-    </div>
+    <Card
+      title="The next three weeks"
+      sub={(any ? "Filled days are covered by an approval." : "Nothing approved in the next three weeks.")
+        + " A pending request paints nothing — it changes no derivation until somebody decides it."}
+      tight
+    >
+      <div className="flex flex-wrap gap-1" role="group" aria-label="The next three weeks">
+        {days.map((d) => {
+          const l = onLeave(m.memberId, d);
+          return (
+            <span
+              key={d}
+              title={fmtDate(d) + (l ? " · " + labelOf(LEAVE_KIND, l.kind) + " leave"
+                : isWeekend(d) ? " · not a working day" : "")}
+              className={cx(
+                "flex size-9 flex-col items-center justify-center rounded-lg ring-1 ring-inset",
+                l ? "bg-brand-primary text-brand-secondary ring-brand"
+                  : isWeekend(d) ? "bg-secondary text-quaternary ring-transparent"
+                    : "bg-primary text-tertiary ring-secondary",
+                d === TODAY && "ring-2 ring-brand",
+              )}
+            >
+              <b className="text-xs font-semibold tnum">{Number(d.slice(8))}</b>
+              <i className="text-2xs not-italic opacity-70">
+                {["S", "M", "T", "W", "T", "F", "S"][new Date(d + "T00:00:00").getDay()]}
+              </i>
+            </span>
+          );
+        })}
+      </div>
+    </Card>
   );
 }

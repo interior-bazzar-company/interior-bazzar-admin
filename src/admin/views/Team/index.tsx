@@ -8,31 +8,46 @@
      /team/:id    the member page — identity AND the operational half, tabbed
      /roles       what a responsibility means, as a matrix (its own folder)
 
+   THE PAGE READS TOP TO BOTTOM THE WAY THE QUESTION IS ASKED: what is this
+   page and its one primary action (`PageHeader`), which collection
+   (`Tabs`), how do I narrow it (`FilterBar`), what is in it (the stat
+   strip, every cell its own filter), and then the roster as one queue
+   table with the exception rail on the left. A row is a PERSON and it
+   opens their page; the admin acts on that person ride behind the row's
+   own menu, so the whole row stays a link to the record.
+
    KNOWN LIMITATION, not a bug here: the list endpoint
    (`getSelfCreatedUsersController`) returns only members the SIGNED-IN
    admin created, not the whole team. There is no "everyone" endpoint yet.
    Of the fields the old local engine had, active/last sign-in/added are now
-   real (AdminUserTasks._accountFacts) and render in the drawer; designation,
-   avatar, the locked/suspended statuses and the failed-attempt count have no
+   real (AdminUserTasks._accountFacts) and render on the row; the avatar,
+   the locked/suspended statuses and the failed-attempt count have no
    column behind them and stay off the screen rather than being invented.
    ===================================================================== */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import AdminOpsService from "../../../api/modules/adminOps";
 import { errMessage } from "../../../api/apiService";
-import { EmptyState, FilterChips, Icon, ListTable, Pill, qs, SearchField, Select, StatStrip, Tabs, TbTitle } from "../../ui";
-import type { StatCell } from "../../ui";
+import {
+  Button, EmptyState, FilterBar, FilterChips, ListSkeleton, ListTable, MoreMenu, PageHeader,
+  Pagination, Person, Pill, Rail, SearchField, Select, StatStrip, Tabs, TbTitle, fmtDate, qs,
+} from "../../ui";
+import type { MenuItem, StatCell } from "../../ui";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
-import { Avatar, RoleChips } from "../teamShared";
+import { RoleChips } from "../teamShared";
 import type { Member, Ops, Role } from "../teamShared";
-import { ListSkeleton } from "../../ui";
 import MemberPage from "./MemberPage";
 import { adoptPeople } from "./adopt";
 import { DOCUMENT_KIND, labelOf, missingDocs, readMember, readMembers, useMembers, useDocuments } from "./store";
 import { opOf } from "./member/ops";
-import { MemberNewModal } from "./memberModals";
+import {
+  MemberDeleteModal, MemberEditModal, MemberNewModal, MemberRolesModal, MemberSendCredentialsModal,
+} from "./memberModals";
 import AccessRequests, { pendingRequests } from "./AccessRequests";
+
+const CHIP_LABELS = { q: "Search", role: "Role", dept: "Department" };
+const PAGE_SIZE = 25;
 
 export default function Team() {
   const { id, sub } = useParams();
@@ -42,6 +57,7 @@ export default function Team() {
   const [tick, setTick] = useState(0);
   const [rows, setRows] = useState<Member[] | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
+  const [page, setPage] = useState(1);
 
   const p: Record<string, string> = {
     q: sp.get("q") || "", role: sp.get("role") || "", dept: sp.get("dept") || "",
@@ -81,13 +97,16 @@ export default function Team() {
     return () => { cancelled = true; };
   }, [tick]);
 
+  /* A narrower list is a different list: page 4 of it does not exist. */
+  useEffect(() => { setPage(1); }, [p.q, p.role, p.dept, p.tab]);
+
   /* ------------------------------------------------------------ chrome -- */
   const crumbs = useMemo(() => {
     /* "Members", matching the sidebar row that opens this — see LABEL_OVERRIDE
        in shell/modules.ts. The crumb is written out here rather than read from
        the module item because this page also renders the member and operation
        crumbs below, and one source for all three is what keeps them a chain. */
-    if (!id) return <span className="tb-title">Members</span>;
+    if (!id) return <TbTitle label="Members" to="#/team" />;
     const u = (rows || []).find((x) => String(x.id) === id);
     const name = u ? u.name : readMember(id)?.name || "Member";
     /* ON AN OPERATION PAGE THE CRUMB SAYS BOTH. The name is the way back to the
@@ -97,11 +116,11 @@ export default function Team() {
     const op = sub ? opOf(sub) : null;
     if (!op) return <TbTitle label={name} to="#/team" />;
     return (
-      <>
+      <span className="flex min-w-0 items-center gap-1.5">
         <TbTitle label={name} to={"#/team/" + id} />
-        <span className="tb-sep">/</span>
-        <span className="tb-title is-here">{op.label}</span>
-      </>
+        <span aria-hidden="true" className="text-fg-quaternary">/</span>
+        <span className="truncate text-sm font-semibold text-brand-secondary" aria-current="page">{op.label}</span>
+      </span>
     );
   }, [id, rows, sub]);
   /* Up from an operation is the member, not the roster. */
@@ -112,15 +131,31 @@ export default function Team() {
 
   /* ----------------------------------------------------------- filters -- */
   const typing = useRef<number | undefined>(undefined);
+  const caret = useRef<number | null>(null);
   function setFilter(name: string, value: string) {
     const q: Record<string, string> = { ...p };
     q[name] = value;
     go("#/team" + (id ? "/" + id : "") + qs(q));
   }
+  /* Typing is debounced, and the caret is handed back afterwards — the input is
+     remounted by the new `q` in the URL, so the focus has to be re-asked for. */
   function setSearch(name: string, value: string) {
     window.clearTimeout(typing.current);
-    typing.current = window.setTimeout(() => setFilter(name, value), 220);
+    typing.current = window.setTimeout(() => {
+      const el = document.querySelector('input[data-filter="q"]') as HTMLInputElement | null;
+      caret.current = el ? el.selectionStart : null;
+      setFilter(name, value);
+    }, 220);
   }
+  useEffect(() => {
+    const at = caret.current;
+    if (at === null) return;
+    caret.current = null;
+    const el = document.querySelector('input[data-filter="q"]') as HTMLInputElement | null;
+    if (!el) return;
+    el.focus();
+    try { el.setSelectionRange(at, at); } catch { /* type=search may refuse */ }
+  });
   function unfilter(k: string) {
     if (k === "*" || k === "q") {
       const el = document.querySelector('input[data-filter="q"]') as HTMLInputElement | null;
@@ -137,12 +172,11 @@ export default function Team() {
     q.tab = k === "members" ? "" : k;
     return "#/team" + qs(q);
   }
-
   if (!rows) return <ListSkeleton />;
 
   /* A ROW IS A PERSON AND IT OPENS THEIR PAGE. The drawer is gone: identity,
      access, attendance, work, reports, documents and pay are one screen with
-     tabs, and the admin actions moved into its header. */
+     its own launcher, and the admin actions moved into its header. */
   if (id) {
     const u = rows.find((x) => String(x.id) === id) || null;
     return <MemberPage id={id} sub={sub || ""} live={u} roles={roles} ops={ops} />;
@@ -164,113 +198,170 @@ export default function Team() {
   const waiting = pendingRequests();
   const filtered = !!(p.q || p.role || p.dept);
 
+  const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  const at = Math.min(page, pages);
+  const shown = list.slice((at - 1) * PAGE_SIZE, at * PAGE_SIZE);
+
   const cells: (StatCell | "sep")[] = [
-    { k: "members", v: rows.length, to: "#/team", on: !p.role && !p.q },
+    { k: "members", v: rows.length, to: "#/team" + qs({ tab: p.tab }), on: !filtered },
     "sep",
-    { k: "no role", v: noRole, dot: noRole ? "warn" : "", tone: noRole ? "warn" : "",
+    { k: "no role", v: noRole, dot: noRole ? "warn" : "neutral", tone: noRole ? "warn" : "",
       title: "Signed-in and granted nothing — a successful login never implies access" },
     "sep",
     /* A COUNT, NEVER A GATE. Nothing in the panel blocks on a missing document —
        a hard gate would stop somebody working on their first day over a scan. */
-    { k: "documents short", v: noDocs, dot: noDocs ? "warn" : "", tone: noDocs ? "warn" : "",
+    { k: "documents short", v: noDocs, dot: noDocs ? "warn" : "neutral", tone: noDocs ? "warn" : "",
       title: "Members missing at least one required document. Nothing blocks on it." },
     "sep",
     { k: "roles", v: roles.length, to: "#/roles", title: "Open Roles" },
   ];
 
+  const addMember = can("team", "create")
+    ? (
+      <Button color="primary" ico="plus" data-act="tm-new"
+        onClick={() => modal(<MemberNewModal roles={roles} ops={ops} />, "lg")}>
+        Add member
+      </Button>
+    )
+    : null;
+
   return (
-    <div className="dls">
-      {/* Two collections behind one module: the people, and the people asking
-          to get back in. Same `?tab=` convention the Platform surfaces use. */}
-      <div className="dls-chips">
-        <Tabs cur={tab} items={[
+    <div className="flex flex-col gap-4">
+      <PageHeader
+        title="Members"
+        meta={<>
+          <span>{rows.length} on the roster</span>
+          <span>{roles.length} role{roles.length === 1 ? "" : "s"}</span>
+          {filtered ? <span>{list.length} shown</span> : null}
+        </>}
+        actions={tab === "members" ? addMember : null}
+        /* Two collections behind one module: the people, and the people asking
+           to get back in. Same `?tab=` convention the Platform surfaces use. */
+        tabs={<Tabs cur={tab} items={[
           { k: "members", label: "Members", n: rows.length, quiet: true, to: tabTo("members") },
           { k: "requests", label: "Access requests", n: waiting, to: tabTo("requests") },
-        ]} />
-      </div>
+        ]} />}
+      />
 
       {tab === "members" ? (
         <>
-          <div className="dls-cmd">
-            <SearchField ph="Search name, email or username…" val={p.q} onFilter={setSearch} />
-            <Select key={"role:" + p.role} name="role" label="Role"
-              options={roles.map((r) => ({ v: String(r.id), l: r.name }))}
-              value={p.role} onFilter={setFilter} />
-            {/* DEPARTMENT IS A FILTER, NOT AN ANSWER. `department` is already a
-                string on every member, so filtering by it costs nothing. It
-                does NOT settle what "my JD team" means — if that turns out to
-                be a second company rather than a department, the roster needs a
-                tenancy switch and this control is the wrong shape entirely. */}
-            {depts.length ? (
-              <Select key={"dept:" + p.dept} name="dept" label="Department"
-                options={depts.map((d) => ({ v: d, l: d }))}
-                value={p.dept} onFilter={setFilter} />
-            ) : null}
-            <span className="spacer"></span>
-            {can("team", "create") ? (
-              <button className="btn pri" data-act="tm-new"
-                      onClick={() => modal(<MemberNewModal roles={roles} ops={ops} />, "wide")}>
-                <Icon name="plus" />Add member
-              </button>
-            ) : null}
-          </div>
+          <FilterBar
+            search={<SearchField key={"q:" + p.q} ph="Search name, email or username…" val={p.q} onFilter={setSearch} />}
+            filters={<>
+              <Select key={"role:" + p.role} name="role" label="Role"
+                options={roles.map((r) => ({ v: String(r.id), l: r.name }))}
+                value={p.role} onFilter={setFilter} />
+              {/* DEPARTMENT IS A FILTER, NOT AN ANSWER. `department` is already a
+                  string on every member, so filtering by it costs nothing. It
+                  does NOT settle what "my JD team" means — if that turns out to
+                  be a second company rather than a department, the roster needs a
+                  tenancy switch and this control is the wrong shape entirely. */}
+              {depts.length ? (
+                <Select key={"dept:" + p.dept} name="dept" label="Department"
+                  options={depts.map((d) => ({ v: d, l: d }))}
+                  value={p.dept} onFilter={setFilter} />
+              ) : null}
+            </>}
+            chips={filtered
+              ? <FilterChips params={p} labels={CHIP_LABELS} onUnfilter={unfilter} />
+              : null}
+          />
 
           <StatStrip cells={cells} />
 
-          {filtered ? (
-            <div className="dls-chips">
-              <FilterChips params={p} labels={{ q: "Search", role: "Role", dept: "Department" }}
-                onUnfilter={unfilter} />
-            </div>
-          ) : null}
-
-          <div className="dls-body">
-            {list.length ? (
-              <ListTable head={<tr>
-                    <th style={{ width: "3px" }}></th><th>Member</th>
-                    <th style={{ width: "220px" }}>Reports to</th>
-                    <th style={{ width: "230px" }}>Role</th>
-                    <th style={{ width: "190px" }}>Documents</th>
-                  </tr>}>
-                  {list.map((u) => (
-                    <tr key={u.id} className={"clickable" + (u.roles.length ? "" : " u-warn")}
-                        data-go={"#/team/" + u.id} onClick={() => go("#/team/" + u.id)}>
-                      <td className="rail"><i title={u.roles.length ? undefined : "Active with no role — can sign in, can do nothing"}></i></td>
+          {shown.length ? (
+            <>
+              <ListTable min="66rem" head={<tr>
+                <th className="rail" />
+                <th scope="col">Member</th>
+                <th scope="col">Role</th>
+                <th scope="col">Department</th>
+                <th scope="col">Documents</th>
+                <th scope="col">Account</th>
+                <th scope="col">Last sign-in</th>
+                <th scope="col" className="acts"><span className="sr-only">Actions</span></th>
+              </tr>}>
+                {shown.map((u) => {
+                  const to = "#/team/" + u.id;
+                  return (
+                    <tr key={u.id} className="clickable" data-go={to} onClick={() => go(to)}>
+                      <Rail tone={u.roles.length ? undefined : "warn"}
+                        title={u.roles.length ? undefined : "Active with no role — can sign in, can do nothing"} />
+                      <td className="cell-1">
+                        <Person name={u.name} sub={(u.username || "—") + " · " + u.email} to={to} />
+                      </td>
                       <td>
-                        <div className="cell-1" style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <Avatar u={u} />
-                          <span>{u.name}
-                            {u.isSuperAdmin ? <> <span className="pill brand xs">Full access</span></> : null}
-                          </span>
-                        </div>
-                        <div className="cell-2 mono">{u.username || "—"} · {u.email}</div>
+                        {/* Superuser is not a role, so it is not a role chip —
+                            but it is the loudest thing about an account and it
+                            belongs in the column a reader scans for access. */}
+                        <span className="inline-flex flex-wrap items-center gap-1">
+                          {u.isSuperAdmin
+                            ? <Pill xs tone="brand" text="Full access" title="Superuser — every module, by definition" />
+                            : null}
+                          <RoleChips u={u} />
+                        </span>
                       </td>
                       <td><ReportsTo id={String(u.id)} /></td>
-                      <td><RoleChips u={u} /></td>
                       <td><DocsCell id={String(u.id)} /></td>
+                      <td>
+                        {u.isActive === false
+                          ? <Pill xs dot tone="bad" text="Inactive" />
+                          : <Pill xs dot tone="ok" text="Active" />}
+                      </td>
+                      <td className="font-mono text-xs whitespace-nowrap tnum">
+                        {u.lastLogin
+                          ? fmtDate(u.lastLogin)
+                          : <span className="text-quaternary">never</span>}
+                      </td>
+                      <td className="acts" onClick={(e) => e.stopPropagation()}>
+                        <RowMenu u={u} roles={roles} ops={ops} />
+                      </td>
                     </tr>
-                  ))}
-                </ListTable>
-            ) : (
-              <EmptyState
-                icon="team"
-                title={filtered ? "No members match these filters" : "No team members"}
-                body={filtered
-                  ? "Nothing matches. Clear a filter to widen the search."
-                  : "Members are created here by an admin — there is no public signup."}
-                action={filtered
-                  ? <button className="btn" data-unfilter="*" onClick={() => unfilter("*")}>Clear all filters</button>
-                  : <button className="btn pri" data-act="tm-new"
-                            onClick={() => modal(<MemberNewModal roles={roles} ops={ops} />, "wide")}>Add member</button>}
-              />
-            )}
-          </div>
+                  );
+                })}
+              </ListTable>
+
+              <Pagination page={at} pages={pages} total={list.length} unit="members"
+                pageSize={PAGE_SIZE} shown={shown.length} alwaysCount onPage={setPage} />
+            </>
+          ) : (
+            <EmptyState
+              icon="team"
+              title={filtered ? "No members match these filters" : "No team members"}
+              body={filtered
+                ? "Nothing matches. Clear a filter to widen the search."
+                : "Members are created here by an admin — there is no public signup."}
+              action={filtered
+                ? <Button color="secondary" ico="x" data-unfilter="*" onClick={() => unfilter("*")}>Clear all filters</Button>
+                : addMember}
+            />
+          )}
         </>
       ) : (
-        <div className="dls-body"><AccessRequests /></div>
+        <AccessRequests />
       )}
     </div>
   );
+}
+
+/* ===================================================== the row's actions === */
+
+/* Locked actions are ABSENT, not greyed — a disabled row action invites a
+   click and a support ticket. Delete goes last and apart: `MoreMenu` pulls a
+   `bad` item under its own separator. */
+function RowMenu({ u, roles, ops }: { u: Member; roles: Role[]; ops: Ops }) {
+  const items: MenuItem[] = [
+    { icon: "user", label: "Open member", act: () => ops.go("#/team/" + u.id) },
+  ];
+  if (can("team", "edit"))
+    items.push({ icon: "edit", label: "Edit member", act: () => ops.modal(<MemberEditModal u={u} ops={ops} />) });
+  if (can("team", "roles"))
+    items.push({ icon: "shield", label: "Roles", act: () => ops.modal(<MemberRolesModal u={u} roles={roles} ops={ops} />) });
+  if (can("team", "edit"))
+    items.push({ icon: "lock", label: "Send new password", act: () => ops.modal(<MemberSendCredentialsModal u={u} ops={ops} />) });
+  if (can("team", "status"))
+    items.push({ icon: "trash", label: "Delete member", tone: "bad", act: () => ops.modal(<MemberDeleteModal u={u} ops={ops} />) });
+  return <MoreMenu small align="right" items={items} />;
 }
 
 /* ================================================== two derived columns === */
@@ -281,13 +372,13 @@ export default function Team() {
  *  answers to the same question and they would drift within a month. */
 function ReportsTo({ id }: { id: string }) {
   const m = readMember(id);
-  if (!m) return <span className="faint">—</span>;
-  if (!m.reportsTo) return <span className="dim">nobody</span>;
-  const s = readMember(m.reportsTo);
+  if (!m) return <span className="text-quaternary">—</span>;
   return (
     <>
-      <span className="cell-1">{s ? s.name : "—"}</span>
-      <span className="cell-2">{m.department || m.designation}</span>
+      <span className="font-medium text-primary">{m.department || m.designation}</span>
+      <span className="block cell-2">
+        {m.reportsTo ? "reports to " + (readMember(m.reportsTo)?.name || "—") : "reports to nobody"}
+      </span>
     </>
   );
 }
@@ -298,13 +389,19 @@ function ReportsTo({ id }: { id: string }) {
  *  actionable — "2 missing" sends somebody hunting. */
 function DocsCell({ id }: { id: string }) {
   const m = readMember(id);
-  if (!m) return <span className="faint">—</span>;
+  if (!m) return <span className="text-quaternary">—</span>;
   const missing = missingDocs(id);
-  if (!missing.length) return <Pill text="Complete" tone="ok" />;
+  if (!missing.length) return <Pill xs tone="ok" text="Complete" />;
+  /* NAMED, BUT NOT ALL OF THEM. "2 missing" sends somebody hunting; four
+     document names down a table row is three lines of noise on every row. Two
+     names and a count is the trade, and the full list is on the title. */
+  const names = missing.map((k) => labelOf(DOCUMENT_KIND, k));
   return (
     <>
-      <Pill text={missing.length + " missing"} tone="warn" />
-      <span className="cell-2">{missing.map((k) => labelOf(DOCUMENT_KIND, k)).join(", ")}</span>
+      <Pill xs tone="warn" text={missing.length + " missing"} />
+      <span className="block cell-2" title={names.join(", ")}>
+        {names.slice(0, 2).join(", ")}{names.length > 2 ? " +" + (names.length - 2) : ""}
+      </span>
     </>
   );
 }

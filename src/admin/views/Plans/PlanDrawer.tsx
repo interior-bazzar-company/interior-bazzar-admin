@@ -1,134 +1,129 @@
 /* =====================================================================
    PLANS — the drawer. One plan, everything the server holds about it, and
    the actions that can be taken on it. Same drawer pattern Deals uses.
+   ---------------------------------------------------------------------
+   Read in the order the questions are asked: what is this and can it be
+   bought (the badges and the two conditions worth interrupting for), what
+   does it cost (the cycles, which ARE the money), what does it promise
+   (the features), what already points at it, the record's own facts, and
+   finally what has been done to it.
    ===================================================================== */
 import { useEffect, useState } from "react";
 import AdminOpsService from "../../../api/modules/adminOps";
 import type { AuditEntry } from "../../../api/modules/adminOps";
-import { EmptyState, Icon, KvList, Notice, Pill, SectionHead, Timeline } from "../../ui";
+import { Alert, Button, DrawerShell, EmptyState, KvList, PaneLoading, Pill, SectionHead, Table, Timeline } from "../../ui";
 import { can } from "../../shell/AdminShell";
 import { dateLabel, familyLabel, inr, money, monthsLabel } from "./helpers";
 import { rangeOf, savingOf } from "./api";
 import type { Cycle, Plan } from "./api";
+import { FeatureList, PlanStatus } from "./bits";
 
 export type Act = (a: string, ref?: number) => void;
 
 export default function PlanDrawer({ plan, act, go }: { plan: Plan; act: Act; go: (h: string) => void }) {
   const pl = plan;
   const rng = rangeOf(pl);
+  const unbuyable = !pl.archived && pl.active && !pl.cycles.filter((c) => c.active).length;
 
   return (
-    <>
-      <div className="dw-h"><div style={{ display: "flex", alignItems: "flex-start", gap: "10px" }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-            <h2 style={{ fontSize: "var(--text-2xl)", fontWeight: 600 }}>{pl.title}</h2>
-            <Pill text={familyLabel(pl.family)} />
-            {pl.archived
-              ? <Pill text="Archived" />
-              : pl.active ? <Pill text="On sale" tone="ok" /> : <Pill text="Off sale" />}
-            {pl.badge ? <Pill text={pl.badge} tone="warn" /> : null}
+    <DrawerShell
+      title={pl.title}
+      sub={<span className="font-mono tnum">#{pl.id}{pl.tag ? " · " + pl.tag : ""}{pl.updatedAt ? " · updated " + dateLabel(pl.updatedAt) : ""}</span>}
+      onClose={() => go("#/plans")}
+      actions={<ActionBar pl={pl} act={act} />}
+    >
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <PlanStatus plan={pl} lg />
+            <Pill tone="neutral" text={familyLabel(pl.family)} title="What buying it unlocks" />
+            {pl.tier ? <Pill tone="neutral" text={"tier " + pl.tier} /> : null}
+            {pl.badge ? <Pill tone="brand" text={pl.badge} title="The ribbon printed on the public card" /> : null}
           </div>
-          <div className="mono" style={{ fontSize: "var(--text-md)", color: "var(--text-2)", marginTop: "5px" }}>
-            #{pl.id}{pl.tag ? " · " + pl.tag : ""}{pl.tier ? " · tier " + pl.tier : ""}
-            {pl.updatedAt ? " · updated " + dateLabel(pl.updatedAt) : ""}
-          </div>
+          {pl.subtitle ? <p className="text-sm text-tertiary">{pl.subtitle}</p> : null}
+
+          {pl.archived ? (
+            <Alert tone="info" ico="lock" title="Archived — out of the catalogue, and kept.">
+              It cannot be bought and cannot be put back on sale until it is restored. Everything that
+              already names it — quotation lines, memberships, the audit trail — still reads as it always did.
+            </Alert>
+          ) : null}
+
+          {unbuyable ? (
+            <Alert tone="bad" title="On sale with nothing to sell it at.">
+              The public plans page prices a card from its active durations only, so this one renders
+              with no price and cannot be bought. Switch a duration on, or take the plan off sale.
+            </Alert>
+          ) : null}
         </div>
-        <span className="spacer"></span>
-        <button className="btn icon sm" data-go="#/plans" aria-label="Close" onClick={() => go("#/plans")}>
-          <Icon name="x" />
-        </button>
-      </div></div>
 
-      <div className="dw-b">
-        {pl.subtitle
-          ? <p style={{ color: "var(--text-2)", marginBottom: "14px" }}>{pl.subtitle}</p>
-          : null}
+        <section>
+          <SectionHead title="Pricing" desc="What a buyer pays. This is the money the checkout charges." />
+          <CycleTable pl={pl} act={act} />
+        </section>
 
-        {pl.archived
-          ? <Notice ico="lock" text={<>
-              <b>Archived — out of the catalogue, and kept.</b> It cannot be bought and cannot be put
-              back on sale until it is restored. Everything that already names it — quotation lines,
-              memberships, the audit trail — still reads as it always did.
-            </>} />
-          : null}
+        <section>
+          <SectionHead title="Features" desc="The bullet list on the public plan card." />
+          {pl.features.length
+            ? <FeatureList features={pl.features} />
+            : <EmptyState icon="quote" title="No features listed"
+                body="The plan card on the public page would show an empty list." />}
+        </section>
 
-        {!pl.archived && pl.active && !pl.cycles.filter((c) => c.active).length
-          ? <Notice tone="bad" ico="alert" text={<>
-              <b>On sale with nothing to sell it at.</b> The public plans page prices a card from its
-              active durations only, so this one renders with no price and cannot be bought. Switch a
-              duration on, or take the plan off sale.
-            </>} />
-          : null}
+        <section>
+          <SectionHead title="Where it is used"
+            desc="What already points at this plan — and would be left unexplainable if the row went away." />
+          <KvList pairs={[
+            /* Quotation lines carry no plan FK: the line snapshots a title typed by
+               hand. Counted by the NAME they carry, and labelled as such — a link
+               this weak must not be printed as if it were a foreign key. */
+            ["On quotations", pl.usage.quotationLines
+              ? <>{pl.usage.quotationLines} line{pl.usage.quotationLines === 1 ? "" : "s"}{" "}
+                  <span className="text-quaternary">· matched by the title they name</span></>
+              : <span className="text-quaternary">none</span>],
+            ["Members", pl.usage.members
+              ? <>{pl.usage.members} bought{" "}
+                  <span className="text-quaternary">· {pl.usage.membersActive} still active</span></>
+              : <span className="text-quaternary">none</span>]
+          ]} />
+        </section>
 
-        <SectionHead title="Pricing" desc="What a buyer pays. This is the money the checkout charges." />
-        <CycleTable pl={pl} act={act} />
+        <section>
+          <SectionHead title="Plan record" />
+          <KvList pairs={[
+            ["Price range", rng ? money(rng.lo) + (rng.lo === rng.hi ? "" : " – " + money(rng.hi)) : "—"],
+            ["Family", familyLabel(pl.family)],
+            /* entityType is what a purchase actually unlocks, and it is derived
+               from the family at creation — worth showing, because a mismatch is
+               what makes a plan unbuyable. */
+            ["Unlocks", pl.entityType || null],
+            ["Card order", pl.displayIndex ? "#" + pl.displayIndex + " in " + familyLabel(pl.family)
+              : <span className="text-quaternary">last</span>],
+            ["Upgrade tier", pl.tier || null],
+            /* NOT the price. Spelt out because it looks exactly like one — and
+               blank must not print as "Free", which is a price. An unset amount
+               is a real hazard: activating a plan that ranks below one the user
+               already holds expires itself on the spot. */
+            ["Ranking amount", pl.amount
+              ? <><span className="font-mono tnum">{inr(pl.amount)}</span>{" "}
+                  <span className="text-quaternary">· ranks upgrades, never charged</span></>
+              : <span className="text-warning-primary">not set — this plan cannot outrank one a buyer already holds</span>],
+            ["Default duration", pl.duration ? monthsLabel(Number(pl.duration)) : null]
+          ]} />
+        </section>
 
-        <SectionHead title="Features" desc="The bullet list on the public plan card." />
-        {pl.features.length
-          ? <ul className="pl-feats">
-              {pl.features.map((f, i) => (
-                <li key={i}><Icon name="check" size="sm" /><span>
-                  <b>{f.text}</b>
-                  {/* The detail line the public card prints under the bullet. Most
-                      features have none — an empty one renders nothing, not a gap. */}
-                  {f.detail ? <div className="d">{f.detail}</div> : null}
-                </span></li>
-              ))}
-            </ul>
-          : <EmptyState icon="quote" title="No features listed"
-              body="The plan card on the public page would show an empty list." />}
+        <section>
+          <SectionHead title="History" desc="Every level-3 write that named this plan." />
+          <History planId={pl.id} />
+        </section>
 
-        <SectionHead title="Where it is used"
-          desc="What already points at this plan — and would be left unexplainable if the row went away." />
-        <KvList cls="wide" pairs={[
-          /* Quotation lines carry no plan FK: the line snapshots a title typed by
-             hand. Counted by the NAME they carry, and labelled as such — a link
-             this weak must not be printed as if it were a foreign key. */
-          ["On quotations", pl.usage.quotationLines
-            ? <>{pl.usage.quotationLines} line{pl.usage.quotationLines === 1 ? "" : "s"}{" "}
-                <span className="faint">· matched by the title they name</span></>
-            : <span className="faint">none</span>],
-          ["Members", pl.usage.members
-            ? <>{pl.usage.members} bought{" "}
-                <span className="faint">· {pl.usage.membersActive} still active</span></>
-            : <span className="faint">none</span>]
-        ]} />
-
-        <SectionHead title="Plan record" />
-        <KvList cls="wide" pairs={[
-          ["Price range", rng ? money(rng.lo) + (rng.lo === rng.hi ? "" : " – " + money(rng.hi)) : "—"],
-          ["Family", familyLabel(pl.family)],
-          /* entityType is what a purchase actually unlocks, and it is derived
-             from the family at creation — worth showing, because a mismatch is
-             what makes a plan unbuyable. */
-          ["Unlocks", pl.entityType || <span className="faint">—</span>],
-          ["Card order", pl.displayIndex ? "#" + pl.displayIndex + " in " + familyLabel(pl.family)
-            : <span className="faint">last</span>],
-          ["Upgrade tier", pl.tier || <span className="faint">—</span>],
-          /* NOT the price. Spelt out because it looks exactly like one — and
-             blank must not print as "Free", which is a price. An unset amount
-             is a real hazard: activating a plan that ranks below one the user
-             already holds expires itself on the spot. */
-          ["Ranking amount", pl.amount
-            ? <>{inr(pl.amount)} <span className="faint">· ranks upgrades, never charged</span></>
-            : <span className="faint">not set — this plan cannot outrank one a buyer already holds</span>],
-          ["Default duration", pl.duration ? monthsLabel(Number(pl.duration)) : <span className="faint">—</span>]
-        ]} />
-
-        <SectionHead title="History" />
-        <History planId={pl.id} />
-
-        <Notice ico="lock" text={<>
-          <b>Editing this plan cannot change a quotation that already exists.</b> A quotation copies
-          the price, the discount, the term and the feature list at the moment it is created, and
-          reads nothing from here afterwards. New quotations get the new numbers; issued ones keep
-          theirs.
-        </>} />
+        <Alert tone="info" ico="lock" title="Editing this plan cannot change a quotation that already exists.">
+          A quotation copies the price, the discount, the term and the feature list at the moment it is
+          created, and reads nothing from here afterwards. New quotations get the new numbers; issued
+          ones keep theirs.
+        </Alert>
       </div>
-
-      <div className="dw-f"><ActionBar pl={pl} act={act} /></div>
-    </>
+    </DrawerShell>
   );
 }
 
@@ -140,34 +135,38 @@ function CycleTable({ pl, act }: { pl: Plan; act: Act }) {
     return <EmptyState icon="tag" title="Not priced yet"
       body="Add a duration and this plan becomes buyable."
       action={can("plans", "pricing")
-        ? <button className="btn pri" data-act="pl-edit" data-ref={pl.id}
-            onClick={() => act("pl-edit", pl.id)}>Set pricing</button>
+        ? <Button color="primary" ico="plus" data-act="pl-edit" data-ref={pl.id}
+            onClick={() => act("pl-edit", pl.id)}>Set pricing</Button>
         : null} />;
 
   return (
-    <table className="tbl pl-price"><thead><tr>
-      <th>Duration</th><th className="n">Price</th><th className="n">Was</th>
-      <th className="n">Saving</th><th className="n">Per month</th><th>Label</th><th>On sale</th>
-    </tr></thead><tbody>
-      {pl.cycles.map((c: Cycle) => {
+    <Table
+      min="34rem"
+      cols={[
+        { label: "Duration" }, { label: "Price", cls: "n" }, { label: "Per month", cls: "n" },
+        { label: "Label" }, { label: "On sale", cls: "c" },
+      ]}
+      rows={pl.cycles.map((c: Cycle) => {
         const save = savingOf(c);
         return (
-          <tr key={c.id} className={c.active ? undefined : "dim"}>
-            <td><b>{monthsLabel(c.months)}</b></td>
-            <td className="n tnum"><b>{money(c.price)}</b></td>
-            <td className="n tnum">{save
-              ? <span style={{ textDecoration: "line-through", color: "var(--text-3)" }}>{money(c.oldPrice)}</span>
-              : <span className="faint">—</span>}</td>
-            <td className="n tnum">{save
-              ? <span style={{ color: "var(--ok)" }}>−{inr(save)}</span>
-              : <span className="faint">—</span>}</td>
-            <td className="n tnum faint">{c.months ? inr(Math.round(c.price / c.months)) : "—"}</td>
-            <td>{c.badge || <span className="faint">—</span>}</td>
-            <td>{c.active ? <Pill text="Yes" tone="ok" /> : <Pill text="No" />}</td>
+          <tr key={c.id}>
+            <td className="cell-1">{monthsLabel(c.months)}</td>
+            <td className="n">
+              <span className="font-medium text-primary">{money(c.price)}</span>
+              {save ? <div className="cell-2">
+                <span className="line-through">{money(c.oldPrice)}</span>{" "}
+                <span className="text-success-primary">−{inr(save)}</span>
+              </div> : null}
+            </td>
+            <td className="n text-quaternary">{c.months ? inr(Math.round(c.price / c.months)) : "—"}</td>
+            <td>{c.badge ? <Pill xs tone="neutral" text={c.badge} /> : <span className="text-quaternary">—</span>}</td>
+            <td className="c">{c.active
+              ? <Pill xs dot tone="ok" text="Yes" />
+              : <Pill xs dot tone="neutral" text="No" title="Kept, but off the public card" />}</td>
           </tr>
         );
       })}
-    </tbody></table>
+    />
   );
 }
 
@@ -191,13 +190,16 @@ function History({ planId }: { planId: number }) {
     return () => { cancelled = true; };
   }, [planId]);
 
-  if (rows === null) return <div className="faint">Loading…</div>;
-  if (!rows.length) return <div className="faint">Nothing yet.</div>;
+  if (rows === null) return <PaneLoading label="Loading the history…" />;
+  if (!rows.length) return <p className="text-sm text-tertiary">Nothing yet.</p>;
   return (
     /* the shared timeline — see the note in Deals/Drawer.tsx */
     <Timeline items={rows.slice(0, 12).map((e) => ({
       tone: e.action.indexOf("deleted") >= 0 ? "bad" as const : "ok" as const,
-      title: <><span className="pill xs">{e.action.replace(/^plan_/, "")}</span><span className="tl-when">{dateLabel(e.ts || "")}</span></>,
+      title: <span className="flex flex-wrap items-center gap-2">
+        <Pill xs tone="neutral" text={e.action.replace(/^plan_/, "").replace(/_/g, " ")} />
+        <span className="text-xs font-normal text-quaternary tnum">{dateLabel(e.ts || "")}</span>
+      </span>,
       body: e.detail || "—",
       meta: e.actor || "—",
     }))} />
@@ -214,30 +216,28 @@ function ActionBar({ pl, act }: { pl: Plan; act: Act }) {
      offered and then refused — restore is the only way back to the catalogue. */
   if (pl.archived)
     return can("plans", "archive")
-      ? <><span className="spacer"></span>
-          <button className="btn pri" data-act="pl-restore" data-ref={pl.id}
-            onClick={() => act("pl-restore", pl.id)}><Icon name="check" />Restore plan</button></>
+      ? <Button color="primary" ico="undo" data-act="pl-restore" data-ref={pl.id}
+          onClick={() => act("pl-restore", pl.id)}>Restore plan</Button>
       : null;
 
   return (
     <>
-      {mayEdit
-        ? <button className="btn pri" data-act="pl-edit" data-ref={pl.id}
-            onClick={() => act("pl-edit", pl.id)}><Icon name="quote" />Edit plan</button>
-        : null}
-      {can("plans", "status")
-        ? (pl.active
-          ? <button className="btn" data-act="pl-off" data-ref={pl.id}
-              onClick={() => act("pl-off", pl.id)}>Take off sale</button>
-          : <button className="btn" data-act="pl-on" data-ref={pl.id}
-              onClick={() => act("pl-on", pl.id)}><Icon name="check" />Put on sale</button>)
-        : null}
-      <span className="spacer"></span>
       {/* Archive, never delete: every row that names this plan has to keep
           resolving. Not styled danger-red, because nothing is destroyed. */}
       {can("plans", "archive")
-        ? <button className="btn" data-act="pl-archive" data-ref={pl.id}
-            onClick={() => act("pl-archive", pl.id)}>Archive</button>
+        ? <Button color="secondary" ico="archive" data-act="pl-archive" data-ref={pl.id}
+            onClick={() => act("pl-archive", pl.id)}>Archive</Button>
+        : null}
+      {can("plans", "status")
+        ? (pl.active
+          ? <Button color="secondary" ico="eyeoff" data-act="pl-off" data-ref={pl.id}
+              onClick={() => act("pl-off", pl.id)}>Take off sale</Button>
+          : <Button color="secondary" ico="check" data-act="pl-on" data-ref={pl.id}
+              onClick={() => act("pl-on", pl.id)}>Put on sale</Button>)
+        : null}
+      {mayEdit
+        ? <Button color="primary" ico="edit" data-act="pl-edit" data-ref={pl.id}
+            onClick={() => act("pl-edit", pl.id)}>Edit plan</Button>
         : null}
     </>
   );

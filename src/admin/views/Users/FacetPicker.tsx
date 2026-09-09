@@ -23,6 +23,16 @@
    box you are typing into has moved somewhere else on the page. Above the
    control, the answer stays in one place and the box you type into never moves.
 
+   THE LIST NOW HOLDS WHAT IS PICKED, WITH A TICK. It used to drop a value out
+   of the list the moment it was chosen, on the argument that "the list is what
+   you can still do". Two things were wrong with it: the panel's own
+   `MultiSelect` keeps a chosen row and ticks it, so this was a second drawing
+   of one idea; and a list whose rows move under the cursor as you pick makes
+   the third pick land on the row you were not aiming at. Picking a ticked row
+   takes the value off again, which is the reason a tick can be pressed at all.
+   AT THE CAP the list narrows to what you have picked, so the only thing you
+   can do there — take one off — is the only thing offered.
+
    WHY THE CLOSED LISTS ARE CLOSED. Business type, Segments, Categories and
    State refuse anything not in the vocabulary. They are what the marketplace
    filters and ranks on, and free text fragments a facet inside a month —
@@ -47,7 +57,10 @@
    returns focus, and Backspace on an empty box removes the last chip.
    ============================================================================= */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Icon } from "../../ui";
+import { InputBase } from "@/components/base/input/input";
+import { cx } from "@/utils/cx";
+import { Icon, IconButton, Tag, iconOf } from "../../ui";
+import { OptionGroup, OptionNote, OptionRow, Pop } from "./bits";
 import { cleanKeyword, groupsFor, optionsFor } from "./store";
 import type { FacetOption, ProfileField } from "./store";
 
@@ -64,29 +77,46 @@ export function Chips({ f, values, onRemove, disabled, options: given, below }: 
 }) {
   if (!values.length) return null;
   const opts = given || optionsFor(f);
+  const items = values.map((v) => {
+    const hit = opts.filter((o) => o.key === v)[0];
+    /* A value the vocabulary no longer has is still a fact about this
+       profile. It renders, flagged, rather than vanishing — a silently
+       dropped chip is a data migration nobody finds out about. */
+    return { v, label: hit ? hit.label : v, stale: !f.open && f.type !== "tags" && !hit };
+  });
+  const stale = items.filter((i) => i.stale).length;
   return (
-    <div className={"um-chips" + (below ? " below" : "")} role="list">
-      {values.map((v) => {
-        const hit = opts.filter((o) => o.key === v)[0];
-        /* A value the vocabulary no longer has is still a fact about this
-           profile. It renders, flagged, rather than vanishing — a silently
-           dropped chip is a data migration nobody finds out about. */
-        const stale = !f.open && f.type !== "tags" && !hit;
-        return (
-          /* The tone comes off when a chip is stale: a value the vocabulary
-             dropped must not wear the colours of one it still has. */
-          <span className={"pill um-chip " + (stale ? "warn" : (f.chip || ""))} role="listitem" key={v}
-            title={stale ? "Not in the current vocabulary — saved before it changed." : undefined}>
-            {hit ? hit.label : v}
-            {disabled ? null : (
-              <button type="button" className="um-chip-x" onClick={() => onRemove(v)}
-                aria-label={"Remove " + (hit ? hit.label : v)}>
-                <Icon name="x" size="sm" />
-              </button>
-            )}
+    <div className={cx("flex min-w-0 flex-col gap-1", below ? "mt-2" : "mb-2")}>
+      <div className="flex flex-wrap items-center gap-1.5" role="list">
+        {items.map((it) => (
+          <span role="listitem" key={it.v} className="inline-flex max-w-full">
+            {/* The tone comes off when a chip is stale: a value the vocabulary
+                dropped must not wear the colours of one it still has. */}
+            <Tag
+              tone={it.stale ? "warn" : f.chip}
+              onRemove={disabled ? undefined : () => onRemove(it.v)}
+              label={
+                it.stale ? (
+                  <span className="inline-flex min-w-0 items-center gap-1">
+                    <Icon name="alert" size="xs" />
+                    <span className="truncate">{it.label}</span>
+                  </span>
+                ) : (
+                  <span className="block max-w-56 truncate">{it.label}</span>
+                )
+              }
+            />
           </span>
-        );
-      })}
+        ))}
+      </div>
+      {/* SAID ONCE, NOT PER CHIP. The flag on the chip is the marker; this is
+          what the marker means, and a `title=` nobody hovers is not it. */}
+      {stale ? (
+        <p className="text-xs text-tertiary">
+          {stale === 1 ? "One value is" : stale + " values are"} not in the current vocabulary —
+          saved before it changed.
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -126,24 +156,23 @@ export default function FacetPicker({ f, values, onChange, disabled, options: gi
   const options = given || optionsFor(f);
   const groups = groupsFor(f);
   const full = values.length >= max;
+  const capped = full && !single;
   const pickedLabel = selectLike && values.length
     ? ((options.filter((o) => o.key === values[0])[0] || { label: values[0] }).label)
     : "";
 
-  /* Already-picked options leave the list rather than sitting in it greyed
-     out: the list is what you can still do, and a menu mostly made of things
-     you have already done is a menu you stop reading. */
+  /* At the cap the pool narrows to what is already on, so the list offers the
+     one move left rather than a screen of rows that refuse to be pressed. */
   const matches = useMemo(() => {
     const needle = cleanKeyword(q).toLowerCase();
-    return options.filter((o) =>
-      (selectLike || values.indexOf(o.key) < 0)
-      && (!needle || o.label.toLowerCase().indexOf(needle) >= 0));
-  }, [options, values, q, selectLike]);
+    const pool = capped ? options.filter((o) => values.indexOf(o.key) >= 0) : options;
+    return pool.filter((o) => !needle || o.label.toLowerCase().indexOf(needle) >= 0);
+  }, [options, values, q, capped]);
 
-  /* The typed value, offered as itself. Only on an open field, and only when
-     it is not already a suggestion and not already picked. */
+  /* The typed value, offered as itself. Only on an open field, only below the
+     cap, and only when it is not already a suggestion and not already picked. */
   const typed = cleanKeyword(q);
-  const canAddTyped = free && !!typed
+  const canAddTyped = free && !!typed && !full
     && !matches.some((o) => o.label.toLowerCase() === typed.toLowerCase())
     && !values.some((v) => v.toLowerCase() === typed.toLowerCase())
     && (!f.maxLength || typed.length <= f.maxLength);
@@ -153,6 +182,16 @@ export default function FacetPicker({ f, values, onChange, disabled, options: gi
     : matches;
 
   useEffect(() => { setActive(0); }, [q, open]);
+
+  /* THE ACTIVE ROW IS KEPT IN VIEW. `aria-activedescendant` moves the reader's
+     cursor without moving focus, so nothing scrolls the popup on its own —
+     arrowing past the sixth option walked off the bottom of it. */
+  const activeId = open && rows.length ? "facet-" + f.key + "-" + active : "";
+  useEffect(() => {
+    if (!activeId) return;
+    const el = document.getElementById(activeId);
+    if (el) el.scrollIntoView({ block: "nearest" });
+  }, [activeId]);
 
   /* Outside click and Escape both close. Without the first, a picker left open
      sits over the field below it and swallows the next click on the form. */
@@ -172,7 +211,10 @@ export default function FacetPicker({ f, values, onChange, disabled, options: gi
       setOpen(false);
       return;
     }
-    if (values.indexOf(key) >= 0 || full) return;
+    /* A TICKED ROW IS A CONTROL. Pressing it takes the value off, which is the
+       only thing the cap leaves anybody to do. */
+    if (values.indexOf(key) >= 0) { onChange(values.filter((v) => v !== key)); return; }
+    if (full) return;
     onChange(values.concat([key]));
     setQ("");
     /* Stays open. Picking three segments should be three keystrokes, not
@@ -221,115 +263,139 @@ export default function FacetPicker({ f, values, onChange, disabled, options: gi
      Categories mixes a delivery model with a sector — two different questions
      — and flattening them makes somebody choose as though they were one. */
   const rendered = () => {
-    if (!rows.length) {
-      return (
-        <li className="um-opt none" role="presentation">
-          {full
-            ? "That is the maximum of " + max + ". Remove one to add another."
-            : free
-              ? "Type to add a keyword."
-              : q ? "Nothing matches “" + q + "”." : "Everything here is already picked."}
-        </li>
+    const out: React.ReactNode[] = [];
+    if (capped) {
+      out.push(
+        <OptionNote key="cap">
+          That is the maximum of {max}. Take one off to add another.
+        </OptionNote>,
       );
+    }
+    if (!rows.length) {
+      out.push(
+        <OptionNote key="none">
+          {free
+            ? "Type to add a keyword."
+            : q ? "Nothing matches “" + q + "”." : "Nothing to pick from."}
+        </OptionNote>,
+      );
+      return out;
     }
     const row = (r: FacetOption | "new", i: number) => {
       if (r === "new") {
         return (
-          <li key="new" id={optId(i)} role="option" aria-selected={active === i}
-            className={"um-opt add" + (active === i ? " on" : "")}
-            onMouseEnter={() => setActive(i)} onMouseDown={(e) => e.preventDefault()}
-            onClick={() => commit(typed)}>
-            <Icon name="plus" size="sm" />
-            <b>Add “{typed}”</b>
-          </li>
+          <OptionRow key="new" id={optId(i)} active={active === i}
+            onHover={() => setActive(i)} onPick={() => commit(typed)}
+            label={<span className="inline-flex items-center gap-1.5 font-medium text-brand-secondary">
+              <Icon name="plus" size="sm" />Add “{typed}”
+            </span>} />
         );
       }
-      const picked = selectLike && values[0] === r.key;
+      const picked = values.indexOf(r.key) >= 0;
       return (
-        <li key={r.key} id={optId(i)} role="option" aria-selected={active === i}
-          className={"um-opt" + (active === i ? " on" : "") + (picked ? " picked" : "")}
-          onMouseEnter={() => setActive(i)} onMouseDown={(e) => e.preventDefault()}
-          onClick={() => commit(r.key)}>
-          <span className="l">{r.label}</span>
-          {/* A field with an i button keeps its dropdown simple — the
-              sentences live in the info panel, not on every row. */}
-          {r.hint && !f.info ? <em>{r.hint}</em> : null}
-        </li>
+        <OptionRow key={r.key} id={optId(i)} active={active === i} picked={picked}
+          /* The tick is a checkbox on a list that holds several and a mark on a
+             list that holds one — the same distinction the panel's own
+             MultiSelect and Select draw. */
+          box={!single}
+          label={r.label}
+          /* A field with an i button keeps its dropdown simple — the
+             sentences live in the info panel, not on every row. */
+          hint={r.hint && !f.info ? r.hint : undefined}
+          onHover={() => setActive(i)}
+          onPick={() => commit(r.key)} />
       );
     };
-    if (!groups.length) return rows.map(row);
-    const out: React.ReactNode[] = [];
+    if (!groups.length) {
+      rows.forEach((r, i) => out.push(row(r, i)));
+      return out;
+    }
+    const grouped: React.ReactNode[] = [];
     groups.forEach((g) => {
       const mine = rows.filter((r) => r !== "new" && (r as FacetOption).group === g.key);
       if (!mine.length) return;
-      out.push(
-        <li className="um-optg" role="presentation" key={"g-" + g.key}>
-          {g.label}{g.note ? <em>{g.note}</em> : null}
-        </li>,
-      );
-      mine.forEach((r) => out.push(row(r, rows.indexOf(r))));
+      grouped.push(<OptionGroup key={"g-" + g.key} label={g.label} note={g.note} />);
+      mine.forEach((r) => grouped.push(row(r, rows.indexOf(r))));
     });
     /* Anything the groups did not claim still has to render, or a vocabulary
        entry with a typo'd group silently disappears from the picker. */
     rows.forEach((r, i) => {
       if (r === "new" || !groups.some((g) => g.key === (r as FacetOption).group)) {
-        out.unshift(row(r, i));
+        grouped.unshift(row(r, i));
       }
     });
-    return out;
+    return out.concat(grouped);
   };
 
+  const placeholder = capped
+    ? max + " of " + max + " picked"
+    : selectLike && open && pickedLabel
+      ? pickedLabel
+      : f.placeholder || (free ? "Search or type your own"
+        : single ? "Choose one" : "Search and pick");
+
   return (
-    <div className={"um-facet" + (selectLike ? " sellike" : "") + (open ? " open" : "")} ref={box}>
+    <div className="relative flex min-w-0 flex-col" ref={box}>
       {selectLike || chipsBelow ? null : (
         <Chips f={f} values={values} onRemove={remove} disabled={disabled} options={given} />
       )}
 
-      <div className="um-facet-in">
-        {selectLike && !open ? null : <Icon name="search" size="sm" />}
-        <input
+      <div className="relative flex min-w-0 items-center">
+        <InputBase
           ref={input}
-          className="inp"
+          size="sm"
           type="text"
           role="combobox"
           aria-expanded={open}
           aria-controls={listId}
           aria-haspopup="listbox"
           aria-autocomplete="list"
-          aria-activedescendant={open && rows.length ? optId(active) : undefined}
+          aria-activedescendant={activeId || undefined}
           aria-label={f.label}
-          disabled={disabled || (full && !free && !single)}
-          placeholder={
-            full && !single
-              ? max + " of " + max + " picked"
-              : selectLike && open && pickedLabel
-                ? pickedLabel
-                : f.placeholder || (free ? "Search or type your own"
-                  : single ? "Choose one" : "Search and pick")
-          }
+          isDisabled={disabled}
+          disabled={disabled}
+          icon={selectLike && !open ? undefined : iconOf("search")}
+          placeholder={placeholder}
           /* Closed select-like: the box shows the answer, read-only, and a
              press opens the list. Open: it is the search box again. */
           readOnly={selectLike && !open}
           value={selectLike && !open ? pickedLabel : q}
+          wrapperClassName="w-full"
+          inputClassName="pr-9"
           onChange={(e) => { setQ(e.target.value); setOpen(true); }}
-          onFocus={() => setOpen(true)}
-          onClick={() => { if (!open) setOpen(true); }}
+          onFocus={() => { if (!disabled) setOpen(true); }}
+          onClick={() => { if (!disabled && !open) setOpen(true); }}
           onKeyDown={onKey}
         />
-        {!open ? null : (
-          <button type="button" className="um-facet-x" aria-label="Close the list"
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => { setOpen(false); if (input.current) input.current.focus(); }}>
-            <Icon name="x" size="sm" />
-          </button>
-        )}
+        {/* The list's own switch. Labelled, but out of the tab order: the
+            combobox itself already opens on ArrowDown and closes on Escape,
+            and a second stop on every facet would double a twelve-field
+            form's tab count. */}
+        <span className="absolute right-1 flex items-center">
+          <IconButton
+            size="xs"
+            color="tertiary"
+            ico="chev"
+            isDisabled={disabled}
+            label={open ? "Close the list" : "Open the list"}
+            className={cx("transition duration-100", open && "rotate-180")}
+            onClick={() => {
+              if (open) { setOpen(false); setQ(""); return; }
+              setOpen(true);
+              if (input.current) input.current.focus();
+            }}
+          />
+        </span>
       </div>
 
       {open ? (
-        <ul className="um-opts" role="listbox" id={listId}
-          aria-multiselectable={single ? undefined : true} aria-label={f.label}>
-          {rendered()}
-        </ul>
+        <Pop>
+          <ul role="listbox" id={listId} aria-label={f.label}
+            aria-multiselectable={single ? undefined : true}
+            className="flex flex-col">
+            {rendered()}
+          </ul>
+        </Pop>
       ) : null}
 
       {chipsBelow && !selectLike ? (
@@ -339,11 +405,14 @@ export default function FacetPicker({ f, values, onChange, disabled, options: gi
       {/* Only when there is something to say. An empty line under every
           state picker was a margin with nothing in it. */}
       {f.hint || (f.max && !single) ? (
-        <p className="um-facet-fine">
-          {f.hint ? <span>{f.hint}</span> : null}
-          {f.max && !single
-            ? <b className={full ? "warn" : ""}>{values.length}/{f.max}</b>
-            : null}
+        <p className="mt-1.5 flex min-w-0 items-baseline gap-2 text-xs text-tertiary">
+          {f.hint ? <span className="min-w-0 flex-1">{f.hint}</span> : <span className="flex-1" />}
+          {f.max && !single ? (
+            <b className={cx("shrink-0 font-mono font-medium tnum",
+              full ? "text-warning-primary" : "text-quaternary")}>
+              {values.length}/{f.max}
+            </b>
+          ) : null}
         </p>
       ) : null}
     </div>

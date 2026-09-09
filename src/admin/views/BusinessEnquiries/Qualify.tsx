@@ -3,9 +3,9 @@
    -----------------------------------------------------------------------------
    What a person does between "a form arrived" and "this is worth a business's
    time". It replaces the Business Suggestions panel while the enquiry is
-   still being worked, and it is deliberately the same shape: one column of record, one
-   column of decision. The decision here is not which business gets it — it is
-   whether anyone should.
+   still being worked, and it is deliberately the same shape: one column of
+   record, one column of decision. The decision here is not which business gets
+   it — it is whether anyone should.
 
    The premise, and the reason the first cut of this module was wrong: a funnel
    submission is a CLAIM, not a fact. Someone skimming a landing page types
@@ -27,8 +27,11 @@
         point there is something worth making immutable.
    ============================================================================= */
 import { useEffect, useState } from "react";
-import { Icon, Pill } from "../../ui";
-import { BlockHead, InfoNote, VocabInput } from "./bits";
+import {
+  Button, Card, Checkbox, FieldRow, FormField, FormSection, InfoDot, Input, Meter, Pill,
+  SelectInput, Tag, Textarea, Timeline,
+} from "../../ui";
+import { channelOptions, contactLogItem, InfoNote, outcomeOptions, PanelNote, VocabInput } from "./bits";
 import { can } from "../../shell/AdminShell";
 import {
   CHANNELS, CHECKLIST, CONTACT_OUTCOMES, STATES, TAGS, VOCAB, canQualify, checklistMissing,
@@ -61,119 +64,116 @@ export function RequirementForm({ e }: { e: Enquiry }) {
   const set = (k: keyof typeof r) => (v: string) => setR({ ...r, [k]: v || null });
 
   return (
-    <div className="be-blk">
-      <BlockHead title="Requirement · as received, and as confirmed" info={<>
-        What the form captured is what the customer typed while skimming a page. Correct it here from
-        what they actually told you — every change is listed field by field in the timeline, so a
-        correction is visible rather than silent. It stops being editable the moment this enquiry is
-        qualified.
-      </>} />
-
-      <div className="be-form">
-        <div className="fg">
-          <label htmlFor="be-f-name">Customer</label>
-          <input id="be-f-name" className="inp" value={c.name} disabled={!writes}
-            onChange={(ev) => setC({ ...c, name: ev.target.value })} />
-        </div>
-        <div className="fg">
-          <label htmlFor="be-f-phone">Phone</label>
-          <input id="be-f-phone" className="inp" value={c.phone} disabled={!writes}
-            onChange={(ev) => setC({ ...c, phone: ev.target.value })} />
-          <div className="help">Masked in this prototype.</div>
-        </div>
-        <div className="fg">
-          <label htmlFor="be-f-email">Email</label>
-          <input id="be-f-email" className="inp" value={c.email || ""} disabled={!writes}
-            placeholder="—" onChange={(ev) => setC({ ...c, email: ev.target.value || null })} />
-        </div>
-
-        <VocabInput id="be-f-cat" label="Category" req value={r.category || ""}
-          options={VOCAB.categories} onChange={set("category")}
-          known={knownCategory} placeholder="Interior Design…"
-          unknownNote="Stage 1 eliminates on this, and the matching rules do not know this category — it will match nobody until the list catches up. A wrong category is not a low score, it is the wrong pool." />
-        <div className="fg">
-          <label htmlFor="be-f-svc">Service</label>
-          <input id="be-f-svc" className="inp" value={r.service || ""} disabled={!writes}
-            placeholder="Full home interiors, living room, L-shaped kitchen…"
-            onChange={(ev) => set("service")(ev.target.value)} />
-        </div>
-        <VocabInput id="be-f-city" label="City" req value={r.city || ""}
-          options={VOCAB.cities} onChange={set("city")}
-          known={knownCity} placeholder="New Delhi…"
-          unknownNote="Not a city we currently match on. Worth recording — it is the evidence that says where coverage is missing." />
-        <VocabInput id="be-f-state" label="State" value={r.state || ""}
-          options={STATES} onChange={set("state")} placeholder="Delhi…" />
-        <div className="fg">
-          <label htmlFor="be-f-loc">Locality</label>
-          <input id="be-f-loc" className="inp" value={r.locality || ""} disabled={!writes}
-            onChange={(ev) => set("locality")(ev.target.value)} />
-        </div>
-        <div className="fg">
-          <label htmlFor="be-f-pin">PIN code</label>
-          <input id="be-f-pin" className="inp" value={r.pincode || ""} disabled={!writes}
-            placeholder="—" onChange={(ev) => set("pincode")(ev.target.value)} />
-          <div className="help">Captured, not yet matched on — BE-OD-04.</div>
-        </div>
-        <div className="fg">
-          <label htmlFor="be-f-proj">Project type</label>
-          <input id="be-f-proj" className="inp" value={r.projectType || ""} disabled={!writes}
-            placeholder="Residential · 3BHK" onChange={(ev) => set("projectType")(ev.target.value)} />
-        </div>
-        <div className="fg">
-          <label htmlFor="be-f-intent">Intent</label>
-          <select id="be-f-intent" className="inp" value={r.intent || ""} disabled={!writes}
-            onChange={(ev) => set("intent")(ev.target.value)}>
-            <option value="">— not confirmed —</option>
-            <option value="project">Project</option>
-            <option value="product">Product</option>
-          </select>
-        </div>
-        <div className="fg">
-          <label htmlFor="be-f-urg">Urgency <span className="req">*</span></label>
-          <select id="be-f-urg" className="inp" value={urgency} disabled={!writes}
-            onChange={(ev) => setUrgency(ev.target.value)}>
-            <option value="">— not confirmed —</option>
-            {VOCAB.urgency.map((u) => <option key={u.key} value={u.key}>{u.label}</option>)}
-          </select>
-          <div className="help">Drives the queue order.</div>
-        </div>
-      </div>
-
-      <div className="fg" style={{ marginTop: "var(--space-3)" }}>
-        <label htmlFor="be-f-text">What they submitted</label>
-        <textarea id="be-f-text" className="inp" rows={2} value={r.text} disabled={!writes}
-          onChange={(ev) => setR({ ...r, text: ev.target.value })} />
-        <div className="help">Correct typos, never the meaning.</div>
-      </div>
-
-      {writes ? (
-        <div className="be-form-f">
-          <span className="faint">{dirty ? "Unsaved changes" : "Saved"}</span>
-          <span className="spacer" />
-          {dirty
-            ? <button className="btn" onClick={() => {
-                setR(e.requirement); setC(e.customer); setUrgency(e.qualification.urgency || "");
-              }}>Discard</button>
-            : null}
-          <button className="btn pri" disabled={!dirty}
+    <Card
+      title="Requirement · as received, and as confirmed"
+      right={
+        <InfoDot label="Why is this editable?">
+          What the form captured is what the customer typed while skimming a page. Correct it here from
+          what they actually told you — every change is listed field by field in the timeline, so a
+          correction is visible rather than silent. It stops being editable the moment this enquiry is
+          qualified.
+        </InfoDot>
+      }
+      foot={writes ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={dirty ? "text-warning-primary" : undefined}>{dirty ? "Unsaved changes" : "Saved"}</span>
+          <span className="flex-1" />
+          {dirty ? (
+            <Button color="secondary" size="xs" onClick={() => {
+              setR(e.requirement); setC(e.customer); setUrgency(e.qualification.urgency || "");
+            }}>Discard</Button>
+          ) : null}
+          <Button color="primary" size="xs" isDisabled={!dirty}
             onClick={() => updateEnquiry(e.enquiryId, { requirement: r, customer: c, urgency: urgency || null })}>
             Save changes
-          </button>
+          </Button>
         </div>
-      ) : null}
-    </div>
+      ) : undefined}
+    >
+      <div className="flex flex-col gap-5">
+        <FormSection title="Customer">
+          <FieldRow cols={3}>
+            <FormField id="be-f-name" label="Customer">
+              <Input id="be-f-name" value={c.name} disabled={!writes}
+                onChange={(v) => setC({ ...c, name: v })} />
+            </FormField>
+            <FormField id="be-f-phone" label="Phone" hint="Masked in this prototype.">
+              <Input id="be-f-phone" value={c.phone} disabled={!writes} mono
+                onChange={(v) => setC({ ...c, phone: v })} />
+            </FormField>
+            <FormField id="be-f-email" label="Email">
+              <Input id="be-f-email" value={c.email || ""} disabled={!writes} ph="—"
+                onChange={(v) => setC({ ...c, email: v || null })} />
+            </FormField>
+          </FieldRow>
+        </FormSection>
+
+        <FormSection title="What they want">
+          <FieldRow cols={2}>
+            <VocabInput id="be-f-cat" label="Category" req value={r.category || ""}
+              options={VOCAB.categories} onChange={set("category")} disabled={!writes}
+              known={knownCategory} placeholder="Interior Design…"
+              unknownNote="Stage 1 eliminates on this, and the matching rules do not know this category — it will match nobody until the list catches up. A wrong category is not a low score, it is the wrong pool." />
+            <FormField id="be-f-svc" label="Service">
+              <Input id="be-f-svc" value={r.service || ""} disabled={!writes}
+                ph="Full home interiors, living room, L-shaped kitchen…"
+                onChange={set("service")} />
+            </FormField>
+          </FieldRow>
+
+          <FieldRow cols={2}>
+            <VocabInput id="be-f-city" label="City" req value={r.city || ""}
+              options={VOCAB.cities} onChange={set("city")} disabled={!writes}
+              known={knownCity} placeholder="New Delhi…"
+              unknownNote="Not a city we currently match on. Worth recording — it is the evidence that says where coverage is missing." />
+            <VocabInput id="be-f-state" label="State" value={r.state || ""}
+              options={STATES} onChange={set("state")} disabled={!writes} placeholder="Delhi…" />
+          </FieldRow>
+
+          <FieldRow cols={2}>
+            <FormField id="be-f-loc" label="Locality">
+              <Input id="be-f-loc" value={r.locality || ""} disabled={!writes} onChange={set("locality")} />
+            </FormField>
+            <FormField id="be-f-pin" label="PIN code" hint="Captured, not yet matched on — BE-OD-04.">
+              <Input id="be-f-pin" value={r.pincode || ""} disabled={!writes} ph="—" onChange={set("pincode")} />
+            </FormField>
+          </FieldRow>
+
+          <FieldRow cols={3}>
+            <FormField id="be-f-proj" label="Project type">
+              <Input id="be-f-proj" value={r.projectType || ""} disabled={!writes}
+                ph="Residential · 3BHK" onChange={set("projectType")} />
+            </FormField>
+            <FormField id="be-f-intent" label="Intent">
+              <SelectInput id="be-f-intent" value={r.intent || ""} disabled={!writes}
+                ph="— not confirmed —"
+                options={[{ v: "project", l: "Project" }, { v: "product", l: "Product" }]}
+                onChange={set("intent")} />
+            </FormField>
+            <FormField id="be-f-urg" label="Urgency" req hint="Drives the queue order.">
+              <SelectInput id="be-f-urg" value={urgency} disabled={!writes}
+                ph="— not confirmed —"
+                options={VOCAB.urgency.map((u) => ({ v: u.key, l: u.label }))}
+                onChange={setUrgency} />
+            </FormField>
+          </FieldRow>
+
+          <FormField id="be-f-text" label="What they submitted" hint="Correct typos, never the meaning.">
+            <Textarea id="be-f-text" rows={2} value={r.text} disabled={!writes}
+              onChange={(v) => setR({ ...r, text: v })} />
+          </FormField>
+        </FormSection>
+      </div>
+    </Card>
   );
 }
 
 /* ==================================================== THE QUALIFY PANEL === */
-/* Header, scrolling body, pinned footer — see .be-sp in enquiries.css for the
-   bug that shape exists to fix.
-
-   ORDER INSIDE THE BODY IS BY FREQUENCY, NOT BY NARRATIVE. Logging a contact is
-   the thing an operator does ten times a day and the checklist is the thing
+/* ORDER INSIDE THE PANEL IS BY FREQUENCY, NOT BY NARRATIVE. Logging a contact
+   is the thing an operator does ten times a day and the checklist is the thing
    they do once, so the composer leads even though the checklist reads first as
-   an explanation of the job. The footer carries what is still outstanding, so
-   the "what do I still need" question is answered next to the button that is
+   an explanation of the job. The foot carries what is still outstanding, so the
+   "what do I still need" question is answered next to the button that is
    waiting on the answer. */
 export function QualifyPanel({ e, onQualified }: { e: Enquiry; onQualified: (msg: string) => void }) {
   const writes = can("business-enquiries", "edit");
@@ -183,110 +183,93 @@ export function QualifyPanel({ e, onQualified }: { e: Enquiry; onQualified: (msg
   const last = lastResponse(e);
 
   return (
-    <div className="be-sp be-qp">
-      <div className="be-sp-h">
-        <b>Qualification</b>
-        <div className="r">
+    <Card
+      title="Qualification"
+      sub={
+        <>
           {done} of {CHECKLIST.length} confirmed · {e.contactLog.length} contact
           {e.contactLog.length === 1 ? "" : "s"} logged
-        </div>
-        <div className="be-qp-bar" aria-hidden="true">
-          <i style={{ width: Math.round((done / CHECKLIST.length) * 100) + "%" }} />
-        </div>
-      </div>
+        </>
+      }
+      right={<Pill xs tone={ready ? "ok" : "warn"} text={ready ? "Ready" : "In progress"} />}
+      tight
+    >
+      <div className="flex flex-col gap-5">
+        <Meter value={done} max={CHECKLIST.length} tone={ready ? "ok" : undefined}
+          label={done + " of " + CHECKLIST.length + " qualification checks confirmed"} />
 
-      <div className="be-sp-scroll">
         {writes ? <ContactComposer e={e} /> : null}
 
         {/* ------------------------------------------------------ checklist --- */}
-        <div className="be-qp-sec">
-          <div className="be-qp-h">Qualification checks</div>
-          {CHECKLIST.map((row) => {
-            const on = e.qualification.checklist[row.key];
-            return (
-              <button key={row.key} className={"be-check" + (on ? " on" : "")} disabled={!writes}
-                aria-pressed={on}
-                onClick={() => setCheck(e.enquiryId, row.key, !on)}>
-                <span className="bx" aria-hidden="true">{on ? <Icon name="check" size="sm" /> : null}</span>
-                <span className="t">
-                  <b>{row.label}</b>
-                  <em>{row.help}</em>
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        <FormSection title="Qualification checks">
+          <div className="flex flex-col gap-3">
+            {CHECKLIST.map((row) => (
+              <Checkbox
+                key={row.key}
+                id={"be-chk-" + row.key}
+                checked={!!e.qualification.checklist[row.key]}
+                disabled={!writes}
+                label={row.label}
+                hint={row.help}
+                onChange={(v) => setCheck(e.enquiryId, row.key, v)}
+              />
+            ))}
+          </div>
+        </FormSection>
 
         {/* ----------------------------------------------------------- tags --- */}
-        <div className="be-qp-sec">
-          <div className="be-qp-h">Tags</div>
-          <div className="be-tagpick">
-            {TAGS.map((t) => {
-              const on = e.tags.indexOf(t.slug) >= 0;
-              return (
-                <button key={t.slug} className={"pill xs pick " + (t.tone || "") + (on ? " on" : "")}
-                  disabled={!writes} aria-pressed={on}
-                  aria-label={t.label + " — " + t.help + (t.auto ? " Set automatically from the contact log." : "")}
-                  title={t.help + (t.auto ? " · set automatically from the contact log" : "")}
-                  onClick={() => toggleTag(e.enquiryId, t.slug)}>
-                  {t.auto ? <i className="auto" aria-hidden="true" /> : null}{t.label}
-                </button>
-              );
-            })}
+        <FormSection title="Tags">
+          <div className="flex flex-col gap-2.5">
+            {TAGS.map((t) => (
+              <Checkbox
+                key={t.slug}
+                id={"be-tag-" + t.slug}
+                checked={e.tags.indexOf(t.slug) >= 0}
+                disabled={!writes}
+                label={<Tag label={t.label} tone={t.tone} auto={t.auto} />}
+                hint={t.help + (t.auto ? " · set automatically from the contact log" : "")}
+                onChange={() => toggleTag(e.enquiryId, t.slug)}
+              />
+            ))}
           </div>
-          <InfoNote ico="tag" short={<>Dotted tags are set from the contact log.</>}>
+          <InfoNote ico="tag" short={<>Tags with the system mark are set from the contact log.</>}>
             The system recomputes them on every logged attempt, so an override by hand lasts until the
             next one. There is no tag for what a customer might spend, for the same reason there is no
             budget field.
           </InfoNote>
-        </div>
+        </FormSection>
 
         {/* ------------------------------------------------------------ log --- */}
-        <div className="be-qp-sec">
-          <div className="be-qp-h">
-            Contact log
-            {last ? <span className="faint"> · last response {dateTimeLabel(last.at)}</span> : null}
-          </div>
+        <FormSection
+          title="Contact log"
+          desc={last ? "Last response " + dateTimeLabel(last.at) : undefined}
+        >
           {e.contactLog.length ? (
-            <div className="be-log">
-              {e.contactLog.map((entry) => (
-                <ContactEntryRow key={entry.logId} entry={entry} isLast={entry.logId === last?.logId} />
-              ))}
-            </div>
+            <ContactLog entries={e.contactLog} lastId={last?.logId} />
           ) : (
-            <div className="be-qp-empty">
-              Nobody has contacted this customer yet. It is still in the untouched pile.
-            </div>
+            <PanelNote>Nobody has contacted this customer yet. It is still in the untouched pile.</PanelNote>
           )}
-        </div>
-      </div>
+        </FormSection>
 
-      <QualifyFoot e={e} ready={ready} missing={missing} writes={writes} onQualified={onQualified} />
-    </div>
+        <QualifyFoot e={e} ready={ready} missing={missing} writes={writes} onQualified={onQualified} />
+      </div>
+    </Card>
   );
 }
 
-/* One logged attempt. Shared by the panel and by the read-only block on a
-   qualified record, so the two can never drift into showing different things
-   about the same entry. */
+/* ------------------------------------------------------- the contact log --- */
+/* THE WHOLE LOG AS ONE TIMELINE — the shape the panel uses for "what happened
+   to this record" everywhere else. Shared by the qualification panel and by the
+   read-only block on a qualified record, so the two can never drift into
+   showing different things about the same entry. */
+export function ContactLog({ entries, lastId }: { entries: ContactEntry[]; lastId?: string }) {
+  return <Timeline items={entries.map((entry) => contactLogItem(entry, entry.logId === lastId))} />;
+}
+
+/** One logged attempt, on its own. Kept as part of this module's surface — the
+ *  whole-log renderer above is the one every screen actually reaches for. */
 export function ContactEntryRow({ entry, isLast }: { entry: ContactEntry; isLast?: boolean }) {
-  const o = contactOutcomeOf(entry.outcome);
-  return (
-    <div className={"be-log-i" + (isLast ? " last" : "")}>
-      <div className="r1">
-        <b>{channelOf(entry.channel).label}</b>
-        <Pill text={o.label} tone={o.tone} />
-        {isLast ? <span className="be-lastmark">last response</span> : null}
-        <span className="spacer" />
-        <span className="w">{dateTimeLabel(entry.at)}</span>
-      </div>
-      {entry.response
-        ? <div className="resp">“{entry.response}”</div>
-        : <div className="resp none">No response — nothing was said to record.</div>}
-      {entry.note ? <div className="nt">{entry.note}</div> : null}
-      <div className="by">{entry.direction === "inbound" ? "Inbound · " : ""}{entry.actor}</div>
-    </div>
-  );
+  return <Timeline items={[contactLogItem(entry, isLast)]} />;
 }
 
 /* --------------------------------------------------------- the composer --- */
@@ -309,55 +292,61 @@ function ContactComposer({ e }: { e: Enquiry }) {
   };
 
   return (
-    <div className="be-qp-sec be-compose"
+    <FormSection
+      title="Log a contact"
+      className="rounded-lg bg-secondary p-4"
       /* Cmd/Ctrl+Enter submits from any field. Somebody logging twenty calls
          should never have to reach for the mouse between them. */
-      onKeyDown={(ev) => {
-        if ((ev.metaKey || ev.ctrlKey) && ev.key === "Enter") { ev.preventDefault(); submit(); }
-      }}>
-      <div className="be-qp-h">Log a contact</div>
-      <div className="be-compose-r">
-        <select className="inp sm" value={channel} onChange={(ev) => setChannel(ev.target.value)}
-          aria-label="Channel">
-          {CHANNELS.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
-        </select>
-        <select className="inp sm" value={direction} aria-label="Direction"
-          onChange={(ev) => setDirection(ev.target.value as "outbound" | "inbound")}>
-          <option value="outbound">We contacted them</option>
-          <option value="inbound">They contacted us</option>
-        </select>
-        <select className="inp sm" value={outcome} onChange={(ev) => setOutcome(ev.target.value)}
-          aria-label="Outcome">
-          {CONTACT_OUTCOMES.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}
-        </select>
-      </div>
+    >
+      <div
+        className="flex flex-col gap-4"
+        onKeyDown={(ev) => {
+          if ((ev.metaKey || ev.ctrlKey) && ev.key === "Enter") { ev.preventDefault(); submit(); }
+        }}
+      >
+        {/* TWO ON A LINE, NOT THREE. This panel is the narrow column of a
+            two-pane page; a third select here clipped its own longest option
+            ("We contacted them") to "We contacted t". Direction takes the full
+            width because its options are sentences and the other two are words. */}
+        <FieldRow cols={2}>
+          <FormField id="be-c-chan" label="Channel">
+            <SelectInput id="be-c-chan" value={channel} options={channelOptions()} onChange={setChannel} />
+          </FormField>
+          <FormField id="be-c-out" label="Outcome">
+            <SelectInput id="be-c-out" value={outcome} options={outcomeOptions()} onChange={setOutcome} />
+          </FormField>
+        </FieldRow>
+        <FormField id="be-c-dir" label="Direction">
+          <SelectInput id="be-c-dir" value={direction}
+            options={[{ v: "outbound", l: "We contacted them" }, { v: "inbound", l: "They contacted us" }]}
+            onChange={(v) => setDirection(v as "outbound" | "inbound")} />
+        </FormField>
 
-      {wantsResponse ? (
-        <div className="fg">
-          <label htmlFor="be-c-resp">What the customer said</label>
-          <textarea id="be-c-resp" className="inp" rows={3} value={response}
-            placeholder="Their words, as close as you can. This is the part a business can be told."
-            onChange={(ev) => setResponse(ev.target.value)} />
-        </div>
-      ) : null}
+        {wantsResponse ? (
+          <FormField id="be-c-resp" label="What the customer said">
+            <Textarea id="be-c-resp" rows={3} value={response}
+              ph="Their words, as close as you can. This is the part a business can be told."
+              onChange={setResponse} />
+          </FormField>
+        ) : null}
 
-      <div className="fg">
-        <label htmlFor="be-c-note">Your note</label>
-        <input id="be-c-note" className="inp" value={note}
-          placeholder="Your read of it. Optional."
-          onChange={(ev) => setNote(ev.target.value)} />
-      </div>
+        <FormField id="be-c-note" label="Your note">
+          <Input id="be-c-note" value={note} ph="Your read of it. Optional." onChange={setNote} />
+        </FormField>
 
-      <button className="btn pri full" onClick={submit}>
-        <Icon name="plus" />Log {channelOf(channel).label.toLowerCase()}
-      </button>
-      <div className="be-qp-help">
-        <span className="kbd">Ctrl</span>+<span className="kbd">Enter</span> to log.
-        {o.autoTag
-          ? <> Tags this <b>{TAGS.filter((t) => t.slug === o.autoTag)[0]?.label}</b>.</>
-          : null}
+        <Button color="primary" block ico="plus" onClick={submit}>
+          Log {channelOf(channel).label.toLowerCase()}
+        </Button>
+
+        <p className="text-xs text-tertiary">
+          <b className="font-mono font-semibold text-secondary">Ctrl</b>+
+          <b className="font-mono font-semibold text-secondary">Enter</b> to log.
+          {o.autoTag
+            ? <> Tags this <b className="font-semibold text-secondary">{TAGS.filter((t) => t.slug === o.autoTag)[0]?.label}</b>.</>
+            : null}
+        </p>
       </div>
-    </div>
+    </FormSection>
   );
 }
 
@@ -375,52 +364,49 @@ function QualifyFoot({ e, ready, missing, writes, onQualified }: {
   useEffect(() => { setSummary(last?.response || ""); }, [last?.response]);
 
   if (!writes) {
-    return <div className="be-sp-f">You have read access to this enquiry. Qualifying it needs write access.</div>;
+    return <PanelNote>You have read access to this enquiry. Qualifying it needs write access.</PanelNote>;
   }
 
   return (
-    <div className="be-qp-foot">
-      <div className="fg">
-        <label htmlFor="be-q-sum">Requirement summary <span className="req">*</span></label>
-        <textarea id="be-q-sum" className="inp" rows={2} value={summary}
-          placeholder="One line a business can read in five seconds."
-          onChange={(ev) => setSummary(ev.target.value)} />
-        <div className="help">
-          Pre-filled from the last thing the customer said. This is what the matching engine scores
-          against and what the assigned business sees first.
-        </div>
-      </div>
+    <div className="flex flex-col gap-4 border-t border-secondary pt-5">
+      <FormField id="be-q-sum" label="Requirement summary" req
+        hint="Pre-filled from the last thing the customer said. This is what the matching engine scores against and what the assigned business sees first.">
+        <Textarea id="be-q-sum" rows={2} value={summary}
+          ph="One line a business can read in five seconds."
+          onChange={setSummary} />
+      </FormField>
 
-      <button className="btn pri full lg" disabled={!ready}
+      <Button color="primary" size="lg" block ico="check" isDisabled={!ready}
         onClick={() => {
           markQualified(e.enquiryId, summary);
           onQualified("Qualified — the snapshot is frozen and matching can run.");
         }}>
-        <Icon name="check" />Mark qualified
-      </button>
+        Mark qualified
+      </Button>
 
       {ready ? (
-        <InfoNote ico="lock"
-          short={<>Freezes the snapshot and stamps your name on it.</>}>
-          Against <span className="mono">{VOCAB.qualificationVersion}</span>. Nothing above stays
+        <InfoNote ico="lock" short={<>Freezes the snapshot and stamps your name on it.</>}>
+          Against <span className="font-mono">{VOCAB.qualificationVersion}</span>. Nothing above stays
           editable afterwards — corrections become annotation events — and the record becomes
           matchable.
         </InfoNote>
       ) : (
-        <div className="be-qp-block">
-          <b>Not ready to qualify.</b>
-          <ul>
+        <div className="rounded-lg bg-secondary p-4 text-sm text-tertiary">
+          <b className="font-semibold text-primary">Not ready to qualify.</b>
+          <ul className="mt-1.5 flex list-disc flex-col gap-1 pl-4">
             {!e.contactLog.length
               ? <li>No contact has been logged. Four ticked boxes on an enquiry nobody rang is a formality, not a record.</li>
               : null}
             {missing.map((m) => <li key={m.key}>{m.label} is not confirmed.</li>)}
           </ul>
           {e.contactLog.length > 0 && !everReached(e)
-            ? <span className="be-qp-hint">
+            ? (
+              <p className="mt-2">
                 Attempted {e.contactLog.length} time{e.contactLog.length === 1 ? "" : "s"}, never reached.
-                If this stays true, the honest end is <b>Rejected</b> with a reason — not a qualification
-                nobody can stand behind.
-              </span>
+                If this stays true, the honest end is <b className="font-semibold text-primary">Rejected</b> with
+                a reason — not a qualification nobody can stand behind.
+              </p>
+            )
             : null}
         </div>
       )}

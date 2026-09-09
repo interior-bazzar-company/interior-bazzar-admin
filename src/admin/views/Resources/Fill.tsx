@@ -8,13 +8,22 @@
    required fields, one submission per person, the size cap. This renders the
    seven field types and mirrors "required" only so the button can say so early.
 
+   IT IS THE FORM, NOT A PICTURE OF ONE. Every control is the panel's real
+   control for that kind of answer — the same Input, SelectInput, Checkbox,
+   DateInput and FileUpload every other form in the admin uses — so a member's
+   half of the product is built out of the product rather than beside it.
+
    A FILE IS NOT UPLOADED. It becomes an object URL in this tab and nothing
    else, and the dialog says so — an identity document must never be put on a
    public URL by this panel, and there is no private store to put it in yet.
    ============================================================================= */
 import { useEffect, useRef, useState } from "react";
-import { ModalHead, Notice } from "../../ui";
+import {
+  Alert, Button, Checkbox, DateInput, FileUpload, FormField, FormSection, IconButton, Input,
+  ModalShell, SelectInput, Textarea,
+} from "../../ui";
 import { useShell } from "../../shell/ShellContext";
+import { FileChip } from "./bits";
 import { acceptAttr, acceptLine, answered, submitResponse } from "./store";
 import type { FileAnswer, Resource, ResourceField } from "./store";
 
@@ -51,55 +60,97 @@ export function FillModal({ r, memberId }: { r: Resource; memberId: string }) {
     shell.closeLayer();
     shell.toast("Submitted. It is on your record.");
   };
+
   const control = (f: ResourceField) => {
     const id = "rf-" + f.fieldId;
     const v = values[f.fieldId] || "";
     switch (f.type) {
-      case "textarea": return <textarea id={id} className="inp" rows={3} value={v} onChange={(e) => set(f.fieldId, e.target.value)} />;
-      case "number": return <input id={id} type="number" className="inp" value={v} onChange={(e) => set(f.fieldId, e.target.value)} />;
-      case "date": return <input id={id} type="date" className="inp" value={v} onChange={(e) => set(f.fieldId, e.target.value)} />;
-      case "select": return (
-        <select id={id} className="inp" value={v} onChange={(e) => set(f.fieldId, e.target.value)}>
-          <option value="">Choose…</option>
-          {f.options.map((o) => <option key={o} value={o}>{o}</option>)}
-        </select>);
-      case "checkbox": return (
-        <label className="check" htmlFor={id}>
-          <input id={id} type="checkbox" checked={v === "Yes"} onChange={(e) => set(f.fieldId, e.target.checked ? "Yes" : "")} />
-          <span></span>Yes
-        </label>);
-      case "file": return (
-        <>
-          <input id={id} type="file" className="inp" accept={acceptAttr(f.accept)}
-            onChange={(e) => pick(f, e.target.files && e.target.files[0] ? e.target.files[0] : null)} />
-          <span className="help">{acceptLine(f.accept)}{f.maxMb !== null ? " · up to " + f.maxMb + " MB" : ""}</span>
-        </>);
-      default: return <input id={id} className="inp" value={v} onChange={(e) => set(f.fieldId, e.target.value)} />;
+      case "textarea":
+        return <Textarea id={id} rows={3} value={v} onChange={(t) => set(f.fieldId, t)} />;
+      case "number":
+        return <Input id={id} type="number" value={v} onChange={(t) => set(f.fieldId, t)} />;
+      case "date":
+        return <DateInput id={id} value={v} onChange={(t) => set(f.fieldId, t)} />;
+      case "select":
+        return (
+          <SelectInput id={id} value={v} ph="Choose…" options={f.options}
+            onChange={(t) => set(f.fieldId, t)} />
+        );
+      case "checkbox":
+        return (
+          <Checkbox id={id} label="Yes" checked={v === "Yes"}
+            onChange={(on) => set(f.fieldId, on ? "Yes" : "")} />
+        );
+      case "file": {
+        const got = files[f.fieldId];
+        return got ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <FileChip f={got} />
+            <IconButton size="xs" ico="x" label={"Remove " + got.fileName}
+              onClick={() => pick(f, null)} />
+          </div>
+        ) : (
+          <FileUpload id={id} accept={acceptAttr(f.accept)}
+            hint={acceptLine(f.accept) + (f.maxMb !== null ? " · up to " + f.maxMb + " MB" : "")}
+            onFiles={(list) => pick(f, list[0] || null)} />
+        );
+      }
+      default:
+        return <Input id={id} value={v} onChange={(t) => set(f.fieldId, t)} />;
     }
   };
+
   return (
-    <>
-      <ModalHead title={r.title} onClose={() => shell.closeLayer()} />
-      <div className="md-b">
-        {r.description ? <p className="cell-2">{r.description}</p> : null}
+    <ModalShell
+      title={r.title}
+      sub={r.description || undefined}
+      onClose={() => shell.closeLayer()}
+      actions={
+        <>
+          <Button color="secondary" onClick={() => shell.closeLayer()}>Cancel</Button>
+          <Button color="primary" isDisabled={missing > 0} onClick={save}
+            aria-label={missing
+              ? missing + " required field" + (missing === 1 ? "" : "s") + " still empty"
+              : undefined}>
+            Submit
+          </Button>
+        </>
+      }>
+      <FormSection>
         {r.fields.some((f) => f.type === "file") ? (
-          <Notice ico="lock" text="A file you pick stays in this browser tab. Nothing is uploaded until private storage is decided — this panel never puts a document on a public address." />
+          <Alert tone="info" ico="lock" title="Nothing is uploaded.">
+            A file you pick stays in this browser tab. Nothing leaves it until private storage
+            is decided — this panel never puts a document on a public address.
+          </Alert>
         ) : null}
+
         {r.fields.map((f) => (
-          <div className="fg" key={f.fieldId}>
-            <label htmlFor={"rf-" + f.fieldId}>{f.label}{f.required ? <b className="req"> *</b> : null}</label>
-            {control(f)}
-            {f.help && f.type !== "file" ? <span className="help">{f.help}</span> : null}
-          </div>
+          <FormField key={f.fieldId} id={"rf-" + f.fieldId}
+            label={f.type === "checkbox" ? undefined : f.label}
+            req={f.type === "checkbox" ? undefined : f.required}
+            hint={f.type === "file" ? undefined : f.help || undefined}>
+            {/* A CHECKBOX CARRIES ITS OWN LABEL, beside the box where the eye
+                expects it, so the question is not printed twice. */}
+            {f.type === "checkbox" ? (
+              <div className="flex flex-col gap-1.5">
+                <span className="flex items-center gap-1 text-sm font-medium text-secondary">
+                  {f.label}
+                  {f.required ? <span className="text-brand-tertiary" title="Required">*</span> : null}
+                </span>
+                {control(f)}
+              </div>
+            ) : control(f)}
+          </FormField>
         ))}
-        <p className="tm-foot">Answered on v{r.version}. Once submitted it cannot be edited, so read it back before you send.</p>
-      </div>
-      <div className="md-f">
-        <span className="spacer" />
-        <button className="btn" onClick={() => shell.closeLayer()}>Cancel</button>
-        <button className="btn pri" disabled={missing > 0} onClick={save}
-          title={missing ? missing + " required field" + (missing === 1 ? "" : "s") + " still empty" : undefined}>Submit</button>
-      </div>
-    </>
+
+        <p className="text-xs text-tertiary">
+          Answered on v{r.version}. Once submitted it cannot be edited, so read it back
+          before you send.
+          {missing
+            ? " " + missing + " required field" + (missing === 1 ? " is" : "s are") + " still empty."
+            : ""}
+        </p>
+      </FormSection>
+    </ModalShell>
   );
 }

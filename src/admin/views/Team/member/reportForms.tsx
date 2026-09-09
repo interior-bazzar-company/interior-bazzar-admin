@@ -21,7 +21,10 @@
    not a record of anything.
    ============================================================================= */
 import { useMemo, useState } from "react";
-import { Icon, ModalHead, Notice } from "../../../ui";
+import {
+  Alert, Button, FormField, FormSection, IconButton, Icon, Input, ModalShell, Notice, SelectInput,
+} from "../../../ui";
+import { cx } from "@/utils/cx";
 import { go } from "../../../ui/nav";
 import { useShell } from "../../../shell/ShellContext";
 import {
@@ -32,15 +35,6 @@ import type { Member, Priority, WorkItem } from "../store";
 const openWork = (id: string) => go("#/work?item=" + id);
 
 interface Line { title: string; priority: Priority }
-
-/* -------------------------------------------------------------- chrome --- */
-
-function Head({ title, sub }: { title: string; sub?: string }) {
-  const shell = useShell();
-  return (
-    <ModalHead title={<>{title}{sub ? <span className="md-sub">{sub}</span> : null}</>} onClose={() => shell.closeLayer()} />
-  );
-}
 
 /* ---------------------------------------------------------------- plan --- */
 
@@ -70,56 +64,62 @@ export function PlanModal({ m }: { m: Member }) {
   };
 
   return (
-    <>
-      <Head title="Today's plan" sub="Each line becomes a work item due today" />
-      <div className="md-b">
-        <ol className="tm-plan">
-          {lines.map((l, i) => (
-            <li key={i}>
-              <input className="inp" value={l.title} autoFocus={i === 0}
-                aria-label={"Line " + (i + 1)}
-                placeholder="One thing you are doing today"
-                onChange={(e) => set(i, { title: e.target.value })} />
-              <select className="inp" value={l.priority} aria-label={"Priority for line " + (i + 1)}
-                onChange={(e) => set(i, { priority: e.target.value as Priority })}>
-                <option value="high">High</option>
-                <option value="medium">Medium</option>
-                <option value="low">Low</option>
-              </select>
-              <button className="btn icon sm" aria-label={"Remove line " + (i + 1)}
-                disabled={lines.length === 1}
-                onClick={() => setLines(lines.filter((_, n) => n !== i))}>
-                <Icon name="x" size="sm" />
-              </button>
-            </li>
-          ))}
-        </ol>
-        <button className="btn sm" onClick={() => setLines(lines.concat([{ title: "", priority: "medium" }]))}>
-          <Icon name="plus" size="sm" />Add a line
-        </button>
+    <ModalShell
+      title="Today's plan"
+      sub="Each line becomes a work item due today"
+      ico="check"
+      onClose={() => shell.closeLayer()}
+      actions={
+        <>
+          <Button color="secondary" onClick={() => shell.closeLayer()}>Cancel</Button>
+          <Button color="primary" isDisabled={!usable} onClick={save}>Submit plan</Button>
+        </>
+      }
+    >
+      <FormSection>
+        <FormField label="What you are doing today" req>
+          <ol className="flex flex-col gap-2">
+            {lines.map((l, i) => (
+              <li key={i} className="flex items-center gap-2">
+                <span aria-hidden="true" className="w-4 shrink-0 text-right font-mono text-xs text-quaternary tnum">
+                  {i + 1}
+                </span>
+                <Input value={l.title} autoFocus={i === 0}
+                  ariaLabel={"Line " + (i + 1)}
+                  ph="One thing you are doing today"
+                  className="flex-1"
+                  onChange={(v) => set(i, { title: v })} />
+                <SelectInput value={l.priority} ariaLabel={"Priority for line " + (i + 1)}
+                  className="w-28 shrink-0"
+                  options={[{ v: "high", l: "High" }, { v: "medium", l: "Medium" }, { v: "low", l: "Low" }]}
+                  onChange={(v) => set(i, { priority: v as Priority })} />
+                <IconButton ico="x" size="sm" label={"Remove line " + (i + 1)}
+                  isDisabled={lines.length === 1}
+                  onClick={() => setLines(lines.filter((_, n) => n !== i))} />
+              </li>
+            ))}
+          </ol>
+        </FormField>
 
-        <div className="fg">
-          <label htmlFor="tmOutcome">Expected outcome <span className="tm-opt">optional</span></label>
-          <input id="tmOutcome" className="inp" value={outcome}
-            placeholder="What good looks like by this evening"
-            onChange={(e) => setOutcome(e.target.value)} />
+        <div>
+          <Button color="secondary" size="xs" ico="plus"
+            onClick={() => setLines(lines.concat([{ title: "", priority: "medium" }]))}>
+            Add a line
+          </Button>
         </div>
-        <div className="fg">
-          <label htmlFor="tmBlockers">Anything blocking you? <span className="tm-opt">optional</span></label>
-          <input id="tmBlockers" className="inp" value={blockers}
-            placeholder="Say it now rather than at six o'clock"
-            onChange={(e) => setBlockers(e.target.value)} />
-        </div>
-        <p className="tm-foot">
+
+        <FormField id="tmOutcome" label="Expected outcome" tip="optional">
+          <Input id="tmOutcome" value={outcome} ph="What good looks like by this evening" onChange={setOutcome} />
+        </FormField>
+        <FormField id="tmBlockers" label="Anything blocking you?" tip="optional">
+          <Input id="tmBlockers" value={blockers} ph="Say it now rather than at six o'clock" onChange={setBlockers} />
+        </FormField>
+
+        <p className="text-xs text-quaternary">
           Two fields and a list. If this takes more than a minute it is the wrong form.
         </p>
-      </div>
-      <div className="md-f">
-        <span className="spacer" />
-        <button className="btn" onClick={() => shell.closeLayer()}>Cancel</button>
-        <button className="btn pri" disabled={!usable} onClick={save}>Submit plan</button>
-      </div>
-    </>
+      </FormSection>
+    </ModalShell>
   );
 }
 
@@ -191,80 +191,90 @@ export function EodModal({ m }: { m: Member }) {
 
   if (report && report.submittedAt) {
     return (
-      <>
-        <Head title="Today's report" sub={"Submitted " + fmtTime(report.submittedAt)} />
-        <div className="md-b">
-          <Notice tone="ok" ico="check" text={report.acknowledgedById
-            ? "Submitted, and somebody has read it."
-            : "Submitted. Nobody has opened it yet — the tab on this page says who owes you that."} />
-        </div>
-        <div className="md-f">
-          <span className="spacer" />
-          <button className="btn pri" onClick={() => shell.closeLayer()}>Close</button>
-        </div>
-      </>
+      <ModalShell
+        title="Today's report"
+        sub={"Submitted " + fmtTime(report.submittedAt)}
+        ico="checkcircle"
+        tone="success"
+        onClose={() => shell.closeLayer()}
+        actions={<Button color="primary" onClick={() => shell.closeLayer()}>Close</Button>}
+      >
+        <Alert tone="ok" ico="check" title="Submitted">
+          {report.acknowledgedById
+            ? "Somebody has read it."
+            : "Nobody has opened it yet — the Reports page says who owes you that."}
+        </Alert>
+      </ModalShell>
     );
   }
 
   return (
-    <>
-      <Head title="End of day" sub="What moved today, read from the board" />
-      <div className="md-b">
+    <ModalShell
+      title="End of day"
+      sub="What moved today, read from the board"
+      ico="doc"
+      onClose={() => shell.closeLayer()}
+      actions={
+        <>
+          <Button color="secondary" onClick={() => shell.closeLayer()}>Cancel</Button>
+          <Button color="primary" isDisabled={blocked} onClick={save}>Submit report</Button>
+        </>
+      }
+    >
+      <FormSection>
         {!plan || !plan.submittedAt ? (
-          <Notice tone="warn" text="No plan went in this morning, so this lists only what was closed today." />
+          <Alert tone="warn" title="No plan went in this morning">
+            So this lists only what was closed today.
+          </Alert>
         ) : null}
 
         {/* WHAT THE DAY ACTUALLY DID, read off the board. Ticks are not
             controls here — they are the item's own status, drawn. */}
-        <ul className="tm-eod read">
+        <ul className="flex flex-col divide-y divide-border-secondary rounded-xl bg-primary px-3 ring-1 ring-secondary">
           {lines.map((l, i) => (
-            <li key={i} className={l.done ? "done" : ""}>
-              <i className={l.done ? "on" : ""} aria-hidden="true" />
-              <b>{l.title || "Untitled"}</b>
+            <li key={i} className="flex items-center gap-2.5 py-2.5">
+              <Icon name={l.done ? "checkcircle" : "clock"} size="sm"
+                className={cx("shrink-0", l.done ? "text-fg-success-primary" : "text-fg-quaternary")} />
+              <b className={cx("min-w-0 flex-1 truncate text-sm font-medium",
+                l.done ? "text-quaternary line-through" : "text-primary")}>
+                {l.title || "Untitled"}
+              </b>
               {l.workItemId ? (
-                <button className="lnk" onClick={() => openWork(l.workItemId as string)}>open</button>
+                <Button color="link-color" size="xs" onClick={() => openWork(l.workItemId as string)}>open</Button>
               ) : null}
             </li>
           ))}
-          {!lines.length ? <li className="dim">Nothing planned, and nothing closed today.</li> : null}
+          {lines.length ? null : (
+            <li className="py-4 text-center text-sm text-quaternary">Nothing planned, and nothing closed today.</li>
+          )}
         </ul>
 
         {undone ? (
-          <div className="fg">
-            <label htmlFor="tmPending">Why did the unticked lines not get done? <b className="req">*</b></label>
-            <textarea id="tmPending" className="inp" rows={2} value={pending}
-              placeholder="The reason, not an apology. It is what a senior reads first."
-              onChange={(e) => setPending(e.target.value)} />
-            <span className="help">{undone} line{undone > 1 ? "s" : ""} unticked.</span>
-          </div>
+          <FormField id="tmPending" label="Why did the unticked lines not get done?" req
+            hint={undone + " line" + (undone > 1 ? "s" : "") + " unticked."}>
+            <Input id="tmPending" value={pending}
+              ph="The reason, not an apology. It is what a senior reads first."
+              onChange={setPending} />
+          </FormField>
         ) : null}
 
-        <div className="fg">
-          <label htmlFor="tmWin">Biggest win today <span className="tm-opt">optional</span></label>
-          <input id="tmWin" className="inp" value={win} onChange={(e) => setWin(e.target.value)} />
-        </div>
-        <div className="fg">
-          <label htmlFor="tmHelp">Blocked on, or need help with <span className="tm-opt">optional</span></label>
-          <input id="tmHelp" className="inp" value={help} onChange={(e) => setHelp(e.target.value)} />
-        </div>
-        <div className="fg">
-          <label htmlFor="tmTomorrow">Tomorrow's first priority <span className="tm-opt">optional</span></label>
-          <input id="tmTomorrow" className="inp" value={tomorrow}
-            onChange={(e) => setTomorrow(e.target.value)} />
-        </div>
+        <FormField id="tmWin" label="Biggest win today" tip="optional">
+          <Input id="tmWin" value={win} onChange={setWin} />
+        </FormField>
+        <FormField id="tmHelp" label="Blocked on, or need help with" tip="optional">
+          <Input id="tmHelp" value={help} onChange={setHelp} />
+        </FormField>
+        <FormField id="tmTomorrow" label="Tomorrow's first priority" tip="optional">
+          <Input id="tmTomorrow" value={tomorrow} onChange={setTomorrow} />
+        </FormField>
 
         {/* READ FROM THE CLOCK, and there is no field for it on purpose. */}
         <Notice ico="clock" text={day
           ? "Worked " + fmtHM(worked) + (breakMins ? " · " + fmtHM(breakMins) + " break" : "")
           + " · started " + fmtTime(day.startedAt) + ". Read from your clock, not typed here."
           : "You have not clocked in today, so there are no hours to attach to this."} />
-      </div>
-      <div className="md-f">
-        <span className="spacer" />
-        <button className="btn" onClick={() => shell.closeLayer()}>Cancel</button>
-        <button className="btn pri" disabled={blocked} onClick={save}>Submit report</button>
-      </div>
-    </>
+      </FormSection>
+    </ModalShell>
   );
 }
 

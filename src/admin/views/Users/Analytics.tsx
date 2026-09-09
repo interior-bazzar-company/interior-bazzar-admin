@@ -14,10 +14,10 @@
    money. What is left here is the base and how it grew: registrations, the
    channels they arrived through, and how far their profiles got.
 
-   EVERY FIGURE IS IN A CARD, and the cards pair up. Loose sections in one
-   column read as an undifferentiated scroll — nothing tells you where an idea
-   starts, and the eye has nothing to catch on the way down. A card gives each
-   figure a boundary and a subtitle that states what it counts.
+   THE READING ORDER: the base as tiles, then how it grew, then the two
+   readings of the same range side by side, then the definitions the whole page
+   is answerable to. Every measured surface is a `ChartFrame` — it carries the
+   corner ticks, which is the panel's way of saying somebody counted this.
 
    THE RANGE IS REAL. It drives every range-dependent figure on the page through
    `rangeTotals()`, which sums the monthly series and recomputes each rate from
@@ -25,17 +25,16 @@
    ============================================================================= */
 import { useMemo } from "react";
 import { useShell } from "../../shell/ShellContext";
-import { Icon, Notice, Tiles } from "../../ui";
+import { ActivityFeed, Button, ChartFrame, EmptyState, Notice, Table, Tiles } from "../../ui";
 import { go } from "../../ui/nav";
 import { Block, Blocks, Frame } from "./Frame";
 import type { FaceProps } from "./Frame";
-import { EventRow } from "./bits";
 import { BarRows, ColumnChart, FunnelChart } from "../charts";
 import type { BarRow, Series } from "../charts";
 import DateRange from "./DateRange";
 import {
   METRICS, VOCAB,
-  bandCounts, clampRange, countsOf, delta, pct, presetRange, rangeTotals,
+  ago, bandCounts, clampRange, countsOf, delta, pct, presetRange, rangeTotals,
   useRecentActivity,
 } from "./store";
 
@@ -89,48 +88,47 @@ export default function Analytics({ rows, p, onView, onParams }: FaceProps) {
   return (
     <Frame view="analytics" onView={onView} toast={toast}
       counts={bandCounts(rows)}
-      cmd={<>
-        <DateRange from={range.from} to={range.to} onPick={onRange} />
-        <span className="um-against">
+      title="Users analytics"
+      meta={<>
+        <span>{t.label}</span>
+        <span>
           {t.monthCount} month{t.monthCount === 1 ? "" : "s"}
           {t.prev ? <> · against the {t.monthCount} before</> : <> · no prior span to compare</>}
         </span>
-        <span className="spacer" />
-        <button className="btn" onClick={() => onView("users")}>
-          <Icon name="users" />Users
-        </button>
-      </>}>
+      </>}
+      actions={<Button color="secondary" ico="users" onClick={() => onView("users")}>Open the directory</Button>}
+      cmd={<DateRange from={range.from} to={range.to} onPick={onRange} />}
+      bands={
+        /* ======================================================= the base ===
+           Counted NOW, not over the range: the range narrows how the base
+           grew, never how big it is. */
+        <Tiles list={[
+          { k: "Total registered", v: c.total, s: c.deactivated + " deactivated, kept in history",
+            to: dir({}) },
+          { k: "Active accounts", v: c.active, tone: "ok", s: "the account works",
+            to: dir({ status: "active" }) },
+          { k: "Deactivated", v: c.deactivated,
+            s: "profile, links and audit all retained", to: dir({ status: "deactivated" }) },
+          { k: "Incomplete profiles", v: c.incompleteProfiles,
+            tone: c.incompleteProfiles ? "warn" : undefined,
+            s: "graded against profile v1", to: dir({ flag: "incomplete" }) },
+        ]} />
+      }>
 
-      {/* ======================================================= the base === */}
       <Blocks>
-        <Block wide title="The base" desc="unique users · counted now, not over the range"
-          foot={<>Active and Deactivated are derived from the account's own status at read time;
-            there is no stored flag behind either number. Neither says anything about whether
-            somebody is paying — that is a Finance figure, counted against the subscription that
-            holds the money.</>}>
-          <Tiles list={[
-            { k: "Total registered", v: c.total, s: c.deactivated + " deactivated, kept in history",
-              to: dir({}) },
-            { k: "Active accounts", v: c.active, tone: "ok", s: "the account works",
-              to: dir({ status: "active" }) },
-            { k: "Deactivated", v: c.deactivated,
-              s: "profile, links and audit all retained", to: dir({ status: "deactivated" }) },
-            { k: "Incomplete profiles", v: c.incompleteProfiles,
-              tone: c.incompleteProfiles ? "warn" : undefined,
-              s: "graded against profile v1", to: dir({ flag: "incomplete" }) },
-          ]} />
-        </Block>
-
         {/* ========================================================= growth === */}
-        <Block wide title="How the base grew" desc={t.label + " · unique users per month"}
-          right={<span className="um-blocknums">
+        <ChartFrame
+          className="lg:col-span-2"
+          title={"How the base grew · " + t.label}
+          right={<span className="text-xs text-tertiary tnum">
             {t.registrations.toLocaleString("en-IN")} registered ·{" "}
             {t.profileCompleted.toLocaleString("en-IN")} profiles completed
           </span>}
-          foot={<>Profiles completed sits beside registrations and is never subtracted from it:
+          note={<>Profiles completed sits beside registrations and is never subtracted from it:
             a profile finished this month may belong to somebody who registered last month, so
             the two series are counted in the month each event happened and not netted off.
-            {t.prev ? <> Registrations are {delta(t.registrations, t.prev.registrations).text}.</> : null}</>}>
+            {t.prev ? <> Registrations are {delta(t.registrations, t.prev.registrations).text}.</> : null}</>}
+        >
           <ColumnChart series={GROWTH} labelSeries="registrations"
             points={t.months.map((m) => ({
               key: m.month, label: m.label,
@@ -140,14 +138,15 @@ export default function Analytics({ rows, p, onView, onParams }: FaceProps) {
               },
             }))}
             unit="hover or tab a group for both figures" />
-        </Block>
+        </ChartFrame>
 
         {/* ===================================================== the funnel === */}
-        <Block title="Registered to a usable profile"
-          desc="unique users · stages with a real event behind them"
-          foot={<>Two stages, because two things are recorded. There is no <em>viewed plans</em>
+        <ChartFrame
+          title="Registered to a usable profile"
+          note={<>Two stages, because two things are recorded. There is no <em>viewed plans</em>
             {" "}stage and no membership stage — nothing here records the first, and the second is
-            a Finance fact now. A funnel with an invented stage is worse than a short one.</>}>
+            a Finance fact now. A funnel with an invented stage is worse than a short one.</>}
+        >
           <FunnelChart unit=""
             stages={[
               { key: "registered", label: "Registered", value: t.registrations,
@@ -155,82 +154,84 @@ export default function Analytics({ rows, p, onView, onParams }: FaceProps) {
               { key: "profile", label: "Profile completed", value: t.profileCompleted,
                 note: "Met the profile v1 completion threshold. Re-graded if the schema versions." },
             ]} />
-          <Tiles cols={2} list={[
+          <Tiles cols={2} className="mt-4" list={[
             { k: "Completion", v: pct(t.completion.value),
               s: t.completion.num + " of " + t.completion.den + " in range" },
             { k: "Still incomplete", v: c.incompleteProfiles, tone: "warn",
               s: "across the whole base, counted now",
               to: dir({ flag: "incomplete" }) },
           ]} />
-        </Block>
+        </ChartFrame>
 
         {/* ======================================================== sources === */}
-        <Block title="Where they come from" desc={"unique users · " + t.label}
-          foot={<>One hue: these are names, not an order. Shading them by size would say the
-            bar length twice.</>}>
-          <BarRows rows={sourceRows} />
-        </Block>
+        <ChartFrame
+          title={"Where they come from · " + t.label}
+          note={<>One hue: these are names, not an order. Shading them by size would say the
+            bar length twice.</>}
+        >
+          <BarRows rows={sourceRows} unit="unique users" />
+        </ChartFrame>
 
         {/* ===================================================== engagement === */}
         <Block title="How they use it" desc="blocked on the event taxonomy">
-          <div className="um-unavailable">
-            <Icon name="chart" size="lg" />
-            <div>
-              <b>Unavailable, not zero.</b>
-              <p>
-                DAU, WAU and MAU need a defined set of qualifying product events. That taxonomy
-                does not exist (<span className="mono">UM-OD-10</span>), so the payload carries{" "}
-                <span className="mono">engagement: null</span> rather than zeros — which would be
-                indistinguishable from a platform nobody opens.
-              </p>
-            </div>
-          </div>
+          <EmptyState flat icon="chart" title="Unavailable, not zero"
+            body={<>
+              DAU, WAU and MAU need a defined set of qualifying product events. That taxonomy
+              does not exist (<span className="font-mono">UM-OD-10</span>), so the payload carries{" "}
+              <span className="font-mono">engagement: null</span> rather than zeros — which would
+              be indistinguishable from a platform nobody opens.
+            </>} />
         </Block>
 
         {/* ========================================================= recent === */}
         <Block title="Just happened" desc="registrations, profile edits, tags, notes, account status">
-          <div className="um-evlist">
-            {recent.map((e) => {
+          {recent.length ? (
+            <ActivityFeed items={recent.map((e) => {
               const meta = VOCAB.eventTypes.filter((x) => x.key === e.type)[0];
-              return (
-                <EventRow key={e.eventId} type={e.type}
-                  label={meta ? meta.label : e.type} tone={meta ? meta.tone : ""}
-                  text={<>
-                    <a data-go={"#/users/" + e.userId} onClick={() => go("#/users/" + e.userId)}>
-                      {e.userName}
-                    </a>
-                    {e.note ? <span className="um-evnote"> — {e.note}</span> : null}
-                  </>}
-                  who={e.actor} when={e.at} />
-              );
-            })}
-          </div>
+              return {
+                who: e.actor,
+                what: <>
+                  <span className="text-tertiary">{meta ? meta.label : e.type} · </span>
+                  <a href={"#/users/" + e.userId} data-go={"#/users/" + e.userId}
+                    className="rounded font-medium text-brand-secondary outline-focus-ring hover:underline focus-visible:outline-2 focus-visible:outline-offset-2"
+                    onClick={(ev) => { ev.preventDefault(); go("#/users/" + e.userId); }}>
+                    {e.userName}
+                  </a>
+                  {e.note ? <span className="text-tertiary"> — {e.note}</span> : null}
+                </>,
+                when: <>{e.actor} · {ago(e.at)}</>,
+              };
+            })} />
+          ) : (
+            <EmptyState flat icon="history" title="Nothing yet"
+              body="The audit trail across every user lands here as it happens." />
+          )}
         </Block>
 
         {/* ==================================================== definitions === */}
         <Block wide title="Definitions"
-          desc="the same metric has to mean the same thing in March and in September">
-          <table className="tbl um-defs">
-            <thead>
-              <tr><th>Metric</th><th>Unit</th><th>Definition</th><th>Easy to get wrong</th></tr>
-            </thead>
-            <tbody>
-              {METRICS.map((m) => (
-                <tr key={m.key}>
-                  <td className="cell-1">{m.label}</td>
-                  <td className="um-fine">{m.unit}</td>
-                  <td>{m.formula}</td>
-                  <td className="um-fine">{m.caution}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <Notice tone="info" ico="lock" text={<>
-            <b>The commercial metrics are not missing, they moved.</b> Conversion to a paid plan,
-            renewal rate, churn, revenue per customer and cohort retention are asked of the
-            subscription that holds the money, in Finance. Answering them from the user base
-            would be this module estimating a figure another one records.
-          </>} />
+          desc="the same metric has to mean the same thing in March and in September"
+          foot={
+            <Notice tone="info" ico="lock" text={<>
+              <b>The commercial metrics are not missing, they moved.</b> Conversion to a paid plan,
+              renewal rate, churn, revenue per customer and cohort retention are asked of the
+              subscription that holds the money, in Finance. Answering them from the user base
+              would be this module estimating a figure another one records.
+            </>} />
+          }>
+          <Table
+            list
+            min="48rem"
+            cols={[{ label: "Metric", w: "13rem" }, { label: "Unit", w: "8rem" }, { label: "Definition" }, { label: "Easy to get wrong" }]}
+            rows={METRICS.map((m) => (
+              <tr key={m.key}>
+                <td className="cell-1">{m.label}</td>
+                <td className="faint">{m.unit}</td>
+                <td>{m.formula}</td>
+                <td className="faint">{m.caution}</td>
+              </tr>
+            ))}
+          />
         </Block>
       </Blocks>
     </Frame>

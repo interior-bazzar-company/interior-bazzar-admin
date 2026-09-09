@@ -31,8 +31,9 @@
    — putting them side by side would count every rupee four times and draw a
    total that means nothing.
    ============================================================================= */
-import type { ReactNode } from "react";
-import { Block, Blocks } from "./Frame";
+import { Button, ChartFrame, Tiles } from "../../ui";
+import type { TileProps } from "../../ui";
+import { Blocks } from "./Frame";
 import { Unavailable } from "./bits";
 import InfoTip from "./InfoTip";
 import { BarRows, ColumnChart } from "../charts";
@@ -47,34 +48,6 @@ const thousands = (paise: number) => Math.round(paise / 100000);
 /* One series, so the kit draws no legend and the block title names it. Slot 1
    is money that arrived, here and everywhere else in the panel. */
 const COLLECTED: Series[] = [{ key: "collected", label: "Collected", slot: 1 }];
-
-/* ============================================================== pieces === */
-
-/** One headline figure with its definition behind the i. A tile, not a chart:
- *  a single number has no shape to see.
- *
- *  THE SAME ANATOMY AS THE LIST TAB'S STRIP, deliberately — label and i, the
- *  figure, a second figure of a different KIND beside it where there is one,
- *  then a line that says what the number counts and offers to show it. Two
- *  strips in one module that read differently make a reader work out twice
- *  what they are looking at.
- *
- *  `action` crosses to the Subscriptions tab with that filter applied: the
- *  charts here are never narrowed — a chart narrowed by a filter is a chart
- *  whose caption lies — so "show only these" takes you to the records, which
- *  is where narrowing belongs. */
-function Tile({ label, value, sub, tone, tip, aside, action }: {
-  label: string; value: ReactNode; sub: ReactNode; tone?: string; tip: ReactNode;
-  aside?: ReactNode; action?: ReactNode;
-}) {
-  return (
-    <div className={"fin-mt " + (tone || "")}>
-      <div className="k">{label}{tip}</div>
-      <div className="v">{value}{aside ? <span className="fin-mt-aside">{aside}</span> : null}</div>
-      <div className="s">{sub}{action ? <> · {action}</> : null}</div>
-    </div>
-  );
-}
 
 const plural = (n: number, one: string, many: string) => n + " " + (n === 1 ? one : many);
 
@@ -157,8 +130,8 @@ export default function SubAnalytics({ year, onQueue }: {
      and cancelled are neutral — `due` is the ABSENCE of an event, and
      painting it as a warning would say something happened that has not. */
   const instRows: BarRow[] = (() => {
-    const all = rows.flatMap((r) => r.s.installments);
-    const of = (st: string) => all.filter((i) => i.status === st);
+    const every = rows.flatMap((r) => r.s.installments);
+    const of = (st: string) => every.filter((i) => i.status === st);
     return [
       { key: "paid", label: "Paid", tone: "st-ok", n: of("paid").length },
       { key: "due", label: "Due", tone: "st-mute", n: of("due").length },
@@ -168,7 +141,7 @@ export default function SubAnalytics({ year, onQueue }: {
       .filter((r) => r.n > 0)
       .map((r) => ({
         key: r.key, label: r.label, value: r.n, tone: r.tone,
-        hint: <>{inr(all.filter((i) => i.status === r.key)
+        hint: <>{inr(every.filter((i) => i.status === r.key)
           .reduce((n, i) => n + i.amountPaise, 0))}</>,
         title: plural(r.n, "installment", "installments") + " · " + r.label,
       }));
@@ -176,89 +149,111 @@ export default function SubAnalytics({ year, onQueue }: {
 
   if (!rows.length) {
     return (
-      <Blocks>
-        <Block wide title={year ? "Nothing was sold in " + year : "Nothing to read back yet"}>
-          <Unavailable title={year ? "No subscription started in " + year + "." : "No subscription has been recorded."}
-            why="Every figure on this tab is derived from the records beside it." />
-        </Block>
-      </Blocks>
+      <Unavailable
+        title={year ? "No subscription started in " + year + "." : "No subscription has been recorded."}
+        why="Every figure on this tab is derived from the records beside it." />
     );
   }
 
+  /* THE FOUR HEADLINE FIGURES, on the panel's own stat tile — the label with
+     its `i`, the figure, what it counts, and where to go and see it. A tile
+     rather than a chart because a single number has no shape to see.
+
+     `foot` crosses to the Subscriptions tab with that filter applied: the
+     charts here are never narrowed — a chart narrowed by a filter is a chart
+     whose caption lies — so "show only these" takes you to the records, which
+     is where narrowing belongs. */
+  const tiles: TileProps[] = [
+    {
+      k: <>Expected collection<InfoTip label="Expected collection"
+        intro={<>The <b>whole contracted value</b> of every subscription ever recorded — each
+          one's own agreed total, summed. The three figures beside it are its parts: what has
+          arrived, what is still to come, and what did not clear.</>}
+        rows={[
+          { label: "Counts", hint: "every subscription in the module: active, completed, cancelled and defaulting alike." },
+          { label: "Is not revenue", hint: "it is what was agreed, not what arrived — Collected is the part that has." },
+          { label: "Caution", hint: "a cancelled subscription keeps the total it was agreed at. Cancelling forward stops the schedule; it does not rewrite what was sold." },
+        ]} /></>,
+      v: inr(agreedPaise),
+      s: plural(rows.length, "sale", "sales") + " recorded",
+    },
+    {
+      k: <>Collected<InfoTip label="Collected"
+        intro={<>Money that <b>actually arrived</b>, summed across every installment recorded
+          as paid, all time.</>}
+        rows={[
+          { label: "Counts", hint: "an installment the moment a payment is recorded against it and its receipt is issued." },
+          { label: "Excludes", hint: "reversed payments — a reversal puts the installment back to unpaid and this figure drops with it." },
+          { label: "Not the same as the list's tile", hint: "that one is one period; this is everything ever collected." },
+        ]} /></>,
+      v: inr(collectedPaise),
+      tone: "ok",
+      s: plural(collectedN, "installment", "installments") + " settled",
+      foot: <>
+        <span className="inline-flex items-center gap-1 text-tertiary tnum">
+          <b className="font-medium text-secondary">{activeN}</b> active
+          <InfoTip label="Active subscriptions"
+            intro={<>Subscriptions running right now — <b>a level, read at this moment</b>, not a total for any period.</>}
+            rows={[
+              { label: "Counts", hint: "every subscription still being served: paid up front or still paying." },
+              { label: "Excludes", hint: "completed, cancelled, refunded — and defaulting, which leaves the moment an installment fails." },
+              { label: "Caution", hint: "it does not explain the figure beside it. Money collected all time includes subscriptions that are no longer active." },
+            ]} />
+        </span>
+        {collectedN
+          ? <Button color="link-color" size="sm" onClick={() => onQueue("settled")}>show only these</Button>
+          : null}
+      </>,
+    },
+    {
+      k: <>Expected installments<InfoTip label="Expected installments"
+        intro={<>Installments that are <b>due — the absence of an event</b>. Nothing has
+          happened to them: they have not been paid and they have not failed.</>}
+        rows={[
+          { label: "Counts", hint: "every unpaid installment on every live schedule, whether its date has passed or not." },
+          { label: "Expected, not earned", hint: "each one is a row that already exists, dated when the subscription was recorded — it is not a forecast, and it is not revenue." },
+          { label: "Excludes", hint: "cancelled installments, and anything that failed — a failure is an event and it is counted beside this." },
+        ]} /></>,
+      v: inr(duePaise),
+      tone: duePaise ? undefined : "ok",
+      s: dueN
+        ? plural(dueN, "installment", "installments") + " · expected"
+        : "every installment that exists has been settled",
+      foot: dueN
+        ? <Button color="link-color" size="sm" onClick={() => onQueue("due")}>show only these</Button>
+        : null,
+    },
+    {
+      k: <>Fail installments<InfoTip label="Fail installments"
+        intro={<>Installments recorded as <b>fail to pay</b> — a decline, a cancelled mandate,
+          or a due date that demonstrably passed.</>}
+        rows={[
+          { label: "Always evidenced", hint: "a failure cannot be recorded without a reason from the closed list and a note. There is no state here meaning 'probably failed'." },
+          { label: "Is not written off", hint: "the money is still owed; the subscription reads defaulting until the installment is settled or the subscription is cancelled." },
+        ]} /></>,
+      v: inr(failedPaise),
+      tone: failedN ? "bad" : undefined,
+      s: failedN
+        ? plural(failedN, "installment", "installments") + " did not clear, each with its evidence on the record"
+        : "every installment that fell due has cleared",
+      foot: failedN
+        ? <Button color="link-color" size="sm" onClick={() => onQueue("failed")}>show only these</Button>
+        : null,
+    },
+  ];
+
   return (
-    <Blocks>
-      {/* ============================================================ the money === */}
-      <Block wide title={"The money · " + (year || "all time")}
-        right={<span className="fin-sum">
-          {plural(rows.length, "subscription", "subscriptions")}
-        </span>}>
-        <div className="fin-money-strip">
-          <Tile label="Expected collection" value={inr(agreedPaise)}
-            sub={plural(rows.length, "sale", "sales") + " recorded"}
-            tip={<InfoTip label="Expected collection"
-              intro={<>The <b>whole contracted value</b> of every subscription ever recorded — each
-                one's own agreed total, summed. The three figures beside it are its parts: what has
-                arrived, what is still to come, and what did not clear.</>}
-              rows={[
-                { label: "Counts", hint: "every subscription in the module: active, completed, cancelled and defaulting alike." },
-                { label: "Is not revenue", hint: "it is what was agreed, not what arrived — Collected is the part that has." },
-                { label: "Caution", hint: "a cancelled subscription keeps the total it was agreed at. Cancelling forward stops the schedule; it does not rewrite what was sold." },
-              ]} />} />
-
-          <Tile label="Collected" tone="ok" value={inr(collectedPaise)}
-            aside={<>
-              <b className="tnum">{activeN}</b> active
-              <InfoTip label="Active subscriptions"
-                intro={<>Subscriptions running right now — <b>a level, read at this moment</b>, not a total for any period.</>}
-                rows={[
-                  { label: "Counts", hint: "every subscription still being served: paid up front or still paying." },
-                  { label: "Excludes", hint: "completed, cancelled, refunded — and defaulting, which leaves the moment an installment fails." },
-                  { label: "Caution", hint: "it does not explain the figure beside it. Money collected all time includes subscriptions that are no longer active." },
-                ]} />
-            </>}
-            sub={plural(collectedN, "installment", "installments") + " settled"}
-            action={collectedN ? <button className="lnk" onClick={() => onQueue("settled")}>show only these</button> : null}
-            tip={<InfoTip label="Collected"
-              intro={<>Money that <b>actually arrived</b>, summed across every installment recorded
-                as paid, all time.</>}
-              rows={[
-                { label: "Counts", hint: "an installment the moment a payment is recorded against it and its receipt is issued." },
-                { label: "Excludes", hint: "reversed payments — a reversal puts the installment back to unpaid and this figure drops with it." },
-                { label: "Not the same as the list's tile", hint: "that one is one period; this is everything ever collected." },
-              ]} />} />
-
-          <Tile label="Expected installments" tone={duePaise ? "mute" : "ok"} value={inr(duePaise)}
-            sub={dueN
-              ? plural(dueN, "installment", "installments") + " · expected"
-              : "every installment that exists has been settled"}
-            action={dueN ? <button className="lnk" onClick={() => onQueue("due")}>show only these</button> : null}
-            tip={<InfoTip label="Expected installments"
-              intro={<>Installments that are <b>due — the absence of an event</b>. Nothing has
-                happened to them: they have not been paid and they have not failed.</>}
-              rows={[
-                { label: "Counts", hint: "every unpaid installment on every live schedule, whether its date has passed or not." },
-                { label: "Expected, not earned", hint: "each one is a row that already exists, dated when the subscription was recorded — it is not a forecast, and it is not revenue." },
-                { label: "Excludes", hint: "cancelled installments, and anything that failed — a failure is an event and it is counted beside this." },
-              ]} />} />
-
-          <Tile label="Fail installments" tone={failedN ? "bad" : "mute"}
-            value={<>{inr(failedPaise)}{failedN ? <span className="fin-count"> · {failedN}</span> : null}</>}
-            sub={failedN
-              ? plural(failedN, "installment", "installments") + " did not clear, each with its evidence on the record"
-              : "every installment that fell due has cleared"}
-            action={failedN ? <button className="lnk" onClick={() => onQueue("failed")}>show only these</button> : null}
-            tip={<InfoTip label="Fail installments"
-              intro={<>Installments recorded as <b>fail to pay</b> — a decline, a cancelled mandate,
-                or a due date that demonstrably passed.</>}
-              rows={[
-                { label: "Always evidenced", hint: "a failure cannot be recorded without a reason from the closed list and a note. There is no state here meaning 'probably failed'." },
-                { label: "Is not written off", hint: "the money is still owed; the subscription reads defaulting until the installment is settled or the subscription is cancelled." },
-              ]} />} />
+    <div className="flex min-w-0 flex-col gap-5">
+      <section className="flex min-w-0 flex-col gap-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-md font-semibold text-primary">The money · {year || "all time"}</h2>
+          <span className="label-mono">{plural(rows.length, "subscription", "subscriptions")}</span>
         </div>
-      </Block>
+        <Tiles cols={4} list={tiles} />
+      </section>
 
       {/* ============================================================ over time === */}
-      <Block wide title="Collected, month by month">
+      <ChartFrame title="Collected, month by month">
         {months.length ? (
           <ColumnChart series={COLLECTED} labelSeries="collected"
             points={months.map((m) => ({
@@ -271,30 +266,32 @@ export default function SubAnalytics({ year, onQueue }: {
           <Unavailable title="Nothing has been collected yet."
             why="A bar appears the moment an installment is settled with a value date." />
         )}
-      </Block>
+      </ChartFrame>
 
-      {/* ================================================================ by plan === */}
-      <Block title="Which plans are selling">
-        {planRows.length
-          ? <BarRows rows={planRows} unit="₹ thousand · collected" />
-          : <Unavailable title="No plan has collected anything yet."
-              why="A plan appears here once money has arrived against a subscription sold on it." />}
-      </Block>
+      <Blocks>
+        {/* ================================================================ by plan === */}
+        <ChartFrame title="Which plans are selling">
+          {planRows.length
+            ? <BarRows rows={planRows} unit="₹ thousand · collected" />
+            : <Unavailable title="No plan has collected anything yet."
+                why="A plan appears here once money has arrived against a subscription sold on it." />}
+        </ChartFrame>
 
-      {/* ============================================================== by source === */}
-      <Block title="Where the sales came from">
-        {sourceRows.length
-          ? <BarRows rows={sourceRows} unit="subscriptions · hover a bar for the money" />
-          : <Unavailable title="No subscription carries a source."
-              why="Every recorded sale carries one, so this appears with the first record." />}
-      </Block>
+        {/* ============================================================== by source === */}
+        <ChartFrame title="Where the sales came from">
+          {sourceRows.length
+            ? <BarRows rows={sourceRows} unit="subscriptions · hover a bar for the money" />
+            : <Unavailable title="No subscription carries a source."
+                why="Every recorded sale carries one, so this appears with the first record." />}
+        </ChartFrame>
+      </Blocks>
 
       {/* ========================================================= installments === */}
       {/* Due wears no warning colour on purpose: it is the ABSENCE of an
           event, and a tint would claim something happened that has not. */}
-      <Block wide title="Every installment, by state">
+      <ChartFrame title="Every installment, by state">
         <BarRows rows={instRows} unit="installments · hover a bar for what it is worth" />
-      </Block>
-    </Blocks>
+      </ChartFrame>
+    </div>
   );
 }

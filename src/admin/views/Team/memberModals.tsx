@@ -11,10 +11,17 @@
        generates a new password and EMAILS it — it is never returned to the
        caller, so it cannot be shown on screen at all, unlike the old
        local-engine flow.
+
+   EVERY DIALOG IS `ModalShell`: the title where every other modal in the
+   panel puts its title, the refusal at the top of the body where the form
+   can act on it, and the actions in the footer with the primary last and
+   the destructive one carried in `danger` on the far left. The FORMS ARE
+   UNCONTROLLED — `val(id)` reads them out of the DOM at save, and
+   `readRolePicks()` reads `#tmRoles` — so every field keeps its id.
    ===================================================================== */
 import { useState } from "react";
 import AdminOpsService from "../../../api/modules/adminOps";
-import { Field, ModalHead, Notice, SectionHead } from "../../ui";
+import { Button, FieldRow, FormField, FormSection, Input, ModalShell, Notice } from "../../ui";
 import { ErrSlot, RolePicks, errOf, readRolePicks, val } from "../teamShared";
 import type { EngineErr, Member, Ops, Role } from "../teamShared";
 
@@ -42,31 +49,55 @@ export function MemberNewModal({ roles, ops }: { roles: Role[]; ops: Ops }) {
   }
 
   return (
-    <>
-      <ModalHead title="Add team member" sub="You set the username and password; pass them on yourself" onClose={ops.closeLayer} />
-      <div className="md-b">
-        <ErrSlot err={err} />
-        <SectionHead title="Team member" />
-        <Field id="tmName" label="Name" req ph="Rhea Menon" />
-        <Field id="tmEmail" label="Email" req type="email" ph="rhea@interiorbazzar.com" />
-        <Field id="tmPhone" label="Phone" req ph="+91 98100 00000" />
-        <SectionHead title="Account" />
-        <Field id="tmUser" label="Username" req ph="rhea.menon" />
-        <Field id="tmPass" label="Password" req type="password" ph="At least 8 characters"
-               help="Set it here and pass it on yourself — there is no generated, shown-once password on this endpoint." />
-        <SectionHead title="Role" />
-        <RolePicks roles={roles} />
-        <Notice ico="shield" text={
-          <><b>A member with no role can sign in and do nothing.</b> That is deliberate — a successful
-            login never implies access to anything — but it is rarely what you want.</>
-        } />
+    <ModalShell
+      title="Add team member"
+      sub="You set the username and password; pass them on yourself"
+      ico="user"
+      onClose={ops.closeLayer}
+      actions={
+        <>
+          <Button color="secondary" data-close="1" onClick={ops.closeLayer}>Cancel</Button>
+          <Button color="primary" data-act="tm-new-go" isLoading={busy} onClick={create}>Create member</Button>
+        </>
+      }
+    >
+      <ErrSlot err={err} />
+      <div className="flex flex-col gap-6">
+        <FormSection title="Team member">
+          <FormField id="tmName" label="Name" req>
+            <Input id="tmName" ph="Rhea Menon" autoFocus />
+          </FormField>
+          <FieldRow>
+            <FormField id="tmEmail" label="Email" req>
+              <Input id="tmEmail" type="email" ph="rhea@interiorbazzar.com" />
+            </FormField>
+            <FormField id="tmPhone" label="Phone" req>
+              <Input id="tmPhone" ph="+91 98100 00000" />
+            </FormField>
+          </FieldRow>
+        </FormSection>
+
+        <FormSection title="Account">
+          <FieldRow>
+            <FormField id="tmUser" label="Username" req>
+              <Input id="tmUser" ph="rhea.menon" />
+            </FormField>
+            <FormField id="tmPass" label="Password" req
+              hint="Set it here and pass it on yourself — there is no generated, shown-once password on this endpoint.">
+              <Input id="tmPass" type="password" ph="At least 8 characters" />
+            </FormField>
+          </FieldRow>
+        </FormSection>
+
+        <FormSection title="Role" desc="Effective access is the union of every role held.">
+          <RolePicks roles={roles} />
+          <Notice ico="shield" text={
+            <><b>A member with no role can sign in and do nothing.</b> That is deliberate — a successful
+              login never implies access to anything — but it is rarely what you want.</>
+          } />
+        </FormSection>
       </div>
-      <div className="md-f">
-        <span className="spacer"></span>
-        <button className="btn" data-close="1" onClick={ops.closeLayer}>Cancel</button>
-        <button className="btn pri" data-act="tm-new-go" onClick={create} disabled={busy}>Create member</button>
-      </div>
-    </>
+    </ModalShell>
   );
 }
 
@@ -90,25 +121,43 @@ export function MemberEditModal({ u, ops }: { u: Member; ops: Ops }) {
     }
   }
   return (
-    <>
-      <ModalHead title="Edit member" sub={u.username || u.id} mono onClose={ops.closeLayer} />
-      <div className="md-b">
-        <ErrSlot err={err} />
-        <Field id="tmName" label="Name" req value={u.name} />
-        <Field id="tmEmail" label="Email" req type="email" value={u.email} />
-        <Field id="tmPhone" label="Phone" value={u.phone || ""} />
-        <Field id="tmUser" label="Username" value={u.username || ""} />
+    <ModalShell
+      title="Edit member"
+      sub={u.username || String(u.id)}
+      mono
+      ico="edit"
+      onClose={ops.closeLayer}
+      actions={
+        <>
+          <Button color="secondary" data-close="1" onClick={ops.closeLayer}>Cancel</Button>
+          <Button color="primary" data-act="tm-edit-go" data-ref={u.id} isLoading={busy} onClick={save}>Save</Button>
+        </>
+      }
+    >
+      <ErrSlot err={err} />
+      <FormSection>
+        <FieldRow>
+          <FormField id="tmName" label="Name" req>
+            <Input id="tmName" defaultValue={u.name} autoFocus />
+          </FormField>
+          <FormField id="tmEmail" label="Email" req>
+            <Input id="tmEmail" type="email" defaultValue={u.email} />
+          </FormField>
+        </FieldRow>
+        <FieldRow>
+          <FormField id="tmPhone" label="Phone">
+            <Input id="tmPhone" defaultValue={u.phone || ""} />
+          </FormField>
+          <FormField id="tmUser" label="Username">
+            <Input id="tmUser" mono defaultValue={u.username || ""} />
+          </FormField>
+        </FieldRow>
         <Notice ico="shield" text={
           <><b>Roles are not on this form.</b> Changing what somebody may access is a different
             decision from fixing their phone number, so it has its own button.</>
         } />
-      </div>
-      <div className="md-f">
-        <span className="spacer"></span>
-        <button className="btn" data-close="1" onClick={ops.closeLayer}>Cancel</button>
-        <button className="btn pri" data-act="tm-edit-go" data-ref={u.id} onClick={save} disabled={busy}>Save</button>
-      </div>
-    </>
+      </FormSection>
+    </ModalShell>
   );
 }
 
@@ -131,22 +180,27 @@ export function MemberRolesModal({ u, roles, ops }: { u: Member; roles: Role[]; 
     }
   }
   return (
-    <>
-      <ModalHead title="Roles" sub={<>{u.name} · what they may access</>} onClose={ops.closeLayer} />
-      <div className="md-b">
-        <ErrSlot err={err} />
+    <ModalShell
+      title="Roles"
+      sub={u.name + " · what they may access"}
+      ico="shield"
+      onClose={ops.closeLayer}
+      actions={
+        <>
+          <Button color="secondary" data-close="1" onClick={ops.closeLayer}>Cancel</Button>
+          <Button color="primary" data-act="tm-roles-go" data-ref={u.id} isLoading={busy} onClick={save}>Save roles</Button>
+        </>
+      }
+    >
+      <ErrSlot err={err} />
+      <div className="flex flex-col gap-4">
         <RolePicks roles={roles} held={held} />
         <Notice ico="check" text={
           <><b>More than one role adds up.</b> Effective access is the union of every role held —
             somebody who is both a Sales Agent and Finance does both jobs.</>
         } />
       </div>
-      <div className="md-f">
-        <span className="spacer"></span>
-        <button className="btn" data-close="1" onClick={ops.closeLayer}>Cancel</button>
-        <button className="btn pri" data-act="tm-roles-go" data-ref={u.id} onClick={save} disabled={busy}>Save roles</button>
-      </div>
-    </>
+    </ModalShell>
   );
 }
 
@@ -172,21 +226,25 @@ export function MemberSendCredentialsModal({ u, ops }: { u: Member; ops: Ops }) 
     }
   }
   return (
-    <>
-      <ModalHead title="Send new credentials" sub={u.name} onClose={ops.closeLayer} />
-      <div className="md-b">
-        <ErrSlot err={err} />
-        <Notice ico="lock" text={
-          <>A new password is generated and <b>emailed to {u.email}</b> — it is not shown on screen here.
-            The old password stops working the moment this succeeds.</>
-        } />
-      </div>
-      <div className="md-f">
-        <span className="spacer"></span>
-        <button className="btn" data-close="1" onClick={ops.closeLayer}>Cancel</button>
-        <button className="btn pri" data-act="tm-pw-go" data-ref={u.id} onClick={send} disabled={busy}>Send new password</button>
-      </div>
-    </>
+    <ModalShell
+      title="Send new credentials"
+      sub={u.name}
+      ico="lock"
+      tone="warning"
+      onClose={ops.closeLayer}
+      actions={
+        <>
+          <Button color="secondary" data-close="1" onClick={ops.closeLayer}>Cancel</Button>
+          <Button color="primary" data-act="tm-pw-go" data-ref={u.id} isLoading={busy} onClick={send}>Send new password</Button>
+        </>
+      }
+    >
+      <ErrSlot err={err} />
+      <Notice ico="lock" text={
+        <>A new password is generated and <b>emailed to {u.email}</b> — it is not shown on screen here.
+          The old password stops working the moment this succeeds.</>
+      } />
+    </ModalShell>
   );
 }
 
@@ -211,20 +269,26 @@ export function MemberDeleteModal({ u, ops }: { u: Member; ops: Ops }) {
     }
   }
   return (
-    <>
-      <ModalHead title="Delete member" sub={u.name} onClose={ops.closeLayer} />
-      <div className="md-b">
-        <ErrSlot err={err} />
-        <Notice tone="bad" ico="alert" text={
-          <><b>This removes the account outright.</b> There is no "deactivate instead" option on this
-            endpoint — deals, quotations and invoices they own keep naming them by id regardless.</>
-        } />
-      </div>
-      <div className="md-f">
-        <span className="spacer"></span>
-        <button className="btn" data-close="1" onClick={ops.closeLayer}>Cancel</button>
-        <button className="btn dgr" data-act="tm-del-go" data-ref={u.id} onClick={remove} disabled={busy}>Delete member</button>
-      </div>
-    </>
+    <ModalShell
+      title="Delete member"
+      sub={u.name}
+      ico="alert"
+      tone="error"
+      onClose={ops.closeLayer}
+      actions={
+        <>
+          <Button color="secondary" data-close="1" onClick={ops.closeLayer}>Cancel</Button>
+          <Button color="primary-destructive" data-act="tm-del-go" data-ref={u.id} isLoading={busy} onClick={remove}>
+            Delete member
+          </Button>
+        </>
+      }
+    >
+      <ErrSlot err={err} />
+      <Notice tone="bad" ico="alert" text={
+        <><b>This removes the account outright.</b> There is no “deactivate instead” option on this
+          endpoint — deals, quotations and invoices they own keep naming them by id regardless.</>
+      } />
+    </ModalShell>
   );
 }

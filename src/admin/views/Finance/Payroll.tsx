@@ -33,8 +33,8 @@
    ONE CLOCK. Which months have started comes from `asOf` in module.json, so a
    screenshot taken next March still says the year ended in August 2026.
    ============================================================================= */
-import type { ReactNode } from "react";
-import { Block, Blocks } from "./Frame";
+import { ChartFrame, SelectInput, Tiles } from "../../ui";
+import type { TileProps } from "../../ui";
 import { Unavailable } from "./bits";
 import InfoTip, { PayrollMetricTip } from "./InfoTip";
 import { ColumnChart } from "../charts";
@@ -67,35 +67,15 @@ const MIX: Series[] = [
 
 /* ============================================================== pieces === */
 
-/** One headline figure, with its formula and its caution behind the i.
- *
- *  `value` is a node rather than an amount because one of the five is a COUNT
- *  of people. Formatting it as money would have been the easy way to keep the
- *  signature and a lie on the face of the tile. */
-function Tile({ k, label, value, sub, tone }: {
-  k: string; label: string; value: ReactNode; sub: ReactNode; tone?: string;
-}) {
-  return (
-    <div className={"fin-mt " + (tone || "")}>
-      <div className="k">{label}<PayrollMetricTip k={k} /></div>
-      {value === null
-        ? <p className="fin-na">No run has been opened in this year.</p>
-        : <div className="v">{value}</div>}
-      <div className="s">{sub}</div>
-    </div>
-  );
-}
-
 /** A dropdown for a choice that ALWAYS has a value.
  *
- *  Deliberately not the panel's `Select`, which carries a blank first option
- *  because it is built for FILTERS, where empty means "not filtering". Neither
- *  of these is a filter: a year is always some year and a grouping is always
- *  some grouping, so a blank option would be an entry that either does nothing
- *  or silently means "the default" — and both readings are worse than not
- *  offering it. Same `.selectbox` chrome, so it looks like every other dropdown
- *  in the panel; controlled rather than `defaultValue`, so it cannot drift from
- *  the URL that actually decides what is drawn. */
+ *  Deliberately not the panel's filter `Select`, which carries a blank first
+ *  option because it is built for FILTERS, where empty means "not filtering".
+ *  Neither of these is a filter: a year is always some year and a grouping is
+ *  always some grouping, so a blank option would be an entry that either does
+ *  nothing or silently means "the default" — and both readings are worse than
+ *  not offering it. `SelectInput` is the panel's ANSWER control, which is what
+ *  each of these is. */
 function Picker({ label, value, options, onPick }: {
   label: string;
   value: string;
@@ -103,21 +83,11 @@ function Picker({ label, value, options, onPick }: {
   onPick: (v: string) => void;
 }) {
   return (
-    <span className="fin-picker">
-      <span className="fin-picker-l">{label}</span>
-      {/* PLAIN `.selectbox`, NOT `.on`. The `on` modifier tints the control with
-          the brand and is the panel's "this filter is active" state — it means
-          a filter is narrowing the list, and it is green so somebody can see at
-          a glance which controls are doing that. Neither of these is a filter,
-          so both would have been permanently green: a signal that never varies
-          is not a signal, and it made two ordinary dropdowns look like applied
-          filters somebody ought to clear. */}
-      <span className="selectbox">
-        <select aria-label={label} value={value} onChange={(e) => onPick(e.target.value)}>
-          {options.map((o) => <option key={o.v} value={o.v}>{o.l}</option>)}
-        </select>
-      </span>
-    </span>
+    <label className="flex items-center gap-2 text-sm font-medium text-secondary">
+      {label}
+      <SelectInput ariaLabel={label} value={value} options={options} onChange={onPick}
+        className="w-40" />
+    </label>
   );
 }
 
@@ -127,7 +97,13 @@ export function YearSwitch({ year, onPick }: { year: string; onPick: (year: stri
   const years = usePayrollYears();
   /* One year is not a choice. A dropdown with a single option is a control that
      looks like it does something and does not. */
-  if (years.length < 2) return <span className="fin-sum">Year <b>{yearLabel(year)}</b></span>;
+  if (years.length < 2) {
+    return (
+      <span className="text-sm text-tertiary">
+        Year <b className="font-semibold text-secondary">{yearLabel(year)}</b>
+      </span>
+    );
+  }
   return (
     <Picker label="Year" value={year} onPick={onPick}
       options={years.map((y) => ({ v: y, l: yearLabel(y) }))} />
@@ -147,41 +123,63 @@ export function YearSwitch({ year, onPick }: { year: string; onPick: (year: stri
 function Totals({ y, year }: { y: PayrollYear; year: string }) {
   const t = y.totals;
   const head = useHeadcount(year);
+  const na = "No run has been opened in this year.";
+  const tiles: TileProps[] = [
+    /* THE ONE FIGURE THAT MOVES WHEN AN ACCOUNT IS OPENED, and it leads for
+       that reason. Everything after it is derived from SLIPS, so adding
+       somebody to the payroll changes none of them until a run is opened
+       and paid — correct for money, and no feedback at all for the person
+       who just added them. */
+    {
+      k: <>On the payroll<PayrollMetricTip k="payroll_headcount" /></>,
+      v: head.active,
+      s: inr(head.monthlyPaise) + " a month, committed",
+      foot: head.openedInYear
+        ? <span className="label-mono">{head.openedInYear} opened in {yearLabel(year)}</span>
+        : null,
+    },
+    {
+      k: <>Payroll, the year<PayrollMetricTip k="payroll_cost" /></>,
+      v: t.monthsRun ? inr(t.grossPaise) : "—",
+      s: t.monthsRun
+        ? t.peopleEver + " " + (t.peopleEver === 1 ? "person" : "people") + " across the year"
+        : na,
+    },
+    {
+      k: <>Paid out<PayrollMetricTip k="payroll_paid" /></>,
+      v: t.monthsRun ? inr(t.paidPaise) : "—",
+      tone: t.paidPaise ? "ok" : undefined,
+      s: t.monthsRun ? "net of deductions" : na,
+      foot: t.monthsRun
+        ? <span className="label-mono">{inr(t.deductionsPaise)} deducted</span>
+        : null,
+    },
+    {
+      k: <>Still owed<PayrollMetricTip k="payroll_owed" /></>,
+      v: t.monthsRun ? inr(t.unpaidPaise + t.heldPaise) : "—",
+      tone: t.unpaidPaise + t.heldPaise ? "warn" : undefined,
+      s: !t.monthsRun ? na
+        : t.unpaidPaise + t.heldPaise
+          ? (t.heldPaise ? inr(t.heldPaise) + " of it held" : "issued and not yet paid")
+          : "everybody is paid up",
+    },
+    {
+      k: <>Incentives<PayrollMetricTip k="payroll_incentive" /></>,
+      v: t.monthsRun ? inr(t.incentivePaise) : "—",
+      s: !t.monthsRun ? na
+        : t.grossPaise
+          ? pct(Math.round((t.incentivePaise / t.grossPaise) * 1000) / 10) + " of the wage bill"
+          : "nothing earned yet",
+    },
+  ];
   return (
-    <Block wide title={"The wage bill · " + yearLabel(y.year)}
-      right={<span className="fin-sum">
-        {t.monthsRun} of 12 month{t.monthsRun === 1 ? "" : "s"} run
-      </span>}>
-      <div className="fin-money-strip">
-        {/* THE ONE FIGURE THAT MOVES WHEN AN ACCOUNT IS OPENED, and it leads for
-            that reason. Everything after it is derived from SLIPS, so adding
-            somebody to the payroll changes none of them until a run is opened
-            and paid — correct for money, and no feedback at all for the person
-            who just added them. */}
-        <Tile k="payroll_headcount" label="On the payroll"
-          value={<span className="tnum">{head.active}</span>}
-          sub={head.openedInYear
-            ? head.openedInYear + " opened in " + yearLabel(year) + " · " + inr(head.monthlyPaise) + " a month"
-            : inr(head.monthlyPaise) + " a month, committed"} />
-        <Tile k="payroll_cost" label="Payroll, the year"
-          value={t.monthsRun ? inr(t.grossPaise) : null}
-          sub={t.peopleEver + " " + (t.peopleEver === 1 ? "person" : "people") + " across the year"} />
-        <Tile k="payroll_paid" label="Paid out" value={t.monthsRun ? inr(t.paidPaise) : null}
-          tone={t.paidPaise ? "ok" : ""}
-          sub={"net, after " + inr(t.deductionsPaise) + " of deductions"} />
-        <Tile k="payroll_owed" label="Still owed"
-          value={t.monthsRun ? inr(t.unpaidPaise + t.heldPaise) : null}
-          tone={t.unpaidPaise + t.heldPaise ? "warn" : "mute"}
-          sub={t.unpaidPaise + t.heldPaise
-            ? (t.heldPaise ? inr(t.heldPaise) + " of it held" : "issued and not yet paid")
-            : "everybody is paid up"} />
-        <Tile k="payroll_incentive" label="Incentives"
-          value={t.monthsRun ? inr(t.incentivePaise) : null}
-          sub={t.grossPaise
-            ? pct(Math.round((t.incentivePaise / t.grossPaise) * 1000) / 10) + " of the wage bill"
-            : "nothing earned yet"} />
+    <section className="flex min-w-0 flex-col gap-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-md font-semibold text-primary">The wage bill · {yearLabel(y.year)}</h2>
+        <span className="label-mono">{t.monthsRun} of 12 month{t.monthsRun === 1 ? "" : "s"} run</span>
       </div>
-    </Block>
+      <Tiles cols={5} list={tiles} />
+    </section>
   );
 }
 
@@ -290,14 +288,10 @@ function Chart({ year, by, onPick }: {
       ]} />
   );
 
-  const right = (
-    <span className="fin-groupby">
-      <Picker label="Group by" value={by} options={GROUPINGS} onPick={onPick} />
-    </span>
-  );
-
   return (
-    <Block wide title={<>Payroll · {yearLabel(year)}{tip}</>} right={right}>
+    <ChartFrame
+      title={<>Payroll · {yearLabel(year)}{tip}</>}
+      right={<Picker label="Group by" value={by} options={GROUPINGS} onPick={onPick} />}>
       {empty ? (
         <Unavailable
           title={isMonth
@@ -313,7 +307,7 @@ function Chart({ year, by, onPick }: {
             + (isMonth ? "net paid against net owed" : "gross, before deductions")
             + " · hover or tab a column for both figures"} />
       )}
-    </Block>
+    </ChartFrame>
   );
 }
 /* ============================================================== face ==== */
@@ -337,9 +331,9 @@ export default function Payroll({ year, p, onParams }: {
        Its one load-bearing sentence — that this is the calendar year and a total
        here will NOT match a filed return — is now the first row behind the i on
        the chart, next to the figures it qualifies. */
-    <Blocks>
+    <div className="flex min-w-0 flex-col gap-5">
       <Totals y={y} year={year} />
       <Chart year={year} by={by} onPick={(k) => onParams({ by: k === "month" ? undefined : k })} />
-    </Blocks>
+    </div>
   );
 }

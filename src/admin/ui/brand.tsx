@@ -14,13 +14,6 @@ export const BRAND_MARK =
 
 export function BrandLogo({ size, radius }: { size?: number; radius?: number }) {
   const s = size || 40;
-  return (
-    <img
-      src={BRAND_MARK}
-      width={s}
-      height={s}
-      alt="Interior bazzar"
-      style={{ flex: "0 0 " + s + "px", display: "block", borderRadius: (radius === undefined ? Math.round(s * 0.2) : radius) + "px" }}
-    />
-  );
+  void radius;
+  return <img src={BRAND_MARK} width={s} height={s} alt="Interior bazzar" className="block shrink-0 rounded-[20%]" />;
 }

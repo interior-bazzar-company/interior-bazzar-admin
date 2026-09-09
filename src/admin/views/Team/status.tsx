@@ -16,11 +16,17 @@
    reader sees — Delay, when the date has passed — while the menu offers what
    the STORED status allows, and says so, because otherwise the menu looks
    broken: you opened "Delay" and were offered "Complete".
+
+   THE POPUP IS THE LIBRARY'S. It used to position itself against its own
+   button and listen for scroll, resize, Escape and an outside press by hand;
+   React Aria's Menu does all four, portals out of any scrolling table body, and
+   is keyboard-complete without a line of it here.
    ============================================================================= */
-import { useEffect, useRef, useState } from "react";
-import { Icon, ModalHead, Pill } from "../../ui";
+import { useState } from "react";
+import { ChevronDown } from "@untitledui/icons";
+import { Dropdown } from "@/components/base/dropdown/dropdown";
+import { Button, FormField, ModalShell, Pill, Textarea } from "../../ui";
 import { useShell } from "../../shell/ShellContext";
-import { useMenuPlacement } from "../../ui/menu";
 import {
   WORK_STATUS, labelOf, setItemStatus, stageOf, toneOf, transitionsFrom,
 } from "./store";
@@ -35,60 +41,41 @@ export function ReasonModal({ title, onSubmit }: {
   const shell = useShell();
   const [v, setV] = useState("");
   return (
-    <>
-      <ModalHead title={title} onClose={() => shell.closeLayer()} />
-      <div className="md-b">
-        <div className="fg">
-          <label htmlFor="tmReason">Reason <b className="req">*</b></label>
-          <textarea id="tmReason" className="inp" rows={3} autoFocus value={v}
-            onChange={(e) => setV(e.target.value)} />
-          <span className="help">Stored on the item and shown wherever its stage is.</span>
-        </div>
-      </div>
-      <div className="md-f">
-        <span className="spacer" />
-        <button className="btn" onClick={() => shell.closeLayer()}>Cancel</button>
-        <button className="btn pri" disabled={!v.trim()} onClick={() => onSubmit(v)}>Save</button>
-      </div>
-    </>
+    <ModalShell
+      title={title}
+      ico="note"
+      onClose={() => shell.closeLayer()}
+      actions={
+        <>
+          <Button color="secondary" onClick={() => shell.closeLayer()}>Cancel</Button>
+          <Button isDisabled={!v.trim()} onClick={() => onSubmit(v)}>Save</Button>
+        </>
+      }
+    >
+      <FormField id="tmReason" label="Reason" req hint="Stored on the item and shown wherever its stage is.">
+        <Textarea id="tmReason" rows={3} autoFocus value={v} onChange={setV} />
+      </FormField>
+    </ModalShell>
   );
 }
 
+/** The dot beside a move, so the menu says what colour the item becomes. */
+const DOT: Record<string, string> = {
+  ok: "bg-utility-green-500",
+  warn: "bg-utility-yellow-500",
+  bad: "bg-utility-red-500",
+  info: "bg-utility-blue-500",
+  neutral: "bg-utility-neutral-400",
+};
+
 export function StatusPicker({ item, sm }: { item: WorkItem; sm?: boolean }) {
   const shell = useShell();
-  const [open, setOpen] = useState(false);
-  const box = useRef<HTMLSpanElement | null>(null);
-  const pop = useRef<HTMLSpanElement | null>(null);
-  const { style } = useMenuPlacement(open, box, pop, "left");
 
   const stage = stageOf(item);
   const moves = transitionsFrom(item.status);
   /* Derived, so the chip and the menu are talking about two different things
      and the menu has to say which. */
   const derived = stage !== item.status;
-
-  useEffect(() => {
-    if (!open) return;
-    const away = (e: MouseEvent) => {
-      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
-    };
-    const esc = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.stopPropagation();
-      setOpen(false);
-    };
-    const shut = () => setOpen(false);
-    document.addEventListener("mousedown", away);
-    document.addEventListener("keydown", esc, true);
-    window.addEventListener("scroll", shut, true);
-    window.addEventListener("resize", shut);
-    return () => {
-      document.removeEventListener("mousedown", away);
-      document.removeEventListener("keydown", esc, true);
-      window.removeEventListener("scroll", shut, true);
-      window.removeEventListener("resize", shut);
-    };
-  }, [open]);
 
   const move = (to: WorkStatus, reason?: string) => {
     const r = setItemStatus(item.itemId, to, reason);
@@ -97,7 +84,6 @@ export function StatusPicker({ item, sm }: { item: WorkItem; sm?: boolean }) {
   };
 
   const pick = (t: { to: WorkStatus; requiresReason: boolean; label: string }) => {
-    setOpen(false);
     if (!t.requiresReason) { move(t.to); return; }
     shell.modal(
       <ReasonModal title={t.label + " this item"}
@@ -115,32 +101,44 @@ export function StatusPicker({ item, sm }: { item: WorkItem; sm?: boolean }) {
     /* `stopPropagation` on the wrapper: this sits inside a row that is itself a
        link to the record, and changing a status must not also open the drawer
        behind the menu you are reading. */
-    <span className="ib-menu tm-st" ref={box}
+    <span
+      className="inline-flex"
       onClick={(e) => e.stopPropagation()}
-      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") e.stopPropagation(); }}>
-      <button className={"tm-st-b" + (sm ? " sm" : "")} aria-haspopup="menu" aria-expanded={open}
-        aria-label={"Status: " + labelOf(WORK_STATUS, stage) + ". Change it."}
-        onClick={() => setOpen((o) => !o)}>
-        <Pill text={labelOf(WORK_STATUS, stage)} tone={toneOf(WORK_STATUS, stage)} />
-        <Icon name="chev" size="sm" />
-      </button>
-      {open ? (
-        <span ref={pop} className="ib-menu-pop tm-st-p" role="menu" aria-label="Change status"
-          style={style}>
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") e.stopPropagation(); }}
+    >
+      <Dropdown.Root>
+        <Button
+          color="tertiary"
+          size="xs"
+          iconTrailing={ChevronDown}
+          className="-mx-1 gap-1.5 px-1 py-0.5"
+          aria-haspopup="menu"
+          aria-label={"Status: " + labelOf(WORK_STATUS, stage) + ". Change it."}
+        >
+          <Pill xs={sm} text={labelOf(WORK_STATUS, stage)} tone={toneOf(WORK_STATUS, stage)} />
+        </Button>
+        <Dropdown.Popover placement="bottom left" className="w-max min-w-52">
           {derived ? (
-            <span className="tm-st-n">
-              Delay is read from the due date. Stored: <b>{labelOf(WORK_STATUS, item.status)}</b>
-            </span>
+            <p className="border-b border-secondary px-3 py-2 text-xs text-tertiary">
+              Delay is read from the due date. Stored: <b className="font-medium text-secondary">{labelOf(WORK_STATUS, item.status)}</b>
+            </p>
           ) : null}
-          {moves.map((t) => (
-            <button key={t.to} role="menuitem" className="mi" onClick={() => pick(t)}>
-              <span className={"dot " + (toneOf(WORK_STATUS, t.to) || "idle")} />
-              {t.label}
-              {t.requiresReason ? <span className="r tm-st-r">needs a reason</span> : null}
-            </button>
-          ))}
-        </span>
-      ) : null}
+          <Dropdown.Menu aria-label="Change status">
+            {moves.map((t) => (
+              <Dropdown.Item
+                key={t.to}
+                id={t.to}
+                addon={t.requiresReason ? "needs a reason" : undefined}
+                onAction={() => pick(t)}
+                icon={() => (
+                  <span data-icon className={"mx-0.5 size-2 shrink-0 rounded-full " + (DOT[toneOf(WORK_STATUS, t.to)] || DOT.neutral)} />
+                )}
+                label={t.label}
+              />
+            ))}
+          </Dropdown.Menu>
+        </Dropdown.Popover>
+      </Dropdown.Root>
     </span>
   );
 }

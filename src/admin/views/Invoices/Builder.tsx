@@ -8,12 +8,16 @@
    The proof block lives here beside the form, not on a separate screen — the
    reference and the evidence are the two things the issue transaction refuses
    without, and they are entered in the same sitting.
+
+   The four guards and the header are drawn exactly as Quotations/Builder draws
+   them: this is the second half of one workflow, and the two builders must not
+   look like two products.
    ===================================================================== */
 import { useCallback, useState } from "react";
-import { EmptyState, Icon, Notice, PaneLoading, Pill, TbTitle, qs } from "../../ui";
+import { Alert, Button, Card, EmptyState, PageHeader, PaneLoading, Pill, TbTitle, qs } from "../../ui";
 import { inr } from "../../ui/format";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
-import { STATUS_LABEL, useInvoice } from "./api";
+import { STATUS_LABEL, STATUS_TONE, useInvoice } from "./api";
 import type { InvoiceRow } from "./api";
 import { BuilderBody } from "./Form";
 import { planItemOf } from "./helpers";
@@ -29,81 +33,67 @@ export default function InvoiceBuilder({ id, params }: {
   usePageChrome({ crumbs: <TbTitle label="Invoices" to="#/invoices" />, right: null,
                   parent: "#/invoices/" + id });
 
-  if (loading && !invoice) return <div className="page wide"><PaneLoading /></div>;
+  if (loading && !invoice) return <PaneLoading label="Opening the draft…" />;
   if (notFound || !invoice) return (
-    <div className="page wide">
-      <EmptyState icon="invoice" title="Invoice not found"
-        body={"Invoice " + id + " could not be opened. It may have been deleted, or it "
-          + "belongs to a deal outside your access."}
-        action={<button className="btn" onClick={() => go("#/invoices")}>Back to invoices</button>} />
-    </div>
+    <EmptyState icon="invoice" title="Invoice not found"
+      body={"Invoice " + id + " could not be opened. It may have been deleted, or it "
+        + "belongs to a deal outside your access."}
+      action={<Button color="primary" onClick={() => go("#/invoices")}>Back to invoices</Button>} />
   );
 
   const inv = invoice;
   const detail = "#/invoices/" + inv.id + qs({ ...params, mode: "" });
 
   if (inv.status !== "draft") return (
-    <div className="page wide">
-      <div className="ph"><div className="ph-t">
-        <h1 className="mono">{inv.invoiceNumber || "Draft"}</h1>
-        <div className="scope">Issued content is frozen.</div>
-      </div></div>
-      <Notice tone="bad" ico="lock" text={<>
-        <b>This invoice is {STATUS_LABEL[inv.status].toLowerCase()}.</b> A settled document cannot be
-        edited — cancel it and raise another if it is wrong.
-      </>} />
-      <button className="btn" style={{ marginTop: "12px" }} onClick={() => go(detail)}>
-        <Icon name="chevl" />Back to the invoice</button>
+    <div className="flex min-w-0 flex-col gap-4">
+      <PageHeader eyebrow="Invoice" title={<span className="font-mono tnum">{inv.invoiceNumber || "Draft"}</span>}
+        back={{ label: "Back to the invoice", to: detail }}
+        meta={<><Pill dot text={STATUS_LABEL[inv.status]} tone={STATUS_TONE[inv.status]} /> Issued content is frozen.</>}
+        actions={<Button color="primary" ico="chevl" onClick={() => go(detail)}>Back to the invoice</Button>} />
+      <Alert tone="bad" ico="lock" title={"This invoice is " + STATUS_LABEL[inv.status].toLowerCase() + "."}>
+        A settled document cannot be edited — cancel it and raise another if it is wrong.
+      </Alert>
     </div>
   );
 
   if (!can("invoices", "edit")) return (
-    <div className="page wide">
-      <EmptyState icon="lock" title="No editing access"
-        body="Your role can read invoices but not change them."
-        action={<button className="btn" onClick={() => go(detail)}>Back to the invoice</button>} />
-    </div>
+    <EmptyState icon="lock" title="No editing access"
+      body="Your role can read invoices but not change them."
+      action={<Button color="primary" onClick={() => go(detail)}>Back to the invoice</Button>} />
   );
 
   return (
-    <div className="page wide">
-      <div className="ph">
-        <div className="ph-t">
-          <div className="faint" style={{ fontSize: "var(--text-sm)" }}>
-            Step 2 of 2 ·{" "}
-            <a className="lnk" data-go={"#/deals/" + inv.dealRef} onClick={() => go("#/deals/" + inv.dealRef)}>
-              {inv.dealRef}</a>
-          </div>
-          <h1>New invoice</h1>
-          <div className="scope">
-            <Pill text="Draft" />{" "}
-            <span className="mono">Number assigned on issue</span>
-          </div>
-        </div>
-        <div className="acts">
-          <button className="btn" onClick={() => go(detail)}><Icon name="chevl" />Back</button>
-          <button className="btn pri" onClick={() => go("#/invoices/" + inv.id + "?mode=preview")}>
-            Preview &amp; issue</button>
-        </div>
-      </div>
+    <div className="flex min-w-0 flex-col gap-4">
+      <PageHeader
+        eyebrow="Step 2 of 2"
+        title="New invoice"
+        meta={<><Pill dot text="Draft" tone="neutral" /> <span className="font-mono tnum">Number assigned on issue</span></>}
+        back={{ label: "Back to the invoice", to: detail }}
+        actions={<>
+          <Button color="secondary" ico="chevl" onClick={() => go(detail)}>Back</Button>
+          <Button color="primary" onClick={() => go("#/invoices/" + inv.id + "?mode=preview")}>
+            Preview &amp; issue</Button>
+        </>} />
 
-      {/* The source strip -- both links and what this draft is billing, always
+      {/* THE SOURCE STRIP — both links and what this draft is billing, always
           visible. An invoice that loses sight of its quotation is the one thing
-          the issue guards refuse outright. */}
-      <div className="card" style={{ marginBottom: "14px" }}><div className="card-b"
-        style={{ display: "flex", gap: "22px", flexWrap: "wrap", alignItems: "center" }}>
-        <a className="lnk mono" data-go={"#/deals/" + inv.dealRef}
-          onClick={() => go("#/deals/" + inv.dealRef)}>{inv.dealRef} ↗</a>
-        {inv.quotationId
-          ? <a className="lnk mono" data-go={"#/quotations/" + inv.quotationId}
-              onClick={() => go("#/quotations/" + inv.quotationId)}>
-              {inv.quotationNumber || "quotation"} ↗</a>
-          : <span className="pill bad xs">quotation_required</span>}
-        <span style={{ marginLeft: "auto" }} className="tnum">
-          <b>{inr(inv.grandTotalPaise)}</b>
-          <span className="faint">{" · " + installmentLine(inv)}</span>
-        </span>
-      </div></div>
+          the issue guards refuse outright, so the missing case is stated here
+          in the words the guard will use rather than left blank. */}
+      <Card tight>
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+          <Button color="link-color" size="xs" className="font-mono tnum" data-go={"#/deals/" + inv.dealRef}
+            onClick={() => go("#/deals/" + inv.dealRef)}>{inv.dealRef} ↗</Button>
+          {inv.quotationId
+            ? <Button color="link-color" size="xs" className="font-mono tnum" data-go={"#/quotations/" + inv.quotationId}
+                onClick={() => go("#/quotations/" + inv.quotationId)}>
+                {inv.quotationNumber || "quotation"} ↗</Button>
+            : <Pill xs text="quotation_required" tone="bad" />}
+          <span className="ml-auto text-sm">
+            <b className="font-mono tnum">{inr(inv.grandTotalPaise)}</b>
+            <span className="text-quaternary">{" · " + installmentLine(inv)}</span>
+          </span>
+        </div>
+      </Card>
 
       <BuilderBody inv={inv} onSaved={bump} />
     </div>

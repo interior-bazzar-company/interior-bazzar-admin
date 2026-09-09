@@ -1,21 +1,26 @@
 /* =============================================================================
-   Finance — the shell every face renders inside. Same `.dls` workspace as the
-   rest of the panel: title and scope live in the topbar; the page opens on its
-   controls. The view band changes WHICH RECORD you are looking at; the filters
-   narrow it, so the band produces no filter chip.
+   Finance — the shell every face renders inside, and the header every record
+   wears.
+   -----------------------------------------------------------------------------
+   A LIST IS THE PANEL'S PAGE SKELETON: `PageHeader` (what this section is, how
+   many rows, the clock it was read at, ONE primary action) → `FilterBar` →
+   `StatStrip` → the table. The five sections are sidebar rows, so a page opens
+   straight onto its own controls and carries no navigation of its own.
+
+   A RECORD IS THAT SAME HEADER with the id as the title: the id leads, the
+   status pills sit under it, and everything that can be done to the record is
+   behind one `MoreMenu`. Back is the topbar title — the panel has one way up —
+   and the header's own back link carries the list state the record arrived
+   with, so returning is a return and not a reset.
    ============================================================================= */
+import type { ReactNode } from "react";
+import { Card, PageHeader, Segmented, Tabs } from "../../ui";
 import { MoreMenu } from "../../ui/menu";
 import type { MenuItem } from "../../ui/menu";
-import type { ReactNode } from "react";
-import { Icon } from "../../ui";
-import { go } from "../../ui/nav";
 import { ProtoBar } from "./bits";
 import { RECORD_TYPES, resetStore } from "./store";
 import type { Params } from "./store";
 
-/* FOUR RECORD TYPES AND WHAT THEY ADD UP TO. The order is the order money
-   moves through the company: what was sold, what the team costs, everything
-   else, what went back out — then all four read together. */
 /* THE SECTIONS AND THEIR ROUTES. Each is its own sidebar row and its own
    module key, so a grant can be held on one without the others — payroll
    especially. `finance` keeps the bare route because it is the module's home
@@ -37,7 +42,7 @@ export const MODULE_OF = (view: string) => ROUTE_OF[view] || "finance";
 export const VIEWS = Object.keys(ROUTE_OF)
   .map((key) => ({ key, label: RECORD_TYPES.filter((r) => r.key === key)[0]?.label || key }));
 
-/** A switch WITHIN a sub-section — Transactions / Tags, Overview / KPI.
+/** A switch WITHIN a sub-section — Overview / KPI.
  *
  *  Deliberately not `Tabs`: two identical underlined strips stacked on one
  *  page say the two levels are peers, and they are not. A segmented control
@@ -47,102 +52,119 @@ export function SubTabs({ items, cur, onPick, right }: {
   cur: string; onPick: (k: string) => void; right?: ReactNode;
 }) {
   return (
-    <div className="fin-subtabs">
-      <div className="btn-group" role="tablist">
-        {items.map((t) => (
-          <button key={t.k} type="button" role="tab" aria-selected={t.k === cur}
-            className={t.k === cur ? "on" : ""} onClick={() => onPick(t.k)}>
-            {t.label}{typeof t.n === "number" && t.n > 0 ? <span className="n tnum">{t.n}</span> : null}
-          </button>
-        ))}
-      </div>
-      {right ? <span className="r">{right}</span> : null}
+    <div className="flex flex-wrap items-center gap-3">
+      <Segmented
+        label="View"
+        value={cur}
+        onPick={onPick}
+        options={items.map((t) => ({
+          v: t.k,
+          l: (
+            <span className="inline-flex items-center gap-1.5">
+              {t.label}
+              {typeof t.n === "number" && t.n > 0 ? <span className="text-xs text-quaternary tnum">{t.n}</span> : null}
+            </span>
+          ),
+        }))}
+      />
+      {right ? <span className="flex items-center gap-2">{right}</span> : null}
     </div>
   );
 }
 
-/** The workspace a section renders inside. It carries no navigation of its
- *  own any more — the five sections are sidebar rows, so the page opens
- *  straight onto its own controls. */
-export function Frame({ tabs, cmd, bands, children, toast }: {
-  /** A view band ABOVE the command row — the Users directory's anatomy:
-   *  banner, tabs, filters, strip, table. SubTabs below the filters said the
-   *  levels backwards: the tab changes WHAT the filters narrow. */
+/** The workspace a section renders inside — the panel's page skeleton, in
+ *  order: the proto notice, the header, the filters, the strip, the body. */
+export function Frame({ title, meta, actions, tabs, cmd, bands, children, toast }: {
+  /** What this section is. Absent on a face that is only a body (a record's
+   *  sub-page supplies its own header). */
+  title?: ReactNode;
+  /** The line under the title: the count and the clock the rows were read at. */
+  meta?: ReactNode;
+  /** ONE primary action, in the header where every page in the panel puts it. */
+  actions?: ReactNode;
+  /** The face switch, hung off the header's bottom edge — the tab decides
+   *  WHAT the filters narrow, so it cannot sit under them. */
   tabs?: ReactNode;
-  cmd?: ReactNode; bands?: ReactNode; children: ReactNode;
+  /** The `FilterBar` for this face. */
+  cmd?: ReactNode;
+  /** The `StatStrip`, and anything else that stands between filters and rows. */
+  bands?: ReactNode;
+  children: ReactNode;
   toast?: (msg: ReactNode, tone?: string) => void;
 }) {
   return (
-    <div className="dls fin">
+    <div className="flex min-w-0 flex-col gap-4">
       <ProtoBar onReset={() => { resetStore(); if (toast) toast("Back to the seed."); }} />
-      {tabs}
-      {cmd ? <div className="dls-cmd">{cmd}</div> : null}
+      {title !== undefined ? (
+        <PageHeader className="mb-0" title={title} meta={meta} actions={actions} tabs={tabs} />
+      ) : tabs}
+      {cmd}
       {bands}
-      <div className="dls-body">{children}</div>
+      <div className="flex min-w-0 flex-col gap-4">{children}</div>
     </div>
   );
 }
 
-/** The tab band itself — the same bones as the Users directory's view band,
- *  restated here because that stylesheet belongs to another module. */
+/** The tab band itself — the shared `Tabs`, so a face switch in Finance is the
+ *  same object as a face switch anywhere else in the panel. */
 export function ViewBand({ items, cur, onPick }: {
   items: { k: string; label: string; icon: string; n?: number }[];
   cur: string; onPick: (k: string) => void;
 }) {
   return (
-    <nav className="fin-views" aria-label="Views">
-      {items.map((t) => (
-        <button key={t.k} type="button" className={t.k === cur ? "on" : ""}
-          aria-current={t.k === cur ? "page" : undefined}
-          onClick={() => onPick(t.k)}>
-          <Icon name={t.icon} size="sm" />
-          <span>{t.label}</span>
-          {typeof t.n === "number" && t.n > 0 ? <i className="tnum">{t.n}</i> : null}
-        </button>
-      ))}
-    </nav>
+    <Tabs
+      cur={cur}
+      onPick={onPick}
+      items={items.map((t) => ({ k: t.k, label: t.label, icon: t.icon, n: t.n, quiet: true }))}
+    />
   );
 }
 
+/** A titled block on a page — the panel's `Card`. `wide` spans both columns of
+ *  the two-column read below. */
 export function Block({ title, desc, right, wide, foot, children }: {
   title: ReactNode; desc?: ReactNode; right?: ReactNode; wide?: boolean; foot?: ReactNode; children: ReactNode;
 }) {
   return (
-    <section className={"card fin-block" + (wide ? " wide" : "")}>
-      <div className="card-h"><h3>{title}</h3>{desc ? <span className="d">{desc}</span> : null}{right ? <span className="r">{right}</span> : null}</div>
-      <div className="card-b">{children}</div>
-      {foot ? <div className="card-f">{foot}</div> : null}
-    </section>
+    <Card title={title} sub={desc} right={right} foot={foot} className={wide ? "lg:col-span-2" : undefined}>
+      {children}
+    </Card>
   );
 }
-export function Blocks({ children }: { children: ReactNode }) { return <div className="fin-blocks">{children}</div>; }
+/** Two columns on `lg`, one below it. A `Block wide` takes the whole row. */
+export function Blocks({ children }: { children: ReactNode }) {
+  return <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">{children}</div>;
+}
 
-/** One entry behind a More button. */
-/* THE MORE MENU IS `ui/menu`. A copy lived here -- the same rows, the same
-   `.mi`, the same handlers -- differing only in that its popup was
-   position:absolute, which is clipped by any scrolling ancestor. The shared
-   one measures its button and positions fixed. Slip.tsx imports that. */
-
-/** The record screen wrapper — the same chrome on all four detail pages.
- *  The slip page's pattern: the id leads, a thin rule sets the status pills
- *  off it, and the right side holds the actions with Back — the one filled
- *  control — closing the row. More than two controls on the right go behind
- *  `menu` rather than sitting as a row of buttons. */
-export function Rec({ id, pills, back, actions, menu, children }: {
-  id: ReactNode; pills?: ReactNode; back: string; actions?: ReactNode;
+/** THE RECORD SCREEN'S HEADER — the same chrome on all four detail pages.
+ *  The id leads as the page title, the status pills and the record's own
+ *  sub-line are its meta, and everything that can be done to it is one
+ *  primary action plus a `MoreMenu`. `back` is the list state this record
+ *  arrived with, so the way up returns rather than resets. */
+export function Rec({ id, pills, sub, back, actions, menu, children }: {
+  id: ReactNode; pills?: ReactNode; sub?: ReactNode; back: string; actions?: ReactNode;
   menu?: MenuItem[]; children: ReactNode;
 }) {
   return (
-    <div className="fin-rec">
+    <div className="flex min-w-0 flex-col gap-4">
       <ProtoBar />
-      <div className="fin-idbar">
-        <h2 className="mono">{id}</h2>
-        {pills ? <><span className="fin-vsep" aria-hidden="true" />{pills}</> : null}
-        <span className="spacer" />
-        {actions}
-        {menu && menu.length ? <MoreMenu small items={menu} /> : null}
-        <button className="btn sm pri" onClick={() => go(back)}><Icon name="chevl" size="sm" />Back</button>
-      </div>
+      <PageHeader
+        className="mb-0"
+        back={{ label: "Back", to: back }}
+        title={<span className="font-mono tnum">{id}</span>}
+        meta={pills || sub ? (
+          <>
+            {pills ? <span className="flex flex-wrap items-center gap-2">{pills}</span> : null}
+            {sub ? <span className="w-full text-sm text-tertiary">{sub}</span> : null}
+          </>
+        ) : undefined}
+        actions={actions || (menu && menu.length) ? (
+          <>
+            {actions}
+            {menu && menu.length ? <MoreMenu items={menu} /> : null}
+          </>
+        ) : undefined}
+      />
       {children}
     </div>
   );

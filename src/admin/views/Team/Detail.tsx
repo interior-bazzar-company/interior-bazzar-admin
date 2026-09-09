@@ -10,10 +10,10 @@
 
    THE SHAPE IS FOUR BANDS, and they are in the order the questions are asked:
 
-     1  WHAT IS IT      kind, title, and the way out
+     1  WHAT IS IT      kind, title, and the way out — `DrawerShell`'s own head
      2  WHERE IS IT     the status, as a control, on a line of its own — plus
                         whatever is wrong with it right now
-     3  THE FACTS       who, when, how loud, what it belongs to
+     3  THE FACTS       who, when, how loud, what it belongs to — one `KvList`
      4  THE WORK        steps, details, tags, links, related
 
    ONE FIELD, ONE CONTROL. Status is a menu of the moves the store actually
@@ -27,8 +27,12 @@
    one in the old footer, one hung off a section heading.
    ============================================================================= */
 import type { ReactNode } from "react";
-import { useMemo, useRef, useState } from "react";
-import { Icon, ModalHead, Notice, SectionHead } from "../../ui";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Alert, Button, Checkbox, DateInput, DrawerShell, FormField, FormSection, Icon, IconButton,
+  Input, KvList, ModalShell, SectionHead, SelectInput, Tag, Textarea,
+} from "../../ui";
+import { cx } from "@/utils/cx";
 import { useShell } from "../../shell/ShellContext";
 import {
   KIND, PRIORITY, PRIORITY_SCALE, TODAY, addCheckLine, addLink, addResourceLink,
@@ -37,7 +41,7 @@ import {
   removeResourceLink, setBlockedBy, tagItem, tagsOwnedBy, toggleCheckLine, updateItem, useItem,
   useLinks, useMembers, useTags, useWork,
 } from "./store";
-import type { LinkRelation, Priority, Tag, WorkItem } from "./store";
+import type { LinkRelation, Priority, Tag as TagRecord, WorkItem } from "./store";
 import { KindMark, PriorityChip, TagTypePicker, Who, ago } from "./bits";
 import { ProgressWindow, RichText, StagePill, daysOver, noteOf } from "./workBits";
 import { StatusPicker } from "./status";
@@ -59,17 +63,9 @@ export function ItemDrawer({ itemId, onClose, onOpen }: {
      one made in another tab. Saying so beats an empty panel or a crash. */
   if (!item) {
     return (
-      <>
-        <div className="dw-h tm-dw-h">
-          <span className="tm-dw-t"><b>Item not found</b></span>
-          <button className="btn icon sm" aria-label="Close" onClick={onClose}>
-            <Icon name="x" size="sm" />
-          </button>
-        </div>
-        <div className="dw-b">
-          <Notice tone="warn" text="This item was removed while the panel was open." />
-        </div>
-      </>
+      <DrawerShell title="Item not found" onClose={onClose}>
+        <Alert tone="warn" title="This item was removed while the panel was open." />
+      </DrawerShell>
     );
   }
 
@@ -91,170 +87,182 @@ export function ItemDrawer({ itemId, onClose, onOpen }: {
      rather than a cell saying it is not set. Status is not among them: it is
      band 2, as a control, and printing it here as well would be the same fact
      twice one scroll-line apart. */
-  const facts: { k: string; v: ReactNode; wide?: boolean }[] = [
-    { k: "Assigned to", v: m ? <Who m={m} /> : <span className="dim">Nobody</span> },
-    {
-      k: "Due",
-      v: item.dueDate
-        ? <span className={late ? "u-warn-t" : ""}>
-            {fmtDate(item.dueDate)}<span className="cell-2">{ago(item.dueDate, TODAY)}</span>
+  const facts: [ReactNode, ReactNode][] = [
+    ["Assigned to", m ? <Who m={m} /> : <span className="text-quaternary">Nobody</span>],
+    [
+      "Due",
+      item.dueDate
+        ? (
+          <span className={cx("flex flex-wrap items-baseline gap-2", late && "text-warning-primary")}>
+            <span className="tnum">{fmtDate(item.dueDate)}</span>
+            <span className="text-xs text-tertiary">{ago(item.dueDate, TODAY)}</span>
           </span>
-        : <span className="dim">No date</span>,
-    },
-    { k: "Priority", v: <PriorityChip p={item.priority} /> },
+        )
+        : <span className="text-quaternary">No date</span>,
+    ],
+    ["Priority", <PriorityChip key="p" p={item.priority} />],
   ];
-  if (item.startDate) facts.push({ k: "Starts", v: fmtDate(item.startDate) });
+  if (item.startDate) facts.push(["Starts", <span key="s" className="tnum">{fmtDate(item.startDate)}</span>]);
   if (item.kind !== "task") {
-    facts.push({ k: "Kind", v: <span className="tm-dw-lk"><KindMark kind={item.kind} />{labelOf(KIND, item.kind)}</span> });
+    facts.push(["Kind", (
+      <span className="inline-flex items-center gap-1.5">
+        <KindMark kind={item.kind} />{labelOf(KIND, item.kind)}
+      </span>
+    )]);
   }
   if (parent) {
-    facts.push({
-      k: "Rolls up to", wide: true,
-      v: <a className="tm-dw-lk" data-go={"#/work?item=" + parent.itemId}
-        onClick={() => onOpen(parent.itemId)}>
-        <KindMark kind={parent.kind} />{parent.title}
-      </a>,
-    });
+    facts.push(["Rolls up to", <ItemLink key="up" item={parent} onOpen={onOpen} />]);
   }
   if (blocker) {
-    facts.push({
-      k: "Waiting on", wide: true,
-      v: <a className="tm-dw-lk" data-go={"#/work?item=" + blocker.itemId}
-        onClick={() => onOpen(blocker.itemId)}>
-        <KindMark kind={blocker.kind} />{blocker.title}
-      </a>,
-    });
+    facts.push(["Waiting on", <ItemLink key="blk" item={blocker} onOpen={onOpen} />]);
   }
 
   return (
-    <>
-      {/* 1 — WHAT IS IT */}
-      <div className="dw-h tm-dw-h">
-        <span className="tm-dw-t"><KindMark kind={item.kind} /><b>{item.title}</b></span>
-        {!isTerminal(item.status) ? (
-          <button className="btn sm" onClick={() => shell.modal(<EditItemModal item={item} all={all} />, "sm")}>
-            Edit
-          </button>
-        ) : null}
-        <button className="btn icon sm" aria-label="Close" onClick={onClose}>
-          <Icon name="x" size="sm" />
-        </button>
-      </div>
-
-      <div className="dw-b tm-dw-b">
+    <DrawerShell
+      title={item.title}
+      sub={labelOf(KIND, item.kind)}
+      mark={<KindMark kind={item.kind} />}
+      onClose={onClose}
+      actions={!isTerminal(item.status) ? (
+        <>
+          <Button color="secondary" ico="lock" onClick={() => shell.modal(<WaitModal item={item} all={all} />, "sm")}>
+            {blocker ? "Waiting on…" : "Wait on…"}
+          </Button>
+          <Button color="secondary" ico="link" onClick={() => shell.modal(<LinkModal item={item} all={all} />, "sm")}>
+            Link…
+          </Button>
+        </>
+      ) : undefined}
+    >
+      <div className="flex flex-col gap-5">
         {/* 2 — WHERE IS IT. The status is the control, not a badge, and it is
             the first thing under the title because it is the most common
             reason this panel is open. */}
-        <div className="tm-dw-st">
+        <div className="flex flex-wrap items-center gap-2">
           <StatusPicker item={item} />
           {late ? (
-            <span className="tm-dw-flag u-warn-t">
-              <Icon name="alert" size="sm" />{daysOver(item)} days over
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-warning-primary tnum">
+              <Icon name="alert" size="xs" />{daysOver(item)} days over
             </span>
+          ) : null}
+          <span className="flex-1" />
+          {!isTerminal(item.status) ? (
+            <Button color="secondary" size="xs" ico="edit"
+              onClick={() => shell.modal(<EditItemModal item={item} all={all} />, "md")}>
+              Edit
+            </Button>
           ) : null}
         </div>
 
         {blocker ? (
-          <Notice tone="bad" text={(item.blockedReason || "Waiting on another item.") + " → " + blocker.title} />
+          <Alert tone="bad" ico="lock" title="Waiting on another item">
+            {(item.blockedReason || "Waiting on another item.") + " → " + blocker.title}
+          </Alert>
         ) : null}
         {item.status === "cancelled" && item.cancelledReason
-          ? <Notice text={item.cancelledReason} /> : null}
+          ? <Alert tone="info" title="Cancelled">{item.cancelledReason}</Alert> : null}
 
         {/* 3 — THE FACTS */}
-        <dl className="tm-facts">
-          {facts.map((f) => (
-            <div key={f.k} className={"tm-fact" + (f.wide ? " wide" : "")}>
-              <dt>{f.k}</dt>
-              <dd>{f.v}</dd>
-            </div>
-          ))}
-        </dl>
+        <KvList pairs={facts} />
 
         {/* 4 — THE WORK. Steps lead: they are the only part of this panel you
             act on repeatedly, and the heading answers "how far along" where the
             section is named rather than in a sentence beside it. */}
-        {item.kind === "task" ? (
-          <>
-            <SectionHead title="Steps" desc={ck.total ? ck.done + " of " + ck.total : undefined}
-              right={ck.total ? <ProgressWindow item={item} bare /> : undefined} />
-            <CheckList item={item} />
-          </>
-        ) : (
-          <>
-            <SectionHead title="Progress" desc={noteOf(item)} />
-            <ProgressWindow item={item} showNote />
-          </>
-        )}
+        <section>
+          {item.kind === "task" ? (
+            <>
+              <SectionHead title="Steps" desc={ck.total ? ck.done + " of " + ck.total : undefined}
+                right={ck.total ? <ProgressWindow item={item} bare /> : undefined} />
+              <CheckList item={item} />
+            </>
+          ) : (
+            <>
+              <SectionHead title="Progress" desc={noteOf(item)} />
+              <ProgressWindow item={item} showNote />
+            </>
+          )}
+        </section>
 
         {item.description ? (
-          <>
+          <section>
             <SectionHead title="Details" />
             <RichText text={item.description} />
-          </>
+          </section>
         ) : null}
 
-        <SectionHead title="Tags" desc={on.length ? String(on.length) : undefined} />
-        <TagPicker item={item} mine={mine} on={on} tags={tags} />
+        <section>
+          <SectionHead title="Tags" desc={on.length ? String(on.length) : undefined} />
+          <TagPicker item={item} mine={mine} on={on} tags={tags} />
+        </section>
 
-        <SectionHead title="Links" desc={linkCount ? String(linkCount) : undefined} />
-        <LinkList item={item} />
+        <section>
+          <SectionHead title="Links" desc={linkCount ? String(linkCount) : undefined} />
+          <LinkList item={item} />
+        </section>
 
         {links.length ? (
-          <>
+          <section>
             <SectionHead title="Related" desc={String(links.length)} />
-            <ul className="tm-kids">
+            <ul className="flex flex-col divide-y divide-border-secondary rounded-xl bg-primary px-3 ring-1 ring-secondary">
               {links.map(({ link, other, outward }) => (
-                <li key={link.linkId}>
-                  <a data-go={"#/work?item=" + other.itemId} onClick={() => onOpen(other.itemId)}>
-                    <span className="tm-lk-rel">{linkLabelOf(link.relation, outward)}</span>
-                    <KindMark kind={other.kind} />{other.title}
-                  </a>
-                  <button className="btn icon sm" aria-label="Remove this link"
-                    onClick={() => removeLink(link.linkId)}><Icon name="x" size="sm" /></button>
+                <li key={link.linkId} className="flex items-center gap-2 py-2">
+                  <span className="label-mono shrink-0">{linkLabelOf(link.relation, outward)}</span>
+                  <ItemLink item={other} onOpen={onOpen} className="min-w-0 flex-1" />
+                  <IconButton ico="x" size="xs" label={"Remove this link to " + other.title}
+                    onClick={() => removeLink(link.linkId)} />
                 </li>
               ))}
             </ul>
-          </>
+          </section>
         ) : null}
 
         {kids.length ? (
-          <>
+          <section>
             <SectionHead title={"Inside this " + item.kind} desc={String(kids.length)} />
-            <ul className="tm-kids">
+            <ul className="flex flex-col divide-y divide-border-secondary rounded-xl bg-primary px-3 ring-1 ring-secondary">
               {kids.map((k) => (
-                <li key={k.itemId} className={k.status === "completed" ? "done" : ""}>
-                  <a data-go={"#/work?item=" + k.itemId} onClick={() => onOpen(k.itemId)}>
-                    <KindMark kind={k.kind} />{k.title}
-                  </a>
+                <li key={k.itemId} className="flex items-center gap-2 py-2">
+                  <ItemLink item={k} onOpen={onOpen} done={k.status === "completed"} className="min-w-0 flex-1" />
                   <StagePill item={k} />
                 </li>
               ))}
             </ul>
-          </>
+          </section>
         ) : null}
       </div>
-
-      {/* THE TWO RELATIONSHIPS, together. Everything else that used to live
-          down here was the status field spelled as five buttons. */}
-      {!isTerminal(item.status) ? (
-        <div className="dw-f">
-          <button className="btn" onClick={() => shell.modal(<WaitModal item={item} all={all} />, "sm")}>
-            <Icon name="lock" size="sm" />{blocker ? "Waiting on…" : "Wait on…"}
-          </button>
-          <button className="btn" onClick={() => shell.modal(<LinkModal item={item} all={all} />, "sm")}>
-            <Icon name="link" size="sm" />Link…
-          </button>
-        </div>
-      ) : null}
-    </>
+    </DrawerShell>
   );
 }
 
 /* --------------------------------------------------- the panel's parts --- */
 
-/** THE FIELDS THE CREATE DIALOG SET, editable. Same `.fg` rows, same rules,
- *  and the kind is not among them — a kind decides what may sit under an item,
- *  so changing it would orphan children without saying so. */
+/** One item, named and reachable. The panel links to itself constantly — a
+ *  parent, a blocker, a child, a related edge — and every one of those is the
+ *  same object: the kind's mark, the title, and a press that swaps the record
+ *  under the panel rather than leaving it. */
+function ItemLink({ item, onOpen, done, className }: {
+  item: WorkItem; onOpen: (id: string) => void; done?: boolean; className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      data-go={"#/work?item=" + item.itemId}
+      onClick={() => onOpen(item.itemId)}
+      className={cx(
+        "inline-flex cursor-pointer items-center gap-1.5 rounded text-left text-sm outline-focus-ring hover:text-brand-secondary focus-visible:outline-2 focus-visible:outline-offset-2",
+        done ? "text-quaternary line-through" : "text-primary",
+        className,
+      )}
+    >
+      <KindMark kind={item.kind} />
+      <span className="min-w-0 truncate">{item.title}</span>
+    </button>
+  );
+}
+
+/** THE FIELDS THE CREATE DIALOG SET, editable. Same rows, same rules, and the
+ *  kind is not among them — a kind decides what may sit under an item, so
+ *  changing it would orphan children without saying so. */
 function EditItemModal({ item, all }: { item: WorkItem; all: WorkItem[] }) {
   const shell = useShell();
   const members = useMembers();
@@ -269,7 +277,13 @@ function EditItemModal({ item, all }: { item: WorkItem; all: WorkItem[] }) {
      could not be corrected, and the marks the toolbar writes were reachable
      only in the seconds before the item existed. */
   const [desc, setDesc] = useState(item.description || "");
+  /* MarkBar needs the real element — it reads and restores the selection, and a
+     selection belongs to a DOM node, not to a value. `Textarea` in ui/ takes no
+     ref (noted in the changelog as a missing prop), so the element is claimed by
+     its own id once, the same way every uncontrolled field in this module is
+     read. */
   const ta = useRef<HTMLTextAreaElement | null>(null);
+  useEffect(() => { ta.current = document.getElementById("eiDesc") as HTMLTextAreaElement | null; }, []);
   /* The store's own rule — never itself, never anything under it — and
      memoised, because it does not change with a keystroke in the title. */
   const parents = useMemo(() => {
@@ -292,65 +306,57 @@ function EditItemModal({ item, all }: { item: WorkItem; all: WorkItem[] }) {
     shell.toast("Saved.");
   };
   return (
-    <>
-      <ModalHead title={<>Edit {labelOf(KIND, item.kind).toLowerCase()}</>} onClose={() => shell.closeLayer()} />
-      <div className="md-b">
-        <div className="fg">
-          <label htmlFor="eiTitle">Title <b className="req">*</b></label>
-          <input id="eiTitle" className="inp" autoFocus value={title} onChange={(e) => setTitle(e.target.value)} />
-        </div>
-        <div className="fg">
-          <label htmlFor="eiWho">Assigned to</label>
-          <select id="eiWho" className="inp" value={who} onChange={(e) => setWho(e.target.value)}>
-            {members.filter((m) => m.status === "active" || m.memberId === item.assigneeId)
-              .map((m) => <option key={m.memberId} value={m.memberId}>{m.name}</option>)}
-          </select>
-          {who !== item.assigneeId
-            ? <span className="help">Tags belong to a member. Handing this over drops the last person's.</span>
-            : null}
-        </div>
-        <div className="fg">
-          <label htmlFor="eiPri">Priority</label>
-          <select id="eiPri" className="inp" value={pri} onChange={(e) => setPri(e.target.value)}>
-            {PRIORITY_SCALE.map((k) => <option key={k} value={k}>{labelOf(PRIORITY, k)}</option>)}
-          </select>
-        </div>
-        <div className="fg">
-          <label htmlFor="eiStart">Starts</label>
-          <input id="eiStart" type="date" className="inp" value={start} onChange={(e) => setStart(e.target.value)} />
-        </div>
-        <div className="fg">
-          <label htmlFor="eiDue">Due</label>
-          <input id="eiDue" type="date" className="inp" value={due} onChange={(e) => setDue(e.target.value)} />
+    <ModalShell
+      title={"Edit " + labelOf(KIND, item.kind).toLowerCase()}
+      ico="edit"
+      onClose={() => shell.closeLayer()}
+      actions={
+        <>
+          <Button color="secondary" onClick={() => shell.closeLayer()}>Cancel</Button>
+          <Button color="primary" isDisabled={!title.trim()} onClick={save}>Save</Button>
+        </>
+      }
+    >
+      <FormSection>
+        <FormField id="eiTitle" label="Title" req>
+          <Input id="eiTitle" autoFocus value={title} onChange={setTitle} />
+        </FormField>
+        <FormField id="eiWho" label="Assigned to"
+          hint={who !== item.assigneeId
+            ? "Tags belong to a member. Handing this over drops the last person's."
+            : undefined}>
+          <SelectInput id="eiWho" value={who} onChange={setWho}
+            options={members.filter((x) => x.status === "active" || x.memberId === item.assigneeId)
+              .map((x) => ({ v: x.memberId, l: x.name }))} />
+        </FormField>
+        <FormField id="eiPri" label="Priority">
+          <SelectInput id="eiPri" value={pri} onChange={setPri}
+            options={PRIORITY_SCALE.map((k) => ({ v: k, l: labelOf(PRIORITY, k) }))} />
+        </FormField>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <FormField id="eiStart" label="Starts">
+            <DateInput id="eiStart" value={start} onChange={setStart} className="w-full" />
+          </FormField>
+          <FormField id="eiDue" label="Due">
+            <DateInput id="eiDue" value={due} onChange={setDue} className="w-full" />
+          </FormField>
         </div>
         {item.kind !== "target" ? (
-          <div className="fg">
-            <label htmlFor="eiParent">Rolls up to</label>
-            <select id="eiParent" className="inp" value={parent} onChange={(e) => setParent(e.target.value)}>
-              <option value="">Nothing — it is top level</option>
-              {parents.map((i) => <option key={i.itemId} value={i.itemId}>{i.title}</option>)}
-            </select>
-          </div>
+          <FormField id="eiParent" label="Rolls up to">
+            <SelectInput id="eiParent" value={parent} onChange={setParent}
+              options={[{ v: "", l: "Nothing — it is top level" }]
+                .concat(parents.map((i) => ({ v: i.itemId, l: i.title })))} />
+          </FormField>
         ) : null}
 
         {/* The same field and the same bar as the create dialog, so a
             description reads and is written the same on both screens. */}
-        <div className="fg">
-          <div className="tm-fgh">
-            <label htmlFor="eiDesc">Details</label>
-            <MarkBar ta={ta} value={desc} set={setDesc} />
-          </div>
-          <textarea id="eiDesc" ref={ta} className="inp tm-ni-ta" rows={4} value={desc}
-            placeholder="What does done look like?"
-            onChange={(e) => setDesc(e.target.value)} />
-        </div>
-      </div>
-      <div className="md-f">
-        <span className="spacer" />
-        <button className="btn" onClick={() => shell.closeLayer()}>Cancel</button>
-        <button className="btn pri" disabled={!title.trim()} onClick={save}>Save</button>
-      </div>
-    </>
+        <FormField id="eiDesc" label="Details" tip={<MarkBar ta={ta} value={desc} set={setDesc} />}>
+          <Textarea id="eiDesc" rows={4} value={desc}
+            ph="What does done look like?" onChange={setDesc} />
+        </FormField>
+      </FormSection>
+    </ModalShell>
   );
 }
 
@@ -374,32 +380,31 @@ function CheckList({ item }: { item: WorkItem }) {
     setDraft("");
   };
   return (
-    <div className="tm-ck">
+    <div className="flex flex-col gap-2">
       {lines.length ? (
-        <ul className="tm-ck-l">
+        <ul className="flex flex-col divide-y divide-border-secondary rounded-xl bg-primary px-3 ring-1 ring-secondary">
           {lines.map((l) => (
-            <li key={l.lineId} className={l.done ? "done" : ""}>
-              {/* A LABEL, so the words are the hit area too. A 13px box is a
-                  hard target and the text beside it is the obvious thing to
-                  press. */}
-              <label className="tm-ck-x">
-                <input type="checkbox" checked={l.done}
-                  onChange={() => toggleCheckLine(item.itemId, l.lineId)} />
-                <span>{l.text}</span>
-              </label>
-              <button className="btn icon sm" aria-label={"Remove step: " + l.text}
-                onClick={() => removeCheckLine(item.itemId, l.lineId)}>
-                <Icon name="x" size="sm" />
-              </button>
+            <li key={l.lineId} className="flex items-center gap-2 py-2">
+              {/* THE WORDS ARE THE HIT AREA TOO — a 16px box is a hard target
+                  and the text beside it is the obvious thing to press. */}
+              <Checkbox
+                checked={l.done}
+                onChange={() => toggleCheckLine(item.itemId, l.lineId)}
+                className="min-w-0 flex-1"
+                label={<span className={cx(l.done && "text-quaternary line-through")}>{l.text}</span>}
+              />
+              <IconButton ico="x" size="xs" label={"Remove step: " + l.text}
+                onClick={() => removeCheckLine(item.itemId, l.lineId)} />
             </li>
           ))}
         </ul>
-      ) : <p className="tm-foot">No steps yet — so its progress can only be 0 or 100.</p>}
-      <div className="tm-ck-new">
-        <input className="inp" value={draft} placeholder="Add a step" aria-label="Add a step"
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} />
-        <button className="btn sm" onClick={add} disabled={!draft.trim()}>Add</button>
+      ) : (
+        <p className="text-xs text-quaternary">No steps yet — so its progress can only be 0 or 100.</p>
+      )}
+      <div className="flex items-center gap-2">
+        <Input value={draft} ph="Add a step" ariaLabel="Add a step" className="flex-1"
+          onChange={setDraft} onEnter={add} />
+        <Button color="secondary" size="sm" isDisabled={!draft.trim()} onClick={add}>Add</Button>
       </div>
     </div>
   );
@@ -414,9 +419,9 @@ function CheckList({ item }: { item: WorkItem }) {
  *  "Links" while `addResourceLink` wrote `links`, so a saved address went into
  *  the record and was never seen — and nothing could save one anyway.
  *
- *  The name is required and the scheme is checked in the store, because
- *  `docs.google.com/…` with no scheme resolves against THIS panel's origin and
- *  404s, which reads as a broken document rather than a typo. */
+ *  The scheme is checked in the store, because `docs.google.com/…` with no
+ *  scheme resolves against THIS panel's origin and 404s, which reads as a
+ *  broken document rather than a typo. */
 function LinkList({ item }: { item: WorkItem }) {
   const shell = useShell();
   const [label, setLabel] = useState("");
@@ -443,26 +448,30 @@ function LinkList({ item }: { item: WorkItem }) {
   })));
 
   return (
-    <div className="tm-lkbox">
+    <div className="flex flex-col gap-2">
       {rows.length ? (
-        <ul className="tm-lk">
+        <ul className="flex flex-col divide-y divide-border-secondary rounded-xl bg-primary px-3 ring-1 ring-secondary">
           {rows.map((l) => (
-            <li key={l.key}>
-              <Icon name="ext" size="sm" />
-              <span className="tm-lk-t">
+            <li key={l.key} className="flex items-center gap-2 py-2">
+              <Icon name="ext" size="sm" className="shrink-0 text-fg-quaternary" />
+              <span className="flex min-w-0 flex-1 flex-col">
                 {/* noreferrer as well as noopener: the target must not be
                     handed this panel's URL in its referrer. */}
-                <a href={l.url} target="_blank" rel="noopener noreferrer">{l.label}</a>
-                <span className="cell-2">{l.url}</span>
+                <a href={l.url} target="_blank" rel="noopener noreferrer"
+                  className="truncate rounded text-sm font-medium text-primary outline-focus-ring hover:text-brand-secondary hover:underline focus-visible:outline-2">
+                  {l.label}
+                </a>
+                <span className="truncate text-xs text-tertiary">{l.url}</span>
               </span>
               {l.drop ? (
-                <button className="btn icon sm" aria-label={"Remove link: " + l.label}
-                  onClick={l.drop}><Icon name="x" size="sm" /></button>
+                <IconButton ico="x" size="xs" label={"Remove link: " + l.label} onClick={l.drop} />
               ) : null}
             </li>
           ))}
         </ul>
-      ) : <p className="tm-foot">Nothing linked yet.</p>}
+      ) : (
+        <p className="text-xs text-quaternary">Nothing linked yet.</p>
+      )}
       {/* THE ADDRESS IS THE FIELD, AND IT LEADS. Add was disabled until BOTH
           were filled and the store then refused anything without a scheme, so
           pasting `docs.google.com/brief` — which the create dialog's own link
@@ -470,14 +479,12 @@ function LinkList({ item }: { item: WorkItem }) {
           The name is optional here as it is there, and falls back to the host.
           Enter on either field adds, because a two-input row where only the
           button commits is a row people leave half-filled. */}
-      <div className="tm-lk-new">
-        <input className="inp" value={url} placeholder="docs.google.com/…" aria-label="Link address"
-          onChange={(e) => setUrl(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} />
-        <input className="inp" value={label} placeholder="Name — optional" aria-label="Link name"
-          onChange={(e) => setLabel(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} />
-        <button className="btn sm" onClick={add} disabled={!url.trim()}>Add</button>
+      <div className="flex flex-wrap items-center gap-2">
+        <Input value={url} ph="docs.google.com/…" ariaLabel="Link address"
+          className="min-w-0 flex-1 basis-48" onChange={setUrl} onEnter={add} />
+        <Input value={label} ph="Name — optional" ariaLabel="Link name"
+          className="min-w-0 flex-1 basis-40" onChange={setLabel} onEnter={add} />
+        <Button color="secondary" size="sm" isDisabled={!url.trim()} onClick={add}>Add</Button>
       </div>
     </div>
   );
@@ -488,7 +495,9 @@ function LinkList({ item }: { item: WorkItem }) {
  *  fields — and it is now the only place in Tasks that can say what TYPE the
  *  new one is. The store has taken a tone since it shipped; nothing here ever
  *  passed one, so every tag made from this panel came out grey. */
-function TagPicker({ item, mine, on, tags }: { item: WorkItem; mine: Tag[]; on: string[]; tags: Tag[] }) {
+function TagPicker({ item, mine, on, tags }: {
+  item: WorkItem; mine: TagRecord[]; on: string[]; tags: TagRecord[];
+}) {
   const shell = useShell();
   const [draft, setDraft] = useState("");
   const [tone, setTone] = useState("slate");
@@ -501,31 +510,41 @@ function TagPicker({ item, mine, on, tags }: { item: WorkItem; mine: Tag[]; on: 
   const others = tags.filter((t) => t.ownerId !== item.assigneeId && !t.archivedAt
     && !mine.some((x) => x.slug === t.slug));
   return (
-    <div className="tm-tagpick">
-      <div className="tm-tagrow">
-        {mine.map((t) => (
-          <button key={t.tagId} type="button"
-            aria-pressed={on.indexOf(t.tagId) >= 0}
-            className={"pill xs is-tag tm-tag tm-pick" + (on.indexOf(t.tagId) >= 0 ? " on" : "")
-              + " tag-" + (t.colourToken || "slate")}
-            onClick={() => tagItem(item.itemId, t.tagId, on.indexOf(t.tagId) < 0)}>
-            {t.label}
-          </button>
-        ))}
-        {mine.length ? null : <span className="dim">No tags yet.</span>}
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {mine.map((t) => {
+          const isOn = on.indexOf(t.tagId) >= 0;
+          return (
+            <button
+              key={t.tagId}
+              type="button"
+              aria-pressed={isOn}
+              onClick={() => tagItem(item.itemId, t.tagId, !isOn)}
+              className={cx(
+                "cursor-pointer rounded-md p-0.5 outline-focus-ring transition duration-100 focus-visible:outline-2 focus-visible:outline-offset-2",
+                isOn ? "ring-2 ring-brand" : "opacity-60 hover:opacity-100",
+              )}
+            >
+              <Tag label={t.label} tone={t.colourToken || "slate"} />
+            </button>
+          );
+        })}
+        {mine.length ? null : <span className="text-xs text-quaternary">No tags yet.</span>}
       </div>
-      <div className="tm-tagnew">
-        <input className="inp sm" placeholder="New tag" aria-label="New tag" value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} />
-        <button className="btn sm" disabled={!draft.trim()} onClick={add}>Create</button>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Input value={draft} ph="New tag" ariaLabel="New tag" className="min-w-0 flex-1 basis-40"
+          onChange={setDraft} onEnter={() => { if (draft.trim()) add(); }} />
+        <Button color="secondary" size="sm" isDisabled={!draft.trim()} onClick={add}>Create</Button>
       </div>
-      <div className="tm-tagtype-row">
-        <span className={"pill xs tm-tag tag-" + tone}>{draft.trim() || "Preview"}</span>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <Tag label={draft.trim() || "Preview"} tone={tone} />
         <TagTypePicker tone={tone} onPick={setTone} />
       </div>
+
       {others.length ? (
-        <p className="tm-foot">{others.length} more on other members.</p>
+        <p className="text-xs text-quaternary">{others.length} more on other members.</p>
       ) : null}
     </div>
   );
@@ -543,30 +562,31 @@ function WaitModal({ item, all }: { item: WorkItem; all: WorkItem[] }) {
     shell.toast(clear ? "No longer waiting." : "Waiting on another item.");
   };
   return (
-    <>
-      <ModalHead title="Waiting on" onClose={() => shell.closeLayer()} />
-      <div className="md-b">
-        <div className="fg">
-          <label htmlFor="tmWaitOn">Item</label>
-          <select id="tmWaitOn" className="inp" value={pick} onChange={(e) => setPick(e.target.value)}>
-            <option value="">—</option>
-            {options.map((i) => <option key={i.itemId} value={i.itemId}>{i.title}</option>)}
-          </select>
-        </div>
-        <div className="fg">
-          <label htmlFor="tmWaitWhy">Reason <b className="req">*</b></label>
-          <input id="tmWaitWhy" className="inp" value={why} onChange={(e) => setWhy(e.target.value)}
-            placeholder="What it is waiting for." />
-          <span className="help">The stage does not move. Waiting is a relationship, not a stage.</span>
-        </div>
-      </div>
-      <div className="md-f">
-        {item.blockedByItemId ? <button className="btn" onClick={() => save(true)}>Clear</button> : null}
-        <span className="spacer" />
-        <button className="btn" onClick={() => shell.closeLayer()}>Cancel</button>
-        <button className="btn pri" disabled={!pick} onClick={() => save()}>Save</button>
-      </div>
-    </>
+    <ModalShell
+      title="Waiting on"
+      ico="lock"
+      onClose={() => shell.closeLayer()}
+      danger={item.blockedByItemId
+        ? <Button color="secondary" onClick={() => save(true)}>Clear</Button>
+        : undefined}
+      actions={
+        <>
+          <Button color="secondary" onClick={() => shell.closeLayer()}>Cancel</Button>
+          <Button color="primary" isDisabled={!pick} onClick={() => save()}>Save</Button>
+        </>
+      }
+    >
+      <FormSection>
+        <FormField id="tmWaitOn" label="Item">
+          <SelectInput id="tmWaitOn" value={pick} onChange={setPick}
+            options={[{ v: "", l: "—" }].concat(options.map((i) => ({ v: i.itemId, l: i.title })))} />
+        </FormField>
+        <FormField id="tmWaitWhy" label="Reason" req
+          hint="The stage does not move. Waiting is a relationship, not a stage.">
+          <Input id="tmWaitWhy" value={why} ph="What it is waiting for." onChange={setWhy} />
+        </FormField>
+      </FormSection>
+    </ModalShell>
   );
 }
 
@@ -586,31 +606,29 @@ function LinkModal({ item, all }: { item: WorkItem; all: WorkItem[] }) {
     shell.toast("Linked.");
   };
   return (
-    <>
-      <ModalHead title="Link an item" onClose={() => shell.closeLayer()} />
-      <div className="md-b">
-        <div className="fg">
-          <label htmlFor="lkRel">Relation</label>
-          <select id="lkRel" className="inp" value={rel}
-            onChange={(e) => setRel(e.target.value as LinkRelation)}>
-            {(["relates_to", "duplicates", "follows"] as LinkRelation[]).map((k) =>
-              <option key={k} value={k}>{linkLabelOf(k, true)}</option>)}
-          </select>
-        </div>
-        <div className="fg">
-          <label htmlFor="lkTo">Item</label>
-          <select id="lkTo" className="inp" value={pick} onChange={(e) => setPick(e.target.value)}>
-            <option value="">—</option>
-            {options.map((i) => <option key={i.itemId} value={i.itemId}>{i.title}</option>)}
-          </select>
-          <span className="help">Gates nothing. A follows edge draws a sequence; it never blocks the work.</span>
-        </div>
-      </div>
-      <div className="md-f">
-        <span className="spacer" />
-        <button className="btn" onClick={() => shell.closeLayer()}>Cancel</button>
-        <button className="btn pri" disabled={!pick} onClick={save}>Link</button>
-      </div>
-    </>
+    <ModalShell
+      title="Link an item"
+      ico="link"
+      onClose={() => shell.closeLayer()}
+      actions={
+        <>
+          <Button color="secondary" onClick={() => shell.closeLayer()}>Cancel</Button>
+          <Button color="primary" isDisabled={!pick} onClick={save}>Link</Button>
+        </>
+      }
+    >
+      <FormSection>
+        <FormField id="lkRel" label="Relation">
+          <SelectInput id="lkRel" value={rel} onChange={(v) => setRel(v as LinkRelation)}
+            options={(["relates_to", "duplicates", "follows"] as LinkRelation[])
+              .map((k) => ({ v: k, l: linkLabelOf(k, true) }))} />
+        </FormField>
+        <FormField id="lkTo" label="Item" req
+          hint="Gates nothing. A follows edge draws a sequence; it never blocks the work.">
+          <SelectInput id="lkTo" value={pick} onChange={setPick}
+            options={[{ v: "", l: "—" }].concat(options.map((i) => ({ v: i.itemId, l: i.title })))} />
+        </FormField>
+      </FormSection>
+    </ModalShell>
   );
 }

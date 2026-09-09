@@ -4,6 +4,671 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ---
 
+## 2026-09-09
+
+### Quotations, Invoices and Agreements come onto the system — the rebuild is one system now
+
+**Area:** `#/quotations`, `#/invoices` (list · pick · builder · detail · document · every dialog), `#/agreements` (templates · sent · the deed · the template editor)
+**Files:** `src/admin/views/Quotations/{IssueModal,PlanModal,ReviseModal,ReasonModal,PickDeal,Detail}.tsx`, `src/admin/views/Invoices/{index,Builder,Detail,Form,IssueModal,PickDeal,Preview,ReasonModal}.tsx`, `src/admin/views/Agreements/{index,Editor}.tsx`, `src/admin/ui/{data,overlays,index}.tsx`, deleted `src/admin/views/Agreements/agreements.css`
+
+**What changed**
+The last three modules the wave-1 agents did not reach were rebuilt by hand, and the
+one-system gate now passes with **zero** violations across the whole panel: no stylesheet
+outside `src/styles`, no colour literal, no inline design value, no retired class. All nine
+module stylesheets are deleted.
+
+Invoices was rebuilt as the twin of Quotations rather than as its own product — same five
+list bands, same record header, same numbered-step builder, and it now IMPORTS that builder
+chrome (`BuilderLayout`, `StepHead`, `PartyStrip`, `MoneyLine`, `ReadyLine`) from
+`Quotations/bits` instead of drawing its own. `ReasonModal`, which the two modules carried
+byte-identical copies of, is one drawing in `ui/overlays` taking a `tone` rather than a raw
+class name; both module files are now one-line re-exports.
+
+Two things the screenshots caught and the fixes are systemic, not local: a `.cell-2` written
+as a bare `<span>` ran INTO the title above it in every module that used one ("IT asset
+handoverEveryone · 5 fields"), so the table rhythm makes it a block; and the plan picker,
+the proof chips and the deed page had lost their drawings entirely when the old global sheet
+was deleted — they were rebuilt on the tokens rather than restored.
+
+Where a required field is empty, the detail and the issue dialog now say **"— required to
+issue"** in the error colour where the value would be, rather than a neutral dash: an empty
+required field is the reason the guard will refuse, not a blank.
+
+**Temp data**
+Agreements and Data Forms read their seeds under `src/content/`; Quotations and Invoices are
+API-backed and photograph their empty state.
+
+**Backend needed**
+none — no endpoint or payload changed.
+
+**Open decisions**
+Invoices imports its builder chrome from `Quotations/bits`, which makes Quotations the owner
+of a drawing two modules depend on. If a third document type appears, that chrome should move
+into `src/admin/ui` rather than be imported from a sibling module.
+
+**Verified**
+`tsc` 0 errors · `vite build` green · `eslint src/admin` 0 errors (50 pre-existing
+exhaustive-deps warnings) · `check:dupes` "one system" · `check:tokens` all 70 properties
+defined · `check:contrast` 84/84 both themes · `check:menu` passes · all 20 routes
+photographed in both themes and looked at, plus a re-shoot after the `.cell-2` fix.
+
+NOT verified: the Quotations and Invoices screens were photographed against the MOCKED empty
+API, so their lists, builders and documents were only seen in their empty state — the rows,
+the paper and the dialogs are typed and linted but not photographed with data. The `*-smoke`
+render checks still assert retired class names and fail; they are stale, not regressions.
+
+### The shared layer grows the parts five modules asked for, and stops the phone scrolling sideways
+
+**Area:** every route — `src/admin/ui` (the composition layer), the one-system gate, the shot script
+**Files:** `src/admin/ui/{page,menu,data,fields,buttons,overlays,index}.tsx`, `src/admin/views/{Invoices/Preview,Invoices/Detail,Quotations/Detail,Quotations/ReasonModal,Invoices/ReasonModal}.tsx`, `src/admin/views/charts.tsx`, `src/styles/brand.css`, `scripts/{check-dupes,shoot-modules}.cjs`, `design/COMPONENT-CONTRACT.md`
+
+**What changed**
+Each module agent hit the same missing parts, so they are now in the shared layer
+once instead of worked around five times: `MoreMenu ico` (an icon-only row menu —
+"More ⌄" cost ~90px in every row of every list) and `MenuItem.title` (a second line
+saying the consequence), `PageHeader fold` (secondary actions that are buttons from
+`lg` and one menu below it), `Card tone` (the exception rail), `Tile wrapSub` (a
+caveat that wraps instead of being clipped mid-word), `Button count`, `Input list`,
+a `Textarea` ref, a non-menu `Popover`, and `SortHead` promoted out of Team into the
+table vocabulary. `ReasonModal` — which Quotations and Invoices carried
+byte-identical copies of — is one drawing in `ui/overlays` now, taking a `tone`
+rather than a raw class name.
+
+The measured fix: on a phone the whole page could be dragged ~580px sideways on any
+route with a wide table. React Aria puts a visually-hidden span beside interactive
+cells; absolutely positioned, it resolved against the DOCUMENT and so landed at the
+table's full width, outside the scroll container that was supposed to clip it. Both
+table wrappers are `relative` now, which contains them.
+
+**Temp data**
+none — this is the component layer.
+
+**Backend needed**
+none.
+
+**Open decisions**
+`PageHeader fold` renders its items as secondary buttons on `lg` and a menu below,
+which assumes the folded actions are all secondary; a page wanting two primaries
+would still have to draw them itself. None seen so far.
+
+**Verified**
+`tsc` 0 errors and `vite build` green across the whole app; `check:contrast` 84/84
+in both themes; `check:menu` passes; `check:dupes` down from 45 problems to 23 (the
+rest is the Invoices/Quotations/Agreements files no agent reached). The sideways
+scroll was verified by MEASUREMENT, not by eye — a Playwright pass scrolls each
+route at 390/768/1024 and reads `scrollX` back; it reported 580px on two routes
+before the fix and "no page scrolls sideways" after. Phone-width screenshots were
+looked at for eight finished routes.
+
+NOT verified: the five modules still on retired classes were not re-photographed,
+and nothing here has been seen against a live API.
+
+### Business Enquiries — the five-stage queue and the decision page, on the shared parts
+
+**Area:** `#/business-enquiries`, `#/business-enquiries/<id>` (`?tab=match|assignment|history`), `?new=1`
+**Files:** `src/admin/views/BusinessEnquiries/{index,List,Detail,Qualify,Suggestions,Modals,NewEnquiry,ExportModal,bits,menus}.tsx`
+
+**What changed**
+
+- **The module is composed of `admin/ui` and Tailwind utilities.** `import "./enquiries.css"` is
+  gone from `index.tsx` and no file here carries an old class name (`btn`, `inp`, `pill`, `card`,
+  `tbl`, `kv`, `faint`-as-a-word, `spacer`, `be-*`, `dls-*`) or a `style={{}}` at all —
+  `check:dupes` reports "no colour literals" on all ten. Every `can()` gate, store call, URL
+  contract, `usePageChrome` claim, `data-act` hook and exported name survives; `store.ts`,
+  `exportCsv.ts`, `imageSheet.ts` and `share.ts` were not touched.
+- **The queue is the panel's page skeleton.** `PageHeader` (count + as-of meta, secondary Export
+  carrying the row count, primary **New enquiry**) → `FilterBar` (search + eleven `Select`s, the
+  Sort control ruled off on the right, `FilterChips` under it) → the attention `StatStrip` → a
+  `ListTable` with a `Rail` per row → `Pagination`. The hand-rolled pager, the two-band command
+  row and the `be-filters-grid` are gone.
+- **The strip and the row rail are one judgement.** `attentionTone()` in `bits.tsx` decides what
+  needs a human today (New, Qualified, No match yet) and both the stat cell's colour and the
+  row's exception stripe read it, so a row can never be striped for a condition the strip thinks
+  is ordinary. Status dots in the Status dropdown come from `statusDot()`, the same map the
+  `LeadStatus` pill uses — before this they all rendered neutral grey.
+- **The record page is a header `Card` → `Tabs` → two columns on `lg`.** Left: requirement,
+  qualification snapshot, the contact log as a `Timeline` with channel `Tag`s, remarks as an
+  `ActivityFeed`. Right: the qualification panel while it is being worked, the ranked
+  suggestions once it is frozen — candidates on one `CandidateCard` with a score `Meter`, the
+  factor breakdown on `BarRows`, exclusions collapsed behind a disclosure.
+- **`?new=1` makes the Add-an-enquiry dialog a link.** Same switch Quotations and Invoices use;
+  pressing the button opens the dialog and writes the param, and arriving on the link opens it
+  on mount. `new` never reaches the query, the chips row or the filter count.
+- **Every dialog is a `ModalShell`** with `FormSection`/`FieldRow`/`FormField` inside: the assign
+  and reassign revalidation lists are a module-local `GuardCheck`, the export column groups are
+  `Checkbox`es with `internal only` / `personal data` marks, and each error-contract line
+  (`422 override_reason_required`, `422 no_eligible_business`, the reassign guard) is an `Alert`.
+- **Two menus, one action list.** `menus.tsx` now exports `useEnquiryActions`, and both
+  placements read it: `RecordMenu` fills the shell's popover on the record header (still opened
+  by the `data-act="be-more"` trigger `check:wiring` asserts), `RowMenu` is the same actions on
+  the shared `MoreMenu` in every queue row.
+- **Layout decisions the screenshots forced.** The reference-and-phone line is `whitespace-nowrap`
+  so it can never wrap mid-number, which sets the identity column's width; provenance moved from
+  its own column onto the chip line, and the assigned business onto the Status cell's second
+  line — with those two columns gone the row menu is reachable at 1440 without a horizontal
+  scroll. A `Pill` inside a `Button` breaks its label onto two lines (a Badge is a flex box), so
+  the Export count and the Reassign "Admin" mark are inline spans.
+
+**Module-local drawings** (all in `bits.tsx`, on the tokens): `LifecycleRail` (the nine-step dot
+ramp — solid behind you, haloed here, hollow ahead, **dashed hollow for the off-ramp**, which is
+why it is not the shared `Pipeline`: that component fills everything behind the current step and
+would claim every assigned record passed through "No match yet"), `CandidateCard`, `GuardCheck`,
+`Disclose`, `PanelNote`, `VocabInput`, `attentionTone`, `statusDot`, `contactLogItem`.
+
+**Temp data**
+
+- `src/content/business-enquiries/enquiries.json` → **placeholder records**, unchanged. Read only
+  by `scripts/shoot-modules.cjs` and this agent's own Playwright pass; the module itself reads the
+  API.
+- `src/content/business-enquiries/vocabularies.json` → **mixed**, unchanged. `attentionCells[]`
+  supplies the strip's tooltips (`counts` / `does`); `statuses`, `urgency`, `tiers`, `sources`,
+  `receivedRanges`, `tags` supply every label and every dropdown.
+
+**Backend needed**
+
+- `none — no endpoint changed.` The module still reads `GET /business-enquiries/vocabularies/`,
+  `/matching-rules/`, `/businesses/`, `/business-enquiries/` and `/business-enquiries/<id>/`
+  exactly as before.
+- Noted for the API, not for this change: the queue's `total` is now read as
+  `page.total || rows.length`, because a response without the paging envelope was dividing by
+  `undefined` in the pager. The strip still renders nothing at all when `counts` is absent —
+  that is the module's own "we do not know yet", kept.
+
+**Open decisions**
+
+None newly assumed. `BE-OD-04`, `BE-OD-08` and `BE-OD-10` are still named on the screens that
+assume them (the PIN-code field's hint, the assign dialog's override alert, the outcome dialog's
+reason hint).
+
+**Verified**
+
+- `npx tsc -p tsconfig.app.json --noEmit --incremental false` → **0 errors in
+  `views/BusinessEnquiries/`** (errors remain in `views/{Deals,Users,Resources}` — other agents,
+  mid-rewrite, untouched here).
+- `npx eslint src/admin/views/BusinessEnquiries/*.tsx` → clean (exit 0).
+- `npx vite build --mode dev --outDir .tmp/dist-A7` → **could not complete**: rollup fails on
+  `views/Users/Analytics.tsx` importing `EventRow`, which `views/Users/bits.tsx` no longer
+  exports. Nothing in this module is involved. A production rollup of this module alone
+  (`.tmp/a7-vite.config.ts`, entry importing all ten files plus the shell) builds: 3374 modules,
+  1,309 kB.
+- `SHOT_PORT=5237 SHOT_ROUTES=business-enquiries SHOT_OUT=A7 node scripts/shoot-modules.cjs` →
+  "Every route rendered", no page errors, both themes looked at.
+- A second Playwright pass (`.tmp/a7-shots.cjs`, port 5237, both themes, 30 images): the queue
+  served with the real paging envelope so the strip and pager render, the empty state with the
+  query named, `?new=1`, a Processing / a Qualified / an Assigned record, all three `?tab=`
+  faces, and the Export, Record-outcome, Reassign and Reject dialogs plus both menus, each opened
+  by pressing its own trigger. Every image was looked at and four rounds of fixes came out of it.
+- `check:export`, `check:clock`, `check:share`, `check:wiring`, `check:match` all pass.
+  `check:enquiries` **fails for want of a backend** — it is an integration test against
+  `http://localhost:8000/api/v1/admin/business-enquiries/vocabularies/` and fails identically
+  before this change.
+- **Not checked:** the Assign dialog on a real ranked run, and the factor breakdown with a real
+  weight table — the seed carries no `matchRun` and the mocked `matching-rules` answer is empty,
+  so both render their honest "nothing ranked / no factor table" states instead. Responsive
+  widths below 1024 were not photographed (wave 2 owns the three-width pass).
+
+---
+
+### Finance — five sidebar rows rebuilt on the shared parts
+
+**Area:** `#/finance`, `#/finance-salaries`, `#/finance-transactions`, `#/finance-refunds`, `#/finance-analytics`, and every record under them (`/SUB-…`, `/SAL-AC-…`, `/SLIP-…`, `/TXN-…`, `/RF-…`)
+**Files:** `src/admin/views/Finance/{index,Frame,InfoTip,bits,dialog,Subscriptions,SubscriptionDetail,SubModals,SubAnalytics,Salaries,SalaryDetail,SalaryTransactions,SalaryModals,Slip,Payroll,Transactions,TxnDetail,TxnModals,Refunds,RefundDetail,RefundModals,Analytics}.tsx`
+
+**What changed**
+
+- **The whole module is composed of the shared layer and Tailwind utilities.** `finance.css` and
+  `../charts.css` are no longer imported by any file here, and not one old class name (`btn`,
+  `inp`, `pill`, `card`, `tbl`, `kv`, `sh`, `spacer`, `faint`-as-a-word, `fin-*`, `dls-*`, `av`,
+  `chip`, `selectbox`), inline colour or inline size literal is left — `check:dupes` reports
+  "no colour literals" on all 22 files. Every `can()` gate, store call, URL contract
+  (`?tab=`, `?inst=`, `?year=`, `?by=`, `?flag=`, `?started=`), `usePageChrome` claim and
+  exported name survives unchanged.
+- **Each of the five rows is now the panel's page skeleton.** `PageHeader` (section title, the
+  record count and the store's `asOf` clock as `label-mono` meta, ONE primary action) →
+  `ViewBand` tabs → `FilterBar` (search + `Select`s + the Started `DateInput` + `FilterChips`) →
+  `StatStrip` (counts filter, money reads out, definitions on `tip`) → `ListTable` with `Rail`
+  on the failing/past-due/unexplained rows → `Pagination`. Salaries A/C, Other Transaction,
+  Refunds and Analytics had no page header at all before; they had a bare command row.
+- **Every row keeps its actions.** The three hand-rolled dropdowns in this module (the slip
+  kebab, the refund menu, the tag buttons) are one `ActionMenu`/`TxnMenu` on the shared
+  `MoreMenu` — a portalled React Aria Dropdown, so a scrolling table body can no longer clip a
+  menu, and Escape/outside-press/scroll are the library's.
+- **The two documents stay paper in both themes.** The receipt on a subscription and the payslip
+  are the only surfaces in the module that do not follow the theme: explicit `bg-white
+  text-neutral-900` with `print:` variants, the watermark behind an `aria-hidden` layer, and
+  print/share/pay behind the record's `MoreMenu`.
+- **Analytics reads as tiles → charts → tables.** The Overview tab leads with four `Tile`s (Net,
+  Collected, Other income, Out) over a full-width `Waterfall` in a `ChartFrame`, then Net by
+  month, spend by tag, the risk table, bank matching on a `Meter` with the unexplained lines as
+  a `ListTable`, tax and activity. KPI is `Tiles` per group; a null KPI's reason and a
+  misleading-figure caveat now wrap in the tile's foot instead of being truncated to one line.
+- **Modules-local drawings added to `bits.tsx`** (all utilities on the tokens, no stylesheet):
+  `Fine`, `Ledger` + `LedgerRow` (the money summary block every dialog and detail card uses),
+  `PickList` + `PickRow` (choose a business, a quotation, a payment), `Picked`, `DocCard`
+  (a quotation or invoice summarised), `Derived` (a value the form computed), `PaidReceipt`
+  (the dialog after a write goes through), `ProofField` (the one file control, on `FileUpload`).
+- **Pagination where there was none.** Salaries A/C (both record tabs), Other Transaction and
+  Refunds now page at 50 with the count line always shown; `?page=` is stripped by every filter
+  helper, so paging is a position and never a filter.
+- **Two behaviour repairs that fell out of the rewrite.** Every `modal(…, "wide")` call passed a
+  size the shell does not know and silently fell back to `md`; they are `lg` now. Releasing a
+  held slip was inside the row menu's own component and is a plain menu item.
+
+**Temp data**
+
+`src/content/finance/*.json` through `store.ts` — untouched by this pass. `module.json` →
+`asOf`, `period`, `accounts`, `billThresholdPaise`; `vocabularies.json` → every status,
+tone, tag kind, failure reason, refund ground, metric and KPI definition (**mixed** — the
+label and caution text is permanent static copy, the lists become server vocabulary);
+`subscriptions/salary-accounts/salary-runs/transactions/refunds/invoices/quotations/statements.json`
+→ placeholder records.
+
+**Backend needed**
+
+`none new` — this is a presentation pass. The module's endpoint map is unchanged and still
+listed in the Finance entries below.
+
+**Open decisions**
+
+None newly assumed. The ones the module already carries are still stated on screen and now on
+the shared `Alert`/`EmptyState` rather than a module class: `FN-OD-02` (bank matching is
+completeness, not correctness) and `FN-OD-08` (tax invoiced is not a return) as `Assumed`
+footers on Analytics; `FN-OD-01`, `FN-OD-06`, `FN-OD-07` in the KPI tab's closing card;
+`FN-OD-06` also on the Monthly-payroll strip cell, which is net paid to people and not cost to
+company; `FN-OD-05` (no final settlement here) in the close-account dialog; `FN-OD-15`
+(a failure does not suspend a membership) in the fail-to-pay dialog.
+
+**Verified**
+
+- `npx tsc -p tsconfig.app.json --noEmit --incremental false` — 0 errors in `views/Finance/*`.
+- `npx eslint src/admin/views/Finance/*.tsx` — clean.
+- `npx vite build --mode dev --outDir .tmp/dist-A6` — builds. (It failed twice earlier on
+  another agent's in-flight `views/Users/bits.tsx`; the Finance module alone was bundled with
+  esbuild to prove it links, and the full build passed once that file was fixed.)
+- `npm run check:finance` — 450 checks pass. `npm run check:finance-nav` — passes.
+- `node scripts/check-dupes.cjs` — every Finance `.tsx` reports "no colour literals". The gate
+  still fails on `finance.css` *existing*; the brief has the main session delete it after the wave.
+- `SHOT_PORT=5236 SHOT_ROUTES=finance,finance-salaries,finance-transactions,finance-refunds,finance-analytics SHOT_OUT=A6 node scripts/shoot-modules.cjs`
+  — 10 images, every route rendered, both themes, all looked at.
+- A Playwright run of my own (same mock setup, port 5236 → `.tmp/A6-deep`) photographed 19
+  screens × 2 themes: one detail page per section, the receipt and history faces, the payslip,
+  the Accounts / Tags / salary-Analytics sub-tabs, the KPI tab, and six modals (record a
+  subscription, record a payment, add a salary account, record a transaction, raise a manual
+  refund, request a refund). Two were re-shot after fixes: the Analytics hero (a 90px tile was
+  stretched beside a 400px chart) and the KPI caveats (truncated to one line).
+- **Not verified:** below 1024px. Both scripts shoot at 1440×900/1000 only; the responsive
+  rules are the shared components' own and were not looked at on a phone. `OpenRunModal` and
+  `LopModal` are exported and rewritten but reachable from no screen in this build, so they were
+  typed and linted but never opened. Nothing in this module has been seen against a live API —
+  everything reads the seed.
+
+### Team core — the roster as a queue, and the member as a place with a launcher
+
+**Area:** `#/team`, `#/team/:id`, `#/team/:id/{leave,attendance,work,reports,pay,documents,agreements,resources}`, and the task panel the Tasks faces open
+**Files:** `src/admin/views/Team/{index,bits,Detail,MemberPage,memberModals,status,marks}.tsx`, `src/admin/views/Team/member/{AgreementsPage,AttendancePage,DocumentsPage,LeavePage,PayPage,ReportsPage,ResourcesPage,WorkPage,frame,modals,reportForms}.tsx`
+
+**What changed**
+
+- **Every screen in this half is composed of the shared parts and nothing else.** `team.css` and
+  `../Resources/resources.css` are no longer imported by any file here, and not one old class
+  name (`btn`, `inp`, `dls-*`, `tm-*`, `sh`, `fg`, `md-b`, `md-f`, `dim`, `faint`, `spacer`),
+  inline colour or inline size literal is left. Every `can()` gate, `usePageChrome` claim, URL
+  contract (`?tab=`, `/team/:id/:sub`), `val(id)` id, `#tmRoles` read, `data-filter="q"`,
+  `data-act`/`data-unfilter` hook and exported name survives unchanged.
+- **The roster is a real queue page.** `PageHeader` (count meta + one primary "Add member") →
+  `Tabs` (Members · Access requests) → `FilterBar` (search + Role + Department `Select`s +
+  `FilterChips`) → `StatStrip` → `ListTable` → `Pagination`. A row is a `Person` linking to the
+  member page, with role chips, department and reporting line, the documents-short pill naming
+  the first two that are missing, account state, last sign-in in mono, and the admin actions on
+  that person behind a row `MoreMenu` (Edit · Roles · Send new password · Delete, destructive
+  last and separated) — so the whole row stays a link to the record. Search keeps its 220 ms
+  debounce and now hands the caret back after the URL remounts the input.
+- **The member page keeps its launcher but stops paying for it on every screen.** `/team/:id`
+  draws the operation tiles at full size, each carrying the live figure that says whether it is
+  worth opening; an operation page draws the same doors as a one-line rail (`OpChip`), which
+  removes ~250 px of chrome from eight pages without losing an address or a figure.
+- **Each operation page is now the right pattern for its data.** Attendance leads with a month
+  grid (`MonthGrid`, module-local) — a run of amber down one column is a Monday problem no list
+  would show — then the fortnight as a `ListTable` with the hour axis sitting over the bars it
+  labels rather than in the section head. Leave, Pay, Documents, Agreements and the tag manager
+  are `ListTable`s with money in right-aligned mono `n` columns; Reports is a week of two-column
+  day cards where an empty day collapses to one line; Resources is one `Card` per form.
+- **Every dialog is `ModalShell` + `FormSection`/`FieldRow`/`FormField`,** with the refusal
+  (`ErrSlot`) at the top of the body and the primary action last in the footer. The Add-document
+  dialog now shows a real (deliberately disabled) `FileUpload` drop zone where the file will land
+  once private-object storage exists, instead of a hand-drawn box.
+- **The task panel is `DrawerShell`.** Status control first, then the facts as one `KvList`, then
+  steps / details / tags / links / related — with `Checkbox`, `Input`, `Tag` and `IconButton`
+  replacing the hand-drawn checklist, link rows and tag chips.
+
+**Temp data**
+
+- `src/content/team/members.json` → the employment block (`designation`, `department`,
+  `reportsTo`, `dayStartsAt`, `graceMinutes`, `employmentType`, `joiningDate`). **Placeholder
+  records.** Identity/roles/last-sign-in come live from `AdminOpsService.users()`.
+- `src/content/team/{attendance,work,leave,agreements,documents,pay,reports}.json` →
+  **placeholder records** behind every operation page.
+- `src/content/team/vocabularies.json` → attendance/leave/agreement/document/priority/tag-tone
+  labels and tones. **Mixed** — the label text is permanent static copy, the lists become server
+  vocabulary.
+- Finance's `salary-accounts` / payslips are read live from `views/Finance/store` — Pay writes
+  nothing.
+
+**Backend needed**
+
+- `none — already live via AdminOpsService.users() / listRoles() / createUser() / updateUser() /
+  sendUserCredentials() / deleteUser()` for the identity half.
+- The operational half is unchanged from the module's existing list — see
+  [BACKEND-INTEGRATION.md](BACKEND-INTEGRATION.md). Two that this pass did not move and that the
+  screens still name out loud: a team-wide `GET /admin/team/members` (the live list endpoint
+  returns only members the signed-in admin created), and private-object storage behind a signed
+  read before `/team/:id/documents` may offer an open or download control.
+
+**Open decisions**
+
+- None newly assumed. The two the screens already state stay stated: identity documents are not
+  downloadable from this panel until private objects exist (said on the page and in the dialog),
+  and a reporting line grants attendance/work/leave/reports and nothing else — `OpRefused` says
+  so in the same words for a hidden card and for a typed URL.
+- One shared part is missing: **`Textarea` in `src/admin/ui/fields.tsx` forwards no ref.**
+  `MarkBar` reads and restores the selection, which belongs to the DOM node, so the edit dialog
+  in `Detail.tsx` claims the element by its id in an effect. The prop wanted is
+  `ref?: Ref<HTMLTextAreaElement>` passed through to `TextAreaBase`, which already accepts one.
+
+**Verified**
+
+`npx tsc -p tsconfig.app.json --noEmit` — **0 errors in these files** (the remaining errors in the
+run are `views/Users/*` and `views/Resources/index.tsx`, mid-rewrite by other agents).
+`npx eslint` on all nineteen files — 0 errors, 1 pre-existing warning
+(`index.tsx` `useEffect` missing `toast`, unchanged from before this pass).
+`SHOT_PORT=5234 SHOT_ROUTES=team SHOT_OUT=A4 node scripts/shoot-modules.cjs` — both themes render;
+that run photographs the roster's EMPTY state, which is designed.
+A second Playwright script of my own served the seed roster as the live list and photographed, in
+both themes: the roster with rows, `/team/63` (senior view), `/team/58` (own record), all eight
+operation pages, the refusal at `/team/63/pay`, four modals and the task drawer — 36 images, every
+one looked at, and the round of fixes they produced (the month grid's day-name row was off by one,
+`cell-2` spans were running inline, the launcher was three rows tall on every operation page, the
+hour axis sat a column away from its bars, `KvList cols={2}` opened a canyon between label and
+value) is in this pass.
+`npm run check:team` and `npm run check:team-nav` — all checks passed.
+
+**`npx vite build` could not be completed.** It fails in `src/admin/views/Users/Analytics.tsx`
+(`EventRow` is not exported by `Users/bits.tsx`) — another agent's module, mid-rewrite. Every Team
+file transformed and rendered under `vite dev` across 38 page loads with zero page errors, so the
+module itself is known to compile; the production bundle needs re-running once Users lands.
+
+### Overview, recomposed on the shared layer — six tiles, a trend beside a ranking, and one action per problem
+
+**Area:** `#/overview` (the landing page)
+**Files:** `src/admin/views/Overview/{index,top,deals,team,money,decide,bits}.tsx`
+
+**What changed**
+
+- **The page is now built out of the shared parts and nothing else.** `PageHeader` → `FilterBar` →
+  eight `Section`s of `Tile`/`ChartFrame`/`Card`/`ListTable`. `overview.css` and `../charts.css`
+  are no longer imported, and not one old class name, inline colour or inline size is left in the
+  module. The reading order, every derivation call, every `can()` gate, the URL contract
+  (`?period` / `?from` / `?to` / `?owner` / `?dept`), the `usePageChrome` claim and the two quick
+  actions that open real modals (`useActs().create()`, `NewItemModal`) are unchanged.
+- **The executive snapshot is six tiles, not eight.** Collected · Pipeline value · Won ·
+  Conversion · Receivable · Enquiries (7 days), each with its delta, the window it is compared
+  against, and the ⓘ beside the label. Team-today and overdue-task counts moved down into
+  **Operations**, which already carried the same two figures behind the same two links — so the
+  snapshot answers "how is the business", not "how is everything", and no drill-down was lost.
+  Their two ⓘ definitions moved with them onto the Operations column heads.
+- **Business performance is now one trend beside one ranking.** Deal flow (`ColumnChart`) sits
+  next to Pipeline by stage (`BarRows`, moved up from the Deals section); Money in and out moved
+  down into **Finance**, beside Net by month, because a reader asking about cash is asking about
+  cash. Deals is left with the two things only it can answer: whose pipeline it is (`BarRows` by
+  owner) and which named deals want a person today (the four-lens `ListTable` in a `Card`).
+- **Needs attention reads as a ranked queue.** Each item is a plane with a `rail-error|warning|info`
+  stripe, the title and its area, the money in `font-mono tnum`, a severity `Pill` and exactly one
+  action. The three trailing columns are fixed so ten rows scan down as well as across. The row's
+  edge is a **border**, not a ring: the exception rail is an inset box-shadow and so is a ring, and
+  on one element the later declaration simply wins — the row had silently lost its edge.
+- **The quick actions collapse into one menu under `lg`.** Five labelled buttons are 650px of
+  header; at 768px they had squeezed the page title down to "Ov…". Same five entries, same order,
+  built from one array so the row and the menu cannot drift.
+- **Every unavailable state is designed, not blank.** A source that is answering draws a
+  `Skeleton` tile or plot; one that failed prints "—", "could not load" and a `Retry`
+  (`Button size="xs" color="link-color"`); one that is outside the session's access renders `Gone`
+  — an `Alert tone="info"` — inside the section's own card, so the reading order never has a hole.
+  Reworded to "No access to Deals · This section needs deals access."
+- **Module-local drawings live in `bits.tsx`:** `HealthStrip` (four one-line verdicts, each a way
+  into the list that produced it), `StatLine` (an operations count and its queue, a zero drawn
+  quiet rather than dropped), `AttnRow`, `PlotSkeleton`, plus the existing `Tip`/`Stamp`/`Section`/
+  `Gone`/`Empty`/`Loading`/`Kpi`/`Money`/`Dot`/`Go`/`rowLink`, whose names and signatures are
+  unchanged for the five files that import them.
+- One display guard: the enquiry counter answers with a total or with nothing, and a backend that
+  returns no total left the tile printing the word `undefined`. It now prints the zero the intake
+  hook itself documents as its fallback.
+
+**Temp data** — `src/content/overview/metrics.json` → `metrics{}`: **static copy**, unchanged.
+The page still imports no JSON of its own; Finance and Team come through their modules' stores.
+
+**Backend needed** — `none` for this change. The page's reads are unchanged: `AdminOpsService.deals()`
+(live), the two `businessEnquiries` count reads (live), and the Finance/Team seeds through their
+own stores. See [BACKEND-INTEGRATION.md](BACKEND-INTEGRATION.md).
+
+**Open decisions** — `none`. No figure, rule or threshold moved; `derive.ts` and `store.ts` were
+not touched.
+
+**Verified**
+
+- `npx tsc -p tsconfig.app.json --noEmit --incremental false` — **0 errors in
+  `src/admin/views/Overview/*`**. Four errors remain elsewhere in the tree (`views/Users/bits.tsx`,
+  `views/Users/{Analytics,Detail}.tsx`, `views/Resources/index.tsx`), all in modules another wave-1
+  agent is mid-rewrite on.
+- `npx eslint src/admin/views/Overview/*.tsx` — clean.
+- `npx vite build --mode dev --outDir .tmp/dist-A1` — **transforms all 3,581 modules, then fails in
+  `views/Users/Analytics.tsx` ("EventRow" is not exported by `views/Users/bits.tsx`)** — another
+  agent's file, not reachable from Overview. The Overview subgraph was bundled on its own to prove
+  it: `npx esbuild src/admin/views/Overview/index.tsx --bundle --format=esm --alias:@=./src`
+  succeeds with no warnings.
+- `npm run check:overview` and `npm run check:overview-nav` — both **all checks passed** (the
+  derivations and the nav row are untouched).
+- Screenshots: `SHOT_PORT=5231 SHOT_ROUTES=overview SHOT_OUT=A1 node scripts/shoot-modules.cjs`
+  ("Every route rendered", no page errors), plus a local sliced full-page Playwright run in both
+  themes at 1440px and 768px, once against an empty API (the tiles' failure state) and once against
+  a twelve-deal fixture (the populated state), a session without `deals` (the `Gone` state) and
+  `?period=custom&from=&to=` (the date range). Alignment, wrapping and truncation were fixed from
+  those images.
+- **Not fixed, not mine:** `SignedColumns` in `views/charts.tsx` prints a negative month's value
+  label over its own bar (visible on Net by month, July). `views/charts.tsx` is frozen for wave 1.
+
+---
+
+### Attendance, on the shared layer — the rail is the filter, and the month is a heat grid
+
+**Area:** `#/attendance` (Team → Attendance), all four `?face=` values
+**Files:** `src/admin/views/Team/Attendance.tsx`, `src/admin/views/Team/workBits.tsx`
+
+**What changed**
+
+- **The page is composed of shared parts and nothing else.** `PageHeader` (title · the date in
+  words · scope · a `live` pill) → `Tabs` → `StatStrip` → `FilterBar` → `ListTable`. `team.css` is
+  no longer imported and not one `tm-*`, `btn`, `inp`, `dls-*` or inline colour/size is left in the
+  file. Every derivation call (`dayRows`, `attendanceTotals`, `spanRows`, `spanTotals`, `spanDays`,
+  `arrivalSpread`, `earliestAttendance`, `leaveQueue`, `leaveOverlap`), the `usePageChrome` claim,
+  the `LeaveDecideModal` write path and every URL parameter (`?face=today|history|requests|
+  analytics`, `?date=`, `?state=`, `?late=`, `?q=`, `?span=`) are unchanged.
+- **The derived-count rail is now a `StatStrip` whose cells ARE the filter,** and pressing the cell
+  you are already on clears it — so the strip can no longer be a trap you have to leave by the chip
+  row. Working / on break / ended became filters too; they used to be read-outs.
+- **Day and Month are two zooms of one question, so they are a `Segmented` in the date bar** (prev
+  · `DateInput` · next · Today · Day/Month) rather than two tabs. `?face=history` still opens the
+  month, so no link moved; the tab row is now Record · Requests · Analytics.
+- **The month replaces the five-column week and is drawn as a heat grid** (`HeatGrid`/`HeatLegend`,
+  new in `workBits.tsx`): magnitude on the `bg-chart-seq-*` ramp for a worked day, status colours
+  for the three states that are not a quantity (no record · on leave · still open), `label-mono`
+  day heads, a legend, and every cell a link back to that day's own row. A week could not show a
+  pattern and the pattern is the only thing a grid of hours is for.
+- **The leave queue is a `ListTable` with an exception rail** instead of two hand-drawn inbox
+  blocks — clash and "waiting on an admin" still read on the row, Refuse/Approve still open the
+  same modals, and the unrouted group still has its own heading.
+- **Analytics is `Tiles` + two `ChartFrame`s + a sortable `ListTable`.** Day-by-day is `StackBars`
+  (module-local), arrivals are a `ColumnChart`. `SortHead` (new, in `workBits.tsx`) is the one
+  sortable column head both this face and Reports → Analytics use.
+
+**Temp data**
+
+`src/content/team/{members,attendance,leave,vocabularies}.json` → placeholder records for the
+roster, the day rows, leave requests and the state vocabulary. Labels and empty-state copy are
+permanent static copy.
+
+**Backend needed**
+
+- `GET /api/v1/team/attendance/?date=` → one row per member in scope, with the day, its breaks and
+  `isLate` — replaces `attendance.json`
+- `GET /api/v1/team/leave/` and `POST /api/v1/team/leave/{id}/decide/` → replaces `leave.json`
+- `none` for the derivations: `stateOf` / `workedOf` / `spanRows` stay client-side by design so the
+  day view and the analytics face cannot disagree.
+
+**Open decisions**
+
+`TM-OD-13` — "working day" still means "not a weekend"; holidays are out of v1 and the month
+heading says so on screen.
+
+**Verified**
+
+`npx tsc -p tsconfig.app.json --noEmit` clean in this file; `npx eslint` clean; `node
+scripts/check-dupes.cjs` reports no colour literal and no inline design style; `npm run check:team`
+passes (the store was not touched). Photographed in both themes at 1440×900 with
+`SHOT_ROUTES=attendance` and, for the three query-param faces, a Playwright pass of my own
+(`?face=history`, `?face=requests`, `?face=analytics`). Two things the pictures caught and I fixed:
+the bar scale in the "The day" head ran into its own label and lined up with nothing (it is stacked
+under the label now, over the column the bars are drawn in), and the heat cells stretched to a hand's
+width on a four-day month-to-date (the surplus is a spacer column now). **Not verified against a
+live API** — the mocked session adopts a one-person roster, so the multi-member cases (a full heat
+grid, an arrival spread with a real shape) were reasoned about, not seen.
+
+---
+
+### Tasks, five faces in one tab row — list · board · calendar · timeline · analysis
+
+**Area:** `#/work` (Team → Tasks), every `?face=` value and the `?item=` drawer
+**Files:** `src/admin/views/Team/Work.tsx`, `src/admin/views/Team/workBits.tsx`
+
+**What changed**
+
+- **The five destinations are one `Tabs` row on the page.** They were three faces plus a hidden
+  view switcher in the topbar, so getting from the board to the timeline meant two controls in two
+  places to answer one question. Every old URL still resolves — `?face=list|board|calendar`,
+  `?face=tasks&view=…` and a bare `#/work` (calendar) all land where they meant (`readTab`).
+  `FaceSwitch` and `FaceMenu` keep their export names and `{face, view, goto}` props for their
+  other caller and are now built on the library `Dropdown`.
+- **`PageHeader` carries the counts, Today's plan and one primary — "New task".** The create menu
+  is a library `Dropdown` (`useMenuPlacement` is gone from this file); the six-count strip that
+  lived in the breadcrumb slot is a real `StatStrip` on the page, still filtering by `?status=` and
+  `?wait=` and still clearing when you press the cell you are on.
+- **List** is a `ListTable`: an exception `Rail` for delayed and blocked, the title as `cell-1` with
+  its parent and tags under it, the kind as a `Tag`, `Priority`, the due date in `font-mono tnum`
+  with "8 days ago" on its own line, the assignee as a `Person`, and the same `StatusPicker` the
+  drawer uses so a stage is changed where it is read.
+- **Board** is `StageColumn` + `TaskCard` (module-local, in `workBits.tsx`) in a horizontally
+  scrolling row of `w-72` columns; `?group=` still switches the axis (stage · kind · assignee ·
+  priority · tag) and the ungrouped column is still never hidden.
+- **Calendar** is a seven-column grid of `CalCell`s with `CalChip` events, `+n more`, the leave
+  banner, click-an-empty-day-to-create and its keyboard-reachable Add button. Today is marked on
+  the ring and the number, never as a wash. The rail beside it (month roll-up + assigned work) is
+  a second pane that drops below the grid under `lg`.
+- **Timeline** is lanes on a date grid with `LaneBar`s — the lane's own window dashed in the brand,
+  its tasks as toned bars, weekends tinted. **Analysis** is `Tiles` + `BarRows`/`ColumnChart` in
+  `ChartFrame`s + the steps table in a `Card`.
+- **New item is a `ModalShell`** — `Segmented` kind switch, `FormField`/`Input`/`DateInput`/
+  `SelectInput`/`FieldRow`, the mark toolbar beside the Details label rather than inside it, the
+  link row and the tag picker. Same `createItem` call, same fields, same refusal handling.
+
+**Temp data**
+
+`src/content/team/{work,tags,members,vocabularies}.json` → placeholder work items, tags, the roster
+and the status/kind/priority vocabulary. Every write on this page is **simulated in the browser tab
+and discarded on reload**, exactly as it was.
+
+**Backend needed**
+
+- `GET /api/v1/team/work-items/` (+ `POST`, `PATCH /{id}`, `PATCH /{id}/status/`) → replaces
+  `work.json`
+- `GET/POST /api/v1/team/tags/` → replaces `tags.json`
+- `none` for delay: it is derived from the due date and must stay derived — nothing may write it.
+
+**Open decisions**
+
+none new. Delay stays derived and takes precedence in the grouping, so the strip and the board
+cannot disagree; "waiting" stays a relationship rather than a stage.
+
+**Verified**
+
+`npx tsc -p tsconfig.app.json --noEmit` clean in this file; `npx eslint` clean; `check-dupes`
+clean. Photographed in both themes with `SHOT_ROUTES=work` and, in a Playwright pass of my own,
+`?face=list`, `?face=board`, `?face=board&group=assignee`, `?cal=week`, `?face=timeline`,
+`?face=analysis`, the `?item=W-K01` drawer, the create modal and the plan note. Three things the
+pictures caught and I fixed: the due date and its "8 days ago" ran together (`.cell-2` is a type
+ramp, not a block), the week heading printed the anchor rather than the row `gridDays` actually
+draws, and `BarRows unit="items"` left a stray "ITEMS" caption under two charts. **Not verified
+against a live API**, and drag-to-move is still deliberately absent from the board.
+
+---
+
+### Reports and Today's plan — the day as a read, the queue as a queue, the note as a real popover
+
+**Area:** `#/reports` (Team → Reports), all three `?face=` values; the Today's plan note on `#/work`
+**Files:** `src/admin/views/Team/Reports.tsx`, `src/admin/views/Team/TodayPlan.tsx`
+
+**What changed**
+
+- **The day is a card per member, not a row per member.** A row of eight columns answers "did they
+  submit" and nothing else; what a senior opens this for is the diff — what somebody said they
+  would do against what came back — so each `Card` stacks the clock, the plan (with its lines
+  ticked according to what the board says) and the EOD, in the order they happened, two to a row
+  above `xl`. Mark-read is still on the card; `acknowledgeReport` is unchanged.
+- **The date moved into the `PageHeader`,** because it scopes the whole page — the record, the
+  queue and the window all read it. It was competing with the stat strip for one row and clipping
+  the last count off the end of it.
+- **Actions is one queue `ListTable` with rails,** not six attention cards plus a "waiting on you"
+  block. Every entry — leave to decide, an unread EOD, an outstanding EOD, a missing plan, blocked
+  work, overdue work, late-or-absent, an agreement nobody opened — carries its kind, why it is
+  there, and the one control that clears it. The tab still carries the count.
+- **Analytics is `Tiles` + a `ColumnChart` in a `ChartFrame` + a sortable `ListTable`,** with the
+  three progress blocks under it. `?span=` unchanged.
+- **`?tab=` is read as an alias for `?face=`** and never written back, so a link typed with the
+  panel's other spelling lands on the right face instead of silently opening the record.
+- **Today's plan is a React Aria popover.** It was `.ib-menu-pop` — a fixed element measuring its
+  own button through `useMenuPlacement` and listening for scroll, resize, Escape and an outside
+  press by hand. The library does all five, portals out of any scrolling ancestor, traps focus and
+  announces itself as a dialog. Inside it is a `Card` with `Checkbox` rows before the plan is in
+  and static ticks after (a tick is then a fact the board owns, not a control), continuous entry on
+  Enter, and the same `submitPlan` / `addPlanLine` calls.
+
+**Temp data**
+
+`src/content/team/{plans,reports,members,work}.json` → placeholder plans, EODs, the roster and the
+work items the plan lines link to. Copy on the empty and "not due yet" states is permanent.
+
+**Backend needed**
+
+- `GET /api/v1/team/plans/?date=` and `POST /api/v1/team/plans/` → replaces `plans.json`
+- `GET /api/v1/team/reports/?date=` and `POST /api/v1/team/reports/{id}/acknowledge/` → replaces
+  `reports.json`
+- `none` for `eodDue` — it must stay a function of the member's own auto-close time and the clock,
+  not a stored flag.
+
+**Open decisions**
+
+none new. An EOD is still due only once that member's own day is over, and anybody with no
+reporting line is still owed nothing and reads as "not owed" rather than as a failure.
+
+**Verified**
+
+`npx tsc -p tsconfig.app.json --noEmit` clean in both files; `npx eslint` clean; `check-dupes`
+clean; `npm run check:team` passes. Photographed in both themes with `SHOT_ROUTES=reports` and, in
+a Playwright pass of my own, `?tab=actions`, `?tab=analytics`, `?face=analytics&span=30` and the
+plan note opened over `#/work`. Two things the pictures caught and I fixed: the last stat cell was
+scrolled off the end of its row by the date bar sharing it, and the plan note's count badge pushed
+the trigger onto two lines (a `Badge` is a flex box; an inline-flex wrapper puts it back). **Not
+verified against a live API**; with the mocked one-person roster the two-column card read was seen
+with one card in it.
+
 ## 2026-09-08
 
 ### The Overview — a command centre, and the new landing page

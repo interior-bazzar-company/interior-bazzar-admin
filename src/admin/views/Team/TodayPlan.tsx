@@ -14,24 +14,28 @@
 
    A NOTE, NOT A DIALOG. A plan is three ticks; a modal takes the whole screen
    for that and turns it into a form you complete. The note hangs off its
-   button, the list stays readable behind it, and it closes the way a menu
+   button, the list stays readable behind it, and it closes the way a popover
    closes.
 
-   IT IS PICKED, NOT TYPED. Nothing here creates work. Everything the note
-   offers is already assigned to you, and the plan says which of it you are
-   doing today — a task invented while planning a morning has no owner but you,
-   no kind, no dates and no parent, and Create is where those questions get
-   asked.
+   THE POPOVER IS THE LIBRARY'S NOW. It used to be `.ib-menu-pop` — a fixed
+   element that measured its own button through `useMenuPlacement` and listened
+   for scroll, resize, Escape and an outside press by hand. React Aria's
+   Popover does all five, portals out of any scrolling ancestor, traps focus and
+   announces itself as a dialog. The only handler left here is the one that is
+   genuinely ours: Escape backs out of the row being typed BEFORE it closes the
+   note.
 
-   THE PAPER IS THE TAG PALETTE, not a status tone. `--tag-amber-*` is the one
-   warm surface in this panel that does not mean "warning" — the tag palette is
-   explicitly "a label the team chose, never a state" — so a note can be yellow
-   without reading as an alert.
+   IT IS PICKED, NOT TYPED. Nothing here creates work out of nowhere: everything
+   the note offers is already assigned to you, and the plan says which of it you
+   are doing today. A typed line is matched against your open work and links to
+   it if it finds a match — Create is where a genuinely new piece of work with
+   an owner, a kind and dates gets made.
    ============================================================================= */
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Icon } from "../../ui";
+import { useMemo, useState } from "react";
+import { Dialog as AriaDialog, DialogTrigger as AriaDialogTrigger, Popover as AriaPopover } from "react-aria-components";
+import { cx } from "@/utils/cx";
+import { Button, Card, Checkbox, Icon, IconButton, Input, Pill } from "../../ui";
 import { useShell } from "../../shell/ShellContext";
-import { useMenuPlacement } from "../../ui/menu";
 import {
   TODAY, addPlanLine, fmtDate, isDelayed, isTerminal, meId, readMember, submitPlan,
   usePlan, useWork,
@@ -59,9 +63,9 @@ const dueNote = (i: WorkItem): string => {
  *  read-back, and continuous entry (type, Enter, next row) is exactly the kind
  *  of thing a rendered string cannot check.
  *
- *  The scope moved to "all" with it, which is not a concession: the filter is
- *  already `member: me`, and `membersInScope("self")` intersected with that is
- *  the same set for the real caller. It was only ever right by coincidence. */
+ *  The scope is "all", which is not a concession: the filter is already
+ *  `member: me`, and `membersInScope("self")` intersected with that is the same
+ *  set for the real caller. */
 export function TodayPlanMenu({ who }: { who?: string } = {}) {
   const shell = useShell();
   const me = who || meId();
@@ -69,9 +73,6 @@ export function TodayPlanMenu({ who }: { who?: string } = {}) {
   const mine = useWork({ member: me }, "all");
 
   const [open, setOpen] = useState(false);
-  const box = useRef<HTMLSpanElement | null>(null);
-  const pop = useRef<HTMLSpanElement | null>(null);
-  const { style: popStyle } = useMenuPlacement(open, box, pop, "right");
 
   const openTasks = useMemo(
     () => mine.filter((i) => i.kind === "task" && !isTerminal(i.status))
@@ -89,10 +90,6 @@ export function TodayPlanMenu({ who }: { who?: string } = {}) {
   const [extra, setExtra] = useState<string[]>([]);
   const [draft, setDraft] = useState("");
   const [adding, setAdding] = useState(false);
-  /* Read by the document-level Escape handler, which is registered once and
-     must not be re-registered on every keystroke. */
-  const addingRef = useRef(false);
-  addingRef.current = adding;
 
   const done = !!(plan && plan.submittedAt);
 
@@ -107,46 +104,6 @@ export function TodayPlanMenu({ who }: { who?: string } = {}) {
     }
     setOpen(true);
   };
-
-  useEffect(() => {
-    if (!open) return;
-    const away = (e: MouseEvent) => {
-      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
-    };
-    const esc = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.stopPropagation();
-      /* ESCAPE BACKS OUT OF ONE THING AT A TIME. This listener is in the
-         CAPTURE phase, so it beat the input's own handler to every Escape and
-         closed the whole note mid-sentence — losing the line being typed and
-         the ticks above it. The row is the innermost thing open, so it goes
-         first; a second Escape closes the note. */
-      if (addingRef.current) {
-        setDraft("");
-        setAdding(false);
-        return;
-      }
-      setOpen(false);
-    };
-    /* Fixed coordinates cannot follow the button, so anything that moves it
-       closes the note. Scrolling INSIDE the note is not that: this one holds a
-       task list and a form, and a note that shut every time you scrolled its
-       own list would be unusable. */
-    const shut = (e: Event) => {
-      if (pop.current && pop.current.contains(e.target as Node)) return;
-      setOpen(false);
-    };
-    document.addEventListener("mousedown", away);
-    document.addEventListener("keydown", esc, true);
-    window.addEventListener("scroll", shut, true);
-    window.addEventListener("resize", shut);
-    return () => {
-      document.removeEventListener("mousedown", away);
-      document.removeEventListener("keydown", esc, true);
-      window.removeEventListener("scroll", shut, true);
-      window.removeEventListener("resize", shut);
-    };
-  }, [open]);
 
   /* CONTINUOUS ENTRY, which is the whole of the pattern. Enter commits the line
      and leaves a fresh empty row open under it, so a plan is typed in one go
@@ -210,13 +167,11 @@ export function TodayPlanMenu({ who }: { who?: string } = {}) {
      press. Same list either way; only what a tick MEANS changes, and it changes
      with the day rather than with the design. */
   type Row = {
-    key: string; title: string; note?: string; on: boolean; done?: boolean;
+    key: string; title: string; note?: string; on: boolean;
     fixed?: boolean; toggle?: () => void; drop?: () => void;
   };
   const rows: Row[] = done
-    ? planned.map((l) => ({
-      key: l.key, title: l.title, on: l.done, done: l.done, fixed: true,
-    }))
+    ? planned.map((l) => ({ key: l.key, title: l.title, on: l.done, fixed: true }))
     : (openTasks.map((i) => ({
       key: i.itemId, title: i.title, note: dueNote(i), on: !!picked[i.itemId],
       toggle: () => setPicked((pk) => ({ ...pk, [i.itemId]: !pk[i.itemId] })),
@@ -233,71 +188,101 @@ export function TodayPlanMenu({ who }: { who?: string } = {}) {
     : (total ? total + " to do" : "Nothing picked");
 
   return (
-    <span className="ib-menu" ref={box}>
-      <button className="btn" aria-haspopup="dialog" aria-expanded={open}
-        onClick={() => (open ? setOpen(false) : show())}>
-        <Icon name="check" size="sm" />Today&rsquo;s plan
-        {done ? <span className="tm-np-c">{ticked}/{planned.length}</span> : null}
-      </button>
-
-      {open ? (
-        <span ref={pop} className="ib-menu-pop tm-np" role="dialog"
-          aria-label="Today's plan" style={popStyle}>
-          <span className="tm-np-h">
-            <b>Today&rsquo;s plan</b>
-            <span className="tm-np-d">{fmtDate(TODAY)}</span>
-          </span>
-
-          {/* ONE BODY, BOTH STATES. The note used to fork into a picker and a
-              read-back, and the read-back had no way to add anything — so the
-              moment a plan went in, the place you stand when you think of the
-              next thing went read-only. A day is not sealed at 9am. */}
-          <span className="tm-np-b">
-            <ul className="tm-np-l">
-              {rows.map((r) => (
-                <li key={r.key} className={r.done ? "done" : ""}>
-                  <label>
-                    <input type="checkbox" checked={r.on} readOnly={r.fixed}
-                      tabIndex={r.fixed ? -1 : undefined}
-                      onChange={r.toggle} />
-                    <span>{r.title}{r.note ? <em>{r.note}</em> : null}</span>
-                  </label>
-                  {r.drop ? (
-                    <button className="tm-np-x" aria-label={"Remove " + r.title}
-                      onClick={r.drop}><Icon name="x" size="sm" /></button>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-
-            {adding ? (
-              <span className="tm-np-new">
-                <i aria-hidden="true" />
-                <input className="tm-np-in" value={draft} autoFocus
-                  placeholder="Task" aria-label="Add a task"
-                  onChange={(e) => setDraft(e.target.value)}
-                  onBlur={() => commit(false)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") { e.preventDefault(); commit(true); }
-                    /* Escape is handled by the note's capture-phase listener,
-                       which sees it first either way. */
-                  }} />
-              </span>
-            ) : (
-              <button className="tm-np-add" onClick={() => setAdding(true)}>
-                <Icon name="plus" size="sm" />Add a task
-              </button>
-            )}
-          </span>
-
-          <span className="tm-np-f">
-            <span className="tm-np-t">{footNote}</span>
-            {done
-              ? <button className="btn pri" onClick={endDay}>End the day&hellip;</button>
-              : <button className="btn pri" disabled={!total} onClick={put}>Put the plan in</button>}
-          </span>
+    <AriaDialogTrigger isOpen={open} onOpenChange={(v) => (v ? show() : setOpen(false))}>
+      <Button color="secondary" ico="check" aria-haspopup="dialog">
+        {/* ONE LINE. The Button wraps its children in an inline span, and a
+            Badge is a flex box — dropped straight in it took a line of its
+            own and made this button half again as tall as the primary beside
+            it. An inline-flex wrapper puts them back on one row. */}
+        <span className="inline-flex items-center gap-1.5">
+          Today&rsquo;s plan
+          {done ? <Pill xs tone={ticked === planned.length ? "ok" : "neutral"} text={ticked + "/" + planned.length} /> : null}
         </span>
-      ) : null}
-    </span>
+      </Button>
+
+      <AriaPopover
+        placement="bottom end"
+        offset={6}
+        className={({ isEntering, isExiting }) =>
+          cx(
+            "z-50 w-88 max-w-[calc(100vw-2rem)] origin-(--trigger-anchor-point) will-change-transform",
+            isEntering && "duration-150 ease-out animate-in fade-in slide-in-from-top-0.5",
+            isExiting && "duration-100 ease-in animate-out fade-out slide-out-to-top-0.5",
+          )
+        }
+      >
+        <AriaDialog aria-label="Today's plan" className="outline-hidden">
+          <Card
+            tight
+            className="shadow-lg"
+            title="Today&rsquo;s plan"
+            right={<span className="text-xs text-tertiary tnum">{fmtDate(TODAY)}</span>}
+            foot={
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-tertiary tnum">{footNote}</span>
+                <span className="flex-1" />
+                {done
+                  ? <Button color="primary" size="xs" onClick={endDay}>End the day…</Button>
+                  : <Button color="primary" size="xs" isDisabled={!total} onClick={put}>Put the plan in</Button>}
+              </div>
+            }
+          >
+            {/* ONE BODY, BOTH STATES. The note used to fork into a picker and a
+                read-back, and the read-back had no way to add anything — so the
+                moment a plan went in, the place you stand when you think of the
+                next thing went read-only. A day is not sealed at 9am. */}
+            <div className="-mx-1 flex max-h-80 flex-col gap-0.5 overflow-y-auto">
+              {rows.length ? rows.map((r) => (
+                <div key={r.key}
+                  className="group/row flex items-start gap-2 rounded-md px-1 py-1.5 transition duration-100 hover:bg-primary_hover">
+                  {r.fixed ? (
+                    /* A FACT, NOT A CONTROL: after the plan is in, a tick is
+                       what the board says about that item. */
+                    <span aria-hidden="true"
+                      className={cx("mt-0.5 flex size-4 shrink-0 items-center justify-center rounded ring-1 ring-inset",
+                        r.on ? "bg-brand-solid ring-brand-solid" : "bg-primary ring-primary")}>
+                      {r.on ? <Icon name="check" size="xs" className="text-white" /> : null}
+                    </span>
+                  ) : (
+                    <span className="mt-0.5">
+                      <Checkbox checked={r.on} ariaLabel={r.title} onChange={r.toggle} />
+                    </span>
+                  )}
+                  <span className={cx("flex min-w-0 flex-1 flex-col leading-tight",
+                    r.fixed && r.on && "text-quaternary line-through")}>
+                    <span className="truncate text-sm text-secondary">{r.title}</span>
+                    {r.note ? <span className="truncate text-xs text-quaternary">{r.note}</span> : null}
+                  </span>
+                  {r.drop ? (
+                    <IconButton ico="x" size="xs" label={"Remove " + r.title} onClick={r.drop} />
+                  ) : null}
+                </div>
+              )) : (
+                <p className="px-1 py-3 text-sm text-quaternary">
+                  Nothing open is assigned to you. Type a line below, or create the work first.
+                </p>
+              )}
+
+              {adding ? (
+                <div className="flex items-center gap-2 px-1 py-1.5">
+                  <span aria-hidden="true" className="size-4 shrink-0 rounded bg-primary ring-1 ring-primary ring-inset" />
+                  <Input className="min-w-0 flex-1" value={draft} autoFocus ph="Task" ariaLabel="Add a task"
+                    onChange={setDraft}
+                    onBlur={() => commit(false)}
+                    onEnter={() => commit(true)} />
+                </div>
+              ) : (
+                <button type="button"
+                  className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-2 text-left text-sm font-medium text-tertiary outline-focus-ring transition duration-100 hover:bg-primary_hover hover:text-secondary focus-visible:outline-2 focus-visible:-outline-offset-2"
+                  onClick={() => setAdding(true)}>
+                  <Icon name="plus" size="sm" className="text-fg-quaternary" />
+                  Add a task
+                </button>
+              )}
+            </div>
+          </Card>
+        </AriaDialog>
+      </AriaPopover>
+    </AriaDialogTrigger>
   );
 }

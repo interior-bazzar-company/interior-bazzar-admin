@@ -38,6 +38,21 @@ export default defineConfig([
     },
   },
   {
+    // Untitled UI's own components, copied by their CLI and kept verbatim so an
+    // upgrade is a file copy. They are written to a different lint profile
+    // (constants exported beside components, `_unused` args, empty marker
+    // interfaces); the panel's rules apply to the panel's code, not to theirs.
+    files: ['src/components/{base,application,foundations,shared-assets}/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+      '@typescript-eslint/no-empty-object-type': 'off',
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      '@typescript-eslint/ban-ts-comment': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
+      'prefer-const': 'off',
+    },
+  },
+  {
     // scripts/ is the check suite: node scripts and the fixtures they bundle,
     // none of it shipped to a browser. `react-refresh/only-export-components`
     // is about surviving a Vite HMR update, which is not a thing that can

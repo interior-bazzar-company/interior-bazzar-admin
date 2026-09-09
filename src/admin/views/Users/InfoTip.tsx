@@ -7,70 +7,42 @@
    mostly already known. Behind an i button it costs one press exactly when
    somebody is unsure, and the control itself stays a plain dropdown.
 
-   A BUTTON with a dropdown panel, not a hover tooltip, on purpose: this is a
+   It is the panel's `InfoDot` — a PRESS, not a hover, on purpose: this is a
    paragraph of reference text, and hover tooltips vanish while being read,
-   never open on touch, and never open on keyboard focus half the time. The
-   panel closes on Escape and on any outside press.
+   never open on touch and only half the time on keyboard focus. The shared
+   part owns the popover, its dismissal and its focus behaviour; this file owns
+   only what goes inside one, which is the field's own vocabulary.
    ============================================================================= */
-import { useEffect, useRef, useState } from "react";
+import { InfoDot } from "../../ui";
 import { groupsFor, optionsFor } from "./store";
 import type { ProfileField } from "./store";
 
+function Row({ o }: { o: { key: string; label: string; hint?: string } }) {
+  return (
+    <div className="mt-1.5 first:mt-0">
+      <b className="text-sm font-semibold text-primary">{o.label}</b>
+      {o.hint ? <span className="text-sm text-tertiary"> — {o.hint}</span> : null}
+    </div>
+  );
+}
+
 export default function InfoTip({ f }: { f: ProfileField }) {
-  const [open, setOpen] = useState(false);
-  const box = useRef<HTMLSpanElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const away = (e: MouseEvent) => {
-      if (box.current && !box.current.contains(e.target as Node)) setOpen(false);
-    };
-    /* Escape closes the panel and STOPS there: the modal shell's own Escape
-       listener sits on the same document, and this panel opens inside its
-       dialogs. Capture phase, so it runs first. */
-    const esc = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      e.stopPropagation();
-      setOpen(false);
-    };
-    document.addEventListener("mousedown", away);
-    document.addEventListener("keydown", esc, true);
-    return () => {
-      document.removeEventListener("mousedown", away);
-      document.removeEventListener("keydown", esc, true);
-    };
-  }, [open]);
-
   const opts = optionsFor(f);
   const groups = groupsFor(f);
 
-  const row = (o: { key: string; label: string; hint?: string }) => (
-    <div className="um-info-row" key={o.key}>
-      <b>{o.label}</b>
-      {o.hint ? <span>{o.hint}</span> : null}
-    </div>
-  );
-
   return (
-    <span className="um-info" ref={box}>
-      <button type="button" className="um-info-b" aria-expanded={open}
-        aria-label={"What the " + f.label + " options mean"}
-        onClick={() => setOpen(!open)}>i</button>
-      {open ? (
-        <div className="um-info-pop" role="note">
-          {/* The field's own sentence first, when the schema gives one — what
-              the question IS, before what each answer means. */}
-          {typeof f.info === "string" ? <p className="um-info-intro">{f.info}</p> : null}
-          {groups.length
-            ? groups.map((g) => (
-                <div key={g.key}>
-                  <div className="um-info-g">{g.label}</div>
-                  {opts.filter((o) => o.group === g.key).map(row)}
-                </div>
-              ))
-            : opts.map(row)}
-        </div>
-      ) : null}
-    </span>
+    <InfoDot label={"What the " + f.label + " options mean"}>
+      {/* The field's own sentence first, when the schema gives one — what the
+          question IS, before what each answer means. */}
+      {typeof f.info === "string" ? <p className="mb-2 text-sm text-secondary">{f.info}</p> : null}
+      {groups.length
+        ? groups.map((g) => (
+            <div key={g.key} className="mt-3 first:mt-0">
+              <div className="label-mono mb-1">{g.label}</div>
+              {opts.filter((o) => o.group === g.key).map((o) => <Row key={o.key} o={o} />)}
+            </div>
+          ))
+        : opts.map((o) => <Row key={o.key} o={o} />)}
+    </InfoDot>
   );
 }

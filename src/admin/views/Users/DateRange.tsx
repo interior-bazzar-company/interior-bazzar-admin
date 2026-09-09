@@ -6,6 +6,8 @@
    promise a resolution the data does not have: the figure would not move when
    you dragged the end a week and would jump when you moved it a day. Picking
    "Mar 2026 to Aug 2026" off a grid of months is the calendar for this data.
+   It is also why this is not the shared `DateRange` — that control is two ISO
+   dates, and two dates is exactly the precision this series cannot honour.
 
    Two clicks. The first sets the start and arms the second; the second sets the
    end. Clicking a month before the armed start reverses the pair rather than
@@ -17,43 +19,30 @@
    does, and which preset is lit is DERIVED from the range — so a span picked by
    hand that happens to equal six months lights the six-month chip, and there is
    never a preset highlighted that disagrees with the dates beside it.
+
+   THE POPOVER IS THE SHARED ONE. Outside press, Escape, focus containment and
+   the anchoring were four hand-rolled listeners here; React Aria owns all four
+   through `Popover`, and this file is left with the two things only it knows —
+   which months exist, and what the second click means.
    ============================================================================= */
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Icon } from "../../ui";
+import { useMemo, useState } from "react";
+import { Button, Icon, Popover } from "../../ui";
+import { ChoiceChip, MonthGrid } from "./bits";
 import { MONTHS, RANGE_PRESETS, presetOf, presetRange } from "./store";
+import type { MonthRow } from "./store";
 
 export default function DateRange({ from, to, onPick }: {
   from: string;
   to: string;
   onPick: (from: string, to: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
-  const box = useRef<HTMLDivElement>(null);
-
-  /* Close on outside click and on Escape. A popover that only closes by
-     re-pressing its own trigger is one people leave open by accident. */
-  useEffect(() => {
-    if (!open) return;
-    const away = (e: MouseEvent) => {
-      if (box.current && !box.current.contains(e.target as Node)) { setOpen(false); setAnchor(null); }
-    };
-    const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape") { setOpen(false); setAnchor(null); }
-    };
-    document.addEventListener("mousedown", away);
-    document.addEventListener("keydown", key);
-    return () => {
-      document.removeEventListener("mousedown", away);
-      document.removeEventListener("keydown", key);
-    };
-  }, [open]);
 
   /* Grouped by year so the grid reads like a calendar rather than a list of
      twelve buttons. */
   const years = useMemo(() => {
-    const out: { year: string; months: typeof MONTHS }[] = [];
+    const out: { year: string; months: MonthRow[] }[] = [];
     MONTHS.forEach((m) => {
       const y = m.month.slice(0, 4);
       const row = out.filter((r) => r.year === y)[0];
@@ -76,65 +65,62 @@ export default function DateRange({ from, to, onPick }: {
     ? [anchor, hover].sort()
     : anchor ? [anchor, anchor] : [from, to];
 
-  const pick = (month: string) => {
-    if (!anchor) { setAnchor(month); setHover(month); return; }
-    const [a, b] = [anchor, month].sort();
-    setAnchor(null); setHover(null); setOpen(false);
-    onPick(a, b);
-  };
+  const disarm = () => { setAnchor(null); setHover(null); };
 
   return (
-    <div className="um-daterange" ref={box}>
-      <button className={"btn" + (open ? " on" : "")} aria-haspopup="dialog" aria-expanded={open}
-        onClick={() => { setOpen((v) => !v); setAnchor(null); }}>
-        <Icon name="clock" size="sm" />
-        <span>{label}</span>
-        <Icon name="chev" size="sm" />
-      </button>
-
-      {open ? (
-        <div className="um-cal" role="dialog" aria-label="Choose a month range">
-          <div className="um-cal-h">
-            <b>{anchor ? "Now pick the end month" : "Pick the start month"}</b>
-            <span>the series is monthly, so ranges are whole months</span>
+    <Popover
+      title="Choose a month range"
+      w="md"
+      placement="bottom start"
+      /* Leaving the popover half-armed would mean the NEXT press committed a
+         range whose start was chosen minutes ago on a different question. */
+      onOpenChange={(v) => { if (!v) disarm(); }}
+      trigger={
+        <Button color="secondary" ico="calendar" aria-haspopup="dialog">
+          <span className="inline-flex items-center gap-1.5">
+            <span className="tnum">{label}</span>
+            <Icon name="chev" size="sm" className="text-fg-quaternary" />
+          </span>
+        </Button>
+      }
+    >
+      {(close) => (
+        <div className="flex flex-col gap-3 p-3">
+          <div className="flex flex-col gap-0.5">
+            <b className="text-sm font-semibold text-primary">
+              {anchor ? "Now pick the end month" : "Pick the start month"}
+            </b>
+            <span className="text-xs text-tertiary">
+              The series is monthly, so ranges are whole months.
+            </span>
           </div>
 
-          {years.map((y) => (
-            <div className="um-cal-year" key={y.year}>
-              <span className="um-cal-yl">{y.year}</span>
-              <div className="um-cal-grid">
-                {y.months.map((m) => {
-                  const inSpan = m.month >= span[0] && m.month <= span[1];
-                  const isEdge = m.month === span[0] || m.month === span[1];
-                  return (
-                    <button key={m.month}
-                      className={"um-cal-m" + (inSpan ? " in" : "") + (isEdge ? " edge" : "")}
-                      aria-pressed={isEdge}
-                      onMouseEnter={() => anchor && setHover(m.month)}
-                      onFocus={() => anchor && setHover(m.month)}
-                      onClick={() => pick(m.month)}>
-                      {m.short}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
+          <MonthGrid
+            years={years}
+            span={span}
+            onHover={(m) => { if (anchor) setHover(m); }}
+            onPick={(m) => {
+              if (!anchor) { setAnchor(m); setHover(m); return; }
+              const [a, b] = [anchor, m].sort();
+              disarm();
+              onPick(a, b);
+              close();
+            }}
+          />
 
-          <div className="um-cal-f">
+          <div className="flex flex-wrap items-center gap-1.5 border-t border-secondary pt-3">
             {RANGE_PRESETS.map((p) => (
-              <button key={p.key} className={"chip" + (preset === p.key ? " on" : "")}
-                onClick={() => {
+              <ChoiceChip key={p.key} label={"Last " + p.label} on={preset === p.key}
+                onPick={() => {
                   const r = presetRange(p.months);
-                  setAnchor(null); setOpen(false);
+                  disarm();
                   onPick(r.from, r.to);
-                }}>
-                Last {p.label}
-              </button>
+                  close();
+                }} />
             ))}
           </div>
         </div>
-      ) : null}
-    </div>
+      )}
+    </Popover>
   );
 }

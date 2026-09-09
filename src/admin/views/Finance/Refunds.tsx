@@ -4,13 +4,13 @@
 
    ONE TABLE, WHERE THERE WERE THREE BANDS. The face used to stack three
    sections — awaiting a decision, approved but not sent, settled — each with
-   its own heading, its own empty state and its own list of bespoke `.fin-q`
-   rows. The reasoning was that those are three different jobs, and that is
-   true; what was wrong was answering it with three lists. It meant three
-   headings and three empty states on a screen that often holds four refunds,
-   no way to see the whole book at once, and a row shape that existed nowhere
-   else in the panel — so a refund did not read like a slip or a transaction
-   even though it is the same kind of thing.
+   its own heading, its own empty state and its own list of bespoke rows. The
+   reasoning was that those are three different jobs, and that is true; what
+   was wrong was answering it with three lists. It meant three headings and
+   three empty states on a screen that often holds four refunds, no way to see
+   the whole book at once, and a row shape that existed nowhere else in the
+   panel — so a refund did not read like a slip or a transaction even though it
+   is the same kind of thing.
 
    THE STRIP ANSWERS IT INSTEAD. Each cell is a filter, so "approved, not sent"
    is one press rather than a section that is always on screen whether or not
@@ -24,7 +24,10 @@
    ============================================================================= */
 import { useShell } from "../../shell/ShellContext";
 import { can } from "../../shell/AdminShell";
-import { EmptyState, FilterChips, Icon, ListTable, qs, SearchField, Select, StatStrip } from "../../ui";
+import {
+  Button, EmptyState, FilterBar, FilterChips, ListTable, Pagination, qs, Rail,
+  SearchField, Select, StatStrip,
+} from "../../ui";
 import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import { Frame } from "./Frame";
@@ -32,10 +35,13 @@ import type { FaceProps } from "./Frame";
 import { ActionMenu, Money, OriginTag, RefundPill } from "./bits";
 import {
   FILTER_LABELS, PERIOD, REFUND_ORIGINS, REFUND_STATES,
-  ago, filterValueLabel, fmtDate, groundMeta, inr, useOverview, useRefundQueue,
+  ago, filterValueLabel, fmtDate, groundMeta, inr, todayIso, useOverview, useRefundQueue,
 } from "./store";
 import type { Params, RefundRow } from "./store";
 import { ManualRefundModal, RecordTransferModal, RequestRefundModal } from "./RefundModals";
+
+/** One screen of rows. `?page=` is a position in the list, never a filter. */
+const PAGE_SIZE = 50;
 
 /* THE THREE JOBS, AS A SORT RATHER THAN AS THREE LISTS. A refund waiting on a
    decision is somebody else's move; one approved and not sent is money the
@@ -46,7 +52,7 @@ const RANK: Record<string, number> = {
 };
 const jobOf = (state: string) => (RANK[state] ?? 3);
 
-export default function Refunds({ p, onFilter, onSearch, onUnfilter }: FaceProps) {
+export default function Refunds({ p, onFilter, onSearch, onUnfilter, onParams }: FaceProps) {
   const { toast, modal, closeLayer } = useShell();
   const q = useRefundQueue();
   const ov = useOverview();
@@ -59,8 +65,12 @@ export default function Refunds({ p, onFilter, onSearch, onUnfilter }: FaceProps
   const declinedN = q.settled.filter((x) => x.r.state === "declined").length;
   const narrowed = Object.keys(p).some((k) => p[k] && ["page", "tab"].indexOf(k) < 0);
 
+  const page = Math.max(1, Number(p.page) || 1);
+  const pages = Math.max(1, Math.ceil(shown.length / PAGE_SIZE));
+  const paged = shown.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   const done = (msg: string, tone?: string) => { closeLayer(); toast(msg, tone); };
-  const openRequest = () => modal(<RequestRefundModal onClose={closeLayer} onDone={done} />, "wide");
+  const openRequest = () => modal(<RequestRefundModal onClose={closeLayer} onDone={done} />, "lg");
   const openManual = () => modal(<ManualRefundModal onClose={closeLayer} onDone={done} />);
   const openRecord = (x: RefundRow) => modal(<RecordTransferModal r={x.r} onClose={closeLayer} onDone={done} />);
 
@@ -77,7 +87,7 @@ export default function Refunds({ p, onFilter, onSearch, onUnfilter }: FaceProps
   };
 
   /* THE STRIP EVERY LIST IN THIS PANEL CARRIES: a stated Total, then its
-     parts, each cell a filter. It replaced four `.fin-mt` tiles that were
+     parts, each cell a filter. It replaced four money tiles that were
      read-outs — they stated the four numbers and then made somebody scroll to
      the band that held them. The definitions ride `tip`, because a cell is a
      button and an `i` inside one would swallow half its own click target. */
@@ -103,7 +113,7 @@ export default function Refunds({ p, onFilter, onSearch, onUnfilter }: FaceProps
       on: p.state === "paid", to: cellHash({ state: "paid" }),
       tip: <>Transfers actually made in {PERIOD.label}. A refund counts here when the money left,
         not when it was approved.</> },
-    { k: <>Declined</>, v: declinedN, tone: "mute",
+    { k: <>Declined</>, v: declinedN,
       on: p.state === "declined", to: cellHash({ state: "declined" }),
       tip: <>Decided against, with the reason on the record. No transfer will be made, and the
         request is kept — a refund somebody said no to is more interesting than one nobody
@@ -112,55 +122,70 @@ export default function Refunds({ p, onFilter, onSearch, onUnfilter }: FaceProps
 
   return (
     <Frame toast={toast}
-      cmd={<>
-        {/* KEYED ON THEIR VALUE. SearchField and Select are uncontrolled, so
-            clearing a chip otherwise leaves the old text in the box. */}
-        <SearchField key={"q" + (p.q || "")} ph="Refund id, payee, payment, subscription…"
-          val={p.q} onFilter={onSearch} />
-        <Select key={"origin" + (p.origin || "")} name="origin" label="Origin" value={p.origin}
-          onFilter={onFilter} options={REFUND_ORIGINS.map((o) => ({ v: o.key, l: o.label }))} />
-        <Select key={"state" + (p.state || "")} name="state" label="State" value={p.state}
-          onFilter={onFilter} options={REFUND_STATES.map((s) => ({ v: s.key, l: s.label }))} />
-        <span className="spacer" />
-        {writable ? (
-          <>
-            <button className="btn sm" onClick={openRequest}>
-              <Icon name="cash" size="sm" />Request a refund
-            </button>
-            <button className="btn sm pri" onClick={openManual}>
-              <Icon name="plus" size="sm" />Raise a manual refund
-            </button>
-          </>
-        ) : null}
-      </>}
-      bands={<>
-        <StatStrip cells={cells} />
-        <div className="dls-chips">
-          <FilterChips
-            params={(["q", "origin", "state", "flag"] as const)
-              .filter((k) => p[k])
-              .reduce((o, k) => { o[k] = chipLabel(k, p[k] as string); return o; }, {} as Record<string, string>)}
-            labels={FILTER_LABELS}
-            onUnfilter={onUnfilter} />
-        </div>
-      </>}>
+      title="Refunds"
+      meta={
+        <>
+          <span className="label-mono">
+            {shown.length === q.all.length
+              ? q.all.length + (q.all.length === 1 ? " refund" : " refunds")
+              : shown.length + " of " + q.all.length}
+          </span>
+          <span className="label-mono">as of {fmtDate(todayIso())}</span>
+        </>
+      }
+      /* ONE PRIMARY ACTION. Raising by hand is the door that always works —
+         a refund against a recorded payment is the ordinary case and sits in
+         the filter row's own control, where it does not compete with it. */
+      actions={writable
+        ? <Button color="primary" ico="plus" onClick={openManual}>Raise a manual refund</Button>
+        : null}
+      cmd={
+        <FilterBar
+          /* KEYED ON THEIR VALUE. SearchField and Select are uncontrolled, so
+             clearing a chip otherwise leaves the old text in the box. */
+          search={<SearchField key={"q" + (p.q || "")} ph="Refund id, payee, payment, subscription…"
+            val={p.q} onFilter={onSearch} />}
+          filters={<>
+            <Select key={"origin" + (p.origin || "")} name="origin" label="Origin" value={p.origin}
+              onFilter={onFilter} options={REFUND_ORIGINS.map((o) => ({ v: o.key, l: o.label }))} />
+            <Select key={"state" + (p.state || "")} name="state" label="State" value={p.state}
+              onFilter={onFilter} options={REFUND_STATES.map((s) => ({ v: s.key, l: s.label, dot: s.tone }))} />
+          </>}
+          right={writable
+            ? <Button color="secondary" ico="cash" onClick={openRequest}>Request a refund</Button>
+            : null}
+          chips={
+            <FilterChips
+              params={(["q", "origin", "state", "flag"] as const)
+                .filter((k) => p[k])
+                .reduce((o, k) => { o[k] = chipLabel(k, p[k] as string); return o; }, {} as Record<string, string>)}
+              labels={FILTER_LABELS}
+              onUnfilter={onUnfilter} />
+          } />
+      }
+      bands={<StatStrip cells={cells} />}>
 
       {shown.length ? (
-        <ListTable cls="fin-tbl" head={<tr>
-              <th className="rail" />
-              <th>Refund</th>
-              <th>Payee</th>
-              <th>Why</th>
-              <th className="n">Amount</th>
-              <th>State</th>
-              <th>Raised</th>
-              <th className="tight" />
-            </tr>}>
-            {shown.map((x) => (
+        <>
+          <ListTable min="64rem" head={<tr>
+            <th className="rail" />
+            <th scope="col">Refund</th>
+            <th scope="col">Payee</th>
+            <th scope="col">Why</th>
+            <th scope="col" className="n">Amount</th>
+            <th scope="col">State</th>
+            <th scope="col">Raised</th>
+            <th scope="col" className="acts"><span className="sr-only">Actions</span></th>
+          </tr>}>
+            {paged.map((x) => (
               <RefundLine key={x.r.refundId} x={x} p={p}
                 onRecord={writable && x.r.state === "approved" ? () => openRecord(x) : null} />
             ))}
           </ListTable>
+          <Pagination alwaysCount page={page} pages={pages} total={shown.length} unit="refunds"
+            pageSize={PAGE_SIZE} shown={paged.length}
+            onPage={(n) => onParams({ page: n > 1 ? String(n) : undefined })} />
+        </>
       ) : (
         <EmptyState icon={narrowed ? "search" : "refund"}
           title={narrowed ? "Nothing matches those filters" : "No refund has been raised"}
@@ -168,8 +193,8 @@ export default function Refunds({ p, onFilter, onSearch, onUnfilter }: FaceProps
             ? "The strip above counts the whole book before any filter is applied."
             : "A refund is raised against a recorded installment payment, or by hand when there is no ledger row behind it — a duplicate transfer, an order taken off-platform."}
           action={narrowed
-            ? <button className="btn" onClick={() => onUnfilter("*")}>Clear the filters</button>
-            : (writable ? <button className="btn pri" onClick={openManual}>Raise a manual refund</button> : null)} />
+            ? <Button color="secondary" onClick={() => onUnfilter("*")}>Clear the filters</Button>
+            : (writable ? <Button color="primary" ico="plus" onClick={openManual}>Raise a manual refund</Button> : null)} />
       )}
     </Frame>
   );
@@ -188,36 +213,37 @@ function RefundLine({ x, p, onRecord }: {
      somebody else's move, and a settled row is quiet. */
   const rail = r.state === "approved" ? "warn"
     : r.state === "declined" ? "bad"
-      : r.state === "paid" ? "ok" : "";
+      : r.state === "paid" ? "ok" : undefined;
   return (
     <tr className="clickable" tabIndex={0} role="link" aria-label={"Open " + r.refundId}
       onClick={open}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } }}>
-      <td className="rail"><i className={rail} /></td>
-      <td className="fin-c-slip">
-        <div className="cell-1 mono">{r.refundId}</div>
+      <Rail tone={rail} />
+      <td className="cell-1 whitespace-nowrap">
+        <span className="font-mono tnum">{r.refundId}</span>
         <div className="cell-2"><OriginTag k={r.origin} /></div>
       </td>
       <td>
         <div className="cell-1">{r.payee.name}</div>
         <div className="cell-2">
           {r.origin === "subscription"
-            ? <>Payment <span className="mono">{r.paymentId}</span></>
+            ? <>Payment <span className="font-mono tnum">{r.paymentId}</span></>
             : "No ledger row behind this one"}
         </div>
       </td>
-      <td>
+      <td className="max-w-64">
         <div className="cell-1">{groundMeta(r.ground)?.label || r.ground}</div>
-        {r.decisionNote ? <div className="cell-2 fin-heldnote" title={r.decisionNote}>{r.decisionNote}</div> : null}
+        {r.decisionNote
+          ? <div className="cell-2 line-clamp-2" title={r.decisionNote}>{r.decisionNote}</div>
+          : null}
       </td>
       <td className="n"><Money paise={r.amountPaise} strong /></td>
       <td><RefundPill k={r.state} /></td>
-      <td className="fin-c-when">
+      <td className="whitespace-nowrap">
         <div className="cell-1">{fmtDate(r.requestedAt)}</div>
         <div className="cell-2">{r.decidedAt ? "decided " + ago(r.decidedAt) : ago(r.requestedAt)}</div>
       </td>
-      <td className="tight" onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}>
+      <td className="acts">
         <RefundMenu r={x} to={to} onRecord={onRecord} />
       </td>
     </tr>
@@ -226,7 +252,7 @@ function RefundLine({ x, p, onRecord }: {
 
 /* ----------------------------------------------------------- the menu ---- */
 /** The row's actions. Same shell as every other menu in the module, so there
- *  is one outside-click handler and one set of item styles rather than four. */
+ *  is one dismissal behaviour and one set of item styles rather than four. */
 function RefundMenu({ r, to, onRecord }: {
   r: RefundRow; to: string; onRecord?: (() => void) | null;
 }) {

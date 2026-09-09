@@ -56,6 +56,7 @@ async function reachable() {
   const paint = (theme) =>
     page.evaluate((th) => {
       document.documentElement.setAttribute("data-theme", th);
+      document.documentElement.classList.toggle("dark-mode", th === "dark");
       window.scrollTo(0, 0);
     }, theme);
 

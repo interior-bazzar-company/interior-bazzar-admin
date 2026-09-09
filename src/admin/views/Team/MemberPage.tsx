@@ -20,10 +20,18 @@
    with the op it came from and dropped whole when that op is not on this
    viewer's list.
 
+   THE LAUNCHER CARRIES THE FIGURES. There used to be a tile row, a card grid
+   and a nav row — three surfaces answering "how is this person doing" with
+   three chances to disagree. There is one now: the operation tiles, each with
+   the reading that says whether it is worth opening, on every page of this
+   person.
+
    CHROME BELONGS TO Team/index.tsx. This component never calls usePageChrome,
    so the two cannot fight over the topbar.
    ============================================================================= */
-import { Icon, KvList, Notice, Pill, SectionHead, Tiles } from "../../ui";
+import type { ReactNode } from "react";
+import { Alert, Button, Card, EmptyState, Icon, KvList, ListTable, Pill, Rail, SectionHead } from "../../ui";
+import { cx } from "@/utils/cx";
 import { go } from "../../ui/nav";
 import { MoreMenu } from "../../ui/menu";
 import type { MenuItem } from "../../ui/menu";
@@ -43,7 +51,7 @@ import {
 import type { Member } from "./store";
 import { inr, readSalaryAccounts } from "../Finance/store";
 import { MemberStrip, OpHead, OpNav, OpRefused, memberHref, rupees, workHref } from "./member/frame";
-import { MEMBER_OPS, opAllowed, opOf, opsFor } from "./member/ops";
+import { opAllowed, opOf, opsFor } from "./member/ops";
 import type { Viewer } from "./member/ops";
 import AgreementsPage from "./member/AgreementsPage";
 import AttendancePage from "./member/AttendancePage";
@@ -53,7 +61,6 @@ import LeavePage from "./member/LeavePage";
 import PayPage from "./member/PayPage";
 import ReportsPage from "./member/ReportsPage";
 import WorkPage from "./member/WorkPage";
-import "./team.css";
 
 export default function MemberPage({ id, sub, live, roles, ops }: {
   id: string; sub: string; live: LiveMember | null; roles: Role[]; ops: Ops;
@@ -64,9 +71,12 @@ export default function MemberPage({ id, sub, live, roles, ops }: {
 
   if (!m && !live) {
     return (
-      <div className="dls"><div className="dls-body">
-        <Notice tone="warn" text={"No member holds the id " + id + ". The link may be stale."} />
-      </div></div>
+      <EmptyState
+        icon="user"
+        title="No such member"
+        body={"No member holds the id " + id + ". The link may be stale."}
+        action={<Button color="secondary" ico="chevl" onClick={() => go("#/team")}>Back to the roster</Button>}
+      />
     );
   }
 
@@ -83,41 +93,46 @@ export default function MemberPage({ id, sub, live, roles, ops }: {
   if (live && can("team", "edit"))
     menu.push({ icon: "lock", label: "Send new password", act: () => ops.modal(<MemberSendCredentialsModal u={live} ops={ops} />) });
   if (live && can("team", "status"))
-    menu.push({ icon: "x", label: "Delete member", tone: "dgr", act: () => ops.modal(<MemberDeleteModal u={live} ops={ops} />) });
+    menu.push({ icon: "trash", label: "Delete member", tone: "dgr", act: () => ops.modal(<MemberDeleteModal u={live} ops={ops} />) });
 
   return (
-    <div className="dls">
+    <div className="flex flex-col gap-5">
       <MemberStrip m={m} live={live} viewer={viewer} right={
         <>
           {m ? (
-            <button className="btn sm" onClick={() => go(workHref(m.memberId))}>
-              <Icon name="calendar" size="sm" />Their board
-            </button>
+            <Button color="secondary" ico="calendar" onClick={() => go(workHref(m.memberId))}>
+              Their board
+            </Button>
           ) : null}
           {live && can("team", "edit") ? (
-            <button className="btn pri sm" onClick={() => ops.modal(<MemberEditModal u={live} ops={ops} />)}>
-              Edit member
-            </button>
+            <Button onClick={() => ops.modal(<MemberEditModal u={live} ops={ops} />)}>Edit member</Button>
           ) : null}
           {menu.length ? <MoreMenu small items={menu} /> : null}
         </>
       } />
 
-      <OpNav id={id} ops={allowed} cur={op && opAllowed(op.key, viewer) ? op.key : sub ? sub : ""} />
+      <OpNav
+        id={id}
+        ops={allowed}
+        cur={op && opAllowed(op.key, viewer) ? op.key : sub ? sub : ""}
+        stats={m ? opStats(m, viewer) : undefined}
+      />
 
-      <div className="dls-body">
-        {!m ? (
-          <NotAdopted live={live as LiveMember} roles={roles} sub={sub} />
-        ) : sub && !op ? (
-          <Notice tone="warn" text={"There is no \"" + sub + "\" page for a member. The link may be stale."} />
-        ) : op && !opAllowed(op.key, viewer) ? (
-          <OpRefused label={op.label} />
-        ) : op ? (
+      {!m ? (
+        <NotAdopted live={live as LiveMember} roles={roles} sub={sub} />
+      ) : sub && !op ? (
+        <Alert tone="warn" title="No such page">
+          There is no “{sub}” page for a member. The link may be stale.
+        </Alert>
+      ) : op && !opAllowed(op.key, viewer) ? (
+        <OpRefused label={op.label} />
+      ) : op ? (
+        <div className="flex flex-col gap-4">
           <OpBody op={op.key} m={m} viewer={viewer} />
-        ) : (
-          <Overview m={m} live={live} roles={roles} viewer={viewer} />
-        )}
-      </div>
+        </div>
+      ) : (
+        <Overview m={m} live={live} roles={roles} viewer={viewer} />
+      )}
     </div>
   );
 }
@@ -139,53 +154,53 @@ function OpBody({ op, m, viewer }: { op: string; m: Member; viewer: Viewer }) {
 function Overview({ m, live, roles, viewer }: {
   m: Member; live: LiveMember | null; roles: Role[]; viewer: Viewer;
 }) {
-  const items = readItems().filter((i) => i.assigneeId === m.memberId);
-  const open = items.filter((i) => !isTerminal(i.status));
-  const late = open.filter((i) => isDelayed(i));
-  const day = dayRows(TODAY, "all").filter((r) => r.member.memberId === m.memberId)[0];
-  const ms = items.filter((i) => i.kind === "milestone" && !isTerminal(i.status))[0] || null;
   const senior = m.reportsTo ? readMember(m.reportsTo) : null;
+  const ms = readItems().filter((i) =>
+    i.assigneeId === m.memberId && i.kind === "milestone" && !isTerminal(i.status))[0] || null;
 
   return (
-    <>
-      <Tiles list={[
-        {
-          k: "Today",
-          v: day ? labelOf(ATT_STATE, day.state) : "—",
-          s: day && day.day ? fmtHM(workedOf(day.day, m)) + " worked" : "no day opened",
-          tone: day && (day.state === "absent" || day.state === "unclosed") ? "warn" : "",
-        },
-        { k: "Open work", v: String(open.length), s: late.length + " past its date", tone: late.length ? "warn" : "" },
-        {
-          k: "Milestone",
-          v: ms ? (progressOf(ms) || 0) + "%" : "—",
-          s: ms ? shortWindow(ms.itemId, m) : "none assigned",
-          tone: ms && behind(ms) ? "warn" : "",
-        },
-        { k: "Reports to", v: senior ? senior.name.split(" ")[0] : "Nobody", s: senior ? senior.designation : "top of the tree" },
-      ]} />
-
+    <div className="flex flex-col gap-5">
       <NeedsYou m={m} viewer={viewer} />
 
-      <SectionHead title="Operations"
-        desc="Each one is a page of its own. Open it and the address names the person and the operation both." />
-      <OpGrid m={m} viewer={viewer} />
-
-      <SectionHead title="Record" />
-      <KvList cls="wide" pairs={[
-        ["Designation", m.designation],
-        ["Department", m.department || "—"],
-        ["Reports to", senior ? senior.name : "Nobody"],
-        ["Employment", m.employmentType.replace(/_/g, " ")],
-        ["Joined", fmtDate(m.joiningDate)],
-        ["Day starts", m.dayStartsAt + " · " + m.graceMinutes + " minutes of grace"],
-      ]} />
+      {/* TWO COLUMNS OF PAIRS, not one pair stretched across the page. `KvList`
+          keeps its label beside its value; the grid is what makes seven facts
+          read as a block rather than as seven lines with a canyon down the
+          middle of each. */}
+      <Card title="Record" sub="The employment facts every derivation on the other pages reads.">
+        <div className="grid gap-x-8 gap-y-2.5 lg:grid-cols-2">
+          <KvList
+            pairs={[
+              ["Designation", m.designation],
+              ["Department", m.department || ""],
+              ["Reports to", senior ? senior.name : "Nobody"],
+              ["Employment", m.employmentType.replace(/_/g, " ")],
+            ]}
+          />
+          <KvList
+            pairs={[
+              ["Joined", fmtDate(m.joiningDate)],
+              ["Day starts", m.dayStartsAt + " · " + m.graceMinutes + " minutes of grace"],
+              [
+                "Milestone",
+                ms ? (
+                  <span className="flex flex-col">
+                    <span>{ms.title}</span>
+                    <span className={behind(ms) ? "text-xs text-warning-primary tnum" : "text-xs text-tertiary tnum"}>
+                      {(progressOf(ms) || 0) + "% done · " + shortWindow(ms.itemId, m)}
+                    </span>
+                  </span>
+                ) : "",
+              ],
+            ]}
+          />
+        </div>
+      </Card>
 
       {/* ACCESS IS NOT ON THE MEMBER'S OWN VIEW. Somebody reading their own
           permission matrix learns exactly which verb to go and ask for, and the
           panel gains nothing by telling them. */}
       {live ? <IdentityBlock live={live} roles={roles} showAccess={viewer !== "self"} /> : null}
-    </>
+    </div>
   );
 }
 
@@ -205,18 +220,22 @@ function shortWindow(itemId: string, m: Member): string {
 
 /* ------------------------------------------------------- what needs doing --- */
 
-interface Nudge { tone: string; op: string; title: string; note: string; act?: string }
+interface Nudge { tone: string; op: string; title: string; note: string }
 
 /** EVERY ROW CARRIES THE OP IT CAME FROM, and rows whose op this viewer cannot
  *  open are dropped before the block is drawn — not greyed, not labelled "no
  *  access". A row that named an unsigned NDA would announce a document the
- *  Agreements page just refused to show this reader. */
+ *  Agreements page just refused to show this reader.
+ *
+ *  RANKED, AND THE RANK IS THE RAIL. Red before amber, because a report that
+ *  was never written and an incentive waiting on Finance are not the same size
+ *  of problem, and a flat list makes somebody read all eight to find that out. */
 function NeedsYou({ m, viewer }: { m: Member; viewer: Viewer }) {
   useLeave(); useAgreements(); useDocuments();
   const rows: Nudge[] = [];
 
   const report = reportFor(m.memberId, TODAY);
-  /* Same derivation the Resources page and the launcher card run — three
+  /* Same derivation the Resources page and the launcher tile run — three
      readings of "what does this person still owe" that could drift apart is
      precisely what one exported function prevents. */
   const owed = outstandingFor(m.memberId);
@@ -301,49 +320,71 @@ function NeedsYou({ m, viewer }: { m: Member; viewer: Viewer }) {
     });
   }
 
-  const visible = rows.filter((r) => opAllowed(r.op, viewer));
+  const RANK: Record<string, number> = { bad: 0, warn: 1 };
+  const visible = rows
+    .filter((r) => opAllowed(r.op, viewer))
+    .sort((a, b) => (RANK[a.tone] ?? 2) - (RANK[b.tone] ?? 2));
   const hidden = rows.length - visible.length;
 
   return (
-    <>
+    <section className="flex flex-col">
       <SectionHead
         title={viewer === "self" ? "Needs you" : "Waiting on somebody"}
-        desc="One query a row, not a feed. Things that have stopped because a person has not acted." />
+        desc="One query a row, ranked by severity. Things that have stopped because a person has not acted."
+      />
       {visible.length ? (
-        <ul className="tm-nudges">
+        <ListTable min="40rem" head={
+          <tr>
+            <th className="rail" />
+            <th scope="col">What has stopped</th>
+            <th scope="col">Operation</th>
+            <th scope="col" className="acts"><span className="sr-only">Open it</span></th>
+          </tr>
+        }>
           {visible.map((r, i) => (
-            <li key={i} className={"tm-nudge t-" + r.tone}>
-              <span className="tm-nudge-d" aria-hidden="true" />
-              <span className="tm-nudge-t">
-                <b>{r.title}</b>
-                <span>{r.note}</span>
-              </span>
-              <button className="btn sm" onClick={() => go(memberHref(m.memberId, r.op))}>
-                Open {(opOf(r.op) || { label: "" }).label.toLowerCase()}
-              </button>
-            </li>
+            <tr key={i}>
+              <Rail tone={r.tone} title={r.tone === "bad" ? "Blocking" : "Needs a person today"} />
+              <td className="cell-1">
+                {r.title}
+                <div className="block cell-2">{r.note}</div>
+              </td>
+              <td>
+                <Pill xs tone="neutral" text={(opOf(r.op) || { label: r.op }).label} />
+              </td>
+              <td className="acts">
+                <Button color="secondary" size="xs" onClick={() => go(memberHref(m.memberId, r.op))}>
+                  Open
+                </Button>
+              </td>
+            </tr>
           ))}
-        </ul>
+        </ListTable>
       ) : (
-        <Notice tone="ok" ico="check" text="Nothing is waiting on anybody." />
+        <EmptyState
+          icon="checkcircle"
+          title="Nothing is waiting on anybody"
+          body="Every plan, report, signature, document and decision this page can see is in."
+        />
       )}
       {hidden && viewer === "senior" ? (
-        <p className="tm-foot">
+        <p className="mt-2 text-xs text-quaternary">
           {hidden} row{hidden > 1 ? "s are" : " is"} absent rather than greyed. They come from pages a
           reporting line does not open, and naming them here would announce what those pages refuse
           to show.
         </p>
       ) : null}
-    </>
+    </section>
   );
 }
 
-/* ------------------------------------------------------------ the cards --- */
+/* ------------------------------------------------------ the launcher figures --- */
 
-/** A card per operation, each carrying ONE live figure. A card that only
- *  repeated its own title would be a link with extra padding; the figure is
- *  what makes the grid worth reading before you click anything. */
-function OpGrid({ m, viewer }: { m: Member; viewer: Viewer }) {
+/** ONE FIGURE PER OPERATION, derived where the operation's own page derives it.
+ *  The launcher is the only surface that carries these now, so a card that
+ *  counted differently from the page it opens is a failure that cannot happen
+ *  in two places at once. */
+function opStats(m: Member, viewer: Viewer): Record<string, { v: ReactNode; s?: ReactNode; tone?: string }> {
+  void viewer;
   const items = readItems().filter((i) => i.assigneeId === m.memberId);
   const late = items.filter((i) => isDelayed(i)).length;
   const open = items.filter((i) => !isTerminal(i.status)).length;
@@ -355,14 +396,14 @@ function OpGrid({ m, viewer }: { m: Member; viewer: Viewer }) {
   const day = dayRows(TODAY, "all").filter((r) => r.member.memberId === m.memberId)[0];
   const report = reportFor(m.memberId, TODAY);
   /* Same derivation the member's Resources page runs, called rather than
-     re-implemented — a card that counted differently from the page it opens is
-     the exact failure the single-source rule exists to stop. */
+     re-implemented. */
   const owed = outstandingFor(m.memberId);
+  const account = salaryOf(m.memberId);
 
-  const stat: Record<string, { v: string; s: string; tone?: string }> = {
+  return {
     attendance: {
-      v: day ? labelOf(ATT_STATE, day.state) : "no row",
-      s: "today",
+      v: day ? labelOf(ATT_STATE, day.state) : "No row",
+      s: day && day.day ? fmtHM(workedOf(day.day, m)) + " worked today" : "today",
       tone: day && (day.state === "absent" || day.state === "unclosed") ? "warn" : "",
     },
     work: { v: String(open), s: "open · " + late + " delayed", tone: late ? "warn" : "" },
@@ -372,7 +413,7 @@ function OpGrid({ m, viewer }: { m: Member; viewer: Viewer }) {
       tone: pendingLv ? "warn" : "",
     },
     reports: {
-      v: report && report.submittedAt ? (report.acknowledgedById ? "read" : "unread") : "not in",
+      v: report && report.submittedAt ? (report.acknowledgedById ? "Read" : "Unread") : "Not in",
       s: "today's report",
       tone: report && report.submittedAt && !report.acknowledgedById ? "warn" : "",
     },
@@ -382,42 +423,20 @@ function OpGrid({ m, viewer }: { m: Member; viewer: Viewer }) {
       tone: unsigned ? "bad" : "",
     },
     documents: {
-      v: missing ? missing + " missing" : "complete",
+      v: missing ? missing + " missing" : "Complete",
       s: "required documents",
       tone: missing ? "warn" : "",
     },
     resources: {
-      v: owed.length ? owed.length + " outstanding" : "nothing owed",
+      v: owed.length ? owed.length + " outstanding" : "Nothing owed",
       s: owed.length ? owed[0].title : "forms the company asked for",
       tone: owed.length ? "warn" : "",
     },
     pay: {
-      ...((s) => ({
-        v: s ? inr(s.monthlyGrossPaise) : "—",
-        s: s ? "a month, from Finance" : "no salary account",
-      }))(salaryOf(m.memberId)),
+      v: account ? inr(account.monthlyGrossPaise) : "—",
+      s: account ? "a month, from Finance" : "no salary account",
     },
   };
-
-  return (
-    <div className="tm-opgrid">
-      {MEMBER_OPS.filter((o) => opAllowed(o.key, viewer)).map((o) => {
-        const s = stat[o.key];
-        return (
-          <button key={o.key} className="tm-opcard" onClick={() => go(memberHref(m.memberId, o.key))}>
-            <span className="tm-opcard-h">
-              <Icon name={o.icon} size="sm" />
-              <b>{o.label}</b>
-              <Icon name="chevr" size="sm" className="tm-opcard-go" />
-            </span>
-            <span className={"tm-opcard-v" + (s.tone ? " u-" + s.tone : "")}>{s.v}</span>
-            <span className="tm-opcard-s">{s.s}</span>
-            <span className="tm-opcard-b">{o.blurb}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
 }
 
 /* --------------------------------------------------------- the identity --- */
@@ -426,49 +445,61 @@ function OpGrid({ m, viewer }: { m: Member; viewer: Viewer }) {
  *  in flight, or an id the adoption never saw. Identity still renders. */
 function NotAdopted({ live, roles, sub }: { live: LiveMember; roles: Role[]; sub: string }) {
   return (
-    <>
+    <div className="flex flex-col gap-5">
       {sub ? <OpHead title="Nothing here yet" /> : null}
-      <Notice text="No operational record yet — attendance, work, leave and pay arrive with the API." />
+      <Alert tone="info" title="No operational record yet">
+        Attendance, work, leave and pay arrive with the API.
+      </Alert>
       <IdentityBlock live={live} roles={roles} showAccess />
-    </>
+    </div>
   );
 }
 
 function IdentityBlock({ live: u, roles, showAccess }: {
   live: LiveMember; roles: Role[]; showAccess: boolean;
 }) {
+  /* The account card is half the page when Effective access stands beside it
+     and the whole page when it does not — so its facts run in one column or
+     two rather than leaving a void where the second card would have been. */
   return (
-    <>
-      <SectionHead title="Account" />
-      <KvList cls="wide" pairs={[
-        ["Email", <a key="e" href={"mailto:" + u.email}>{u.email}</a>],
-        ["Phone", u.phone ? u.phone : <span className="faint">—</span>],
-        ["Username", <span key="u" className="mono">{u.username || "—"}</span>],
-        ["Account status", u.isActive === undefined ? <span className="faint">—</span>
-          : u.isActive ? <Pill text="Active" tone="ok" /> : <Pill text="Inactive" tone="bad" />],
-        ["Roles", u.roles.length ? <RoleChips u={u} />
-          : <span className="faint">none — this account can sign in and do nothing</span>],
-        ["Last sign-in", u.lastLogin ? fmtLiveDate(u.lastLogin)
-          : <span className="faint">never signed in</span>],
-        ["Added", u.addedAt ? fmtLiveDate(u.addedAt) : <span className="faint">—</span>],
-      ]} />
+    <div className={cx("grid grid-cols-1 gap-4", showAccess && "lg:grid-cols-2")}>
+      <Card title="Account" sub="The identity the server holds, not the operational record.">
+        <div className={cx("grid gap-x-8 gap-y-2.5", !showAccess && "lg:grid-cols-2")}>
+          <KvList
+            pairs={[
+              ["Email", <a key="e" href={"mailto:" + u.email} className="rounded text-brand-secondary outline-focus-ring hover:underline focus-visible:outline-2 focus-visible:outline-offset-2">{u.email}</a>],
+              ["Phone", u.phone ? <span className="tnum">{u.phone}</span> : ""],
+              ["Username", <span key="u" className="font-mono text-sm">{u.username || "—"}</span>],
+              ["Account status", u.isActive === undefined ? ""
+                : u.isActive ? <Pill text="Active" tone="ok" dot /> : <Pill text="Inactive" tone="bad" dot />],
+            ]}
+          />
+          <KvList
+            pairs={[
+              ["Roles", u.roles.length ? <RoleChips u={u} />
+                : <span className="text-quaternary">none — this account can sign in and do nothing</span>],
+              ["Last sign-in", u.lastLogin ? <span className="font-mono text-sm tnum">{fmtLiveDate(u.lastLogin)}</span>
+                : <span className="text-quaternary">never signed in</span>],
+              ["Added", u.addedAt ? <span className="font-mono text-sm tnum">{fmtLiveDate(u.addedAt)}</span> : ""],
+            ]}
+          />
+        </div>
+      </Card>
 
       {showAccess ? (
-        <>
-          <SectionHead title="Effective access"
-            desc="What happens when they click, not what their roles are called." />
+        <Card title="Effective access" sub="What happens when they click, not what their roles are called.">
           <EffectiveAccess u={u} roles={roles} />
-        </>
+        </Card>
       ) : null}
-    </>
+    </div>
   );
 }
 
 /* The keys are the server's own (ModuleAction.key), so anything unlisted falls
    back to the key itself rather than disappearing. */
-/* THE OVERVIEW TILE READS FINANCE, as the Pay tab does. It quoted pay.json's
+/* THE PAY TILE READS FINANCE, as the Pay page does. It quoted pay.json's
    annualCtc — the second payroll this branch stopped rendering — so the tile
-   and the Pay tab two clicks away disagreed about one person's salary. */
+   and the Pay page one click away disagreed about one person's salary. */
 const salaryOf = (memberId: string) =>
   readSalaryAccounts().filter((a) => a.active && String(a.memberId) === memberId)[0] || null;
 
@@ -511,35 +542,41 @@ function grantsOfMember(u: LiveMember, roles: Role[]): Record<string, string[]> 
 function EffectiveAccess({ u, roles }: { u: LiveMember; roles: Role[] }) {
   const s = getSession();
   if (u.isActive === false)
-    return <Notice tone="warn" ico="lock" text={
-      <><b>This account is inactive.</b> Whatever its roles say, it cannot sign in and every
-        call it makes would be refused.</>
-    } />;
+    return (
+      <Alert tone="warn" ico="lock" title="This account is inactive">
+        Whatever its roles say, it cannot sign in and every call it makes would be refused.
+      </Alert>
+    );
   if (u.isSuperAdmin || roles.some((r) => r.isFullAccess && (u.roles || []).some((x) => x.id === r.id)))
-    return <Notice ico="shield" text={
-      <><b>Everything.</b> Full access is a grant, not a list — it resolves to a wildcard, so a
-        module added tomorrow is included without anybody editing a matrix.</>
-    } />;
+    return (
+      <Alert tone="info" ico="shield" title="Everything">
+        Full access is a grant, not a list — it resolves to a wildcard, so a module added tomorrow is
+        included without anybody editing a matrix.
+      </Alert>
+    );
 
   const grants = grantsOfMember(u, roles);
   const mods = (s ? s.modules : []).filter(
     (mod) => !HIDDEN_MODULES.has(mod.key) && (grants[mod.key] || []).indexOf("view") >= 0);
   if (!mods.length)
-    return <Notice tone="warn" ico="lock"
-      text="No access to anything. This member can sign in and will see an empty panel — assign a role." />;
+    return (
+      <Alert tone="warn" ico="lock" title="No access to anything">
+        This member can sign in and will see an empty panel — assign a role.
+      </Alert>
+    );
 
   return (
-    <ul className="pl-feats">
+    <ul className="flex flex-col divide-y divide-border-secondary">
       {mods.map((mod) => {
         const acts = (grants[mod.key] || []).filter((a) => a !== "view");
         return (
-          <li key={mod.key}>
-            <Icon name="check" size="sm" />
-            <span>
-              <b>{mod.label}</b>
-              <span className="d">{acts.length
-                ? acts.map((a) => labelFor(mod.key, a)).join(" · ")
-                : "View only"}</span>
+          <li key={mod.key} className="flex items-start gap-2.5 py-2 first:pt-0 last:pb-0">
+            <Icon name="check" size="sm" className="mt-0.5 shrink-0 text-fg-success-primary" />
+            <span className="flex min-w-0 flex-col">
+              <span className="text-sm font-medium text-primary">{mod.label}</span>
+              <span className="text-xs text-tertiary">
+                {acts.length ? acts.map((a) => labelFor(mod.key, a)).join(" · ") : "View only"}
+              </span>
             </span>
           </li>
         );

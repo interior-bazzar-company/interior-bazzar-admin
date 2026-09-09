@@ -17,10 +17,10 @@
    ============================================================================= */
 import { useShell } from "../../shell/ShellContext";
 import { can, useNav } from "../../shell/AdminShell";
-import { EmptyState, Icon, KvList, Notice, Tabs } from "../../ui";
+import { Alert, Button, Card, EmptyState, Icon, KvList, ListTable, Pill, Tabs } from "../../ui";
 import { go } from "../../ui/nav";
-import { Rec, Block, Blocks } from "./Frame";
-import { EventList, Money, ProtoBar } from "./bits";
+import { Rec, Blocks } from "./Frame";
+import { EventList, Fine, Ledger, LedgerRow, Money, ProtoBar } from "./bits";
 import { CloseAccountModal, SalaryAccountModal } from "./SalaryModals";
 import {
   SLIP_RULE, ago, fmtDate, fmtDateTime, fmtMonth, incentiveOf, inr, slipsOf, useSalaryAccount,
@@ -58,11 +58,11 @@ export default function SalaryDetail({ id, p, onParams }: {
 
   if (!row) {
     return (
-      <div className="fin-rec">
+      <div className="flex min-w-0 flex-col gap-4">
         <ProtoBar />
         <EmptyState icon="search" title="No salary account at that address"
-          body={<>There is no record for <span className="mono">{id}</span>.</>}
-          action={<button className="btn pri" onClick={() => navGo(back)}>Back to Salaries A/C</button>} />
+          body={<>There is no record for <span className="font-mono tnum">{id}</span>.</>}
+          action={<Button color="primary" onClick={() => navGo(back)}>Back to Salaries A/C</Button>} />
       </div>
     );
   }
@@ -85,9 +85,15 @@ export default function SalaryDetail({ id, p, onParams }: {
       back={back}
       pills={<>
         {a.active
-          ? <span className="pill ok lg" title="On the payroll. The next run opened issues a slip.">Active</span>
-          : <span className="pill lg" title="Closed. No run picks this account up again.">Closed</span>}
-        {row.inOpenRun ? <span className="pill warn lg">On the open run</span> : null}
+          ? <Pill dot lg tone="ok" text="Active" title="On the payroll. The next run opened issues a slip." />
+          : <Pill dot lg tone="neutral" text="Closed" title="Closed. No run picks this account up again." />}
+        {row.inOpenRun ? <Pill dot lg tone="warn" text="On the open run" /> : null}
+      </>}
+      sub={<>
+        <b className="font-medium text-secondary">{a.memberName}</b> · {a.designation} ·{" "}
+        <span className="font-mono tnum">{a.employeeCode}</span>
+        {" · "}<Money paise={row.monthlyNetPaise} strong /> net a month
+        {" · "}{row.slipsN} slip{row.slipsN === 1 ? "" : "s"} issued
       </>}
       menu={[
         {
@@ -95,7 +101,11 @@ export default function SalaryDetail({ id, p, onParams }: {
           disabled: !writable || !a.active,
           title: !writable ? "Revising a salary needs Finance edit rights."
             : !a.active ? "This account is closed. Reopen it by opening a new one for the member." : undefined,
-          act: () => modal(<SalaryAccountModal account={a} onClose={closeLayer} onDone={done} />, "wide"),
+          act: () => modal(<SalaryAccountModal account={a} onClose={closeLayer} onDone={done} />, "lg"),
+        },
+        {
+          icon: "team", label: "Open the team record",
+          act: () => go("#/team/" + a.memberId),
         },
         {
           icon: "lock", label: "Close account", tone: "bad",
@@ -106,14 +116,8 @@ export default function SalaryDetail({ id, p, onParams }: {
         },
       ]}>
 
-      <div className="fin-subline">
-        <b>{a.memberName}</b> · {a.designation} · <span className="mono">{a.employeeCode}</span>
-        {" · "}<Money paise={row.monthlyNetPaise} strong /> net a month
-        {" · "}{row.slipsN} slip{row.slipsN === 1 ? "" : "s"} issued
-      </div>
-
       <Tabs items={TABS.map((t) => ({
-        k: t.k, label: t.label,
+        k: t.k, label: t.label, quiet: true,
         n: t.k === "slips" ? slips.length : t.k === "history" ? a.events.length : undefined,
       }))} cur={tab}
         onPick={(k) => onParams({ tab: k === "salary" ? undefined : k })} />
@@ -121,76 +125,71 @@ export default function SalaryDetail({ id, p, onParams }: {
       {/* ========================================================= salary === */}
       {tab === "salary" ? (
         <Blocks>
-          <Block title="The person"
-            desc={<>Held in Team, copied here for the slip.</>}>
-            <KvList cls="wide" pairs={[
+          <Card title="The person" sub="Held in Team, copied here for the slip.">
+            <KvList pairs={[
               ["Name", a.memberName],
-              ["Employee code", <span className="mono">{a.employeeCode}</span>],
+              ["Employee code", <span className="font-mono tnum">{a.employeeCode}</span>],
               ["Designation", a.designation],
-              ["Joined", <>{fmtDate(a.joinedAt)} <span className="faint">· {ago(a.joinedAt)}</span></>],
+              ["Joined", <>{fmtDate(a.joinedAt)} <span className="text-quaternary">· {ago(a.joinedAt)}</span></>],
               ["Team record",
-                <a className="lnk mono" data-go={"#/team/" + a.memberId}
-                  onClick={() => go("#/team/" + a.memberId)}>
-                  member {a.memberId} <Icon name="ext" size="sm" />
+                <a href={"#/team/" + a.memberId} data-go={"#/team/" + a.memberId}
+                  className="inline-flex items-center gap-1 rounded font-mono text-sm text-brand-secondary outline-focus-ring tnum hover:underline focus-visible:outline-2 focus-visible:outline-offset-2"
+                  onClick={(e) => { e.preventDefault(); go("#/team/" + a.memberId); }}>
+                  member {a.memberId} <Icon name="ext" size="xs" />
                 </a>],
-              ["Account opened", <>{fmtDateTime(a.recordedAt)} <span className="faint">by {a.recordedBy}</span></>],
+              ["Account opened", <>{fmtDateTime(a.recordedAt)} <span className="text-quaternary">by {a.recordedBy}</span></>],
             ]} />
-            <p className="fin-fine">
-              The link is the join: this account exists against <span className="mono">member {a.memberId}</span> in
+            <Fine className="mt-3">
+              The link is the join: this account exists against <span className="font-mono tnum">member {a.memberId}</span> in
               Team, and Finance never creates a member of its own. The name and designation above are
               a copy taken for the slip — a retitle in Team does not rewrite a slip already issued.
-            </p>
-          </Block>
+            </Fine>
+          </Card>
 
-          <Block title="Where it is paid" desc="What prints on the slip.">
-            <KvList cls="wide" pairs={[
+          <Card title="Where it is paid" sub="What prints on the slip.">
+            <KvList pairs={[
               ["Bank", a.bank.name],
-              ["Account", <span className="mono">{a.bank.masked}</span>],
-              ["IFSC", <span className="mono">{a.bank.ifsc}</span>],
-              ["PAN", <span className="mono">{a.pan}</span>],
+              ["Account", <span className="font-mono tnum">{a.bank.masked}</span>],
+              ["IFSC", <span className="font-mono tnum">{a.bank.ifsc}</span>],
+              ["PAN", <span className="font-mono tnum">{a.pan}</span>],
               ["UAN", a.uan
-                ? <span className="mono">{a.uan}</span>
-                : <span className="faint">none — outside EPF membership here</span>],
+                ? <span className="font-mono tnum">{a.uan}</span>
+                : <span className="text-quaternary">none — outside EPF membership here</span>],
             ]} />
-            <p className="fin-fine">
+            <Fine className="mt-3">
               The account number is held masked. The full number is not this module's to keep, and a
               payslip has never needed it.
-            </p>
-          </Block>
+            </Fine>
+          </Card>
 
-          <Block wide title="What the slip is built from"
-            desc={<>Typed, never derived. Gross is the sum of the earnings; net is gross minus the deductions.</>}
->
-            <div className="fin-two">
-              <div>
-                <div className="sh"><h2>Earnings</h2></div>
-                {a.earnings.map((c) => (
-                  <div className="fin-srow" key={c.key}>
-                    <span className="l">{c.label}</span>
-                    <span className="tnum">{inr(c.amountPaise)}</span>
-                  </div>
-                ))}
-                <div className="fin-srow grand">
-                  <span className="l">Gross</span><span className="tnum">{inr(gross)}</span>
-                </div>
+          <Card
+            className="lg:col-span-2"
+            title="What the slip is built from"
+            sub="Typed, never derived. Gross is the sum of the earnings; net is gross minus the deductions.">
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+              <div className="min-w-0">
+                <h4 className="label-mono mb-1.5">Earnings</h4>
+                <Ledger>
+                  {a.earnings.map((c) => (
+                    <LedgerRow key={c.key} label={c.label}>{inr(c.amountPaise)}</LedgerRow>
+                  ))}
+                  <LedgerRow label="Gross" grand>{inr(gross)}</LedgerRow>
+                </Ledger>
               </div>
-              <div>
-                <div className="sh"><h2>Deductions</h2></div>
-                {a.deductions.length ? a.deductions.map((c) => (
-                  <div className="fin-srow" key={c.key}>
-                    <span className="l">{c.label}</span>
-                    <span className="tnum">−{inr(c.amountPaise)}</span>
-                  </div>
-                )) : <p className="fin-fine">Nothing comes off this gross.</p>}
-                <div className="fin-srow grand">
-                  <span className="l">Total deductions</span><span className="tnum">{ded ? "−" + inr(ded) : inr(0)}</span>
-                </div>
+              <div className="min-w-0">
+                <h4 className="label-mono mb-1.5">Deductions</h4>
+                <Ledger>
+                  {a.deductions.length ? a.deductions.map((c) => (
+                    <LedgerRow key={c.key} label={c.label}>−{inr(c.amountPaise)}</LedgerRow>
+                  )) : <Fine className="py-1.5">Nothing comes off this gross.</Fine>}
+                  <LedgerRow label="Total deductions" grand>{ded ? "−" + inr(ded) : inr(0)}</LedgerRow>
+                </Ledger>
               </div>
             </div>
 
-            <div className="fin-srow grand">
-              <span className="l">Net every month</span>
-              <span><Money paise={gross - ded} strong /></span>
+            <div className="mt-4 flex items-baseline justify-between gap-4 border-t border-secondary pt-3">
+              <span className="text-sm font-semibold text-primary">Net every month</span>
+              <Money paise={gross - ded} strong />
             </div>
 
             {/* THE CTC LINE THAT SAT HERE IS GONE WITH THE FIELD. It said,
@@ -200,42 +199,36 @@ export default function SalaryDetail({ id, p, onParams }: {
                 was not cost to company at all. A figure needing that much
                 defending was not worth keeping. The slip is the earnings
                 above and nothing else, which is now true without argument. */}
-          </Block>
+          </Card>
         </Blocks>
       ) : null}
 
       {/* ========================================================== slips === */}
       {tab === "slips" ? (
         slips.length ? (
-          <div className="fin-cards">
+          <div className="flex min-w-0 flex-col gap-4">
             {differs ? (
-              <Notice tone="info" ico="lock" text={<>
-                <b>Two of these slips carry different amounts, and that is the rule working.</b>{" "}
+              <Alert tone="info" ico="lock"
+                title="Two of these slips carry different amounts, and that is the rule working.">
                 {SLIP_RULE}
-              </>} />
+              </Alert>
             ) : null}
-            <table className="tbl fin-stbl">
-              <thead>
-                <tr>
-                  <th>Month</th>
-                  <th className="n">Paid days</th>
-                  <th className="n">Gross</th>
-                  {/* WHAT VARIED, beside the gross that contains it. Without this
-                      column a month reads as an unexplained jump: the gross is
-                      right, the salary did not change, and nothing on the row
-                      says which of the two is true. */}
-                  <th className="n">of which earned</th>
-                  <th className="n">Deductions</th>
-                  <th className="n">Net</th>
-                  <th>Paid</th>
-                  <th>Evidenced by</th>
-                  <th className="tight" />
-                </tr>
-              </thead>
-              <tbody>
-                {slips.map((s) => <SlipRow key={s.slipId} s={s} p={p} />)}
-              </tbody>
-            </table>
+            <ListTable min="64rem" head={<tr>
+              <th scope="col">Month</th>
+              <th scope="col" className="n">Paid days</th>
+              <th scope="col" className="n">Gross</th>
+              {/* WHAT VARIED, beside the gross that contains it. Without this
+                  column a month reads as an unexplained jump: the gross is
+                  right, the salary did not change, and nothing on the row
+                  says which of the two is true. */}
+              <th scope="col" className="n">of which earned</th>
+              <th scope="col" className="n">Deductions</th>
+              <th scope="col" className="n">Net</th>
+              <th scope="col">Paid</th>
+              <th scope="col">Evidenced by</th>
+            </tr>}>
+              {slips.map((s) => <SlipRow key={s.slipId} s={s} p={p} />)}
+            </ListTable>
           </div>
         ) : (
           <EmptyState icon="doc" title="No slip has been issued on this account"
@@ -245,12 +238,10 @@ export default function SalaryDetail({ id, p, onParams }: {
 
       {/* ======================================================== history === */}
       {tab === "history" ? (
-        <div className="fin-cards">
-          <Block title="What has happened to this account"
-            desc="Opened, revised, closed. Every entry names who did it.">
-            <EventList events={a.events} />
-          </Block>
-        </div>
+        <Card title="What has happened to this account"
+          sub="Opened, revised, closed. Every entry names who did it.">
+          <EventList events={a.events} />
+        </Card>
       ) : null}
     </Rec>
   );
@@ -269,24 +260,24 @@ function SlipRow({ s, p }: { s: Payslip; p: Params }) {
     <tr className="clickable" tabIndex={0} role="link" aria-label={"Open the slip for " + fmtMonth(s.month)}
       onClick={() => go(to)}
       onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(to); } }}>
-      <td>
-        <div className="cell-1">{fmtMonth(s.month)}</div>
-        <div className="cell-2 mono">{s.slipId}</div>
+      <td className="cell-1">
+        {fmtMonth(s.month)}
+        <div className="cell-2 font-mono tnum">{s.slipId}</div>
       </td>
       <td className="n">
-        <span className="tnum">{s.paidDays}</span>
+        {s.paidDays}
         {s.lopDays ? <div className="cell-2">{s.lopDays} day{s.lopDays === 1 ? "" : "s"} loss of pay</div> : null}
       </td>
-      <td className="n tnum">{inr(s.grossPaise)}</td>
-      <td className="n tnum">{incentiveOf(s)
+      <td className="n">{inr(s.grossPaise)}</td>
+      <td className="n">{incentiveOf(s)
         ? inr(incentiveOf(s))
-        : <span className="faint">—</span>}</td>
-      <td className="n tnum">{s.deductionsPaise ? "−" + inr(s.deductionsPaise) : <span className="faint">none</span>}</td>
+        : <span className="text-quaternary">—</span>}</td>
+      <td className="n">{s.deductionsPaise ? "−" + inr(s.deductionsPaise) : <span className="text-quaternary">none</span>}</td>
       <td className="n"><Money paise={s.netPaise} strong /></td>
       <td>
         {s.paidAt
           ? <><div className="cell-1">{fmtDate(s.paidAt)}</div><div className="cell-2">{ago(s.paidAt)}</div></>
-          : <span className="pill warn">Draft</span>}
+          : <Pill dot tone="warn" text="Draft" />}
       </td>
       {/* EVIDENCE, NOT A REFERENCE. This column printed `s.reference`, which
           `paySalary` deliberately leaves empty — the typed UTR was removed
@@ -295,13 +286,12 @@ function SlipRow({ s, p }: { s: Payslip; p: Params }) {
           shows what the payment is actually evidenced BY: the receipt where
           there is one, the old reference on a historical slip, and the absence
           named where there is neither. */}
-      <td className="cell-2">
-        {draft ? <span className="faint">not issued</span>
-          : s.proof ? <span className="mono" title={"Receipt: " + s.proof.filename}>{s.proof.filename}</span>
-            : s.reference ? <span className="mono">{s.reference}</span>
-              : <span className="faint">no evidence attached</span>}
+      <td>
+        {draft ? <span className="text-quaternary">not issued</span>
+          : s.proof ? <span className="font-mono text-xs" title={"Receipt: " + s.proof.filename}>{s.proof.filename}</span>
+            : s.reference ? <span className="font-mono text-xs tnum">{s.reference}</span>
+              : <span className="text-quaternary">no evidence attached</span>}
       </td>
-      <td className="tight"><Icon name="chevr" size="sm" /></td>
     </tr>
   );
 }

@@ -9,11 +9,7 @@
    `#/business-enquiries`          the queue
    `#/business-enquiries/:id`      one enquiry, its suggestions, its history
    `?tab=match|assignment|history` which face of the record
-
-   NO API YET. Everything is read from `src/content/business-enquiries/*.json`
-   and every write lands in memory for this tab only — see store.ts for what the
-   simulation does and does not honour, and `src/proto/v-2.2.0.0/` for the
-   endpoint work-list this stands in for.
+   `?new=1`                        the Add-an-enquiry dialog, as a link
 
    The detail is a PAGE, not a drawer. Deals and Plans open a record over the
    list they were reading it from, which is right when the record is a summary
@@ -26,7 +22,7 @@ import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { hashToPath, usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
-import { qs } from "../../ui";
+import { Button, EmptyState, PaneLoading, qs, TbTitle } from "../../ui";
 import List, { enquiryHash, listHash, merge, omit } from "./List";
 import Detail from "./Detail";
 import NewEnquiryModal from "./NewEnquiry";
@@ -34,7 +30,6 @@ import {
   bootBusinessEnquiries, queryFromParams, useBoot, useEnquiryPage, useIntakeCounts,
 } from "./store";
 import type { Params } from "./store";
-import "./enquiries.css";
 
 /* The vocabulary, the matching rules and the business directory come from the
    API and every screen below reads them synchronously, so the module waits for
@@ -47,21 +42,22 @@ function BootGate() {
   const boot = useBoot();
   if (boot.error) {
     return (
-      <div className="pad" style={{ padding: 24 }}>
-        <h2>Business Enquiries could not load.</h2>
-        <p>
-          The panel reads its vocabulary, matching rules and business directory from{" "}
-          <code>/api/v1/admin/business-enquiries/</code>. That request failed, so there is
-          nothing to show — this module keeps no local copy of them on purpose.
-        </p>
-        <p><b>{boot.error}</b></p>
-        <button className="btn pri" onClick={() => void bootBusinessEnquiries(true)}>
-          Retry
-        </button>
-      </div>
+      <EmptyState
+        icon="alert"
+        title="Business Enquiries could not load"
+        body={
+          <>
+            The panel reads its vocabulary, matching rules and business directory from{" "}
+            <span className="font-mono">/api/v1/admin/business-enquiries/</span>. That request failed,
+            so there is nothing to show — this module keeps no local copy of them on purpose.
+            <span className="mt-2 block font-medium text-secondary">{boot.error}</span>
+          </>
+        }
+        action={<Button color="primary" ico="refresh" onClick={() => void bootBusinessEnquiries(true)}>Retry</Button>}
+      />
     );
   }
-  if (!boot.ready) return <div className="pad" style={{ padding: 24 }}>Loading…</div>;
+  if (!boot.ready) return <PaneLoading label="Loading the enquiry vocabulary…" />;
   return <BusinessEnquiriesRoute />;
 }
 
@@ -80,54 +76,52 @@ function BusinessEnquiriesRoute() {
     return o;
   }, [sp]);
 
+  /* `new` is a DIALOG SWITCH, not a filter: it must not reach the query, the
+     chips row or the "how many filters are on" count. Everything below reads
+     `lp` — the URL minus that one key — and only the dialog itself reads `p`. */
+  const lp = useMemo(() => omit(p, ["new"]), [p]);
+
   /* THE PAGE, from the server, keyed on the filters in the URL. `page` is part
      of the URL like every other filter, so a link to page 3 of the breached
      queue is a link somebody can send. */
-  const pageNo = Math.max(1, Number(p.page) || 1);
-  const query = useMemo(() => queryFromParams(omit(p, ["tab", "page"]), pageNo),
-    [p, pageNo]);
+  const pageNo = Math.max(1, Number(lp.page) || 1);
+  const query = useMemo(() => queryFromParams(omit(lp, ["tab", "page"]), pageNo),
+    [lp, pageNo]);
   const page = useEnquiryPage(query);
   const all = page.rows;
 
   /* ------------------------------------------------------------ topbar ---
-     The counts sit beside the title rather than only in the strip, because the
-     one number an operator wants without scrolling is how many are waiting on
-     a decision — and on the detail page the strip is not on screen at all. */
-  /* Counted by the SERVER over the whole queue, not over this page — the
-     topbar numbers would otherwise never exceed the page size, and they are
-     unfiltered on purpose: how much is coming in must not change meaning
-     because somebody narrowed the list. */
+     INTAKE, not lifecycle. The strip on the page already counts every state and
+     counts them better — repeating two of them in the topbar said nothing the
+     page was not already saying louder. What the topbar can say that the strip
+     cannot is how much is COMING IN, which is the number you want before you
+     look at the queue at all.
+
+     Counted by the SERVER over the whole queue, not over this page — the topbar
+     numbers would otherwise never exceed the page size, and they are unfiltered
+     on purpose: how much is coming in must not change meaning because somebody
+     narrowed the list. */
   const { today, week } = useIntakeCounts();
   const crumbs = useMemo(() => (
     <>
-      {/* The title is the way up: pressing it returns to the module's default
-          view, the job the topbar's Back button did before it came off. */}
-      <button type="button" className="tb-title" title="Back to the default view"
-        onClick={() => navigate(hashToPath("#/business-enquiries"), { replace: true })}>
-        Business Enquiries
-      </button>
-      {/* INTAKE, not lifecycle. The strip below already counts every state and
-          counts them better — repeating two of them in the topbar said nothing
-          the page was not already saying louder. What the topbar can say that
-          the strip cannot is how much is COMING IN, which is the number you
-          want before you look at the queue at all. */}
-      <span className="tb-stats">
-        {/* Label first, then the figure. "0 today" reads as a sentence
-            fragment you have to finish; "today 0" reads as a labelled value,
-            which is what it is. */}
-        <span className="tb-stat ro"><span className="k">today</span><span className="v tnum">{today}</span></span>
-        <span className="tb-stat ro"><span className="k">last 7 days</span><span className="v tnum">{week}</span></span>
+      <TbTitle label="Business Enquiries" to="#/business-enquiries" />
+      <span className="ml-3 hidden items-center gap-3 sm:flex">
+        {/* Label first, then the figure. "0 today" reads as a sentence fragment
+            you have to finish; "today 0" reads as a labelled value, which is
+            what it is. */}
+        <IntakeStat k="today" v={today} />
+        <IntakeStat k="last 7 days" v={week} />
       </span>
     </>
     /* usePageChrome republishes once per LOCATION, not per render, so this
        memo only has to be right for the counts it prints. */
-  ), [today, week, navigate]);
+  ), [today, week]);
 
   /* Where "up" is. From a record, the list it was opened from — filters and
      all, so Back is a return and not a reset. */
   /* Keyed on the counts: they come from the server after the first render, and
      without the key the topbar would keep the zeros it mounted with. */
-  usePageChrome({ crumbs, right: null, parent: id ? listHash(omit(p, ["tab"])) : null },
+  usePageChrome({ crumbs, right: null, parent: id ? listHash(omit(lp, ["tab"])) : null },
     `${today}/${week}`);
 
   /* ----------------------------------------------------------- filters ---
@@ -145,21 +139,60 @@ function BusinessEnquiriesRoute() {
      usually past the end of a filtered one, and the empty table that follows
      reads as "nothing matches" when the answer is "not on page 7". */
   const onFilter = useCallback((name: string, value: string) => {
-    goFilter(listHash(merge(omit(p, ["tab", "page"]), { [name]: value })));
-  }, [p, goFilter]);
+    goFilter(listHash(merge(omit(lp, ["tab", "page"]), { [name]: value })));
+  }, [lp, goFilter]);
   const onSearch = useCallback((name: string, value: string) => {
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(
-      () => goFilter(listHash(merge(omit(p, ["tab", "page"]), { [name]: value }))), 220);
-  }, [p, goFilter]);
+      () => goFilter(listHash(merge(omit(lp, ["tab", "page"]), { [name]: value }))), 220);
+  }, [lp, goFilter]);
   const onUnfilter = useCallback((k: string) => {
     /* A key may carry its dependants, joined by "+": removing the received
        range has to remove the from/to it was made of, or the next range picked
        silently inherits the old custom bounds. */
     const keys = k === "*" ? [] : k.split("+");
-    goFilter(k === "*" ? listHash({}) : listHash(omit(p, keys.concat(["tab"]))));
-  }, [p, goFilter]);
+    goFilter(k === "*" ? listHash({}) : listHash(omit(lp, keys.concat(["tab"]))));
+  }, [lp, goFilter]);
   useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  /* -------------------------------------------------------- add an enquiry ---
+     THE DIALOG IS A URL, so it can be linked, reloaded into and photographed —
+     `?new=1`, the same switch Quotations and Invoices use for their own create
+     step. Pressing the button opens it AND writes the param; arriving on a link
+     that already carries the param opens it on mount. Both paths run the one
+     `openNew` below, so there is no second copy of what the dialog is given. */
+  const closeNew = useCallback(() => {
+    closeLayer();
+    navigate(hashToPath(listHash(lp)), { replace: true });
+  }, [closeLayer, navigate, lp]);
+
+  /* Straight to the new record, not back to the list: whoever just typed it is
+     still on the call, and the next thing they need is the contact log they are
+     about to write into. */
+  const openNew = useCallback(() => {
+    modal(
+      <NewEnquiryModal
+        onClose={closeNew}
+        onDone={(newId, msg) => {
+          closeLayer();
+          toast(msg);
+          navigate(hashToPath(enquiryHash(newId, {})));
+        }} />,
+      "lg");
+    if (p.new !== "1") {
+      navigate(hashToPath(listHash(merge(lp, { new: "1" }))), { replace: true });
+    }
+  }, [modal, closeNew, closeLayer, toast, navigate, p.new, lp]);
+
+  /* Once, on arrival. A later change to the param is not watched on purpose:
+     the button is the only thing that sets it while this page is mounted, and
+     it opens the dialog itself. */
+  const booted = useRef(false);
+  useEffect(() => {
+    if (booted.current) return;
+    booted.current = true;
+    if (p.new === "1" && !id) openNew();
+  }, [p.new, id, openNew]);
 
   /* THE QUEUE, AS THE RECORD SEES IT — the page the operator was looking at,
      in the order they were looking at it, so "next" means next in what they
@@ -172,12 +205,12 @@ function BusinessEnquiriesRoute() {
   const queue = all;
   const at = id ? queue.findIndex((x) => x.enquiryId === id) : -1;
   const hashOf = (n: number) =>
-    queue[n] ? enquiryHash(queue[n].enquiryId, omit(p, ["tab"])) : null;
+    queue[n] ? enquiryHash(queue[n].enquiryId, omit(lp, ["tab"])) : null;
   const offset = (page.pageNo - 1) * page.pageSize;
 
   if (id) {
     return (
-      <Detail id={id} listHash={listHash(omit(p, ["tab"]))}
+      <Detail id={id} listHash={listHash(omit(lp, ["tab"]))}
         prev={at > 0 ? hashOf(at - 1) : null}
         next={at >= 0 && at < queue.length - 1 ? hashOf(at + 1) : null}
         /* No position when the record is not in the current filter — a record
@@ -187,25 +220,22 @@ function BusinessEnquiriesRoute() {
     );
   }
 
-  /* Straight to the new record, not back to the list: whoever just typed it is
-     still on the call, and the next thing they need is the contact log they are
-     about to write into. */
-  const onCreate = () => modal(
-    <NewEnquiryModal
-      onClose={closeLayer}
-      onDone={(newId, msg) => {
-        closeLayer();
-        toast(msg);
-        navigate(hashToPath(enquiryHash(newId, {})));
-      }} />,
-    "wide"
-  );
-
   return (
-    <List all={all} page={page} p={p} sel={null}
-      onPage={(n) => goFilter(listHash(merge(omit(p, ["tab"]), { page: String(n) })))}
+    <List all={all} page={page} p={lp} sel={null}
+      onPage={(n) => goFilter(listHash(merge(omit(lp, ["tab"]), { page: String(n) })))}
       onFilter={onFilter} onSearch={onSearch} onUnfilter={onUnfilter} toast={toast}
-      onCreate={onCreate} />
+      onCreate={openNew} />
+  );
+}
+
+/* One intake figure in the topbar. Small enough that a shared part would be a
+   part with one caller, so it is drawn here from the utilities. */
+function IntakeStat({ k, v }: { k: string; v: number }) {
+  return (
+    <span className="inline-flex items-baseline gap-1.5">
+      <span className="label-mono">{k}</span>
+      <span className="text-sm font-semibold text-primary tnum">{Number(v) || 0}</span>
+    </span>
   );
 }
 

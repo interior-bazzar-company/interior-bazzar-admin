@@ -8,24 +8,26 @@
    and whether anybody else has it — rather than making somebody press Save to
    find out.
 
-   THE VERDICT IS THE POINT. Three states, said plainly and differently:
+   THE VERDICT IS THE POINT, and it is said where the panel says every other
+   field's verdict: as the field's own `err` when it is wrong, its `hint` when
+   it is not. Three states, plainly and differently:
 
      malformed   your mistake, and fixable from the message alone
      taken       not your mistake, and no amount of re-reading fixes it
      free        say so, out loud, because the absence of an error is not
                  the same as confirmation and people re-check silence
 
-   The host sits INSIDE the box as prefix text, so the field reads as the
-   address it is. It used to also print the full URL underneath — the same
-   string a second time, one line lower — and that was the clutter the host
-   prefix had already made unnecessary.
+   The host is welded to the box as an `InputGroup` prefix — one control with
+   one border — so the field reads as the address it is. It used to also print
+   the full URL underneath, the same string a second time one line lower, and
+   that was the clutter the prefix had already made unnecessary.
 
    COPY IS NOT AVAILABLE UNTIL THE HANDLE IS SAVED AND FREE. A copy button that
    hands somebody a link to a profile that does not exist yet is worse than no
    button: they will paste it somewhere.
    ============================================================================= */
 import { useEffect, useState } from "react";
-import { Icon, copyToClipboard } from "../../ui";
+import { Button, FormField, Icon, Input, InputGroup, copyToClipboard } from "../../ui";
 import {
   USERNAME_RULES, profileUrl, slugify, usernameError, usernameTaken,
 } from "./store";
@@ -56,6 +58,7 @@ export default function HandleField({ value, saved, userId, suggestFrom, disable
   const live = !!saved && saved === v;
 
   const suggestion = !v && suggestFrom ? slugify(suggestFrom) : "";
+  const host = String(profileUrl("")).replace(/^https?:\/\//, "");
 
   /* Through the shared helper: the async clipboard REJECTS on an insecure
      origin (the `vite --host` LAN case) rather than throwing, so a sync
@@ -65,59 +68,51 @@ export default function HandleField({ value, saved, userId, suggestFrom, disable
     copyToClipboard(profileUrl(v)).then((line) => setCopied(line === "Copied."));
   };
 
-  return (
-    <div className={"um-handle" + (free ? " ok" : "") + (malformed || taken ? " bad" : "")}>
-      <div className="um-handle-in">
-        <span className="um-handle-pre" aria-hidden="true">
-          {String(profileUrl("")).replace(/^https?:\/\//, "")}
+  const err = malformed
+    ? malformed
+    : taken
+      ? <>Taken by another profile. Try <b className="font-mono">{v}-studio</b> or <b className="font-mono">{v}-interiors</b>.</>
+      : undefined;
+
+  const hint = err
+    ? undefined
+    : free
+      ? <span className="inline-flex items-center gap-1 text-success-primary">
+          <Icon name="check" size="xs" />
+          Available{live ? " · this link is live" : " · not saved yet"}
         </span>
-        <input
-          className="inp"
-          value={value}
-          disabled={disabled}
-          spellCheck={false}
-          autoCapitalize="none"
-          autoComplete="off"
-          aria-label="Username"
-          aria-invalid={!!malformed || taken}
-          aria-describedby="handle-note"
-          placeholder="business-name"
-          /* Lower-cased and hyphenated as you type rather than rejected after
-             the fact. Somebody typing "Meera Studio" means `meera-studio`, and
-             a form that knows that should not make them find out by failing. */
-          onChange={(e) => onChange(slugify(e.target.value))}
-        />
-        {live && free ? (
-          <button type="button" className="um-handle-copy" onClick={copy}
-            aria-label="Copy the profile link">
-            <Icon name={copied ? "check" : "link"} size="sm" />
-            {copied ? "Copied" : "Copy link"}
+      : suggestion
+        ? <button type="button"
+            className="cursor-pointer rounded text-left text-sm text-brand-secondary outline-focus-ring hover:underline focus-visible:outline-2 focus-visible:outline-offset-2"
+            onClick={() => onChange(suggestion)}>
+            Use <b className="font-mono font-medium">{suggestion}</b>
           </button>
+        : USERNAME_RULES.help;
+
+  return (
+    <FormField err={err} hint={hint}>
+      <div className="flex min-w-0 items-center gap-2">
+        <InputGroup pre={<span className="font-mono text-xs">{host}</span>} className="min-w-0 flex-1">
+          <Input
+            mono
+            value={value}
+            disabled={disabled}
+            err={!!err}
+            ariaLabel="Username"
+            ph="business-name"
+            /* Lower-cased and hyphenated as you type rather than rejected after
+               the fact. Somebody typing "Meera Studio" means `meera-studio`,
+               and a form that knows that should not make them find out by
+               failing. */
+            onChange={(next) => onChange(slugify(next))}
+          />
+        </InputGroup>
+        {live && free ? (
+          <Button size="sm" color="secondary" ico={copied ? "check" : "link"} onClick={copy}>
+            {copied ? "Copied" : "Copy link"}
+          </Button>
         ) : null}
       </div>
-
-      <p className="um-handle-note" id="handle-note">
-        {malformed ? (
-          <span className="bad"><Icon name="alert" size="sm" />{malformed}</span>
-        ) : taken ? (
-          <span className="bad">
-            <Icon name="alert" size="sm" />
-            Taken by another profile. Try <b>{v}-studio</b> or <b>{v}-interiors</b>.
-          </span>
-        ) : free ? (
-          <span className="ok">
-            <Icon name="check" size="sm" />
-            Available{live ? " · this link is live" : " · not saved yet"}
-          </span>
-        ) : suggestion ? (
-          <button type="button" className="um-handle-sug" onClick={() => onChange(suggestion)}>
-            Use <b>{suggestion}</b>
-          </button>
-        ) : (
-          <span>{USERNAME_RULES.help}</span>
-        )}
-      </p>
-
-    </div>
+    </FormField>
   );
 }

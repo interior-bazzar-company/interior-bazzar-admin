@@ -11,9 +11,17 @@
    showing a clash is a courtesy — the dates can be edited after it renders, and
    a second tab never saw it — so every refusal drawn here is also a rule in
    store.ts, and the store's is the one that decides.
+
+   ONE FRAME. `ModalShell` puts the title, the body and the footer in the same
+   place in every dialog in the panel, primary last; `FormField` owns the label
+   and the one line of hint or error under a control. Nothing here draws its own
+   header or its own button row.
    ============================================================================= */
 import { useEffect, useState } from "react";
-import { Icon, ModalHead, Notice } from "../../../ui";
+import {
+  Alert, Button, Checkbox, DateInput, FieldRow, FileUpload, FormField, FormSection, Input,
+  ModalShell, Notice, SelectInput, Tag,
+} from "../../../ui";
 import { useShell } from "../../../shell/ShellContext";
 import {
   AGREEMENT_KIND, LEAVE_KIND, DOCUMENT_KIND, TODAY, VOCAB, addDays, addDocument, createTag,
@@ -22,27 +30,21 @@ import {
 } from "../store";
 import { bodyOf, sendTemplate, useTemplates } from "../../Agreements/store";
 import { Sheet } from "../../Agreements/bits";
-import type { Agreement, LeaveRequest, LeaveState, Tag } from "../store";
+import type { Agreement, LeaveRequest, LeaveState, Tag as TagRecord } from "../store";
 
 /* ------------------------------------------------------------- chrome --- */
 
-function Head({ title, sub }: { title: string; sub?: string }) {
-  const shell = useShell();
-  return (
-    <ModalHead title={<>{title}{sub ? <span className="md-sub">{sub}</span> : null}</>} onClose={() => shell.closeLayer()} />
-  );
-}
-
-function Foot({ label, tone, disabled, onSave }: {
-  label: string; tone?: string; disabled?: boolean; onSave: () => void;
+/** The two-button footer every one of these shares: cancel, then the verb. */
+function Foot({ label, tone, disabled, onSave, onClose }: {
+  label: string; tone?: "bad" | "pri"; disabled?: boolean; onSave: () => void; onClose: () => void;
 }) {
-  const shell = useShell();
   return (
-    <div className="md-f">
-      <span className="spacer" />
-      <button className="btn" onClick={() => shell.closeLayer()}>Cancel</button>
-      <button className={"btn " + (tone || "pri")} disabled={disabled} onClick={onSave}>{label}</button>
-    </div>
+    <>
+      <Button color="secondary" onClick={onClose}>Cancel</Button>
+      <Button color={tone === "bad" ? "primary-destructive" : "primary"} isDisabled={disabled} onClick={onSave}>
+        {label}
+      </Button>
+    </>
   );
 }
 
@@ -71,60 +73,52 @@ export function LeaveRequestModal({ memberId }: { memberId: string }) {
   };
 
   return (
-    <>
-      <Head title="Request leave" />
-      <div className="md-b">
-        <div className="tm-fg2">
-          <div className="fg">
-            <label htmlFor="lvFrom">First day</label>
-            <input id="lvFrom" type="date" className={"inp" + (backwards ? " bad" : "")} value={from}
-              onChange={(e) => setFrom(e.target.value)} />
-          </div>
-          <div className="fg">
-            <label htmlFor="lvTo">Last day</label>
-            <input id="lvTo" type="date" className={"inp" + (backwards ? " bad" : "")} value={to}
-              aria-describedby="lvRange" onChange={(e) => setTo(e.target.value)} />
-            {backwards
-              ? <span id="lvRange" className="help bad">The last day is before the first.</span>
-              : <span id="lvRange" className="help">{days} day{days === 1 ? "" : "s"}, both included.</span>}
-          </div>
-        </div>
+    <ModalShell
+      title="Request leave"
+      ico="calendar"
+      onClose={() => shell.closeLayer()}
+      actions={<Foot label="Send request" disabled={blocked || !why.trim()} onSave={save} onClose={() => shell.closeLayer()} />}
+    >
+      <FormSection>
+        <FieldRow>
+          <FormField id="lvFrom" label="First day" req>
+            <DateInput id="lvFrom" value={from} onChange={setFrom} className="w-full" />
+          </FormField>
+          <FormField id="lvTo" label="Last day" req
+            err={backwards ? "The last day is before the first." : undefined}
+            hint={backwards ? undefined : days + " day" + (days === 1 ? "" : "s") + ", both included."}>
+            <DateInput id="lvTo" value={to} onChange={setTo} className="w-full" />
+          </FormField>
+        </FieldRow>
 
-        <div className="fg">
-          <label htmlFor="lvKind">Kind</label>
-          <select id="lvKind" className="inp" value={kind} onChange={(e) => setKind(e.target.value)}>
-            {(VOCAB.leaveKinds as { key: string }[]).map((k) =>
-              <option key={k.key} value={k.key}>{labelOf(LEAVE_KIND, k.key)}</option>)}
-          </select>
-        </div>
+        <FormField id="lvKind" label="Kind">
+          <SelectInput id="lvKind" value={kind} onChange={setKind}
+            options={(VOCAB.leaveKinds as { key: string }[]).map((k) =>
+              ({ v: k.key, l: labelOf(LEAVE_KIND, k.key) }))} />
+        </FormField>
 
-        <div className="fg">
-          <label htmlFor="lvWhy">Reason <b className="req">*</b></label>
-          <input id="lvWhy" className="inp" value={why} placeholder="Family function, out of Delhi"
-            onChange={(e) => setWhy(e.target.value)} />
-          <span className="help">Your senior reads this and nothing else.</span>
-        </div>
+        <FormField id="lvWhy" label="Reason" req hint="Your senior reads this and nothing else.">
+          <Input id="lvWhy" value={why} ph="Family function, out of Delhi" onChange={setWhy} />
+        </FormField>
 
         {clash.worked.length ? (
-          <Notice tone="bad" ico="alert" text={
-            <><b>There is already an attendance row on {fmtDate(clash.worked[0])}.</b> A leave record
-              over a day that was clocked would make that date both worked and away, and nothing
-              downstream could choose between them.</>
-          } />
+          <Alert tone="bad" ico="alert" title={"There is already an attendance row on " + fmtDate(clash.worked[0])}>
+            A leave record over a day that was clocked would make that date both worked and away,
+            and nothing downstream could choose between them.
+          </Alert>
         ) : clash.taken.length ? (
-          <Notice tone="warn" ico="alert" text={
-            <><b>{fmtDate(clash.taken[0])} is already covered</b> by a request of yours. Edit that one
-              rather than sending a second over the same day.</>
-          } />
+          <Alert tone="warn" ico="alert" title={fmtDate(clash.taken[0]) + " is already covered"}>
+            A request of yours already covers it. Edit that one rather than sending a second over the
+            same day.
+          </Alert>
         ) : (
-          <p className="tm-foot">
+          <p className="text-xs text-quaternary">
             Until it is approved these days still count as absent. An approval suppresses that;
             it never writes an attendance row.
           </p>
         )}
-      </div>
-      <Foot label="Send request" disabled={blocked || !why.trim()} onSave={save} />
-    </>
+      </FormSection>
+    </ModalShell>
   );
 }
 
@@ -144,41 +138,46 @@ export function LeaveDecideModal({ l, state }: { l: LeaveRequest; state: LeaveSt
   };
 
   return (
-    <>
-      <Head title={reject ? "Refuse this request" : "Approve this leave"}
-        sub={fmtDate(l.fromDate) + (l.toDate !== l.fromDate ? " to " + fmtDate(l.toDate) : "")} />
-      <div className="md-b">
-        <p className="tm-quote">{l.reason}</p>
+    <ModalShell
+      title={reject ? "Refuse this request" : "Approve this leave"}
+      sub={fmtDate(l.fromDate) + (l.toDate !== l.fromDate ? " to " + fmtDate(l.toDate) : "")}
+      ico={reject ? "xcircle" : "checkcircle"}
+      tone={reject ? "error" : "success"}
+      onClose={() => shell.closeLayer()}
+      actions={
+        <Foot label={reject ? "Refuse" : "Approve"} tone={reject ? "bad" : "pri"}
+          disabled={reject && !note.trim()} onSave={save} onClose={() => shell.closeLayer()} />
+      }
+    >
+      <FormSection>
+        <blockquote className="rounded-lg border-l-2 border-brand bg-secondary px-3.5 py-3 text-sm text-secondary">
+          {l.reason}
+        </blockquote>
 
         {clashes.length ? (
-          <Notice tone="warn" ico="alert" text={
-            <>
-              <b>{clashes[0].members.map((m) => m.name).join(", ")}
-                {clashes[0].members.length > 1 ? " are" : " is"} also away on {fmtDate(clashes[0].date)}.</b>
-              {" "}Nothing in the panel knows how many people that day needs — you do. It is shown,
-              not enforced.
-            </>
-          } />
+          <Alert tone="warn" ico="alert" title={
+            clashes[0].members.map((m) => m.name).join(", ")
+            + (clashes[0].members.length > 1 ? " are" : " is")
+            + " also away on " + fmtDate(clashes[0].date)
+          }>
+            Nothing in the panel knows how many people that day needs — you do. It is shown, not
+            enforced.
+          </Alert>
         ) : null}
 
         {reject ? (
-          <div className="fg">
-            <label htmlFor="lvNo">Why <b className="req">*</b></label>
-            <input id="lvNo" className="inp" autoFocus value={note} onChange={(e) => setNote(e.target.value)} />
-            <span className="help">It appears on their row. A refusal nobody explained is one they
-              have to come and ask about.</span>
-          </div>
+          <FormField id="lvNo" label="Why" req
+            hint="It appears on their row. A refusal nobody explained is one they have to come and ask about.">
+            <Input id="lvNo" autoFocus value={note} onChange={setNote} />
+          </FormField>
         ) : (
-          <div className="fg">
-            <label htmlFor="lvYes">A note, if you want one</label>
-            <input id="lvYes" className="inp" value={note} onChange={(e) => setNote(e.target.value)} />
-            <span className="help">Optional. Approving needs no reason; refusing does.</span>
-          </div>
+          <FormField id="lvYes" label="A note, if you want one"
+            hint="Optional. Approving needs no reason; refusing does.">
+            <Input id="lvYes" value={note} onChange={setNote} />
+          </FormField>
         )}
-      </div>
-      <Foot label={reject ? "Refuse" : "Approve"} tone={reject ? "dgr" : "pri"}
-        disabled={reject && !note.trim()} onSave={save} />
-    </>
+      </FormSection>
+    </ModalShell>
   );
 }
 
@@ -201,24 +200,28 @@ export function SendAgreementModal({ memberId }: { memberId: string }) {
     shell.toast("Sent. The link expires in seven days.");
   };
   return (
-    <>
-      <Head title="Send an agreement" />
-      <div className="md-b">
+    <ModalShell
+      title="Send an agreement"
+      ico="shield"
+      onClose={() => shell.closeLayer()}
+      actions={<Foot label="Send" disabled={!t} onSave={save} onClose={() => shell.closeLayer()} />}
+    >
+      <FormSection>
         {templates.length ? (
-          <div className="fg">
-            <label htmlFor="agTpl">Template</label>
-            <select id="agTpl" className="inp" value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
-              {templates.map((x) => <option key={x.templateId} value={x.templateId}>{x.title} · v{x.version}</option>)}
-            </select>
-            {t ? <span className="help">{t.purpose}</span> : null}
-          </div>
+          <FormField id="agTpl" label="Template" hint={t ? t.purpose : undefined}>
+            <SelectInput id="agTpl" value={templateId} onChange={setTemplateId}
+              options={templates.map((x) => ({ v: x.templateId, l: x.title + " · v" + x.version }))} />
+          </FormField>
         ) : (
-          <Notice tone="warn" text="No active template to send. Write one under Agreements first — a document with nothing in it cannot be signed." />
+          <Alert tone="warn" title="No active template to send">
+            Write one under Agreements first — a document with nothing in it cannot be signed.
+          </Alert>
         )}
-        <p className="tm-foot">The wording is frozen at send. The link is single-use and expires on {fmtDate(addDays(TODAY, 7))}.</p>
-      </div>
-      <Foot label="Send" disabled={!t} onSave={save} />
-    </>
+        <p className="text-xs text-quaternary">
+          The wording is frozen at send. The link is single-use and expires on {fmtDate(addDays(TODAY, 7))}.
+        </p>
+      </FormSection>
+    </ModalShell>
   );
 }
 
@@ -234,6 +237,7 @@ export function SignAgreementModal({ a }: { a: Agreement }) {
   const expired = a.state !== "signed" && !!a.expiresAt && (a.expiresAt as string) < TODAY;
   const closed = a.state === "signed" || a.state === "revoked" || expired;
   const body = bodyOf(a);
+  const sub = labelOf(AGREEMENT_KIND, a.kind) + " · v" + a.version;
 
   /* Opening the document is the reading. Recorded once, and only while it can
      still be signed — a revoked or expired link records nothing. */
@@ -248,46 +252,56 @@ export function SignAgreementModal({ a }: { a: Agreement }) {
 
   if (closed) {
     return (
-      <>
-        <Head title={a.title} sub={labelOf(AGREEMENT_KIND, a.kind) + " v" + a.version} />
-        <div className="md-b">
-          {a.state === "signed" ? (
-            <Notice tone="ok" ico="check" text={
-              <><b>Already signed</b> by {a.signedName} on {fmtDate((a.signedAt || "").slice(0, 10))}.
-                The signed copy is the record — there is no second signature box, because a document
-                that can be signed twice has two versions of the truth.</>
-            } />
-          ) : a.state === "revoked" ? (
-            <Notice tone="bad" ico="lock" text={
-              <><b>This link was revoked.</b> Not "not found" — somebody was told this document was
-                coming, and a dead end would leave them guessing. Ask whoever sent it for a new one.</>
-            } />
-          ) : (
-            <Notice tone="warn" ico="clock" text={
-              <><b>This link expired on {fmtDate(a.expiresAt as string)}.</b> The document is not shown
-                on an expired link. Ask for a new one and it arrives as a fresh version.</>
-            } />
-          )}
-        </div>
-        <div className="md-f">
-          <span className="spacer" />
-          <button className="btn pri" onClick={() => shell.closeLayer()}>Close</button>
-        </div>
-      </>
+      <ModalShell
+        title={a.title}
+        sub={sub}
+        ico={a.state === "signed" ? "checkcircle" : a.state === "revoked" ? "lock" : "clock"}
+        tone={a.state === "signed" ? "success" : a.state === "revoked" ? "error" : "warning"}
+        onClose={() => shell.closeLayer()}
+        actions={<Button color="primary" onClick={() => shell.closeLayer()}>Close</Button>}
+      >
+        {a.state === "signed" ? (
+          <Alert tone="ok" ico="check"
+            title={"Already signed by " + a.signedName + " on " + fmtDate((a.signedAt || "").slice(0, 10))}>
+            The signed copy is the record — there is no second signature box, because a document that
+            can be signed twice has two versions of the truth.
+          </Alert>
+        ) : a.state === "revoked" ? (
+          <Alert tone="bad" ico="lock" title="This link was revoked">
+            Not “not found” — somebody was told this document was coming, and a dead end would leave
+            them guessing. Ask whoever sent it for a new one.
+          </Alert>
+        ) : (
+          <Alert tone="warn" ico="clock" title={"This link expired on " + fmtDate(a.expiresAt as string)}>
+            The document is not shown on an expired link. Ask for a new one and it arrives as a fresh
+            version.
+          </Alert>
+        )}
+      </ModalShell>
     );
   }
 
   return (
-    <>
-      <Head title={a.title} sub={labelOf(AGREEMENT_KIND, a.kind) + " v" + a.version} />
-      <div className="md-b">
+    <ModalShell
+      title={a.title}
+      sub={sub}
+      ico="shield"
+      onClose={() => shell.closeLayer()}
+      actions={
+        <Foot label="Sign and accept" disabled={!agree || name.trim().length < 2}
+          onSave={save} onClose={() => shell.closeLayer()} />
+      }
+    >
+      <div className="flex flex-col gap-4">
         {/* THE DOCUMENT ITSELF. This box held two lines of boilerplate and never
             the clauses, so a member "read and agreed" to text that was not the
             NDA. It is the same frozen body the deed page shows, from one read. */}
         {body.clauses.length ? (
           <Sheet title={a.title} clauses={body.clauses} />
         ) : (
-          <Notice tone="warn" ico="alert" text="This copy has no frozen wording — it was sent without a template. Revoke it and send a fresh copy from one." />
+          <Alert tone="warn" ico="alert" title="This copy has no frozen wording">
+            It was sent without a template. Revoke it and send a fresh copy from one.
+          </Alert>
         )}
 
         {/* THE DISCLOSURE SITS ABOVE THE BOX, not under the button. Recording an
@@ -295,20 +309,14 @@ export function SignAgreementModal({ a }: { a: Agreement }) {
             entitled to be told before they sign. */}
         <Notice ico="alert" text="Your name, the time, and the address you sign from are recorded with the signature." />
 
-        <div className="fg">
-          <label htmlFor="sgName">Your full name <b className="req">*</b></label>
-          <input id="sgName" className="inp" autoFocus value={name} onChange={(e) => setName(e.target.value)} />
-          <span className="help">Typing it is the signature.</span>
-        </div>
+        <FormField id="sgName" label="Your full name" req hint="Typing it is the signature.">
+          <Input id="sgName" autoFocus value={name} onChange={setName} />
+        </FormField>
 
-        <label className="check">
-          <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
-          <span></span>
-          I have read the document above and I agree to it.
-        </label>
+        <Checkbox checked={agree} onChange={setAgree}
+          label="I have read the document above and I agree to it." />
       </div>
-      <Foot label="Sign and accept" disabled={!agree || name.trim().length < 2} onSave={save} />
-    </>
+    </ModalShell>
   );
 }
 
@@ -326,31 +334,39 @@ export function AddDocumentModal({ memberId, kind: seed }: { memberId: string; k
   };
   const kinds = (VOCAB.documentKinds as { key: string }[]).map((k) => k.key);
   return (
-    <>
-      <Head title="Add a document" />
-      <div className="md-b">
-        <div className="fg">
-          <label htmlFor="rsKind">What is it</label>
-          <select id="rsKind" className="inp" value={kind}
-            onChange={(e) => { setKind(e.target.value); setLabel(labelOf(DOCUMENT_KIND, e.target.value)); }}>
-            {kinds.map((k) => <option key={k} value={k}>{labelOf(DOCUMENT_KIND, k)}</option>)}
-          </select>
-        </div>
-        <div className="fg">
-          <label htmlFor="rsLabel">Name it <b className="req">*</b></label>
-          <input id="rsLabel" className="inp" value={label} onChange={(e) => setLabel(e.target.value)} />
-        </div>
-        <div className="fg">
-          <span className="fg-lb">File</span>
-          <div className="tm-drop">
-            <Icon name="doc" />
-            <span>The upload lands here once private-object storage is decided.
-              <b> Nothing in this panel may put an identity document on a public URL.</b></span>
-          </div>
-        </div>
-      </div>
-      <Foot label="Add" disabled={!label.trim()} onSave={save} />
-    </>
+    <ModalShell
+      title="Add a document"
+      ico="lock"
+      onClose={() => shell.closeLayer()}
+      actions={<Foot label="Add" disabled={!label.trim()} onSave={save} onClose={() => shell.closeLayer()} />}
+    >
+      <FormSection>
+        <FormField id="rsKind" label="What is it">
+          <SelectInput id="rsKind" value={kind}
+            options={kinds.map((k) => ({ v: k, l: labelOf(DOCUMENT_KIND, k) }))}
+            onChange={(v) => { setKind(v); setLabel(labelOf(DOCUMENT_KIND, v)); }} />
+        </FormField>
+        <FormField id="rsLabel" label="Name it" req>
+          <Input id="rsLabel" value={label} onChange={setLabel} />
+        </FormField>
+        <FormField label="File" hint="The file itself lands once private-object storage is decided.">
+          {/* THE DROP ZONE IS DRAWN AND DELIBERATELY INERT. Nothing in this
+              panel may put an identity document on a public URL, so the control
+              records the intent and the store records the row — the bytes wait
+              for a signed, short-lived read. */}
+          <FileUpload
+            disabled
+            accept="image/*,.pdf"
+            hint="PDF or an image, up to 5 MB — enabled with private storage."
+            onFiles={() => { /* inert until private objects exist */ }}
+          />
+        </FormField>
+        <Notice tone="warn" ico="lock" text={
+          <><b>Nothing in this panel may put an identity document on a public URL.</b> The row is
+            recorded now; the file arrives with private objects behind a signed read.</>
+        } />
+      </FormSection>
+    </ModalShell>
   );
 }
 
@@ -367,24 +383,25 @@ export function NewTagModal({ ownerId }: { ownerId: string }) {
     shell.toast(r.data.label + " created.");
   };
   return (
-    <>
-      <Head title="New tag" />
-      <div className="md-b">
-        <div className="fg">
-          <label htmlFor="tgName">Name <b className="req">*</b></label>
-          <input id="tgName" className="inp" autoFocus value={name} onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) save(); }} />
-          <span className="help">It is yours. Somebody else may hold a tag of the same name and it
-            stays a different record.</span>
-        </div>
-        <ToneField value={tone} onPick={setTone} />
-      </div>
-      <Foot label="Create" disabled={!name.trim()} onSave={save} />
-    </>
+    <ModalShell
+      title="New tag"
+      ico="tag"
+      onClose={() => shell.closeLayer()}
+      actions={<Foot label="Create" disabled={!name.trim()} onSave={save} onClose={() => shell.closeLayer()} />}
+    >
+      <FormSection>
+        <FormField id="tgName" label="Name" req
+          hint="It is yours. Somebody else may hold a tag of the same name and it stays a different record.">
+          <Input id="tgName" autoFocus value={name} onChange={setName}
+            onEnter={() => { if (name.trim()) save(); }} />
+        </FormField>
+        <ToneField value={tone} onPick={setTone} preview={name.trim()} />
+      </FormSection>
+    </ModalShell>
   );
 }
 
-export function RenameTagModal({ t }: { t: Tag }) {
+export function RenameTagModal({ t }: { t: TagRecord }) {
   const shell = useShell();
   const [name, setName] = useState(t.label);
   const save = () => {
@@ -394,36 +411,47 @@ export function RenameTagModal({ t }: { t: Tag }) {
     shell.toast("Renamed.");
   };
   return (
-    <>
-      <Head title="Rename this tag" sub={t.label} />
-      <div className="md-b">
-        <div className="fg">
-          <label htmlFor="tgRename">Name <b className="req">*</b></label>
-          <input id="tgRename" className="inp" autoFocus value={name} onChange={(e) => setName(e.target.value)} />
-          <span className="help">Every item of yours wearing it follows the rename. Nobody else's does.</span>
-        </div>
-      </div>
-      <Foot label="Rename" disabled={!name.trim()} onSave={save} />
-    </>
+    <ModalShell
+      title="Rename this tag"
+      sub={t.label}
+      ico="edit"
+      onClose={() => shell.closeLayer()}
+      actions={<Foot label="Rename" disabled={!name.trim()} onSave={save} onClose={() => shell.closeLayer()} />}
+    >
+      <FormField id="tgRename" label="Name" req
+        hint="Every item of yours wearing it follows the rename. Nobody else's does.">
+        <Input id="tgRename" autoFocus value={name} onChange={setName} onEnter={() => { if (name.trim()) save(); }} />
+      </FormField>
+    </ModalShell>
   );
 }
 
 /** SIX TONES, NOT A COLOUR PICKER. A free picker on a per-member tag makes a
  *  board where two people's palettes collide, and it would be the first
- *  non-token colour in a panel whose dark mode is a token swap. */
-export function ToneField({ value, onPick }: { value: string; onPick: (t: string) => void }) {
+ *  non-token colour in a panel whose dark mode is a token swap. The chips are
+ *  the thing itself rather than a word for it, and the one you have chosen is
+ *  the one wearing the brand ring. */
+export function ToneField({ value, onPick, preview }: {
+  value: string; onPick: (t: string) => void; preview?: string;
+}) {
   return (
-    <div className="fg">
-      <span className="fg-lb">Tone</span>
-      <div className="tm-tagrow">
+    <FormField label="Tone">
+      <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Tone">
         {(VOCAB.tagTones as { key: string; label: string }[]).map((o) => (
-          <button key={o.key} type="button" aria-pressed={value === o.key}
-            className={"pill xs tm-pick tag-" + o.key + (value === o.key ? " on" : "")}
-            onClick={() => onPick(o.key)}>
-            {o.label}
+          <button
+            key={o.key}
+            type="button"
+            aria-pressed={value === o.key}
+            onClick={() => onPick(o.key)}
+            className={
+              "cursor-pointer rounded-md p-0.5 outline-focus-ring transition duration-100 focus-visible:outline-2 focus-visible:outline-offset-2"
+              + (value === o.key ? " ring-2 ring-brand" : "")
+            }
+          >
+            <Tag label={preview && value === o.key ? preview : o.label} tone={o.key} />
           </button>
         ))}
       </div>
-    </div>
+    </FormField>
   );
 }

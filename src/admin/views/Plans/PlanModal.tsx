@@ -7,6 +7,10 @@
    order the decisions are actually made: what it is → what it costs → what
    it includes.
 
+   Each duration is its own small card rather than a row in a dense grid:
+   the four numbers on it are money, they are typed rarely, and a labelled
+   field somebody can read is worth more here than a compact table.
+
    NOT one transaction, and it cannot be: the server keeps a plan and its
    billing cycles behind separate endpoints. So the order is deliberate —
    the plan is written first, then each cycle, and the first refusal stops
@@ -18,15 +22,20 @@
    WHOLE call if a price field is present without it — so for a level-2
    editor those inputs are absent and never sent, and the rest of the form
    still saves.
+
+   THE FORM IS UNCONTROLLED where the value is a plain string: `val(id)`
+   reads it back off the DOM at save time, exactly as the prototype did, so
+   every `id` below is load-bearing.
    ===================================================================== */
 import { useState } from "react";
+import { InputBase } from "@/components/base/input/input";
 import AdminOpsService from "../../../api/modules/adminOps";
-import { Field, Icon, ModalHead, Notice, SectionHead } from "../../ui";
+import { Alert, Button, Checkbox, FormField, FormSection, IconButton, Input, ModalShell, Textarea } from "../../ui";
 import { can } from "../../shell/AdminShell";
 import { val } from "../teamShared";
 import { call, rupees } from "./api";
 import type { Cycle, Feature, Plan } from "./api";
-import { familyLabel, money } from "./helpers";
+import { familyLabel, money, monthsLabel } from "./helpers";
 
 /* An existing cycle carries its server id; a row added here has id 0 and is
    created on save. Strings throughout — these are text inputs, and a blank
@@ -163,150 +172,206 @@ export default function PlanModal({ plan, families, onClose, onDone }: {
   };
 
   return (
-    <>
-      <ModalHead title={isNew ? "Create plan" : "Edit plan"} sub={isNew ? "Everything about the plan, on one form" : "#" + pl.id + " · " + familyLabel(pl.family)} mono={!isNew} onClose={onClose} />
+    <ModalShell
+      title={isNew ? "Create plan" : "Edit plan"}
+      sub={isNew ? "Everything about the plan, on one form" : "#" + pl.id + " · " + familyLabel(pl.family)}
+      mono={!isNew}
+      onClose={onClose}
+      actions={<>
+        <Button color="secondary" data-close="1" onClick={onClose} isDisabled={busy}>Cancel</Button>
+        <Button color="primary" data-act="pl-save" data-ref={pl ? pl.id : undefined}
+          isLoading={busy} showTextWhileLoading onClick={save}>
+          {isNew ? "Create plan" : "Save changes"}
+        </Button>
+      </>}
+    >
+      <div className="flex flex-col gap-6">
+        {err ? <div id="plErr"><Alert tone="bad" title={err} /></div> : null}
 
-      <div className="md-b">
-        <div id="plErr">
-          {err ? <Notice tone="bad" text={<b>{err}</b>} /> : null}
-        </div>
-
-        <SectionHead title="Plan information" />
-        <Field id="plTitle" label="Plan title" req value={pl ? pl.title : ""} ph="Growth" />
-        {isNew
-          ? <Field id="plFamily" label="Family" req custom={
-              <>
-                <input className="inp" id="plFamily" list="plFamilyList" placeholder="business"
-                  defaultValue={families[0] || "business"} />
-                <datalist id="plFamilyList">
-                  {families.map((f) => <option key={f} value={f} />)}
-                </datalist>
-                <div className="help">
-                  Decides what buying it unlocks — a plan under <span className="mono">architect</span>{" "}
+        <FormSection title="Plan information">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormField id="plTitle" label="Plan title" req>
+              <Input id="plTitle" defaultValue={pl ? pl.title : ""} ph="Growth" autoFocus />
+            </FormField>
+            {isNew
+              ? <FormField id="plFamily" label="Family" req hint={<>
+                  Decides what buying it unlocks — a plan under <span className="font-mono">architect</span>{" "}
                   entitles an architect profile. Pick an existing family unless you are genuinely
-                  starting a new one; <b>it cannot be changed afterwards.</b>
+                  starting a new one; <b className="font-semibold">it cannot be changed afterwards.</b>
+                </>}>
+                  <InputBase id="plFamily" size="sm" list="plFamilyList" placeholder="business"
+                    defaultValue={families[0] || "business"} />
+                  <datalist id="plFamilyList">
+                    {families.map((f) => <option key={f} value={f} />)}
+                  </datalist>
+                </FormField>
+              : <FormField id="plFamilyRO" label="Family"
+                  hint="Fixed at creation — it decides what a purchase unlocks, and moving a sold plan between families would strand the entitlements already granted.">
+                  <Input id="plFamilyRO" readOnly value={familyLabel(pl.family)} />
+                </FormField>}
+          </div>
+
+          <FormField id="plSubtitle" label="Description" hint="Shown under the title on the catalogue list.">
+            <Textarea id="plSubtitle" rows={2} defaultValue={pl ? pl.subtitle : ""}
+              ph="One line an agent can read out on a call." />
+          </FormField>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <FormField id="plTag" label="Tag" hint="The plan's key on the public page.">
+              <Input id="plTag" defaultValue={pl ? pl.tag : ""} ph="business-starter" mono />
+            </FormField>
+            <FormField id="plBadge" label="Ribbon" hint="Printed across the corner of the card.">
+              <Input id="plBadge" defaultValue={pl ? pl.badge : ""} ph="Most popular" />
+            </FormField>
+            <FormField id="plBadgeIcon" label="Ribbon icon" hint="A tabler icon name.">
+              <Input id="plBadgeIcon" defaultValue={pl ? pl.badgeIcon : ""} ph="star" mono />
+            </FormField>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <FormField id="plTier" label="Upgrade tier" hint="Rank inside the family, 1 = entry. Upgrades are judged on it.">
+              <Input id="plTier" type="number" min={0} step={1} defaultValue={pl ? String(pl.tier) : "1"} />
+            </FormField>
+            <FormField id="plIndex" label="Card order" hint="Which slot the card takes on the public page, 1 = first. Blank appends it last.">
+              <Input id="plIndex" type="number" min={0} step={1} defaultValue={pl && pl.displayIndex ? String(pl.displayIndex) : ""} />
+            </FormField>
+          </div>
+        </FormSection>
+
+        <FormSection title="Pricing" desc={mayPrice
+          ? "What a buyer pays, per duration. The checkout charges these — Was is the struck-through figure on the public card and only shows when it is above the price."
+          : "What a buyer pays, per duration."}>
+          {mayPrice
+            ? <>
+                <ul id="plGrid" className="flex flex-col gap-3">
+                  {rows.map((r, i) => (
+                    <CycleCard key={i} r={r} i={i} n={rows.length}
+                      onPatch={(patch) => setRow(i, patch)}
+                      onRemove={() => setRows((rs) => {
+                        const out = rs.filter((_, j) => j !== i);
+                        return out.length ? out : [blankRow()];
+                      })} />
+                  ))}
+                </ul>
+                <div>
+                  <Button color="secondary" ico="plus" data-act="pl-row-add"
+                    onClick={() => setRows((rs) => rs.concat([blankRow()]))}>Add duration</Button>
                 </div>
+                <p className="text-sm text-tertiary">
+                  A duration switched off keeps its history but disappears from the card. Removing one
+                  deletes it outright if nobody ever bought it, and switches it off if somebody did.
+                </p>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                  <FormField id="plAmount" label="Ranking amount ₹"
+                    hint="NOT charged to anybody. It ranks plans against each other, so it should track the annual price.">
+                    <Input id="plAmount" type="number" min={0} step={100} mono defaultValue={pl && pl.amount ? String(pl.amount) : ""} />
+                  </FormField>
+                  <FormField id="plPayable" label="Payable amount ₹"
+                    hint="Legacy figure on the plan row. Keep it equal to the ranking amount.">
+                    <Input id="plPayable" type="number" min={0} step={100} mono defaultValue={pl && pl.payable ? String(pl.payable) : ""} />
+                  </FormField>
+                  <FormField id="plDuration" label="Default duration (months)"
+                    hint="Fallback term when a plan is granted by hand.">
+                    <Input id="plDuration" defaultValue={pl ? pl.duration : "12"} />
+                  </FormField>
+                </div>
+
+                <Alert tone="warn" ico="alert" title="Activating a plan worth less than the one a buyer already holds silently expires it.">
+                  The ranking amount is what decides that, and it is not the price — leaving it unset is a
+                  real hazard, not a blank field.
+                </Alert>
               </>
-            } />
-          : <Field id="plFamilyRO" label="Family" value={familyLabel(pl.family)} ro
-              help="Fixed at creation — it decides what a purchase unlocks, and moving a sold plan between families would strand the entitlements already granted." />}
-        <Field id="plSubtitle" label="Description" type="textarea" value={pl ? pl.subtitle : ""}
-          ph="One line an agent can read out on a call."
-          help="Shown under the title on the catalogue list." />
-        <Field id="plTag" label="Tag" value={pl ? pl.tag : ""} ph="business-starter"
-          help="The plan's key on the public page. Leave it alone on an existing plan unless you know what reads it." />
-        <Field id="plBadge" label="Ribbon" value={pl ? pl.badge : ""} ph="Most popular"
-          help="Printed across the corner of the plan card. Blank for no ribbon." />
-        <Field id="plBadgeIcon" label="Ribbon icon" value={pl ? pl.badgeIcon : ""} ph="tabler icon name" />
-        <Field id="plTier" label="Upgrade tier" type="number" value={pl ? pl.tier : 1}
-          help="Rank inside the family, 1 = entry. Upgrades are judged on it." />
-        <Field id="plIndex" label="Card order" type="number" value={pl ? pl.displayIndex : ""}
-          help="Which slot the card takes on the public page, 1 = first. Siblings shift to make room; blank appends it last." />
+            : <Alert tone="info" ico="lock" title="Prices are yours to read, not to change.">
+                Editing money on the catalogue needs the Plans · pricing permission. Everything else on
+                this form still saves.
+              </Alert>}
+        </FormSection>
 
-        <SectionHead title="Pricing" desc="What a buyer pays, per duration. The checkout charges these." />
-        {mayPrice
-          ? <>
-              <div className="pl-grid" id="plGrid">
-                <div className="pl-grid-h">
-                  <span>Months</span><span>Price ₹</span><span>Was ₹</span>
-                  <span>Label</span><span>Per month</span><span>On sale</span>
+        <FormSection title="Features"
+          desc="The bullet list on the public plan card. The detail box is the smaller line printed under the bullet — left empty, no detail line is shown.">
+          <ul id="plFeats" className="flex flex-col gap-3">
+            {feats.map((f, i) => (
+              <li key={i} className="flex items-end gap-2">
+                <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 sm:grid-cols-5">
+                  <FormField cls="sm:col-span-3" id={"plFeatText" + i} label={"Feature " + (i + 1)}>
+                    <Input id={"plFeatText" + i} ph="Verified business listing" value={f.text}
+                      onChange={(v) => setFeats((fs) => fs.map((x, j) => (j === i ? { ...x, text: v } : x)))} />
+                  </FormField>
+                  <FormField cls="sm:col-span-2" id={"plFeatDetail" + i} label="Detail">
+                    <Input id={"plFeatDetail" + i} ph="Optional" value={f.detail}
+                      onChange={(v) => setFeats((fs) => fs.map((x, j) => (j === i ? { ...x, detail: v } : x)))} />
+                  </FormField>
                 </div>
-                {rows.map((r, i) => {
-                  const price = rupees(r.price), months = parseInt(r.months, 10) || 0;
-                  return (
-                    <div className="pl-row" key={i}>
-                      <input className="inp pl-base" type="number" min="1" step="1" placeholder="12"
-                        value={r.months} onChange={(e) => setRow(i, { months: e.target.value })} />
-                      <input className="inp pl-base" type="number" min="0" step="100" placeholder="0"
-                        value={r.price} onChange={(e) => setRow(i, { price: e.target.value })} />
-                      <input className="inp pl-base" type="number" min="0" step="100" placeholder="—"
-                        value={r.oldPrice} onChange={(e) => setRow(i, { oldPrice: e.target.value })} />
-                      <input className="inp" placeholder="Annual"
-                        value={r.badge} onChange={(e) => setRow(i, { badge: e.target.value })} />
-                      <span className="pl-final tnum">{price && months ? money(Math.round(price / months)) : "—"}</span>
-                      <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-                        <label className="check pl-live">
-                          <input type="checkbox" className="pl-active" checked={r.active}
-                            onChange={(e) => setRow(i, { active: e.target.checked })} /><span></span>
-                        </label>
-                        <button className="btn icon sm" data-act="pl-row-del" aria-label="Remove duration"
-                          onClick={() => setRows((rs) => {
-                            const out = rs.filter((_, j) => j !== i);
-                            return out.length ? out : [blankRow()];
-                          })}><Icon name="x" size="sm" /></button>
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-              <button className="btn sm" data-act="pl-row-add" style={{ marginTop: "8px" }}
-                onClick={() => setRows((rs) => rs.concat([blankRow()]))}>
-                <Icon name="plus" size="sm" />Add duration
-              </button>
-              <div className="help" style={{ marginTop: "8px" }}>
-                <b>Was</b> is the struck-through price on the public card, and it only shows when it is
-                higher than the price — the site prints "Save ₹x" from the difference. A duration
-                switched off keeps its history but disappears from the card. Removing a row deletes it
-                outright if nobody ever bought it, and switches it off if somebody did.
-              </div>
-              <div style={{ marginTop: "14px" }}>
-                <Field id="plAmount" label="Ranking amount ₹" type="number" value={pl ? pl.amount : ""}
-                  help="NOT charged to anybody. It ranks plans against each other — activating a plan worth less than the one a user already holds silently expires it — so it should track the annual price." />
-                <Field id="plPayable" label="Payable amount ₹" type="number" value={pl ? pl.payable : ""}
-                  help="Legacy figure on the plan row itself. Keep it equal to the ranking amount unless you know what still reads it." />
-                <Field id="plDuration" label="Default duration (months)" value={pl ? pl.duration : "12"}
-                  help="Fallback term when a plan is granted by hand and no duration is given." />
-              </div>
-            </>
-          : <Notice ico="lock" text={<>
-              <b>Prices are yours to read, not to change.</b> Editing money on the catalogue needs the
-              Plans · pricing permission. Everything else on this form still saves.
-            </>} />}
-
-        <SectionHead title="Features"
-          desc="The bullet list on the public plan card. The second box is the smaller detail
-                line printed under the bullet — left empty, no detail line is shown." />
-        <div id="plFeats">
-          {feats.map((f, i) => (
-            <div className="pl-frow" key={i}>
-              <input className="inp pl-flabel" placeholder="Verified business listing" value={f.text}
-                onChange={(e) => setFeats((fs) => fs.map((x, j) =>
-                  (j === i ? { ...x, text: e.target.value } : x)))} />
-              <input className="inp pl-fdetail" placeholder="Detail (optional)" value={f.detail}
-                onChange={(e) => setFeats((fs) => fs.map((x, j) =>
-                  (j === i ? { ...x, detail: e.target.value } : x)))} />
-              <button className="btn icon sm" data-act="pl-feat-del" aria-label="Remove"
-                onClick={() => setFeats((fs) => {
-                  const out = fs.filter((_, j) => j !== i);
-                  return out.length ? out : [{ text: "", detail: "" }];
-                })}><Icon name="x" size="sm" /></button>
-            </div>
-          ))}
-        </div>
-        <button className="btn sm" data-act="pl-feat-add" style={{ marginTop: "8px" }}
-          onClick={() => setFeats((fs) => fs.concat([{ text: "", detail: "" }]))}>
-          <Icon name="plus" size="sm" />Add feature
-        </button>
+                <IconButton ico="trash" size="sm" label={"Remove feature " + (i + 1)} data-act="pl-feat-del"
+                  onClick={() => setFeats((fs) => {
+                    const out = fs.filter((_, j) => j !== i);
+                    return out.length ? out : [{ text: "", detail: "" }];
+                  })} />
+              </li>
+            ))}
+          </ul>
+          <div>
+            <Button color="secondary" ico="plus" data-act="pl-feat-add"
+              onClick={() => setFeats((fs) => fs.concat([{ text: "", detail: "" }]))}>Add feature</Button>
+          </div>
+        </FormSection>
 
         {isNew
-          ? <Notice ico="alert" text={<>
-              <b>A new plan is on sale the moment it is created.</b> It appears on the public plans
-              page straight away — take it off sale from the drawer if it is not ready.
-            </>} />
-          : <Notice ico="lock" text={<>
-              <b>Saving changes what the next buyer pays, immediately.</b> Subscriptions already sold
-              keep the price they were bought at.
-            </>} />}
+          ? <Alert tone="warn" ico="alert" title="A new plan is on sale the moment it is created.">
+              It appears on the public plans page straight away — take it off sale from the drawer if it
+              is not ready.
+            </Alert>
+          : <Alert tone="info" ico="lock" title="Saving changes what the next buyer pays, immediately.">
+              Subscriptions already sold keep the price they were bought at.
+            </Alert>}
       </div>
+    </ModalShell>
+  );
+}
 
-      <div className="md-f">
-        <span className="spacer"></span>
-        <button className="btn" data-close="1" onClick={onClose}>Cancel</button>
-        <button className="btn pri" data-act="pl-save" data-ref={pl ? pl.id : undefined}
-          disabled={busy} onClick={save}>
-          {busy ? "Saving…" : isNew ? "Create plan" : "Save changes"}
-        </button>
+/* ONE DURATION, as a card: the four numbers that decide what a buyer pays,
+   each with a label somebody can read, and the per-month figure computed
+   beside them so a price can be sanity-checked without arithmetic. */
+function CycleCard({ r, i, n, onPatch, onRemove }: {
+  r: RowState; i: number; n: number;
+  onPatch: (patch: Partial<RowState>) => void;
+  onRemove: () => void;
+}) {
+  const price = rupees(r.price);
+  const months = parseInt(r.months, 10) || 0;
+  return (
+    <li className="flex flex-col gap-3 rounded-lg bg-secondary p-3 ring-1 ring-secondary">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <span className="label-mono">{months ? monthsLabel(months) : "New duration"}</span>
+        <span className="text-xs text-tertiary tnum">
+          {price && months ? money(Math.round(price / months)) + " / month" : "—"}
+        </span>
+        <span className="ml-auto flex items-center gap-2">
+          <Checkbox id={"plCycleOn" + i} checked={r.active} label="On sale"
+            onChange={(v) => onPatch({ active: v })} />
+          <IconButton ico="trash" size="sm" data-act="pl-row-del"
+            label={n > 1 ? "Remove this duration" : "Clear this duration"} onClick={onRemove} />
+        </span>
       </div>
-    </>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-4">
+        <FormField id={"plCycleM" + i} label="Months">
+          <Input id={"plCycleM" + i} type="number" min={1} step={1} ph="12" value={r.months}
+            onChange={(v) => onPatch({ months: v })} />
+        </FormField>
+        <FormField id={"plCycleP" + i} label="Price ₹">
+          <Input id={"plCycleP" + i} type="number" min={0} step={100} ph="0" mono value={r.price}
+            onChange={(v) => onPatch({ price: v })} />
+        </FormField>
+        <FormField id={"plCycleO" + i} label="Was ₹">
+          <Input id={"plCycleO" + i} type="number" min={0} step={100} ph="—" mono value={r.oldPrice}
+            onChange={(v) => onPatch({ oldPrice: v })} />
+        </FormField>
+        <FormField id={"plCycleL" + i} label="Label">
+          <Input id={"plCycleL" + i} ph="Annual" value={r.badge}
+            onChange={(v) => onPatch({ badge: v })} />
+        </FormField>
+      </div>
+    </li>
   );
 }

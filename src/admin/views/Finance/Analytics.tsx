@@ -37,11 +37,14 @@
    from module.json, so a screenshot taken next March still says August 2026.
    ============================================================================= */
 import { useShell } from "../../shell/ShellContext";
-import { Icon } from "../../ui";
+import {
+  ActivityFeed, Card, ChartFrame, Icon, ListTable, Meter, Rail, Table, Tiles,
+} from "../../ui";
+import type { TileProps } from "../../ui";
 import { go } from "../../ui/nav";
-import { SubTabs, Block, Blocks, Frame } from "./Frame";
+import { Blocks, Frame, SubTabs } from "./Frame";
 import type { FaceProps } from "./Frame";
-import { Assumed, Dir, Money, TagChip, Unavailable } from "./bits";
+import { Assumed, Dir, Fine, Ledger, LedgerRow, Money, TagChip, Unavailable } from "./bits";
 import { KpiTip, MetricTip } from "./InfoTip";
 import { BarRows, SignedColumns, Spark, Waterfall } from "../charts";
 import type { BarRow, SignedPoint, WaterStep } from "../charts";
@@ -94,56 +97,71 @@ function kpiValue(v: number, unit: Kpi["unit"]): string {
   return v.toLocaleString("en-IN");
 }
 
-/** One decision metric.
+/** One decision metric, on the panel's own stat tile.
  *
- *  FOUR STATES, and the two null ones are the reason this is not a tile that
- *  prints a number. `runway` and `cost_per_head` return null on purpose; a zero
- *  or a dash in either is a decision made on a wrong number, so the reason
- *  takes the value's place and the card says which kind of null it is —
- *  waiting on a write, or deliberately never computed here.
+ *  FOUR STATES, and the two null ones are the reason a KPI is not simply a
+ *  number. `runway` and `cost_per_head` return null on purpose; a zero or a
+ *  dash in either is a decision made on a wrong number, so the reason takes the
+ *  value's place and the tile says which kind of null it is — waiting on a
+ *  write, or deliberately never computed here.
  *
  *  A SPARKLINE ONLY WHERE THERE IS A SERIES. Most metrics on this page have one
  *  month behind them; a flat line drawn from a single reading is a claim about
- *  stability the records do not make, so the card says "first reading" instead.
+ *  stability the records do not make, so the tile says "first reading" instead.
  *  The store returns null for those and the chart renders nothing. */
-function KpiTile({ k, priorLabel, note }: { k: Kpi; priorLabel: string | null; note?: string }) {
+function kpiTile(k: Kpi, priorLabel: string | null, note?: string): TileProps {
   if (k.value === null) {
-    return (
-      <div className="fin-kpi na">
-        <div className="k">{k.label}<KpiTip k={k.key} /></div>
-        <p className="why">{k.why || "The inputs this metric needs are not in these records."}</p>
-        <div className="foot">
-          <span className="stamp">{k.why && k.why.indexOf("FN-OD") >= 0
-            ? "deliberately not computed" : "not computed — and not zero"}</span>
+    return {
+      k: <>{k.label}<KpiTip k={k.key} /></>,
+      v: "—",
+      /* THE REASON GOES IN `foot`, NOT IN `s`. The tile truncates its sub-line
+         to one line, and the whole point of a null KPI is the sentence saying
+         which kind of null it is — a caveat cut off mid-word is worse than no
+         caveat, because it looks like it was said. */
+      foot: (
+        <>
+          <span className="w-full text-xs leading-relaxed text-tertiary">
+            {k.why || "The inputs this metric needs are not in these records."}
+          </span>
+          <span className="label-mono">
+            {k.why && k.why.indexOf("FN-OD") >= 0 ? "deliberately not computed" : "not computed — and not zero"}
+          </span>
           {k.prior !== null
-            ? <span className="was">{priorLabel} {kpiValue(k.prior, k.unit)}</span>
+            ? <span className="text-quaternary tnum">{priorLabel} · {kpiValue(k.prior, k.unit)}</span>
             : null}
-        </div>
-      </div>
-    );
+        </>
+      ),
+    };
   }
   const series = kpiSeries(k.key);
   /* The movement is toned by `goodDirection` and never described in words: a
      falling burn and a falling MRR are the same arrow and opposite news. */
   const d = k.prior === null ? null : delta(k.value, k.prior);
-  const tone = !d ? "" : d.tone === "mute" ? "flat"
-    : (d.tone === "up") === (k.goodDirection === "up") ? "good" : "poor";
-  return (
-    <div className="fin-kpi">
-      <div className="k">{k.label}<KpiTip k={k.key} /></div>
-      <div className="v tnum">{kpiValue(k.value, k.unit)}</div>
-      <div className="foot">
-        {d
-          ? <span className={"d " + tone}>{d.text}</span>
-          : <span className="first">first reading</span>}
+  return {
+    k: <>{k.label}<KpiTip k={k.key} /></>,
+    v: kpiValue(k.value, k.unit),
+    delta: d && d.tone !== "mute"
+      ? {
+        dir: d.tone === "up" ? "up" : "down",
+        text: d.text,
+        good: (d.tone === "up") === (k.goodDirection === "up"),
+        of: priorLabel ? "vs " + priorLabel : undefined,
+      }
+      : undefined,
+    foot: (
+      <>
+        {!d ? <span className="text-quaternary">first reading</span>
+          : d.tone === "mute" ? <span className="text-quaternary">{d.text}</span> : null}
         {series
           ? <Spark values={series} tone={SPARK_TONE[k.key] || "s1"}
               label={k.label + " over " + series.length + " months"} />
           : null}
-      </div>
-      {note ? <p className="caveat">{note}</p> : null}
-    </div>
-  );
+        {/* THE CAVEAT WRAPS, on its own line. It is the sentence that stops a
+            wrong decision, and the tile's one-line sub would clip it. */}
+        {note ? <span className="w-full text-xs leading-relaxed text-warning-primary">{note}</span> : null}
+      </>
+    ),
+  };
 }
 
 /* ============================================================ overview === */
@@ -185,7 +203,7 @@ function Overview() {
     value: Math.round(r.spentPaise / 100),
     hint: r.pctOfBudget === null
       ? <>{r.n} payment{r.n === 1 ? "" : "s"}</>
-      : <span className={r.overBudget ? "bad" : undefined}>{r.pctOfBudget}% of budget</span>,
+      : <span className={r.overBudget ? "text-error-primary" : undefined}>{r.pctOfBudget}% of budget</span>,
     /* The hover line is a description too, and it was a sentence. Four facts,
        separated, is what a tooltip is for. */
     title: inr(r.spentPaise) + " · " + r.n + " payment" + (r.n === 1 ? "" : "s")
@@ -193,182 +211,196 @@ function Overview() {
   }));
 
   return (
-    <Blocks>
-      {/* ================================================== the arithmetic === */}
-      <Block wide title={PERIOD.label}
-        right={<span className="fin-sum">as of <b>{fmtDate(todayIso())}</b></span>}>
-        <div className="fin-wfsplit">
-          <div className="fin-hero">
-            <div className="k">Net<MetricTip k="net" /></div>
-            <div className={"v tnum " + (o.netPaise >= 0 ? "ok" : "bad")}>{inr(o.netPaise)}</div>
-            <div className="s">cash, not profit</div>
-            <dl className="fin-heroin">
-              <div><dt>Collected</dt><dd className="tnum">{inr(o.collectedPaise)}</dd></div>
-              <div><dt>Other income</dt><dd className="tnum">{inr(o.otherInPaise)}</dd></div>
-              <div><dt>Out</dt><dd className="tnum">{inr(o.outPaise)}</dd></div>
-            </dl>
-            {o.salaryN ? null : (
-              <p className="fin-caveat">
-                <Icon name="alert" size="sm" />
-                No salary run has been paid into this period yet — the largest cost is not in the
-                figure above.
-              </p>
-            )}
-          </div>
-          <div className="fin-wfplot">
-            <Waterfall steps={wf} unit="₹ thousand" />
-          </div>
-        </div>
-      </Block>
+    <div className="flex min-w-0 flex-col gap-5">
+      {/* ================================================== the arithmetic ===
+          THE FOUR FIGURES THE WATERFALL DRAWS, as tiles above it. They stood in
+          a tall panel BESIDE the chart, which meant a 90px card stretched to a
+          400px chart's height with nothing in the gap — and the reading order
+          was sideways where every other page in the panel reads down. */}
+      <Tiles cols={4} list={[
+        { k: <>Net · {PERIOD.label}<MetricTip k="net" /></>,
+          v: inr(o.netPaise), tone: o.netPaise >= 0 ? "ok" : "bad", s: "cash, not profit",
+          foot: <span className="label-mono">as of {fmtDate(todayIso())}</span> },
+        { k: "Collected", v: inr(o.collectedPaise),
+          s: o.collectedN + " installment" + (o.collectedN === 1 ? "" : "s") + " settled" },
+        { k: "Other income", v: inr(o.otherInPaise),
+          s: o.otherInN + " credit" + (o.otherInN === 1 ? "" : "s") + " · never revenue" },
+        { k: "Out", v: inr(o.outPaise), s: "salary, other spend and refunds together" },
+      ]} />
+
+      <ChartFrame title={"Where " + PERIOD.label + " went"}
+        note={o.salaryN ? undefined : (
+          <span className="inline-flex items-start gap-1.5 text-warning-primary">
+            <Icon name="alert" size="xs" className="mt-0.5 shrink-0" />
+            No salary run has been paid into this period yet — the largest cost is not in the
+            figures above.
+          </span>
+        )}>
+        <Waterfall steps={wf} unit="₹ thousand" />
+      </ChartFrame>
 
       {/* ==================================================== net by month === */}
-      <Block wide title="Net by month"
-        right={<span className="fin-sum">{months.length} month{months.length === 1 ? "" : "s"} in these records</span>}>
+      <ChartFrame title="Net by month"
+        right={<span className="label-mono">{months.length} month{months.length === 1 ? "" : "s"} in these records</span>}>
         {months.length > 1 ? (
           <SignedColumns points={net} groups={years} unit="₹ lakh" />
         ) : (
           <Unavailable title="One month is not a trend."
             why="Built from the records, not a calendar — it appears as months accumulate." />
         )}
-      </Block>
+      </ChartFrame>
 
-      {/* ============================================ where it went | risk === */}
-      <Block title="Where it went" desc={"by tag · " + PERIOD.label}
-        right={<span className="fin-sum">{inr(tags.totalPaise)} out</span>}>
-        {spendRows.length
-          ? <BarRows rows={spendRows} unit="₹" />
-          : <Unavailable title="Nothing was spent under any tag in this period."
-              why="An empty list is a month with no outgoing transaction, not a missing figure." />}
-      </Block>
+      <Blocks>
+        {/* ============================================ where it went | risk === */}
+        <ChartFrame title={"Where it went · by tag · " + PERIOD.label}
+          right={<span className="label-mono">{inr(tags.totalPaise)} out</span>}>
+          {spendRows.length
+            ? <BarRows rows={spendRows} unit="₹" />
+            : <Unavailable title="Nothing was spent under any tag in this period."
+                why="An empty list is a month with no outgoing transaction, not a missing figure." />}
+        </ChartFrame>
 
-      {/* NO FOOTER SAYING THESE ARE NEVER ADDED. The table has no total row, the
-          rails are four different colours and the neutral one is on the row that
-          is not a problem — the form already refuses the sum a sentence was
-          asking the reader not to make. */}
-      <Block title="Not where it should be" desc="never added together">
-        <table className="tbl fin-risk">
-          <thead>
-            <tr><th>What</th><th className="n">Amount</th><th>Count</th><th /></tr>
-          </thead>
-          <tbody>
-            {risk.map((r) => (
+        {/* NO FOOTER SAYING THESE ARE NEVER ADDED. The table has no total row, the
+            rails are four different colours and the neutral one is on the row that
+            is not a problem — the form already refuses the sum a sentence was
+            asking the reader not to make. */}
+        <Card flush title="Not where it should be" sub="never added together">
+          <Table list
+            cols={[
+              { label: "", cls: "rail" },
+              { label: "What" },
+              { label: "Amount", cls: "n" },
+              { label: "Count", cls: "c" },
+              { label: <span className="sr-only">Go</span>, cls: "acts" },
+            ]}
+            rows={risk.map((r) => (
               <tr key={r.key}>
-                <td><span className="lab"><i className={"rail " + r.tone} />{r.label}</span></td>
-                <td className={"n tnum " + r.tone}>
-                  {r.paise !== null ? inr(r.paise) : r.figure}
-                </td>
-                <td className="faint">{r.count}</td>
-                <td className="n">
-                  {r.to ? <a onClick={() => go(r.to as string)}>{r.toLabel}</a>
-                    : <span className="faint">{r.toLabel}</span>}
+                <Rail tone={r.tone} />
+                <td className="cell-1">{r.label}</td>
+                <td className="n">{r.paise !== null ? inr(r.paise) : r.figure}</td>
+                <td className="c faint">{r.count}</td>
+                <td className="acts">
+                  {r.to
+                    ? <a href={r.to} data-go={r.to}
+                        className="rounded text-sm font-medium text-brand-secondary outline-focus-ring hover:underline focus-visible:outline-2 focus-visible:outline-offset-2"
+                        onClick={(e) => { e.preventDefault(); go(r.to as string); }}>{r.toLabel}</a>
+                    : <span className="text-quaternary">{r.toLabel}</span>}
                 </td>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </Block>
+            ))} />
+        </Card>
+      </Blocks>
 
       {/* ================================================ matched to bank === */}
-      <Block wide title="Matched to bank" desc="completeness, never correctness"
+      <Card
+        title="Matched to bank"
+        sub="completeness, never correctness"
         right={recon.stmt
-          ? <span className="fin-sum">
-              {recon.stmt.closed ? "window closed" : "window open"} · <b className="mono">{recon.stmt.stmtId}</b>
+          ? <span className="label-mono">
+              {recon.stmt.closed ? "window closed" : "window open"} · {recon.stmt.stmtId}
             </span>
           : null}
         foot={<Assumed id="FN-OD-02" />}>
         {recon.stmt ? (
-          <>
-            <div className="fin-match">
-              <div className="fig">
-                <div className="v tnum">{matched === null ? "—" : pct(matched)}</div>
-                <div className="k">{recon.matchedN} of {recon.lines.length} lines</div>
-              </div>
-              <div className="bar">
-                <div className="track">
-                  <i className="ok" style={{ flexGrow: recon.matchedN }} />
-                  {recon.bankOnly.length
-                    ? <i className="bad" style={{ flexGrow: recon.bankOnly.length }} />
-                    : null}
+          <div className="flex min-w-0 flex-col gap-4">
+            <div className="grid grid-cols-1 items-center gap-4 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
+              <div className="min-w-0">
+                <div className="text-display-xs font-semibold tracking-tight text-primary tnum">
+                  {matched === null ? "—" : pct(matched)}
                 </div>
-                <div className="legend">
-                  <span>matched to a record</span>
-                  <span className={recon.bankOnly.length ? "bad" : "faint"}>
+                <div className="label-mono mt-0.5">{recon.matchedN} of {recon.lines.length} lines</div>
+              </div>
+              <div className="min-w-0">
+                <Meter value={matched === null ? 0 : matched} tone={recon.bankOnly.length ? "warn" : "ok"}
+                  label="Share of bank lines matched to a record" />
+                <div className="mt-1.5 flex flex-wrap justify-between gap-x-4 text-xs">
+                  <span className="text-tertiary">matched to a record</span>
+                  <span className={recon.bankOnly.length ? "text-error-primary" : "text-quaternary"}>
                     {recon.bankOnly.length
                       ? recon.bankOnly.length + " unexplained · the window cannot close"
                       : "every line ties to a record"}
                   </span>
                 </div>
               </div>
-              <div className="acct">
-                <div className="k">Account</div>
-                <div className="v">{accountOf(recon.stmt.accountId)?.name || recon.stmt.accountId}</div>
-                <div className="s mono">{accountOf(recon.stmt.accountId)?.masked || "—"}</div>
+              <div className="min-w-0">
+                <div className="label-mono">Account</div>
+                <div className="text-sm font-medium text-primary">
+                  {accountOf(recon.stmt.accountId)?.name || recon.stmt.accountId}
+                </div>
+                <div className="font-mono text-xs text-tertiary tnum">
+                  {accountOf(recon.stmt.accountId)?.masked || "—"}
+                </div>
               </div>
             </div>
 
             {recon.bankOnly.length ? (
-              <table className="tbl">
-                <thead>
-                  <tr>
-                    <th>Date</th><th>Direction</th><th className="n">Amount</th>
-                    <th>Reference</th><th>Counterparty</th>
+              <ListTable min="52rem" head={<tr>
+                <th className="rail" />
+                <th scope="col">Date</th>
+                <th scope="col">Direction</th>
+                <th scope="col" className="n">Amount</th>
+                <th scope="col">Reference</th>
+                <th scope="col">Counterparty</th>
+              </tr>}>
+                {recon.bankOnly.map((b) => (
+                  <tr key={b.line.lineId}>
+                    <Rail tone="bad" />
+                    <td className="whitespace-nowrap">{fmtDate(b.line.date)}</td>
+                    <td><Dir d={b.line.dir === "credit" ? "in" : "out"} /></td>
+                    <td className="n"><Money paise={b.line.amountPaise} /></td>
+                    <td className="mono">{b.line.reference}</td>
+                    <td>
+                      <div className="cell-1">{b.line.counterparty}</div>
+                      <div className="cell-2">{b.line.narration}</div>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {recon.bankOnly.map((b) => (
-                    <tr key={b.line.lineId}>
-                      <td>{fmtDate(b.line.date)}</td>
-                      <td><Dir d={b.line.dir === "credit" ? "in" : "out"} /></td>
-                      <td className="n"><Money paise={b.line.amountPaise} /></td>
-                      <td className="mono">{b.line.reference}</td>
-                      <td>{b.line.counterparty}<div className="fin-fine">{b.line.narration}</div></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                ))}
+              </ListTable>
             ) : null}
-          </>
+          </div>
         ) : (
           <Unavailable title="No statement has been imported."
             why="Computed from no bank lines, completeness would read 100% for the wrong reason." />
         )}
-      </Block>
+      </Card>
 
-      {/* ========================================================== tax === */}
-      <Block title="Tax invoiced" desc="not a return"
-        right={<span className="fin-sum">{tax.n} invoice{tax.n === 1 ? "" : "s"}</span>}
-        foot={<Assumed id="FN-OD-08" />}>
-        <div className="fin-summary">
-          <div className="row"><span className="l">Taxable value</span><span className="tnum">{inr(tax.taxablePaise)}</span></div>
-          <div className="row"><span className="l">CGST</span><span className="tnum">{inr(tax.cgstPaise)}</span></div>
-          <div className="row"><span className="l">SGST</span><span className="tnum">{inr(tax.sgstPaise)}</span></div>
-          <div className="row"><span className="l">IGST</span><span className="tnum">{inr(tax.igstPaise)}</span></div>
-          <div className="row grand"><span className="l">Total tax invoiced</span><span className="tnum">{inr(tax.totalTaxPaise)}</span></div>
-        </div>
-      </Block>
+      <Blocks>
+        {/* ========================================================== tax === */}
+        <Card title="Tax invoiced" sub="not a return"
+          right={<span className="label-mono">{tax.n} invoice{tax.n === 1 ? "" : "s"}</span>}
+          foot={<Assumed id="FN-OD-08" />}>
+          <Ledger>
+            <LedgerRow label="Taxable value">{inr(tax.taxablePaise)}</LedgerRow>
+            <LedgerRow label="CGST">{inr(tax.cgstPaise)}</LedgerRow>
+            <LedgerRow label="SGST">{inr(tax.sgstPaise)}</LedgerRow>
+            <LedgerRow label="IGST">{inr(tax.igstPaise)}</LedgerRow>
+            <LedgerRow label="Total tax invoiced" grand>{inr(tax.totalTaxPaise)}</LedgerRow>
+          </Ledger>
+        </Card>
 
-      {/* ===================================================== activity === */}
-      <Block wide title="Just happened" desc="last eight writes">
-        {activity.length ? (
-          <div className="fin-evlist">
-            {activity.map((e, i) => {
+        {/* ===================================================== activity === */}
+        <Card title="Just happened" sub="last eight writes">
+          {activity.length ? (
+            <ActivityFeed items={activity.map((e) => {
               const m = eventMeta(e.type);
-              return (
-                <div className="fin-ev" key={e.at + ":" + i}>
-                  <span className={"ty" + (m?.tone ? " " + m.tone : "")} title={e.type}>{m?.label || e.type}</span>
-                  <span className="tx"><b className="mono">{e.ref}</b> — {e.note || "—"}</span>
-                  <span className="wh">{e.actor}</span>
-                  <span className="wn" title={e.at}>{ago(e.at)}</span>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <Unavailable title="Nothing has been written in this session."
-            why="The seed is what happened before this tab opened; this is what happens inside it." />
-        )}
-      </Block>
-    </Blocks>
+              return {
+                ico: "history",
+                what: (
+                  <>
+                    <b className="font-mono font-medium text-primary">{e.ref}</b>
+                    {" — "}{e.note || "—"}
+                  </>
+                ),
+                when: <>{m?.label || e.type} · {e.actor} · {ago(e.at)}</>,
+              };
+            })} />
+          ) : (
+            <Unavailable title="Nothing has been written in this session."
+              why="The seed is what happened before this tab opened; this is what happens inside it." />
+          )}
+        </Card>
+      </Blocks>
+    </div>
   );
 }
 
@@ -405,28 +437,31 @@ function Kpis() {
   });
 
   return (
-    <Blocks>
+    <div className="flex min-w-0 flex-col gap-6">
       {order.map((g) => (
-        <Block key={g} wide title={g} desc={GROUP_DECIDES[g] || "read together"}
-          right={<span className="fin-sum">
-            {priorLabel ? "movement against " + priorLabel : PERIOD.label}
-          </span>}>
-          <div className="fin-kpis">
-            {byGroup[g].map((k) => (
-              <KpiTile key={k.key} k={k} priorLabel={priorLabel}
-                note={caveatFor(k, !!o.salaryN)} />
-            ))}
+        <section key={g} className="flex min-w-0 flex-col gap-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <div className="min-w-0">
+              <h2 className="text-md font-semibold text-primary">{g}</h2>
+              <p className="mt-0.5 text-sm text-tertiary">{GROUP_DECIDES[g] || "read together"}</p>
+            </div>
+            <span className="label-mono">
+              {priorLabel ? "movement against " + priorLabel : PERIOD.label}
+            </span>
           </div>
-        </Block>
+          <Tiles cols={3} list={byGroup[g].map((k) => kpiTile(k, priorLabel, caveatFor(k, !!o.salaryN)))} />
+        </section>
       ))}
 
-      <Block wide title="What these deliberately do not tell you"
->
-        <Assumed id="FN-OD-01" />
-        <Assumed id="FN-OD-06" />
-        <Assumed id="FN-OD-07" />
-      </Block>
-    </Blocks>
+      <Card title="What these deliberately do not tell you"
+        sub="three open decisions, stated rather than quietly assumed">
+        <div className="flex flex-col gap-2">
+          <Assumed id="FN-OD-01" />
+          <Assumed id="FN-OD-06" />
+          <Assumed id="FN-OD-07" />
+        </div>
+      </Card>
+    </div>
   );
 }
 
@@ -438,14 +473,19 @@ export default function Analytics({ p, onParams }: FaceProps) {
 
   return (
     <Frame toast={toast}
-      cmd={<>
+      title="Analytics"
+      meta={
+        <>
+          <span className="label-mono">Period {PERIOD.label}</span>
+          <span className="label-mono">as of {fmtDate(todayIso())}</span>
+        </>
+      }
+      cmd={
         <SubTabs cur={tab}
           items={[{ k: "overview", label: "Overview" }, { k: "kpi", label: "KPI" }]}
-          onPick={(k) => onParams({ tab: k === "overview" ? undefined : k })} />
-        <span className="fin-sum">
-          Period <b>{PERIOD.label}</b> · one clock, from the module seed
-        </span>
-      </>}>
+          onPick={(k) => onParams({ tab: k === "overview" ? undefined : k })}
+          right={<Fine>Every figure is derived from the four record types beside it — nothing here is a fifth.</Fine>} />
+      }>
       {tab === "kpi" ? <Kpis /> : <Overview />}
     </Frame>
   );

@@ -28,7 +28,7 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { hashToPath, usePageChrome } from "../../shell/AdminShell";
-import { qs } from "../../ui";
+import { qs, TbTitle } from "../../ui";
 import type { Params } from "./store";
 import { PERIOD, RECORD_TYPES, inr, useActiveCount, useSalaryRows, useSalaryTotals, useSubTotals } from "./store";
 import { ROUTE_OF, VIEW_OF } from "./Frame";
@@ -42,8 +42,6 @@ import TxnDetail from "./TxnDetail";
 import Refunds from "./Refunds";
 import RefundDetail from "./RefundDetail";
 import Analytics from "./Analytics";
-import "../charts.css";
-import "./finance.css";
 
 export const merge = (p: Params, extra: Params): Params => {
   const o: Params = { ...p };
@@ -61,6 +59,22 @@ export const listHash = (view: string, p: Params = {}) =>
   "#/" + (ROUTE_OF[view] || "finance") + qs(p as Record<string, string>);
 export const recHash = (view: string, id: string, p: Params = {}) =>
   "#/" + (ROUTE_OF[view] || "finance") + "/" + encodeURIComponent(id) + qs(p as Record<string, string>);
+
+/* THE TOPBAR FIGURE. A tracked micro-label over a tabular figure, tinted only
+   where the tone is the news — the panel's own vocabulary, so the Finance
+   topbar and the Users topbar read as one product. */
+function TbStat({ k, v, tone, title }: { k: string; v: string | number; tone?: "ok" | "warn"; title: string }) {
+  return (
+    <span className="flex min-w-0 flex-col leading-tight" title={title}>
+      <span className="label-mono truncate">{k}</span>
+      <span className={
+        tone === "ok" ? "text-sm font-semibold text-success-primary tnum"
+          : tone === "warn" ? "text-sm font-semibold text-warning-primary tnum"
+            : "text-sm font-semibold text-primary tnum"
+      }>{v}</span>
+    </span>
+  );
+}
 
 export default function Finance() {
   const raw = useParams().id;
@@ -103,96 +117,63 @@ export default function Finance() {
       {/* The title says WHICH SECTION you are in — each is its own sidebar
           row and its own module key, so "Finance" over all five named none of
           them. It is also the way up: pressing it returns to this section's
-          default view, the job the topbar's Back button used to do beside
-          it. */}
-      <button type="button" className="tb-title" title="Back to the section's default view"
-        onClick={() => navigate(hashToPath(listHash(view)), { replace: true })}>
-        {RECORD_TYPES.filter((r: { key: string; label: string }) => r.key === view)[0]?.label || "Finance"}
-      </button>
-      {/* ONE FIGURE, AND IT FOLLOWS THE SECTION. Which number depends on what
-          is on screen: how many businesses are subscribed is scope on the
-          subscriptions face and noise on the payroll one, where the question
-          is how many people are being paid.
-
-          It is `.tb-stat`, the panel's own topbar figure — the same markup
-          Users renders, so the two sections read as one panel. It used to be
-          `.fin-scope`: a bordered pill, tinted green, with a status dot and
-          the count in a second bordered well, which said its one thing three
-          times and coloured the label, against the theme's own rule that the
-          tone goes on the figure and never on the word beside it. */}
-      <span className="tb-stats">
+          default view. */}
+      <TbTitle
+        to={listHash(view)}
+        label={RECORD_TYPES.filter((r: { key: string; label: string }) => r.key === view)[0]?.label || "Finance"}
+      />
+      {/* THE FIGURES FOLLOW THE SECTION, and they are hidden on a narrow
+          topbar rather than crushed into it: which number matters depends on
+          what is on screen, and none of them is the page's own subject —
+          every one is also on the page below, under a label that says what
+          period it is for. */}
+      <span className="hidden min-w-0 items-center gap-4 border-l border-secondary pl-3 xl:flex">
         {view === "salaries" ? (
           <>
-            <span className="tb-stat ro"
+            <TbStat k="Total members" v={totals.membersAll}
               title={"Every salary account of every kind, closed ones included. "
-                + membersN + " of them are on the payroll right now."}>
-              <span className="k">Total members</span>
-              <span className="v tnum">{totals.membersAll}</span>
-            </span>
-            <span className="tb-sep" />
+                + membersN + " of them are on the payroll right now."} />
             {/* MONEY IN THE TOPBAR, WHICH THIS MODULE ONCE REFUSED — and the
                 refusal is worth restating, because it still holds where it was
                 made. Three totals used to sit here on EVERY section, including
-                the ones that had nothing to do with them: a figure with no
-                formula and no caution, repeated above pages that do not compute
-                it, is a number nobody can check. These two are the opposite
-                case. They belong to the section they appear on, they are the
-                question that section exists to answer, and they are derived
-                from the same `dueOf` the rows below use — so the header and the
-                table cannot disagree. */}
-            <span className="tb-stat ro ok"
+                the ones that had nothing to do with them. These two are the
+                opposite case: they belong to the section they appear on, and
+                they are derived from the same `dueOf` the rows below use — so
+                the header and the table cannot disagree. */}
+            <TbStat k="Total paid" v={inr(totals.paidAllPaise)} tone="ok"
               title={"Every rupee ever paid out as salary, summed off the paid slips. "
-                + inr(totals.paidPaise) + " of it in " + PERIOD.label + "."}>
-              <span className="k">Total paid</span>
-              <span className="v tnum">{inr(totals.paidAllPaise)}</span>
-            </span>
-            <span className="tb-stat ro warn"
+                + inr(totals.paidPaise) + " of it in " + PERIOD.label + "."} />
+            <TbStat k="Total unpaid" v={totals.unpaidPaise ? inr(totals.unpaidPaise) : "—"} tone="warn"
               title={totals.unpaidPeople
                 ? totals.unpaidPeople + " " + (totals.unpaidPeople === 1 ? "person is" : "people are") + " owed, arrears included."
-                : "Everybody is paid up."}>
-              <span className="k">Total unpaid</span>
-              <span className="v tnum">{totals.unpaidPaise ? inr(totals.unpaidPaise) : "—"}</span>
-            </span>
+                : "Everybody is paid up."} />
           </>
         ) : view === "subscriptions" ? (
           /* THE SAME THREE-FIGURE HEADER SALARIES A/C CARRIES: how many, what
-              came in, what has not. All time, and every one of them summed by
-              `subTotals()` — the strip on the page below and the tiles on the
-              Analytics tab read that same function, so no two of them can
-              print different money under the same word. */
+             came in, what has not. All time, and every one of them summed by
+             `subTotals()` — the strip on the page below and the tiles on the
+             Analytics tab read that same function, so no two of them can print
+             different money under the same word. */
           <>
-            <span className="tb-stat ro"
-              title="Subscriptions running right now — a level, read at this moment, not a total for any period.">
-              <span className="k">Active subscriptions</span>
-              <span className="v tnum">{subs.activeN}</span>
-            </span>
-            <span className="tb-sep" />
-            <span className="tb-stat ro ok"
+            <TbStat k="Active subscriptions" v={subs.activeN}
+              title="Subscriptions running right now — a level, read at this moment, not a total for any period." />
+            <TbStat k="Total collection" v={inr(subs.collectedPaise)} tone="ok"
               title={"Every rupee ever collected against an installment, across "
                 + subs.subs + " subscription" + (subs.subs === 1 ? "" : "s") + ". "
-                + subs.collectedN + " installment" + (subs.collectedN === 1 ? "" : "s") + " settled."}>
-              <span className="k">Total collection</span>
-              <span className="v tnum">{inr(subs.collectedPaise)}</span>
-            </span>
-            <span className="tb-stat ro warn"
+                + subs.collectedN + " installment" + (subs.collectedN === 1 ? "" : "s") + " settled."} />
+            <TbStat k="Total outstanding" v={subs.outstandingPaise ? inr(subs.outstandingPaise) : "—"} tone="warn"
               title={subs.outstandingPaise
                 ? "Agreed and not yet in the bank: " + inr(subs.duePaise) + " still expected and "
                   + inr(subs.failedPaise) + " that did not clear."
-                : "Every installment that exists has been settled."}>
-              <span className="k">Total outstanding</span>
-              <span className="v tnum">{subs.outstandingPaise ? inr(subs.outstandingPaise) : "—"}</span>
-            </span>
+                : "Every installment that exists has been settled."} />
           </>
         ) : (
-          <span className="tb-stat ro"
-            title="Subscriptions running right now — a level, read at this moment, not a total for any period.">
-            <span className="k">Active subscriptions</span>
-            <span className="v tnum">{activeN}</span>
-          </span>
+          <TbStat k="Active subscriptions" v={activeN}
+            title="Subscriptions running right now — a level, read at this moment, not a total for any period." />
         )}
       </span>
     </>
-  ), [view, activeN, membersN, navigate, subs, totals.membersAll, totals.paidPaise,
+  ), [view, activeN, membersN, subs, totals.membersAll, totals.paidPaise,
     totals.paidAllPaise, totals.unpaidPaise, totals.unpaidPeople]);
 
   usePageChrome(

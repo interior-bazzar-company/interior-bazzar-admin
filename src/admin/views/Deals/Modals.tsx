@@ -15,14 +15,14 @@
    reverse payment, raise invoice, create quotation, co-assignment splits and
    the funnel-response viewer. Every one of them read or wrote a browser-side
    store with no model behind it — there is no payment, invoice, quotation,
-   split or enquiry table server-side. They were operating on seed data that
-   the real deal list never contained, so on any live deal they either did
-   nothing or wrote a record nobody else could ever see. They come back when
-   the models do.
+   split or enquiry table server-side. They come back when the models do.
    ============================================================================= */
 import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { Field, Icon, ModalHead, Notice } from "../../ui";
+import {
+  Alert, Button, DateInput, FieldRow, FormField, FormSection, Input, ModalShell, Notice, PaneLoading,
+  Pill, Radio, Segmented, SelectInput, Textarea
+} from "../../ui";
 import { go } from "../../ui/nav";
 import { can } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
@@ -32,11 +32,9 @@ import {
   setChan, useDealApi, useDone, useRefuse, val, render
 } from "./useDeals";
 import type { Params, Refusal } from "./useDeals";
-import { ErrSlot } from "./bits";
+import { ErrSlot, StageChip } from "./bits";
 import { TagsModal } from "./Tags";
 
-/* A modal's own close button. The shell owns the layer; every dialog closes
-   the same way. */
 /* ==========================================================================
    THE ACTION TABLE
    ====================================================================== */
@@ -52,7 +50,7 @@ export function useActs(p: Params) {
      handler below has to remember the envelope. */
   const failed = (e: unknown) => refuse(refusalOf(e));
 
-  const edit = (ref: string) => modal(<EditModal dealRef={ref} onClose={close} done={done} />, "wide");
+  const edit = (ref: string) => modal(<EditModal dealRef={ref} onClose={close} done={done} />, "lg");
   const stageRemark = (ref: string, to: number, from: number) => {
     if (to === from) return;                    // not a change; nothing to explain
     modal(<StageRemarkModal dealRef={ref} to={to} from={from} onClose={close} done={done} />);
@@ -64,7 +62,7 @@ export function useActs(p: Params) {
     create() {
       if (!can("deals", "create"))
         return shell.toast("403 — you do not have deal-creation access.", "bad");
-      modal(<CreateModal onClose={close} done={done} />);
+      modal(<CreateModal onClose={close} done={done} />, "lg");
     },
     edit,
 
@@ -180,32 +178,47 @@ function useDeal(ref: string) {
   return { dl: deal, loading };
 }
 
-function Loading() {
-  return <div className="md-b"><div className="faint">Loading…</div></div>;
+/** The two footer buttons every dialog here ends on, in the panel's order:
+ *  cancel first, the commit last and primary. */
+function Commit({ onClose, onGo, busy, label, busyLabel, act, dealRef, ico, tone }: {
+  onClose: () => void; onGo: () => void; busy?: boolean; label: string; busyLabel: string;
+  act: string; dealRef?: string; ico?: string; tone?: "bad";
+}) {
+  return (
+    <>
+      <Button color="secondary" data-close="1" isDisabled={busy} onClick={onClose}>Cancel</Button>
+      <Button color={tone === "bad" ? "primary-destructive" : "primary"} ico={ico}
+        data-act={act} data-ref={dealRef} isDisabled={busy} onClick={onGo}>
+        {busy ? busyLabel : label}
+      </Button>
+    </>
+  );
 }
 
 /* THE DEAL IS NOT THERE. useDealApi() reports both "no such deal" and "not in
    your scope" as `deal: null` — the API answers an out-of-scope read with
    not-found, so the dialog cannot tell them apart and does not pretend to.
    Every modal below used to `return null` for it, which left the shell's modal
-   layer up over a completely blank dialog: no title, no message, no close
-   button. That is reachable any time the list is a few seconds stale, which
-   scoping made the ordinary case — a deal reassigned away between the render
-   and the click. Same shell as every other dialog, so it closes the same way. */
+   layer up over a completely blank dialog. That is reachable any time the list
+   is a few seconds stale, which scoping made the ordinary case. */
 function Gone({ title, dealRef, onClose }: { title: string; dealRef: string; onClose: () => void }) {
   return (
-    <>
-      <ModalHead title={title} sub={dealRef} mono onClose={onClose} />
-      <div className="md-b">
-        <Notice tone="bad" text={<>
-          <b>This deal is no longer available.</b> It may have been deleted, or reassigned to
-          somebody else since this list was loaded. Close this and reload the list.
-        </>} />
-      </div>
-      <div className="md-f"><span className="spacer"></span>
-        <button className="btn" data-close="1" onClick={onClose}>Close</button>
-      </div>
-    </>
+    <ModalShell title={title} sub={dealRef} mono ico="alert" tone="warning" onClose={onClose}
+      actions={<Button color="secondary" data-close="1" onClick={onClose}>Close</Button>}>
+      <Alert tone="bad" title="This deal is no longer available.">
+        It may have been deleted, or reassigned to somebody else since this list was loaded.
+        Close this and reload the list.
+      </Alert>
+    </ModalShell>
+  );
+}
+
+/** The waiting state of a dialog that opens over a ref it still has to fetch. */
+function Opening({ title, dealRef, onClose }: { title: string; dealRef: string; onClose: () => void }) {
+  return (
+    <ModalShell title={title} sub={dealRef} mono onClose={onClose}>
+      <PaneLoading label={"Opening " + dealRef + "…"} />
+    </ModalShell>
   );
 }
 
@@ -215,21 +228,14 @@ function Gone({ title, dealRef, onClose }: { title: string; dealRef: string; onC
 /* Identity first, then what they want, then how hard to chase — the order a
    person actually takes an inbound call in. Priority is a segmented control
    rather than a dropdown: three options are not worth a menu. */
-const PRIO_PICKS: [string, string, string][] = [["1", "Normal", ""], ["2", "High", "warn"], ["3", "Urgent", "bad"]];
+const PRIO_PICKS = [{ v: "1", l: "Normal" }, { v: "2", l: "High" }, { v: "3", l: "Urgent" }];
 
 function PrioRow({ id, value, onPick }: { id: string; value: string; onPick: (v: string) => void }) {
   return (
     <>
-      <div className="pickrow" id={id + "Row"}>
-        {PRIO_PICKS.map((o) => (
-          <button key={o[0]} type="button" className={"pick " + o[2] + (value === o[0] ? " on" : "")}
-            data-pick={id} data-v={o[0]} onClick={() => onPick(o[0])}>
-            <span className={"dws-odot " + o[2]}></span>{o[1]}
-          </button>
-        ))}
-      </div>
-      {/* Segmented pickers write to a hidden input, so the commit handler keeps
-          reading plain values through val() exactly as it did with selects. */}
+      <Segmented sm label="Priority" options={PRIO_PICKS} value={value} onPick={onPick} />
+      {/* The segmented picker writes to a hidden input, so anything still
+          reading plain values through val() keeps working. */}
       <input type="hidden" id={id} value={value} readOnly />
     </>
   );
@@ -264,55 +270,67 @@ function CreateModal({ onClose, done }: { onClose: () => void; done: (m: string,
   };
 
   return (
-    <>
-      <ModalHead ico="deal" title="New deal" sub="Off-funnel business — an inbound call, a walk-in, a referral." onClose={onClose} />
-
-      <div className="md-b">
+    <ModalShell ico="deal" tone="brand" title="New deal"
+      sub="Off-funnel business — an inbound call, a walk-in, a referral."
+      onClose={onClose}
+      actions={<Commit onClose={onClose} onGo={() => submit(false)} busy={busy} ico="plus"
+        label="Create deal" busyLabel="Creating…" act="dl-create-go" />}
+    >
+      <div className="flex flex-col gap-6">
         <ErrSlot err={err} />
         {dupRef
-          ? <Notice tone="warn" ico="alert" text={<>
-              <b>{dupRef} is already open on this number.</b> Add what was said as a remark there
-              instead of starting a second pipeline — or create this one anyway if it is genuinely
-              different business.
-              <div style={{ marginTop: "8px", display: "flex", gap: "8px" }}>
-                <button className="btn sm" onClick={() => { shell.closeLayer(); go("#/deals/" + dupRef); }}>
-                  Open {dupRef}</button>
-                <button className="btn sm dgr" disabled={busy} onClick={() => submit(true)}>
-                  Create anyway</button>
+          ? <Alert tone="warn" title={dupRef + " is already open on this number."}>
+              Add what was said as a remark there instead of starting a second pipeline — or create
+              this one anyway if it is genuinely different business.
+              <div className="mt-2.5 flex flex-wrap gap-2">
+                <Button color="secondary" size="xs" onClick={() => { shell.closeLayer(); go("#/deals/" + dupRef); }}>
+                  Open {dupRef}</Button>
+                <Button color="secondary-destructive" size="xs" isDisabled={busy} onClick={() => submit(true)}>
+                  Create anyway</Button>
               </div>
-            </>} />
+            </Alert>
           : null}
-        <div className="fset"><div className="fset-h">Who</div>
-          <div className="f2">
-            <Field id="cName" label="Customer name" req ph="e.g. Sandeep Kulkarni" />
+
+        <FormSection title="Who">
+          <FieldRow>
+            <FormField id="cName" label="Customer name" req>
+              <Input id="cName" ph="e.g. Sandeep Kulkarni" />
+            </FormField>
             {/* Optional — a walk-in customer is often a person before they are
                 a business, and blocking on it would stall the call. */}
-            <Field id="cBiz" label="Business name" ph="e.g. KitchenCraft" />
-          </div>
-          <div className="f2">
-            <Field id="cPhone" label="Mobile" req ph="98100 00000"
-              help="Checked against every open deal before anything is created — on the digits, so 090322… and +91 90322… are one customer." />
-            <Field id="cEmail" label="Email" type="email" ph="name@company.in" />
-          </div>
-          <div className="f2">
-            <Field id="cCity" label="City" ph="e.g. Mumbai" />
-            <Field id="cState" label="State" ph="e.g. Maharashtra" />
-          </div>
-        </div>
+            <FormField id="cBiz" label="Business name">
+              <Input id="cBiz" ph="e.g. KitchenCraft" />
+            </FormField>
+          </FieldRow>
+          <FieldRow>
+            <FormField id="cPhone" label="Mobile" req
+              hint="Checked against every open deal before anything is created — on the digits, so 090322… and +91 90322… are one customer.">
+              <Input id="cPhone" ph="98100 00000" mono />
+            </FormField>
+            <FormField id="cEmail" label="Email">
+              <Input id="cEmail" type="email" ph="name@company.in" />
+            </FormField>
+          </FieldRow>
+          <FieldRow>
+            <FormField id="cCity" label="City"><Input id="cCity" ph="e.g. Mumbai" /></FormField>
+            <FormField id="cState" label="State"><Input id="cState" ph="e.g. Maharashtra" /></FormField>
+          </FieldRow>
+        </FormSection>
 
-        <div className="fset"><div className="fset-h">What they want</div>
+        <FormSection title="What they want">
           {/* The package they asked about, not the service they sell. It is a
               note of what was said on the call and binds nothing downstream. */}
-          <Field id="cInterest" label="Interested in" ph="e.g. AutoGrowth · Growth"
-            help="Which package they asked about. Free text, and indicative only." />
-        </div>
+          <FormField id="cInterest" label="Interested in"
+            hint="Which package they asked about. Free text, and indicative only.">
+            <Input id="cInterest" ph="e.g. AutoGrowth · Growth" />
+          </FormField>
+        </FormSection>
 
-        <div className="fset"><div className="fset-h">How urgent</div>
-          <div className="fg"><label>Priority</label>
+        <FormSection title="How urgent">
+          <FormField label="Priority" hint="Visual triage only. It never influences who the deal goes to.">
             <PrioRow id="cPrio" value={prio} onPick={setPrio} />
-            <div className="help">Visual triage only. It never influences who the deal goes to.</div>
-          </div>
-        </div>
+          </FormField>
+        </FormSection>
 
         <Notice ico="shield" text={<>
           <b>This deal is yours.</b> It is assigned to you, the person taking the call — there is no
@@ -320,13 +338,7 @@ function CreateModal({ onClose, done }: { onClose: () => void; done: (m: string,
           reassigned by name when it should sit with somebody else.
         </>} />
       </div>
-
-      <div className="md-f"><span className="spacer"></span>
-        <button className="btn" data-close="1" onClick={onClose}>Cancel</button>
-        <button className="btn pri" data-act="dl-create-go" disabled={busy} onClick={() => submit(false)}>
-          <Icon name="plus" />{busy ? "Creating…" : "Create deal"}</button>
-      </div>
-    </>
+    </ModalShell>
   );
 }
 
@@ -336,7 +348,7 @@ function CreateModal({ onClose, done }: { onClose: () => void; done: (m: string,
    Every field on the deal that is a FACT about it, in one form. What is NOT
    here is as deliberate as what is:
 
-     Stage    the header's stage button owns it, and a dropdown that can refuse
+     Stage    the record's stage button owns it, and a dropdown that can refuse
               you is not a form field.
      Owner    Reassign is a named action that takes a reason, because changing
               who a deal belongs to is an event.
@@ -359,7 +371,7 @@ function EditModal({ dealRef, onClose, done }: {
     if (f) setTimeout(() => { f.focus(); f.select(); }, 60);
   }, [loading]);
 
-  if (loading) return <><ModalHead title="Edit deal" sub={dealRef} mono onClose={onClose} /><Loading /></>;
+  if (loading) return <Opening title="Edit deal" dealRef={dealRef} onClose={onClose} />;
   if (!dl) return <Gone title="Edit deal" dealRef={dealRef} onClose={onClose} />;
   const prioNow = prio === null ? String(dl.priority) : prio;
   const closed = dl.stage >= STAGE.WON;
@@ -390,62 +402,72 @@ function EditModal({ dealRef, onClose, done }: {
   };
 
   return (
-    <>
-      <ModalHead ico="deal" title="Edit deal" sub={<>{dealRef} · {dl.customer_name}</>} mono onClose={onClose} />
-
-      <div className="md-b">
+    <ModalShell ico="deal" tone="brand" title="Edit deal" mono
+      sub={<>{dealRef} · {dl.customer_name}</>} onClose={onClose}
+      actions={<Commit onClose={onClose} onGo={save} busy={busy}
+        label="Save changes" busyLabel="Saving…" act="dl-edit-go" dealRef={dealRef} />}
+    >
+      <div className="flex flex-col gap-6">
         <ErrSlot err={err} />
-        <div className="fset"><div className="fset-h">Who</div>
-          <div className="f2">
-            <Field id="eName" label="Customer name" req value={dl.customer_name} />
-            <Field id="eBiz" label="Business name" value={dl.business_name} />
-          </div>
-          <div className="f2">
-            <Field id="ePhone" label="Mobile" req value={dl.phone}
-              help="No two OPEN deals may share a number — the server checks the digits, not the formatting." />
-            <Field id="eEmail" label="Email" type="email" value={dl.email} />
-          </div>
-          <div className="f2">
-            <Field id="eCity" label="City" value={dl.city === "—" ? "" : dl.city} />
-            <Field id="eState" label="State" value={dl.state === "—" ? "" : dl.state} />
-          </div>
-        </div>
+        <FormSection title="Who">
+          <FieldRow>
+            <FormField id="eName" label="Customer name" req>
+              <Input id="eName" defaultValue={dl.customer_name} />
+            </FormField>
+            <FormField id="eBiz" label="Business name">
+              <Input id="eBiz" defaultValue={dl.business_name || ""} />
+            </FormField>
+          </FieldRow>
+          <FieldRow>
+            <FormField id="ePhone" label="Mobile" req
+              hint="No two OPEN deals may share a number — the server checks the digits, not the formatting.">
+              <Input id="ePhone" mono defaultValue={dl.phone || ""} />
+            </FormField>
+            <FormField id="eEmail" label="Email">
+              <Input id="eEmail" type="email" defaultValue={dl.email || ""} />
+            </FormField>
+          </FieldRow>
+          <FieldRow>
+            <FormField id="eCity" label="City">
+              <Input id="eCity" defaultValue={dl.city === "—" ? "" : dl.city || ""} />
+            </FormField>
+            <FormField id="eState" label="State">
+              <Input id="eState" defaultValue={dl.state === "—" ? "" : dl.state || ""} />
+            </FormField>
+          </FieldRow>
+        </FormSection>
 
-        <div className="fset"><div className="fset-h">What they want</div>
-          <Field id="eInterest" label="Interested in"
-            value={dl.interested_in === "—" ? "" : dl.interested_in}
-            help="Indicative only — what they asked about on the call." />
-        </div>
+        <FormSection title="What they want">
+          <FormField id="eInterest" label="Interested in"
+            hint="Indicative only — what they asked about on the call.">
+            <Input id="eInterest" defaultValue={dl.interested_in === "—" ? "" : dl.interested_in || ""} />
+          </FormField>
+        </FormSection>
 
-        <div className="fset"><div className="fset-h">Money</div>
+        <FormSection title="Money">
           {closed
             ? <Notice ico="shield" text={<>
                 This deal is <b>{D.STAGES[dl.stage].label}</b>, so its value is settled history:{" "}
                 {dl.deal_value ? inr(dl.deal_value) : "never quoted"}. Move it back to an open stage
                 first if that figure is genuinely wrong.
               </>} />
-            : <Field id="eValue" label="Deal value" value={dl.deal_value ? rupeeStr(dl.deal_value) : ""}
-                ph="e.g. 1,20,000"
-                help="The agreed total, in rupees, stored as integer paise. Clear it to put the deal back to “not quoted yet” — which is not the same as ₹0." />}
-        </div>
+            : <FormField id="eValue" label="Deal value"
+                hint="The agreed total, in rupees, stored as integer paise. Clear it to put the deal back to “not quoted yet” — which is not the same as ₹0.">
+                <Input id="eValue" mono ph="e.g. 1,20,000" defaultValue={dl.deal_value ? rupeeStr(dl.deal_value) : ""} />
+              </FormField>}
+        </FormSection>
 
-        <div className="fset"><div className="fset-h">Timing and triage</div>
-          <div className="fg"><span className="fg-lb">Priority</span>
+        <FormSection title="Timing and triage">
+          <FormField label="Priority"
+            hint="Triage only — it never changes who the deal goes to, what it is worth, or which stage it can reach.">
             <PrioRow id="ePrio" value={prioNow} onPick={setPrio} />
-            <div className="help">Triage only — it never changes who the deal goes to, what it is worth, or which stage it can reach.</div>
-          </div>
-          <Field id="eClose" label="Expected close" type="date" value={dl.expected_close_date || ""}
-            help="An annotation. It gates nothing and feeds no target." />
-        </div>
+          </FormField>
+          <FormField id="eClose" label="Expected close" hint="An annotation. It gates nothing and feeds no target.">
+            <DateInput id="eClose" defaultValue={dl.expected_close_date || ""} ariaLabel="Expected close" />
+          </FormField>
+        </FormSection>
       </div>
-
-      <div className="md-f">
-        <span className="spacer"></span>
-        <button className="btn" data-close="1" onClick={onClose}>Cancel</button>
-        <button className="btn pri" data-act="dl-edit-go" data-ref={dealRef} disabled={busy} onClick={save}>
-          {busy ? "Saving…" : "Save changes"}</button>
-      </div>
-    </>
+    </ModalShell>
   );
 }
 
@@ -464,21 +486,23 @@ function RemarkModal({ dealRef, onClose, done }: {
       .catch((e: unknown) => { setErr(refusalOf(e)); setBusy(false); });
   };
   return (
-    <>
-      <ModalHead title="Add remark" sub={<>{dealRef} · appended, never edited</>} onClose={onClose} />
-      <div className="md-b">
+    <ModalShell ico="note" title="Add remark" mono sub={<>{dealRef} · appended, never edited</>}
+      onClose={onClose}
+      actions={<Commit onClose={onClose} onGo={add} busy={busy}
+        label="Add remark" busyLabel="Adding…" act="dl-remark-go" dealRef={dealRef} />}
+    >
+      <div className="flex flex-col gap-5">
         <ErrSlot err={err} />
-        <Field id="rText" label="What happened" req type="textarea"
-          ph="Called — customer is comparing two quotes, wants a revision on the kitchen line." />
-        <Field id="rNext" label="Next action date" type="date"
-          help="Advisory. It drives the Due today / Overdue grouping on the list, and it is what the stall sweep measures silence against." />
+        <FormField id="rText" label="What happened" req>
+          <Textarea id="rText" rows={4} autoFocus
+            ph="Called — customer is comparing two quotes, wants a revision on the kitchen line." />
+        </FormField>
+        <FormField id="rNext" label="Next action date"
+          hint="Advisory. It drives the Due today / Overdue grouping on the list, and it is what the stall sweep measures silence against.">
+          <DateInput id="rNext" ariaLabel="Next action date" />
+        </FormField>
       </div>
-      <div className="md-f"><span className="spacer"></span>
-        <button className="btn" data-close="1" onClick={onClose}>Cancel</button>
-        <button className="btn pri" data-act="dl-remark-go" data-ref={dealRef} disabled={busy} onClick={add}>
-          {busy ? "Adding…" : "Add remark"}</button>
-      </div>
-    </>
+    </ModalShell>
   );
 }
 
@@ -489,38 +513,42 @@ function StageModal({ dealRef, from, onClose, onPick }: {
   dealRef: string; from: number; onClose: () => void; onPick: (to: number) => void;
 }) {
   const [err, setErr] = useState<Refusal | null>(null);
+  const [to, setTo] = useState<string>("");
   const targets = Object.keys(D.STAGES).map(Number).filter((t) => t !== from);
   const commit = () => {
-    const picked = document.querySelector('input[name="stageTo"]:checked') as HTMLInputElement | null;
-    if (!picked) return setErr({ http: 400, code: "", detail: "Choose a target stage." });
-    onPick(parseInt(picked.value, 10));
+    if (!to) return setErr({ http: 400, code: "", detail: "Choose a target stage." });
+    onPick(parseInt(to, 10));
   };
   return (
-    <>
-      <ModalHead title="Change stage" sub={<>{dealRef} · currently {D.STAGES[from].label}</>} onClose={onClose} />
-      <div className="md-b">
+    <ModalShell ico="route" title="Change stage" mono
+      sub={<>{dealRef} · currently {D.STAGES[from].label}</>} onClose={onClose}
+      actions={<Commit onClose={onClose} onGo={commit} label="Change stage" busyLabel="" act="dl-stage-go" dealRef={dealRef} />}
+    >
+      <div className="flex flex-col gap-4">
         <ErrSlot err={err} />
-        {targets.map((t) => (
-          <label key={t} className="check" style={{ alignItems: "flex-start", border: "1px solid var(--line-2)",
-            borderRadius: "var(--radius-md)", padding: "11px 13px", marginBottom: "8px" }}>
-            <input type="radio" name="stageTo" value={t} />
-            <span><b>{D.STAGES[t].label}</b>
-              {D.STAGES[t].hint ? <> <span className="faint">— {D.STAGES[t].hint}</span></> : null}
-              {t < from ? <> <span className="pill warn xs">backward · logged</span></> : null}
-            </span>
-          </label>
-        ))}
+        <div className="flex flex-col gap-2" role="radiogroup" aria-label="Target stage">
+          {targets.map((t) => (
+            <label key={t}
+              className={"flex cursor-pointer gap-3 rounded-lg bg-primary p-3 ring-1 transition duration-100 ring-inset " +
+                (String(t) === to ? "ring-2 ring-brand bg-brand-primary" : "ring-secondary hover:ring-primary")}>
+              <Radio name="stageTo" value={String(t)} checked={String(t) === to} onChange={setTo} />
+              <span className="flex min-w-0 flex-1 flex-col gap-1">
+                <span className="flex flex-wrap items-center gap-2">
+                  <StageChip stage={t} />
+                  {t < from ? <Pill xs tone="warn" text="backward · logged" /> : null}
+                </span>
+                {D.STAGES[t].hint ? <span className="text-sm text-tertiary">{D.STAGES[t].hint}</span> : null}
+              </span>
+            </label>
+          ))}
+        </div>
         <Notice ico="shield" text={<>
           <b>Every stage is a legal target from every other — there is no matrix to rule one out.</b>{" "}
           Nothing here refuses a move. Picking one asks you to say why, and the deal moves when you
           have: the server requires that reason, and it is the only record of it.
         </>} />
       </div>
-      <div className="md-f"><span className="spacer"></span>
-        <button className="btn" data-close="1" onClick={onClose}>Cancel</button>
-        <button className="btn pri" data-act="dl-stage-go" data-ref={dealRef} onClick={commit}>Change stage</button>
-      </div>
-    </>
+    </ModalShell>
   );
 }
 
@@ -543,32 +571,30 @@ function StageRemarkModal({ dealRef, to, from, onClose, done }: {
       .catch((e: unknown) => { setErr(refusalOf(e)); setBusy(false); });  // stage unchanged; dialog stays open
   };
   return (
-    <>
-      <ModalHead title="Change stage" sub={<>{dealRef} · a remark is required</>} onClose={onClose} />
-      <div className="md-b">
+    <ModalShell ico="route" title="Change stage" mono sub={<>{dealRef} · a remark is required</>}
+      onClose={onClose}
+      actions={<Commit onClose={onClose} onGo={commit} busy={busy}
+        label="Change stage" busyLabel="Moving…" act="dl-stage-commit" dealRef={dealRef} />}
+    >
+      <div className="flex flex-col gap-5">
         <ErrSlot err={err} />
         {/* Both stages on one line, in the order the deal moves through them, so
             "what am I about to do" is answered without reading a sentence. */}
-        <div className="dl-stagemove">
-          <span className={"dws-stagebtn " + (D.STAGES[from].tone || "")} aria-hidden="true">
-            <span className={"dws-sdot " + (D.STAGES[from].tone || "")}></span>{D.STAGES[from].label}</span>
-          <span className="dl-stagearrow"><Icon name="chevr" size="sm" /></span>
-          <span className={"dws-stagebtn " + (D.STAGES[to].tone || "")} aria-hidden="true">
-            <span className={"dws-sdot " + (D.STAGES[to].tone || "")}></span>{D.STAGES[to].label}</span>
-          {back ? <span className="pill warn xs">backward · logged</span> : null}
+        <div className="flex flex-wrap items-center gap-2 rounded-lg bg-secondary px-3 py-2.5">
+          <StageChip stage={from} />
+          <span aria-hidden="true" className="text-quaternary">→</span>
+          <StageChip stage={to} />
+          {back ? <Pill xs tone="warn" text="backward · logged" /> : null}
         </div>
-        <Field id="stRemark" label="What changed" req type="textarea"
-          ph={D.STAGES[to].hint
-            ? "Why the deal is now " + D.STAGES[to].label + ". " + D.STAGES[to].hint + "."
-            : "Why the deal is now " + D.STAGES[to].label + "."}
-          help="Goes on the transition and on the timeline, under your name and today's date. Appended, never edited — this is the only record of why the stage changed." />
+        <FormField id="stRemark" label="What changed" req
+          hint="Goes on the transition and on the timeline, under your name and today's date. Appended, never edited — this is the only record of why the stage changed.">
+          <Textarea id="stRemark" rows={4} autoFocus
+            ph={D.STAGES[to].hint
+              ? "Why the deal is now " + D.STAGES[to].label + ". " + D.STAGES[to].hint + "."
+              : "Why the deal is now " + D.STAGES[to].label + "."} />
+        </FormField>
       </div>
-      <div className="md-f"><span className="spacer"></span>
-        <button className="btn" data-close="1" onClick={onClose}>Cancel</button>
-        <button className="btn pri" data-act="dl-stage-commit" data-ref={dealRef} data-to={to}
-          disabled={busy} onClick={commit}>{busy ? "Moving…" : "Change stage"}</button>
-      </div>
-    </>
+    </ModalShell>
   );
 }
 
@@ -581,7 +607,7 @@ function ValueModal({ dealRef, onClose, done }: {
   const { dl, loading } = useDeal(dealRef);
   const [err, setErr] = useState<Refusal | null>(null);
   const [busy, setBusy] = useState(false);
-  if (loading) return <><ModalHead title="Set deal value" sub={dealRef} onClose={onClose} /><Loading /></>;
+  if (loading) return <Opening title="Set deal value" dealRef={dealRef} onClose={onClose} />;
   if (!dl) return <Gone title="Set deal value" dealRef={dealRef} onClose={onClose} />;
   const save = () => {
     const typed = val("vAmt").trim();
@@ -593,20 +619,19 @@ function ValueModal({ dealRef, onClose, done }: {
       .catch((e: unknown) => { setErr(refusalOf(e)); setBusy(false); });
   };
   return (
-    <>
-      <ModalHead title="Set deal value" sub={<>{dealRef} · the agreed total</>} onClose={onClose} />
-      <div className="md-b">
+    <ModalShell ico="rupee" title="Set deal value" mono sub={<>{dealRef} · the agreed total</>}
+      onClose={onClose}
+      actions={<Commit onClose={onClose} onGo={save} busy={busy}
+        label="Save" busyLabel="Saving…" act="dl-value-go" dealRef={dealRef} />}
+    >
+      <div className="flex flex-col gap-4">
         <ErrSlot err={err} />
-        <Field id="vAmt" label="Total agreed deal value" ph="8,85,000"
-          value={dl.deal_value ? rupeeStr(dl.deal_value) : ""}
-          help="Stored as integer paise — no float reaches a commercial total. Leave it blank to record that nothing has been quoted yet, which is not the same as ₹0." />
+        <FormField id="vAmt" label="Total agreed deal value"
+          hint="Stored as integer paise — no float reaches a commercial total. Leave it blank to record that nothing has been quoted yet, which is not the same as ₹0.">
+          <Input id="vAmt" mono autoFocus ph="8,85,000" defaultValue={dl.deal_value ? rupeeStr(dl.deal_value) : ""} />
+        </FormField>
       </div>
-      <div className="md-f"><span className="spacer"></span>
-        <button className="btn" data-close="1" onClick={onClose}>Cancel</button>
-        <button className="btn pri" data-act="dl-value-go" data-ref={dealRef} disabled={busy} onClick={save}>
-          {busy ? "Saving…" : "Save"}</button>
-      </div>
-    </>
+    </ModalShell>
   );
 }
 
@@ -619,63 +644,66 @@ function CloseModal({ dealRef, onClose, done }: {
   const { dl, loading } = useDeal(dealRef);
   const [err, setErr] = useState<Refusal | null>(null);
   const [busy, setBusy] = useState(false);
-  if (loading) return <><ModalHead title="Close deal" sub={dealRef} onClose={onClose} /><Loading /></>;
+  const [as, setAs] = useState<string>("");
+  if (loading) return <Opening title="Close deal" dealRef={dealRef} onClose={onClose} />;
   if (!dl) return <Gone title="Close deal" dealRef={dealRef} onClose={onClose} />;
 
   const commit = () => {
-    const picked = document.querySelector('input[name="closeAs"]:checked') as HTMLInputElement | null;
-    if (!picked) return setErr({ http: 400, code: "", detail: "Choose Won or Lost." });
+    if (!as) return setErr({ http: 400, code: "", detail: "Choose Won or Lost." });
     const why = String(val("clReason") || "").trim();
     if (!why) return setErr({ http: 400, code: "",
       detail: "A reason is required — say why this deal is being closed." });
     setErr(null); setBusy(true);
-    const to = Number(picked.value);
+    const to = Number(as);
     call(AdminOpsService.dealStage(dealRef, apiStageKey(String(to)) as string, why))
       .then(() => done("Deal closed " + (to === STAGE.WON ? "Won" : "Lost") + ".", dealRef))
       .catch((e: unknown) => { setErr(refusalOf(e)); setBusy(false); });
   };
+
+  const outcome = (v: number, title: string, hint: ReactNode, tone: "ok" | "bad") => (
+    <label className={"flex cursor-pointer gap-3 rounded-lg p-3 ring-1 transition duration-100 ring-inset " +
+      (as === String(v)
+        ? (tone === "ok" ? "bg-success-primary ring-2 ring-utility-green-300" : "bg-error-primary ring-2 ring-utility-red-300")
+        : "bg-primary ring-secondary hover:ring-primary")}>
+      <Radio name="closeAs" value={String(v)} checked={as === String(v)} onChange={setAs} />
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className="flex items-center gap-2">
+          <Pill dot tone={tone} text={title} />
+        </span>
+        <span className="text-sm text-tertiary">{hint}</span>
+      </span>
+    </label>
+  );
+
   return (
-    <>
-      <ModalHead title="Close deal" sub={<>{dealRef} · Won or Lost, and reversible either way</>} onClose={onClose} />
-      <div className="md-b">
+    <ModalShell ico="alert" tone="error" title="Close deal" mono
+      sub={<>{dealRef} · Won or Lost, and reversible either way</>} onClose={onClose}
+      actions={<Commit onClose={onClose} onGo={commit} busy={busy} tone="bad"
+        label="Close deal" busyLabel="Closing…" act="dl-close-go" dealRef={dealRef} />}
+    >
+      <div className="flex flex-col gap-4">
         <ErrSlot err={err} />
-        {dl.stage !== STAGE.WON
-          ? <label className="check" style={{ alignItems: "flex-start", border: "1px solid var(--ok-line)",
-              borderRadius: "var(--radius-md)", padding: "11px 13px", marginBottom: "8px", background: "var(--ok-bg)" }}>
-              <input type="radio" name="closeAs" value={STAGE.WON} />
-              <span><b>Closed - Won</b>
-                <div className="help" style={{ marginTop: "3px" }}>
-                  {dl.deal_value ? "Worth " + inr(dl.deal_value) + "." : "No value was ever quoted on this deal."}
-                </div>
-              </span>
-            </label>
-          : null}
-        {dl.stage !== STAGE.LOST
-          ? <label className="check" style={{ alignItems: "flex-start", border: "1px solid var(--line-2)",
-              borderRadius: "var(--radius-md)", padding: "11px 13px", marginBottom: "8px" }}>
-              <input type="radio" name="closeAs" value={STAGE.LOST} />
-              <span><b>Closed - Lost</b>
-                <div className="help" style={{ marginTop: "3px" }}>
-                  The reason below is stored on the deal as well as on the timeline, so the list can
-                  show why without opening it.
-                </div>
-              </span>
-            </label>
-          : null}
-        <Field id="clReason" label="Reason" req type="textarea" ph="Chose a local vendor on price." />
+        <div className="flex flex-col gap-2" role="radiogroup" aria-label="Outcome">
+          {dl.stage !== STAGE.WON
+            ? outcome(STAGE.WON, "Closed - Won",
+                dl.deal_value ? "Worth " + inr(dl.deal_value) + "." : "No value was ever quoted on this deal.", "ok")
+            : null}
+          {dl.stage !== STAGE.LOST
+            ? outcome(STAGE.LOST, "Closed - Lost",
+                "The reason below is stored on the deal as well as on the timeline, so the list can show why without opening it.", "bad")
+            : null}
+        </div>
+        <FormField id="clReason" label="Reason" req>
+          <Textarea id="clReason" rows={3} ph="Chose a local vendor on price." />
+        </FormField>
         <Notice ico="shield" text={<>
           <b>Closing sets a stage, it does not freeze anything.</b> Remarks can still be added
           afterwards, and the deal can be moved back out — a record you cannot annotate is a record
-          people keep somewhere else. Closing needs the level-3 <span className="mono">deals.close</span>{" "}
-          permission, which the server checks again.
+          people keep somewhere else. Closing needs the level-3{" "}
+          <span className="font-mono">deals.close</span> permission, which the server checks again.
         </>} />
       </div>
-      <div className="md-f"><span className="spacer"></span>
-        <button className="btn" data-close="1" onClick={onClose}>Cancel</button>
-        <button className="btn pri" data-act="dl-close-go" data-ref={dealRef} disabled={busy} onClick={commit}>
-          {busy ? "Closing…" : "Close deal"}</button>
-      </div>
-    </>
+    </ModalShell>
   );
 }
 
@@ -697,6 +725,12 @@ function ReassignModal({ dealRef, onClose, done }: {
   /* Kept apart from `err`, which belongs to the SAVE. The roster failing is not
      a failed reassignment, it just means there is nothing to pick from. */
   const [teamErr, setTeamErr] = useState<Refusal | null>(null);
+  /* THE TWO PICKS LIVE IN STATE, not in the DOM. `SelectInput` renders the
+     library's native select, which owns its own element id — so `val("raOwner")`
+     reads nothing at all and the dialog would post an empty patch. State is
+     also what lets the hidden inputs below keep the ids anything else expects. */
+  const [owner, setOwner] = useState("");
+  const [co, setCo] = useState("__keep");
 
   /* The team list, from the admin user endpoint — the same roster Settings →
      Team shows. The deals list only knows the owners who happen to appear on
@@ -713,11 +747,10 @@ function ReassignModal({ dealRef, onClose, done }: {
     return () => { cancelled = true; };
   }, []);
 
-  if (loading) return <><ModalHead title="Reassign" sub={dealRef} onClose={onClose} /><Loading /></>;
+  if (loading) return <Opening title="Reassign" dealRef={dealRef} onClose={onClose} />;
   if (!dl) return <Gone title="Reassign" dealRef={dealRef} onClose={onClose} />;
 
   const commit = () => {
-    const owner = val("raOwner"), co = val("raCo");
     const body: { ownerId?: number; coOwnerId?: number | null; reason: string } = { reason: val("raReason") };
     if (owner) body.ownerId = Number(owner);
     // "" is the None row and means "no co-owner" — an explicit null clears it.
@@ -733,42 +766,45 @@ function ReassignModal({ dealRef, onClose, done }: {
      keep-option, and "— leave as it is —" does not say what it is leaving: the
      person adding a co-owner could not see whose deal they were adding
      themselves to without closing the dialog. Worse when the roster fails to
-     load, which is the state a sales head is permanently in — every option is
-     gone and the two selects say nothing at all.
+     load, which is the state a sales head is permanently in.
 
      Read off the deal, never off `people`: the deal is already loaded by the
      time this renders, so the current owner and co-owner are legible even when
      the roster call was refused outright. */
   const ownerNow = dl.owner_id || "unassigned";
   const coOwnerNow = dl.co_owner_id || "none";
+
   return (
-    <>
-      <ModalHead title="Reassign" sub={<>{dealRef} · owner {ownerNow} · co-owner {coOwnerNow}</>} onClose={onClose} />
-      <div className="md-b">
+    <ModalShell ico="recon" title="Reassign" mono
+      sub={<>{dealRef} · owner {ownerNow} · co-owner {coOwnerNow}</>} onClose={onClose}
+      actions={<Commit onClose={onClose} onGo={commit} busy={busy}
+        label="Save" busyLabel="Saving…" act="dl-reassign-go" dealRef={dealRef} />}
+    >
+      <div className="flex flex-col gap-5">
         <ErrSlot err={err} />
-        {people === null ? <div className="faint">Loading the team…</div> : null}
+        {people === null ? <PaneLoading label="Loading the team…" /> : null}
         {teamErr
-          ? <Notice tone="bad" text={<>
-              <b>The team list could not be loaded.</b> This dialog reads the same roster as
-              Settings → Team, which your role may not include — there is nobody to pick from
-              until an Admin grants it. <span className="mono">{teamErr.detail}</span>
-            </>} />
+          ? <Alert tone="bad" title="The team list could not be loaded.">
+              This dialog reads the same roster as Settings → Team, which your role may not
+              include — there is nobody to pick from until an Admin grants it.{" "}
+              <span className="font-mono">{teamErr.detail}</span>
+            </Alert>
           : null}
-        <Field id="raOwner" label="Owner" type="select"
-          options={[{ v: "", l: "— leave as it is (" + ownerNow + ") —" }].concat(opts)}
-          help="Everyone with an admin account. A deal always has exactly one owner." />
-        <Field id="raCo" label="Co-owner" type="select"
-          options={([{ v: "__keep", l: "— leave as it is (" + coOwnerNow + ") —" }, { v: "", l: "None" }] as { v: string; l: string }[]).concat(opts)}
-          help="A second pair of hands. Optional, and it never removes the owner." />
-        <Field id="raReason" label="Reason" req type="textarea"
-          ph="Owner on extended leave; customer needs a response this week."
-          help="Mandatory, and enforced by the server. It is appended to the timeline as a remark." />
+        <FormField label="Owner" hint="Everyone with an admin account. A deal always has exactly one owner.">
+          <SelectInput ariaLabel="Owner" value={owner} onChange={setOwner}
+            options={[{ v: "", l: "— leave as it is (" + ownerNow + ") —" }].concat(opts)} />
+          <input type="hidden" id="raOwner" value={owner} readOnly />
+        </FormField>
+        <FormField label="Co-owner" hint="A second pair of hands. Optional, and it never removes the owner.">
+          <SelectInput ariaLabel="Co-owner" value={co} onChange={setCo}
+            options={([{ v: "__keep", l: "— leave as it is (" + coOwnerNow + ") —" }, { v: "", l: "None" }] as { v: string; l: string }[]).concat(opts)} />
+          <input type="hidden" id="raCo" value={co} readOnly />
+        </FormField>
+        <FormField id="raReason" label="Reason" req
+          hint="Mandatory, and enforced by the server. It is appended to the timeline as a remark.">
+          <Textarea id="raReason" rows={3} ph="Owner on extended leave; customer needs a response this week." />
+        </FormField>
       </div>
-      <div className="md-f"><span className="spacer"></span>
-        <button className="btn" data-close="1" onClick={onClose}>Cancel</button>
-        <button className="btn pri" data-act="dl-reassign-go" data-ref={dealRef} disabled={busy} onClick={commit}>
-          {busy ? "Saving…" : "Save"}</button>
-      </div>
-    </>
+    </ModalShell>
   );
 }

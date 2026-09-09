@@ -1,52 +1,66 @@
-/* Every var(--x) the panel reads must be defined somewhere the panel loads.
-   An undefined custom property does not error — the declaration is simply
-   dropped, so a missing token is an invisible hole, which is exactly the kind
-   of thing a re-skin leaves behind. This walks the real CSS and reports them.
+/* =============================================================================
+   Every custom property the panel reads is defined somewhere the panel loads.
+   -----------------------------------------------------------------------------
+   An undefined `var(--x)` does not error — the declaration is dropped, so a
+   missing token is an invisible hole. This walks the panel's own code
+   (src/admin, src/styles/{globals,brand}.css, src/components/shared) for bare
+   `var(--x)` reads and checks each against the three files that define
+   tokens: Tailwind's default theme, Untitled UI's theme.css and brand.css —
+   plus the handful of runtime variables React Aria and Tailwind set on the
+   element (`--trigger-width`, `--tw-*`).
 
-   A read WITH a fallback — `var(--x, Georgia, serif)` — carries its own
-   answer and is not a hole; only a bare `var(--x)` needs the property.
+   The library's own components (src/components/{base,application,…}) are
+   written against the same three files and are not walked as consumers —
+   they are Untitled UI's, verbatim, and read only what their theme defines.
 
-   Untitled UI's own code (components/{base,application,foundations,
-   shared-assets} and styles/untitled) is styled by Tailwind, whose default
-   palette and scales (--color-slate-*, --spacing …) are emitted at build time
-   from node_modules, not from anything under src. Those files DEFINE tokens
-   the panel reads, so they stay on the defining side; they are just not
-   walked as consumers. */
+   `npm run check:tokens`.
+   ========================================================================== */
 const fs = require("fs");
 const path = require("path");
 
-const ROOT = path.resolve(__dirname, "..", "src");
-const LIBRARY = /\/(components\/(base|application|foundations|shared-assets)|styles\/untitled)\//;
+const ROOT = path.resolve(__dirname, "..");
+const SRC = path.join(ROOT, "src");
+const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, "");
 
-const files = [];
+const defined = new Set();
+for (const f of [
+  path.join(ROOT, "node_modules", "tailwindcss", "theme.css"),
+  path.join(SRC, "styles", "theme.css"),
+  path.join(SRC, "styles", "brand.css"),
+  path.join(SRC, "styles", "globals.css"),
+]) {
+  for (const m of strip(fs.readFileSync(f, "utf8")).matchAll(/(--[a-zA-Z0-9_-]+)\s*:/g)) defined.add(m[1]);
+}
+/* set at runtime by React Aria / Tailwind, not in any sheet */
+const RUNTIME = /^--(tw-|trigger-|spacing$|radius-|shadow-|text-|font-|color-|breakpoint-|container-|ease-|animate-|blur-|tracking-|leading-|default-)/;
+
+const consumers = [];
 (function walk(d) {
   for (const e of fs.readdirSync(d, { withFileTypes: true })) {
     const p = path.join(d, e.name);
-    if (e.isDirectory()) walk(p);
-    else if (/\.(css|tsx|ts)$/.test(e.name)) files.push(p);
+    const rel = path.relative(SRC, p).split(path.sep).join("/");
+    if (e.isDirectory()) {
+      if (/^components\/(base|application|foundations|shared-assets)/.test(rel)) continue;
+      walk(p);
+    } else if (/\.(css|tsx|ts)$/.test(e.name) && rel !== "styles/theme.css") consumers.push(p);
   }
-})(ROOT);
+})(SRC);
 
-const defined = new Set();
-const consumed = new Map(); // name -> Set(relative files)
-
-for (const f of files) {
-  const src = fs.readFileSync(f, "utf8");
-  const rel = path.relative(ROOT, f).split(path.sep).join("/");
-  for (const m of src.matchAll(/(--[a-zA-Z0-9_-]+)\s*:/g)) defined.add(m[1]);
-  if (LIBRARY.test("/" + rel)) continue;
-  for (const m of src.matchAll(/var\(\s*(--[a-zA-Z0-9_-]+)\s*([,)])/g)) {
-    if (m[2] === ",") continue;
+const consumed = new Map();
+for (const f of consumers) {
+  const rel = path.relative(SRC, f).split(path.sep).join("/");
+  for (const m of strip(fs.readFileSync(f, "utf8")).matchAll(/var\(\s*(--[a-zA-Z0-9_-]+)\s*([,)])/g)) {
+    if (m[2] === ",") continue; // carries its own fallback
     if (!consumed.has(m[1])) consumed.set(m[1], new Set());
     consumed.get(m[1]).add(rel);
   }
 }
 
-const missing = [...consumed.keys()].filter((k) => !defined.has(k)).sort();
+const missing = [...consumed.keys()].filter((k) => !defined.has(k) && !RUNTIME.test(k)).sort();
 if (!missing.length) {
   console.log(`ok — every one of ${consumed.size} custom properties read is defined.`);
 } else {
   console.log(`${missing.length} custom propert${missing.length === 1 ? "y" : "ies"} read but never defined:\n`);
-  for (const k of missing) console.log(`  ${k.padEnd(28)} ${[...consumed.get(k)].join(", ")}`);
+  for (const k of missing) console.log(`  ${k.padEnd(32)} ${[...consumed.get(k)].join(", ")}`);
 }
 process.exit(missing.length ? 1 : 0);

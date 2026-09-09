@@ -20,6 +20,12 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
+    /* `@/` — the import root the Untitled UI components are written against.
+       Mirrored in vite.config.ts and the root tsconfig.json (the esbuild
+       smoke bundles read that one). */
+    "baseUrl": ".",
+    "paths": { "@/*": ["./src/*"] },
+
     /* Linting */
     "strict": true,
     "noUnusedLocals": true,

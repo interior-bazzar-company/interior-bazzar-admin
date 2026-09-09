@@ -4,28 +4,32 @@
    the SAME fetch as those two, so the deal picked here is always a deal the
    current filters would also show there.
 
-   The quotation card, the invoice cards, the collected/outstanding read-outs
-   and the co-assignment stack are still gone — each rendered a browser-side
-   store with no model behind it.
+   THE SHAPE IS THE PANEL'S CONVERSATION SHAPE: a list pane on the left, the
+   thread in the middle on the one warm plane in the product, and a context
+   pane on the right. Under `lg` the three become one, switched by a tab row —
+   three 320px columns on a laptop-sized window is three unreadable columns.
 
-   The WhatsApp/Email composer channels are BACK, but not as they were. In the
-   prototype a message "sent via WhatsApp" was a coloured bubble and nothing
-   else — no model, no actual send. Now: `channel` is DealRemark.typeKey, a
-   real column (manual/whatsapp/email, see DealsController.CLIENT_REMARK_TYPES),
-   and a whatsapp/email-tagged remark grows a genuinely new "Open ↗" link that
-   was never in the prototype either — wa.me / mailto prefilled with the exact
-   text just logged, so the agent writes the message once and sends it for
-   real, instead of retyping it in a second app.
+   The WhatsApp/Email composer channels are real: `channel` is DealRemark's
+   typeKey (manual/whatsapp/email, see DealsController.CLIENT_REMARK_TYPES), a
+   stored column, and a whatsapp/email-tagged remark grows an "Open" link —
+   wa.me / mailto prefilled with the exact text just logged, so the agent
+   writes the message once and sends it for real.
    ============================================================================= */
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyEvent, MouseEvent as ReactMouseEvent, ReactNode } from "react";
-import { EmptyState, Icon, KvList, PaneLoading, Pill, SearchField, avatarTone, cap, initials, qs } from "../../ui";
+import { TextAreaBase } from "@/components/base/textarea/textarea";
+import { cx } from "@/utils/cx";
+import {
+  Avatar, Button, EmptyState, Eyebrow, FilterChips, Icon, IconButton, KvList, Meter, PageHeader,
+  PaneLoading, Pill, SearchField, Segmented, Select, Tabs, Tag, cap, qs
+} from "../../ui";
 import { go } from "../../ui/nav";
 import { can } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
+import { ChainStrip } from "../chainStrip";
 import {
-  D, STAGE, chanOf, daysFrom, fullAccess, hasFilters, head, inr, place, prioTone, refusalOf,
-  relativeDate, render, setChan, urgency, useDealApi, useDealDocs, usePop
+  D, STAGE, chanOf, daysFrom, fullAccess, hasFilters, head, inr, omit, place, refusalOf,
+  relativeDate, render, setChan, urgency, useDealApi, useDealDocs, useFilters, usePop
 } from "./useDeals";
 import type { DealDocsState } from "./useDeals";
 import AdminOpsService from "../../../api/modules/adminOps";
@@ -33,9 +37,19 @@ import type { InvoiceRow, QuotationRow } from "../../../api/modules/adminOps";
 import { STATUS_LABEL as Q_LABEL } from "../Quotations/api";
 import { STATUS_LABEL as I_LABEL } from "../Invoices/api";
 import type { DealsApiState, Params } from "./useDeals";
-import { ChainDots, MoneyCellCtx, Rich, TagChips, orDash, toneClass } from "./bits";
+import { ChainCard, ChainDots, MoneyCellCtx, Rich, StagePipeline, TagChips, orDash } from "./bits";
 import { useActs } from "./Modals";
-import { ChipMenu, CHIP_LABEL, MoreMenu, Odot, PrioMenu, StageMenu, chipOptions } from "./menus";
+import { CHIP_LABEL, GateBody, MoreMenu, PrioMenu, StageMenu, selectOptions } from "./menus";
+
+/* The workspace is BOUNDED BY THE VIEWPORT, not by its content: a conversation
+   scrolls inside its own pane, and the page around it never does. The subtrahend
+   is the shell's own chrome — the 56px topbar and the page's vertical padding —
+   so the three panes end exactly where the window does. */
+const FRAME = "flex h-[calc(100dvh-6rem)] min-h-[30rem] flex-col gap-3 md:h-[calc(100dvh-6.5rem)]";
+
+/** Which single pane a narrow window is showing. Above `lg` all three are on
+ *  screen at once and this is ignored. */
+type Pane = "list" | "thread" | "info";
 
 export function ChatWorkspace({ id, p, api }: {
   id: string | null; p: Params; api: DealsApiState;
@@ -43,6 +57,7 @@ export function ChatWorkspace({ id, p, api }: {
   const list = api.list;
   const acts = useActs(p);
   const canCreate = can("deals", "create");
+  const [pane, setPane] = useState<Pane>("thread");
 
   /* ponytail: falls back to the first row of the already-loaded, filter-
      matching API list when no id is in the URL — the same "open something"
@@ -50,7 +65,7 @@ export function ChatWorkspace({ id, p, api }: {
   const ref = id || (list.length ? list[0].deal_id : null);
 
   /* Nothing matched, but only because of a FILTER: the workspace stays exactly
-     where it is — list pane with its chips (the only way back out) and its own
+     where it is — list pane with its filters (the only way back out) and its own
      "no deals match" line, detail panes blank. Taking the whole page over with
      an empty state would hide the very controls you need to widen the search,
      and claim the pipeline is empty when it is not. The full-page state is for
@@ -62,38 +77,55 @@ export function ChatWorkspace({ id, p, api }: {
   const mine = !fullAccess();
 
   if (!ref && !filtered) return (
-    <div className="dws"><div className="dws-panes" style={{ gridTemplateColumns: "1fr" }}>
-      <EmptyState icon="deal" title={mine ? "No deals assigned to you" : "No deals yet"}
-        body={(mine ? "Deals you own or co-own appear here." : "Nothing in the pipeline yet.") +
+    <div className="flex flex-col gap-4">
+      {/* The page still names itself and still offers its one action: an empty
+          workspace is a state of the page, not the absence of one. */}
+      <PageHeader title="Deals" meta={<>The conversation view · one deal, its whole history</>}
+        actions={canCreate
+          ? <Button color="primary" ico="plus" data-act="dl-create" onClick={() => acts.create()}>New deal</Button>
+          : null} />
+      <EmptyState icon="chat" title={mine ? "No deals assigned to you" : "No deals yet"}
+        body={(mine ? "Deals you own or co-own appear here, each with its whole conversation beside it." : "Nothing in the pipeline yet.") +
           (canCreate ? " Create one for an inbound call, a walk-in or a referral." : " Once one exists, its chat opens here.")}
         action={canCreate
-          ? <button className="btn pri" data-act="dl-create" onClick={() => acts.create()}>Create deal</button>
+          ? <Button color="primary" ico="plus" data-act="dl-create" onClick={() => acts.create()}>New deal</Button>
           : null} />
-    </div></div>
+    </div>
   );
+
+  /* No selection means there is nothing for the other two panes to be about, so
+     a narrow window is put on the list whatever tab it was last on. */
+  const shown: Pane = ref ? pane : "list";
+  const only = (k: Pane) => (shown === k ? "flex" : "hidden");
 
   /* THE SPLIT THAT KEEPS THE LIST STILL.
 
-     The detail fetch used to live here, in the parent of all three panes, so
-     every response — a deal switch, and every write, since each one re-fetches
-     — re-rendered the list too, and the "nothing loaded yet" branch returned a
-     full-page loader that took the whole workspace down with it.
+     The detail fetch lives in `<DetailPanes>`, not here: the list renders from
+     `api`, which changes only when the FILTERS change, so picking another deal
+     — and every write, since each one re-fetches — moves nothing on the left.
 
-     `<DetailPanes>` owns that fetch now. The list renders from `api`, which
-     changes only when the FILTERS change, so picking another deal moves
-     nothing on the left. The two halves of this screen have genuinely separate
-     reasons to re-render, and now they are separate components to match.
-
-     `ref` (the URL param), not the loaded deal's id — the list highlight has
-     to jump to the clicked row the instant it is clicked, not wait for that
-     deal's own fetch to resolve. */
+     `ref` (the URL param), not the loaded deal's id: the list highlight has to
+     jump to the clicked row the instant it is clicked, not wait for that deal's
+     own fetch to resolve. */
   return (
-    <div className="dws">
-      <div className="dws-panes">
-        <ListPane list={list} activeRef={ref || ""} p={p} api={api} />
+    <div className={FRAME}>
+      <Tabs className="lg:hidden" cur={shown} onPick={(k) => setPane(k as Pane)}
+        items={[
+          { k: "list", label: "Deals", icon: "list", n: list.length || null, quiet: true },
+          { k: "thread", label: "Conversation", icon: "chat" },
+          { k: "info", label: "Details", icon: "info" },
+        ]} />
+      <div className="flex min-h-0 flex-1 overflow-hidden rounded-xl bg-primary ring-1 ring-secondary">
+        <ListPane list={list} activeRef={ref || ""} p={p} api={api} cls={only("list")} onPick={() => setPane("thread")} />
         {ref
-          ? <DetailPanes dealRef={ref} p={p} />
-          : <><section className="dws-chat" /><aside className="dws-ctx" /></>}
+          ? <DetailPanes dealRef={ref} p={p} thread={only("thread")} info={only("info")} />
+          : <>
+              <section className={cx("min-w-0 flex-1 bg-chat lg:flex", only("thread"))}>
+                <EmptyState flat icon="chat" title="No deals match these filters"
+                  body="Widen the search on the left and the conversation opens here." />
+              </section>
+              <aside className={cx("w-full min-w-0 shrink-0 border-secondary lg:flex lg:w-80 lg:border-l", only("info"))} />
+            </>}
       </div>
     </div>
   );
@@ -101,7 +133,7 @@ export function ChatWorkspace({ id, p, api }: {
 
 /* The two panes that are about ONE deal. Everything here re-renders when the
    selected deal's data changes; nothing outside it does. */
-function DetailPanes({ dealRef, p }: { dealRef: string; p: Params }) {
+function DetailPanes({ dealRef, p, thread, info }: { dealRef: string; p: Params; thread: string; info: string }) {
   const shell = useShell();
   const detail = useDealApi(dealRef);
 
@@ -125,8 +157,10 @@ function DetailPanes({ dealRef, p }: { dealRef: string; p: Params }) {
   if (detail.stale || (!detail.deal && detail.loading)) {
     return (
       <>
-        <section className="dws-chat"><PaneLoading label={"Opening " + dealRef + "\u2026"} /></section>
-        <aside className="dws-ctx"><PaneLoading label="" /></aside>
+        <section className={cx("min-w-0 flex-1 flex-col bg-chat lg:flex", thread)}>
+          <PaneLoading label={"Opening " + dealRef + "…"} />
+        </section>
+        <aside className={cx("w-full min-w-0 shrink-0 border-secondary lg:flex lg:w-80 lg:border-l", info)} />
       </>
     );
   }
@@ -137,150 +171,128 @@ function DetailPanes({ dealRef, p }: { dealRef: string; p: Params }) {
      are genuinely indistinguishable from here; the copy names both rather than
      picking one, and says neither in API vocabulary. */
   if (!detail.deal) return (
-    <section className="dws-chat">
-      <EmptyState icon="deal" title="Deal not found"
-        body={"\u201c" + dealRef + "\u201d could not be opened \u2014 it may have been deleted, or it may belong to someone else now."} />
-    </section>
+    <>
+      <section className={cx("min-w-0 flex-1 flex-col bg-chat lg:flex", thread)}>
+        <EmptyState flat icon="deal" title="Deal not found"
+          body={"“" + dealRef + "” could not be opened — it may have been deleted, or it may belong to someone else now."} />
+      </section>
+      <aside className={cx("w-full min-w-0 shrink-0 border-secondary lg:flex lg:w-80 lg:border-l", info)} />
+    </>
   );
 
   return (
     <>
-      <ChatPane dl={detail.deal} ev={detail.timeline} p={p} />
-      <CtxPane dl={detail.deal} p={p} />
+      <ChatPane dl={detail.deal} ev={detail.timeline} p={p} cls={thread} />
+      <CtxPane dl={detail.deal} p={p} cls={info} />
     </>
   );
 }
 
-/* AT MODULE SCOPE, NOT INSIDE ListPane. Declared in ListPane's body it was a
-   NEW component type on every render, so React threw the chip's <button> away
-   and mounted a fresh one each time — including the render that opening the
-   menu itself triggers (usePop reads shell context, so ListPane re-renders).
-   The popover measured the element it was handed, which by then was detached:
-   getBoundingClientRect() read all zeros and the menu landed at the top-left
-   of the page instead of under the chip. A stable type keeps the DOM node, and
-   the rect stays real. */
-/* A filter chip. It used to be a transparent native <select> laid over the
-   chip, which meant the browser drew the option list using the SELECT's
-   colours — and those are the chip's, so an active (mint-on-tint) chip
-   produced a mint-on-nothing popup. The chip now opens the app's own menu
-   instead: same look as the view switcher, fully themeable. */
-function Chip({ name, p, api }: { name: string; p: Params; api: DealsApiState }) {
-  const pop = usePop();
-  const value = p[name];
-  const label = CHIP_LABEL[name] || name;
-  const on = value !== undefined && value !== null && value !== "";
-  let sel: { v: string | number; l: string; dot?: string } | null = null;
-  if (on) chipOptions(name, api).forEach((o) => { if (String(o.v) === String(value)) sel = o; });
-  const chosen = sel as { l: string; dot?: string } | null;
-  return (
-    <button className={"dws-chip" + (on ? " on" : "")} data-act="dl-chipmenu" data-name={name}
-      aria-haspopup="menu" aria-label={label + (on ? ": " + ((chosen && chosen.l) || value) : "")}
-      onClick={(e) => pop(e, <ChipMenu name={name} p={p} api={api} />,
-        { width: 210, cls: "pop-views pop-chip", align: "left" })}>
-      {/* the chosen option's colour rides on the chip too, so it survives the
-          menu closing — otherwise the dot would only ever be seen
-          mid-decision */}
-      {on ? <Odot o={chosen} /> : null}
-      <span className="lb">{on ? ((chosen && chosen.l) || value) : label}</span>
-      <Icon name="chev" size="sm" />
-    </button>
-  );
-}
+/* ============================================================ LIST PANE ===
+   Search, the same filters the table offers, and one row per deal. The filters
+   come from `selectOptions()` in menus.tsx, which the table's filter bar reads
+   too — so the two can never offer different options for the same filter. */
+const LIST_FILTERS = ["stage", "tag", "priority", "owner", "sort"];
 
-/* ============================================================ LIST PANE === */
-function ListPane({ list, activeRef, p, api }: { list: any[]; activeRef: string; p: Params; api: DealsApiState }) {
+function ListPane({ list, activeRef, p, api, cls, onPick }: {
+  list: any[]; activeRef: string; p: Params; api: DealsApiState; cls: string; onPick: () => void;
+}) {
   const acts = useActs(p);
-  const timer = useRef<number | undefined>(undefined);
-  const onSearch = (name: string, value: string) => {
-    window.clearTimeout(timer.current);
-    // No selection (a filter matched nothing) — keep the id segment off the URL
-    // entirely rather than emitting "#/deals/?q=…".
-    const to = "#/deals" + (activeRef ? "/" + encodeURIComponent(activeRef) : "")
-      + qs({ ...p, [name]: value });
-    timer.current = window.setTimeout(() => go(to), 220);
-  };
-  useEffect(() => () => window.clearTimeout(timer.current), []);
+  const { onFilter, onSearch, onUnfilter } = useFilters(omit(p, ["page"]), activeRef || null);
 
   return (
-    <aside className="dws-list">
-      <div className="dws-list-top">
+    <aside className={cx("w-full min-w-0 shrink-0 flex-col border-secondary lg:flex lg:w-80 lg:border-r", cls)}
+      aria-label="Deals">
+      <div className="flex shrink-0 flex-col gap-2 border-b border-secondary p-3">
         {/* Search first, with New deal beside it. The old "Deals · 14 shown"
             title was restating the page you are already on. */}
-        <div className="dws-find">
+        <div className="flex items-center gap-2">
           <SearchField ph="Search deals…" val={p.q} onFilter={onSearch} />
           {can("deals", "create")
-            ? <button className="btn icon" data-act="dl-create" aria-label="Create deal" title="Create deal"
-                onClick={() => acts.create()}><Icon name="plus" /></button>
+            ? <IconButton ico="plus" color="secondary" label="Create deal" data-act="dl-create" onClick={() => acts.create()} />
             : null}
         </div>
-        {/* One scrolling row, so the number of filters never changes the pane's
-            layout. Each chip shows its ACTIVE value when set and its own name
-            when not — a filter whose value you cannot read is decoration. */}
-        <div className="dws-filters">
-          <Chip name="stage" p={p} api={api} />
-          <Chip name="tag" p={p} api={api} />
-          <Chip name="priority" p={p} api={api} />
-          {/* Full access only — see fullAccess() in useDeals.ts: a scoped
-              session's own deals are all it can be shown, so this chip would
-              filter nothing. */}
-          {fullAccess() ? <Chip name="owner" p={p} api={api} /> : null}
-          <Chip name="sort" p={p} api={api} />
+        {/* ONE SCROLLING ROW, so the number of filters never changes the pane's
+            layout. Owner is full-access only — see fullAccess() in useDeals.ts:
+            a scoped session's own deals are all it can be shown, so the picker
+            would filter nothing. */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-hide">
+          {LIST_FILTERS.map((name) => (name === "owner" && !fullAccess() ? null : (
+            <span key={name} className="shrink-0">
+              <Select name={name} label={CHIP_LABEL[name] || name} value={p[name]} onFilter={onFilter}
+                options={selectOptions(name, api)}
+                allLabel={name === "sort" ? "Sort: newest first" : undefined} />
+            </span>
+          )))}
         </div>
+        {hasFilters(p)
+          ? <FilterChips params={omit(p, ["view", "page"])} onUnfilter={onUnfilter}
+              labels={{ q: "Search", stage: "Stage", owner: "Owner", priority: "Priority",
+                next: "Next action", stalled: "Stalled", sort: "Sort", tag: "List" }} />
+          : null}
       </div>
-      <div className="dws-list-scroll">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {list.length
-          ? list.map((d: any) => <Row key={d.deal_id} d={d} activeRef={activeRef} p={p} />)
-          : <div className="faint" style={{ fontSize: "var(--text-md)", padding: "16px 10px" }}>
-              {/* The same three readings as the full-page state above. This
-                  pane also renders with NO filters set — a deal ref in the URL
-                  keeps the workspace mounted over an empty scope — so it
-                  cannot blame the filters unconditionally. */}
+          ? list.map((d: any) => <Row key={d.deal_id} d={d} activeRef={activeRef} p={p} onPick={onPick} />)
+          : <p className="p-4 text-sm text-tertiary">
+              {/* The same three readings as the full-page state. This pane also
+                  renders with NO filters set — a deal ref in the URL keeps the
+                  workspace mounted over an empty scope — so it cannot blame the
+                  filters unconditionally. */}
               {hasFilters(p) ? "No deals match these filters."
-                : fullAccess() ? "No deals yet." : "No deals assigned to you."}</div>}
+                : fullAccess() ? "No deals yet." : "No deals assigned to you."}</p>}
       </div>
     </aside>
   );
 }
 
-function Row({ d, activeRef, p }: { d: any; activeRef: string; p: Params }) {
+function Row({ d, activeRef, p, onPick }: { d: any; activeRef: string; p: Params; onPick: () => void }) {
   const u = urgency(d);
   const over = d.next_action && daysFrom(d.next_action.date) < 0 && d.stage < STAGE.WON;
-  // `last_remark_at` is only ever set on the ONE deal fetched in full by
-  // useDealApi() (see useDeals.ts) — the API's list endpoint doesn't return
-  // it per row, so every other row here falls back to created_at, same as
-  // it would for a deal with no remarks yet.
-  const when = d.is_stalled ? "Stalled"
-    : over ? Math.abs(daysFrom(d.next_action.date)) + "d overdue"
-    : relativeDate(d.last_remark_at || d.created_at);
-  const to = "#/deals/" + d.deal_id + qs(p);
+  /* `last_remark_at` is only ever set on the ONE deal fetched in full by
+     useDealApi() — the list endpoint doesn't return it per row, so every other
+     row falls back to created_at, same as a deal with no remarks yet. */
+  const when = relativeDate(d.last_remark_at || d.created_at);
+  const flag = d.is_stalled ? "Stalled"
+    : over ? Math.abs(daysFrom(d.next_action.date)) + "d overdue" : "";
+  const on = activeRef === d.deal_id;
+  const to = "#/deals/" + encodeURIComponent(d.deal_id) + qs(p);
+  const stage = D.STAGES[d.stage] || { label: String(d.stage), tone: "" };
+
   return (
-    <a className={"dws-row" + (activeRef === d.deal_id ? " on" : "")} data-go={to} onClick={() => go(to)}>
-      {/* The face identifies the customer, and nothing else: it carried a
-          stage ring in its corner, which put the same fact in two places --
-          the pill below already carries the stage in the tone every pill in
-          the product uses -- and a 10px disc with a 2px cut-out ring read as a
-          fold in the circle rather than as a mark on it.
-          `aria-hidden` because the name is the very next element. */}
-      <span className={"av dws-face " + avatarTone(d.customer_name)} aria-hidden="true">
-        {initials(d.customer_name)}
+    <a
+      href={to}
+      data-go={to}
+      aria-current={on ? "true" : undefined}
+      className={cx(
+        "flex w-full cursor-pointer gap-2.5 border-b border-secondary px-3 py-2.5 text-left outline-focus-ring transition duration-100 last:border-0 hover:bg-primary_hover focus-visible:outline-2 focus-visible:-outline-offset-2",
+        on && "bg-selected hover:bg-selected",
+        u && u.cls === "u-bad" && "rail-error",
+        u && u.cls === "u-warn" && "rail-warning",
+        u && u.cls === "u-info" && "rail-info",
+      )}
+      onClick={(e) => { e.preventDefault(); onPick(); go(to); }}
+    >
+      <Avatar name={d.customer_name} sm />
+      <span className="flex min-w-0 flex-1 flex-col gap-1">
+        <span className="flex min-w-0 items-baseline gap-2">
+          <span className="min-w-0 flex-1 truncate text-sm font-medium text-primary">{d.customer_name}</span>
+          {/* The deal's own value — the only money on the record. Null means
+              nothing has been quoted yet, which is not ₹0. */}
+          <span className="shrink-0 font-mono text-xs font-semibold text-primary tnum">
+            {d.deal_value ? inr(d.deal_value, { compact: true }) : "—"}</span>
+        </span>
+        <span className="flex min-w-0 items-center gap-1.5">
+          <Pill xs tone={stage.tone || "neutral"} text={stage.label} />
+          {flag
+            ? <Pill xs dot tone="bad" text={flag} />
+            : <span className="truncate text-xs text-quaternary">{when}</span>}
+          <span className="flex-1" />
+          <ChainDots d={d} />
+        </span>
+        {d.business_name ? <span className="truncate text-xs text-tertiary">{d.business_name}</span> : null}
+        {d.tags && d.tags.length ? <TagChips max={2} tags={d.tags} /> : null}
       </span>
-      <div className="l1">
-        <span className={"name" + (u ? " " + u.cls : "")} title={u ? u.why : ""}>{d.customer_name}</span>
-        {/* The deal's own value — the only money on the record. Null means
-            nothing has been quoted yet, which is not ₹0. */}
-        <span className="amt tnum">{d.deal_value ? inr(d.deal_value, { compact: true }) : "—"}</span>
-      </div>
-      <div className="l2">
-        <span className={"pill xs" + (D.STAGES[d.stage].tone ? " " + D.STAGES[d.stage].tone : "")}>
-          {D.STAGES[d.stage].label}</span>
-        <span className={"time" + (u ? " " + u.cls : "")}>{when}</span>
-      </div>
-      <TagChips max={2} tags={d.tags} />
-      {/* The chain, on its own line under the tags — the prototype's `l3`.
-          It is where the row answers "how far has this deal actually got",
-          which the stage pill alone cannot say: a deal can sit in Followup
-          with an accepted quotation and a paid invoice behind it. */}
-      <div className="l3"><ChainDots d={d} /></div>
     </a>
   );
 }
@@ -292,22 +304,15 @@ function dayLabel(iso: string) {
   if (n === -1) return "Yesterday";
   return D.fmtDate(iso);
 }
-/* One short name per channel, mirroring the prototype's CHAN_CLS — every
-   surface that colours itself by channel (bubble, badge, composer button)
-   takes it from here, and the CSS needs one class per channel and nothing
-   else (see .dws-msg.wa / .dws-msg.em in admin-theme.css). */
-const CHAN_CLS: Record<string, string> = { whatsapp: "wa", email: "em", manual: "rmk" };
-function chanCls(channel?: string) { return CHAN_CLS[channel || "manual"] || "rmk"; }
+/* One tone per channel, and the chip that carries it. The hue is a LABEL — a
+   tag, not a status — because "this went out on WhatsApp" is a fact about the
+   message, never a verdict about the deal. */
+const CHAN_TONE: Record<string, string> = { whatsapp: "green", email: "blue", manual: "" };
+const CHAN_LABEL: Record<string, string> = { manual: "Remark", whatsapp: "WhatsApp", email: "Email" };
 
 function kindLabel(e: any) {
   if (e.kind !== "REMARK") return cap(String(e.kind).toLowerCase());
-  return e.channel === "whatsapp" ? "WhatsApp" : e.channel === "email" ? "Email" : "Remark";
-}
-function rowCls(e: any) {
-  if (e.kind !== "REMARK") return "log";
-  if (e.channel === "whatsapp") return "out wa";
-  if (e.channel === "email") return "out em";
-  return "log";
+  return CHAN_LABEL[e.channel || "manual"] || "Remark";
 }
 /* Digits only, no leading zero/plus — the shape wa.me needs. Indian numbers
    here are stored "+91 90322 19614"; a bare 10-digit number (no country code
@@ -320,14 +325,11 @@ function waDigits(phone: string) {
 }
 
 /* `apiEv` is the API's transitions+remarks, already shaped by adaptTimeline()
-   (useDeals.ts's useDealApi) — real STAGE/REMARK/SYSTEM events, sorted newest
-   first same as the prototype's Activity.timeline() was. `channel` on a
-   REMARK row is DealRemark.typeKey (manual/whatsapp/email) — a real, stored
-   field. Quote/invoice/payment lines the local engine's own timeline also
-   produced are still absent, for the same reason Drawer.tsx's TimelineTab
-   omits them: those chains are still local-only. */
-function ChatPane({ dl, ev: apiEv, p }: {
-  dl: any; ev: { kind: string; tone: string; at: string; by: string; text: string; channel?: string }[]; p: Params;
+   — real STAGE/REMARK/SYSTEM events, newest first. `channel` on a REMARK row
+   is DealRemark.typeKey (manual/whatsapp/email), a real stored field. */
+function ChatPane({ dl, ev: apiEv, p, cls }: {
+  dl: any; ev: { kind: string; tone: string; at: string; by: string; text: string; channel?: string }[];
+  p: Params; cls: string;
 }) {
   const ev = apiEv.slice().reverse();   // chronological, oldest first
   const scroll = useRef<HTMLDivElement>(null);
@@ -336,37 +338,78 @@ function ChatPane({ dl, ev: apiEv, p }: {
     if (el) el.scrollTop = el.scrollHeight;
   }, [ev.length, dl.deal_id]);
 
+  /* GROUPED BY AUTHOR. Six remarks from one person in one afternoon is one
+     person talking, not six events — the face and the name are drawn once and
+     the run reads as a paragraph. A day divider or a system line breaks the
+     run, because both mean the conversation moved on. */
   let lastDay: string | null = null;
+  let lastWho: string | null = null;
   const body: ReactNode[] = [];
+
   ev.forEach((e: any, i: number) => {
     const day = String(e.at || "").slice(0, 10);
     if (day && day !== lastDay) {
-      body.push(<div className="dws-daydiv" key={"d" + i}><span>{dayLabel(day)}</span></div>);
-      lastDay = day;
+      lastDay = day; lastWho = null;
+      body.push(
+        <div key={"d" + i} className="flex items-center gap-3 px-4 py-3">
+          <span aria-hidden="true" className="h-px flex-1 bg-border-secondary" />
+          <span className="label-mono rounded-full bg-primary px-2 py-0.5 ring-1 ring-secondary">{dayLabel(day)}</span>
+          <span aria-hidden="true" className="h-px flex-1 bg-border-secondary" />
+        </div>
+      );
     }
-    // The real send — new, not in the prototype. A whatsapp/email remark
-    // carries the exact text just logged into the link, so the agent writes
-    // it once here and the second app opens ready to actually send it.
-    const openHref = e.kind !== "REMARK" ? null
-      : e.channel === "whatsapp" && dl.phone
-        ? "https://wa.me/" + waDigits(dl.phone) + "?text=" + encodeURIComponent(e.text)
+
+    /* A STAGE MOVE OR A SYSTEM NOTE IS NOT A MESSAGE. It is what the record
+       did between two messages, so it reads as a quiet centred line rather
+       than as somebody speaking. */
+    if (e.kind !== "REMARK") {
+      lastWho = null;
+      body.push(
+        <div key={i} className="flex justify-center px-4 py-1.5">
+          <span className={cx(
+            "max-w-full rounded-full bg-primary px-2.5 py-1 text-center text-xs ring-1 ring-inset",
+            e.tone === "bad" ? "text-error-primary ring-secondary" : "text-tertiary ring-secondary",
+          )}>
+            {e.kind === "SYSTEM" ? e.text : <Rich text={e.text} />}
+            {e.by ? <span className="text-quaternary"> · {e.by}</span> : null}
+          </span>
+        </div>
+      );
+      return;
+    }
+
+    const who = (e.by || "") + "|" + (e.channel || "manual");
+    const grouped = who === lastWho;
+    lastWho = who;
+
+    /* The real send. A whatsapp/email remark carries the exact text just
+       logged into the link, so the agent writes it once here and the second
+       app opens ready to actually send it. */
+    const openHref = e.channel === "whatsapp" && dl.phone
+      ? "https://wa.me/" + waDigits(dl.phone) + "?text=" + encodeURIComponent(e.text)
       : e.channel === "email" && dl.email
         ? "mailto:" + dl.email + "?body=" + encodeURIComponent(e.text)
-      : null;
+        : null;
+
     body.push(
-      <div className={"dws-msg " + rowCls(e)} key={i}>
-        {e.kind !== "REMARK"
-          ? <div className="dws-badge sys"><Icon name="dots" size="sm" /></div>
-          : <div className={"dws-badge " + chanCls(e.channel)}>{initials(e.by)}</div>}
-        <div className="dws-col">
-          <div className="dws-meta"><span className="who">{e.by || ""}</span>
-            <span className="ch">· {kindLabel(e)}</span></div>
-          <div className="dws-bubble">
-            {e.kind === "REMARK" || e.kind === "SYSTEM" ? e.text : <Rich text={e.text} />}
+      <div key={i} className={cx("flex gap-2.5 px-4", grouped ? "mt-0.5" : "mt-4")}>
+        <span className="w-6 shrink-0">{grouped ? null : <Avatar name={e.by} xs />}</span>
+        <div className="flex min-w-0 flex-1 flex-col items-start gap-1">
+          {grouped ? null : (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-xs font-semibold text-secondary">{e.by || "—"}</span>
+              {e.channel && e.channel !== "manual"
+                ? <Tag label={kindLabel(e)} tone={CHAN_TONE[e.channel]} />
+                : null}
+            </div>
+          )}
+          <div className="max-w-full rounded-lg bg-primary px-3 py-2 text-sm whitespace-pre-wrap text-secondary shadow-xs ring-1 ring-secondary">
+            {e.text}
           </div>
           {openHref
-            ? <a className="dws-openchan" href={openHref} target="_blank" rel="noreferrer">
-                <Icon name="link" size="sm" />Open in {e.channel === "whatsapp" ? "WhatsApp" : "Email"}
+            ? <a className="inline-flex items-center gap-1 rounded text-xs font-medium text-brand-secondary outline-focus-ring hover:underline focus-visible:outline-2 focus-visible:outline-offset-2"
+                href={openHref} target="_blank" rel="noreferrer">
+                <Icon name="ext" size="xs" />Open in {CHAN_LABEL[e.channel]}
               </a>
             : null}
         </div>
@@ -375,13 +418,12 @@ function ChatPane({ dl, ev: apiEv, p }: {
   });
 
   return (
-    <section className="dws-chat">
+    <section className={cx("min-w-0 flex-1 flex-col bg-chat lg:flex", cls)} aria-label="Conversation">
       <Head dl={dl} p={p} />
-      <TagRow dl={dl} p={p} />
-      <div className="dws-chat-scroll" id="dwsChatScroll" ref={scroll}>
-        {ev.length ? body
-          : <div className="faint" style={{ textAlign: "center", padding: "40px 0", fontSize: "var(--text-md)" }}>
-              No activity yet. Add the first remark below.</div>}
+      <div className="min-h-0 flex-1 overflow-y-auto pb-4" id="dwsChatScroll" ref={scroll}>
+        {ev.length
+          ? body
+          : <p className="px-6 py-12 text-center text-sm text-tertiary">No activity yet. Add the first remark below.</p>}
       </div>
       <Composer dl={dl} p={p} />
     </section>
@@ -390,139 +432,76 @@ function ChatPane({ dl, ev: apiEv, p }: {
 
 /* Who the deal belongs to, as faces rather than a line of text. Owner leads,
    any co-owner sits behind — the stack IS the answer to "is this shared",
-   readable before a word is.
-
-   There is no pending-request face and no split percentage any more: the
-   server stores an owner and a co-owner, and nothing else. A request queue and
-   a commission split are both records, and neither has a table.
-
-   The stack is the button that opens Reassign, so the way to change who is on
-   a deal is to press the people already on it. Head-only, because that is who
-   the server lets reassign. */
+   readable before a word is. The stack is also the button that opens Reassign,
+   so the way to change who is on a deal is to press the people already on it.
+   Head-only, because that is who the server lets reassign. */
 function People({ dl, p }: { dl: any; p: Params }) {
   const acts = useActs(p);
-  const face = (name: string, tip: string) => (
-    <span key={name} className={"av sm " + avatarTone(name)} title={tip}>{initials(name)}</span>
-  );
-  const faces = [face(dl.owner_id || "—", "Owner · " + (dl.owner_id || "unassigned"))];
-  if (dl.co_owner_id) faces.push(face(dl.co_owner_id, "Co-owner · " + dl.co_owner_id));
-
   const tip = dl.co_owner_id
-    ? dl.owner_id + " with " + dl.co_owner_id + (head() ? " — click to change" : "")
-    : "Owned by " + (dl.owner_id || "nobody") + (head() ? " — click to reassign" : "");
-
-  if (!head()) return <span className="dws-people" title={tip}>{faces}</span>;
+    ? dl.owner_id + " with " + dl.co_owner_id + (head() ? " — press to change" : "")
+    : "Owned by " + (dl.owner_id || "nobody") + (head() ? " — press to reassign" : "");
+  const faces = (
+    <>
+      <Avatar name={dl.owner_id || "—"} xs />
+      {dl.co_owner_id ? <span className="-ml-1.5"><Avatar name={dl.co_owner_id} xs /></span> : null}
+    </>
+  );
+  if (!head()) return <span className="flex shrink-0 items-center" title={tip} aria-label={tip}>{faces}</span>;
   return (
-    <button className="dws-people" data-act="dl-reassign" data-ref={dl.deal_id} title={tip} aria-label={tip}
+    <button type="button" data-act="dl-reassign" data-ref={dl.deal_id} title={tip} aria-label={tip}
+      className="flex shrink-0 cursor-pointer items-center rounded-full p-0.5 outline-focus-ring transition duration-100 hover:bg-primary_hover focus-visible:outline-2"
       onClick={() => acts.reassign(dl.deal_id)}>
       {faces}
-      {dl.co_owner_id ? null : <span className="av sm dws-people-add"><Icon name="plus" size="sm" /></span>}
     </button>
   );
 }
 
+/* The identity row, then the control row. Stage and priority are the two
+   fields an agent retunes as a call goes on, so both are controls rather than
+   read-only pills; the deal's lists sit on the same line, each with the × that
+   takes it off THIS deal only. No back arrow — the deals list is the left
+   pane, already on screen, so there is nothing to go back to. */
 function Head({ dl, p }: { dl: any; p: Params }) {
   const acts = useActs(p);
-  const pop = usePop();
-  /* The name leads the row on its own. No back arrow — the deals list is the
-     left pane, already on screen, so there is nothing to go back to. */
+  const tags = dl.tags || [];
   return (
-    <div className="dws-head">
-      <div className="dws-who">
-        <h1>{dl.customer_name}</h1>
-        {dl.is_stalled ? <Pill text="Stalled" tone="warn" /> : null}
-        {/* The plan is what the deal is FOR — it decides the value, the
-            quotation and every tier gate downstream — so it reads as its own
-            accented chip rather than as the first half of a sentence about
-            geography. */}
-        {dl.interested_in ? <span className="pill brand">{dl.interested_in}</span> : null}
-        <span className="pill">{place(dl)}</span>
+    <header className="flex shrink-0 flex-col gap-2 border-b border-secondary bg-primary px-4 py-3">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <Avatar name={dl.customer_name} sm />
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-md font-semibold text-primary">{dl.customer_name}</h2>
+          <div className="truncate text-xs text-tertiary">
+            {dl.business_name ? dl.business_name + " · " : ""}{place(dl)}
+            {dl.interested_in ? " · " + dl.interested_in : ""}
+          </div>
+        </div>
+        <People dl={dl} p={p} />
+        <MoreMenu dl={dl} onValue={() => acts.value(dl.deal_id)}
+          onReassign={() => acts.reassign(dl.deal_id)} onClose={() => acts.closeDeal(dl.deal_id)} />
       </div>
-      <span className="spacer"></span>
-      <People dl={dl} p={p} />
-      {/* Priority sits beside stage because they are the two things an agent
-          retunes as a call goes on. It used to be a read-only pill, which meant
-          a deal that turned urgent on a Tuesday stayed Normal forever. */}
-      <button className={"dws-priobtn " + prioTone(dl.priority)} data-act="dl-priomenu" data-ref={dl.deal_id}
-        aria-haspopup="menu" title="Priority · visual triage only, it never changes who the deal goes to"
-        onClick={(e) => pop(e, <PrioMenu dl={dl} onPick={(v) => acts.priority(dl.deal_id, v)} />,
-          { width: 250, cls: "pop-views" })}>
-        <span className={"dws-odot " + prioTone(dl.priority)}></span>
-        {D.PRIORITY[dl.priority]}<Icon name="chev" size="sm" />
-      </button>
-      {/* Stage is the one field an agent changes constantly, so it gets a
-          control rather than a read-only pill buried in the identity line. */}
-      <button className={"dws-stagebtn " + (D.STAGES[dl.stage].tone || "")} data-act="dl-stagemenu"
-        data-ref={dl.deal_id} aria-haspopup="menu"
-        onClick={(e) => pop(e, <StageMenu dl={dl} onPick={(to) => {
+      <div className="flex flex-wrap items-center gap-1.5">
+        <StageMenu dl={dl} size="xs" onPick={(to) => {
           /* Lost needs a reason and Won is worth confirming — that is Close
              deal's job, not the generic modal's. A quick pick lands on the same
              guarded flow the dedicated Close-deal button does. */
           if (to === STAGE.LOST || to === STAGE.WON) acts.closeDeal(dl.deal_id);
           else acts.stageRemark(dl.deal_id, to, dl.stage);
-        }} />, { width: 280, cls: "pop-views" })}>
-        <span className={"dws-sdot " + (D.STAGES[dl.stage].tone || "")}></span>
-        {D.STAGES[dl.stage].label}<Icon name="chev" size="sm" />
-      </button>
-      <button className="btn icon dws-more" data-act="dl-more" data-ref={dl.deal_id} aria-haspopup="menu"
-        aria-label="More actions" title="More actions"
-        onClick={(e) => pop(e, <MoreMenu dl={dl} onValue={() => acts.value(dl.deal_id)}
-          onReassign={() => acts.reassign(dl.deal_id)} onClose={() => acts.closeDeal(dl.deal_id)} />,
-          { width: 250, cls: "pop-views" })}>
-        <Icon name="dots" />
-      </button>
-    </div>
+        }} />
+        <PrioMenu dl={dl} size="xs" onPick={(v) => acts.priority(dl.deal_id, v)} />
+        {dl.is_stalled ? <Pill dot tone="warn" text="Stalled" /> : null}
+        <span aria-hidden="true" className="mx-0.5 h-4 w-px bg-border-secondary" />
+        {tags.length
+          ? tags.map((t: any) => (
+              <Tag key={t.slug} label={t.label} tone={t.tone || ""}
+                onRemove={() => acts.untag(dl.deal_id, t.slug)} />
+            ))
+          : <span className="text-xs text-quaternary">No lists yet</span>}
+        <Button color="link-gray" size="xs" ico="plus" data-act="dl-tag" data-ref={dl.deal_id}
+          onClick={() => acts.tags(dl.deal_id)}>List</Button>
+      </div>
+    </header>
   );
 }
-
-/* The deal's tags, on their own strip under the header — visible without
-   opening a dialog, and editable from the same place. Every tag carries an ×,
-   and it takes that tag off THIS deal only.
-
-   Read straight off the deal the API returned, so what is on screen is what is
-   stored; the × posts the removal and the refetch brings the row back without
-   it. */
-function TagRow({ dl, p }: { dl: any; p: Params }) {
-  const acts = useActs(p);
-  const tags = dl.tags || [];
-  return (
-    <div className="dws-tagrow">
-      {tags.length
-        ? tags.map((t: any) => (
-            <span key={t.slug} className={"pill is-tag" + toneClass(t.tone)} title={t.label + " · × removes it from this deal"}>
-              {t.label}
-              <button className="tag-x" data-act="dl-untag" data-ref={dl.deal_id} data-slug={t.slug}
-                title={"Remove " + t.label} aria-label={"Remove " + t.label}
-                onClick={() => acts.untag(dl.deal_id, t.slug)}><Icon name="x" size="sm" /></button>
-            </span>
-          ))
-        : <span className="faint" style={{ fontSize: "var(--text-sm)" }}>No tags yet</span>}
-      <span className="spacer"></span>
-      <button className="dws-tagadd" data-act="dl-tag" data-ref={dl.deal_id} onClick={() => acts.tags(dl.deal_id)}>
-        <Icon name="plus" size="sm" />List
-      </button>
-    </div>
-  );
-}
-
-/* Starts at one line and grows with what's typed — a pasted email or a long
-   remark should be readable while it's written, not a one-line window onto a
-   wall of text. Caps out and scrolls internally past COMPOSER_MAX so a very
-   long draft cannot push the send button off the bottom of the pane.
-
-   The cap is generous because the box is now nothing but writing space: the
-   bar under it is gone and Send lives up beside the channel chips, so every
-   pixel the composer occupies is a pixel you can type into. */
-const COMPOSER_MAX = 300;
-
-// One placeholder per channel — what the box hints depends on how the text
-// is about to go out, same three strings the prototype used.
-const CHAN_PLACEHOLDER: Record<string, string> = {
-  manual: "Log a call, a site visit, or what you told the customer…",
-  whatsapp: "Message sent to the customer via WhatsApp…",
-  email: "Message sent to the customer via email…",
-};
-const CHAN_LABEL: Record<string, string> = { manual: "Remark", whatsapp: "WhatsApp", email: "Email" };
 
 /* ------------------------------------------------------- composer marks ---
    Bold and a bullet list, applied to whatever is selected in the box. They are
@@ -554,31 +533,31 @@ function wordAt(v: string, at: number): [number, number] {
   return [a, b];
 }
 
+// One placeholder per channel — what the box hints depends on how the text
+// is about to go out.
+const CHAN_PLACEHOLDER: Record<string, string> = {
+  manual: "Log a call, a site visit, or what you told the customer…",
+  whatsapp: "Message sent to the customer via WhatsApp…",
+  email: "Message sent to the customer via email…",
+};
+
+/* The composer is WRITING SPACE and nothing else: the channel picker and the
+   two marks sit above it, Send sits beside them, and the box grows with what
+   is typed (`field-sizing-content`) up to a third of the pane before it starts
+   scrolling itself. No bar underneath explaining where a remark lands — that
+   sentence was the same on every deal forever, and it was height taken from
+   the one thing in this box anybody uses. */
 function Composer({ dl, p }: { dl: any; p: Params }) {
   const acts = useActs(p);
   const shell = useShell();
   const ta = useRef<HTMLTextAreaElement>(null);
   const [busy, setBusy] = useState(false);
-  // Module state (chanOf/setChan), mirrored locally so picking a tab
-  // re-renders this composer — the prototype's `var CHAN` had a whole page
-  // re-render to lean on; React needs its own trigger.
+  /* Module state (chanOf/setChan), mirrored locally so picking a channel
+     re-renders this composer — the prototype's `var CHAN` had a whole page
+     re-render to lean on; React needs its own trigger. */
   const [chan, setChanLocal] = useState(chanOf());
-  /* Is there a draft? The textarea is uncontrolled — it holds the text, React
-     does not — so this is the one bit of it React needs, and it is a boolean,
-     not the value: it decides where Send is and whether the hint bar is there,
-     and nothing about the box re-renders per keystroke. */
-  const [drafting, setDrafting] = useState(false);
 
-  const grow = () => {
-    const el = ta.current; if (!el) return;
-    el.style.height = "auto";
-    const h = Math.min(el.scrollHeight, COMPOSER_MAX);
-    el.style.height = h + "px";
-    el.style.overflowY = el.scrollHeight > COMPOSER_MAX ? "auto" : "hidden";
-  };
-  const type = () => { grow(); setDrafting(!!(ta.current && ta.current.value.trim())); };
-
-  /* Both marks run on the SELECTION, and both toggle: a second click on
+  /* Both marks run on the SELECTION, and both toggle: a second press on
      something already bold takes the markers off rather than doubling them. */
   const bold = () => {
     const el = ta.current; if (!el) return;
@@ -586,17 +565,16 @@ function Composer({ dl, p }: { dl: any; p: Params }) {
     let a = el.selectionStart, b = el.selectionEnd;
     if (a === b) [a, b] = wordAt(v, a);
     const sel = v.slice(a, b);
-    // Already wrapped — either the markers sit just outside the selection
-    // (the usual case, re-clicking after bolding) or inside it (dragged over
-    // the asterisks too). Both come off.
+    // Already wrapped — either the markers sit just outside the selection (the
+    // usual case, re-pressing after bolding) or inside it (dragged over the
+    // asterisks too). Both come off.
     if (v.slice(Math.max(0, a - m.length), a) === m && v.slice(b, b + m.length) === m)
-      return writeInto(el, a - m.length, b + m.length, sel, a - m.length, b - m.length), type();
+      return writeInto(el, a - m.length, b + m.length, sel, a - m.length, b - m.length);
     if (sel.length > 2 * m.length && sel.startsWith(m) && sel.endsWith(m))
-      return writeInto(el, a, b, sel.slice(m.length, -m.length), a, b - 2 * m.length), type();
+      return writeInto(el, a, b, sel.slice(m.length, -m.length), a, b - 2 * m.length);
     // Nothing to bold and no word under the caret: leave the markers with the
-    // caret between them, which is what every editor does with an empty click.
+    // caret between them, which is what every editor does with an empty press.
     writeInto(el, a, b, m + sel + m, a + m.length, a + m.length + sel.length);
-    type();
   };
 
   /* Whole lines, never part of one — the selection is widened to the lines it
@@ -611,7 +589,6 @@ function Composer({ dl, p }: { dl: any; p: Params }) {
     const on = lines.every((l) => !l.trim() || /^\s*- /.test(l));
     const next = lines.map((l) => (!l.trim() ? l : on ? l.replace(/^(\s*)- /, "$1") : "- " + l)).join("\n");
     writeInto(el, a, b, next, a, a + next.length);
-    type();
   };
 
   /* Ctrl/⌘+B, because a toolbar button that has no shortcut is a button people
@@ -619,15 +596,9 @@ function Composer({ dl, p }: { dl: any; p: Params }) {
   const keys = (e: ReactKeyEvent<HTMLTextAreaElement>) => {
     if ((e.ctrlKey || e.metaKey) && (e.key === "b" || e.key === "B")) { e.preventDefault(); bold(); }
   };
-
-  /* Keeps the textarea's selection alive while a toolbar button is pressed —
+  /* Keeps the textarea's selection alive while a mark button is pressed —
      without this the mousedown blurs the box and the mark lands on nothing. */
   const holdSel = (e: ReactMouseEvent) => e.preventDefault();
-  useEffect(grow, []);
-  /* Re-measured AFTER the class lands: the first character both grows the box
-     and drops the hint bar, and `drafting` raises the textarea's min-height —
-     measuring in the same tick as the keystroke would measure the old one. */
-  useEffect(grow, [drafting]);
 
   const pick = (ch: string) => { setChan(ch); setChanLocal(ch); };
 
@@ -640,141 +611,146 @@ function Composer({ dl, p }: { dl: any; p: Params }) {
     acts.send(dl.deal_id, text, chan).then((ok: boolean) => {
       setBusy(false);
       if (!ok) return;
-      if (ta.current) { ta.current.value = ""; grow(); }
-      setDrafting(false);
+      if (ta.current) ta.current.value = "";
       setChanLocal(chanOf());   // acts.send resets the module state to manual
     });
   };
 
   return (
-    <div className={"dws-composer " + chanCls(chan) + (drafting ? " drafting" : "")}>
-      {/* The head is the channel row, and once there is something to send it is
-          also where Send is — top right, beside the channel it will go out on,
-          the way every chat client puts the send next to what you are writing
-          rather than under a bar at the bottom of it. */}
-      <div className="dws-chans">
-        {["manual", "whatsapp", "email"].map((ch) => (
-          <button key={ch} type="button"
-            className={"dws-chanbtn " + chanCls(ch) + (chan === ch ? " on" : "")}
-            data-act="dl-chan" data-chan={ch} onClick={() => pick(ch)}>
-            {CHAN_LABEL[ch]}
-          </button>
-        ))}
-        <span className="dws-sep" aria-hidden="true" />
-        <button type="button" className="dws-fmt bold" title="Bold (Ctrl+B)" aria-label="Bold"
-          onMouseDown={holdSel} onClick={bold}>B</button>
-        <button type="button" className="dws-fmt" title="Bullet list" aria-label="Bullet list"
-          onMouseDown={holdSel} onClick={bullet}><Icon name="list" size="sm" /></button>
-        {drafting && (
-          <button className="dws-send top" data-act="dl-send" data-ref={dl.deal_id}
-            disabled={busy} onClick={send}>
-            {busy ? "Sending" : "Send"}<Icon name="arrow" size="sm" />
-          </button>
-        )}
+    <div className="flex shrink-0 flex-col gap-2 border-t border-secondary bg-primary p-3">
+      {/* HOW IT GOES OUT, then WHAT GOES OUT, then the send. The channel row is
+          allowed to wrap in a narrow pane; Send never is, because it sits on
+          the writing row where the thing it sends is. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Segmented sm label="Channel" value={chan} onPick={pick}
+          options={[
+            { v: "manual", l: "Remark", ico: "note" },
+            { v: "whatsapp", l: "WhatsApp", ico: "message" },
+            { v: "email", l: "Email", ico: "mail" },
+          ]} />
+        <span aria-hidden="true" className="h-5 w-px bg-border-secondary" />
+        {/* The mousedown is caught on the WRAPPER: preventing it there keeps
+            the textarea's selection alive while either mark is pressed —
+            without it the press blurs the box and the mark lands on nothing. */}
+        <span className="flex items-center gap-1" onMouseDown={holdSel}>
+          <IconButton ico="bolt" size="xs" label={"Bold  " + boldMark(chan) + "text" + boldMark(chan)} onClick={bold} />
+          <IconButton ico="list" size="xs" label="Bullet list" onClick={bullet} />
+        </span>
       </div>
-      {/* Everything under the textarea is gone — the bar that explained where a
-          remark lands said the same sentence on every deal forever, and it was
-          height taken from the one thing in this box anybody uses. What it said
-          the placeholder above says per channel, in the box being typed in. */}
-      <textarea id="dwsComposerText" rows={1} ref={ta}
-        placeholder={CHAN_PLACEHOLDER[chan]} onInput={type} onKeyDown={keys} />
+      <div className="flex items-end gap-2">
+        <TextAreaBase
+          id="dwsComposerText"
+          ref={ta}
+          rows={2}
+          size="sm"
+          aria-label="Write a remark"
+          placeholder={CHAN_PLACEHOLDER[chan]}
+          className="field-sizing-content max-h-64 min-h-16 flex-1 resize-none"
+          onKeyDown={keys}
+        />
+        <Button color="primary" size="xs" ico="arrow" className="mb-1.5 shrink-0"
+          data-act="dl-send" data-ref={dl.deal_id}
+          isDisabled={busy} onClick={send}>{busy ? "Sending…" : "Send"}</Button>
+      </div>
     </div>
   );
 }
 
 /* ========================================================== CONTEXT PANE === */
-function CtxPane({ dl, p }: { dl: any; p: Params }) {
+function CtxPane({ dl, p, cls }: { dl: any; p: Params; cls: string }) {
   /* One fetch for the whole chain half of this pane — the Quotation block, the
      Invoices block AND the two chain actions all read it, so they cannot
      disagree about what this deal has. */
   const docs = useDealDocs(dl.deal_id);
   const quote: QuotationRow | null = docs.quotations.length ? docs.quotations[0] : null;
 
-  /* Clamped: an overpaid deal is a data question, not a bar that runs past its
-     track. Same units on both sides (paise), so the ratio needs no conversion. */
-  const collectedPct = dl.deal_value
-    ? Math.min(100, Math.round(((dl.revenue_collected || 0) / dl.deal_value) * 100))
-    : 0;
-
   return (
-    <aside className="dws-ctx">
+    <aside className={cx("w-full min-w-0 shrink-0 flex-col gap-5 overflow-y-auto border-secondary p-4 lg:flex lg:w-80 lg:border-l 2xl:w-[22rem]", cls)}
+      aria-label="Deal details">
       {/* Three cells, and all three are REAL: deal value is the agreed total on
           the record, collected is the sum of the payment ledger, outstanding is
           the first minus the second. The server computes both sums from rows
-          (DealsController._with_chain) — nothing here is estimated, and no
-          figure is derived twice on two screens. */}
-      <div>
-        <div className="dws-ctx-h">Money</div>
-        <div className="dls-attn dws-money">
+          (DealsController._with_chain) — nothing here is estimated. */}
+      <section className="flex flex-col gap-2">
+        <Eyebrow>Money</Eyebrow>
+        <div className="grid grid-cols-3 gap-2">
           <MoneyCellCtx k="deal value" v={dl.deal_value ? inr(dl.deal_value, { compact: true }) : "—"} />
-          <span className="dls-sep"></span>
           <MoneyCellCtx k="collected" v={inr(dl.revenue_collected || 0, { compact: true })} tone="ok" />
-          <span className="dls-sep"></span>
           <MoneyCellCtx k="outstanding" v={inr(dl.outstanding || 0, { compact: true })} tone="warn" />
         </div>
-        {/* Added under the three figures, not in place of them: full width is
-            the deal value, the green run is collected, the amber remainder is
-            outstanding — the same numbers as a ratio, which the row above
-            makes you work out. No deal value, no denominator, no bar. */}
-        {dl.deal_value ? (
-          <div className="bar dws-mbar" title={collectedPct + "% collected"}>
-            <i className="ok" style={{ width: collectedPct + "%" }}></i>
-            <i className="warn" style={{ width: 100 - collectedPct + "%" }}></i>
-          </div>
-        ) : null}
-      </div>
+        {/* Under the three figures, not in place of them: the same numbers as a
+            ratio, which the row above makes you work out. No deal value, no
+            denominator, no bar. */}
+        {dl.deal_value
+          ? <Meter tone="ok" value={dl.revenue_collected || 0} max={dl.deal_value}
+              label={"Collected against the deal value"} />
+          : null}
+      </section>
+
+      <section className="flex flex-col gap-2">
+        <Eyebrow>Stage</Eyebrow>
+        <StagePipeline stage={dl.stage} closeReason={dl.close_reason} compact />
+        <p className="text-xs text-quaternary tnum">{Math.abs(daysFrom(dl.stage_since))} days in stage</p>
+      </section>
 
       {/* Who you are talking to, before the deal mechanics — the composer sits
           right below, so the contact details have to be reachable without
-          reopening the drawer. */}
-      <div>
-        <div className="dws-ctx-h">Contact</div>
+          opening a dialog. */}
+      <section className="flex flex-col gap-2">
+        <Eyebrow>Contact</Eyebrow>
         <KvList pairs={[
           ["Business", orDash(dl.business_name)],
-          ["Email", dl.email ? <a href={"mailto:" + dl.email}>{dl.email}</a> : <span className="faint">—</span>],
-          ["Phone", <span className="mono">{dl.phone}</span>],
-          ["Location", place(dl)]
+          ["Email", dl.email
+            ? <a className="rounded text-brand-secondary outline-focus-ring hover:underline focus-visible:outline-2" href={"mailto:" + dl.email}>{dl.email}</a>
+            : null],
+          ["Phone", <span className="font-mono tnum">{dl.phone}</span>],
+          ["Location", place(dl)],
         ]} />
-      </div>
+      </section>
 
-      <div>
-        <div className="dws-ctx-h">Deal facts</div>
+      <section className="flex flex-col gap-2">
+        <Eyebrow>Deal facts</Eyebrow>
         <KvList pairs={([
-          ["Owner", <>{dl.owner_id || "—"}{dl.co_owner_id ? <> <span className="faint">+ {dl.co_owner_id}</span></> : null}</>],
+          ["Owner", <>{dl.owner_id || "—"}{dl.co_owner_id ? <span className="text-tertiary"> + {dl.co_owner_id}</span> : null}</>],
           ["Interested in", orDash(dl.interested_in)],
           /* The intake reference. A plain string that points at whatever
              collected the submission — see Deal.enquiryRef — so it is shown and
              never linked: there is nothing on this side to open. */
-          ["Enquiry", dl.enquiry_id ? <span className="mono">{dl.enquiry_id}</span> : null],
+          ["Enquiry", dl.enquiry_id ? <span className="font-mono tnum">{dl.enquiry_id}</span> : null],
           ["Created", D.fmtDate(dl.created_at)],
           /* Both rows are ALWAYS present, with a null value where there is no
              figure — KvList renders that as the faint em-dash. Hiding the row
              instead makes the panel change height per deal and quietly loses
              the fact that the field exists and is unset. */
           ["Expected close", dl.expected_close_date ? D.fmtDate(dl.expected_close_date) : null],
-          ["Stage age", Math.abs(daysFrom(dl.stage_since)) + " days"],
           /* Off the live quotation, not the deal — a discount is a term of an
-             offer, and the deal has no column for one. Absent until there is a
-             quotation to read it from. */
-          ["Discount", quote ? quote.discountPct + "%" : null]
-        ].filter(Boolean)) as [ReactNode, ReactNode][]} />
-      </div>
+             offer, and the deal has no column for one. */
+          ["Discount", quote ? quote.discountPct + "%" : null],
+        ] as [ReactNode, ReactNode][])} />
+      </section>
 
-      <div>
-        <div className="dws-ctx-h">Quotation</div>
+      {/* THE CHAIN, as the panel's one drawing of it — the same strip
+          Quotations and Invoices put at the top of their own detail pages, so
+          "where is this deal in the sequence" is answered identically wherever
+          you are standing. */}
+      <section className="flex flex-col gap-2">
+        <Eyebrow>Chain</Eyebrow>
+        <ChainStrip dealRef={dl.deal_id} here="deal" quotation={quote} />
+      </section>
+
+      {/* ONE DOCUMENTS BLOCK, not a Quotation block and an Invoices block. The
+          strip above already says where the chain has got to; this is the list
+          of the actual papers, newest kind first, each openable — and the slot
+          that is still empty is the control that fills it. Two headings for one
+          sequence made the pane read as two unrelated stacks. */}
+      <section className="flex flex-col gap-2">
+        <Eyebrow>Documents{docs.invoices.length ? " · " + (docs.invoices.length + (quote ? 1 : 0)) : ""}</Eyebrow>
         {quote
-          ? <ChainCard to={"#/quotations/" + quote.id} tone="q" icon="quote"
-              t1={<>{quote.quotationNumber || "Draft"}{" "}
-                <span className="faint" style={{ fontWeight: "var(--weight-normal)" }}>v{quote.version}</span></>}
+          ? <ChainCard to={"#/quotations/" + quote.id} icon="quote"
+              tone={quote.status === "accepted" ? "ok" : quote.status === "draft" ? "warn" : "q"}
+              t1={<>{quote.quotationNumber || "Draft"} <span className="font-normal text-tertiary">v{quote.version}</span></>}
               t2={(Q_LABEL[quote.status] || cap(quote.status)) + " · " + inr(quote.grandTotalPaise)} />
           : <ChainAdd dl={dl} kind="quotation" docs={docs} />}
-      </div>
-
-      <div>
-        <div className="dws-ctx-h">Invoices
-          <span style={{ fontWeight: "var(--weight-normal)", textTransform: "none", letterSpacing: 0 }}>
-            {docs.invoices.length ? docs.invoices.length + " raised" : ""}</span>
-        </div>
         {docs.invoices.length
           ? docs.invoices.map((i: InvoiceRow) => (
               <ChainCard key={i.id} to={"#/invoices/" + i.id} icon="invoice"
@@ -784,69 +760,45 @@ function CtxPane({ dl, p }: { dl: any; p: Params }) {
                     (i.cancellationReason ? " · " + i.cancellationReason : "")} />
             ))
           : <ChainAdd dl={dl} kind="invoice" docs={docs} />}
-      </div>
+      </section>
 
-      <div>
-        <div className="dws-ctx-h">Actions</div>
-        <div className="dws-actions"><ChatActions dl={dl} p={p} docs={docs} /></div>
-      </div>
+      <section className="flex flex-col gap-2">
+        <Eyebrow>Actions</Eyebrow>
+        <ChatActions dl={dl} p={p} />
+      </section>
     </aside>
-  );
-}
-
-/* One document, as a row you can open. The same card for a quotation and an
-   invoice — they are the same kind of thing to the reader (a document this
-   deal produced, its state, its amount), and reading them the same way is the
-   point of the block. */
-function ChainCard({ to, tone, icon, t1, t2 }: {
-  to: string; tone: string; icon: string; t1: ReactNode; t2: ReactNode;
-}) {
-  return (
-    <a className="dws-chain-card" data-go={to} onClick={() => go(to)}>
-      <div className={"dws-chain-ic " + tone}><Icon name={icon} size="sm" /></div>
-      <div className="dws-chain-body">
-        <div className="t1">{t1}</div>
-        <div className="t2">{t2}</div>
-      </div>
-    </a>
   );
 }
 
 /* THE EMPTY SLOT, AS THE WAY TO FILL IT.
 
    "None yet." was a sentence that answered a question nobody asked and left you
-   to go and find the module that raises one. The dotted card says the same
+   to go and find the module that raises one. The dashed card says the same
    thing by being empty AND is the control — one target, no second trip.
 
-   It stays dotted and clickable when the chain is not ready for it, rather than
-   vanishing or greying out: a control that disappears takes the sequence with
-   it (a quotation becomes an invoice becomes money), and a grey one invites a
-   click and answers with nothing. When it cannot act it says what has to happen
+   It stays pressable when the chain is not ready for it, rather than vanishing
+   or greying out: a control that disappears takes the sequence with it (a
+   quotation becomes an invoice becomes money), and a grey one invites a press
+   and answers with nothing. When it cannot act it says what has to happen
    first — chainGate() below, read off the same documents the enabled path
    reads, so the button and the rule cannot disagree. */
-function ChainAdd({ dl, kind, docs, as }: {
+function ChainAdd({ dl, kind, docs }: {
   dl: any; kind: "quotation" | "invoice"; docs: DealDocsState;
-  /** "card" is the dotted empty slot in the Quotation / Invoices block;
-   *  "btn" is the same action as a button in Actions. One component for both,
-   *  because it is one action with one gate — two copies is how the panel's
-   *  two halves end up disagreeing about whether a deal can be invoiced. */
-  as?: "card" | "btn";
 }) {
   const shell = useShell();
   const pop = usePop();
   const [busy, setBusy] = useState(false);
 
-  if (docs.loading) return <div className="faint" style={{ fontSize: "var(--text-sm)" }}>Loading…</div>;
+  if (docs.loading) return <p className="text-sm text-quaternary">Loading…</p>;
 
   const gate = chainGate(dl, kind, docs);
   const label = kind === "quotation" ? "Create quote" : "Raise invoice";
-  const card = as !== "btn";
-  const icon = card ? "plus" : kind === "quotation" ? "quote" : "invoice";
 
   if (gate) return (
-    <button className={(card ? "dws-chain-add" : "btn") + " gated"} data-act="dl-gate" title={gate.title}
-      onClick={(e) => pop(e, <GateBody gate={gate} />, { width: 264, cls: "pop-views" })}>
-      <Icon name={icon} /><span>{label}</span>
+    <button type="button" data-act="dl-gate" title={gate.title}
+      className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-primary px-3 py-3 text-sm font-medium text-tertiary outline-focus-ring transition duration-100 hover:border-secondary hover:text-secondary focus-visible:outline-2 focus-visible:outline-offset-2"
+      onClick={(e) => pop(e, <GateBody title={gate.title} body={gate.body} />, { width: 288 })}>
+      <Icon name="lock" size="sm" />{label}
     </button>
   );
 
@@ -873,8 +825,9 @@ function ChainAdd({ dl, kind, docs, as }: {
   };
 
   return (
-    <button className={card ? "dws-chain-add" : "btn pri"} onClick={create} disabled={busy}>
-      <Icon name={icon} /><span>{busy ? "Working…" : label}</span>
+    <button type="button" disabled={busy} onClick={create}
+      className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-brand px-3 py-3 text-sm font-semibold text-brand-secondary outline-focus-ring transition duration-100 hover:bg-brand-primary focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+      <Icon name="plus" size="sm" />{busy ? "Working…" : label}
     </button>
   );
 }
@@ -909,7 +862,7 @@ function chainGate(dl: any, kind: "quotation" | "invoice", docs: DealDocsState):
     return { title: "The quotation is not accepted yet",
              body: "This deal's quotation is " + (Q_LABEL[live[0].status] || live[0].status).toLowerCase() +
                    ". Until the customer accepts it there is no agreed amount to bill." };
-  /* The same test the server makes, stated before the click rather than as a
+  /* The same test the server makes, stated before the press rather than as a
      422 after it: nothing left uninvoiced means nothing left to raise. */
   if (dl.deal_value && (dl.revenue_collected || 0) >= dl.deal_value)
     return { title: "Everything is invoiced",
@@ -918,59 +871,31 @@ function chainGate(dl: any, kind: "quotation" | "invoice", docs: DealDocsState):
   return null;
 }
 
-function GateBody({ gate }: { gate: NonNullable<Gate> }) {
-  return (
-    <div className="pop-b"><div className="pop-gate">
-      <div className="pop-gate-h"><Icon name="alert" /><b>{gate.title}</b></div>
-      <p>{gate.body}</p>
-    </div></div>
-  );
-}
+/* WHAT THE BLOCKS ABOVE DO NOT ALREADY DO, AND NOTHING ELSE.
 
-/* THE FOUR, IN THAT ORDER, ALWAYS.
+   Create quote and Raise invoice used to be repeated here as buttons beside the
+   very slots that already offer them, and Open quote repeated the document card
+   that already links it — three controls with two homes each, which is exactly
+   how the panel ends up telling you two things about one deal.
 
-   Open quote and Raise invoice sit side by side because that IS the chain: a
-   quotation becomes an invoice becomes money. Showing only whichever one is
-   legal right now made the panel change shape under you and hid the sequence
-   the whole module is built on. Neither is ever disabled — when the chain is
-   not ready, the button says what has to happen first (chainGate above).
+   What is left is the record pair: what we hold, and what they sent. Neither is
+   primary — both are things you can always do and rarely the thing to do next;
+   the documents above are what move the deal.
 
-   Change value, Lists, Change stage and Close deal are NOT here any more, and
-   nothing was lost with them: value and Close live in the header's ⋮ menu,
-   Lists in the tag strip directly above, and stage on the header's own stage
-   chip. A second way to reach one control is a second place it can go stale.
-
-   Add remark is not here either — the composer three inches to the left
-   already does that. */
-function ChatActions({ dl, p, docs }: { dl: any; p: Params; docs: DealDocsState }) {
+   Change value, Lists, Change stage and Close deal are not here either: value
+   and Close live in the header ⋮ menu, Lists on the header control row, and
+   stage on its own stage button. Add remark is the composer to the left. */
+function ChatActions({ dl, p }: { dl: any; p: Params }) {
   const acts = useActs(p);
   const pop = usePop();
-  const quote = docs.quotations.length ? docs.quotations[0] : null;
-
   return (
-    <>
-      <div className="dws-pair">
-        {/* Open the quotation that exists, or make the first one. Raising an
-            invoice is always the same control — ChainAdd owns both the create
-            and the refusal, so this pair and the blocks above cannot end up
-            telling you different things about the same deal. */}
-        {quote
-          ? <a className="btn pri" data-go={"#/quotations/" + quote.id}
-              onClick={() => go("#/quotations/" + quote.id)}><Icon name="quote" />Open quote</a>
-          : <ChainAdd dl={dl} kind="quotation" docs={docs} as="btn" />}
-        <ChainAdd dl={dl} kind="invoice" docs={docs} as="btn" />
-      </div>
-      {/* The record pair: what we hold, and what they sent. Neither is primary
-          — both are things you can always do and rarely the thing to do next;
-          the chain above is what moves the deal. */}
-      <div className="dws-pair">
-        <button className="btn" data-act="dl-edit" data-ref={dl.deal_id} onClick={() => acts.edit(dl.deal_id)}>
-          <Icon name="doc" />Edit deal</button>
-        <button className="btn gated" data-act="dl-gate" title={RESPONSE_GATE.title}
-          onClick={(e) => pop(e, <GateBody gate={RESPONSE_GATE} />, { width: 264, cls: "pop-views" })}>
-          <Icon name="quote" />View response</button>
-      </div>
-    </>
+    <div className="grid grid-cols-2 gap-2">
+      <Button color="secondary" ico="doc" data-act="dl-edit" data-ref={dl.deal_id}
+        onClick={() => acts.edit(dl.deal_id)}>Edit deal</Button>
+      <Button color="secondary" ico="lock" data-act="dl-gate"
+        onClick={(e?: ReactMouseEvent<HTMLButtonElement>) => e && pop(e, <GateBody title={RESPONSE_GATE.title} body={RESPONSE_GATE.body} />, { width: 288 })}>
+        View response</Button>
+    </div>
   );
 }
 

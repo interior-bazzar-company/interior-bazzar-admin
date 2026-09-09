@@ -16,13 +16,16 @@
    area and no list holds every locality. Half of each row rigid, half free:
    the same closed/open split the facets use, applied within one field.
 
-   Each row is a tile. Add state appends one; a row's remove control takes the
-   whole row and its cities with it, and says so in its label. States already
-   claimed by another row leave the state picker's list — the duplicate is
-   impossible to express rather than refused after the fact.
+   EACH ROW IS A CARD, and its head is the claim in one line: the state's name,
+   how much of it is claimed, and the control that takes the row away. That
+   head is the reason the composite reads at a glance — five rows of two
+   pickers is a wall, five titled cards is a list of five claims. A row with no
+   state yet says so in its head rather than looking like a card that failed to
+   load. States already claimed by another row leave the state picker's list —
+   the duplicate is impossible to express rather than refused after the fact.
    ============================================================================= */
 import FacetPicker from "./FacetPicker";
-import { Icon } from "../../ui";
+import { Button, Card, EmptyState, IconButton, Pill } from "../../ui";
 import { ALL_CITIES, STATES, citySuggestionsOf } from "./store";
 import type { ProfileField, TargetArea } from "./store";
 
@@ -41,6 +44,13 @@ const ROW_CITIES: ProfileField = {
   type: "multi", open: true, max: 8, maxLength: 40, chip: "tag-teal",
   placeholder: "Search or type a city",
 };
+
+/** What a row claims, in the words somebody would use for it. */
+function claim(row: TargetArea) {
+  if (row.cities.indexOf(ALL_CITIES) >= 0) return { text: ALL_CITIES, tone: "ok" };
+  if (!row.cities.length) return { text: "No city yet", tone: "warn" };
+  return { text: row.cities.length + (row.cities.length === 1 ? " city" : " cities"), tone: "neutral" };
+}
 
 export default function AreaRows({ f, value, onChange, disabled }: {
   f: ProfileField;
@@ -66,71 +76,97 @@ export default function AreaRows({ f, value, onChange, disabled }: {
     /* Named as a group: the rows inside carry their own picker labels, but
        the composite itself had no name — and now that the field's label row
        is gone (the legend names it), this is the only name it has. */
-    <div className="um-areas" role="group" aria-label={f.label}>
+    <div className="flex min-w-0 flex-col gap-3" role="group" aria-label={f.label}>
       {value.length === 0 ? (
-        <p className="um-areas-none">No areas yet — add the state they work in.</p>
+        <EmptyState flat icon="pin" title="No areas yet"
+          body="Add the state they work in, then the cities inside it — that is what the marketplace matches on."
+          action={disabled ? null : (
+            <Button size="sm" color="secondary" ico="plus" onClick={addRow}>Add state</Button>
+          )} />
       ) : null}
 
-      {value.map((row, i) => (
-        <div className="um-area" key={i}>
-          <div className="um-area-state">
-            <FacetPicker f={ROW_STATE} disabled={disabled}
-              values={row.state ? [row.state] : []}
-              /* States another row already holds leave this list — a duplicate
-                 row becomes impossible to express, not refused after. */
-              options={STATES.filter((o) =>
-                o.key === row.state || claimed.indexOf(o.key) < 0)}
-              onChange={(next) => {
-                const state = next[0] || "";
-                /* A NEW state keeps only the cities that could still belong —
-                   which is none of them, since city lists are per-state. Kept
-                   cities under a changed state are wrong quietly. */
-                patchRow(i, state === row.state ? { state } : { state, cities: [] });
-              }} />
-          </div>
-          <div className="um-area-cities">
-            {row.state ? (
-              /* Chips under the box, so the city input and the state select
-                 share one baseline across the row. */
-              <FacetPicker f={ROW_CITIES} disabled={disabled} chipsBelow
-                values={row.cities}
-                options={citySuggestionsOf(row.state)}
-                onChange={(cities) => {
-                  /* "All cities" is exclusive both ways: picking it replaces
-                     the list, and picking a specific city afterwards narrows
-                     the claim, so the sentinel comes off. The validator
-                     refuses the mixed state; this is what makes it
-                     unreachable from the UI rather than merely refused. */
-                  const hadAll = row.cities.indexOf(ALL_CITIES) >= 0;
-                  const hasAll = cities.indexOf(ALL_CITIES) >= 0;
-                  patchRow(i, {
-                    cities: hasAll && !hadAll ? [ALL_CITIES]
-                      : hasAll && cities.length > 1
-                        ? cities.filter((c) => c !== ALL_CITIES)
-                        : cities,
-                  });
-                }} />
-            ) : (
-              <p className="um-area-wait">Pick the state first.</p>
-            )}
-          </div>
-          {disabled ? null : (
-            <button type="button" className="um-area-x"
-              aria-label={"Remove " + (row.state || "this row") + " and its cities"}
-              onClick={() => removeRow(i)}>
-              <Icon name="x" size="sm" />
-            </button>
-          )}
-        </div>
-      ))}
+      {value.map((row, i) => {
+        const named = STATES.filter((s) => s.key === row.state)[0];
+        const c = claim(row);
+        return (
+          <Card
+            key={i}
+            tight
+            title={row.state
+              ? (named ? named.label : row.state)
+              : <span className="text-tertiary">New area</span>}
+            right={
+              <>
+                {row.state ? <Pill xs tone={c.tone} text={c.text} /> : null}
+                {disabled ? null : (
+                  <IconButton size="xs" ico="trash"
+                    label={"Remove " + (row.state || "this row") + " and its cities"}
+                    onClick={() => removeRow(i)} />
+                )}
+              </>
+            }
+          >
+            <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <span className="label-mono">State</span>
+                <FacetPicker f={ROW_STATE} disabled={disabled}
+                  values={row.state ? [row.state] : []}
+                  /* States another row already holds leave this list — a duplicate
+                     row becomes impossible to express, not refused after. */
+                  options={STATES.filter((o) =>
+                    o.key === row.state || claimed.indexOf(o.key) < 0)}
+                  onChange={(next) => {
+                    const state = next[0] || "";
+                    /* A NEW state keeps only the cities that could still belong —
+                       which is none of them, since city lists are per-state. Kept
+                       cities under a changed state are wrong quietly. */
+                    patchRow(i, state === row.state ? { state } : { state, cities: [] });
+                  }} />
+              </div>
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <span className="label-mono">Cities</span>
+                {row.state ? (
+                  /* Chips under the box, so the city input and the state select
+                     share one baseline across the row. */
+                  <FacetPicker f={ROW_CITIES} disabled={disabled} chipsBelow
+                    values={row.cities}
+                    options={citySuggestionsOf(row.state)}
+                    onChange={(cities) => {
+                      /* "All cities" is exclusive both ways: picking it replaces
+                         the list, and picking a specific city afterwards narrows
+                         the claim, so the sentinel comes off. The validator
+                         refuses the mixed state; this is what makes it
+                         unreachable from the UI rather than merely refused. */
+                      const hadAll = row.cities.indexOf(ALL_CITIES) >= 0;
+                      const hasAll = cities.indexOf(ALL_CITIES) >= 0;
+                      patchRow(i, {
+                        cities: hasAll && !hadAll ? [ALL_CITIES]
+                          : hasAll && cities.length > 1
+                            ? cities.filter((c) => c !== ALL_CITIES)
+                            : cities,
+                      });
+                    }} />
+                ) : (
+                  /* NOT A SKELETON. Nothing is loading — the question simply
+                     does not exist until the state does, and a shimmer bar
+                     here would promise cities that are never coming. */
+                  <p className="flex h-9 items-center rounded-lg bg-secondary px-3 text-sm text-quaternary ring-1 ring-secondary ring-inset">
+                    Pick the state first.
+                  </p>
+                )}
+              </div>
+            </div>
+          </Card>
+        );
+      })}
 
-      {disabled ? null : (
-        <div className="um-areas-foot">
-          <button type="button" className="btn sm" onClick={addRow}
-            disabled={value.length >= maxRows || lastIncomplete}>
-            <Icon name="plus" size="sm" />Add state
-          </button>
-          <span className="um-areas-count tnum">{value.length}/{maxRows}</span>
+      {disabled || !value.length ? null : (
+        <div className="flex items-center gap-3">
+          <Button size="sm" color="secondary" ico="plus" onClick={addRow}
+            isDisabled={value.length >= maxRows || lastIncomplete}>
+            Add state
+          </Button>
+          <span className="font-mono text-xs text-tertiary tnum">{value.length}/{maxRows}</span>
         </div>
       )}
     </div>

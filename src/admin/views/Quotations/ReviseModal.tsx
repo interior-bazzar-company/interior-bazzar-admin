@@ -7,9 +7,14 @@
    itself issued. It is one click away from the Revise button, so it has to
    distinguish "I meant this" from a mis-click — and the way to do that is to
    state what will and will not change, not to ask "are you sure?".
+
+   So the dialog is a LIST OF FACTS, not a warning. Each one is an `Alert`
+   carrying its own tone: neutral for what happens, warning for the window in
+   which two documents are live at once, and — for the case operators used to
+   believe was impossible — the plain statement that an acceptance survives.
    ===================================================================== */
 import { useState } from "react";
-import { ModalHead, Notice } from "../../ui";
+import { Alert, ModalShell, Button } from "../../ui";
 import { errMessage } from "../../../api/apiService";
 import type { QuotationRow } from "./api";
 
@@ -27,46 +32,46 @@ export default function ReviseModal({ q, onClose, run }: {
   };
 
   return (
-    <>
-      <ModalHead title={<>Revise {accepted ? "an accepted quotation" : "quotation"}</>} sub={<>from {q.quotationNumber || "draft"} v{q.version}</>} onClose={onClose} />
+    <ModalShell
+      title={"Revise " + (accepted ? "an accepted quotation" : "quotation")}
+      sub={"from " + (q.quotationNumber || "draft") + " v" + q.version}
+      ico="history"
+      tone="brand"
+      mono
+      onClose={onClose}
+      actions={<>
+        <Button color="secondary" onClick={onClose} isDisabled={busy}>Cancel</Button>
+        <Button color="primary" data-act="qt-revise-go" isLoading={busy} onClick={submit}>Create revision</Button>
+      </>}>
 
-      <div className="md-b">
-        {err ? <Notice tone="bad" text={<b>{err}</b>} /> : null}
+      <div className="flex flex-col gap-3">
+        {err ? <Alert tone="bad" title={err} /> : null}
 
-        <Notice ico="history" text={<>
-          <b>{ref} stays exactly as the customer received it.</b> This creates <b>v{q.version + 1} as a
-          new Draft</b>, cloned from it — header and line items — and linked by{" "}
-          <span className="mono">parent_quotation_id</span>.
-        </>} />
+        <Alert ico="history" title={ref + " stays exactly as the customer received it."}>
+          This creates <b>v{q.version + 1} as a new Draft</b>, cloned from it — header and line
+          items — and linked by <span className="font-mono tnum">parent_quotation_id</span>.
+        </Alert>
 
         {q.status === "issued"
-          ? <Notice tone="warn" ico="clock" text={<>
-              While the revision sits in Draft, <b>{ref} is still the current proposal and is still
-              acceptable</b>. It becomes Superseded only after the revision has successfully issued.
-            </>} />
+          ? <Alert tone="warn" ico="clock" title={ref + " is still the current proposal"}>
+              While the revision sits in Draft it is still acceptable. It becomes Superseded only
+              after the revision has successfully issued.
+            </Alert>
           : null}
 
         {/* The case that used to be impossible, said plainly. */}
         {accepted
-          ? <Notice ico="shield" text={<>
-              <b>The acceptance on {ref} stands until the revision is issued and accepted in its
-              turn.</b> Nothing is undone by starting this: the deal keeps the value it already agreed,
-              and if the customer does not take the new terms you simply cancel the draft and
-              everything is where it was.
-            </>} />
+          ? <Alert ico="shield" title={"The acceptance on " + ref + " stands until the revision is issued and accepted in its turn."}>
+              Nothing is undone by starting this: the deal keeps the value it already agreed, and if
+              the customer does not take the new terms you simply cancel the draft and everything is
+              where it was.
+            </Alert>
           : null}
 
-        <Notice ico="shield" text={<>
-          An abandoned revision can be cancelled. It consumes no quotation number, so nothing dangles.
-        </>} />
+        <Alert ico="shield" title="An abandoned revision can be cancelled.">
+          It consumes no quotation number, so nothing dangles.
+        </Alert>
       </div>
-
-      <div className="md-f">
-        <span className="spacer"></span>
-        <button className="btn" data-close="1" onClick={onClose}>Cancel</button>
-        <button className="btn pri" data-act="qt-revise-go" disabled={busy} onClick={submit}>
-          {busy ? "Creating…" : "Create revision"}</button>
-      </div>
-    </>
+    </ModalShell>
   );
 }

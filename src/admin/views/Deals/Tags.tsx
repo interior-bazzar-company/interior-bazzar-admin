@@ -2,24 +2,28 @@
    TAGS — the fourth view mode. Not a way of looking at deals but a way of
    labelling them, so it gets a management surface rather than a list layout.
    -----------------------------------------------------------------------------
-   Plus the per-deal editor: one editable row per tag. A name field, a colour
-   dot that opens its swatches, and an × that takes the list off. "Add to list"
+   Plus the per-deal editor: one editable row per list. A name field, a colour
+   chip that opens its swatches, and an × that takes the list off. "Add to list"
    appends an empty row. That is the whole editor.
 
    Nothing commits until Save. Rows are component state and are never rebuilt
-   from the store while the dialog is open, because rebuilding would throw away
-   whatever is half-typed in the other four rows.
+   from the catalogue while the dialog is open, because rebuilding would throw
+   away whatever is half-typed in the other four rows.
    ============================================================================= */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { EmptyState, Field, Icon, ListTable, ModalHead, Notice, qs } from "../../ui";
+import { InputBase } from "@/components/base/input/input";
+import { cx } from "@/utils/cx";
+import {
+  Alert, Button, EmptyState, FormField, Icon, IconButton, Input, ListSkeleton, ListTable,
+  ModalShell, MoreMenu, Notice, PageHeader, Pill, Tag, qs, tagClasses
+} from "../../ui";
 import { go } from "../../ui/nav";
 import { useShell } from "../../shell/ShellContext";
 import AdminOpsService, { call } from "../../../api/modules/adminOps";
 import type { DealTagRow } from "../../../api/modules/adminOps";
 import { merge, omit, refusalOf, render, val } from "./useDeals";
 import type { Params, Refusal } from "./useDeals";
-import { ErrSlot, toneClass, toneName, toneOpts } from "./bits";
-import { ListSkeleton } from "../../ui";
+import { ErrSlot, Swatches, toneName } from "./bits";
 
 /* Django's own slugify rule, near enough to spot a collision before asking the
    server to. The SERVER derives the real slug — this is only used to warn. */
@@ -65,72 +69,67 @@ export function TagsView({ p }: { p: Params }) {
   const rename = (t: DealTagRow) => shell.modal(<ToneModal kind="edit" tag={t} onClose={close} after={after} />);
   const remove = (t: DealTagRow) => shell.modal(<DeleteListModal tag={t} onClose={close} after={after} />);
 
-  if (tags === null) return <ListSkeleton />;
+  if (tags === null) return <ListSkeleton rows={5} />;
   const all = tags.slice().sort((x, y) => y.count - x.count);
+  const unused = all.filter((t) => !t.count).length;
 
   return (
-    <div className="dls">
-      <div className="dls-cmd">
-        {/* The local back arrow that used to sit here is gone. This screen had
-            to invent its own way out because the shell had none; it has one
-            now, in the topbar, in the same place on every screen. */}
-        <span className="dls-tagline">
-          {all.length} list{all.length === 1 ? "" : "s"} · {all.filter((t) => !t.count).length} on no deal
-        </span>
-        <span className="spacer"></span>
-        <button className="btn pri" data-act="tg-new" onClick={newList}><Icon name="plus" />New list</button>
-      </div>
-      <div className="dls-body">
-        {all.length
-          ? <ListTable head={<tr><th>List</th><th>Slug</th><th>Status</th><th className="n">Deals</th><th></th></tr>}>
-                {all.map((t) => {
-                  const to = "#/deals" + qs(merge(omit(p, ["view"]), { tag: t.slug }));
-                  return (
-                    <tr key={t.slug} className="clickable" data-go={to} onClick={() => go(to)}>
-                      <td><span className={"pill is-tag" + toneClass(t.tone)}>{t.label}</span></td>
-                      <td className="mono cell-2">{t.slug}</td>
-                      <td className="cell-2">{t.isActive ? "Active" : "Archived"}</td>
-                      <td className="n"><b>{t.count}</b></td>
-                      <td className="c">
-                        <button className="btn sm rowact" data-act="tg-edit" data-slug={t.slug}
-                          onClick={(e) => { e.stopPropagation(); rename(t); }}>Rename</button>
-                        <button className="btn sm dgr rowact" data-act="tg-del" data-slug={t.slug}
-                          style={{ marginLeft: "4px" }}
-                          onClick={(e) => { e.stopPropagation(); remove(t); }}>Delete</button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </ListTable>
-          : <EmptyState icon="tag" title="No lists yet"
-              body="Make one for whatever your team actually sorts by — a campaign, a city push, a follow-up batch."
-              action={<button className="btn pri" data-act="tg-new" onClick={newList}>New list</button>} />}
+    <div className="flex flex-col gap-4">
+      <PageHeader
+        title="Lists"
+        meta={
+          <>
+            <span className="tnum">{all.length} list{all.length === 1 ? "" : "s"}</span>
+            {unused ? <span className="tnum">{unused} on no deal</span> : null}
+            <span>A label, never a rule</span>
+          </>
+        }
+        actions={<Button color="primary" ico="plus" data-act="tg-new" onClick={newList}>New list</Button>}
+      />
 
-        <Notice ico="tag" text={<>
-          <b>A list is a label, never a record.</b> Nothing here gates a stage, changes a target or
-          touches money — which is exactly why every list is yours to make, rename and recolour.
-          Deleting one that no deal carries removes it; deleting one that deals DO carry{" "}
-          <b>archives</b> it instead, so their history keeps saying what it said.
-        </>} />
-      </div>
-    </div>
-  );
-}
+      {all.length
+        ? <ListTable min="42rem" head={
+            <tr>
+              <th>List</th>
+              <th>Slug</th>
+              <th>Status</th>
+              <th className="n">Deals</th>
+              <th className="acts"><span className="sr-only">Actions</span></th>
+            </tr>
+          }>
+            {all.map((t) => {
+              const to = "#/deals" + qs(merge(omit(p, ["view"]), { tag: t.slug }));
+              return (
+                <tr key={t.slug} className="clickable" data-go={to} onClick={() => go(to)}>
+                  <td className="cell-1"><Tag label={t.label} tone={t.tone || ""} /></td>
+                  <td className="mono">{t.slug}</td>
+                  <td>{t.isActive
+                    ? <Pill xs dot tone="ok" text="Active" />
+                    : <Pill xs dot tone="neutral" text="Archived" />}</td>
+                  <td className="n">{t.count || <span className="text-quaternary">0</span>}</td>
+                  <td className="acts">
+                    <span className="inline-flex" onClick={(e) => e.stopPropagation()}>
+                      <MoreMenu small label="" items={[
+                        { icon: "eye", label: "Show its deals", act: () => go(to) },
+                        { icon: "edit", label: "Rename or recolour", act: () => rename(t) },
+                        { icon: "trash", label: t.count ? "Archive list" : "Delete list", act: () => remove(t), tone: "bad" },
+                      ]} />
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </ListTable>
+        : <EmptyState icon="tag" title="No lists yet"
+            body="Make one for whatever your team actually sorts by — a campaign, a city push, a follow-up batch."
+            action={<Button color="primary" ico="plus" data-act="tg-new" onClick={newList}>New list</Button>} />}
 
-/* One tone list for everywhere a tag colour is picked. The colour IS the
-   label; spelling out "Amber" adds a word you then have to map back onto the
-   swatch. The names survive as tooltips and aria-labels only. */
-function Swatches({ value, onPick }: { value: string; onPick: (v: string) => void }) {
-  return (
-    <div className="tgdots">
-      {toneOpts(value).map((o) => (
-        <button key={o.v || "none"} type="button" className={"tgdot " + (o.v || "none") + (o.sel ? " on" : "")}
-          data-pick="tgTone" data-v={o.v} title={o.l} aria-label={o.l}
-          onClick={() => onPick(o.v)}></button>
-      ))}
-      {/* Picking a colour is a state change, never a re-fetch — the name field
-          beside it is usually half-typed when you reach for a dot. */}
-      <input type="hidden" id="tgTone" value={value} readOnly />
+      <Notice ico="tag" text={<>
+        <b>A list is a label, never a record.</b> Nothing here gates a stage, changes a target or
+        touches money — which is exactly why every list is yours to make, rename and recolour.
+        Deleting one that no deal carries removes it; deleting one that deals DO carry{" "}
+        <b>archives</b> it instead, so their history keeps saying what it said.
+      </>} />
     </div>
   );
 }
@@ -140,6 +139,7 @@ function ToneModal({ kind, tag, onClose, after }: {
 }) {
   const [err, setErr] = useState<Refusal | null>(null);
   const [tone, setTone] = useState<string>(tag ? tag.tone || "" : "");
+  const [name, setName] = useState<string>(tag ? tag.label : "");
   const [busy, setBusy] = useState(false);
   const commit = () => {
     setErr(null); setBusy(true);
@@ -151,26 +151,42 @@ function ToneModal({ kind, tag, onClose, after }: {
     p.catch((e: unknown) => { setErr(refusalOf(e)); setBusy(false); });
   };
   return (
-    <>
-      <ModalHead title={kind === "new" ? "New list" : "Rename list"} sub={kind === "new" ? "Yours to apply and remove freely" : (tag ? tag.label : "")} onClose={onClose} />
-      <div className="md-b">
+    <ModalShell ico="tag" title={kind === "new" ? "New list" : "Rename list"}
+      sub={kind === "new" ? "Yours to apply and remove freely" : (tag ? tag.label : "")}
+      onClose={onClose}
+      actions={
+        <>
+          <Button color="secondary" data-close="1" isDisabled={busy} onClick={onClose}>Cancel</Button>
+          <Button color="primary" data-act={kind === "new" ? "tg-new-go" : "tg-edit-go"}
+            isDisabled={busy} onClick={commit}>
+            {busy ? "Saving…" : kind === "new" ? "Create list" : "Save"}</Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-5">
         <ErrSlot err={err} />
-        <Field id="tgName" label="Name" req
-          ph={kind === "new" ? "Site visit due" : undefined}
-          value={tag ? tag.label : ""}
-          help={kind === "new" ? "The slug is derived from it, on the server." : undefined} />
-        <div className="fg"><span className="fg-lb">Colour</span><Swatches value={tone} onPick={setTone} /></div>
+        <FormField id="tgName" label="Name" req
+          hint={kind === "new" ? "The slug is derived from it, on the server." : undefined}>
+          <Input id="tgName" autoFocus maxLength={24} value={name} onChange={setName}
+            ph={kind === "new" ? "Site visit due" : undefined} onEnter={commit} />
+        </FormField>
+        <FormField label="Colour" hint="The hue means nothing by contract — it is a label, not a verdict.">
+          <div className="flex flex-col gap-3">
+            <Swatches value={tone} onPick={setTone} name="tgTone" />
+            {/* The chip you are actually making, at the size it will be read. */}
+            <span className="flex items-center gap-2">
+              <span className="label-mono">Preview</span>
+              <Tag label={name.trim() || "List name"} tone={tone} />
+            </span>
+          </div>
+        </FormField>
         {kind === "edit"
-          ? <Notice ico="link" text={<>Renaming keeps the slug <span className="mono">{tag ? tag.slug : ""}</span>, so every deal already on this list stays on it.</>} />
+          ? <Notice ico="link" text={<>Renaming keeps the slug{" "}
+              <span className="font-mono">{tag ? tag.slug : ""}</span>, so every deal already on this
+              list stays on it.</>} />
           : null}
       </div>
-      <div className="md-f"><span className="spacer"></span>
-        <button className="btn" data-close="1" onClick={onClose}>Cancel</button>
-        <button className="btn pri" data-act={kind === "new" ? "tg-new-go" : "tg-edit-go"}
-          disabled={busy} onClick={commit}>
-          {busy ? "Saving…" : kind === "new" ? "Create list" : "Save"}</button>
-      </div>
-    </>
+    </ModalShell>
   );
 }
 
@@ -186,27 +202,38 @@ function DeleteListModal({ tag, onClose, after }: { tag: DealTagRow; onClose: ()
       .catch((e: unknown) => { setErr(refusalOf(e)); setBusy(false); });
   };
   return (
-    <>
-      <ModalHead title="Delete list" sub={tag.label} onClose={onClose} />
-      <div className="md-b">
+    <ModalShell ico="alert" tone={tag.count ? "warning" : "error"}
+      title={tag.count ? "Archive list" : "Delete list"} sub={tag.label} onClose={onClose}
+      actions={
+        <>
+          <Button color="secondary" data-close="1" isDisabled={busy} onClick={onClose}>Cancel</Button>
+          <Button color="primary-destructive" data-act="tg-del-go" data-slug={tag.slug}
+            isDisabled={busy} onClick={commit}>
+            {busy ? "Working…" : tag.count ? "Archive list" : "Delete list"}</Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
         <ErrSlot err={err} />
-        <Notice tone={tag.count ? "warn" : "bad"} text={tag.count
-          ? <>This list is on <b>{tag.count} deal(s)</b>, so it is <b>archived</b> rather than deleted:
-              it disappears from the pickers and stops being applicable, and those deals keep saying
-              what they said. A label that vanishes out of a deal's history rewrites the history.</>
-          : <>No deal carries this list, so it is deleted outright.</>} />
+        <div className="flex items-center gap-2">
+          <Tag label={tag.label} tone={tag.tone || ""} />
+          <span className="text-sm text-tertiary tnum">on {tag.count} deal{tag.count === 1 ? "" : "s"}</span>
+        </div>
+        <Alert tone={tag.count ? "warn" : "bad"}>
+          {tag.count
+            ? <>This list is on <b>{tag.count} deal(s)</b>, so it is <b>archived</b> rather than
+                deleted: it disappears from the pickers and stops being applicable, and those deals
+                keep saying what they said. A label that vanishes out of a deal's history rewrites
+                the history.</>
+            : <>No deal carries this list, so it is deleted outright.</>}
+        </Alert>
       </div>
-      <div className="md-f"><span className="spacer"></span>
-        <button className="btn" data-close="1" onClick={onClose}>Cancel</button>
-        <button className="btn dgr" data-act="tg-del-go" data-slug={tag.slug} disabled={busy} onClick={commit}>
-          {busy ? "Working…" : tag.count ? "Archive list" : "Delete list"}</button>
-      </div>
-    </>
+    </ModalShell>
   );
 }
 
 /* ==========================================================================
-   TAGS ON A DEAL — one editable row per tag
+   TAGS ON A DEAL — one editable row per list
    ====================================================================== */
 type Row = { slug: string; name: string; tone: string; pop: boolean };
 
@@ -235,16 +262,15 @@ export function TagsModal({ dealRef, onClose, onSaved }: {
       .catch((e: unknown) => { if (!cancelled) { setErr(refusalOf(e)); setRows([]); } });
     return () => { cancelled = true; };
   }, [dealRef]);
-  const host = useRef<HTMLDivElement>(null);
   const focusLast = useRef(false);
 
   useEffect(() => {
     if (!focusLast.current) return;
     focusLast.current = false;
-    const inputs = host.current ? host.current.querySelectorAll(".tgr-inp") : null;
-    const last = inputs && inputs.length ? inputs[inputs.length - 1] as HTMLInputElement : null;
+    const n = (rows || []).length;
+    const last = document.getElementById("tgRow" + (n - 1)) as HTMLInputElement | null;
     if (last) last.focus();
-  }, [rows && rows.length]);
+  }, [rows]);
 
   const closePops = () => setRows((cur) => (cur || []).map((r) => ({ ...r, pop: false })));
   const addRow = () => {
@@ -253,8 +279,8 @@ export function TagsModal({ dealRef, onClose, onSaved }: {
   };
   const delRow = (ix: number) => setRows((cur) => {
     const next = (cur || []).filter((_, i) => i !== ix).map((r) => ({ ...r, pop: false }));
-    /* Never leave the tile empty — an editor with nothing in it reads as
-       broken, and adding a row is the only thing you would do next anyway. */
+    /* Never leave the editor empty — one with nothing in it reads as broken,
+       and adding a row is the only thing you would do next anyway. */
     return next.length ? next : [{ slug: "", name: "", tone: "", pop: false }];
   });
 
@@ -276,8 +302,8 @@ export function TagsModal({ dealRef, onClose, onSaved }: {
       const name = row.name.trim();
       if (!name) return;                    // a blank row is a row you did not fill in
       const key = tagKey(name);
-      if (!key) { bad = "\u201c" + name + "\u201d has no letters or digits in it."; return; }
-      if (seen[key]) { bad = "\u201c" + name + "\u201d is on two rows. One row per list."; return; }
+      if (!key) { bad = "“" + name + "” has no letters or digits in it."; return; }
+      if (seen[key]) { bad = "“" + name + "” is on two rows. One row per list."; return; }
       seen[key] = 1;
       draft.push({ slug: row.slug, name, tone: row.tone || "" });
     });
@@ -292,7 +318,7 @@ export function TagsModal({ dealRef, onClose, onSaved }: {
       if (!d.slug) continue;
       const clash = tagBySlug(all, tagKey(d.name));
       if (clash && clash.slug !== d.slug) return setErr({ http: 409, code: "",
-        detail: "A different list is already called \u201c" + clash.label + "\u201d." });
+        detail: "A different list is already called “" + clash.label + "”." });
     }
 
     setErr(null); setBusy(true);
@@ -308,8 +334,8 @@ export function TagsModal({ dealRef, onClose, onSaved }: {
             await call(AdminOpsService.dealTag(dealRef, row.slug, true));
         } else {
           /* Typed by hand. It may already exist under that name — the name
-             field's datalist is exactly that path — so reuse it rather than
-             asking the server to create a duplicate it would refuse. */
+             field's suggestion list is exactly that path — so reuse it rather
+             than asking the server to create a duplicate it would refuse. */
           const existing = tagBySlug(all, tagKey(row.name));
           const slug = existing
             ? existing.slug
@@ -318,8 +344,8 @@ export function TagsModal({ dealRef, onClose, onSaved }: {
           kept.push(slug);
         }
       }
-      /* Anything the deal carried that the tile no longer lists comes off.
-         That is what \u00d7 did, deferred to Save like every other edit here. */
+      /* Anything the deal carried that the editor no longer lists comes off.
+         That is what × did, deferred to Save like every other edit here. */
       for (const gone of before.filter((sl) => kept.indexOf(sl) < 0))
         await call(AdminOpsService.dealTag(dealRef, gone, false));
 
@@ -332,17 +358,12 @@ export function TagsModal({ dealRef, onClose, onSaved }: {
     }
   };
 
+  /* Escape peels one layer at a time. With swatches open it closes those and
+     stops there — the shell's own Escape would otherwise take the whole dialog
+     down, losing four filled rows to a keystroke meant for one. */
   const onKeyDown = (e: React.KeyboardEvent) => {
-    /* Escape peels one layer at a time. With swatches open it closes those and
-       stops there — the shell's own Escape would otherwise take the whole
-       dialog down, losing four filled rows to a keystroke meant for one. */
     if (e.key === "Escape" && (rows || []).some((r) => r.pop)) {
-      e.preventDefault(); e.stopPropagation(); closePops(); return;
-    }
-    /* Enter commits the whole tile rather than only the row you are in —
-       there is one Save, so there is one thing Enter can mean. */
-    if (e.key === "Enter" && (e.target as HTMLElement).classList.contains("tgr-inp")) {
-      e.preventDefault(); save();
+      e.preventDefault(); e.stopPropagation(); closePops();
     }
   };
 
@@ -350,59 +371,82 @@ export function TagsModal({ dealRef, onClose, onSaved }: {
     setRows((cur) => (cur || []).map((r, i) => (i === ix ? { ...r, ...patch } : r)));
 
   return (
-    <div onKeyDownCapture={onKeyDown}>
-      <ModalHead title="Lists" sub={dealRef} mono onClose={onClose} />
-      <div className="md-b">
-        <ErrSlot err={err} />
-        <div className="tgtile" id="tgEdit" data-ref={dealRef} ref={host}>
-          <div className="tgrows">
+    <div className="flex min-h-0 flex-1 flex-col" onKeyDownCapture={onKeyDown}>
+      <ModalShell title="Lists" sub={dealRef} mono ico="tag" onClose={onClose}
+        actions={
+          <>
+            <Button color="secondary" data-close="1" isDisabled={busy} onClick={onClose}>Cancel</Button>
+            <Button color="primary" data-tgr="save" isDisabled={busy || rows === null} onClick={save}>
+              {busy ? "Saving…" : "Save"}</Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <ErrSlot err={err} />
+          <div className="flex flex-col gap-2" id="tgEdit" data-ref={dealRef}>
             {(rows || []).map((row, ix) => (
               /* A row carries its slug: that is what tells Save whether it is
-                 editing a tag or making one, and an empty slug never lies. */
-              <div className="tgr" key={ix} data-slug={row.slug} data-tone={row.tone}>
-                <input className="tgr-inp" maxLength={24} placeholder="List name" spellCheck={false}
-                  list="tgNames" aria-label="List name" value={row.name}
-                  onChange={(e) => setRow(ix, { name: e.target.value })} />
-                <div className={"tgr-col" + (row.pop ? " on" : "")}>
-                  {/* The dot says which colour it IS, not that it is a colour
-                      control — the swatch already says the second thing. */}
-                  <button type="button" className={"tgr-dot " + (row.tone || "none")} data-tgr="pick"
-                    aria-haspopup="true" aria-label={"Colour: " + toneName(row.tone)}
-                    title={"Colour: " + toneName(row.tone)}
-                    onClick={() => setRows((cur) => (cur || []).map((r, i) =>
-                      ({ ...r, pop: i === ix ? !r.pop : false })))}></button>
-                  {/* The swatches live inside the row and stay hidden until
-                      asked for, so the picker cannot outlive the row. */}
-                  <div className="tgr-pop">
-                    {toneOpts(row.tone).map((o) => (
-                      <button key={o.v || "none"} type="button"
-                        className={"tgdot " + (o.v || "none") + (o.sel ? " on" : "")}
-                        data-tgr="tone" data-v={o.v} title={o.l} aria-label={o.l}
-                        onClick={() => setRow(ix, { tone: o.v, pop: false })}></button>
-                    ))}
-                  </div>
+                 editing a list or making one, and an empty slug never lies. */
+              <div key={ix} data-slug={row.slug} data-tone={row.tone}
+                className="flex flex-col gap-2 rounded-lg bg-secondary p-2 ring-1 ring-secondary ring-inset">
+                <div className="flex items-center gap-2">
+                  {/* `list=` is the whole apply-an-existing-list path — type two
+                      letters, pick it, and Save resolves it onto the list that
+                      is already there. `Input` cannot forward the attribute, so
+                      this one field is the library control directly. */}
+                  <InputBase
+                    id={"tgRow" + ix}
+                    size="sm"
+                    maxLength={24}
+                    spellCheck={false}
+                    list="tgNames"
+                    aria-label="List name"
+                    placeholder="List name"
+                    value={row.name}
+                    wrapperClassName="min-w-0 flex-1"
+                    onChange={(e) => setRow(ix, { name: e.target.value })}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); save(); } }}
+                  />
+                  {/* The chip says which colour it IS, not that it is a colour
+                      control — the swatches it opens already say the second. */}
+                  <button type="button" data-tgr="pick" aria-haspopup="true" aria-expanded={row.pop}
+                    aria-label={"Colour: " + toneName(row.tone)} title={"Colour: " + toneName(row.tone)}
+                    className={cx(
+                      "size-9 shrink-0 cursor-pointer rounded-lg ring-1 outline-focus-ring transition duration-100 ring-inset hover:ring-2 focus-visible:outline-2 focus-visible:outline-offset-2",
+                      tagClasses(row.tone),
+                      row.pop && "ring-2 ring-brand",
+                    )}
+                    onClick={() => setRows((cur) => (cur || []).map((r, i) => ({ ...r, pop: i === ix ? !r.pop : false })))}>
+                    <Icon name={row.pop ? "chevu" : "chev"} size="xs" className="mx-auto" />
+                  </button>
+                  <IconButton ico="x" size="sm" label="Remove from this deal" onClick={() => delRow(ix)} />
                 </div>
-                <button type="button" className="tgr-x" data-tgr="del" title="Remove from this deal"
-                  aria-label="Remove from this deal" onClick={() => delRow(ix)}><Icon name="x" size="sm" /></button>
+                {/* The swatches live inside the row and stay hidden until asked
+                    for, so the picker cannot outlive the row. */}
+                {row.pop
+                  ? <Swatches value={row.tone} name={"tgTone" + ix}
+                      onPick={(v) => setRow(ix, { tone: v, pop: false })} />
+                  : null}
               </div>
             ))}
           </div>
-          <button type="button" className="tgadd" data-tgr="add" onClick={addRow}>
-            <Icon name="plus" />Add to list</button>
+          <div>
+            <Button color="secondary" ico="plus" data-tgr="add" onClick={addRow}>Add to list</Button>
+          </div>
+          {/* Every list that already exists, as the name field's suggestions. */}
+          <datalist id="tgNames">
+            {(catalogue || []).filter((t) => t.isActive).map((t) => <option key={t.slug} value={t.label} />)}
+          </datalist>
+          <p className="text-sm text-tertiary">
+            A list can hold any number of deals. Renaming or recolouring one here changes it on all
+            of them; <b className="font-semibold text-secondary">×</b> only takes it off this deal.
+            To delete a list everywhere, use{" "}
+            <a className="rounded text-brand-secondary outline-focus-ring hover:underline focus-visible:outline-2"
+              href={"#/deals" + qs({ view: "tags" })} data-go={"#/deals" + qs({ view: "tags" })}
+              onClick={(e) => { e.preventDefault(); go("#/deals" + qs({ view: "tags" })); }}>Manage lists</a>.
+          </p>
         </div>
-        {/* The name field suggests every tag that already exists. That is the
-            whole apply-an-existing-tag path — type two letters, pick it, and
-            Save resolves it to the tag that is already there. */}
-        <datalist id="tgNames">
-          {(catalogue || []).filter((t) => t.isActive).map((t) => <option key={t.slug} value={t.label}></option>)}
-        </datalist>
-        <p className="tgnote">A list can hold any number of deals. Renaming or recolouring one here changes it on all of them; <b>×</b> only takes it off this deal. To delete a list everywhere, use <a data-go={"#/deals" + qs({ view: "tags" })} onClick={() => go("#/deals" + qs({ view: "tags" }))}>Manage lists</a>.</p>
-      </div>
-      <div className="md-f"><span className="spacer"></span>
-        <button className="btn" data-close="1" onClick={onClose}>Cancel</button>
-        <button className="btn pri" data-tgr="save" disabled={busy || rows === null} onClick={save}>
-          {busy ? "Saving\u2026" : "Save"}</button>
-      </div>
+      </ModalShell>
     </div>
   );
 }

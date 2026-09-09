@@ -1,82 +1,43 @@
 /* =============================================================================
-   Auth — the React port of prototype/admin-panel/admin-access/admin-auth.html.
+   Auth — the door.
    -----------------------------------------------------------------------------
-   Signs in against the real server (POST v1/auth/signin/, portal: "admin")
-   instead of IBData.TeamStore's localStorage demo accounts. The demo-accounts
-   box and the seeded demo credentials are gone — the only way in is a real
-   session, and the panel's own RBAC matrix (admin/auth/session.ts) decides
-   what it is worth once it exists.
+   Signs in against the real server (POST v1/auth/signin/, portal: "admin").
+   The only way in is a real session, and the panel's own RBAC matrix
+   (admin/auth/session.ts) decides what it is worth once it exists.
 
-   Two things differ from the prototype, both forced by the move to real
-   routes and a real backend:
-     - the panel lives at real paths, so `next` is a PATH, not a hash. It is
-       still accepted only in one shape — a same-origin path — and an absolute,
-       protocol-relative or scheme-bearing value is REFUSED, not sanitised.
-     - the four steps are React state rather than `.step.on` class flipping;
-       the emitted class names are unchanged.
+   Two things forced by real routes and a real backend:
+     - `next` is a PATH, not a hash. It is accepted only as a same-origin path;
+       an absolute, protocol-relative or scheme-bearing value is REFUSED.
+     - the three steps — login · pending · active — are React state.
 
-   WHERE THIS DIFFERS FROM THE 9-STATE PROTOTYPE PORT, and why (see the report
-   for the full account — this is the short version in the code that has to
-   live with the decision):
+   The dormant states (an HTTP-423 lock banner, the "attempts remain" count)
+   are kept exactly as before: wired to a signal the backend does not send yet,
+   never fabricated client-side.
 
-     · "Account locked" (a client-side 5-failed-attempt counter written into
-       TeamStore) had no server equivalent to port — the counter itself was
-       the localStorage credential path this phase deletes, and the API
-       contract does not expose a "locked" reason distinct from "wrong
-       credentials" (deliberately: revealing an account is locked, rather
-       than possibly-wrong, is exactly the kind of half-revealed answer the
-       generic wording exists to prevent). The banner's COPY is kept — wired
-       to a standard HTTP 423 (Locked) status, which the backend does not yet
-       send — so the state activates without fabricating a client-side
-       attempt count if the backend ever adopts it, but is not reachable today.
-     · The component-level "blocked" step (two distinct titles for suspended
-       vs deactivated) is gone outright: the contract's `user` object carries
-       no status field to tell the two apart, and — per the contract — a
-       correct-password sign-in against an inactive account now FAILS at
-       sign-in with the same generic message, so this screen (which only ever
-       rendered AFTER a successful credential check) can no longer be reached
-       that way. The generic "Access withdrawn" banner below (worded
-       "suspended, deactivated or locked" without distinguishing) is what a
-       plain `?blocked=1` shows — an existing session that failed to resolve
-       at all. A second, more specific "Access withdrawn" body — "This
-       account can no longer sign in." — is also restored (prototype
-       admin-auth.html:405, dormant there behind a client-side re-resolve this
-       phase has no equivalent for): RequireSession now sends a session that
-       DID resolve but failed the server's admin gate (soft-deleted, demoted,
-       role-stripped) to `?blocked=gate`, and that is where this string
-       renders. The two are not the same claim: one is "we couldn't tell",
-       the other is "we asked, and the answer is no".
-     · The "remaining attempts" figure in the invalid-credentials banner is
-       restored dormant, alongside LOCKED_BANNER's HTTP-423 wiring: the count
-       was TeamStore's client-side `failedAttempts`, which this phase deleted
-       along with the rest of the local demo store, and no server field
-       replaces it yet. `invalidBanner()` accepts one if the backend ever
-       adds it; nothing today supplies it, so the line never renders — never
-       a fabricated count, per guardrail 6.
+   THE HERO IS THE ONE LARGE DARK FILL IN THE PRODUCT, with the forest thread
+   through it — the mark's dot, the emphasised word, the ticks. Everything else
+   on the door is the panel's own controls.
    ========================================================================== */
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { cx } from "@/utils/cx";
 import { AppExceptions, isServiceError } from "../../api/apiService";
 import { AuthService } from "../../api/modules/auth";
 import { TokenService } from "../../api/apiService/authHelper/TokenService";
 import type { LoginFormResponse } from "../../types/global";
 import { clearSession, grantsOf, isZeroAccess, loadSession, sessionUnreachable } from "./session";
 import { currentTheme, setTheme } from "../shell/ShellContext";
-import { Alert, FormField, Icon, Input, Segmented } from "../ui";
-import "../../styles/admin-theme.css";
-import "./admin-auth.css";
+import { Alert, Button, FormField, Icon, Input, Pill, Segmented } from "../ui";
 
 type Identity = { name: string; role: string | null; grants: string[] };
 type Step = "login" | "pending" | "active";
-type Banner = { kind: string; title: string; body: ReactNode };
+type Banner = { kind: "ok" | "warn" | "bad" | "info"; title: string; body: ReactNode };
 
-/* The redirect target. `next` is accepted only as a same-origin PATH, never as
-   an arbitrary URL: an absolute or protocol-relative value from a query string
-   is an open-redirect vector, so it is rejected rather than sanitised. */
+/* The redirect target: a same-origin PATH, never an arbitrary URL. */
 function nextPath(n: string | null): string {
   const v = n || "";
-  return /^\/[A-Za-z0-9\-_/?=&.%]*$/.test(v) && v.indexOf("//") === -1 ? v : "/deals";
+  return /^\/[A-Za-z0-9\-_/?=&.%]*$/.test(v) && v.indexOf("//") === -1 ? v : "/overview";
 }
 
 const LOCKED_BANNER: Banner = {
@@ -88,13 +49,8 @@ const LOCKED_BANNER: Banner = {
     </>
   ),
 };
-/* Restored from the prototype (admin-auth.html:311) — dormant, like
-   LOCKED_BANNER above: the "N attempts remain" count was TeamStore's
-   client-side `failedAttempts` counter, deleted along with the rest of the
-   local demo store. No server response field replaces it yet, so this takes
-   one if the backend ever adds it and renders nothing extra otherwise —
-   never a fabricated count (guardrail 6). Every existing call site passes no
-   argument, so this is inert until something supplies a real number. */
+/* Dormant: the "N attempts remain" count has no server field yet; this takes
+   one if the backend ever adds it and renders nothing extra otherwise. */
 function invalidBanner(attemptsRemaining?: number): Banner {
   return {
     kind: "bad",
@@ -113,50 +69,30 @@ function invalidBanner(attemptsRemaining?: number): Banner {
   };
 }
 const INVALID_BANNER = invalidBanner();
-const WITHDRAWN_BANNER: Banner = {
-  kind: "bad",
-  title: "Access withdrawn",
-  body: "This account is suspended, deactivated or locked. Contact an Admin.",
-};
-/* Restored from the prototype (admin-auth.html:405) — the distinct body for
-   a session that resolved but failed the server's admin gate, as opposed to
-   WITHDRAWN_BANNER above (a session that didn't resolve at all). Wired to
-   RequireSession's `?blocked=gate` (session.gateOk === false). */
-const GATE_BLOCKED_BANNER: Banner = {
-  kind: "bad",
-  title: "Access withdrawn",
-  body: "This account can no longer sign in. Contact an Admin.",
-};
-/* The service could not be reached at all. Deliberately says nothing about a
-   host, a port or a status code — and, just as deliberately, is NOT
-   INVALID_BANNER: telling somebody their password is wrong when the server is
-   simply down sends them to reset a credential that was never the problem. */
-const SERVICE_BANNER: Banner = {
-  kind: "bad",
-  title: "Something went wrong",
-  body: "We couldn’t reach the service just now. Please try again in a moment.",
-};
-const SIGNED_OUT_BANNER: Banner = {
-  kind: "ok",
-  title: "Signed out",
-  body: "Your session has been cleared on this device.",
-};
+const WITHDRAWN_BANNER: Banner = { kind: "bad", title: "Access withdrawn", body: "This account is suspended, deactivated or locked. Contact an Admin." };
+const GATE_BLOCKED_BANNER: Banner = { kind: "bad", title: "Access withdrawn", body: "This account can no longer sign in. Contact an Admin." };
+const SERVICE_BANNER: Banner = { kind: "bad", title: "Something went wrong", body: "We couldn’t reach the service just now. Please try again in a moment." };
+const SIGNED_OUT_BANNER: Banner = { kind: "ok", title: "Signed out", body: "Your session has been cleared on this device." };
 
-/* The same three choices the panel's account menu offers — Light, Dark and
-   System — on the door itself. Appearance is a device preference, not a
-   session one, so it is legitimately settable before anybody has signed in,
-   and it reads back through the same attribute the shell will boot from. */
+/* The same three choices the panel's account menu offers, on the door itself. */
 function AppearanceSwitch() {
   const [cur, setCur] = useState(currentTheme);
   return (
-    <div className="auth-appearance">
-      <span className="k">Theme</span>
+    <div className="flex items-center gap-2">
+      <span className="label-mono">Theme</span>
       <Segmented
         sm
         label="Theme"
         value={cur}
-        options={[{ v: "light", l: "Light" }, { v: "dark", l: "Dark" }, { v: "system", l: "System" }]}
-        onPick={(v) => { setTheme(v); setCur(v); }}
+        options={[
+          { v: "light", l: "Light" },
+          { v: "dark", l: "Dark" },
+          { v: "system", l: "System" },
+        ]}
+        onPick={(v) => {
+          setTheme(v);
+          setCur(v);
+        }}
       />
     </div>
   );
@@ -178,7 +114,6 @@ export default function AdminAuth() {
     navigate(nextPath(params.get("next")));
   }
 
-  /* ---------- sign in ---------- */
   async function handleLogin() {
     if (busy) return;
     setBanner(null);
@@ -189,9 +124,6 @@ export default function AdminAuth() {
       TokenService.setTokens(data.accessToken, data.refreshToken);
       const s = await loadSession(true);
       if (!s) {
-        /* Credentials were accepted and tokens are already stored; only the
-           permission read failed. If that was the service, keep them — the
-           next attempt resumes — and never call it a bad password. */
         if (sessionUnreachable()) {
           setBanner(SERVICE_BANNER);
           return;
@@ -203,15 +135,11 @@ export default function AdminAuth() {
       setUser({ name: s.user.name, role: s.role, grants: grantsOf(s) });
       setStep(isZeroAccess(s) ? "pending" : "active");
     } catch (e) {
-      // An unreachable server is not a verdict on the credentials — say so,
-      // and leave whatever is on this device alone.
       if (isServiceError(e)) {
         setBanner(SERVICE_BANNER);
         return;
       }
       clearSession();
-      // Generic message — never reveal which half was wrong, and never
-      // distinguish "locked" from "wrong" either (see the header note).
       setBanner(e instanceof AppExceptions && e.code === 423 ? LOCKED_BANNER : INVALID_BANNER);
     } finally {
       setBusy(false);
@@ -227,25 +155,15 @@ export default function AdminAuth() {
     setBanner(null);
   }
 
-  /* Enter submits — `Input` takes that as `onEnter`, so the local keydown
-     handler this page carried is gone with the raw <input> it was bound to. */
-
-  /* ---------- boot ---------- */
   useEffect(() => {
     if (booted.current) return;
     booted.current = true;
-
     if (params.get("bye")) setBanner(SIGNED_OUT_BANNER);
     if (params.get("blocked") === "gate") setBanner(GATE_BLOCKED_BANNER);
     else if (params.get("blocked")) setBanner(WITHDRAWN_BANNER);
-
-    /* A token already on this device — re-resolve from the SERVER, never
-       trust a stored session blob. */
     if (!TokenService.getAccessToken()) return;
     loadSession().then((s) => {
       if (!s) {
-        /* Down, not denied. Keep the tokens and say the honest thing — wiping
-           a good session because the server blinked is the bug this replaces. */
         if (sessionUnreachable()) {
           setBanner(SERVICE_BANNER);
           return;
@@ -266,141 +184,127 @@ export default function AdminAuth() {
   }, []);
 
   return (
-    <div className="auth">
+    <div className="grid min-h-dvh bg-secondary lg:grid-cols-2">
       {/* ------------------------------------------------------------- brand */}
-      <section className="brandside">
-        <div className="bs-top">
-          <span className="bs-mark">ib</span>
-          <span className="bs-name">
-            Interior bazzar<small>Admin access</small>
+      <section
+        className="relative hidden flex-col overflow-hidden bg-hero px-14 py-12 text-hero lg:flex"
+        style={{
+          backgroundImage: "linear-gradient(var(--color-border-hero) 1px, transparent 1px), linear-gradient(90deg, var(--color-border-hero) 1px, transparent 1px)",
+          backgroundSize: "32px 32px",
+        }}
+      >
+        <div aria-hidden="true" className="pointer-events-none absolute -right-36 -bottom-44 size-[520px] rounded-full border border-hero bg-fg-hero-accent/5" />
+        <div aria-hidden="true" className="pointer-events-none absolute -top-32 right-16 size-[300px] rounded-full border border-hero" />
+
+        <div className="relative z-10 flex items-center gap-3">
+          <span className="relative grid size-9 place-items-center rounded-lg border border-hero text-lg font-bold tracking-tight">
+            ib
+            <span aria-hidden="true" className="absolute -top-1 -right-1 size-2.5 rounded-full bg-fg-hero-accent ring-2 ring-bg-hero" />
+          </span>
+          <span className="flex flex-col leading-none">
+            <span className="text-md font-semibold">Interior bazzar</span>
+            <span className="label-mono mt-1 text-hero-muted">Admin access</span>
           </span>
         </div>
 
-        <div className="bs-mid">
-          <h1>
-            One workspace for <em>everything</em> you run.
+        <div className="relative z-10 my-auto max-w-lg">
+          <h1 className="text-display-md font-semibold tracking-tight text-balance">
+            One workspace for <em className="not-italic text-fg-hero-accent">everything</em> you run.
           </h1>
-          <p>
-            Deals, quotations, invoices, the payment ledger, the marketplace and the people who work it —
-            behind one door, in one place.
-          </p>
-          <div className="bs-list">
-            <div>
-              <svg className="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"
-                   strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.6 4.6L19 7.5" /></svg>
-              <span>Every queue across seven modules, on one screen</span>
-            </div>
-            <div>
-              <svg className="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"
-                   strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.6 4.6L19 7.5" /></svg>
-              <span>Follow a deal from enquiry to money in the bank</span>
-            </div>
-            <div>
-              <svg className="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"
-                   strokeLinecap="round" strokeLinejoin="round"><path d="m5 12.5 4.6 4.6L19 7.5" /></svg>
-              <span>Access resolved fresh on every request, never cached</span>
-            </div>
-          </div>
+          <p className="mt-4 text-md leading-relaxed text-hero-muted">Deals, quotations, invoices, the payment ledger, the marketplace and the people who work it — behind one door, in one place.</p>
+          <ul className="mt-8 flex flex-col gap-3 text-sm">
+            {["Every queue across seven modules, on one screen", "Follow a deal from enquiry to money in the bank", "Access resolved fresh on every request, never cached"].map((s) => (
+              <li key={s} className="flex items-start gap-3">
+                <Icon name="check" size="sm" className="mt-0.5 text-fg-hero-accent" />
+                <span>{s}</span>
+              </li>
+            ))}
+          </ul>
         </div>
 
-        <div className="bs-foot">Feelsafe Technology India Pvt Ltd · staff access only</div>
+        <div className="label-mono relative z-10 text-hero-muted">Feelsafe Technology India Pvt Ltd · staff access only</div>
       </section>
 
       {/* -------------------------------------------------------------- form */}
-      <section className="formside">
-        <AppearanceSwitch />
-        <div className="box">
-
+      <section className="relative flex items-start justify-center px-5 pt-20 pb-10 lg:items-center lg:px-8 lg:pt-10">
+        <div className="absolute top-5 right-5">
+          <AppearanceSwitch />
+        </div>
+        <div className="w-full max-w-sm">
           {/* ---------------------------------------------------------- LOGIN */}
-          <div className={"step" + (step === "login" ? " on" : "")} id="step-login">
-            <h2>Welcome back</h2>
-            <p className="lede">
-              Sign in with the username or email your admin gave you. Access is decided by your role, not by
-              signing in.
-            </p>
-            <div id="loginBanner" style={{ marginTop: 20 }}>
-              {/* THE PANEL'S OWN ALERT. This page drew its own `.banner`, with
-                  its own four tone names suffixed `2` — `err2`, `ok2`, `warn2`,
-                  `info2` — precisely BECAUSE `.banner` was already taken by the
-                  shell's docked strip and the plain tone names collided with
-                  it. Two alert drawings, and the door had the one nobody else
-                  ever saw. It is `Alert` now, which is `.notice`: the same soft
-                  ground, hairline and 3px tone stripe, defined once. */}
+          <div className={cx(step !== "login" && "hidden")} id="step-login">
+            <div className="mb-6 flex items-center gap-3 lg:hidden">
+              <span className="grid size-9 place-items-center rounded-lg bg-brand-solid text-md font-bold text-white">ib</span>
+              <span className="text-md font-semibold text-primary">Interior bazzar Admin</span>
+            </div>
+            <h2 className="text-display-xs font-semibold tracking-tight text-primary">Welcome back</h2>
+            <p className="mt-1.5 text-sm text-tertiary">Sign in with the username or email your admin gave you. Access is decided by your role, not by signing in.</p>
+            <div className="mt-5" id="loginBanner">
               {banner ? (
-                <Alert tone={banner.kind as "ok" | "warn" | "bad" | "info"} title={banner.title}>
+                <Alert tone={banner.kind} title={banner.title}>
                   {banner.body}
                 </Alert>
               ) : null}
             </div>
-
-            <div className="auth-fields">
+            <div className="mt-5 flex flex-col gap-4">
               <FormField id="loginEmail" label="Username or work email">
-                <Input id="loginEmail" type="text" ph="you@interiorbazzar.com" value={who}
-                       onChange={setWho} onEnter={handleLogin} />
+                <Input id="loginEmail" type="text" ph="you@interiorbazzar.com" value={who} onChange={setWho} onEnter={handleLogin} autoFocus />
               </FormField>
               <FormField id="loginPass" label="Password">
-                <Input id="loginPass" type="password" ph="••••••••" value={pass}
-                       onChange={setPass} onEnter={handleLogin} />
+                <Input id="loginPass" type="password" ph="••••••••" value={pass} onChange={setPass} onEnter={handleLogin} />
               </FormField>
             </div>
-
-            <button type="button" className="btn pri lg block" disabled={busy} onClick={handleLogin}>
-              {busy ? <span className="spinner" /> : null}
+            <Button color="primary" size="lg" block className="mt-6" isLoading={busy} showTextWhileLoading onClick={handleLogin}>
               {busy ? "Signing in…" : "Sign in"}
-            </button>
-
-            <div className="foot">
-              Accounts are created by an admin — there is no public sign-up. Lost your password? Ask an admin
-              to reset it.
-            </div>
+            </Button>
+            <p className="mt-6 border-t border-secondary pt-5 text-sm text-tertiary">Accounts are created by an admin — there is no public sign-up. Lost your password? Ask an admin to reset it.</p>
           </div>
 
           {/* -------------------------------------------------------- PENDING */}
-          <div className={"step" + (step === "pending" ? " on" : "")} id="step-pending">
-            <div className="icon-round wait">
-              <svg className="ic lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"
-                   strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 7.2v5.1l3.3 1.9" /></svg>
-            </div>
-            <h2>Signed in — access pending</h2>
-            <p className="lede" id="pendingMsg">
+          <div className={cx(step !== "pending" && "hidden")} id="step-pending">
+            <span className="mb-4 grid size-12 place-items-center rounded-xl bg-warning-primary text-fg-warning-primary ring-1 ring-utility-yellow-200 ring-inset">
+              <Icon name="clock" size="lg" />
+            </span>
+            <h2 className="text-display-xs font-semibold tracking-tight text-primary">Signed in — access pending</h2>
+            <p className="mt-1.5 text-sm text-tertiary" id="pendingMsg">
               {user ? "You’re signed in as " + user.name + ". Dashboard access is awaiting Admin assignment." : ""}
             </p>
-            <div style={{ marginTop: 20 }}>
+            <div className="mt-5">
               <Alert tone="warn" title="This is not an error">
-                A successful sign-in never implies access to anything. Your account holds{" "}
-                <b>zero permissions by construction</b> until an Admin assigns a role — you are
-                the number in their <span className="mono">Team</span> badge right now.
+                A successful sign-in never implies access to anything. Your account holds <b>zero permissions by construction</b> until an Admin assigns a role — you are the
+                number in their <span className="font-mono">Team</span> badge right now.
               </Alert>
             </div>
-            <button type="button" className="btn lg block" style={{ marginTop: 18 }}
-                    onClick={handleLogout}>Sign out</button>
+            <Button color="secondary" size="lg" block className="mt-5" onClick={handleLogout}>
+              Sign out
+            </Button>
           </div>
 
           {/* --------------------------------------------------------- ACTIVE */}
-          <div className={"step" + (step === "active" ? " on" : "")} id="step-active">
-            <div className="icon-round ok3">
-              <svg className="ic lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"
-                   strokeLinecap="round" strokeLinejoin="round"><path d="M12 3.2 19.6 6v6c0 4.7-3.2 7.6-7.6 8.6C7.6 19.6 4.4 16.7 4.4 12V6z" /><path d="m9.2 12 2.1 2.1L15 10.4" /></svg>
-            </div>
-            <h2 id="activeTitle">{user ? "Welcome back, " + user.name.split(" ")[0] : "Welcome back"}</h2>
-            <p className="lede" id="activeMsg">
-              {user && user.role
-                ? "Signed in as " + user.role + ". Effective access, resolved fresh for this session:"
-                : ""}
+          <div className={cx(step !== "active" && "hidden")} id="step-active">
+            <span className="mb-4 grid size-12 place-items-center rounded-xl bg-success-primary text-fg-success-primary ring-1 ring-utility-green-200 ring-inset">
+              <Icon name="shield" size="lg" />
+            </span>
+            <h2 className="text-display-xs font-semibold tracking-tight text-primary" id="activeTitle">
+              {user ? "Welcome back, " + user.name.split(" ")[0] : "Welcome back"}
+            </h2>
+            <p className="mt-1.5 text-sm text-tertiary" id="activeMsg">
+              {user && user.role ? "Signed in as " + user.role + ". Effective access, resolved fresh for this session:" : ""}
             </p>
-            <div className="grants" id="activeGrants">
+            <div className="mt-4 mb-5 flex flex-wrap gap-1.5" id="activeGrants">
               {(user ? user.grants : []).map((g) => (
-                <span className="chip" key={g}>{g}</span>
+                <Pill key={g} tone="neutral" text={g} />
               ))}
             </div>
-            <button type="button" className="btn pri lg block" id="continueBtn" onClick={enterPanel}>
-              Continue to the panel<Icon name="arrow" size="sm" />
-            </button>
-            <div className="foot">
-              <button type="button" className="tlink" onClick={handleLogout}>Not you? Sign out</button>
+            <Button color="primary" size="lg" block id="continueBtn" ico="arrow" onClick={enterPanel}>
+              Continue to the panel
+            </Button>
+            <div className="mt-5 border-t border-secondary pt-4">
+              <Button color="link-gray" size="sm" onClick={handleLogout}>
+                Not you? Sign out
+              </Button>
             </div>
           </div>
-
         </div>
       </section>
     </div>

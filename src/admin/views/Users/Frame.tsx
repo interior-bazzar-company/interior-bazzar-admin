@@ -1,25 +1,21 @@
 /* =============================================================================
    Users Management — the shell every list-side face renders inside.
    -----------------------------------------------------------------------------
-   THE PAGE HAS NO TITLE, and that is the panel's rule rather than an omission:
-   `.dls-head is gone — title and scope live in the topbar, and the page opens
-   on its controls`. An earlier pass put an <h1> and a three-line paragraph
-   above the fold on every face, repeating what the topbar already said and
-   pushing the actual work down. Both are gone; the scope moved into the
-   topbar's stat slots, where Deals and Business Enquiries keep theirs.
+   THE PAGE SKELETON, once, so the directory and the dashboard over it open the
+   same way: `PageHeader` (title · scope · the face tabs) → `FilterBar` (search,
+   the filters, the chips) → the bands (`StatStrip`) → the body.
 
-   `.dls` is the house list workspace: a full-height flex column with one
-   scrolling body, so the table header sticks and the command bands never move.
-   Analytics scrolls prose and charts rather than rows and uses the same shell —
-   same bands, same left edge, same behaviour under the topbar.
+   The FACE is the one control here that is NOT a filter: it changes which
+   question the page asks, and the filters narrow the answer. So it hangs off
+   the page header as a `Tabs` row and produces no chip — clearing the filters
+   must never clear the screen you are on.
 
-   The view band is the one control here that is NOT a filter. It changes which
-   question the page asks; the filters narrow the answer. So it sits above the
-   command row and produces no chip — clearing the filters must not clear the
-   screen you are on.
+   The scope figures live in the header's `meta`, counted off the WHOLE row set
+   rather than the filtered one: how big the base is and how much of it is live
+   must not change meaning because somebody typed in the search box.
    ============================================================================= */
 import type { ReactNode } from "react";
-import { Icon } from "../../ui";
+import { Card, FilterBar, PageHeader, Tabs } from "../../ui";
 import { ProtoBar } from "./bits";
 import { resetStore } from "./store";
 import type { Params, UserRow } from "./store";
@@ -32,7 +28,7 @@ import type { Params, UserRow } from "./store";
    `users` is the default face and carries no `view` param, so `#/users` is the
    directory — the working surface, which is what the route already reads like. */
 export const VIEWS = [
-  { key: "users", label: "Users", icon: "users" },
+  { key: "users", label: "Directory", icon: "users" },
   { key: "analytics", label: "Analytics", icon: "chart" },
 ];
 
@@ -42,42 +38,64 @@ export function ViewBand({ view, onView, counts }: {
   counts?: Record<string, number | null>;
 }) {
   return (
-    <nav className="um-views" aria-label="Users Management views">
-      {VIEWS.map((v) => {
+    <Tabs
+      cur={view}
+      onPick={onView}
+      items={VIEWS.map((v) => {
         const n = counts ? counts[v.key] : null;
-        return (
-          <button key={v.key} className={v.key === view ? "on" : ""}
-            aria-current={v.key === view ? "page" : undefined}
-            onClick={() => onView(v.key)}>
-            <Icon name={v.icon} size="sm" />
-            <span>{v.label}</span>
-            {typeof n === "number" && n > 0 ? <i className="tnum">{n}</i> : null}
-          </button>
-        );
+        /* `quiet`, because the number is a SIZE and not a debt. A loud badge
+           on a tab means somebody owes something. */
+        return { k: v.key, label: v.label, icon: v.icon, n: typeof n === "number" ? n : undefined, quiet: true };
       })}
-    </nav>
+    />
   );
 }
 
-export function Frame({ view, onView, counts, cmd, bands, children, toast }: {
+export function Frame({
+  view, onView, counts, cmd, bands, children, toast,
+  title, meta, actions, search, right, chips,
+}: {
   view: string;
   onView: (v: string) => void;
   counts?: Record<string, number | null>;
-  /** The command row — search, filters, actions. Rendered in `.dls-cmd`. */
+  /** The filter controls — the selects, the range, the sort. */
   cmd?: ReactNode;
-  /** Full-bleed bands between the command row and the body: the stat strip,
-   *  the filter chips. They live outside `.dls-body` so they do not scroll. */
+  /** Full-bleed bands between the filter bar and the body: the stat strip. */
   bands?: ReactNode;
   children: ReactNode;
   toast?: (msg: ReactNode, tone?: string) => void;
+  /** The page title. Defaults to the face's own name. */
+  title?: ReactNode;
+  /** The line under the title: the scope, unfiltered. */
+  meta?: ReactNode;
+  /** The page's one primary action, in the header. */
+  actions?: ReactNode;
+  /** The search field, at the head of the filter bar. */
+  search?: ReactNode;
+  /** The right end of the filter row — a view switch, a sort. */
+  right?: ReactNode;
+  /** The applied-filter chips, under the filter row. */
+  chips?: ReactNode;
 }) {
   return (
-    <div className="dls um">
+    <div className="flex flex-col gap-4">
       <ProtoBar onReset={() => { resetStore(); if (toast) toast("Back to the seed."); }} />
-      <ViewBand view={view} onView={onView} counts={counts} />
-      {cmd ? <div className="dls-cmd">{cmd}</div> : null}
+
+      <PageHeader
+        title={title || (view === "analytics" ? "Users analytics" : "Users Management")}
+        meta={meta}
+        actions={actions}
+        tabs={<ViewBand view={view} onView={onView} counts={counts} />}
+        className="mb-0"
+      />
+
+      {search || cmd || right || chips
+        ? <FilterBar search={search} filters={cmd} right={right} chips={chips} />
+        : null}
+
       {bands}
-      <div className="dls-body">{children}</div>
+
+      {children}
     </div>
   );
 }
@@ -92,8 +110,8 @@ export function Frame({ view, onView, counts, cmd, bands, children, toast }: {
  *
  * A card gives each figure a boundary, a title and a subtitle that says what it
  * counts. `wide` opts out of the two-up grid for the charts that need the
- * width; everything else pairs up automatically and falls to one column when
- * the container is narrow.
+ * width; everything else pairs up automatically and falls to one column under
+ * `lg`.
  */
 export function Block({ title, desc, right, wide, foot, children }: {
   title: ReactNode;
@@ -104,23 +122,16 @@ export function Block({ title, desc, right, wide, foot, children }: {
   children: ReactNode;
 }) {
   return (
-    <section className={"card um-block" + (wide ? " wide" : "")}>
-      <div className="card-h">
-        <h3>{title}</h3>
-        {desc ? <span className="d">{desc}</span> : null}
-        {right ? <span className="r">{right}</span> : null}
-      </div>
-      <div className="card-b">{children}</div>
-      {foot ? <div className="card-f">{foot}</div> : null}
-    </section>
+    <Card title={title} sub={desc} right={right} foot={foot} className={wide ? "lg:col-span-2" : undefined}>
+      {children}
+    </Card>
   );
 }
 
-/** The two-up grid. `auto-fit` rather than a fixed two columns, so the same
- *  markup is one column on a laptop half-screen and two on a monitor without a
- *  breakpoint anybody has to maintain. */
+/** The two-up grid: one column under `lg`, two above it, and a `wide` block
+ *  spans both. */
 export function Blocks({ children }: { children: ReactNode }) {
-  return <div className="um-blocks">{children}</div>;
+  return <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">{children}</div>;
 }
 
 /** The props every list-side face receives. Declared once so a new face cannot
