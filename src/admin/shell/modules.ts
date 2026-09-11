@@ -299,6 +299,12 @@ export function getModules(): ModuleGroup[] {
       if (!seen.has(r.key) && PROTO_MODULES.has(r.key)) put(r.key, r.label, r.group);
     });
   }
+  /* A row keeps its PROTO_ROWS place inside its group when the server starts
+     sending it (finance-transactions, attendance, work did, 2026-09-11), so a
+     module going real does not jump to the top of its group. Rows that were
+     never proto stay first, in server order. */
+  const protoAt = (k: string) => PROTO_ROWS.findIndex((r) => r.key === k);
+  groups.forEach((g) => g.items.sort((a, b) => protoAt(a.key) - protoAt(b.key)));
   const rank = (g: string) => {
     const i = GROUP_ORDER.indexOf(g);
     return i < 0 ? GROUP_ORDER.length : i;

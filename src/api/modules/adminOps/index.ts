@@ -520,8 +520,56 @@ export interface DealPaymentRow {
   reversesPaymentId: number | null; idempotencyKey: string;
   ownerAtPayment: DealPersonRef | null; recordedBy: DealPersonRef | null;
   reason: string; createdAt: string;
+  /** A payment row that has a reversal row — the pair nets to zero whatever
+   *  dates they fall on. Always false on reversal rows. */
+  reversed: boolean;
 }
 export interface DealPaymentsListResponse { payments: DealPaymentRow[]; total: number; pageNo: number; pageSize: number; }
+
+/** One row of any GET v1/admin/vocab/<list>/ value list. */
+export interface VocabItem { key: string; label: string; tone: string; hint?: string; displayOrder?: number; isActive?: boolean }
+
+/** A plan purchase (TransectionData) as `payments/` returns it. Money is a
+ *  RUPEE string here, not paise — the legacy model stores it that way. */
+export interface PlanPaymentRow {
+  id: number; orderId: string; transactionId: string; amount: string; paymentFor: string;
+  orderStatus: string; paymentMethod: string; refundStatus: string; refundAmount: string;
+  verifiedAt: string | null; createdAt: string;
+}
+export interface PlanPaymentsListResponse { payments: PlanPaymentRow[]; total: number; pageNo: number; pageSize: number; }
+
+/** interior_deals_billing.Installment — stored, or computed for a quotation
+ *  accepted before the table existed (`source: "computed"`, `id: null`). */
+export interface InstallmentRow {
+  id: number | null; source: "stored" | "computed"; quotationId: number; quotationNumber: string | null;
+  dealRef: string; seq: number; count: number; amountPaise: number; dueDate: string;
+  status: VocabItem; graceEnds: string; invoiceId: number | null; invoiceNumber: string | null;
+  paidAt: string | null; failedAt: string | null; failureReason: VocabItem | null; failureNote: string;
+  cancelledAt: string | null; cancelledReason: string;
+}
+export interface InstallmentsListResponse { installments: InstallmentRow[]; total: number; pageNo: number; pageSize: number; }
+
+/** interior_admin.OtherIncome — money in that is not a customer payment. */
+export interface IncomeRow {
+  id: number; kind: VocabItem; amountPaise: number; description: string; party: string; mode: VocabItem;
+  reference: string; valueDate: string; account: VocabItem; state: VocabItem; recordedAt: string;
+}
+export interface IncomeListResponse { income: IncomeRow[]; total: number; pageNo: number; pageSize: number; }
+
+/** interior_admin.WorkItem. `delayed` is derived server-side (open, past due). */
+export interface WorkItemRow {
+  id: number; title: string; assignee: DealPersonRef; status: VocabItem; priority: VocabItem;
+  delayed: boolean; startDate: string | null; dueDate: string | null; completedAt: string | null; rowVersion: number;
+}
+export interface WorkListResponse { items: WorkItemRow[]; total: number; pageNo: number; pageSize: number; }
+
+/** interior_admin.AttendanceDay. `state` is derived: working / on_break / ended / unclosed. */
+export interface AttendanceDayRow {
+  id: number; member: DealPersonRef; businessDate: string; startedAt: string; endedAt: string | null;
+  breakMinutes: number; workedMinutes: number | null; isLate: boolean; lateByMinutes: number;
+  state: "working" | "on_break" | "ended" | "unclosed"; source: VocabItem;
+}
+export interface AttendanceDaysResponse { days: AttendanceDayRow[]; total: number; pageNo: number; pageSize: number; }
 /** The rare repair path only — an issued invoice that somehow has no ledger
  *  row. The normal path is InvoicesService.issueInvoice() itself writing
  *  this row, server-side, in the same transaction as freezing the invoice. */
@@ -721,7 +769,8 @@ export class AdminOpsService {
   }
 
   // ── Payments ──
-  static payments(params: { status?: string; refunded?: boolean; paymentMethod?: string; pageNo?: number; pageSize?: number } = {}) {
+  /** `status` takes a comma list (PAID,REFUNDED); `start`/`end` filter on verifiedAt's date. */
+  static payments(params: { status?: string; refunded?: boolean; paymentMethod?: string; start?: string; end?: string; pageNo?: number; pageSize?: number } = {}) {
     return apiService.getGetApiResponse<any>(`${base}/payments/${qs(params)}`);
   }
 
@@ -1083,8 +1132,25 @@ export class AdminOpsService {
   // TransectionData), a different module (`payments` here maps to
   // `payments/deal-ledger/`, deliberately routed off the legacy `payments/`
   // prefix so the two can never collide).
-  static dealPayments(params: { deal?: string; invoice?: number; pageNo?: number; pageSize?: number } = {}) {
+  /** `start`/`end` filter on paymentDate. */
+  static dealPayments(params: { deal?: string; invoice?: number; start?: string; end?: string; pageNo?: number; pageSize?: number } = {}) {
     return apiService.getGetApiResponse<DealPaymentsListResponse>(`${base}/payments/deal-ledger/${qs(params)}`);
+  }
+
+  // ── Installments / other income / tasks / attendance / value lists (overview d3) ──
+  static installments(params: { start?: string; end?: string; status?: string; deal?: string; pageNo?: number; pageSize?: number } = {}) {
+    return apiService.getGetApiResponse<InstallmentsListResponse>(`${base}/installments/${qs(params)}`);
+  }
+  static income(params: { start?: string; end?: string; kind?: string; state?: string; pageNo?: number; pageSize?: number } = {}) {
+    return apiService.getGetApiResponse<IncomeListResponse>(`${base}/income/${qs(params)}`);
+  }
+  /** `assignee` omitted = the caller's own tasks; an id or `all` needs work.all. */
+  static work(params: { assignee?: string; status?: string; start?: string; end?: string; pageNo?: number; pageSize?: number } = {}) {
+    return apiService.getGetApiResponse<WorkListResponse>(`${base}/work/${qs(params)}`);
+  }
+  /** `member` omitted = the caller's own days; an id or `all` is full access only. */
+  static attendanceDays(params: { member?: string; start?: string; end?: string; pageNo?: number; pageSize?: number } = {}) {
+    return apiService.getGetApiResponse<AttendanceDaysResponse>(`${base}/attendance/days/${qs(params)}`);
   }
   static recordDealPayment(data: DealPaymentRecordInput) {
     return apiService.getPostApiResponse<DealPaymentRow>(`${base}/payments/deal-ledger/`, data);

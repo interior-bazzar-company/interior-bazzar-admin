@@ -42,7 +42,7 @@ export function Snapshot({ d }: { d: OverviewData }) {
   const ds = dealState(d);
   const ofD = "vs prev " + d.periods.deals.days + "d";
   const ofF = "vs prev " + d.periods.finance.days + "d";
-  const fin = d.fin, deals = d.deals;
+  const fin = d.money, deals = d.deals;
 
   /* One of four states for a deals tile: answering, refused, failed, or a
      figure. A refusal and a failure are different facts and print as such. */
@@ -52,21 +52,29 @@ export function Snapshot({ d }: { d: OverviewData }) {
     if (ds === "error") return <Kpi k={k} tip={tip} {...NA} s="could not load" foot={<Retry onPress={d.retryDeals} />} />;
     return <Kpi k={k} tip={tip} {...NA} s="not in your access" />;
   };
+  /* The same four states for the two money tiles, which read the backend
+     (live.ts) rather than the Finance seed. */
+  const moneyTile = (k: string, tip: string, render: () => ReactElement) => {
+    if (d.moneyState === "ready" && fin) return render();
+    if (d.moneyState === "loading") return <Loading k={k} tip={tip} />;
+    if (d.moneyState === "error") return <Kpi k={k} tip={tip} {...NA} s="could not load" foot={<Retry onPress={d.retryLive} />} />;
+    return <Kpi k={k} tip={tip} {...NA} s="not in your access" />;
+  };
   const collected = (o: { collectedPaise: number; otherInPaise: number }) => o.collectedPaise + o.otherInPaise;
 
   return (
     <Section id="ov-snapshot" title="Executive snapshot" desc={d.periods.deals.label}
-      right={<><Stamp clock={d.clocks.deals} /><Stamp clock={d.clocks.finance} /></>}>
+      right={<><Stamp clock={d.clocks.deals} /><Stamp clock={d.clocks.money} /></>}>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {fin
-          ? <Kpi k="Collected" tip="collected" v={<Money paise={collected(fin.cur)} />}
-              s={fin.cur.collectedN + " payment" + (fin.cur.collectedN === 1 ? "" : "s") + " in"}
-              now={collected(fin.cur)} before={collected(fin.prev)} of={ofF} to="#/finance-analytics" />
-          : <Kpi k="Collected" tip="collected" {...NA} s="not in your access" />}
+        {moneyTile("Collected", "collected", () => (
+          <Kpi k="Collected" tip="collected" v={<Money paise={collected(fin!.cur)} />}
+              s={fin!.cur.collectedN + " payment" + (fin!.cur.collectedN === 1 ? "" : "s") + " in"}
+              now={collected(fin!.cur)} before={collected(fin!.prev)} of={ofF} to="#/finance-analytics" />
+        ))}
 
         {dealTile("Pipeline value", "pipeline", () => (
-          <Kpi k="Pipeline value" tip="pipeline" v={<Money paise={deals!.openValue} />}
-            s={deals!.open + " open" + (deals!.unquoted ? " · " + deals!.unquoted + " without a value" : "")}
+          <Kpi k="Pipeline value" tip="pipeline" v={<Money paise={deals!.openInPeriod.value} />}
+            s={deals!.openInPeriod.n + " open" + (deals!.openInPeriod.unquoted ? " · " + deals!.openInPeriod.unquoted + " without a value" : "")}
             to="#/deals?view=board" />
         ))}
         {dealTile("Won", "won", () => (
@@ -80,11 +88,11 @@ export function Snapshot({ d }: { d: OverviewData }) {
             now={deals!.conversion} before={deals!.conversionPrev} kind="pts" of={ofD} to="#/deals?view=board" />
         ))}
 
-        {fin
-          ? <Kpi k="Receivable" tip="outstanding" v={<Money paise={fin.totals.outstandingPaise} />}
-              s={fin.totals.dueN + " due · " + fin.totals.failedN + " failed"}
-              tone={fin.totals.failedN ? "warn" : undefined} to="#/finance?flag=due" />
-          : <Kpi k="Receivable" tip="outstanding" {...NA} s="not in your access" />}
+        {moneyTile("Receivable", "outstanding", () => (
+          <Kpi k="Receivable" tip="outstanding" v={<Money paise={fin!.totals.outstandingPaise} />}
+              s={fin!.totals.dueN + " due · " + fin!.totals.failedN + " failed"}
+              tone={fin!.totals.failedN ? "warn" : undefined} to="#/finance?flag=due" />
+        ))}
         {/* The intake counter answers with a total or with nothing; a backend
             that returns no total leaves the topbar's own zeros standing, so
             the tile prints a zero rather than the word `undefined`. */}

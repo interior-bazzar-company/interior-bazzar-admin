@@ -156,6 +156,10 @@ export interface OwnerRow { name: string; open: number; value: number; won: numb
 export interface StageRow { stage: number; key: string; label: string; tone: string; n: number; value: number }
 export interface DealMetrics {
   total: number; open: number; openValue: number; unquoted: number;
+  /** The snapshot's Pipeline value (d3, 2026-09-11): deals still open NOW that
+   *  were created inside the period. `open` / `openValue` above stay the whole
+   *  open book for the sections that read it. */
+  openInPeriod: { n: number; value: number; unquoted: number; stalled: number };
   stalled: number; stalledValue: number;
   won: { n: number; value: number }; wonPrev: { n: number; value: number };
   lost: { n: number }; lostPrev: { n: number };
@@ -173,6 +177,7 @@ const rate = (won: number, lost: number) => (won + lost ? Math.round((won / (won
 
 export function dealMetrics(list: DealRec[], p: Period, today: string): DealMetrics {
   const open = list.filter(isOpen);
+  const openNew = open.filter((d) => inRange(d.created_at, p.from, p.to));
   const wonNow = closedIn(list, WON, p.from, p.to);
   const lostNow = closedIn(list, LOST, p.from, p.to);
   const wonPrev = closedIn(list, WON, p.prevFrom, p.prevTo);
@@ -231,6 +236,10 @@ export function dealMetrics(list: DealRec[], p: Period, today: string): DealMetr
   return {
     total: list.length, open: open.length, openValue: sumValue(open),
     unquoted: open.filter((d) => d.deal_value === null).length,
+    openInPeriod: {
+      n: openNew.length, value: sumValue(openNew), unquoted: openNew.filter((d) => d.deal_value === null).length,
+      stalled: openNew.filter((d) => d.is_stalled).length,
+    },
     stalled: stalled.length, stalledValue: sumValue(stalled),
     won: { n: wonNow.length, value: sumValue(wonNow) }, wonPrev: { n: wonPrev.length, value: sumValue(wonPrev) },
     lost: { n: lostNow.length }, lostPrev: { n: lostPrev.length },
@@ -352,14 +361,24 @@ export function teamMetrics(p: Period, today: string, dept: string | undefined, 
 /* ---------------------------------------------------------------- health --- */
 export type Tone = "ok" | "warn" | "bad" | "mute";
 export interface HealthCell { key: string; label: string; tone: Tone; why: string; to: string }
-export function healthOf(deals: DealMetrics | null, fin: FinanceMetrics | null, team: TeamMetrics | null): HealthCell[] {
+/** Only what the cells read, so the seed metrics and the live ones (live.ts)
+ *  both fit. */
+export interface HealthMoney { failed: { n: number }; overdue: { n: number } }
+export interface HealthTeam {
+  span: { onTimePct: number | null };
+  work: { total: number; completed: number; cancelled: number; delayed: number };
+}
+export function healthOf(deals: DealMetrics | null, fin: HealthMoney | null, team: HealthTeam | null): HealthCell[] {
   const out: HealthCell[] = [];
   if (deals) {
-    const share = deals.open ? (deals.stalled / deals.open) * 100 : null;
+    /* The same deals as the Pipeline value tile: open now, created in the
+       period (d3, 2026-09-11). */
+    const { n, stalled } = deals.openInPeriod;
+    const share = n ? (stalled / n) * 100 : null;
     out.push({
       key: "pipeline", label: "Pipeline", to: "#/deals?stalled=1",
       tone: share === null ? "mute" : share < 15 ? "ok" : share < 35 ? "warn" : "bad",
-      why: share === null ? "no open deals" : deals.stalled + " of " + deals.open + " open deals stalled",
+      why: share === null ? "no open deals" : stalled + " of " + n + " open deals stalled",
     });
   }
   if (fin) {

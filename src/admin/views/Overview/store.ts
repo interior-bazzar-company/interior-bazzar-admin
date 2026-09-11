@@ -29,9 +29,11 @@ import { can } from "../../auth/session";
 import { getSession } from "../../auth/session";
 import { fmtDate } from "../../ui/format";
 import {
-  attentionItems, dealMetrics, financeMetrics, healthOf, payrollMetrics, periodFor, planningSignals,
+  attentionItems, dealMetrics, financeMetrics, payrollMetrics, periodFor, planningSignals,
   teamMetrics, todayLocal,
 } from "./derive";
+import { liveHealth, liveMoney, liveTeam, useLive } from "./live";
+import type { LiveMoney, LiveState } from "./live";
 import type {
   AttentionItem, DealMetrics, DealRec, FinanceMetrics, HealthCell, OwnerStat, Payroll, Period, Signal,
   TeamMetrics,
@@ -54,10 +56,13 @@ export const GATES = {
  *  "seed · as of 25 Aug 2026". Every section stamps one, because the same
  *  period lands on different dates in each — see derive.ts. */
 export interface Clock { kind: "live" | "seed"; today: string; label: string }
-export function clocks(): { deals: Clock; finance: Clock; team: Clock } {
+export function clocks(): { deals: Clock; finance: Clock; team: Clock; money: Clock } {
   const real = todayLocal();
   return {
     deals: { kind: "live", today: real, label: "live · " + fmtDate(real) },
+    /* The executive snapshot's money and health (live.ts) run on the real
+       clock; `finance` stays the seed clock for the sections still on seeds. */
+    money: { kind: "live", today: real, label: "live · " + fmtDate(real) },
     finance: { kind: "seed", today: finToday(), label: "seed · as of " + finFmtDate(finToday()) },
     team: { kind: "seed", today: teamToday, label: "seed · as of " + teamFmtDate(teamToday) },
   };
@@ -107,9 +112,14 @@ export interface OverviewData {
   gates: { deals: boolean; finance: boolean; payroll: boolean; team: boolean; enquiries: boolean };
   api: DealsApiState;
   clocks: ReturnType<typeof clocks>;
-  periods: { deals: Period; finance: Period; team: Period };
+  periods: { deals: Period; finance: Period; team: Period; money: Period };
   deals: DealMetrics | null;
   fin: FinanceMetrics | null;
+  /** Collected + Receivable for the executive snapshot, from the backend
+   *  (live.ts). null until `moneyState` is ready. */
+  money: LiveMoney | null;
+  moneyState: LiveState;
+  retryLive: () => void;
   pay: Payroll | null;
   team: TeamMetrics | null;
   intake: { today: number; week: number } | null;
@@ -140,7 +150,9 @@ export function useOverview(p: Params): OverviewData {
     deals: periodFor(p.period, ck.deals.today, p.from, p.to),
     finance: periodFor(p.period, ck.finance.today, p.from, p.to),
     team: periodFor(p.period, ck.team.today, p.from, p.to),
+    money: periodFor(p.period, ck.money.today, p.from, p.to),
   }), [p.period, p.from, p.to, ck]);
+  const live = useLive(periods.money, { money: gates.finance, team: gates.team });
 
   const dealsReady = gates.deals && !api.loading && !api.error && !api.forbidden;
   const deals = useMemo(
@@ -173,13 +185,22 @@ export function useOverview(p: Params): OverviewData {
     () => (gates.team ? teamMetrics(periods.team, ck.team.today, p.dept || undefined, owners, dept.rolesOf) : null),
     [gates.team, periods.team, ck, p.dept, owners, dept.rolesOf, teamVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const health = useMemo(() => healthOf(deals, fin, team), [deals, fin, team]);
+  const money = useMemo(
+    () => (live.money === "ready" ? liveMoney(live.raw, periods.money) : null),
+    [live.money, live.raw, periods.money]);
+  const teamLive = useMemo(
+    () => (live.team === "ready" ? liveTeam(live.raw, p.dept || undefined, dept.rolesOf) : null),
+    [live.team, live.raw, p.dept, dept.rolesOf]);
+  const health = useMemo(
+    () => liveHealth(deals, money, live.money, teamLive, live.team),
+    [deals, money, live.money, teamLive, live.team]);
   const attention = useMemo(() => attentionItems(deals, fin, pay, team, ck.team.today), [deals, fin, pay, team, ck]);
   const signals = useMemo(() => planningSignals(deals, fin, pay, team, ck.deals.today), [deals, fin, pay, team, ck]);
 
   const s = getSession();
   return {
     gates, api, clocks: ck, periods, deals, fin, pay, team,
+    money, moneyState: live.money, retryLive: live.retry,
     intake: gates.enquiries ? intake : null,
     health, attention, signals,
     retryDeals: refetchDeals,
