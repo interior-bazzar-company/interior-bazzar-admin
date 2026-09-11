@@ -27,6 +27,7 @@ import { AuthService } from "../../api/modules/auth";
 import { TokenService } from "../../api/apiService/authHelper/TokenService";
 import type { LoginFormResponse } from "../../types/global";
 import { clearSession, grantsOf, isZeroAccess, loadSession, sessionUnreachable } from "./session";
+import { homeRoute, HOME_ROUTE } from "../shell/modules";
 import { currentTheme, setTheme } from "../shell/ShellContext";
 import { Alert, Button, FormField, Icon, Input, Pill, Segmented } from "../ui";
 
@@ -37,7 +38,10 @@ type Banner = { kind: "ok" | "warn" | "bad" | "info"; title: string; body: React
 /* The redirect target: a same-origin PATH, never an arbitrary URL. */
 function nextPath(n: string | null): string {
   const v = n || "";
-  return /^\/[A-Za-z0-9\-_/?=&.%]*$/.test(v) && v.indexOf("//") === -1 ? v : "/overview";
+  /* No usable `next`: this session's own home, which is the Overview only
+     when it holds that grant. Called from enterPanel, after the session is
+     loaded, so homeRoute() has something to read. */
+  return /^\/[A-Za-z0-9\-_/?=&.%]*$/.test(v) && v.indexOf("//") === -1 ? v : "/" + (homeRoute() || HOME_ROUTE);
 }
 
 const LOCKED_BANNER: Banner = {

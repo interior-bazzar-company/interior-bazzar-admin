@@ -14,7 +14,14 @@ import AdminShell from "../admin/shell/AdminShell";
 import AdminAuth from "../admin/auth/AdminAuth";
 import { ViewHost } from "../admin/views/registry";
 import RequireSession from "./RequireSession";
-import { HOME_ROUTE } from "../admin/shell/modules";
+import { homeRoute, HOME_ROUTE } from "../admin/shell/modules";
+
+/* "/" resolves per SESSION, at render time — a constant here would send a
+   session without the Overview grant to a page it then has to be forwarded
+   off. Rendered inside RequireSession, so the session exists by now. */
+function HomeRedirect() {
+  return <Navigate to={"/" + (homeRoute() || HOME_ROUTE)} replace />;
+}
 
 const UserRoutes = () => (
   <Routes>
@@ -26,7 +33,7 @@ const UserRoutes = () => (
         </RequireSession>
       }
     >
-      <Route path="/" element={<Navigate to={"/" + HOME_ROUTE} replace />} />
+      <Route path="/" element={<HomeRedirect />} />
       <Route path="/:route" element={<ViewHost />} />
       <Route path="/:route/:id" element={<ViewHost />} />
       {/* A THIRD SEGMENT, for a record's own operations. `/team/58/leave` is a

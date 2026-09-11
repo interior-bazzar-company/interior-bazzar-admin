@@ -14,7 +14,7 @@
    behaviour, so a module key with no entry in ICON_OF still renders instead
    of guessing.
    ============================================================================= */
-import { getSession, HIDDEN_MODULES, PROTO_MODULES } from "../auth/session";
+import { can, getSession, HIDDEN_MODULES, PROTO_MODULES } from "../auth/session";
 
 export type ModuleItem = {
   key: string;
@@ -327,8 +327,25 @@ export const moduleLabel = (k: string) => {
   return it ? it.label : k;
 };
 
-/** The default landing route. The prototype booted to #/deals; the panel now
- * lands on the Overview, which every signed-in member can open (it is proto-
- * gated) and which says, per section, what is and is not in their access.
- * Kept static: it is where "/" redirects to, not a permission. */
+/** The PREFERRED landing route. The prototype booted to #/deals; the panel
+ * lands on the Overview. Since 2026-09-11 Overview is a real permission
+ * (server Module row, full access holds it) rather than open to everyone, so
+ * where a given session actually lands is `homeRoute()`, not this constant. */
 export const HOME_ROUTE = "overview";
+
+/** Where "home" is for THIS session: the Overview when it may open it,
+ *  otherwise the first page its own sidebar shows, in sidebar order. Every
+ *  hop that means "go home" — "/" , login with no `next`, a direct visit to
+ *  the Overview without the grant, the brand, "Back to Overview" — resolves
+ *  through here, so they cannot disagree.
+ *
+ *  `null` only when nothing at all is allowed. RequireSession sends such an
+ *  account to /login?pending=1 before the shell renders, so this exists to
+ *  keep a redirect from looping, not as a state anyone should reach. */
+export function homeRoute(): string | null {
+  if (can(HOME_ROUTE)) return HOME_ROUTE;
+  for (const g of getModules()) {
+    for (const it of g.items) if (can(it.key)) return it.route;
+  }
+  return null;
+}

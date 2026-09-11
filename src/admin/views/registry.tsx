@@ -17,9 +17,9 @@
    ========================================================================== */
 import { lazy, Suspense } from "react";
 import type { ComponentType } from "react";
-import { useLocation } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { Button, EmptyState, Notice, PageHeader, PaneLoading } from "../ui";
-import { getItems, HOME_ROUTE } from "../shell/modules";
+import { getItems, homeRoute, HOME_ROUTE } from "../shell/modules";
 import type { ModuleItem } from "../shell/modules";
 import { can, useNav } from "../shell/AdminShell";
 
@@ -75,7 +75,15 @@ export function ViewHost() {
   const item = getItems()[route];
 
   if (!item) return <NotFound route={route} />;
-  if (!can(item.key)) return <Denied item={item} />;
+  if (!can(item.key)) {
+    /* THE HOME PAGE FORWARDS instead of refusing: a session without the
+       Overview grant that lands on it (a bookmark, a typed URL, `?next=`
+       after sign-in) goes to its own first page. Every other module still
+       says it is not in your access. `home` is null only for a session with
+       nothing allowed at all, which then gets the refusal rather than a loop. */
+    const home = item.key === HOME_ROUTE ? homeRoute() : null;
+    return home ? <Navigate to={"/" + home} replace /> : <Denied item={item} />;
+  }
 
   const View = VIEWS[route];
   if (!View) return <ComingSoon item={item} />;
@@ -101,7 +109,7 @@ function NotFound({ route }: { route: string }) {
           </>
         }
         action={
-          <Button color="primary" data-go={"#/" + HOME_ROUTE} onClick={() => go("#/" + HOME_ROUTE)}>
+          <Button color="primary" data-go={"#/" + (homeRoute() || HOME_ROUTE)} onClick={() => go("#/" + (homeRoute() || HOME_ROUTE))}>
             Back to Overview
           </Button>
         }

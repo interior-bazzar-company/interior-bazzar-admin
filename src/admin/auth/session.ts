@@ -87,13 +87,11 @@ export const HIDDEN_MODULES = new Set(["design", "payments"]);
  *  either would hand member CRUD and role assignment to every signed-in
  *  account. See OPERATION-2026-08-30-team-module.md § TM-BR-01. */
 export const PROTO_MODULES = new Set<string>([
-  /* `overview` (the landing page) qualifies on a different ground from the
-     rest: it has no data of its own to leak and no write at all — it reads
-     the other modules' stores and API hooks, each of which enforces its own
-     grant, so a section is absent from the page exactly when its module is
-     absent from the nav. It comes out when the server ships a Module row for
-     it, at which point a role can withhold the page itself. */
-  "overview",
+  /* `overview` CAME OUT 2026-09-11: the server ships its Module row
+     (interior_admin migration 0026), so `can("overview")` now reads the
+     session's own grant. Full access holds it without a grant row; any other
+     role only when its cell is ticked in the roles editor. A session without
+     it is forwarded to its first allowed page — see `homeRoute()`. */
   "users",
   "finance",
   "finance-salaries",

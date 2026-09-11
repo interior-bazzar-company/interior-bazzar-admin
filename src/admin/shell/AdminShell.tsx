@@ -34,7 +34,7 @@ import config from "../../config";
 import { AuthService } from "../../api/modules/auth";
 import AdminOpsService, { call } from "../../api/modules/adminOps";
 import type { AuditEntry, MePermissions } from "../../api/modules/adminOps";
-import { getModules, getGroupOf, getItems, moduleLabel, HOME_ROUTE } from "./modules";
+import { getModules, getGroupOf, getItems, moduleLabel, homeRoute, HOME_ROUTE } from "./modules";
 import { can, canWrite, clearSession, getSession, grantsOf } from "../auth/session";
 import { LS, THEMES, PopBody, PopFoot, PopHead, currentTheme, setTheme, useShell } from "./ShellContext";
 import { CommandPalette } from "./CommandPalette";
@@ -367,9 +367,9 @@ function Sidebar({
         <button
           type="button"
           className="flex min-w-0 cursor-pointer items-center gap-2.5 rounded-lg outline-focus-ring focus-visible:outline-2 focus-visible:outline-offset-2"
-          data-go={"#/" + HOME_ROUTE}
+          data-go={"#/" + (homeRoute() || HOME_ROUTE)}
           title="Interior bazzar Admin"
-          onClick={() => go("#/" + HOME_ROUTE)}
+          onClick={() => go("#/" + (homeRoute() || HOME_ROUTE))}
         >
           <img className="size-8 shrink-0 rounded-lg" src={IB_ICON} alt="" />
           {!railed && (
