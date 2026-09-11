@@ -1,34 +1,38 @@
 /* =====================================================================
-   QUOTATION — the builder body, laid out as the prototype's builder()
-   (views-quotation.js).
+   QUOTATION — the builder body: the form on the left, the paper on the right.
 
-   The rules that layout encodes, and why they are worth keeping:
+   ONE BUILDER CHROME, written the same way in both modules (Invoices/Form.tsx
+   is its twin): `BuilderLayout` puts the numbered steps in the main column and
+   the LIVE SHEET in a rail that sticks from `lg`. Under `lg` the sheet drops
+   below the form — a 210mm document in a 320px column is not a preview of
+   anything.
 
-     · ONE Save, in the rail, that writes the dates, the plan and the charges
-       together. There used to be one button per block in this panel, and
-       nothing said which of them still had unwritten work in it.
-     · TAX HAS ONE CONTROL, in the summary, beside the number it changes.
-     · ONE place to add a one-off charge — inside the section that already
-       holds what the customer is buying.
-     · THREE numbered steps in the order the document reads: who and when,
-       what they are buying, what it says. Bill-to is reference, so it is a
-       strip inside step 1 rather than a section competing with it.
+   The rules the layout encodes, and why they are worth keeping:
 
-   Inputs stay uncontrolled and are read from the DOM, exactly as the
-   prototype's `val(id)` does. What the prototype does NOT do is show the
-   effect: its rail — and this one, until now — printed the figures from the
-   LAST save, so typing a discount moved nothing on screen and the only way to
-   see it applied was to save and open the document. The rail below now
-   recomputes from those same DOM fields on every keystroke (helpers.liveTotals,
-   a port of pricing.py). The server still recomputes on save and remains the
-   only source of truth — this removes the wait, not the authority.
+     · ONE Save, in the page header, that writes the dates, the plan and the
+       charges together. There used to be one button per block, and nothing
+       said which of them still held unwritten work.
+     · TAX HAS ONE CONTROL, in the totals block, beside the number it changes.
+     · ONE place to add a one-off charge — inside the step that already holds
+       what the customer is buying.
+     · FOUR numbered steps in the order the document reads: who and when, what
+       they are buying, what it comes to, what it says. Bill-to is reference,
+       so it is a strip inside step 1 rather than a section competing with it.
+
+   Inputs are uncontrolled and read from the DOM at save time, exactly as the
+   prototype's `val(id)` does: the server recomputes every figure anyway, so
+   re-rendering the page on each keystroke would buy nothing. What is typed is
+   ALSO mirrored into `live` so the sheet beside it keeps up — text only; every
+   figure on the sheet is the one the server last computed, and the rail says so.
    ===================================================================== */
 import { useState } from "react";
-import type { CSSProperties, ReactNode } from "react";
 import AdminOpsService from "../../../api/modules/adminOps";
 import type { QuotationSaveInput } from "../../../api/modules/adminOps";
-import { Field, Icon, Notice, Table } from "../../ui";
-import { inr, inrWords } from "../../ui/format";
+import {
+  Alert, Button, Card, DateInput, Eyebrow, FieldRow, FormField, FormSection, Input, PageHeader, Pill,
+  SectionHead, SelectInput, Table, Tag, Textarea,
+} from "../../ui";
+import { inr } from "../../ui/format";
 import { useShell } from "../../shell/ShellContext";
 import { useNav } from "../../shell/AdminShell";
 import { errMessage } from "../../../api/apiService";
@@ -38,16 +42,22 @@ import type { PlanPick } from "./PlanModal";
 import type { QuotationRow } from "./api";
 import type { PlanRow } from "../../../api/modules/adminOps";
 import {
-  GST_RATES, SELLER, STATES, addonsOf, blockersOf, discountFromServer, discountToServer,
-  lineNet, liveTotals, planItemOf, planLabel,
+  BillTo, BuilderLayout, BuilderSummary, FeatureFold, QuotationSheet, StepHead,
+} from "./bits";
+import type { LiveDoc } from "./bits";
+import {
+  STATES, addonsOf, blockersOf, discountFromServer, discountToServer, lineNet, planItemOf, planLabel,
 } from "./helpers";
-import type { LineNet, LiveTotals } from "./helpers";
 
 const DEFAULT_VALIDITY_DAYS = 15;
 const COUNTS = [1, 2, 3, 4, 5];
 
+type LiveKey = "date" | "until" | "placeOfSupply" | "notes" | "terms" | "planName" | "planHsn" | "termMonths";
+
 /* ============================================================== the body === */
-export function BuilderBody({ q, onSaved }: { q: QuotationRow; onSaved: () => void }) {
+export function BuilderBody({ q, onSaved, detail }: {
+  q: QuotationRow; onSaved: () => void; detail: string;
+}) {
   const plan = planItemOf(q);
   const addons = addonsOf(q);
   const [err, setErr] = useState<string | null>(null);
@@ -56,51 +66,19 @@ export function BuilderBody({ q, onSaved }: { q: QuotationRow; onSaved: () => vo
      are read from the DOM at save time. */
   const [taxMode, setTaxMode] = useState(q.taxMode);
   const [count, setCount] = useState(plan ? plan.installments || 1 : 1);
+  /* What has been typed but not yet saved, mirrored onto the sheet beside it. */
+  const [live, setLive] = useState<LiveDoc>({});
   const { plans, loading: plansLoading } = usePlanCatalogue();
   const { modal, closeLayer, toast } = useShell();
   const { go } = useNav();
 
+  const mirror = (k: LiveKey) => (value: string) =>
+    setLive((l) => { const n: LiveDoc = { ...l }; n[k] = value; return n; });
+  const mirrorAddon = (id: number) => (value: string) =>
+    setLive((l) => ({ ...l, addons: { ...(l.addons || {}), [id]: value } }));
+
   const v = (id: string) =>
     (document.getElementById(id) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null)?.value ?? "";
-  /* Same read, but "" and "not on screen yet" stay distinguishable — the first
-     render happens before the inputs exist, and a missing box must fall back to
-     the stored value rather than price the quotation at zero. */
-  const raw = (id: string): string | null =>
-    (document.getElementById(id) as HTMLInputElement | HTMLSelectElement | null)?.value ?? null;
-
-  /* One re-render per keystroke, so the rail can show what Save is about to
-     write. `input` covers the text/number boxes, `change` the selects; both
-     bubble, so one pair on the wrapper serves every field on the page and no
-     input has to become controlled to be counted. */
-  const [, setKeystroke] = useState(0);
-  const recalc = () => setKeystroke((k) => k + 1);
-
-  /* Priced from the DOM, field for field the way `patch()` reads it — an empty
-     box means "leave the stored value alone", which is exactly what the absent
-     key does on the server. So the rail and the request can never disagree. */
-  const live: LiveTotals = liveTotals({
-    lines: [
-      ...(plan ? [{
-        amountPaise: raw("pTotal") ? rupeesToPaise(raw("pTotal") as string) : lineNet(plan).base,
-        discountType: raw("pDiscT") || plan.discountType,
-        discountValue: raw("pDisc")
-          ? discountToServer(raw("pDiscT") || plan.discountType, raw("pDisc") as string)
-          : (plan.discountValue || 0),
-      }] : []),
-      ...addons.map((a) => ({
-        amountPaise: raw("a-am-" + a.id) === null
-          ? lineNet(a).base : rupeesToPaise(raw("a-am-" + a.id) as string),
-        discountType: raw("a-dt-" + a.id) || a.discountType,
-        discountValue: raw("a-dv-" + a.id) === null
-          ? (a.discountValue || 0)
-          : discountToServer(raw("a-dt-" + a.id) || a.discountType, raw("a-dv-" + a.id) as string),
-      })),
-    ],
-    gstRate: raw("qGst") ? Number(raw("qGst")) : q.gstRate,
-    taxMode,
-    placeOfSupply: raw("qPos") || q.placeOfSupply,
-  });
-  const planNet: LineNet = plan ? live.nets[0] : { base: 0, disc: 0, net: 0 };
 
   /* Everything on the page, in one patch. Read fresh on every write — an
      add-a-charge must not throw away what is already typed beside it. */
@@ -123,7 +101,8 @@ export function BuilderBody({ q, onSaved }: { q: QuotationRow; onSaved: () => vo
     installmentGapMonths: v("pGap") ? Number(v("pGap")) : undefined,
     discountType: (v("pDiscT") as "pct" | "amt") || undefined,
     /* Scaled the way `pTotal` beside it is: the box says ₹, the server reads
-       `amt` as paise. Sent raw, ₹5,000 off arrived as ₹50. */
+       an `amt` discount as paise (pricing.line_net), so sending it raw is
+       ₹5,000 off arriving as ₹50. A `pct` discount passes through. */
     discountValue: v("pDisc") ? discountToServer(v("pDiscT"), v("pDisc")) : undefined,
     addons: addons.map((a) => ({
       itemId: a.id, name: v("a-nm-" + a.id), hsn: v("a-hs-" + a.id),
@@ -170,94 +149,123 @@ export function BuilderBody({ q, onSaved }: { q: QuotationRow; onSaved: () => vo
     set("pName", p.name);
     set("pTerm", String(p.months));
     set("pTotal", String(p.rupees));
+    setLive((l) => ({ ...l, planName: p.name, termMonths: String(p.months) }));
     closeLayer();
     withQuietSave(p.name + " applied.", () => Promise.resolve());
   };
   const openPlanPicker = () => modal(
     <PlanModal plans={plans} loading={plansLoading} current={plan ? plan.name : ""}
-      currentMonths={plan ? plan.termMonths || 0 : 0} onClose={closeLayer} onPick={pickPlan} />, "wide");
+      currentMonths={plan ? plan.termMonths || 0 : 0} onClose={closeLayer} onPick={pickPlan} />, "lg");
   const removeAddon = (itemId: number) => withQuietSave("Charge removed.", (rowVersion) =>
     call(AdminOpsService.removeQuotationAddon(q.id, itemId, rowVersion)));
 
+  const dealTo = "#/deals/" + q.dealRef;
+
+  /* The lines above the tax block, in the order the document prints them.
+     Display only — every figure is what the server last computed, and
+     helpers.lineNet reads the discount back off it rather than recomputing. */
+  const addonGross = addons.reduce((a, i) => a + lineNet(i).base, 0);
+  const lines = [
+    { k: "Plan · " + (plan && plan.termMonths ? plan.termMonths + " months" : "—"), v: inr(plan ? lineNet(plan).base : 0) },
+    ...(addons.length ? [{ k: "Add-ons", v: inr(addonGross) }] : []),
+    { k: "Gross amount", v: inr(q.subtotalPaise), rule: true },
+    ...(q.discountAmountPaise ? [{ k: "Discount", v: "−" + inr(q.discountAmountPaise), tone: "warn" as const }] : []),
+    { k: taxMode !== "not_applicable" ? "Taxable value" : "Subtotal", v: inr(q.taxablePaise), rule: true },
+  ];
+
   return (
-    <div className="qbld" onInput={recalc} onChange={recalc}>
-      <div>
-        {err ? <Notice tone="bad" text={<b>{err}</b>} /> : null}
+    <div className="flex min-w-0 flex-col gap-5">
+      <PageHeader
+        eyebrow="Step 2 of 2"
+        title={q.parentQuotationId ? "Revision" : "New quotation"}
+        back={{ label: "Back to the quotation", to: detail }}
+        meta={<>
+          <Pill dot text="Draft" />
+          <Tag label={"v" + q.version} />
+          <a href={dealTo} data-go={dealTo} className="font-mono text-brand-secondary tnum"
+            onClick={(e) => { e.preventDefault(); go(dealTo); }}>{q.dealRef}</a>
+          <span className="font-mono tnum">Number assigned on issue</span>
+        </>}
+        actions={<Button color="primary" ico="quote" onClick={() => go("#/quotations/" + q.id + "?mode=preview")}>
+          Preview &amp; issue</Button>} />
 
-        <Step n={1} title="Who and when" hint="snapshotted from the deal, frozen again at issue" />
-        <div className="card"><div className="card-b">
-          <Parties q={q} />
-          <div className="f3" style={{ marginTop: "var(--space-4)" }}>
-            <Field id="qDate" label="Quotation date" type="date" value={q.quotationDate} />
-            <Field id="qValid" label="Valid until" type="date" value={q.validUntil}
-              help={"Defaults to +" + DEFAULT_VALIDITY_DAYS + " days (QT-OD-02)."} />
-            <Field id="qPos" label="Place of supply" type="select"
-              options={STATES.map((s) => ({ v: s, l: s, sel: s === q.placeOfSupply }))}
-              help="Drives the CGST/SGST ↔ IGST split." />
-          </div>
-          <div className="help">
-            Nothing here is retyped. It is snapshotted from the deal at creation and <b>frozen again at
-            issue</b> — a later change to the deal never rewrites a document the customer already holds.
-          </div>
-        </div></div>
+      {err ? <Alert tone="bad" title="Could not save this quotation.">{err}</Alert> : null}
 
-        <Step n={2} title="What they are buying" hint="one plan, and anything one-off beside it" />
-        <div className="card">
-          <PlanBlock plan={plan} plans={plans} busy={busy} onChange={openPlanPicker}
-            count={count} onCount={setCount} net={planNet} />
-          <AddonBlock q={q} addons={addons} busy={busy} onAdd={addAddon} onRemove={removeAddon} />
-        </div>
+      <BuilderLayout
+        form={<>
+          <section className="flex min-w-0 flex-col gap-3">
+            <StepHead n={1} title="Details" hint="from the deal, frozen at issue" />
+            <Card>
+              <FormSection>
+                <BillTo
+                  name={q.party.business ? q.party.name + " · " + q.party.business : q.party.name || "—"}
+                  address={q.party.address || [q.party.city, q.party.state].filter(Boolean).join(", ") || "—"}
+                  phone={q.party.phone || "—"}
+                  edit={<Button color="link-color" size="xs" ico="ext" data-go={dealTo}
+                    onClick={() => go(dealTo)}>Edit on the deal</Button>} />
+                <FieldRow cols={3}>
+                  <FormField id="qDate" label="Quotation date">
+                    <DateInput id="qDate" defaultValue={q.quotationDate} onChange={mirror("date")} className="w-full" />
+                  </FormField>
+                  <FormField id="qValid" label="Valid until"
+                    hint={"Defaults to +" + DEFAULT_VALIDITY_DAYS + " days (QT-OD-02)."}>
+                    <DateInput id="qValid" defaultValue={q.validUntil} onChange={mirror("until")} className="w-full" />
+                  </FormField>
+                  <FormField id="qPos" label="Place of supply" hint="Drives the CGST/SGST ↔ IGST split.">
+                    <SelectInput id="qPos" defaultValue={q.placeOfSupply}
+                      options={STATES.map((s) => ({ v: s, l: s }))} onChange={mirror("placeOfSupply")} />
+                  </FormField>
+                </FieldRow>
+              </FormSection>
+            </Card>
+          </section>
 
-        <Step n={3} title="What it says" hint="printed on the document, under the figures" />
-        <div className="card"><div className="card-b">
-          <Field id="qNotes" label="Notes (customer-facing)" type="textarea" rows={3} value={q.notes}
-            ph="Anything the customer should read alongside the price." />
-          <Field id="qTerms" label="Commercial terms" type="textarea" rows={6} value={q.terms} />
-        </div></div>
-      </div>
+          <section className="flex min-w-0 flex-col gap-3">
+            <StepHead n={2} title="Plan and charges" />
+            <Card flush>
+              <PlanBlock plan={plan} plans={plans} busy={busy} onChange={openPlanPicker}
+                count={count} onCount={setCount} onHsn={mirror("planHsn")} onTerm={mirror("termMonths")} />
+              <AddonBlock q={q} addons={addons} busy={busy} onAdd={addAddon} onRemove={removeAddon}
+                onName={mirrorAddon} />
+            </Card>
+          </section>
 
-      <div className="qbld-rail">
-        <Summary q={q} plan={plan} addons={addons} live={live} planNet={planNet}
-          onTaxMode={setTaxMode} busy={busy} onSave={save} />
-      </div>
-    </div>
-  );
-}
+          <section className="flex min-w-0 flex-col gap-3">
+            <StepHead n={3} title="Notes and terms" />
+            <Card>
+              <FormSection>
+                <FormField id="qNotes" label="Notes (customer-facing)">
+                  <Textarea id="qNotes" rows={3} defaultValue={q.notes} onChange={mirror("notes")}
+                    ph="Anything the customer should read alongside the price." />
+                </FormField>
+                <FormField id="qTerms" label="Commercial terms">
+                  <Textarea id="qTerms" rows={6} defaultValue={q.terms} onChange={mirror("terms")} />
+                </FormField>
+              </FormSection>
+            </Card>
+          </section>
 
-/* A numbered step rather than a section heading: five equal headings read as a
-   list of five things, three numbers read as a sequence you are part way
-   through — which is what a two-step builder should feel like. */
-function Step({ n, title, hint }: { n: number; title: string; hint?: string }) {
-  return (
-    <div className="qstep">
-      <span className="qstep-n">{n}</span>
-      <div><b>{title}</b>{hint ? <span className="qstep-h">{hint}</span> : null}</div>
-    </div>
-  );
-}
+        </>}
+        rail={
+          <BuilderSummary lines={lines}
+            gstId="qGst" gstRate={q.gstRate} taxMode={taxMode} onTaxMode={setTaxMode}
+            placeOfSupply={q.placeOfSupply}
+            cgstPaise={q.cgstPaise} sgstPaise={q.sgstPaise} igstPaise={q.igstPaise}
+            grandTotalPaise={q.grandTotalPaise} blockers={blockersOf(q)}
+            busy={busy} onSave={save} saveLabel="Save draft" saveAct="qt-save-all" />
+        } />
 
-/* Reference, not input: it reads as a strip, not as a form somebody is meant
-   to fill in and then wonders why they cannot. */
-function Parties({ q }: { q: QuotationRow }) {
-  const { go } = useNav();
-  const p = q.party;
-  return (
-    <div className="qparties">
-      <div>
-        <span className="qparties-k">From</span>
-        <b>{SELLER.brand}</b><br />
-        <span className="faint">{SELLER.tagline}</span><br />
-        {SELLER.addr}<br />
-        <span className="mono">{SELLER.gstin ? "GSTIN " + SELLER.gstin : "CIN " + SELLER.cin}</span>
-      </div>
-      <div>
-        <span className="qparties-k">Bill to</span>
-        <b>{p.name || "—"}</b>{p.business ? " · " + p.business : ""}<br />
-        {p.address || [p.city, p.state].filter(Boolean).join(", ") || "—"}<br />
-        <span className="mono">{p.phone || "—"}</span>{" "}
-        <a className="lnk" data-go={"#/deals/" + q.dealRef} onClick={() => go("#/deals/" + q.dealRef)}>
-          Edit on deal ↗</a>
-      </div>
+      {/* THE LIVE SHEET, at the width a document needs. It used to stand in the
+          rail beside the form, where a 210mm page in a 28rem column was cut off
+          at the fold on a laptop. The rail now holds the figures — the one thing
+          that has to stay in view while typing — and the sheet sits under the
+          form, whole. It is OUTSIDE the two-column grid, padded to the form
+          column's width, so that on a phone the summary and its Save come
+          before it rather than under a page of paper. */}
+      <section className="flex min-w-0 flex-col gap-3 lg:pr-[calc(24rem+1.25rem)] xl:pr-[calc(28rem+1.25rem)]">
+        <Eyebrow>Live preview · figures update on save</Eyebrow>
+        <QuotationSheet q={q} compact live={live} />
+      </section>
     </div>
   );
 }
@@ -265,14 +273,12 @@ function Parties({ q }: { q: QuotationRow }) {
 /* The plan, as the top half of "what they are buying". A card BODY, not a card
    — its other half is the one-off charges, and the two share one surface
    because they are one answer. */
-function PlanBlock({ plan, plans, busy, onChange, count, onCount, net }: {
+function PlanBlock({ plan, plans, busy, onChange, count, onCount, onHsn, onTerm }: {
   plan: ReturnType<typeof planItemOf>; plans: PlanRow[]; busy: boolean;
-  onChange: () => void; count: number; onCount: (n: number) => void; net: LineNet;
+  onChange: () => void; count: number; onCount: (n: number) => void;
+  onHsn: (v: string) => void; onTerm: (v: string) => void;
 }) {
-  if (!plan) return <div className="card-b faint">No plan block.</div>;
-  /* `n` is what the SERVER last stored — it seeds the uncontrolled inputs
-     below, and re-seeding them from the live figure would fight the typing.
-     `net` is what those inputs currently say, and it is what gets shown. */
+  if (!plan) return <div className="p-5 text-sm text-quaternary">No plan block.</div>;
   const n = lineNet(plan);
   /* The catalogue row this line was picked from, matched back by the stored
      name. Absent for a hand-typed name or a tier since retired — the line
@@ -281,82 +287,80 @@ function PlanBlock({ plan, plans, busy, onChange, count, onCount, net }: {
   const feats = cat ? (cat.features || []).map((f) => (typeof f === "string" ? f : f.text)).filter(Boolean) : [];
 
   return (
-    <div className="card-b">
-      <div className="qplan-h">
-        <div>
-          <div className="qplan-nm">{plan.name || <span className="faint">No plan chosen yet</span>}</div>
-          <div className="faint" style={{ fontSize: "var(--text-md)" }}>
+    <div className="flex min-w-0 flex-col gap-4 p-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-lg font-semibold text-primary">
+            {plan.name || <span className="font-normal text-quaternary">No plan chosen yet</span>}
+          </div>
+          <div className="mt-0.5 text-sm text-tertiary">
             {cat && cat.subtitle ? cat.subtitle : plan.description || "SaaS subscription — billed for the full term"}
           </div>
         </div>
-        <div className="qplan-amt">
-          <b className="tnum">{inr(net.net)}</b>
-          {net.disc
-            ? <span className="faint tnum"><s>{inr(net.base)}</s> −{inr(net.disc)}</span>
-            : null}
+        <div className="flex shrink-0 items-center gap-3">
+          <div className="text-right">
+            <div className="font-mono text-lg font-semibold text-primary tnum">{inr(n.net)}</div>
+            {n.disc ? (
+              <div className="font-mono text-xs text-tertiary tnum">
+                <s>{inr(n.base)}</s> −{inr(n.disc)}
+              </div>
+            ) : null}
+          </div>
+          <Button color="secondary" data-act="qt-plan" isDisabled={busy} onClick={onChange}>
+            {plan.name ? "Change plan" : "Choose a plan"}
+          </Button>
         </div>
-        <button className="btn sm" data-act="qt-plan" disabled={busy} onClick={onChange}>
-          {plan.name ? "Change plan" : "Choose a plan"}</button>
       </div>
 
       {/* The features are what the tier IS, so they stay — but folded, because
-          ten pills between the plan name and the price you are negotiating put
-          the two things you are comparing on different screens. */}
-      {feats.length
-        ? <details className="qfeat">
-            <summary>{feats.length} features included</summary>
-            <div>
-              {feats.map((f, i) => <span key={i} className="pill xs" title={f}>{f}</span>)}
-              <div className="help">Snapshotted from the plan catalogue when it was picked. A later edit
-                to the plan sheet cannot rewrite a proposal already sent.</div>
-            </div>
-          </details>
-        : null}
+          ten chips between the plan name and the price being negotiated put the
+          two things being compared on different screens. */}
+      <FeatureFold feats={feats} />
 
       {/* The name is set by the picker, not typed — but it still has to go out
           with the save, and `patch()` reads every field the same way. */}
       <input type="hidden" id="pName" defaultValue={plan.name} />
 
-      <div className="f2" style={{ marginTop: "var(--space-3)" }}>
-        <Field id="pHsn" label="HSN / SAC" value={plan.hsn} />
-      </div>
+      <FormSection>
+        <FieldRow cols={3}>
+          <FormField id="pHsn" label="HSN / SAC">
+            <Input id="pHsn" mono defaultValue={plan.hsn} onChange={onHsn} />
+          </FormField>
+          <FormField id="pTerm" label="Term (months)">
+            <Input id="pTerm" type="number" defaultValue={String(plan.termMonths || "")} onChange={onTerm} />
+          </FormField>
+          <FormField id="pTotal" label="Total amount ₹" hint="One negotiated total for the full term.">
+            <Input id="pTotal" type="number" mono defaultValue={String(Math.round(n.base / 100))} />
+          </FormField>
+        </FieldRow>
 
-      <div className="f3">
-        <Field id="pTerm" label="Term (months)" type="number" value={plan.termMonths || ""}
-          help="Replaces quantity." />
-        <Field id="pTotal" label="Total amount ₹" type="number" value={Math.round(n.base / 100)}
-          help="One negotiated total for the full term." />
-        <Field label="Discount"
-          help="Above 30%, Module 1 turns off Target 2 eligibility on this deal."
-          custom={<div className="qdisc">
-            <input className="inp" id="pDisc" type="number"
-              defaultValue={discountFromServer(plan.discountType, plan.discountValue)} />
-            <select className="inp" id="pDiscT" defaultValue={plan.discountType === "amt" ? "amt" : "pct"}>
-              <option value="pct">%</option>
-              <option value="amt">₹</option>
-            </select>
-          </div>} />
-      </div>
-
-      <div className="f2" style={{ marginTop: "var(--space-2)", marginBottom: 0 }}>
-        <div className="fg">
-          <label htmlFor="pInstallments">Payments</label>
-          <select className="inp" id="pInstallments" defaultValue={String(count)}
-            onChange={(e) => onCount(Number(e.target.value))}>
-            {COUNTS.map((k) => <option key={k} value={k}>{k === 1 ? "1 (full amount)" : k + " payments"}</option>)}
-          </select>
-          <div className="help">How many payments the total splits into.</div>
-        </div>
-        {count > 1
-          ? <Field id="pGap" label="Gap between payments" type="select"
-              options={COUNTS.map((k) => ({ v: String(k), l: k === 1 ? "Every month" : "Every " + k + " months",
-                sel: k === (plan.installmentGapMonths || 1) }))}
-              help="A yearly package can be paid quarterly; a short one, monthly." />
-          : <div className="fg">
-              <span className="fg-lb">Gap between payments</span>
-              <div className="help">Paid in full, so there is no gap to set.</div>
-            </div>}
-      </div>
+        <FieldRow cols={3}>
+          <FormField id="pDisc" label="Discount"
+            hint="Above 30%, Module 1 turns off Target 2 eligibility on this deal.">
+            <div className="flex items-center gap-2">
+              <Input id="pDisc" type="number" defaultValue={String(discountFromServer(plan.discountType, plan.discountValue))}
+                className="min-w-0 flex-1" />
+              <SelectInput id="pDiscT" ariaLabel="Discount unit" className="w-20 shrink-0"
+                defaultValue={plan.discountType === "amt" ? "amt" : "pct"}
+                options={[{ v: "pct", l: "%" }, { v: "amt", l: "₹" }]} />
+            </div>
+          </FormField>
+          <FormField id="pInstallments" label="Payments" hint="How many payments the total splits into.">
+            <SelectInput id="pInstallments" defaultValue={String(count)}
+              onChange={(x) => onCount(Number(x))}
+              options={COUNTS.map((k) => ({ v: String(k), l: k === 1 ? "1 (full amount)" : k + " payments" }))} />
+          </FormField>
+          {/* Only when there is a gap to set — a placeholder field holding a
+              dash was a question with no answer, drawn to fill the grid. */}
+          {count > 1 ? (
+            <FormField id="pGap" label="Gap between payments"
+              hint="A yearly package can be paid quarterly; a short one, monthly.">
+              <SelectInput id="pGap" defaultValue={String(plan.installmentGapMonths || 1)}
+                options={COUNTS.map((k) => ({ v: String(k), l: k === 1 ? "Every month" : "Every " + k + " months" }))} />
+            </FormField>
+          ) : null}
+        </FieldRow>
+      </FormSection>
       {/* ponytail: no schedule strip. The prototype draws the due dates under
           these two controls; the API returns no schedule, and inventing the
           dates on the client is a set of figures with no source. Draw it when
@@ -367,173 +371,56 @@ function PlanBlock({ plan, plans, busy, onChange, count, onCount, net }: {
 
 /* The other half of the same card. One entry point, in the place the thing it
    adds will appear — there used to be three, and none of them was here. */
-function AddonBlock({ q, addons, busy, onAdd, onRemove }: {
+function AddonBlock({ q, addons, busy, onAdd, onRemove, onName }: {
   q: QuotationRow; addons: ReturnType<typeof addonsOf>; busy: boolean;
-  onAdd: () => void; onRemove: (itemId: number) => void;
+  onAdd: () => void; onRemove: (itemId: number) => void; onName: (id: number) => (v: string) => void;
 }) {
-  const head = (
-    <div className="qaddon-h">
-      <span><b>One-off charges</b>
-        <span className="faint"> · {addons.length
-          ? addons.length + " on this quotation"
-          : "onboarding, a shoot, a custom build — no months, no quantity"}</span></span>
-      <button className="btn sm" data-act="qt-addon-add" data-ref={q.id} disabled={busy} onClick={onAdd}>
-        <Icon name="plus" size="sm" />Add a charge</button>
-    </div>
+  const add = (
+    <Button color="secondary" size="xs" ico="plus" data-act="qt-addon-add" data-ref={q.id}
+      isDisabled={busy} onClick={onAdd}>Add a charge</Button>
   );
-  if (!addons.length) return <div className="card-b qaddon">{head}</div>;
-
   return (
-    <div className="card-b qaddon">
-      {head}
-      <Table
-        cols={[{ label: "#", w: "32px" }, { label: "Description" }, { label: "HSN / SAC", w: "104px" },
-          { label: "Discount", w: "142px" }, { label: "Amount ₹", cls: "n", w: "128px" }, { label: "", w: "40px" }]}
-        rows={addons.map((it, ix) => {
-          const n = lineNet(it);
-          return (
-            <tr key={it.id}>
-              <td className="faint">{ix + 1}</td>
-              <td><input className="inp sm" id={"a-nm-" + it.id} defaultValue={it.name} /></td>
-              <td><input className="inp sm" id={"a-hs-" + it.id} defaultValue={it.hsn || ""} /></td>
-              <td><div style={{ display: "flex", gap: "4px" }}>
-                <input className="inp sm" id={"a-dv-" + it.id} type="number" style={{ width: "58px" }}
-                  defaultValue={discountFromServer(it.discountType, it.discountValue)} />
-                <select className="inp sm" id={"a-dt-" + it.id} style={{ width: "54px" }}
-                  defaultValue={it.discountType === "amt" ? "amt" : "pct"}>
-                  <option value="pct">%</option><option value="amt">₹</option>
-                </select>
-              </div></td>
-              <td className="n">
-                <input className="inp sm n" id={"a-am-" + it.id} type="number"
-                  defaultValue={Math.round(n.base / 100)} />
-                {n.disc ? <div className="cell-2">net {inr(n.net)}</div> : null}
-              </td>
-              <td className="c">
-                <button className="btn sm icon dgr" data-act="qt-addon-del" aria-label="Remove charge"
-                  disabled={busy} onClick={() => onRemove(it.id)}><Icon name="x" size="sm" /></button>
-              </td>
-            </tr>
-          );
-        })}
-      />
+    <div className="flex min-w-0 flex-col gap-3 border-t border-secondary p-5">
+      <SectionHead className="mb-0" title="One-off charges" right={add} />
+      {addons.length ? (
+        <Table
+          min="42rem"
+          cols={[{ label: "#", w: "2.5rem" }, { label: "Description" }, { label: "HSN / SAC", w: "8rem" },
+            { label: "Discount", w: "10rem" }, { label: "Amount ₹", cls: "n", w: "9rem" }, { label: "", cls: "c", w: "3rem" }]}
+          rows={addons.map((it, ix) => {
+            const n = lineNet(it);
+            return (
+              <tr key={it.id}>
+                <td className="faint tnum">{ix + 1}</td>
+                <td><Input id={"a-nm-" + it.id} ariaLabel="Charge description" defaultValue={it.name}
+                  onChange={onName(it.id)} /></td>
+                <td><Input id={"a-hs-" + it.id} mono ariaLabel="HSN or SAC code" defaultValue={it.hsn || ""} /></td>
+                <td>
+                  <div className="flex items-center gap-1.5">
+                    <Input id={"a-dv-" + it.id} type="number" ariaLabel="Discount value"
+                      defaultValue={String(discountFromServer(it.discountType, it.discountValue))}
+                      className="min-w-0 flex-1" />
+                    <SelectInput id={"a-dt-" + it.id} ariaLabel="Discount unit" className="w-16 shrink-0"
+                      defaultValue={it.discountType === "amt" ? "amt" : "pct"}
+                      options={[{ v: "pct", l: "%" }, { v: "amt", l: "₹" }]} />
+                  </div>
+                </td>
+                <td className="n">
+                  <Input id={"a-am-" + it.id} type="number" mono ariaLabel="Charge amount"
+                    defaultValue={String(Math.round(n.base / 100))} inputClassName="text-right" />
+                  {n.disc ? <div className="cell-2">net {inr(n.net)}</div> : null}
+                </td>
+                <td className="c">
+                  <Button color="tertiary-destructive" size="xs" ico="trash" data-act="qt-addon-del"
+                    aria-label="Remove charge" isDisabled={busy} onClick={() => onRemove(it.id)} />
+                </td>
+              </tr>
+            );
+          })} />
+      ) : null}
     </div>
   );
 }
 
-/* ============================================================= the rail === */
-/* A preview, not a record. Every figure below is `live` — recomputed from the
-   fields on this page by helpers.liveTotals, a port of the server's pricing.py
-   — so a discount shows its effect as it is typed. Nothing here is arithmetic
-   this page invented: the same function, the same units, the same rounding
-   order, and the server recomputes the lot on save regardless.
-
-   `q` is still read for the one thing that is only true once SAVED — the issue
-   blockers, which are about the stored document, not the draft on screen. The
-   one commit for the whole page lives here too, because this is the card that
-   already shows what every field on it adds up to. */
-function Summary({ q, plan, addons, live, planNet, onTaxMode, busy, onSave }: {
-  q: QuotationRow; plan: ReturnType<typeof planItemOf>; addons: ReturnType<typeof addonsOf>;
-  live: LiveTotals; planNet: LineNet;
-  onTaxMode: (m: "applicable" | "not_applicable") => void;
-  busy: boolean; onSave: () => void;
-}) {
-  const applicable = live.taxApplicable;
-  const intra = live.intra;
-  /* Exact: subtotal is the gross of every line, so what is not the plan is the
-     add-ons — no second reduce that could drift from the one in liveTotals. */
-  const addonGross = live.subtotalPaise - planNet.base;
-  const blockers = blockersOf(q);
-
-  return (
-    <div className="card">
-      <div className="card-h"><h3>Summary</h3>
-        <span className="d">live — the server recomputes on save</span></div>
-      <div className="card-b">
-        <Row k={"Plan · " + (plan && plan.termMonths ? plan.termMonths + " months" : "—")}
-          v={inr(planNet.base)} />
-        {addons.length ? <Row k="Add-ons" v={inr(addonGross)} /> : null}
-        <Row k={<b>Gross amount</b>} v={<b>{inr(live.subtotalPaise)}</b>}
-          style={{ borderTop: "1px solid var(--line)", marginTop: "4px" }} />
-        {live.discountAmountPaise
-          ? <Row k={<span style={{ color: "var(--warn)" }}>Discount</span>}
-              v={<span style={{ color: "var(--warn)" }}>−{inr(live.discountAmountPaise)}</span>} />
-          : null}
-        <Row k="Taxable value" v={inr(live.taxablePaise)} style={{ borderTop: "1px solid var(--line)" }} />
-
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0" }}>
-          <span>Tax</span>
-          <div className="btn-group">
-            <button className={applicable ? "on" : ""} data-act="qt-tax-mode" data-v="applicable"
-              onClick={() => onTaxMode("applicable")}>Applicable</button>
-            <button className={!applicable ? "on" : ""} data-act="qt-tax-mode" data-v="not_applicable"
-              onClick={() => onTaxMode("not_applicable")}>Not applicable</button>
-          </div>
-        </div>
-
-        {applicable
-          ? <>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0" }}>
-                <span>GST rate</span>
-                <select className="inp sm" id="qGst" style={{ width: "96px" }} defaultValue={String(q.gstRate)}>
-                  {GST_RATES.map((r) => <option key={r} value={r}>{r}%</option>)}
-                </select>
-              </div>
-              {intra
-                ? <>
-                    <Row k={"CGST (" + live.gstRate / 2 + "%)"} v={inr(live.cgstPaise)} />
-                    <Row k={"SGST (" + live.gstRate / 2 + "%)"} v={inr(live.sgstPaise)} />
-                  </>
-                : <Row k={"IGST (" + live.gstRate + "%)"} v={inr(live.igstPaise)} />}
-            </>
-          : <div className="help" style={{ marginTop: "10px" }}>
-              <b>Tax not applicable.</b> The grand total excludes GST entirely — the Sales Team's
-              explicit choice for this quotation, for a client paying with no tax.
-            </div>}
-
-        <Row k={<b style={{ fontSize: "var(--text-lg)" }}>Grand total</b>}
-          v={<b style={{ fontSize: "var(--text-lg)" }}>{inr(live.grandTotalPaise)}</b>}
-          style={{ borderTop: "2px solid var(--line-2)", marginTop: "6px", paddingTop: "9px" }} />
-        <div className="faint" style={{ fontSize: "var(--text-sm)", marginTop: "4px" }}>
-          {inrWords(live.grandTotalPaise)}
-        </div>
-
-        {applicable
-          ? <div className="help" style={{ marginTop: "10px" }}>
-              {intra
-                ? <><b>Intra-state.</b> Place of supply is {live.placeOfSupply}, the same state as
-                    Interior bazzar — so GST splits into CGST + SGST.</>
-                : <><b>Inter-state.</b> Place of supply is {live.placeOfSupply || "not set"} and Interior
-                    bazzar is in {SELLER.state} — so a single IGST applies.</>}
-            </div>
-          : null}
-      </div>
-
-      <div className="card-f qsave">
-        <button className="btn pri" data-act="qt-save-all" disabled={busy} onClick={onSave}>
-          <Icon name="check" />{busy ? "Saving…" : "Save changes"}</button>
-        <span className="qsave-h">Writes the dates, the plan and the charges together.</span>
-      </div>
-
-      <div className="card-f">
-        {blockers.length
-          ? <Notice tone="bad" ico="alert" text={<>
-              <b>Cannot be issued yet</b>
-              <ul style={{ margin: "5px 0 0 16px" }}>
-                {blockers.map((b) => <li key={b.code + b.text}>{b.text}{" "}
-                  <span className="mono">422 {b.code}</span></li>)}
-              </ul>
-            </>} />
-          : <span style={{ color: "var(--ok)" }}><Icon name="check" size="sm" /> Ready to issue</span>}
-      </div>
-    </div>
-  );
-}
-
-function Row({ k, v, style }: { k: ReactNode; v: ReactNode; style?: CSSProperties }) {
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", ...style }}>
-      <span>{k}</span><span className="tnum">{v}</span>
-    </div>
-  );
-}
+/* The totals are `BuilderSummary` in ./bits now, in the rail — one drawing
+   shared with the invoice builder, where they had always lived. */

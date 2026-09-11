@@ -1,0 +1,1904 @@
+{
+  "$comment": "Stands in for GET /api/v1/admin/users (the directory page) and GET /api/v1/admin/users/{id} (the workspace). ONE row per registered identity — `authUserId` is the link to Authentication, never a copy of it, and there is deliberately NO classification column anywhere in this file: Active and Deactivated are DERIVED at read time from `userStatus` by classify() in store.ts (UM-FR-003, UM-AD-02). This file carries NO membership, plan, term or entitlement field of any kind — what a customer bought is a subscription and that is a Finance record; two modules holding one fact is how they end up disagreeing. `notes[]` and `tags[]` are INTERNAL: they must never appear on a customer-facing profile response (UM-BR-17), which is why they live beside the profile and not inside it. `commercial` holds READ-ONLY references into Deals / Invoicing / Finance — no amount is stored here, because this module owns no money (UM-BR-06). Names, emails and phone numbers are FICTIONAL but complete and unmasked, so duplicate checks and search have something real to work on.",
+  "generatedAt": "2026-08-25T09:00:00+05:30",
+  "asOf": "2026-08-25T09:00:00+05:30",
+  "$comment_asOf": "Every derived age and registration window on these screens is computed against this instant rather than the browser clock, so the seed reads the same tomorrow as it does today. store.ts is the only place that decides that.",
+  "users": [
+    {
+      "userId": "IB-U-1041",
+      "authUserId": "auth_2f81c4a9",
+      "registrationSource": "web",
+      "userStatus": "active",
+      "registeredAt": "2026-08-06T11:40:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-25T10:02:00+05:30",
+      "identity": {
+        "name": "Priya Nair",
+        "email": "priya.nair@examplemail.in",
+        "emailVerified": true,
+        "phone": "+91 98100 00027",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-1041",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "priya-nair-studio",
+        "about": "Independent stylist taking on residential projects across east Bengaluru.",
+        "businessName": "Priya Nair Studio",
+        "businessType": "independent",
+        "dealsIn": [
+          "services"
+        ],
+        "segments": [
+          "interior_designer",
+          "interior_decorator"
+        ],
+        "categories": [
+          "decor",
+          "curtains_blinds",
+          "residential"
+        ],
+        "searchKeywords": [
+          "Residential styling",
+          "Space planning",
+          "Home decor"
+        ],
+        "targetAreas": [
+          {
+            "state": "Karnataka",
+            "cities": [
+              "Indiranagar",
+              "Whitefield",
+              "Bengaluru"
+            ]
+          }
+        ],
+        "positioning": [
+          "budget_friendly"
+        ],
+        "updatedBy": "Priya Nair",
+        "updatedAt": "2026-08-07T09:15:00+05:30"
+      },
+      "tags": [
+        {
+          "slug": "high-intent",
+          "assignedBy": "D. Kapoor",
+          "assignedAt": "2026-08-20T12:10:00+05:30"
+        }
+      ],
+      "notes": [
+        {
+          "noteId": "NT-1041-1",
+          "author": "D. Kapoor",
+          "authorRole": "Operations",
+          "at": "2026-08-20T12:12:00+05:30",
+          "text": "Called about Starter. Wants to see how many enquiries a month realistically land in Indiranagar before committing. Call back after the 1st."
+        }
+      ],
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-3310"
+        ],
+        "invoiceRefs": []
+      }
+    },
+    {
+      "userId": "IB-U-1038",
+      "authUserId": "auth_7b30de11",
+      "registrationSource": "funnel",
+      "userStatus": "active",
+      "registeredAt": "2026-08-05T18:02:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-24T19:41:00+05:30",
+      "identity": {
+        "name": "Arjun Bhat",
+        "email": "arjun.bhat@examplemail.in",
+        "emailVerified": true,
+        "phone": "+91 98860 41127",
+        "phoneVerified": false
+      },
+      "profile": {
+        "profileId": "PRF-1038",
+        "schemaVersion": "profile v1",
+        "profileStatus": "incomplete",
+        "username": "bhat-carpentry-works",
+        "about": null,
+        "businessName": "Bhat Carpentry Works",
+        "businessType": "contractor",
+        "dealsIn": [
+          "services"
+        ],
+        "segments": [
+          "carpentry"
+        ],
+        "categories": [
+          "furniture",
+          "doors_windows",
+          "residential"
+        ],
+        "searchKeywords": [],
+        "targetAreas": [
+          {
+            "state": "Karnataka",
+            "cities": [
+              "Bengaluru"
+            ]
+          }
+        ],
+        "positioning": [],
+        "updatedBy": "Arjun Bhat",
+        "updatedAt": "2026-08-05T18:20:00+05:30"
+      },
+      "tags": [
+        {
+          "slug": "profile-chase",
+          "assignedBy": "N. Pillai",
+          "assignedAt": "2026-08-18T10:00:00+05:30"
+        }
+      ],
+      "notes": [],
+      "commercial": {
+        "salesOwner": null,
+        "dealRefs": [],
+        "invoiceRefs": []
+      }
+    },
+    {
+      "userId": "IB-U-1029",
+      "authUserId": "auth_c1094aa7",
+      "registrationSource": "web",
+      "userStatus": "active",
+      "registeredAt": "2026-08-02T08:55:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-11T14:20:00+05:30",
+      "identity": {
+        "name": "Nikhil Rao",
+        "email": "nikhil.rao@examplemail.in",
+        "emailVerified": true,
+        "phone": "+91 90080 22114",
+        "phoneVerified": false
+      },
+      "profile": {
+        "profileId": "PRF-1029",
+        "schemaVersion": "profile v1",
+        "profileStatus": "incomplete",
+        "username": null,
+        "about": null,
+        "businessName": null,
+        "businessType": null,
+        "dealsIn": [],
+        "segments": [],
+        "categories": [],
+        "searchKeywords": [],
+        "targetAreas": [],
+        "positioning": [],
+        "updatedBy": "Nikhil Rao",
+        "updatedAt": "2026-08-02T09:01:00+05:30"
+      },
+      "tags": [
+        {
+          "slug": "profile-chase",
+          "assignedBy": "N. Pillai",
+          "assignedAt": "2026-08-14T11:30:00+05:30"
+        }
+      ],
+      "notes": [],
+      "commercial": {
+        "salesOwner": null,
+        "dealRefs": [],
+        "invoiceRefs": []
+      }
+    },
+    {
+      "userId": "IB-U-1012",
+      "authUserId": "auth_44a9e2b0",
+      "registrationSource": "referral",
+      "userStatus": "active",
+      "registeredAt": "2026-07-28T16:12:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-23T11:05:00+05:30",
+      "identity": {
+        "name": "Rohit Desai",
+        "email": "rohit.desai@examplemail.in",
+        "emailVerified": true,
+        "phone": "+91 99870 55621",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-1012",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "desai-interiors",
+        "about": "Turnkey residential fit-out, mostly 2 and 3 BHK redevelopments.",
+        "businessName": "Desai Interiors",
+        "businessType": "contractor",
+        "dealsIn": [
+          "services"
+        ],
+        "segments": [
+          "civil_contractor",
+          "pmc"
+        ],
+        "categories": [
+          "stone_marble",
+          "false_ceiling",
+          "residential",
+          "commercial"
+        ],
+        "searchKeywords": [
+          "Turnkey interiors",
+          "Bathroom renovation",
+          "Renovation & remodelling"
+        ],
+        "targetAreas": [
+          {
+            "state": "Maharashtra",
+            "cities": [
+              "Mumbai",
+              "Thane",
+              "Navi Mumbai"
+            ]
+          }
+        ],
+        "positioning": [
+          "budget_friendly",
+          "custom"
+        ],
+        "updatedBy": "Rohit Desai",
+        "updatedAt": "2026-08-12T13:44:00+05:30"
+      },
+      "tags": [
+        {
+          "slug": "high-intent",
+          "assignedBy": "A. Sharma",
+          "assignedAt": "2026-08-22T15:20:00+05:30"
+        }
+      ],
+      "notes": [
+        {
+          "noteId": "NT-1012-1",
+          "author": "A. Sharma",
+          "authorRole": "Sales Head",
+          "at": "2026-08-22T15:22:00+05:30",
+          "text": "Referred by R. Menon. Quoted Growth; waiting on his partner. Do not discount — Menon is on list price."
+        }
+      ],
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-3287"
+        ],
+        "invoiceRefs": []
+      }
+    },
+    {
+      "userId": "IB-U-0975",
+      "authUserId": "auth_5e1d7c33",
+      "registrationSource": "portal",
+      "userStatus": "active",
+      "registeredAt": "2025-09-20T10:30:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-25T08:12:00+05:30",
+      "identity": {
+        "name": "Verve Modular Kitchens",
+        "email": "hello@verve-example.in",
+        "emailVerified": true,
+        "phone": "+91 88800 31200",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-0975",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "verve-modular",
+        "about": "Factory-finished modular kitchens and wardrobes, installed in eleven days.",
+        "businessName": "Verve Modular Pvt Ltd",
+        "businessType": "manufacturer",
+        "dealsIn": [
+          "products",
+          "services"
+        ],
+        "segments": [
+          "modular_kitchen",
+          "furniture"
+        ],
+        "categories": [
+          "kitchen",
+          "wardrobes_storage",
+          "furniture",
+          "residential"
+        ],
+        "searchKeywords": [
+          "Modular kitchen",
+          "Wardrobe design",
+          "Storage solutions"
+        ],
+        "targetAreas": [
+          {
+            "state": "Delhi",
+            "cities": [
+              "New Delhi"
+            ]
+          },
+          {
+            "state": "Uttar Pradesh",
+            "cities": [
+              "Noida"
+            ]
+          },
+          {
+            "state": "Haryana",
+            "cities": [
+              "Gurugram"
+            ]
+          }
+        ],
+        "positioning": [],
+        "updatedBy": "D. Kapoor",
+        "updatedAt": "2026-07-02T17:10:00+05:30"
+      },
+      "tags": [
+        {
+          "slug": "vip",
+          "assignedBy": "V. Shakya",
+          "assignedAt": "2026-02-11T09:00:00+05:30"
+        }
+      ],
+      "notes": [
+        {
+          "noteId": "NT-0975-1",
+          "author": "V. Shakya",
+          "authorRole": "Founder",
+          "at": "2026-08-14T18:30:00+05:30",
+          "text": "Renewal conversation is mine, not Sales. They want the Delhi NCR expansion priced before October."
+        }
+      ],
+      "commercial": {
+        "salesOwner": "V. Shakya",
+        "dealRefs": [
+          "DL-2140"
+        ],
+        "invoiceRefs": [
+          "INV-2025-0912"
+        ]
+      }
+    },
+    {
+      "userId": "IB-U-0958",
+      "authUserId": "auth_9ac3f118",
+      "registrationSource": "portal",
+      "userStatus": "active",
+      "registeredAt": "2026-08-12T12:00:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-24T16:33:00+05:30",
+      "identity": {
+        "name": "Sunlight Furnishings",
+        "email": "accounts@sunlight-example.in",
+        "emailVerified": true,
+        "phone": "+91 97400 88123",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-0958",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "sunlight-furnishings",
+        "about": "Curtains, upholstery and soft furnishing for homes and boutique hotels.",
+        "businessName": "Sunlight Furnishings LLP",
+        "businessType": "retailer",
+        "dealsIn": [
+          "products"
+        ],
+        "segments": [
+          "furnishing",
+          "furniture"
+        ],
+        "categories": [
+          "curtains_blinds",
+          "decor",
+          "furniture",
+          "residential",
+          "hospitality"
+        ],
+        "searchKeywords": [
+          "Curtains & blinds",
+          "Upholstery",
+          "Soft furnishing"
+        ],
+        "targetAreas": [
+          {
+            "state": "Maharashtra",
+            "cities": [
+              "Mumbai",
+              "Pune"
+            ]
+          }
+        ],
+        "positioning": [],
+        "updatedBy": "N. Pillai",
+        "updatedAt": "2026-08-18T10:25:00+05:30"
+      },
+      "tags": [
+        {
+          "slug": "onboarding",
+          "assignedBy": "N. Pillai",
+          "assignedAt": "2026-08-18T10:26:00+05:30"
+        }
+      ],
+      "notes": [
+        {
+          "noteId": "NT-0958-1",
+          "author": "N. Pillai",
+          "authorRole": "Operations",
+          "at": "2026-08-22T11:00:00+05:30",
+          "text": "Growth term is raised and sitting at Pending. Finance has not confirmed the transfer yet, so it stays pending — do not activate on the screenshot they sent."
+        }
+      ],
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-3301"
+        ],
+        "invoiceRefs": [
+          "INV-2026-0511"
+        ]
+      }
+    },
+    {
+      "userId": "IB-U-0944",
+      "authUserId": "auth_1b77d0e5",
+      "registrationSource": "web",
+      "userStatus": "active",
+      "registeredAt": "2025-11-04T09:10:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-24T21:15:00+05:30",
+      "identity": {
+        "name": "Tara Design Collective",
+        "email": "studio@tara-example.in",
+        "emailVerified": true,
+        "phone": "+91 90190 47788",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-0944",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "tara-design-collective",
+        "about": "A four-person studio doing heritage-sensitive residential interiors.",
+        "businessName": "Tara Design Collective",
+        "businessType": "firm_studio",
+        "dealsIn": [
+          "services"
+        ],
+        "segments": [
+          "interior_designer",
+          "architect"
+        ],
+        "categories": [
+          "decor",
+          "doors_windows",
+          "residential",
+          "hospitality"
+        ],
+        "searchKeywords": [
+          "Complete home interiors",
+          "Heritage restoration",
+          "Furniture design"
+        ],
+        "targetAreas": [
+          {
+            "state": "Rajasthan",
+            "cities": [
+              "All cities"
+            ]
+          }
+        ],
+        "positioning": [
+          "luxury"
+        ],
+        "updatedBy": "Tara Design Collective",
+        "updatedAt": "2026-05-30T15:00:00+05:30"
+      },
+      "tags": [],
+      "notes": [],
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-2588"
+        ],
+        "invoiceRefs": [
+          "INV-2026-0122"
+        ]
+      }
+    },
+    {
+      "userId": "IB-U-0921",
+      "authUserId": "auth_ee20b4c9",
+      "registrationSource": "portal",
+      "userStatus": "active",
+      "registeredAt": "2025-06-18T14:25:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-07-30T12:40:00+05:30",
+      "identity": {
+        "name": "Bhatia Ply & Hardware",
+        "email": "sales@bhatiaply-example.in",
+        "emailVerified": true,
+        "phone": "+91 98110 60042",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-0921",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "bhatia-ply-and-hardware",
+        "about": "Plywood, laminates and hardware supply to the trade since 1994.",
+        "businessName": "Bhatia Ply & Hardware",
+        "businessType": "dealer",
+        "dealsIn": [
+          "products"
+        ],
+        "segments": [
+          "ply_hardware",
+          "tiles_sanitary"
+        ],
+        "categories": [
+          "plywood_laminates",
+          "hardware",
+          "flooring_tiles",
+          "sanitaryware"
+        ],
+        "searchKeywords": [
+          "Plywood",
+          "Laminates",
+          "Hardware fittings"
+        ],
+        "targetAreas": [
+          {
+            "state": "Delhi",
+            "cities": [
+              "Uttam Nagar",
+              "Dwarka"
+            ]
+          }
+        ],
+        "positioning": [
+          "budget_friendly"
+        ],
+        "updatedBy": "D. Kapoor",
+        "updatedAt": "2026-03-19T11:05:00+05:30"
+      },
+      "tags": [
+        {
+          "slug": "win-back",
+          "assignedBy": "A. Sharma",
+          "assignedAt": "2026-07-20T09:30:00+05:30"
+        }
+      ],
+      "notes": [
+        {
+          "noteId": "NT-0921-1",
+          "author": "A. Sharma",
+          "authorRole": "Sales Head",
+          "at": "2026-07-22T16:10:00+05:30",
+          "text": "Let Growth lapse on purpose — said the enquiries were retail, not trade. Worth another call once the trade filter ships."
+        }
+      ],
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-1904"
+        ],
+        "invoiceRefs": [
+          "INV-2025-0640"
+        ]
+      }
+    },
+    {
+      "userId": "IB-U-0912",
+      "authUserId": "auth_3d5f81ba",
+      "registrationSource": "web",
+      "userStatus": "active",
+      "registeredAt": "2024-06-14T10:22:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-25T09:14:00+05:30",
+      "identity": {
+        "name": "Meera Studio Interiors",
+        "email": "meera@meerastudio-example.in",
+        "emailVerified": true,
+        "phone": "+91 98450 11902",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-0912",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "meera-studio-interiors",
+        "about": "Full-service interior design studio serving Bengaluru since 2019. Residential and commercial fit-out, in-house carpentry.",
+        "businessName": "Meera Studio Interiors LLP",
+        "businessType": "firm_studio",
+        "dealsIn": [
+          "services"
+        ],
+        "segments": [
+          "interior_designer",
+          "visualiser_3d",
+          "pmc"
+        ],
+        "categories": [
+          "decor",
+          "residential",
+          "commercial"
+        ],
+        "searchKeywords": [
+          "Complete home interiors",
+          "Office fit-out",
+          "Turnkey interiors"
+        ],
+        "targetAreas": [
+          {
+            "state": "Karnataka",
+            "cities": [
+              "Bengaluru",
+              "Koramangala"
+            ]
+          }
+        ],
+        "positioning": [
+          "luxury",
+          "custom"
+        ],
+        "updatedBy": "D. Kapoor",
+        "updatedAt": "2026-08-22T14:02:00+05:30"
+      },
+      "tags": [
+        {
+          "slug": "vip",
+          "assignedBy": "V. Shakya",
+          "assignedAt": "2025-08-01T10:00:00+05:30"
+        }
+      ],
+      "notes": [
+        {
+          "noteId": "NT-0912-2",
+          "author": "V. Shakya",
+          "authorRole": "Founder",
+          "at": "2026-06-14T12:00:00+05:30",
+          "text": "Upgraded to Pro on a call. Manual assignment on purpose — the deal payment lands next week and I did not want them waiting on it."
+        },
+        {
+          "noteId": "NT-0912-1",
+          "author": "D. Kapoor",
+          "authorRole": "Operations",
+          "at": "2025-07-11T09:40:00+05:30",
+          "text": "Longest-running member. Two renewals, no support tickets, sends us referrals."
+        }
+      ],
+      "commercial": {
+        "salesOwner": "V. Shakya",
+        "dealRefs": [
+          "DL-1042",
+          "DL-2291",
+          "DL-3102"
+        ],
+        "invoiceRefs": [
+          "INV-2024-0210",
+          "INV-2025-0447"
+        ]
+      }
+    },
+    {
+      "userId": "IB-U-0899",
+      "authUserId": "auth_a7712fd4",
+      "registrationSource": "funnel",
+      "userStatus": "active",
+      "registeredAt": "2025-11-28T13:45:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-21T10:50:00+05:30",
+      "identity": {
+        "name": "Lokesh Interiors",
+        "email": "lokesh@lokesh-example.in",
+        "emailVerified": true,
+        "phone": "+91 94480 77310",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-0899",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "lokesh-interiors",
+        "about": "Two-person outfit doing apartment interiors around Infopark.",
+        "businessName": "Lokesh Interiors",
+        "businessType": "firm_studio",
+        "dealsIn": [
+          "services"
+        ],
+        "segments": [
+          "interior_designer"
+        ],
+        "categories": [
+          "decor",
+          "residential"
+        ],
+        "searchKeywords": [
+          "2BHK interior",
+          "Apartment interiors"
+        ],
+        "targetAreas": [
+          {
+            "state": "Maharashtra",
+            "cities": [
+              "Pune",
+              "Hinjewadi"
+            ]
+          }
+        ],
+        "positioning": [],
+        "updatedBy": "Lokesh Interiors",
+        "updatedAt": "2026-01-08T18:12:00+05:30"
+      },
+      "tags": [],
+      "notes": [],
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-2402"
+        ],
+        "invoiceRefs": [
+          "INV-2025-0988"
+        ]
+      }
+    },
+    {
+      "userId": "IB-U-0880",
+      "authUserId": "auth_0cc934e2",
+      "registrationSource": "portal",
+      "userStatus": "active",
+      "registeredAt": "2024-08-30T11:00:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-25T08:40:00+05:30",
+      "identity": {
+        "name": "R. Menon Woodworks",
+        "email": "menon@menonwoodworks-example.in",
+        "emailVerified": true,
+        "phone": "+91 98470 22118",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-0880",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "r-menon-woodworks",
+        "about": "Solid-wood furniture and site carpentry. Own workshop, twelve carpenters.",
+        "businessName": "R. Menon Woodworks",
+        "businessType": "contractor",
+        "dealsIn": [
+          "services"
+        ],
+        "segments": [
+          "carpentry",
+          "furniture"
+        ],
+        "categories": [
+          "furniture",
+          "doors_windows",
+          "residential"
+        ],
+        "searchKeywords": [
+          "Site carpentry",
+          "Furniture design",
+          "Wardrobe design"
+        ],
+        "targetAreas": [
+          {
+            "state": "Kerala",
+            "cities": [
+              "Kochi"
+            ]
+          }
+        ],
+        "positioning": [
+          "custom"
+        ],
+        "updatedBy": "D. Kapoor",
+        "updatedAt": "2026-08-22T11:18:00+05:30"
+      },
+      "tags": [],
+      "notes": [
+        {
+          "noteId": "NT-0880-1",
+          "author": "D. Kapoor",
+          "authorRole": "Operations",
+          "at": "2026-08-19T09:20:00+05:30",
+          "text": "Term ends 01 Sep. He asked to be invoiced in the new financial year rather than auto-renewed — flagged to Finance."
+        }
+      ],
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-1811",
+          "DL-2291"
+        ],
+        "invoiceRefs": [
+          "INV-2024-0388",
+          "INV-2026-0447"
+        ]
+      }
+    },
+    {
+      "userId": "IB-U-0867",
+      "authUserId": "auth_88f1a05c",
+      "registrationSource": "web",
+      "userStatus": "active",
+      "registeredAt": "2025-09-05T15:30:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-20T17:22:00+05:30",
+      "identity": {
+        "name": "Zenith Ceilings",
+        "email": "info@zenith-example.in",
+        "emailVerified": true,
+        "phone": "+91 90040 19923",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-0867",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "zenith-ceilings",
+        "about": "False ceiling, cove lighting and acoustic panelling for offices.",
+        "businessName": "Zenith Ceilings",
+        "businessType": "contractor",
+        "dealsIn": [
+          "services"
+        ],
+        "segments": [
+          "false_ceiling",
+          "mep"
+        ],
+        "categories": [
+          "false_ceiling",
+          "lighting",
+          "electricals",
+          "plumbing",
+          "hvac",
+          "commercial",
+          "retail"
+        ],
+        "searchKeywords": [
+          "False ceiling",
+          "Cove lighting",
+          "Acoustic panels"
+        ],
+        "targetAreas": [
+          {
+            "state": "Telangana",
+            "cities": [
+              "Hyderabad",
+              "Gachibowli"
+            ]
+          }
+        ],
+        "positioning": [
+          "budget_friendly"
+        ],
+        "updatedBy": "Zenith Ceilings",
+        "updatedAt": "2026-04-14T12:00:00+05:30"
+      },
+      "tags": [],
+      "notes": [],
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-2210"
+        ],
+        "invoiceRefs": [
+          "INV-2025-0870"
+        ]
+      }
+    },
+    {
+      "userId": "IB-U-0834",
+      "authUserId": "auth_65b2d7f0",
+      "registrationSource": "referral",
+      "userStatus": "active",
+      "registeredAt": "2025-04-11T10:05:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-22T09:00:00+05:30",
+      "identity": {
+        "name": "Sharma Interiors",
+        "email": "contact@sharmainteriors-example.in",
+        "emailVerified": true,
+        "phone": "+91 98991 40088",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-0834",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "sharma-interiors",
+        "about": "Residential interiors and renovation across west Delhi.",
+        "businessName": "Sharma Interiors",
+        "businessType": "firm_studio",
+        "dealsIn": [
+          "services"
+        ],
+        "segments": [
+          "civil_contractor"
+        ],
+        "categories": [
+          "stone_marble",
+          "false_ceiling",
+          "residential"
+        ],
+        "searchKeywords": [
+          "Renovation & remodelling",
+          "Complete home interiors"
+        ],
+        "targetAreas": [
+          {
+            "state": "Delhi",
+            "cities": [
+              "New Delhi",
+              "Rohini"
+            ]
+          }
+        ],
+        "positioning": [],
+        "updatedBy": "Sharma Interiors",
+        "updatedAt": "2026-02-02T14:40:00+05:30"
+      },
+      "tags": [],
+      "notes": [
+        {
+          "noteId": "NT-0834-1",
+          "author": "N. Pillai",
+          "authorRole": "Operations",
+          "at": "2026-08-22T09:05:00+05:30",
+          "text": "Asked for a two-month pause — family bereavement, workshop shut. Paused rather than cancelled so the term and the history survive."
+        }
+      ],
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-2050"
+        ],
+        "invoiceRefs": [
+          "INV-2025-0322"
+        ]
+      }
+    },
+    {
+      "userId": "IB-U-0812",
+      "authUserId": "auth_f0e4a221",
+      "registrationSource": "web",
+      "userStatus": "active",
+      "registeredAt": "2026-06-30T19:20:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-24T08:30:00+05:30",
+      "identity": {
+        "name": "Anaya Verma",
+        "email": "anaya.verma@examplemail.in",
+        "emailVerified": true,
+        "phone": "+91 99160 33471",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-0812",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "anaya-verma-design",
+        "about": "Small studio, mostly rental-friendly interiors for young couples.",
+        "businessName": "Anaya Verma Design",
+        "businessType": "independent",
+        "dealsIn": [
+          "services"
+        ],
+        "segments": [
+          "interior_designer",
+          "interior_decorator"
+        ],
+        "categories": [
+          "decor",
+          "curtains_blinds",
+          "residential"
+        ],
+        "searchKeywords": [
+          "Residential styling",
+          "Rental interiors"
+        ],
+        "targetAreas": [
+          {
+            "state": "Maharashtra",
+            "cities": [
+              "Mumbai",
+              "Andheri",
+              "Bandra"
+            ]
+          }
+        ],
+        "positioning": [
+          "custom"
+        ],
+        "updatedBy": "Anaya Verma",
+        "updatedAt": "2026-07-04T10:15:00+05:30"
+      },
+      "tags": [
+        {
+          "slug": "high-intent",
+          "assignedBy": "D. Kapoor",
+          "assignedAt": "2026-08-24T09:00:00+05:30"
+        }
+      ],
+      "notes": [],
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [],
+        "invoiceRefs": []
+      }
+    },
+    {
+      "userId": "IB-U-0790",
+      "authUserId": "auth_2ab6c908",
+      "registrationSource": "portal",
+      "userStatus": "active",
+      "registeredAt": "2025-03-22T09:15:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-16T13:10:00+05:30",
+      "identity": {
+        "name": "K. Iyer Interior Co.",
+        "email": "office@kiyer-example.in",
+        "emailVerified": true,
+        "phone": "+91 98410 55207",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-0790",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "k-iyer-interior",
+        "about": "Residential interiors, twenty years in T. Nagar.",
+        "businessName": "K. Iyer Interior Co.",
+        "businessType": "firm_studio",
+        "dealsIn": [
+          "services"
+        ],
+        "segments": [
+          "interior_designer"
+        ],
+        "categories": [
+          "decor",
+          "residential"
+        ],
+        "searchKeywords": [
+          "Complete home interiors",
+          "Renovation & remodelling"
+        ],
+        "targetAreas": [
+          {
+            "state": "Tamil Nadu",
+            "cities": [
+              "Chennai"
+            ]
+          }
+        ],
+        "positioning": [
+          "luxury"
+        ],
+        "updatedBy": "D. Kapoor",
+        "updatedAt": "2026-06-11T16:20:00+05:30"
+      },
+      "tags": [],
+      "notes": [
+        {
+          "noteId": "NT-0790-1",
+          "author": "D. Kapoor",
+          "authorRole": "Operations",
+          "at": "2026-08-16T13:30:00+05:30",
+          "text": "Two customers said the listed workshop photos are not theirs. Suspended while we check. Account itself is untouched — they can still sign in."
+        }
+      ],
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-1755"
+        ],
+        "invoiceRefs": [
+          "INV-2025-0201"
+        ]
+      }
+    },
+    {
+      "userId": "IB-U-0745",
+      "authUserId": "auth_71d0bb46",
+      "registrationSource": "portal",
+      "userStatus": "active",
+      "registeredAt": "2025-02-14T11:50:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-09T10:05:00+05:30",
+      "identity": {
+        "name": "Craftline Carpentry",
+        "email": "craftline@example-craft.in",
+        "emailVerified": true,
+        "phone": "+91 91480 60031",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-0745",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "craftline-carpentry",
+        "about": "Contract carpentry for builders and design studios.",
+        "businessName": "Craftline Carpentry",
+        "businessType": "contractor",
+        "dealsIn": [
+          "services"
+        ],
+        "segments": [
+          "carpentry",
+          "modular_kitchen"
+        ],
+        "categories": [
+          "furniture",
+          "doors_windows",
+          "kitchen",
+          "wardrobes_storage",
+          "residential"
+        ],
+        "searchKeywords": [
+          "Contract carpentry",
+          "Modular kitchen"
+        ],
+        "targetAreas": [
+          {
+            "state": "Karnataka",
+            "cities": [
+              "Bengaluru"
+            ]
+          }
+        ],
+        "positioning": [],
+        "updatedBy": "D. Kapoor",
+        "updatedAt": "2026-05-02T09:30:00+05:30"
+      },
+      "tags": [
+        {
+          "slug": "payment-risk",
+          "assignedBy": "S. Raghavan",
+          "assignedAt": "2026-08-05T15:00:00+05:30"
+        }
+      ],
+      "notes": [
+        {
+          "noteId": "NT-0745-1",
+          "author": "S. Raghavan",
+          "authorRole": "Finance Admin",
+          "at": "2026-08-05T15:04:00+05:30",
+          "text": "Bank reversed the Growth payment. Finance holds the ledger truth — this is a note, not a refund. Membership suspended by Operations while it is resolved."
+        }
+      ],
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-1620"
+        ],
+        "invoiceRefs": [
+          "INV-2025-0104"
+        ]
+      }
+    },
+    {
+      "userId": "IB-U-0702",
+      "authUserId": "auth_bb37ca10",
+      "registrationSource": "funnel",
+      "userStatus": "active",
+      "registeredAt": "2025-01-11T08:40:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-07-15T09:00:00+05:30",
+      "identity": {
+        "name": "D. Fernandes",
+        "email": "d.fernandes@examplemail.in",
+        "emailVerified": true,
+        "phone": "+91 98220 71145",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-0702",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "fernandes-interiors",
+        "about": "Independent designer, residential only.",
+        "businessName": "Fernandes Interiors",
+        "businessType": "firm_studio",
+        "dealsIn": [
+          "services"
+        ],
+        "segments": [
+          "interior_designer"
+        ],
+        "categories": [
+          "decor",
+          "residential"
+        ],
+        "searchKeywords": [
+          "Complete home interiors"
+        ],
+        "targetAreas": [
+          {
+            "state": "Maharashtra",
+            "cities": [
+              "Pune",
+              "Baner"
+            ]
+          }
+        ],
+        "positioning": [],
+        "updatedBy": "Fernandes Interiors",
+        "updatedAt": "2025-12-01T10:00:00+05:30"
+      },
+      "tags": [
+        {
+          "slug": "win-back",
+          "assignedBy": "A. Sharma",
+          "assignedAt": "2026-07-20T09:35:00+05:30"
+        }
+      ],
+      "notes": [],
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-1503"
+        ],
+        "invoiceRefs": [
+          "INV-2025-0055"
+        ]
+      }
+    },
+    {
+      "userId": "IB-U-0688",
+      "authUserId": "auth_49ee20a3",
+      "registrationSource": "web",
+      "userStatus": "active",
+      "registeredAt": "2024-12-02T17:00:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-23T15:45:00+05:30",
+      "identity": {
+        "name": "Saloni Interiors",
+        "email": "saloni@saloni-example.in",
+        "emailVerified": true,
+        "phone": "+91 99300 84412",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-0688",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "saloni-interiors",
+        "about": "Apartment interiors and small commercial spaces in central Mumbai.",
+        "businessName": "Saloni Interiors",
+        "businessType": "firm_studio",
+        "dealsIn": [
+          "services"
+        ],
+        "segments": [
+          "interior_designer"
+        ],
+        "categories": [
+          "decor",
+          "residential",
+          "commercial"
+        ],
+        "searchKeywords": [
+          "Apartment interiors",
+          "Office fit-out"
+        ],
+        "targetAreas": [
+          {
+            "state": "Delhi",
+            "cities": [
+              "New Delhi",
+              "Saket"
+            ]
+          }
+        ],
+        "positioning": [
+          "custom"
+        ],
+        "updatedBy": "Saloni Interiors",
+        "updatedAt": "2026-03-01T11:20:00+05:30"
+      },
+      "tags": [],
+      "notes": [
+        {
+          "noteId": "NT-0688-1",
+          "author": "D. Kapoor",
+          "authorRole": "Operations",
+          "at": "2026-03-01T11:30:00+05:30",
+          "text": "Cancelled Growth in January, came back on Starter in March. Two separate terms on purpose — the cancelled one still shows in her history and in the churn cohort for January."
+        }
+      ],
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-1488",
+          "DL-2901"
+        ],
+        "invoiceRefs": [
+          "INV-2024-0501",
+          "INV-2026-0233"
+        ]
+      }
+    },
+    {
+      "userId": "IB-U-0655",
+      "authUserId": "auth_d2a90c77",
+      "registrationSource": "referral",
+      "userStatus": "active",
+      "registeredAt": "2024-12-02T09:30:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-05-27T14:00:00+05:30",
+      "identity": {
+        "name": "Sandeep Kulkarni",
+        "email": "sandeep.k@examplemail.in",
+        "emailVerified": true,
+        "phone": "+91 98230 65590",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-0655",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "kulkarni-and-sons",
+        "about": "Family furniture business, three generations in Kothrud.",
+        "businessName": "Kulkarni & Sons",
+        "businessType": "contractor",
+        "dealsIn": [
+          "services"
+        ],
+        "segments": [
+          "carpentry",
+          "furniture"
+        ],
+        "categories": [
+          "furniture",
+          "doors_windows",
+          "residential"
+        ],
+        "searchKeywords": [
+          "Furniture design",
+          "Wardrobe design"
+        ],
+        "targetAreas": [
+          {
+            "state": "Maharashtra",
+            "cities": [
+              "Pune"
+            ]
+          }
+        ],
+        "positioning": [],
+        "updatedBy": "Kulkarni & Sons",
+        "updatedAt": "2025-11-10T13:00:00+05:30"
+      },
+      "tags": [
+        {
+          "slug": "win-back",
+          "assignedBy": "A. Sharma",
+          "assignedAt": "2026-06-01T10:00:00+05:30"
+        }
+      ],
+      "notes": [],
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-1477"
+        ],
+        "invoiceRefs": [
+          "INV-2024-0498"
+        ]
+      }
+    },
+    {
+      "userId": "IB-U-0601",
+      "authUserId": "auth_00110bee",
+      "registrationSource": "admin",
+      "userStatus": "deactivated",
+      "registeredAt": "2024-01-01T00:00:00+05:30",
+      "deactivatedAt": "2026-04-27T10:00:00+05:30",
+      "deactivatedReason": "Internal / demo account",
+      "lastActivityAt": "2026-04-27T09:50:00+05:30",
+      "identity": {
+        "name": "Founder demo account",
+        "email": "demo@interiorbazzar-example.com",
+        "emailVerified": true,
+        "phone": "+91 90000 00000",
+        "phoneVerified": false
+      },
+      "profile": {
+        "profileId": "PRF-0601",
+        "schemaVersion": "profile v1",
+        "profileStatus": "hidden",
+        "username": null,
+        "about": "Internal account used for walkthroughs. Not a customer.",
+        "businessName": null,
+        "businessType": null,
+        "dealsIn": [],
+        "segments": [],
+        "categories": [],
+        "searchKeywords": [],
+        "targetAreas": [],
+        "positioning": [],
+        "updatedBy": "V. Shakya",
+        "updatedAt": "2026-04-27T10:00:00+05:30"
+      },
+      "tags": [],
+      "notes": [
+        {
+          "noteId": "NT-0601-1",
+          "author": "V. Shakya",
+          "authorRole": "Founder",
+          "at": "2026-04-27T10:01:00+05:30",
+          "text": "Deactivated rather than deleted. It appears in last year's registration counts and deleting it would change a number we have already reported."
+        }
+      ],
+      "commercial": {
+        "salesOwner": null,
+        "dealRefs": [],
+        "invoiceRefs": []
+      }
+    },
+    {
+      "userId": "IB-U-1200",
+      "authUserId": "auth_1200c1200",
+      "registrationSource": "web",
+      "userStatus": "active",
+      "registeredAt": "2025-08-19T10:20:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-24T18:30:00+05:30",
+      "identity": {
+        "name": "Sandeep Kulkarni",
+        "email": "sandeep@sk-interiors-example.in",
+        "emailVerified": true,
+        "phone": "+91 98200 41155",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-1200",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "sandeep-kulkarni",
+        "about": "SK Interiors — a Finance customer, registered on the platform like any other.",
+        "businessName": "SK Interiors",
+        "businessType": "firm_studio",
+        "dealsIn": [
+          "services"
+        ],
+        "segments": [
+          "interior_designer"
+        ],
+        "categories": [
+          "residential"
+        ],
+        "searchKeywords": [
+          "Complete home interiors"
+        ],
+        "targetAreas": [
+          {
+            "state": "Maharashtra",
+            "cities": [
+              "Mumbai"
+            ]
+          }
+        ],
+        "positioning": [
+          "premium"
+        ],
+        "updatedBy": "Sandeep Kulkarni",
+        "updatedAt": "2025-08-19T10:20:00+05:30"
+      },
+      "tags": [],
+      "notes": [],
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-2396"
+        ],
+        "invoiceRefs": [
+          "IB-INV-2026-00088",
+          "IB-INV-2026-00089",
+          "IB-INV-2026-00087"
+        ]
+      }
+    },
+    {
+      "userId": "IB-U-1201",
+      "authUserId": "auth_1201c1201",
+      "registrationSource": "web",
+      "userStatus": "active",
+      "registeredAt": "2025-07-02T12:05:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-24T18:30:00+05:30",
+      "identity": {
+        "name": "Meera Iyer",
+        "email": "meera@iyer-woodworks-example.in",
+        "emailVerified": true,
+        "phone": "+91 98400 20931",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-1201",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "meera-iyer",
+        "about": "Iyer Woodworks — a Finance customer, registered on the platform like any other.",
+        "businessName": "Iyer Woodworks",
+        "businessType": "manufacturer",
+        "dealsIn": [
+          "services"
+        ],
+        "segments": [
+          "interior_designer"
+        ],
+        "categories": [
+          "residential"
+        ],
+        "searchKeywords": [
+          "Complete home interiors"
+        ],
+        "targetAreas": [
+          {
+            "state": "Tamil Nadu",
+            "cities": [
+              "Chennai"
+            ]
+          }
+        ],
+        "positioning": [
+          "custom"
+        ],
+        "updatedBy": "Meera Iyer",
+        "updatedAt": "2025-07-02T12:05:00+05:30"
+      },
+      "tags": [],
+      "notes": [],
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-2291"
+        ],
+        "invoiceRefs": [
+          "IB-INV-2026-00092",
+          "IB-INV-2026-00074"
+        ]
+      }
+    },
+    {
+      "userId": "IB-U-1105",
+      "authUserId": "auth_1105c1105",
+      "registrationSource": "web",
+      "userStatus": "active",
+      "registeredAt": "2026-03-11T09:45:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-24T18:30:00+05:30",
+      "identity": {
+        "name": "Vikram Shetty",
+        "email": "vikram@shetty-modulars-example.in",
+        "emailVerified": true,
+        "phone": "+91 98450 77120",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-1105",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "vikram-shetty",
+        "about": "Shetty Modulars — a Finance customer, registered on the platform like any other.",
+        "businessName": "Shetty Modulars",
+        "businessType": "manufacturer",
+        "dealsIn": [
+          "services"
+        ],
+        "segments": [
+          "interior_designer"
+        ],
+        "categories": [
+          "residential"
+        ],
+        "searchKeywords": [
+          "Complete home interiors"
+        ],
+        "targetAreas": [
+          {
+            "state": "Karnataka",
+            "cities": [
+              "Mangaluru"
+            ]
+          }
+        ],
+        "positioning": [
+          "custom"
+        ],
+        "updatedBy": "Vikram Shetty",
+        "updatedAt": "2026-03-11T09:45:00+05:30"
+      },
+      "tags": [],
+      "notes": [],
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-2411"
+        ],
+        "invoiceRefs": [
+          "IB-INV-2026-00091"
+        ]
+      }
+    },
+    {
+      "userId": "IB-U-1118",
+      "authUserId": "auth_1118c1118",
+      "registrationSource": "web",
+      "userStatus": "active",
+      "registeredAt": "2026-04-02T16:30:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-24T18:30:00+05:30",
+      "identity": {
+        "name": "Farah Qureshi",
+        "email": "farah@fq-design-example.in",
+        "emailVerified": true,
+        "phone": "+91 98490 33017",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-1118",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "farah-qureshi",
+        "about": "FQ Design House — a Finance customer, registered on the platform like any other.",
+        "businessName": "FQ Design House",
+        "businessType": "firm_studio",
+        "dealsIn": [
+          "services"
+        ],
+        "segments": [
+          "interior_designer"
+        ],
+        "categories": [
+          "residential"
+        ],
+        "searchKeywords": [
+          "Complete home interiors"
+        ],
+        "targetAreas": [
+          {
+            "state": "Telangana",
+            "cities": [
+              "Hyderabad"
+            ]
+          }
+        ],
+        "positioning": [
+          "premium"
+        ],
+        "updatedBy": "Farah Qureshi",
+        "updatedAt": "2026-04-02T16:30:00+05:30"
+      },
+      "tags": [],
+      "notes": [],
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-2390"
+        ],
+        "invoiceRefs": [
+          "IB-INV-2026-00079",
+          "IB-INV-2026-00080"
+        ]
+      }
+    },
+    {
+      "userId": "IB-U-1142",
+      "authUserId": "auth_1142c1142",
+      "registrationSource": "web",
+      "userStatus": "active",
+      "registeredAt": "2026-06-18T11:15:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-24T18:30:00+05:30",
+      "identity": {
+        "name": "Rohan Mehta",
+        "email": "rohan@mehta-furnishings-example.in",
+        "emailVerified": true,
+        "phone": "+91 98220 61884",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-1142",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "rohan-mehta",
+        "about": "Mehta & Co Furnishings — a Finance customer, registered on the platform like any other.",
+        "businessName": "Mehta & Co Furnishings",
+        "businessType": "dealer",
+        "dealsIn": [
+          "services"
+        ],
+        "segments": [
+          "interior_designer"
+        ],
+        "categories": [
+          "residential"
+        ],
+        "searchKeywords": [
+          "Complete home interiors"
+        ],
+        "targetAreas": [
+          {
+            "state": "Maharashtra",
+            "cities": [
+              "Pune"
+            ]
+          }
+        ],
+        "positioning": [
+          "budget_friendly"
+        ],
+        "updatedBy": "Rohan Mehta",
+        "updatedAt": "2026-06-18T11:15:00+05:30"
+      },
+      "tags": [],
+      "notes": [],
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-2402"
+        ],
+        "invoiceRefs": [
+          "IB-INV-2026-00085"
+        ]
+      }
+    },
+    {
+      "userId": "IB-U-1160",
+      "authUserId": "auth_1160c1160",
+      "registrationSource": "web",
+      "userStatus": "active",
+      "registeredAt": "2026-07-24T14:00:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-24T18:30:00+05:30",
+      "identity": {
+        "name": "Tanvi Bhandari",
+        "email": "tanvi@bhandari-interiors-example.in",
+        "emailVerified": true,
+        "phone": "+91 98221 45590",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-1160",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "tanvi-bhandari",
+        "about": "Bhandari Interiors — a Finance customer, registered on the platform like any other.",
+        "businessName": "Bhandari Interiors",
+        "businessType": "firm_studio",
+        "dealsIn": [
+          "services"
+        ],
+        "segments": [
+          "interior_designer"
+        ],
+        "categories": [
+          "residential"
+        ],
+        "searchKeywords": [
+          "Complete home interiors"
+        ],
+        "targetAreas": [
+          {
+            "state": "Maharashtra",
+            "cities": [
+              "Pune"
+            ]
+          }
+        ],
+        "positioning": [
+          "custom"
+        ],
+        "updatedBy": "Tanvi Bhandari",
+        "updatedAt": "2026-07-24T14:00:00+05:30"
+      },
+      "tags": [],
+      "notes": [],
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [
+          "DL-2455"
+        ],
+        "invoiceRefs": [
+          "IB-INV-2026-00071"
+        ]
+      }
+    },
+    {
+      "userId": "IB-U-1173",
+      "authUserId": "auth_1173c1173",
+      "registrationSource": "web",
+      "userStatus": "active",
+      "registeredAt": "2026-08-21T10:05:00+05:30",
+      "deactivatedAt": null,
+      "deactivatedReason": null,
+      "lastActivityAt": "2026-08-24T18:30:00+05:30",
+      "identity": {
+        "name": "Aarav Pillai",
+        "email": "aarav@pillai-home-example.in",
+        "emailVerified": true,
+        "phone": "+91 98470 12266",
+        "phoneVerified": true
+      },
+      "profile": {
+        "profileId": "PRF-1173",
+        "schemaVersion": "profile v1",
+        "profileStatus": "published",
+        "username": "aarav-pillai",
+        "about": "Pillai Home Studio — a Finance customer, registered on the platform like any other.",
+        "businessName": "Pillai Home Studio",
+        "businessType": "firm_studio",
+        "dealsIn": [
+          "services"
+        ],
+        "segments": [
+          "interior_designer"
+        ],
+        "categories": [
+          "residential"
+        ],
+        "searchKeywords": [
+          "Complete home interiors"
+        ],
+        "targetAreas": [
+          {
+            "state": "Kerala",
+            "cities": [
+              "Kochi"
+            ]
+          }
+        ],
+        "positioning": [
+          "budget_friendly"
+        ],
+        "updatedBy": "Aarav Pillai",
+        "updatedAt": "2026-08-21T10:05:00+05:30"
+      },
+      "tags": [],
+      "notes": [],
+      "commercial": {
+        "salesOwner": "A. Sharma",
+        "dealRefs": [],
+        "invoiceRefs": []
+      }
+    }
+  ]
+}

@@ -1,0 +1,266 @@
+{
+  "$comment": "PLACEHOLDER RECORDS — the submissions. Stands in for GET /api/v1/admin/resources/{id}/responses and GET /api/v1/admin/resources/responses?memberId=. A FILE ANSWER CARRIES BOTH: `value` is the file's name so any reader can print it without knowing the type, and `file` is `{fileName, mimeType, sizeKb, url}` — the thing itself. `url` here is a plain path and MUST become a signed, expiring read before this ships; an onboarding pack holds a PAN card. THE ANSWER CARRIES ITS OWN LABEL, deliberately duplicating the field label from the definition: a response has to read correctly in a year, and the form it was answered on may have been edited twice since. `version` says which version was answered — RSP-03 below is a real instance of this, answered on v1 of RES-02 when the third field was still called 'Condition'. `memberId` is the Team roster's id, unchanged, which is the whole link back to the profile: `#/team/{memberId}/resources` reads this list and nothing else.",
+  "generatedAt": "2026-09-06T10:00:00+05:30",
+  "responses": [
+    {
+      "responseId": "RSP-01",
+      "resourceId": "RES-01",
+      "version": 1,
+      "memberId": "70",
+      "submittedAt": "2025-07-23T10:12:00+05:30",
+      "answers": [
+        {
+          "fieldId": "F1",
+          "label": "Full name, as on your PAN",
+          "value": "Rahul Menon"
+        },
+        {
+          "fieldId": "F2",
+          "label": "Date you started",
+          "value": "2025-07-21"
+        },
+        {
+          "fieldId": "F3",
+          "label": "Territory",
+          "value": "West"
+        },
+        {
+          "fieldId": "F7",
+          "label": "PAN card",
+          "value": "pan-rahul.jpg",
+          "file": {
+            "fileName": "pan-rahul.jpg",
+            "mimeType": "image/jpeg",
+            "sizeKb": 880,
+            "url": "/media/resources/pan-rahul.jpg"
+          }
+        },
+        {
+          "fieldId": "F8",
+          "label": "Passport photograph",
+          "value": "rahul-photo.png",
+          "file": {
+            "fileName": "rahul-photo.png",
+            "mimeType": "image/png",
+            "sizeKb": 1640,
+            "url": "/media/resources/rahul-photo.png"
+          }
+        },
+        {
+          "fieldId": "F4",
+          "label": "Signed offer letter",
+          "value": "offer-letter-signed.pdf",
+          "file": {
+            "fileName": "offer-letter-signed.pdf",
+            "mimeType": "application/pdf",
+            "sizeKb": 412,
+            "url": "/media/resources/offer-letter-signed.pdf"
+          }
+        },
+        {
+          "fieldId": "F5",
+          "label": "I have received my laptop and SIM",
+          "value": "Yes"
+        },
+        {
+          "fieldId": "F6",
+          "label": "Anything still outstanding?",
+          "value": "SIM activated on the 24th, one day late."
+        }
+      ]
+    },
+    {
+      "responseId": "RSP-02",
+      "resourceId": "RES-02",
+      "version": 2,
+      "memberId": "86",
+      "submittedAt": "2026-03-17T09:40:00+05:30",
+      "answers": [
+        {
+          "fieldId": "F1",
+          "label": "Asset",
+          "value": "Laptop"
+        },
+        {
+          "fieldId": "F2",
+          "label": "Serial or IMEI",
+          "value": "5CD3421LMQ"
+        },
+        {
+          "fieldId": "F3",
+          "label": "Condition at handover",
+          "value": "Refurbished"
+        },
+        {
+          "fieldId": "F4",
+          "label": "Handed over on",
+          "value": "2026-03-16"
+        },
+        {
+          "fieldId": "F5",
+          "label": "Photo at handover",
+          "value": "laptop-5cd3421lmq.jpg",
+          "file": {
+            "fileName": "laptop-5cd3421lmq.jpg",
+            "mimeType": "image/jpeg",
+            "sizeKb": 2280,
+            "url": "/media/resources/laptop-5cd3421lmq.jpg"
+          }
+        }
+      ]
+    },
+    {
+      "responseId": "RSP-03",
+      "resourceId": "RES-02",
+      "version": 1,
+      "memberId": "63",
+      "submittedAt": "2025-02-11T14:05:00+05:30",
+      "answers": [
+        {
+          "fieldId": "F1",
+          "label": "Asset",
+          "value": "Laptop"
+        },
+        {
+          "fieldId": "F2",
+          "label": "Serial or IMEI",
+          "value": "8XK1190PPT"
+        },
+        {
+          "fieldId": "F3",
+          "label": "Condition",
+          "value": "New"
+        },
+        {
+          "fieldId": "F4",
+          "label": "Handed over on",
+          "value": "2025-02-10"
+        }
+      ]
+    },
+    {
+      "responseId": "RSP-04",
+      "resourceId": "RES-02",
+      "version": 2,
+      "memberId": "70",
+      "submittedAt": "2025-07-22T11:20:00+05:30",
+      "answers": [
+        {
+          "fieldId": "F1",
+          "label": "Asset",
+          "value": "Phone"
+        },
+        {
+          "fieldId": "F2",
+          "label": "Serial or IMEI",
+          "value": "356938035643809"
+        },
+        {
+          "fieldId": "F3",
+          "label": "Condition at handover",
+          "value": "Good"
+        },
+        {
+          "fieldId": "F4",
+          "label": "Handed over on",
+          "value": "2025-07-21"
+        }
+      ]
+    },
+    {
+      "responseId": "RSP-05",
+      "resourceId": "RES-03",
+      "version": 1,
+      "memberId": "41",
+      "submittedAt": "2026-01-05T09:30:00+05:30",
+      "answers": [
+        {
+          "fieldId": "F1",
+          "label": "I have read the 2026 leave policy",
+          "value": "Yes"
+        },
+        {
+          "fieldId": "F2",
+          "label": "Questions, if any",
+          "value": ""
+        }
+      ]
+    },
+    {
+      "responseId": "RSP-06",
+      "resourceId": "RES-03",
+      "version": 1,
+      "memberId": "52",
+      "submittedAt": "2026-01-05T15:02:00+05:30",
+      "answers": [
+        {
+          "fieldId": "F1",
+          "label": "I have read the 2026 leave policy",
+          "value": "Yes"
+        },
+        {
+          "fieldId": "F2",
+          "label": "Questions, if any",
+          "value": "Does the carry-forward cap apply to the Sales incentive trip days?"
+        }
+      ]
+    },
+    {
+      "responseId": "RSP-07",
+      "resourceId": "RES-03",
+      "version": 1,
+      "memberId": "58",
+      "submittedAt": "2026-01-06T10:15:00+05:30",
+      "answers": [
+        {
+          "fieldId": "F1",
+          "label": "I have read the 2026 leave policy",
+          "value": "Yes"
+        },
+        {
+          "fieldId": "F2",
+          "label": "Questions, if any",
+          "value": ""
+        }
+      ]
+    },
+    {
+      "responseId": "RSP-08",
+      "resourceId": "RES-03",
+      "version": 1,
+      "memberId": "63",
+      "submittedAt": "2026-01-07T12:44:00+05:30",
+      "answers": [
+        {
+          "fieldId": "F1",
+          "label": "I have read the 2026 leave policy",
+          "value": "Yes"
+        },
+        {
+          "fieldId": "F2",
+          "label": "Questions, if any",
+          "value": ""
+        }
+      ]
+    },
+    {
+      "responseId": "RSP-09",
+      "resourceId": "RES-03",
+      "version": 1,
+      "memberId": "79",
+      "submittedAt": "2026-01-09T17:30:00+05:30",
+      "answers": [
+        {
+          "fieldId": "F1",
+          "label": "I have read the 2026 leave policy",
+          "value": "Yes"
+        },
+        {
+          "fieldId": "F2",
+          "label": "Questions, if any",
+          "value": "Flagging that payroll needs the encashment rule in writing."
+        }
+      ]
+    }
+  ]
+}

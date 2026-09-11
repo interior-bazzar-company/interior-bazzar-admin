@@ -1,0 +1,286 @@
+{
+  "$comment": "PLACEHOLDER RECORDS — the form definitions. Stands in for GET /api/v1/admin/resources and GET /api/v1/admin/resources/{id}. A resource is a FORM plus the DEPARTMENT it is for. `departments[]` is the whole audience rule — a member in ANY of them is in the audience and it is evaluated at read time against the team roster, never materialised into a list of ids — the day somebody joins Sales they are inside the Sales onboarding audience without anybody re-sending anything. An EMPTY list is every active member, not none: the difference between a company-wide form and one that goes nowhere is an empty string, and `audienceOf` in views/Resources/store.ts is the one place that reading is enforced. `tags` is free text, not an enum — `vocabularies.json` seeds suggestions and never a closed list. `version` is what makes an answered form safe to edit: bump it and old responses keep pointing at the version they answered. `fields[].accept` is a `file` field's allowed types (empty = any) and `fields[].maxMb` its size cap in megabytes (null = uncapped); both are printed to the member before they open a file picker, and both must be enforced server-side.",
+  "generatedAt": "2026-09-06T10:00:00+05:30",
+  "resources": [
+    {
+      "resourceId": "RES-01",
+      "title": "Sales onboarding pack",
+      "description": "Everything a new Sales joiner has to hand back in their first week.",
+      "tags": [
+        "Onboarding",
+        "Sales"
+      ],
+      "departments": [
+        "Sales"
+      ],
+      "state": "open",
+      "version": 1,
+      "createdAt": "2025-06-30T11:00:00+05:30",
+      "createdById": "58",
+      "openedAt": "2025-07-01T09:00:00+05:30",
+      "closedAt": null,
+      "fields": [
+        {
+          "fieldId": "F1",
+          "type": "text",
+          "label": "Full name, as on your PAN",
+          "help": "It has to match the card exactly — payroll rejects a mismatch.",
+          "required": true,
+          "options": [],
+          "accept": [],
+          "maxMb": null
+        },
+        {
+          "fieldId": "F2",
+          "type": "date",
+          "label": "Date you started",
+          "help": null,
+          "required": true,
+          "options": [],
+          "accept": [],
+          "maxMb": null
+        },
+        {
+          "fieldId": "F3",
+          "type": "select",
+          "label": "Territory",
+          "help": null,
+          "required": true,
+          "options": [
+            "North",
+            "West",
+            "South",
+            "East"
+          ],
+          "accept": [],
+          "maxMb": null
+        },
+        {
+          "fieldId": "F4",
+          "type": "file",
+          "label": "Signed offer letter",
+          "help": "Scan or photo, both fine. PDF or an image, up to 10 MB.",
+          "required": true,
+          "options": [],
+          "accept": [
+            "pdf",
+            "image"
+          ],
+          "maxMb": 10
+        },
+        {
+          "fieldId": "F7",
+          "type": "file",
+          "label": "PAN card",
+          "help": "The card itself, not a screenshot of a form.",
+          "required": true,
+          "options": [],
+          "accept": [
+            "pdf",
+            "image"
+          ],
+          "maxMb": 10
+        },
+        {
+          "fieldId": "F8",
+          "type": "file",
+          "label": "Passport photograph",
+          "help": null,
+          "required": false,
+          "options": [],
+          "accept": [
+            "image"
+          ],
+          "maxMb": 5
+        },
+        {
+          "fieldId": "F5",
+          "type": "checkbox",
+          "label": "I have received my laptop and SIM",
+          "help": null,
+          "required": true,
+          "options": [],
+          "accept": [],
+          "maxMb": null
+        },
+        {
+          "fieldId": "F6",
+          "type": "textarea",
+          "label": "Anything still outstanding?",
+          "help": null,
+          "required": false,
+          "options": [],
+          "accept": [],
+          "maxMb": null
+        }
+      ]
+    },
+    {
+      "resourceId": "RES-02",
+      "title": "IT asset handover",
+      "description": "What a member was given, when, and in what condition.",
+      "tags": [
+        "Asset",
+        "IT"
+      ],
+      "departments": [],
+      "state": "open",
+      "version": 2,
+      "createdAt": "2025-01-08T11:00:00+05:30",
+      "createdById": "58",
+      "openedAt": "2025-01-09T09:00:00+05:30",
+      "closedAt": null,
+      "fields": [
+        {
+          "fieldId": "F1",
+          "type": "select",
+          "label": "Asset",
+          "help": null,
+          "required": true,
+          "options": [
+            "Laptop",
+            "Monitor",
+            "Phone",
+            "SIM",
+            "Access card"
+          ],
+          "accept": [],
+          "maxMb": null
+        },
+        {
+          "fieldId": "F2",
+          "type": "text",
+          "label": "Serial or IMEI",
+          "help": null,
+          "required": true,
+          "options": [],
+          "accept": [],
+          "maxMb": null
+        },
+        {
+          "fieldId": "F3",
+          "type": "select",
+          "label": "Condition at handover",
+          "help": null,
+          "required": true,
+          "options": [
+            "New",
+            "Good",
+            "Marked",
+            "Refurbished"
+          ],
+          "accept": [],
+          "maxMb": null
+        },
+        {
+          "fieldId": "F4",
+          "type": "date",
+          "label": "Handed over on",
+          "help": null,
+          "required": true,
+          "options": [],
+          "accept": [],
+          "maxMb": null
+        },
+        {
+          "fieldId": "F5",
+          "type": "file",
+          "label": "Photo at handover",
+          "help": "One photo showing any existing marks.",
+          "required": false,
+          "options": [],
+          "accept": [
+            "image"
+          ],
+          "maxMb": 15
+        }
+      ]
+    },
+    {
+      "resourceId": "RES-03",
+      "title": "Leave policy 2026 — acknowledgement",
+      "description": "Everyone reads the revised policy once and says so.",
+      "tags": [
+        "Policy",
+        "Company-wide"
+      ],
+      "departments": [],
+      "state": "open",
+      "version": 1,
+      "createdAt": "2026-01-02T11:00:00+05:30",
+      "createdById": "41",
+      "openedAt": "2026-01-05T09:00:00+05:30",
+      "closedAt": null,
+      "fields": [
+        {
+          "fieldId": "F1",
+          "type": "checkbox",
+          "label": "I have read the 2026 leave policy",
+          "help": null,
+          "required": true,
+          "options": [],
+          "accept": [],
+          "maxMb": null
+        },
+        {
+          "fieldId": "F2",
+          "type": "textarea",
+          "label": "Questions, if any",
+          "help": null,
+          "required": false,
+          "options": [],
+          "accept": [],
+          "maxMb": null
+        }
+      ]
+    },
+    {
+      "resourceId": "RES-04",
+      "title": "Exit checklist",
+      "description": "The last day: what comes back, and who confirms it.",
+      "tags": [
+        "Exit",
+        "Checklist"
+      ],
+      "departments": [],
+      "state": "draft",
+      "version": 1,
+      "createdAt": "2026-09-01T11:00:00+05:30",
+      "createdById": "58",
+      "openedAt": null,
+      "closedAt": null,
+      "fields": [
+        {
+          "fieldId": "F1",
+          "type": "date",
+          "label": "Last working day",
+          "help": null,
+          "required": true,
+          "options": [],
+          "accept": [],
+          "maxMb": null
+        },
+        {
+          "fieldId": "F2",
+          "type": "checkbox",
+          "label": "Laptop returned",
+          "help": null,
+          "required": true,
+          "options": [],
+          "accept": [],
+          "maxMb": null
+        },
+        {
+          "fieldId": "F3",
+          "type": "checkbox",
+          "label": "Access card returned",
+          "help": null,
+          "required": true,
+          "options": [],
+          "accept": [],
+          "maxMb": null
+        }
+      ]
+    }
+  ]
+}

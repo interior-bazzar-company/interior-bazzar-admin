@@ -1,0 +1,320 @@
+/* =============================================================================
+   Interior bazzar — Admin · THE BRAND LAYER
+   -----------------------------------------------------------------------------
+   Every decision Interior bazzar makes on top of Untitled UI's theme is in
+   this file, and only in this file. theme.css above it is the library's,
+   verbatim; the utilities every component is written in read the semantic
+   names (bg-primary, text-secondary, border-primary, bg-brand-solid …) and
+   those names resolve here when this file says so and in theme.css when it
+   does not.
+
+   THE THREE RULES
+     1. BLACK, WHITE AND NEUTRAL GREY build the interface. The neutral ramp is
+        Tailwind's true grey — no hue bias — so the ground is as monochrome as
+        the type on it.
+     2. FOREST GREEN is the brand, and it is spent, not poured: the primary
+        action, the active nav row, the selected row and tab, links, focus,
+        checked controls, progress, chart series one, the sign-in hero. If a
+        screen reads as green, that screen is wrong.
+     3. A STATUS IS NEVER THE BRAND. Success is Untitled UI's green, warning
+        its yellow, error its red, info blue. Role separation is absolute
+        because forest and success-green are close enough in hue that nothing
+        else keeps them apart.
+
+   DARK IS DESIGNED, NOT INVERTED. The plane is lighter than the ground (that
+   is how a dark surface says "raised"), the brand lightens two steps so it is
+   still legible as link text, and every soft status ground is re-mixed against
+   near-black rather than faded toward it.
+   ========================================================================== */
+
+@theme {
+    /* ---- TYPE FACES ------------------------------------------------------
+       Inter for everything read; JetBrains Mono for everything counted — ids,
+       money, timestamps, axes, and the tracked micro-labels. Both load from
+       Google Fonts in index.html with real system fallbacks, so a blocked CDN
+       costs weight, never paint. */
+    --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --font-display: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+    /* ---- THE MICRO-LABEL STEP -------------------------------------------
+       Untitled UI's scale starts at 12px. A metric name and a column head are
+       set one step under that, in mono, tracked — the panel's instrument
+       voice — and this is the one size the library did not have. Never a
+       sentence. */
+    --text-2xs: 0.6875rem;
+    --text-2xs--line-height: 1rem;
+
+    /* ---- BRAND · FOREST -------------------------------------------------
+       The portal's colour, so moving between the public site and the panel
+       feels like one product. 600 is the light-theme solid (white on it
+       clears 6:1); 700 is legible as link text on white at 5.3:1; 300/400 are
+       the dark-theme brand for the same reason in reverse. */
+    --color-brand-25: #f4faf7;
+    --color-brand-50: #ecf7f1;
+    --color-brand-100: #d3ede0;
+    --color-brand-200: #a9dcc3;
+    --color-brand-300: #74c39f;
+    --color-brand-400: #43a67d;
+    --color-brand-500: #218a62;
+    --color-brand-600: #14704e;
+    --color-brand-700: #0f5a3f;
+    --color-brand-800: #0e4834;
+    --color-brand-900: #0d3b2c;
+    --color-brand-950: #06231a;
+
+    /* ---- DATA VISUALISATION ---------------------------------------------
+       Slot one is the brand because series one is almost always "ours".
+       The rest are identities — distinguished from their neighbours and
+       from nothing else — so they are muted to sit beside the tag row
+       rather than shout over it. Assigned in fixed order, never cycled.
+       Status colours are reserved and never a series: a negative month is
+       `--color-chart-neg`, not error-red. The sequential ramp is forest,
+       because a ramp encodes magnitude and magnitude is the panel's own
+       measurement. */
+    /* THE Y-AXIS GUTTER. A chart's value axis is this wide, and any row of
+       labels drawn UNDER the plot (a stage name, a group name) must start at
+       the same place or it points at the wrong column. `AXIS_W` in
+       views/charts.tsx is the same number for recharts, which wants a JS
+       integer; the two are declared together and change together. */
+    --chart-gutter: 44px;
+    --color-chart-1: var(--color-brand-600);
+    --color-chart-2: #3b6fd4;
+    --color-chart-3: #c2731c;
+    --color-chart-4: #7b5bc4;
+    --color-chart-5: #1a8f8a;
+    --color-chart-6: #c94f8a;
+    --color-chart-7: #6b8f2a;
+    --color-chart-8: #6b7280;
+    --color-chart-seq-1: var(--color-brand-50);
+    --color-chart-seq-2: var(--color-brand-200);
+    --color-chart-seq-3: var(--color-brand-400);
+    --color-chart-seq-4: var(--color-brand-600);
+    --color-chart-seq-5: var(--color-brand-900);
+    --color-chart-pos: var(--color-green-600);
+    --color-chart-neg: var(--color-red-600);
+    --color-chart-grid: var(--color-neutral-200);
+    --color-chart-axis: var(--color-neutral-500);
+
+    /* ---- TOKENS THE PANEL NAMES THAT THE LIBRARY DOES NOT ---------------- */
+    /* the operable edge: an input border is NON-TEXT contrast and WCAG 1.4.11
+       puts it at 3:1 — neutral-300 on white is 1.5:1, right for a hairline
+       that groups and wrong for the edge that identifies a control */
+    --color-border-control: var(--color-neutral-500);
+    /* info is a fifth status the library's semantic set leaves out */
+    --color-bg-info-primary: var(--color-blue-50);
+    --color-bg-info-secondary: var(--color-blue-100);
+    --color-bg-info-solid: var(--color-blue-600);
+    --color-border-info: var(--color-blue-300);
+    --color-text-info-primary: var(--color-blue-700);
+    --color-fg-info-primary: var(--color-blue-600);
+    --color-fg-info-secondary: var(--color-blue-500);
+    /* the nav ground, one step off the plane so the rail reads as chrome */
+    --color-bg-nav: var(--color-neutral-50);
+    /* a selected row or tile: brand-tinted, and tinted only, so eight of
+       them on one screen do not become a green wall */
+    --color-bg-selected: var(--color-brand-50);
+    --color-border-selected: var(--color-brand-200);
+    /* skeletons */
+    --color-bg-skeleton: var(--color-neutral-200);
+    --color-bg-skeleton-sheen: var(--color-neutral-100);
+    /* the chat thread — the ONLY warm plane in the product. Somebody reads
+       a conversation for minutes rather than scanning it for seconds, and a
+       cream ground says "this is talk" before a word of it is read */
+    --color-bg-chat: #f7f2e3;
+    /* the sign-in hero: the one large dark fill, with the forest thread */
+    --color-bg-hero: var(--color-neutral-950);
+    --color-text-hero: var(--color-neutral-50);
+    --color-text-hero-muted: rgb(250 250 250 / 0.62);
+    --color-border-hero: rgb(250 250 250 / 0.12);
+    --color-fg-hero-accent: var(--color-brand-300);
+    /* a toast is a dark slab in BOTH themes — it is not part of the page it
+       covers and should not restate its theme */
+    --color-bg-toast: var(--color-neutral-900);
+    --color-text-toast: var(--color-neutral-50);
+
+    /* ---- THE UTILITY NAMES FOR THE TOKENS ABOVE --------------------------
+       Untitled UI maps `bg-primary` → `--background-color-primary` →
+       `--color-bg-primary` (Tailwind's property-namespaced theme). The
+       panel's own tokens take the same route so `bg-selected`, `text-info-
+       primary`, `ring-control` read like the library's, and so a token can be
+       re-decided in one place without a utility changing its name. */
+    --background-color-info-primary: var(--color-bg-info-primary);
+    --background-color-info-secondary: var(--color-bg-info-secondary);
+    --background-color-info-solid: var(--color-bg-info-solid);
+    --background-color-nav: var(--color-bg-nav);
+    --background-color-selected: var(--color-bg-selected);
+    --background-color-skeleton: var(--color-bg-skeleton);
+    --background-color-skeleton-sheen: var(--color-bg-skeleton-sheen);
+    --background-color-chat: var(--color-bg-chat);
+    --background-color-hero: var(--color-bg-hero);
+    --background-color-toast: var(--color-bg-toast);
+    --text-color-info-primary: var(--color-text-info-primary);
+    --text-color-hero: var(--color-text-hero);
+    --text-color-hero-muted: var(--color-text-hero-muted);
+    --text-color-toast: var(--color-text-toast);
+    --border-color-info: var(--color-border-info);
+    --border-color-control: var(--color-border-control);
+    --border-color-selected: var(--color-border-selected);
+    --border-color-hero: var(--color-border-hero);
+    --ring-color-info: var(--color-border-info);
+    --ring-color-control: var(--color-border-control);
+    --ring-color-selected: var(--color-border-selected);
+    --ring-color-hero: var(--color-border-hero);
+    --outline-color-control: var(--color-border-control);
+
+    /* ---- ELEVATION EXTRAS ------------------------------------------------ */
+    --surface-sheen: 0 0 0 0 transparent;
+    --nav-active-glow: 0 0 0 0 transparent;
+
+    /* ---- MOTION ----------------------------------------------------------- */
+    --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+    --ease-exit: cubic-bezier(0.16, 1, 0.3, 1);
+
+    /* ---- LAYOUT ----------------------------------------------------------- */
+    --width-nav: 264px;
+    --width-rail: 64px;
+    --height-topbar: 56px;
+    --width-context: 320px;
+    --container-page: 1440px;
+}
+
+/* =============================================================================
+   LIGHT — a few of the library's own semantic values, re-decided.
+   ========================================================================== */
+:root {
+    /* The ground is neutral-50 and the plane is white — a workbench, not a
+       page. The library's bg-secondary is already neutral-50; bg-tertiary
+       (wells, table heads) is neutral-100. Nothing to change here except the
+       focus ring, which the library keys on brand-500 (too light on white for
+       a 3:1 ring) — 600 is the same step as the solid. */
+    --color-focus-ring: var(--color-brand-600);
+    /* STATUS TEXT ON ITS SOFT GROUND. The library sets these to the 600 steps,
+       which on the 50 grounds measure 3.1 (success), 2.8 (warning) and 4.4
+       (error) — under the 4.5 text floor. The 700 steps clear it in all three
+       and read one notch more serious, which is what an alert wants. */
+    --color-text-success-primary: var(--color-green-700);
+    --color-text-warning-primary: var(--color-yellow-700);
+    --color-text-error-primary: var(--color-red-700);
+    /* A RESTING ICON is a UI component part and wants the 3:1 non-text floor;
+       neutral-400 on white is 2.6. One step darker clears it at 4.7. */
+    --color-fg-quaternary: var(--color-neutral-500);
+    --color-fg-quaternary_hover: var(--color-neutral-600);
+}
+
+/* =============================================================================
+   DARK — designed, not inverted.
+   ========================================================================== */
+@layer base {
+    .dark-mode,
+    [data-theme="dark"] {
+        /* THE PLANE IS LIGHTER THAN THE GROUND. The library puts both at
+           neutral-950/900 the other way round; here the ground is the darkest
+           thing on screen and a card rises off it. */
+        --color-bg-primary: var(--color-neutral-900);
+        --color-bg-primary_alt: var(--color-neutral-900);
+        --color-bg-primary_hover: var(--color-neutral-800);
+        --color-bg-secondary: var(--color-neutral-950);
+        --color-bg-secondary_alt: var(--color-neutral-950);
+        --color-bg-secondary_hover: var(--color-neutral-800);
+        --color-bg-tertiary: var(--color-neutral-800);
+        --color-bg-quaternary: var(--color-neutral-700);
+        --color-bg-active: var(--color-neutral-800);
+        --color-bg-nav: var(--color-neutral-950);
+        --color-bg-overlay: var(--color-neutral-950);
+
+        /* THE BRAND LIGHTENS. forest-600 on near-black measures 2.4:1 and is
+           unreadable as link text; 300/400 are, and the library's dark
+           de-brands its text to neutral — here the forest thread stays. */
+        --color-text-brand-primary: var(--color-brand-200);
+        --color-text-brand-secondary: var(--color-brand-300);
+        --color-text-brand-secondary_hover: var(--color-brand-200);
+        --color-text-brand-tertiary: var(--color-brand-400);
+        --color-text-brand-tertiary_alt: var(--color-brand-300);
+        --color-fg-brand-primary: var(--color-brand-400);
+        --color-fg-brand-primary_alt: var(--color-brand-400);
+        --color-fg-brand-secondary: var(--color-brand-300);
+        --color-fg-brand-secondary_alt: var(--color-brand-400);
+        --color-fg-brand-secondary_hover: var(--color-brand-300);
+        --color-border-brand: var(--color-brand-400);
+        --color-border-brand_alt: var(--color-brand-400);
+        --color-bg-brand-primary: #0f2a20;
+        --color-bg-brand-primary_alt: #0f2a20;
+        --color-bg-brand-secondary: var(--color-brand-800);
+        /* white on brand-500 measures 4.3 — the primary button keeps the 600
+           step in dark too, where it is still the highest-contrast fill */
+        --color-bg-brand-solid: var(--color-brand-600);
+        --color-bg-brand-solid_hover: var(--color-brand-500);
+        /* a placeholder is text: neutral-500 on the dark plane is 3.8 */
+        --color-text-placeholder: var(--color-neutral-400);
+        --color-fg-quaternary: var(--color-neutral-500);
+        --color-fg-quaternary_hover: var(--color-neutral-400);
+        --color-bg-brand-section: var(--color-brand-950);
+        --color-bg-brand-section_subtle: var(--color-brand-900);
+        --color-focus-ring: var(--color-brand-400);
+
+        /* the panel's own names */
+        --color-border-control: var(--color-neutral-500);
+        --color-bg-selected: #0f2a20;
+        --color-border-selected: var(--color-brand-800);
+        --color-bg-info-primary: #0f1c30;
+        --color-bg-info-secondary: var(--color-blue-900);
+        --color-bg-info-solid: var(--color-blue-500);
+        --color-border-info: var(--color-blue-800);
+        --color-text-info-primary: var(--color-blue-300);
+        --color-fg-info-primary: var(--color-blue-400);
+        --color-fg-info-secondary: var(--color-blue-500);
+        --color-bg-skeleton: var(--color-neutral-800);
+        --color-bg-skeleton-sheen: var(--color-neutral-700);
+        /* the same warmth at a fraction of the chroma — a genuinely yellow
+           dark panel reads as sepia damage rather than as a warm room */
+        --color-bg-chat: #14120c;
+        --color-bg-hero: #0a0a0b;
+        --color-text-hero: var(--color-neutral-50);
+        --color-text-hero-muted: rgb(250 250 250 / 0.58);
+        --color-border-hero: rgb(250 250 250 / 0.1);
+        --color-fg-hero-accent: var(--color-brand-300);
+        --color-bg-toast: var(--color-neutral-800);
+        --color-text-toast: var(--color-neutral-50);
+
+        /* SOFT STATUS GROUNDS, re-mixed against near-black. The library uses
+           the 950 steps, which at a full-width band are slabs; these sit a
+           step darker so a row can wear one without owning the screen. */
+        --color-bg-success-primary: #0c2418;
+        --color-bg-warning-primary: #2a1c07;
+        --color-bg-error-primary: #2b1210;
+
+        /* charts: the categorical set re-mixed for a dark ground — the light
+           mid-tones vanish against near-black */
+        --color-chart-1: var(--color-brand-400);
+        --color-chart-2: #7fa6f0;
+        --color-chart-3: #e3a25a;
+        --color-chart-4: #b39ae6;
+        --color-chart-5: #5dc2bd;
+        --color-chart-6: #e58ab7;
+        --color-chart-7: #a6c46a;
+        --color-chart-8: #9ca3af;
+        --color-chart-seq-1: var(--color-brand-950);
+        --color-chart-seq-2: var(--color-brand-800);
+        --color-chart-seq-3: var(--color-brand-600);
+        --color-chart-seq-4: var(--color-brand-400);
+        --color-chart-seq-5: var(--color-brand-200);
+        --color-chart-pos: var(--color-green-500);
+        --color-chart-neg: var(--color-red-500);
+        --color-chart-grid: var(--color-neutral-800);
+        --color-chart-axis: var(--color-neutral-500);
+
+        /* elevation: a dark ground cannot show a shadow, so a raised surface
+           carries an inner highlight, and the active nav row a faint glow —
+           the one place the dark theme is allowed to glow */
+        --surface-sheen: inset 0 1px 0 rgb(255 255 255 / 0.06);
+        --nav-active-glow: -8px 0 18px -10px rgb(67 166 125 / 0.55);
+        --shadow-xs: 0px 1px 2px rgb(0 0 0 / 0.5);
+        --shadow-sm: 0px 1px 3px rgb(0 0 0 / 0.5), 0px 1px 2px -1px rgb(0 0 0 / 0.4);
+        --shadow-md: 0px 4px 6px -1px rgb(0 0 0 / 0.5), 0px 2px 4px -2px rgb(0 0 0 / 0.4);
+        --shadow-lg: 0px 12px 16px -4px rgb(0 0 0 / 0.5), 0px 4px 6px -2px rgb(0 0 0 / 0.4);
+        --shadow-xl: 0px 20px 24px -4px rgb(0 0 0 / 0.55), 0px 8px 8px -4px rgb(0 0 0 / 0.4);
+        --shadow-2xl: 0px 24px 48px -12px rgb(0 0 0 / 0.65), 0px 4px 4px -2px rgb(0 0 0 / 0.4);
+        --shadow-skeuomorphic: 0px 0px 0px 1px rgb(255 255 255 / 0.12) inset, 0px -2px 0px 0px rgb(0 0 0 / 0.2) inset;
+    }
+}

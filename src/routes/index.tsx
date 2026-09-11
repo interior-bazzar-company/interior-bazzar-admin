@@ -29,6 +29,13 @@ const UserRoutes = () => (
       <Route path="/" element={<Navigate to={"/" + HOME_ROUTE} replace />} />
       <Route path="/:route" element={<ViewHost />} />
       <Route path="/:route/:id" element={<ViewHost />} />
+      {/* A THIRD SEGMENT, for a record's own operations. `/team/58/leave` is a
+          page about one person's leave, not a tab of a page about the person —
+          it has its own crumb, its own toolbar and its own link somebody can
+          send. The host still keys on the FIRST segment, so this adds a depth
+          and never a module: a route with no third segment behaves exactly as
+          it did. */}
+      <Route path="/:route/:id/:sub" element={<ViewHost />} />
     </Route>
   </Routes>
 );

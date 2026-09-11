@@ -11,7 +11,7 @@
    ~200 KB of dependency to solve a problem this file solves in one function,
    and they solve it wrongly: they rasterise the DOM as it currently looks, so
    an operator working in dark mode would send a dark card, and a card rendered
-   from `enquiries.css` changes every time somebody touches a rule in it. A
+   from a module stylesheet changed every time somebody touched a rule in it. A
    hand-drawn canvas is deterministic — the same enquiry produces the same
    pixels on every machine, every theme, every browser — and nothing in the
    panel's stylesheet can reach it. That determinism is also what makes rule 1
@@ -53,7 +53,7 @@
    enforce anything past that.
 
    COLOURS ARE LITERAL HEX HERE, ON PURPOSE. This file is not styled by
-   enquiries.css and a canvas never sees a CSS variable, so there is nothing to
+   the design tokens and a canvas never sees a CSS variable, so there is nothing to
    read a token from even if we wanted to. More importantly the image must look
    identical for every viewer regardless of the theme they happen to be working
    in — the recipient's copy cannot depend on the sender's settings. The palette

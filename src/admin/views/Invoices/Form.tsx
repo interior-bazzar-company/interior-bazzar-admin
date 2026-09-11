@@ -9,17 +9,20 @@
    evidence are what the issue transaction refuses without.
    ===================================================================== */
 import { useRef, useState } from "react";
-import type { CSSProperties, ReactNode } from "react";
 import AdminOpsService from "../../../api/modules/adminOps";
 import type { InvoiceSaveInput } from "../../../api/modules/adminOps";
 import { CommonService } from "../../../api/modules/common";
-import { Field, Icon, Notice, Table } from "../../ui";
-import { inr, inrWords, fmtDate } from "../../ui/format";
+import {
+  Alert, Button, Card, DateInput, FieldRow, FormField, FormSection, Icon, IconButton, Input, PageHeader, Pill,
+  SectionHead, SelectInput, Table, Textarea, Timeline,
+} from "../../ui";
+import { BillTo, BuilderLayout, BuilderSummary, FeatureFold, StepHead } from "../Quotations/bits";
+import { inr, fmtDate } from "../../ui/format";
 import { useNav } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import { AppExceptions, SERVICE_MESSAGE, errMessage } from "../../../api/apiService";
 import { usePlanCatalogue } from "../Quotations/api";
-import { GST_RATES, SELLER, STATES, planLabel } from "../Quotations/helpers";
+import { STATES, planLabel } from "../Quotations/helpers";
 import { call, paiseToRupees, rupeesToPaise } from "./api";
 import type { InvoiceRow } from "./api";
 import { addonsOf, blockersOf, planItemOf } from "./helpers";
@@ -34,7 +37,7 @@ const REMARK_PRESETS = ["Slot booking", "Installment 1", "Installment 2",
   "Installment 3", "Installment 4", "Installment 5"];
 
 /* ============================================================== the body === */
-export function BuilderBody({ inv, onSaved }: { inv: InvoiceRow; onSaved: () => void }) {
+export function BuilderBody({ inv, onSaved, detail }: { inv: InvoiceRow; onSaved: () => void; detail: string }) {
   const plan = planItemOf(inv);
   const addons = addonsOf(inv);
   const [err, setErr] = useState<string | null>(null);
@@ -114,101 +117,125 @@ export function BuilderBody({ inv, onSaved }: { inv: InvoiceRow; onSaved: () => 
   const removeAddon = (itemId: number) => withQuietSave("Charge removed.", (rowVersion) =>
     call(AdminOpsService.removeInvoiceAddon(inv.id, itemId, rowVersion)));
 
+  const dealTo = "#/deals/" + inv.dealRef;
+  const quoteTo = inv.quotationId ? "#/quotations/" + inv.quotationId : null;
+
+  /* The lines above the tax block. Display only — every figure is what the
+     server last computed, and it recomputes them again on save. */
+  const lines = [
+    { k: "Plan" + (plan && plan.installmentCount
+        ? " · installment " + plan.installmentSeq + " of " + plan.installmentCount : ""),
+      v: inr(plan ? plan.amountPaise : 0) },
+    ...(addons.length ? [{ k: "One-off charges", v: inr(addons.reduce((a, i) => a + i.amountPaise, 0)) }] : []),
+    { k: "Subtotal", v: inr(inv.subtotalPaise), rule: true },
+    { k: taxMode !== "not_applicable" ? "Taxable value" : "Amount", v: inr(inv.taxableTotalPaise), rule: true },
+  ];
+
   return (
-    <div className="qbld">
-      <div>
-        {err ? <Notice tone="bad" text={<b>{err}</b>} /> : null}
+    <div className="flex min-w-0 flex-col gap-5">
+      {/* The header is the quotation builder's, line for line: same eyebrow,
+          same meta row carrying the record's own links, one primary. The
+          "source strip" card that used to sit under it repeated the deal ref,
+          the quotation number and the total — all three are already on this
+          screen, in the meta, the plan line and the summary. */}
+      <PageHeader
+        eyebrow="Step 2 of 2"
+        title="New invoice"
+        back={{ label: "Back to the invoice", to: detail }}
+        meta={<>
+          <Pill dot text="Draft" />
+          <a href={dealTo} data-go={dealTo} className="font-mono text-brand-secondary tnum"
+            onClick={(e) => { e.preventDefault(); go(dealTo); }}>{inv.dealRef}</a>
+          {quoteTo
+            ? <a href={quoteTo} data-go={quoteTo} className="font-mono text-brand-secondary tnum"
+                onClick={(e) => { e.preventDefault(); go(quoteTo); }}>{inv.quotationNumber || "quotation"}</a>
+            : <Pill xs text="quotation_required" tone="bad" />}
+          <span className="font-mono tnum">Number assigned on issue</span>
+        </>}
+        actions={<Button color="primary" ico="quote" onClick={() => go("#/invoices/" + inv.id + "?mode=preview")}>
+          Preview &amp; issue</Button>} />
 
-        <Step n={1} title="Who and when" hint="the invoice's own dates, and who it is billed to" />
-        <div className="card"><div className="card-b">
-          <Parties inv={inv} />
-          <div className="f3" style={{ marginTop: "var(--space-4)" }}>
-            <Field id="nvDate" label="Invoice date" type="date" value={inv.invoiceDate} />
-            <Field id="nvDue" label="Due date" type="date" value={inv.dueDate}
-              help="Drives Overdue on the list." />
-            <Field id="nvPos" label="Place of supply" type="select"
-              options={STATES.map((s) => ({ v: s, l: s, sel: s === inv.placeOfSupply }))}
-              help="Drives the CGST/SGST ↔ IGST split." />
-          </div>
-          <div className="help">
-            The billing block is a <b>column, not a join</b>. It is copied from the deal now and
-            <b> frozen again at issue</b>, so a later profile edit cannot reach a document the
-            customer already holds.
-          </div>
-        </div></div>
+      {err ? <Alert tone="bad" title="Could not save this invoice.">{err}</Alert> : null}
 
-        <Step n={2} title="What you're billing"
-          hint="the quotation's schedule, the plan, and anything one-off" />
-        <div className="card">
-          <PlanBlock inv={inv} plan={plan} />
-          <AddonBlock addons={addons} busy={busy} onAdd={addAddon} onRemove={removeAddon} />
-        </div>
+      <BuilderLayout
+        form={<>
+          <section className="flex min-w-0 flex-col gap-3">
+            <StepHead n={1} title="Details" hint="from the deal, frozen at issue" />
+            <Card>
+              <FormSection>
+                <BillTo name={inv.billing.name || "—"} address={inv.billing.address || "—"} phone={inv.billing.phone || "—"}
+                  edit={<Button color="link-color" size="xs" ico="ext" data-go={dealTo}
+                    onClick={() => go(dealTo)}>Edit on the deal</Button>} />
+                <FieldRow cols={3}>
+                  <FormField id="nvDate" label="Invoice date">
+                    <DateInput id="nvDate" defaultValue={inv.invoiceDate} className="w-full" />
+                  </FormField>
+                  <FormField id="nvDue" label="Due date" hint="Drives Overdue on the list.">
+                    <DateInput id="nvDue" defaultValue={inv.dueDate} className="w-full" />
+                  </FormField>
+                  <FormField id="nvPos" label="Place of supply" hint="Drives the CGST/SGST ↔ IGST split.">
+                    <SelectInput id="nvPos" defaultValue={inv.placeOfSupply}
+                      options={STATES.map((s) => ({ v: s, l: s }))} />
+                  </FormField>
+                </FieldRow>
+              </FormSection>
+            </Card>
+          </section>
 
-        <Step n={3} title="Payment received"
-          hint="required — an invoice is raised only after the client has paid" />
-        <div className="card"><div className="card-b">
-          <div className="f3">
-            <Field id="nvPayDate" label="Date received" type="date" value={inv.paymentDate || ""} />
-            <Field id="nvPayMode" label="Mode" type="select"
-              options={PAY_MODES.concat(inv.paymentMode && PAY_MODES.indexOf(inv.paymentMode) < 0
-                ? [inv.paymentMode] : [])
-                .map((m) => ({ v: m, l: m, sel: m === inv.paymentMode }))} />
-            <Field id="nvPayRef" label="Reference / UTR" req value={inv.paymentReference}
-              ph="NEFT0026JUN4471"
-              help="Mandatory — without it the payment cannot be reconciled against the bank." />
-          </div>
-          <ProofsBlock inv={inv} onChanged={onSaved} />
-        </div></div>
+          <section className="flex min-w-0 flex-col gap-3">
+            <StepHead n={2} title="Plan and charges" />
+            <Card flush>
+              <PlanBlock inv={inv} plan={plan} />
+              <AddonBlock addons={addons} busy={busy} onAdd={addAddon} onRemove={removeAddon} />
+            </Card>
+          </section>
 
-        <Step n={4} title="What it says" hint="notes and terms, printed on the document" />
-        <div className="card"><div className="card-b">
-          <Field id="nvNotes" label="Notes (customer-facing)" type="textarea" rows={3} value={inv.notes}
-            ph="Anything the customer should read alongside the figures." />
-          <Field id="nvTerms" label="Payment terms" type="textarea" rows={6} value={inv.terms} />
-        </div></div>
-      </div>
+          <section className="flex min-w-0 flex-col gap-3">
+            <StepHead n={3} title="Payment received" hint="required before an invoice is raised" />
+            <Card>
+              <FormSection>
+                <FieldRow cols={3}>
+                  <FormField id="nvPayDate" label="Date received">
+                    <DateInput id="nvPayDate" defaultValue={inv.paymentDate || ""} className="w-full" />
+                  </FormField>
+                  <FormField id="nvPayMode" label="Mode">
+                    <SelectInput id="nvPayMode" defaultValue={inv.paymentMode}
+                      options={PAY_MODES.concat(inv.paymentMode && PAY_MODES.indexOf(inv.paymentMode) < 0
+                        ? [inv.paymentMode] : []).map((m) => ({ v: m, l: m }))} />
+                  </FormField>
+                  <FormField id="nvPayRef" label="Reference / UTR" req
+                    hint="Mandatory — without it the payment cannot be reconciled against the bank.">
+                    <Input id="nvPayRef" defaultValue={inv.paymentReference} mono ph="NEFT0026JUN4471" />
+                  </FormField>
+                </FieldRow>
+                <ProofsBlock inv={inv} onChanged={onSaved} />
+              </FormSection>
+            </Card>
+          </section>
 
-      <div className="qbld-rail">
-        <Summary inv={inv} plan={plan} addons={addons} taxMode={taxMode} onTaxMode={setTaxMode}
-          busy={busy} onSave={save} />
-      </div>
-    </div>
-  );
-}
-
-/* A numbered step rather than a section heading — the quotation builder's own
-   step(), for the same reason: four equal headings read as four things, four
-   numbers read as a sequence you are part way through. */
-function Step({ n, title, hint }: { n: number; title: string; hint?: string }) {
-  return (
-    <div className="qstep">
-      <span className="qstep-n">{n}</span>
-      <div><b>{title}</b>{hint ? <span className="qstep-h">{hint}</span> : null}</div>
-    </div>
-  );
-}
-
-/* Reference, not input: it reads as a strip, not as a form somebody is meant
-   to fill in and then wonders why they cannot. */
-function Parties({ inv }: { inv: InvoiceRow }) {
-  const { go } = useNav();
-  return (
-    <div className="qparties">
-      <div>
-        <span className="qparties-k">From</span>
-        <b>{SELLER.brand}</b><br />
-        <span className="faint">{SELLER.tagline}</span><br />
-        {SELLER.addr}<br />
-        <span className="mono">{SELLER.gstin ? "GSTIN " + SELLER.gstin : "CIN " + SELLER.cin}</span>
-      </div>
-      <div>
-        <span className="qparties-k">Bill to <span className="faint">· from the deal</span></span>
-        <b>{inv.billing.name || "—"}</b><br />
-        {inv.billing.address || "—"}<br />
-        <span className="mono">{inv.billing.phone || "—"}</span>{" "}
-        <a className="lnk" data-go={"#/deals/" + inv.dealRef} onClick={() => go("#/deals/" + inv.dealRef)}>
-          Edit on deal ↗</a>
-      </div>
+          <section className="flex min-w-0 flex-col gap-3">
+            <StepHead n={4} title="Notes and terms" />
+            <Card>
+              <FormSection>
+                <FormField id="nvNotes" label="Notes (customer-facing)">
+                  <Textarea id="nvNotes" rows={3} defaultValue={inv.notes}
+                    ph="Anything the customer should read alongside the figures." />
+                </FormField>
+                <FormField id="nvTerms" label="Payment terms">
+                  <Textarea id="nvTerms" rows={6} defaultValue={inv.terms} />
+                </FormField>
+              </FormSection>
+            </Card>
+          </section>
+        </>}
+        rail={
+          <BuilderSummary lines={lines}
+            gstId="nvGst" gstRate={inv.gstRate} taxMode={taxMode} onTaxMode={setTaxMode}
+            placeOfSupply={inv.placeOfSupply}
+            cgstPaise={inv.cgstPaise} sgstPaise={inv.sgstPaise} igstPaise={inv.igstPaise}
+            grandTotalPaise={inv.grandTotalPaise} blockers={blockersOf(inv).map((b) => ({ text: b }))}
+            busy={busy} onSave={save} saveLabel="Save changes" saveAct="in-save-all" />
+        } />
     </div>
   );
 }
@@ -223,54 +250,53 @@ function Parties({ inv }: { inv: InvoiceRow }) {
    renders without them. */
 function PlanBlock({ inv, plan }: { inv: InvoiceRow; plan: ReturnType<typeof planItemOf> }) {
   const { plans } = usePlanCatalogue();
-  if (!plan) return <div className="card-b faint">No plan block.</div>;
+  /* Which remark is chosen is STATE, because "Other" is the one answer that
+     opens a second field — and a field for an answer nobody gave should not
+     be on screen. `patch()` still reads both controls off the DOM: the select
+     carries its value, and the free-text input exists exactly when it is the
+     one being read. */
+  const stored = plan ? plan.remark || "" : "";
+  const storedIsPreset = REMARK_PRESETS.indexOf(stored) >= 0;
+  const [remark, setRemark] = useState(storedIsPreset ? stored : "other");
+  if (!plan) return <p className="p-5 text-sm text-tertiary">No plan block.</p>;
   const cat = plans.find((c) => planLabel(c) === plan.description);
   const feats = cat ? (cat.features || []).map((f) => (typeof f === "string" ? f : f.text)).filter(Boolean) : [];
-  const preset = REMARK_PRESETS.indexOf(plan.remark || "") >= 0;
   return (
-    <div className="card-b">
-      <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: "var(--text-xl)", fontWeight: 600 }}>{plan.description}</div>
-          <div className="faint" style={{ fontSize: "var(--text-md)" }}>
-            From {inv.quotationNumber || "the accepted quotation"} · suggested:{" "}
+    <div className="flex flex-col gap-4 p-5">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <div className="text-lg font-semibold text-primary">{plan.description}</div>
+          <div className="mt-0.5 text-sm text-tertiary">
+            {inv.quotationNumber || "Accepted quotation"} ·{" "}
             {plan.installmentCount
               ? "installment " + plan.installmentSeq + " of " + plan.installmentCount
-              : "the plan's full amount"}
+              : "full amount"}
           </div>
-          {plan.remark
-            ? <div className="faint" style={{ fontSize: "var(--text-sm)", marginTop: "3px" }}>
-                <Icon name="tag" size="sm" />{plan.remark}</div>
-            : null}
         </div>
-        <div className="tnum" style={{ fontSize: "var(--text-2xl)", fontWeight: 600 }}>
+        <div className="shrink-0 font-mono text-display-xs font-semibold text-primary tnum">
           {inr(plan.amountPaise)}</div>
       </div>
 
-      {feats.length
-        ? <div style={{ marginTop: "12px" }}>
-            <div className="lbl">What the plan includes</div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: "5px", marginTop: "6px" }}>
-              {feats.map((f, i) => <span key={i} className="pill xs" title={f}>{f}</span>)}
-            </div>
-            {/* Not snapshotted, unlike the prototype's copy: the line stores the
-                plan NAME, and these are read live from the catalogue by it. The
-                document carries the figures below, never this list. */}
-            <div className="help">Read from the plan catalogue by the name on this line. The document
-              carries the figures below, not these.</div>
-          </div>
-        : null}
+      {/* Read live from the catalogue by the name on the line, same as the
+          quotation builder — and folded the same way, so the tier's ten chips
+          do not stand between the amount and the field that changes it. */}
+      <FeatureFold feats={feats} />
 
-      <div className="f3" style={{ marginTop: "14px" }}>
-        <Field id="nvAmt" label="Amount ₹" type="number" value={paiseToRupees(plan.amountPaise)} />
-        <Field id="nvRemark" label="Remark" type="select"
-          options={REMARK_PRESETS.map((r) => ({ v: r, l: r, sel: plan.remark === r }))
-            .concat([{ v: "other", l: "Other (type below)", sel: !preset }])}
-          help="One-click preset, or Other for anything else." />
-        <Field id="nvRemarkOther" label="Custom remark" value={preset ? "" : plan.remark || ""}
-          ph="e.g. Registration amount, balance payment…"
-          help="Used only when Remark above is Other — mandatory in that case." />
-      </div>
+      <FieldRow cols={3}>
+        <FormField id="nvAmt" label="Amount ₹">
+          <Input id="nvAmt" type="number" defaultValue={paiseToRupees(plan.amountPaise)} mono />
+        </FormField>
+        <FormField id="nvRemark" label="Remark" req>
+          <SelectInput id="nvRemark" value={remark} onChange={setRemark}
+            options={REMARK_PRESETS.map((r) => ({ v: r, l: r })).concat([{ v: "other", l: "Other…" }])} />
+        </FormField>
+        {remark === "other" ? (
+          <FormField id="nvRemarkOther" label="Custom remark" req>
+            <Input id="nvRemarkOther" defaultValue={storedIsPreset ? "" : stored}
+              ph="e.g. Registration amount, balance payment" />
+          </FormField>
+        ) : null}
+      </FieldRow>
     </div>
   );
 }
@@ -282,150 +308,40 @@ function AddonBlock({ addons, busy, onAdd, onRemove }: {
   addons: ReturnType<typeof addonsOf>; busy: boolean;
   onAdd: () => void; onRemove: (itemId: number) => void;
 }) {
-  const addBtn = (
-    <button className="btn" data-act="in-addon-add" disabled={busy} onClick={onAdd}>
-      <Icon name="plus" size="sm" />Add charge</button>
+  /* The same head the quotation's charges wear — title left, the one entry
+     point right — so the two builders' second cards read as one drawing. */
+  const add = (
+    <Button color="secondary" size="xs" ico="plus" data-act="in-addon-add" isDisabled={busy} onClick={onAdd}>
+      Add a charge</Button>
   );
-  if (!addons.length) return (
-    <div className="card-b" style={{ display: "flex", alignItems: "center", gap: "10px",
-                                     borderTop: "1px solid var(--line)" }}>
-      {addBtn}
-      <span className="faint" style={{ fontSize: "var(--text-md)" }}>
-        Onboarding, a shoot, a custom integration. <b>No months and no quantity</b> — a one-off
-        charge has an amount and nothing else.</span>
-    </div>
-  );
-
   return (
-    <div className="card-b" style={{ borderTop: "1px solid var(--line)" }}>
-      <Table
+    <div className="flex min-w-0 flex-col gap-3 border-t border-secondary p-5">
+      <SectionHead className="mb-0" title="One-off charges" right={add} />
+      {addons.length ? <Table
         cols={[{ label: "#", w: "36px" }, { label: "Description" }, { label: "HSN / SAC", w: "120px" },
-          { label: "Amount ₹", cls: "n", w: "150px" }, { label: "", w: "44px" }]}
+          { label: "Amount ₹", cls: "n", w: "150px" }, { label: "", cls: "acts", w: "44px" }]}
         rows={addons.map((it, ix) => (
           <tr key={it.id}>
             <td className="faint">{ix + 1}</td>
-            <td><input className="inp sm" id={"a-nm-" + it.id} defaultValue={it.description} /></td>
-            <td><input className="inp sm" id={"a-hs-" + it.id} defaultValue={it.hsn || ""} /></td>
+            <td><Input id={"a-nm-" + it.id} defaultValue={it.description} ariaLabel="Description" /></td>
+            <td><Input id={"a-hs-" + it.id} defaultValue={it.hsn || ""} ariaLabel="HSN or SAC" mono /></td>
             <td className="n">
-              <input className="inp sm n" id={"a-am-" + it.id} type="number"
-                defaultValue={Math.round(it.amountPaise / 100)} />
+              <Input id={"a-am-" + it.id} type="number" ariaLabel="Amount in rupees" mono
+                inputClassName="text-right" defaultValue={String(Math.round(it.amountPaise / 100))} />
             </td>
-            <td className="c">
-              <button className="btn sm icon dgr" data-act="in-addon-del" aria-label="Remove charge"
-                disabled={busy} onClick={() => onRemove(it.id)}><Icon name="x" size="sm" /></button>
+            <td className="acts">
+              <IconButton ico="x" size="xs" label="Remove charge" data-act="in-addon-del"
+                isDisabled={busy} onClick={() => onRemove(it.id)} />
             </td>
           </tr>
         ))}
-      />
-      <div style={{ display: "flex", gap: "8px", marginTop: "8px" }}>{addBtn}</div>
+      /> : null}
     </div>
   );
 }
 
-/* ============================================================= the rail === */
-/* Display only — every figure is what the SERVER last computed, and it
-   recomputes them again on save. The one commit for the whole page lives here,
-   because this is the card that already shows what every field on it adds up
-   to. */
-function Summary({ inv, plan, addons, taxMode, onTaxMode, busy, onSave }: {
-  inv: InvoiceRow; plan: ReturnType<typeof planItemOf>; addons: ReturnType<typeof addonsOf>;
-  taxMode: string; onTaxMode: (m: "applicable" | "not_applicable") => void;
-  busy: boolean; onSave: () => void;
-}) {
-  const applicable = taxMode !== "not_applicable";
-  const intra = inv.placeOfSupply === SELLER.state;
-  const addonGross = addons.reduce((a, i) => a + i.amountPaise, 0);
-  const blockers = blockersOf(inv);
-
-  return (
-    <div className="card">
-      <div className="card-h"><h3>Summary</h3>
-        <span className="d">display only — the server recomputes</span></div>
-      <div className="card-b">
-        <Row k={"Plan" + (plan && plan.installmentCount
-          ? " · installment " + plan.installmentSeq + " of " + plan.installmentCount : "")}
-          v={inr(plan ? plan.amountPaise : 0)} />
-        {addons.length ? <Row k="One-off charges" v={inr(addonGross)} /> : null}
-        <Row k={<b>Subtotal</b>} v={<b>{inr(inv.subtotalPaise)}</b>}
-          style={{ borderTop: "1px solid var(--line)", marginTop: "4px" }} />
-        <Row k={applicable ? "Taxable value" : "Amount"} v={inr(inv.taxableTotalPaise)}
-          style={{ borderTop: "1px solid var(--line)" }} />
-
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0" }}>
-          <span>Tax</span>
-          <div className="btn-group">
-            <button className={applicable ? "on" : ""} data-act="in-tax-mode" data-v="applicable"
-              onClick={() => onTaxMode("applicable")}>Applicable</button>
-            <button className={!applicable ? "on" : ""} data-act="in-tax-mode" data-v="not_applicable"
-              onClick={() => onTaxMode("not_applicable")}>Not applicable</button>
-          </div>
-        </div>
-
-        {applicable
-          ? <>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0" }}>
-                <span>GST rate</span>
-                <select className="inp sm" id="nvGst" style={{ width: "96px" }} defaultValue={String(inv.gstRate)}>
-                  {GST_RATES.map((r) => <option key={r} value={r}>{r}%</option>)}
-                </select>
-              </div>
-              {intra
-                ? <>
-                    <Row k={"CGST (" + inv.gstRate / 2 + "%)"} v={inr(inv.cgstPaise)} />
-                    <Row k={"SGST (" + inv.gstRate / 2 + "%)"} v={inr(inv.sgstPaise)} />
-                  </>
-                : <Row k={"IGST (" + inv.gstRate + "%)"} v={inr(inv.igstPaise)} />}
-            </>
-          : <div className="help" style={{ marginTop: "10px" }}>
-              <b>Tax not applicable.</b> The grand total excludes GST entirely — an explicit choice
-              for this invoice.
-            </div>}
-
-        <Row k={<b style={{ fontSize: "var(--text-lg)" }}>Grand total</b>}
-          v={<b style={{ fontSize: "var(--text-lg)" }}>{inr(inv.grandTotalPaise)}</b>}
-          style={{ borderTop: "2px solid var(--line-2)", marginTop: "6px", paddingTop: "9px" }} />
-        <div className="faint" style={{ fontSize: "var(--text-sm)", marginTop: "4px" }}>
-          {inrWords(inv.grandTotalPaise)}
-        </div>
-
-        {applicable
-          ? <div className="help" style={{ marginTop: "10px" }}>
-              {intra
-                ? <><b>Intra-state.</b> Place of supply is {inv.placeOfSupply}, the same state as
-                    Interior bazzar — so GST splits into CGST + SGST.</>
-                : <><b>Inter-state.</b> Place of supply is {inv.placeOfSupply || "not set"} and Interior
-                    bazzar is in {SELLER.state} — so a single IGST applies.</>}
-            </div>
-          : null}
-      </div>
-
-      <div className="card-f qsave">
-        <button className="btn pri" data-act="in-save-all" disabled={busy} onClick={onSave}>
-          <Icon name="check" />{busy ? "Saving…" : "Save changes"}</button>
-        <span className="qsave-h">Writes the dates, the plan, the charges and the payment together.</span>
-      </div>
-
-      <div className="card-f">
-        {blockers.length
-          ? <Notice tone="bad" ico="alert" text={<>
-              <b>Cannot be issued yet</b>
-              <ul style={{ margin: "5px 0 0 16px" }}>
-                {blockers.map((b) => <li key={b}>{b}</li>)}
-              </ul>
-            </>} />
-          : <span style={{ color: "var(--ok)" }}><Icon name="check" size="sm" /> Ready to issue</span>}
-      </div>
-    </div>
-  );
-}
-
-function Row({ k, v, style }: { k: ReactNode; v: ReactNode; style?: CSSProperties }) {
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", padding: "5px 0", ...style }}>
-      <span>{k}</span><span className="tnum">{v}</span>
-    </div>
-  );
-}
+/* The rail is `BuilderSummary` in Quotations/bits now — one drawing for both
+   builders, carrying the figures, the tax decision and the one Save. */
 
 /* ---------------------------------------------------------------- proof --- */
 /* One line, not a section: what the issue transaction is still missing, and
@@ -483,58 +399,55 @@ export function ProofsBlock({ inv, onChanged }: { inv: InvoiceRow; onChanged: ()
   };
 
   return (
-    <>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
-                    flexWrap: "wrap", gap: "8px", marginTop: "6px" }}>
-        <span style={{ fontSize: "var(--text-sm)" }}>
+    <div className="flex flex-col gap-2.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="min-w-0 text-sm">
+          {/* THE STATE FIRST, then the caveat: whether the issue guard is
+              satisfied is the only thing being asked here. */}
           {proofs.length
-            ? <b style={{ color: "var(--ok)" }}><Icon name="check" size="sm" />
+            ? <b className="inline-flex items-center gap-1 font-medium text-success-primary">
+                <Icon name="check" size="xs" />
                 {proofs.length} proof{proofs.length === 1 ? "" : "s"}{" "}
                 {isDraft ? "attached" : "on file"}</b>
             : isDraft
-              ? <b style={{ color: "var(--bad)" }}><Icon name="alert" size="sm" />
+              ? <b className="inline-flex items-center gap-1 font-medium text-error-primary">
+                  <Icon name="alert" size="xs" />
                   No payment proof attached yet — required to issue</b>
-              : <b className="faint">No proof on file</b>}{" "}
-          <span className="faint">· internal record, never shown to the customer</span>
+              : <b className="font-medium text-quaternary">No proof on file</b>}{" "}
+          <span className="text-tertiary">· internal record, never shown to the customer</span>
         </span>
         {isDraft
           ? <>
-              <button className="btn sm" disabled={busy} onClick={() => fileRef.current?.click()}>
-                <Icon name="plus" size="sm" />
-                {busy ? (pct && pct < 100 ? `Uploading ${pct}%` : "Attaching\u2026") : "Attach payment proof"}</button>
+              <Button color="secondary" size="xs" ico="plus" isDisabled={busy}
+                onClick={() => fileRef.current?.click()}>
+                {busy ? (pct && pct < 100 ? "Uploading " + pct + "%" : "Attaching…") : "Attach payment proof"}</Button>
               <input ref={fileRef} type="file" accept="image/*,application/pdf" hidden onChange={upload} />
             </>
-          : <span className="faint" style={{ fontSize: "var(--text-sm)" }}>
-              Frozen with the invoice at issue</span>}
+          : <span className="text-sm text-tertiary">Frozen with the invoice at issue</span>}
       </div>
       {proofs.length
-        ? <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", marginTop: "10px" }}>
+        ? <div className="flex flex-wrap gap-1.5">
             {proofs.map((p) => (p.url
-              ? <a key={p.id} className="pill xs ok" href={p.url} target="_blank" rel="noreferrer"
-                  title={p.filename}><Icon name="shield" size="sm" />{p.filename}</a>
-              : <span key={p.id} className="pill xs ok" title={p.filename}>
-                  <Icon name="shield" size="sm" />{p.filename}</span>))}
+              ? <a key={p.id} href={p.url} target="_blank" rel="noreferrer" title={p.filename}
+                  className="rounded-md outline-focus-ring focus-visible:outline-2 focus-visible:outline-offset-2">
+                  <Pill xs ico="shield" tone="ok" text={p.filename} /></a>
+              : <Pill key={p.id} xs ico="shield" tone="ok" text={p.filename} title={p.filename} />))}
           </div>
         : null}
-    </>
+    </div>
   );
 }
 
 export function EventLog({ events }: { events: NonNullable<InvoiceRow["events"]> }) {
   return (
-    <div className="tl">
-      {events.map((e) => (
-        <div key={e.id} className="ti">
-          <div style={{ display: "flex", alignItems: "baseline", gap: "8px" }}>
-            <span className="pill xs">{e.eventType}</span>
-            <span className="faint" style={{ fontSize: "var(--text-sm)", marginLeft: "auto" }}>{fmtDate(e.createdAt)}</span>
-          </div>
-          {e.detail ? <div style={{ fontSize: "var(--text-base)", marginTop: "4px" }}>{e.detail}</div> : null}
-          <div className="faint" style={{ fontSize: "var(--text-sm)", marginTop: "2px" }}>
-            {e.actor ? e.actor.name : e.actorRole || "System"}
-          </div>
-        </div>
-      ))}
-    </div>
+    /* the shared timeline — see the note in Deals/Drawer.tsx */
+    <Timeline items={events.map((e) => ({
+      title: <span className="flex flex-wrap items-center gap-2">
+        <Pill xs text={e.eventType} tone="neutral" />
+        <span className="text-xs text-quaternary tnum">{fmtDate(e.createdAt)}</span>
+      </span>,
+      body: e.detail || null,
+      meta: e.actor ? e.actor.name : e.actorRole || "System",
+    }))} />
   );
 }

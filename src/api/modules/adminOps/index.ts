@@ -133,8 +133,40 @@ export interface AdminUserInput {
   roles: number[];
 }
 export interface AuditEntry {
-  id: number; actor: string | null; role: string | null;
-  action: string; module: string; detail: string | null; ts: string | null;
+  /** Null on the synthesised registration line — there is no row to link to. */
+  id: number | null;
+  /** The handle, for searching back to an account. */
+  actor: string | null;
+  /** The name to PRINT. Falls back to the handle, never blank. */
+  actorName: string;
+  role: string | null;
+  action: string;
+  /** Server-derived: "team_member_roles_updated" -> "Team member roles updated". */
+  label: string;
+  /** created | updated | approved | removed | refused | changed. */
+  verb: string;
+  destructive: boolean;
+  module: string; detail: string | null; ts: string | null;
+  /** Who the action was done TO. Null on rows that are not about a person, and
+   *  null again once that account is deleted. */
+  subjectUser: number | null;
+  subjectUsername: string | null;
+  subjectName: string;
+  /** True only for the registration line, which is derived from the account's
+   *  own creation stamp rather than stored — no admin ever performed it. */
+  synthetic: boolean;
+}
+export interface AuditAction {
+  action: string; label: string; verb: string; destructive: boolean;
+}
+/** Built from what the log actually holds, so a filter never offers a value
+ *  with no rows behind it. */
+export interface AuditVocabularies {
+  actions: AuditAction[];
+  modules: string[];
+  roles: string[];
+  verbs: string[];
+  destructiveWords: string[];
 }
 /** Counts over the WHOLE filtered log, not the page — each facet ignores its
  *  own filter so picking one value never collapses the others to zero. */
@@ -558,6 +590,30 @@ export class AdminOpsService {
     dateFrom?: string; dateTo?: string; pageNo?: number; pageSize?: number;
   } = {}) {
     return apiService.getGetApiResponse<AuditResponse>(`${base}/audit/${qs(params)}`);
+  }
+  /** ONE ACCOUNT'S slice of the same trail — every entry whose SUBJECT is that
+   *  user, same envelope, same filters, same paging.
+   *
+   *  `ref` is the pk, the public `unique_id` UUID, or the username. Three,
+   *  because the panel does not hold one id: a reference that matches no
+   *  account is REFUSED (`user_not_found`) rather than answered with an empty
+   *  page, so "nobody touched them" and "no such person" stay different facts.
+   *
+   *  The oldest entry is always the registration line, carrying
+   *  `synthetic: true` — derived from the account's creation stamp because no
+   *  admin performed it and no stored row exists. It is withheld from a
+   *  filtered read. */
+  static userAudit(ref: string | number, params: {
+    module?: string; role?: string; search?: string; destructive?: string;
+    dateFrom?: string; dateTo?: string; pageNo?: number; pageSize?: number;
+  } = {}) {
+    return apiService.getGetApiResponse<AuditResponse>(
+      `${base}/audit/user/${encodeURIComponent(String(ref))}/${qs(params)}`);
+  }
+  /** The labels, verbs, modules and roles the trail is drawn and filtered
+   *  from, so the panel hard-codes none of them. */
+  static auditVocabularies() {
+    return apiService.getGetApiResponse<AuditVocabularies>(`${base}/audit/vocabularies/`);
   }
 
   // ── Revenue ──

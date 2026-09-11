@@ -1,0 +1,46 @@
+{
+  "$comment": "STATIC CONFIG for Finance — the module's clock, its reporting period and the accounts money moves through. Replaced by GET /admin/finance/context. `asOf` IS THE CLOCK: every \"this month\", \"due in 30 days\", \"overdue by N days\" and \"age\" in the module is computed from it and never from the browser. A panel that reads the device clock shows a different answer on a laptop whose date is wrong, and a demo recorded in August still has to make sense in December. Writes stamp `asOf` plus however long the session has been open, so a row recorded during a session sits after the seed rather than jumping to real today.",
+  "generatedAt": "2026-08-25T09:00:00+05:30",
+  "asOf": "2026-08-25T09:00:00+05:30",
+
+  "period": {
+    "key": "2026-08",
+    "label": "August 2026",
+    "from": "2026-08-01",
+    "to": "2026-08-31"
+  },
+
+  "accounts": [
+    {
+      "accountId": "ACC-HDFC-4021",
+      "name": "HDFC current",
+      "masked": "HDFC ••••4021",
+      "type": "bank",
+      "openingPaise": 184200000,
+      "unrestricted": true,
+      "active": true
+    },
+    {
+      "accountId": "ACC-RZP",
+      "name": "Razorpay clearing",
+      "masked": "Razorpay",
+      "type": "gateway",
+      "openingPaise": 7080000,
+      "unrestricted": false,
+      "active": true
+    },
+    {
+      "accountId": "ACC-CASH",
+      "name": "Petty cash",
+      "masked": "Cash",
+      "type": "cash",
+      "openingPaise": 1500000,
+      "unrestricted": true,
+      "active": true
+    }
+  ],
+  "$comment_accounts": "The gateway account is marked `unrestricted: false` on purpose: money sitting in Razorpay clearing has been collected but not settled to the company's bank, and counting it as spendable cash is how a runway figure lies. Nothing in this seed computes runway anyway — see FN-OD-07 — but the flag is the reason it could not be faked if it did.",
+
+  "billThresholdPaise": 2500000,
+  "$comment_billThresholdPaise": "Above ₹25,000 a company transaction needs a bill attached before the period it sits in can be closed. Below it, a missing bill is shown and does not block. FN-OD-04."
+}

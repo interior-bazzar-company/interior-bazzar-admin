@@ -1,6 +1,7 @@
 // ── ErrorBoundary ── last-resort catch for render-time throws so one broken
 // view can't blank the whole admin console.
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { Button } from "@/components/base/buttons/button";
 
 interface Props {
   children: ReactNode;
@@ -22,8 +23,7 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidUpdate(prev: Props) {
-    if (this.state.hasError && prev.resetKey !== this.props.resetKey)
-      this.setState({ hasError: false });
+    if (this.state.hasError && prev.resetKey !== this.props.resetKey) this.setState({ hasError: false });
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
@@ -33,16 +33,12 @@ class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.hasError) {
       return (
-        <div role="alert" style={{ minHeight: "60vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, padding: "40px 20px", textAlign: "center" }}>
-          <h1 style={{ fontSize: "1.4rem", fontWeight: 700 }}>Something went wrong</h1>
-          <p style={{ color: "#6b7280", maxWidth: 420 }}>An unexpected error occurred while showing this page.</p>
-          <button
-            type="button"
-            style={{ padding: "10px 22px", borderRadius: 999, fontWeight: 600, cursor: "pointer", background: "#0f3d2e", color: "#fff", border: "none" }}
-            onClick={() => window.location.reload()}
-          >
+        <div role="alert" className="flex min-h-[60vh] flex-col items-center justify-center gap-3 p-10 text-center">
+          <h1 className="text-xl font-semibold tracking-tight text-primary">Something went wrong</h1>
+          <p className="max-w-md text-sm text-tertiary">An unexpected error occurred while showing this page. Nothing was changed.</p>
+          <Button color="secondary" size="sm" onClick={() => window.location.reload()}>
             Reload page
-          </button>
+          </Button>
         </div>
       );
     }

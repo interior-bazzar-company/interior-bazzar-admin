@@ -48,17 +48,64 @@ export const HIDDEN_MODULES = new Set(["design", "payments"]);
  *  does not send yet, because they are being built frontend-first on the
  *  proto-v-2.2.0.0 branch (see src/proto/v-2.2.0.0/CHANGELOG.md).
  *
- *  EMPTY, and that is the finished state, not a stub. `business-enquiries` was
- *  the last entry and came out when the API landed: backend migration 0024
- *  seeds its Module row and BusinessEnquiriesViews moved off the legacy
- *  full-access-only gate onto @requires. The hole this set used to open —
- *  `can()` answering true unconditionally — is closed with it, which is the
- *  whole reason a normal admin can now be given enquiries and nothing else.
+ *  `business-enquiries` was here and came out when its API landed: backend
+ *  migration 0024 seeds its Module row and BusinessEnquiriesViews moved onto
+ *  @requires. Adding a key here re-opens a real hole for that key — `can()`
+ *  answers true unconditionally for it — and that is only ever safe while the
+ *  module has no server data to leak and no server write to authorise. It has
+ *  to come out on the commit that gives it either.
  *
- *  Adding a key back re-opens that hole for the key. It is only ever safe while
- *  the module has no server data to leak and no server write to authorise, and
- *  it has to come out on the commit that gives it either. */
-export const PROTO_MODULES = new Set<string>([]);
+ *  `users` (Business Ops · Users Management) qualifies today on both counts and
+ *  on nothing else: every record it renders is a fixture in
+ *  src/content/users/*.json, and every write it performs lands in the browser
+ *  tab and is discarded on reload. The moment `GET /admin/users` exists this
+ *  key comes out, in the same commit — see
+ *  src/proto/v-2.2.0.0/BACKEND-INTEGRATION.md, where it is listed as work
+ *  rather than as design.
+ *
+ *  `attendance`, `work` and `reports` (the Team group's operational half)
+ *  qualify on the same two counts and, for now, more cleanly than anything that
+ *  has been in this set before: they have no seed data and no views at all yet
+ *  — the routes resolve to ViewHost's "coming soon" state. They are here so the
+ *  nav rows are reachable while the surfaces are built. Each key comes out in
+ *  the commit that gives it either server data or a server write.
+ *
+ *  `resources` (the form module) qualifies on both counts as well: its four
+ *  definitions and nine responses are fixtures in src/content/resources/*.json,
+ *  and creating a form or submitting an answer writes the browser tab and
+ *  nothing else. It is the newest entry here and it comes out the same way the
+ *  others do.
+ *
+ *  `agreements` is the same case again, with one wrinkle worth naming: the
+ *  AGREEMENTS it reads are real Team records, not fixtures — but they are Team
+ *  fixtures, and every write still lands in the tab. The templates beside them
+ *  are src/content/agreements/templates.json. It comes out with `team`'s own
+ *  server data, whichever lands first.
+ *
+ *  NOTE what is deliberately NOT here: `team` and `roles`. Both have real
+ *  Module rows on the server and real grants issued against them, so adding
+ *  either would hand member CRUD and role assignment to every signed-in
+ *  account. See OPERATION-2026-08-30-team-module.md § TM-BR-01. */
+export const PROTO_MODULES = new Set<string>([
+  /* `overview` (the landing page) qualifies on a different ground from the
+     rest: it has no data of its own to leak and no write at all — it reads
+     the other modules' stores and API hooks, each of which enforces its own
+     grant, so a section is absent from the page exactly when its module is
+     absent from the nav. It comes out when the server ships a Module row for
+     it, at which point a role can withhold the page itself. */
+  "overview",
+  "users",
+  "finance",
+  "finance-salaries",
+  "finance-transactions",
+  "finance-refunds",
+  "finance-analytics",
+  "attendance",
+  "work",
+  "reports",
+  "resources",
+  "agreements",
+]);
 
 export function getSession(): MePermissions | null {
   return session;

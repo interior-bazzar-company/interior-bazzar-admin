@@ -1,0 +1,2458 @@
+/* =============================================================================
+   Team — the data module for the operational half.
+   -----------------------------------------------------------------------------
+   THE ONLY FILE IN THIS MODULE THAT KNOWS WHERE ITS OWN RECORDS COME FROM.
+   Every view imports from here; no view imports JSON and no view fetches. When
+   the API lands, the five imports below become AdminOpsService calls and the
+   write simulation underneath comes out — the views, the CSS and the URL scheme
+   do not move. See src/proto/v-2.2.0.0/BACKEND-INTEGRATION.md § Module 7.
+
+   THIS FILE DOES NOT OWN THE IDENTITY HALF. `#/team` and `#/roles` are LIVE and
+   read `AdminOpsService.users()` / `.listRoles()` directly, as they always have.
+   `members.json` here stands in for the ONE thing that endpoint cannot answer:
+   every member rather than only those the signed-in admin created, plus the
+   employment block that has no column on the server yet. The day the team-wide
+   endpoint exists, `MEMBERS` below becomes that call and nothing else changes.
+
+   THE THREE RULES THIS FILE EXISTS TO ENFORCE
+   -------------------------------------------
+   1. `absent`, `unclosed` and `delayed` are NEVER STORED. Each is derived at
+      read against `NOW`. Storing them needs a sweep, and this backend has no
+      queue — only a 15-minute cron. The enquiries module withdrew its SLA sweep
+      for exactly this reason, and a screen confidently showing a stale flag is
+      worse than one showing none.
+   2. `isLate` IS stored, and only ever written at open, against that member's
+      own `dayStartsAt`. Changing the policy tomorrow must not make last month
+      late, and there is no company-wide constant to read instead.
+   3. Milestone and target progress is DERIVED, never typed. A milestone counts
+      its completed children; a target accumulates the deltas its EOD reports
+      recorded. A stored percentage that disagrees with the children is the bug
+      this prevents, and it is the one nobody notices for a month.
+
+   `NOW` is the seed's own `asOf`, not the browser clock — Friday 28 August
+   2026, 14:20 IST. Every elapsed time, late flag and "today" is computed
+   against it, so the fixture reads the same next month and a screenshot taken
+   in December still makes sense. The API will send its own `asOf`, and there is
+   a server-time endpoint already (`GET /engine/server-time/`) whose whole
+   purpose is that the client computes a skew and never trusts `Date`.
+   ============================================================================= */
+import { useSyncExternalStore } from "react";
+import membersDoc from "../../../content/team/members.json";
+import attendanceDoc from "../../../content/team/attendance.json";
+import workDoc from "../../../content/team/work.json";
+import plansDoc from "../../../content/team/plans.json";
+import reportsDoc from "../../../content/team/reports.json";
+import tagsDoc from "../../../content/team/tags.json";
+import leaveDoc from "../../../content/team/leave.json";
+import agreementsDoc from "../../../content/team/agreements.json";
+import documentsDoc from "../../../content/team/documents.json";
+import payDoc from "../../../content/team/pay.json";
+import linksDoc from "../../../content/team/links.json";
+import vocabDoc from "../../../content/team/vocabularies.json";
+import { can, getSession } from "../../auth/session";
+
+/* ============================================================== types === */
+
+export type MemberStatus = "active" | "inactive" | "suspended";
+export type AttendanceState =
+  "not_started" | "working" | "on_break" | "ended" | "unclosed" | "absent" | "on_leave";
+export type WorkKind = "task" | "milestone" | "target";
+/** FOUR stored values. `blocked` is not among them: waiting on someone is a
+ *  relationship, not a stage, and it lives on `blockedByItemId`. */
+export type WorkStatus = "planned" | "in_progress" | "completed" | "cancelled";
+/** The five stages a person sees. `delayed` is derived and takes precedence,
+ *  so an item is in exactly one of them. */
+export type WorkStage = WorkStatus | "delayed";
+export type LeaveState = "requested" | "approved" | "rejected" | "withdrawn";
+/** FOUR, AND `urgent` IS NEW. It sits above `high` rather than replacing it:
+ *  a scale whose top value is also its common value has no top value, and
+ *  every existing item keeps the priority it was given. `medium` reads as
+ *  "Normal" now — it was always the default and never the middle of anything
+ *  anybody thought about. */
+export type Priority = "urgent" | "high" | "medium" | "low";
+export type Scope = "self" | "team" | "all";
+
+export interface Member {
+  memberId: string;
+  name: string;
+  email: string;
+  phone: string;
+  username: string;
+  designation: string;
+  department: string;
+  employmentType: string;
+  joiningDate: string;
+  /** The scope axis, in one column. One level deep, never transitive. */
+  reportsTo: string | null;
+  workLocation: string;
+  expectedHoursPerDay: number;
+  dayStartsAt: string;
+  graceMinutes: number;
+  autoCloseAt: string;
+  timezone: string;
+  status: MemberStatus;
+  isFullAccess: boolean;
+  roles: string[];
+  addedAt: string;
+  lastLogin: string | null;
+}
+
+export interface Break { startedAt: string; endedAt: string | null; minutes: number | null }
+
+export interface AttendanceDay {
+  attendanceId: string;
+  memberId: string;
+  businessDate: string;
+  startedAt: string;
+  endedAt: string | null;
+  breaks: Break[];
+  workedMinutes: number | null;
+  breakMinutes: number;
+  isLate: boolean;
+  lateByMinutes: number;
+  source: "self" | "corrected";
+  correctedBy?: string;
+  correctedAt?: string;
+  correctionReason?: string;
+}
+
+/** One line of a task's checklist. `done` is stored — unlike almost everything
+ *  else derived in this module — because a tick is an act somebody performed
+ *  and there is nothing to derive it from. */
+export interface CheckLine {
+  lineId: string;
+  text: string;
+  done: boolean;
+}
+
+/** A named link out of the panel. */
+export interface ResourceLink {
+  linkId: string;
+  label: string;
+  url: string;
+}
+
+export interface WorkItem {
+  itemId: string;
+  kind: WorkKind;
+  title: string;
+  description: string | null;
+  assigneeId: string;
+  createdById: string;
+  parentId: string | null;
+  status: WorkStatus;
+  priority: Priority;
+  startDate: string | null;
+  dueDate: string | null;
+  completedAt: string | null;
+  expectedOutcome: string | null;
+  blockedReason?: string;
+  blockedByItemId?: string | null;
+  blockedAt?: string;
+  cancelledReason?: string;
+  cancelledAt?: string;
+  targetValue?: number;
+  targetUnit?: string;
+  currentValue?: number;
+  sourcePlanLineId?: string | null;
+  /** Member-owned tag records. Free, unlike the stage, which is company-wide. */
+  tagIds?: string[];
+  attachments?: Attachment[];
+  /** THE WORK INSIDE THE WORK. A task's description says what it is; the
+   *  checklist says what is left of it. It is what makes a task's progress a
+   *  number rather than a coin-flip between 0 and 100 — see `progressOf`. */
+  checklist?: CheckLine[];
+  /** Where the work actually lives: the brief, the folder, the board. A URL
+   *  with a name on it, because a bare link in a list of six is a link nobody
+   *  clicks. Distinct from `attachments`, which are files this panel holds,
+   *  and from item↔item links, which are relationships between records. */
+  links?: ResourceLink[];
+  rowVersion: number;
+  createdAt: string;
+}
+
+export type AgreementState = "draft" | "sent" | "viewed" | "signed" | "revoked" | "expired";
+
+export interface Agreement {
+  agreementId: string;
+  memberId: string;
+  kind: string;
+  title: string;
+  /** The template it was made from, if it was made from one. Null for the
+   *  agreements that predate templates — the link is provenance, never a read:
+   *  `body` below is the document, and the template may have moved on. */
+  templateId: string | null;
+  /** THE DOCUMENT ITSELF, frozen at send. A signature over a body that can
+   *  still change is not a signature — this is the whole reason a template edit
+   *  makes a new version rather than rewriting what is out there. */
+  body: string;
+  version: number;
+  state: AgreementState;
+  sentAt: string | null;
+  sentById: string | null;
+  viewedAt: string | null;
+  signedAt: string | null;
+  signedName: string | null;
+  signerIp: string | null;
+  expiresAt: string | null;
+  token: string;
+  fileName: string;
+}
+
+export interface MemberDocument {
+  documentId: string;
+  memberId: string;
+  kind: string;
+  label: string;
+  fileName: string;
+  sizeKb: number;
+  uploadedAt: string;
+  uploadedById: string;
+  verifiedById: string | null;
+  verifiedAt: string | null;
+}
+
+export interface Incentive {
+  incentiveId: string; month: string;
+  /** The work item it was earned against — the join in both directions. Null
+   *  where the basis is not a tracked item, which the screen has to survive. */
+  workItemId: string | null;
+  /** A readable label for that basis, so a deleted item still prints. */
+  basis: string;
+  amount: number; state: string;
+}
+export interface Payslip {
+  month: string; net: number; base: number;
+  /** The incentive PAID with this slip, if any. It is repeated from the
+   *  incentive ledger on purpose: a payslip that quietly omitted it would send
+   *  somebody to Finance to ask why the two numbers differ. */
+  incentive: number | null;
+  note: string | null;
+  paidAt: string;
+}
+export interface Pay {
+  memberId: string;
+  annualCtc: number;
+  currency: string;
+  effectiveFrom: string;
+  /** The account the money leaves from. Finance's record; Team only names it so
+   *  a member can check it is the right one without asking. */
+  account: { bank: string; ref: string } | null;
+  payslips: Payslip[];
+  incentives: Incentive[];
+}
+
+export interface Tag {
+  tagId: string;
+  ownerId: string;
+  /** Identity is (ownerId, slug). Two members may both hold `call`. */
+  slug: string;
+  label: string;
+  colourToken: string;
+  createdAt: string;
+  archivedAt: string | null;
+}
+
+/** A link hung on an item — a brief, a sheet, a thread. Stored as an address
+ *  and a name, never as markup. */
+export interface Attachment { url: string; label: string }
+
+export type LinkRelation = "relates_to" | "duplicates" | "follows";
+
+/** A soft edge between two items. It never touches rollup and gates nothing:
+ *  `parentId` and `blockedByItemId` are the two strong links, and an edge here
+ *  may not restate either of them. */
+export interface WorkLink {
+  linkId: string;
+  fromItemId: string;
+  toItemId: string;
+  relation: LinkRelation;
+  createdAt: string;
+}
+
+export interface LeaveRequest {
+  leaveId: string;
+  memberId: string;
+  fromDate: string;
+  toDate: string;
+  kind: string;
+  reason: string;
+  state: LeaveState;
+  decidedById: string | null;
+  decidedAt: string | null;
+  decisionNote: string | null;
+  requestedAt: string;
+}
+
+export interface PlanLine { lineId: string; ordinal: number; title: string; priority: Priority; workItemId: string | null }
+export interface DailyPlan {
+  planId: string; memberId: string; businessDate: string;
+  expectedOutcome: string | null; blockers: string | null; notes: string | null;
+  submittedAt: string | null; lines: PlanLine[];
+}
+
+export interface ReportLine { lineId: string; workItemId: string | null; title: string; done: boolean; targetDelta: number | null }
+export interface DailyReport {
+  reportId: string; memberId: string; businessDate: string;
+  pendingWork: string | null; pendingReason: string | null; achievement: string | null;
+  blockers: string | null; supportNeeded: string | null; tomorrowPriority: string | null;
+  notes: string | null; submittedAt: string | null;
+  acknowledgedById: string | null; acknowledgedAt: string | null;
+  lines: ReportLine[];
+}
+
+/* ========================================================== the clock === */
+
+export const DAY = 86400000;
+
+/* THE DEMO CLOCK ROLLS FORWARD, WHOLE WEEKS AT A TIME, IN THE BROWSER ONLY.
+   The seed is authored around Friday 28 August 2026, 14:20 IST, and every rule
+   in it (who is late, what is due, which day is over) is relative to that
+   frame. Shifting by exact weeks keeps every weekday what it was and lands
+   "today" on the most recent same weekday, so the panel reads current without
+   a single derivation changing. Node (the check suite) gets no shift: the
+   assertions pin the authored frame. */
+const plusDays = (ymd: string, n: number): string => {
+  const p = ymd.split("-");
+  const dt = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]) + n);
+  return dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0") + "-" + String(dt.getDate()).padStart(2, "0");
+};
+const AS_OF = new Date(membersDoc.asOf).getTime();
+export const SHIFT_DAYS = (() => {
+  if (typeof window === "undefined") return 0;
+  const r = new Date();
+  const real = new Date(r.getFullYear(), r.getMonth(), r.getDate()).getTime();
+  const p = membersDoc.asOf.slice(0, 10).split("-");
+  const seeded = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2])).getTime();
+  const days = Math.round((real - seeded) / DAY);
+  return days > 0 ? Math.floor(days / 7) * 7 : 0;
+})();
+export const NOW = AS_OF + SHIFT_DAYS * DAY;
+
+/* Writes stamp NOW plus the time elapsed since the module loaded: the same
+   clock as every derivation, and still strictly ordered, so a break opened in
+   this tab cannot land before the day that contains it. */
+const LOADED_AT = Date.now();
+export const stamp = () => new Date(NOW + (Date.now() - LOADED_AT)).toISOString();
+export const now = () => NOW + (Date.now() - LOADED_AT);
+
+/** The business date, IST, as a plain YYYY-MM-DD. Derived from the payload's
+ *  own `asOf` rather than the browser, and never from a UTC instant on the
+ *  client — that is the off-by-one that puts a Friday evening's work on
+ *  Saturday for anybody west of the office. */
+export const TODAY = plusDays(membersDoc.asOf.slice(0, 10), SHIFT_DAYS);
+/** A day from a URL, clamped to today. The picker's `max` stops the mouse, not
+ *  a hand-edited address, and a future day must never be asked who was absent. */
+export const clampDay = (d?: string): string => (d && d <= TODAY ? d : TODAY);
+
+export const ts = (iso: string | null | undefined) => (iso ? new Date(iso).getTime() : NaN);
+
+/** "09:30" on a given business date, as an instant. The member's own start and
+ *  auto-close times are wall-clock strings, which is what makes them editable
+ *  by a person; this is the one place they become comparable. */
+const atClock = (businessDate: string, hhmm: string) =>
+  new Date(businessDate + "T" + hhmm + ":00+05:30").getTime();
+
+/* ========================================================= formatting === */
+
+export const fmtHM = (mins: number | null | undefined) => {
+  if (mins == null || isNaN(mins)) return "—";
+  const h = Math.floor(mins / 60);
+  const m = Math.abs(mins % 60);
+  return h > 0 ? h + "h " + String(m).padStart(2, "0") + "m" : m + "m";
+};
+
+export const fmtTime = (iso: string | null | undefined) => {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  let h = d.getHours();
+  const m = String(d.getMinutes()).padStart(2, "0");
+  const ap = h >= 12 ? "pm" : "am";
+  h = h % 12 || 12;
+  return h + ":" + m + ap;
+};
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MONTHS_LONG = ["January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"];
+const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/** Parsed field by field, not through Date(string), so a date-only value is
+ *  never nudged a day by the UTC-midnight rule. Same reason `ui/format.ts`
+ *  does it this way. */
+export const fmtDate = (d: string | null | undefined) => {
+  if (!d) return "—";
+  const p = d.slice(0, 10).split("-");
+  return Number(p[2]) + " " + MONTHS[Number(p[1]) - 1] + " " + p[0];
+};
+/** "September 2026", or "Sep 2026" short. A month heading was being cut out of
+ *  a full date with a slice, which is how the calendar came to say "ep 2026". */
+export const fmtMonth = (d: string, long?: boolean) =>
+  (long ? MONTHS_LONG : MONTHS)[Number(d.slice(5, 7)) - 1] + " " + d.slice(0, 4);
+
+/** The first of the month `n` months away. Field arithmetic, never
+ *  `toISOString()` on a local midnight — that is +05:30 behind and walks the
+ *  anchor back a day on every press. */
+export const monthStep = (d: string, n: number) => {
+  const dt = new Date(Number(d.slice(0, 4)), Number(d.slice(5, 7)) - 1 + n, 1);
+  return dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0") + "-01";
+};
+
+export const fmtDayName = (d: string) => {
+  const p = d.slice(0, 10).split("-");
+  return DOW[new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2])).getDay()];
+};
+export const addDays = (d: string, n: number) => {
+  const p = d.slice(0, 10).split("-");
+  const dt = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]) + n);
+  return dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0") + "-" + String(dt.getDate()).padStart(2, "0");
+};
+export const isWeekend = (d: string) => {
+  const n = fmtDayName(d);
+  return n === "Sat" || n === "Sun";
+};
+
+/* ======================================================== vocabulary === */
+
+export const VOCAB = vocabDoc;
+
+type ToneRow = { key: string; label: string; tone: string };
+const toneMap = (rows: ToneRow[]) => {
+  const o: Record<string, ToneRow> = {};
+  rows.forEach((r) => { o[r.key] = r; });
+  return o;
+};
+export const ATT_STATE = toneMap(vocabDoc.attendanceStates as ToneRow[]);
+/** All five stages, the derived one included — labels and tones come from the
+ *  vocabulary so a relabel server-side needs no code edit here. */
+export const WORK_STATUS = toneMap(vocabDoc.workStatuses as ToneRow[]);
+export const LEAVE_STATE = toneMap(vocabDoc.leaveStates as ToneRow[]);
+export const LEAVE_KIND = toneMap(vocabDoc.leaveKinds as unknown as ToneRow[]);
+export const AGREEMENT_KIND = toneMap(vocabDoc.agreementKinds as unknown as ToneRow[]);
+export const AGREEMENT_STATE = toneMap(vocabDoc.agreementStates as ToneRow[]);
+export const DOCUMENT_KIND = toneMap(vocabDoc.documentKinds as unknown as ToneRow[]);
+/** The documents a member is expected to have handed over. Vocabulary, not a
+ *  constant here: adding one server-side must not need a code edit. */
+export const REQUIRED_DOCS: string[] = (vocabDoc.documentKinds as { key: string; required?: boolean }[])
+  .filter((r) => r.required).map((r) => r.key);
+export const LINK_RELATION = toneMap(vocabDoc.linkRelations as unknown as ToneRow[]);
+/** The label read from the side you are standing on: "Follows" out, "Followed
+ *  by" back. Direction is presentation; the stored edge does not flip. */
+export const linkLabelOf = (key: string, outward: boolean): string => {
+  const row = (vocabDoc.linkRelations as { key: string; label: string; inverse?: string }[])
+    .filter((r) => r.key === key)[0];
+  if (!row) return key;
+  return outward ? row.label : (row.inverse || row.label);
+};
+/** Soft cap on a member's active tags — warned past, never blocked (TM-OD-22). */
+export const TAG_CAP = 20;
+export const PRIORITY = toneMap(vocabDoc.priorities as ToneRow[]);
+/** THE SCALE IN ORDER, loudest first. Three screens listed the priorities by
+ *  hand and two of them stopped at `high` — so `urgent` could be seeded and
+ *  sorted on but never chosen in the create dialog or picked in the filter.
+ *  One list, read from the vocabulary's own `rank`, so the next value added
+ *  there appears everywhere at once. */
+export const PRIORITY_SCALE: Priority[] = (vocabDoc.priorities as (ToneRow & { rank: number })[])
+  .slice().sort((a, b) => a.rank - b.rank).map((r) => r.key as Priority);
+export const KIND = toneMap(vocabDoc.workKinds as unknown as ToneRow[]);
+
+export const labelOf = (map: Record<string, ToneRow>, k: string) => (map[k] ? map[k].label : k);
+export const toneOf = (map: Record<string, ToneRow>, k: string) => (map[k] ? map[k].tone : "");
+
+/* ============================================================== state === */
+/* One mutable snapshot for this browser tab. Every write replaces the arrays it
+   touches and bumps `version`, which is what useSyncExternalStore subscribes
+   to. Nothing is persisted: a reload restores the seed, and the proto banner on
+   every face says so in the same words. */
+
+type Snapshot = {
+  members: Member[];
+  days: AttendanceDay[];
+  items: WorkItem[];
+  plans: DailyPlan[];
+  reports: DailyReport[];
+  tags: Tag[];
+  leave: LeaveRequest[];
+  agreements: Agreement[];
+  documents: MemberDocument[];
+  links: WorkLink[];
+  /** In the snapshot so a roster adoption re-keys it with everything else —
+   *  but nothing in this file ever writes it. Team reads pay. */
+  pay: Pay[];
+  version: number;
+};
+
+const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
+
+/* Every date in the seed moves with the clock. Anything that starts like a
+   date — date-only or a full ISO instant — shifts by the same whole weeks the
+   clock moved; wall-clock strings ("09:30") and prose are untouched. */
+const DATED = /^\d{4}-\d{2}-\d{2}/;
+const shiftValue = (v: unknown): unknown => {
+  if (typeof v === "string" && DATED.test(v)) return plusDays(v.slice(0, 10), SHIFT_DAYS) + v.slice(10);
+  if (Array.isArray(v)) return v.map(shiftValue);
+  if (v && typeof v === "object") {
+    const o: Record<string, unknown> = {};
+    Object.keys(v).forEach((k) => { o[k] = shiftValue((v as Record<string, unknown>)[k]); });
+    return o;
+  }
+  return v;
+};
+const seedRows = <T,>(rows: T[]): T[] => (SHIFT_DAYS ? (shiftValue(rows) as T[]) : rows);
+
+const seed = (): Snapshot => ({
+  members: seedRows(clone(membersDoc.members)) as Member[],
+  days: seedRows(clone(attendanceDoc.days)) as AttendanceDay[],
+  items: seedRows(clone(workDoc.items)) as WorkItem[],
+  plans: seedRows(clone(plansDoc.plans)) as DailyPlan[],
+  reports: seedRows(clone(reportsDoc.reports)) as DailyReport[],
+  tags: seedRows(clone(tagsDoc.tags)) as Tag[],
+  leave: seedRows(clone(leaveDoc.leave)) as LeaveRequest[],
+  agreements: seedRows(clone(agreementsDoc.agreements)) as Agreement[],
+  documents: seedRows(clone(documentsDoc.documents)) as MemberDocument[],
+  links: seedRows(clone(linksDoc.links)) as WorkLink[],
+  pay: seedRows(clone(payDoc.pay)) as Pay[],
+  version: 0,
+});
+
+let snap: Snapshot = seed();
+const listeners = new Set<() => void>();
+const emit = () => { snap = { ...snap, version: snap.version + 1 }; listeners.forEach((l) => l()); };
+const subscribe = (fn: () => void) => { listeners.add(fn); return () => { listeners.delete(fn); }; };
+const getVersion = () => snap.version;
+
+/** Re-seed. Local scaffolding only — it exists so a demo can be walked twice. */
+export function resetStore() { snap = seed(); emit(); }
+
+/* Plain readers over the same snapshot the hooks subscribe to. The check suite
+   calls exactly these, so what it asserts is what the screens see and not a
+   parallel reimplementation of it. */
+export const readMembers = (): Member[] => snap.members;
+export const readDays = (): AttendanceDay[] => snap.days;
+export const readItems = (): WorkItem[] => snap.items;
+export const readPlans = (): DailyPlan[] => snap.plans;
+export const readReports = (): DailyReport[] => snap.reports;
+export const readTags = (): Tag[] => snap.tags;
+export const readLeave = (): LeaveRequest[] => snap.leave;
+export const readAgreements = (): Agreement[] => snap.agreements;
+export const readDocuments = (): MemberDocument[] => snap.documents;
+export const readLinks = (): WorkLink[] => snap.links;
+export const readMember = (id: string): Member | null =>
+  snap.members.filter((m) => m.memberId === id)[0] || null;
+export const readItem = (id: string): WorkItem | null =>
+  snap.items.filter((i) => i.itemId === id)[0] || null;
+
+/* ============================================================== scope === */
+
+/** Who is looking. The session's own id where the seed knows it, and otherwise
+ *  a designated member so the prototype is walkable signed in as anybody — the
+ *  fallback is scaffolding and goes with the seed. */
+let adoptedMe: string | null = null;
+export function meId(): string {
+  const s = getSession();
+  const byId = s?.user?.id != null ? String(s.user.id) : null;
+  if (byId && snap.members.some((m) => m.memberId === byId)) return byId;
+  const byName = snap.members.filter((m) => m.name === s?.user?.name)[0];
+  if (byName) return byName.memberId;
+  if (adoptedMe && snap.members.some((m) => m.memberId === adoptedMe)) return adoptedMe;
+  return "58";
+}
+
+/** TM-OD-01, answered 2026-08-30: a senior sees their own reports, one level,
+ *  and everybody only with the module's `all` verb.
+ *
+ *  WHILE THE MODULE IS PROTO-GATED THIS RESOLVES TO `all` FOR EVERY SESSION,
+ *  because `can()` answers true unconditionally for a key in PROTO_MODULES —
+ *  including `all`. That is the proto hole, not a bug here, and it closes on
+ *  the commit that gives these keys real Module rows. The derivation is already
+ *  the real one and starts discriminating the moment it does. Every face states
+ *  the scope it is showing, so the widening is visible rather than silent. */
+export function scopeOf(moduleKey: string): Scope {
+  const s = getSession();
+  if (s?.isFullAccess) return "all";
+  if (can(moduleKey, "all")) return "all";
+  if (can(moduleKey, "view")) return "team";
+  return "self";
+}
+
+/** The members a scope resolves to. ONE LEVEL for `team`: a head whose reports
+ *  have their own reports sees the first ring, not the transitive closure — a
+ *  recursive default is a permission that widens every time somebody is hired
+ *  under somebody else, and nobody notices until it has. */
+export function membersInScope(scope: Scope, me = meId()): Member[] {
+  if (scope === "all") return snap.members;
+  if (scope === "self") return snap.members.filter((m) => m.memberId === me);
+  return snap.members.filter((m) => m.memberId === me || m.reportsTo === me);
+}
+
+export const scopeLabel = (scope: Scope, n: number) =>
+  scope === "all" ? "Everyone · " + n
+    : scope === "team" ? "You and your reports · " + n
+      : "Only you";
+
+/* ======================================================== attendance === */
+
+const breaksClosedMinutes = (d: AttendanceDay) =>
+  d.breaks.reduce((a, b) => a + (b.minutes || 0), 0);
+
+export const openBreakOf = (d: AttendanceDay): Break | null =>
+  d.breaks.filter((b) => !b.endedAt)[0] || null;
+
+/** Past its own auto-close on a day that is over. Derived, and the reason
+ *  nothing sweeps: an auto-closed day is a number the system invented; an
+ *  unclosed one is a question, and a question is honest. */
+export function isUnclosed(d: AttendanceDay, m: Member | null, at = now()): boolean {
+  if (d.endedAt) return false;
+  const cutoff = atClock(d.businessDate, (m && m.autoCloseAt) || "20:00");
+  return at > cutoff;
+}
+
+/** APPROVED LEAVE SUPPRESSES A DERIVED ABSENCE. It writes no attendance row —
+ *  two records answering "was this person in" disagree inside a month — so the
+ *  suppression happens here, at read, and only when no day was opened. A member
+ *  who came in anyway has a row, and the row wins. */
+export function stateOf(d: AttendanceDay | null, m: Member | null, at: number, date: string): AttendanceState {
+  const on = d ? null : onLeave(m ? m.memberId : "", date || "");
+  if (on) return "on_leave";
+  if (!d) {
+    if (!m) return "not_started";
+    /* Absent is only answerable once the day is over. At 10am a member who is
+       not in yet is Not started — calling them absent is a verdict the clock
+       has not earned. */
+    /* THE CUTOFF IS THE DAY BEING ASKED ABOUT, not today's. This compared `at`
+       against TODAY's 20:00 whatever `date` was, so a day last week read as
+       "not started" until this evening — and `dayRows` faked its way round it
+       with a `+ DAY` on `at`, a workaround the other two call sites never
+       applied. That is why History drew an approved leave day as absent and
+       Reports called a past absence "Not started". A day that has not happened
+       yet owes nothing, so it is never absent either. */
+    const ref = date || TODAY;
+    if (ref > TODAY) return "not_started";
+    const over = at > atClock(ref, m.autoCloseAt || "20:00");
+    return over ? "absent" : "not_started";
+  }
+  if (isUnclosed(d, m, at)) return "unclosed";
+  if (d.endedAt) return "ended";
+  return openBreakOf(d) ? "on_break" : "working";
+}
+
+/** Minutes actually worked. A closed day uses its stored total; an open one
+ *  counts to `at` and subtracts every closed break AND the running one. An
+ *  unclosed day returns null and contributes to nothing — it is not a
+ *  fourteen-hour shift and it is not zero either. */
+export function workedOf(d: AttendanceDay | null, m: Member | null, at = now()): number | null {
+  if (!d) return null;
+  if (d.endedAt) return d.workedMinutes;
+  if (isUnclosed(d, m, at)) return null;
+  const open = openBreakOf(d);
+  const runningBreak = open ? Math.max(0, Math.round((at - ts(open.startedAt)) / 60000)) : 0;
+  const elapsed = Math.max(0, Math.round((at - ts(d.startedAt)) / 60000));
+  return Math.max(0, elapsed - breaksClosedMinutes(d) - runningBreak);
+}
+
+export function breakOf(d: AttendanceDay | null, at = now()): number {
+  if (!d) return 0;
+  const open = openBreakOf(d);
+  const running = open ? Math.max(0, Math.round((at - ts(open.startedAt)) / 60000)) : 0;
+  return breaksClosedMinutes(d) + running;
+}
+
+export const dayFor = (memberId: string, date: string): AttendanceDay | null =>
+  snap.days.filter((d) => d.memberId === memberId && d.businessDate === date)[0] || null;
+
+export interface DayRow {
+  member: Member;
+  day: AttendanceDay | null;
+  state: AttendanceState;
+  worked: number | null;
+  breakMins: number;
+}
+
+/** One row per member in scope for one business date — including the members
+ *  with no row at all, because absence is the LACK of a record and a screen
+ *  that only renders rows can never show who did not come in. */
+export function dayRows(date: string, scope: Scope, at = now()): DayRow[] {
+  return membersInScope(scope)
+    .filter((m) => m.status === "active")
+    .map((m) => {
+      const day = dayFor(m.memberId, date);
+      return {
+        member: m,
+        day,
+        state: stateOf(day, m, at, date),
+        worked: workedOf(day, m, at),
+        breakMins: breakOf(day, at),
+      };
+    });
+}
+
+export interface AttendanceTotals {
+  present: number; working: number; onBreak: number; ended: number;
+  late: number; absent: number; onLeave: number; unclosed: number; total: number;
+}
+
+export function attendanceTotals(rows: DayRow[]): AttendanceTotals {
+  const t: AttendanceTotals = { present: 0, working: 0, onBreak: 0, ended: 0, late: 0, absent: 0, onLeave: 0, unclosed: 0, total: rows.length };
+  rows.forEach((r) => {
+    if (r.day) t.present++;
+    if (r.state === "working") t.working++;
+    if (r.state === "on_break") t.onBreak++;
+    if (r.state === "ended") t.ended++;
+    if (r.state === "unclosed") t.unclosed++;
+    if (r.state === "absent") t.absent++;
+    if (r.state === "on_leave") t.onLeave++;
+    if (r.day && r.day.isLate) t.late++;
+  });
+  return t;
+}
+
+/** The working days of the week containing `date`, Monday first, weekends
+ *  dropped. Leave and holidays are out of v1 (TM-OD-13), so "working day"
+ *  means "not a weekend" and nothing more — stated here rather than assumed
+ *  in four places. */
+export function weekOf(date: string): string[] {
+  const p = date.slice(0, 10).split("-");
+  const dt = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]));
+  const back = (dt.getDay() + 6) % 7;
+  const monday = addDays(date, -back);
+  const out: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = addDays(monday, i);
+    if (!isWeekend(d)) out.push(d);
+  }
+  return out;
+}
+
+/* ====================================================== attendance span === */
+
+/** ONE MEMBER OVER A RANGE OF DAYS, counted the same way one day is counted.
+ *
+ *  Everything here is derived from the same `dayRows` the table draws, so the
+ *  analytics and the day view cannot disagree — the alternative is two
+ *  counting rules, and the one nobody is looking at is always the wrong one.
+ *
+ *  Three things it refuses to get wrong:
+ *
+ *  · **Weekends are not days.** They are excluded from the denominator, so an
+ *    "80% present" figure is 80% of the days somebody was expected.
+ *  · **Nobody is absent before they joined.** A member who started last Tuesday
+ *    is not counted against the fortnight before it. Without this a new joiner
+ *    reads as the worst attender in the company on their first week.
+ *  · **An unclosed day adds no hours and is not an absence.** It is its own
+ *    state, counted separately, exactly as it is on the day view.
+ */
+export interface SpanRow {
+  member: Member;
+  /** Working days this member was actually expected, joining date honoured. */
+  days: number;
+  present: number;
+  late: number;
+  absent: number;
+  onLeave: number;
+  unclosed: number;
+  /** Minutes. `worked` excludes unclosed days, which contribute nothing. */
+  worked: number;
+  expected: number;
+  lateMinutes: number;
+  breakMinutes: number;
+  /** Start times as minutes past midnight, for the arrival spread. */
+  arrivals: number[];
+}
+
+export function spanRows(from: string, to: string, scope: Scope): SpanRow[] {
+  /* A day nobody has lived yet is not an absence. Same guard as the report
+     span, for the same reason. */
+  const dates = datesIn(from, to).filter((d) => !isWeekend(d) && d <= TODAY);
+  const out = new Map<string, SpanRow>();
+  membersInScope(scope).filter((m) => m.status === "active").forEach((m) => {
+    out.set(m.memberId, {
+      member: m, days: 0, present: 0, late: 0, absent: 0, onLeave: 0, unclosed: 0,
+      worked: 0, expected: 0, lateMinutes: 0, breakMinutes: 0, arrivals: [],
+    });
+  });
+
+  dates.forEach((d) => {
+    dayRows(d, scope).forEach((r) => {
+      const row = out.get(r.member.memberId);
+      if (!row) return;
+      /* Before somebody joined there is nothing to count and nothing to miss. */
+      if (d < r.member.joiningDate) return;
+      row.days++;
+      row.expected += r.member.expectedHoursPerDay * 60;
+      if (r.state === "unclosed") { row.unclosed++; return; }
+      if (r.state === "on_leave") { row.onLeave++; return; }
+      if (!r.day) { row.absent++; return; }
+      row.present++;
+      row.worked += r.worked || 0;
+      row.breakMinutes += r.breakMins || 0;
+      if (r.day.isLate) { row.late++; row.lateMinutes += r.day.lateByMinutes || 0; }
+      const t = new Date(r.day.startedAt);
+      row.arrivals.push(t.getHours() * 60 + t.getMinutes());
+    });
+  });
+  return Array.from(out.values());
+}
+
+export interface SpanTotals {
+  members: number; days: number; present: number; late: number; absent: number;
+  onLeave: number; unclosed: number; worked: number; expected: number;
+  /** Present days that were NOT late, over present days. Null with no data —
+   *  a percentage of nothing is 0% on screen and a lie in the reader's head. */
+  onTimePct: number | null;
+  /** Average length of a day somebody actually worked, in minutes. */
+  avgDay: number | null;
+}
+
+export function spanTotals(rows: SpanRow[]): SpanTotals {
+  const t: SpanTotals = {
+    members: rows.length, days: 0, present: 0, late: 0, absent: 0, onLeave: 0,
+    unclosed: 0, worked: 0, expected: 0, onTimePct: null, avgDay: null,
+  };
+  rows.forEach((r) => {
+    t.days += r.days; t.present += r.present; t.late += r.late; t.absent += r.absent;
+    t.onLeave += r.onLeave; t.unclosed += r.unclosed;
+    t.worked += r.worked; t.expected += r.expected;
+  });
+  if (t.present) {
+    t.onTimePct = Math.round(((t.present - t.late) / t.present) * 100);
+    t.avgDay = Math.round(t.worked / t.present);
+  }
+  return t;
+}
+
+/** WHEN PEOPLE ACTUALLY ARRIVE, in half-hours. This is the one figure on the
+ *  analytics face that no single day can show, and it is the honest version of
+ *  "are we starting on time" — a spread, not an average, because one person at
+ *  11:00 moves a mean and changes nothing about the rest. */
+export function arrivalSpread(rows: SpanRow[]): { at: number; label: string; n: number }[] {
+  const buckets = new Map<number, number>();
+  rows.forEach((r) => r.arrivals.forEach((mins) => {
+    const slot = Math.floor(mins / 30) * 30;
+    buckets.set(slot, (buckets.get(slot) || 0) + 1);
+  }));
+  return Array.from(buckets.keys()).sort((a, b) => a - b).map((at) => ({
+    at,
+    label: String(Math.floor(at / 60)).padStart(2, "0") + ":" + String(at % 60).padStart(2, "0"),
+    n: buckets.get(at) || 0,
+  }));
+}
+
+/** Each working day of the span, counted across everybody — the shape the
+ *  fortnight had, rather than one number for it. */
+/** THE FIRST DAY ANYBODY EVER CLOCKED, across the whole record.
+ *
+ *  A window that reaches back past this is not showing absence, it is showing
+ *  the edge of the data — and the two are indistinguishable to a derivation
+ *  whose whole rule is "an absence is the lack of a row". So the screen has to
+ *  say which one it is looking at, and this is how it knows. It is a real
+ *  question against a real API too: an attendance table has a first row. */
+export const earliestAttendance = (): string | null =>
+  snap.days.reduce<string | null>((a, d) =>
+    (!a || d.businessDate < a ? d.businessDate : a), null);
+
+export interface SpanDay { date: string; present: number; late: number; absent: number; onLeave: number; unclosed: number }
+
+/** THE SAME PARTITION `spanRows` USES, one entry per day rather than per member.
+ *
+ *  It deliberately does NOT call `attendanceTotals`, and a derivation check
+ *  caught why: that function counts `present` as "a row was opened", so an
+ *  unclosed day is both present AND unclosed there — correct on the day view,
+ *  where the two are separate columns answering separate questions. Here the
+ *  numbers are drawn as one stacked bar, and a stack whose segments overlap is
+ *  a bar that is taller than the team. Every day lands in exactly one of the
+ *  four, and `late` is a subset of `present`. */
+export function spanDays(from: string, to: string, scope: Scope): SpanDay[] {
+  return datesIn(from, to).filter((d) => !isWeekend(d) && d <= TODAY).map((d) => {
+    const t: SpanDay = { date: d, present: 0, late: 0, absent: 0, onLeave: 0, unclosed: 0 };
+    dayRows(d, scope).forEach((r) => {
+      if (d < r.member.joiningDate) return;
+      if (r.state === "unclosed") { t.unclosed++; return; }
+      if (r.state === "on_leave") { t.onLeave++; return; }
+      if (!r.day) { t.absent++; return; }
+      t.present++;
+      if (r.day.isLate) t.late++;
+    });
+    return t;
+  });
+}
+
+/* ============================================================== work === */
+
+export const isTerminal = (s: WorkStatus) => s === "completed" || s === "cancelled";
+
+/** Past due and not finished. Never stored — see rule 1 at the top. A cancelled
+ *  item is excluded, which is the single easiest part of this to get wrong:
+ *  a terminal item cannot be late. */
+/** How much of a task's checklist is done, as a fraction rather than a
+ *  percentage — the list wants "3 of 5", the bar wants a number, and they
+ *  should not be two computations. */
+export const checkCount = (i: WorkItem): { done: number; total: number } => {
+  const lines = i.checklist || [];
+  return { done: lines.filter((l) => l.done).length, total: lines.length };
+};
+
+export function isDelayed(i: WorkItem, today = TODAY): boolean {
+  if (isTerminal(i.status)) return false;
+  return !!i.dueDate && i.dueDate < today;
+}
+
+export const childrenOf = (id: string, all = snap.items) => all.filter((i) => i.parentId === id);
+
+/** Progress, derived. A milestone counts its completed children; a target
+ *  divides what its EOD reports accumulated by what it asked for; a task
+ *  counts its ticked lines, and is binary only when it has none.
+ *
+ *  A COMPLETED TASK IS 100 WHATEVER ITS LINES SAY. Somebody closing a task
+ *  with two lines unticked has decided those lines did not matter, and a bar
+ *  reading 60% on a finished task argues with them. The unticked lines are
+ *  still on the record; the percentage is not the place to make the point.
+ *
+ *  Nothing here reads a stored percentage, and none is written. */
+export function progressOf(i: WorkItem, all = snap.items): number | null {
+  if (i.kind === "task") {
+    if (i.status === "completed") return 100;
+    const lines = i.checklist || [];
+    if (!lines.length) return 0;
+    return Math.round((lines.filter((l) => l.done).length / lines.length) * 100);
+  }
+  if (i.kind === "target") {
+    if (!i.targetValue) return null;
+    return Math.min(100, Math.round(((i.currentValue || 0) / i.targetValue) * 100));
+  }
+  const kids = childrenOf(i.itemId, all);
+  if (!kids.length) return i.status === "completed" ? 100 : 0;
+  return Math.round((kids.filter((k) => k.status === "completed").length / kids.length) * 100);
+}
+
+export const parentOf = (i: WorkItem, all = snap.items) =>
+  (i.parentId ? all.filter((p) => p.itemId === i.parentId)[0] : null) || null;
+
+/** The stage an item is IN, which is not always the stage it stores. Delay wins
+ *  over the stored value, so every item sits in exactly one column and the
+ *  strip and the board can never disagree. */
+export const stageOf = (i: WorkItem, today = TODAY): WorkStage =>
+  (isDelayed(i, today) ? "delayed" : i.status);
+
+/** What an item is waiting on, if the blocker is still open. A finished blocker
+ *  stops blocking without anybody clearing the field. */
+export function blockerOf(i: WorkItem, all = snap.items): WorkItem | null {
+  if (!i.blockedByItemId) return null;
+  const b = all.filter((x) => x.itemId === i.blockedByItemId)[0];
+  return b && !isTerminal(b.status) ? b : null;
+}
+
+/** Where today sits between startDate and dueDate, as a percentage. Elapsed —
+ *  NOT progress. Drawn as a marker over the progress bar so "50% done, 91% of
+ *  the window gone" is one glance instead of two numbers nobody compares. */
+export function timePct(i: WorkItem, today = TODAY): number | null {
+  if (!i.startDate || !i.dueDate) return null;
+  const a = new Date(i.startDate).getTime(), b = new Date(i.dueDate).getTime();
+  if (b <= a) return 100;
+  const t = new Date(today).getTime();
+  return Math.max(0, Math.min(100, Math.round(((t - a) / (b - a)) * 100)));
+}
+
+/* ============================================================== tags === */
+
+export const readTag = (id: string): Tag | null =>
+  snap.tags.filter((t) => t.tagId === id)[0] || null;
+
+/** The tags on an item, live rows rather than the ids stored on it. */
+export const tagsOf = (i: WorkItem, all = snap.tags): Tag[] =>
+  (i.tagIds || []).map((id) => all.filter((t) => t.tagId === id)[0]).filter(Boolean) as Tag[];
+
+/** A member's own tags, archived ones last and only if asked for. */
+export const tagsOwnedBy = (memberId: string, withArchived = false): Tag[] =>
+  snap.tags.filter((t) => t.ownerId === memberId && (withArchived || !t.archivedAt));
+
+/** Cross-member views group by SLUG, never by tagId: otherwise a team board
+ *  fragments into one column per person per tag and is useless at five people. */
+export function tagSlugs(items: WorkItem[]): { slug: string; label: string; n: number }[] {
+  const by: Record<string, { slug: string; label: string; n: number }> = {};
+  items.forEach((i) => tagsOf(i).forEach((t) => {
+    if (!by[t.slug]) by[t.slug] = { slug: t.slug, label: t.label, n: 0 };
+    by[t.slug].n += 1;
+  }));
+  return Object.keys(by).sort().map((k) => by[k]);
+}
+export const hasSlug = (i: WorkItem, slug: string) => tagsOf(i).some((t) => t.slug === slug);
+
+/* ============================================================= leave === */
+
+export const leaveFor = (memberId: string): LeaveRequest[] =>
+  snap.leave.filter((l) => l.memberId === memberId)
+    .slice().sort((a, b) => a.fromDate.localeCompare(b.fromDate));
+
+/** Approved leave covering a date. It suppresses a derived absence; it never
+ *  writes an attendance row. */
+export function onLeave(memberId: string, date: string): LeaveRequest | null {
+  return snap.leave.filter((l) => l.memberId === memberId && l.state === "approved"
+    && date >= l.fromDate && date <= l.toDate)[0] || null;
+}
+export const leaveOn = (date: string, ids: string[]): LeaveRequest[] =>
+  snap.leave.filter((l) => l.state === "approved" && ids.indexOf(l.memberId) >= 0
+    && date >= l.fromDate && date <= l.toDate);
+export const pendingLeave = (scope: Scope): LeaveRequest[] => {
+  const ids = membersInScope(scope).map((m) => m.memberId);
+  return snap.leave.filter((l) => l.state === "requested" && ids.indexOf(l.memberId) >= 0);
+};
+
+/** Every date a range covers, inclusive. Field arithmetic through addDays, not
+ *  `new Date(...).toISOString()`: this panel runs at +05:30, where an ISO
+ *  round-trip of a local midnight lands on the day before. */
+export function datesIn(from: string, to: string): string[] {
+  const out: string[] = [];
+  for (let d = from; d <= to && out.length < 400; d = addDays(d, 1)) out.push(d);
+  return out;
+}
+
+/** WHAT MAKES THIS REQUEST IMPOSSIBLE, said before it is sent.
+ *
+ *  Two clashes, and they are different in kind:
+ *
+ *  · **A day already opened.** §3.7: a leave record laid over an attendance row
+ *    makes one date both worked and away, and the derivation has no way to
+ *    choose between them. It is refused, not warned.
+ *  · **A day already spoken for** by this member's own live request. A second
+ *    request over the same date gives the approver two rows to decide and the
+ *    member two answers.
+ *
+ *  It returns the dates rather than a sentence, so the form can name them and
+ *  the store can refuse on exactly the same rule. */
+export interface LeaveClash { worked: string[]; taken: string[] }
+export function leaveClash(memberId: string, from: string, to: string): LeaveClash {
+  const days = datesIn(from, to);
+  const live = snap.leave.filter((l) => l.memberId === memberId
+    && (l.state === "requested" || l.state === "approved"));
+  return {
+    worked: days.filter((d) => !!dayFor(memberId, d)),
+    taken: days.filter((d) => live.some((l) => d >= l.fromDate && d <= l.toDate)),
+  };
+}
+
+/** WHO ELSE IS AWAY over the same dates, among the people this request's
+ *  approver is responsible for. §3.8: this is a WARNING and never a block —
+ *  nothing in the module knows how many people a day needs, and refusing on a
+ *  staffing rule nobody configured would be the panel inventing one. */
+export interface LeaveOverlap { date: string; members: Member[] }
+export function leaveOverlap(l: LeaveRequest): LeaveOverlap[] {
+  const m = readMember(l.memberId);
+  if (!m) return [];
+  /* The peer group is everyone reporting to the same senior, minus the person
+     asking. A clash only matters against people who cover the same work. */
+  const peers = snap.members.filter((x) => x.memberId !== l.memberId
+    && x.status === "active" && !!m.reportsTo && x.reportsTo === m.reportsTo);
+  const ids = peers.map((x) => x.memberId);
+  return datesIn(l.fromDate, l.toDate)
+    .map((date) => ({ date, members: leaveOn(date, ids).map((x) => readMember(x.memberId)).filter(Boolean) as Member[] }))
+    .filter((r) => r.members.length > 0);
+}
+
+/** A REQUEST WITH NO APPROVER MUST NEVER JUST SIT THERE. §3.8/TM-OD-25: a
+ *  member at the top of the tree points at nobody, so their request routes to
+ *  whoever holds the deciding verb instead of falling down a hole. Surfacing
+ *  the list is what stops that being silent. */
+export const unroutedLeave = (): LeaveRequest[] =>
+  snap.leave.filter((l) => l.state === "requested" && !(readMember(l.memberId) || { reportsTo: "x" }).reportsTo);
+
+/** THE WHOLE QUEUE, SPLIT AND DE-DUPLICATED — one function, so the tab's count
+ *  and the list under it cannot disagree.
+ *
+ *  They could, and briefly did: an admin whose scope reaches the founder sees
+ *  that request in `pendingLeave` AND in `unroutedLeave`, and adding the two
+ *  lengths counted it twice. A badge that says 3 over a list of 2 is a badge
+ *  nobody trusts again. */
+export interface LeaveQueue { mine: LeaveRequest[]; unrouted: LeaveRequest[]; total: number }
+export function leaveQueue(scope: Scope): LeaveQueue {
+  const mine = pendingLeave(scope);
+  const unrouted = unroutedLeave().filter((l) => mine.every((x) => x.leaveId !== l.leaveId));
+  return { mine, unrouted, total: mine.length + unrouted.length };
+}
+
+/* ====================================================== documents === */
+
+export const agreementsFor = (memberId: string): Agreement[] =>
+  snap.agreements.filter((a) => a.memberId === memberId)
+    .slice().sort((a, b) => (b.sentAt || "").localeCompare(a.sentAt || ""));
+
+/** By kind, and NEWEST FIRST within a kind — so the first row of a kind is the
+ *  latest upload, which is what every reader of `[0]` was assuming. */
+export const documentsFor = (memberId: string): MemberDocument[] =>
+  snap.documents.filter((r) => r.memberId === memberId)
+    .slice().sort((a, b) => a.kind.localeCompare(b.kind) || b.uploadedAt.localeCompare(a.uploadedAt));
+
+/** Which of the required documents this member has not handed over. Derived
+ *  from the vocabulary, so the answer changes with the list and not with a
+ *  constant somebody has to remember to edit. */
+export const missingDocs = (memberId: string): string[] => {
+  const have = documentsFor(memberId).map((r) => r.kind);
+  return REQUIRED_DOCS.filter((k) => have.indexOf(k) < 0);
+};
+
+/** An agreement that was sent, never opened, and is running out of time. It is
+ *  the only thing on this list that is waiting on a human. */
+export const staleAgreements = (memberId: string, today = TODAY): Agreement[] =>
+  agreementsFor(memberId).filter((a) => a.state === "sent" && !!a.expiresAt && (a.expiresAt as string) >= today);
+
+/** Sent and never opened, across a scope. The one list on the roll-up that is
+ *  waiting on a human rather than on work. */
+export const unopenedAgreements = (scope: Scope): Agreement[] => {
+  const ids = membersInScope(scope).map((m) => m.memberId);
+  return snap.agreements.filter((a) => a.state === "sent" && ids.indexOf(a.memberId) >= 0);
+};
+
+/* ============================================================== pay === */
+
+/** TEAM READS PAY AND NEVER WRITES IT. Every number below belongs to Finance;
+ *  this module shows it and links there for anything that changes it. */
+export const payFor = (memberId: string): Pay | null =>
+  snap.pay.filter((p) => p.memberId === memberId)[0] || null;
+
+export const incentiveTotal = (p: Pay | null, state?: string): number =>
+  (p ? p.incentives : []).filter((i) => !state || i.state === state)
+    .reduce((a, i) => a + i.amount, 0);
+
+/** THE ONLY WAY A TYPED ADDRESS BECOMES A STORED ONE.
+ *
+ *  It returns null rather than throwing, so a half-typed address is simply not
+ *  addable yet. Two things it is doing that are not cosmetic:
+ *
+ *  · **http and https only.** `javascript:alert(1)` is a valid URL and a valid
+ *    `href`, and one click on a stored one runs script with the panel's
+ *    session. A link field is the classic way that gets in, so the scheme is
+ *    allow-listed here rather than sanitised at the render.
+ *  · A bare `docs.google.com/…` is treated as https, because a link somebody
+ *    pastes without a scheme is still a link and `//` is not a thing anybody
+ *    should have to remember. */
+/** The host, for a link nobody bothered to name. Never throws: it is handed
+ *  URLs that have already been through `normaliseUrl`, and a fallback beats a
+ *  crash for the one that has not. */
+export function hostOf(u: string): string {
+  try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; }
+}
+
+export function normaliseUrl(raw: string): string | null {
+  const v = (raw || "").trim();
+  if (!v) return null;
+  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(v) ? v : "https://" + v;
+  try {
+    const u = new URL(withScheme);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    return u.href;
+  } catch { return null; }
+}
+
+/* ============================================================= links === */
+
+export interface LinkedItem { link: WorkLink; other: WorkItem; outward: boolean }
+
+/** Both directions of every edge touching an item, with the row the edge
+ *  points at resolved live. A dangling edge renders nothing rather than a
+ *  dead id. */
+export function linksOf(itemId: string, all = snap.links): LinkedItem[] {
+  const out: LinkedItem[] = [];
+  all.forEach((l) => {
+    const outward = l.fromItemId === itemId;
+    if (!outward && l.toItemId !== itemId) return;
+    const other = readItem(outward ? l.toItemId : l.fromItemId);
+    if (other) out.push({ link: l, other, outward });
+  });
+  return out;
+}
+
+/* ========================================================== calendar === */
+
+/** How long an item occupies the grid. A task of a week or less is drawn on
+ *  every day it spans — that is a schedule. Anything longer, and every
+ *  milestone and target, is drawn twice: the day it starts and the day it is
+ *  due. A quarter-long target printed on ninety-two days is wallpaper, and it
+ *  buries the day's actual work under "+4 more". */
+export const CAL_SPAN_DAYS = 7;
+export type CalEdge = "" | "starts" | "due";
+export interface CalEvent { item: WorkItem; edge: CalEdge }
+
+export function eventsOn(date: string, rows: WorkItem[]): CalEvent[] {
+  const out: CalEvent[] = [];
+  rows.forEach((i) => {
+    const a = i.startDate || i.dueDate, b = i.dueDate || i.startDate;
+    if (!a || !b) return;
+    const days = Math.round((new Date(b).getTime() - new Date(a).getTime()) / DAY) + 1;
+    if (i.kind === "task" && days <= CAL_SPAN_DAYS) {
+      if (date >= a && date <= b) out.push({ item: i, edge: "" });
+    } else if (date === a && date === b) out.push({ item: i, edge: "due" });
+    else if (date === a) out.push({ item: i, edge: "starts" });
+    else if (date === b) out.push({ item: i, edge: "due" });
+  });
+  return out;
+}
+
+/** Six Monday-first weeks covering a month, or one week around a date. */
+export function gridDays(anchor: string, mode: "month" | "week"): string[] {
+  const d = new Date(anchor);
+  let start: string;
+  if (mode === "week") start = addDays(anchor, -((d.getDay() + 6) % 7));
+  else {
+    const first = anchor.slice(0, 8) + "01";
+    start = addDays(first, -((new Date(first).getDay() + 6) % 7));
+  }
+  const n = mode === "week" ? 7 : 42;
+  const out: string[] = [];
+  for (let i = 0; i < n; i++) out.push(addDays(start, i));
+  return out;
+}
+
+/* ========================================================== timeline === */
+
+export interface Lane { item: WorkItem | null; sub: boolean; tasks: WorkItem[] }
+
+/** Target ▸ milestone, with each lane's own tasks under it, and a last lane for
+ *  the tasks that hang off nothing. Lanes are the WORK, never the worker: a
+ *  lane per person is a productivity chart this module has no estimate field to
+ *  justify, and member load already has the Assignee axis and §3.13. */
+export function lanesOf(rows: WorkItem[]): Lane[] {
+  const kidsOf = (id: string | null) =>
+    rows.filter((i) => i.kind === "task" && (id ? i.parentId === id : !i.parentId));
+  const lanes: Lane[] = [];
+  rows.filter((i) => i.kind === "target").forEach((t) => {
+    lanes.push({ item: t, sub: false, tasks: kidsOf(t.itemId) });
+    rows.filter((m) => m.kind === "milestone" && m.parentId === t.itemId)
+      .forEach((m) => lanes.push({ item: m, sub: true, tasks: kidsOf(m.itemId) }));
+  });
+  rows.filter((m) => m.kind === "milestone"
+    && (!m.parentId || !rows.some((x) => x.itemId === m.parentId)))
+    .forEach((m) => lanes.push({ item: m, sub: false, tasks: kidsOf(m.itemId) }));
+  lanes.push({ item: null, sub: false, tasks: kidsOf(null) });
+  return lanes;
+}
+
+export interface WorkFilter {
+  member?: string; kind?: string; status?: string; priority?: string;
+  due?: string; q?: string; parent?: string; tag?: string;
+  /** Truthy = only items waiting on another open item. */
+  wait?: string;
+}
+
+export function workRows(f: WorkFilter, scope: Scope): WorkItem[] {
+  const ids = membersInScope(scope).map((m) => m.memberId);
+  let rows = snap.items.filter((i) => ids.indexOf(i.assigneeId) >= 0);
+  if (f.member) rows = rows.filter((i) => i.assigneeId === f.member);
+  if (f.kind) rows = rows.filter((i) => i.kind === f.kind);
+  if (f.status) rows = rows.filter((i) => stageOf(i) === f.status);
+  if (f.tag) rows = rows.filter((i) => hasSlug(i, f.tag as string));
+  if (f.priority) rows = rows.filter((i) => i.priority === f.priority);
+  if (f.wait) rows = rows.filter((i) => !!blockerOf(i));
+  if (f.parent) rows = rows.filter((i) => i.parentId === f.parent || i.itemId === f.parent);
+  if (f.due === "today") rows = rows.filter((i) => i.dueDate === TODAY);
+  if (f.due === "week") {
+    const wk = weekOf(TODAY);
+    rows = rows.filter((i) => !!i.dueDate && wk.indexOf(i.dueDate) >= 0);
+  }
+  if (f.q) {
+    const q = f.q.toLowerCase();
+    rows = rows.filter((i) =>
+      i.title.toLowerCase().indexOf(q) >= 0 ||
+      (i.description || "").toLowerCase().indexOf(q) >= 0);
+  }
+  /* Overdue first, then by due date, then priority. The order answers "what is
+     going wrong" before "what is next", which is the question this list is
+     opened with. */
+  const rank = (i: WorkItem) => (isDelayed(i) ? 0 : isTerminal(i.status) ? 2 : 1);
+  const prank = (p: Priority) => (PRIORITY[p] ? (PRIORITY[p] as unknown as { rank: number }).rank : 9);
+  return rows.slice().sort((a, b) =>
+    rank(a) - rank(b) ||
+    (a.dueDate || "9999").localeCompare(b.dueDate || "9999") ||
+    prank(a.priority) - prank(b.priority));
+}
+
+export interface WorkTotals {
+  total: number; planned: number; inProgress: number; waiting: number;
+  completed: number; cancelled: number; delayed: number;
+}
+
+/** Counted by STAGE, not by stored status, so the strip and the columns agree:
+ *  a late card is in Delay and is not also counted under In progress. */
+export function workTotals(rows: WorkItem[]): WorkTotals {
+  const t: WorkTotals = { total: rows.length, planned: 0, inProgress: 0, waiting: 0, completed: 0, cancelled: 0, delayed: 0 };
+  rows.forEach((i) => {
+    const st = stageOf(i);
+    if (st === "planned") t.planned++;
+    if (st === "in_progress") t.inProgress++;
+    if (st === "delayed") t.delayed++;
+    if (st === "completed") t.completed++;
+    if (st === "cancelled") t.cancelled++;
+    if (blockerOf(i)) t.waiting++;
+  });
+  return t;
+}
+
+/* ====================================================== plans & EOD === */
+
+export const planFor = (memberId: string, date: string): DailyPlan | null =>
+  snap.plans.filter((p) => p.memberId === memberId && p.businessDate === date)[0] || null;
+
+export const reportFor = (memberId: string, date: string): DailyReport | null =>
+  snap.reports.filter((r) => r.memberId === memberId && r.businessDate === date)[0] || null;
+
+/** An EOD is only outstanding once the day is over. Missing at 14:20 is not
+ *  missing, it is early — and a band that shouts at half the company every
+ *  afternoon is a band people stop reading. */
+export function eodDue(date: string, m: Member, at = now()): boolean {
+  if (date < TODAY) return true;
+  if (date > TODAY) return false;
+  return at > atClock(date, m.autoCloseAt || "20:00");
+}
+
+export interface ReviewRow {
+  member: Member;
+  day: AttendanceDay | null;
+  state: AttendanceState;
+  worked: number | null;
+  plan: DailyPlan | null;
+  report: DailyReport | null;
+  eodDue: boolean;
+  items: WorkItem[];
+  doing: WorkItem | null;
+  done: number;
+  planned: number;
+  delayed: number;
+  waiting: number;
+}
+
+/** The senior's day, one row per member in scope. Everything on it is derived
+ *  from the same arrays the drill-down renders, so a count here and the list it
+ *  opens cannot disagree — the rule the Users module's analytics face was
+ *  built on and the reason its headline numbers are not served separately. */
+export function reviewRows(date: string, scope: Scope, at = now()): ReviewRow[] {
+  return membersInScope(scope)
+    .filter((m) => m.status === "active")
+    .map((m) => {
+      const day = dayFor(m.memberId, date);
+      const items = snap.items.filter((i) => i.assigneeId === m.memberId);
+      const dueToday = items.filter((i) => i.dueDate === date);
+      return {
+        member: m,
+        day,
+        state: stateOf(day, m, at, date),
+        worked: workedOf(day, m, at),
+        plan: planFor(m.memberId, date),
+        report: reportFor(m.memberId, date),
+        eodDue: eodDue(date, m, at),
+        items,
+        doing: items.filter((i) => i.status === "in_progress")[0] || null,
+        done: dueToday.filter((i) => i.status === "completed").length,
+        planned: dueToday.length,
+        delayed: items.filter((i) => isDelayed(i)).length,
+        waiting: items.filter((i) => !!blockerOf(i)).length,
+      };
+    });
+}
+
+/* ==================================================== reports over a span === */
+
+/** PLANS AND EODS OVER A RANGE, counted the way the day view counts them.
+ *
+ *  The pair is the point: a plan is what somebody meant to do this morning, an
+ *  EOD is what happened, and the gap between `planned` and `done` is the only
+ *  thing in this module that compares an intention with an outcome. Summing
+ *  them here rather than in the component keeps one counting rule; two would
+ *  drift, and the one nobody is watching is the one that drifts.
+ *
+ *  Three rules it inherits from `attentionOf`, deliberately and not by accident:
+ *
+ *  · **Anybody with no reporting line is out of the submission counts.** The
+ *    founder reports to nobody, so a plan from them is owed to nobody. A figure
+ *    that always shows the same person delinquent is a figure people stop
+ *    reading. They still appear in the table — with their expected days at zero,
+ *    which says why rather than hiding them.
+ *  · **An EOD is only owed once that member's own day is over.** `eodDue` takes
+ *    the member and the clock, so missing at four in the afternoon is early.
+ *  · **Weekends are not days, and nobody owes anything before they joined.**
+ */
+export interface ReportSpanRow {
+  member: Member;
+  /** Working days this member was expected to plan for. Zero for anybody with
+   *  no reporting line, which is what keeps them out of the percentages. */
+  days: number;
+  plans: number;
+  /** Days on which an EOD had actually fallen due. */
+  eodsDue: number;
+  eods: number;
+  /** Submitted and still nobody has opened it. */
+  unread: number;
+  /** Plan lines written, and report lines ticked. The two numbers, never a
+   *  score made out of them. */
+  planned: number;
+  done: number;
+}
+
+export function reportSpanRows(from: string, to: string, scope: Scope): ReportSpanRow[] {
+  /* NOTHING IS OWED FOR A DAY THAT HAS NOT HAPPENED. Callers pass `to = TODAY`,
+     so this never bites in the panel — and a derivation that is only correct
+     because of how it happens to be called is one bad argument from lying. A
+     check asking for a window in the future is what found it. */
+  const dates = datesIn(from, to).filter((d) => !isWeekend(d) && d <= TODAY);
+  return membersInScope(scope).filter((m) => m.status === "active").map((m) => {
+    const row: ReportSpanRow = {
+      member: m, days: 0, plans: 0, eodsDue: 0, eods: 0, unread: 0, planned: 0, done: 0,
+    };
+    dates.forEach((d) => {
+      if (d < m.joiningDate) return;
+      if (m.reportsTo) row.days++;
+      const plan = planFor(m.memberId, d);
+      if (plan && plan.submittedAt) { row.plans++; row.planned += plan.lines.length; }
+      const due = eodDue(d, m);
+      if (m.reportsTo && due) row.eodsDue++;
+      const rep = reportFor(m.memberId, d);
+      if (rep && rep.submittedAt) {
+        row.eods++;
+        row.done += rep.lines.filter((l) => l.done).length;
+        if (!rep.acknowledgedById) row.unread++;
+      }
+    });
+    return row;
+  });
+}
+
+export interface ReportSpanTotals {
+  members: number; days: number; plans: number; eodsDue: number; eods: number;
+  unread: number; planned: number; done: number;
+  /** Null rather than zero where there is nothing to divide — a percentage of
+   *  nothing reads as 0% and lands in the reader's head as a failure. */
+  planPct: number | null;
+  eodPct: number | null;
+  keptPct: number | null;
+}
+
+export function reportSpanTotals(rows: ReportSpanRow[]): ReportSpanTotals {
+  const t: ReportSpanTotals = {
+    members: rows.length, days: 0, plans: 0, eodsDue: 0, eods: 0, unread: 0,
+    planned: 0, done: 0, planPct: null, eodPct: null, keptPct: null,
+  };
+  rows.forEach((r) => {
+    t.days += r.days; t.plans += r.plans; t.eodsDue += r.eodsDue; t.eods += r.eods;
+    t.unread += r.unread; t.planned += r.planned; t.done += r.done;
+  });
+  if (t.days) t.planPct = Math.round((t.plans / t.days) * 100);
+  if (t.eodsDue) t.eodPct = Math.round((t.eods / t.eodsDue) * 100);
+  if (t.planned) t.keptPct = Math.round((t.done / t.planned) * 100);
+  return t;
+}
+
+/** The same numbers a day at a time, for the shape rather than the total. */
+export interface ReportSpanDay {
+  date: string; owed: number; plans: number; eodsDue: number; eods: number; unread: number;
+}
+export function reportSpanDays(from: string, to: string, scope: Scope): ReportSpanDay[] {
+  const people = membersInScope(scope).filter((m) => m.status === "active");
+  return datesIn(from, to).filter((d) => !isWeekend(d) && d <= TODAY).map((d) => {
+    const t: ReportSpanDay = { date: d, owed: 0, plans: 0, eodsDue: 0, eods: 0, unread: 0 };
+    people.forEach((m) => {
+      if (d < m.joiningDate) return;
+      if (m.reportsTo) t.owed++;
+      const plan = planFor(m.memberId, d);
+      if (plan && plan.submittedAt) t.plans++;
+      if (m.reportsTo && eodDue(d, m)) t.eodsDue++;
+      const rep = reportFor(m.memberId, d);
+      if (rep && rep.submittedAt) {
+        t.eods++;
+        if (!rep.acknowledgedById) t.unread++;
+      }
+    });
+    return t;
+  });
+}
+
+export interface Attention {
+  noPlan: ReviewRow[];
+  noEod: ReviewRow[];
+  delayed: WorkItem[];
+  waiting: WorkItem[];
+  lateOrAbsent: ReviewRow[];
+  unacknowledged: ReviewRow[];
+}
+
+/** What needs a human, in the order a manager actually asks. Everything here is
+ *  a filter over `reviewRows` — there is no second query and no second
+ *  definition of "missing". */
+export function attentionOf(rows: ReviewRow[]): Attention {
+  const items = rows.reduce<WorkItem[]>((a, r) => a.concat(r.items), []);
+  const seen: Record<string, boolean> = {};
+  const uniq = (list: WorkItem[]) => list.filter((i) => (seen[i.itemId] ? false : (seen[i.itemId] = true)));
+  return {
+    /* The founder — anybody with no reporting line — is excluded from the two
+       submission counts. A number that always shows the same person delinquent
+       is a number people learn to ignore. */
+    noPlan: rows.filter((r) => r.member.reportsTo && (!r.plan || !r.plan.submittedAt)),
+    noEod: rows.filter((r) => r.member.reportsTo && r.eodDue && (!r.report || !r.report.submittedAt)),
+    delayed: uniq(items.filter((i) => isDelayed(i))),
+    waiting: uniq(items.filter((i) => !!blockerOf(i))),
+    lateOrAbsent: rows.filter((r) => r.state === "absent" || (r.day && r.day.isLate)),
+    unacknowledged: rows.filter((r) => r.report && r.report.submittedAt && !r.report.acknowledgedById),
+  };
+}
+
+/* ================================================ the write simulation ===
+   Everything below lands in this browser tab and is discarded on reload. It
+   exists so the screens can be walked end to end and so the transitions are
+   stated somewhere executable rather than only in a document. Each function
+   returns { ok } or { ok:false, code, message } in the shape the API's error
+   contract uses, so the views' refusal handling is the real one. */
+
+export type Refusal = { ok: false; code: string; message: string };
+export type Ok<T> = { ok: true; data: T };
+export type Result<T> = Ok<T> | Refusal;
+const err = (code: string, message: string): Refusal => ({ ok: false, code, message });
+const ok = <T,>(data: T): Ok<T> => ({ ok: true, data });
+
+let seq = 0;
+const nextId = (prefix: string) => prefix + "-" + (Date.now().toString(36) + (seq++).toString(36)).toUpperCase();
+
+/** THE RECORD INSIDE *THIS* ARRAY. Every mutator finds its row in the list it
+ *  is about to write back, never in a second read — the prototype lost every
+ *  member edit for exactly that reason (defect T-1), because two reads of one
+ *  store hand back objects from two different parses and mutating one saves
+ *  the other. */
+const findDay = (list: AttendanceDay[], memberId: string, date: string) =>
+  list.filter((d) => d.memberId === memberId && d.businessDate === date)[0] || null;
+
+export function openDay(memberId: string): Result<AttendanceDay> {
+  const days = snap.days.slice();
+  const existing = findDay(days, memberId, TODAY);
+  /* IDEMPOTENT, not a conflict. A second tab, or a second device, must get the
+     SAME open day back — refusing it would make the honest fix (press it
+     again) look like a bug. */
+  if (existing) return ok(existing);
+  const m = readMember(memberId);
+  if (!m) return err("member_not_found", "No such member.");
+  if (m.status !== "active") return err("account_inactive", "This account is not active.");
+  const at = now();
+  const threshold = atClock(TODAY, m.dayStartsAt) + m.graceMinutes * 60000;
+  const day: AttendanceDay = {
+    attendanceId: nextId("ATT"),
+    memberId, businessDate: TODAY,
+    startedAt: new Date(at).toISOString(),
+    endedAt: null, breaks: [], workedMinutes: null, breakMinutes: 0,
+    /* Computed at open, against this member's own start time, and stored. */
+    isLate: at > threshold,
+    lateByMinutes: at > threshold ? Math.round((at - threshold) / 60000) : 0,
+    source: "self",
+  };
+  days.push(day);
+  snap.days = days;
+  emit();
+  return ok(day);
+}
+
+export function startBreak(memberId: string): Result<AttendanceDay> {
+  const days = snap.days.slice();
+  const d = findDay(days, memberId, TODAY);
+  if (!d) return err("day_not_open", "Start the day before taking a break.");
+  if (d.endedAt) return err("day_ended", "The day is already closed.");
+  if (openBreakOf(d)) return err("already_on_break", "A break is already running.");
+  d.breaks = d.breaks.concat([{ startedAt: new Date(now()).toISOString(), endedAt: null, minutes: null }]);
+  snap.days = days;
+  emit();
+  return ok(d);
+}
+
+export function resumeDay(memberId: string): Result<AttendanceDay> {
+  const days = snap.days.slice();
+  const d = findDay(days, memberId, TODAY);
+  if (!d) return err("day_not_open", "No open day.");
+  const open = openBreakOf(d);
+  if (!open) return err("not_on_break", "No break is running.");
+  const at = now();
+  open.endedAt = new Date(at).toISOString();
+  open.minutes = Math.max(0, Math.round((at - ts(open.startedAt)) / 60000));
+  d.breakMinutes = breaksClosedMinutes(d);
+  snap.days = days;
+  emit();
+  return ok(d);
+}
+
+export function endDay(memberId: string): Result<AttendanceDay> {
+  const days = snap.days.slice();
+  const d = findDay(days, memberId, TODAY);
+  if (!d) return err("day_not_open", "No open day to close.");
+  if (d.endedAt) return err("day_ended", "The day is already closed.");
+  const at = now();
+  /* Closing the day closes a running break at the same instant. Leaving it open
+     reports a nine-hour lunch, which is the only way this arithmetic can
+     produce a number nobody recognises. */
+  const open = openBreakOf(d);
+  if (open) {
+    open.endedAt = new Date(at).toISOString();
+    open.minutes = Math.max(0, Math.round((at - ts(open.startedAt)) / 60000));
+  }
+  d.endedAt = new Date(at).toISOString();
+  d.breakMinutes = breaksClosedMinutes(d);
+  d.workedMinutes = Math.max(0, Math.round((at - ts(d.startedAt)) / 60000) - d.breakMinutes);
+  snap.days = days;
+  emit();
+  return ok(d);
+}
+
+/** WHERE THIS ITEM MAY GO NEXT, read from the same vocabulary row that
+ *  `setItemStatus` enforces with. A control that offers a move the store will
+ *  refuse is a control that lies, and hard-coding the four rows into a menu is
+ *  how the offer and the rule drift apart — which already happened once in this
+ *  module, when the drawer's footer had no branch for cancelled → planned and a
+ *  cancelled item became a dead end the store would have allowed out of.
+ *
+ *  DELAY IS NOT IN HERE AND CANNOT BE. It is derived from the due date, nothing
+ *  writes it, and there is no row for it: an item in Delay is offered the moves
+ *  its STORED status allows. */
+export interface Transition { to: WorkStatus; requiresReason: boolean; label: string }
+
+export function transitionsFrom(from: WorkStatus): Transition[] {
+  const rows = vocabDoc.workTransitions as
+    { from: string; to: string[]; requiresReason?: boolean; label?: string }[];
+  const row = rows.filter((t) => t.from === from)[0];
+  if (!row) return [];
+  return row.to.map((to) => ({
+    to: to as WorkStatus,
+    requiresReason: !!row.requiresReason || to === "cancelled",
+    /* The row's own verb when it has one — "Reopen", "Restore" — because
+       "Completed → In progress" is not what a person calls that. */
+    label: row.label || labelOf(WORK_STATUS, to),
+  }));
+}
+
+export function setItemStatus(itemId: string, to: WorkStatus, reason?: string): Result<WorkItem> {
+  const items = snap.items.slice();
+  const i = items.filter((x) => x.itemId === itemId)[0];
+  if (!i) return err("item_not_found", "No such work item.");
+  const row = (vocabDoc.workTransitions as { from: string; to: string[]; requiresReason?: boolean }[])
+    .filter((t) => t.from === i.status)[0];
+  if (!row || row.to.indexOf(to) < 0)
+    return err("invalid_transition", labelOf(WORK_STATUS, i.status) + " cannot become " + labelOf(WORK_STATUS, to) + ".");
+  const needsReason = row.requiresReason || to === "cancelled";
+  if (needsReason && !(reason || "").trim())
+    return err("reason_required", "This change needs a reason.");
+  i.status = to;
+  i.rowVersion += 1;
+  if (to === "completed") i.completedAt = new Date(now()).toISOString();
+  if (to === "cancelled") { i.cancelledReason = reason; i.cancelledAt = new Date(now()).toISOString(); }
+  if (to === "in_progress") i.completedAt = null;
+  snap.items = items;
+  emit();
+  return ok(i);
+}
+
+/** Waiting on another item. A field with a reason, not a stage — the stage
+ *  keeps saying where the work is, and this says who it is stuck behind. */
+export function setBlockedBy(itemId: string, blockerId: string | null, reason?: string): Result<WorkItem> {
+  const items = snap.items.slice();
+  const i = items.filter((x) => x.itemId === itemId)[0];
+  if (!i) return err("item_not_found", "No such work item.");
+  if (blockerId) {
+    if (blockerId === itemId) return err("self_block", "An item cannot wait on itself.");
+    const b = items.filter((x) => x.itemId === blockerId)[0];
+    if (!b) return err("blocker_not_found", "No such item to wait on.");
+    if (!(reason || "").trim()) return err("reason_required", "Say what it is waiting for.");
+    i.blockedByItemId = blockerId;
+    i.blockedReason = reason;
+    i.blockedAt = new Date(now()).toISOString();
+  } else {
+    i.blockedByItemId = null;
+    delete i.blockedReason;
+    delete i.blockedAt;
+  }
+  i.rowVersion += 1;
+  snap.items = items;
+  emit();
+  return ok(i);
+}
+
+/** A tag is born here and nowhere else — one keystroke from the picker. A
+ *  member may only tag with their own tags, which is what (ownerId, slug)
+ *  identity means in practice. */
+export function createTag(ownerId: string, label: string, tone?: string): Result<Tag> {
+  const clean = label.trim();
+  if (!clean) return err("tag_empty", "A tag needs a name.");
+  const slug = clean.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const dup = snap.tags.filter((t) => t.ownerId === ownerId && t.slug === slug && !t.archivedAt)[0];
+  if (dup) return ok(dup);
+  const t: Tag = {
+    tagId: nextId("TG"), ownerId, slug, label: clean, colourToken: tone || "slate",
+    createdAt: new Date(now()).toISOString(), archivedAt: null,
+  };
+  snap.tags = snap.tags.concat([t]);
+  emit();
+  return ok(t);
+}
+
+export function tagItem(itemId: string, tagId: string, on: boolean): Result<WorkItem> {
+  const items = snap.items.slice();
+  const i = items.filter((x) => x.itemId === itemId)[0];
+  if (!i) return err("item_not_found", "No such work item.");
+  const have = i.tagIds || [];
+  i.tagIds = on ? (have.indexOf(tagId) < 0 ? have.concat([tagId]) : have)
+                : have.filter((t) => t !== tagId);
+  i.rowVersion += 1;
+  snap.items = items;
+  emit();
+  return ok(i);
+}
+
+export function archiveTag(tagId: string): Result<Tag> {
+  const tags = snap.tags.slice();
+  const t = tags.filter((x) => x.tagId === tagId)[0];
+  if (!t) return err("tag_not_found", "No such tag.");
+  t.archivedAt = new Date(now()).toISOString();
+  snap.tags = tags;
+  emit();
+  return ok(t);
+}
+
+/** Rename keeps the record and its history; the slug follows the label. A
+ *  rename that would collide with another of the owner's active tags is
+ *  refused rather than silently merged. */
+export function renameTag(tagId: string, label: string): Result<Tag> {
+  const clean = label.trim();
+  if (!clean) return err("tag_empty", "A tag needs a name.");
+  const tags = snap.tags.slice();
+  const t = tags.filter((x) => x.tagId === tagId)[0];
+  if (!t) return err("tag_not_found", "No such tag.");
+  const slug = clean.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const dup = tags.filter((x) => x.ownerId === t.ownerId && x.slug === slug
+    && !x.archivedAt && x.tagId !== tagId)[0];
+  if (dup) return err("tag_exists", "You already hold a tag called " + dup.label + ".");
+  t.label = clean;
+  t.slug = slug;
+  snap.tags = tags;
+  emit();
+  return ok(t);
+}
+
+export function restoreTag(tagId: string): Result<Tag> {
+  const tags = snap.tags.slice();
+  const t = tags.filter((x) => x.tagId === tagId)[0];
+  if (!t) return err("tag_not_found", "No such tag.");
+  const dup = tags.filter((x) => x.ownerId === t.ownerId && x.slug === t.slug
+    && !x.archivedAt && x.tagId !== tagId)[0];
+  if (dup) return err("tag_exists", "An active tag already holds that name.");
+  t.archivedAt = null;
+  snap.tags = tags;
+  emit();
+  return ok(t);
+}
+
+export function setTagTone(tagId: string, tone: string): Result<Tag> {
+  const tags = snap.tags.slice();
+  const t = tags.filter((x) => x.tagId === tagId)[0];
+  if (!t) return err("tag_not_found", "No such tag.");
+  t.colourToken = tone;
+  snap.tags = tags;
+  emit();
+  return ok(t);
+}
+
+/* --------------------------------------------------------- documents --- */
+
+/** SENDING FREEZES THE DOCUMENT — and now there is a document to freeze. The
+ *  body is copied in, not referenced: a template edit afterwards makes a new
+ *  version and never rewrites what is already out there, which is the rule this
+ *  function has claimed since before templates existed.
+ *
+ *  `version` is the TEMPLATE's version at the moment of sending, so an agreement
+ *  can say which draft of the NDA somebody actually signed. */
+export function sendAgreement(
+  memberId: string, kind: string, title: string,
+  from?: { templateId: string; body: string; version: number },
+): Result<Agreement> {
+  if (!title.trim()) return err("validation_failed", "A title is required.");
+  if (!readMember(memberId)) return err("member_not_found", "No such member.");
+  const a: Agreement = {
+    agreementId: nextId("AG"), memberId, kind, title: title.trim(),
+    templateId: from ? from.templateId : null,
+    body: from ? from.body : "",
+    version: from ? from.version : 1,
+    state: "sent", sentAt: new Date(now()).toISOString(), sentById: meId(),
+    viewedAt: null, signedAt: null, signedName: null, signerIp: null,
+    expiresAt: addDays(TODAY, 7), token: "tok_" + nextId("t").toLowerCase(),
+    fileName: title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-") + ".pdf",
+  };
+  snap.agreements = snap.agreements.concat([a]);
+  emit();
+  return ok(a);
+}
+
+/** The signature is the member's, so the name they type is stored beside the
+ *  time and the address it came from. A signed agreement is never editable. */
+/** OPENING IS A MOMENT ON THE RECORD. `viewedAt` was read in four places and
+ *  written in none, so every unsigned agreement stayed "not opened" forever and
+ *  the member page's nudge about it was always true. The stand-in sign dialog
+ *  is the only place a member reads the document today, so it is what records
+ *  the reading; the real link page will call the same thing. */
+export function markViewed(agreementId: string): Result<Agreement> {
+  const list = snap.agreements.slice();
+  const a = list.filter((x) => x.agreementId === agreementId)[0];
+  if (!a) return err("not_found", "No such agreement.");
+  /* Only a copy that can still be signed: an expired link records nothing. */
+  if (a.state !== "sent" || (a.expiresAt && (a.expiresAt as string) < TODAY)) return ok(a);
+  a.state = "viewed";
+  a.viewedAt = new Date(now()).toISOString();
+  snap.agreements = list;
+  emit();
+  return ok(a);
+}
+
+export function signAgreement(agreementId: string, name: string): Result<Agreement> {
+  const list = snap.agreements.slice();
+  const a = list.filter((x) => x.agreementId === agreementId)[0];
+  if (!a) return err("agreement_not_found", "No such agreement.");
+  if (a.state === "signed") return err("already_signed", "It is already signed.");
+  if (a.state === "revoked") return err("revoked", "That link was revoked.");
+  if (!name.trim() || name.trim().length < 2) return err("name_required", "Type your full name to sign.");
+  a.state = "signed";
+  a.signedName = name.trim();
+  a.signedAt = new Date(now()).toISOString();
+  a.signerIp = "127.0.0.1";
+  a.expiresAt = null;
+  snap.agreements = list;
+  emit();
+  return ok(a);
+}
+
+export function revokeAgreement(agreementId: string): Result<Agreement> {
+  const list = snap.agreements.slice();
+  const a = list.filter((x) => x.agreementId === agreementId)[0];
+  if (!a) return err("agreement_not_found", "No such agreement.");
+  if (a.state === "signed") return err("already_signed", "A signed agreement cannot be revoked.");
+  a.state = "revoked";
+  a.expiresAt = null;
+  snap.agreements = list;
+  emit();
+  return ok(a);
+}
+
+export function addDocument(memberId: string, kind: string, label: string): Result<MemberDocument> {
+  if (!label.trim()) return err("validation_failed", "A label is required.");
+  /* ONE ROW PER UPLOAD, AND THE READ SHOWS THE NEWEST. "Replace" used to append
+     while the page read the OLDEST row of a kind, so a replaced PAN card went on
+     file invisibly and the stale one kept showing as handed over and checked.
+     The fix is on the read (`documentsFor` is newest-first), not an overwrite:
+     an identity document that was checked on Monday and replaced on Tuesday
+     keeps Monday's row — who verified what, and when — as the audit trail. */
+  const r: MemberDocument = {
+    documentId: nextId("DOC"), memberId, kind, label: label.trim(),
+    fileName: label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-") + ".pdf",
+    sizeKb: 240, uploadedAt: new Date(now()).toISOString(), uploadedById: memberId,
+    verifiedById: null, verifiedAt: null,
+  };
+  snap.documents = snap.documents.concat([r]);
+  emit();
+  return ok(r);
+}
+
+/** The member may delete what they handed over. That is the half that travels
+ *  member → company, and it is theirs. */
+export function deleteDocument(documentId: string): Result<string> {
+  const before = snap.documents.length;
+  snap.documents = snap.documents.filter((r) => r.documentId !== documentId);
+  if (snap.documents.length === before) return err("document_not_found", "No such document.");
+  emit();
+  return ok(documentId);
+}
+
+export function verifyDocument(documentId: string): Result<MemberDocument> {
+  const list = snap.documents.slice();
+  const r = list.filter((x) => x.documentId === documentId)[0];
+  if (!r) return err("document_not_found", "No such document.");
+  r.verifiedById = meId();
+  r.verifiedAt = new Date(now()).toISOString();
+  snap.documents = list;
+  emit();
+  return ok(r);
+}
+
+/* ------------------------------------------------------------- links --- */
+
+/** An edge may not restate a strong link: the parent and the blocker already
+ *  carry meaning, and the same pair drawn twice would eventually disagree. */
+export function addLink(fromItemId: string, toItemId: string, relation: LinkRelation): Result<WorkLink> {
+  if (fromItemId === toItemId) return err("self_link", "An item cannot link to itself.");
+  const a = readItem(fromItemId), b = readItem(toItemId);
+  if (!a || !b) return err("item_not_found", "No such work item.");
+  if (a.parentId === toItemId || b.parentId === fromItemId)
+    return err("is_parent", "That is already the parent link.");
+  if (a.blockedByItemId === toItemId || b.blockedByItemId === fromItemId)
+    return err("is_blocker", "That is already the waiting-on link.");
+  const dup = snap.links.filter((l) => l.relation === relation
+    && ((l.fromItemId === fromItemId && l.toItemId === toItemId)
+      || (l.fromItemId === toItemId && l.toItemId === fromItemId)))[0];
+  if (dup) return ok(dup);
+  const link: WorkLink = {
+    linkId: nextId("LN"), fromItemId, toItemId, relation,
+    createdAt: new Date(now()).toISOString(),
+  };
+  snap.links = snap.links.concat([link]);
+  emit();
+  return ok(link);
+}
+
+export function removeLink(linkId: string): Result<string> {
+  const before = snap.links.length;
+  snap.links = snap.links.filter((l) => l.linkId !== linkId);
+  if (snap.links.length === before) return err("link_not_found", "No such link.");
+  emit();
+  return ok(linkId);
+}
+
+/* ------------------------------------------------------------- leave --- */
+
+export function requestLeave(memberId: string, input: {
+  fromDate: string; toDate: string; kind: string; reason: string;
+}): Result<LeaveRequest> {
+  if (!input.fromDate || !input.toDate) return err("dates_required", "Both dates are needed.");
+  if (input.toDate < input.fromDate) return err("bad_range", "The last day is before the first.");
+  if (!input.reason.trim()) return err("reason_required", "A leave request needs a reason.");
+  /* THE SAME RULE THE FORM DREW, ENFORCED. The form warns early because that is
+     kinder; this refuses because a form is not a gate — the dates can be edited
+     after the warning renders, and a second tab never saw it at all. */
+  const clash = leaveClash(memberId, input.fromDate, input.toDate);
+  if (clash.worked.length)
+    return err("day_worked", "They clocked in on " + fmtDate(clash.worked[0])
+      + ". A leave record over an attendance row makes that day both worked and away.");
+  if (clash.taken.length)
+    return err("already_requested", fmtDate(clash.taken[0]) + " is already covered by another request.");
+  const l: LeaveRequest = {
+    leaveId: nextId("LV"), memberId, fromDate: input.fromDate, toDate: input.toDate,
+    kind: input.kind, reason: input.reason.trim(), state: "requested",
+    decidedById: null, decidedAt: null, decisionNote: null,
+    requestedAt: new Date(now()).toISOString(),
+  };
+  snap.leave = snap.leave.concat([l]);
+  emit();
+  return ok(l);
+}
+
+/** A decision needs a decider. Rejecting also needs a sentence — a refusal
+ *  nobody explained is one the member has to come and ask about. */
+export function decideLeave(leaveId: string, state: LeaveState, byId: string, note?: string): Result<LeaveRequest> {
+  const list = snap.leave.slice();
+  const l = list.filter((x) => x.leaveId === leaveId)[0];
+  if (!l) return err("leave_not_found", "No such request.");
+  if (l.state !== "requested") return err("already_decided", "That request is already " + l.state + ".");
+  if (state === "rejected" && !(note || "").trim())
+    return err("reason_required", "Say why it is refused.");
+  l.state = state;
+  l.decidedById = state === "withdrawn" ? null : byId;
+  l.decidedAt = new Date(now()).toISOString();
+  l.decisionNote = (note || "").trim() || null;
+  snap.leave = list;
+  emit();
+  return ok(l);
+}
+
+/* ------------------------------------------------- checklist and links --- */
+
+/** THE ONE STORED THING IN A DERIVED MODULE. A tick is an act somebody
+ *  performed and there is nothing to compute it from — unlike delay, progress
+ *  and stage, which are all read from other facts. It writes the item's own
+ *  row, so the board, the list and the bar all move together. */
+function withItem(itemId: string, fn: (i: WorkItem) => string | null): Result<WorkItem> {
+  const list = snap.items.slice();
+  const i = list.filter((x) => x.itemId === itemId)[0];
+  if (!i) return err("item_not_found", "No such item.");
+  const why = fn(i);
+  if (why) return err("validation_failed", why);
+  i.rowVersion = (i.rowVersion || 0) + 1;
+  snap.items = list;
+  emit();
+  return ok(i);
+}
+
+/** WHO MAY ROLL UP UNDER WHOM — depth 3, target ▸ milestone ▸ task — written
+ *  once. It was in four places (both dialogs, createItem, updateItem) and had
+ *  already drifted: the store let a milestone sit under a milestone while the
+ *  dialogs never offered it. `selfId` is the item being re-parented; a new
+ *  item has no descendants, so without it the loop check is skipped. */
+export function parentError(kind: WorkKind, parentId: string | null | undefined, selfId?: string): string | null {
+  if (!parentId) return null;
+  if (selfId && parentId === selfId) return "An item cannot roll up to itself.";
+  const p = readItem(parentId);
+  if (!p) return "No such parent.";
+  if (p.kind === "task") return "A task cannot hold children.";
+  if (kind === "target") return "A target is always top level.";
+  if (kind === "milestone" && p.kind !== "target") return "A milestone rolls up to a target.";
+  if (selfId) {
+    /* Walk UP from the proposed parent: if this item is one of its ancestors
+       the new edge closes a loop. Depth-bounded — no subtree is enumerated —
+       and the visited set guards a tree that is already broken. */
+    const seen = new Set<string>();
+    for (let cur: WorkItem | null = p; cur && !seen.has(cur.itemId); cur = cur.parentId ? readItem(cur.parentId) : null) {
+      if (cur.itemId === selfId) return "That would make the item roll up to itself.";
+      seen.add(cur.itemId);
+    }
+  }
+  return null;
+}
+/** The parents a dialog may offer an item of `kind`: open, of a kind that may
+ *  hold it, never itself and never anything under it — the same rule the
+ *  store applies on save, so the list cannot offer what the store refuses. */
+export function parentOptions(kind: WorkKind, all: WorkItem[], selfId?: string): WorkItem[] {
+  return all.filter((i) => !isTerminal(i.status) && i.itemId !== selfId
+    && (kind === "task" ? i.kind !== "task" : i.kind === "target")
+    && !(selfId && parentError(kind, i.itemId, selfId)));
+}
+
+/** EDITING WHAT WAS CREATED. Nothing could change after creation — a typo in
+ *  the title, a wrong due date, the wrong person — was permanent. The rules are
+ *  createItem's. The kind is not among them: a kind decides what may sit under
+ *  an item, so changing it would orphan children without saying so. Handing an
+ *  item to somebody else drops the tags the last person owned, the rule the
+ *  create dialog already applies. */
+export interface ItemPatch {
+  title?: string; assigneeId?: string; priority?: Priority;
+  startDate?: string | null; dueDate?: string | null; parentId?: string | null;
+  /** Plain text with the description marks in it — see workBits/RichText.
+   *  It was settable at create and nowhere afterwards, so the one field on the
+   *  record that holds what the work actually IS was write-once. */
+  description?: string | null;
+}
+export function updateItem(itemId: string, patch: ItemPatch): Result<WorkItem> {
+  return withItem(itemId, (i) => {
+    /* EVERY CHECK BEFORE ANY WRITE. `withItem` hands over the live record, and
+       a refusal after a field was already set left a half-applied edit on an
+       item the screen went on showing — reassigned and de-tagged, under a
+       toast saying nothing had happened. A finished item is not edited either:
+       every other verb on the drawer is gated the same way, and a completed
+       item re-dated or re-parented moves a rollup somebody already signed off. */
+    if (isTerminal(i.status)) return "It is " + labelOf(WORK_STATUS, i.status).toLowerCase() + ". Reopen or restore it first.";
+    const title = patch.title !== undefined ? patch.title.trim() : i.title;
+    if (!title) return "A title is required.";
+    const assigneeId = patch.assigneeId !== undefined ? patch.assigneeId : i.assigneeId;
+    if (assigneeId !== i.assigneeId) {
+      const m = readMember(assigneeId);
+      if (!m) return "No such member.";
+      if (m.status !== "active") return "That member is not active.";
+    }
+    const start = patch.startDate !== undefined ? patch.startDate : i.startDate;
+    const due = patch.dueDate !== undefined ? patch.dueDate : i.dueDate;
+    if (start && due && start > due) return "It cannot be due before it starts.";
+    const parentId = patch.parentId !== undefined ? patch.parentId : i.parentId;
+    if (parentId !== i.parentId) {
+      const bad = parentError(i.kind, parentId, i.itemId);
+      if (bad) return bad;
+    }
+    i.title = title;
+    if (assigneeId !== i.assigneeId) {
+      i.assigneeId = assigneeId;
+      const theirs = tagsOwnedBy(assigneeId).map((t) => t.tagId);
+      const kept = (i.tagIds || []).filter((t) => theirs.indexOf(t) >= 0);
+      i.tagIds = kept.length ? kept : undefined;
+    }
+    if (patch.priority !== undefined) i.priority = patch.priority;
+    if (patch.description !== undefined) i.description = patch.description;
+    i.startDate = start;
+    i.dueDate = due;
+    i.parentId = parentId;
+    return null;
+  });
+}
+
+export function addCheckLine(itemId: string, text: string): Result<WorkItem> {
+  return withItem(itemId, (i) => {
+    if (!text.trim()) return "Write the step first.";
+    i.checklist = (i.checklist || []).concat([
+      { lineId: nextId("CK"), text: text.trim(), done: false },
+    ]);
+    return null;
+  });
+}
+
+export function toggleCheckLine(itemId: string, lineId: string): Result<WorkItem> {
+  return withItem(itemId, (i) => {
+    const line = (i.checklist || []).filter((l) => l.lineId === lineId)[0];
+    if (!line) return "No such step.";
+    line.done = !line.done;
+    return null;
+  });
+}
+
+export function removeCheckLine(itemId: string, lineId: string): Result<WorkItem> {
+  return withItem(itemId, (i) => {
+    i.checklist = (i.checklist || []).filter((l) => l.lineId !== lineId);
+    return null;
+  });
+}
+
+/** A URL ATTACHED TO ONE ITEM. `addLink` above is a different thing entirely
+ *  — that one relates two ITEMS to each other.
+ *
+ *  IT NORMALISES, IT DOES NOT REFUSE. This used to demand a scheme outright,
+ *  which is why Add did nothing you could act on: `docs.google.com/brief` —
+ *  what a person actually pastes, and exactly what the create dialog's own link
+ *  field accepts, because that one runs `normaliseUrl` — came back as "the
+ *  address needs to start with http://". Two fields for one idea, disagreeing
+ *  about what a link is. Now both go through `normaliseUrl`, so http and https
+ *  are still the only schemes that survive and a bare host is completed rather
+ *  than rejected.
+ *
+ *  AND THE NAME IS OPTIONAL. Refusing to save a pasted URL because nobody typed
+ *  a word for it is the same refusal from the other side; the host is a name,
+ *  and it is the one the create dialog already falls back to. */
+export function addResourceLink(itemId: string, label: string, url: string): Result<WorkItem> {
+  return withItem(itemId, (i) => {
+    if (!url.trim()) return "Paste the address.";
+    const u = normaliseUrl(url);
+    if (!u) return "That is not a web address — links have to be http or https.";
+    i.links = (i.links || []).concat([
+      { linkId: nextId("LN"), label: label.trim() || hostOf(u), url: u },
+    ]);
+    return null;
+  });
+}
+
+export function removeResourceLink(itemId: string, linkId: string): Result<WorkItem> {
+  return withItem(itemId, (i) => {
+    i.links = (i.links || []).filter((l) => l.linkId !== linkId);
+    return null;
+  });
+}
+
+export function createItem(input: Partial<WorkItem> & {
+  title: string; assigneeId: string; kind: WorkKind;
+  /** Plain text, one per line to be. The dialog cannot mint ids. */
+  steps?: string[];
+}): Result<WorkItem> {
+  if (!input.title.trim()) return err("validation_failed", "A title is required.");
+  const assignee = readMember(input.assigneeId);
+  if (!assignee) return err("member_not_found", "No such member.");
+  if (assignee.status !== "active") return err("assignee_inactive", "That member is not active.");
+  const badParent = parentError(input.kind, input.parentId);
+  if (badParent) return err("invalid_parent", badParent);
+  const item: WorkItem = {
+    itemId: nextId("W"),
+    kind: input.kind,
+    title: input.title.trim(),
+    description: input.description || null,
+    assigneeId: input.assigneeId,
+    createdById: meId(),
+    parentId: input.parentId || null,
+    status: "planned",
+    priority: input.priority || "medium",
+    startDate: input.startDate || null,
+    dueDate: input.dueDate || null,
+    completedAt: null,
+    expectedOutcome: input.expectedOutcome || null,
+    targetValue: input.targetValue,
+    targetUnit: input.targetUnit,
+    tagIds: input.tagIds && input.tagIds.length ? input.tagIds : undefined,
+    attachments: input.attachments && input.attachments.length ? input.attachments : undefined,
+    /* STEPS ARRIVE AS TEXT AND LEAVE AS LINES. Minting ids is this file's job,
+       so the dialog hands over strings and the lines are built here in the
+       same shape `addCheckLine` writes one at a time. Only a task carries
+       them: `progressOf` reads a milestone's children and a target's value,
+       so steps on either would be a control that moves nothing. */
+    checklist: input.kind === "task" && input.steps && input.steps.length
+      ? input.steps.map((t) => t.trim()).filter(Boolean)
+          .map((t) => ({ lineId: nextId("CK"), text: t, done: false }))
+      : undefined,
+    currentValue: input.kind === "target" ? 0 : undefined,
+    rowVersion: 1,
+    createdAt: new Date(now()).toISOString(),
+  };
+  snap.items = snap.items.concat([item]);
+  emit();
+  return ok(item);
+}
+
+/** ONE LINE OF A PLAN, minted the one way. Pulled out of `submitPlan` so that
+ *  appending to a plan already in uses exactly the same rule — two copies of
+ *  "link if it exists, otherwise create" is how the second copy comes to forget
+ *  the linking half.
+ *
+ *  Link an existing open item with the same title rather than minting a second
+ *  copy of it: a plan that quietly forks a task is how one piece of work becomes
+ *  two that each look half-done. `items` is mutated — the caller owns the
+ *  snapshot copy and commits it. */
+function makePlanLine(
+  items: WorkItem[], memberId: string, rawTitle: string, priority: Priority, ordinal: number,
+): PlanLine {
+  const title = rawTitle.trim();
+  const match = items.filter((i) =>
+    i.assigneeId === memberId && !isTerminal(i.status) &&
+    i.title.trim().toLowerCase() === title.toLowerCase())[0];
+  const lineId = nextId("PL");
+  if (match) return { lineId, ordinal, title, priority, workItemId: match.itemId };
+  const made: WorkItem = {
+    itemId: nextId("W"), kind: "task", title, description: null,
+    assigneeId: memberId, createdById: memberId, parentId: null, status: "planned",
+    priority, startDate: TODAY, dueDate: TODAY, completedAt: null,
+    expectedOutcome: null, sourcePlanLineId: lineId, rowVersion: 1,
+    createdAt: new Date(now()).toISOString(),
+  };
+  items.push(made);
+  return { lineId, ordinal, title: made.title, priority, workItemId: made.itemId };
+}
+
+/** ADD ONE MORE THING TO TODAY, whether or not the plan has gone in.
+ *
+ *  `submitPlan` refuses a second submit and tells you to change the work items
+ *  instead, which is true of the RECORD and useless as an answer: the note is
+ *  where somebody is standing when they think of the next thing, and until now
+ *  it went read-only the moment the plan was filed. A day is not sealed at
+ *  9am. This appends — same minting rule, same linking — and leaves
+ *  `submittedAt` alone, because the plan was still filed when it was filed. */
+export function addPlanLine(
+  memberId: string, title: string, priority: Priority = "medium",
+): Result<DailyPlan> {
+  if (!title.trim()) return err("validation_failed", "Give it a name.");
+  const existing = planFor(memberId, TODAY);
+  const items = snap.items.slice();
+  const line = makePlanLine(items, memberId, title, priority,
+    (existing ? existing.lines.length : 0) + 1);
+  const plan: DailyPlan = existing
+    ? { ...existing, lines: existing.lines.concat([line]) }
+    : {
+      planId: nextId("PLAN"), memberId, businessDate: TODAY,
+      expectedOutcome: null, blockers: null, notes: null,
+      submittedAt: null, lines: [line],
+    };
+  snap.items = items;
+  snap.plans = snap.plans.filter((p) => p.planId !== plan.planId).concat([plan]);
+  emit();
+  return ok(plan);
+}
+
+export function submitPlan(memberId: string, input: {
+  lines: { title: string; priority: Priority }[];
+  expectedOutcome?: string; blockers?: string;
+}): Result<DailyPlan> {
+  const existing = planFor(memberId, TODAY);
+  if (existing && existing.submittedAt)
+    return err("already_submitted", "Today's plan is in. Change the work items instead.");
+  const lines = input.lines.filter((l) => l.title.trim());
+  if (!lines.length) return err("validation_failed", "Add at least one line.");
+
+  const items = snap.items.slice();
+  const planLines: PlanLine[] = lines.map((l, n) =>
+    makePlanLine(items, memberId, l.title, l.priority, n + 1));
+
+  const plan: DailyPlan = {
+    planId: existing ? existing.planId : nextId("PLAN"),
+    memberId, businessDate: TODAY,
+    expectedOutcome: input.expectedOutcome || null,
+    blockers: input.blockers || null,
+    notes: null,
+    submittedAt: new Date(now()).toISOString(),
+    lines: planLines,
+  };
+  snap.items = items;
+  snap.plans = snap.plans.filter((p) => p.planId !== plan.planId).concat([plan]);
+  emit();
+  return ok(plan);
+}
+
+export function submitReport(memberId: string, input: {
+  lines: { workItemId: string | null; title: string; done: boolean; targetDelta?: number | null }[];
+  pendingWork?: string; pendingReason?: string; achievement?: string;
+  blockers?: string; supportNeeded?: string; tomorrowPriority?: string;
+}): Result<DailyReport> {
+  const existing = reportFor(memberId, TODAY);
+  if (existing && existing.submittedAt)
+    return err("already_submitted", "Today's report is in.");
+  const undone = input.lines.filter((l) => !l.done);
+  if (undone.length && !(input.pendingReason || "").trim())
+    return err("validation_failed", "Say why the unticked lines did not get done.");
+
+  const items = snap.items.slice();
+  input.lines.forEach((l) => {
+    if (!l.done || !l.workItemId) return;
+    const i = items.filter((x) => x.itemId === l.workItemId)[0];
+    /* Ticking a line COMPLETES the item. The report and the board cannot
+       disagree about what got done, because there is one write. */
+    if (i && !isTerminal(i.status)) {
+      i.status = "completed";
+      i.completedAt = new Date(now()).toISOString();
+      i.rowVersion += 1;
+    }
+    /* A target moves only here — the EOD delta is its one writer. */
+    if (l.targetDelta && i && i.parentId) {
+      const parent = items.filter((x) => x.itemId === i.parentId)[0];
+      if (parent && parent.kind === "target") parent.currentValue = (parent.currentValue || 0) + l.targetDelta;
+    } else if (l.targetDelta && i && i.kind === "target") {
+      i.currentValue = (i.currentValue || 0) + l.targetDelta;
+    }
+  });
+
+  const report: DailyReport = {
+    reportId: existing ? existing.reportId : nextId("EOD"),
+    memberId, businessDate: TODAY,
+    pendingWork: input.pendingWork || null,
+    pendingReason: input.pendingReason || null,
+    achievement: input.achievement || null,
+    blockers: input.blockers || null,
+    supportNeeded: input.supportNeeded || null,
+    tomorrowPriority: input.tomorrowPriority || null,
+    notes: null,
+    submittedAt: new Date(now()).toISOString(),
+    acknowledgedById: null, acknowledgedAt: null,
+    lines: input.lines.map((l) => ({
+      lineId: nextId("ER"), workItemId: l.workItemId, title: l.title,
+      done: l.done, targetDelta: l.targetDelta ?? null,
+    })),
+  };
+  snap.items = items;
+  snap.reports = snap.reports.filter((r) => r.reportId !== report.reportId).concat([report]);
+  emit();
+  return ok(report);
+}
+
+export function acknowledgeReport(reportId: string): Result<DailyReport> {
+  const reports = snap.reports.slice();
+  const r = reports.filter((x) => x.reportId === reportId)[0];
+  if (!r) return err("report_not_found", "No such report.");
+  if (!r.submittedAt) return err("not_submitted", "A draft cannot be acknowledged.");
+  if (r.acknowledgedById) return ok(r);
+  r.acknowledgedById = meId();
+  r.acknowledgedAt = new Date(now()).toISOString();
+  snap.reports = reports;
+  emit();
+  return ok(r);
+}
+
+/* ========================================================== adoption === */
+
+export interface LivePerson {
+  id: number | string; name: string; email?: string; phone?: string;
+  username?: string; isSuperAdmin?: boolean;
+}
+
+/** The order the seed's eight slots are handed to live people. The signed-in
+ *  user takes the first — D. Kapoor's slot, the senior the demo is written
+ *  around: the leave inbox, the sent agreements, the EODs waiting to be read
+ *  all point at whoever holds it. */
+export const ADOPT_SLOTS = ["58", "41", "52", "86", "63", "70", "74", "79"];
+
+/** RE-KEY THE SEED ONTO A LIVE ROSTER, in one pass. Mapped slots take the live
+ *  person's identity and keep the seed's operational history; unmapped slots
+ *  are dropped — their identity-bound rows (attendance, leave, tags, documents,
+ *  pay, plans, reports) go with them, and their work items are reassigned so
+ *  the board stays rich. Secondary references (who decided, sent, verified,
+ *  acknowledged) repoint to the signed-in user when their author was dropped.
+ *  People beyond eight get a thin record with no history. */
+export function adoptRoster(people: LivePerson[]): void {
+  if (!people.length) return;
+  const ids = people.map((p) => String(p.id));
+  const map: Record<string, string> = {};
+  ADOPT_SLOTS.forEach((slot, i) => { if (i < ids.length) map[slot] = ids[i]; });
+  const meNew = map["58"];
+  const keptNew: string[] = ADOPT_SLOTS.filter((sl) => map[sl]).map((sl) => map[sl]);
+  const mapped = (id: string | null | undefined): boolean => id != null && map[id] !== undefined;
+  /* A secondary reference: mapped ids follow the map, dropped seed ids repoint
+     to the signed-in user, anything else passes through. */
+  const re = (id: string | null | undefined): string | null => {
+    if (id == null) return null;
+    if (map[id] !== undefined) return map[id];
+    return ADOPT_SLOTS.indexOf(id) >= 0 ? meNew : id;
+  };
+
+  const members: Member[] = [];
+  ADOPT_SLOTS.forEach((slot, i) => {
+    if (!map[slot]) return;
+    const m = snap.members.filter((x) => x.memberId === slot)[0];
+    const p = people[i];
+    if (!m) return;
+    const boss = m.reportsTo === null ? null : re(m.reportsTo);
+    members.push({
+      ...m,
+      memberId: map[slot],
+      name: p.name || m.name,
+      email: p.email || m.email,
+      phone: p.phone || m.phone,
+      username: p.username || m.username,
+      isFullAccess: p.isSuperAdmin != null ? !!p.isSuperAdmin : m.isFullAccess,
+      reportsTo: boss === map[slot] ? null : boss,
+    });
+  });
+  people.slice(ADOPT_SLOTS.length).forEach((p) => {
+    members.push({
+      memberId: String(p.id), name: p.name, email: p.email || "", phone: p.phone || "",
+      username: p.username || "", designation: "Member", department: "",
+      employmentType: "full_time", joiningDate: TODAY, reportsTo: meNew === String(p.id) ? null : meNew,
+      workLocation: "office", expectedHoursPerDay: 8, dayStartsAt: "09:30",
+      graceMinutes: 15, autoCloseAt: "20:00", timezone: "Asia/Kolkata",
+      status: "active", isFullAccess: !!p.isSuperAdmin, roles: [],
+      addedAt: stamp(), lastLogin: null,
+    });
+  });
+
+  const days = snap.days.filter((d) => mapped(d.memberId)).map((d) => ({
+    ...d, memberId: map[d.memberId],
+    correctedBy: d.correctedBy ? (re(d.correctedBy) as string) : d.correctedBy,
+  }));
+
+  let robin = 0;
+  const items = snap.items.map((i) => ({
+    ...i,
+    assigneeId: mapped(i.assigneeId) ? map[i.assigneeId] : keptNew[robin++ % keptNew.length],
+    createdById: re(i.createdById) as string,
+  }));
+
+  const tags = snap.tags.filter((t) => mapped(t.ownerId))
+    .map((t) => ({ ...t, ownerId: map[t.ownerId] }));
+  const liveTagIds = tags.map((t) => t.tagId);
+  items.forEach((i) => {
+    if (i.tagIds) i.tagIds = i.tagIds.filter((id) => liveTagIds.indexOf(id) >= 0);
+  });
+
+  const plans = snap.plans.filter((p) => mapped(p.memberId))
+    .map((p) => ({ ...p, memberId: map[p.memberId] }));
+  const reports = snap.reports.filter((r) => mapped(r.memberId)).map((r) => ({
+    ...r, memberId: map[r.memberId],
+    acknowledgedById: r.acknowledgedById ? re(r.acknowledgedById) : r.acknowledgedById,
+  }));
+  const leave = snap.leave.filter((l) => mapped(l.memberId)).map((l) => ({
+    ...l, memberId: map[l.memberId],
+    decidedById: l.decidedById ? re(l.decidedById) : l.decidedById,
+  }));
+  const agreements = snap.agreements.filter((a) => mapped(a.memberId)).map((a) => ({
+    ...a, memberId: map[a.memberId],
+    sentById: a.sentById ? re(a.sentById) : a.sentById,
+  }));
+  const documents = snap.documents.filter((r) => mapped(r.memberId)).map((r) => ({
+    ...r, memberId: map[r.memberId],
+    uploadedById: re(r.uploadedById) as string,
+    verifiedById: r.verifiedById ? re(r.verifiedById) : r.verifiedById,
+  }));
+  const pay = snap.pay.filter((p) => mapped(p.memberId))
+    .map((p) => ({ ...p, memberId: map[p.memberId] }));
+
+  adoptedMe = meNew;
+  snap = { ...snap, members, days, items, tags, plans, reports, leave, agreements, documents, pay };
+  emit();
+}
+
+/* ============================================================== hooks === */
+
+/** Exported for the Overview, which reads this store through the plain
+ *  readers and needs only the subscription — the same arrangement Finance
+ *  makes with its own `useVersion`. */
+export const useVersion = () => useSyncExternalStore(subscribe, getVersion, getVersion);
+
+export function useMembers(): Member[] { useVersion(); return snap.members; }
+export function useMe(): Member | null { useVersion(); return readMember(meId()); }
+export function useDayRows(date: string, scope: Scope): DayRow[] { useVersion(); return dayRows(date, scope); }
+export function useWork(f: WorkFilter, scope: Scope): WorkItem[] { useVersion(); return workRows(f, scope); }
+export function useItem(id: string | null): WorkItem | null { useVersion(); return id ? readItem(id) : null; }
+export function useTags(): Tag[] { useVersion(); return snap.tags; }
+export function useLeave(): LeaveRequest[] { useVersion(); return snap.leave; }
+export function usePlans(): DailyPlan[] { useVersion(); return snap.plans; }
+export function useReports(): DailyReport[] { useVersion(); return snap.reports; }
+export function useAgreements(): Agreement[] { useVersion(); return snap.agreements; }
+export function useDocuments(): MemberDocument[] { useVersion(); return snap.documents; }
+export function useLinks(): WorkLink[] { useVersion(); return snap.links; }
+export function useItems(): WorkItem[] { useVersion(); return snap.items; }
+export function useReview(date: string, scope: Scope): ReviewRow[] { useVersion(); return reviewRows(date, scope); }
+export function useMyDay(date = TODAY): { day: AttendanceDay | null; state: AttendanceState; worked: number | null; breakMins: number } {
+  useVersion();
+  const m = readMember(meId());
+  const day = dayFor(meId(), date);
+  return { day, state: stateOf(day, m, now(), date), worked: workedOf(day, m), breakMins: breakOf(day) };
+}
+export function usePlan(memberId: string, date = TODAY): DailyPlan | null { useVersion(); return planFor(memberId, date); }
+export function useReport(memberId: string, date = TODAY): DailyReport | null { useVersion(); return reportFor(memberId, date); }

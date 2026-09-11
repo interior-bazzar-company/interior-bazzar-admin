@@ -1,0 +1,360 @@
+/* =============================================================================
+   Finance · Subscriptions — sales that happened, paid in installments.
+   -----------------------------------------------------------------------------
+   This is not a pipeline and it is not a forecast. Every row is a sale that was
+   closed — by the sales team against a deal, or by the customer themselves on
+   the website — and the money against it arrives one installment at a time.
+
+   THE INSTALLMENT IS THE UNIT. The subscription is what was agreed; the
+   installment is what gets paid, invoiced, receipted and, when it does not
+   clear, recorded as FAIL TO PAY. So the table gives the whole schedule its own
+   column rather than a progress bar: five cells you can read at a glance beat a
+   percentage nobody can act on.
+
+   NOTHING HERE IS AWAITING VERIFICATION. `Due` is the absence of an event —
+   nothing has happened to that installment yet. `Fail to pay` is the presence
+   of one: a decline, a cancelled mandate, or a due date that demonstrably
+   passed, and the record carries the evidence. There is no third state meaning
+   "recorded but not yet believed", here or at the API.
+   ============================================================================= */
+import { useShell } from "../../shell/ShellContext";
+import { can } from "../../shell/AdminShell";
+import {
+  Button, DateInput, EmptyState, FilterBar, FilterChips, ListTable, Pagination, Rail,
+  SearchField, Select, SelectInput, StatStrip,
+} from "../../ui";
+import type { StatCell } from "../../ui";
+import { go } from "../../ui/nav";
+import { Frame, ViewBand } from "./Frame";
+import type { FaceProps } from "./Frame";
+import { ActionMenu, InstStrip, Money, SourceTag, SubPill } from "./bits";
+import { RecordSubModal } from "./SubModals";
+import SubAnalytics from "./SubAnalytics";
+import {
+  FILTER_LABELS, PERIOD, SUB_SOURCES, SUB_STATUSES,
+  applySubFilters, filterValueLabel, fmtDate, inr, startedOptions, subYears, todayIso,
+  useOverview, useSubRows,
+} from "./store";
+import type { Params, SubRow } from "./store";
+
+/** One screen of rows. `?page=` is already a param every filter helper strips,
+ *  so paging is a position in the list and never a filter. */
+const PAGE_SIZE = 50;
+
+export default function Subscriptions({ p, onFilter, onSearch, onUnfilter, onParams }: FaceProps) {
+  const { toast, modal, closeLayer } = useShell();
+  const rows = useSubRows();
+  const o = useOverview();
+  const shown = applySubFilters(rows, p);
+  const writable = can("finance", "edit");
+
+  /* TWO READINGS OF ONE BOOK OF SALES: the RECORDS, which somebody acts on one
+     at a time, and what they add up to. The band is a sub-switch and not a
+     section — Subscriptions is one sidebar row, and both tabs are it.
+
+     SUBSCRIPTIONS IS THE LANDING TAB: the grain of daily work here is "where
+     is every sale and what is failing", and Analytics is one press away
+     carrying ?tab=analytics. */
+  const tab = p.tab === "analytics" ? "analytics" : "subscriptions";
+
+  /* `view` is the record type you are looking at and `page` is a position in a
+     list. Neither narrows anything, so neither counts as a filter — a chip
+     reading "view: subscriptions" invites somebody to clear the screen. */
+  const narrowed = Object.keys(p).some((k) => p[k] && ["view", "page", "tab"].indexOf(k) < 0);
+
+  const activeN = rows.filter((r) => r.s.status === "active").length;
+  const page = Math.max(1, Number(p.page) || 1);
+  const pages = Math.max(1, Math.ceil(shown.length / PAGE_SIZE));
+  const paged = shown.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  /* A queue cell TOGGLES: pressing the filter it already applied clears it,
+     because the only other way back is to hunt for the chip. The strip
+     navigates rather than calling back — every cell in every strip in this
+     panel is a link, so the address bar always says what is on screen. */
+  const queueHash = (flag: string) => {
+    const o: Record<string, string> = {};
+    Object.keys(p).forEach((k) => { if (p[k] && ["flag", "page", "tab"].indexOf(k) < 0) o[k] = p[k] as string; });
+    if (p.flag !== flag) o.flag = flag;
+    const q = Object.keys(o)
+      .map((k) => encodeURIComponent(k) + "=" + encodeURIComponent(o[k])).join("&");
+    return "#/finance" + (q ? "?" + q : "");
+  };
+
+  const onRecord = () => modal(
+    <RecordSubModal onClose={closeLayer}
+      onDone={(msg, tone) => { closeLayer(); toast(msg, tone); }} />, "xl");
+
+  const chips = (
+    <FilterChips
+      params={Object.keys(p)
+        .filter((k) => ["view", "page", "tab"].indexOf(k) < 0 && p[k])
+        .reduce((acc, k) => { acc[k] = filterValueLabel(k, p[k] as string); return acc; },
+          {} as Record<string, string>)}
+      labels={FILTER_LABELS}
+      onUnfilter={onUnfilter} />
+  );
+
+  return (
+    <Frame
+      toast={toast}
+      title="Subscriptions"
+      meta={
+        <>
+          <span className="label-mono">
+            {shown.length === rows.length
+              ? rows.length + (rows.length === 1 ? " sale" : " sales")
+              : shown.length + " of " + rows.length}
+          </span>
+          <span className="label-mono">as of {fmtDate(todayIso())}</span>
+        </>
+      }
+      actions={tab === "subscriptions" && writable
+        ? <Button color="primary" ico="plus" onClick={onRecord}>Record a subscription</Button>
+        : null}
+      tabs={
+        <ViewBand cur={tab}
+          items={[
+            { k: "subscriptions", label: "Subscriptions", icon: "coin", n: rows.length },
+            /* NO COUNT ON ANALYTICS. The badge beside Subscriptions says how
+               many records are behind the tab; what is behind this one is
+               every one of them read four ways, and a number there would
+               invite somebody to read it as a fifth. */
+            { k: "analytics", label: "Analytics", icon: "chart" },
+          ]}
+          onPick={(k) => onParams({
+            tab: k === "subscriptions" ? undefined : k,
+            /* The filters belong to the list. Carrying one onto a tab that
+               shows no filter control would narrow a page with something
+               nobody can see or clear. */
+            q: undefined, source: undefined, status: undefined, flag: undefined, plan: undefined,
+            started: undefined, page: undefined,
+            /* `year` is Analytics's own scope and goes the same way. */
+            year: undefined,
+          })} />
+      }
+      cmd={tab === "analytics" ? (
+        /* THE YEAR IS THE ONLY CONTROL ON THIS TAB, because the year IS the
+           scope here. There are no filters beside it: a chart narrowed by a
+           search box is a chart whose total no longer matches its own caption.
+
+           Deliberately not the panel's filter `Select`, which carries a blank
+           first option because empty means "not filtering". This always has a
+           value — `All time` is a real answer, not the absence of one. */
+        <FilterBar
+          filters={
+            <label className="flex items-center gap-2 text-sm font-medium text-secondary">
+              Year
+              <SelectInput
+                ariaLabel="Year"
+                value={p.year || ""}
+                className="w-40"
+                options={[{ v: "", l: "All time" }].concat(subYears(rows).map((y) => ({ v: y, l: y })))}
+                onChange={(v) => onParams({ year: v || undefined })}
+              />
+            </label>
+          }
+        />
+      ) : (
+        <FilterBar
+          /* KEYED ON THEIR VALUE. SearchField and Select are uncontrolled, so
+             clearing a chip otherwise left the old text in the box. */
+          search={<SearchField key={"q" + (p.q || "")} val={p.q} onFilter={onSearch}
+            ph="Customer, ID, deal, plan, UTR or invoice…" />}
+          filters={<>
+            <Select key={"source" + (p.source || "")} name="source" label="Source" value={p.source}
+              onFilter={onFilter} options={SUB_SOURCES.map((s) => ({ v: s.key, l: s.label }))} />
+            <Select key={"status" + (p.status || "")} name="status" label="Status" value={p.status}
+              onFilter={onFilter} options={SUB_STATUSES.map((s) => ({ v: s.key, l: s.label, dot: s.tone }))} />
+            <Select key={"flag" + (p.flag || "")} name="flag" label="Queue" value={p.flag}
+              onFilter={onFilter} options={[
+                { v: "failed", l: "Has a failed installment", dot: "bad" },
+                { v: "due", l: "Has something still to pay", dot: "warn" },
+              ]} />
+            {/* WHEN IT STARTED — one filter, three grains. The dropdown carries
+                the years and their months, read off the records themselves so
+                it can never offer a month nothing was sold in; the date box
+                beside it names one day. Both write the same `started` param,
+                because they are two ways of saying one thing and two params
+                would be two filters that could contradict each other. */}
+            <Select key={"started" + (p.started || "")} name="started" label="Started"
+              value={/^\d{4}(-\d{2})?$/.test(p.started || "") ? p.started : ""}
+              onFilter={onFilter} options={startedOptions(rows)} />
+            <DateInput
+              ariaLabel="Started on one exact day"
+              value={/^\d{4}-\d{2}-\d{2}$/.test(p.started || "") ? (p.started as string) : ""}
+              onChange={(v) => onFilter("started", v)} />
+          </>}
+          chips={chips}
+        />
+      )}
+      bands={tab === "analytics" ? null : (
+        /* THE STRIP EVERY LIST IN THIS PANEL CARRIES: a count, its label, the
+           money it stands for — one row, each cell a filter.
+
+           THE CELL IS THE FILTER, which is what cost the i buttons: a cell is
+           a button, and an `i` inside it would swallow half its own click
+           target. The definitions ride `tip`, the strip's own description
+           channel.
+
+           EACH CELL IS ONE PERIOD, deliberately unlike the topbar above it,
+           which is all time. The label says which. */
+        <StatStrip cells={([
+          { k: <>Collected · {PERIOD.label} <b className="tnum">{inr(o.collectedPaise)}</b></>,
+            v: o.collectedN, dot: "ok", on: p.flag === "settled",
+            to: rows.some((r) => r.paidN > 0) ? queueHash("settled") : undefined,
+            tip: <>Installments settled in {PERIOD.label} and what they came to.
+              Money that <b>actually arrived</b> — some of it from subscriptions that have since
+              completed, defaulted or been refunded, so it does not describe the {activeN} running
+              right now.</> },
+          "sep",
+          { k: <>Expected installments <b className="tnum">{inr(o.dueNextPaise)}</b></>,
+            v: o.dueNextN, on: p.flag === "due",
+            to: rows.some((r) => !!r.dueNext) ? queueHash("due") : undefined,
+            tip: <>Due in the next 30 days: the one installment genuinely in front of each customer.
+              <b> Expected, not earned</b> — every one is a row that already exists, and none of it
+              is revenue until it is collected.</> },
+          /* LAST, and last on purpose: it is the one a person acts on, so it
+             ends the strip rather than interrupting it. */
+          { k: <>Fail to pay <b className="tnum">{inr(o.failedPaise)}</b></>,
+            v: o.failedN, dot: o.failedN ? "bad" : "", on: p.flag === "failed",
+            to: o.failedN ? queueHash("failed") : undefined,
+            tip: o.failedN
+              ? <>Installments that <b>did not clear</b> — a decline, a cancelled mandate, or a due
+                date that demonstrably passed. Each carries its evidence on the record; none of it
+                is written off.</>
+              : <>Every installment that fell due has cleared.</> },
+        ] as (StatCell | "sep")[])} />
+      )}
+    >
+      {tab === "analytics" ? (
+        /* The strip's queues cross back to the records with that filter
+           applied — the charts are never narrowed, so "show only these" goes
+           where narrowing means something. */
+        <SubAnalytics year={p.year || ""}
+          onQueue={(flag) => onParams({ tab: undefined, year: undefined, flag })} />
+      ) : shown.length ? (
+        <>
+          <ListTable min="66rem" head={<tr>
+            <th className="rail" />
+            <th scope="col">Subscription</th>
+            <th scope="col">Plan</th>
+            <th scope="col" className="n">Total</th>
+            <th scope="col">Schedule</th>
+            <th scope="col">What is next</th>
+            <th scope="col">Source</th>
+            <th scope="col">Status</th>
+            <th scope="col" className="acts"><span className="sr-only">Actions</span></th>
+          </tr>}>
+            {paged.map((r) => <Row key={r.s.subscriptionId} r={r} p={p} onCopied={(m) => toast(m, "ok")} />)}
+          </ListTable>
+          <Pagination alwaysCount page={page} pages={pages} total={shown.length} unit="subscriptions"
+            pageSize={PAGE_SIZE} shown={paged.length}
+            onPage={(n) => onParams({ page: n > 1 ? String(n) : undefined })} />
+        </>
+      ) : (
+        <EmptyState icon={narrowed ? "search" : "cash"}
+          title={narrowed ? "Nothing matches those filters" : "No subscription has been recorded yet"}
+          body={narrowed
+            ? <>The money strip above counts every subscription in the module, before any filter.
+                {p.flag === "failed"
+                  ? " Nothing is failing right now, which is the result this queue exists to show."
+                  : ""}</>
+            : <>A row lands here the moment a sale is recorded: the sales team closes a deal and
+                records the payment against its invoice, or a customer buys on the website and the
+                gateway credit is recorded against the schedule. Nothing arrives on its own, and
+                nothing here is a forecast — a row exists because a sale happened.</>}
+          action={narrowed
+            ? <Button color="secondary" onClick={() => onUnfilter("*")}>Clear all filters</Button>
+            : writable
+              ? <Button color="primary" ico="plus" onClick={onRecord}>Record a subscription</Button>
+              : null} />
+      )}
+    </Frame>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+
+/** "due in 4 days" / "6 days overdue". One fragment, and it never says late
+ *  about a date that has not passed. */
+function dueWords(days: number): { text: string; tone: string } {
+  if (days < 0) return { text: Math.abs(days) + (days === -1 ? " day" : " days") + " overdue", tone: "bad" };
+  if (days === 0) return { text: "due today", tone: "warn" };
+  if (days <= 7) return { text: "due in " + days + (days === 1 ? " day" : " days"), tone: "warn" };
+  return { text: "due in " + days + " days", tone: "" };
+}
+
+function Row({ r, p, onCopied }: { r: SubRow; p: Params; onCopied: (m: string) => void }) {
+  const s = r.s;
+  /* The rail has two states, not one per status: something failed, or nothing
+     did. A colour per status turns the table into a paint chart. */
+  const rail = r.needsAttention ? "bad" : s.status === "cancelled" || s.status === "refunded" ? "warn" : undefined;
+
+  /* THE WHOLE LIST STATE TRAVELS WITH THE LINK, so the record's Back button is
+     a return and not a reset. */
+  const carried = Object.keys(p)
+    .filter((k) => p[k] && ["tab", "inst"].indexOf(k) < 0)
+    .map((k) => encodeURIComponent(k) + "=" + encodeURIComponent(p[k] as string))
+    .join("&");
+  const to = "#/finance/" + encodeURIComponent(s.subscriptionId) + (carried ? "?" + carried : "");
+
+  const next = r.next;
+  const words = next && r.nextDueInDays !== null ? dueWords(r.nextDueInDays) : null;
+
+  return (
+    <tr className={s.status === "cancelled" ? "clickable opacity-60" : "clickable"}
+      tabIndex={0} role="link" aria-label={"Open " + s.subscriptionId + " · " + s.customer.name}
+      onClick={() => go(to)}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(to); } }}>
+      <Rail tone={rail} />
+      <td className="cell-1">
+        {s.customer.name}
+        <div className="cell-2 font-mono tnum">{s.subscriptionId}</div>
+      </td>
+      <td className="cell-1">
+        {s.planName}
+        <div className="cell-2 whitespace-nowrap">{s.cycleMonths} months · from {fmtDate(s.startDate)}</div>
+      </td>
+      <td className="n whitespace-nowrap">
+        <Money paise={s.totalPaise} />
+        <div className="cell-2">{inr(r.paidPaise)} collected</div>
+      </td>
+      <td className="min-w-28">
+        {/* One cell per installment, in order, coloured by what happened to it.
+            A bar reading "60%" would hide which two failed. */}
+        <InstStrip items={s.installments.map((i) => ({
+          seq: i.seq, status: i.status,
+          label: "Installment " + i.seq + " of " + i.of + " · " + inr(i.amountPaise) + " · due " + fmtDate(i.dueDate),
+        }))} />
+        <div className="cell-2">{r.paidN} of {s.installments.length} paid</div>
+      </td>
+      <td className="whitespace-nowrap">
+        {next && words ? (
+          <>
+            <Money paise={next.amountPaise} />
+            <div className={
+              words.tone === "bad" ? "cell-2 text-error-primary!"
+                : words.tone === "warn" ? "cell-2 text-warning-primary!" : "cell-2"
+            }>
+              {next.status === "fail_to_pay" ? "failed · " : ""}{words.text}
+            </div>
+          </>
+        ) : (
+          <span className="text-sm text-quaternary">nothing outstanding</span>
+        )}
+      </td>
+      <td><SourceTag k={s.source} /></td>
+      <td><SubPill k={s.status} /></td>
+      <td className="acts">
+        <ActionMenu forWhat={s.subscriptionId} items={[
+          { icon: "invoice", label: "Open the record", act: () => go(to) },
+          { icon: "deal", label: "Open the deal", act: () => go("#/deals?q=" + encodeURIComponent(s.subscriptionId)) },
+          { icon: "copy", label: "Copy subscription id", act: () => {
+            void navigator?.clipboard?.writeText?.(s.subscriptionId);
+            onCopied(s.subscriptionId + " copied.");
+          } },
+        ]} />
+      </td>
+    </tr>
+  );
+}

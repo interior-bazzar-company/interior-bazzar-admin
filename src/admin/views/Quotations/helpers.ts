@@ -51,6 +51,24 @@ export function planLabel(p: Pick<PlanRow, "planFamily" | "title">): string {
   return cap(p.planFamily || "business") + " · " + p.title;
 }
 
+/** What the picked tier INCLUDES, read back out of the catalogue by the name
+ *  stored on the line — the same match `planLabel` defines, and the only join
+ *  available: a quotation item carries the plan's name, never its features.
+ *
+ *  So this is a LIVE read, not a snapshot. A tier since renamed, or a line
+ *  whose name was typed by hand, returns nothing and the document simply
+ *  prints without the list rather than inventing one. Editing the plan sheet
+ *  changes what an already-issued quotation displays here, which is the known
+ *  cost of there being nowhere on the row to freeze it. */
+export function featuresOf(plans: PlanRow[], name: string | null | undefined): string[] {
+  if (!name) return [];
+  const cat = plans.find((c) => planLabel(c) === name);
+  if (!cat) return [];
+  return (cat.features || [])
+    .map((f) => (typeof f === "string" ? f : f && f.text) || "")
+    .filter(Boolean);
+}
+
 /** base / discount / net for one line. `taxableAmountPaise` is what the server
  *  already computed the net to be (pricing.line_net), so the discount is read
  *  back off it rather than recomputed here — two implementations of the same

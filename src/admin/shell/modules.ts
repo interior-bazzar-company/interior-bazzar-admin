@@ -33,12 +33,81 @@ export type ModuleGroup = {
 /** Icon names verified against ICONS in admin/ui/index.tsx. A key with no
  * entry here falls through to Icon's own "doc" default rather than guessing. */
 const ICON_OF: Record<string, string> = {
+  overview: "home",
   deals: "deal",
   plans: "tag",
   team: "team",
   roles: "shield",
   audit: "history",
   "business-enquiries": "route",
+  users: "users",
+  finance: "cash",
+  "finance-salaries": "team",
+  "finance-transactions": "out",
+  "finance-refunds": "refund",
+  "finance-analytics": "chart",
+  attendance: "clock",
+  work: "calendar",
+  reports: "inbox",
+  resources: "flag",
+  agreements: "shield",
+};
+
+/* ------------------------------------------------------- group override ---
+   The server sends each module's `groupLabel`, and that is normally the whole
+   answer. `team` and `roles` are the exception: their rows say "Settings",
+   which was right while Team meant "add a staff account and grant it a role" —
+   configuration, done rarely. It stops being right the moment Attendance, Work
+   and Reports sit beside them, because those are the most-visited screens in
+   the panel and Settings is the one group nobody opens daily.
+
+   So the two are re-filed client-side, next to the surfaces they belong with.
+   This is a STAND-IN, not the design: `groupLabel` is the server's field and
+   the fix is a Module-row update, at which point this map empties and the
+   behaviour does not change. Listed as work in BACKEND-INTEGRATION.md.
+
+   Note it re-files rather than renames: a key absent here keeps whatever the
+   server said, so a new server group still appears rather than vanishing. */
+const GROUP_OVERRIDE: Record<string, string> = {
+  team: "Team",
+  roles: "Team",
+};
+
+/* ------------------------------------------------------- label override ---
+   The same arrangement as GROUP_OVERRIDE above, for the same reason, on the
+   other field: the server sends each module's `label`, and that is normally
+   the whole answer.
+
+   `team` is the exception. Its row reads "Team", which is now the name of the
+   GROUP it sits in — so the sidebar printed Team ▸ Team, and the row that
+   opens the roster was named after the section rather than after what is on
+   it. The screen is a table of people, every other row in the group is named
+   by its own noun (Attendance, Calendar, Reports), and this module's own page
+   already calls its tab Members.
+
+   LABEL ONLY. The key is still `team`, the route is still `#/team`, the grant
+   is still `team.*` and the member dashboard is still `#/team/:id` — the same
+   reasoning that renamed `work` to Calendar in PROTO_ROWS without moving the
+   route. Nothing here changes what a link points at.
+
+   This is a STAND-IN, not the design: `label` is the server's field and the
+   fix is a Module-row update, at which point this map empties and the sidebar
+   does not change. Listed as work in BACKEND-INTEGRATION.md.
+
+   Note it renames rather than supplies: a key absent here keeps whatever the
+   server said, so a new server module still appears under its own name. */
+const LABEL_OVERRIDE: Record<string, string> = {
+  team: "Members",
+  /* Data Forms. UNREACHABLE TODAY AND DELIBERATELY PRESENT: `resources` has no
+     server Module row, so the sidebar reads its label from PROTO_ROWS below.
+     The day the API ships that row, PROTO_ROWS stops being reached and the
+     server's own `Resources` would take the nav back without anybody editing a
+     line — a rename that undoes itself on somebody else's migration.
+
+     This map is the one place that outlives the stand-in, so the label lives
+     here too. Same treatment as `team`, and the same fix: a Module-row update
+     on the server, after which both entries go. */
+  resources: "Data Forms",
 };
 
 /* ---------------------------------------------------------- proto rows ---
@@ -51,11 +120,114 @@ const ICON_OF: Record<string, string> = {
    `group` matches an existing server group label so the module lands in the
    sidebar where it belongs rather than in a section of one. */
 const PROTO_ROWS: { key: string; label: string; group: string }[] = [
+  /* Overview · THE LANDING PAGE, and a row with no group heading over it. It
+     is not filed under Sales or Team or Finance because it reads all of them:
+     a group of one would have named a section the row does not belong to,
+     and an empty group label renders as nothing, which is what a home row
+     wants — the first thing in the sidebar, above every section.
+
+     It has no server Module row and never needs one for data: it owns no
+     records. It still needs a row so a grant can hold it or withhold it, and
+     until that lands it carries the proto gate like the rest of this list. */
+  { key: "overview", label: "Overview", group: "" },
   /* business-enquiries removed: the server sends its own Module row now
      (backend migration 0024), so the stand-in would never have been reached —
      PROTO_MODULES no longer holds the key, which is the second half of the
-     condition below. Kept as an empty list because the mechanism is still the
-     right one for the next frontend-first module. */
+     condition below. Kept as a comment because the mechanism is still the right
+     one for the next frontend-first module, and `users` is that module. */
+
+  /* Business Ops · Users Management. A NEW GROUP, not a row inside Sales: the
+     registered-user base is neither a sales pipeline nor a setting, and filing
+     it under either would have been a
+     filing decision pretending to be a product one. The group is empty apart
+     from this until the rest of Business Ops lands, and a group of one is the
+     honest state of that rather than a reason to hide it somewhere else. */
+  { key: "users", label: "Users Management", group: "Business Ops" },
+  /* Finance · FIVE ROWS, ONE GROUP, because Finance records four different
+     things and reads them back in a fifth place. A single row labelled
+     "Finance" inside a group labelled "Finance" said nothing about what was
+     inside it, and buried the five sections one click deep behind an in-page
+     tab strip nobody could see from the sidebar.
+
+     They are separate KEYS rather than one key with five faces because the
+     grant is genuinely different: payroll is the most sensitive record in the
+     panel, and `finance-salaries` has to be holdable — or withholdable —
+     without touching the subscription ledger. Same argument that made
+     `reports` its own key rather than a face of `work`.
+
+     Order is the order money moves: what was sold, what the team costs,
+     everything else, what went back out, then all four read together. */
+  { key: "finance", label: "Subscriptions", group: "Finance" },
+  { key: "finance-salaries", label: "Salaries A/C", group: "Finance" },
+  { key: "finance-transactions", label: "Other Transaction", group: "Finance" },
+  { key: "finance-refunds", label: "Refunds", group: "Finance" },
+  { key: "finance-analytics", label: "Analytics", group: "Finance" },
+
+  /* Team · the operational half. `Members` and `Roles` are already real server
+     rows and are NOT listed here — they are re-filed into this group by
+     GROUP_OVERRIDE above. These three are the surfaces that do not exist
+     server-side at all yet, so they carry the proto gate like Users and Finance
+     did. Order inside the group is arrival order, and it is the order of a
+     working day: who is here, what they are doing, what they reported.
+
+     `reports` is its own key rather than a face of `work` because the verb it
+     needs is not the same one: reading everybody's daily plans and EOD reports
+     is a manager's grant, and it must be possible to hold it without holding
+     the right to create or reassign anybody's work. */
+  { key: "attendance", label: "Attendance", group: "Team" },
+  /* `Tasks`. It was `Work`, then `Calendar` — named after one of its four
+     faces, which is why nobody could find the task board in it. The module has
+     always been the company's tasks; the label finally says so.
+
+     THE LABEL IS STILL THE WHOLE CHANGE: the route is `work`, the entity is
+     WorkItem and the grant is `team.work.*`, so every existing link, bookmark
+     and `?item=` drawer URL keeps working, and the member's own Work page and
+     the nudges on their record read the same rows they always did. Renaming
+     the route would buy a tidier address bar for a redirect to maintain
+     forever, and a module key that disagrees with its own table. */
+  { key: "work", label: "Tasks", group: "Team" },
+  { key: "reports", label: "Reports", group: "Team" },
+
+  /* Resources · A SECTION OF ITS OWN, and a group of one for now.
+     It is not filed under Team even though the first form anybody builds here
+     is an onboarding pack, because the module is about the FORM and not about
+     the person: an asset handover, a policy acknowledgement and a vendor
+     declaration are the same machine pointed at different audiences, and only
+     some of those audiences are staff. Filing it under Team would have made the
+     staff case look like the definition rather than the first example.
+
+     A group of one is normally a filing mistake, and this is the honest state
+     of a section that has one surface in it rather than a reason to hide that
+     surface somewhere it does not belong — the same call Business Ops made when
+     Users Management arrived alone. */
+  /* THE LABEL IS THE WHOLE CHANGE, the same call Tasks made. The row reads
+     `Data Forms` because `Resources` inside a group called `Resources` named
+     the section twice and the surface not at all — and because `resource` is
+     the one word in this panel that already means several other things: a file
+     on a response, a named link on a task, a company asset. `Data Forms` says
+     what the module actually is — a form the company sends out, and the
+     answers that come back.
+
+     The key is still `resources`, the route is still `#/resources` and the
+     grant is still `resources.*`, so every link, bookmark and `?form=` deep
+     link keeps working, and the per-member page at `#/team/:id/resources`
+     reads the same rows it always did. */
+  { key: "resources", label: "Data Forms", group: "Resources" },
+
+  /* Agreements · beside Resources, and the pairing is the point. Both are a
+     document the company sends a member and gets something back on; they
+     differ in what comes back — a form's answers, or a signature. Filing them
+     apart would have made that difference look bigger than it is, and would
+     have left the group with one row in it.
+
+     It is NOT under Team, even though every copy points at a member, for the
+     same reason Resources is not: the module is about the DOCUMENT. The
+     per-member view already exists at `#/team/:id/agreements` and still
+     works — this is the same records read across everybody. */
+  { key: "agreements", label: "Agreements", group: "Resources" },
+  /* There is no `me` row. The member dashboard lives at `#/team/:id` — a row
+     on the Members table opens it — because "the team, as a table" already
+     existed there and a second roster was a second front door to one room. */
 ];
 /** Sidebar queue-count keys, from IBData.derive.badges(). A module with no
  * entry here shows no badge, which is correct for anything the prototype
@@ -73,7 +245,26 @@ const Q_OF: Record<string, string> = {
 
    A group not named here keeps its arrival order, after the named ones: a new
    server group appears rather than silently vanishing. */
-const GROUP_ORDER = ["Sales", "Client Ops", "Catalogue", "Settings"];
+const GROUP_ORDER = [
+  /* The unlabelled group: the Overview row, above everything. */
+  "",
+  "Sales",
+  "Client Ops",
+  "Business Ops",
+  /* Team sits above Finance and well above Settings because it is opened every
+     day — the clock, the day's work and the day's reports — and Settings is the
+     group nobody opens daily. Same argument that moved Users Management out of
+     Settings into Business Ops. */
+  "Team",
+  /* Resources sits directly under Team because that is where its traffic comes
+     from — somebody joins, and the pack they owe is the next thing anybody
+     looks at. It is above Finance for the same reason Team is: it is opened on
+     the days people arrive and leave, which is more often than the ledger. */
+  "Resources",
+  "Finance",
+  "Catalogue",
+  "Settings",
+];
 
 export function getModules(): ModuleGroup[] {
   const s = getSession();
@@ -97,7 +288,8 @@ export function getModules(): ModuleGroup[] {
       q: Q_OF[key],
     });
   };
-  mods.forEach((m) => put(m.key, m.label, m.groupLabel || ""));
+  mods.forEach((m) =>
+    put(m.key, LABEL_OVERRIDE[m.key] || m.label, GROUP_OVERRIDE[m.key] || m.groupLabel || ""));
   /* Appended last and only if the server did not send the key, so a real
      Module row always takes precedence over the proto stand-in. Also gated on
      a session existing at all: a signed-out browser must see no nav. */
@@ -135,8 +327,8 @@ export const moduleLabel = (k: string) => {
   return it ? it.label : k;
 };
 
-/** The default landing route. The prototype boots to #/deals. Kept static:
- * it is where "/" redirects to, not a permission — a member without `deals`
- * access still lands there and ViewHost shows the Denied state, same as any
- * other route it cannot see. */
-export const HOME_ROUTE = "deals";
+/** The default landing route. The prototype booted to #/deals; the panel now
+ * lands on the Overview, which every signed-in member can open (it is proto-
+ * gated) and which says, per section, what is and is not in their access.
+ * Kept static: it is where "/" redirects to, not a permission. */
+export const HOME_ROUTE = "overview";

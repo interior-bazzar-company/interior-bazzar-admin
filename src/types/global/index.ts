@@ -1,4 +1,5 @@
-import type { IconType } from "react-icons";
+import type { ComponentType } from "react";
+type IconType = ComponentType<{ className?: string }>;
 import type { AUTH_VARS, UserRoleValue } from "../../utils/constants/app";
 export type AlertType = "success" | "info" | "warning" | "error";
 

@@ -1,0 +1,97 @@
+{
+  "$comment": "STATIC COPY, not placeholder records. Stands in for GET /api/v1/admin/resources/vocabularies. Labels and tones for every enumerated value the module draws. `fieldTypes` is the one list here that is NOT config: it is the set of inputs the builder can render, so a key added on the server that this panel has no renderer for would draw a blank field. Adding a type is a client change and a server change, in that order.",
+  "generatedAt": "2026-09-06T10:00:00+05:30",
+  "tagSuggestions": [
+    {
+      "key": "onboarding",
+      "label": "Onboarding"
+    },
+    {
+      "key": "policy",
+      "label": "Policy"
+    },
+    {
+      "key": "asset",
+      "label": "Asset"
+    },
+    {
+      "key": "exit",
+      "label": "Exit"
+    },
+    {
+      "key": "survey",
+      "label": "Survey"
+    },
+    {
+      "key": "compliance",
+      "label": "Compliance"
+    }
+  ],
+  "$comment_tags": "SUGGESTIONS, NOT A VOCABULARY. `tagSuggestions` replaced `resourceKinds`, which was a closed list of five. A tag is free text an operator types; these are offered on an empty field so nobody has to invent a word for \"onboarding\", and a tag that is not here is just as valid. The server must accept any string and must not validate against this list.",
+  "resourceStates": [
+    {
+      "key": "draft",
+      "label": "Draft",
+      "tone": "slate"
+    },
+    {
+      "key": "open",
+      "label": "Open",
+      "tone": "ok"
+    },
+    {
+      "key": "closed",
+      "label": "Closed",
+      "tone": ""
+    },
+    {
+      "key": "outdated",
+      "label": "Outdated",
+      "tone": "bad"
+    }
+  ],
+  "responseStates": [
+    {
+      "key": "submitted",
+      "label": "Submitted",
+      "tone": "ok"
+    },
+    {
+      "key": "pending",
+      "label": "Pending",
+      "tone": "warn"
+    }
+  ],
+  "$comment_pending": "`pending` HAS NO ROW ANYWHERE and never will. It is the audience minus the responses, computed at read time — the same rule attendance uses for `absent`. Storing it would let a count and the list it drills into disagree, and it would need a write every time somebody new matched the condition.",
+  "fieldTypes": [
+    {
+      "key": "text",
+      "label": "Short text"
+    },
+    {
+      "key": "textarea",
+      "label": "Long text"
+    },
+    {
+      "key": "number",
+      "label": "Number"
+    },
+    {
+      "key": "date",
+      "label": "Date"
+    },
+    {
+      "key": "select",
+      "label": "Choice"
+    },
+    {
+      "key": "checkbox",
+      "label": "Yes / no"
+    },
+    {
+      "key": "file",
+      "label": "File"
+    }
+  ],
+  "$comment_states": "FOUR STATES, and the last two are not the same thing. `closed` is a round that ended and might be reopened; `outdated` is a form that is WRONG NOW — superseded, kept for the record, never to be sent again. Both refuse submissions and both keep every answer; they differ in what somebody does next, which is the only reason a state earns its place. If that distinction stops being used, collapse them."
+}

@@ -1,0 +1,67 @@
+{
+  "$comment": "PLACEHOLDER RECORDS — the agreement templates. Stands in for GET /api/v1/admin/agreements/templates and /{id}. A TEMPLATE IS NOT AN AGREEMENT: this is the wording, written once; an Agreement is one copy of it sent to one member, with the body COPIED IN at send. That copy is the whole point — a signature over a body that can still change is not a signature, so editing a template here bumps its `version` and never touches anything already out there. `clauses[]` is ordered and the order is the order it is read in. `{{name}}` and `{{date}}` are the only placeholders; they are filled at send from the member and the day, and anything else is left as typed rather than silently blanked.",
+  "generatedAt": "2026-09-06T10:00:00+05:30",
+  "templates": [
+    {
+      "templateId": "TPL-NDA",
+      "title": "NDA · 2026",
+      "kind": "nda",
+      "purpose": "Confidentiality, for everyone with access to client work.",
+      "state": "active",
+      "version": 1,
+      "createdAt": "2026-01-04T11:00:00+05:30",
+      "createdById": "41",
+      "clauses": [
+        { "clauseId": "C1", "heading": "What this covers", "text": "This agreement is between Interior Bazzar and {{name}}, and it takes effect on {{date}}. It covers everything you see, hear or are given access to in the course of your work here that is not already public." },
+        { "clauseId": "C2", "heading": "What you agree to", "text": "You will not share client drawings, quotations, pricing, supplier terms or customer contact details with anyone outside the company, and you will not keep copies after you leave." },
+        { "clauseId": "C3", "heading": "What is not covered", "text": "Anything already public, anything you knew before you joined, and anything a court or regulator requires you to disclose. Tell us before you disclose under that last one, if you are allowed to." },
+        { "clauseId": "C4", "heading": "How long it lasts", "text": "Two years from your last working day. Client material stays confidential for as long as the client requires it." }
+      ]
+    },
+    {
+      "templateId": "TPL-OFFER",
+      "title": "Offer letter",
+      "kind": "offer_letter",
+      "purpose": "The written offer, signed before a start date is confirmed.",
+      "state": "active",
+      "version": 2,
+      "createdAt": "2025-02-01T11:00:00+05:30",
+      "createdById": "58",
+      "clauses": [
+        { "clauseId": "C1", "heading": "The offer", "text": "Interior Bazzar is pleased to offer {{name}} the role described in your appointment letter, on the terms below. This offer is made on {{date}} and is open for seven days." },
+        { "clauseId": "C2", "heading": "Pay and review", "text": "Your salary is as stated in your appointment letter, paid monthly. It is reviewed once a year, in April." },
+        { "clauseId": "C3", "heading": "Hours and place", "text": "Standard hours are eight a day, five days a week, at the location named in your appointment letter. Hybrid arrangements are agreed with your reporting manager." },
+        { "clauseId": "C4", "heading": "Notice", "text": "Thirty days on either side, once your probation is complete. Fifteen during probation." },
+        { "clauseId": "C5", "heading": "Accepting", "text": "Type your full name below to accept. Your start date is confirmed once this is signed and your documents are in." }
+      ]
+    },
+    {
+      "templateId": "TPL-ASSET",
+      "title": "Equipment acknowledgement",
+      "kind": "custom",
+      "purpose": "Signed when a laptop or phone is handed over.",
+      "state": "active",
+      "version": 1,
+      "createdAt": "2026-03-02T11:00:00+05:30",
+      "createdById": "58",
+      "clauses": [
+        { "clauseId": "C1", "heading": "What you were given", "text": "{{name}} received the equipment listed in the handover record on {{date}}. It stays company property throughout." },
+        { "clauseId": "C2", "heading": "Looking after it", "text": "Use it for work, keep it insured against your own negligence, and tell IT the same day if it is lost, stolen or damaged." },
+        { "clauseId": "C3", "heading": "Giving it back", "text": "Everything comes back on your last working day, in working order, with company data removed by IT rather than by you." }
+      ]
+    },
+    {
+      "templateId": "TPL-EXIT",
+      "title": "Exit declaration",
+      "kind": "custom",
+      "purpose": "Signed on the last day. Not in use yet.",
+      "state": "draft",
+      "version": 1,
+      "createdAt": "2026-09-01T11:00:00+05:30",
+      "createdById": "58",
+      "clauses": [
+        { "clauseId": "C1", "heading": "Confirmation", "text": "{{name}} confirms that as of {{date}} all company property has been returned and no company data is retained on personal devices or accounts." }
+      ]
+    }
+  ]
+}

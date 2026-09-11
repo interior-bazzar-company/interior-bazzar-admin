@@ -1,0 +1,90 @@
+{
+  "$comment": "PLACEHOLDER RECORDS — the EOD report, answering 'what did they actually get done'. Stands in for GET /api/v1/admin/team/reports?date= and GET/PUT/POST /api/v1/admin/team/reports/{date}, plus POST /api/v1/admin/team/reports/{id}/acknowledge. ONE per member per business day, unique on (memberId, businessDate). The completed list is PRE-FILLED from that morning's plan and from anything completed that day, and ticking a line COMPLETES the work item — so 'what they said they would do' and 'what they did' are a diff, not two paragraphs somebody has to compare. THE HOURS ARE NOT IN THIS PAYLOAD and must never be: they are read from the attendance row. A report that lets a person type their own hours is not a record of anything. `acknowledgedBy` is the senior's read receipt — it exists so a member can see that the thing they wrote was read.",
+  "generatedAt": "2026-08-28T14:20:00+05:30",
+  "$comment_today": "There are NO reports for 2026-08-28. It is 14:20 and the day is not over — an EOD report missing at 14:20 is not missing, it is early. The Reports screen must not count it as outstanding until the business day has ended, which is why 'not submitted' is derived against the clock rather than against the mere absence of a row.",
+  "reports": [
+    {
+      "reportId": "EOD-0827-63", "memberId": "63", "businessDate": "2026-08-27",
+      "pendingWork": "Two of the callbacks did not pick up.",
+      "pendingReason": "Numbers rang out twice. Trying again Friday morning.",
+      "achievement": "Backlog down from 41 to 18 in one day.",
+      "blockers": null,
+      "supportNeeded": null,
+      "tomorrowPriority": "Finish the backlog and clear the six unreached leads.",
+      "notes": null,
+      "submittedAt": "2026-08-27T18:26:00+05:30",
+      "acknowledgedById": "58", "acknowledgedAt": "2026-08-27T19:02:00+05:30",
+      "lines": [
+        { "lineId": "ER-0827-63-1", "workItemId": null, "title": "Work the enquiry backlog", "done": true, "targetDelta": null },
+        { "lineId": "ER-0827-63-2", "workItemId": null, "title": "Weekly ops numbers for D.", "done": true, "targetDelta": null }
+      ]
+    },
+    {
+      "reportId": "EOD-0827-74", "memberId": "74", "businessDate": "2026-08-27",
+      "pendingWork": "Outreach list stalled at 14 rows.",
+      "pendingReason": "Cannot quote anybody until the tier price is agreed, so I stopped adding rows I cannot call.",
+      "achievement": null,
+      "blockers": "Pune tier pricing sign-off. Asked Tuesday.",
+      "supportNeeded": "Somebody to push Finance on the discount floor.",
+      "tomorrowPriority": "Chase the sign-off first thing.",
+      "notes": null,
+      "submittedAt": "2026-08-27T18:52:00+05:30",
+      "acknowledgedById": null, "acknowledgedAt": null,
+      "lines": [
+        { "lineId": "ER-0827-74-1", "workItemId": "W-K07", "title": "Build the Pune outreach list", "done": false, "targetDelta": null }
+      ],
+      "$comment": "SUBMITTED AND UNACKNOWLEDGED, and it is the one asking for help. That combination is what the Reports band has to surface — a report nobody read is worse than one nobody wrote, because the person who wrote it believes it was read."
+    },
+    {
+      "reportId": "EOD-0827-58", "memberId": "58", "businessDate": "2026-08-27",
+      "pendingWork": null, "pendingReason": null,
+      "achievement": "Ops review deck done and circulated.",
+      "blockers": null, "supportNeeded": null,
+      "tomorrowPriority": "Runbook.",
+      "notes": null,
+      "submittedAt": "2026-08-27T18:22:00+05:30",
+      "acknowledgedById": null, "acknowledgedAt": null,
+      "lines": [
+        { "lineId": "ER-0827-58-1", "workItemId": "W-K09", "title": "Weekly ops review deck", "done": true, "targetDelta": null }
+      ]
+    },
+    {
+      "reportId": "EOD-0827-52", "memberId": "52", "businessDate": "2026-08-27",
+      "pendingWork": null, "pendingReason": null,
+      "achievement": "Two deals moved to Slot Booked.",
+      "blockers": null, "supportNeeded": null,
+      "tomorrowPriority": "Pipeline review prep.",
+      "notes": null,
+      "submittedAt": "2026-08-27T18:44:00+05:30",
+      "acknowledgedById": null, "acknowledgedAt": null,
+      "lines": [
+        { "lineId": "ER-0827-52-1", "workItemId": "W-T01", "title": "Deals closed today", "done": true, "targetDelta": 2 }
+      ],
+      "$comment": "`targetDelta: 2` is the ONLY writer of a target's currentValue. A target moves because somebody reported it moving at the end of a day they worked — not because a number was typed into a progress field on the target itself."
+    },
+    {
+      "reportId": "EOD-0827-79", "memberId": "79", "businessDate": "2026-08-27",
+      "pendingWork": "Reconciliation half done.",
+      "pendingReason": "Statement for the 26th had not landed by end of day.",
+      "achievement": null, "blockers": null, "supportNeeded": null,
+      "tomorrowPriority": "Finish the August reconciliation.",
+      "notes": null,
+      "submittedAt": "2026-08-27T18:08:00+05:30",
+      "acknowledgedById": null, "acknowledgedAt": null,
+      "lines": [
+        { "lineId": "ER-0827-79-1", "workItemId": "W-K13", "title": "August payout reconciliation", "done": false, "targetDelta": null }
+      ]
+    },
+    {
+      "reportId": "EOD-0827-41", "memberId": "41", "businessDate": "2026-08-27",
+      "pendingWork": null, "pendingReason": null,
+      "achievement": "Signed off the Q3 plan.",
+      "blockers": null, "supportNeeded": null,
+      "tomorrowPriority": null, "notes": null,
+      "submittedAt": "2026-08-27T19:14:00+05:30",
+      "acknowledgedById": null, "acknowledgedAt": null,
+      "lines": []
+    }
+  ],
+  "$comment_missing": "Members 70 and 86 filed nothing for 2026-08-27. Member 70 also left his attendance row open that night — the same person, the same evening, and the two facts are recorded independently rather than one being inferred from the other. That is deliberate: a missing EOD does not prove somebody stopped working, and an unclosed day does not prove they did. The screen shows both and lets a person draw the conclusion."
+}
