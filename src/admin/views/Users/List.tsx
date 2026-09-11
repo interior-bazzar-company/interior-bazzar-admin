@@ -14,7 +14,7 @@
 import { useShell } from "../../shell/ShellContext";
 import {
   Button, DateRange, EmptyState, FilterChips, ListTable, MoreMenu, Pagination,
-  Rail, SearchField, Select, StatStrip, copyToClipboard,
+  Rail, SearchField, Select, Skeleton, StatStrip, copyToClipboard,
 } from "../../ui";
 import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
@@ -22,23 +22,27 @@ import { Frame } from "./Frame";
 import type { FaceProps } from "./Frame";
 import { ClassPill, Completeness, WhoCell } from "./bits";
 import {
-  CITIES, CLASSIFICATIONS, FILTER_LABELS, NOW, REGISTERED_RANGES,
+  CITIES, CLASSIFICATIONS, FILTER_LABELS, REGISTERED_RANGES,
   REGISTRATION_SOURCES, SORT_OPTIONS, TAGS, ago, applyFilters, applySort,
   bandCounts, countsOf, filterValueLabel, fmtDate, paginate, primaryCityOf,
-  profileUrl,
+  profileUrl, useUserTotals,
 } from "./store";
 import type { Params, UserRow } from "./store";
 
-/** Where the seed's clock stands. Every relative figure on this page is read
- *  against it, so the page says so rather than implying "now". */
-const AS_OF = fmtDate(new Date(NOW).toISOString());
-
 export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, onPage, onParams }: FaceProps) {
   const { toast } = useShell();
+  const totals = useUserTotals();
 
   const filtered = applyFilters(rows, p);
   const page = paginate(applySort(filtered, p.sort), Number(p.page) || 1);
-  const c = countsOf(rows);
+  /* Total and Active are the server's (v2/total-users). Deactivated and
+     Incomplete still count the seed rows until the stat strip (d3) moves. */
+  const c = { ...countsOf(rows), total: totals.data?.totalUsers ?? 0, active: totals.data?.activeUsers ?? 0 };
+  /** The day the server counted, not the seed's clock. */
+  const AS_OF = totals.data ? fmtDate(totals.data.asOf + "T00:00:00") : "";
+  /* A figure that has not arrived is a skeleton, and one that failed is a dash
+     — never a 0 that reads as a real count. */
+  const live = (n: number) => (totals.data ? n : totals.error ? "—" : <Skeleton className="h-5" w={28} />);
   const narrowed = Object.keys(p).some((k) => p[k] && ["view", "sort", "page"].indexOf(k) < 0);
 
   const off = (k: string, v: string) => (p[k] === v ? undefined : v);
@@ -49,12 +53,12 @@ export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, 
      is the scope you chose, and a cell called Total should not silently throw
      that away. */
   const cells: (StatCell | "sep")[] = [
-    { k: "Total", v: c.total,
+    { k: "Total", v: live(c.total),
       on: !p.flag && !p.status,
       to: hash(p, { flag: undefined, status: undefined }),
       tip: <>Every registered identity in scope. The cells beside it are its parts.</> },
     "sep",
-    { k: "Active", v: c.active, dot: "ok", on: p.status === "active",
+    { k: "Active", v: live(c.active), dot: "ok", on: p.status === "active",
       to: hash(p, { status: off("status", "active") }),
       tip: <>The account works. It says nothing about whether they are paying — that is a Finance question, asked of the subscription that holds the money.</> },
     { k: "Deactivated", v: c.deactivated, dot: "neutral", on: p.status === "deactivated",
@@ -68,17 +72,19 @@ export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, 
 
   return (
     <Frame view="users" onView={onView} toast={toast}
-      counts={bandCounts(rows)}
+      counts={bandCounts(totals.data)}
       title="Users Management"
       /* THE SCOPE, UNFILTERED ON PURPOSE: how big the base is and how much of
          it is live must not change meaning because somebody narrowed the list
          below them — which is exactly what would happen if they were counted
          off the filtered set. */
-      meta={<>
+      meta={totals.data ? <>
         <span><b className="font-medium text-secondary tnum">{c.total.toLocaleString("en-IN")}</b> registered</span>
         <span><b className="font-medium text-secondary tnum">{c.active.toLocaleString("en-IN")}</b> active</span>
         <span>as of {AS_OF}</span>
-      </>}
+      </> : totals.error
+        ? <span className="text-error-primary">Could not load the user count — {totals.error}</span>
+        : <Skeleton w={220} />}
       /* KEYED ON THEIR VALUE. SearchField and Select are uncontrolled, so
          clearing a chip left the old text in the box and the old choice in the
          dropdown — the pattern Audit and Invoices already use. */

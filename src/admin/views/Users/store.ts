@@ -33,6 +33,9 @@ import analyticsDoc from "../../../content/users/analytics.json";
 import auditDoc from "../../../content/users/audit.json";
 import AdminOpsService, { call } from "../../../api/modules/adminOps";
 import type { AuditEntry } from "../../../api/modules/adminOps";
+import { AdminService } from "../../../api/modules/admin";
+import type { UserTotals } from "../../../api/modules/admin";
+import { errMessage } from "../../../api/apiService";
 import { getSession } from "../../auth/session";
 import config from "../../../config";
 
@@ -725,16 +728,37 @@ export function countsOf(rows: UserRow[]): Counts {
 }
 
 /**
- * The figures on the view band, counted off the WHOLE row set.
+ * The figures on the view band: the server's platform-user total, unfiltered.
  *
- * Every face passes `rows`, never its own filtered population. The band is
- * navigation, and a tab whose number moves while you type in the search box is
- * reporting on the search rather than on the tab — the same reasoning as the
- * topbar counts. One function, called with the same argument everywhere, is
- * what stops two faces printing two numbers for one question.
+ * Every face passes the same `useUserTotals().data`, never its own filtered
+ * population. The band is navigation, and a tab whose number moves while you
+ * type in the search box is reporting on the search rather than on the tab.
+ * Null until the count arrives — the tab then shows no number rather than 0.
  */
-export function bandCounts(rows: UserRow[]): Record<string, number> {
-  return { users: countsOf(rows).total };
+export function bandCounts(totals: UserTotals | null): Record<string, number | null> {
+  return { users: totals ? totals.totalUsers : null };
+}
+
+/* ======================================================= live totals ===
+   `GET /admin/v2/total-users/` — platform users (admin and staff excluded),
+   how many are active, and the server's date. AdminService keeps the answer in
+   sessionStorage for 10 minutes, so moving between the faces of this module
+   reuses it instead of asking again. */
+export interface TotalsState { data: UserTotals | null; error: string | null }
+
+export function useUserTotals(): TotalsState {
+  const [s, setS] = useState<TotalsState>({ data: null, error: null });
+  useEffect(() => {
+    let live = true;
+    AdminService.fetchTotalUsers()
+      .then((r) => {
+        if (!live) return;
+        setS(r.response ? { data: r.data, error: null } : { data: null, error: r.message || "Could not load the user count." });
+      })
+      .catch((e) => { if (live) setS({ data: null, error: errMessage(e) }); });
+    return () => { live = false; };
+  }, []);
+  return s;
 }
 
 /* ============================================================== hooks === */

@@ -35,7 +35,7 @@ import DateRange from "./DateRange";
 import {
   METRICS, VOCAB,
   ago, bandCounts, clampRange, countsOf, delta, pct, presetRange, rangeTotals,
-  useRecentActivity,
+  useRecentActivity, useUserTotals,
 } from "./store";
 
 const dir = (extra: Record<string, string>) =>
@@ -53,6 +53,7 @@ export default function Analytics({ rows, p, onView, onParams }: FaceProps) {
   const { toast } = useShell();
   const c = countsOf(rows);
   const recent = useRecentActivity(6);
+  const totals = useUserTotals();
 
   /* The range lives in the URL like every other control in this module, so a
      narrowed dashboard is a link somebody can send. Six months is the default
@@ -87,7 +88,7 @@ export default function Analytics({ rows, p, onView, onParams }: FaceProps) {
 
   return (
     <Frame view="analytics" onView={onView} toast={toast}
-      counts={bandCounts(rows)}
+      counts={bandCounts(totals.data)}
       title="Users analytics"
       meta={<>
         <span>{t.label}</span>

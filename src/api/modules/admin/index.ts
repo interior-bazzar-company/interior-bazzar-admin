@@ -19,15 +19,19 @@ import type {
 
 import { getCache, setCache, CACHE_KEYS, clearCache } from "../../../utils/cache";
 
+export interface UserTotals { totalUsers: number; activeUsers: number; asOf: string }
+
 export class AdminService {
 
+  /** Users Management header: platform users (admin/staff excluded), how many
+   *  are active, and the server's date the count was taken. */
   static async fetchTotalUsers() {
     try {
-      const cached = getCache<ApiResponseType<{ totalUsers: number }>>(CACHE_KEYS.TOTAL_USERS, 'session');
+      const cached = getCache<ApiResponseType<UserTotals>>(CACHE_KEYS.TOTAL_USERS, 'session');
       if (cached) return cached;
 
-      const url = `${appUrl.admin}/total-users/`;
-      const response: ApiResponseType<{ totalUsers: number }> =
+      const url = `${appUrl.admin}/v2/total-users/`;
+      const response: ApiResponseType<UserTotals> =
         await apiService.getGetApiResponse(url);
 
       if (response.response) {

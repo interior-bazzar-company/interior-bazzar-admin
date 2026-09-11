@@ -197,17 +197,12 @@ ok("an empty population counts to zero rather than throwing",
     [SEED.deactivated, 0, SEED.deactivated]);
 }
 
-console.log("\nthe view band has one figure, and it is not a readout of the search");
-const band = S.bandCounts(all);
+console.log("\nthe view band has one figure: the server's total, not a readout of the search");
+const band = S.bandCounts({ totalUsers: 167, activeUsers: 166, asOf: "2026-09-11" });
 ok("bandCounts answers for the Users face and nothing else", Object.keys(band), ["users"]);
-ok("...with the whole population behind it", band.users, c.total);
-{
-  const narrowed = S.applyFilters(all, { q: "sharma" });
-  ok("a search genuinely narrows the list", narrowed.length < all.length, true);
-  ok("...and does not move the band", S.bandCounts(all).users, band.users);
-  ok("...even though the band would follow it if it were counted off the filter",
-    S.bandCounts(narrowed).users < band.users, true);
-}
+ok("...with the server's platform-user total behind it", band.users, 167);
+ok("...and no number at all before the count arrives", S.bandCounts(null).users, null);
+ok("a search genuinely narrows the list", S.applyFilters(all, { q: "sharma" }).length < all.length, true);
 
 /* ============================================================= filters === */
 console.log("\nfilters agree with the counts they are drawn from");
