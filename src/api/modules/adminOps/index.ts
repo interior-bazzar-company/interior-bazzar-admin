@@ -581,6 +581,57 @@ export interface WorkListResponse { items: WorkItemRow[]; total: number; pageNo:
 /** A day the member OPENED has an id and a start; a day that does not exist
  *  (asked for with `includeMissing`) has neither, and its state says which
  *  kind of nothing it is. Same keys either way, so one list holds both. */
+/* ── the finance section's own reads (overview/d5) ───────────────────────── */
+/** A spend row's tag carries its KIND, because `excluded` spend (taxes,
+ *  statutory) leaves the bank without changing any operating figure. */
+export interface SpendTagRef extends VocabItem { kind: string; budgetPaise: number }
+export interface SpendRow {
+  id: number; label: string; amountPaise: number; tag: SpendTagRef | null; category: string;
+  kind: string; state: "recorded" | "cancelled"; mode: VocabItem | null; reference: string;
+  account: VocabItem | null; valueDate: string | null;
+  bill: { url: string | null; name: string; mime: string; bytes: number };
+  cancelReason: string; cancelledAt: string | null; recordedAt: string | null;
+}
+export interface SpendTagTotal {
+  key: string; label: string; kind: string; budgetPaise: number; spentPaise: number; n: number;
+  /** null when no budget is set — never 0%, which reads as "on budget". */
+  pctOfBudget: number | null; overBudget: boolean;
+}
+export interface SpendListResponse {
+  spend: SpendRow[]; total: number; pageNo: number; pageSize: number;
+  totals: { operatingPaise: number; excludedPaise: number }; byTag: SpendTagTotal[];
+}
+export interface SalaryRunRow {
+  id: number; month: string; state: VocabItem; totalNetPaise: number; slips: number;
+  unpaidPeople: number; owedPaise: number; paidAt: string | null; recordedAt: string | null;
+}
+export interface SalariesResponse {
+  runs: SalaryRunRow[]; total: number;
+  paidInPeriod: { runs: number; slips: number; paise: number };
+  openRun: SalaryRunRow | null;
+}
+export interface RefundRow {
+  id: number; amountPaise: number; ground: VocabItem; detail: string; state: VocabItem;
+  payment: { id: number; orderId: string; transactionId: string; amountPaise: number; orderStatus: string; paymentFor: string };
+  requestedAt: string; decidedAt: string | null; decisionNote: string;
+  settledAt: string | null; mode: VocabItem | null; reference: string;
+}
+export interface RefundsListResponse {
+  refunds: RefundRow[]; total: number; pageNo: number; pageSize: number;
+  /** Approved and not yet sent — all of it, whenever it was asked for. */
+  owed: { n: number; paise: number }; toDecide: number;
+}
+export interface BankTotals {
+  lines: number; matched: number; matchedPct: number | null; unexplained: number; variancePaise: number;
+}
+export interface BankStatementRow {
+  id: number; account: { key: string; label: string }; fromDate: string; toDate: string;
+  closed: boolean; closedAt: string | null; importedAt: string; lines: number; matched: number;
+  matchedPct: number | null; unexplained: number; variancePaise: number; canClose: boolean;
+}
+export interface BankStatementsResponse {
+  statements: BankStatementRow[]; total: number; totals: BankTotals;
+}
 export interface AttendanceDayRow {
   id: number | null; member: DealPersonRef; businessDate: string; startedAt: string | null; endedAt: string | null;
   breakMinutes: number; workedMinutes: number | null; isLate: boolean; lateByMinutes: number;
@@ -1167,6 +1218,34 @@ export class AdminOpsService {
   static income(params: { start?: string; end?: string; kind?: string; state?: string; pageNo?: number; pageSize?: number } = {}) {
     return apiService.getGetApiResponse<IncomeListResponse>(`${base}/income/${qs(params)}`);
   }
+  /** Money out, read for a window (overview/d5). Recording one is
+   *  `addExpense` — the revenue module has always owned that. */
+  static spend(params: { start?: string; end?: string; tag?: string; state?: string; pageNo?: number; pageSize?: number } = {}) {
+    return apiService.getGetApiResponse<SpendListResponse>(`${base}/spend/${qs(params)}`);
+  }
+  static cancelSpend(id: number, reason: string) {
+    return apiService.getPostApiResponse<SpendRow>(`${base}/spend/${id}/cancel/`, { reason });
+  }
+  /** Payroll runs. `start`/`end` are MONTHS (YYYY-MM) on the date a run was
+   *  paid — a June run paid in August is August's money out. */
+  static salaries(params: { start?: string; end?: string; state?: string } = {}) {
+    return apiService.getGetApiResponse<SalariesResponse>(`${base}/salaries/${qs(params)}`);
+  }
+  /** Refund requests. `owed` is approved-and-unsent, `toDecide` is waiting. */
+  static refunds(params: { start?: string; end?: string; state?: string; payment?: number; pageNo?: number; pageSize?: number } = {}) {
+    return apiService.getGetApiResponse<RefundsListResponse>(`${base}/refunds/${qs(params)}`);
+  }
+  static decideRefund(id: number, data: { state: "approved" | "declined"; note?: string }) {
+    return apiService.getPostApiResponse<RefundRow>(`${base}/refunds/${id}/decide/`, data);
+  }
+  static settleRefund(id: number, data: { mode: string; reference: string }) {
+    return apiService.getPostApiResponse<RefundRow>(`${base}/refunds/${id}/settle/`, data);
+  }
+  /** Statements and how much of the bank the records explain. */
+  static bankStatements(params: { account?: string; closed?: boolean } = {}) {
+    return apiService.getGetApiResponse<BankStatementsResponse>(`${base}/bank/statements/${qs(params)}`);
+  }
+
   /** `assignee` omitted = the caller's own tasks; an id or `all` needs work.all.
    *  `start`/`end` are the DUE date; `completedFrom`/`completedTo` the date it
    *  was finished — "what did they close this month" is the second question.

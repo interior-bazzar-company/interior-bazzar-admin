@@ -9,13 +9,14 @@
    rather than in Business performance because a reader asking about cash is
    asking about cash, not about deals.
    ============================================================================= */
-import { Card, ChartFrame, Icon, ListTable, Rail } from "../../ui";
+import { Card, ChartFrame, Icon, ListSkeleton, ListTable, Rail } from "../../ui";
 import { inr } from "../../ui/format";
-import { fmtMonth } from "../Finance/store";
+import { shortMonth } from "./derive";
 import { ColumnChart, SignedColumns } from "../charts";
 import type { ColumnPoint, Series, SignedPoint } from "../charts";
-import { Gone, Go, Kpi, Money, Section, Stamp, Tip, Empty, rowLink } from "./bits";
+import { Gone, Go, Kpi, Loading, Money, PlotSkeleton, Section, Stamp, Tip, Empty, rowLink } from "./bits";
 import type { OverviewData } from "./store";
+import { Retry } from "./top";
 
 /** Lakh to two places for the axis; the exact figure rides as `display`. */
 const lakh = (paise: number) => Math.round(paise / 100000) / 100;
@@ -34,12 +35,31 @@ const RISK_TONE: Record<string, string> = {
 };
 
 export function Finance({ d }: { d: OverviewData }) {
-  const f = d.fin;
-  const of = "vs prev " + d.periods.finance.days + "d";
-  if (!f) {
+  /* The backend, on the real clock (d5). `d.fin` — the seed metrics — is what
+     the attention list and the signals still read, and is not touched here. */
+  const f = d.finLive;
+  const of = "vs prev " + d.periods.financeLive.days + "d";
+  if (!d.gates.finance || !f) {
     return (
-      <Section id="ov-finance" title="Finance">
-        <Card tight><Gone what="Finance" needs="finance access" /></Card>
+      <Section id="ov-finance" title="Finance"
+        right={d.gates.finance ? <Stamp clock={d.clocks.financeLive} /> : null}>
+        {!d.gates.finance ? (
+          <Card tight><Gone what="Finance" needs="finance access" /></Card>
+        ) : d.finState === "loading" ? (
+          <>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {["Net", "In", "Out", "Due in 30 days", "Failed to pay", "Refunds owed"].map((k) => (
+                <Loading key={k} k={k} />
+              ))}
+            </div>
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <PlotSkeleton tall /><PlotSkeleton tall />
+            </div>
+            <Card tight><ListSkeleton rows={4} /></Card>
+          </>
+        ) : (
+          <Card tight><Empty title="Finance did not load." why={<Retry onPress={d.retryFinance} />} /></Card>
+        )}
       </Section>
     );
   }
@@ -47,7 +67,7 @@ export function Finance({ d }: { d: OverviewData }) {
   const inPrev = f.prev.collectedPaise + f.prev.otherInPaise;
   const money: ColumnPoint[] = f.flow.map((x) => ({ key: x.key, label: x.label, values: { in: thousands(x.collected), out: thousands(x.out) } }));
   const anyMoney = money.some((p) => p.values.in || p.values.out);
-  const net: SignedPoint[] = f.months.map((m) => ({ key: m.month, label: fmtMonth(m.month).slice(0, 3), value: lakh(m.netPaise), display: inr(m.netPaise) }));
+  const net: SignedPoint[] = f.months.map((m) => ({ key: m.month, label: shortMonth(m.month), value: lakh(m.netPaise), display: inr(m.netPaise) }));
   const years: { label: string; n: number }[] = [];
   f.months.forEach((m) => {
     const y = m.month.slice(0, 4);
@@ -56,8 +76,8 @@ export function Finance({ d }: { d: OverviewData }) {
   });
 
   return (
-    <Section id="ov-finance" title="Finance" desc={d.periods.finance.label + " · cash, not profit"}
-      right={<><Stamp clock={d.clocks.finance} /><Go to="#/finance-analytics">Analytics</Go></>}>
+    <Section id="ov-finance" title="Finance" desc={d.periods.financeLive.label + " · cash, not profit"}
+      right={<><Stamp clock={d.clocks.financeLive} /><Go to="#/finance-analytics">Analytics</Go></>}>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Kpi k="Net" tip="net" v={<Money paise={f.cur.netPaise} />} tone={f.cur.netPaise < 0 ? "bad" : undefined}
           s={f.cur.salaryN ? undefined : "no salary run paid into this period"}
@@ -77,7 +97,7 @@ export function Finance({ d }: { d: OverviewData }) {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <ChartFrame
           title={<span className="inline-flex items-center gap-1.5">Money in and out<Tip k="moneyflow" /></span>}
-          right={<Stamp clock={d.clocks.finance} />}
+          right={<Stamp clock={d.clocks.financeLive} />}
         >
           {anyMoney
             ? <ColumnChart series={MONEY} points={money} labelSeries="in" unit="₹ thousand · in is collections plus other income, out is salaries, spend and refunds" />
@@ -104,11 +124,11 @@ export function Finance({ d }: { d: OverviewData }) {
         title="Not where it should be"
         sub="Never added together — each line is a different kind of problem."
         foot={
-          d.pay ? (
+          d.payLive ? (
             <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <span className="label-mono inline-flex items-center gap-1.5">Payroll<Tip k="payroll" /></span>
-              {d.pay.openRun
-                ? <span className="text-sm text-secondary">Run <b className="font-mono font-medium text-primary tnum">{d.pay.openRun}</b> open · {d.pay.people ? d.pay.people + " unpaid · " : ""}<Money paise={d.pay.owedPaise} /> owed</span>
+              {d.payLive.openRun
+                ? <span className="text-sm text-secondary">Run <b className="font-mono font-medium text-primary tnum">{d.payLive.openRun}</b> open · {d.payLive.people ? d.payLive.people + " unpaid · " : ""}<Money paise={d.payLive.owedPaise} /> owed</span>
                 : <span className="text-sm text-success-primary">No run open · nothing owed</span>}
               <span className="ml-auto"><Go to="#/finance-salaries">Salaries</Go></span>
             </span>

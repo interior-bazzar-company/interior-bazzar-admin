@@ -35,6 +35,8 @@ import {
 } from "./derive";
 import { liveHealth, liveMoney, liveTeam, liveTeamRows, useLive } from "./live";
 import type { LiveMoney, LiveState, LiveTeamTable } from "./live";
+import { liveFinance, livePayroll, spanFor, useFinanceLive } from "./financeLive";
+import type { LiveFinance, LivePayroll } from "./financeLive";
 import type {
   AttentionItem, DealMetrics, DealRec, FinanceMetrics, HealthCell, OwnerStat, Payroll, Period, Signal,
   TeamMetrics,
@@ -59,7 +61,7 @@ export const GATES = {
  *  "seed · as of 25 Aug 2026". Every section stamps one, because the same
  *  period lands on different dates in each — see derive.ts. */
 export interface Clock { kind: "live" | "seed"; today: string; label: string }
-export function clocks(): { deals: Clock; finance: Clock; team: Clock; teamLive: Clock; money: Clock } {
+export function clocks(): { deals: Clock; finance: Clock; financeLive: Clock; team: Clock; teamLive: Clock; money: Clock } {
   const real = todayLocal();
   return {
     deals: { kind: "live", today: real, label: "live · " + fmtDate(real) },
@@ -67,6 +69,10 @@ export function clocks(): { deals: Clock; finance: Clock; team: Clock; teamLive:
        seed `team` clock below stays for the sections still on the seeds —
        Operations, the attention list, the planning signals. */
     teamLive: { kind: "live", today: real, label: "live · " + fmtDate(real) },
+    /* The Finance SECTION reads the backend (d5) and runs on the real clock.
+       `finance` below stays the seed clock for what still reads the seeds —
+       the attention list and the planning signals. */
+    financeLive: { kind: "live", today: real, label: "live · " + fmtDate(real) },
     /* The executive snapshot's money and health (live.ts) run on the real
        clock; `finance` stays the seed clock for the sections still on seeds. */
     money: { kind: "live", today: real, label: "live · " + fmtDate(real) },
@@ -127,7 +133,7 @@ export interface OverviewData {
   gates: { deals: boolean; finance: boolean; payroll: boolean; team: boolean; enquiries: boolean };
   api: DealsApiState;
   clocks: ReturnType<typeof clocks>;
-  periods: { deals: Period; finance: Period; team: Period; teamLive: Period; money: Period };
+  periods: { deals: Period; finance: Period; financeLive: Period; team: Period; teamLive: Period; money: Period };
   deals: DealMetrics | null;
   fin: FinanceMetrics | null;
   /** Collected + Receivable for the executive snapshot, from the backend
@@ -136,6 +142,12 @@ export interface OverviewData {
   moneyState: LiveState;
   retryLive: () => void;
   pay: Payroll | null;
+  /** The seed metrics, still read by the attention list and the signals. The
+   *  Finance SECTION reads `finLive` (d5). */
+  finLive: LiveFinance | null;
+  finState: LiveState;
+  payLive: LivePayroll | null;
+  retryFinance: () => void;
   /** The seed metrics, still read by Operations, the attention list and the
    *  signals. The Team TABLE reads `teamTable` below (d4). */
   team: TeamMetrics | null;
@@ -170,9 +182,11 @@ export function useOverview(p: Params): OverviewData {
     finance: periodFor(p.period, ck.finance.today, p.from, p.to),
     team: periodFor(p.period, ck.team.today, p.from, p.to),
     teamLive: periodFor(p.period, ck.teamLive.today, p.from, p.to),
+    financeLive: periodFor(p.period, ck.financeLive.today, p.from, p.to),
     money: periodFor(p.period, ck.money.today, p.from, p.to),
   }), [p.period, p.from, p.to, ck]);
   const live = useLive(periods.money, { money: gates.finance, team: gates.team });
+  const finance = useFinanceLive(periods.financeLive, gates.finance);
 
   const dealsReady = gates.deals && !api.loading && !api.error && !api.forbidden;
   const deals = useMemo(
@@ -205,6 +219,17 @@ export function useOverview(p: Params): OverviewData {
     () => (gates.team ? teamMetrics(periods.team, ck.team.today, p.dept || undefined, owners, dept.rolesOf) : null),
     [gates.team, periods.team, ck, p.dept, owners, dept.rolesOf, teamVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const finLive = useMemo(
+    () => (finance.state === "ready"
+      ? liveFinance(finance.raw, periods.financeLive, spanFor(periods.financeLive).months)
+      : null),
+    [finance.state, finance.raw, periods.financeLive]);
+  /* Salaries are their own module: a finance session without it sees the
+     payroll line say so, exactly as it did on the seeds. */
+  const payLive = useMemo(
+    () => (finance.state === "ready" && gates.payroll ? livePayroll(finance.raw) : null),
+    [finance.state, finance.raw, gates.payroll]);
+
   const money = useMemo(
     () => (live.money === "ready" ? liveMoney(live.raw, periods.money) : null),
     [live.money, live.raw, periods.money]);
@@ -225,6 +250,7 @@ export function useOverview(p: Params): OverviewData {
   const s = getSession();
   return {
     gates, api, clocks: ck, periods, deals, fin, pay, team,
+    finLive, finState: finance.state, payLive, retryFinance: finance.retry,
     teamTable,
     /* The table needs BOTH reads: the roster (roles + users) and the period's
        attendance and tasks. Whichever is still answering decides the state. */

@@ -48,7 +48,7 @@ const NONE: Raw = { ledger: [], plans: [], income: [], installments: [], days: [
 
 /** Every page of a list endpoint. ponytail: sequential pages; fine at
  *  hundreds of rows, parallelise if a list ever runs to thousands. */
-async function every<R extends { total: number }, T>(page: (pageNo: number) => Promise<R>, pick: (r: R) => T[]): Promise<T[]> {
+export async function every<R extends { total: number }, T>(page: (pageNo: number) => Promise<R>, pick: (r: R) => T[]): Promise<T[]> {
   const out: T[] = [];
   for (let n = 1; ; n++) {
     const got = await page(n);
@@ -100,15 +100,15 @@ export function useLive(p: Period, on: { money: boolean; team: boolean }) {
 
 /* ------------------------------------------------------------------ money --- */
 /** Local calendar date of an ISO timestamp (verifiedAt is UTC on the wire). */
-const ymd = (v: string | null | undefined) => {
+export const ymd = (v: string | null | undefined) => {
   if (!v) return "";
   if (v.length <= 10) return v;
   const d = new Date(v);
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 };
-const within = (d: string, from: string, to: string) => !!d && d >= from && d <= to;
+export const within = (d: string, from: string, to: string) => !!d && d >= from && d <= to;
 /** "19500.0" rupees -> 1950000 paise. */
-const paiseOf = (rupees: string | null | undefined) => Math.round((parseFloat(rupees || "0") || 0) * 100);
+export const paiseOf = (rupees: string | null | undefined) => Math.round((parseFloat(rupees || "0") || 0) * 100);
 
 export interface MoneyWindow { collectedPaise: number; otherInPaise: number; collectedN: number }
 export interface LiveMoney {
