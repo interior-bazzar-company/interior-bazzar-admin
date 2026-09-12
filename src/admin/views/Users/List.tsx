@@ -39,9 +39,19 @@ export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, 
 
   const filtered = applyFilters(rows, p);
   const page = paginate(applySort(filtered, p.sort), Number(p.page) || 1);
-  /* Total and Active are the server's (v2/total-users). Deactivated and
-     Incomplete still count the seed rows until the stat strip (d3) moves. */
-  const c = { ...countsOf(rows), total: totals.data?.totalUsers ?? 0, active: totals.data?.activeUsers ?? 0 };
+  /* THE WHOLE STRIP IS THE SERVER'S NOW (v2/total-users). `countsOf` still
+     runs -- the table, the record and the analytics tiles read it -- but not a
+     figure on this strip comes from it any more. Deactivated is total minus
+     active rather than a fourth count: the server already states both, and a
+     third number that could disagree with their difference would be a bug
+     waiting to happen. */
+  const c = {
+    ...countsOf(rows),
+    total: totals.data?.totalUsers ?? 0,
+    active: totals.data?.activeUsers ?? 0,
+    deactivated: (totals.data?.totalUsers ?? 0) - (totals.data?.activeUsers ?? 0),
+    incompleteProfiles: totals.data?.incompleteProfiles ?? 0,
+  };
   /** The day the server counted, not the seed's clock. */
   const AS_OF = totals.data ? fmtDate(totals.data.asOf + "T00:00:00") : "";
   /* A figure that has not arrived is a skeleton, and one that failed is a dash
@@ -65,13 +75,13 @@ export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, 
     { k: "Active", v: live(c.active), dot: "ok", on: p.status === "active",
       to: hash(p, { status: off("status", "active") }),
       tip: <>The account works. It says nothing about whether they are paying — that is a Finance question, asked of the subscription that holds the money.</> },
-    { k: "Deactivated", v: c.deactivated, dot: "neutral", on: p.status === "deactivated",
+    { k: "Deactivated", v: live(c.deactivated), dot: "neutral", on: p.status === "deactivated",
       to: hash(p, { status: off("status", "deactivated") }),
       tip: <>Administratively disabled. Their profile, commercial links and audit trail are all still here.</> },
     "sep",
-    { k: "Incomplete", v: c.incompleteProfiles, dot: "warn", on: p.flag === "incomplete",
+    { k: "Incomplete", v: live(c.incompleteProfiles), dot: "warn", on: p.flag === "incomplete",
       to: hash(p, { flag: off("flag", "incomplete") }),
-      tip: <>Missing at least one field the current profile schema requires. Graded against profile v1.</> },
+      tip: <>Business and shop accounts whose profile has not met the go-live checklist yet. Accounts without one are not counted.</> },
   ];
 
   return (

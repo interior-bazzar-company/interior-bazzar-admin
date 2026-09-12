@@ -19,12 +19,21 @@ import type {
 
 import { getCache, setCache, CACHE_KEYS, clearCache } from "../../../utils/cache";
 
-export interface UserTotals { totalUsers: number; activeUsers: number; asOf: string }
+export interface UserTotals {
+  totalUsers: number;
+  activeUsers: number;
+  /** Accounts holding a business, shop or architect profile the go-live
+   *  checklist still counts as unfinished. An account with none of those is
+   *  not counted: there is nothing to grade. */
+  incompleteProfiles: number;
+  asOf: string;
+}
 
 export class AdminService {
 
-  /** Users Management header: platform users (admin/staff excluded), how many
-   *  are active, and the server's date the count was taken. */
+  /** Users Management header and stat strip: platform users (admin/staff
+   *  excluded), how many are active, how many hold an unfinished seller
+   *  profile, and the server's date the count was taken. */
   static async fetchTotalUsers() {
     try {
       const cached = getCache<ApiResponseType<UserTotals>>(CACHE_KEYS.TOTAL_USERS, 'session');
