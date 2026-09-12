@@ -52,6 +52,25 @@ function ok(label, actual, expected) {
 const usersDoc = require("../src/content/users/users.json");
 const users = usersDoc.users;
 const vocab = require("../src/content/users/vocabularies.json");
+
+/* THE VALUE LISTS COME FROM THE SERVER NOW (GET /admin/users/vocabularies/), so
+   the module starts with them empty and a check that ran offline would assert
+   against nothing. This states what "the vocabulary arrived" means and plants
+   it through the real setter — the same move check:clock makes for Business
+   Enquiries — in the shape the controller serves: classifications carry their
+   sentence in `hint`, and cities are plain strings.
+
+   It is planted FROM the bundled file on purpose: this file's whole method is to
+   recompute the expected answer from src/content/users/*.json independently, and
+   a vocabulary typed out here by hand would be a second copy to keep in step. */
+S.applyUsersVocab({
+  classifications: vocab.classifications.map((c) => ({ key: c.key, label: c.label, tone: c.tone, hint: c.meaning })),
+  registrationSources: vocab.registrationSources,
+  tags: vocab.tags,
+  cities: vocab.cities.map((c) => c.key),
+  registeredRanges: vocab.registeredRanges,
+  sortOptions: vocab.sortOptions,
+});
 const auditDoc = require("../src/content/users/audit.json");
 const all = users.map((u) => S.toRow(u));
 const byId = {};

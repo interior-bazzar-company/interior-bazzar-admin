@@ -526,8 +526,22 @@ export interface DealPaymentRow {
 }
 export interface DealPaymentsListResponse { payments: DealPaymentRow[]; total: number; pageNo: number; pageSize: number; }
 
-/** One row of any GET v1/admin/vocab/<list>/ value list. */
-export interface VocabItem { key: string; label: string; tone: string; hint?: string; displayOrder?: number; isActive?: boolean }
+/** One row of any GET v1/admin/vocab/<list>/ value list. `scope` names the
+ *  consumer a row was added for ('' = every consumer); `?scope=` filters on it. */
+export interface VocabItem { key: string; label: string; tone: string; hint?: string; displayOrder?: number; isActive?: boolean; scope?: string }
+
+/** GET v1/admin/users/vocabularies/ — every option list the Users directory's
+ *  filter bar offers. `cities` are the ones on record, folded to one entry per
+ *  spelling, so they are a suggestion list and not a closed set. */
+export interface UserTagItem { slug: string; label: string; tone: string; help: string; isActive: boolean }
+export interface UsersVocabularies {
+  classifications: VocabItem[];
+  registrationSources: VocabItem[];
+  tags: UserTagItem[];
+  cities: string[];
+  registeredRanges: { key: string; label: string }[];
+  sortOptions: { key: string; label: string }[];
+}
 
 /** A plan purchase (TransectionData) as `payments/` returns it. Money is a
  *  RUPEE string here, not paise — the legacy model stores it that way. */
@@ -758,6 +772,11 @@ export class AdminOpsService {
   }
   static toggleBuyer(id: number) {
     return apiService.getPostApiResponse<any>(`${base}/buyers/${id}/toggle/`, {});
+  }
+
+  // ── Users (the platform's own accounts, not the admin team) ──
+  static usersVocabularies() {
+    return apiService.getGetApiResponse<UsersVocabularies>(`${base}/users/vocabularies/`);
   }
 
   // ── Businesses ──

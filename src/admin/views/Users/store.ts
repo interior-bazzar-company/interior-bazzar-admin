@@ -32,7 +32,7 @@ import vocabDoc from "../../../content/users/vocabularies.json";
 import analyticsDoc from "../../../content/users/analytics.json";
 import auditDoc from "../../../content/users/audit.json";
 import AdminOpsService, { call } from "../../../api/modules/adminOps";
-import type { AuditEntry } from "../../../api/modules/adminOps";
+import type { AuditEntry, UsersVocabularies } from "../../../api/modules/adminOps";
 import { AdminService } from "../../../api/modules/admin";
 import type { UserTotals } from "../../../api/modules/admin";
 import { errMessage } from "../../../api/apiService";
@@ -139,8 +139,23 @@ export type Params = Record<string, string | undefined>;
    and cautions live in the file — the behaviour lives in this module. */
 
 export const VOCAB = vocabDoc;
-export const CLASSIFICATIONS = vocabDoc.classifications;
-export const REGISTRATION_SOURCES = vocabDoc.registrationSources;
+
+/* ------------------------------------------------------- the value lists ---
+   SIX LISTS COME FROM THE SERVER, not from the file above: the account states
+   and the registration channels are rows, the tag catalogue is whatever people
+   have actually made, the cities are the ones on record, and the range and
+   sort keys are a contract the server implements too.
+
+   `let`, not `const`, so the assignment when the read lands is visible through
+   the ES live bindings every consumer already imports — the same move
+   BusinessEnquiries made. THERE IS NO FALLBACK TO THE JSON: empty means the
+   read has not landed or has failed, and the filter bar says which. A panel
+   that quietly shows bundled options cannot tell you whether it is wired up. */
+export interface VocabOption { key: string; label: string; tone?: string; meaning?: string }
+export interface TagOption { slug: string; label: string; tone: string; help: string }
+
+export let CLASSIFICATIONS: VocabOption[] = [];
+export let REGISTRATION_SOURCES: VocabOption[] = [];
 /**
  * One entry of the profile schema. `type` is what decides which control the
  * form renders, which is why EditProfile no longer knows a single field by
@@ -464,8 +479,8 @@ export function validateFacets(patch: Partial<UserProfile>): string {
   });
   return bad.length ? bad.join(". ") + "." : "";
 }
-export const TAGS = vocabDoc.tags;
-export const CITIES = vocabDoc.cities;
+export let TAGS: TagOption[] = [];
+export let CITIES: VocabOption[] = [];
 export const BUSINESS_TYPES = vocabDoc.businessTypes;
 export const SEGMENTS = vocabDoc.segments;
 export const CATEGORIES = vocabDoc.categories;
@@ -475,15 +490,19 @@ export const STATE_CITIES = vocabDoc.stateCities as Record<string, string[]>;
 export const STATES = vocabDoc.states as { key: string; label: string }[];
 export const USERNAME_RULES = vocabDoc.usernameRules;
 export const RESERVED_USERNAMES = vocabDoc.reservedUsernames as string[];
-export const REGISTERED_RANGES = vocabDoc.registeredRanges;
-export const SORT_OPTIONS = vocabDoc.sortOptions;
+export let REGISTERED_RANGES: VocabOption[] = [];
+export let SORT_OPTIONS: VocabOption[] = [];
 export const METRICS = vocabDoc.metricDefinitions;
 export const OPEN_DECISIONS = vocabDoc.openDecisions;
 export const PROFILE_SCHEMA_VERSION = vocabDoc.profileSchemaVersion;
 export const ANALYTICS = analyticsDoc;
 
-export const classificationMeta = (k: Classification) =>
-  CLASSIFICATIONS.filter((c) => c.key === k)[0] || CLASSIFICATIONS[0];
+/* A SYNTHETIC ROW RATHER THAN `CLASSIFICATIONS[0]`: the list is empty until the
+   read lands, and a pill whose label is `undefined` is worse than one that
+   shows the key it was given. */
+export const classificationMeta = (k: Classification): VocabOption =>
+  CLASSIFICATIONS.filter((c) => c.key === k)[0]
+  || { key: k, label: k, tone: k === "deactivated" ? "dead" : "", meaning: "" };
 export const tagMeta = (slug: string) =>
   TAGS.filter((t) => t.slug === slug)[0] || null;
 export const decision = (id: string) =>
@@ -759,6 +778,58 @@ export function useUserTotals(): TotalsState {
     return () => { live = false; };
   }, []);
   return s;
+}
+
+/* ================================================== the value lists, live ===
+   `GET /admin/users/vocabularies/` — the account states, the registration
+   channels, the tag catalogue, the cities on record, and the range and sort
+   keys. Read ONCE per session rather than per face: these do not change while
+   somebody works, and the directory, the record and the analytics tab all read
+   the same six bindings.
+
+   The lists are planted on the module (see `CLASSIFICATIONS` and friends
+   above), so no consumer had to change; what a consumer CAN do is ask whether
+   the read has landed, which is the whole of this state. */
+export interface VocabState { ready: boolean; error: string | null }
+
+let vocab: VocabState = { ready: false, error: null };
+let vocabStarted = false;
+
+/** Plants a fetched vocabulary across the module bindings. Its own function so
+ *  a test can state "the vocabulary arrived" without standing up a server. */
+export function applyUsersVocab(v: UsersVocabularies): void {
+  /* The row's `hint` is the sentence the class pill shows on hover, which is
+     what `meaning` was in the bundled file. */
+  CLASSIFICATIONS = (v.classifications || []).map((c) => ({
+    key: c.key, label: c.label, tone: c.tone, meaning: c.hint || "",
+  }));
+  REGISTRATION_SOURCES = (v.registrationSources || []).map((r) => ({ key: r.key, label: r.label }));
+  TAGS = (v.tags || []).map((t) => ({ slug: t.slug, label: t.label, tone: t.tone, help: t.help }));
+  /* Cities arrive as the strings people actually typed; the controls want a
+     key and a label, and for a city those are the same thing. */
+  CITIES = (v.cities || []).map((c) => ({ key: c, label: c }));
+  REGISTERED_RANGES = v.registeredRanges || [];
+  SORT_OPTIONS = v.sortOptions || [];
+}
+
+export async function bootUsersVocab(force = false): Promise<void> {
+  if (vocabStarted && !force) return;
+  vocabStarted = true;
+  vocab = { ready: false, error: null };
+  try {
+    applyUsersVocab(await call<UsersVocabularies>(AdminOpsService.usersVocabularies()));
+    vocab = { ready: true, error: null };
+  } catch (e) {
+    vocab = { ready: false, error: errMessage(e) };
+  }
+  emit();
+}
+
+/** Subscribes a face to the read, and starts it on first mount. */
+export function useUsersVocab(): VocabState {
+  useVersion();
+  useEffect(() => { void bootUsersVocab(); }, []);
+  return vocab;
 }
 
 /* ============================================================== hooks === */

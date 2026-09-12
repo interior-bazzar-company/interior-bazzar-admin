@@ -13,7 +13,7 @@
    ============================================================================= */
 import { useShell } from "../../shell/ShellContext";
 import {
-  Button, DateRange, EmptyState, FilterChips, ListTable, MoreMenu, Pagination,
+  Button, DateRange, EmptyState, FilterChips, ListTable, MoreMenu, Notice, Pagination,
   Rail, SearchField, Select, Skeleton, StatStrip, copyToClipboard,
 } from "../../ui";
 import type { StatCell } from "../../ui";
@@ -25,13 +25,17 @@ import {
   CITIES, CLASSIFICATIONS, FILTER_LABELS, REGISTERED_RANGES,
   REGISTRATION_SOURCES, SORT_OPTIONS, TAGS, ago, applyFilters, applySort,
   bandCounts, countsOf, filterValueLabel, fmtDate, paginate, primaryCityOf,
-  profileUrl, useUserTotals,
+  profileUrl, useUserTotals, useUsersVocab,
 } from "./store";
 import type { Params, UserRow } from "./store";
 
 export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, onPage, onParams }: FaceProps) {
   const { toast } = useShell();
   const totals = useUserTotals();
+  /* The filter bar's own options come from the server. Until the read lands the
+     dropdowns are empty, and if it fails the bar says so rather than offering a
+     stale set that would filter on values nobody holds. */
+  const vocab = useUsersVocab();
 
   const filtered = applyFilters(rows, p);
   const page = paginate(applySort(filtered, p.sort), Number(p.page) || 1);
@@ -115,10 +119,17 @@ export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, 
           allLabel={SORT_OPTIONS[0]?.label || "Default order"}
           onFilter={onFilter} options={SORT_OPTIONS.slice(1).map((o) => ({ v: o.key, l: o.label }))} />
       }
-      chips={
-        /* `view`, `sort` and `page` sit in the URL like filters and are not
+      chips={<>
+        {/* THE OPTIONS DID NOT ARRIVE. The controls stay where they are — the
+            applied filters in the URL are still valid and still listed below —
+            but nobody should wonder why every dropdown is empty. */}
+        {vocab.error
+          ? <Notice tone="bad" ico="alert"
+              text={<>The filter options did not load — {vocab.error}</>} />
+          : null}
+        {/* `view`, `sort` and `page` sit in the URL like filters and are not
            filters. A chip reading "view: analytics" invites somebody to clear
-           the screen they are on. */
+           the screen they are on. */}
         <FilterChips
           params={Object.keys(p)
             .filter((k) => ["view", "sort", "page", "from", "to"].indexOf(k) < 0 && p[k])
@@ -126,7 +137,7 @@ export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, 
               {} as Record<string, string>)}
           labels={FILTER_LABELS}
           onUnfilter={(k) => onUnfilter(k === "registered" ? "registered+from+to" : k)} />
-      }
+      </>}
       bands={<StatStrip cells={cells} />}>
 
       {page.rows.length ? (

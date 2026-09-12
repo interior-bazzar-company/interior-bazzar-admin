@@ -30,7 +30,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { hashToPath, usePageChrome } from "../../shell/AdminShell";
 import { qs, TbTitle } from "../../ui";
 import type { Params } from "./store";
-import { FILTER_KEYS, countsOf, useAllRows } from "./store";
+import { FILTER_KEYS, countsOf, useAllRows, useUsersVocab } from "./store";
 import List from "./List";
 import Analytics from "./Analytics";
 import Detail from "./Detail";
@@ -67,6 +67,13 @@ export default function Users() {
      rather than a dashboard nobody asked for on the way to it. */
   const view = p.view || "users";
   const rows = useAllRows();
+  /* THE VALUE LISTS, STARTED HERE RATHER THAN ON THE DIRECTORY. A record URL is
+     a real address (`/users/<id>`, and `_redirects` serves the SPA for it), so a
+     reload or a pasted link mounts the RECORD with the directory never having
+     rendered — and the class pill and the tag chips read the same lists the
+     filter bar does. Booting from the host covers all three faces; the read
+     itself is guarded to run once per session. */
+  useUsersVocab();
 
   /* ------------------------------------------------------------ topbar ---
      THE TITLE IS THE WAY UP, panel-wide: pressing it returns to this face's
