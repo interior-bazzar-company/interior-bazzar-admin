@@ -564,10 +564,14 @@ export interface WorkItemRow {
 export interface WorkListResponse { items: WorkItemRow[]; total: number; pageNo: number; pageSize: number; }
 
 /** interior_admin.AttendanceDay. `state` is derived: working / on_break / ended / unclosed. */
+/** A day the member OPENED has an id and a start; a day that does not exist
+ *  (asked for with `includeMissing`) has neither, and its state says which
+ *  kind of nothing it is. Same keys either way, so one list holds both. */
 export interface AttendanceDayRow {
-  id: number; member: DealPersonRef; businessDate: string; startedAt: string; endedAt: string | null;
+  id: number | null; member: DealPersonRef; businessDate: string; startedAt: string | null; endedAt: string | null;
   breakMinutes: number; workedMinutes: number | null; isLate: boolean; lateByMinutes: number;
-  state: "working" | "on_break" | "ended" | "unclosed"; source: VocabItem;
+  state: "working" | "on_break" | "ended" | "unclosed" | "absent" | "not_started" | "on_leave";
+  source: VocabItem | null;
 }
 export interface AttendanceDaysResponse { days: AttendanceDayRow[]; total: number; pageNo: number; pageSize: number; }
 /** The rare repair path only — an issued invoice that somehow has no ledger
@@ -1144,12 +1148,21 @@ export class AdminOpsService {
   static income(params: { start?: string; end?: string; kind?: string; state?: string; pageNo?: number; pageSize?: number } = {}) {
     return apiService.getGetApiResponse<IncomeListResponse>(`${base}/income/${qs(params)}`);
   }
-  /** `assignee` omitted = the caller's own tasks; an id or `all` needs work.all. */
-  static work(params: { assignee?: string; status?: string; start?: string; end?: string; pageNo?: number; pageSize?: number } = {}) {
+  /** `assignee` omitted = the caller's own tasks; an id or `all` needs work.all.
+   *  `start`/`end` are the DUE date; `completedFrom`/`completedTo` the date it
+   *  was finished — "what did they close this month" is the second question.
+   *  `role` is an rbac role name (the panel's "department"). */
+  static work(params: {
+    assignee?: string; status?: string; start?: string; end?: string;
+    completedFrom?: string; completedTo?: string; role?: string; pageNo?: number; pageSize?: number } = {}) {
     return apiService.getGetApiResponse<WorkListResponse>(`${base}/work/${qs(params)}`);
   }
-  /** `member` omitted = the caller's own days; an id or `all` is full access only. */
-  static attendanceDays(params: { member?: string; start?: string; end?: string; pageNo?: number; pageSize?: number } = {}) {
+  /** `member` omitted = the caller's own days; an id or `all` is full access only.
+   *  `includeMissing` also returns the days nobody opened (absent / not started
+   *  / on leave) and then needs `start` and `end`. `role` = rbac role name. */
+  static attendanceDays(params: {
+    member?: string; start?: string; end?: string; role?: string;
+    includeMissing?: string; pageNo?: number; pageSize?: number } = {}) {
     return apiService.getGetApiResponse<AttendanceDaysResponse>(`${base}/attendance/days/${qs(params)}`);
   }
   static recordDealPayment(data: DealPaymentRecordInput) {

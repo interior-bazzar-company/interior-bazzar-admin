@@ -19,6 +19,7 @@
    ============================================================================= */
 import { useEffect, useMemo, useState } from "react";
 import AdminOpsService, { call } from "../../../api/modules/adminOps";
+import type { AdminUserRow } from "../../../api/modules/adminOps";
 import { useDealsApi, render as refetchDeals } from "../Deals/useDeals";
 import type { DealsApiState } from "../Deals/useDeals";
 import { fmtDate as finFmtDate, todayIso as finToday, useVersion as useFinVersion } from "../Finance/store";
@@ -32,8 +33,8 @@ import {
   attentionItems, dealMetrics, financeMetrics, payrollMetrics, periodFor, planningSignals,
   teamMetrics, todayLocal,
 } from "./derive";
-import { liveHealth, liveMoney, liveTeam, useLive } from "./live";
-import type { LiveMoney, LiveState } from "./live";
+import { liveHealth, liveMoney, liveTeam, liveTeamRows, useLive } from "./live";
+import type { LiveMoney, LiveState, LiveTeamTable } from "./live";
 import type {
   AttentionItem, DealMetrics, DealRec, FinanceMetrics, HealthCell, OwnerStat, Payroll, Period, Signal,
   TeamMetrics,
@@ -48,7 +49,9 @@ export const GATES = {
   deals: () => can("deals"),
   finance: () => can("finance"),
   payroll: () => can("finance-salaries"),
-  team: () => can("work") && can("attendance"),
+  /* The Team table also reads the roster (`GET /admin/users/`, team.view), so
+     a session without it would render the section and fail the fetch (d4). */
+  team: () => can("work") && can("attendance") && can("team"),
   enquiries: () => can("business-enquiries"),
 };
 
@@ -56,10 +59,14 @@ export const GATES = {
  *  "seed · as of 25 Aug 2026". Every section stamps one, because the same
  *  period lands on different dates in each — see derive.ts. */
 export interface Clock { kind: "live" | "seed"; today: string; label: string }
-export function clocks(): { deals: Clock; finance: Clock; team: Clock; money: Clock } {
+export function clocks(): { deals: Clock; finance: Clock; team: Clock; teamLive: Clock; money: Clock } {
   const real = todayLocal();
   return {
     deals: { kind: "live", today: real, label: "live · " + fmtDate(real) },
+    /* The Team TABLE reads the backend (d4) and runs on the real clock. The
+       seed `team` clock below stays for the sections still on the seeds —
+       Operations, the attention list, the planning signals. */
+    teamLive: { kind: "live", today: real, label: "live · " + fmtDate(real) },
     /* The executive snapshot's money and health (live.ts) run on the real
        clock; `finance` stays the seed clock for the sections still on seeds. */
     money: { kind: "live", today: real, label: "live · " + fmtDate(real) },
@@ -82,13 +89,21 @@ export function clocks(): { deals: Clock; finance: Clock; team: Clock; money: Cl
    `off` when the Team section is not in this session's access (the control
    never showed there), then `loading` -> `ready` or `error`. */
 export type DeptState = "off" | "loading" | "ready" | "error";
-interface Departments { names: string[]; rolesOf: Map<string, string[]>; state: DeptState }
+interface Departments {
+  names: string[]; rolesOf: Map<string, string[]>;
+  /** The roster itself, kept rather than thrown away: the Team table is one
+   *  row per active account (d4), and this is the same read. */
+  people: AdminUserRow[];
+  state: DeptState;
+}
 const NO_ROLES = new Map<string, string[]>();
+const NO_PEOPLE: AdminUserRow[] = [];
 
 function useDepartments(enabled: boolean): Departments {
-  const [d, setD] = useState<Departments>({ names: [], rolesOf: NO_ROLES, state: enabled ? "loading" : "off" });
+  const [d, setD] = useState<Departments>({
+    names: [], rolesOf: NO_ROLES, people: NO_PEOPLE, state: enabled ? "loading" : "off" });
   useEffect(() => {
-    if (!enabled) { setD({ names: [], rolesOf: NO_ROLES, state: "off" }); return; }
+    if (!enabled) { setD({ names: [], rolesOf: NO_ROLES, people: NO_PEOPLE, state: "off" }); return; }
     let live = true;
     setD((x) => ({ ...x, state: "loading" }));
     Promise.all([call(AdminOpsService.listRoles()), call(AdminOpsService.users())])
@@ -97,12 +112,12 @@ function useDepartments(enabled: boolean): Departments {
         const rolesOf = new Map<string, string[]>();
         users.forEach((u) => rolesOf.set(String(u.id), (u.roles || []).map((r) => r.name)));
         const names = roles.roles.map((r) => r.name).sort((a, b) => a.localeCompare(b));
-        setD({ names, rolesOf, state: "ready" });
+        setD({ names, rolesOf, people: users, state: "ready" });
       })
       /* A refusal (no roles.view) and a failed request land here alike: no
          options, and the control says it could not load rather than showing
          seed departments in their place. */
-      .catch(() => { if (live) setD({ names: [], rolesOf: NO_ROLES, state: "error" }); });
+      .catch(() => { if (live) setD({ names: [], rolesOf: NO_ROLES, people: NO_PEOPLE, state: "error" }); });
     return () => { live = false; };
   }, [enabled]);
   return d;
@@ -112,7 +127,7 @@ export interface OverviewData {
   gates: { deals: boolean; finance: boolean; payroll: boolean; team: boolean; enquiries: boolean };
   api: DealsApiState;
   clocks: ReturnType<typeof clocks>;
-  periods: { deals: Period; finance: Period; team: Period; money: Period };
+  periods: { deals: Period; finance: Period; team: Period; teamLive: Period; money: Period };
   deals: DealMetrics | null;
   fin: FinanceMetrics | null;
   /** Collected + Receivable for the executive snapshot, from the backend
@@ -121,7 +136,11 @@ export interface OverviewData {
   moneyState: LiveState;
   retryLive: () => void;
   pay: Payroll | null;
+  /** The seed metrics, still read by Operations, the attention list and the
+   *  signals. The Team TABLE reads `teamTable` below (d4). */
   team: TeamMetrics | null;
+  teamTable: LiveTeamTable | null;
+  teamState: LiveState;
   intake: { today: number; week: number } | null;
   health: HealthCell[];
   attention: AttentionItem[];
@@ -150,6 +169,7 @@ export function useOverview(p: Params): OverviewData {
     deals: periodFor(p.period, ck.deals.today, p.from, p.to),
     finance: periodFor(p.period, ck.finance.today, p.from, p.to),
     team: periodFor(p.period, ck.team.today, p.from, p.to),
+    teamLive: periodFor(p.period, ck.teamLive.today, p.from, p.to),
     money: periodFor(p.period, ck.money.today, p.from, p.to),
   }), [p.period, p.from, p.to, ck]);
   const live = useLive(periods.money, { money: gates.finance, team: gates.team });
@@ -191,6 +211,11 @@ export function useOverview(p: Params): OverviewData {
   const teamLive = useMemo(
     () => (live.team === "ready" ? liveTeam(live.raw, p.dept || undefined, dept.rolesOf) : null),
     [live.team, live.raw, p.dept, dept.rolesOf]);
+  const teamTable = useMemo(
+    () => (live.team === "ready" && dept.state === "ready"
+      ? liveTeamRows(live.raw, dept.people, p.dept || undefined, dept.rolesOf, owners, ck.teamLive.today)
+      : null),
+    [live.team, live.raw, dept.state, dept.people, p.dept, dept.rolesOf, owners, ck]);
   const health = useMemo(
     () => liveHealth(deals, money, live.money, teamLive, live.team),
     [deals, money, live.money, teamLive, live.team]);
@@ -200,6 +225,10 @@ export function useOverview(p: Params): OverviewData {
   const s = getSession();
   return {
     gates, api, clocks: ck, periods, deals, fin, pay, team,
+    teamTable,
+    /* The table needs BOTH reads: the roster (roles + users) and the period's
+       attendance and tasks. Whichever is still answering decides the state. */
+    teamState: dept.state === "error" ? "error" : dept.state === "loading" ? "loading" : live.team,
     money, moneyState: live.money, retryLive: live.retry,
     intake: gates.enquiries ? intake : null,
     health, attention, signals,

@@ -2,11 +2,11 @@
    Overview — team intelligence and operational health. Who is performing,
    who is carrying too much, and where execution is blocked on a person.
    ============================================================================= */
-import { Avatar, Card, Eyebrow, ListTable, Meter, Rail } from "../../ui";
-import { labelOf, ATT_STATE } from "../Team/store";
+import { Avatar, Card, Eyebrow, ListSkeleton, ListTable, Meter, Rail } from "../../ui";
 import type { TeamMetrics } from "./derive";
 import { Empty, Gone, Go, Money, Section, StatLine, Stamp, Tip, rowLink } from "./bits";
 import type { OverviewData } from "./store";
+import { Retry } from "./top";
 
 /** The one figure on this page that is a JUDGEMENT rather than a count, so it
  *  is the one that carries a colour. No bar, no ramp — three bands and the
@@ -17,13 +17,20 @@ function OnTime({ v }: { v: number | null }) {
 }
 
 export function TeamIntel({ d }: { d: OverviewData }) {
-  const t = d.team;
+  /* The roster, the attendance and the tasks come from the backend on the real
+     clock (d4). `d.team` — the seed metrics — is still what Operations below
+     reads, and is not touched here. */
+  const t = d.teamTable;
   return (
     <Section id="ov-team" title="Team" tip="teamtable"
-      desc={t ? t.members.length + " active · " + t.done + " task" + (t.done === 1 ? "" : "s") + " completed " + d.periods.team.label : undefined}
-      right={t ? <><Stamp clock={d.clocks.team} /><Go to="#/team">Members</Go></> : null}>
-      {!t ? (
-        <Card tight><Gone what="Team" needs="tasks and attendance access" /></Card>
+      desc={t ? t.members.length + " active · " + t.done + " task" + (t.done === 1 ? "" : "s") + " completed " + d.periods.teamLive.label : undefined}
+      right={t ? <><Stamp clock={d.clocks.teamLive} /><Go to="#/team">Members</Go></> : null}>
+      {!d.gates.team ? (
+        <Card tight><Gone what="Team" needs="tasks, attendance and team access" /></Card>
+      ) : d.teamState === "loading" ? (
+        <Card tight><ListSkeleton rows={5} /></Card>
+      ) : !t ? (
+        <Card tight><Empty title="The team did not load." why={<Retry onPress={d.retryLive} />} /></Card>
       ) : !t.rows.length ? (
         <Card tight><Empty title="No active members in this department." why="Clear the department filter to see everyone." /></Card>
       ) : (
@@ -59,7 +66,7 @@ export function TeamIntel({ d }: { d: OverviewData }) {
                     <span className="flex min-w-0 flex-col leading-tight">
                       <span className="max-w-48 truncate">{r.m.name}</span>
                       <span className="cell-2 max-w-48 truncate">
-                        {r.m.designation}{r.state ? " · " + labelOf(ATT_STATE, r.state).toLowerCase() : ""}
+                        {r.m.designation}{r.stateLabel ? " · " + r.stateLabel.toLowerCase() : ""}
                       </span>
                     </span>
                   </span>
