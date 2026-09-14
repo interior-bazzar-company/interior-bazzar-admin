@@ -28,9 +28,9 @@ import { Assumed, ClassPill, Completeness, ProtoBar, TagChips } from "./bits";
 import EditProfile from "./EditProfile";
 import { DeactivateModal, NoteModal, TagsModal } from "./Modals";
 import {
-  PROFILE_FIELDS, PROFILE_SCHEMA_VERSION, VOCAB,
+  PROFILE_FIELDS, VOCAB,
   ago, facetLabel, fmtDate, fmtDateTime, labelsFor, primaryCityOf, profileUrl,
-  resetStore, useTimeline, useUsersPageState,
+  resetStore, useTimeline, useUserRecord, useUsersPageState,
 } from "./store";
 import type { Params, ProfileField, TargetArea, UserRow } from "./store";
 
@@ -47,10 +47,6 @@ const DOT: Record<string, "sys" | "bad" | "ok" | "warn" | "info" | "brand"> = {
   sys: "sys", ok: "ok", warn: "warn", stop: "bad", bad: "bad", info: "info",
 };
 
-/* Everything but the two fields that get their own drawing: the address, which
-   is a link, and the service areas, which are a table. */
-const FACT_FIELDS = PROFILE_FIELDS.filter((f) => f.type !== "handle" && f.type !== "areas");
-
 export default function Detail({ id, p, rows, onParams }: {
   id: string;
   p: Params;
@@ -62,6 +58,7 @@ export default function Detail({ id, p, rows, onParams }: {
   const { go: navGo } = useNav();
   const row = rows.filter((r) => r.user.userId === id)[0] || null;
   const timeline = useTimeline(row ? row.user.userId : null);
+  const record = useUserRecord(row ? row.user.userId : null);
   const listing = useUsersPageState();
   const tab = p.tab || "profile";
 
@@ -97,6 +94,10 @@ export default function Detail({ id, p, rows, onParams }: {
   }
 
   const u = row.user;
+  /* Everything but the two fields that get their own drawing: the address, which
+     is a link, and the service areas, which are a table. Read at render: the
+     schema arrives from the server after this module loads. */
+  const FACT_FIELDS = PROFILE_FIELDS.filter((f) => f.type !== "handle" && f.type !== "areas");
   const writable = can("users", "edit");
   const off = u.userStatus === "deactivated";
   const city = primaryCityOf(u.profile);
@@ -172,12 +173,15 @@ export default function Detail({ id, p, rows, onParams }: {
       />
 
       {/* ======================================================== profile === */}
+      {tab === "profile" && record.loading ? <Notice tone="info" text="Loading the business profile…" /> : null}
+      {tab === "profile" && record.error
+        ? <Notice tone="bad" ico="alert" text={<>The business profile did not load: {record.error}</>} /> : null}
       {tab === "profile" ? (
         <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
           <div className="flex flex-col gap-4 lg:col-span-2">
             <Card
               title="Business profile"
-              sub={PROFILE_SCHEMA_VERSION}
+              sub={u.accountUsername}
               right={row.completeness === null
                 ? <span className="text-sm text-tertiary">No business profile</span>
                 : <Completeness pct={row.completeness} missing={row.missingFields} />}

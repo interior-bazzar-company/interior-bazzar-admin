@@ -574,8 +574,30 @@ export interface PlatformUserItem {
   profile: { username: string | null; targetAreas: { state: string; cities: string[] }[] };
   tags: { slug: string }[];
   completeness: number | null;
+  /** The go-live checklist items the graded entity has not met, by label. */
+  missingFields?: string[];
 }
 export interface PlatformUsersPage { users: PlatformUserItem[]; total: number; pageNo: number; pageSize: number }
+
+/** A stored value and the label the server gives it. */
+export interface ValueLabel { value: string; label: string }
+/** GET v1/admin/platform-users/<pk>/ — the row above plus the account's login
+ *  username and the business profile it holds (a business first, else a shop). */
+export interface PlatformUserRecord extends PlatformUserItem {
+  accountUsername: string;
+  deactivatedReason: string | null;
+  deactivatedAt: string | null;
+  profile: PlatformUserItem["profile"] & {
+    businessName: string | null;
+    businessType: ValueLabel[];
+    dealsIn: ValueLabel[];
+    segments: ValueLabel[];
+    categories: ValueLabel[];
+    searchKeywords: ValueLabel[];
+    positioning: ValueLabel[];
+    about: string | null;
+  };
+}
 
 export interface UsersVocabularies {
   classifications: VocabItem[];
@@ -584,6 +606,8 @@ export interface UsersVocabularies {
   cities: string[];
   registeredRanges: { key: string; label: string }[];
   sortOptions: { key: string; label: string }[];
+  /** The profile schema rows (the ProfileField shape the Users store reads). */
+  profileFields?: Record<string, unknown>[];
 }
 
 /** A plan purchase (TransectionData) as `payments/` returns it. Money is a
@@ -929,6 +953,9 @@ export class AdminOpsService {
    *  so the store owns the one mapping from the panel's URL params to the API's. */
   static platformUsers(query: string) {
     return apiService.getGetApiResponse<PlatformUsersPage>(`${base}/platform-users/${query}`);
+  }
+  static platformUser(pk: number) {
+    return apiService.getGetApiResponse<PlatformUserRecord>(`${base}/platform-users/${pk}/`);
   }
 
   // ── Businesses ──

@@ -30,7 +30,9 @@ import vocabDoc from "../../../content/users/vocabularies.json";
 import analyticsDoc from "../../../content/users/analytics.json";
 import auditDoc from "../../../content/users/audit.json";
 import AdminOpsService, { call } from "../../../api/modules/adminOps";
-import type { AuditEntry, PlatformUserItem, PlatformUsersPage, UsersVocabularies } from "../../../api/modules/adminOps";
+import type {
+  AuditEntry, PlatformUserItem, PlatformUserRecord, PlatformUsersPage, UsersVocabularies, ValueLabel,
+} from "../../../api/modules/adminOps";
 import { AdminService } from "../../../api/modules/admin";
 import type { UserTotals } from "../../../api/modules/admin";
 import { errMessage } from "../../../api/apiService";
@@ -67,6 +69,8 @@ export interface UserProfile {
      search all key on. searchKeywords holds raw text because it is the one
      facet whose whole job is the tail nobody thought to enumerate. */
   businessType: string | null;
+  /** products · services -- what the business sells. */
+  dealsIn: string[];
   segments: string[];
   categories: string[];
   searchKeywords: string[];
@@ -118,6 +122,10 @@ export interface PlatformUser {
    *  Absent, the row is graded here against the profile schema (the offline
    *  checks plant rows like that). */
   completeness?: number | null;
+  /** Server rows only: the go-live checklist items that score is still short of. */
+  missingFields?: string[];
+  /** The account's login username. Only once the record read has landed. */
+  accountUsername?: string;
 }
 
 export interface AuditEvent {
@@ -217,7 +225,9 @@ export interface ProfileField {
   chip?: string;
   hint?: string;
 }
-export const PROFILE_FIELDS = vocabDoc.profileFields as unknown as ProfileField[];
+/* FROM THE SERVER (users/vocabularies/ `profileFields`), planted by
+   applyUsersVocab like the six lists below -- empty until that read lands. */
+export let PROFILE_FIELDS: ProfileField[] = [];
 
 export interface FacetOption { key: string; label: string; hint?: string; group?: string }
 export interface FacetGroup { key: string; label: string; note?: string }
@@ -262,10 +272,17 @@ export const optionsFor = (f: ProfileField): FacetOption[] =>
 export const groupsFor = (f: ProfileField): FacetGroup[] =>
   (f.groups && VOCAB_GROUPS[f.groups]) || [];
 
+/** Labels the SERVER gave the values on the records it has sent, by value --
+ *  they win over the bundled lists (the record's chips say what the backend says).
+ *  ponytail: one flat map across facets -- a value two lists label differently
+ *  would show the last one read; key it by facet if that ever happens. */
+const SERVER_LABELS: Record<string, string> = {};
+
 /** A stored key rendered for a human. Falls back to the key rather than to an
  *  empty cell: a value the vocabulary has since dropped is still a fact about
  *  this profile, and blanking it would hide a migration that needs doing. */
 export function facetLabel(vocab: string, key: string): string {
+  if (SERVER_LABELS[key]) return SERVER_LABELS[key];
   const hit = (VOCABS[vocab] || []).filter((o) => o.key === key)[0];
   return hit ? hit.label : key;
 }
@@ -280,7 +297,8 @@ export const labelsFor = (f: ProfileField, keys: string[]): string[] =>
  *  placeholder rather than to the string "undefined" in front of a customer. */
 export function profileUrl(username: string): string {
   const base = String(config.FRONTEND_URL || "").replace(/\/+$/, "");
-  return (base || "https://interiorbazzar.com") + USERNAME_RULES.path + username;
+  /* The storefront's business page is /b/:slug (frontend app.ts BUSINESS_DETAIL). */
+  return (base || "https://interiorbazzar.com") + "/b/" + username;
 }
 
 /** Lower-case, hyphens for runs of anything else. What a person typing their
@@ -614,10 +632,10 @@ export function completenessOf(p: UserProfile): { pct: number; missing: string[]
 
 export function toRow(user: PlatformUser): UserRow {
   /* A SERVER ROW IS NOT RE-GRADED. Its score is the go-live checklist the
-     engine persists, and it carries no per-field list, so "what is missing" is
-     empty rather than a guess made from fields the list never sent. */
+     engine persists, and "what is missing" is that checklist's unmet items as
+     the server sent them -- not a guess made from profile fields. */
   const { pct, missing } = user.completeness !== undefined
-    ? { pct: user.completeness, missing: [] as string[] }
+    ? { pct: user.completeness, missing: user.missingFields || [] }
     : completenessOf(user.profile);
   return {
     user,
@@ -834,6 +852,7 @@ export function applyUsersVocab(v: UsersVocabularies): void {
   CITIES = (v.cities || []).map((c) => ({ key: c, label: c }));
   REGISTERED_RANGES = v.registeredRanges || [];
   SORT_OPTIONS = v.sortOptions || [];
+  PROFILE_FIELDS = (v.profileFields || []) as unknown as ProfileField[];
 }
 
 export async function bootUsersVocab(force = false): Promise<void> {
@@ -912,13 +931,14 @@ function fromServer(r: ServerUserItem): PlatformUser {
     profile: {
       profileId: "", schemaVersion: "", profileStatus: "",
       username: r.profile.username, about: null, businessName: null, businessType: null,
-      segments: [], categories: [], searchKeywords: [],
+      dealsIn: [], segments: [], categories: [], searchKeywords: [],
       targetAreas: r.profile.targetAreas, positioning: [], updatedBy: null, updatedAt: null,
     },
     tags: r.tags.map((t) => ({ slug: t.slug, assignedBy: "", assignedAt: "" })),
     notes: [],
     commercial: { salesOwner: null, dealRefs: [], invoiceRefs: [] },
     completeness: r.completeness,
+    missingFields: r.missingFields || [],
   };
 }
 
@@ -961,6 +981,64 @@ export function useUsersPage(p: Params): UsersPageState {
 export function useUsersPageState(): UsersPageState {
   useVersion();
   return pageState;
+}
+
+/* =================================================== the record, live ===
+   `GET /admin/platform-users/<pk>/` — the row plus the business profile the
+   seller filled in and the account's login username. Read each time a record
+   opens and merged INTO the loaded row, so the header, the tabs and the edit
+   form all read one user. Chips keep their stored values; the server's labels
+   go to SERVER_LABELS, which `facetLabel` prefers. */
+export interface RecordState { userId: string | null; loading: boolean; error: string | null }
+
+let recordState: RecordState = { userId: null, loading: false, error: null };
+
+const valuesOf = (list: ValueLabel[] | undefined) => {
+  (list || []).forEach((c) => { SERVER_LABELS[c.value] = c.label; });
+  return (list || []).map((c) => c.value);
+};
+
+/** Merges one record into the snapshot (and the held page Reset returns to). */
+export function applyUserRecord(r: PlatformUserRecord): void {
+  const p = r.profile;
+  const merge = (u: PlatformUser): PlatformUser => u.userId !== r.userId ? u : {
+    ...fromServer(r),
+    notes: u.notes, tags: u.tags,
+    accountUsername: r.accountUsername,
+    profile: {
+      ...fromServer(r).profile,
+      businessName: p.businessName, about: p.about,
+      businessType: valuesOf(p.businessType)[0] || null,
+      dealsIn: valuesOf(p.dealsIn), segments: valuesOf(p.segments), categories: valuesOf(p.categories),
+      searchKeywords: valuesOf(p.searchKeywords), positioning: valuesOf(p.positioning),
+    },
+  };
+  heldUsers = heldUsers.map(merge);
+  snap = { ...snap, users: snap.users.map(merge) };
+}
+
+/** Reads the open record once per mount (a dev double-mount shares the flight). */
+export function useUserRecord(userId: string | null): RecordState {
+  useVersion();
+  useEffect(() => {
+    const pk = Number((/^IB-U-(\d+)$/.exec(userId || "") || [])[1]);
+    if (!pk || (recordState.userId === userId && recordState.loading)) return;
+    recordState = { userId, loading: true, error: null };
+    emit();
+    call<PlatformUserRecord>(AdminOpsService.platformUser(pk))
+      .then((r) => {
+        if (recordState.userId !== userId) return;
+        applyUserRecord(r);
+        recordState = { userId, loading: false, error: null };
+        emit();
+      })
+      .catch((e) => {
+        if (recordState.userId !== userId) return;
+        recordState = { userId, loading: false, error: errMessage(e) };
+        emit();
+      });
+  }, [userId]);
+  return recordState.userId === userId ? recordState : { userId, loading: !!userId, error: null };
 }
 
 /* ============================================================== hooks === */

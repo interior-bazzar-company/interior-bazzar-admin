@@ -70,6 +70,7 @@ S.applyUsersVocab({
   cities: vocab.cities.map((c) => c.key),
   registeredRanges: vocab.registeredRanges,
   sortOptions: vocab.sortOptions,
+  profileFields: vocab.profileFields,   // the server seeds its table from these rows verbatim
 });
 
 /* THE ROWS COME FROM THE SERVER NOW TOO (GET /admin/platform-users/), so the
@@ -925,7 +926,7 @@ S.resetStore();
   ok("every seeded handle is well formed", names.filter((n) => S.usernameError(n)), []);
   ok("...and no two profiles share one", names.length, new Set(names).size);
   ok("the profile URL is built on the storefront, not the API",
-    S.profileUrl("meera-studio").indexOf(S.USERNAME_RULES.path + "meera-studio") > 0, true);
+    S.profileUrl("meera-studio").indexOf("/b/meera-studio") > 0, true);
   ok("...and degrades to a readable host rather than the string `undefined`",
     S.profileUrl("meera-studio").indexOf("undefined") < 0, true);
 
