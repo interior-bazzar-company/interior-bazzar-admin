@@ -891,17 +891,21 @@ function queryOf(p: Params): string {
   return parts.length ? "?" + parts.join("&") : "";
 }
 
+/** The two keys the row gained after `PlatformUserItem` was written. Declared
+ *  here because the api module is another route's open work right now. */
+type ServerUserItem = PlatformUserItem & { deactivatedReason?: string | null; deactivatedAt?: string | null };
+
 /** A server row in the directory's own shape. Everything the list does not send
  *  is EMPTY -- no invented values -- and fills in as the record's divs move. */
-function fromServer(r: PlatformUserItem): PlatformUser {
+function fromServer(r: ServerUserItem): PlatformUser {
   return {
     userId: r.userId,
     authUserId: "",
     registrationSource: "",
     userStatus: r.userStatus,
     registeredAt: r.registeredAt || "",
-    deactivatedAt: null,
-    deactivatedReason: null,
+    deactivatedAt: r.deactivatedAt ?? null,
+    deactivatedReason: r.deactivatedReason ?? null,
     lastActivityAt: r.lastActivityAt,
     identity: { name: r.identity.name, email: r.identity.email, emailVerified: false,
                 phone: r.identity.phone, phoneVerified: false },
@@ -982,10 +986,9 @@ export function useAllRows(): UserRow[] {
    not exist -- and it starts filling in by itself the day the directory moves
    onto real accounts, with no edit here.
 
-   THE REFERENCE IS THE EMAIL, falling back to the record id. Backend accounts
-   are keyed by username and v3 usernames ARE the email, so this is the field
-   most likely to resolve once the users are real; the endpoint also takes the
-   pk and the `unique_id` UUID, and tries each in turn. */
+   THE REFERENCE IS THE PK, read back out of `IB-U-<pk>`. The endpoint takes the
+   pk, the `unique_id` UUID or the username; the profile email only matched the
+   username on 2 of 167 accounts, and `IB-U-<pk>` itself is refused by design. */
 
 /** The panel's own `type` for one server entry. The registration line maps
  *  onto the vocabulary's REGISTERED so it keeps its label and its tone; every
@@ -1020,8 +1023,7 @@ export function useTimeline(userId: string | null): AuditEvent[] {
   const [rows, setRows] = useState<AuditEvent[]>([]);
   useEffect(() => {
     if (!userId) { setRows([]); return; }
-    const user = snap.users.filter((u) => u.userId === userId)[0];
-    const ref = (user && user.identity.email) || userId;
+    const ref = (/^IB-U-(\d+)$/.exec(userId) || [])[1] || userId;
     let live = true;
     void (async () => {
       try {
