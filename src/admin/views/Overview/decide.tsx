@@ -4,10 +4,11 @@
    one action each. Planning Signals is the last thing read, and looks ahead.
    ============================================================================= */
 import { useState } from "react";
-import { Button, Tile } from "../../ui";
+import { Button, ListSkeleton, Notice, Tile } from "../../ui";
 import { Spark } from "../charts";
 import { AttnRow, Empty, Go, Section } from "./bits";
 import type { OverviewData } from "./store";
+import { Retry } from "./top";
 
 const SHOW = 8;
 
@@ -24,11 +25,23 @@ export function Attention({ d }: { d: OverviewData }) {
   return (
     <Section id="ov-attention" title="Needs attention" tip="attention"
       desc={items.length ? bad + " urgent · " + warn + " to watch · " + (items.length - bad - warn) + " to note" : undefined}>
-      {!items.length ? (
+      {/* The list reads the backend (d6): nothing is ranked until every source
+          has answered, and a source that failed says so rather than leaving
+          its rows silently out of an "all clear". */}
+      {d.attentionState === "loading" ? (
+        <ListSkeleton rows={4} />
+      ) : d.attentionState === "error" && !items.length ? (
+        <Empty title="What needs you did not load." why={<Retry onPress={d.retryAttention} />} />
+      ) : !items.length ? (
         <Empty title="Nothing needs you right now." tone="ok"
           why="No stalled deal, failed payment, overdue urgent task or unread report across what you can see." />
       ) : (
         <>
+          {d.attentionState === "error" ? (
+            <Notice tone="warn" text="Some sources did not load, so this list may be missing rows.">
+              {" "}<Retry onPress={d.retryAttention} />
+            </Notice>
+          ) : null}
           <ol className="flex flex-col gap-2">
             {shown.map((i) => (
               <li key={i.id}>

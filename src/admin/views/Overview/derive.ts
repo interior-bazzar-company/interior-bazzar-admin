@@ -424,8 +424,29 @@ const bigLine = (deals: DealMetrics) => {
   return vs.length >= 4 ? vs[Math.floor(vs.length / 4)] : 0;
 };
 
-export function attentionItems(deals: DealMetrics | null, fin: FinanceMetrics | null, pay: Payroll | null,
-  team: TeamMetrics | null, today: string): AttentionItem[] {
+/** Only what the attention rules read (overview/d6), so the live sources fit:
+ *  finance and payroll from financeLive.ts, the team from live.ts attentionTeam. */
+export interface AttentionMoney {
+  failed: { n: number; paise: number }; overdue: { n: number; paise: number };
+  refundsOwed: { n: number; paise: number }; refundsOpen: number;
+  bankUnexplained: number; matched: number | null;
+  cur: { collectedPaise: number; otherInPaise: number }; prev: { collectedPaise: number; otherInPaise: number };
+}
+export interface AttentionPay { openRun: string | null; owedPaise: number; people: number; openRunPaise: number }
+interface Named { memberId: string; name: string }
+export interface AttentionTeam {
+  members: Named[];
+  rows: { m: Named; open: number; late: number }[];
+  attention: {
+    delayed: { itemId: string; title: string; assigneeId: string; priority: string; dueDate: string | null }[];
+    noEod: { member: { name: string } }[]; noPlan: { member: { name: string } }[]; unacknowledged: unknown[];
+  };
+  today: { unclosed: number };
+  leave: { total: number; unrouted: unknown[] };
+  expiring: { agreementId: string; memberId: string; title: string; expiresAt: string | null; state: string }[];
+}
+export function attentionItems(deals: DealMetrics | null, fin: AttentionMoney | null, pay: AttentionPay | null,
+  team: AttentionTeam | null, today: string): AttentionItem[] {
   const out: AttentionItem[] = [];
   const push = (i: Omit<AttentionItem, "rank"> & { rank?: number }) => out.push({ rank: 0, ...i });
 

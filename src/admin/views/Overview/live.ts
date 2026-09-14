@@ -18,8 +18,9 @@
                  on time = present and not late.
      Delivery    every task: delayed over open (not completed / cancelled).
 
-   The rest of the page (Finance section, attention list, signals) still reads
-   the seed stores through `fin` / `team` in store.ts and is untouched here.
+   The Finance section (d5) reads financeLive.ts and the attention list (d6)
+   reads both files; the planning signals still read the seed stores through
+   `fin` / `team` in store.ts.
 
    Nothing is invented: a source that has not answered is `loading`, a refusal
    or failure is `error`, and no rows is a real zero or the health cell's own
@@ -28,11 +29,11 @@
 import { useEffect, useState } from "react";
 import AdminOpsService, { call } from "../../../api/modules/adminOps";
 import type {
-  AdminUserRow, AttendanceDayRow, DealPaymentRow, IncomeRow, InstallmentRow, PlanPaymentRow, PlanPaymentsListResponse,
-  WorkItemRow,
+  AdminUserRow, AgreementRow, AttendanceDayRow, DailyPlanRow, DailyReportRow, DealPaymentRow, IncomeRow, InstallmentRow,
+  LeaveRow, PlanPaymentRow, PlanPaymentsListResponse, WorkItemRow, WorkSettingsRow,
 } from "../../../api/modules/adminOps";
-import { healthOf, todayLocal } from "./derive";
-import type { DealMetrics, HealthCell, OwnerStat, Period } from "./derive";
+import { addDays, healthOf, todayLocal } from "./derive";
+import type { AttentionTeam, DealMetrics, HealthCell, OwnerStat, Period } from "./derive";
 
 export type LiveState = "off" | "loading" | "ready" | "error";
 
@@ -222,6 +223,85 @@ export function liveTeamRows(r: Raw, people: AdminUserRow[], dept: string | unde
     members: rows.map((x) => x.m), rows,
     maxOpen: Math.max(0, ...rows.map((x) => x.open)),
     done: r.doneWork.filter((i) => ids.indexOf(String(i.assignee.id)) >= 0).length,
+  };
+}
+
+/* -------------------------------------------------------------- attention --- */
+/** The attention list's team rows beyond what the table already reads
+ *  (overview/d6): today's plans, reports and attendance, leave waiting,
+ *  agreements running out within a week, and who answers to whom.
+ *
+ *  Each read is asked only when the session may see everybody's -- plans and
+ *  reports on reports.acknowledge, the rest on full access -- and `asked`
+ *  remembers which, so a read that was never made cannot turn into "nobody
+ *  filed a plan". */
+interface AttnRaw {
+  asked: { reports: boolean; full: boolean };
+  plans: DailyPlanRow[]; reports: DailyReportRow[]; days: AttendanceDayRow[]; leave: LeaveRow[];
+  agreements: AgreementRow[]; settings: WorkSettingsRow[];
+}
+const ATTN_NONE: AttnRaw = {
+  asked: { reports: false, full: false }, plans: [], reports: [], days: [], leave: [], agreements: [], settings: [] };
+
+export function useAttentionLive(today: string, on: { reports: boolean; full: boolean }) {
+  const [s, setS] = useState<{ state: LiveState; raw: AttnRaw }>(
+    { state: on.reports || on.full ? "loading" : "off", raw: ATTN_NONE });
+  const [nonce, setNonce] = useState(0);
+
+  useEffect(() => {
+    if (!on.reports && !on.full) { setS({ state: "off", raw: ATTN_NONE }); return; }
+    let live = true;
+    setS((x) => ({ ...x, state: "loading" }));
+    const day = { start: today, end: today };
+    const none = Promise.resolve([] as never[]);
+    Promise.all([
+      on.reports ? every((n) => call(AdminOpsService.dailyPlans({ member: "all", ...day, pageNo: n, pageSize: 500 })), (r) => r.plans) : none,
+      on.reports ? every((n) => call(AdminOpsService.dailyReports({ member: "all", ...day, pageNo: n, pageSize: 500 })), (r) => r.reports) : none,
+      on.full ? every((n) => call(AdminOpsService.attendanceDays({ member: "all", ...day, pageNo: n, pageSize: 1000 })), (r) => r.days) : none,
+      on.full ? every((n) => call(AdminOpsService.leave({ member: "all", state: "requested", pageNo: n, pageSize: 500 })), (r) => r.leave) : none,
+      on.full ? every((n) => call(AdminOpsService.agreements({
+        member: "all", state: "sent,viewed", expiresFrom: today, expiresTo: addDays(today, 7), pageNo: n, pageSize: 500 })), (r) => r.agreements) : none,
+      /* Own row only without full access -- which is then nobody's manager. */
+      call(AdminOpsService.attendanceSettings()).then((r) => r.settings),
+    ]).then(([plans, reports, days, leave, agreements, settings]) => {
+      if (live) setS({ state: "ready", raw: { asked: { ...on }, plans, reports, days, leave, agreements, settings } });
+    }).catch(() => { if (live) setS((x) => ({ ...x, state: "error" })); });
+    return () => { live = false; };
+  }, [today, on.reports, on.full, nonce]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return { ...s, retry: () => setNonce((n) => n + 1) };
+}
+
+/** The team half of attentionItems, off the live reads. Members are the Team
+ *  table's (active, in the department), so every row here is about somebody
+ *  the table lists. The rules are the panel's own (Team/store.ts attentionOf,
+ *  eodDue, leaveQueue): a plan and an EOD are owed only by somebody who reports
+ *  to someone, and an EOD only once their day has closed. */
+export function attentionTeam(a: AttnRaw, work: WorkItemRow[], table: LiveTeamTable, now = new Date()): AttentionTeam {
+  const ids = new Set(table.members.map((m) => m.memberId));
+  const inDept = (id: number) => ids.has(String(id));
+  const settings = new Map(a.settings.map((x) => [String(x.member.id), x]));
+  const clock = String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0");
+  const filed = (rows: { member: { id: number }; submittedAt: string | null }[], id: string) =>
+    rows.some((x) => String(x.member.id) === id && !!x.submittedAt);
+  const owing = a.asked.reports ? table.members.filter((m) => settings.get(m.memberId)?.reportsTo) : [];
+  return {
+    members: table.members,
+    rows: table.rows,
+    attention: {
+      delayed: work.filter((i) => i.delayed && inDept(i.assignee.id)).map((i) => ({
+        itemId: String(i.id), title: i.title, assigneeId: String(i.assignee.id), priority: i.priority?.key, dueDate: i.dueDate })),
+      noPlan: owing.filter((m) => !filed(a.plans, m.memberId)).map((m) => ({ member: m })),
+      noEod: owing.filter((m) => clock > (settings.get(m.memberId)?.autoCloseAt || "20:00") && !filed(a.reports, m.memberId))
+        .map((m) => ({ member: m })),
+      unacknowledged: a.reports.filter((r) => inDept(r.member.id) && !!r.submittedAt && !r.acknowledgedAt),
+    },
+    today: { unclosed: a.days.filter((d) => inDept(d.member.id) && d.state === "unclosed").length },
+    /* The whole queue, as the panel's leaveQueue("all") counted it. Nobody is
+       outside an admin's scope, so nothing is ever "unrouted" from here. */
+    leave: { total: a.leave.length, unrouted: [] },
+    expiring: a.agreements.filter((x) => inDept(x.member.id)).map((x) => ({
+      agreementId: String(x.id), memberId: String(x.member.id), title: x.title, expiresAt: x.expiresAt, state: x.state.key })),
   };
 }
 

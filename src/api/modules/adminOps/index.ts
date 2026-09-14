@@ -591,7 +591,48 @@ export interface IncomeListResponse { income: IncomeRow[]; total: number; pageNo
 export interface WorkItemRow {
   id: number; title: string; assignee: DealPersonRef; status: VocabItem; priority: VocabItem;
   delayed: boolean; startDate: string | null; dueDate: string | null; completedAt: string | null; rowVersion: number;
+  /* overview/d6 */
+  kind: VocabItem; targetValue: number | null; targetUnit: string; tags: WorkTagRef[]; links: WorkLink[];
 }
+export interface WorkTagRef { id: number; slug: string; label: string; tone: VocabItem }
+export interface WorkTagRow extends WorkTagRef { owner: DealPersonRef; createdAt: string; archivedAt: string | null }
+export interface WorkLink { url: string; label: string }
+/** POST work/. `assignee` omitted = the caller; someone else needs work.all.
+ *  Target value + unit only on kind `target`; tags only the assignee's own. */
+export interface WorkCreateInput {
+  title: string; description?: string; assignee?: number; priority?: string; startDate?: string | null;
+  dueDate?: string | null; kind?: string; targetValue?: number | null; targetUnit?: string;
+  tags?: number[]; links?: WorkLink[];
+}
+/* ── who owes a plan / report, leave, agreements (overview/d6) ── */
+export interface WorkSettingsRow {
+  member: DealPersonRef; dayStartsAt: string; graceMinutes: number; expectedHoursPerDay: number;
+  joiningDate: string | null; autoCloseAt: string; timezone: string;
+  /** Who this member answers to; null = nobody. */
+  reportsTo: DealPersonRef | null; updatedAt: string;
+}
+export interface LeaveRow {
+  id: number; member: DealPersonRef; kind: VocabItem; fromDate: string; toDate: string; reason: string;
+  state: VocabItem; decidedBy: DealPersonRef | null; decidedAt: string | null; decisionNote: string; createdAt: string;
+}
+export interface LeaveListResponse { leave: LeaveRow[]; total: number; pageNo: number; pageSize: number }
+export interface DailyPlanRow {
+  id: number; member: DealPersonRef; businessDate: string; expectedOutcome: string; blockers: string; notes: string;
+  submittedAt: string | null; createdAt: string;
+  lines: { id: number; ordinal: number; title: string; priority: VocabItem; workItemId: number | null }[];
+}
+export interface DailyReportRow {
+  id: number; member: DealPersonRef; businessDate: string; pendingWork: string; pendingReason: string;
+  achievement: string; blockers: string; supportNeeded: string; tomorrowPriority: string; notes: string;
+  submittedAt: string | null; acknowledgedBy: DealPersonRef | null; acknowledgedAt: string | null; createdAt: string;
+  lines: { id: number; title: string; done: boolean; targetDelta: number | null; workItemId: number | null }[];
+}
+export interface AgreementRow {
+  id: number; member: DealPersonRef; kind: VocabItem; title: string; version: number; state: VocabItem;
+  sentAt: string | null; sentBy: DealPersonRef | null; viewedAt: string | null; signedAt: string | null;
+  signedName: string; expiresAt: string | null; createdAt: string;
+}
+type Paged<K extends string, T> = { [k in K]: T[] } & { total: number; pageNo: number; pageSize: number };
 export interface WorkListResponse { items: WorkItemRow[]; total: number; pageNo: number; pageSize: number; }
 
 /** interior_admin.AttendanceDay. `state` is derived: working / on_break / ended / unclosed. */
@@ -1276,6 +1317,40 @@ export class AdminOpsService {
     assignee?: string; status?: string; start?: string; end?: string;
     completedFrom?: string; completedTo?: string; role?: string; pageNo?: number; pageSize?: number } = {}) {
     return apiService.getGetApiResponse<WorkListResponse>(`${base}/work/${qs(params)}`);
+  }
+  static createWork(data: WorkCreateInput) {
+    return apiService.getPostApiResponse<WorkItemRow>(`${base}/work/`, data);
+  }
+  /** `owner` omitted = the caller's own tags; an id or `all` needs work.all. */
+  static workTags(params: { owner?: string; includeArchived?: boolean } = {}) {
+    return apiService.getGetApiResponse<{ tags: WorkTagRow[] }>(`${base}/work/tags/${qs(params)}`);
+  }
+  /** An active tag with the same name for the same owner comes back as it is. */
+  static createWorkTag(data: { label: string; tone: string; owner?: number }) {
+    return apiService.getPostApiResponse<WorkTagRow>(`${base}/work/tags/`, data);
+  }
+  /** One value list, whole (interior_admin VocabViews LISTS). */
+  static vocab(name: string) {
+    return apiService.getGetApiResponse<{ items: VocabItem[] }>(`${base}/vocab/${name}/`);
+  }
+  /** Own settings row, or everyone's for full access. */
+  static attendanceSettings() {
+    return apiService.getGetApiResponse<{ settings: WorkSettingsRow[] }>(`${base}/attendance/settings/`);
+  }
+  /** `member` omitted = own; an id or `all` is full access only. `state` = LeaveState keys, comma-separated. */
+  static leave(params: { member?: string; state?: string; start?: string; end?: string; role?: string; pageNo?: number; pageSize?: number } = {}) {
+    return apiService.getGetApiResponse<LeaveListResponse>(`${base}/leave/${qs(params)}`);
+  }
+  /** `member` omitted = own; an id or `all` needs reports.acknowledge. */
+  static dailyPlans(params: { member?: string; start?: string; end?: string; pageNo?: number; pageSize?: number } = {}) {
+    return apiService.getGetApiResponse<Paged<"plans", DailyPlanRow>>(`${base}/daily-plans/${qs(params)}`);
+  }
+  static dailyReports(params: { member?: string; start?: string; end?: string; acknowledged?: boolean; pageNo?: number; pageSize?: number } = {}) {
+    return apiService.getGetApiResponse<Paged<"reports", DailyReportRow>>(`${base}/daily-reports/${qs(params)}`);
+  }
+  /** `member` omitted = own; an id or `all` is full access only. `expiresFrom`/`To` are dates. */
+  static agreements(params: { member?: string; state?: string; expiresFrom?: string; expiresTo?: string; pageNo?: number; pageSize?: number } = {}) {
+    return apiService.getGetApiResponse<Paged<"agreements", AgreementRow>>(`${base}/agreements/${qs(params)}`);
   }
   /** `member` omitted = the caller's own days; an id or `all` is full access only.
    *  `includeMissing` also returns the days nobody opened (absent / not started

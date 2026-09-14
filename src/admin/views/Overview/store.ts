@@ -33,7 +33,7 @@ import {
   attentionItems, dealMetrics, financeMetrics, payrollMetrics, periodFor, planningSignals,
   teamMetrics, todayLocal,
 } from "./derive";
-import { liveHealth, liveMoney, liveTeam, liveTeamRows, useLive } from "./live";
+import { attentionTeam, liveHealth, liveMoney, liveTeam, liveTeamRows, useAttentionLive, useLive } from "./live";
 import type { LiveMoney, LiveState, LiveTeamTable } from "./live";
 import { liveFinance, livePayroll, spanFor, useFinanceLive } from "./financeLive";
 import type { LiveFinance, LivePayroll } from "./financeLive";
@@ -155,7 +155,10 @@ export interface OverviewData {
   teamState: LiveState;
   intake: { today: number; week: number } | null;
   health: HealthCell[];
+  /** Empty while any source it reads is still answering (overview/d6). */
   attention: AttentionItem[];
+  attentionState: LiveState;
+  retryAttention: () => void;
   signals: Signal[];
   retryDeals: () => void;
   ownerOptions: { v: string; l: string }[];
@@ -244,10 +247,34 @@ export function useOverview(p: Params): OverviewData {
   const health = useMemo(
     () => liveHealth(deals, money, live.money, teamLive, live.team),
     [deals, money, live.money, teamLive, live.team]);
-  const attention = useMemo(() => attentionItems(deals, fin, pay, team, ck.team.today), [deals, fin, pay, team, ck]);
+  /* NEEDS ATTENTION ON THE BACKEND, ON THE REAL CLOCK (d6). Deals as before;
+     finance and payroll are the Finance section's own reads (d5); the team
+     rows are the Team table's reads plus today's plans, reports, days, leave
+     and agreements. Nothing is listed until every source it asked has
+     answered, so the count in the header never climbs while you read it. */
+  const s = getSession();
+  const full = !!(s && s.isFullAccess);
+  const held = (key: string, action: string) =>
+    full || !!s?.modules.find((m) => m.key === key)?.actions.includes(action);
+  const attnLive = useAttentionLive(ck.teamLive.today,
+    { reports: gates.team && held("reports", "acknowledge"), full: gates.team && full });
+  const attTeam = useMemo(
+    () => (teamTable && live.team === "ready" && attnLive.state !== "loading" && attnLive.state !== "error"
+      ? attentionTeam(attnLive.raw, live.raw.work, teamTable) : null),
+    [teamTable, live.team, live.raw.work, attnLive.state, attnLive.raw]);
+  const attnStates: LiveState[] = [
+    !gates.deals ? "off" : api.loading ? "loading" : api.error || api.forbidden ? "error" : "ready",
+    finance.state,
+    !gates.team ? "off"
+      : [dept.state, live.team, attnLive.state].some((x) => x === "loading") ? "loading"
+        : [dept.state, live.team, attnLive.state].some((x) => x === "error") ? "error" : "ready",
+  ];
+  const attentionState: LiveState = attnStates.includes("loading") ? "loading" : attnStates.includes("error") ? "error" : "ready";
+  const attention = useMemo(
+    () => (attentionState === "loading" ? [] : attentionItems(deals, finLive, payLive, attTeam, ck.teamLive.today)),
+    [attentionState, deals, finLive, payLive, attTeam, ck]);
   const signals = useMemo(() => planningSignals(deals, fin, pay, team, ck.deals.today), [deals, fin, pay, team, ck]);
 
-  const s = getSession();
   return {
     gates, api, clocks: ck, periods, deals, fin, pay, team,
     finLive, finState: finance.state, payLive, retryFinance: finance.retry,
@@ -257,7 +284,8 @@ export function useOverview(p: Params): OverviewData {
     teamState: dept.state === "error" ? "error" : dept.state === "loading" ? "loading" : live.team,
     money, moneyState: live.money, retryLive: live.retry,
     intake: gates.enquiries ? intake : null,
-    health, attention, signals,
+    health, attention, attentionState, signals,
+    retryAttention: () => { refetchDeals(); live.retry(); finance.retry(); attnLive.retry(); },
     retryDeals: refetchDeals,
     ownerOptions: api.owners.map((o) => ({ v: String(o.id), l: o.name })),
     departments: dept.names,

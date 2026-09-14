@@ -48,15 +48,16 @@ import { BarRows, ColumnChart } from "../charts";
 import { go } from "../../ui/nav";
 import {
   KIND, PRIORITY, PRIORITY_SCALE, TODAY, WORK_STATUS, addDays,
-  blockerOf, checkCount, createItem, createTag, eventsOn, fmtDate, fmtMonth, gridDays,
+  blockerOf, checkCount, eventsOn, fmtDate, fmtMonth, gridDays,
   isDelayed, isTerminal, isWeekend, labelOf, lanesOf, leaveOn, meId, membersInScope, monthStep,
-  normaliseUrl, parentOf, progressOf, readMember, scopeLabel, stageOf, tagsOf, tagsOwnedBy,
+  normaliseUrl, parentOf, progressOf, readMember, scopeLabel, stageOf, tagsOf,
   toneOf, useItem, useMembers, useTags, useWork, workTotals,
 } from "./store";
 import type {
-  Attachment, CalEvent, Member, Priority, Tag, WorkItem, WorkStage,
+  Attachment, CalEvent, Member, Tag, WorkItem, WorkStage,
 } from "./store";
 import { ensureAdopted } from "./adopt";
+import { createWorkItem, createWorkTag, myId, todayReal, useAssignees, useWorkTags, useWorkVocab } from "./liveWork";
 import { MarkBar } from "./marks";
 import { ItemDrawer } from "./Detail";
 import { StatusPicker } from "./status";
@@ -634,8 +635,8 @@ function NewTagField({ ownerId, onMade }: { ownerId: string; onMade: (id: string
   const shell = useShell();
   const [draft, setDraft] = useState("");
   const [tone, setTone] = useState("slate");
-  const add = () => {
-    const r = createTag(ownerId, draft, tone);
+  const add = async () => {
+    const r = await createWorkTag(ownerId, draft, tone);
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
     onMade(r.data.tagId);
     setDraft(""); setTone("slate");
@@ -672,42 +673,51 @@ function NewTagField({ ownerId, onMade }: { ownerId: string; onMade: (id: string
  *  milestone it belongs under is a decision about the SHAPE of the work, and it
  *  is one you usually make after the task exists. It lives on Edit, where
  *  `parentOptions` still enforces target ▸ milestone ▸ task. */
-export function NewItemModal({ kind: initial, members, date }: {
+export function NewItemModal({ kind: initial, date }: {
+  /** Still passed by both callers; the dialog lists the backend's people now. */
   kind: string; members: Member[]; date?: string;
 }) {
   const shell = useShell();
+  /* THE DIALOG READS AND WRITES THE BACKEND (overview/d6). The names the form
+     below reads — members, KIND, PRIORITY, PRIORITY_SCALE, mine — are bound to
+     the live lists here, so the form itself is unchanged. */
+  const members = useAssignees();
+  const { KIND, PRIORITY, PRIORITY_SCALE, failed } = useWorkVocab();
+  useEffect(() => { if (failed) shell.toast("Kinds and priorities did not load.", "bad"); }, [failed]); // eslint-disable-line react-hooks/exhaustive-deps
   const [kind, setKind] = useState(initial);
   const [title, setTitle] = useState("");
-  const [who, setWho] = useState(meId());
+  const [who, setWho] = useState(myId());
   const [pri, setPri] = useState("medium");
   /* A day was clicked: it is both the start and the due date, so the item lands
      on the day somebody pointed at rather than near it. */
   const [start, setStart] = useState(date || "");
-  const [due, setDue] = useState(date || addDays(TODAY, 3));
+  const [due, setDue] = useState(date || addDays(todayReal(), 3));
   const [tv, setTv] = useState("");
   const [tu, setTu] = useState("");
   const [desc, setDesc] = useState("");
   const [links, setLinks] = useState<Attachment[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const ta = useRef<HTMLTextAreaElement | null>(null);
-  useTags();
-  const mine = tagsOwnedBy(who);
+  const mine = useWorkTags(who);
+  const busy = useRef(false);
 
   /* A tag belongs to a member, so handing the item to somebody else cannot
      carry the last person's tags with it. */
   const assign = (id: string) => { setWho(id); setTags([]); };
 
-  const save = () => {
-    if (!title.trim()) return;
-    const r = createItem({
-      title, assigneeId: who, kind: kind as "task" | "milestone" | "target",
-      priority: pri as Priority,
+  const save = async () => {
+    if (!title.trim() || busy.current) return;
+    busy.current = true;
+    const r = await createWorkItem({
+      title, assigneeId: who, kind,
+      priority: pri,
       startDate: start || null, dueDate: due || null,
       description: desc.trim() || null,
       attachments: links, tagIds: tags,
       targetValue: kind === "target" && tv ? Number(tv) : undefined,
       targetUnit: kind === "target" ? tu || undefined : undefined,
     });
+    busy.current = false;
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
     shell.closeLayer();
     shell.toast(r.data.title + " created");
