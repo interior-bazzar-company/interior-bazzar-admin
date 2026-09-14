@@ -38,13 +38,12 @@ import { useShell } from "../../shell/ShellContext";
 import { RoleChips } from "../teamShared";
 import type { Member, Ops, Role } from "../teamShared";
 import MemberPage from "./MemberPage";
-import { adoptPeople } from "./adopt";
-import { DOCUMENT_KIND, labelOf, missingDocs, readMember, readMembers, useMembers, useDocuments } from "./store";
+import { readMember, useMembers } from "./store";
 import { opOf } from "./member/ops";
 import {
   MemberDeleteModal, MemberEditModal, MemberNewModal, MemberRolesModal, MemberSendCredentialsModal,
 } from "./memberModals";
-import AccessRequests, { pendingRequests } from "./AccessRequests";
+import AccessRequests, { pendingRequests, usePendingRequests } from "./AccessRequests";
 
 const CHIP_LABELS = { q: "Search", role: "Role", dept: "Department" };
 const PAGE_SIZE = 25;
@@ -76,18 +75,13 @@ export default function Team() {
   }, [closeLayer, toast, modal, go]);
 
   useMembers();
-  useDocuments();
+  const requests = usePendingRequests();
 
   useEffect(() => {
     let cancelled = false;
     Promise.all([AdminOpsService.users(), AdminOpsService.listRoles()])
       .then(([u, r]) => {
         if (cancelled) return;
-        /* The operational seed puts on the live roster's faces before anything
-           renders against it — see adopt.ts. It is guarded because it must not
-           be able to cost us the list: a re-key that fails leaves the seed's own
-           ids in place, which is a worse demo and a working page. */
-        try { adoptPeople(u.data); } catch { /* the seed keeps its own ids */ }
         setRows(u.data);
         setRoles(r.data.roles);
       })
@@ -184,9 +178,11 @@ export default function Team() {
 
   /* -------------------------------------------------------------- rows -- */
   let list = rows.slice();
-  const depts = uniq(readMembers().map((m) => m.department).filter(Boolean) as string[]);
+  /* DEPARTMENT IS THE ROLE NAME (team/d1): the backend has no department
+     column, and the Overview filter already reads it this way. */
+  const depts = uniq(rows.flatMap((u) => u.roles.map((r) => r.name)));
   if (p.role) list = list.filter((u) => u.roles.some((r) => String(r.id) === p.role));
-  if (p.dept) list = list.filter((u) => (readMember(String(u.id))?.department || "") === p.dept);
+  if (p.dept) list = list.filter((u) => u.roles.some((r) => r.name === p.dept));
   if (p.q) {
     const s = p.q.toLowerCase();
     list = list.filter((u) =>
@@ -194,8 +190,8 @@ export default function Team() {
   }
 
   const noRole = rows.filter((u) => !u.roles.length).length;
-  const noDocs = rows.filter((u) => missingDocs(String(u.id)).length).length;
-  const waiting = pendingRequests();
+  const noDocs = rows.filter((u) => (u.missingDocuments || []).length).length;
+  const waiting = pendingRequests(requests);
   const filtered = !!(p.q || p.role || p.dept);
 
   const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
@@ -301,8 +297,8 @@ export default function Team() {
                           <RoleChips u={u} />
                         </span>
                       </td>
-                      <td><ReportsTo id={String(u.id)} /></td>
-                      <td><DocsCell id={String(u.id)} /></td>
+                      <td><ReportsTo u={u} /></td>
+                      <td><DocsCell u={u} /></td>
                       <td>
                         {u.isActive === false
                           ? <Pill xs dot tone="bad" text="Inactive" />
@@ -338,7 +334,7 @@ export default function Team() {
           )}
         </>
       ) : (
-        <AccessRequests />
+        <AccessRequests q={requests} />
       )}
     </div>
   );
@@ -370,14 +366,15 @@ function RowMenu({ u, roles, ops }: { u: Member; roles: Role[]; ops: Ops }) {
  *  `reportsTo` the leave inbox routes on and the member page derives `senior`
  *  from — a second hierarchy for the word "captain" would give the module two
  *  answers to the same question and they would drift within a month. */
-function ReportsTo({ id }: { id: string }) {
-  const m = readMember(id);
-  if (!m) return <span className="text-quaternary">—</span>;
+function ReportsTo({ u }: { u: Member }) {
+  /* No work-settings row: the server leaves `reportsTo` out, which is "not set
+     up" — not "reports to nobody". */
+  if (!("reportsTo" in u)) return <span className="text-quaternary">—</span>;
   return (
     <>
-      <span className="font-medium text-primary">{m.department || m.designation}</span>
+      <span className="font-medium text-primary">{u.roles.map((r) => r.name).join(", ") || u.designation?.label}</span>
       <span className="block cell-2">
-        {m.reportsTo ? "reports to " + (readMember(m.reportsTo)?.name || "—") : "reports to nobody"}
+        {u.reportsTo ? "reports to " + u.reportsTo.name : "reports to nobody"}
       </span>
     </>
   );
@@ -387,15 +384,14 @@ function ReportsTo({ id }: { id: string }) {
  *  on the member's own page and in the roster filter, and nothing anywhere
  *  blocks on it. Naming which ones are short is what makes the column
  *  actionable — "2 missing" sends somebody hunting. */
-function DocsCell({ id }: { id: string }) {
-  const m = readMember(id);
-  if (!m) return <span className="text-quaternary">—</span>;
-  const missing = missingDocs(id);
+function DocsCell({ u }: { u: Member }) {
+  const missing = u.missingDocuments;
+  if (!missing) return <span className="text-quaternary">—</span>;
   if (!missing.length) return <Pill xs tone="ok" text="Complete" />;
   /* NAMED, BUT NOT ALL OF THEM. "2 missing" sends somebody hunting; four
      document names down a table row is three lines of noise on every row. Two
      names and a count is the trade, and the full list is on the title. */
-  const names = missing.map((k) => labelOf(DOCUMENT_KIND, k));
+  const names = missing.map((d) => d.label);
   return (
     <>
       <Pill xs tone="warn" text={missing.length + " missing"} />

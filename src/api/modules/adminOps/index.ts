@@ -123,6 +123,32 @@ export interface AdminUserRow {
   isActive?: boolean;
   addedAt?: string;
   lastLogin?: string;
+  /** Roster columns (AdminUserTasks._teamFacts, team/d1). `reportsTo` and
+   * `designation` are ABSENT when the member has no work-settings row, and null
+   * when that row says nobody / unset. Department is not a field: it is `roles`. */
+  reportsTo?: { id: number; username: string; name: string } | null;
+  designation?: { key: string; label: string; tone: string } | null;
+  /** Required document kinds this member has not handed over. */
+  missingDocuments?: { key: string; label: string }[];
+}
+/** One row of GET access-requests/ (team/d1): a member asking for one module action. */
+export interface AccessRequestRow {
+  id: number;
+  member: { id: number; username: string; name: string };
+  module: { key: string; label: string };
+  action: string;
+  reason: string;
+  state: { key: string; label: string; tone: string };
+  decidedBy: { id: number; username: string; name: string } | null;
+  decidedAt: string | null;
+  grantedRole: { id: number; name: string } | null;
+  createdAt: string;
+}
+export interface AccessRequestsResponse {
+  requests: AccessRequestRow[];
+  total: number;
+  /** Requests still waiting on a decision, whatever `state` filtered. */
+  pending: number;
 }
 export interface AdminUserInput {
   username: string;
@@ -735,6 +761,10 @@ export class AdminOpsService {
   // ── Team members (interior_admin/urls.py → AdminUserViews) ──
   static users() {
     return apiService.getGetApiResponse<AdminUserRow[]>(`${base}/users/`);
+  }
+  /** GET access-requests/ — team.requests; anyone else gets a 403. */
+  static accessRequests(params: { state?: string } = {}) {
+    return apiService.getGetApiResponse<AccessRequestsResponse>(`${base}/access-requests/${qs(params)}`);
   }
   static user(id: number) {
     return apiService.getGetApiResponse<AdminUserRow>(`${base}/users/${id}`);
