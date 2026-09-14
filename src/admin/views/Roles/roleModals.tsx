@@ -7,7 +7,7 @@
    grid out of `#rlMatrix`, so every `id` below is load-bearing.
    ===================================================================== */
 import { useState } from "react";
-import AdminOpsService from "../../../api/modules/adminOps";
+import AdminOpsService, { call } from "../../../api/modules/adminOps";
 import type { RolesModuleDef } from "../../../api/modules/adminOps";
 import { Alert, Button, FormField, FormSection, Input, ModalShell, SelectInput } from "../../ui";
 import { ActionMatrix, ErrSlot, errOf, readActionMatrix, val } from "../teamShared";
@@ -24,12 +24,18 @@ export function RoleModal({ role, mods, ops }: { role: Role | null; mods: RolesM
     setErr(null);
     try {
       const name = val("rlName");
-      const modules = readActionMatrix();
+      /* Every drawn module is named, unticked ones as []: the server replaces
+         grants only on modules the payload names, so this is what revokes a
+         fully-cleared row — and what leaves the hidden ones (design, payments)
+         alone. */
+      const modules = { ...Object.fromEntries(mods.map((m) => [m.key, [] as string[]])), ...readActionMatrix() };
       const isActive = val("rlStatus") === "active";
-      const res = role
-        ? await AdminOpsService.updateRole(role.id, { name, modules, isActive })
-        : await AdminOpsService.createRole(name, modules, isActive);
-      ops.done(role ? "Role saved." : "Role created.", "#/roles/" + res.data.id);
+      /* call() throws on the 200 `response:false` envelope, so a refusal lands
+         in ErrSlot instead of reading as "Role saved." */
+      const saved = role
+        ? await call(AdminOpsService.updateRole(role.id, { name, modules, isActive }))
+        : await call(AdminOpsService.createRole(name, modules, isActive));
+      ops.done(role ? "Role saved." : "Role created.", "#/roles/" + saved.id);
     } catch (e) {
       setErr(errOf(e));
     } finally {
@@ -92,7 +98,7 @@ export function RoleDeleteModal({ role, ops }: { role: Role; ops: Ops }) {
     setBusy(true);
     setErr(null);
     try {
-      await AdminOpsService.deleteRole(role.id);
+      await call(AdminOpsService.deleteRole(role.id));
       ops.done("Role deleted.", "#/roles");
     } catch (e) {
       setErr(errOf(e));
