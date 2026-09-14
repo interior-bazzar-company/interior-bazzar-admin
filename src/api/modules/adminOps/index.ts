@@ -534,6 +534,23 @@ export interface VocabItem { key: string; label: string; tone: string; hint?: st
  *  filter bar offers. `cities` are the ones on record, folded to one entry per
  *  spelling, so they are a suggestion list and not a closed set. */
 export interface UserTagItem { slug: string; label: string; tone: string; help: string; isActive: boolean }
+/** One row of GET v1/admin/platform-users/ — a platform account (admin and
+ *  staff are not in it) as the Users directory renders it. `userId` is
+ *  "IB-U-<pk>"; `completeness` is null when the account holds no business, shop
+ *  or architect profile to grade. */
+export interface PlatformUserItem {
+  userId: string;
+  pk: number;
+  userStatus: "active" | "deactivated";
+  registeredAt: string | null;
+  lastActivityAt: string | null;
+  identity: { name: string; email: string | null; phone: string | null };
+  profile: { username: string | null; targetAreas: { state: string; cities: string[] }[] };
+  tags: { slug: string }[];
+  completeness: number | null;
+}
+export interface PlatformUsersPage { users: PlatformUserItem[]; total: number; pageNo: number; pageSize: number }
+
 export interface UsersVocabularies {
   classifications: VocabItem[];
   registrationSources: VocabItem[];
@@ -828,6 +845,11 @@ export class AdminOpsService {
   // ── Users (the platform's own accounts, not the admin team) ──
   static usersVocabularies() {
     return apiService.getGetApiResponse<UsersVocabularies>(`${base}/users/vocabularies/`);
+  }
+  /** One page of the directory. `query` is a ready query string ("?status=active&pageNo=2")
+   *  so the store owns the one mapping from the panel's URL params to the API's. */
+  static platformUsers(query: string) {
+    return apiService.getGetApiResponse<PlatformUsersPage>(`${base}/platform-users/${query}`);
   }
 
   // ── Businesses ──

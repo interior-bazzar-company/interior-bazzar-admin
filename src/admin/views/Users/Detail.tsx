@@ -22,7 +22,7 @@ import { useShell } from "../../shell/ShellContext";
 import { can, useNav } from "../../shell/AdminShell";
 import {
   Avatar, Button, Card, EmptyState, Icon, KvList, LinkChip, MoreMenu, Notice,
-  PageHeader, Pill, Table, Tabs, Tag, Timeline, ActivityFeed,
+  PageHeader, PaneLoading, Pill, Table, Tabs, Tag, Timeline, ActivityFeed,
 } from "../../ui";
 import { Assumed, ClassPill, Completeness, ProtoBar, TagChips } from "./bits";
 import EditProfile from "./EditProfile";
@@ -30,7 +30,7 @@ import { DeactivateModal, NoteModal, TagsModal } from "./Modals";
 import {
   PROFILE_FIELDS, PROFILE_SCHEMA_VERSION, VOCAB,
   ago, facetLabel, fmtDate, fmtDateTime, labelsFor, primaryCityOf, profileUrl,
-  resetStore, useTimeline,
+  resetStore, useTimeline, useUsersPageState,
 } from "./store";
 import type { Params, ProfileField, TargetArea, UserRow } from "./store";
 
@@ -62,6 +62,7 @@ export default function Detail({ id, p, rows, onParams }: {
   const { go: navGo } = useNav();
   const row = rows.filter((r) => r.user.userId === id)[0] || null;
   const timeline = useTimeline(row ? row.user.userId : null);
+  const listing = useUsersPageState();
   const tab = p.tab || "profile";
 
   const back = (() => {
@@ -71,6 +72,18 @@ export default function Detail({ id, p, rows, onParams }: {
       .join("&");
     return "#/users" + (keep ? "?" + keep : "");
   })();
+
+  /* NOT FOUND IS A VERDICT, and the page has not answered yet. Until the read
+     lands the loaded rows are empty for EVERY id, so saying "no user at that
+     address" now would be false for most of the links that get here. */
+  if (!row && listing.loading) {
+    return (
+      <div className="flex flex-col gap-4">
+        <ProtoBar />
+        <PaneLoading label="Loading the user…" />
+      </div>
+    );
+  }
 
   if (!row) {
     return (
@@ -165,7 +178,9 @@ export default function Detail({ id, p, rows, onParams }: {
             <Card
               title="Business profile"
               sub={PROFILE_SCHEMA_VERSION}
-              right={<Completeness pct={row.completeness} missing={row.missingFields} />}
+              right={row.completeness === null
+                ? <span className="text-sm text-tertiary">No business profile</span>
+                : <Completeness pct={row.completeness} missing={row.missingFields} />}
             >
               <KvList pairs={([
                 /* The username is an ADDRESS, so on the record it is the thing

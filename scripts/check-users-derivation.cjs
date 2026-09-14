@@ -71,6 +71,16 @@ S.applyUsersVocab({
   registeredRanges: vocab.registeredRanges,
   sortOptions: vocab.sortOptions,
 });
+
+/* THE ROWS COME FROM THE SERVER NOW TOO (GET /admin/platform-users/), so the
+   module starts with no users at all and a clock that is the browser's. This
+   plants the seed as "the page that arrived" and the seed's own instant as the
+   server's date, through the same two setters the live read uses -- so every
+   derivation below is asserted on exactly the path the screens take. Rows planted
+   without a `completeness` key are graded here against the profile schema,
+   which is what this file has always checked. */
+S.applyServerDate(usersDoc.asOf);
+S.applyUsersPage(users);
 const auditDoc = require("../src/content/users/audit.json");
 const all = users.map((u) => S.toRow(u));
 const byId = {};

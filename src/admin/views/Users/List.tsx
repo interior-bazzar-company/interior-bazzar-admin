@@ -13,7 +13,7 @@
    ============================================================================= */
 import { useShell } from "../../shell/ShellContext";
 import {
-  Button, DateRange, EmptyState, FilterChips, ListTable, MoreMenu, Notice, Pagination,
+  Button, DateRange, EmptyState, FilterChips, ListSkeleton, ListTable, MoreMenu, Notice, Pagination,
   Rail, SearchField, Select, Skeleton, StatStrip, copyToClipboard,
 } from "../../ui";
 import type { StatCell } from "../../ui";
@@ -24,8 +24,8 @@ import { ClassPill, Completeness, WhoCell } from "./bits";
 import {
   CITIES, CLASSIFICATIONS, FILTER_LABELS, REGISTERED_RANGES,
   REGISTRATION_SOURCES, SORT_OPTIONS, TAGS, ago, applyFilters, applySort,
-  bandCounts, countsOf, filterValueLabel, fmtDate, paginate, primaryCityOf,
-  profileUrl, useUserTotals, useUsersVocab,
+  bandCounts, countsOf, filterValueLabel, fmtDate, primaryCityOf,
+  profileUrl, useUserTotals, useUsersPageState, useUsersVocab,
 } from "./store";
 import type { Params, UserRow } from "./store";
 
@@ -37,8 +37,15 @@ export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, 
      stale set that would filter on values nobody holds. */
   const vocab = useUsersVocab();
 
-  const filtered = applyFilters(rows, p);
-  const page = paginate(applySort(filtered, p.sort), Number(p.page) || 1);
+  /* THE SERVER FILTERS, SORTS AND PAGES (GET platform-users). `rows` is already
+     the page it sent. If that read FAILED, the rows still held are filtered and
+     sorted here instead, so the list narrows the way the bar says rather than
+     sitting on a page that ignores it -- and the notice below says why. */
+  const listing = useUsersPageState();
+  const pageRows = listing.error ? applySort(applyFilters(rows, p), p.sort) : rows;
+  const page = listing.error
+    ? { rows: pageRows, total: pageRows.length, pageNo: 1, pageSize: Math.max(1, pageRows.length), pages: 1 }
+    : { rows: pageRows, total: listing.total, pageNo: listing.pageNo, pageSize: listing.pageSize, pages: listing.pages };
   /* THE WHOLE STRIP IS THE SERVER'S NOW (v2/total-users). `countsOf` still
      runs -- the table, the record and the analytics tiles read it -- but not a
      figure on this strip comes from it any more. Deactivated is total minus
@@ -150,7 +157,15 @@ export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, 
       </>}
       bands={<StatStrip cells={cells} />}>
 
-      {page.rows.length ? (
+      {listing.error ? (
+        <Notice tone="bad" ico="alert"
+          text={<>The user list did not load — {listing.error}. Showing only the rows already loaded, filtered here.</>} />
+      ) : null}
+
+      {listing.loading && !page.rows.length ? (
+        /* The first read has not landed: the table's shape, not "No registered users yet". */
+        <ListSkeleton rows={8} />
+      ) : page.rows.length ? (
         <ListTable min="66rem" head={<tr>
           <th className="rail" />
           <th>User</th>
@@ -215,7 +230,7 @@ function Row({ r, p, toast }: {
      one thing left in this module worth raising it for: a live account whose
      profile is not finished, which is the one gap somebody here can close.
      A colour per state would turn the table into a paint chart nobody scans. */
-  const rail = r.classification === "active" && r.completeness < 100 ? "warn" : undefined;
+  const rail = r.classification === "active" && r.completeness !== null && r.completeness < 100 ? "warn" : undefined;
   /* THE WHOLE LIST STATE TRAVELS WITH THE LINK — every filter, the sort and the
      page — so the record's Back button is a return and not a reset. */
   const carried = Object.keys(p)
@@ -243,7 +258,13 @@ function Row({ r, p, toast }: {
           : <span className="text-quaternary">—</span>}
       </td>
       <td><ClassPill k={r.classification} /></td>
-      <td><Completeness pct={r.completeness} missing={r.missingFields} bare /></td>
+      <td>
+        {r.completeness === null
+          /* Nothing to grade: no business, shop or architect profile. A bar at
+             0% would read as a profile somebody abandoned. */
+          ? <span className="text-sm text-tertiary">No business profile</span>
+          : <Completeness pct={r.completeness} missing={r.missingFields} bare />}
+      </td>
       <td>
         {city ? (
           <span className="flex min-w-0 flex-col leading-tight">

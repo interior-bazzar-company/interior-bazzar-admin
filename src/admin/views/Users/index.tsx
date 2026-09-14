@@ -30,7 +30,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { hashToPath, usePageChrome } from "../../shell/AdminShell";
 import { qs, TbTitle } from "../../ui";
 import type { Params } from "./store";
-import { FILTER_KEYS, countsOf, useAllRows, useUsersVocab } from "./store";
+import { FILTER_KEYS, countsOf, useAllRows, useUsersPage, useUsersVocab } from "./store";
 import List from "./List";
 import Analytics from "./Analytics";
 import Detail from "./Detail";
@@ -66,6 +66,10 @@ export default function Users() {
   /* `users` is the default and carries no param, so `#/users` is the directory
      rather than a dashboard nobody asked for on the way to it. */
   const view = p.view || "users";
+  /* THE ROWS ARE THE SERVER'S PAGE for the params in the URL, fetched from the
+     host so the directory, the record and the analytics tab all read the same
+     loaded page -- and a record-first load fetches too. */
+  useUsersPage(p);
   const rows = useAllRows();
   /* THE VALUE LISTS, STARTED HERE RATHER THAN ON THE DIRECTORY. A record URL is
      a real address (`/users/<id>`, and `_redirects` serves the SPA for it), so a

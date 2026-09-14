@@ -20,19 +20,17 @@
    now has exactly two answers: active, or deactivated. There is no stored
    classification column in users.json and there must never be one.
 
-   `NOW` is the seed's own `asOf` instant, not the browser clock. Every age and
-   every registration window is computed against it, so the fixture reads the
-   same tomorrow as it does today and a screenshot taken in November still
-   makes sense. The API will send its own `asOf` and this stays the only place
-   that decides what "now" means.
+   `NOW` is the SERVER's date (v2/total-users `asOf`), planted when that read
+   lands; until then it is the browser clock, which is the same day in practice.
+   Every age and every registration window is computed against it, and this
+   stays the only place that decides what "now" means.
    ============================================================================= */
 import { useEffect, useState, useSyncExternalStore } from "react";
-import usersDoc from "../../../content/users/users.json";
 import vocabDoc from "../../../content/users/vocabularies.json";
 import analyticsDoc from "../../../content/users/analytics.json";
 import auditDoc from "../../../content/users/audit.json";
 import AdminOpsService, { call } from "../../../api/modules/adminOps";
-import type { AuditEntry, UsersVocabularies } from "../../../api/modules/adminOps";
+import type { AuditEntry, PlatformUserItem, PlatformUsersPage, UsersVocabularies } from "../../../api/modules/adminOps";
 import { AdminService } from "../../../api/modules/admin";
 import type { UserTotals } from "../../../api/modules/admin";
 import { errMessage } from "../../../api/apiService";
@@ -115,6 +113,11 @@ export interface PlatformUser {
    *  relationship. References, never amounts and never state: this module
    *  records that a deal or an invoice exists and links to it. */
   commercial: { salesOwner: string | null; dealRefs: string[]; invoiceRefs: string[] };
+  /** Present only on a row the SERVER sent: the go-live score it already
+   *  persists, or null when there is no business, shop or architect to grade.
+   *  Absent, the row is graded here against the profile schema (the offline
+   *  checks plant rows like that). */
+  completeness?: number | null;
 }
 
 export interface AuditEvent {
@@ -127,7 +130,8 @@ export interface AuditEvent {
 export interface UserRow {
   user: PlatformUser;
   classification: Classification;
-  completeness: number;
+  /** null = nothing to grade (no business, shop or architect profile). */
+  completeness: number | null;
   missingFields: string[];
 }
 
@@ -510,7 +514,15 @@ export const decision = (id: string) =>
 
 /* ============================================================== clock === */
 
-export const NOW = new Date(usersDoc.asOf).getTime();
+export let NOW = Date.now();
+
+/** Plants the server's "today". A bare date is anchored at NOON so a moment
+ *  from earlier or later that same day still reads "today" through
+ *  `daysBetween`'s rounding; a full instant is taken as it is. */
+export function applyServerDate(asOf: string): void {
+  const t = new Date(/^\d{4}-\d{2}-\d{2}$/.test(asOf) ? asOf + "T12:00:00" : asOf).getTime();
+  if (!isNaN(t)) NOW = t;
+}
 export const DAY = 86400000;
 
 /* ONE CLOCK. Derivation runs on `NOW` — the payload's `asOf` — and writes
@@ -532,8 +544,11 @@ export const ts = (iso: string | null | undefined) => (iso ? new Date(iso).getTi
 
 type Snapshot = { users: PlatformUser[]; audit: AuditEvent[]; version: number };
 
+/* THE ROWS START EMPTY. They are planted by `applyUsersPage` when the server
+   answers -- there is no bundled fallback, so an empty directory means the read
+   has not landed, failed, or found nobody, and the screen says which. */
 const seed = (): Snapshot => ({
-  users: JSON.parse(JSON.stringify(usersDoc.users)) as PlatformUser[],
+  users: [],
   audit: JSON.parse(JSON.stringify(auditDoc.events)) as AuditEvent[],
   version: 0,
 });
@@ -545,8 +560,8 @@ const emit = () => { snap = { ...snap, version: snap.version + 1 }; listeners.fo
 const subscribe = (fn: () => void) => { listeners.add(fn); return () => { listeners.delete(fn); }; };
 const getVersion = () => snap.version;
 
-/** Re-seed. Local scaffolding only — it exists so a demo can be walked twice. */
-export function resetStore() { snap = seed(); emit(); }
+/** Throws away every in-tab edit: back to the page exactly as the server sent it. */
+export function resetStore() { snap = { ...seed(), users: clone(heldUsers) }; emit(); }
 
 /* Plain readers over the same snapshot the hooks subscribe to. They exist so
    the check suite can assert the write simulation without pretending to be
@@ -598,7 +613,12 @@ export function completenessOf(p: UserProfile): { pct: number; missing: string[]
 }
 
 export function toRow(user: PlatformUser): UserRow {
-  const { pct, missing } = completenessOf(user.profile);
+  /* A SERVER ROW IS NOT RE-GRADED. Its score is the go-live checklist the
+     engine persists, and it carries no per-field list, so "what is missing" is
+     empty rather than a guess made from fields the list never sent. */
+  const { pct, missing } = user.completeness !== undefined
+    ? { pct: user.completeness, missing: [] as string[] }
+    : completenessOf(user.profile);
   return {
     user,
     classification: classify(user),
@@ -606,6 +626,9 @@ export function toRow(user: PlatformUser): UserRow {
     missingFields: missing,
   };
 }
+
+/** Unfinished = graded AND short of 100. Nothing to grade is not unfinished. */
+const unfinished = (r: UserRow) => r.completeness !== null && r.completeness < 100;
 
 /* ============================================================ filters === */
 
@@ -686,7 +709,7 @@ export function applyFilters(rows: UserRow[], p: Params): UserRow[] {
     if (p.src && r.user.registrationSource !== p.src) return false;
     if (p.tag && !r.user.tags.some((t) => t.slug === p.tag)) return false;
     if (p.status && r.user.userStatus !== p.status) return false;
-    if (p.flag === "incomplete" && r.completeness >= 100) return false;
+    if (p.flag === "incomplete" && !unfinished(r)) return false;
     if (!inRegisteredRange(r, p)) return false;
     return true;
   });
@@ -698,7 +721,7 @@ export function applyFilters(rows: UserRow[], p: Params): UserRow[] {
  *  opens on alphabetical order makes somebody sort it before they can start. */
 function attentionScore(r: UserRow): number {
   if (r.classification === "deactivated") return 2;
-  if (r.completeness < 100) return 0;
+  if (unfinished(r)) return 0;
   return 1;
 }
 
@@ -742,7 +765,7 @@ export function countsOf(rows: UserRow[]): Counts {
     total: rows.length,
     active: c((r) => r.classification === "active"),
     deactivated: c((r) => r.classification === "deactivated"),
-    incompleteProfiles: c((r) => r.completeness < 100),
+    incompleteProfiles: c(unfinished),
   };
 }
 
@@ -772,6 +795,7 @@ export function useUserTotals(): TotalsState {
     AdminService.fetchTotalUsers()
       .then((r) => {
         if (!live) return;
+        if (r.response) applyServerDate(r.data.asOf);
         setS(r.response ? { data: r.data, error: null } : { data: null, error: r.message || "Could not load the user count." });
       })
       .catch((e) => { if (live) setS({ data: null, error: errMessage(e) }); });
@@ -830,6 +854,109 @@ export function useUsersVocab(): VocabState {
   useVersion();
   useEffect(() => { void bootUsersVocab(); }, []);
   return vocab;
+}
+
+/* ===================================================== the live page ===
+   `GET /admin/platform-users/` — ONE PAGE of the directory, filtered, sorted
+   and paged by the server. It is planted into the same snapshot every face
+   reads, so the directory, the record and the analytics tab all see exactly the
+   rows that were loaded and nothing else: a record that is not on the loaded
+   page is not found (the decision behind this div, recorded in the route file).
+
+   Started from the route host so a record-first load fetches too. The key is
+   the query string, so a re-render or a second mount with the same filters
+   does not ask again. */
+export interface UsersPageState {
+  loading: boolean; error: string | null;
+  total: number; pageNo: number; pageSize: number; pages: number;
+}
+
+let pageState: UsersPageState = { loading: true, error: null, total: 0, pageNo: 1, pageSize: 20, pages: 1 };
+let pageKey: string | null = null;
+/** The page exactly as the server sent it -- what Reset returns to. */
+let heldUsers: PlatformUser[] = [];
+
+const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v));
+
+/** The panel's URL params, renamed to the API's. `view`, `tab` and friends are
+ *  not the server's business and never reach it. */
+function queryOf(p: Params): string {
+  const map: Record<string, string> = {
+    q: "q", status: "status", city: "city", src: "src", tag: "tag", flag: "flag",
+    registered: "registered", from: "dateFrom", to: "dateTo", sort: "sort", page: "pageNo",
+  };
+  const parts = Object.keys(map)
+    .filter((k) => p[k])
+    .map((k) => encodeURIComponent(map[k]) + "=" + encodeURIComponent(p[k] as string));
+  return parts.length ? "?" + parts.join("&") : "";
+}
+
+/** A server row in the directory's own shape. Everything the list does not send
+ *  is EMPTY -- no invented values -- and fills in as the record's divs move. */
+function fromServer(r: PlatformUserItem): PlatformUser {
+  return {
+    userId: r.userId,
+    authUserId: "",
+    registrationSource: "",
+    userStatus: r.userStatus,
+    registeredAt: r.registeredAt || "",
+    deactivatedAt: null,
+    deactivatedReason: null,
+    lastActivityAt: r.lastActivityAt,
+    identity: { name: r.identity.name, email: r.identity.email, emailVerified: false,
+                phone: r.identity.phone, phoneVerified: false },
+    profile: {
+      profileId: "", schemaVersion: "", profileStatus: "",
+      username: r.profile.username, about: null, businessName: null, businessType: null,
+      segments: [], categories: [], searchKeywords: [],
+      targetAreas: r.profile.targetAreas, positioning: [], updatedBy: null, updatedAt: null,
+    },
+    tags: r.tags.map((t) => ({ slug: t.slug, assignedBy: "", assignedAt: "" })),
+    notes: [],
+    commercial: { salesOwner: null, dealRefs: [], invoiceRefs: [] },
+    completeness: r.completeness,
+  };
+}
+
+/** Plants a page into the snapshot. Its own function so the offline checks can
+ *  state "these rows arrived" without standing up a server. */
+export function applyUsersPage(users: PlatformUser[]): void {
+  heldUsers = clone(users);
+  snap = { ...snap, users: clone(users) };
+}
+
+/** Fetches the page the URL describes, once per distinct query. */
+export function useUsersPage(p: Params): UsersPageState {
+  useVersion();
+  const key = queryOf(p);
+  useEffect(() => {
+    if (key === pageKey) return;
+    pageKey = key;
+    pageState = { ...pageState, loading: true, error: null };
+    emit();
+    call<PlatformUsersPage>(AdminOpsService.platformUsers(key))
+      .then((r) => {
+        if (pageKey !== key) return;   // a newer query has taken over
+        applyUsersPage(r.users.map(fromServer));
+        pageState = {
+          loading: false, error: null, total: r.total, pageNo: r.pageNo, pageSize: r.pageSize,
+          pages: Math.max(1, Math.ceil(r.total / Math.max(1, r.pageSize))),
+        };
+        emit();
+      })
+      .catch((e) => {
+        if (pageKey !== key) return;
+        pageState = { ...pageState, loading: false, error: errMessage(e) };
+        emit();
+      });
+  }, [key]);
+  return pageState;
+}
+
+/** The same state, for a face that did not start the read. */
+export function useUsersPageState(): UsersPageState {
+  useVersion();
+  return pageState;
 }
 
 /* ============================================================== hooks === */
