@@ -33,8 +33,11 @@ import {
   attentionItems, dealMetrics, financeMetrics, payrollMetrics, periodFor, planningSignals,
   teamMetrics, todayLocal,
 } from "./derive";
-import { attentionTeam, liveHealth, liveMoney, liveTeam, liveTeamRows, useAttentionLive, useLive } from "./live";
-import type { LiveMoney, LiveState, LiveTeamTable } from "./live";
+import {
+  attentionTeam, liveHealth, liveMoney, liveTeam, liveTeamRows, useAttentionLive, useLive, useOperationsLive,
+} from "./live";
+import type { LiveMoney, LiveState, LiveTeamTable, OpsState } from "./live";
+import type { OverviewOperations } from "../../../api/modules/adminOps";
 import { liveFinance, livePayroll, spanFor, useFinanceLive } from "./financeLive";
 import type { LiveFinance, LivePayroll } from "./financeLive";
 import type {
@@ -65,9 +68,9 @@ export function clocks(): { deals: Clock; finance: Clock; financeLive: Clock; te
   const real = todayLocal();
   return {
     deals: { kind: "live", today: real, label: "live · " + fmtDate(real) },
-    /* The Team TABLE reads the backend (d4) and runs on the real clock. The
-       seed `team` clock below stays for the sections still on the seeds —
-       Operations, the attention list, the planning signals. */
+    /* The Team TABLE (d4), the attention list (d6) and Operations (d7) read the
+       backend on the real clock. The seed `team` clock below stays for the
+       planning signals. */
     teamLive: { kind: "live", today: real, label: "live · " + fmtDate(real) },
     /* The Finance SECTION reads the backend (d5) and runs on the real clock.
        `finance` below stays the seed clock for what still reads the seeds —
@@ -148,11 +151,15 @@ export interface OverviewData {
   finState: LiveState;
   payLive: LivePayroll | null;
   retryFinance: () => void;
-  /** The seed metrics, still read by Operations, the attention list and the
-   *  signals. The Team TABLE reads `teamTable` below (d4). */
+  /** The seed metrics, still read by the planning signals. The Team TABLE reads
+   *  `teamTable` below (d4), Operations reads `ops` (d7). */
   team: TeamMetrics | null;
   teamTable: LiveTeamTable | null;
   teamState: LiveState;
+  /** The Operations card's counts from the backend (d7). null until ready. */
+  ops: OverviewOperations | null;
+  opsState: OpsState;
+  retryOps: () => void;
   intake: { today: number; week: number } | null;
   health: HealthCell[];
   /** Empty while any source it reads is still answering (overview/d6). */
@@ -190,6 +197,9 @@ export function useOverview(p: Params): OverviewData {
   }), [p.period, p.from, p.to, ck]);
   const live = useLive(periods.money, { money: gates.finance, team: gates.team });
   const finance = useFinanceLive(periods.financeLive, gates.finance);
+  /* Gated on the server by overview.view -- the page's own gate -- so it is
+     asked whenever the page is open (d7). */
+  const ops = useOperationsLive(periods.teamLive, p.dept || undefined);
 
   const dealsReady = gates.deals && !api.loading && !api.error && !api.forbidden;
   const deals = useMemo(
@@ -282,6 +292,7 @@ export function useOverview(p: Params): OverviewData {
     /* The table needs BOTH reads: the roster (roles + users) and the period's
        attendance and tasks. Whichever is still answering decides the state. */
     teamState: dept.state === "error" ? "error" : dept.state === "loading" ? "loading" : live.team,
+    ops: ops.data, opsState: ops.state, retryOps: ops.retry,
     money, moneyState: live.money, retryLive: live.retry,
     intake: gates.enquiries ? intake : null,
     health, attention, attentionState, signals,

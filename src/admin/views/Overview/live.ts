@@ -19,8 +19,8 @@
      Delivery    every task: delayed over open (not completed / cancelled).
 
    The Finance section (d5) reads financeLive.ts and the attention list (d6)
-   reads both files; the planning signals still read the seed stores through
-   `fin` / `team` in store.ts.
+   reads both files; Operations (d7) reads useOperationsLive below; the planning
+   signals still read the seed stores through `fin` / `team` in store.ts.
 
    Nothing is invented: a source that has not answered is `loading`, a refusal
    or failure is `error`, and no rows is a real zero or the health cell's own
@@ -30,7 +30,7 @@ import { useEffect, useState } from "react";
 import AdminOpsService, { call } from "../../../api/modules/adminOps";
 import type {
   AdminUserRow, AgreementRow, AttendanceDayRow, DailyPlanRow, DailyReportRow, DealPaymentRow, IncomeRow, InstallmentRow,
-  LeaveRow, PlanPaymentRow, PlanPaymentsListResponse, WorkItemRow, WorkSettingsRow,
+  LeaveRow, OverviewOperations, PlanPaymentRow, PlanPaymentsListResponse, WorkItemRow, WorkSettingsRow,
 } from "../../../api/modules/adminOps";
 import { addDays, healthOf, todayLocal } from "./derive";
 import type { AttentionTeam, DealMetrics, HealthCell, OwnerStat, Period } from "./derive";
@@ -268,6 +268,29 @@ export function useAttentionLive(today: string, on: { reports: boolean; full: bo
     }).catch(() => { if (live) setS((x) => ({ ...x, state: "error" })); });
     return () => { live = false; };
   }, [today, on.reports, on.full, nonce]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return { ...s, retry: () => setNonce((n) => n + 1) };
+}
+
+/* ------------------------------------------------------------ operations --- */
+/** The Operations card (d7): one read, every count worked out on the server
+ *  (GET overview/operations/). `forbidden` is a 403, which the card turns into
+ *  its "needs access" line; any other refusal or failure is `error`. */
+export type OpsState = LiveState | "forbidden";
+export function useOperationsLive(p: Period, role: string | undefined) {
+  const [s, setS] = useState<{ state: OpsState; data: OverviewOperations | null }>({ state: "loading", data: null });
+  const [nonce, setNonce] = useState(0);
+
+  useEffect(() => {
+    let live = true;
+    setS({ state: "loading", data: null });
+    AdminOpsService.overviewOperations({ start: p.from, end: p.to, role }).then((r) => {
+      if (!live) return;
+      if (r.response === false) setS({ state: r.code === 403 ? "forbidden" : "error", data: null });
+      else setS({ state: "ready", data: r.data });
+    }).catch(() => { if (live) setS({ state: "error", data: null }); });
+    return () => { live = false; };
+  }, [p.from, p.to, role, nonce]);
 
   return { ...s, retry: () => setNonce((n) => n + 1) };
 }

@@ -658,6 +658,14 @@ export interface AgreementRow {
   sentAt: string | null; sentBy: DealPersonRef | null; viewedAt: string | null; signedAt: string | null;
   signedName: string; expiresAt: string | null; createdAt: string;
 }
+/** GET overview/operations/ (overview/d7): the Operations card's counts, on the
+ *  server's clock. Counts only; `leave` ignores the role filter. */
+export interface OverviewOperations {
+  asOf: string; period: { start: string; end: string }; members: number;
+  tasks: { overdue: number; waiting: number; dueWeek: number; inProgress: number; completed: number };
+  today: { present: number; late: number; absent: number; onLeave: number; unclosed: number };
+  owed: { noPlan: number; noEod: number; unread: number; leave: number; agreementsUnopened: number; docsMissing: number };
+}
 type Paged<K extends string, T> = { [k in K]: T[] } & { total: number; pageNo: number; pageSize: number };
 export interface WorkListResponse { items: WorkItemRow[]; total: number; pageNo: number; pageSize: number; }
 
@@ -1377,6 +1385,10 @@ export class AdminOpsService {
   }
   static dailyReports(params: { member?: string; start?: string; end?: string; acknowledged?: boolean; pageNo?: number; pageSize?: number } = {}) {
     return apiService.getGetApiResponse<Paged<"reports", DailyReportRow>>(`${base}/daily-reports/${qs(params)}`);
+  }
+  /** overview.view. `start`/`end` bound "Completed"; `role` = rbac role name. */
+  static overviewOperations(params: { start: string; end: string; role?: string }) {
+    return apiService.getGetApiResponse<OverviewOperations>(`${base}/overview/operations/${qs(params)}`);
   }
   /** `member` omitted = own; an id or `all` is full access only. `expiresFrom`/`To` are dates. */
   static agreements(params: { member?: string; state?: string; expiresFrom?: string; expiresTo?: string; pageNo?: number; pageSize?: number } = {}) {
