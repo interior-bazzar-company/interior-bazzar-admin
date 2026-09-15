@@ -46,6 +46,7 @@ import type {
   VocabulariesResponse,
 } from "../../../api/modules/businessEnquiries";
 import { call } from "../../../api/modules/adminOps";
+import { errMessage } from "../../../api/apiService";
 import type { ApiResponseType } from "../../../types/reqResType";
 
 /* ============================================================ THE SHAPES === */
@@ -1095,6 +1096,31 @@ async function write<D>(id: string, send: Promise<ApiResponseType<D>>,
   /* Nothing on screen to fold into — the write still landed, and the next read
      of this enquiry gets it from the server like any other. */
   if (current) replace(merge(current, got));
+}
+
+/** A button's view of one write: `busy` while the server has not answered,
+ *  `err` holding its refusal. `ok` runs only after the server confirmed, so a
+ *  success message, a closed dialog or a cleared box can no longer get ahead of
+ *  a write that is then refused. `resetKey` clears a stale refusal when the
+ *  screen moves to another enquiry without remounting. */
+export function useWrite(resetKey?: string) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  useEffect(() => { setErr(""); }, [resetKey]);
+  const run = async (send: () => Promise<void>, ok?: () => void) => {
+    if (busy) return;
+    setBusy(true);
+    setErr("");
+    try {
+      await send();
+      ok?.();
+    } catch (e) {
+      setErr(errMessage(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return { busy, err, run };
 }
 
 /** The merge for the three writes that answer with the whole record. */

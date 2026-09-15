@@ -15,12 +15,12 @@
    ============================================================================= */
 import { useState } from "react";
 import {
-  Alert, Button, FormField, FormSection, Input, ModalShell, Radio, SelectInput, Textarea,
+  Alert, Button, FormField, FormSection, Input, ModalShell, Notice, Radio, SelectInput, Textarea,
 } from "../../ui";
 import { BusinessSearch, Disclose, GuardCheck, InfoNote } from "./bits";
 import {
   RULES, VOCAB, assign, businessById, invalidate, needsOverrideReason,
-  reassign, recordOutcome, statusOf,
+  reassign, recordOutcome, statusOf, useWrite,
 } from "./store";
 
 import type { Candidate, Enquiry, MatchRun } from "./store";
@@ -36,6 +36,7 @@ export function AssignModal({ e, run, c, onClose, onDone }: {
   const b = businessById(c.businessId);
   const [reason, setReason] = useState("");
   const [touched, setTouched] = useState(false);
+  const go = useWrite();
 
   /* NOTHING RANKED THIS ONE. Either matching has not run, or it ran and this
      business was not in the pool — an operator picked it by hand out of the
@@ -68,11 +69,12 @@ export function AssignModal({ e, run, c, onClose, onDone }: {
       actions={
         <>
           <Button color="secondary" data-close="1" onClick={onClose}>Cancel</Button>
-          <Button color="primary" data-act="be-assign-go" isDisabled={blocked}
+          <Button color="primary" data-act="be-assign-go" isDisabled={blocked || go.busy}
             onClick={() => {
               if (blocked) { setTouched(true); return; }
-              assign(e.enquiryId, c.businessId, needsReason ? reason.trim() : null);
-              onDone("Assigned to " + c.name + " — published to them.");
+              go.run(
+                () => assign(e.enquiryId, c.businessId, needsReason ? reason.trim() : null),
+                () => onDone("Assigned to " + c.name + " — published to them."));
             }}>
             {needsReason ? "Confirm with reason" : "Confirm assignment"}
           </Button>
@@ -138,6 +140,7 @@ export function AssignModal({ e, run, c, onClose, onDone }: {
             went. Such changes affect future matching only.
           </p>
         </InfoNote>
+        {go.err ? <Notice tone="bad" text={go.err} /> : null}
       </div>
     </ModalShell>
   );
@@ -156,6 +159,7 @@ export function ReassignModal({ e, run, onClose, onDone }: {
   const [reason, setReason] = useState(VOCAB.reassignReasons[0]);
   const [note, setNote] = useState("");
   const [touched, setTouched] = useState(false);
+  const go = useWrite();
   /* Open by itself when the run left nothing to choose from — which is the
      common case and used to be a dead end. With candidates present it is a way
      out for the operator who knows the business the run could not see. */
@@ -180,11 +184,12 @@ export function ReassignModal({ e, run, onClose, onDone }: {
       actions={
         <>
           <Button color="secondary" data-close="1" onClick={onClose}>Keep current</Button>
-          <Button color="primary" data-act="be-reassign-go" isDisabled={blocked}
+          <Button color="primary" data-act="be-reassign-go" isDisabled={blocked || go.busy}
             onClick={() => {
               if (blocked) { setTouched(true); return; }
-              reassign(e.enquiryId, pick, full);
-              onDone("Reassigned to " + chosenName + " — the previous assignment is closed, not deleted.");
+              go.run(
+                () => reassign(e.enquiryId, pick, full),
+                () => onDone("Reassigned to " + chosenName + " — the previous assignment is closed, not deleted."));
             }}>Reassign</Button>
         </>
       }
@@ -271,6 +276,7 @@ export function ReassignModal({ e, run, onClose, onDone }: {
               value={note} onChange={setNote} />
           </FormField>
         </FormSection>
+        {go.err ? <Notice tone="bad" text={go.err} /> : null}
       </div>
     </ModalShell>
   );
@@ -288,6 +294,7 @@ export function OutcomeModal({ e, onClose, onDone }: {
   const reasons = VOCAB.outcomeReasons[outcome];
   const [reason, setReason] = useState(VOCAB.outcomeReasons.converted[0]);
   const [notes, setNotes] = useState("");
+  const go = useWrite();
 
   const pickOutcome = (v: string) => {
     const k = v as "converted" | "not_converted";
@@ -305,11 +312,10 @@ export function OutcomeModal({ e, onClose, onDone }: {
       actions={
         <>
           <Button color="secondary" data-close="1" onClick={onClose}>Cancel</Button>
-          <Button color="primary" data-act="be-outcome-go"
-            onClick={() => {
-              recordOutcome(e.enquiryId, outcome, reason, notes.trim());
-              onDone(statusOf(outcome).label + " — capacity released.");
-            }}>Record outcome</Button>
+          <Button color="primary" data-act="be-outcome-go" isDisabled={go.busy}
+            onClick={() => go.run(
+              () => recordOutcome(e.enquiryId, outcome, reason, notes.trim()),
+              () => onDone(statusOf(outcome).label + " — capacity released."))}>Record outcome</Button>
         </>
       }
     >
@@ -343,6 +349,7 @@ export function OutcomeModal({ e, onClose, onDone }: {
           bazzar revenue, and no analytics rollup may infer our revenue from this column. Ours is their
           subscription, which lives in Plans.
         </InfoNote>
+        {go.err ? <Notice tone="bad" text={go.err} /> : null}
       </div>
     </ModalShell>
   );
@@ -359,6 +366,7 @@ export function InvalidateModal({ e, onClose, onDone }: {
   const [reason, setReason] = useState(VOCAB.invalidReasons[0]);
   const [note, setNote] = useState("");
   const hasException = !!e.exception;
+  const go = useWrite();
 
   return (
     <ModalShell
@@ -375,8 +383,10 @@ export function InvalidateModal({ e, onClose, onDone }: {
       actions={
         <>
           <Button color="secondary" data-close="1" onClick={onClose}>Cancel</Button>
-          <Button color="primary-destructive" data-act="be-invalid-go"
-            onClick={() => { invalidate(e.enquiryId, reason, note.trim()); onDone("Marked invalid, with a stored reason."); }}>
+          <Button color="primary-destructive" data-act="be-invalid-go" isDisabled={go.busy}
+            onClick={() => go.run(
+              () => invalidate(e.enquiryId, reason, note.trim()),
+              () => onDone("Marked invalid, with a stored reason."))}>
             Reject
           </Button>
         </>
@@ -405,6 +415,7 @@ export function InvalidateModal({ e, onClose, onDone }: {
           Reopening needs a controlled admin policy that does not exist yet. The record, its snapshot
           and its whole event timeline stay exactly as they are — nothing is deleted.
         </InfoNote>
+        {go.err ? <Notice tone="bad" text={go.err} /> : null}
       </div>
     </ModalShell>
   );

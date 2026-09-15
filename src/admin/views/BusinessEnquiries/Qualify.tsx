@@ -28,7 +28,7 @@
    ============================================================================= */
 import { useEffect, useState } from "react";
 import {
-  Button, Card, Checkbox, FieldRow, FormField, FormSection, InfoDot, Input, Meter, Pill,
+  Button, Card, Checkbox, FieldRow, FormField, FormSection, InfoDot, Input, Meter, Notice, Pill,
   SelectInput, Tag, Textarea, Timeline,
 } from "../../ui";
 import { channelOptions, contactLogItem, InfoNote, outcomeOptions, PanelNote, VocabInput } from "./bits";
@@ -36,7 +36,7 @@ import { can } from "../../shell/AdminShell";
 import {
   CHANNELS, CHECKLIST, CONTACT_OUTCOMES, STATES, TAGS, VOCAB, canQualify, checklistMissing,
   contactOutcomeOf, channelOf, dateTimeLabel, everReached, knownCategory, knownCity,
-  lastResponse, logContact, markQualified, setCheck, toggleTag, updateEnquiry,
+  lastResponse, logContact, markQualified, setCheck, toggleTag, updateEnquiry, useWrite,
 } from "./store";
 import type { ContactEntry, Enquiry } from "./store";
 
@@ -49,6 +49,7 @@ export function RequirementForm({ e }: { e: Enquiry }) {
   const [c, setC] = useState(e.customer);
   const [urgency, setUrgency] = useState(e.qualification.urgency || "");
   const writes = can("business-enquiries", "edit");
+  const save = useWrite(e.enquiryId);
 
   /* Re-seed when the record changes underneath — a logged contact bumps the
      store, and the form must not hold a stale copy over the top of it. */
@@ -83,8 +84,8 @@ export function RequirementForm({ e }: { e: Enquiry }) {
               setR(e.requirement); setC(e.customer); setUrgency(e.qualification.urgency || "");
             }}>Discard</Button>
           ) : null}
-          <Button color="primary" size="xs" isDisabled={!dirty}
-            onClick={() => updateEnquiry(e.enquiryId, { requirement: r, customer: c, urgency: urgency || null })}>
+          <Button color="primary" size="xs" isDisabled={!dirty || save.busy}
+            onClick={() => save.run(() => updateEnquiry(e.enquiryId, { requirement: r, customer: c, urgency: urgency || null }))}>
             Save changes
           </Button>
         </div>
@@ -163,6 +164,7 @@ export function RequirementForm({ e }: { e: Enquiry }) {
               onChange={(v) => setR({ ...r, text: v })} />
           </FormField>
         </FormSection>
+        {save.err ? <Notice tone="bad" text={save.err} /> : null}
       </div>
     </Card>
   );
@@ -181,6 +183,8 @@ export function QualifyPanel({ e, onQualified }: { e: Enquiry; onQualified: (msg
   const done = CHECKLIST.length - missing.length;
   const ready = canQualify(e);
   const last = lastResponse(e);
+  const check = useWrite(e.enquiryId);
+  const tag = useWrite(e.enquiryId);
 
   return (
     <Card
@@ -208,13 +212,14 @@ export function QualifyPanel({ e, onQualified }: { e: Enquiry; onQualified: (msg
                 key={row.key}
                 id={"be-chk-" + row.key}
                 checked={!!e.qualification.checklist[row.key]}
-                disabled={!writes}
+                disabled={!writes || check.busy}
                 label={row.label}
                 hint={row.help}
-                onChange={(v) => setCheck(e.enquiryId, row.key, v)}
+                onChange={(v) => check.run(() => setCheck(e.enquiryId, row.key, v))}
               />
             ))}
           </div>
+          {check.err ? <Notice tone="bad" text={check.err} /> : null}
         </FormSection>
 
         {/* ----------------------------------------------------------- tags --- */}
@@ -225,13 +230,14 @@ export function QualifyPanel({ e, onQualified }: { e: Enquiry; onQualified: (msg
                 key={t.slug}
                 id={"be-tag-" + t.slug}
                 checked={e.tags.indexOf(t.slug) >= 0}
-                disabled={!writes}
+                disabled={!writes || tag.busy}
                 label={<Tag label={t.label} tone={t.tone} auto={t.auto} />}
                 hint={t.help + (t.auto ? " · set automatically from the contact log" : "")}
-                onChange={() => toggleTag(e.enquiryId, t.slug)}
+                onChange={() => tag.run(() => toggleTag(e.enquiryId, t.slug))}
               />
             ))}
           </div>
+          {tag.err ? <Notice tone="bad" text={tag.err} /> : null}
           <InfoNote ico="tag" short={<>Tags with the system mark are set from the contact log.</>}>
             The system recomputes them on every logged attempt, so an override by hand lasts until the
             next one. There is no tag for what a customer might spend, for the same reason there is no
@@ -289,11 +295,11 @@ function ContactComposer({ e }: { e: Enquiry }) {
      Demanding one would train people to type "n/a" into the field that is
      supposed to hold the customer's words. */
   const wantsResponse = o.reached;
+  const log = useWrite(e.enquiryId);
 
-  const submit = () => {
-    logContact(e.enquiryId, { channel, direction, outcome, response, note });
-    setResponse(""); setNote("");
-  };
+  const submit = () => log.run(
+    () => logContact(e.enquiryId, { channel, direction, outcome, response, note }),
+    () => { setResponse(""); setNote(""); });
 
   return (
     <FormSection
@@ -338,9 +344,10 @@ function ContactComposer({ e }: { e: Enquiry }) {
           <Input id="be-c-note" value={note} ph="Your read of it. Optional." onChange={setNote} />
         </FormField>
 
-        <Button color="primary" block ico="plus" onClick={submit}>
+        <Button color="primary" block ico="plus" isDisabled={log.busy} onClick={submit}>
           Log {channelOf(channel).label.toLowerCase()}
         </Button>
+        {log.err ? <Notice tone="bad" text={log.err} /> : null}
 
         <p className="text-xs text-tertiary">
           <b className="font-mono font-semibold text-secondary">Ctrl</b>+
@@ -364,6 +371,7 @@ function QualifyFoot({ e, ready, missing, writes, onQualified }: {
 }) {
   const last = lastResponse(e);
   const [summary, setSummary] = useState("");
+  const qualify = useWrite(e.enquiryId);
 
   useEffect(() => { setSummary(last?.response || ""); }, [last?.response]);
 
@@ -380,13 +388,13 @@ function QualifyFoot({ e, ready, missing, writes, onQualified }: {
           onChange={setSummary} />
       </FormField>
 
-      <Button color="primary" size="lg" block ico="check" isDisabled={!ready}
-        onClick={() => {
-          markQualified(e.enquiryId, summary);
-          onQualified("Qualified — the snapshot is frozen and matching can run.");
-        }}>
+      <Button color="primary" size="lg" block ico="check" isDisabled={!ready || qualify.busy}
+        onClick={() => qualify.run(
+          () => markQualified(e.enquiryId, summary),
+          () => onQualified("Qualified — the snapshot is frozen and matching can run."))}>
         Mark qualified
       </Button>
+      {qualify.err ? <Notice tone="bad" text={qualify.err} /> : null}
 
       {ready ? (
         <InfoNote ico="lock" short={<>Freezes the snapshot and stamps your name on it.</>}>

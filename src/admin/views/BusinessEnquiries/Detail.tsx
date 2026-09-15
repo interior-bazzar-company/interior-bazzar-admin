@@ -21,7 +21,7 @@ import { useState } from "react";
 import type { MouseEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-  ActivityFeed, Button, Card, Checkbox, EmptyState, IconButton, InfoDot, KvList,
+  ActivityFeed, Button, Card, Checkbox, EmptyState, IconButton, InfoDot, KvList, Notice,
   SectionHead, Tabs, Tag, Textarea, Timeline,
 } from "../../ui";
 import { can, useNav } from "../../shell/AdminShell";
@@ -40,7 +40,7 @@ import {
   CHECKLIST, activeAssignment, addRemark, businessById, dateTimeLabel, durationLabel, isWorking,
   markNoMatch, matchCooldown, tierOf,
   isTerminal, lastResponse, pastAssignments, place, runMatching, statusOf,
-  transitionOf, useEnquiry, useMatchRun,
+  transitionOf, useEnquiry, useMatchRun, useWrite,
 } from "./store";
 import type { Candidate, Enquiry, MatchRun } from "./store";
 
@@ -62,6 +62,7 @@ export default function Detail({ id, listHash, prev, next, pos }: {
   const [sp, setSp] = useSearchParams();
   const { go } = useNav();
   const { modal, closeLayer, toast, openPop, closePop, popAnchor } = useShell();
+  const bar = useWrite(id);
 
   if (!e) {
     return (
@@ -211,13 +212,13 @@ export default function Detail({ id, listHash, prev, next, pos }: {
             ? (() => {
                 const cool = matchCooldown(e);
                 return (
-                  <Button color="primary" ico="sparkle" isDisabled={cool.blocked}
+                  <Button color="primary" ico="sparkle" isDisabled={cool.blocked || bar.busy}
                     title={cool.blocked
                       ? "Last run " + dateTimeLabel(cool.lastAt) + ". Neither the frozen snapshot "
                         + "nor the business directory moves fast enough for another run to answer "
                         + "differently — next one from " + dateTimeLabel(cool.readyAt) + "."
                       : "Reads the qualification snapshot and the active rule version"}
-                    onClick={() => { runMatching(e.enquiryId); toast("Matching run complete."); }}>
+                    onClick={() => bar.run(() => runMatching(e.enquiryId), () => toast("Matching run complete."))}>
                     {cool.blocked
                       ? "Matched " + durationLabel(cool.lastAt!, new Date().toISOString()) + " ago"
                       : e.status === "no_match" ? "Try matching again" : "Run matching"}
@@ -230,9 +231,9 @@ export default function Detail({ id, listHash, prev, next, pos }: {
               suspended. Not destructive: this is not a rejection and it is not
               terminal, it says the supply is missing and the enquiry is fine. */}
           {e.status === "qualified"
-            ? <Button color="secondary"
+            ? <Button color="secondary" isDisabled={bar.busy}
                 title="No subscribed business can take this one — reversible, re-run matching to clear it"
-                onClick={() => { markNoMatch(e.enquiryId); toast("Marked No match yet."); }}>
+                onClick={() => bar.run(() => markNoMatch(e.enquiryId), () => toast("Marked No match yet."))}>
                 No match yet
               </Button>
             : null}
@@ -265,6 +266,7 @@ export default function Detail({ id, listHash, prev, next, pos }: {
                 Terminal — {statusOf(e.status).label}.{" "}
                 {transitionOf(e.status).guard.replace(/^Terminal\.\s*/, "")}
               </span>}
+          {bar.err ? <Notice tone="bad" className="w-full" text={bar.err} /> : null}
         </div>
       ) : null}
     </div>
@@ -340,11 +342,11 @@ function EnquiryTab({ e, run, onAssign, onQualified }: {
 function RemarksBlock({ e }: { e: Enquiry }) {
   const writes = can("business-enquiries", "edit");
   const [text, setText] = useState("");
+  const remark = useWrite(e.enquiryId);
 
   const submit = () => {
     if (!text.trim()) return;
-    addRemark(e.enquiryId, text);
-    setText("");
+    remark.run(() => addRemark(e.enquiryId, text), () => setText(""));
   };
 
   return (
@@ -382,8 +384,9 @@ function RemarksBlock({ e }: { e: Enquiry }) {
                 <b className="font-mono font-semibold text-secondary">Enter</b>
               </span>
               <span className="flex-1" />
-              <Button color="primary" size="xs" isDisabled={!text.trim()} onClick={submit}>Add remark</Button>
+              <Button color="primary" size="xs" isDisabled={!text.trim() || remark.busy} onClick={submit}>Add remark</Button>
             </div>
+            {remark.err ? <Notice tone="bad" text={remark.err} /> : null}
           </div>
         ) : null}
 
