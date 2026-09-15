@@ -89,11 +89,17 @@ export function legacyPriorityInt(p: DealPriorityVocab | { key: string; label: s
    Trimming here rather than in the formatter: converting the wire shape into
    the legacy shape is exactly this adapter's job, and the legacy shape has
    always been date-only. One helper, applied to every date the adapter emits,
-   so a new date field cannot reintroduce the bug by being passed raw. */
+   so a new date field cannot reintroduce the bug by being passed raw.
+
+   INDIA TIME (overview/d9): a timestamp becomes its date in Asia/Kolkata, not
+   the UTC date the wire's "Z" carries -- a deal saved at 02:00 IST belongs to
+   that day, not the one before. A plain date ("2026-09-20") passes through. */
+const IST_DATE = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" });
 export function dateOnly(v: string | null | undefined): string | null {
   if (!v) return null;
-  const t = v.indexOf("T");
-  return t === -1 ? v : v.slice(0, t);
+  if (v.indexOf("T") === -1) return v;
+  const at = new Date(v);
+  return isNaN(at.getTime()) ? v.slice(0, v.indexOf("T")) : IST_DATE.format(at);
 }
 
 export function adaptDeal(row: DealRow): any {

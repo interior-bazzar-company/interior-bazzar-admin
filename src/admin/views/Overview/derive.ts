@@ -22,6 +22,7 @@
    fetch: scripts/check-overview.cjs bundles this file and asserts the rules.
    ============================================================================= */
 import { STAGES } from "../Deals/adapter";
+import type { DealStageVocab } from "../../../api/modules/adminOps";
 import { inr } from "../../ui/format";
 import {
   atRisk, installmentRows, matchedPct, monthPoints, overview, refundQueue, runsNewestFirst,
@@ -143,9 +144,6 @@ export interface DealRec {
   revenue_collected: number; outstanding: number;
 }
 const stageInt = (key: string) => Number(Object.keys(STAGES).find((k) => STAGES[Number(k)].key === key) || 0);
-export const WON = stageInt("won");
-export const LOST = stageInt("lost");
-export const isOpen = (d: DealRec) => d.stage < WON;
 const value = (d: DealRec) => d.deal_value || 0;
 const sumValue = (ds: DealRec[]) => ds.reduce((a, d) => a + value(d), 0);
 
@@ -171,17 +169,26 @@ export interface DealMetrics {
   collected: number; outstanding: number;
 }
 
-const closedIn = (ds: DealRec[], stage: number, from: string, to: string) =>
-  ds.filter((d) => d.stage === stage && inRange(d.stage_since, from, to));
+/** A deal's server stage key. The adapter keeps the panel's int; STAGES maps it
+ *  back (and holds any key the server added since). */
+const keyOf = (d: DealRec) => STAGES[d.stage]?.key || "";
+const closedIn = (ds: DealRec[], key: string, from: string, to: string) =>
+  ds.filter((d) => keyOf(d) === key && inRange(d.stage_since, from, to));
 const rate = (won: number, lost: number) => (won + lost ? Math.round((won / (won + lost)) * 1000) / 10 : null);
 
-export function dealMetrics(list: DealRec[], p: Period, today: string): DealMetrics {
+/** THE SERVER'S STAGES (overview/d9). `stages` is the deals response's own
+ *  vocabulary: what ends a deal is its `isTerminal`, the pipeline bars follow
+ *  its `displayOrder` and labels. Won and Lost are still named by key -- the
+ *  vocabulary says a stage is final, not which way it ended. */
+export function dealMetrics(list: DealRec[], p: Period, today: string, stages: DealStageVocab[] = []): DealMetrics {
+  const final = new Set(stages.filter((s) => s.isTerminal).map((s) => s.key));
+  const isOpen = (d: DealRec) => !final.has(keyOf(d));
   const open = list.filter(isOpen);
   const openNew = open.filter((d) => inRange(d.created_at, p.from, p.to));
-  const wonNow = closedIn(list, WON, p.from, p.to);
-  const lostNow = closedIn(list, LOST, p.from, p.to);
-  const wonPrev = closedIn(list, WON, p.prevFrom, p.prevTo);
-  const lostPrev = closedIn(list, LOST, p.prevFrom, p.prevTo);
+  const wonNow = closedIn(list, "won", p.from, p.to);
+  const lostNow = closedIn(list, "lost", p.from, p.to);
+  const wonPrev = closedIn(list, "won", p.prevFrom, p.prevTo);
+  const lostPrev = closedIn(list, "lost", p.prevFrom, p.prevTo);
   const valued = wonNow.filter((d) => d.deal_value !== null);
   const stalled = open.filter((d) => d.is_stalled);
 
@@ -190,9 +197,10 @@ export function dealMetrics(list: DealRec[], p: Period, today: string): DealMetr
   list.forEach((d) => {
     const c = bucketIndex(bs, d.created_at);
     if (c >= 0) flow[c].created += 1;
-    if (d.stage === WON || d.stage === LOST) {
+    const k = keyOf(d);
+    if (k === "won" || k === "lost") {
       const s = bucketIndex(bs, d.stage_since);
-      if (s >= 0) flow[s][d.stage === WON ? "won" : "lost"] += 1;
+      if (s >= 0) flow[s][k] += 1;
     }
   });
 
@@ -210,10 +218,11 @@ export function dealMetrics(list: DealRec[], p: Period, today: string): DealMetr
   });
   wonNow.forEach((d) => { if (d.owner_id) { const r = ownerRow(d.owner_id); r.won += 1; r.wonValue += value(d); } });
 
-  const byStage: StageRow[] = Object.keys(STAGES).map(Number).filter((s) => s !== LOST).sort((a, b) => a - b)
+  const byStage: StageRow[] = stages.filter((s) => s.key !== "lost")
+    .slice().sort((a, b) => a.displayOrder - b.displayOrder)
     .map((s) => {
-      const at = list.filter((d) => d.stage === s);
-      return { stage: s, key: STAGES[s].key, label: STAGES[s].label, tone: STAGES[s].tone, n: at.length, value: sumValue(at) };
+      const at = list.filter((d) => keyOf(d) === s.key);
+      return { stage: stageInt(s.key), key: s.key, label: s.label, tone: s.tone, n: at.length, value: sumValue(at) };
     });
 
   const atRiskRows: RiskDeal[] = [];

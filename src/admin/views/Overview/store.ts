@@ -195,8 +195,8 @@ export function useOverview(p: Params): OverviewData {
 
   const dealsReady = gates.deals && !api.loading && !api.error && !api.forbidden;
   const deals = useMemo(
-    () => (dealsReady ? dealMetrics(api.list as DealRec[], periods.deals, ck.deals.today) : null),
-    [dealsReady, api.list, periods.deals, ck]);
+    () => (dealsReady ? dealMetrics(api.list as DealRec[], periods.deals, ck.deals.today, api.stages) : null),
+    [dealsReady, api.list, api.stages, periods.deals, ck]);
 
   /* Deal owner → team member. The API names the owner and gives the id on the
      owners vocabulary; the Team store keys a member by the same id once the
