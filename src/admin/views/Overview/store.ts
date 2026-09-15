@@ -22,28 +22,22 @@ import AdminOpsService, { call } from "../../../api/modules/adminOps";
 import type { AdminUserRow } from "../../../api/modules/adminOps";
 import { useDealsApi, render as refetchDeals } from "../Deals/useDeals";
 import type { DealsApiState } from "../Deals/useDeals";
-import { fmtDate as finFmtDate, todayIso as finToday, useVersion as useFinVersion } from "../Finance/store";
-import { TODAY as teamToday, fmtDate as teamFmtDate, useVersion as useTeamVersion } from "../Team/store";
+import { fmtDate as finFmtDate, todayIso as finToday } from "../Finance/store";
 import { ensureAdopted } from "../Team/adopt";
 import { useIntakeCounts } from "../BusinessEnquiries/store";
 import { can } from "../../auth/session";
 import { getSession } from "../../auth/session";
 import { fmtDate } from "../../ui/format";
-import {
-  attentionItems, dealMetrics, financeMetrics, payrollMetrics, periodFor, planningSignals,
-  teamMetrics, todayLocal,
-} from "./derive";
+import { attentionItems, dealMetrics, periodFor, planningSignals, todayLocal } from "./derive";
 import {
   attentionTeam, liveHealth, liveMoney, liveTeam, liveTeamRows, useAttentionLive, useLive, useOperationsLive,
+  useSignalsLive,
 } from "./live";
 import type { LiveMoney, LiveState, LiveTeamTable, OpsState } from "./live";
 import type { OverviewOperations } from "../../../api/modules/adminOps";
 import { liveFinance, livePayroll, spanFor, useFinanceLive } from "./financeLive";
 import type { LiveFinance, LivePayroll } from "./financeLive";
-import type {
-  AttentionItem, DealMetrics, DealRec, FinanceMetrics, HealthCell, OwnerStat, Payroll, Period, Signal,
-  TeamMetrics,
-} from "./derive";
+import type { AttentionItem, DealMetrics, DealRec, HealthCell, OwnerStat, Period, Signal } from "./derive";
 
 export type Params = Record<string, string | undefined>;
 
@@ -64,23 +58,21 @@ export const GATES = {
  *  "seed · as of 25 Aug 2026". Every section stamps one, because the same
  *  period lands on different dates in each — see derive.ts. */
 export interface Clock { kind: "live" | "seed"; today: string; label: string }
-export function clocks(): { deals: Clock; finance: Clock; financeLive: Clock; team: Clock; teamLive: Clock; money: Clock } {
+export function clocks(): { deals: Clock; finance: Clock; financeLive: Clock; teamLive: Clock; money: Clock } {
   const real = todayLocal();
   return {
     deals: { kind: "live", today: real, label: "live · " + fmtDate(real) },
-    /* The Team TABLE (d4), the attention list (d6) and Operations (d7) read the
-       backend on the real clock. The seed `team` clock below stays for the
-       planning signals. */
+    /* The Team TABLE (d4), the attention list (d6), Operations (d7) and the
+       planning signals (d8) read the backend on the real clock. */
     teamLive: { kind: "live", today: real, label: "live · " + fmtDate(real) },
-    /* The Finance SECTION reads the backend (d5) and runs on the real clock.
-       `finance` below stays the seed clock for what still reads the seeds —
-       the attention list and the planning signals. */
+    /* The Finance SECTION reads the backend (d5) and runs on the real clock. */
     financeLive: { kind: "live", today: real, label: "live · " + fmtDate(real) },
     /* The executive snapshot's money and health (live.ts) run on the real
-       clock; `finance` stays the seed clock for the sections still on seeds. */
+       clock. */
     money: { kind: "live", today: real, label: "live · " + fmtDate(real) },
+    /* No section reads the seeds any more (d8); kept only because the
+       snapshot's "vs prev Nd" reads `periods.finance.days`. */
     finance: { kind: "seed", today: finToday(), label: "seed · as of " + finFmtDate(finToday()) },
-    team: { kind: "seed", today: teamToday, label: "seed · as of " + teamFmtDate(teamToday) },
   };
 }
 
@@ -132,28 +124,27 @@ function useDepartments(enabled: boolean): Departments {
   return d;
 }
 
+/** A source the planning signals are waiting on or lost (d8): its tiles are
+ *  not drawn, and the section says which source and offers a retry. */
+export interface SignalWait { key: string; what: string; state: "loading" | "error"; retry: () => void }
+
 export interface OverviewData {
   gates: { deals: boolean; finance: boolean; payroll: boolean; team: boolean; enquiries: boolean };
   api: DealsApiState;
   clocks: ReturnType<typeof clocks>;
-  periods: { deals: Period; finance: Period; financeLive: Period; team: Period; teamLive: Period; money: Period };
+  periods: { deals: Period; finance: Period; financeLive: Period; teamLive: Period; money: Period };
   deals: DealMetrics | null;
-  fin: FinanceMetrics | null;
   /** Collected + Receivable for the executive snapshot, from the backend
    *  (live.ts). null until `moneyState` is ready. */
   money: LiveMoney | null;
   moneyState: LiveState;
   retryLive: () => void;
-  pay: Payroll | null;
-  /** The seed metrics, still read by the attention list and the signals. The
-   *  Finance SECTION reads `finLive` (d5). */
+  /** The Finance SECTION's reads (d5); also the attention list (d6) and the
+   *  signals' next-30-days tile (d8). */
   finLive: LiveFinance | null;
   finState: LiveState;
   payLive: LivePayroll | null;
   retryFinance: () => void;
-  /** The seed metrics, still read by the planning signals. The Team TABLE reads
-   *  `teamTable` below (d4), Operations reads `ops` (d7). */
-  team: TeamMetrics | null;
   teamTable: LiveTeamTable | null;
   teamState: LiveState;
   /** The Operations card's counts from the backend (d7). null until ready. */
@@ -167,6 +158,8 @@ export interface OverviewData {
   attentionState: LiveState;
   retryAttention: () => void;
   signals: Signal[];
+  /** Sources the signals are still waiting on, or that failed. */
+  signalWaits: SignalWait[];
   retryDeals: () => void;
   ownerOptions: { v: string; l: string }[];
   departments: string[];
@@ -180,8 +173,6 @@ export function useOverview(p: Params): OverviewData {
   /* The owner filter is a server parameter, so changing it is a refetch — the
      same one the Deals module makes for its own Owner chip. */
   const api = useDealsApi(p.owner ? { owner: p.owner } : {});
-  const finVersion = useFinVersion();
-  const teamVersion = useTeamVersion();
   const intake = useIntakeCounts();
   const dept = useDepartments(gates.team);
   useEffect(() => { if (gates.team) ensureAdopted(); }, [gates.team]);
@@ -190,7 +181,6 @@ export function useOverview(p: Params): OverviewData {
   const periods = useMemo(() => ({
     deals: periodFor(p.period, ck.deals.today, p.from, p.to),
     finance: periodFor(p.period, ck.finance.today, p.from, p.to),
-    team: periodFor(p.period, ck.team.today, p.from, p.to),
     teamLive: periodFor(p.period, ck.teamLive.today, p.from, p.to),
     financeLive: periodFor(p.period, ck.financeLive.today, p.from, p.to),
     money: periodFor(p.period, ck.money.today, p.from, p.to),
@@ -200,18 +190,13 @@ export function useOverview(p: Params): OverviewData {
   /* Gated on the server by overview.view -- the page's own gate -- so it is
      asked whenever the page is open (d7). */
   const ops = useOperationsLive(periods.teamLive, p.dept || undefined);
+  /* Same server gate; each piece in it is gated again on its own (d8). */
+  const sig = useSignalsLive(p.dept || undefined);
 
   const dealsReady = gates.deals && !api.loading && !api.error && !api.forbidden;
   const deals = useMemo(
     () => (dealsReady ? dealMetrics(api.list as DealRec[], periods.deals, ck.deals.today) : null),
     [dealsReady, api.list, periods.deals, ck]);
-
-  const fin = useMemo(
-    () => (gates.finance ? financeMetrics(periods.finance, ck.finance.today) : null),
-    [gates.finance, periods.finance, ck, finVersion]); // eslint-disable-line react-hooks/exhaustive-deps
-  const pay = useMemo(
-    () => (gates.payroll ? payrollMetrics() : null),
-    [gates.payroll, finVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* Deal owner → team member. The API names the owner and gives the id on the
      owners vocabulary; the Team store keys a member by the same id once the
@@ -227,10 +212,6 @@ export function useOverview(p: Params): OverviewData {
     });
     return m;
   }, [deals, api.owners]);
-
-  const team = useMemo(
-    () => (gates.team ? teamMetrics(periods.team, ck.team.today, p.dept || undefined, owners, dept.rolesOf) : null),
-    [gates.team, periods.team, ck, p.dept, owners, dept.rolesOf, teamVersion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const finLive = useMemo(
     () => (finance.state === "ready"
@@ -283,10 +264,33 @@ export function useOverview(p: Params): OverviewData {
   const attention = useMemo(
     () => (attentionState === "loading" ? [] : attentionItems(deals, finLive, payLive, attTeam, ck.teamLive.today)),
     [attentionState, deals, finLive, payLive, attTeam, ck]);
-  const signals = useMemo(() => planningSignals(deals, fin, pay, team, ck.deals.today), [deals, fin, pay, team, ck]);
+  /* PLANNING SIGNALS ON THE BACKEND (d8). Deals as before; the next-30-days
+     tile is the Finance section's installments plus salaries/ `owed` (every
+     unpaid, un-held slip); the workload tile is Operations' split; net cash and
+     away soon are overview/signals/. Each source draws its tiles when it
+     answers (signalWaits covers the rest). */
+  const salaries = finance.raw.salaries;
+  const signals = useMemo(() => planningSignals({
+    deals,
+    trajectory: gates.finance && sig.data && "months" in sig.data.trajectory ? sig.data.trajectory.months : null,
+    obligations: finLive ? {
+      dueSoon: finLive.dueSoon, owedPaise: gates.payroll && salaries ? salaries.owed.paise : null,
+    } : null,
+    workload: gates.team && ops.data
+      ? { dueWeek: ops.data.tasks.dueWeek, byMember: ops.data.tasks.dueWeekByMember } : null,
+    away: !gates.team || !sig.data ? null : "denied" in sig.data.away ? "denied" : sig.data.away.members,
+  }, ck.deals.today), [deals, gates.finance, gates.payroll, gates.team, sig.data, finLive, salaries, ops.data, ck]);
+  const signalWaits = ([
+    { key: "deals", what: "Deals", retry: refetchDeals,
+      state: gates.deals && api.loading ? "loading" : gates.deals && api.error ? "error" : "ready" },
+    { key: "finance", what: "Installments and payroll", retry: finance.retry, state: gates.finance ? finance.state : "off" },
+    { key: "signals", what: "Net cash and leave", retry: sig.retry, state: gates.finance || gates.team ? sig.state : "off" },
+    { key: "tasks", what: "Tasks due", retry: ops.retry, state: gates.team ? ops.state : "off" },
+  ] as { key: string; what: string; retry: () => void; state: string }[])
+    .filter((x): x is SignalWait => x.state === "loading" || x.state === "error");
 
   return {
-    gates, api, clocks: ck, periods, deals, fin, pay, team,
+    gates, api, clocks: ck, periods, deals,
     finLive, finState: finance.state, payLive, retryFinance: finance.retry,
     teamTable,
     /* The table needs BOTH reads: the roster (roles + users) and the period's
@@ -295,7 +299,7 @@ export function useOverview(p: Params): OverviewData {
     ops: ops.data, opsState: ops.state, retryOps: ops.retry,
     money, moneyState: live.money, retryLive: live.retry,
     intake: gates.enquiries ? intake : null,
-    health, attention, attentionState, signals,
+    health, attention, attentionState, signals, signalWaits,
     retryAttention: () => { refetchDeals(); live.retry(); finance.retry(); attnLive.retry(); },
     retryDeals: refetchDeals,
     ownerOptions: api.owners.map((o) => ({ v: String(o.id), l: o.name })),

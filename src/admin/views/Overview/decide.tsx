@@ -4,7 +4,7 @@
    one action each. Planning Signals is the last thing read, and looks ahead.
    ============================================================================= */
 import { useState } from "react";
-import { Button, ListSkeleton, Notice, Tile } from "../../ui";
+import { Button, ListSkeleton, Notice, Skeleton, Tile } from "../../ui";
 import { Spark } from "../charts";
 import { AttnRow, Empty, Go, Section } from "./bits";
 import type { OverviewData } from "./store";
@@ -67,9 +67,10 @@ export function Attention({ d }: { d: OverviewData }) {
    happened — that is what the sections above are for. */
 export function Signals({ d }: { d: OverviewData }) {
   const s = d.signals;
+  const waits = d.signalWaits;
   return (
     <Section id="ov-signals" title="Planning signals" tip="signals" desc="what the dated records say about the next few weeks">
-      {!s.length ? (
+      {!s.length && !waits.length ? (
         <Empty title="Nothing to plan from." why="Signals appear once deals, finance or team records are in your access." />
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -97,6 +98,19 @@ export function Signals({ d }: { d: OverviewData }) {
               }
             />
           ))}
+          {/* Per source (d8): a tile-sized shimmer while a source answers, a
+              notice with a retry in its place when it failed. */}
+          {waits.map((w) =>
+            w.state === "loading" ? (
+              <span key={w.key} role="status" aria-label={"Loading " + w.what.toLowerCase()}>
+                <Skeleton className="h-28 rounded-xl" />
+              </span>
+            ) : (
+              <Notice key={w.key} tone="warn" text={w.what + " did not load."}>
+                {" "}<Retry onPress={w.retry} />
+              </Notice>
+            ),
+          )}
         </div>
       )}
     </Section>

@@ -20,7 +20,8 @@
 
    The Finance section (d5) reads financeLive.ts and the attention list (d6)
    reads both files; Operations (d7) reads useOperationsLive below; the planning
-   signals still read the seed stores through `fin` / `team` in store.ts.
+   signals (d8) read the deals list, the Finance section's reads, Operations and
+   useSignalsLive below -- no seed store any more.
 
    Nothing is invented: a source that has not answered is `loading`, a refusal
    or failure is `error`, and no rows is a real zero or the health cell's own
@@ -30,7 +31,7 @@ import { useEffect, useState } from "react";
 import AdminOpsService, { call } from "../../../api/modules/adminOps";
 import type {
   AdminUserRow, AgreementRow, AttendanceDayRow, DailyPlanRow, DailyReportRow, DealPaymentRow, IncomeRow, InstallmentRow,
-  LeaveRow, OverviewOperations, PlanPaymentRow, PlanPaymentsListResponse, WorkItemRow, WorkSettingsRow,
+  LeaveRow, OverviewOperations, OverviewSignals, PlanPaymentRow, PlanPaymentsListResponse, WorkItemRow, WorkSettingsRow,
 } from "../../../api/modules/adminOps";
 import { addDays, healthOf, todayLocal } from "./derive";
 import type { AttentionTeam, DealMetrics, HealthCell, OwnerStat, Period } from "./derive";
@@ -291,6 +292,26 @@ export function useOperationsLive(p: Period, role: string | undefined) {
     }).catch(() => { if (live) setS({ state: "error", data: null }); });
     return () => { live = false; };
   }, [p.from, p.to, role, nonce]);
+
+  return { ...s, retry: () => setNonce((n) => n + 1) };
+}
+
+/* --------------------------------------------------------------- signals --- */
+/** Net cash by month + away soon for the planning signals (d8), one read
+ *  (GET overview/signals/). Real clock; `role` narrows away. */
+export function useSignalsLive(role: string | undefined) {
+  const [s, setS] = useState<{ state: LiveState; data: OverviewSignals | null }>({ state: "loading", data: null });
+  const [nonce, setNonce] = useState(0);
+
+  useEffect(() => {
+    let live = true;
+    setS({ state: "loading", data: null });
+    AdminOpsService.overviewSignals({ role }).then((r) => {
+      if (!live) return;
+      setS(r.response === false ? { state: "error", data: null } : { state: "ready", data: r.data });
+    }).catch(() => { if (live) setS({ state: "error", data: null }); });
+    return () => { live = false; };
+  }, [role, nonce]);
 
   return { ...s, retry: () => setNonce((n) => n + 1) };
 }

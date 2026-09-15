@@ -569,8 +569,23 @@ export function attentionItems(deals: DealMetrics | null, fin: AttentionMoney | 
 export interface Signal {
   id: string; title: string; value: string; sub: string; tone?: Tone; to?: string; toLabel?: string; spark?: number[];
 }
-export function planningSignals(deals: DealMetrics | null, fin: FinanceMetrics | null, pay: Payroll | null,
-  team: TeamMetrics | null, dealsToday: string): Signal[] {
+/** What the signals read, all live (overview/d8). A source that is off, still
+ *  answering or failed is null and its tiles are not drawn -- the section says
+ *  why beside them. */
+export interface SignalSources {
+  deals: DealMetrics | null;
+  /** GET overview/signals/ months, oldest first (last 3 calendar months). */
+  trajectory: { month: string; netPaise: number }[] | null;
+  /** Installments due in the next 30 days (financeLive dueSoon) + what payroll
+   *  still owes (salaries/ owed; null = payroll not in your access). */
+  obligations: { dueSoon: { n: number; paise: number }; owedPaise: number | null } | null;
+  /** overview/operations tasks: dueWeek + dueWeekByMember. */
+  workload: { dueWeek: number; byMember: { name: string; n: number }[] } | null;
+  /** overview/signals away; "denied" = the tile is drawn and says so. */
+  away: { name: string; fromDate: string; toDate: string }[] | "denied" | null;
+}
+export function planningSignals(src: SignalSources, dealsToday: string): Signal[] {
+  const { deals, trajectory, obligations, workload, away } = src;
   const out: Signal[] = [];
   if (deals) {
     const e = deals.expectedThisMonth;
@@ -586,8 +601,8 @@ export function planningSignals(deals: DealMetrics | null, fin: FinanceMetrics |
       to: "#/deals?sort=value", toLabel: "By value",
     });
   }
-  if (fin) {
-    const last = fin.months.slice(-3);
+  if (trajectory) {
+    const last = trajectory.slice(-3);
     if (last.length >= 2) {
       const a = last[0].netPaise, b = last[last.length - 1].netPaise;
       const dir = b > a ? "rising" : b < a ? "falling" : "flat";
@@ -597,25 +612,34 @@ export function planningSignals(deals: DealMetrics | null, fin: FinanceMetrics |
         to: "#/finance-analytics", toLabel: "Analytics",
       });
     }
-    const owed = fin.dueSoon.paise + (pay ? pay.owedPaise : 0);
+  }
+  if (obligations) {
+    const { dueSoon, owedPaise } = obligations;
+    const owed = dueSoon.paise + (owedPaise || 0);
     out.push({
       id: "obligations", title: "Next 30 days", value: owed ? cmp(owed) : "—",
-      sub: [fin.dueSoon.n ? cmp(fin.dueSoon.paise) + " due from " + plural(fin.dueSoon.n, "installment") : "no installments fall due",
-        pay ? (pay.owedPaise ? cmp(pay.owedPaise) + " payroll owed" : "payroll clear") : "payroll not in your access"].join(" · "),
+      sub: [dueSoon.n ? cmp(dueSoon.paise) + " due from " + plural(dueSoon.n, "installment") : "no installments fall due",
+        owedPaise === null ? "payroll not in your access" : owedPaise ? cmp(owedPaise) + " payroll owed" : "payroll clear"].join(" · "),
       to: "#/finance?flag=due", toLabel: "Due",
     });
   }
-  if (team) {
-    const load = team.dueSoonByMember.slice(0, 3);
+  if (workload) {
+    const load = workload.byMember.slice(0, 3);
     out.push({
-      id: "workload", title: "Due in the next 7 days", value: team.dueWeek ? plural(team.dueWeek, "item") : "—",
-      sub: load.length ? load.map((x) => x.m.name.split(" ")[0] + " " + x.n).join(" · ") : "nothing is due this week",
-      tone: team.dueWeek ? undefined : "mute", to: "#/work?due=week", toLabel: "This week",
+      id: "workload", title: "Due in the next 7 days", value: workload.dueWeek ? plural(workload.dueWeek, "item") : "—",
+      sub: load.length ? load.map((x) => x.name.split(" ")[0] + " " + x.n).join(" · ") : "nothing is due this week",
+      tone: workload.dueWeek ? undefined : "mute", to: "#/work?due=week", toLabel: "This week",
     });
-    const away = team.onLeaveSoon;
+  }
+  if (away === "denied") {
+    out.push({
+      id: "capacity", title: "Away in the next 14 days", value: "—", sub: "leave not in your access",
+      tone: "mute", to: "#/attendance", toLabel: "Attendance",
+    });
+  } else if (away) {
     out.push({
       id: "capacity", title: "Away in the next 14 days", value: away.length ? plural(away.length, "member") : "nobody",
-      sub: away.length ? away.map((l) => (team.members.find((m) => m.memberId === l.memberId)?.name.split(" ")[0] || "?") + " " + shortDate(l.fromDate) + "–" + shortDate(l.toDate)).join(" · ") : "no approved leave ahead",
+      sub: away.length ? away.map((l) => l.name.split(" ")[0] + " " + shortDate(l.fromDate) + "–" + shortDate(l.toDate)).join(" · ") : "no approved leave ahead",
       tone: away.length ? "warn" : "mute", to: "#/attendance", toLabel: "Attendance",
     });
   }

@@ -717,9 +717,21 @@ export interface AgreementRow {
  *  server's clock. Counts only; `leave` ignores the role filter. */
 export interface OverviewOperations {
   asOf: string; period: { start: string; end: string }; members: number;
-  tasks: { overdue: number; waiting: number; dueWeek: number; inProgress: number; completed: number };
+  tasks: {
+    overdue: number; waiting: number; dueWeek: number; inProgress: number; completed: number;
+    /** dueWeek per assignee with any, most first (overview/d8). */
+    dueWeekByMember: { id: number; name: string; n: number }[];
+  };
   today: { present: number; late: number; absent: number; onLeave: number; unclosed: number };
   owed: { noPlan: number; noEod: number; unread: number; leave: number; agreementsUnopened: number; docsMissing: number };
+}
+/** GET overview/signals/ (overview/d8): the planning signals the page does not
+ *  already read. Each piece is gated on the server on its own -- trajectory on
+ *  finance.view, away on full access -- and is `{ denied: true }` when refused. */
+export interface OverviewSignals {
+  asOf: string;
+  trajectory: { months: { month: string; netPaise: number }[] } | { denied: true };
+  away: { members: { id: number; name: string; fromDate: string; toDate: string }[] } | { denied: true };
 }
 type Paged<K extends string, T> = { [k in K]: T[] } & { total: number; pageNo: number; pageSize: number };
 export interface WorkListResponse { items: WorkItemRow[]; total: number; pageNo: number; pageSize: number; }
@@ -756,6 +768,8 @@ export interface SalariesResponse {
   runs: SalaryRunRow[]; total: number;
   paidInPeriod: { runs: number; slips: number; paise: number };
   openRun: SalaryRunRow | null;
+  /** Every unpaid slip in every run, held slips left out (overview/d8). */
+  owed: { paise: number; people: number };
 }
 export interface RefundRow {
   id: number; amountPaise: number; ground: VocabItem; detail: string; state: VocabItem;
@@ -1465,6 +1479,10 @@ export class AdminOpsService {
   /** overview.view. `start`/`end` bound "Completed"; `role` = rbac role name. */
   static overviewOperations(params: { start: string; end: string; role?: string }) {
     return apiService.getGetApiResponse<OverviewOperations>(`${base}/overview/operations/${qs(params)}`);
+  }
+  /** overview.view; each piece gated on its own (see OverviewSignals). `role` narrows `away`. */
+  static overviewSignals(params: { role?: string } = {}) {
+    return apiService.getGetApiResponse<OverviewSignals>(`${base}/overview/signals/${qs(params)}`);
   }
   /** `member` omitted = own; an id or `all` is full access only. `expiresFrom`/`To` are dates. */
   static agreements(params: { member?: string; state?: string; expiresFrom?: string; expiresTo?: string; pageNo?: number; pageSize?: number } = {}) {
