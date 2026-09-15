@@ -589,7 +589,15 @@ export interface PlatformUserRecord extends PlatformUserItem {
   accountUsername: string;
   deactivatedReason: string | null;
   deactivatedAt: string | null;
+  /** ONE flag for the account (an OTP entered on the login name), not per channel. */
+  isVerified: boolean;
+  /** CustomUser.unique_id. */
+  authUserId: string;
+  /** A UserRegistrationSource key; "" = not recorded. */
+  registrationSource: string;
   profile: PlatformUserItem["profile"] & {
+    /** UserProfile.updatedAt; null when the account has no profile row. */
+    updatedAt: string | null;
     businessName: string | null;
     businessType: ValueLabel[];
     dealsIn: ValueLabel[];
@@ -610,7 +618,10 @@ export interface UsersVocabularies {
   sortOptions: { key: string; label: string }[];
   /** The profile schema rows (the ProfileField shape the Users store reads). */
   profileFields?: Record<string, unknown>[];
+  /** Decisions not yet taken, named on the screens they affect. */
+  openDecisions?: OpenDecision[];
 }
+export interface OpenDecision { id: string; title: string; position: string; blocks: string }
 
 /** A plan purchase (TransectionData) as `payments/` returns it. Money is a
  *  RUPEE string here, not paise — the legacy model stores it that way. */

@@ -31,7 +31,7 @@ import analyticsDoc from "../../../content/users/analytics.json";
 import auditDoc from "../../../content/users/audit.json";
 import AdminOpsService, { call } from "../../../api/modules/adminOps";
 import type {
-  AuditEntry, PlatformUserItem, PlatformUserRecord, PlatformUsersPage, UsersVocabularies, ValueLabel,
+  AuditEntry, OpenDecision, PlatformUserItem, PlatformUserRecord, PlatformUsersPage, UsersVocabularies, ValueLabel,
 } from "../../../api/modules/adminOps";
 import { AdminService } from "../../../api/modules/admin";
 import type { UserTotals } from "../../../api/modules/admin";
@@ -515,7 +515,7 @@ export const RESERVED_USERNAMES = vocabDoc.reservedUsernames as string[];
 export let REGISTERED_RANGES: VocabOption[] = [];
 export let SORT_OPTIONS: VocabOption[] = [];
 export const METRICS = vocabDoc.metricDefinitions;
-export const OPEN_DECISIONS = vocabDoc.openDecisions;
+export let OPEN_DECISIONS: OpenDecision[] = [];
 export const PROFILE_SCHEMA_VERSION = vocabDoc.profileSchemaVersion;
 export const ANALYTICS = analyticsDoc;
 
@@ -853,6 +853,7 @@ export function applyUsersVocab(v: UsersVocabularies): void {
   REGISTERED_RANGES = v.registeredRanges || [];
   SORT_OPTIONS = v.sortOptions || [];
   PROFILE_FIELDS = (v.profileFields || []) as unknown as ProfileField[];
+  OPEN_DECISIONS = v.openDecisions || [];
 }
 
 export async function bootUsersVocab(force = false): Promise<void> {
@@ -910,29 +911,31 @@ function queryOf(p: Params): string {
   return parts.length ? "?" + parts.join("&") : "";
 }
 
-/** The two keys the row gained after `PlatformUserItem` was written. Declared
- *  here because the api module is another route's open work right now. */
-type ServerUserItem = PlatformUserItem & { deactivatedReason?: string | null; deactivatedAt?: string | null };
+/** A list row, or a record, which carries the identity facts on top. */
+type ServerUserItem = PlatformUserItem & Partial<Pick<PlatformUserRecord,
+  "deactivatedReason" | "deactivatedAt" | "isVerified" | "authUserId" | "registrationSource">>
+  & { profile: { updatedAt?: string | null } };
 
 /** A server row in the directory's own shape. Everything the list does not send
  *  is EMPTY -- no invented values -- and fills in as the record's divs move. */
 function fromServer(r: ServerUserItem): PlatformUser {
   return {
     userId: r.userId,
-    authUserId: "",
-    registrationSource: "",
+    authUserId: r.authUserId ?? "",
+    registrationSource: r.registrationSource ?? "",
     userStatus: r.userStatus,
     registeredAt: r.registeredAt || "",
     deactivatedAt: r.deactivatedAt ?? null,
     deactivatedReason: r.deactivatedReason ?? null,
     lastActivityAt: r.lastActivityAt,
-    identity: { name: r.identity.name, email: r.identity.email, emailVerified: false,
-                phone: r.identity.phone, phoneVerified: false },
+    /* The server verifies the ACCOUNT, not each channel, so both read the one flag. */
+    identity: { name: r.identity.name, email: r.identity.email, emailVerified: !!r.isVerified,
+                phone: r.identity.phone, phoneVerified: !!r.isVerified },
     profile: {
       profileId: "", schemaVersion: "", profileStatus: "",
       username: r.profile.username, about: null, businessName: null, businessType: null,
       dealsIn: [], segments: [], categories: [], searchKeywords: [],
-      targetAreas: r.profile.targetAreas, positioning: [], updatedBy: null, updatedAt: null,
+      targetAreas: r.profile.targetAreas, positioning: [], updatedBy: null, updatedAt: r.profile.updatedAt ?? null,
     },
     tags: r.tags.map((t) => ({ slug: t.slug, assignedBy: "", assignedAt: "" })),
     notes: [],

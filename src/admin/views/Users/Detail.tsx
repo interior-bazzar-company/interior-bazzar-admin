@@ -28,7 +28,7 @@ import { Assumed, ClassPill, Completeness, ProtoBar, TagChips } from "./bits";
 import EditProfile from "./EditProfile";
 import { DeactivateModal, NoteModal, TagsModal } from "./Modals";
 import {
-  PROFILE_FIELDS, VOCAB,
+  PROFILE_FIELDS, REGISTRATION_SOURCES, VOCAB,
   ago, facetLabel, fmtDate, fmtDateTime, labelsFor, primaryCityOf, profileUrl,
   resetStore, useTimeline, useUserRecord, useUsersPageState,
 } from "./store";
@@ -244,7 +244,7 @@ export default function Detail({ id, p, rows, onParams }: {
                     </span>
                   : ""],
                 ["Auth identity", <span className="font-mono">{u.authUserId}</span>],
-                ["Registered via", VOCAB.registrationSources.filter((s) => s.key === u.registrationSource)[0]?.label],
+                ["Registered via", REGISTRATION_SOURCES.filter((s) => s.key === u.registrationSource)[0]?.label],
                 ["Registered", <span className="tnum">{fmtDate(u.registeredAt)}</span>],
                 ["Last seen", <span className="tnum">{ago(u.lastActivityAt)}</span>],
                 ["Account", off

@@ -71,6 +71,7 @@ S.applyUsersVocab({
   registeredRanges: vocab.registeredRanges,
   sortOptions: vocab.sortOptions,
   profileFields: vocab.profileFields,   // the server seeds its table from these rows verbatim
+  openDecisions: vocab.openDecisions,   // the server's constant is these rows verbatim
 });
 
 /* THE ROWS COME FROM THE SERVER NOW TOO (GET /admin/platform-users/), so the
