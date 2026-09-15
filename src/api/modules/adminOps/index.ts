@@ -583,6 +583,12 @@ export interface PlatformUsersPage { users: PlatformUserItem[]; total: number; p
 
 /** A stored value and the label the server gives it. */
 export interface ValueLabel { value: string; label: string }
+/** Pointers into Deals and Invoices. An invoice is opened by id; its number is null until issued. */
+export interface UserCommercial {
+  salesOwner: string | null;
+  dealRefs: string[];
+  invoices: { id: number; number: string | null }[];
+}
 /** GET v1/admin/platform-users/<pk>/ — the row above plus the account's login
  *  username and the business profile it holds (a business first, else a shop). */
 export interface PlatformUserRecord extends PlatformUserItem {
@@ -595,6 +601,8 @@ export interface PlatformUserRecord extends PlatformUserItem {
   authUserId: string;
   /** A UserRegistrationSource key; "" = not recorded. */
   registrationSource: string;
+  /** Always empty today: a Deal has no link to an account. */
+  commercial: UserCommercial;
   profile: PlatformUserItem["profile"] & {
     /** UserProfile.updatedAt; null when the account has no profile row. */
     updatedAt: string | null;

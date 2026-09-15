@@ -273,10 +273,10 @@ export default function Detail({ id, p, rows, onParams }: {
                     ))}
                   </span>
                 : ""],
-              ["Invoices", u.commercial.invoiceRefs.length
+              ["Invoices", u.commercial.invoices.length
                 ? <span className="flex flex-wrap items-center gap-1.5">
-                    {u.commercial.invoiceRefs.map((d) => (
-                      <LinkChip key={d} refText={d} to={"#/invoices/" + d} ico="invoice" />
+                    {u.commercial.invoices.map((d) => (
+                      <LinkChip key={d.id} refText={d.number || "Draft #" + d.id} to={"#/invoices/" + d.id} ico="invoice" />
                     ))}
                   </span>
                 : ""],

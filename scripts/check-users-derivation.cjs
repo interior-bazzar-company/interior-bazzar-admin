@@ -82,6 +82,11 @@ S.applyUsersVocab({
    without a `completeness` key are graded here against the profile schema,
    which is what this file has always checked. */
 S.applyServerDate(usersDoc.asOf);
+/* The server sends invoices as {id, number}; the seed still holds bare numbers. */
+users.forEach((u) => {
+  const { invoiceRefs, ...rest } = u.commercial;
+  u.commercial = { ...rest, invoices: (invoiceRefs || []).map((n, i) => ({ id: i + 1, number: n })) };
+});
 S.applyUsersPage(users);
 const auditDoc = require("../src/content/users/audit.json");
 const all = users.map((u) => S.toRow(u));
@@ -146,7 +151,7 @@ ok("no user record carries a stored classification column",
   probe.lastActivityAt = null;
   probe.tags = [];
   probe.notes = [];
-  probe.commercial = { salesOwner: null, dealRefs: [], invoiceRefs: [] };
+  probe.commercial = { salesOwner: null, dealRefs: [], invoices: [] };
   ok("a stale deactivatedAt does not deactivate anybody", S.classify(probe), "active");
   probe.userStatus = "deactivated";
   ok("...and the status word alone does", S.classify(probe), "deactivated");

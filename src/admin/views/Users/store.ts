@@ -31,7 +31,8 @@ import analyticsDoc from "../../../content/users/analytics.json";
 import auditDoc from "../../../content/users/audit.json";
 import AdminOpsService, { call } from "../../../api/modules/adminOps";
 import type {
-  AuditEntry, OpenDecision, PlatformUserItem, PlatformUserRecord, PlatformUsersPage, UsersVocabularies, ValueLabel,
+  AuditEntry, OpenDecision, PlatformUserItem, PlatformUserRecord, PlatformUsersPage, UserCommercial,
+  UsersVocabularies, ValueLabel,
 } from "../../../api/modules/adminOps";
 import { AdminService } from "../../../api/modules/admin";
 import type { UserTotals } from "../../../api/modules/admin";
@@ -116,7 +117,7 @@ export interface PlatformUser {
   /** Read-only pointers into the modules that DO own the commercial
    *  relationship. References, never amounts and never state: this module
    *  records that a deal or an invoice exists and links to it. */
-  commercial: { salesOwner: string | null; dealRefs: string[]; invoiceRefs: string[] };
+  commercial: UserCommercial;
   /** Present only on a row the SERVER sent: the go-live score it already
    *  persists, or null when there is no business, shop or architect to grade.
    *  Absent, the row is graded here against the profile schema (the offline
@@ -684,7 +685,7 @@ function matchesSearch(r: UserRow, q: string): boolean {
     /* The commercial references are searchable because somebody arrives
        holding one — "who is DL-3310" is asked of this directory even though
        the deal and the invoice live elsewhere. */
-    ...u.commercial.dealRefs, ...u.commercial.invoiceRefs,
+    ...u.commercial.dealRefs, ...u.commercial.invoices.map((i) => i.number || ""),
   ].map(norm).join(" ");
   if (hay.indexOf(needle) >= 0) return true;
   /* Phone matched on the LAST TEN DIGITS, so "+91 98450 11902", "9845011902"
@@ -913,7 +914,7 @@ function queryOf(p: Params): string {
 
 /** A list row, or a record, which carries the identity facts on top. */
 type ServerUserItem = PlatformUserItem & Partial<Pick<PlatformUserRecord,
-  "deactivatedReason" | "deactivatedAt" | "isVerified" | "authUserId" | "registrationSource">>
+  "deactivatedReason" | "deactivatedAt" | "isVerified" | "authUserId" | "registrationSource" | "commercial">>
   & { profile: { updatedAt?: string | null } };
 
 /** A server row in the directory's own shape. Everything the list does not send
@@ -939,7 +940,7 @@ function fromServer(r: ServerUserItem): PlatformUser {
     },
     tags: r.tags.map((t) => ({ slug: t.slug, assignedBy: "", assignedAt: "" })),
     notes: [],
-    commercial: { salesOwner: null, dealRefs: [], invoiceRefs: [] },
+    commercial: r.commercial ?? { salesOwner: null, dealRefs: [], invoices: [] },
     completeness: r.completeness,
     missingFields: r.missingFields || [],
   };
