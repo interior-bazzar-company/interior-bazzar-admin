@@ -132,7 +132,12 @@ export default function MemberPage({ id, sub, live, roles, ops }: {
       ) : op && !opAllowed(op.key, viewer) ? (
         <OpRefused label={op.label} />
       ) : op ? (
-        m ? (
+        /* Attendance reads the server (team/d3); the other op pages still take the seed record. */
+        op.key === "attendance" ? (
+          <div className="flex flex-col gap-4">
+            <AttendancePage q={q} live={live} viewer={viewer} />
+          </div>
+        ) : m ? (
           <div className="flex flex-col gap-4">
             <OpBody op={op.key} m={m} viewer={viewer} />
           </div>
@@ -145,7 +150,6 @@ export default function MemberPage({ id, sub, live, roles, ops }: {
 }
 
 function OpBody({ op, m, viewer }: { op: string; m: Member; viewer: Viewer }) {
-  if (op === "attendance") return <AttendancePage m={m} viewer={viewer} />;
   if (op === "work") return <WorkPage m={m} viewer={viewer} />;
   if (op === "leave") return <LeavePage m={m} viewer={viewer} />;
   if (op === "reports") return <ReportsPage m={m} viewer={viewer} />;

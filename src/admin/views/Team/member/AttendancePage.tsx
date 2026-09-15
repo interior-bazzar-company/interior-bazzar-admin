@@ -20,19 +20,29 @@
    chances for the panel to disagree with itself mid-request; this page states
    the day, the other two change it.
    ============================================================================= */
-import { Alert, Button, Card, ListTable, Pill, Tiles } from "../../../ui";
+import { Alert, Button, Card, ListTable, Notice, PaneLoading, Pill, Tiles } from "../../../ui";
 import { go } from "../../../ui/nav";
-import {
-  TODAY, addDays, attendanceTotals, dayRows, fmtDate, fmtDayName, fmtHM, isWeekend, leaveFor,
-  now as clockNow, onLeave, workedOf,
-} from "../store";
-import type { DayRow, Member } from "../store";
+import { addDays, fmtDate, fmtDayName, fmtHM } from "../store";
+import type { Member as LiveMember } from "../../teamShared";
+import { ATTENDANCE_WINDOW as WINDOW, useAttendanceDays } from "../liveMember";
+import type { LiveDay, MemberReads, Part } from "../liveMember";
 import { BarScale, DayBar, MonthGrid, MonthKey, StatePill } from "../bits";
 import type { MonthCell } from "../bits";
 import type { Viewer } from "./ops";
 import { OpHead, memberHref } from "./frame";
 
-const WINDOW = 14;
+/* team/d3: the server's days, clock, settings and leave — never the seed. The
+   weekly off is Sunday only; Saturday is a working day. */
+const isSunday = (d: string) => fmtDayName(d) === "Sun";
+
+/** A server day in the shape the bar and the table draw. */
+const rowOf = (x: LiveDay) => ({
+  day: x.startedAt ? { startedAt: x.startedAt, endedAt: x.endedAt, breaks: x.breaks, breakMinutes: x.breakMinutes } : null,
+  state: x.state.key, label: x.state.label, tone: x.state.tone,
+  worked: x.workedMinutes, isLate: x.isLate,
+  // ponytail: stored break total only — a break still running shows on the bar, not in its tooltip figure
+  breakMins: x.breakMinutes,
+});
 
 const KEY = [
   { tone: "ok", label: "Worked" },
@@ -41,26 +51,43 @@ const KEY = [
   { tone: "info", label: "On leave" },
 ];
 
-export default function AttendancePage({ m, viewer }: { m: Member; viewer: Viewer }) {
+export default function AttendancePage({ q, live, viewer }: { q: MemberReads; live: LiveMember; viewer: Viewer }) {
+  const today = q.clock.state === "ok" ? q.clock.data.today : "";
+  const got = useAttendanceDays(String(live.id), today);
+
+  if (q.clock.state !== "ok" || got.state !== "ok") {
+    const p: Part<unknown> = q.clock.state !== "ok" ? q.clock : got;
+    return p.state === "denied" ? <Notice tone="warn" text={"Attendance is not in your access. " + p.message} />
+      : p.state === "error" ? <Notice tone="bad" text={"Attendance could not be loaded. " + p.message} />
+        : <PaneLoading />;
+  }
+
+  const settings = q.settings.state === "ok" ? q.settings.data : null;
+  const leave = q.leave.state === "ok" ? q.leave.data : [];
+  const onLeave = (d: string) => leave.some((l) => l.state?.key === "approved" && d >= l.fromDate && d <= l.toDate);
+
+  /* The member's days by date. An inactive member lists none (team/d3). */
+  const known: Record<string, LiveDay> = {};
+  if (live.isActive !== false) got.data.forEach((x) => { known[x.businessDate] = x; });
+
   const days: string[] = [];
-  for (let i = WINDOW - 1; i >= 0; i--) days.push(addDays(TODAY, -i));
+  for (let i = WINDOW - 1; i >= 0; i--) days.push(addDays(today, -i));
+  const rows = days.filter((d) => !!known[d]).map((d) => ({ d, row: rowOf(known[d]) }));
 
-  const rows = days
-    .map((d) => ({ d, row: dayRows(d, "all").filter((r) => r.member.memberId === m.memberId)[0] }))
-    .filter((x) => !!x.row) as { d: string; row: DayRow }[];
+  const tot = {
+    present: rows.filter((x) => !!x.row.day).length,
+    late: rows.filter((x) => !!x.row.day && x.row.isLate).length,
+    absent: rows.filter((x) => x.row.state === "absent").length,
+    unclosed: rows.filter((x) => x.row.state === "unclosed").length,
+  };
+  const hm = q.clock.data.hhmm.split(":");
+  const nowH = Number(hm[0]) + Number(hm[1]) / 60;
+  const covered = rows.filter((x) => onLeave(x.d)).length;
+  const pending = leave.filter((l) => l.state?.key === "requested").length;
 
-  const tot = attendanceTotals(rows.map((x) => x.row));
-  const at = new Date(clockNow());
-  const nowH = at.getHours() + at.getMinutes() / 60;
-  const covered = rows.filter((x) => !!onLeave(m.memberId, x.d)).length;
-  const pending = leaveFor(m.memberId).filter((l) => l.state === "requested").length;
-
-  /* The calendar the fortnight sits inside. Days the window cannot answer for
-     are drawn as ground and carry no state — a blank that read as "absent"
-     would be this screen inventing a fact it has not been given. */
-  const known: Record<string, DayRow> = {};
-  rows.forEach((x) => { known[x.d] = x.row; });
-  const month = monthCells(TODAY, known, m);
+  /* The calendar: every day of the month up to today carries the server's
+     state; days after today and the neighbouring months are ground. */
+  const month = monthCells(today, known);
 
   return (
     <div className="flex flex-col gap-5">
@@ -68,14 +95,14 @@ export default function AttendancePage({ m, viewer }: { m: Member; viewer: Viewe
         title="Attendance"
         desc={"The last " + WINDOW + " days, as the derivation sees them. The clock itself lives in the topbar."}
         right={
-          <Button color="secondary" ico="calendar" onClick={() => go(memberHref(m.memberId, "leave"))}>
+          <Button color="secondary" ico="calendar" onClick={() => go(memberHref(String(live.id), "leave"))}>
             Leave{pending ? " · " + pending : ""}
           </Button>
         } />
 
       <Tiles list={[
         { k: "Present", v: String(tot.present), s: "of " + rows.length + " days listed" },
-        { k: "Late", v: String(tot.late), s: "against their own " + m.dayStartsAt + " start", tone: tot.late ? "warn" : "" },
+        { k: "Late", v: String(tot.late), s: "against their own " + (settings ? settings.dayStartsAt : "—") + " start", tone: tot.late ? "warn" : "" },
         { k: "Absent", v: String(tot.absent), s: covered ? covered + " other days covered by leave" : "derived, never stored", tone: tot.absent ? "bad" : "" },
         { k: "Unclosed", v: String(tot.unclosed), s: "nothing auto-closes", tone: tot.unclosed ? "warn" : "" },
       ]} />
@@ -130,23 +157,23 @@ export default function AttendancePage({ m, viewer }: { m: Member; viewer: Viewe
           <th scope="col">Note</th>
         </tr>}>
           {rows.slice().reverse().map(({ d, row }) => {
-            const lv = onLeave(m.memberId, d);
+            const lv = onLeave(d);
             return (
               /* A weekend is listed so a gap is never read as a missed day, and
                  it is dimmed so it never competes with one. */
-              <tr key={d} className={isWeekend(d) ? "opacity-60" : undefined}>
+              <tr key={d} className={isSunday(d) ? "opacity-60" : undefined}>
                 <td className="cell-1">
                   {fmtDayName(d)}
                   <span className="block cell-2 tnum">{fmtDate(d)}</span>
                 </td>
-                <td><StatePill state={row.state} /></td>
+                <td><StatePill state={row.state} label={row.label} tone={row.tone} /></td>
                 <td><DayBar row={row} nowH={nowH} /></td>
-                <td className="n">{row.day ? fmtHM(workedOf(row.day, m)) : "—"}</td>
+                <td className="n">{row.day ? fmtHM(row.worked) : "—"}</td>
                 <td className="n">{row.day ? fmtHM(row.day.breakMinutes) : "—"}</td>
                 <td>
                   {lv ? <Pill xs dot tone="info" text="on leave" />
-                    : isWeekend(d) ? <span className="text-quaternary">not a working day</span>
-                      : row.day && row.day.isLate ? <span className="text-warning-primary">late at the open</span>
+                    : isSunday(d) ? <span className="text-quaternary">not a working day</span>
+                      : row.day && row.isLate ? <span className="text-warning-primary">late at the open</span>
                         : <span className="text-quaternary">—</span>}
                 </td>
               </tr>
@@ -177,7 +204,7 @@ export default function AttendancePage({ m, viewer }: { m: Member; viewer: Viewe
 
 /* THE CALENDAR, built from the month `today` falls in. Sunday-first, because
    that is what the day-name strip everywhere else in this module uses. */
-function monthCells(today: string, known: Record<string, DayRow>, m: Member): MonthCell[] {
+function monthCells(today: string, known: Record<string, LiveDay>): MonthCell[] {
   const first = today.slice(0, 8) + "01";
   const start = new Date(first + "T00:00:00");
   const lead = start.getDay();
@@ -188,14 +215,15 @@ function monthCells(today: string, known: Record<string, DayRow>, m: Member): Mo
   for (let i = 0; i < total; i++) {
     const date = addDays(first, i - lead);
     const outside = date.slice(0, 7) !== first.slice(0, 7);
-    const row = known[date] || null;
-    const lv = !outside && !!onLeave(m.memberId, date);
+    const row = outside ? null : known[date] || null;
     out.push({
       date,
-      state: outside ? null : lv && !(row && row.day) ? "on_leave" : row ? row.state : null,
-      worked: row && row.day ? workedOf(row.day, m) : null,
-      late: !!(row && row.day && row.day.isLate),
-      weekend: isWeekend(date),
+      state: row ? row.state.key : null,
+      label: row ? row.state.label : undefined,
+      tone: row ? row.state.tone : undefined,
+      worked: row && row.startedAt ? row.workedMinutes : null,
+      late: !!(row && row.startedAt && row.isLate),
+      weekend: isSunday(date),
       today: date === today,
       outside,
     });

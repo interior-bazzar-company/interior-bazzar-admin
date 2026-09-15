@@ -17,6 +17,7 @@ import type {
   ResourceResponseRow, ResourceRow, SalaryAccountRow, WorkItemRow, WorkSettingsRow,
 } from "../../../api/modules/adminOps";
 import { AppExceptions, errMessage } from "../../../api/apiService";
+import { addDays } from "./store";
 
 export type Part<T> =
   | { state: "loading" }
@@ -100,6 +101,40 @@ export function useMemberReads(live: AdminUserRow | null): MemberReads {
   }, [id]);
 
   return r;
+}
+
+/* ------------------------------------------------ attendance page (d3) --- */
+
+export const ATTENDANCE_WINDOW = 14;
+
+/** A day row as the server sends it. Declared here, not in adminOps (held by
+ *  another route): the row also carries its breaks, and `weekly_off` (an
+ *  unopened Sunday) is a state the shared type does not list yet. */
+export type LiveDay = Omit<AttendanceDayRow, "state"> & {
+  state: { key: string; label: string; tone: string };
+  breaks: { startedAt: string; endedAt: string | null; minutes: number | null }[];
+};
+
+/** The member's days, the days nobody opened included: the 14-day window and
+ *  the month `today` sits in, in one request. */
+export function useAttendanceDays(memberId: string, today: string): Part<LiveDay[]> {
+  const [p, setP] = useState<Part<LiveDay[]>>(LOADING);
+
+  useEffect(() => {
+    if (!memberId || !today) return;
+    let cancelled = false;
+    setP(LOADING);
+    const back = addDays(today, -(ATTENDANCE_WINDOW - 1));
+    const first = today.slice(0, 8) + "01";
+    call(AdminOpsService.attendanceDays({
+      member: memberId, start: back < first ? back : first, end: today, includeMissing: "true", pageSize: 100,
+    }))
+      .then((x) => { if (!cancelled) setP({ state: "ok", data: x.days as unknown as LiveDay[] }); })
+      .catch((e) => { if (!cancelled) setP(failed(e)); });
+    return () => { cancelled = true; };
+  }, [memberId, today]);
+
+  return p;
 }
 
 /** Where today sits between two dates, 0–100 — elapsed, NOT progress. */

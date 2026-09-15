@@ -21,7 +21,7 @@ import { cx } from "@/utils/cx";
 import { Icon, Person, Pill, cap, tagClasses } from "../../ui";
 import { go } from "../../ui/nav";
 import type {
-  AttendanceState, DayRow, Member, Priority, WorkItem, WorkStatus,
+  AttendanceDay, AttendanceState, DayRow, Member, Priority, WorkItem, WorkStatus,
 } from "./store";
 import {
   ATT_STATE, PRIORITY, WORK_STATUS, fmtHM, fmtTime, isDelayed, labelOf, progressOf, toneOf,
@@ -35,9 +35,11 @@ export function Who({ m, sub }: { m: Member; sub?: ReactNode }) {
 
 /* ------------------------------------------------------------- status --- */
 
-export function StatePill({ state }: { state: AttendanceState }) {
+/** `label` / `tone` given = the server's words for the state (team/d3); omitted
+ *  = the vocabulary's. */
+export function StatePill({ state, label, tone }: { state: AttendanceState | string; label?: string; tone?: string }) {
   const row = ATT_STATE[state];
-  return <Pill text={labelOf(ATT_STATE, state)} tone={row ? row.tone : ""} dot />;
+  return <Pill text={label ?? labelOf(ATT_STATE, state)} tone={tone ?? (row ? row.tone : "")} dot />;
 }
 
 export function StatusPill({ status }: { status: WorkStatus }) {
@@ -83,7 +85,10 @@ const pct = (h: number) => Math.max(0, Math.min(100, ((h - DAY_FROM) / (DAY_TO -
  *  outside the window left as ground. It is here because "in at 9:04, out at
  *  18:14, 32m of break" is four numbers a person has to assemble, and the shape
  *  of a day is the thing they were actually looking for. */
-export function DayBar({ row, nowH }: { row: DayRow; nowH: number }) {
+export function DayBar({ row, nowH }: {
+  row: Pick<DayRow, "breakMins"> & { state: string; day: Pick<AttendanceDay, "startedAt" | "endedAt" | "breaks" | "breakMinutes"> | null };
+  nowH: number;
+}) {
   const d = row.day;
   if (!d) {
     return (
@@ -227,7 +232,10 @@ const CELL_TONE: Record<string, string> = {
 export interface MonthCell {
   date: string;
   /** null on a day outside the window this page can answer for. */
-  state: AttendanceState | null;
+  state: AttendanceState | string | null;
+  /** The server's label / tone for `state` (team/d3); omitted = the vocabulary's. */
+  label?: string;
+  tone?: string;
   worked: number | null;
   late: boolean;
   weekend: boolean;
@@ -261,10 +269,11 @@ export function MonthGrid({ cells, weekStart = 0 }: { cells: MonthCell[]; weekSt
              right, because a finished day is not news. On the grid it is the
              whole signal: a month of green with two red gaps is the reading,
              so a day with hours on it takes the finished tone here. */
+          const own = c.tone ?? (row ? row.tone : "");
           const tone = c.late && c.state !== "absent" ? "warn"
-            : row && row.tone ? row.tone
+            : own ? own
               : c.worked != null ? "ok" : "";
-          const label = c.state ? labelOf(ATT_STATE, c.state) : "no record";
+          const label = c.state ? c.label ?? labelOf(ATT_STATE, c.state) : "no record";
           return (
             <div
               key={c.date}
