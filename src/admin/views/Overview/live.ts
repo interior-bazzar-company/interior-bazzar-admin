@@ -158,7 +158,7 @@ export function liveTeam(r: Raw, dept: string | undefined, rolesOf: Map<string, 
   /* PRESENT IS A DAY SOMEBODY OPENED. The list now also carries the days that
      do not exist (d4), and an absence is not an attendance: the start time is
      what separates them, and an unclosed day still counts for nobody. */
-  const present = r.days.filter((d) => inDept(d.member.id) && !!d.startedAt && d.state !== "unclosed");
+  const present = r.days.filter((d) => inDept(d.member.id) && !!d.startedAt && d.state.key !== "unclosed");
   const late = present.filter((d) => d.isLate).length;
   const items = r.work.filter((i) => inDept(i.assignee.id));
   const key = (i: WorkItemRow) => i.status?.key;
@@ -205,7 +205,7 @@ export function liveTeamRows(r: Raw, people: AdminUserRow[], dept: string | unde
     const id = String(u.id);
     const mine = r.work.filter((i) => String(i.assignee.id) === id);
     const days = r.days.filter((d) => String(d.member.id) === id);
-    const present = days.filter((d) => !!d.startedAt && d.state !== "unclosed");
+    const present = days.filter((d) => !!d.startedAt && d.state.key !== "unclosed");
     const late = present.filter((d) => d.isLate).length;
     const now = days.filter((d) => d.businessDate === today)[0];
     return {
@@ -214,7 +214,7 @@ export function liveTeamRows(r: Raw, people: AdminUserRow[], dept: string | unde
       late: mine.filter((i) => i.delayed).length,
       done: r.doneWork.filter((i) => String(i.assignee.id) === id).length,
       onTime: present.length ? Math.round(((present.length - late) / present.length) * 100) : null,
-      stateLabel: now ? STATE_LABEL[now.state] || now.state : "",
+      stateLabel: now ? STATE_LABEL[now.state.key] || now.state.key : "",
       deals: owners.get(id) || owners.get(u.name) || null,
     };
   }).sort((a, b) => (b.deals?.collected || 0) - (a.deals?.collected || 0) || b.done - a.done || a.late - b.late);
@@ -319,7 +319,7 @@ export function attentionTeam(a: AttnRaw, work: WorkItemRow[], table: LiveTeamTa
         .map((m) => ({ member: m })),
       unacknowledged: a.reports.filter((r) => inDept(r.member.id) && !!r.submittedAt && !r.acknowledgedAt),
     },
-    today: { unclosed: a.days.filter((d) => inDept(d.member.id) && d.state === "unclosed").length },
+    today: { unclosed: a.days.filter((d) => inDept(d.member.id) && d.state.key === "unclosed").length },
     /* The whole queue, as the panel's leaveQueue("all") counted it. Nobody is
        outside an admin's scope, so nothing is ever "unrouted" from here. */
     leave: { total: a.leave.length, unrouted: [] },

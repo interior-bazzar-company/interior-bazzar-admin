@@ -130,6 +130,8 @@ export interface AdminUserRow {
   designation?: { key: string; label: string; tone: string } | null;
   /** Required document kinds this member has not handed over. */
   missingDocuments?: { key: string; label: string }[];
+  /** team/d2; absent with no work-settings row, like `reportsTo`. */
+  employmentType?: { key: string; label: string; tone: string } | null;
 }
 /** One row of GET access-requests/ (team/d1): a member asking for one module action. */
 export interface AccessRequestRow {
@@ -643,6 +645,9 @@ export interface WorkItemRow {
   delayed: boolean; startDate: string | null; dueDate: string | null; completedAt: string | null; rowVersion: number;
   /* overview/d6 */
   kind: VocabItem; targetValue: number | null; targetUnit: string; tags: WorkTagRef[]; links: WorkLink[];
+  /** team/d2: the item it rolls up into, and progress derived by the server
+   *  (milestone = completed children ÷ all; target = EOD deltas ÷ value; task 0|100). */
+  parent?: number | null; progress?: number | null;
 }
 export interface WorkTagRef { id: number; slug: string; label: string; tone: VocabItem }
 export interface WorkTagRow extends WorkTagRef { owner: DealPersonRef; createdAt: string; archivedAt: string | null }
@@ -660,6 +665,21 @@ export interface WorkSettingsRow {
   joiningDate: string | null; autoCloseAt: string; timezone: string;
   /** Who this member answers to; null = nobody. */
   reportsTo: DealPersonRef | null; updatedAt: string;
+  designation?: VocabItem | null; employmentType?: VocabItem | null;
+}
+/** GET salaries/accounts/?member= (team/d2) — finance-salaries.view. */
+export interface SalaryAccountRow { id: number; member: DealPersonRef; employeeCode: string; monthlyGrossPaise: number; isActive: boolean }
+/** GET resources/?member= (team/d2): the member's forms (audience or answered) and their responses. */
+export interface ResourceRow {
+  id: number; title: string; description: string; tags: string[]; roles: { id: number; name: string }[];
+  state: VocabItem; version: number; fields: unknown[]; createdAt: string | null; openedAt: string | null;
+  closedAt: string | null; responses: number | null;
+}
+export interface ResourceResponseRow { id: number; resource: number; version: number; member: DealPersonRef; submittedAt: string | null }
+/** GET incentives/?member= (team/d2) — finance-salaries.view. Money in paise. */
+export interface IncentiveRow {
+  id: number; member: DealPersonRef; month: string; workItem: { id: number; title: string } | null; basis: string;
+  amountPaise: number; state: VocabItem; decidedAt: string | null; paidAt: string | null;
 }
 export interface LeaveRow {
   id: number; member: DealPersonRef; kind: VocabItem; fromDate: string; toDate: string; reason: string;
@@ -751,7 +771,8 @@ export interface BankStatementsResponse {
 export interface AttendanceDayRow {
   id: number | null; member: DealPersonRef; businessDate: string; startedAt: string | null; endedAt: string | null;
   breakMinutes: number; workedMinutes: number | null; isLate: boolean; lateByMinutes: number;
-  state: "working" | "on_break" | "ended" | "unclosed" | "absent" | "not_started" | "on_leave";
+  /** The label is the backend's (team/d2); the key is what code compares. */
+  state: { key: "working" | "on_break" | "ended" | "unclosed" | "absent" | "not_started" | "on_leave"; label: string; tone: string };
   source: VocabItem | null;
 }
 export interface AttendanceDaysResponse { days: AttendanceDayRow[]; total: number; pageNo: number; pageSize: number; }
@@ -793,6 +814,23 @@ export class AdminOpsService {
   // ── Team members (interior_admin/urls.py → AdminUserViews) ──
   static users() {
     return apiService.getGetApiResponse<AdminUserRow[]>(`${base}/users/`);
+  }
+  /** GET v1/engine/server-time/ — the server's clock; the member page's "today". */
+  static serverTime() {
+    return apiService.getGetApiResponse<{ serverNow: string; epochMs: number }>("v1/engine/server-time/");
+  }
+  /** GET resources/?member=<id> — own freely, anybody else's with resources.view. */
+  static resources(params: { member?: string; state?: string } = {}) {
+    return apiService.getGetApiResponse<{ resources: ResourceRow[]; responses: ResourceResponseRow[] | null }>(
+      `${base}/resources/${qs(params)}`);
+  }
+  /** GET incentives/?member= — finance-salaries.view. */
+  static incentives(params: { member?: string; state?: string; month?: string } = {}) {
+    return apiService.getGetApiResponse<{ incentives: IncentiveRow[]; total: number }>(`${base}/incentives/${qs(params)}`);
+  }
+  /** GET salaries/accounts/?member= — finance-salaries.view. */
+  static salaryAccounts(params: { member?: string } = {}) {
+    return apiService.getGetApiResponse<{ accounts: SalaryAccountRow[] }>(`${base}/salaries/accounts/${qs(params)}`);
   }
   /** GET access-requests/ — team.requests; anyone else gets a 403. */
   static accessRequests(params: { state?: string } = {}) {

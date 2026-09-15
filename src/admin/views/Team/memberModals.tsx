@@ -20,7 +20,9 @@
    `readRolePicks()` reads `#tmRoles` — so every field keeps its id.
    ===================================================================== */
 import { useState } from "react";
-import AdminOpsService from "../../../api/modules/adminOps";
+/* `call` unwraps the envelope: a refusal (HTTP 200, response:false) throws,
+   so it lands in ErrSlot instead of a success toast (team/d2). */
+import AdminOpsService, { call } from "../../../api/modules/adminOps";
 import { Button, FieldRow, FormField, FormSection, Input, ModalShell, Notice } from "../../ui";
 import { ErrSlot, RolePicks, errOf, readRolePicks, val } from "../teamShared";
 import type { EngineErr, Member, Ops, Role } from "../teamShared";
@@ -35,11 +37,11 @@ export function MemberNewModal({ roles, ops }: { roles: Role[]; ops: Ops }) {
     setBusy(true);
     setErr(null);
     try {
-      await AdminOpsService.createUser({
+      await call(AdminOpsService.createUser({
         username: val("tmUser"), password: val("tmPass"),
         name: val("tmName"), email: val("tmEmail"), phone: val("tmPhone"),
         roles: readRolePicks(),
-      });
+      }));
       ops.done("Member created.");
     } catch (e) {
       setErr(errOf(e));
@@ -110,9 +112,9 @@ export function MemberEditModal({ u, ops }: { u: Member; ops: Ops }) {
     setBusy(true);
     setErr(null);
     try {
-      await AdminOpsService.updateUser(u.id, {
+      await call(AdminOpsService.updateUser(u.id, {
         name: val("tmName"), email: val("tmEmail"), phone: val("tmPhone"), username: val("tmUser"),
-      });
+      }));
       ops.done("Member updated.", "#/team/" + u.id);
     } catch (e) {
       setErr(errOf(e));
@@ -171,7 +173,7 @@ export function MemberRolesModal({ u, roles, ops }: { u: Member; roles: Role[]; 
     setBusy(true);
     setErr(null);
     try {
-      await AdminOpsService.updateUser(u.id, { roles: readRolePicks() });
+      await call(AdminOpsService.updateUser(u.id, { roles: readRolePicks() }));
       ops.done("Roles updated.", "#/team/" + u.id);
     } catch (e) {
       setErr(errOf(e));
@@ -217,7 +219,7 @@ export function MemberSendCredentialsModal({ u, ops }: { u: Member; ops: Ops }) 
     setBusy(true);
     setErr(null);
     try {
-      await AdminOpsService.sendUserCredentials(u.id);
+      await call(AdminOpsService.sendUserCredentials(u.id));
       ops.done("A new password was emailed to " + u.email + ".", "#/team/" + u.id);
     } catch (e) {
       setErr(errOf(e));
@@ -260,7 +262,7 @@ export function MemberDeleteModal({ u, ops }: { u: Member; ops: Ops }) {
     setBusy(true);
     setErr(null);
     try {
-      await AdminOpsService.deleteUser(u.id);
+      await call(AdminOpsService.deleteUser(u.id));
       ops.done("Member deleted.", "#/team");
     } catch (e) {
       setErr(errOf(e));

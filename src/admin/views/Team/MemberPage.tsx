@@ -30,33 +30,33 @@
    so the two cannot fight over the topbar.
    ============================================================================= */
 import type { ReactNode } from "react";
-import { Alert, Button, Card, EmptyState, Icon, KvList, ListTable, Pill, Rail, SectionHead } from "../../ui";
+import { Alert, Button, Card, EmptyState, Icon, KvList, ListTable, PaneLoading, Pill, Rail, SectionHead } from "../../ui";
 import { cx } from "@/utils/cx";
 import { go } from "../../ui/nav";
 import { MoreMenu } from "../../ui/menu";
 import type { MenuItem } from "../../ui/menu";
-import { fmtDate as fmtLiveDate } from "../../ui/format";
+import { fmtDate as fmtLiveDate, inr } from "../../ui/format";
 import { can } from "../../shell/AdminShell";
 import { getSession, HIDDEN_MODULES } from "../../auth/session";
 import { RoleChips } from "../teamShared";
 import type { Member as LiveMember, Ops, Role } from "../teamShared";
+import type { WorkItemRow } from "../../../api/modules/adminOps";
 import {
   MemberDeleteModal, MemberEditModal, MemberRolesModal, MemberSendCredentialsModal,
 } from "./memberModals";
-import {
-  ATT_STATE, TODAY, agreementsFor, dayRows, eodDue, fmtDate, fmtHM, isDelayed, isTerminal, labelOf,
-  leaveFor, meId, missingDocs, payFor, planFor, progressOf, readItems, readMember, reportFor,
-  timePct, useAgreements, useLeave, useMembers, useDocuments, workedOf,
-} from "./store";
+/* THE SEED IS FOR THE OPERATION PAGES ONLY (layer 3, their own divs). This page's
+   header, launcher figures, record and "waiting on somebody" read the API. */
+import { fmtDate, fmtHM, readMember, useMembers } from "./store";
 import type { Member } from "./store";
-import { inr, readSalaryAccounts } from "../Finance/store";
+import { useMemberReads, windowPct } from "./liveMember";
+import type { MemberReads, Part } from "./liveMember";
 import { MemberStrip, OpHead, OpNav, OpRefused, memberHref, rupees, workHref } from "./member/frame";
 import { opAllowed, opOf, opsFor } from "./member/ops";
 import type { Viewer } from "./member/ops";
 import AgreementsPage from "./member/AgreementsPage";
 import AttendancePage from "./member/AttendancePage";
 import DocumentsPage from "./member/DocumentsPage";
-import MemberResourcesPage, { outstandingFor } from "./member/ResourcesPage";
+import MemberResourcesPage from "./member/ResourcesPage";
 import LeavePage from "./member/LeavePage";
 import PayPage from "./member/PayPage";
 import ReportsPage from "./member/ReportsPage";
@@ -66,10 +66,13 @@ export default function MemberPage({ id, sub, live, roles, ops }: {
   id: string; sub: string; live: LiveMember | null; roles: Role[]; ops: Ops;
 }) {
   useMembers();
+  /* Only the operation pages below take this seed record. */
   const m = readMember(id);
-  const me = meId();
+  const q = useMemberReads(live);
+  const session = getSession();
+  const me = session?.user?.id != null ? String(session.user.id) : "";
 
-  if (!m && !live) {
+  if (!live) {
     return (
       <EmptyState
         icon="user"
@@ -80,7 +83,9 @@ export default function MemberPage({ id, sub, live, roles, ops }: {
     );
   }
 
-  const viewer: Viewer = id === me ? "self" : m && m.reportsTo === me ? "senior" : "admin";
+  const viewer: Viewer = id === me ? "self" : live.reportsTo && String(live.reportsTo.id) === me ? "senior" : "admin";
+  /* No work-settings row: the server leaves `reportsTo` out — no operational record. */
+  const hasRecord = "reportsTo" in live;
   const allowed = opsFor(viewer);
   const op = sub ? opOf(sub) : null;
 
@@ -97,10 +102,10 @@ export default function MemberPage({ id, sub, live, roles, ops }: {
 
   return (
     <div className="flex flex-col gap-5">
-      <MemberStrip m={m} live={live} viewer={viewer} right={
+      <MemberStrip m={null} live={live} viewer={viewer} right={
         <>
-          {m ? (
-            <Button color="secondary" ico="calendar" onClick={() => go(workHref(m.memberId))}>
+          {live ? (
+            <Button color="secondary" ico="calendar" onClick={() => go(workHref(String(live.id)))}>
               Their board
             </Button>
           ) : null}
@@ -115,10 +120,10 @@ export default function MemberPage({ id, sub, live, roles, ops }: {
         id={id}
         ops={allowed}
         cur={op && opAllowed(op.key, viewer) ? op.key : sub ? sub : ""}
-        stats={m ? opStats(m, viewer) : undefined}
+        stats={opStats(q, live)}
       />
 
-      {!m ? (
+      {!hasRecord ? (
         <NotAdopted live={live as LiveMember} roles={roles} sub={sub} />
       ) : sub && !op ? (
         <Alert tone="warn" title="No such page">
@@ -127,11 +132,13 @@ export default function MemberPage({ id, sub, live, roles, ops }: {
       ) : op && !opAllowed(op.key, viewer) ? (
         <OpRefused label={op.label} />
       ) : op ? (
-        <div className="flex flex-col gap-4">
-          <OpBody op={op.key} m={m} viewer={viewer} />
-        </div>
+        m ? (
+          <div className="flex flex-col gap-4">
+            <OpBody op={op.key} m={m} viewer={viewer} />
+          </div>
+        ) : <NotAdopted live={live as LiveMember} roles={roles} sub={sub} />
       ) : (
-        <Overview m={m} live={live} roles={roles} viewer={viewer} />
+        <Overview q={q} live={live} roles={roles} viewer={viewer} />
       )}
     </div>
   );
@@ -151,16 +158,25 @@ function OpBody({ op, m, viewer }: { op: string; m: Member; viewer: Viewer }) {
 
 /* ============================================================ overview === */
 
-function Overview({ m, live, roles, viewer }: {
-  m: Member; live: LiveMember | null; roles: Role[]; viewer: Viewer;
+const TERMINAL = ["completed", "cancelled"];
+const roleNames = (u: LiveMember) => (u.roles || []).map((r) => r.name).join(", ");
+/** What a part says in place of a value it could not read. */
+const partNote = (p: Part<unknown>): string =>
+  p.state === "loading" ? "Loading…" : p.state === "denied" ? "Not in your access" : p.state === "error" ? "Could not load" : "";
+const todayOf = (q: MemberReads) => (q.clock.state === "ok" ? q.clock.data.today : "");
+
+function Overview({ q, live, roles, viewer }: {
+  q: MemberReads; live: LiveMember; roles: Role[]; viewer: Viewer;
 }) {
-  const senior = m.reportsTo ? readMember(m.reportsTo) : null;
-  const ms = readItems().filter((i) =>
-    i.assigneeId === m.memberId && i.kind === "milestone" && !isTerminal(i.status))[0] || null;
+  const today = todayOf(q);
+  const settings = q.settings.state === "ok" ? q.settings.data : null;
+  const ms = q.work.state === "ok"
+    ? q.work.data.filter((i) => i.kind?.key === "milestone" && TERMINAL.indexOf(i.status?.key) < 0)[0] || null
+    : null;
 
   return (
     <div className="flex flex-col gap-5">
-      <NeedsYou m={m} viewer={viewer} />
+      <NeedsYou q={q} live={live} viewer={viewer} />
 
       {/* TWO COLUMNS OF PAIRS, not one pair stretched across the page. `KvList`
           keeps its label beside its value; the grid is what makes seven facts
@@ -170,26 +186,28 @@ function Overview({ m, live, roles, viewer }: {
         <div className="grid gap-x-8 gap-y-2.5 lg:grid-cols-2">
           <KvList
             pairs={[
-              ["Designation", m.designation],
-              ["Department", m.department || ""],
-              ["Reports to", senior ? senior.name : "Nobody"],
-              ["Employment", m.employmentType.replace(/_/g, " ")],
+              ["Designation", live.designation?.label || ""],
+              ["Department", roleNames(live)],
+              ["Reports to", live.reportsTo ? live.reportsTo.name : "Nobody"],
+              ["Employment", live.employmentType?.label || ""],
             ]}
           />
           <KvList
             pairs={[
-              ["Joined", fmtDate(m.joiningDate)],
-              ["Day starts", m.dayStartsAt + " · " + m.graceMinutes + " minutes of grace"],
+              ["Joined", settings ? fmtDate(settings.joiningDate) : partNote(q.settings)],
+              ["Day starts", settings
+                ? settings.dayStartsAt + " · " + settings.graceMinutes + " minutes of grace"
+                : partNote(q.settings)],
               [
                 "Milestone",
                 ms ? (
                   <span className="flex flex-col">
                     <span>{ms.title}</span>
-                    <span className={behind(ms) ? "text-xs text-warning-primary tnum" : "text-xs text-tertiary tnum"}>
-                      {(progressOf(ms) || 0) + "% done · " + shortWindow(ms.itemId, m)}
+                    <span className={behind(ms, today) ? "text-xs text-warning-primary tnum" : "text-xs text-tertiary tnum"}>
+                      {(ms.progress || 0) + "% done · " + shortWindow(ms, today)}
                     </span>
                   </span>
-                ) : "",
+                ) : partNote(q.work),
               ],
             ]}
           />
@@ -204,18 +222,21 @@ function Overview({ m, live, roles, viewer }: {
   );
 }
 
-const behind = (i: { itemId: string }) => {
-  const item = readItems().filter((x) => x.itemId === i.itemId)[0];
-  if (!item) return false;
-  const t = timePct(item), p = progressOf(item);
+const behind = (item: WorkItemRow, today: string) => {
+  const t = today ? windowPct(item.startDate, item.dueDate, today) : null, p = item.progress ?? null;
   return t !== null && p !== null && t > p + 5;
 };
 
-function shortWindow(itemId: string, m: Member): string {
-  const item = readItems().filter((x) => x.itemId === itemId && x.assigneeId === m.memberId)[0];
-  if (!item) return "";
-  const t = timePct(item);
+function shortWindow(item: WorkItemRow, today: string): string {
+  const t = today ? windowPct(item.startDate, item.dueDate, today) : null;
   return t === null ? "no window set" : t + "% of its window gone";
+}
+
+/** Forms still owed: open, answered by nobody here, and (the server's filter) addressed to them. */
+function owedOf(q: MemberReads) {
+  if (q.resources.state !== "ok") return [];
+  const { resources, responses } = q.resources.data;
+  return resources.filter((r) => r.state.key === "open" && !responses.some((x) => x.resource === r.id));
 }
 
 /* ------------------------------------------------------- what needs doing --- */
@@ -230,66 +251,80 @@ interface Nudge { tone: string; op: string; title: string; note: string }
  *  RANKED, AND THE RANK IS THE RAIL. Red before amber, because a report that
  *  was never written and an incentive waiting on Finance are not the same size
  *  of problem, and a flat list makes somebody read all eight to find that out. */
-function NeedsYou({ m, viewer }: { m: Member; viewer: Viewer }) {
-  useLeave(); useAgreements(); useDocuments();
+function NeedsYou({ q, live, viewer }: { q: MemberReads; live: LiveMember; viewer: Viewer }) {
   const rows: Nudge[] = [];
+  /* A READ THE SERVER REFUSED IS A ROW, not a silence: "nothing is waiting"
+     would be a claim about a page this viewer was not allowed to read. */
+  const blocked = (p: Part<unknown>, op: string, what: string) => {
+    if (p.state === "denied") rows.push({ tone: "warn", op, title: what + " is not in your access", note: p.message });
+    if (p.state === "error") rows.push({ tone: "bad", op, title: what + " could not be loaded", note: p.message });
+  };
+  const loading = Object.values(q).some((p) => (p as Part<unknown>).state === "loading");
 
-  const report = reportFor(m.memberId, TODAY);
-  /* Same derivation the Resources page and the launcher tile run — three
-     readings of "what does this person still owe" that could drift apart is
-     precisely what one exported function prevents. */
-  const owed = outstandingFor(m.memberId);
-  if (eodDue(TODAY, m) && !(report && report.submittedAt)) {
-    rows.push({
-      tone: "bad", op: "reports", title: "No end-of-day report for today",
-      note: "The day is over. It shows as missing and it never blocks anything.",
-    });
-  } else if (report && report.submittedAt && !report.acknowledgedById && viewer !== "self") {
-    rows.push({
-      tone: "warn", op: "reports", title: "Today's report is unread",
-      note: "A report nobody opened teaches the person writing it that it is paperwork.",
-    });
+  if (q.report.state === "ok" && q.plan.state === "ok" && q.clock.state === "ok") {
+    const report = q.report.data;
+    const settings = q.settings.state === "ok" ? q.settings.data : null;
+    /* Due once the member's own close time has passed, on the server's clock. */
+    const eodDue = q.clock.data.hhmm > ((settings && settings.autoCloseAt) || "20:00");
+    if (eodDue && !(report && report.submittedAt)) {
+      rows.push({
+        tone: "bad", op: "reports", title: "No end-of-day report for today",
+        note: "The day is over. It shows as missing and it never blocks anything.",
+      });
+    } else if (report && report.submittedAt && !report.acknowledgedAt && viewer !== "self") {
+      rows.push({
+        tone: "warn", op: "reports", title: "Today's report is unread",
+        note: "A report nobody opened teaches the person writing it that it is paperwork.",
+      });
+    }
+
+    const plan = q.plan.data;
+    if (!(plan && plan.submittedAt)) {
+      rows.push({
+        tone: "warn", op: "reports", title: "No plan for today",
+        note: "The morning list of what they meant to do.",
+      });
+    }
+  } else {
+    blocked(q.report.state === "ok" ? q.plan : q.report, "reports", "Plans and reports");
   }
 
-  const plan = planFor(m.memberId, TODAY);
-  if (!(plan && plan.submittedAt)) {
-    rows.push({
-      tone: "warn", op: "reports", title: "No plan for today",
-      note: "The morning list of what they meant to do.",
-    });
-  }
+  if (q.work.state === "ok") {
+    const late = q.work.data.filter((i) => i.delayed);
+    if (late.length) {
+      rows.push({
+        tone: "warn", op: "work",
+        title: late.length + " work item" + (late.length > 1 ? "s are" : " is") + " past its date",
+        note: late.slice(0, 3).map((i) => i.title).join(" · ") + (late.length > 3 ? " · …" : ""),
+      });
+    }
+  } else blocked(q.work, "work", "Work");
 
-  const late = readItems().filter((i) => i.assigneeId === m.memberId && isDelayed(i));
-  if (late.length) {
-    rows.push({
-      tone: "warn", op: "work",
-      title: late.length + " work item" + (late.length > 1 ? "s are" : " is") + " past its date",
-      note: late.slice(0, 3).map((i) => i.title).join(" · ") + (late.length > 3 ? " · …" : ""),
-    });
-  }
+  if (q.leave.state === "ok") {
+    const waiting = q.leave.data.filter((l) => l.state?.key === "requested");
+    if (waiting.length) {
+      rows.push({
+        tone: "warn", op: "leave",
+        title: waiting.length + " leave request" + (waiting.length > 1 ? "s" : "") + " undecided",
+        note: viewer === "self"
+          ? "Until it is decided those days still count as absent."
+          : "Waiting on a decision. Until then the days read as absent.",
+      });
+    }
+  } else blocked(q.leave, "leave", "Leave");
 
-  const waiting = leaveFor(m.memberId).filter((l) => l.state === "requested");
-  if (waiting.length) {
-    rows.push({
-      tone: "warn", op: "leave",
-      title: waiting.length + " leave request" + (waiting.length > 1 ? "s" : "") + " undecided",
-      note: viewer === "self"
-        ? "Until it is decided those days still count as absent."
-        : "Waiting on a decision. Until then the days read as absent.",
-    });
-  }
+  if (q.agreements.state === "ok") {
+    const unsigned = q.agreements.data.filter((a) => a.state?.key !== "signed" && a.state?.key !== "revoked");
+    if (unsigned.length) {
+      rows.push({
+        tone: "bad", op: "agreements",
+        title: unsigned.length + " agreement" + (unsigned.length > 1 ? "s are" : " is") + " unsigned",
+        note: unsigned.map((a) => a.title).join(" · "),
+      });
+    }
+  } else blocked(q.agreements, "agreements", "Agreements");
 
-  const unsigned = agreementsFor(m.memberId).filter((a) =>
-    a.state !== "signed" && a.state !== "revoked");
-  if (unsigned.length) {
-    rows.push({
-      tone: "bad", op: "agreements",
-      title: unsigned.length + " agreement" + (unsigned.length > 1 ? "s are" : " is") + " unsigned",
-      note: unsigned.map((a) => a.title).join(" · "),
-    });
-  }
-
-  const missing = missingDocs(m.memberId);
+  const missing = live.missingDocuments || [];
   if (missing.length) {
     rows.push({
       tone: "warn", op: "documents",
@@ -298,27 +333,31 @@ function NeedsYou({ m, viewer }: { m: Member; viewer: Viewer }) {
     });
   }
 
-  if (owed.length) {
-    rows.push({
-      tone: "warn", op: "resources",
-      title: owed.length === 1
-        ? "“" + owed[0].title + "” has not been filled in"
-        : owed.length + " resources have not been filled in",
-      note: owed.length === 1
-        ? "It is open and their name is in its audience."
-        : owed.map((r) => r.title).join(", ") + ".",
-    });
-  }
+  if (q.resources.state === "ok") {
+    const owed = owedOf(q);
+    if (owed.length) {
+      rows.push({
+        tone: "warn", op: "resources",
+        title: owed.length === 1
+          ? "“" + owed[0].title + "” has not been filled in"
+          : owed.length + " resources have not been filled in",
+        note: owed.length === 1
+          ? "It is open and their name is in its audience."
+          : owed.map((r) => r.title).join(", ") + ".",
+      });
+    }
+  } else blocked(q.resources, "resources", "Resources");
 
-  const pay = payFor(m.memberId);
-  const pendingPay = (pay ? pay.incentives : []).filter((i) => i.state === "pending");
-  if (pendingPay.length) {
-    rows.push({
-      tone: "warn", op: "pay",
-      title: rupees(pendingPay.reduce((a, i) => a + i.amount, 0)) + " of incentive awaiting Finance",
-      note: "Team proposed it against their work. Finance decides whether it is paid.",
-    });
-  }
+  if (q.incentives.state === "ok") {
+    const pendingPay = q.incentives.data.filter((i) => i.state?.key === "pending");
+    if (pendingPay.length) {
+      rows.push({
+        tone: "warn", op: "pay",
+        title: rupees(pendingPay.reduce((a, i) => a + i.amountPaise, 0) / 100) + " of incentive awaiting Finance",
+        note: "Team proposed it against their work. Finance decides whether it is paid.",
+      });
+    }
+  } else blocked(q.incentives, "pay", "Incentives");
 
   const RANK: Record<string, number> = { bad: 0, warn: 1 };
   const visible = rows
@@ -332,7 +371,7 @@ function NeedsYou({ m, viewer }: { m: Member; viewer: Viewer }) {
         title={viewer === "self" ? "Needs you" : "Waiting on somebody"}
         desc="One query a row, ranked by severity. Things that have stopped because a person has not acted."
       />
-      {visible.length ? (
+      {loading ? <PaneLoading /> : visible.length ? (
         <ListTable min="40rem" head={
           <tr>
             <th className="rail" />
@@ -352,7 +391,7 @@ function NeedsYou({ m, viewer }: { m: Member; viewer: Viewer }) {
                 <Pill xs tone="neutral" text={(opOf(r.op) || { label: r.op }).label} />
               </td>
               <td className="acts">
-                <Button color="secondary" size="xs" onClick={() => go(memberHref(m.memberId, r.op))}>
+                <Button color="secondary" size="xs" onClick={() => go(memberHref(String(live.id), r.op))}>
                   Open
                 </Button>
               </td>
@@ -383,60 +422,78 @@ function NeedsYou({ m, viewer }: { m: Member; viewer: Viewer }) {
  *  The launcher is the only surface that carries these now, so a card that
  *  counted differently from the page it opens is a failure that cannot happen
  *  in two places at once. */
-function opStats(m: Member, viewer: Viewer): Record<string, { v: ReactNode; s?: ReactNode; tone?: string }> {
-  void viewer;
-  const items = readItems().filter((i) => i.assigneeId === m.memberId);
-  const late = items.filter((i) => isDelayed(i)).length;
-  const open = items.filter((i) => !isTerminal(i.status)).length;
-  const leave = leaveFor(m.memberId);
-  const pendingLv = leave.filter((l) => l.state === "requested").length;
-  const ags = agreementsFor(m.memberId);
-  const unsigned = ags.filter((a) => a.state !== "signed" && a.state !== "revoked").length;
-  const missing = missingDocs(m.memberId).length;
-  const day = dayRows(TODAY, "all").filter((r) => r.member.memberId === m.memberId)[0];
-  const report = reportFor(m.memberId, TODAY);
-  /* Same derivation the member's Resources page runs, called rather than
-     re-implemented. */
-  const owed = outstandingFor(m.memberId);
-  const account = salaryOf(m.memberId);
+type Stat = { v: ReactNode; s?: ReactNode; tone?: string };
 
-  return {
-    attendance: {
-      v: day ? labelOf(ATT_STATE, day.state) : "No row",
-      s: day && day.day ? fmtHM(workedOf(day.day, m)) + " worked today" : "today",
-      tone: day && (day.state === "absent" || day.state === "unclosed") ? "warn" : "",
-    },
-    work: { v: String(open), s: "open · " + late + " delayed", tone: late ? "warn" : "" },
-    leave: {
-      v: pendingLv ? pendingLv + " waiting" : String(leave.length),
+function opStats(q: MemberReads, live: LiveMember): Record<string, Stat> {
+  /* A figure that could not be read says why, in the tile's own two lines. */
+  const miss = (p: Part<unknown>): Stat => ({ v: p.state === "loading" ? "…" : "—", s: partNote(p) });
+  const out: Record<string, Stat> = {};
+
+  if (q.day.state === "ok") {
+    const day = q.day.data;
+    out.attendance = {
+      v: day ? day.state.label : "No row",
+      s: day && day.startedAt ? fmtHM(day.workedMinutes) + " worked today" : "today",
+      tone: day && (day.state.key === "absent" || day.state.key === "unclosed") ? "warn" : "",
+    };
+  } else out.attendance = miss(q.day);
+
+  if (q.work.state === "ok") {
+    const late = q.work.data.filter((i) => i.delayed).length;
+    const open = q.work.data.filter((i) => TERMINAL.indexOf(i.status?.key) < 0).length;
+    out.work = { v: String(open), s: "open · " + late + " delayed", tone: late ? "warn" : "" };
+  } else out.work = miss(q.work);
+
+  if (q.leave.state === "ok") {
+    const pendingLv = q.leave.data.filter((l) => l.state?.key === "requested").length;
+    out.leave = {
+      v: pendingLv ? pendingLv + " waiting" : String(q.leave.data.length),
       s: pendingLv ? "undecided" : "on record",
       tone: pendingLv ? "warn" : "",
-    },
-    reports: {
-      v: report && report.submittedAt ? (report.acknowledgedById ? "Read" : "Unread") : "Not in",
+    };
+  } else out.leave = miss(q.leave);
+
+  if (q.report.state === "ok") {
+    const report = q.report.data;
+    out.reports = {
+      v: report && report.submittedAt ? (report.acknowledgedAt ? "Read" : "Unread") : "Not in",
       s: "today's report",
-      tone: report && report.submittedAt && !report.acknowledgedById ? "warn" : "",
-    },
-    agreements: {
-      v: unsigned ? unsigned + " unsigned" : String(ags.length),
+      tone: report && report.submittedAt && !report.acknowledgedAt ? "warn" : "",
+    };
+  } else out.reports = miss(q.report);
+
+  if (q.agreements.state === "ok") {
+    const unsigned = q.agreements.data.filter((a) => a.state?.key !== "signed" && a.state?.key !== "revoked").length;
+    out.agreements = {
+      v: unsigned ? unsigned + " unsigned" : String(q.agreements.data.length),
       s: unsigned ? "waiting on a signature" : "all signed",
       tone: unsigned ? "bad" : "",
-    },
-    documents: {
-      v: missing ? missing + " missing" : "Complete",
-      s: "required documents",
-      tone: missing ? "warn" : "",
-    },
-    resources: {
+    };
+  } else out.agreements = miss(q.agreements);
+
+  const missing = live.missingDocuments;
+  out.documents = missing
+    ? { v: missing.length ? missing.length + " missing" : "Complete", s: "required documents", tone: missing.length ? "warn" : "" }
+    : { v: "—", s: "required documents" };
+
+  if (q.resources.state === "ok") {
+    const owed = owedOf(q);
+    out.resources = {
       v: owed.length ? owed.length + " outstanding" : "Nothing owed",
       s: owed.length ? owed[0].title : "forms the company asked for",
       tone: owed.length ? "warn" : "",
-    },
-    pay: {
+    };
+  } else out.resources = miss(q.resources);
+
+  if (q.salary.state === "ok") {
+    const account = q.salary.data;
+    out.pay = {
       v: account ? inr(account.monthlyGrossPaise) : "—",
       s: account ? "a month, from Finance" : "no salary account",
-    },
-  };
+    };
+  } else out.pay = miss(q.salary);
+
+  return out;
 }
 
 /* --------------------------------------------------------- the identity --- */
@@ -497,12 +554,6 @@ function IdentityBlock({ live: u, roles, showAccess }: {
 
 /* The keys are the server's own (ModuleAction.key), so anything unlisted falls
    back to the key itself rather than disappearing. */
-/* THE PAY TILE READS FINANCE, as the Pay page does. It quoted pay.json's
-   annualCtc — the second payroll this branch stopped rendering — so the tile
-   and the Pay page one click away disagreed about one person's salary. */
-const salaryOf = (memberId: string) =>
-  readSalaryAccounts().filter((a) => a.active && String(a.memberId) === memberId)[0] || null;
-
 const ACTION_LABEL: Record<string, string> = {
   view: "View", create: "Create", edit: "Edit", stage: "Change stage",
   payment: "Log payment", close: "Close", export: "Export", record: "Record",

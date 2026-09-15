@@ -31,7 +31,6 @@ import { RoleChips } from "../../teamShared";
 import type { Member as LiveMember } from "../../teamShared";
 import { OpChip, OpTile } from "../bits";
 import type { Member } from "../store";
-import { readMember } from "../store";
 import type { MemberOp, Viewer } from "./ops";
 
 /** The store member wearing the live shape, so the avatar renders for a member
@@ -50,7 +49,13 @@ const VIEWER_NOTE: Record<Viewer, string> = {
 export function MemberStrip({ m, live, viewer, right }: {
   m: Member | null; live: LiveMember | null; viewer: Viewer; right?: ReactNode;
 }) {
-  const senior = m && m.reportsTo ? readMember(m.reportsTo) : null;
+  /* The live row's facts (team/d2): designation and reporting line from the
+     work-settings row, department = the member's roles. `reportsTo` absent
+     means no settings row; null means nobody. */
+  const senior = live && live.reportsTo ? live.reportsTo : null;
+  const designation = (live && live.designation && live.designation.label) || "";
+  const department = live ? (live.roles || []).map((r) => r.name).join(", ") : "";
+  const hasLine = !!live && "reportsTo" in live;
   const name = live ? live.name : m ? m.name : "Member";
   const email = (live && live.email) || (m && m.email) || "";
   const phone = (live && live.phone) || (m && m.phone) || "";
@@ -69,16 +74,16 @@ export function MemberStrip({ m, live, viewer, right }: {
           </div>
 
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-tertiary">
-            <span className="font-medium text-secondary">{m ? m.designation : "—"}</span>
-            {m && m.department ? (
+            <span className="font-medium text-secondary">{designation || "—"}</span>
+            {department ? (
               <>
                 <span aria-hidden="true" className="text-quaternary">·</span>
-                <span>{m.department}</span>
+                <span>{department}</span>
               </>
             ) : null}
             <span aria-hidden="true" className="text-quaternary">·</span>
             <span>
-              {senior ? "reports to " + senior.name : m && !m.reportsTo ? "reports to nobody" : "no reporting line"}
+              {senior ? "reports to " + senior.name : hasLine ? "reports to nobody" : "no reporting line"}
             </span>
             <span aria-hidden="true" className="text-quaternary">·</span>
             <span className="text-quaternary">{VIEWER_NOTE[viewer]}</span>

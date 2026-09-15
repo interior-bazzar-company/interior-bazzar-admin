@@ -38,7 +38,7 @@ import { useShell } from "../../shell/ShellContext";
 import { RoleChips } from "../teamShared";
 import type { Member, Ops, Role } from "../teamShared";
 import MemberPage from "./MemberPage";
-import { readMember, useMembers } from "./store";
+import { useMembers } from "./store";
 import { opOf } from "./member/ops";
 import {
   MemberDeleteModal, MemberEditModal, MemberNewModal, MemberRolesModal, MemberSendCredentialsModal,
@@ -102,7 +102,7 @@ export default function Team() {
        crumbs below, and one source for all three is what keeps them a chain. */
     if (!id) return <TbTitle label="Members" to="#/team" />;
     const u = (rows || []).find((x) => String(x.id) === id);
-    const name = u ? u.name : readMember(id)?.name || "Member";
+    const name = u ? u.name : "Member";
     /* ON AN OPERATION PAGE THE CRUMB SAYS BOTH. The name is the way back to the
        person; the operation is where you are. A topbar that named only the
        person on `/team/58/leave` would leave the deepest page in the module
