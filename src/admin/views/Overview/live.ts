@@ -199,14 +199,6 @@ export function liveTeam(r: Raw, dept: string | undefined, rolesOf: Map<string, 
 }
 
 /* ------------------------------------------------------------ team table --- */
-/** What a member's day is called on screen. The states are DERIVED by the
- *  backend (working / on break / ended / unclosed) or by the absence of a row
- *  (absent / not started / on leave), so there is no vocabulary table behind
- *  them and nothing to fetch. */
-const STATE_LABEL: Record<string, string> = {
-  working: "Working", on_break: "On break", ended: "Ended", unclosed: "Not closed",
-  absent: "Absent", not_started: "Not started", on_leave: "On leave",
-};
 const TERMINAL = ["completed", "cancelled"];
 
 export interface TeamPerson { memberId: string; name: string; designation: string }
@@ -239,7 +231,9 @@ export function liveTeamRows(r: Raw, people: AdminUserRow[], dept: string | unde
       late: mine.filter((i) => i.delayed).length,
       done: r.doneWork.filter((i) => String(i.assignee.id) === id).length,
       onTime: present.length ? Math.round(((present.length - late) / present.length) * 100) : null,
-      stateLabel: now ? STATE_LABEL[now.state.key] || now.state.key : "",
+      /* The day's name is the backend's own label (team/d2), weekly off
+         included -- not a list kept here (d14). */
+      stateLabel: now ? now.state.label : "",
       deals: owners.get(id) || owners.get(u.name) || null,
     };
   }).sort((a, b) => (b.deals?.collected || 0) - (a.deals?.collected || 0) || b.done - a.done || a.late - b.late);
