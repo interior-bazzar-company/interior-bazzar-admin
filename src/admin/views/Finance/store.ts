@@ -19,34 +19,45 @@
    stops counting towards anything. Getting the figures right is then a new
    row, recorded the ordinary way.
 
-   ONE CLOCK. `asOf` from module.json drives every "this month", "due in 30
-   days" and "overdue by N". Never the browser clock. Writes stamp NOW plus the
-   time the session has been open, so a row recorded now sits after the seed.
+   EVERY RECORD IS THE SERVER'S (2026-09-16). Other Transaction, Refunds, the
+   bank statements and every Analytics figure read spend/, income/, refunds/,
+   bank/, the deal ledger, plan payments, installments/, invoices/ and
+   revenue/; SALARIES A/C reads salaries/, salaries/accounts/ and
+   salaries/slips/; SUBSCRIPTIONS reads subs/ — the plan purchases, with the
+   payment that bought each one. All of it on the SERVER's clock. Writes go to
+   the server and the rows are re-read from it; a write with no endpoint is
+   refused in words and never faked.
 
-   INTEGER PAISE. A rupee never appears as a float anywhere in this file.
+   WHAT THE SERVER HAS NO COLUMN FOR COMES THROUGH EMPTY, never invented: a
+   slip's hash; a receipt number; the company account a plan payment was
+   credited to. Those fields
+   are in the types because the documents have them, and an empty one says the
+   record does not.
+   Which clock a formatter uses: the server's once read, else the browser's — see `clockNow`.
 
-   NO API YET. Every write below is the client half of an endpoint named in
-   src/proto/v-2.2.0.0/BACKEND-INTEGRATION.md; the sequence and the refusal
-   text are what that endpoint has to keep.
+   INTEGER PAISE. A rupee never appears as a float anywhere in this file; the
+   endpoints that speak rupees are converted at the boundary.
    ============================================================================= */
-import { useSyncExternalStore } from "react";
-import moduleDoc from "../../../content/finance/module.json";
-import subsDoc from "../../../content/finance/subscriptions.json";
-import salariesDoc from "../../../content/finance/salaries.json";
-import txnDoc from "../../../content/finance/transactions.json";
-import refundsDoc from "../../../content/finance/refunds.json";
-import invoicesDoc from "../../../content/finance/invoices.json";
-import quotationsDoc from "../../../content/finance/quotations.json";
-import teamMembersDoc from "../../../content/team/members.json";
-import usersDoc from "../../../content/users/users.json";
-import bankDoc from "../../../content/finance/bank.json";
-import vocabDoc from "../../../content/finance/vocabularies.json";
-import { getSession } from "../../auth/session";
-import { inr } from "../../ui/format";
+import { useEffect, useSyncExternalStore } from "react";
+import AdminOpsService, { call } from "../../../api/modules/adminOps";
 import type {
-  Account, CompanyTxn, FinEvent, Installment, InstallmentPayment, Kpi, MonthPoint,
-  Params, Payslip, Refund, RefundPolicy, SalaryAccount, SalaryComponent, SalaryRun,
-  Subscription, Tag, TagKind, Tile,
+  AdminUserRow, AuditEntry, BankLineRow, BankStatementDetail, DealPaymentRow, IncomeRow, InstallmentRow, InvoiceRow,
+  PayslipRow, PlanPaymentRow, PlanPaymentsListResponse, RefundRow as ApiRefundRow, RevenueOverview,
+  SalaryAccountRow, SalaryComponentRow, SalaryRunRow, SpendRow, SubChainInvoice, SubChainRow, SubRow as SubPurchaseRow,
+  SubscriptionRow as ApiSubscriptionRow, VocabItem, WorkSettingsRow,
+} from "../../../api/modules/adminOps";
+import { CommonService } from "../../../api/modules/common";
+import { AppExceptions, errMessage } from "../../../api/apiService";
+import { every, paiseOf, planCashPaise, settledRefundPayments } from "../Overview/live";
+import { dateOnly } from "../Deals/adapter";
+import { getSession } from "../../auth/session";
+import { moduleLabel } from "../../shell/modules";
+import { inr } from "../../ui/format";
+import type { LoadPart } from "../Team/store";
+import type {
+  Account, CompanyTxn, FinEvent, Installment, InstallmentPayment, InstallmentStatus, Kpi, MonthPoint,
+  Params, Payslip, Refund, RefundPolicy, RefundState, SalaryAccount, SalaryComponent, SalaryRun,
+  Subscription, SubscriptionStatus, Tag, TagKind, Tile,
 } from "./types";
 
 export { inr };
@@ -59,32 +70,68 @@ export type {
 
 /* ====================================================== the vocabulary === */
 
-export const VOCAB = vocabDoc;
-export const RECORD_TYPES = vocabDoc.recordTypes;
-export const SUB_SOURCES = vocabDoc.subscriptionSources;
-export const INSTALLMENT_STATUSES = vocabDoc.installmentStatuses;
-export const FAILURE_REASONS = vocabDoc.failureReasons;
-export const SUB_STATUSES = vocabDoc.subscriptionStatuses;
-export const MODES = vocabDoc.modes;
-export const RUN_STATES = vocabDoc.salaryRunStates;
-export const TAG_KINDS = vocabDoc.tagKinds;
-export const TXN_STATES = vocabDoc.transactionStates;
-export const CREDIT_KINDS = vocabDoc.manualCreditKinds;
-export const REFUND_ORIGINS = vocabDoc.refundOrigins;
-export const REFUND_GROUNDS = vocabDoc.refundGrounds;
-export const REFUND_POLICY = vocabDoc.refundPolicy;
-export const REFUND_STATES = vocabDoc.refundStates;
-export const EVENT_TYPES = vocabDoc.eventTypes;
-export const METRICS = vocabDoc.metricDefinitions;
-export const KPIS = vocabDoc.kpiDefinitions;
-export const ROLES = vocabDoc.roles;
-export const SLIP_RULE = vocabDoc.slipRule;
-export const MODULE_RULE = vocabDoc.moduleRule;
+/** The five sections, named as the sidebar names them — the server's Module
+ *  row where there is one. A getter: the session is read at render, not at import. */
+export const RECORD_TYPES = ([
+  ["subscriptions", "finance"], ["salaries", "finance-salaries"], ["transactions", "finance-transactions"],
+  ["refunds", "finance-refunds"], ["analytics", "finance-analytics"],
+] as const).map(([key, route]) => ({ key, get label() { return moduleLabel(route); } }));
+type State = { key: string; label: string; tone: string; meaning: string };
+/** `installment-statuses`; `meaning` is the row's hint. */
+export const INSTALLMENT_STATUSES: State[] = [];
+/** `salary-run-states`. */
+export const RUN_STATES: State[] = [];
+/** The session log's labels (`note`), from `finance/vocabularies/`. */
+export const EVENT_TYPES: { key: string; label: string; tone: string }[] = [];
+/* THE SERVED VALUE LISTS every section reads (`readCompany`, 2026-09-16).
+   Filled in place, empty until the server answers. The ones the server
+   enforces — tag kinds, subscription sources, refund origins — are served from
+   the code that enforces them, so a picker cannot offer what a write refuses. */
+/** `payment-modes` labels, active only: the server refuses a mode not in use. */
+export const MODES: string[] = [];
+/** `installment-failure-reasons`; `help` is the row's hint. */
+export const FAILURE_REASONS: { key: string; label: string; help: string }[] = [];
+/** `subscription-states`; `meaning` is the row's hint. */
+export const SUB_STATUSES: { key: string; label: string; tone: string; meaning: string }[] = [];
+/** `expense-tag-kinds`, from ExpenseTag.KINDS. */
+export const TAG_KINDS: { key: string; label: string; landsIn: string; help: string }[] = [];
+/** `subscription-sources`: the rule that sets a row's `source` lives beside it. */
+export const SUB_SOURCES: { key: string; label: string; short: string; help: string }[] = [];
+/** `refund-origins`: every refund row carries one of these as `origin`. */
+export const REFUND_ORIGINS: { key: string; label: string; help: string }[] = [];
+/** The refunds read's `policy`. NaN until it answers, so no payment reads as
+ *  inside a window nobody has read. */
+export const REFUND_POLICY = { windowDays: NaN, partial: false };
+/* THE LIVE VALUE LISTS. Filled in place when the live half loads (they are
+   read by name all over the live faces, so the array itself never changes
+   identity) and empty until then. */
+export const TXN_STATES: { key: string; label: string; tone: string; meaning: string }[] = [];
+export const CREDIT_KINDS: { key: string; label: string }[] = [];
+export const REFUND_STATES: { key: string; label: string; tone: string }[] = [];
+/** `permitted` has no backend: it is never true here, and the policy card
+ *  that would print it only renders on a refund carrying a policy — which a
+ *  live refund never does. */
+export const REFUND_GROUNDS: { key: string; label: string; permitted: boolean; help: string }[] = [];
+/** The company's own accounts (`company-accounts`): the only accounts there
+ *  are. Filled in place by whichever section boots first; empty until then. */
+export const COMPANY_ACCOUNTS: Account[] = [];
+/* THE MODULE'S WORDS (`finance/vocabularies/`): every figure's formula and
+   caution, the slip rule and the decision register. Filled in place like the
+   lists above, empty until the server answers — a tip with no definition
+   renders nothing rather than a stale copy. */
+type Definition = { key: string; label: string; unit: string; formula: string; caution: string };
+export const METRICS: Definition[] = [];
+export const KPIS: (Definition & { group: string; goodDirection: string })[] = [];
+export let SLIP_RULE = "";
+const DECISIONS: { id: string; title: string; position: string; status: string }[] = [];
 
-export const COMPANY = invoicesDoc.company;
-export const PERIOD = moduleDoc.period;
-export const ACCOUNTS = moduleDoc.accounts as Account[];
-export const BILL_THRESHOLD_PAISE = moduleDoc.billThresholdPaise;
+/** The letterhead a payslip and a receipt print (`GET company/`). Filled in
+ *  place like COMPANY_ACCOUNTS; every field "" until the server answers, and
+ *  an unregistered GSTIN stays "". */
+export const COMPANY = { brand: "", name: "", address: "", cin: "", gstin: "" };
+/** ₹25,000: a debit at or above it needs a bill. A PANEL rule, not a server one —
+ *  the server only enforces a tag's own `proofRequired`. */
+export const BILL_THRESHOLD_PAISE = 2500000;
 
 type Keyed = { key: string };
 const first = <T extends Keyed>(list: readonly T[], k: string) => list.filter((x) => x.key === k)[0] || null;
@@ -107,66 +154,98 @@ export const kpiMeta = (k: string) => first(KPIS, k);
    `group`, so a payroll figure added there would silently appear on a page
    about subscriptions and refunds. A second list of payroll KPIs was here and
    is gone with the metrics block it annotated. */
-export const PAYROLL_METRICS = vocabDoc.payrollMetricDefinitions;
+export const PAYROLL_METRICS: Definition[] = [];
 export const payrollMetric = (k: string) => first(PAYROLL_METRICS, k);
-export const decision = (id: string) => vocabDoc.openDecisions.filter((d) => d.id === id)[0] || null;
-export const accountOf = (id: string) => ACCOUNTS.filter((a) => a.accountId === id)[0] || null;
+export const decision = (id: string) => DECISIONS.filter((d) => d.id === id)[0] || null;
+export const accountOf = (id: string) =>
+  COMPANY_ACCOUNTS.filter((a) => a.accountId === id)[0] || null;
+/** WHICH ACCOUNTS A TRANSFER MAY LEAVE FROM: the company's own, as the server
+ *  lists them — an empty list until it has, never a stand-in. */
+export const payFromAccounts = (): Account[] => COMPANY_ACCOUNTS;
+/** True when `id` is one the server would accept. */
+const liveAccount = (id: string) => COMPANY_ACCOUNTS.some((a) => a.active && a.accountId === id);
 
 /* =========================================================== the clock === */
 
-export const NOW = new Date(moduleDoc.asOf).getTime();
 export const DAY = 86400000;
-const LOADED_AT = Date.now();
-/** Session-relative, so a row recorded during a demo lands after the seed
- *  rather than jumping to whatever today actually is. */
-export const stamp = () => new Date(NOW + (Date.now() - LOADED_AT)).toISOString();
+/** When something happened in this tab — the activity feed's time. */
+export const stamp = () => new Date(clockNow()).toISOString();
 export const ts = (iso: string | null | undefined) => (iso ? new Date(iso).getTime() : NaN);
 export const daysBetween = (a: number, b: number) => Math.round((b - a) / DAY);
 export const monthOf = (d: string) => d.slice(0, 7);
+
+/* WHICH CLOCK. The server's, once any read has asked it (`serverTime`), and
+   the browser's until then — off a Finance section and before the first
+   answer alike. There is no seed clock. The faces import one PERIOD, one
+   todayIso() and one ago() and pass nothing.
+   `onLive` still decides which half a figure reads (see `overview`).
+   ponytail: read off the URL because the faces are frozen; becomes a face prop
+   the day the markup is reopened. */
+const LIVE_ROUTE = /^\/finance(-(transactions|refunds|analytics|salaries))?(\/|$)/i;
+const onLive = () => typeof window !== "undefined" && LIVE_ROUTE.test(window.location?.pathname || "");
+
+type Period = { key: string; label: string; from: string; to: string };
+/** Set with the live rows, in the same emit: the server's instant when it was
+ *  read, and the local instant it was read at, so the clock keeps running. */
+let server: { epoch: number; at: number } | null = null;
+const IST_DAY = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit" });
+const serverNow = () => (server ? server.epoch + (Date.now() - server.at) : NaN);
+/** India-time date on the server clock — the live half's today. */
+const liveToday = () => (server ? IST_DAY.format(new Date(serverNow())) : "");
+const monthEnd = (m: string) => m + "-" + String(daysInMonth(m)).padStart(2, "0");
+/** The calendar month a date falls in; empty for no date. */
+function periodOf(t: string): Period {
+  if (!t) return { key: "", label: "", from: "", to: "" };
+  const m = monthOf(t);
+  return { key: m, label: fmtMonthLong(m), from: m + "-01", to: monthEnd(m) };
+}
+/** The live figures' month: empty until the server has answered. */
+const livePeriodOf = () => periodOf(liveToday());
+const period = () => periodOf(todayIso());
+/** The reporting period of the section on screen. Read field by field at
+ *  call time — see `clockNow`. */
+export const PERIOD: Period = {
+  get key() { return period().key; },
+  get label() { return period().label; },
+  get from() { return period().from; },
+  get to() { return period().to; },
+};
+/** The server's instant where the store has read it, else the browser's. */
+const clockNow = () => (server ? serverNow() : Date.now());
+
 export const inPeriod = (d: string, from = PERIOD.from, to = PERIOD.to) =>
   d.slice(0, 10) >= from && d.slice(0, 10) <= to;
-export const todayIso = () => new Date(NOW).toISOString().slice(0, 10);
+/** India-time date on `clockNow`. */
+export const todayIso = () => IST_DAY.format(new Date(clockNow()));
 /** Positive when the date has passed. The only definition of "late". */
-export const daysPast = (d: string) => daysBetween(ts(d), NOW);
+export const daysPast = (d: string) => daysBetween(ts(d), clockNow());
 /** The real length of a month. Loss of pay is a fraction of the month a
  *  person was actually employed for, not of a notional thirty. */
 export const daysInMonth = (m: string) => new Date(Number(m.slice(0, 4)), Number(m.slice(5, 7)), 0).getDate();
 
 /* ======================================================== the snapshot === */
 
-type Resolution = { targetId: string; kind: "write_off" | "carried_forward"; reason: string; by: string; at: string };
+/** A bank line explained by hand. `kind` is a `resolution-kinds` key. */
+type Resolution = { targetId: string; kind: string; reason: string; by: string; at: string };
 type Activity = { at: string; type: string; actor: string; ref: string; kind: string; note: string };
 
+/** The records this module holds in one place: the payroll and the plan
+ *  purchases as the server last answered them (see `loadPayroll` / `loadSubs`). */
 interface Snap {
   subscriptions: Subscription[];
   salaryAccounts: SalaryAccount[];
   salaryRuns: SalaryRun[];
-  tags: Tag[];
-  transactions: CompanyTxn[];
-  refunds: Refund[];
-  invoices: typeof invoicesDoc.invoices;
-  quotations: typeof quotationsDoc.quotations;
-  statements: typeof bankDoc.statements;
-  resolutions: Resolution[];
-  pendingImport: typeof bankDoc.pendingImport | null;
+  /** This tab's own writes, live and seed alike — a session log, never a record. */
   activity: Activity[];
 }
 
-const clone = <T,>(x: T): T => JSON.parse(JSON.stringify(x));
-
 function seed(): Snap {
   return {
-    subscriptions: clone(subsDoc.subscriptions) as unknown as Subscription[],
-    salaryAccounts: clone(salariesDoc.accounts) as unknown as SalaryAccount[],
-    salaryRuns: clone(salariesDoc.runs) as unknown as SalaryRun[],
-    tags: clone(txnDoc.tags) as unknown as Tag[],
-    transactions: clone(txnDoc.transactions) as unknown as CompanyTxn[],
-    refunds: clone(refundsDoc.requests) as unknown as Refund[],
-    invoices: clone(invoicesDoc.invoices),
-    quotations: clone(quotationsDoc.quotations),
-    statements: clone(bankDoc.statements),
-    resolutions: [],
-    pendingImport: clone(bankDoc.pendingImport || null),
+    /* EMPTY UNTIL THE SERVER ANSWERS. Payroll and the plan purchases are read
+       rows; before the read they are nothing, never a fixture standing in. */
+    subscriptions: [],
+    salaryAccounts: [],
+    salaryRuns: [],
     activity: [],
   };
 }
@@ -184,7 +263,819 @@ const getVersion = () => version;
  *  snapshot is how a chart and the table beside it end up a render apart. */
 export const useVersion = () => useSyncExternalStore(subscribe, getVersion, getVersion);
 
-export function resetStore() { snap = seed(); seq = 0; emit(); }
+/** Empty the local snapshot; everything that was read is read again. */
+export function resetStore() {
+  snap = seed(); seq = 0; emit();
+  if (loading) void bootFinanceLive(true);
+  if (payrollLoading) void bootPayroll(true);
+  if (subsLoading) void bootSubs(true);
+}
+
+/* ======================================================= the live half ===
+   Every row here came from the server in the last read, and nothing else is
+   ever put in these lists. A read the session may not make (403) or that
+   failed leaves its list empty and its figure `null` — never a seed value. */
+
+/** A statement as the reconciliation reads it. */
+export interface Statement {
+  stmtId: string; accountId: string; from: string; to: string; importedAt: string;
+  closed: boolean; closedBy: string | null; closedAt: string | null; lines: BankLine[];
+}
+
+interface Live {
+  tags: Tag[]; txns: CompanyTxn[]; refunds: Refund[];
+  /** The plan payment each refund points at, by refundId. */
+  refundPayment: Record<string, InstallmentPayment>;
+  statements: Statement[]; lineMatches: Record<string, LineMatch>; resolutions: Resolution[];
+  bankMatchedPct: number | null;
+  ledger: DealPaymentRow[]; plans: PlanPaymentRow[]; runs: SalaryRunRow[];
+  /** Plan payments with a settled refund request (Overview/live.ts planCashPaise). */
+  settledRefunds: Set<number>;
+  installments: InstallmentRow[]; invoices: InvoiceRow[];
+  /** null = not readable by this session, which is not the same as zero. */
+  revenue: RevenueOverview | null; activeSalaryAccounts: number | null;
+  /** Spend, salary runs and refunds were all readable — burn is their sum. */
+  outReadable: boolean;
+  /** The first month the windowed reads (ledger, plans, runs) cover. */
+  sinceMonth: string;
+}
+const NO_LIVE: Live = {
+  tags: [], txns: [], refunds: [], refundPayment: {}, statements: [], lineMatches: {}, resolutions: [],
+  bankMatchedPct: null, ledger: [], plans: [], runs: [], settledRefunds: new Set(), installments: [], invoices: [],
+  revenue: null, activeSalaryAccounts: null, outReadable: false, sinceMonth: "",
+};
+let live: Live = NO_LIVE;
+let loading: Promise<void> | null = null;
+let loadSeq = 0;
+
+const who = (u: { username: string } | null | undefined) => (u ? u.username : "");
+const TXN_OUT = "TXN-OUT-";
+const TXN_IN = "TXN-IN-";
+const RF = "RF-";
+/** The server id inside a panel id, or null when the id is not of that kind. */
+const idIn = (id: string, prefix: string) =>
+  (id.indexOf(prefix) === 0 && /^\d+$/.test(id.slice(prefix.length)) ? Number(id.slice(prefix.length)) : null);
+
+function spendTxn(x: SpendRow): CompanyTxn {
+  return {
+    txnId: TXN_OUT + x.id, direction: "out", tagKey: x.tag ? x.tag.key : "",
+    amountPaise: x.amountPaise, description: x.label,
+    party: x.party || "",
+    mode: x.mode ? x.mode.label : "", reference: x.reference, valueDate: x.valueDate || "",
+    accountId: x.account ? x.account.key : "", state: x.state,
+    /* THE FILE, not only its name: `url` is the server's presigned link to the
+       bill in storage, and the row was attached when it was recorded.
+       ponytail: the link is signed for an hour from THIS read; a tab left open
+       longer opens a stale one. Re-read the row on the press if that bites. */
+    bill: x.bill && x.bill.name
+      ? { type: x.bill.mime || "", filename: x.bill.name, uploadedAt: x.recordedAt || "", url: x.bill.url } : null,
+    bankLineId: null, nonRevenue: false, creditKind: null,
+    cancellation: x.state === "cancelled"
+      ? { reason: x.cancelReason, by: who(x.cancelledBy), at: x.cancelledAt || "" } : null,
+    recordedBy: who(x.recordedBy), recordedAt: x.recordedAt || "", events: [],
+  };
+}
+
+function incomeTxn(x: IncomeRow): CompanyTxn {
+  const state = (x.state && x.state.key) === "cancelled" ? "cancelled" : "recorded";
+  return {
+    txnId: TXN_IN + x.id, direction: "in",
+    /* INCOME IS FILED BY KIND, NOT BY TAG, and the chip prints the kind's own
+       label: an expense tag's key would file this credit under a spend bucket,
+       and an empty one printed an empty chip. Nothing looks it up in the tag
+       table — `tagOf` answers null for it, which is what it is. */
+    tagKey: x.kind ? x.kind.label : "",
+    amountPaise: x.amountPaise, description: x.description, party: x.party,
+    mode: x.mode ? x.mode.label : "", reference: x.reference, valueDate: x.valueDate,
+    accountId: x.account ? x.account.key : "", state,
+    bill: x.receipt && x.receipt.name
+      ? { type: x.receipt.mime || "", filename: x.receipt.name, uploadedAt: x.recordedAt || "", url: x.receipt.url } : null,
+    bankLineId: null, nonRevenue: true, creditKind: x.kind ? x.kind.key : null,
+    cancellation: state === "cancelled"
+      ? { reason: x.cancelReason || "", by: who(x.cancelledBy), at: x.cancelledAt || "" } : null,
+    recordedBy: who(x.recordedBy), recordedAt: x.recordedAt, events: [],
+  };
+}
+
+type TagItem = VocabItem & { kind?: string; budgetPaise?: number; proofRequired?: boolean; custom?: boolean };
+/** Every tag the server lists, plus any a spend row still carries that the
+ *  list no longer does — so a row never files under nothing. */
+function liveTags(items: TagItem[], spend: SpendRow[]): Tag[] {
+  const out: Tag[] = items.map((t) => ({
+    /* `custom` is the server's: a tag made in the panel rather than one the
+       seed shipped. It was hard-false here, so every tag read "Shipped". */
+    tagKey: t.key, label: t.label, kind: t.kind as TagKind, custom: !!t.custom,
+    budgetPaise: t.budgetPaise || null, // 0 on the server means no budget
+    proofRequired: !!t.proofRequired, active: t.isActive !== false, createdBy: "", createdAt: "",
+  }));
+  spend.forEach((x) => {
+    if (x.tag && !out.some((t) => t.tagKey === x.tag!.key)) {
+      out.push({
+        tagKey: x.tag.key, label: x.tag.label, kind: x.tag.kind as TagKind, custom: !!x.tag.custom,
+        budgetPaise: x.tag.budgetPaise || null, proofRequired: false, active: false, createdBy: "", createdAt: "",
+      });
+    }
+  });
+  return out;
+}
+
+function liveRefund(x: ApiRefundRow): Refund {
+  const deal = x.dealPayment || null;
+  return {
+    refundId: RF + x.id,
+    /* EXACTLY ONE OF THREE SAYS WHO IS OWED, and the server names which. */
+    origin: x.origin,
+    subscriptionId: null,
+    paymentId: x.payment ? x.payment.orderId : deal ? deal.reference : null,
+    /* THE PAYER OF THE PAYMENT IT REVERSES, joined off the plan row that
+       carries the payment's transactionId. Where no payment names them, the
+       payee is the name somebody typed — never a guessed one. */
+    payee: x.payer
+      ? { name: x.payer.name || x.payer.business || "", userId: x.payer.userId === null ? null : String(x.payer.userId) }
+      : { name: x.payeeName || (deal ? deal.party || deal.deal : ""), userId: null },
+    amountPaise: x.amountPaise, ground: x.ground ? x.ground.key : "", detail: x.detail,
+    state: (x.state ? x.state.key : "requested") as RefundState,
+    policy: null, // cannot be evaluated server-side; an empty check would read as passed
+    requestedBy: who(x.requestedBy), requestedAt: x.requestedAt,
+    decidedBy: x.decidedAt ? who(x.decidedBy) || "—" : null, decidedAt: x.decidedAt,
+    decisionNote: x.decisionNote || null,
+    settlement: x.settledAt
+      ? { paidAt: x.settledAt, mode: x.mode ? x.mode.label : "", reference: x.reference,
+        accountId: x.account ? x.account.key : "", by: who(x.settledBy) }
+      : null,
+    events: [],
+  };
+}
+
+function refundPaymentOf(x: ApiRefundRow): InstallmentPayment | null {
+  const deal = x.dealPayment;
+  if (deal) {
+    return {
+      paymentId: deal.reference || String(deal.id), amountPaise: deal.amountPaise, mode: deal.mode || "",
+      reference: deal.reference, valueDate: deal.paymentDate || "", accountId: "", recordedBy: "",
+      recordedAt: "", receipt: null, bankLineId: null, proof: null,
+    };
+  }
+  if (!x.payment) return null;
+  return {
+    paymentId: x.payment.orderId, amountPaise: x.payment.amountPaise, mode: "",
+    reference: x.payment.transactionId, valueDate: "", accountId: "", recordedBy: "", recordedAt: "",
+    receipt: null, bankLineId: null, proof: null,
+  };
+}
+
+function liveMatch(m: BankLineRow["match"]): LineMatch {
+  if (m.kind === "spend") return { kind: "transaction", id: TXN_OUT + m.id, label: m.label };
+  if (m.kind === "income") return { kind: "transaction", id: TXN_IN + m.id, label: m.label };
+  if (m.kind === "payment" || m.kind === "deal-payment") return { kind: "payment", id: String(m.id), label: m.label };
+  return { kind: "none" };
+}
+
+/** `n` months before YYYY-MM, as YYYY-MM. */
+function monthBack(m: string, n: number): string {
+  const d = new Date(Date.UTC(Number(m.slice(0, 4)), Number(m.slice(5, 7)) - 1 - n, 1));
+  return d.toISOString().slice(0, 7);
+}
+
+/** How far back the windowed reads go: the twelve months Net by month draws.
+ *  ponytail: a fixed year; widen when somebody asks for older history. */
+const LIVE_MONTHS = 12;
+
+async function loadLive(): Promise<void> {
+  const mine = ++loadSeq;
+  const soft = <T,>(p: Promise<T>): Promise<T | null> => p.catch(() => null);
+  const t = await soft(call(AdminOpsService.serverTime()));
+  if (mine !== loadSeq) return;
+  if (!t) { live = NO_LIVE; server = null; emit(); return; }
+
+  const today = IST_DAY.format(new Date(t.epochMs));
+  const since = monthBack(monthOf(today), LIVE_MONTHS - 1);
+  const win = { start: since + "-01", end: today };
+  const vocab = (name: string) => soft(call(AdminOpsService.vocab(name)).then((r) => r.items));
+
+  const [tagItems, kinds, grounds, rStates, iStates,
+    spend, income, refunds, bank, ledger, plans, salaries, salaryAccounts, installments, invoices, revenue,
+    history, txnHistory] = await Promise.all([
+    vocab("expense-tags"), vocab("income-kinds"),
+    vocab("refund-grounds"), vocab("refund-states"), vocab("income-states"),
+    soft(every((n) => call(AdminOpsService.spend({ state: "all", pageNo: n, pageSize: 500 })), (r) => r.spend)),
+    soft(every((n) => call(AdminOpsService.income({ pageNo: n, pageSize: 500 })), (r) => r.income)),
+    soft(every((n) => call(AdminOpsService.refunds({ pageNo: n, pageSize: 500 })),
+      (r) => { Object.assign(REFUND_POLICY, r.policy); return r.refunds; })),
+    soft(call(AdminOpsService.bankStatements())),
+    soft(every((n) => call(AdminOpsService.dealPayments({ ...win, pageNo: n, pageSize: 200 })), (r) => r.payments)),
+    soft(every((n) => call<PlanPaymentsListResponse>(AdminOpsService.payments({ ...win, status: "PAID,REFUNDED", pageNo: n, pageSize: 100 })), (r) => r.payments)),
+    soft(call(AdminOpsService.salaries({ start: since, end: monthOf(today) }))),
+    soft(call(AdminOpsService.salaryAccounts())),
+    soft(every((n) => call(AdminOpsService.installments({ pageNo: n, pageSize: 500 })), (r) => r.installments)),
+    soft(every((n) => call(AdminOpsService.invoices({ status: "issued", pageNo: n, pageSize: 200 })), (r) => r.invoices)),
+    soft(call(AdminOpsService.revenue())),
+    historyOf("finance-refunds"),
+    historyOf("finance-transactions"),
+    loadCompany(),
+  ]);
+  /* ponytail: one read per statement; fine at a statement a month. */
+  const details = bank
+    ? await Promise.all(bank.statements.map((s) => soft(call(AdminOpsService.bankStatement(s.id)))))
+    : [];
+  if (mine !== loadSeq) return;
+
+  fill(TXN_STATES, (iStates || []).map((s) => ({ key: s.key, label: s.label, tone: s.tone, meaning: s.hint || "" })));
+  fill(CREDIT_KINDS, (kinds || []).map((k) => ({ key: k.key, label: k.label })));
+  fill(REFUND_STATES, (rStates || []).map((s) => ({ key: s.key, label: s.label, tone: s.tone })));
+  /* `permitted` IS THE SERVER'S LIST ITSELF: a request naming a ground that is
+     not in use is refused outright, so every ground offered here is one the
+     server permits. It is not a policy judgement and never was. */
+  fill(REFUND_GROUNDS, (grounds || []).map((g) => ({
+    key: g.key, label: g.label, permitted: g.isActive !== false, help: g.hint || "",
+  })));
+
+  const stmts = (details.filter(Boolean) as BankStatementDetail[]);
+  const lineMatches: Record<string, LineMatch> = {};
+  /** The statement line a transaction is matched to, read back off the match. */
+  const lineOfTxn: Record<string, string> = {};
+  const resolutions: Resolution[] = [];
+  stmts.forEach((s) => s.rows.forEach((l) => {
+    const m = liveMatch(l.match);
+    lineMatches["L-" + l.id] = m;
+    if (m.kind === "transaction") lineOfTxn[m.id] = "L-" + l.id;
+    if (l.resolution) {
+      resolutions.push({ targetId: "L-" + l.id, kind: l.resolution.kind.key, reason: l.resolution.reason, by: "", at: l.resolution.at });
+    }
+  }));
+  const refundRows = refunds || [];
+  const refundPayment: Record<string, InstallmentPayment> = {};
+  refundRows.forEach((r) => { const p = refundPaymentOf(r); if (p) refundPayment[RF + r.id] = p; });
+
+  const txns = (spend || []).map(spendTxn).concat((income || []).map(incomeTxn));
+  txns.forEach((t) => {
+    t.bankLineId = lineOfTxn[t.txnId] || null;
+    /* Its History tab: the trail under the subject the server wrote it with. */
+    const spendId = idIn(t.txnId, TXN_OUT);
+    t.events = txnHistory[spendId !== null ? "expense:" + spendId : "income:" + idIn(t.txnId, TXN_IN)] || [];
+  });
+
+  live = {
+    tags: liveTags((tagItems || []) as TagItem[], spend || []),
+    txns,
+    refunds: refundRows.map((r) => ({ ...liveRefund(r), events: history["refund:" + r.id] || [] })),
+    refundPayment,
+    statements: stmts.map((s) => ({
+      stmtId: "STMT-" + s.id, accountId: s.account ? s.account.key : "", from: s.fromDate, to: s.toDate,
+      importedAt: s.importedAt, closed: s.closed, closedBy: null, closedAt: s.closedAt,
+      lines: s.rows.map((l) => ({
+        lineId: "L-" + l.id, date: l.date, dir: l.direction, amountPaise: l.amountPaise,
+        reference: l.reference, narration: l.narration, counterparty: l.counterparty,
+      })),
+    })),
+    lineMatches, resolutions,
+    bankMatchedPct: bank ? bank.totals.matchedPct : null,
+    ledger: ledger || [], plans: plans || [], runs: salaries ? salaries.runs : [],
+    settledRefunds: settledRefundPayments(refundRows),
+    installments: installments || [], invoices: invoices || [],
+    revenue, activeSalaryAccounts: salaryAccounts ? salaryAccounts.accounts.filter((a) => a.isActive).length : null,
+    outReadable: !!(spend && salaries && refunds),
+    sinceMonth: since,
+  };
+  server = { epoch: t.epochMs, at: Date.now() };
+  emit();
+}
+
+/** The letterhead, the company's own accounts and the served value lists,
+ *  filled in place. Every section's load reads them — a payslip prints the
+ *  first two, the pickers on every face read the lists, and the salaries face
+ *  never boots the live half. */
+let companyLoad: Promise<void> | null = null;
+function loadCompany(): Promise<void> {
+  /* Up to three section loads ask on one page; one request answers them all.
+     A failed read is not kept, so the next load asks again. */
+  return (companyLoad ||= readCompany().then((ok) => { if (!ok) companyLoad = null; }));
+}
+
+const fill = <T,>(list: T[], rows: T[]) => { list.splice(0, list.length, ...rows); };
+
+async function readCompany(): Promise<boolean> {
+  const list = (name: string) => soft(call(AdminOpsService.vocab(name)).then((r) => r.items));
+  const [co, accounts, modes, failures, states, kinds, sources, origins, instStates, runStates, words] = await Promise.all([
+    soft(call(AdminOpsService.company())),
+    list("company-accounts"), list("payment-modes"), list("installment-failure-reasons"),
+    list("subscription-states"), list("expense-tag-kinds"), list("subscription-sources"), list("refund-origins"),
+    list("installment-statuses"), list("salary-run-states"), soft(call(AdminOpsService.financeVocabularies())),
+  ]);
+  const state = (s: VocabItem): State => ({ key: s.key, label: s.label, tone: s.tone, meaning: s.hint || "" });
+  fill(INSTALLMENT_STATUSES, (instStates || []).map(state));
+  fill(RUN_STATES, (runStates || []).map(state));
+  fill(EVENT_TYPES, words ? words.eventTypes : []);
+  fill(METRICS, words ? words.metricDefinitions : []);
+  fill(KPIS, words ? words.kpiDefinitions : []);
+  fill(PAYROLL_METRICS, words ? words.payrollMetricDefinitions : []);
+  fill(DECISIONS, words ? words.openDecisions : []);
+  SLIP_RULE = words ? words.slipRule : "";
+  Object.assign(COMPANY, {
+    brand: co ? co.brand : "", name: co ? co.name : "", address: co ? co.address : "",
+    cin: co ? co.cin : "", gstin: co ? co.gstin : "",
+  });
+  COMPANY_ACCOUNTS.splice(0, COMPANY_ACCOUNTS.length, ...(accounts || []).map((a) => ({
+    accountId: a.key, name: a.label, masked: a.hint || a.label, active: a.isActive !== false,
+  })));
+  fill(MODES, (modes || []).filter((m) => m.isActive !== false).map((m) => m.label));
+  fill(FAILURE_REASONS, (failures || []).map((r) => ({ key: r.key, label: r.label, help: r.hint || "" })));
+  fill(SUB_STATUSES, (states || []).map((s) => ({ key: s.key, label: s.label, tone: s.tone, meaning: s.hint || "" })));
+  fill(TAG_KINDS, (kinds || []).map((k) => ({ key: k.key, label: k.label, landsIn: k.landsIn || "", help: k.hint || "" })));
+  fill(SUB_SOURCES, (sources || []).map((s) => ({ key: s.key, label: s.label, short: s.short || "", help: s.hint || "" })));
+  fill(REFUND_ORIGINS, (origins || []).map((o) => ({ key: o.key, label: o.label, help: o.hint || "" })));
+  return [co, accounts, modes, failures, states, kinds, sources, origins, instStates, runStates, words].every(Boolean);
+}
+
+/** Loads the live half once; `force` re-reads it (after a write). */
+export function bootFinanceLive(force = false): Promise<void> {
+  if (!loading || force) loading = loadLive();
+  return loading;
+}
+/** Every live hook starts the load on first mount, on a live section only. */
+function useLiveBoot() {
+  useEffect(() => { if (onLive()) void bootFinanceLive(); }, []);
+}
+
+/* ============================================================= history ===
+   THERE IS NO EVENTS TABLE, and there must not be one: every write already
+   appends a line to the admin audit trail naming the record it was about
+   (`subjectType` + `subjectId`, migration 0059), so a record's History tab is
+   that trail filtered — not a second copy of it kept in step by hand.
+
+   ONE READ PER MODULE, grouped here, rather than one read per row: a payroll
+   screen showing fifty accounts would otherwise make fifty requests to fill
+   tabs nobody has opened. A session that may not read the trail gets empty
+   lists, which is what "this session cannot see the history" looks like. */
+
+const AUDIT_PAGE = 500;
+
+/** One audit line as this module's event. `type` carries the trail's own
+ *  sentence for the action, because the panel's event vocabulary names seed
+ *  events and these are the server's. */
+const auditEvent = (e: AuditEntry): FinEvent => ({
+  eventId: "AU-" + e.id,
+  type: e.label || e.action,
+  actor: e.actorName || e.actor || "",
+  actorRole: e.role || "",
+  at: e.ts || "",
+  note: e.detail || "",
+});
+
+/** `<subjectType>:<subjectId>` → its events, newest first. */
+async function historyOf(module: string): Promise<Record<string, FinEvent[]>> {
+  const r = await soft(call(AdminOpsService.audit({ module, pageSize: AUDIT_PAGE })));
+  const out: Record<string, FinEvent[]> = {};
+  (r ? r.entries : []).forEach((e) => {
+    if (!e.subjectType || !e.subjectId) return;
+    const k = e.subjectType + ":" + e.subjectId;
+    if (!out[k]) out[k] = [];
+    out[k].push(auditEvent(e));
+  });
+  return out;
+}
+
+/* ============================================================= payroll ===
+   THE PAYROLL IS THREE READS AND ONE ROSTER: the runs (salaries/), what each
+   member is paid (salaries/accounts/) and every slip (salaries/slips/), joined
+   to the team roster (users/ + attendance/settings/) for the things that are
+   facts about a PERSON rather than about their salary — their name, their
+   designation, the department their roles make them, and the day they joined.
+
+   WHAT THE SERVER DOES NOT HOLD comes through empty and is never invented: an
+   account has no component breakdown, no bank account, no PAN and no UAN, so
+   its earnings are the ONE line it does hold — the monthly gross — and its
+   deductions are an empty list rather than a zero somebody decided on. A slip
+   is the same: the figures it was built with, and no hash, proof or receipt. */
+
+const soft = <T,>(p: Promise<T>): Promise<T | null> => p.catch(() => null);
+
+/** The clock, loaded on its own so a payroll read does not need the whole
+ *  live half behind it. Idempotent: the live load sets the same field. */
+async function ensureClock(): Promise<void> {
+  if (server) return;
+  const t = await soft(call(AdminOpsService.serverTime()));
+  if (t) server = { epoch: t.epochMs, at: Date.now() };
+}
+
+/** One team member, as payroll needs them. */
+interface RosterEntry {
+  memberId: number; name: string; designation: string; department: string;
+  employmentType: string; joiningDate: string; active: boolean;
+}
+let roster: RosterEntry[] = [];
+const rosterOf = (id: number) => roster.filter((m) => m.memberId === id)[0] || null;
+
+function toRoster(u: AdminUserRow, s: WorkSettingsRow | undefined): RosterEntry {
+  const designation = (s && s.designation) || u.designation;
+  const employment = (s && s.employmentType) || u.employmentType;
+  return {
+    memberId: u.id,
+    name: u.name || u.username,
+    designation: designation ? designation.label : "",
+    /* The panel's "department" IS the member's rbac roles (team/d1) — one
+       spelling, on the member, rather than a second one typed into Finance. */
+    department: (u.roles || []).map((r) => r.name).join(", "),
+    employmentType: employment ? employment.key : "",
+    joiningDate: (s && s.joiningDate) || "",
+    active: u.isActive !== false,
+  };
+}
+
+const SAL = "SAL-AC-";
+const SLIP = "SLIP-";
+const accountIdOf = (id: number) => SAL + id;
+
+/** One earning line, for an account or a slip that carries no breakdown of its
+ *  own: the single figure it does hold, named for what it is. */
+const oneLine = (key: string, label: string, paise: number): SalaryComponent[] =>
+  (paise ? [{ key, label, amountPaise: paise }] : []);
+
+/** The server's component lines, one side of them, as the panel's shape. */
+const sideOf = (list: SalaryComponentRow[] | undefined, kind: "earning" | "deduction"): SalaryComponent[] =>
+  (list || []).filter((c) => c.kind === kind)
+    .map((c) => ({ key: c.key, label: c.label, amountPaise: c.amountPaise }));
+
+function liveSalaryAccount(a: SalaryAccountRow): SalaryAccount {
+  const m = rosterOf(a.member.id);
+  /* WHAT THE GROSS IS MADE OF and what comes off it every month. An account
+     with no breakdown is the one figure it does hold, which is what every
+     account said before the columns existed. */
+  const earnings = sideOf(a.components, "earning");
+  /* MASKED, AND THAT IS ALL THERE IS. The server sends the last four
+     characters of the account number, the IFSC, the UPI handle, the PAN and
+     the UAN; the whole values never leave it. */
+  const pay = a.payTo || null;
+  return {
+    salaryAccountId: accountIdOf(a.id),
+    memberId: a.member.id,
+    memberName: (m && m.name) || a.member.name || a.member.username,
+    employeeCode: a.employeeCode,
+    designation: (m && m.designation) || "",
+    department: (m && m.department) || "",
+    /* Full time / contract, off the member record — the panel's engagement
+       vocabulary is the server's employment types (see ENGAGEMENTS). */
+    engagement: (m && m.employmentType) || "",
+    joinedAt: (m && m.joiningDate) || "",
+    monthlyGrossPaise: a.monthlyGrossPaise,
+    earnings: earnings.length ? earnings : oneLine("monthly_gross", "Monthly gross", a.monthlyGrossPaise),
+    deductions: sideOf(a.components, "deduction"),
+    bank: {
+      masked: pay ? pay.accountMasked : "", ifsc: pay ? pay.ifsc : "", name: pay ? pay.bankName : "",
+      upi: pay && pay.upi ? pay.upi : undefined,
+    },
+    pan: pay ? pay.pan : "", uan: pay && pay.uan ? pay.uan : null,
+    active: a.isActive,
+    /* WHO OPENED IT is the audit trail's opening row, read back by the server;
+       an account opened before the trail kept subjects names nobody. */
+    recordedBy: a.openedBy ? a.openedBy.name || a.openedBy.username : "", recordedAt: a.createdAt || "",
+    events: [],
+  };
+}
+
+function liveSlip(s: PayslipRow, acc: SalaryAccount | null): Payslip {
+  const b = s.breakdown || {};
+  const via = PAY_VIA.filter((v) => s.mode && v.mode === s.mode.key)[0];
+  /* THE SLIP'S OWN FROZEN LINES. `basePaise` is the full month and never
+     moves, so the worked earnings are derived from it the same way the server
+     derived the gross — half-up on each line, over the month's REAL length. */
+  const base = sideOf(b.earnings, "earning").length
+    ? sideOf(b.earnings, "earning")
+    : oneLine("gross", "Gross salary", b.basePaise || s.grossPaise);
+  const basis = daysInMonth(s.month);
+  const earnings = s.lopDays > 0
+    ? base.map((e) => ({ ...e, amountPaise: Math.round((e.amountPaise * s.paidDays) / basis) }))
+    : base;
+  /* SETTLED WITH THE TRANSFER, not folded into the salary: an incentive is
+     paid for something achieved and an adjustment corrects one month only.
+     A negative adjustment is a deduction and a positive one is an earning —
+     which is what the sign means — and both carry the reason as their label. */
+  const incentive = b.incentivePaise || 0;
+  const adjustment = b.adjustmentPaise || 0;
+  const adjustmentLabel = b.adjustmentReason || "Adjustment";
+  const incentives = oneLine("incentive", "Incentive", incentive)
+    .concat(adjustment > 0 ? [{ key: "adjustment", label: adjustmentLabel, amountPaise: adjustment }] : []);
+  const deductions = sideOf(b.deductions, "deduction")
+    .concat(adjustment < 0 ? [{ key: "adjustment", label: adjustmentLabel, amountPaise: -adjustment }] : []);
+  return {
+    slipId: SLIP + s.id,
+    salaryAccountId: accountIdOf(s.accountId),
+    memberId: s.member.id,
+    memberName: (acc && acc.memberName) || s.member.name || s.member.username,
+    employeeCode: s.employeeCode,
+    designation: (acc && acc.designation) || "",
+    month: s.month,
+    paidDays: s.paidDays, lopDays: s.lopDays,
+    baseEarnings: base, earnings,
+    incentives: incentives.length ? incentives : undefined,
+    incentivePaise: incentive || undefined,
+    deductions,
+    /* Gross INCLUDES what was settled with the transfer, because that is the
+       money that actually left; net stays the server's own figure and the two
+       still reconcile through the deductions. */
+    grossPaise: s.grossPaise + incentive + Math.max(adjustment, 0),
+    deductionsPaise: s.deductionsPaise + Math.max(-adjustment, 0),
+    netPaise: s.netPaise,
+    paidAt: s.paidAt,
+    mode: s.mode ? s.mode.label : "",
+    via: via ? via.key : undefined,
+    reference: s.reference,
+    accountId: s.paidFrom ? s.paidFrom.key : "",
+    /* WHERE IT WAS SENT is the account's, not the slip's: the slip freezes the
+       figures, and the bank details are read live off the account — masked. */
+    bank: acc ? acc.bank : { masked: "", ifsc: "", name: "" },
+    pan: acc ? acc.pan : "", uan: acc ? acc.uan : null,
+    remark: b.remark || undefined,
+    /* THE RECEIPT IS A REAL FILE now: a private Attachment, read back as a
+       signed link. There is still no hash — nothing computes one. */
+    proof: s.receipt
+      ? { type: s.receipt.mimeType, filename: s.receipt.fileName, uploadedAt: s.paidAt || "", url: s.receipt.url }
+      : null,
+    issuedAt: b.issuedAt || s.paidAt, sha256: null,
+    /* The hold's reason has no column and never needed one: it rides the audit
+       trail, and the server reads that trail back by subject. */
+    held: s.held, heldReason: s.heldReason || null,
+  };
+}
+
+function liveRun(r: SalaryRunRow, slips: Payslip[]): SalaryRun {
+  return {
+    runId: "RUN-" + r.month,
+    month: r.month,
+    state: (r.state.key === "paid" ? "paid" : "open"),
+    slips,
+    totalNetPaise: r.totalNetPaise,
+    recordedBy: "", recordedAt: r.recordedAt || "",
+    paidAt: r.paidAt,
+    events: [],
+  };
+}
+
+let payrollLoading: Promise<void> | null = null;
+let payrollSeq = 0;
+/** How the payroll read stands — runs, accounts and slips, the three the
+ *  money comes from. A refused or failed read is said, never an empty payroll. */
+let payrollPart: LoadPart = { state: "loading" };
+const payrollFailure = (e: unknown): LoadPart => (e instanceof AppExceptions && e.code > 0 && e.code < 500
+  ? { state: "denied", message: errMessage(e) } : { state: "error", message: errMessage(e) });
+
+async function loadPayroll(): Promise<void> {
+  const mine = ++payrollSeq;
+  await ensureClock();
+  let failed = null as unknown;
+  const tracked = <T,>(p: Promise<T>): Promise<T | null> => p.catch((e) => { if (failed === null) failed = e; return null; });
+  const [runs, accounts, slips, users, settings, employment, history] = await Promise.all([
+    tracked(call(AdminOpsService.salaries())),
+    tracked(call(AdminOpsService.salaryAccounts())),
+    tracked(call(AdminOpsService.payslips())),
+    soft(call(AdminOpsService.users())),
+    soft(call(AdminOpsService.attendanceSettings()).then((r) => r.settings)),
+    soft(call(AdminOpsService.vocab("employment-types")).then((r) => r.items)),
+    historyOf("finance-salaries"),
+    loadCompany(),
+  ]);
+  if (mine !== payrollSeq) return;
+
+  const settingOf = (id: number) => (settings || []).filter((s) => s.member.id === id)[0];
+  roster = (users || []).map((u) => toRoster(u, settingOf(u.id)));
+  /* HOW PEOPLE ARE ENGAGED IS A SERVER LIST (employment-types), filled in
+     place so every reader keeps the same array. Empty when it is not readable
+     — the filter then offers nothing rather than two keys nobody uses. */
+  ENGAGEMENTS.splice(0, ENGAGEMENTS.length,
+    ...(employment || []).map((e) => ({ key: e.key, label: e.label })));
+
+  const accountRows = accounts ? accounts.accounts : [];
+  snap.salaryAccounts = accountRows.map((a) => ({
+    ...liveSalaryAccount(a), events: history["salary_account:" + a.id] || [] }));
+  const byId: Record<string, SalaryAccount> = {};
+  snap.salaryAccounts.forEach((a) => { byId[a.salaryAccountId] = a; });
+  const slipRows = slips ? slips.slips : [];
+  snap.salaryRuns = (runs ? runs.runs : []).map((r) => ({
+    ...liveRun(r, slipRows.filter((s) => s.month === r.month)
+      .map((s) => liveSlip(s, byId[accountIdOf(s.accountId)] || null))),
+    events: history["salary_run:" + r.id] || [] }));
+  payrollPart = failed === null ? { state: "ok", own: false } : payrollFailure(failed);
+  emit();
+}
+
+/** Loads the payroll once; `force` re-reads it (after a write). */
+export function bootPayroll(force = false): Promise<void> {
+  if (!payrollLoading || force) {
+    const mine = payrollSeq + 1;
+    payrollLoading = loadPayroll().catch((e) => {
+      if (mine !== payrollSeq) return;
+      payrollPart = payrollFailure(e);
+      emit();
+    });
+  }
+  return payrollLoading;
+}
+function usePayrollBoot() {
+  useEffect(() => { void bootPayroll(); }, []);
+}
+/** How the payroll stands, starting its read — for a page outside Finance
+ *  (Team's pay page) that reads the payroll through the plain readers. */
+export function usePayrollLoad(): LoadPart { useVersion(); usePayrollBoot(); return payrollPart; }
+/** Try again: loading until the re-read lands. */
+export function retryPayroll(): Promise<void> {
+  payrollPart = { state: "loading" };
+  emit();
+  return bootPayroll(true);
+}
+
+/* ======================================================= subscriptions ===
+   A SUBSCRIPTION IS A PLAN SOMEBODY BOUGHT (subs/): one purchase row per
+   family — business, shop, architect, automation — with the plan, the term in
+   months, the day it started, the day it expires, what it cost, and the
+   gateway or manual payment that settled it.
+
+   THE SCHEDULE IS NOT A SCHEDULE HERE. A plan purchase is paid once, so the
+   record carries ONE installment: paid when its transaction says PAID or
+   REFUNDED, due while the money has not arrived, cancelled with the purchase.
+   A purchase with no transaction row at all — a free plan, or one activated by
+   hand — carries no installment, because no payment was ever recorded.
+
+   A SALE IS THE OTHER KIND (migration 0063): a subscription recorded over an
+   accepted quotation, read off subscriptions/. Its schedule IS the quotation's
+   own installment rows, each paid by the issued invoice that billed it — the
+   deal ledger's money, never a second copy of it. */
+
+const paiseOfRupees = (v: string | null | undefined): number => {
+  const n = Number(String(v || "0").replace(/,/g, "").trim());
+  return Number.isFinite(n) ? Math.round(n * 100) : 0;
+};
+
+/** `cancelled`/`refunded`/`active` are the panel's words too; `pending` and
+ *  `expired` are the server's own and are vocabulary rows of their own. */
+const subStatusOf = (s: string): SubscriptionStatus => {
+  const k = (s || "").toLowerCase();
+  return (["active", "pending", "expired", "cancelled", "refunded", "defaulting", "completed"].indexOf(k) >= 0
+    ? k : "active") as SubscriptionStatus;
+};
+
+/* THE COMMITMENT STANDING OVER EACH PURCHASE, by the panel id of that
+   purchase. It is what every subscription write addresses — the purchase says
+   what was bought, this says where it stands — and it is empty for a purchase
+   nobody has recorded one against yet. */
+let commitments: Record<string, ApiSubscriptionRow> = {};
+/** A sale's panel id: `SUB-QT-<commitment id>`. Upper case, so `purchaseRefOf`
+ *  never reads it as a purchase. */
+const QSUB = "SUB-QT-";
+/** A deal-ledger payment's panel id, as a sale's installment carries it. */
+const DP = "DP-";
+/** Every accepted quotation on a deal linked to its customer (subscriptions/chains/). */
+let chains: SubChainRow[] = [];
+/** `SUB-business-12` → the purchase it names, or null when the id is not ours. */
+const purchaseRefOf = (id: string): { family: string; purchase: number } | null => {
+  const m = /^SUB-([a-z]+)-(\d+)$/.exec(id || "");
+  return m ? { family: m[1], purchase: Number(m[2]) } : null;
+};
+
+function liveSubscription(x: SubPurchaseRow): Subscription {
+  const startDate = dateOnly(x.startedAt) || "";
+  const endDate = dateOnly(x.expireDate) || "";
+  const totalPaise = paiseOfRupees(x.amount);
+  /* WHERE IT STANDS is the commitment's when one has been recorded, and the
+     purchase's own status otherwise — `defaulting` and a cancellation exist
+     only on the commitment, because only it can carry the reason. */
+  const held = x.subscription || null;
+  const status = subStatusOf(held && held.state ? held.state.key : x.status);
+  const p = x.payment;
+  const settled = !!p && (p.orderStatus === "PAID" || p.orderStatus === "REFUNDED");
+  const payment: InstallmentPayment | null = p && settled ? {
+    paymentId: p.orderId || p.transactionId,
+    amountPaise: paiseOfRupees(p.amount),
+    mode: p.paymentMethod === "manual" ? "Manual" : p.paymentMethod === "free" ? "Free" : "Gateway",
+    reference: p.transactionId,
+    valueDate: dateOnly(p.verifiedAt) || dateOnly(p.createdAt) || "",
+    /* A manual payment names the admin who verified it; a gateway one nobody. */
+    accountId: "", recordedBy: p.verifiedBy ? p.verifiedBy.username : "", recordedAt: p.verifiedAt || p.createdAt || "",
+    receipt: null, bankLineId: null, proof: null,
+  } : null;
+  /* A DEFAULTING COMMITMENT IS THE FAIL TO PAY on its one installment: the
+     reason and the evidence went to the audit trail with the move, and the
+     server reads them back as `failure` while it still stands. */
+  const failed = !settled && !!held && !!held.state && held.state.key === "defaulting";
+  const instStatus = settled ? "paid" : failed ? "fail_to_pay"
+    : status === "cancelled" || status === "expired" ? "cancelled" : "due";
+  const f = failed && held ? held.failure : null;
+  const installments: Installment[] = p ? [{
+    seq: 1, of: 1, dueDate: startDate, amountPaise: totalPaise,
+    status: instStatus, invoiceNumber: null, payment,
+    failure: f ? { at: f.at || "", reason: f.reason, attempt: 0, note: f.note } : null,
+  }] : [];
+  return {
+    subscriptionId: "SUB-" + x.family + "-" + x.id,
+    /* How the sale happened — the server's rule, off the purchase's buyIntent. */
+    source: x.source,
+    customer: { name: x.customer || x.user || "", userId: x.userId === null ? null : String(x.userId) },
+    planId: x.planId === null ? "" : String(x.planId),
+    planName: x.planTitle || "",
+    cycleMonths: x.durationMonths || 0,
+    totalPaise,
+    startDate, endDate,
+    status,
+    installments,
+    invoiceNumber: null,              // no tax invoice is raised against a plan purchase
+    paidInFull: settled,
+    soldBy: held && held.soldBy ? held.soldBy.username : "",
+    recordedBy: held && held.recordedBy ? held.recordedBy.username : "",
+    recordedAt: x.recordedAt || "",
+    events: [],
+  };
+}
+
+/** `SUB-QT-12` → 12, or null for a purchase's id. */
+const saleIdOf = (id: string): number | null => idIn(id || "", QSUB);
+
+/** The plan filter's key for a sale: the plan named on its quotation — the
+ *  same slug the record dialog builds. */
+const planKeyOf = (name: string) =>
+  "PL-" + name.toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+/** ONE SALE, as this tab reads it: the quotation says what was sold and for
+ *  how much; its rows say what is paid, due, failed or cancelled. Where it
+ *  stands is DERIVED from those rows — `defaulting` is "an installment failed
+ *  and has not been recovered", `completed` is "every one is paid" — unless it
+ *  was cancelled, which only the commitment can say. */
+function saleSubscription(c: ApiSubscriptionRow): Subscription {
+  const q = c.quotation as NonNullable<ApiSubscriptionRow["quotation"]>;
+  const installments: Installment[] = (c.installments || []).map((r) => ({
+    seq: r.seq, of: r.count, dueDate: r.dueDate, amountPaise: r.amountPaise,
+    status: (r.status === "failed" ? "fail_to_pay" : r.status) as InstallmentStatus,
+    invoiceNumber: r.invoiceNumber,
+    payment: r.payment ? {
+      paymentId: DP + r.payment.id, amountPaise: r.payment.amountPaise, mode: r.payment.mode,
+      reference: r.payment.reference, valueDate: r.payment.paymentDate, accountId: "",
+      recordedBy: r.payment.recordedBy || "", recordedAt: r.payment.recordedAt || "",
+      receipt: null, bankLineId: null, proof: null,
+    } : null,
+    failure: r.status === "failed"
+      ? { at: r.failedAt || "", reason: r.failureReason || "", attempt: 0, note: r.failureNote } : null,
+  }));
+  const open = installments.filter((i) => i.status !== "cancelled");
+  const paidAll = open.length > 0 && open.every((i) => i.status === "paid");
+  const state = c.state ? c.state.key : "active";
+  const status: SubscriptionStatus = state === "cancelled" ? "cancelled"
+    : open.some((i) => i.status === "fail_to_pay") ? "defaulting"
+      : paidAll ? "completed" : subStatusOf(state);
+  return {
+    subscriptionId: QSUB + c.id,
+    source: "sales",
+    customer: { name: c.customer || "", userId: c.userId === null ? null : String(c.userId) },
+    planId: planKeyOf(q.planName), planName: q.planName,
+    cycleMonths: c.cycleMonths || q.termMonths,
+    totalPaise: q.grandTotalPaise,
+    startDate: c.startedOn || "", endDate: c.renewsOn || "",
+    status, installments,
+    /* The first document it was billed on — what the chain strip names. */
+    invoiceNumber: (installments.filter((i) => !!i.invoiceNumber)[0] || { invoiceNumber: null }).invoiceNumber,
+    paidInFull: paidAll,
+    soldBy: c.soldBy ? c.soldBy.username : "",
+    recordedBy: c.recordedBy ? c.recordedBy.username : "",
+    recordedAt: c.recordedAt || "",
+    events: [],
+  };
+}
+
+let subsLoading: Promise<void> | null = null;
+let subsSeq = 0;
+
+async function loadSubs(): Promise<void> {
+  const mine = ++subsSeq;
+  await ensureClock();
+  const [rows, held, chainRows, history] = await Promise.all([
+    soft(every((n) => call(AdminOpsService.subs({ pageNo: n, pageSize: 100 })), (r) => r.subs)),
+    soft(every((n) => call(AdminOpsService.subscriptions({ pageNo: n, pageSize: 200 })), (r) => r.subscriptions)),
+    soft(call(AdminOpsService.subscriptionChains()).then((r) => r.chains)),
+    historyOf("subs"),
+    loadCompany(),
+  ]);
+  if (mine !== subsSeq) return;
+  /* The purchases carry their commitment; a SALE has no purchase, so it is
+     only on the commitments list. */
+  const sales = (held || []).filter((c) => !!c.quotation);
+  snap.subscriptions = (rows || []).map((x) => ({
+    ...liveSubscription(x),
+    events: x.subscription ? history["subscription:" + x.subscription.id] || [] : [] }))
+    .concat(sales.map((c) => ({ ...saleSubscription(c), events: history["subscription:" + c.id] || [] })));
+  commitments = {};
+  (rows || []).forEach((x) => {
+    if (x.subscription) commitments["SUB-" + x.family + "-" + x.id] = x.subscription;
+  });
+  sales.forEach((c) => { commitments[QSUB + c.id] = c; });
+  chains = chainRows || [];
+  emit();
+}
+
+/** Loads the plan purchases once; `force` re-reads them. */
+export function bootSubs(force = false): Promise<void> {
+  if (!subsLoading || force) subsLoading = loadSubs();
+  return subsLoading;
+}
+function useSubsBoot() {
+  useEffect(() => { void bootSubs(); }, []);
+}
 
 /* ============================================================= readers === */
 
@@ -204,62 +1095,158 @@ export const readSlip = (id: string | null | undefined) => {
 };
 export const runOfSlip = (slipId: string) =>
   snap.salaryRuns.filter((r) => r.slips.some((s) => s.slipId === slipId))[0] || null;
-export const readTags = () => snap.tags;
+export const readTags = () => live.tags;
 export const tagOf = (key: string | null | undefined) =>
-  (key ? snap.tags.filter((t) => t.tagKey === key)[0] || null : null);
-export const readTransactions = () => snap.transactions;
+  (key ? live.tags.filter((t) => t.tagKey === key)[0] || null : null);
+export const readTransactions = () => live.txns;
 export const readTransaction = (id: string | null | undefined) =>
-  (id ? snap.transactions.filter((t) => t.txnId === id)[0] || null : null);
-export const readRefunds = () => snap.refunds;
+  (id ? live.txns.filter((t) => t.txnId === id)[0] || null : null);
+export const readRefunds = () => live.refunds;
 export const readRefund = (id: string | null | undefined) =>
-  (id ? snap.refunds.filter((r) => r.refundId === id)[0] || null : null);
-export const readInvoices = () => snap.invoices;
-
+  (id ? live.refunds.filter((r) => r.refundId === id)[0] || null : null);
 /** THE USER BASE, read for one job: a subscription is recorded against a real
- *  registered person, never a name somebody typed. Read from the Users
- *  module's SEED rather than from its store — Finance already reads
- *  invoices.json the same way, and a view reaching into another module's store
- *  couples the two modules' lifecycles for no gain. When the endpoint lands,
- *  this becomes one fetch and nothing else here changes.
+ *  registered person, never a name somebody typed. The server's platform
+ *  accounts (`platform-users/`), read on the Users module's own endpoint rather
+ *  than through its store — a view reaching into another module's store couples
+ *  the two modules' lifecycles for no gain. `userId` is the account's pk, as
+ *  every live customer id in this module is. The list row carries no business
+ *  name, so `business` is null.
  *
  *  Deactivated accounts are still listed: money that arrived from one is a
  *  fact, and hiding the payer would make the row unrecordable. */
 export interface FinUser {
   userId: string; name: string; business: string | null; status: string; email: string;
 }
-interface SeedUser {
-  userId: string; userStatus: string;
-  identity: { name: string; email: string };
-  profile: { businessName: string | null } | null;
+let users: FinUser[] = [];
+let usersLoading: Promise<void> | null = null;
+/* ponytail: every page, once a session — fine at today's few hundred accounts;
+   a server-side search when the dialog's picker is reopened. */
+function bootUsers(): Promise<void> {
+  if (!usersLoading) {
+    usersLoading = soft(every((n) => call(AdminOpsService.platformUsers("?pageNo=" + n + "&pageSize=100")), (r) => r.users))
+      .then((rows) => {
+        users = (rows || []).map((u) => ({
+          userId: String(u.pk), name: u.identity.name, business: null,
+          status: u.userStatus, email: u.identity.email || "",
+        }));
+        emit();
+      });
+  }
+  return usersLoading;
 }
-export const readUsers = (): FinUser[] =>
-  (usersDoc.users as unknown as SeedUser[]).map((u) => ({
-    userId: u.userId,
-    name: u.identity.name,
-    business: u.profile ? u.profile.businessName : null,
-    status: u.userStatus,
-    email: u.identity.email,
-  }));
-export const readUser = (id: string | null | undefined) =>
-  (id ? readUsers().filter((u) => u.userId === id)[0] || null : null);
-export function useUsers(): FinUser[] { useVersion(); return readUsers(); }
-export const readInvoice = (n: string | null | undefined) =>
-  (n ? snap.invoices.filter((i) => i.invoiceNumber === n)[0] || null : null);
-export const readStatements = () => snap.statements;
-export const readResolutions = () => snap.resolutions;
-export const readPendingImport = () => snap.pendingImport;
+export const readUsers = (): FinUser[] => users;
+export function useUsers(): FinUser[] {
+  useVersion();
+  useEffect(() => { void bootUsers(); }, []);
+  return readUsers();
+}
+
+/** An issued invoice as the Subscriptions dialogs print one. */
+export interface FinInvoice {
+  invoiceNumber: string; dealRef: string; quotationNumber: string | null; status: string;
+  /** "paid" when the invoice carries its payment date, "" when it does not. */
+  paymentStatus: string;
+  /** No invoice names a platform account, so `business` and `userId` are null. */
+  customer: { name: string; business: string | null; userId: string | null };
+  description: string; placeOfSupply: string; invoiceDate: string; dueDate: string;
+  taxablePaise: number; grandTotalPaise: number;
+}
+/** An invoice raised on a sale's quotation, as the dialogs print one. The
+ *  customer is the account the deal names. */
+const chainInvoice = (i: SubChainInvoice, userId: number | null): FinInvoice => ({
+  invoiceNumber: i.invoiceNumber || "", dealRef: i.dealRef, quotationNumber: i.quotationNumber,
+  status: i.status, paymentStatus: i.status === "issued" && i.paymentDate ? "paid" : "",
+  customer: { name: i.billingName, business: null, userId: userId === null ? null : String(userId) },
+  description: i.description, placeOfSupply: i.placeOfSupply, invoiceDate: i.invoiceDate, dueDate: i.dueDate,
+  taxablePaise: i.taxablePaise, grandTotalPaise: i.grandTotalPaise,
+});
+
+/** A real invoice number, resolved against the server's issued invoices
+ *  (`invoices/`, read with the live half) and then the invoices on the sales'
+ *  quotations; null for no number or an unknown one. */
+export function readInvoice(n: string | null | undefined): FinInvoice | null {
+  const x = n ? live.invoices.filter((i) => i.invoiceNumber === n)[0] : null;
+  if (!x) {
+    for (const c of n ? chains : []) {
+      const hit = c.invoices.filter((i) => i.invoiceNumber === n)[0];
+      if (hit) return chainInvoice(hit, c.userId);
+    }
+    return null;
+  }
+  const item = (x.items || [])[0];
+  return {
+    invoiceNumber: x.invoiceNumber as string, dealRef: x.dealRef, quotationNumber: x.quotationNumber,
+    status: x.status, paymentStatus: x.paymentDate ? "paid" : "",
+    customer: { name: x.billing ? x.billing.name : "", business: null, userId: null },
+    description: item ? item.description : "", placeOfSupply: x.placeOfSupply,
+    invoiceDate: x.invoiceDate, dueDate: x.dueDate,
+    taxablePaise: x.taxableTotalPaise, grandTotalPaise: x.grandTotalPaise,
+  };
+}
+export const readStatements = () => live.statements;
+export const readResolutions = () => live.resolutions;
+/** The server has no statement waiting to be imported. */
+export const readPendingImport = () => null;
 export const readActivity = () => snap.activity;
 
 export interface PaymentHit { sub: Subscription; inst: Installment; pay: InstallmentPayment }
 
-/** EVERY installment payment in the module, flattened — including ones whose
- *  installment was later cancelled. This is what a reference lookup, a bank
- *  match and a refund point at, so it must not hide anything. */
-export function readPayments(): PaymentHit[] {
+/** EVERY installment payment on the subscriptions read, flattened — including
+ *  ones whose installment was later cancelled. This is what a reference lookup
+ *  and a reversal point at, so it must not hide anything. */
+function seedPayments(): PaymentHit[] {
   const out: PaymentHit[] = [];
   snap.subscriptions.forEach((s) => s.installments.forEach((i) => { if (i.payment) out.push({ sub: s, inst: i, pay: i.payment }); }));
   return out;
 }
+/** ONE PLAN PURCHASE, in the shape the refund picker reads. A plan payment is
+ *  bought and paid in one go, so its "schedule" is the single installment it
+ *  is; the customer around it is the payer the server joins onto the payment,
+ *  and the status is that plan's own. Nothing here is invented: a payment no
+ *  plan row names carries no customer and reads as not active, which is what
+ *  the records say about it. */
+function planHit(x: PlanPaymentRow): PaymentHit {
+  const paise = paiseOf(x.amount);
+  const valueDate = dateOnly(x.verifiedAt) || dateOnly(x.createdAt) || "";
+  const payer = x.payer || null;
+  const pay: InstallmentPayment = {
+    paymentId: x.orderId, amountPaise: paise, mode: "", reference: x.transactionId,
+    valueDate, accountId: "", recordedBy: "", recordedAt: x.verifiedAt || x.createdAt || "",
+    receipt: null, bankLineId: null, proof: null,
+  };
+  const inst: Installment = {
+    seq: 1, of: 1, dueDate: valueDate, amountPaise: paise, status: "paid",
+    invoiceNumber: null, payment: pay, failure: null,
+  };
+  const sub: Subscription = {
+    subscriptionId: x.orderId, source: "website",
+    customer: {
+      name: (payer && (payer.name || payer.business)) || "",
+      userId: payer && payer.userId !== null ? String(payer.userId) : null,
+    },
+    planId: "", planName: x.paymentFor || "", cycleMonths: 0, totalPaise: paise,
+    startDate: valueDate, endDate: "",
+    /* Only `active` is load-bearing (the policy check asks whether the plan is
+       still running); the rest is the plan's own word for how it ended. */
+    status: planStatus(payer ? payer.planStatus : ""),
+    installments: [inst], invoiceNumber: null, paidInFull: true,
+    soldBy: "", recordedBy: "", recordedAt: pay.recordedAt, events: [],
+  };
+  return { sub, inst, pay };
+}
+const planStatus = (s: string): SubscriptionStatus =>
+  (s === "active" ? "active" : s === "expired" ? "completed" : s === "refunded" ? "refunded" : "cancelled");
+/** The server id of the plan payment a panel payment id names. */
+const planIdOf = (paymentId: string): number | null =>
+  (live.plans.filter((x) => x.orderId === paymentId)[0] || { id: null }).id;
+
+/** On a live section these are the SERVER's plan purchases — money actually
+ *  collected, which is the only thing a refund can go back against. The seed's
+ *  installment payments are what the Subscriptions face reads. */
+export const readPayments = (): PaymentHit[] =>
+  (onLive()
+    ? live.plans.filter((x) => x.orderStatus === "PAID" && !!x.orderId && paiseOf(x.amount) > 0).map(planHit)
+    : seedPayments());
 export const readPayment = (paymentId: string | null | undefined) =>
   (paymentId ? readPayments().filter((r) => r.pay.paymentId === paymentId)[0] || null : null);
 
@@ -273,7 +1260,7 @@ export const readPayment = (paymentId: string | null | undefined) =>
  *  pair nets to zero. Counting it and then not counting the recall would
  *  overstate every month it appears in. */
 export const countedPayments = (): PaymentHit[] =>
-  readPayments().filter((r) => r.inst.status === "paid" || r.sub.status === "refunded");
+  seedPayments().filter((r) => r.inst.status === "paid" || r.sub.status === "refunded");
 
 /* ============================================================== actors === */
 
@@ -287,17 +1274,10 @@ export function superAdminOnly(what: string): string {
   return isSuperAdmin() ? "" : what + " is Super Admin only. (super_admin_required)";
 }
 
-const nextId = (prefix: string) => prefix + "-" + String(9000 + (seq++)).padStart(4, "0");
-
-function pushEvent(list: FinEvent[], type: string, note: string, who?: { name: string; role: string }): FinEvent {
-  const a = who || actor();
-  const ev: FinEvent = {
-    eventId: "EV-" + String(9000 + (seq++)),
-    type, actor: a.name, actorRole: a.role, at: stamp(), note,
-  };
-  list.unshift(ev);
-  return ev;
-}
+/* THE RECORD'S OWN TIMELINE IS THE SERVER'S NOW. `pushEvent` wrote an event
+   onto a local row and `nextId` invented the id it carried; both went with the
+   seed writes they belonged to. What is left is the session log below — this
+   tab's own account of what somebody just did, which was never a record. */
 function log(ev: FinEvent, ref: string, kind: string) {
   snap.activity.unshift({ at: ev.at, type: ev.type, actor: ev.actor, ref, kind, note: ev.note });
 }
@@ -538,32 +1518,22 @@ export const salaryRows = (): SalaryRow[] =>
     return b.a.monthlyGrossPaise - a.a.monthlyGrossPaise;
   });
 
-/** How people are engaged. A vocabulary rather than a union type, so a third
- *  value is a data change. See the note on `SalaryAccount.engagement` for why
- *  these two are not a clean partition. */
-export const ENGAGEMENTS = [
-  { key: "permanent", label: "Permanent" },
-  { key: "payroll", label: "Payroll" },
-];
+/** How people are engaged — the server's `employment-types` list (full time /
+ *  contract), filled in place when the payroll loads so every reader keeps the
+ *  same array. Empty until then, and empty for a session that may not read it:
+ *  a filter offering nothing is honest, two invented keys are not. */
+export const ENGAGEMENTS: { key: string; label: string }[] = [];
 
 /* ================================================= who a salary is for ===
    THE PERSON BELONGS TO TEAM. A salary account points at a member and never
    invents one, so the account form picks from the team rather than asking
    somebody to type a name, a designation and an id that has to match.
 
-   THIS READS TEAM'S OWN SEED, which is a cross-module read of exactly the kind
-   `invoices.json` and `quotations.json` already are — the difference is that
-   this one is not copied here, it is imported, so there is one fixture and not
-   two that drift. It becomes `AdminOpsService.users()` in the same commit that
-   retires those two.
-
-   THE TWO FIXTURES JOIN. They did not until 2026-09-07: Finance's seeded
-   accounts carried memberIds 1-12 and Team's members are 41-86 — two casts
-   written independently, so no historical account resolved to anybody and
-   the pay page had to read a third fixture of its own. Team's cast is the
-   real one; every open account is now one of its eight, and the two closed
-   accounts name people who have left, which an active roster has no row for.
-   `check-finance-ledger.cjs` asserts both halves of that. */
+   THIS READS THE LIVE ROSTER (`users/` + `attendance/settings/`, loaded with
+   the payroll), which is where a member actually exists. It used to read
+   Team's bundled fixture, and the two casts had to be reconciled by hand every
+   time either changed — a salary that pointed at nobody was invisible until
+   somebody opened the pay dialog and found an empty picker. */
 
 export interface SalaryMemberOption {
   memberId: number;
@@ -591,16 +1561,14 @@ export const employeeCodeOf = (memberId: number | string) =>
   "IB-EMP-" + String(memberId).padStart(3, "0");
 
 export function salaryMemberOptions(): SalaryMemberOption[] {
-  const taken = new Set(snap.salaryAccounts.map((a) => String(a.memberId)));
-  return (teamMembersDoc.members as {
-    memberId: string; name: string; designation: string; department?: string; status: string;
-  }[])
-    .filter((m) => m.status === "active")
+  const taken = new Set(snap.salaryAccounts.map((a) => a.memberId));
+  return roster
+    .filter((m) => m.active)
     .map((m) => ({
-      memberId: Number(m.memberId),
+      memberId: m.memberId,
       name: m.name,
       designation: m.designation,
-      department: (m.department || "").trim(),
+      department: m.department,
       taken: taken.has(m.memberId),
       employeeCode: employeeCodeOf(m.memberId),
     }));
@@ -772,7 +1740,7 @@ export function toTxnRow(t: CompanyTxn): TxnRow {
   };
 }
 export const txnRows = (): TxnRow[] =>
-  snap.transactions.map(toTxnRow).sort((a, b) =>
+  live.txns.map(toTxnRow).sort((a, b) =>
     b.t.valueDate.localeCompare(a.t.valueDate) || ts(b.t.recordedAt) - ts(a.t.recordedAt));
 
 export function applyTxnFilters(rows: TxnRow[], p: Params): TxnRow[] {
@@ -794,9 +1762,12 @@ export function applyTxnFilters(rows: TxnRow[], p: Params): TxnRow[] {
 }
 
 export interface TagTotal { tag: Tag; spentPaise: number; n: number; overBudget: boolean; pctOfBudget: number | null }
-export function tagTotals(from = PERIOD.from, to = PERIOD.to): { rows: TagTotal[]; totalPaise: number } {
-  const rows: TagTotal[] = snap.tags.map((tag) => {
-    const list = snap.transactions.filter((t) => t.tagKey === tag.tagKey && t.direction === "out"
+/** EVERY tag, spent against or not — summed here off the spend rows rather than
+ *  taken from the endpoint's `byTag`, which leaves out a tag nothing was spent
+ *  under. Same arithmetic as the server's. */
+export function tagTotals(from = livePeriodOf().from, to = livePeriodOf().to): { rows: TagTotal[]; totalPaise: number } {
+  const rows: TagTotal[] = live.tags.map((tag) => {
+    const list = live.txns.filter((t) => t.tagKey === tag.tagKey && t.direction === "out"
       && t.state === "recorded" && inPeriod(t.valueDate, from, to));
     const spentPaise = list.reduce((n, t) => n + t.amountPaise, 0);
     return {
@@ -811,16 +1782,16 @@ export function tagTotals(from = PERIOD.from, to = PERIOD.to): { rows: TagTotal[
 /* ======================================================== refund rows === */
 
 export interface RefundRow { r: Refund; payment: InstallmentPayment | null; sub: Subscription | null; ageDays: number }
+/** `sub` is always null: a server refund points at a plan payment, and there
+ *  is no subscription record behind that on the server. */
 export function toRefundRow(r: Refund): RefundRow {
-  const hit = r.paymentId ? readPayment(r.paymentId) : null;
   return {
-    r, payment: hit?.pay || null,
-    sub: hit?.sub || readSubscription(r.subscriptionId),
+    r, payment: live.refundPayment[r.refundId] || null, sub: null,
     ageDays: daysPast(r.requestedAt.slice(0, 10)),
   };
 }
 export const refundRows = (): RefundRow[] =>
-  snap.refunds.map(toRefundRow).sort((a, b) => ts(b.r.requestedAt) - ts(a.r.requestedAt));
+  live.refunds.map(toRefundRow).sort((a, b) => ts(b.r.requestedAt) - ts(a.r.requestedAt));
 
 export function refundQueue() {
   const rows = refundRows();
@@ -832,13 +1803,15 @@ export function refundQueue() {
   };
 }
 
+/** Nothing live reaches this: the picker it frames is empty on a live section
+ *  (see `readPayments`), so every check below answers false rather than pass. */
 export function refundPolicyCheck(paymentId: string, ground: string): RefundPolicy & { ageDays: number } {
   const hit = readPayment(paymentId);
   const g = groundMeta(ground);
   const ageDays = hit ? daysPast(hit.pay.valueDate) : 0;
   return {
     groundPermitted: !!g?.permitted,
-    withinWindow: ageDays <= REFUND_POLICY.windowDays,
+    withinWindow: !!hit && ageDays <= REFUND_POLICY.windowDays,
     originalRecorded: !!hit,
     subscriptionActive: !!hit && hit.sub.status === "active",
     ageDays,
@@ -846,13 +1819,6 @@ export function refundPolicyCheck(paymentId: string, ground: string): RefundPoli
 }
 
 /* ============================================================== money === */
-
-const paidInPeriod = (from: string, to: string) =>
-  countedPayments().filter((r) => inPeriod(r.pay.valueDate, from, to));
-const salaryInPeriod = (from: string, to: string) =>
-  snap.salaryRuns.filter((r) => r.state === "paid" && r.month >= monthOf(from) && r.month <= monthOf(to));
-const refundsPaidInPeriod = (from: string, to: string) =>
-  snap.refunds.filter((r) => r.state === "paid" && r.settlement && inPeriod(r.settlement.paidAt, from, to));
 
 export interface Overview {
   collectedPaise: number; collectedN: number;
@@ -871,49 +1837,90 @@ export interface Overview {
   netPaise: number;
 }
 
+const sumOf = <T,>(xs: T[], f: (x: T) => number) => xs.reduce((n, x) => n + f(x), 0);
+const inP = (d: string | null | undefined, from: string, to: string) => !!d && inPeriod(d, from, to);
+const addDaysIso = (d: string, n: number) =>
+  new Date(new Date(d + "T00:00:00Z").getTime() + n * DAY).toISOString().slice(0, 10);
+
+/** THE PERIOD'S MONEY, from ONE half. On a live section every field is the
+ *  server's; on the Subscriptions face — the one seed face that reads this —
+ *  it is the seed's. The two are never mixed in one answer. */
 export function overview(from = PERIOD.from, to = PERIOD.to): Overview {
-  const pays = paidInPeriod(from, to);
-  const collectedPaise = pays.reduce((n, r) => n + r.pay.amountPaise, 0);
+  return onLive() ? liveOverview(from, to) : seedOverview(from, to);
+}
 
-  const runs = salaryInPeriod(from, to);
-  const salaryPaise = runs.reduce((n, r) => n + r.totalNetPaise, 0);
-
-  /* A CANCELLED ROW CHARGES NOTHING. It is on the record forever — nothing is
-     deleted here — but every figure below stops counting it the moment it is
-     cancelled, which is the whole of what cancelling does. */
-  const live = (t: CompanyTxn) => t.state === "recorded";
-  const out = snap.transactions.filter((t) => live(t) && t.direction === "out" && inPeriod(t.valueDate, from, to));
-  const operating = out.filter((t) => tagOf(t.tagKey)?.kind !== "excluded");
-  const excluded = out.filter((t) => tagOf(t.tagKey)?.kind === "excluded");
-  const inn = snap.transactions.filter((t) => live(t) && t.direction === "in" && inPeriod(t.valueDate, from, to));
-
-  const rfPaid = refundsPaidInPeriod(from, to);
-  const rfOwed = snap.refunds.filter((r) => r.state === "approved" && !r.settlement);
-
-  const horizon = new Date(NOW + 30 * DAY).toISOString().slice(0, 10);
-  const rows = installmentRows();
+/** What the Subscriptions strip reads: installments collected in the period,
+ *  what is expected in the next 30 days and what did not clear — plus the
+ *  seed's salary runs. Spend, income and refunds are not in the seed any more,
+ *  so those fields are zero and `net` is collected less salary only. */
+function seedOverview(from: string, to: string): Overview {
+  const pays = countedPayments().filter((r) => inPeriod(r.pay.valueDate, from, to));
+  const collectedPaise = sumOf(pays, (r) => r.pay.amountPaise);
+  const runs = snap.salaryRuns.filter((r) => r.state === "paid" && r.month >= monthOf(from) && r.month <= monthOf(to));
+  const salaryPaise = sumOf(runs, (r) => r.totalNetPaise);
+  const horizon = addDaysIso(todayIso(), 30);
   /* AT MOST ONE PER SUBSCRIPTION, and none at all from a defaulting one —
-     see nextDue. What is expected in the next 30 days is the row in front of
-     each paying customer, not every unpaid row on the books. */
-  const due = snap.subscriptions
-    .map((sub) => ({ sub, i: nextDue(sub) }))
-    .filter((x) => x.i && x.i.dueDate <= horizon) as { sub: Subscription; i: Installment }[];
-  const failed = rows.filter((x) => x.i.status === "fail_to_pay");
-
-  const otherOutPaise = operating.reduce((n, t) => n + t.amountPaise, 0);
-  const otherInPaise = inn.reduce((n, t) => n + t.amountPaise, 0);
-  const refundsPaidPaise = rfPaid.reduce((n, r) => n + r.amountPaise, 0);
-
+     see nextDue. */
+  const due = snap.subscriptions.map(nextDue).filter((i): i is Installment => !!i && i.dueDate <= horizon);
+  const failed = installmentRows().filter((x) => x.i.status === "fail_to_pay");
   return {
     collectedPaise, collectedN: pays.length,
-    salaryPaise, salaryN: runs.reduce((n, r) => n + r.slips.length, 0),
+    salaryPaise, salaryN: sumOf(runs, (r) => r.slips.length),
+    otherOutPaise: 0, otherOutN: 0, otherInPaise: 0, otherInN: 0,
+    refundsPaidPaise: 0, refundsPaidN: 0, refundsOwedPaise: 0, refundsOwedN: 0,
+    dueNextPaise: sumOf(due, (i) => i.amountPaise), dueNextN: due.length,
+    failedPaise: sumOf(failed, (x) => x.i.amountPaise), failedN: failed.length,
+    excludedPaise: 0,
+    outPaise: salaryPaise, netPaise: collectedPaise - salaryPaise,
+  };
+}
+
+/** Plan purchases that landed in the window, at their full amount — a refund
+ *  is counted once, as money out (Overview/live.ts planCashPaise). Rupee
+ *  strings on the wire; a ₹0 free plan is not a payment. */
+const planNet = (from: string, to: string) => live.plans
+  .map((x) => ({ at: dateOnly(x.verifiedAt), net: planCashPaise(x, live.settledRefunds) }))
+  .filter((x) => x.net > 0 && inP(x.at, from, to));
+
+/** THE SERVER'S MONEY FOR A WINDOW, on the same rules as the Overview
+ *  section (Overview/financeLive.ts):
+ *    in   deal-ledger payments not reversed, by paymentDate, + plan purchases
+ *         at full amount, by verifiedAt; other income recorded, by valueDate.
+ *    out  spend recorded whose tag is not `excluded` + salary runs by the day
+ *         they were PAID + refunds by the day they were settled.
+ *  Dates are India dates. Nothing accrued, nothing forecast: cash. */
+function liveOverview(from: string, to: string): Overview {
+  const deal = live.ledger.filter((x) => x.type === "payment" && !x.reversed && inP(dateOnly(x.paymentDate), from, to));
+  const plans = planNet(from, to);
+  const counted = live.txns.filter((t) => t.state === "recorded" && inP(t.valueDate, from, to));
+  const out = counted.filter((t) => t.direction === "out");
+  const operating = out.filter((t) => tagOf(t.tagKey)?.kind !== "excluded");
+  const excluded = out.filter((t) => tagOf(t.tagKey)?.kind === "excluded");
+  const inn = counted.filter((t) => t.direction === "in");
+  const runs = live.runs.filter((r) => inP(dateOnly(r.paidAt), from, to));
+  const rfPaid = live.refunds.filter((r) => !!r.settlement && inP(dateOnly(r.settlement.paidAt), from, to));
+  const rfOwed = live.refunds.filter((r) => r.state === "approved" && !r.settlement);
+  const today = liveToday();
+  const due = today
+    ? live.installments.filter((x) => x.status?.key === "due" && x.dueDate >= today && x.dueDate <= addDaysIso(today, 30))
+    : [];
+  const failed = live.installments.filter((x) => x.status?.key === "failed");
+
+  const collectedPaise = sumOf(deal, (x) => x.amountPaise) + sumOf(plans, (x) => x.net);
+  const salaryPaise = sumOf(runs, (r) => r.totalNetPaise);
+  const otherOutPaise = sumOf(operating, (t) => t.amountPaise);
+  const otherInPaise = sumOf(inn, (t) => t.amountPaise);
+  const refundsPaidPaise = sumOf(rfPaid, (r) => r.amountPaise);
+  return {
+    collectedPaise, collectedN: deal.length + plans.length,
+    salaryPaise, salaryN: sumOf(runs, (r) => r.slips),
     otherOutPaise, otherOutN: operating.length,
     otherInPaise, otherInN: inn.length,
     refundsPaidPaise, refundsPaidN: rfPaid.length,
-    refundsOwedPaise: rfOwed.reduce((n, r) => n + r.amountPaise, 0), refundsOwedN: rfOwed.length,
-    dueNextPaise: due.reduce((n, x) => n + x.i.amountPaise, 0), dueNextN: due.length,
-    failedPaise: failed.reduce((n, x) => n + x.i.amountPaise, 0), failedN: failed.length,
-    excludedPaise: excluded.reduce((n, t) => n + t.amountPaise, 0),
+    refundsOwedPaise: sumOf(rfOwed, (r) => r.amountPaise), refundsOwedN: rfOwed.length,
+    dueNextPaise: sumOf(due, (x) => x.amountPaise), dueNextN: due.length,
+    failedPaise: sumOf(failed, (x) => x.amountPaise), failedN: failed.length,
+    excludedPaise: sumOf(excluded, (t) => t.amountPaise),
     outPaise: salaryPaise + otherOutPaise + refundsPaidPaise,
     netPaise: collectedPaise + otherInPaise - salaryPaise - otherOutPaise - refundsPaidPaise,
   };
@@ -938,41 +1945,21 @@ export function overviewTiles(from = PERIOD.from, to = PERIOD.to): Tile[] {
 
 /* ============================================================== months === */
 
-/** Every month the records touch, oldest first — derived from the records
- *  themselves. There is no separate history file that could disagree with the
- *  lists, which is the whole reason Analytics cannot contradict a tab. */
-/* SALARY PAID BY DEPARTMENT WAS HERE, ALL TIME, AND HAS MOVED — it is
-   `departmentYear(fy)` in payroll.ts now, scoped to one financial year.
-
-   All time was the wrong window for the only thing the figure is used for,
-   which is comparing departments against each other: it silently rewarded
-   whoever had been on the payroll longest, so a team hired in January read as
-   cheap beside one hired two years earlier and the bars gave no hint why. The
-   argument for all-time was that a period figure is a column of zeros early in
-   a month — true of a MONTH, and not true of a year, which is what replaced
-   it. There is one department figure in the module, on the page that owns the
-   payroll year. */
-
+/** Every month the server's records touch inside the windowed reads, oldest
+ *  first — derived from the rows themselves, so Analytics cannot contradict a
+ *  tab. `newCustomers` is null: no payment on the server names its customer,
+ *  so a first payment cannot be told from a repeat. */
 export function monthPoints(): MonthPoint[] {
   const keys = new Set<string>();
-  countedPayments().forEach((r) => keys.add(monthOf(r.pay.valueDate)));
-  snap.transactions.forEach((t) => keys.add(monthOf(t.valueDate)));
-  snap.salaryRuns.filter((r) => r.state === "paid").forEach((r) => keys.add(r.month));
-  snap.refunds.forEach((r) => { if (r.settlement) keys.add(monthOf(r.settlement.paidAt)); });
-
-  /* First payment, not first subscription and not signup: a renewal by an
-     existing customer is not a new customer. */
-  const firstPayOf = new Map<string, string>();
-  countedPayments().slice().sort((a, b) => a.pay.valueDate.localeCompare(b.pay.valueDate))
-    .forEach((r) => {
-      const k = r.sub.customer.userId || r.sub.customer.name;
-      if (!firstPayOf.has(k)) firstPayOf.set(k, r.pay.valueDate);
-    });
-
-  return Array.from(keys).sort().map((m) => {
-    const o = overview(m + "-01", m + "-31");
-    let newCustomers = 0;
-    firstPayOf.forEach((d) => { if (monthOf(d) === m) newCustomers++; });
+  const add = (d: string | null | undefined) => { if (d) keys.add(monthOf(d)); };
+  live.ledger.forEach((x) => { if (x.type === "payment" && !x.reversed) add(dateOnly(x.paymentDate)); });
+  live.plans.forEach((x) => { if (paiseOf(x.amount) > 0) add(dateOnly(x.verifiedAt)); });
+  live.txns.forEach((t) => add(t.valueDate));
+  live.runs.forEach((r) => add(dateOnly(r.paidAt)));
+  live.refunds.forEach((r) => add(r.settlement ? dateOnly(r.settlement.paidAt) : null));
+  const until = livePeriodOf().key;
+  return Array.from(keys).filter((m) => !!live.sinceMonth && m >= live.sinceMonth && m <= until).sort().map((m) => {
+    const o = liveOverview(m + "-01", monthEnd(m));
     return {
       month: m,
       subscriptionsPaise: o.collectedPaise,
@@ -981,7 +1968,7 @@ export function monthPoints(): MonthPoint[] {
       otherInPaise: o.otherInPaise,
       refundsPaise: o.refundsPaidPaise,
       netPaise: o.netPaise,
-      newCustomers,
+      newCustomers: null,
     };
   });
 }
@@ -990,36 +1977,29 @@ export function monthPoints(): MonthPoint[] {
 
 const pctOf = (a: number, b: number) => (b > 0 ? Math.round((a / b) * 1000) / 10 : null);
 
-export function kpis(from = PERIOD.from, to = PERIOD.to): Kpi[] {
-  const o = overview(from, to);
-  const months = monthPoints();
-  const thisM = monthOf(from);
-  const idx = months.findIndex((m) => m.month === thisM);
-  const prior = idx > 0 ? months[idx - 1] : null;
-  const priorO = prior ? overview(prior.month + "-01", prior.month + "-31") : null;
+export function kpis(from = livePeriodOf().from, to = livePeriodOf().to): Kpi[] {
+  const o = liveOverview(from, to);
+  const priorMonth = from ? monthBack(monthOf(from), 1) : "";
+  const priorO = priorMonth && live.sinceMonth && priorMonth >= live.sinceMonth
+    ? liveOverview(priorMonth + "-01", monthEnd(priorMonth)) : null;
 
-  /* MRR is a LEVEL read at a moment, never a rate summed over a period. A
-     defaulting subscription leaves it the instant an installment fails —
-     counting it is how MRR quietly becomes fiction. */
-  const active = snap.subscriptions.filter((s) => s.status === "active");
-  const mrr = active.reduce((n, s) => n + Math.round(s.totalPaise / Math.max(1, s.cycleMonths)), 0);
+  /* MRR and ARPU are the revenue module's own level, read at a moment. */
+  const rev = live.revenue;
+  const noRevenue = "The revenue read is not available to this session.";
 
-  const settled = installmentRows().filter((x) =>
-    (x.i.status === "paid" || x.i.status === "fail_to_pay") && inPeriod(x.i.dueDate, from, to));
-  const paidN = settled.filter((x) => x.i.status === "paid").length;
-  const failN = settled.filter((x) => x.i.status === "fail_to_pay").length;
+  const settled = live.installments.filter((x) =>
+    (x.status?.key === "paid" || x.status?.key === "failed") && inP(x.dueDate, from, to));
+  const paidN = settled.filter((x) => x.status.key === "paid").length;
+  const failN = settled.filter((x) => x.status.key === "failed").length;
 
-  const reinvest = snap.transactions.filter((t) => t.state === "recorded" && t.direction === "out"
-    && tagOf(t.tagKey)?.kind === "reinvestment" && inPeriod(t.valueDate, from, to))
-    .reduce((n, t) => n + t.amountPaise, 0);
-  const newCustomers = months.filter((m) => m.month === thisM)[0]?.newCustomers ?? 0;
-  const activeAccounts = snap.salaryAccounts.filter((a) => a.active).length;
-  const websitePaise = paidInPeriod(from, to).filter((r) => r.sub.source === "website")
-    .reduce((n, r) => n + r.pay.amountPaise, 0);
+  const heads = live.activeSalaryAccounts;
+  const openRunRow = live.runs.filter((r) => !r.paidAt)[0] || null;
+  const websitePaise = sumOf(planNet(from, to), (x) => x.net);
 
   const burn = o.salaryPaise + o.otherOutPaise + o.refundsPaidPaise;
   const priorBurn = priorO ? priorO.salaryPaise + priorO.otherOutPaise + priorO.refundsPaidPaise : null;
   const inTotal = o.collectedPaise + o.otherInPaise;
+  const noIdentity = "No payment on the server names its customer yet, so a first payment cannot be told from a repeat.";
 
   const mk = (key: string, value: number | null, priorV: number | null, why: string | null): Kpi => {
     const d = kpiMeta(key);
@@ -1032,19 +2012,25 @@ export function kpis(from = PERIOD.from, to = PERIOD.to): Kpi[] {
   };
 
   return [
-    mk("mrr", active.length ? mrr : null, null, active.length ? null : "No active subscription to read a level from."),
-    mk("arpu", active.length ? Math.round(mrr / active.length) : null, null,
-      active.length ? null : "A denominator of nothing has no average."),
+    mk("mrr", rev ? Math.round(rev.mrr * 100) : null, null, rev ? null : noRevenue),
+    /* ARPU IS NULL WITH NOBODY ON A PLAN, never zero: an average over an empty
+       denominator is not an average. The server answers 0 there. */
+    mk("arpu", rev && rev.activeSubscribers ? Math.round(rev.arpu * 100) : null, null,
+      !rev ? noRevenue : rev.activeSubscribers ? null : "No plan is active, so there is no average to take."),
     mk("collection_rate", pctOf(paidN, paidN + failN), null,
       paidN + failN ? null : "No installment fell due in this period."),
     mk("fail_rate", pctOf(failN, paidN + failN), null,
       paidN + failN ? null : "No installment fell due in this period."),
     mk("salary_ratio", o.salaryPaise ? pctOf(o.salaryPaise, o.collectedPaise) : null,
       priorO && priorO.salaryPaise ? pctOf(priorO.salaryPaise, priorO.collectedPaise) : null,
-      !o.salaryPaise ? "No salary run was paid in this period — the August run is still open." : !o.collectedPaise ? "Nothing was collected in this period." : null),
-    mk("cost_per_head", activeAccounts && o.salaryPaise ? Math.round(o.salaryPaise / activeAccounts) : null, null,
-      !activeAccounts ? "No active salary account." : !o.salaryPaise ? "No run was paid in this period." : null),
-    mk("burn", burn, priorBurn, null),
+      !o.salaryPaise
+        ? "No salary run was paid in this period" + (openRunRow ? " — the " + fmtMonth(openRunRow.month) + " run is still open." : ".")
+        : !o.collectedPaise ? "Nothing was collected in this period." : null),
+    mk("cost_per_head", heads && o.salaryPaise ? Math.round(o.salaryPaise / heads) : null, null,
+      heads === null ? "The salary accounts are not readable by this session."
+        : !heads ? "No active salary account." : !o.salaryPaise ? "No run was paid in this period." : null),
+    mk("burn", live.outReadable ? burn : null, live.outReadable ? priorBurn : null,
+      live.outReadable ? null : "Spend, salary runs or refunds are not readable by this session."),
     mk("net_margin", pctOf(o.netPaise, inTotal), null,
       inTotal ? null : "No money came in, so there is no margin to take."),
     mk("refund_rate", pctOf(o.refundsPaidPaise, o.collectedPaise), null,
@@ -1052,10 +2038,9 @@ export function kpis(from = PERIOD.from, to = PERIOD.to): Kpi[] {
     /* Deliberately null. Runway needs a reconciled cash balance and several
        closed months of burn; a placeholder here is a decision made on a wrong
        number — FN-OD-07. */
-    mk("runway", null, null, "Needs a reconciled cash balance and a burn history this seed does not carry — FN-OD-07."),
-    mk("new_customers", newCustomers, prior ? prior.newCustomers : null, null),
-    mk("cac", newCustomers ? Math.round(reinvest / newCustomers) : null, null,
-      newCustomers ? null : "No new customer in this period. Dividing by nothing is not free acquisition."),
+    mk("runway", null, null, "Needs a reconciled cash balance and a burn history the records do not carry yet — FN-OD-07."),
+    mk("new_customers", null, null, noIdentity),
+    mk("cac", null, null, noIdentity),
     mk("website_share", pctOf(websitePaise, o.collectedPaise), null,
       o.collectedPaise ? null : "Nothing was collected in this period."),
   ];
@@ -1068,20 +2053,11 @@ export interface WaterfallStep {
   paise: number; kind: "in" | "out" | "total";
 }
 
-/** THE PERIOD AS ARITHMETIC, in the order the money moves.
- *
- *  This exists so that Analytics.tsx can draw the sentence the `net` tile
- *  already prints in words — collected + other in − salary − spend − refunds —
- *  without doing a single addition of its own. The running total is the chart's
- *  job; what is derived here is the six signed steps and the closing figure,
- *  and the closing figure is `overview().netPaise` rather than a sum computed
- *  twice, so the chart and the tile cannot disagree.
- *
- *  A ZERO STEP IS RETURNED, NOT DROPPED. An unpaid salary run is the most
- *  consequential thing about August and a missing bar would hide it; the sub
- *  line says which of the two zeroes it is. */
-export function waterfall(from = PERIOD.from, to = PERIOD.to): WaterfallStep[] {
-  const o = overview(from, to);
+/** THE PERIOD AS ARITHMETIC, in the order the money moves. The closing figure
+ *  is `netPaise` rather than a sum computed twice, so the chart and the tile
+ *  cannot disagree. A ZERO STEP IS RETURNED, NOT DROPPED. */
+export function waterfall(from = livePeriodOf().from, to = livePeriodOf().to): WaterfallStep[] {
+  const o = liveOverview(from, to);
   const n = (c: number, one: string, many = one + "s") => c + " " + (c === 1 ? one : many);
   return [
     { key: "collected", label: "Collected", sub: n(o.collectedN, "installment"),
@@ -1109,25 +2085,14 @@ export interface RiskRow {
   count: string;
   tone: "bad" | "warn" | "mute";
   to: string | null;
-  /** WHAT YOU WILL SEE, never which section holds it. The five sections are
-   *  sidebar rows; a face that labels its own links with another section's name
-   *  is competing with the nav for the same job, and the panel's rule is that
-   *  it does not. "the 2 that failed" also happens to be the better link. */
+  /** WHAT YOU WILL SEE, never which section holds it. */
   toLabel: string;
 }
 
-/** MONEY THAT IS NOT WHERE IT SHOULD BE, gathered from all four record types.
- *
- *  A TABLE AND NOT A CHART, deliberately. These four amounts must never be
- *  added together — one has happened and one has not, one is owed by us and one
- *  to us — and any chart implies a shared axis, which is an invitation to sum
- *  them. Rows with a destination each is the honest form.
- *
- *  It is the one derivation on the page that reads across every module, which
- *  is exactly why it belongs in the store: a component assembling this list
- *  would be a second place for "what counts as at risk" to be decided. */
-export function atRisk(from = PERIOD.from, to = PERIOD.to): RiskRow[] {
-  const o = overview(from, to);
+/** MONEY THAT IS NOT WHERE IT SHOULD BE, gathered from the live records. A
+ *  TABLE AND NOT A CHART: these amounts must never be added together. */
+export function atRisk(from = livePeriodOf().from, to = livePeriodOf().to): RiskRow[] {
+  const o = liveOverview(from, to);
   const over = tagTotals(from, to).rows.filter((r) => r.overBudget);
   const recon = reconciliation();
   const rows: RiskRow[] = [
@@ -1162,26 +2127,14 @@ export function atRisk(from = PERIOD.from, to = PERIOD.to): RiskRow[] {
 
 /* ======================================================== kpi history === */
 
-/** THE SHAPE BEHIND A KPI, or null when there is no history to draw.
- *
- *  NULL IS THE POINT. A single reading rendered as a flat line is a claim about
- *  stability that these records do not make, so a metric with fewer than two
- *  months returns null and the card says "first reading" instead of drawing
- *  something. Only the four metrics that CAN be read month by month off
- *  `monthPoints` are here; the rest are levels read at a moment (MRR, ARPU) or
- *  ratios of a period's own settled installments, and inventing a series for
- *  them would mean deriving history a second way. */
+/** THE SHAPE BEHIND A KPI, or null when there is no history to draw. NULL IS
+ *  THE POINT: a single reading drawn as a flat line claims a stability the
+ *  records do not show. Only burn can be read month by month off the live
+ *  records; new customers has no source (see `monthPoints`). */
 export function kpiSeries(key: string): number[] | null {
   const ms = monthPoints();
   if (ms.length < 2) return null;
   if (key === "burn") return ms.map((m) => m.salaryPaise + m.otherOutPaise + m.refundsPaise);
-  if (key === "new_customers") return ms.map((m) => m.newCustomers);
-  /* NET MARGIN GOT ONE AND LOST IT AGAIN. The series behind it was net RUPEES
-     per month — the right shape, the wrong quantity — under a card whose value
-     is a percentage. A reader takes the line as the metric's own history, and
-     it was not: two months with the same margin and different volumes would
-     have drawn at different heights. Net by month is on the Overview, drawn at
-     full size and labelled as rupees, which is where that series belongs. */
   return null;
 }
 
@@ -1198,16 +2151,13 @@ export type LineMatch =
 
 const norm = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 
+/** What the SERVER matched a line to — the panel matches nothing itself. */
 export function lineMatch(lineId: string): LineMatch {
-  const hit = readPayments().filter((r) => r.pay.bankLineId === lineId)[0];
-  if (hit) return { kind: "payment", id: hit.pay.paymentId, label: hit.sub.customer.name + " · " + hit.sub.subscriptionId };
-  const t = snap.transactions.filter((x) => x.bankLineId === lineId)[0];
-  if (t) return { kind: "transaction", id: t.txnId, label: t.description };
-  return { kind: "none" };
+  return live.lineMatches[lineId] || { kind: "none" };
 }
 
 export interface Recon {
-  stmt: (typeof bankDoc.statements)[number] | null;
+  stmt: Statement | null;
   lines: { line: BankLine; match: LineMatch }[];
   bankOnly: { line: BankLine; match: LineMatch }[];
   matchedN: number;
@@ -1216,98 +2166,59 @@ export interface Recon {
   resolutions: Resolution[];
 }
 
+/** One statement: the one asked for, else the open one, else the newest. */
 export function reconciliation(stmtId?: string): Recon {
-  const stmt = (stmtId ? snap.statements.filter((s) => s.stmtId === stmtId)[0] : snap.statements.filter((s) => !s.closed)[0])
-    || snap.statements[snap.statements.length - 1] || null;
+  const all = live.statements;
+  const stmt = (stmtId ? all.filter((s) => s.stmtId === stmtId)[0] : all.filter((s) => !s.closed)[0])
+    || all[0] || null;
   if (!stmt) return { stmt: null, lines: [], bankOnly: [], matchedN: 0, variancePaise: 0, canClose: false, resolutions: [] };
-  const lines = (stmt.lines as BankLine[]).map((line) => ({ line, match: lineMatch(line.lineId) }));
-  const resolved = new Set(snap.resolutions.map((r) => r.targetId));
+  const lines = stmt.lines.map((line) => ({ line, match: lineMatch(line.lineId) }));
+  const resolved = new Set(live.resolutions.map((r) => r.targetId));
   const bankOnly = lines.filter((l) => l.match.kind === "none" && !resolved.has(l.line.lineId));
   return {
     stmt, lines, bankOnly,
     matchedN: lines.filter((l) => l.match.kind !== "none").length,
     variancePaise: bankOnly.reduce((n, l) => n + (l.line.dir === "credit" ? l.line.amountPaise : -l.line.amountPaise), 0),
     canClose: bankOnly.length === 0,
-    resolutions: snap.resolutions,
+    resolutions: live.resolutions,
   };
 }
 
-/** How much of what the bank shows, the records explain. Completeness, never
- *  correctness — a high figure says the two agree on what exists and says
- *  nothing about whether a row was tagged right. */
+/** How much of what the bank shows, the records explain — the server's figure
+ *  over every statement. Completeness, never correctness. */
 export function matchedPct(): number | null {
-  const all = snap.statements.flatMap((s) => s.lines as BankLine[]);
-  if (!all.length) return null;
-  const n = all.filter((l) => lineMatch(l.lineId).kind !== "none").length;
-  return Math.round((n / all.length) * 1000) / 10;
+  return live.bankMatchedPct;
 }
 
 /* ================================================================ tax === */
 
-export function taxSummary(from = PERIOD.from, to = PERIOD.to) {
-  const invs = paidInPeriod(from, to)
-    .map((r) => readInvoice(r.inst.invoiceNumber))
-    .filter(Boolean) as unknown as Record<string, number>[];
-  const g = (k: string) => invs.reduce((n, i) => n + (Number(i[k]) || 0), 0);
+/** Tax on the invoices ISSUED with an invoice date in the period. */
+export function taxSummary(from = livePeriodOf().from, to = livePeriodOf().to) {
+  const invs = live.invoices.filter((i) => i.status === "issued" && inP(i.invoiceDate, from, to));
+  const g = (f: (i: InvoiceRow) => number) => sumOf(invs, f);
+  const cgstPaise = g((i) => i.cgstPaise), sgstPaise = g((i) => i.sgstPaise), igstPaise = g((i) => i.igstPaise);
   return {
     n: invs.length,
-    taxablePaise: g("taxablePaise"),
-    cgstPaise: g("cgstPaise"), sgstPaise: g("sgstPaise"), igstPaise: g("igstPaise"),
-    totalTaxPaise: g("cgstPaise") + g("sgstPaise") + g("igstPaise"),
+    taxablePaise: g((i) => i.taxableTotalPaise),
+    cgstPaise, sgstPaise, igstPaise,
+    totalTaxPaise: cgstPaise + sgstPaise + igstPaise,
   };
 }
 
 /* ============================================================== writes === */
-/* Each is the client half of an endpoint. The order of the steps and the exact
-   refusal text are the contract — BACKEND-INTEGRATION.md § Module 6.         */
+/* EVERY WRITE GOES TO THE SERVER, re-reads the rows it changed and answers
+   with the server's own refusal when it says no. A write the server has no
+   endpoint for is refused in words — never written into a local copy that
+   the next read would wipe.                                                */
 
-/** One reference, one row, across every record type — a repeated webhook or a
- *  second entry carrying the same UTR is refused, never written twice. */
-function dupReference(ref: string): boolean {
+/** One reference, one row, across the LIVE rows, checked before a write is
+ *  sent. The server enforces it on income; on spend and refunds this is the
+ *  only check. */
+function dupLiveReference(ref: string): boolean {
   const r = norm(ref);
   if (!r) return false;
-  if (readPayments().some((x) => norm(x.pay.reference) === r)) return true;
-  if (snap.transactions.some((t) => norm(t.reference) === r)) return true;
-  if (snap.salaryRuns.some((run) => run.slips.some((s) => s.reference && norm(s.reference).startsWith(r)))) return true;
-  return snap.refunds.some((rf) => rf.settlement && norm(rf.settlement.reference) === r);
-}
-
-function invoiceSet(number: string, patch: Record<string, unknown>) {
-  const i = snap.invoices.filter((x) => x.invoiceNumber === number)[0] as unknown as Record<string, unknown>;
-  if (i) Object.keys(patch).forEach((k) => { i[k] = patch[k]; });
-}
-
-const hex64 = (salt: number) =>
-  Array.from({ length: 64 }, (_, i) => "0123456789abcdef"[Math.abs(salt * (i + 7) + i) % 16]).join("");
-
-function issueReceipt(pay: InstallmentPayment, sub: Subscription, inst: Installment) {
-  const n = readPayments().filter((r) => r.pay.receipt).length + 307;
-  pay.receipt = { number: "IB-RCP-2026-" + String(n).padStart(5, "0"), issuedAt: stamp(), sha256: hex64(n) };
-  log(pushEvent(sub.events, "RECEIPT_ISSUED",
-    pay.receipt.number + " for installment " + inst.seq + " of " + inst.of + "."), sub.subscriptionId, "subscription");
-}
-
-/** A subscription's status is DERIVED from its installments and its term,
- *  never typed.
- *
- *  COMPLETED NEEDS BOTH. Paying every installment does not finish a
- *  subscription — a twelve-month plan settled up front on day one is paid in
- *  full and has eleven months left to serve. Calling that "completed" would
- *  drop a live customer out of MRR the moment they paid, which is precisely
- *  backwards. The term has to be behind us as well. */
-function syncSubStatus(s: Subscription) {
-  if (s.status === "cancelled" || s.status === "refunded") return;
-  const before = s.status;
-  const live = s.installments.filter((i) => i.status !== "cancelled");
-  const allPaid = live.length > 0 && live.every((i) => i.status === "paid");
-  const termServed = s.endDate < todayIso();
-  if (live.some((i) => i.status === "fail_to_pay")) s.status = "defaulting";
-  else if (allPaid && termServed) s.status = "completed";
-  else s.status = "active";
-  if (before !== s.status && s.status === "completed")
-    log(pushEvent(s.events, "SUBSCRIPTION_COMPLETED",
-      "Every installment paid and the term served to " + s.endDate + ". " + inr(s.totalPaise) + " collected in full."),
-    s.subscriptionId, "subscription");
+  return live.txns.some((t) => t.state === "recorded" && norm(t.reference) === r)
+    || live.refunds.some((rf) => !!rf.settlement && norm(rf.settlement.reference) === r);
 }
 
 /** The installment schedule a set of inputs WILL produce. Exported because the
@@ -1339,458 +2250,296 @@ export function plansSeen(): { planId: string; planName: string }[] {
   return Array.from(seen, ([planId, planName]) => ({ planId, planName }))
     .sort((a, b) => a.planName.localeCompare(b.planName));
 }
-export function usePlansSeen() { useVersion(); return plansSeen(); }
+export function usePlansSeen() { useVersion(); useSubsBoot(); return plansSeen(); }
 
-/** Which invoices may be attached when a subscription is recorded: issued, of this
- *  customer, and not already carried by another subscription. Exported because
- *  the dialog offers exactly this list — an offer the write would refuse is a
- *  dialog lying to the person using it. */
 /* ========================================================== the chain ===
-   deal → quotation → invoice → subscription.
+   deal → quotation → invoice → subscription, as the record dialogs walk it
+   (subscriptions/chains/). A deal names the platform account it sells to
+   (Deal.customer, migration leads 0020), so an ACCEPTED quotation on it can be
+   tied to that customer without a join by email or phone. A deal nobody has
+   linked offers nothing, and the dialogs say so in their own empty messages. */
 
-   The QUOTATION is where the shape of a sale is agreed: the plan, the term,
-   the total, and how many installments it is paid in. The INVOICE is one
-   installment of it. Recording a subscription reads both instead of asking an
-   operator to retype four numbers that already exist on two documents — and
-   numbers that are read cannot disagree with the paperwork they came from.
-
-   A quotation whose installment count is 1 IS a complete payment. There is no
-   separate flag, because there is nothing a flag would say that the count does
-   not already say.
-
-   COUNT AND DOCUMENTS ARE DIFFERENT QUESTIONS. The chain raises one invoice per
-   installment as each falls due, so a two-installment quotation usually has one
-   invoice. The count comes from the quotation; counting invoices would report
-   the schedule as shorter than it is for as long as it is still running. */
-
-export type FinQuotation = (typeof quotationsDoc.quotations)[number];
-
-export const readQuotations = (): FinQuotation[] => snap.quotations as FinQuotation[];
-export const readQuotation = (n: string | null | undefined): FinQuotation | null =>
-  (n ? (snap.quotations as FinQuotation[]).filter((q) => q.quotationNumber === n)[0] || null : null);
-
-/** Every invoice number any subscription is holding, at either level. */
-function takenInvoiceNumbers(): Set<string> {
-  const taken = new Set<string>();
-  snap.subscriptions.forEach((s) => {
-    if (s.invoiceNumber) taken.add(s.invoiceNumber);
-    s.installments.forEach((i) => { if (i.invoiceNumber) taken.add(i.invoiceNumber); });
-  });
-  return taken;
+/** A quotation as the record dialog reads one. */
+export interface FinQuotation {
+  quotationNumber: string; dealRef: string; planName: string; termMonths: number;
+  installments: number; installmentGapMonths: number; grandTotalPaise: number;
 }
-
-/** The invoices raised against one quotation, oldest first — the installments
- *  of that sale in the order they were billed. Cancelled ones are included:
- *  they are part of the story, and the caller decides what to do with them. */
-export const invoicesOfQuotation = (n: string) =>
-  snap.invoices.filter((i) => i.quotationNumber === n)
-    .slice().sort((a, b) => a.invoiceDate.localeCompare(b.invoiceDate));
-
 export interface ChainOption {
   quotation: FinQuotation;
-  invoices: ReturnType<typeof invoicesOfQuotation>;
-  /** The first issued invoice on this quotation that nothing is carrying. Null
-   *  when every one is taken or none has been raised yet — two different
-   *  reasons it cannot be recorded, and the dialog says which. */
-  attachable: ReturnType<typeof invoicesOfQuotation>[number] | null;
-  /** Already carried by a subscription. Named so the dialog can say so rather
-   *  than showing nothing and leaving somebody to wonder. */
+  invoices: FinInvoice[];
+  /** The first issued invoice on this quotation — the document a sale is
+   *  recorded on. Null until one is issued. */
+  attachable: FinInvoice | null;
+  /** The subscription already recorded over this quotation. */
   recordedAs: string | null;
 }
+const chainOption = (c: SubChainRow): ChainOption => {
+  const q = c.quotation;
+  const issued = c.invoices.filter((i) => i.status === "issued")[0];
+  return {
+    quotation: {
+      quotationNumber: q.quotationNumber || "", dealRef: q.dealRef, planName: q.planName,
+      termMonths: q.termMonths, installments: q.installments,
+      installmentGapMonths: q.installmentGapMonths, grandTotalPaise: q.grandTotalPaise,
+    },
+    invoices: c.invoices.map((i) => chainInvoice(i, c.userId)),
+    attachable: issued ? chainInvoice(issued, c.userId) : null,
+    recordedAs: c.subscriptionId === null ? null : QSUB + c.subscriptionId,
+  };
+};
+export const chainsFor = (userId: string): ChainOption[] =>
+  chains.filter((c) => String(c.userId) === userId).map(chainOption);
+/** Every issued invoice on this customer's sales that settles no installment yet. */
+export const attachableInvoices = (userId: string): FinInvoice[] =>
+  chains.filter((c) => String(c.userId) === userId)
+    .flatMap((c) => c.invoices.filter((i) => i.status === "issued" && i.carriesSeq === null)
+      .map((i) => chainInvoice(i, c.userId)));
 
-/** THE CHAIN, FOR ONE BUSINESS. Accepted quotations only: a subscription
- *  cannot be recorded on a sale that did not happen, so a rejected or expired
- *  quotation is never offered rather than offered and then refused. */
-export function chainsFor(userId: string): ChainOption[] {
-  const taken = takenInvoiceNumbers();
-  return (snap.quotations as FinQuotation[])
-    .filter((q) => q.party.userId === userId && q.status === "accepted")
-    .map((q) => {
-      const invs = invoicesOfQuotation(q.quotationNumber);
-      const sub = snap.subscriptions.filter((x) =>
-        invs.some((i) => x.invoiceNumber === i.invoiceNumber
-          || x.installments.some((n) => n.invoiceNumber === i.invoiceNumber)))[0];
-      return {
-        quotation: q,
-        invoices: invs,
-        attachable: invs.filter((i) => i.status === "issued" && !taken.has(i.invoiceNumber))[0] || null,
-        recordedAs: sub ? sub.subscriptionId : null,
-      };
-    })
-    .sort((a, b) => b.quotation.quotationDate.localeCompare(a.quotation.quotationDate));
-}
+/* THE SUBSCRIPTION RECORD IS THE SERVER'S (2026-09-16, migration 0059).
 
-export function attachableInvoices(userId: string) {
-  const taken = takenInvoiceNumbers();
-  return snap.invoices.filter((i) => i.status === "issued"
-    && i.customer.userId === userId
-    && !taken.has(i.invoiceNumber));
-}
+   A row on this tab is a PLAN PURCHASE (subs/): the plan, the term, what it
+   cost, and the payment that settled it. On top of it sits the COMMITMENT
+   (subscriptions/) — where it stands, whether it renews, who sold it, and why
+   it stopped. Recording one, moving it between states and cancelling it with a
+   reason all write to the server.
 
-/** FN-T01 · RECORD a subscription against the invoice raised for it, and
- *  create its whole installment schedule.
- *
- *  RECORDED, AND STILL LIVE. Renamed from activateSubscription on 2026-08-31.
- *  This screen was never the thing that entitled anybody — the invoice is —
- *  and what happens here is writing down a sale that already happened, which
- *  is what every other face of this module claims to do (FN-AD-01, "Recorded
- *  is what happened"). Entitlement still follows immediately: recording it
- *  makes the subscription live from its start date. What changed is the word,
- *  and the word was overclaiming.
- *
- *  THE INVOICE CARRIES THE MONEY. Nobody types a total. The chain raises one
- *  invoice per installment (FN-OD-14), each for the same amount, so the
- *  subscription total is the attached invoice multiplied by the number of
- *  installments — and the schedule divides back into it exactly, by
- *  construction rather than by luck.
- *
- *  The schedule is created entire: every installment exists from day one with
- *  a due date, because a schedule invented one row at a time is not one. */
+   A SALE (migration 0063) is recorded over its accepted quotation instead, and
+   its installments are that quotation's rows: settled by the issued invoice
+   that billed each, failed on the deal's own rule, reversed through the deal
+   ledger. A plan purchase is ONE payment, so its single installment line stays
+   derived from that payment; a wrong one is REVERSED on the payment itself. */
+
 export interface RecordSubInput {
-  /** The registered user this was sold to. The name is resolved from it, so a
-   *  subscription can never name somebody the platform has never heard of. */
   userId: string;
   source: "sales" | "website";
   planId: string; planName: string; cycleMonths: number;
-  /** The invoice raised for this subscription. Its grand total is one
-   *  installment; the subscription total is that times the count. */
   invoiceNumber: string;
-  /** 1 = paid in full, and the dialog says so in those words. Above 1 it is a
-   *  schedule. On an invoice from an accepted quotation the count DEFAULTS to
-   *  what was agreed and may be re-picked — the total stays the whole
-   *  agreement either way; the count only says how it is collected. */
   installmentCount: number; startDate: string;
-  /** Free words about THIS recording, kept on the SUBSCRIPTION_RECORDED
-   *  event — never load-bearing, but the only place the reason for an
-   *  unusual sale is written down in words. */
   remark?: string;
-  /** Installments already collected by the time this is recorded. The team
-   *  says which: the first `count` rows (1st; 1st and 2nd; … all of them —
-   *  a complete payment), backed by one transfer's facts. Each covered row
-   *  is written paid with its own payment and receipt, exactly as the
-   *  one-by-one write would have; a multi-row transfer carries its
-   *  reference as REF/2, REF/3 so every payment still names its part. */
   paid?: { count: number; mode: string; reference: string; valueDate: string; accountId: string };
+  /** THE PURCHASE THIS COMMITMENT IS OVER. Without it the subscription is a
+   *  SALE, recorded over the quotation whose invoice `invoiceNumber` names. */
+  purchase?: { family: string; id: number };
+  state?: string;
 }
-export function recordSubscription(input: RecordSubInput): { error: string; subscriptionId: string | null } {
-  const user = readUser(input.userId);
-  if (!user) return { error: "Pick the customer from the user base — a subscription belongs to a registered account, not to a typed name.", subscriptionId: null };
-  const invoice = readInvoice(input.invoiceNumber);
-  if (!invoice) return { error: "Attach the invoice this subscription was raised on. The invoice is what the customer owes against, and it is the only thing here that says how much.", subscriptionId: null };
-  if (invoice.status !== "issued") return { error: invoice.invoiceNumber + " is " + invoice.status + ". A subscription cannot be recorded against an invoice that was never issued or has been cancelled. (invoice_not_open)", subscriptionId: null };
-  if (invoice.customer.userId !== user.userId)
-    return { error: invoice.invoiceNumber + " was raised for " + invoice.customer.name + ", not for " + user.name + ". Recording one customer's plan against another's invoice is how the wrong account gets entitled. (customer_mismatch)", subscriptionId: null };
-  if (snap.subscriptions.some((x) => x.invoiceNumber === invoice.invoiceNumber
-    || x.installments.some((i) => i.invoiceNumber === invoice.invoiceNumber)))
-    return { error: invoice.invoiceNumber + " is already carried by another subscription. One invoice, one thing bought. (duplicate_invoice)", subscriptionId: null };
-  if (!input.planName.trim()) return { error: "Pick a plan.", subscriptionId: null };
-  const n = input.installmentCount;
-  if (!Number.isInteger(n) || n < 1 || n > 5)
-    return { error: "Between 1 and 5 installments. Beyond five it is a payment plan the sales chain does not raise invoices for.", subscriptionId: null };
 
-  /* THE QUOTATION IS THE AUTHORITY ON THE PAYMENT PLAN — with one standing
-     exception: a complete payment is always available. The customer either
-     pays the agreed installments ONE BY ONE (each recorded against its own
-     row as it arrives — 1st, 2nd — through the installment payment write),
-     or pays the whole agreement at once. Any other count would be a schedule
-     the document never agreed. */
-  const quote = readQuotation(invoice.quotationNumber);
-  const quoteN = quote && quote.status === "accepted" ? quote.installments : null;
-  if (quoteN !== null && n !== quoteN && n !== 1)
-    return {
-      error: invoice.invoiceNumber + " was raised on " + quote!.quotationNumber + ", which agreed "
-        + (quoteN === 1 ? "a complete payment" : quoteN + " installments, paid one by one")
-        + ". Record that schedule, or a complete payment — not " + n + " installments. (plan_mismatch)",
-      subscriptionId: null,
-    };
-  if (!input.startDate || input.startDate > todayIso())
-    return { error: "A subscription starts when it is sold. The start date cannot be in the future.", subscriptionId: null };
+/** One commitment against one purchase. Kept apart from `recordSubscription`
+ *  so the store can record one on its way to cancelling or defaulting it,
+ *  which is the ordinary case: nobody records a commitment for its own sake. */
+async function postCommitment(family: string, purchase: number,
+  extra: { state?: string; cycleMonths?: number; startedOn?: string; renewsOn?: string; note?: string } = {}):
+  Promise<ApiSubscriptionRow> {
+  const row = await call(AdminOpsService.recordSubscription({ family, purchase, ...extra }));
+  commitments["SUB-" + family + "-" + purchase] = row;
+  return row;
+}
 
-  const a = actor();
-  const id = nextId("SUB");
-  /* The total is the whole agreement: the invoice's installment amount times
-     the count the quotation agreed — or, with no quotation behind the
-     invoice, times the count being recorded. The chosen count then splits
-     that same total; a count it will not divide into is refused rather than
-     rounded, because a schedule that does not sum back to the agreement is
-     a different agreement. */
-  const each = invoice.grandTotalPaise;
-  const totalPaise = each * (quoteN ?? n);
-  const installments = previewSchedule(input.startDate, n, totalPaise);
-  if (!installments.length)
-    return {
-      error: totalPaise % n !== 0
-        ? inr(totalPaise) + " does not divide into " + n + " equal installments. Pick a count that divides it exactly. (indivisible)"
-        : "That start date is not a date.",
-      subscriptionId: null,
-    };
-  /* INSTALLMENTS ALREADY COLLECTED, validated before anything is written —
-     a half-recorded subscription is worse than a refused one. */
-  const paid = input.paid && input.paid.count > 0 ? input.paid : null;
-  if (paid) {
-    if (!Number.isInteger(paid.count) || paid.count > n)
-      return { error: "Between 1 and " + n + " installments can be marked paid — the schedule has " + n + ".", subscriptionId: null };
-    if (!paid.reference.trim())
-      return { error: "The bank reference / UTR is mandatory on the collected installments — without it nothing ties them to a statement.", subscriptionId: null };
-    if (dupReference(paid.reference))
-      return { error: "A record already carries reference " + paid.reference.trim() + ". (duplicate_reference)", subscriptionId: null };
-    if (!paid.valueDate || paid.valueDate > todayIso())
-      return { error: "The value date is when the bank credited it — it cannot be in the future.", subscriptionId: null };
-    if (!accountOf(paid.accountId))
-      return { error: "Pick the account the collected installments were credited to.", subscriptionId: null };
-  }
-
-  const start = new Date(input.startDate + "T00:00:00Z");
-  const end = new Date(start); end.setUTCMonth(end.getUTCMonth() + input.cycleMonths);
-  const s: Subscription = {
-    subscriptionId: id, source: input.source,
-    customer: { name: user.name, userId: user.userId },
-    planId: input.planId, planName: input.planName, cycleMonths: input.cycleMonths,
-    totalPaise, startDate: input.startDate,
-    endDate: end.toISOString().slice(0, 10),
-    status: "active", installments,
-    invoiceNumber: invoice.invoiceNumber,
-    paidInFull: n === 1 || (paid !== null && paid.count === n),
-    soldBy: a.name, recordedBy: a.name, recordedAt: stamp(), events: [],
-  };
-  /* The invoice this was recorded against is the first installment's. The
-     rest are raised as they fall due. */
-  s.installments[0].invoiceNumber = invoice.invoiceNumber;
-  log(pushEvent(s.events, "SUBSCRIPTION_RECORDED",
-    input.planName + " recorded on " + invoice.invoiceNumber + " · " + inr(totalPaise)
-    + (n === 1 ? " paid in full" : " in " + n + " installments of " + inr(totalPaise / n))
-    + (quoteN !== null && quoteN !== n && quote
-      ? " (" + quote.quotationNumber + " agreed " + (quoteN === 1 ? "a complete payment" : quoteN + " installments") + ")"
-      : "")
-    + " · " + (sourceMeta(input.source)?.label || input.source)
-    + ". The customer is entitled from " + input.startDate + "."
-    + (input.remark && input.remark.trim() ? " Remark: " + input.remark.trim() : "")),
-  id, "subscription");
-  snap.subscriptions = [s].concat(snap.subscriptions);
-
-  /* Write the collected installments paid, each with its own payment row and
-     receipt — the same shape the one-by-one write leaves, so nothing
-     downstream can tell how they arrived. After the unshift, so receipt
-     numbering sees each one it just issued. */
-  if (paid) {
-    for (let k = 1; k <= paid.count; k++) {
-      const inst = s.installments[k - 1];
-      const ref = paid.count === 1 ? paid.reference.trim() : paid.reference.trim() + "/" + k;
-      const line = snap.statements.flatMap((st) => st.lines as BankLine[])
-        .filter((l) => l.dir === "credit" && norm(l.reference) === norm(ref) && l.amountPaise === inst.amountPaise)[0] || null;
-      const pay: InstallmentPayment = {
-        paymentId: nextId("PAY"), amountPaise: inst.amountPaise, mode: paid.mode,
-        reference: ref, valueDate: paid.valueDate, accountId: paid.accountId,
-        recordedBy: a.name, recordedAt: stamp(), receipt: null,
-        bankLineId: line ? line.lineId : null, proof: null,
-      };
-      inst.payment = pay;
-      inst.status = "paid";
-      inst.failure = null;
-      log(pushEvent(s.events, "INSTALLMENT_PAID",
-        "Installment " + inst.seq + " of " + inst.of + " · " + inr(pay.amountPaise) + " · " + pay.mode
-        + " · " + pay.reference
-        + (inst.invoiceNumber ? " · billed on " + inst.invoiceNumber : " · no tax invoice cited")
-        + " — collected before recording."),
-      id, "subscription");
-      issueReceipt(pay, s, inst);
+export async function recordSubscription(input: RecordSubInput):
+  Promise<{ error: string; subscriptionId: string | null }> {
+  if (!input.purchase) {
+    /* THE INVOICE NAMES THE QUOTATION, and the quotation's deal names the
+       customer. What is paid is the ledger's: `paid.count` is checked against
+       it, and the transfer facts beside it are the invoice's own already. */
+    const chain = chains.filter((c) => c.invoices.some((i) => i.invoiceNumber === input.invoiceNumber))[0];
+    if (!chain) return { error: "Attach the invoice this subscription was raised on.", subscriptionId: null };
+    if (String(chain.userId) !== input.userId)
+      return { error: input.invoiceNumber + " is on another customer's deal.", subscriptionId: null };
+    try {
+      const row = await call(AdminOpsService.recordSubscription({
+        quotation: chain.quotation.id, paidCount: input.paid ? input.paid.count : 0,
+        startedOn: input.startDate || undefined, note: input.remark,
+      }));
+      commitments[QSUB + row.id] = row;
+      await bootSubs(true);
+      return { error: "", subscriptionId: QSUB + row.id };
+    } catch (e) {
+      return { error: writeError(e), subscriptionId: null };
     }
-    syncSubStatus(s);
   }
-
-  emit();
-  return { error: "", subscriptionId: id };
+  const { family, id } = input.purchase;
+  try {
+    await postCommitment(family, id, {
+      state: input.state, cycleMonths: input.cycleMonths || undefined,
+      startedOn: input.startDate || undefined, note: input.remark,
+    });
+  } catch (e) {
+    return { error: writeError(e), subscriptionId: null };
+  }
+  await bootSubs(true);
+  return { error: "", subscriptionId: "SUB-" + family + "-" + id };
 }
 
-/** The invoices that may be attached to one installment: issued, this
- *  customer's, carried by nothing else, and **for exactly this installment's
- *  amount**. The chain raises one invoice per installment, so an invoice for a
- *  different figure is an invoice for a different thing — attaching it would
- *  put a receipt in front of a customer citing a document that does not say
- *  what they paid. */
-export function attachableForInstallment(subscriptionId: string, seq: number) {
-  const sub = readSubscription(subscriptionId);
-  const inst = sub ? sub.installments.filter((i) => i.seq === seq)[0] : null;
-  if (!sub || !inst || !sub.customer.userId) return [];
-  return attachableInvoices(sub.customer.userId)
-    .filter((i) => i.grandTotalPaise === inst.amountPaise);
+/** The commitment this purchase already carries, or one recorded now. Every
+ *  write below needs one and most purchases do not have one yet — a state is
+ *  not a thing anybody sets up in advance. */
+async function heldFor(subscriptionId: string): Promise<{ id: number | null; error: string }> {
+  const held = commitments[subscriptionId];
+  if (held) return { id: held.id, error: "" };
+  const ref = purchaseRefOf(subscriptionId);
+  if (!ref) return { id: null, error: "That subscription no longer exists." };
+  try {
+    return { id: (await postCommitment(ref.family, ref.purchase)).id, error: "" };
+  } catch (e) {
+    return { id: null, error: writeError(e) };
+  }
 }
 
-/** FN-T02 · Record the payment that settles one installment. ONE WRITE: the
- *  installment is paid, the receipt is issued and it counts as collected.
- *  There is no window in which two screens disagree. */
+/** The invoices that may settle one installment of a sale: issued, on its own
+ *  quotation, settling nothing yet, and for exactly that installment's amount.
+ *  A purchase has none — it is one payment. */
+export function attachableForInstallment(subscriptionId: string, seq: number): FinInvoice[] {
+  const held = commitments[subscriptionId];
+  const inst = (readSubscription(subscriptionId)?.installments || []).filter((i) => i.seq === seq)[0];
+  if (!held || !held.quotation || !inst) return [];
+  const chain = chains.filter((c) => c.quotation.id === held.quotation!.id)[0];
+  return (chain ? chain.invoices : [])
+    .filter((i) => i.status === "issued" && i.carriesSeq === null && i.grandTotalPaise === inst.amountPaise)
+    .map((i) => chainInvoice(i, chain.userId));
+}
+
 export interface RecordPaymentInput {
   subscriptionId: string; seq: number;
   valueDate: string;
-  /** THE THREE THE INVOICE ALREADY ANSWERS, and therefore optional. A
-   *  payment against an installment is billed on one document, for one
-   *  amount, into the company's own account — asking the operator to retype
-   *  any of that is asking for a second opinion on it. Left out, they are
-   *  derived below: the reference from the invoice the receipt will cite,
-   *  the account from the ledger's own default, the mode from the module's
-   *  first. A caller with better facts may still pass its own. */
   mode?: string; reference?: string; accountId?: string;
-  /** The invoice raised for THIS installment, attached as it is paid. The
-   *  chain raises one per installment as it falls due, so an installment
-   *  after the first usually arrives here without one. */
   invoiceNumber?: string | null;
 }
-export function recordInstallmentPayment(input: RecordPaymentInput): { error: string; paymentId: string | null } {
-  const s = readSubscription(input.subscriptionId);
-  if (!s) return { error: "That subscription no longer exists.", paymentId: null };
-  const inst = s.installments.filter((i) => i.seq === input.seq)[0];
-  if (!inst) return { error: "There is no installment " + input.seq + " on " + s.subscriptionId + ".", paymentId: null };
-  if (inst.status === "paid") return { error: "Installment " + input.seq + " is already paid. (invalid_state_transition)", paymentId: null };
-  if (inst.status === "cancelled") return { error: "A cancelled installment cannot be paid. (invalid_state_transition)", paymentId: null };
-  if (!input.valueDate || input.valueDate > todayIso())
-    return { error: "The value date is when the bank credited it — it cannot be in the future.", paymentId: null };
-
-  /* ATTACHING THE INVOICE FOR THIS INSTALLMENT. The chain raises one per
-     installment as it falls due, so the later ones arrive here without one and
-     this is where they are joined up. Without it the receipt is issued citing
-     no tax invoice at all — it prints a dash where the document should be. */
-  const attach = (input.invoiceNumber || "").trim();
-
-  /* THE THREE THE DOCUMENT ALREADY ANSWERS. Resolved before the attach block
-     because the reference is read off the invoice this payment will cite:
-     that number is what ties the row to the document and to the statement
-     line, it is unique by construction (one invoice bills one installment),
-     and it is the string somebody looking for this money would search. With
-     no invoice at all there is still something unique to say — the
-     subscription and the installment it settles — so nothing ever dangles.
-     The account is the ledger's own default and the mode the module's
-     first; a caller that knows better passes its own. */
-  const billNo = attach || inst.invoiceNumber || "";
-  const reference = (input.reference || "").trim()
-    || billNo
-    || s.subscriptionId + "/" + inst.seq;
-  const accountId = input.accountId
-    || (ACCOUNTS.filter((x) => x.active && x.type === "bank")[0] || ACCOUNTS.filter((x) => x.active)[0] || { accountId: "" }).accountId;
-  const mode = input.mode || MODES[0] || "NEFT";
-  if (dupReference(reference))
-    return { error: "A record already carries reference " + reference + ". (duplicate_reference)", paymentId: null };
-  if (!accountOf(accountId)) return { error: "Pick the account it was credited to.", paymentId: null };
-
-  if (attach) {
-    if (inst.invoiceNumber && inst.invoiceNumber !== attach)
-      return { error: "Installment " + input.seq + " is already billed on " + inst.invoiceNumber + ". An installment is billed once. (duplicate_invoice)", paymentId: null };
-    const iv = readInvoice(attach);
-    if (!iv) return { error: "That invoice does not exist. Raise it in Invoices first, then attach it here.", paymentId: null };
-    if (iv.status !== "issued")
-      return { error: attach + " is " + iv.status + ". A receipt cannot cite an invoice that was never issued or has been cancelled. (invoice_not_open)", paymentId: null };
-    if (iv.customer.userId !== s.customer.userId)
-      return { error: attach + " was raised for " + iv.customer.name + ", not for " + s.customer.name + ". (customer_mismatch)", paymentId: null };
-    if (iv.grandTotalPaise !== inst.amountPaise)
-      return { error: attach + " is for " + inr(iv.grandTotalPaise) + ", and this installment is " + inr(inst.amountPaise) + ". One invoice bills one installment, for what that installment is. (amount_mismatch)", paymentId: null };
-    if (snap.subscriptions.some((x) => x.invoiceNumber === attach
-      || x.installments.some((i) => i.invoiceNumber === attach && !(x.subscriptionId === s.subscriptionId && i.seq === inst.seq))))
-      return { error: attach + " is already carried by another installment. One invoice, one thing billed. (duplicate_invoice)", paymentId: null };
-    inst.invoiceNumber = attach;
+/** A SALE'S INSTALLMENT IS SETTLED BY ITS ISSUED INVOICE: issuing one is what
+ *  writes the ledger row, so this joins the two and records no money itself.
+ *  The value date is the invoice's payment date, not a second one typed here.
+ *  A plan purchase is one payment, settled by the gateway or verified under
+ *  Payments, and is refused. */
+export async function recordInstallmentPayment(input: RecordPaymentInput):
+  Promise<{ error: string; paymentId: string | null }> {
+  const sale = saleIdOf(input.subscriptionId);
+  if (sale === null)
+    return {
+      error: "A plan purchase is one payment: the gateway settles it, or it is verified as a manual payment"
+        + " under Payments. There is no installment to record here.",
+      paymentId: null,
+    };
+  try {
+    const row = await call(AdminOpsService.paySubscriptionInstallment(sale, input.seq, input.invoiceNumber || ""));
+    commitments[input.subscriptionId] = row;
+    const paid = (row.installments || []).filter((r) => r.seq === input.seq)[0];
+    await bootSubs(true);
+    return { error: "", paymentId: paid && paid.payment ? DP + paid.payment.id : null };
+  } catch (e) {
+    return { error: writeError(e), paymentId: null };
   }
-
-  const a = actor();
-  const id = nextId("PAY");
-  /* If an imported statement already shows this exact reference and amount,
-     tie them together now. The statement proves the ledger complete; it is
-     never a second opinion on the row. */
-  const line = snap.statements.flatMap((st) => st.lines as BankLine[])
-    .filter((l) => l.dir === "credit" && norm(l.reference) === norm(reference) && l.amountPaise === inst.amountPaise)[0] || null;
-
-  const pay: InstallmentPayment = {
-    paymentId: id, amountPaise: inst.amountPaise, mode,
-    reference, valueDate: input.valueDate, accountId,
-    recordedBy: a.name, recordedAt: stamp(), receipt: null,
-    bankLineId: line ? line.lineId : null, proof: null,
-  };
-  inst.payment = pay;
-  inst.status = "paid";
-  inst.failure = null;
-
-  log(pushEvent(s.events, "INSTALLMENT_PAID",
-    "Installment " + inst.seq + " of " + inst.of + " · " + inr(pay.amountPaise) + " · " + pay.mode + " · " + pay.reference
-    + (inst.invoiceNumber ? " · billed on " + inst.invoiceNumber : " · no tax invoice cited")
-    + (attach ? ", attached with this payment" : "") + "."),
-  s.subscriptionId, "subscription");
-  issueReceipt(pay, s, inst);
-  if (line) pushEvent(s.events, "MATCHED", "Already on the imported statement as " + line.reference + " · " + line.date + ".");
-  if (inst.invoiceNumber) invoiceSet(inst.invoiceNumber, { paymentStatus: "paid" });
-  syncSubStatus(s);
-  emit();
-  return { error: "", paymentId: id };
 }
 
-/** FN-T03 · Record that an installment did not get paid. This writes down
- *  something that HAPPENED — a decline, a cancelled mandate, or a due date
- *  that has demonstrably passed. Never a guess, which is why the reason is a
- *  closed list and the evidence is mandatory. */
-export function markFailToPay(subscriptionId: string, seq: number, reason: string, evidence: string): string {
-  const s = readSubscription(subscriptionId);
-  if (!s) return "That subscription no longer exists.";
-  const inst = s.installments.filter((i) => i.seq === seq)[0];
-  if (!inst) return "There is no installment " + seq + " on " + s.subscriptionId + ".";
-  if (inst.status === "paid") return "Installment " + seq + " is paid. Reverse the payment first. (invalid_state_transition)";
-  if (inst.status === "cancelled") return "A cancelled installment cannot fail. (invalid_state_transition)";
-  if (!failureMeta(reason)) return "Pick what actually happened.";
-  if (reason === "overdue" && inst.dueDate > todayIso())
-    return "Installment " + seq + " is not due until " + inst.dueDate + ". A date that has not passed is not evidence of anything. (validation_failed)";
+/** FN · A FAILURE IS A STATE, not a schedule row: the commitment goes
+ *  `defaulting`, and the reason and the evidence ride the audit trail with the
+ *  write — the same place the hold reason and the closing reason are kept —
+ *  and come back as the installment's `failure`. The server refuses a paid
+ *  purchase, a reason off the list, and `overdue` before the due date.
+ *  Which installment failed cannot be recorded, because there is only one and
+ *  it is derived from the payment. */
+export async function markFailToPay(subscriptionId: string, seq: number, reason: string,
+  evidence: string): Promise<string> {
+  const sub = readSubscription(subscriptionId);
+  if (!sub) return "That subscription no longer exists.";
+  const sale = saleIdOf(subscriptionId);
+  if (sale !== null) {
+    if (!reason.trim()) return "Pick what happened.";
+    if (!evidence.trim())
+      return "Say what the gateway or the bank said, in their words. A failure with no evidence is indistinguishable from a guess. (reason_required)";
+    try {
+      await call(AdminOpsService.failSubscriptionInstallment(sale, seq, { reason: reason.trim(), note: evidence.trim() }));
+    } catch (e) {
+      return writeError(e);
+    }
+    await bootSubs(true);
+    return "";
+  }
+  if (seq !== 1)
+    return "A plan purchase is paid once, so there is a single installment and it is the one that failed.";
+  if (!reason.trim()) return "Pick what happened.";
   if (!evidence.trim())
-    return "Record what the gateway or the bank said — a failure with no evidence is indistinguishable from a guess. (reason_required)";
-
-  inst.status = "fail_to_pay";
-  inst.failure = { at: stamp(), reason, note: evidence.trim(), attempt: (inst.failure?.attempt || 0) + 1 };
-  log(pushEvent(s.events, "INSTALLMENT_FAILED",
-    "Installment " + inst.seq + " of " + inst.of + " · " + (failureMeta(reason)?.label || reason) + " · " + evidence.trim()),
-  s.subscriptionId, "subscription");
-  syncSubStatus(s);
-  emit();
+    return "Say what the gateway or the bank said, in their words. A failure with no evidence is indistinguishable from a guess. (reason_required)";
+  const held = await heldFor(subscriptionId);
+  if (held.error) return held.error;
+  try {
+    await call(AdminOpsService.setSubscriptionState(held.id as number, {
+      state: "defaulting", reason: reason.trim(), note: evidence.trim(),
+    }));
+  } catch (e) {
+    return writeError(e);
+  }
+  await bootSubs(true);
   return "";
 }
 
-/** FN-T04 · Reverse an installment payment. Super Admin. The history keeps
- *  the payment and its receipt; the installment returns to unpaid. */
-export function reversePayment(paymentId: string, reason: string): string {
-  const hit = readPayment(paymentId);
-  if (!hit) return "That payment no longer exists.";
-  if (hit.inst.status !== "paid") return "Only a paid installment can be reversed. (invalid_state_transition)";
-  if (!reason.trim()) return "A reversal with no reason is indistinguishable from a mistake at audit. (reason_required)";
+/** FN · A RECORDED PAYMENT WAS WRONG — a duplicate, a credit the bank
+ *  recalled. NO MONEY MOVES: money going back to a customer is a refund. On a
+ *  sale it is the deal ledger's reversal (the invoice is cancelled and the
+ *  installment owed again); on a plan purchase the payment turns REVERSED and
+ *  stops counting. The plan itself is not touched. Super Admin, as the dialog
+ *  says; the server holds it to `finance.reverse`. */
+export async function reversePayment(paymentId: string, reason: string): Promise<string> {
+  const hit = seedPayments().filter((h) => h.pay.paymentId === paymentId)[0];
+  if (!hit) return "That payment is not on any subscription.";
   const sa = superAdminOnly("Reversing a payment"); if (sa) return sa;
-  const a = actor();
-  const { sub, inst, pay } = hit;
-  log(pushEvent(sub.events, "PAYMENT_REVERSED",
-    pay.paymentId + " · " + inr(pay.amountPaise) + " reversed by " + a.name + " — " + reason.trim()
-    + ". Receipt " + (pay.receipt?.number || "—") + " is retained: a receipt for money later recalled is more interesting to an auditor, not less."),
-  sub.subscriptionId, "subscription");
-  inst.payment = null;
-  inst.status = "due";
-  if (inst.invoiceNumber)
-    invoiceSet(inst.invoiceNumber, { paymentStatus: "unpaid", status: "cancelled", cancellationReason: "payment reversed" });
-  syncSubStatus(sub);
-  emit();
+  if (!reason.trim()) return "Say why it is being reversed. It goes into the history verbatim. (reason_required)";
+  const held = await heldFor(hit.sub.subscriptionId);
+  if (held.error) return held.error;
+  try {
+    await call(AdminOpsService.reverseSubscriptionPayment(held.id as number, { seq: hit.inst.seq, reason: reason.trim() }));
+  } catch (e) {
+    return writeError(e);
+  }
+  await bootSubs(true);
   return "";
 }
 
-/** FN-T05 · Cancel a subscription. Unpaid installments are cancelled, not
- *  written off; money already collected is untouched. */
-export function cancelSubscription(id: string, reason: string): string {
-  const s = readSubscription(id);
-  if (!s) return "That subscription no longer exists.";
-  if (s.status === "cancelled") return "It is already cancelled. (invalid_state_transition)";
-  if (!reason.trim()) return "Say why it is ending. (reason_required)";
-  const n = s.installments.filter((i) => i.status !== "paid").length;
-  s.installments.forEach((i) => { if (i.status !== "paid") { i.status = "cancelled"; i.failure = null; } });
-  s.status = "cancelled";
-  log(pushEvent(s.events, "SUBSCRIPTION_CANCELLED",
-    reason.trim() + " · " + n + " unpaid installment" + (n === 1 ? "" : "s") + " cancelled. Money already collected is untouched."),
-  id, "subscription");
-  emit();
+/** FN · It stops renewing, on a day, for a reason. NOT A REFUND: money already
+ *  collected stays collected, and goes back only through a refund request that
+ *  somebody approves and actually sends. */
+export async function cancelSubscription(id: string, reason: string): Promise<string> {
+  const sub = readSubscription(id);
+  if (!sub) return "That subscription no longer exists.";
+  if (!reason.trim())
+    return "Say why it is ending. It goes into the history verbatim. (reason_required)";
+  const held = await heldFor(id);
+  if (held.error) return held.error;
+  try {
+    await call(AdminOpsService.cancelSubscription(held.id as number, reason.trim()));
+  } catch (e) {
+    return writeError(e);
+  }
+  await bootSubs(true);
   return "";
 }
 
 /* ---------------------------------------------------------- salaries --- */
+/* EVERY WRITE BELOW GOES TO THE SERVER and answers with the server's own
+   refusal when it says no. WHAT THE RECORD HAS NO COLUMN FOR IS REFUSED rather
+   than dropped: a component breakdown, standing deductions, bank details, PAN,
+   UAN, a one-off incentive on a payment — a form that swallowed any of them
+   would look like it had saved them, and a figure nobody can find afterwards
+   is worse than one that was never accepted. */
 
-/** FN-T06 · Open or revise a salary account. The components are typed, never
- *  derived from a role: a salary is a contract with a person, not a function
- *  of their permissions. */
+/** The server id inside a panel id (`SAL-AC-12` → 12), or null when the id is
+ *  not one of ours — a stale link, never a row to write to. */
+function serverIdOf(id: string, prefix: string): number | null {
+  const n = id.indexOf(prefix) === 0 ? Number(id.slice(prefix.length)) : NaN;
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+/** Fold one server account into the snapshot at once, then re-read the payroll
+ *  in the background so every derived figure agrees with the server. */
+function putAccount(row: SalaryAccountRow): SalaryAccount {
+  const a = liveSalaryAccount(row);
+  snap.salaryAccounts = snap.salaryAccounts
+    .filter((x) => x.salaryAccountId !== a.salaryAccountId).concat([a]);
+  emit();
+  void bootPayroll(true);
+  return a;
+}
+
+/** FN-T06 · Open or revise a salary account. What is stored is the MONTHLY
+ *  GROSS and the employee code: the person, their designation and their
+ *  department are Team's and are read from the roster, never typed here. */
 export interface SalaryAccountInput {
   memberId: number; memberName: string; employeeCode: string; designation: string;
   /** Defaults to permanent where the form does not ask. A value somebody can
@@ -1801,56 +2550,81 @@ export interface SalaryAccountInput {
   bank: { masked: string; ifsc: string; name: string; upi?: string }; pan: string; uan: string | null;
   department: string;
 }
-export function upsertSalaryAccount(input: SalaryAccountInput, id?: string): { error: string; salaryAccountId: string | null } {
-  if (!input.memberId) return { error: "This account must point at a real Team member — that link is what stops a salary existing for nobody.", salaryAccountId: null };
-  if (!input.memberName.trim()) return { error: "Pick the team member this account belongs to.", salaryAccountId: null };
-  const gross = input.earnings.reduce((n, e) => n + e.amountPaise, 0);
-  if (gross <= 0) return { error: "The earnings must add up to more than zero.", salaryAccountId: null };
+export async function upsertSalaryAccount(input: SalaryAccountInput, id?: string):
+Promise<{ error: string; salaryAccountId: string | null }> {
+  const fail = (error: string) => ({ error, salaryAccountId: null });
+  if (!input.memberId) return fail("This account must point at a real Team member — that link is what stops a salary existing for nobody.");
+  if (!input.memberName.trim()) return fail("Pick the team member this account belongs to.");
   if (input.earnings.some((e) => !Number.isInteger(e.amountPaise) || e.amountPaise < 0)
     || input.deductions.some((d) => !Number.isInteger(d.amountPaise) || d.amountPaise < 0))
-    return { error: "Every component is a whole amount, and none of them is negative.", salaryAccountId: null };
-  const ded = input.deductions.reduce((n, d) => n + d.amountPaise, 0);
-  if (ded > gross) return { error: "Deductions of " + inr(ded) + " exceed earnings of " + inr(gross) + ". Net pay cannot be negative.", salaryAccountId: null };
-  const dup = snap.salaryAccounts.filter((a) => a.memberId === input.memberId && a.active && a.salaryAccountId !== id)[0];
-  if (dup) return { error: input.memberName + " already has an open salary account (" + dup.salaryAccountId + "). Close it before opening another. (duplicate_account)", salaryAccountId: null };
-
-  const a = actor();
-  if (id) {
-    const acc = readSalaryAccount(id);
-    if (!acc) return { error: "That salary account no longer exists.", salaryAccountId: null };
-    const was = acc.monthlyGrossPaise;
-    Object.assign(acc, input, { monthlyGrossPaise: gross });
-    log(pushEvent(acc.events, "SALARY_REVISED",
-      "Monthly gross " + inr(was) + " → " + inr(gross) + ". Slips already issued keep the old figures."), id, "salary");
-    emit();
-    return { error: "", salaryAccountId: id };
-  }
-  const newId = nextId("SAL");
-  const acc: SalaryAccount = {
-    salaryAccountId: newId, ...input, engagement: input.engagement || "permanent",
-    monthlyGrossPaise: gross, active: true,
-    recordedBy: a.name, recordedAt: stamp(), events: [],
+    return fail("Every component is a whole amount, and none of them is negative.");
+  const gross = money(input.earnings);
+  if (gross <= 0) return fail("The earnings must add up to more than zero.");
+  /* WHAT THE SALARY IS MADE OF, both sides on one list — the server tells them
+     apart by `kind` and its earnings have to add up to the gross, which is the
+     one thing two figures for one salary could disagree about. */
+  const line = (c: SalaryComponent, kind: "earning" | "deduction"): SalaryComponentRow =>
+    ({ key: c.key, label: c.label, kind, amountPaise: c.amountPaise });
+  const components: SalaryComponentRow[] = input.earnings.map((e) => line(e, "earning"))
+    .concat(input.deductions.map((d) => line(d, "deduction")));
+  /* WHERE IT IS SENT. Only what somebody actually typed goes: the form is
+     prefilled from a MASKED read, and sending those asterisks back would
+     overwrite the real number with its own mask. The server merges, so the
+     fields left alone keep what they hold. */
+  const b = input.bank;
+  const payTo: Record<string, string> = {};
+  const typed = (k: string, v: string) => {
+    const t = (v || "").trim();
+    if (t && t.indexOf("*") < 0) payTo[k] = t;
   };
-  log(pushEvent(acc.events, "SALARY_ACCOUNT_OPENED",
-    input.designation + " · monthly gross " + inr(gross) + " · net " + inr(gross - ded) + "."), newId, "salary");
-  snap.salaryAccounts = snap.salaryAccounts.concat([acc]);
-  emit();
-  return { error: "", salaryAccountId: newId };
+  typed("bankName", b.name);
+  typed("accountMasked", b.masked);
+  typed("ifsc", b.ifsc);
+  typed("upi", b.upi || "");
+  typed("pan", input.pan);
+  typed("uan", input.uan || "");
+
+  const code = input.employeeCode.trim() || employeeCodeOf(input.memberId);
+  try {
+    if (id) {
+      const ref = serverIdOf(id, SAL);
+      if (ref === null) return fail("That salary account no longer exists.");
+      const row = await call(AdminOpsService.updateSalaryAccount(ref, {
+        employeeCode: code, monthlyGrossPaise: gross, components,
+        ...(Object.keys(payTo).length ? { payTo } : {}),
+      }));
+      putAccount(row);
+      return { error: "", salaryAccountId: id };
+    }
+    const row = await call(AdminOpsService.createSalaryAccount({
+      member: input.memberId, employeeCode: code, monthlyGrossPaise: gross, components,
+      ...(Object.keys(payTo).length ? { payTo } : {}),
+    }));
+    const a = putAccount(row);
+    return { error: "", salaryAccountId: a.salaryAccountId };
+  } catch (e) {
+    return fail(writeError(e));
+  }
 }
 
-export function closeSalaryAccount(id: string, reason: string): string {
+/** The person left. The slips stay: closing only stops the next run picking
+ *  this account up. The reason has no column on the account and rides the
+ *  audit trail with the action, which is where it can still be read. */
+export async function closeSalaryAccount(id: string, reason: string): Promise<string> {
   const acc = readSalaryAccount(id);
   if (!acc) return "That salary account no longer exists.";
   if (!acc.active) return "It is already closed. (invalid_state_transition)";
   if (!reason.trim()) return "Say why it is closing. (reason_required)";
-  const run = openRun();
-  if (run && run.slips.some((s) => s.salaryAccountId === id))
-    return acc.memberName + " has a slip on the open run " + run.runId + ". Pay that run first — closing the account now would leave a slip nobody can explain. (invalid_state_transition)";
-  acc.active = false;
-  log(pushEvent(acc.events, "SALARY_ACCOUNT_CLOSED",
-    reason.trim() + " · slips already issued stay on the record."), id, "salary");
-  emit();
-  return "";
+  const ref = serverIdOf(id, SAL);
+  if (ref === null) return "That salary account no longer exists.";
+  try {
+    putAccount(await call(AdminOpsService.updateSalaryAccount(ref, {
+      isActive: false, reason: reason.trim(),
+    })));
+    return "";
+  } catch (e) {
+    return writeError(e);
+  }
 }
 
 /** Who a run WOULD pay and what it would come to. Exported so the dialog can
@@ -1858,255 +2632,160 @@ export function closeSalaryAccount(id: string, reason: string): string {
  *  same reason previewSchedule exists. */
 export function previewRun(): { account: SalaryAccount; grossPaise: number; deductionsPaise: number; netPaise: number }[] {
   return snap.salaryAccounts.filter((a) => a.active).map((account) => {
-    const grossPaise = account.earnings.reduce((n, e) => n + e.amountPaise, 0);
-    const deductionsPaise = account.deductions.reduce((n, d) => n + d.amountPaise, 0);
+    const grossPaise = money(account.earnings);
+    const deductionsPaise = money(account.deductions);
     return { account, grossPaise, deductionsPaise, netPaise: grossPaise - deductionsPaise };
   });
 }
-export function usePreviewRun() { useVersion(); return previewRun(); }
+export function usePreviewRun() { useVersion(); usePayrollBoot(); return previewRun(); }
 
-/** The reference each slip in a run will carry, so the dialog can show what
- *  will actually land rather than only the stem it was given. */
-export const slipReference = (stem: string, index: number) => stem.trim() + "-" + String(index + 1).padStart(2, "0");
-
-/** FN-T07 · Open a run for a month and issue a slip for every active account.
- *  Each slip FREEZES its components — a raise next month cannot rewrite it. */
-export function openSalaryRun(month: string): { error: string; runId: string | null } {
+/** FN-T07 · Build the run for a month: one slip per active account, each
+ *  copying what that account says today. The server is the one that decides —
+ *  a month that has not started, a month already run and a second open run are
+ *  all refused there, so the panel never has to guess at the calendar. */
+export async function openSalaryRun(month: string): Promise<{ error: string; runId: string | null }> {
   if (!/^\d{4}-\d{2}$/.test(month)) return { error: "Pick a month.", runId: null };
-  if (snap.salaryRuns.some((r) => r.month === month)) return { error: "A run already exists for " + month + ". (duplicate_run)", runId: null };
-  if (month > monthOf(todayIso())) return { error: "A month that has not started cannot be run.", runId: null };
-  const open = openRun();
-  if (open) return { error: open.runId + " is still open. Pay it before opening another — two open runs cannot be reconciled against one balance. (period_open)", runId: null };
-  const active = snap.salaryAccounts.filter((a) => a.active);
-  if (!active.length) return { error: "There is no active salary account to pay.", runId: null };
-
-  const a = actor();
-  const runId = "RUN-" + month;
-  const slips: Payslip[] = active.map((acc) => {
-    const gross = acc.earnings.reduce((n, e) => n + e.amountPaise, 0);
-    const ded = acc.deductions.reduce((n, d) => n + d.amountPaise, 0);
-    return {
-      slipId: "SLIP-" + month + "-" + (acc.salaryAccountId.split("-").pop() || "0000"),
-      salaryAccountId: acc.salaryAccountId, memberId: acc.memberId, memberName: acc.memberName,
-      employeeCode: acc.employeeCode, designation: acc.designation, month,
-      paidDays: daysInMonth(month), lopDays: 0,
-      baseEarnings: clone(acc.earnings), earnings: clone(acc.earnings), deductions: clone(acc.deductions),
-      /* A NEW SLIP HAS NO INCENTIVE, and says so with an empty array rather
-         than an absent one. Nothing is earned yet — the month has only just
-         opened — and an incentive is granted when the person is paid, not
-         when the run is cut. Present-and-empty means "none this month";
-         absent would mean "this slip predates incentives", which is a
-         different statement and true only of the historical seed. */
-      incentives: [], incentivePaise: 0,
-      grossPaise: gross, deductionsPaise: ded, netPaise: gross - ded,
-      paidAt: null, mode: "NEFT", reference: "", accountId: "ACC-HDFC-4021",
-      bank: clone(acc.bank), pan: acc.pan, uan: acc.uan, issuedAt: null, sha256: null,
-    };
-  });
-  const run: SalaryRun = {
-    runId, month, state: "open", slips,
-    totalNetPaise: slips.reduce((n, s) => n + s.netPaise, 0),
-    recordedBy: a.name, recordedAt: stamp(), paidAt: null, events: [],
-  };
-  log(pushEvent(run.events, "RUN_OPENED",
-    slips.length + " slip" + (slips.length === 1 ? "" : "s") + " · net " + inr(run.totalNetPaise) + ". Nobody has been paid yet."), runId, "run");
-  snap.salaryRuns = snap.salaryRuns.concat([run]);
-  emit();
-  return { error: "", runId };
+  try {
+    const built = await call(AdminOpsService.buildSalaryRun(month));
+    const byId: Record<string, SalaryAccount> = {};
+    snap.salaryAccounts.forEach((a) => { byId[a.salaryAccountId] = a; });
+    const run = liveRun(built.run, built.slips.map((s) => liveSlip(s, byId[SAL + s.accountId] || null)));
+    snap.salaryRuns = snap.salaryRuns.filter((r) => r.month !== run.month).concat([run]);
+    emit();
+    void bootPayroll(true);
+    return { error: "", runId: run.runId };
+  } catch (e) {
+    return { error: writeError(e), runId: null };
+  }
 }
 
-/** Loss of pay on an open run's slip: every earning is pro-rated, deductions
- *  are not. Recomputes the slip and the run total in one place so the two can
- *  never drift. */
-export function setLop(slipId: string, lopDays: number): string {
-  const run = runOfSlip(slipId);
+/** FN-T07b · Days not worked and not paid, on ONE unpaid slip. The slip
+ *  carries its own frozen `basePaise`, so the server pro-rates from the full
+ *  month every time — which is why applying it twice is safe and why a raise
+ *  granted after the run opened cannot reach back into this month.
+ *  EARNINGS MOVE, DEDUCTIONS DO NOT: professional tax is a flat monthly levy
+ *  and does not shrink because somebody was away. */
+export async function setLop(slipId: string, lopDays: number): Promise<string> {
   const slip = readSlip(slipId);
-  if (!run || !slip) return "That slip no longer exists.";
-  if (run.state !== "open") return "A paid run is frozen. (invalid_state_transition)";
-  const basis = daysInMonth(slip.month);
-  if (!Number.isInteger(lopDays) || lopDays < 0 || lopDays >= basis)
-    return "Loss of pay is between 0 and " + (basis - 1) + " days — " + fmtMonth(slip.month) + " has " + basis + ". A whole month lost is not loss of pay, it is an unpaid month.";
-  /* FROM THE SLIP'S OWN FROZEN BASE, never from the salary account. A raise
-     granted after this run opened must not be able to reach back into this
-     month, and setting loss of pay twice must land on the same figures. */
-  slip.lopDays = lopDays;
-  slip.paidDays = basis - lopDays;
-  slip.earnings = slip.baseEarnings.map((e) => ({ ...e, amountPaise: Math.round((e.amountPaise * (basis - lopDays)) / basis) }));
-  /* THE INCENTIVE IS NOT PRO-RATED, and that is the whole reason it lives in
-     its own array. Salary is paid for time served, so losing three days costs
-     three days of it; an incentive is paid for something that was achieved,
-     and being absent afterwards does not un-achieve it. It is added to gross
-     AFTER the pro-rating above, untouched. */
-  slip.grossPaise = money(slip.earnings) + incentiveOf(slip);
-  slip.deductionsPaise = slip.deductions.reduce((n, d) => n + d.amountPaise, 0);
-  slip.netPaise = slip.grossPaise - slip.deductionsPaise;
-  run.totalNetPaise = run.slips.reduce((n, s) => n + s.netPaise, 0);
-  log(pushEvent(run.events, "SLIP_ISSUED",
-    slip.memberName + " · " + lopDays + " day" + (lopDays === 1 ? "" : "s") + " loss of pay · net " + inr(slip.netPaise) + "."), run.runId, "run");
-  emit();
+  if (!slip) return "That slip no longer exists.";
+  if (slip.paidAt)
+    return slip.slipId + " is paid and frozen. A paid document does not move. (already_paid)";
+  if (!Number.isInteger(lopDays) || lopDays < 0 || lopDays >= daysInMonth(slip.month))
+    return "Loss of pay is a whole number of days inside " + fmtMonth(slip.month) + ".";
+  const ref = serverIdOf(slipId, SLIP);
+  if (ref === null) return "That slip no longer exists.";
+  try {
+    await call(AdminOpsService.setPayslipLop(ref, lopDays));
+  } catch (e) {
+    return writeError(e);
+  }
+  await bootPayroll(true);
   return "";
 }
 
-/** FN-T08b · Pay ONE person. Super Admin.
+/** FN-T08b · Pay ONE person — every month they are owed, oldest first, each
+ *  slip paid in its own write. ARREARS ARE PAID OLDEST FIRST: somebody owed
+ *  two months and paid once has been paid for the older month.
  *
- *  THIS REVERSES THE INVARIANT BELOW, DELIBERATELY. `recordRunPaid` says a run
- *  half paid is not a state, and while the run was the unit somebody acted on
- *  that was true. It is not the unit any more: salaries are paid person by
- *  person, so a run part-paid is the ordinary mid-month state and pretending
- *  otherwise would mean the screen could not show what is actually happening.
- *
- *  WHAT DID NOT CHANGE is the part that matters: a slip still freezes — its
- *  number, its hash and its amounts are stamped in the write that pays it, and
- *  nothing can rewrite it afterwards. The freeze moved from the run to the
- *  slip, which is where it always belonged; a document is frozen when it is
- *  issued, not when its neighbours are.
- *
- *  ARREARS ARE PAID OLDEST FIRST. Somebody owed two months and paid once has
- *  been paid for the older month — anything else invents a preference nobody
- *  expressed, and leaves the older debt ageing while the newer one clears. */
+ *  A HELD SLIP IS SKIPPED, because `dueOf` has already left it out; the server
+ *  refuses it too, which is the same rule in the place that enforces it. */
 export interface PaySalaryInput {
   /** `bank` · `upi` · `cash`. See PAY_VIA. */
   via: string;
   accountId: string;
   /** MANDATORY, whatever the method. An image or a PDF: the transfer receipt,
-   *  the UPI screenshot, the signed cash acknowledgement. It is the only
-   *  evidence a salary payment has now that the reference field is gone. */
-  proof: { filename: string; mime: string; bytes?: number };
+   *  the UPI screenshot, the signed cash acknowledgement. `file` is the picked
+   *  file itself — it is uploaded when the payment is recorded, and a name
+   *  with no bytes behind it stores nothing. */
+  proof: { filename: string; mime: string; bytes?: number; file?: File };
   remark?: string;
-  /** One-off amounts settled WITH this transfer. They land as NAMED LINES on
-   *  the newest month's slip — an incentive as an earning, a deduction as a
-   *  deduction — and the slip's own totals move with them, because the slip
-   *  is the whole story of what was paid. Money that left the account but is
-   *  on no document is money nobody can explain at audit. */
+  /** One-off amounts settled WITH this transfer, landing on the slip's own
+   *  breakdown rather than inside the gross — money paid for something
+   *  achieved must not become indistinguishable from salary. Both apply to the
+   *  CURRENT month only: paying two months of arrears does not pay a bonus
+   *  twice. */
   incentive?: { label: string; amountPaise: number } | null;
   deduction?: { label: string; amountPaise: number } | null;
 }
 
-export function paySalary(salaryAccountId: string, input: PaySalaryInput): string {
+export async function paySalary(salaryAccountId: string, input: PaySalaryInput): Promise<string> {
   const acc = readSalaryAccount(salaryAccountId);
   if (!acc) return "That salary account no longer exists.";
-  const row = toSalaryRow(acc);
-  const due = dueOf(row);
+  const due = dueOf(toSalaryRow(acc));
   if (!due.unpaid.length) return acc.memberName + " has nothing outstanding. (nothing_due)";
 
   const via = payViaMeta(input.via);
   if (!via) return "Pick how it was paid.";
 
-  /* THE PROOF IS THE EVIDENCE, and there is no longer anything else. A payment
-     with none is a claim, and this module does not store claims. */
+  /* THE PROOF IS THE EVIDENCE the dialog asks for, and it is STORED now: one
+     presigned upload, kept against every slip this transfer settles, because
+     one transfer is one receipt whether it covers one month or three. */
   const filename = (input.proof?.filename || "").trim();
   if (!filename) return "Attach the receipt. It is the only evidence this payment has. (proof_required)";
   if (!proofAccepted(input.proof.mime))
     return filename + " is neither an image nor a PDF. A receipt has to be something somebody can open and read. (proof_type)";
-  if (!accountOf(input.accountId)) return "Pick the account it was paid from.";
+  if (proofTooBig(input.proof.bytes))
+    return filename + " is " + fileSize(input.proof.bytes as number) + ". The limit is "
+      + fileSize(PROOF_MAX_BYTES) + ". (proof_too_big)";
+  /* Cash has no account to pick -- the server's accounts carry no type, so
+     there is no "the cash account" to name -- and `paidFrom` is optional
+     server-side. Every other method names the account it left. */
+  if (input.via !== "cash" && !liveAccount(input.accountId)) return "Pick the account it was paid from.";
   const sa = superAdminOnly("Paying a salary"); if (sa) return sa;
-  const accountId = input.accountId;
+  const incentivePaise = input.incentive ? input.incentive.amountPaise : 0;
+  const deductionPaise = input.deduction ? input.deduction.amountPaise : 0;
+  if (incentivePaise < 0 || deductionPaise < 0)
+    return "An incentive and a deduction are both whole amounts above zero.";
+  if (deductionPaise && !(input.deduction as { label: string }).label.trim())
+    return "Say what the deduction is for — it is the only thing that explains it on the slip. (reason_required)";
+  if (!input.proof.file)
+    return "Pick " + filename + " again — the receipt is uploaded when the payment is recorded. (proof_required)";
 
-  /* The adjustments, checked to the same standard as an account component:
-     a clean integer amount and a name. A figure nobody can name is a figure
-     nobody can explain at audit. */
-  const norm = (x: { label: string; amountPaise: number } | null | undefined, what: string):
-      { line: SalaryComponent | null; err: string } => {
-    if (!x || !x.amountPaise) return { line: null, err: "" };
-    if (!Number.isInteger(x.amountPaise) || x.amountPaise < 0)
-      return { line: null, err: "The " + what + " is not a clean amount. Rupees, up to two decimals. (adjustment_amount)" };
-    const label = (x.label || "").trim();
-    if (!label)
-      return { line: null, err: "Name the " + what + ". It prints on the slip, and a figure nobody can name is a figure nobody can explain. (adjustment_label)" };
-    return { line: { key: what, label, amountPaise: x.amountPaise }, err: "" };
+  let receiptUrl: string;
+  try {
+    receiptUrl = await uploadReceipt(input.proof.file);
+  } catch (e) {
+    return writeError(e);
+  }
+  const receipt = {
+    receiptUrl, receiptName: filename, receiptMime: input.proof.mime,
+    receiptSizeKb: Math.max(1, Math.round((input.proof.bytes || 0) / 1024)),
   };
-  const inc = norm(input.incentive, "incentive"); if (inc.err) return inc.err;
-  const ded = norm(input.deduction, "deduction"); if (ded.err) return ded.err;
 
-  const at = stamp();
   /* Oldest first, so the debt that has been waiting longest clears first. */
   const order = due.unpaid.slice().sort((x, y) => x.month.localeCompare(y.month));
-
-  /* ADJUSTMENTS LAND ON THE NEWEST SLIP, before anything freezes. The newest
-     because that is the month being settled today — arrears are old documents
-     clearing, not places for new lines. A deduction may not push that slip
-     below zero: a negative payslip is not a document, it is a debt wearing a
-     document's clothes, and this module does not issue those. */
-  const newest = order[order.length - 1];
-  const incPaise = inc.line ? inc.line.amountPaise : 0;
-  if (ded.line && ded.line.amountPaise > newest.netPaise + incPaise) {
-    return "The deduction is bigger than " + fmtMonth(newest.month) + "'s net"
-      + (inc.line ? " plus the incentive" : "") + " — " + inr(newest.netPaise + incPaise)
-      + ". A slip cannot go below zero; recover the rest from a later month. (deduction_exceeds)";
-  }
-  if (inc.line || ded.line) {
-    /* THE INCENTIVE GOES TO `incentives`, NOT TO `earnings`. It used to be
-       concatenated onto `earnings`, which paid the right amount and destroyed
-       the only thing that made it an incentive: once it sat beside basic and
-       HRA, nothing downstream could tell committed pay from earned pay, and
-       payroll analytics had to guess by matching labels. It is the same money
-       on the same slip and it still prints as its own line — it is now filed
-       as what it is. Loss of pay pro-rates `earnings` and never this. */
-    if (inc.line) {
-      newest.incentives = (newest.incentives || []).concat([inc.line]);
-      newest.incentivePaise = money(newest.incentives);
+  let paid = 0;
+  for (const slip of order) {
+    const ref = serverIdOf(slip.slipId, SLIP);
+    if (ref === null) return "That slip no longer exists.";
+    /* The one-offs ride the CURRENT month, which is the last one written. */
+    const current = paid === order.length - 1;
+    try {
+      await call(AdminOpsService.payPayslip(ref, {
+        mode: via.mode, remark: input.remark, ...receipt, paidFrom: input.accountId || undefined,
+        ...(current && incentivePaise ? { incentivePaise } : {}),
+        ...(current && deductionPaise
+          ? { adjustmentPaise: -deductionPaise, adjustmentReason: (input.deduction as { label: string }).label.trim() }
+          : {}),
+      }));
+      paid++;
+    } catch (e) {
+      const msg = writeError(e);
+      void bootPayroll(true);
+      return paid
+        ? paid + " of " + order.length + " months went out before the server refused the next one: " + msg
+        : msg;
     }
-    if (ded.line) newest.deductions = newest.deductions.concat([ded.line]);
-    newest.grossPaise = money(newest.earnings) + incentiveOf(newest);
-    newest.deductionsPaise = money(newest.deductions);
-    newest.netPaise = newest.grossPaise - newest.deductionsPaise;
-    /* The run's stored total is the sum of its slips and must stay it. */
-    const holder = snap.salaryRuns.filter((r) => r.slips.indexOf(newest) >= 0)[0];
-    if (holder) holder.totalNetPaise = holder.slips.reduce((n, x) => n + x.netPaise, 0);
   }
-  /* What actually leaves the account: the slips as they now stand. */
-  const leaving = order.reduce((n, x) => n + x.netPaise, 0);
-
-  order.forEach((slip, k) => {
-    slip.paidAt = at;
-    slip.accountId = accountId;
-    /* NO REFERENCE, on purpose. The field is gone from the dialog and nothing
-       fabricates one here — a slip whose reference column is blank says
-       plainly that this payment is evidenced by its attachment and not by a
-       string somebody typed. `dupReference` already skips empty ones, so the
-       ledger's uniqueness rule is untouched. */
-    slip.reference = "";
-    slip.mode = via.mode;
-    slip.via = via.key;
-    slip.proof = { type: "receipt", filename, uploadedAt: at };
-    slip.remark = (input.remark || "").trim() || undefined;
-    slip.issuedAt = at;
-    slip.sha256 = hex64(slip.netPaise + k);
-  });
-
-  /* A run is paid when its last unpaid slip is. It is not a thing anybody
-     presses any more — it is a consequence of everybody on it being paid. */
-  snap.salaryRuns.forEach((run) => {
-    if (run.state === "paid") return;
-    if (run.slips.length && run.slips.every((s) => s.paidAt)) {
-      run.state = "paid";
-      run.paidAt = at;
-      log(pushEvent(run.events, "RUN_PAID",
-        "Every slip on " + run.runId + " is now paid. The run closed itself; nobody marked it."), run.runId, "run");
-    }
-  });
-
-  const months = order.map((s) => fmtMonth(s.month)).join(", ");
-  log(pushEvent(acc.events, "SALARY_PAID",
-    inr(leaving) + " to " + acc.memberName + " by " + via.label.toLowerCase()
-    + " from " + (accountOf(accountId)?.masked || accountId)
-    + " · " + months
-    + (order.length > 1 ? " (" + order.length + " months, oldest first)" : "")
-    + (inc.line ? " · incentive " + inr(inc.line.amountPaise) + " (" + inc.line.label + ")" : "")
-    + (ded.line ? " · deduction " + inr(ded.line.amountPaise) + " (" + ded.line.label + ")" : "")
-    + " · evidenced by " + filename + "."),
-  salaryAccountId, "salary");
-  emit();
+  await bootPayroll(true);
   return "";
 }
 
 /** FN-T08d · Hold ONE slip, or release it. A dispute is about a month, not a
- *  person: holding March must not stop April going out, which is why this is
- *  a slip write and not an account one. Only an unpaid slip can hold — a paid
- *  document is frozen — and the reason is mandatory on the way IN because the
- *  hold prints nowhere else. Releasing needs none: it restores the ordinary
- *  state, and the release event says who and when. */
-export function setSlipHold(slipId: string, hold: boolean, reason: string): string {
+ *  person: holding March must not stop April going out. Only an UNPAID slip
+ *  can hold. The reason is mandatory on the way IN and rides the audit trail —
+ *  the slip itself has no column for it, so the row cannot print it back. */
+export async function setSlipHold(slipId: string, hold: boolean, reason: string): Promise<string> {
   const slip = readSlip(slipId);
   if (!slip) return "That slip no longer exists.";
   if (slip.paidAt)
@@ -2115,413 +2794,428 @@ export function setSlipHold(slipId: string, hold: boolean, reason: string): stri
     return hold ? slip.slipId + " is already on hold." : slip.slipId + " is not on hold.";
   if (hold && !reason.trim())
     return "Say why it is held. The hold prints on no document, so the reason is the only record it has. (reason_required)";
-  const acc = readSalaryAccount(slip.salaryAccountId);
-  slip.held = hold;
-  slip.heldReason = hold ? reason.trim() : null;
-  if (acc) {
-    log(pushEvent(acc.events, hold ? "SALARY_HELD" : "SALARY_RELEASED",
-      fmtMonth(slip.month) + "'s slip (" + inr(slip.netPaise) + ") "
-      + (hold ? "held: " + reason.trim() : "released — it counts as owed again.")),
-    slip.salaryAccountId, "salary");
+  const ref = serverIdOf(slipId, SLIP);
+  if (ref === null) return "That slip no longer exists.";
+  try {
+    await call(hold
+      ? AdminOpsService.holdPayslip(ref, reason.trim())
+      : AdminOpsService.releasePayslip(ref));
+    await bootPayroll(true);
+    return "";
+  } catch (e) {
+    return writeError(e);
   }
-  emit();
-  return "";
-}
-
-/** FN-T08 · Mark the run paid. Super Admin. Every slip is stamped, numbered
- *  and frozen in the same write — a run half paid is not a state.
- *
- *  SUPERSEDED by `paySalary` above and kept only because the check suite still
- *  asserts its refusals, which are the same refusals the per-person write
- *  makes. Nothing in the panel calls it: the button that did is gone. Delete
- *  it and its assertions together, or wire it to a "pay everybody" control if
- *  one is ever wanted. */
-export function recordRunPaid(runId: string, reference: string, accountId: string): string {
-  const run = readRun(runId);
-  if (!run) return "That run no longer exists.";
-  if (run.state === "paid") return "It is already paid. (invalid_state_transition)";
-  if (!run.slips.length) return "There is nothing to pay on this run.";
-  if (!reference.trim()) return "The transfer reference is mandatory — it is what ties this run to the bank. (validation_failed)";
-  if (dupReference(reference)) return "A record already carries reference " + reference.trim() + ". (duplicate_reference)";
-  if (!accountOf(accountId)) return "Pick the account it was paid from.";
-  const sa = superAdminOnly("Paying a salary run"); if (sa) return sa;
-
-  const a = actor();
-  const at = stamp();
-  run.slips.forEach((s, k) => {
-    s.paidAt = at;
-    s.accountId = accountId;
-    s.reference = reference.trim() + "-" + String(k + 1).padStart(2, "0");
-    s.issuedAt = at;
-    s.sha256 = hex64(s.netPaise + k);
-  });
-  run.state = "paid";
-  run.paidAt = at;
-  run.recordedBy = a.name;
-  log(pushEvent(run.events, "RUN_PAID",
-    inr(run.totalNetPaise) + " to " + run.slips.length + " people from " + (accountOf(accountId)?.masked || accountId)
-    + " · " + reference.trim() + ". Every slip is frozen."), runId, "run");
-  emit();
-  return "";
 }
 
 /* ------------------------------------------------- other transactions --- */
 
-/** FN-T09 · Create a tag. Custom by definition — the panel makes these. The
- *  KIND is the part that is not free: it decides where the money lands. */
-export function addTag(label: string, kind: TagKind, budgetPaise: number | null, proofRequired: boolean): { error: string; tagKey: string | null } {
-  const l = label.trim();
-  if (!l) return { error: "Name the tag.", tagKey: null };
-  if (!tagKindMeta(kind)) return { error: "Pick what this rolls up to — it decides where the money lands in Analytics.", tagKey: null };
-  const key = l.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 20);
-  if (!key) return { error: "That name has no letters or digits in it.", tagKey: null };
-  if (snap.tags.some((t) => t.tagKey === key)) return { error: "A tag called " + l + " already exists. (duplicate_tag)", tagKey: null };
-  if (budgetPaise !== null && (!Number.isInteger(budgetPaise) || budgetPaise < 0))
-    return { error: "A budget is a whole amount, or none at all.", tagKey: null };
-  const a = actor();
-  snap.tags = snap.tags.concat([{
-    tagKey: key, label: l, kind, custom: true, budgetPaise, proofRequired,
-    active: true, createdBy: a.name, createdAt: stamp(),
-  }]);
-  note("TAG_CREATED", key, "tag", l + " · " + (tagKindMeta(kind)?.label || kind) + " · lands in " + (tagKindMeta(kind)?.landsIn || "—") + ".");
-  emit();
+/* THE TAG TABLE IS THE SERVER'S (`expense-tags`). The three writes below are
+   the server's too — `spend/tags/` and `spend/tags/<key>/` — and the list is
+   re-read from it afterwards, so nothing is ever added to it here.
+   A TAG IS NEVER DELETED AND NEVER RE-KINDED: either would silently re-bucket
+   every row already filed under it, which is why the only writes are create,
+   budget and switch off. */
+export async function addTag(label: string, kind: TagKind, budgetPaise: number | null, proofRequired: boolean):
+  Promise<{ error: string; tagKey: string | null }> {
+  const name = label.trim();
+  if (!name) return { error: "Give the tag a label.", tagKey: null };
+  if (live.tags.some((t) => t.label.toLowerCase() === name.toLowerCase()))
+    return { error: "A tag called " + name + " already exists. (duplicate_tag)", tagKey: null };
+  let key: string;
+  try {
+    const row = await call(AdminOpsService.createExpenseTag({
+      label: name, kind, budgetPaise: budgetPaise || 0, proofRequired,
+    }));
+    key = row.key;
+  } catch (e) {
+    return { error: writeError(e), tagKey: null };
+  }
+  note("TAG_CREATED", key, "tag", name + " · " + (tagKindMeta(kind)?.label || kind)
+    + (budgetPaise ? " · budget " + inr(budgetPaise) : "") + ".");
+  await bootFinanceLive(true);
   return { error: "", tagKey: key };
 }
 
-/** A tag is DEACTIVATED, never deleted — deleting one would silently
- *  re-bucket every transaction that already used it. */
-export function deactivateTag(key: string): string {
+/** Super Admin. Existing rows keep the tag; nothing new can be filed under it. */
+export async function deactivateTag(key: string): Promise<string> {
   const t = tagOf(key);
   if (!t) return "That tag no longer exists.";
   if (!t.active) return "It is already inactive. (invalid_state_transition)";
   const sa = superAdminOnly("Deactivating a tag"); if (sa) return sa;
-  const n = snap.transactions.filter((x) => x.tagKey === key).length;
-  t.active = false;
-  note("TAG_DEACTIVATED", key, "tag", t.label + " · " + n + " existing row" + (n === 1 ? "" : "s") + " keep it. Nothing was re-bucketed.");
-  emit();
+  try {
+    await call(AdminOpsService.updateExpenseTag(key, { isActive: false }));
+  } catch (e) {
+    return writeError(e);
+  }
+  note("TAG_DEACTIVATED", key, "tag", t.label + " takes no new transactions. Every existing row keeps it.");
+  await bootFinanceLive(true);
   return "";
 }
 
-export function setBudget(key: string, budgetPaise: number | null): string {
+/** A budget warns and never blocks; null removes it (0 on the server). */
+export async function setBudget(key: string, budgetPaise: number | null): Promise<string> {
   const t = tagOf(key);
   if (!t) return "That tag no longer exists.";
-  if (budgetPaise !== null && (!Number.isInteger(budgetPaise) || budgetPaise < 0)) return "A budget is a whole amount, or none at all.";
-  const was = t.budgetPaise;
-  t.budgetPaise = budgetPaise;
-  note("BUDGET_SET", key, "tag",
-    t.label + " · " + (was ? inr(was) : "none") + " → " + (budgetPaise ? inr(budgetPaise) : "none") + ". A budget warns; it never blocks.");
-  emit();
+  if (budgetPaise !== null && (!Number.isInteger(budgetPaise) || budgetPaise < 0))
+    return "A budget is a whole rupee amount, or nothing at all. (validation_failed)";
+  try {
+    await call(AdminOpsService.updateExpenseTag(key, { budgetPaise: budgetPaise || 0 }));
+  } catch (e) {
+    return writeError(e);
+  }
+  note("BUDGET_SET", key, "tag", t.label + " · " + (budgetPaise ? inr(budgetPaise) : "no budget") + ".");
+  await bootFinanceLive(true);
   return "";
 }
 
-/** FN-T10 · Record a company expense or income. One mandatory tag, one
- *  mandatory reference. Money IN is restricted to three non-revenue kinds. */
+/** FN-T10 · Record a company expense or income. One mandatory tag on a debit,
+ *  one mandatory reference. Money IN is restricted to the server's income
+ *  kinds. The receipt is mandatory on both. */
 export interface TxnInput {
   direction: "out" | "in"; tagKey: string; amountPaise: number;
+  /** Who the money went to or came from. Stored on both directions now. */
   description: string; party: string; mode: string; reference: string;
   valueDate: string; accountId: string; creditKind?: string | null;
-  /** MANDATORY, on every row, and settable ONLY here. It used to be optional
-   *  and attached afterwards, which is why `missingBill` exists at all — a queue
-   *  of rows somebody meant to come back to. Nothing new can join that queue:
-   *  the money moved, and the paper that says so is part of recording it.
-   *
-   *  Nothing attaches paper to a posted row either, because nothing edits a
-   *  posted row. So the backlog is CLOSED — it can only shrink, and it shrinks
-   *  when one of those rows is cancelled, or when somebody cancels it and
-   *  records it again with the receipt it always needed. */
-  bill: { filename: string; mime: string; bytes?: number };
+  /** MANDATORY, on every row, and settable ONLY here. `file` is the picked
+   *  file itself: it is uploaded to storage when the row is recorded, and a
+   *  name without the bytes behind it records nothing. */
+  bill: { filename: string; mime: string; bytes?: number; file?: File };
 }
-export function recordTransaction(input: TxnInput): { error: string; txnId: string | null } {
+
+/** The key under the bucket host — what the spend write stores. */
+const s3KeyOf = (fileUrl: string) => fileUrl.replace(/^https:\/\/[^/]+\//, "");
+/** Straight to S3 with a presigned PUT, then the API is told where it landed —
+ *  the Invoices proof upload's route. The bytes never cross the API. */
+async function uploadReceipt(file: File): Promise<string> {
+  const res = await CommonService.getUploadUrl({
+    fileName: file.name, fileType: file.type || "application/octet-stream", for: "PaymentScreenshot",
+  });
+  if (!res.response) throw new Error(res.message || "Could not get an upload URL.");
+  await CommonService.uploadToS3(res.data.uploadUrl, file);
+  return res.data.fileUrl;
+}
+/** The S3 leg throws a plain Error whose text we wrote; the API leg an
+ *  AppExceptions whose text is the server's. Anything else is the generic line. */
+const writeError = (e: unknown) =>
+  (e instanceof AppExceptions ? errMessage(e) : (e instanceof Error && e.message) || errMessage(e));
+
+export async function recordTransaction(input: TxnInput): Promise<{ error: string; txnId: string | null }> {
+  const fail = (error: string) => ({ error, txnId: null });
+  const out = input.direction === "out";
   const tag = tagOf(input.tagKey);
-  if (!tag) return { error: "Every row needs a tag — it is what decides where this lands in Analytics.", txnId: null };
-  if (!tag.active) return { error: tag.label + " is inactive. Pick a live tag.", txnId: null };
-  if (!Number.isInteger(input.amountPaise) || input.amountPaise <= 0) return { error: "The amount must be a whole figure above zero.", txnId: null };
-  if (!input.description.trim()) return { error: "Say what it was for.", txnId: null };
-  if (!input.reference.trim()) return { error: "The reference is mandatory — without it this row can never be tied to a statement.", txnId: null };
-  if (dupReference(input.reference)) return { error: "A record already carries reference " + input.reference.trim() + ". (duplicate_reference)", txnId: null };
-  if (!input.valueDate || input.valueDate > todayIso()) return { error: "The value date is when the money moved — it cannot be in the future.", txnId: null };
-  if (!accountOf(input.accountId)) return { error: "Pick the account.", txnId: null };
-  /* THE RECEIPT, TO THE SAME STANDARD AS A SALARY PAYMENT'S. A row with no
-     paper behind it is a claim, and this module does not store claims. */
+  if (out && !tag) return fail("Every debit needs a tag — it is what decides where this lands in Analytics.");
+  if (out && tag && !tag.active) return fail(tag.label + " is inactive. Pick a live tag.");
+  if (!Number.isInteger(input.amountPaise) || input.amountPaise <= 0) return fail("The amount must be a whole figure above zero.");
+  if (!input.description.trim()) return fail("Say what it was for.");
+  if (!input.reference.trim()) return fail("The reference is mandatory — without it this row can never be tied to a statement.");
+  if (dupLiveReference(input.reference)) return fail("A record already carries reference " + input.reference.trim() + ". (duplicate_reference)");
+  if (!input.valueDate || input.valueDate > liveToday()) return fail("The value date is when the money moved — it cannot be in the future.");
+  if (!COMPANY_ACCOUNTS.some((a) => a.active && a.accountId === input.accountId)) return fail("Pick the account.");
   const billName = (input.bill?.filename || "").trim();
   if (!billName)
-    return { error: "Attach the receipt. A recorded row with no paper behind it is a claim, not a transaction. (bill_required)", txnId: null };
+    return fail("Attach the receipt. A recorded row with no paper behind it is a claim, not a transaction. (bill_required)");
   if (!proofAccepted(input.bill.mime))
-    return { error: billName + " is neither an image nor a PDF. A receipt is a photograph of one or a document, and a spreadsheet is neither. (bill_type)", txnId: null };
+    return fail(billName + " is neither an image nor a PDF. A receipt is a photograph of one or a document, and a spreadsheet is neither. (bill_type)");
   if (proofTooBig(input.bill.bytes))
-    return { error: billName + " is " + fileSize(input.bill.bytes as number) + ". The limit is " + fileSize(PROOF_MAX_BYTES) + " — a receipt that size is a scan nobody set the resolution on. (bill_too_big)", txnId: null };
-  if (input.direction === "in" && (!input.creditKind || !CREDIT_KINDS.some((c) => c.key === input.creditKind)))
-    return { error: "Money in is restricted here to bank interest, an own transfer or a vendor refund. Customer money has exactly one way in: a subscription.", txnId: null };
+    return fail(billName + " is " + fileSize(input.bill.bytes as number) + ". The limit is " + fileSize(PROOF_MAX_BYTES) + " — a receipt that size is a scan nobody set the resolution on. (bill_too_big)");
+  if (!out && !CREDIT_KINDS.some((c) => c.key === input.creditKind))
+    return fail("Money in is restricted here to bank interest, an own transfer or a vendor refund. Customer money has exactly one way in: a subscription.");
+  if (!input.bill.file) return fail("Pick " + billName + " again — the receipt is uploaded when the row is recorded. (bill_required)");
 
-  const a = actor();
-  const id = nextId("TXN");
-  const line = snap.statements.flatMap((st) => st.lines as BankLine[])
-    .filter((l) => l.dir === (input.direction === "out" ? "debit" : "credit")
-      && norm(l.reference) === norm(input.reference) && l.amountPaise === input.amountPaise)[0] || null;
-  const t: CompanyTxn = {
-    txnId: id, direction: input.direction, tagKey: input.tagKey, amountPaise: input.amountPaise,
-    description: input.description.trim(), party: input.party.trim(), mode: input.mode,
-    reference: input.reference.trim(), valueDate: input.valueDate, accountId: input.accountId,
-    state: "recorded", bill: { type: "bill", filename: billName, uploadedAt: stamp() },
-    bankLineId: line ? line.lineId : null,
-    nonRevenue: input.direction === "in", creditKind: input.direction === "in" ? input.creditKind || null : null,
-    cancellation: null, recordedBy: a.name, recordedAt: stamp(), events: [],
-  };
-  log(pushEvent(t.events, "TXN_RECORDED",
-    (input.direction === "out" ? "Paid " : "Received ") + inr(t.amountPaise) + " · " + tag.label + " · " + (t.party || "—") + "."), id, "transaction");
-  if (line) pushEvent(t.events, "MATCHED", "Already on the imported statement as " + line.reference + " · " + line.date + ".");
-  snap.transactions = [t].concat(snap.transactions);
-  emit();
-  return { error: "", txnId: id };
+  let txnId: string;
+  try {
+    const url = await uploadReceipt(input.bill.file);
+    if (out && tag) {
+      const row = await call(AdminOpsService.addExpense({
+        label: input.description.trim(), amount: input.amountPaise / 100, // the endpoint takes RUPEES
+        category: tag.label,
+        /* The legacy split the revenue module reads; the tag's own kind is
+           what every figure here reads. */
+        kind: tag.kind === "reinvestment" ? "reinvestment" : "fixed",
+        incurredAt: input.valueDate, tag: tag.tagKey, mode: input.mode, reference: input.reference.trim(),
+        party: input.party.trim(),
+        account: input.accountId, billUrl: s3KeyOf(url), billName, billMime: input.bill.mime, billBytes: input.bill.bytes,
+      })) as { id: number };
+      txnId = TXN_OUT + row.id;
+    } else {
+      const row = await call(AdminOpsService.recordIncome({
+        kind: input.creditKind as string, amountPaise: input.amountPaise, description: input.description.trim(),
+        party: input.party.trim(), mode: input.mode, reference: input.reference.trim(), valueDate: input.valueDate,
+        account: input.accountId, receiptUrl: url, receiptName: billName, receiptMime: input.bill.mime,
+        receiptBytes: input.bill.bytes,
+      }));
+      txnId = TXN_IN + row.id;
+    }
+  } catch (e) {
+    return fail(writeError(e));
+  }
+  note("TXN_RECORDED", txnId, "transaction",
+    (out ? "Paid " : "Received ") + inr(input.amountPaise) + (tag && out ? " · " + tag.label : "") + ".");
+  await bootFinanceLive(true);
+  return { error: "", txnId };
 }
 
-/** FN-T11 · CANCEL A TRANSACTION. Super Admin.
- *
- *  ONE WRITE, ONE REASON, AND NOTHING ELSE MOVES. The row keeps its amount, its
- *  direction, its tag, its date, its account and its receipt — every figure it
- *  was posted with, exactly as posted — and turns `cancelled`. What changes is
- *  that it stops counting: out of the period's spend and credits, out of its
- *  tag's total, out of reinvestment, out of the bank-match candidates, and out
- *  of the missing-bill queue.
- *
- *  IT IS NOT A DELETE. The row stays in the ledger and in every list, wearing a
- *  struck-through chip, because a payment that happened and was then written
- *  off is a different fact from a payment that never happened — and the second
- *  is not something this module is able to assert.
- *
- *  IT IS NOT AN EDIT EITHER, and that is the point of preferring it to one.
- *  Correcting a row by rewriting it means the ledger's figures are whatever
- *  somebody last typed; correcting it by cancelling and recording again means
- *  every figure the books have ever carried is still there to read, each with
- *  the person and the moment behind it. Getting it right is a new row.
- *
- *  THE REASON IS MANDATORY, for the same reason every other decision in this
- *  module carries one: a cancellation with no reason is indistinguishable at
- *  audit from a misclick, and the next person cannot tell which it was. */
-export function cancelTransaction(id: string, reason: string): string {
+/** FN-T11 · CANCEL A TRANSACTION. Super Admin. One write, one reason: the row
+ *  keeps every figure it was posted with and stops counting. It is not a
+ *  delete and it is not an edit. */
+export async function cancelTransaction(id: string, reason: string): Promise<string> {
   const t = readTransaction(id);
   if (!t) return "That transaction no longer exists.";
   if (t.state === "cancelled") return "It is already cancelled. (invalid_state_transition)";
   if (!reason.trim())
     return "Say why it is being cancelled. A cancellation with no reason is indistinguishable from a mistake at audit. (reason_required)";
   const sa = superAdminOnly("Cancelling a transaction"); if (sa) return sa;
-  const a = actor();
-  t.state = "cancelled";
-  t.cancellation = { reason: reason.trim(), by: a.name, at: stamp() };
-  log(pushEvent(t.events, "TXN_CANCELLED",
-    a.name + " cancelled this row — " + reason.trim()
-    + " It keeps " + inr(t.amountPaise) + " and everything else it was posted with, and stops counting towards the period."),
-  id, "transaction");
-  emit();
+  const spendId = idIn(id, TXN_OUT);
+  const incomeId = idIn(id, TXN_IN);
+  try {
+    if (spendId !== null) await call(AdminOpsService.cancelSpend(spendId, reason.trim()));
+    else if (incomeId !== null) await call(AdminOpsService.cancelIncome(incomeId, reason.trim()));
+    else return "That transaction no longer exists.";
+  } catch (e) {
+    return writeError(e);
+  }
+  note("TXN_CANCELLED", id, "transaction", reason.trim());
+  await bootFinanceLive(true);
   return "";
 }
 
 /* ----------------------------------------------------------- refunds --- */
 
-/** FN-T12 · Request a refund against a recorded installment payment. Full
- *  amount only — a partial refund implies a partly-paid installment, which
- *  the 1:1 rule says cannot exist. */
-export function requestRefund(paymentId: string, ground: string, detail: string): { error: string; refundId: string | null } {
+/** FN-T12 · Request a refund against a plan purchase. The picker lists the
+ *  server's own collected payments (`readPayments`) and the request goes to
+ *  `POST refunds/` — the whole payment, since a partial refund would imply a
+ *  partly-paid purchase. The amount is not sent: the server refunds what is
+ *  left of the payment, which on an untouched one is all of it. */
+export async function requestRefund(paymentId: string, ground: string, detail: string):
+  Promise<{ error: string; refundId: string | null }> {
+  const fail = (error: string) => ({ error, refundId: null });
   const hit = readPayment(paymentId);
-  if (!hit) return { error: "That payment is not in the ledger.", refundId: null };
-  if (!groundMeta(ground)) return { error: "Pick a ground.", refundId: null };
-  if (!detail.trim()) return { error: "Say what happened — the approver reads this, and so does the audit.", refundId: null };
-  /* ONE PAYMENT, ONE REFUND. This guard named `requested` and `approved` and
-     stopped there, so the moment a transfer was recorded the payment went back
-     to looking refundable — and the second request could be approved and paid
-     exactly like the first, sending the money out twice with nothing in the
-     ledger objecting. What blocks a new request is ANY refund standing against
-     that payment. `declined` is the only state that releases it, because a
-     decline is the ledger saying the money is not going back. */
-  const standing = refundStanding(paymentId);
-  if (standing)
-    return {
-      error: standing.state === "paid"
-        ? paymentId + " has already been refunded — " + standing.refundId + " sent "
-          + inr(standing.amountPaise) + " back. (duplicate_request)"
-        : "There is already an open refund on " + paymentId + " (" + standing.refundId + "). (duplicate_request)",
-      refundId: null,
-    };
-
-  const a = actor();
-  const id = nextId("RF");
-  const pc = refundPolicyCheck(paymentId, ground);
-  const r: Refund = {
-    refundId: id, origin: "subscription", subscriptionId: hit.sub.subscriptionId, paymentId,
-    payee: { name: hit.sub.customer.name, userId: hit.sub.customer.userId },
-    amountPaise: hit.pay.amountPaise, ground, detail: detail.trim(), state: "requested",
-    policy: {
-      groundPermitted: pc.groundPermitted, withinWindow: pc.withinWindow,
-      originalRecorded: pc.originalRecorded, subscriptionActive: pc.subscriptionActive,
-    },
-    requestedBy: a.name, requestedAt: stamp(),
-    decidedBy: null, decidedAt: null, decisionNote: null, settlement: null, events: [],
-  };
-  log(pushEvent(r.events, "REFUND_REQUESTED",
-    (groundMeta(ground)?.label || ground) + " · " + inr(r.amountPaise)
-    + (pc.groundPermitted ? "" : " · NOT a permitted ground — an exception for the approver")), id, "refund");
-  snap.refunds = [r].concat(snap.refunds);
-  emit();
-  return { error: "", refundId: id };
+  const serverId = planIdOf(paymentId);
+  if (!hit || serverId === null) return fail("That payment is not in the ledger.");
+  if (refundStanding(paymentId))
+    return fail("A refund already stands against this payment. (duplicate_request)");
+  if (!REFUND_GROUNDS.some((g) => g.key === ground)) return fail("Pick why the money is going back.");
+  let id: number;
+  try {
+    const row = await call(AdminOpsService.requestRefund({ payment: serverId, ground, detail: detail.trim() }));
+    id = row.id;
+  } catch (e) {
+    return fail(writeError(e));
+  }
+  note("REFUND_REQUESTED", RF + id, "refund",
+    inr(hit.pay.amountPaise) + " against " + paymentId + ". Nothing has moved.");
+  await bootFinanceLive(true);
+  return { error: "", refundId: RF + id };
 }
 
-/** FN-T13 · Raise a refund by hand, with no ledger row behind it — money that
- *  arrived outside a subscription. It carries NO policy check, because an
- *  empty check would read as a passed one. */
-export function createManualRefund(payeeName: string, amountPaise: number, ground: string, detail: string): { error: string; refundId: string | null } {
-  if (!payeeName.trim()) return { error: "Name who is being paid.", refundId: null };
-  if (!Number.isInteger(amountPaise) || amountPaise <= 0) return { error: "The amount must be a whole figure above zero.", refundId: null };
-  if (!groundMeta(ground)) return { error: "Pick a ground.", refundId: null };
-  if (!detail.trim())
-    return { error: "There is no ledger row behind this one, so the detail IS the evidence. Say what arrived, when, and how you know.", refundId: null };
-
-  const a = actor();
-  const id = nextId("RF");
-  const r: Refund = {
-    refundId: id, origin: "manual", subscriptionId: null, paymentId: null,
-    payee: { name: payeeName.trim(), userId: null },
-    amountPaise, ground, detail: detail.trim(), state: "requested",
-    policy: null,
-    requestedBy: a.name, requestedAt: stamp(),
-    decidedBy: null, decidedAt: null, decisionNote: null, settlement: null, events: [],
-  };
-  log(pushEvent(r.events, "REFUND_REQUESTED",
-    "Raised by hand · " + (groundMeta(ground)?.label || ground) + " · " + inr(amountPaise) + " to " + payeeName.trim()
-    + ". No original payment to check against."), id, "refund");
-  snap.refunds = [r].concat(snap.refunds);
-  emit();
-  return { error: "", refundId: id };
+/** FN-T13 · A refund with no ledger row behind it: a name, an amount and a
+ *  ground. The server takes exactly one of a plan payment, a deal payment or a
+ *  payee — this is the third — and the amount is mandatory here because there
+ *  is nothing to derive it from. */
+export async function createManualRefund(payeeName: string, amountPaise: number, ground: string,
+  detail: string): Promise<{ error: string; refundId: string | null }> {
+  const fail = (error: string) => ({ error, refundId: null });
+  const name = payeeName.trim();
+  if (!name) return fail("Say who the money is going to. Nothing else on this row names them.");
+  if (!Number.isInteger(amountPaise) || amountPaise <= 0)
+    return fail("The amount must be a whole figure above zero.");
+  if (!REFUND_GROUNDS.some((g) => g.key === ground)) return fail("Pick why the money is going back.");
+  let id: number;
+  try {
+    const row = await call(AdminOpsService.requestRefund({
+      payeeName: name, amountPaise, ground, detail: detail.trim(),
+    }));
+    id = row.id;
+  } catch (e) {
+    return fail(writeError(e));
+  }
+  note("REFUND_REQUESTED", RF + id, "refund", inr(amountPaise) + " to " + name + ". Nothing has moved.");
+  await bootFinanceLive(true);
+  return { error: "", refundId: RF + id };
 }
 
-/** FN-T14 · Decide. Super Admin, and never the requester — that separation is
- *  the whole control. Approval AUTHORISES a transfer; it does not make one.
- *
- *  TWO VERDICTS, NOT THREE. There was a `send_back`, which returned the request
- *  to the requester with a note and left it decidable again. It was a message
- *  wearing a state: nothing about the refund changed, no money moved either
- *  way, and a request could sit in that loop indefinitely with the ledger
- *  saying only that somebody had asked a question. A decision is yes or no. */
-export function decideRefund(id: string, verdict: "approve" | "decline", decisionNote: string): string {
+/** FN-T14 · Decide. Super Admin, and never the requester. Approval AUTHORISES
+ *  a transfer; it does not make one. Two verdicts, not three. */
+export async function decideRefund(id: string, verdict: "approve" | "decline", decisionNote: string): Promise<string> {
   const r = readRefund(id);
-  if (!r) return "That request no longer exists.";
+  const serverId = idIn(id, RF);
+  if (!r || serverId === null) return "That request no longer exists.";
   if (r.state !== "requested") return "This request is already decided. (invalid_state_transition)";
   if (verdict !== "approve" && !decisionNote.trim())
     return "Say what is missing or why it is refused — the requester only sees this note. (reason_required)";
   const sa = superAdminOnly("Deciding a refund"); if (sa) return sa;
-  const a = actor();
-  if (a.name === r.requestedBy)
+  const me = getSession()?.user?.username;
+  if (me && me === r.requestedBy)
     return "A refund cannot be approved by the person who requested it. That separation is the whole control. (super_admin_required)";
-
-  r.decidedBy = a.name;
-  r.decidedAt = stamp();
-  r.decisionNote = decisionNote.trim() || null;
-  if (verdict === "approve") {
-    r.state = "approved";
-    log(pushEvent(r.events, "REFUND_APPROVED",
-      inr(r.amountPaise) + " authorised. NO MONEY HAS MOVED — make the transfer in the bank, then record it here."), id, "refund");
-  } else {
-    r.state = "declined";
-    log(pushEvent(r.events, "REFUND_DECLINED", decisionNote.trim()), id, "refund");
+  try {
+    await call(AdminOpsService.decideRefund(serverId, {
+      state: verdict === "approve" ? "approved" : "declined", note: decisionNote.trim(),
+    }));
+  } catch (e) {
+    return writeError(e);
   }
-  emit();
+  note(verdict === "approve" ? "REFUND_APPROVED" : "REFUND_DECLINED", id, "refund",
+    inr(r.amountPaise) + (verdict === "approve" ? " authorised. No money has moved." : " declined — " + decisionNote.trim()));
+  await bootFinanceLive(true);
   return "";
 }
 
 /** FN-T15 · Record the transfer that actually sends the money. Only now is a
- *  refund `paid`, and only now does it leave "approved, not sent". */
-export function recordRefundTransfer(id: string, mode: string, reference: string, accountId: string): string {
+ *  refund `paid`, and only now does the settlement say which of our own
+ *  accounts it left. */
+export const recordRefundTransfer: (id: string, mode: string, reference: string, accountId: string) => Promise<string> =
+  async (id, mode, reference, accountId) => {
   const r = readRefund(id);
-  if (!r) return "That request no longer exists.";
+  const serverId = idIn(id, RF);
+  if (!r || serverId === null) return "That request no longer exists.";
   if (r.state !== "approved") return "Only an approved refund can be paid. (invalid_state_transition)";
   if (!reference.trim()) return "The transfer reference is mandatory — it is the proof the money left. (validation_failed)";
-  if (dupReference(reference)) return "A record already carries reference " + reference.trim() + ". (duplicate_reference)";
-  if (!accountOf(accountId)) return "Pick the account it was paid from.";
-  const a = actor();
-  r.settlement = { paidAt: stamp(), mode, reference: reference.trim(), accountId, by: a.name };
-  r.state = "paid";
-  if (r.subscriptionId) {
-    const s = readSubscription(r.subscriptionId);
-    if (s) {
-      s.status = "refunded";
-      pushEvent(s.events, "REFUND_PAID", r.refundId + " · " + inr(r.amountPaise) + " returned to the customer.");
-    }
+  if (dupLiveReference(reference)) return "A record already carries reference " + reference.trim() + ". (duplicate_reference)";
+  try {
+    await call(AdminOpsService.settleRefund(serverId, {
+      mode, reference: reference.trim(),
+      /* Only an account the server listed is named; none is sent otherwise. */
+      ...(liveAccount(accountId) ? { account: accountId } : {}),
+    }));
+  } catch (e) {
+    return writeError(e);
   }
-  log(pushEvent(r.events, "REFUND_PAID",
-    inr(r.amountPaise) + " sent from " + (accountOf(accountId)?.masked || accountId) + " · " + reference.trim() + "."), id, "refund");
-  emit();
+  note("REFUND_PAID", id, "refund", inr(r.amountPaise) + " sent · " + reference.trim() + ".");
+  await bootFinanceLive(true);
   return "";
 }
 
 /* -------------------------------------------------------------- bank --- */
 
-/** FN-T16 · Statement import. A credit matching a recorded payment just ties
- *  the two together — nothing about the row changes, because nothing about it
- *  was ever in doubt. Anything else is an exception a person explains. */
-export function importStatement(): { error: string; summary: string } {
-  const pi = snap.pendingImport;
-  if (!pi) return { error: "No further statement is available to import in this seed. The next one arrives from the bank.", summary: "" };
-  if (snap.statements.some((s) => !s.closed))
-    return { error: "Close " + snap.statements.filter((s) => !s.closed)[0].stmtId + " first. Two open windows cannot be reconciled against one balance. (period_open)", summary: "" };
-  const stmt = { ...clone(pi), importedAt: stamp(), closed: false, closedBy: null, closedAt: null };
-  snap.statements = snap.statements.concat([stmt]);
-  snap.pendingImport = null;
-  const sys = { name: "System", role: "System" };
-  let matched = 0, exceptions = 0;
-  (stmt.lines as BankLine[]).forEach((l) => {
-    if (l.dir === "credit") {
-      const hit = readPayments().filter((r) => !r.pay.bankLineId
-        && norm(r.pay.reference) === norm(l.reference) && r.pay.amountPaise === l.amountPaise)[0];
-      if (hit) {
-        hit.pay.bankLineId = l.lineId;
-        log(pushEvent(hit.sub.events, "MATCHED",
-          "Installment " + hit.inst.seq + " found on " + stmt.stmtId + " as " + l.reference + " · " + l.date + ". Amount and reference equal.", sys),
-        hit.sub.subscriptionId, "subscription");
-        matched++; return;
-      }
-      exceptions++; return;
-    }
-    const t = snap.transactions.filter((x) => !x.bankLineId && x.state === "recorded"
-      && x.direction === "out" && x.amountPaise > 0
-      && norm(x.reference) === norm(l.reference) && x.amountPaise === l.amountPaise)[0];
-    if (t) {
-      t.bankLineId = l.lineId;
-      log(pushEvent(t.events, "MATCHED", "Auto-matched on import: debit " + l.reference + " · " + l.date + ".", sys), t.txnId, "transaction");
-      matched++; return;
-    }
-    exceptions++;
-  });
-  note("IMPORTED", stmt.stmtId, "statement",
-    stmt.stmtId + " · " + matched + " matched, " + exceptions + " to explain.");
-  emit();
-  return { error: "", summary: matched + " matched · " + exceptions + " to explain" };
+export interface StatementLineInput {
+  date: string; direction: "credit" | "debit"; amountPaise: number;
+  reference: string; narration: string; counterparty: string;
+}
+export interface StatementImport {
+  accountId: string; from: string; to: string;
+  /** The statement file as text, or lines already read out of one. */
+  csv?: string; lines?: StatementLineInput[];
 }
 
-export function resolveException(lineId: string, kind: "write_off" | "carried_forward", reason: string): string {
+/** The bank's own CSV, as lines. THE PANEL READS THE FILE, THE SERVER MATCHES
+ *  IT: nothing here decides what a line belongs to.
+ *  ponytail: CSV with a header row; a bank that exports XLS is saved as CSV
+ *  first, and a parser per bank is a library nobody has asked for. */
+export function parseStatementCsv(csv: string): { error: string; lines: StatementLineInput[] } {
+  const rows = (csv || "").split(/\r?\n/).filter((l) => l.trim());
+  if (rows.length < 2) return { error: "That file has no lines under its header.", lines: [] };
+  const cells = (line: string) =>
+    (line.match(/("([^"]|"")*"|[^,]*)(,|$)/g) || [])
+      .map((c) => c.replace(/,$/, "").trim().replace(/^"|"$/g, "").replace(/""/g, '"'))
+      .slice(0, -1);
+  const head = cells(rows[0]).map((h) => h.toLowerCase().replace(/[^a-z]/g, ""));
+  const at = (...names: string[]) => head.findIndex((h) => names.some((n) => h.indexOf(n) >= 0));
+  const iDate = at("date");
+  const iDebit = at("debit", "withdrawal");
+  const iCredit = at("credit", "deposit");
+  const iAmount = at("amount");
+  const iRef = at("reference", "utr", "chq", "cheque");
+  const iNarr = at("narration", "description", "particular", "remark");
+  const iParty = at("counterparty", "party", "payee");
+  const iType = at("type", "drcr");
+  if (iDate < 0 || (iDebit < 0 && iCredit < 0 && iAmount < 0))
+    return { error: "A statement needs a date column and either debit/credit columns or an amount.", lines: [] };
+  const paise = (v: string) => {
+    const n = Number((v || "").replace(/[^0-9.-]/g, ""));
+    return Number.isFinite(n) ? Math.round(Math.abs(n) * 100) : 0;
+  };
+  const iso = (v: string) => {
+    const t = (v || "").trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(t)) return t.slice(0, 10);
+    const m = t.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})/);
+    if (!m) return "";
+    const y = m[3].length === 2 ? "20" + m[3] : m[3];
+    return y + "-" + m[2].padStart(2, "0") + "-" + m[1].padStart(2, "0");
+  };
+  const lines: StatementLineInput[] = [];
+  for (let i = 1; i < rows.length; i++) {
+    const c = cells(rows[i]);
+    const date = iso(c[iDate] || "");
+    if (!date) return { error: "Line " + i + " has no date this can read (YYYY-MM-DD or DD/MM/YYYY).", lines: [] };
+    const debit = iDebit >= 0 ? paise(c[iDebit] || "") : 0;
+    const credit = iCredit >= 0 ? paise(c[iCredit] || "") : 0;
+    let dir: "credit" | "debit" = debit > 0 ? "debit" : "credit";
+    let amountPaise = debit || credit;
+    if (!amountPaise && iAmount >= 0) {
+      const raw = c[iAmount] || "";
+      amountPaise = paise(raw);
+      const typed = iType >= 0 ? (c[iType] || "").toLowerCase() : "";
+      dir = typed.indexOf("d") === 0 || Number(raw.replace(/[^0-9.-]/g, "")) < 0 ? "debit" : "credit";
+    }
+    if (!amountPaise) return { error: "Line " + i + " has no amount. A statement line is more than zero.", lines: [] };
+    lines.push({
+      date, direction: dir, amountPaise,
+      reference: iRef >= 0 ? (c[iRef] || "").trim() : "",
+      narration: iNarr >= 0 ? (c[iNarr] || "").trim() : "",
+      counterparty: iParty >= 0 ? (c[iParty] || "").trim() : "",
+    });
+  }
+  return { error: "", lines };
+}
+
+/** FN-T16 · Import one statement window. One open window per account — the
+ *  server refuses a second — and every line is matched on the way in by the
+ *  server's own rule: same amount, same reference. */
+export async function importStatement(input: StatementImport): Promise<{ error: string; summary: string }> {
+  const fail = (error: string) => ({ error, summary: "" });
+  if (!input || !COMPANY_ACCOUNTS.some((a) => a.active && a.accountId === input.accountId))
+    return fail("Pick the account this statement is for.");
+  if (!input.from || !input.to || input.to < input.from) return fail("The window ends before it starts.");
+  let lines = input.lines || [];
+  if (!lines.length) {
+    const read = parseStatementCsv(input.csv || "");
+    if (read.error) return fail(read.error);
+    lines = read.lines;
+  }
+  if (!lines.length) return fail("A statement with no lines explains nothing.");
+  let data: { lines: number; autoMatched: number; toExplain: number };
+  try {
+    data = await call(AdminOpsService.importBankStatement({
+      account: input.accountId, fromDate: input.from, toDate: input.to, lines,
+    })) as unknown as { lines: number; autoMatched: number; toExplain: number };
+  } catch (e) {
+    return fail(writeError(e));
+  }
+  const summary = data.lines + " line" + (data.lines === 1 ? "" : "s") + " imported · "
+    + data.autoMatched + " matched to a record · " + data.toExplain + " to explain.";
+  note("IMPORTED", input.accountId, "statement", summary);
+  await bootFinanceLive(true);
+  return { error: "", summary };
+}
+
+export async function resolveException(lineId: string, kind: string, reason: string): Promise<string> {
+  const serverId = idIn(lineId, "L-");
+  if (serverId === null) return "That statement line does not exist.";
   if (!reason.trim()) return "Both a write-off and a carry-forward need a reason. (reason_required)";
   if (kind === "write_off") { const sa = superAdminOnly("Writing off"); if (sa) return sa; }
-  if (snap.resolutions.some((r) => r.targetId === lineId)) return "That line is already resolved. (already_reconciled)";
-  const a = actor();
-  snap.resolutions = snap.resolutions.concat([{ targetId: lineId, kind, reason: reason.trim(), by: a.name, at: stamp() }]);
+  try {
+    await call(AdminOpsService.resolveBankLine(serverId, { kind, reason: reason.trim() }));
+  } catch (e) {
+    return writeError(e);
+  }
   note("IMPORTED", lineId, "statement", lineId + " · " + kind.replace("_", " ") + " · " + reason.trim());
-  emit();
+  await bootFinanceLive(true);
   return "";
 }
 
-/** FN-T17 · Close the window. Refused while anything is unexplained — not a
- *  warning and not a confirm, because "close anyway" is how a hole becomes
- *  permanent. */
-export function closePeriod(stmtId: string): string {
-  const r = reconciliation(stmtId);
-  if (!r.stmt) return "That statement no longer exists.";
-  if (r.stmt.closed) return "It is already closed. (invalid_state_transition)";
-  if (!r.canClose)
-    return "Cannot close " + stmtId + ": " + r.bankOnly.length + " line" + (r.bankOnly.length === 1 ? "" : "s") + " on the statement no record explains. (unresolved_exceptions)";
+/** FN-T17 · Close the window. The server refuses while anything is
+ *  unexplained — not a warning and not a confirm. */
+export async function closePeriod(stmtId: string): Promise<string> {
+  const serverId = idIn(stmtId, "STMT-");
+  if (serverId === null) return "That statement no longer exists.";
   const sa = superAdminOnly("Closing a period"); if (sa) return sa;
-  const a = actor();
-  const st = r.stmt as unknown as Record<string, unknown>;
-  st.closed = true; st.closedBy = a.name; st.closedAt = stamp();
-  note("PERIOD_CLOSED", stmtId, "statement", stmtId + " · " + r.matchedN + " rows matched · variance " + inr(0) + ".");
-  emit();
+  try {
+    await call(AdminOpsService.closeBankStatement(serverId));
+  } catch (e) {
+    return writeError(e);
+  }
+  note("PERIOD_CLOSED", stmtId, "statement", stmtId + " closed.");
+  await bootFinanceLive(true);
   return "";
 }
 
@@ -2536,40 +3230,41 @@ export function logExport(what: string, rows: number) {
  *  moment — not a total for any period, which is why the topbar can carry it
  *  on every section without it meaning something different on each. */
 export const activeCount = () => snap.subscriptions.filter((s) => s.status === "active").length;
-export function useActiveCount(): number { useVersion(); return activeCount(); }
-export function useSubRows(): SubRow[] { useVersion(); return subRows(); }
-export function useSubTotals(): SubTotals { useVersion(); return subTotals(); }
-export function useSubscription(id: string | null): SubRow | null { useVersion(); const s = readSubscription(id); return s ? toSubRow(s) : null; }
-export function useInstallmentRows(): InstRow[] { useVersion(); return installmentRows(); }
-export function useSalaryRows(): SalaryRow[] { useVersion(); return salaryRows(); }
-export function useSalaryTotals() { useVersion(); return salaryTotals(); }
-export function useSalaryAccount(id: string | null): SalaryRow | null { useVersion(); const a = readSalaryAccount(id); return a ? toSalaryRow(a) : null; }
-export function useRuns(): SalaryRun[] { useVersion(); return runsNewestFirst(); }
-export function useRun(id: string | null): SalaryRun | null { useVersion(); return readRun(id); }
+export function useActiveCount(): number { useVersion(); useSubsBoot(); return activeCount(); }
+export function useSubRows(): SubRow[] { useVersion(); useSubsBoot(); return subRows(); }
+export function useSubTotals(): SubTotals { useVersion(); useSubsBoot(); return subTotals(); }
+export function useSubscription(id: string | null): SubRow | null { useVersion(); useSubsBoot(); const s = readSubscription(id); return s ? toSubRow(s) : null; }
+export function useInstallmentRows(): InstRow[] { useVersion(); useSubsBoot(); return installmentRows(); }
+export function useSalaryRows(): SalaryRow[] { useVersion(); usePayrollBoot(); return salaryRows(); }
+export function useSalaryTotals() { useVersion(); usePayrollBoot(); return salaryTotals(); }
+export function useSalaryAccount(id: string | null): SalaryRow | null { useVersion(); usePayrollBoot(); const a = readSalaryAccount(id); return a ? toSalaryRow(a) : null; }
+export function useRuns(): SalaryRun[] { useVersion(); usePayrollBoot(); return runsNewestFirst(); }
+export function useRun(id: string | null): SalaryRun | null { useVersion(); usePayrollBoot(); return readRun(id); }
 export function useSlip(id: string | null): { slip: Payslip; run: SalaryRun } | null {
-  useVersion();
+  useVersion(); usePayrollBoot();
   const slip = readSlip(id); const run = id ? runOfSlip(id) : null;
   return slip && run ? { slip, run } : null;
 }
-export function useTxnRows(): TxnRow[] { useVersion(); return txnRows(); }
-export function useTxn(id: string | null): TxnRow | null { useVersion(); const t = readTransaction(id); return t ? toTxnRow(t) : null; }
-export function useTags(): Tag[] { useVersion(); return snap.tags; }
-export function useTagTotals() { useVersion(); return tagTotals(); }
-export function useRefundQueue() { useVersion(); return refundQueue(); }
-export function useRefund(id: string | null): RefundRow | null { useVersion(); const r = readRefund(id); return r ? toRefundRow(r) : null; }
-export function useOverview(): Overview { useVersion(); return overview(); }
-export function useOverviewTiles(): Tile[] { useVersion(); return overviewTiles(); }
-export function useWaterfall(): WaterfallStep[] { useVersion(); return waterfall(); }
-export function useAtRisk(): RiskRow[] { useVersion(); return atRisk(); }
-export function useKpis(): Kpi[] { useVersion(); return kpis(); }
-export function useMonthPoints(): MonthPoint[] { useVersion(); return monthPoints(); }
-export function useReconciliation(stmtId?: string): Recon { useVersion(); return reconciliation(stmtId); }
-export function useStatements() { useVersion(); return snap.statements; }
-export function usePendingImport() { useVersion(); return snap.pendingImport; }
-export function useMatchedPct() { useVersion(); return matchedPct(); }
-export function useTaxSummary() { useVersion(); return taxSummary(); }
+/* LIVE hooks: each starts the live load on first mount (deduped). */
+export function useTxnRows(): TxnRow[] { useVersion(); useLiveBoot(); return txnRows(); }
+export function useTxn(id: string | null): TxnRow | null { useVersion(); useLiveBoot(); const t = readTransaction(id); return t ? toTxnRow(t) : null; }
+export function useTags(): Tag[] { useVersion(); useLiveBoot(); return live.tags; }
+export function useTagTotals() { useVersion(); useLiveBoot(); return tagTotals(); }
+export function useRefundQueue() { useVersion(); useLiveBoot(); return refundQueue(); }
+export function useRefund(id: string | null): RefundRow | null { useVersion(); useLiveBoot(); const r = readRefund(id); return r ? toRefundRow(r) : null; }
+/** Live on a live section, seed on Subscriptions — see `overview`. */
+export function useOverview(): Overview { useVersion(); useLiveBoot(); return overview(); }
+export function useOverviewTiles(): Tile[] { useVersion(); useLiveBoot(); return overviewTiles(); }
+export function useWaterfall(): WaterfallStep[] { useVersion(); useLiveBoot(); return waterfall(); }
+export function useAtRisk(): RiskRow[] { useVersion(); useLiveBoot(); return atRisk(); }
+export function useKpis(): Kpi[] { useVersion(); useLiveBoot(); return kpis(); }
+export function useMonthPoints(): MonthPoint[] { useVersion(); useLiveBoot(); return monthPoints(); }
+export function useReconciliation(stmtId?: string): Recon { useVersion(); useLiveBoot(); return reconciliation(stmtId); }
+export function useStatements() { useVersion(); useLiveBoot(); return live.statements; }
+export function usePendingImport() { useVersion(); return readPendingImport(); }
+export function useMatchedPct() { useVersion(); useLiveBoot(); return matchedPct(); }
+export function useTaxSummary() { useVersion(); useLiveBoot(); return taxSummary(); }
 export function useActivity(limit = 30) { useVersion(); return snap.activity.slice(0, limit); }
-export function useInvoices() { useVersion(); return snap.invoices; }
 
 /* ========================================================= formatting === */
 
@@ -2590,9 +3285,14 @@ export function fmtMonth(m: string): string {
   const d = new Date(m + "-01T00:00:00");
   return isNaN(d.getTime()) ? m : d.toLocaleDateString("en-IN", { month: "short", year: "numeric" });
 }
+/** `September 2026` — the reporting period's label. */
+function fmtMonthLong(m: string): string {
+  const d = new Date(m + "-01T00:00:00");
+  return isNaN(d.getTime()) ? m : d.toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+}
 export function ago(iso: string | null | undefined): string {
   if (!iso) return "—";
-  const n = daysBetween(ts(iso.length <= 10 ? iso + "T00:00:00" : iso), NOW);
+  const n = daysBetween(ts(iso.length <= 10 ? iso + "T00:00:00" : iso), clockNow());
   if (isNaN(n)) return "—";
   if (n === 0) return "today";
   if (n === 1) return "yesterday";
@@ -2675,5 +3375,5 @@ export function filterValueLabel(key: string, value: string): string {
  *  picker hides on it, from one definition, so the list cannot offer a payment
  *  the store then turns down. */
 export function refundStanding(paymentId: string): Refund | null {
-  return snap.refunds.filter((r) => r.paymentId === paymentId && r.state !== "declined")[0] || null;
+  return live.refunds.filter((r) => r.paymentId === paymentId && r.state !== "declined")[0] || null;
 }

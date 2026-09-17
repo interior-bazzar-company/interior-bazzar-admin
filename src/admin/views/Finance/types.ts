@@ -23,7 +23,9 @@
 
    This file is types only — no data, no logic, no imports from the store. It
    is written before the seeds and before store.ts so that every one of them
-   is talking about the same shapes.
+   is talking about the same shapes. Other Transaction, Refunds and the bank
+   are now server rows ADAPTED into these shapes by store.ts; a field the
+   server has no source for comes through empty, never invented.
    ============================================================================= */
 
 export type Params = Record<string, string | undefined>;
@@ -39,14 +41,16 @@ export interface FinEvent {
   note: string;
 }
 
+/** A seed account carries all of it. A server account (`company-accounts`)
+ *  has only id, name, masked and active — the other three have no backend. */
 export interface Account {
   accountId: string;
   name: string;
   masked: string;
-  type: "bank" | "gateway" | "cash";
-  openingPaise: number;
+  type?: "bank" | "gateway" | "cash";
+  openingPaise?: number;
   /** false when the money in it is owed to someone else and cannot be spent. */
-  unrestricted: boolean;
+  unrestricted?: boolean;
   active: boolean;
 }
 
@@ -74,6 +78,10 @@ export interface Proof {
   type: string;
   filename: string;
   uploadedAt: string;
+  /** Where the file actually is — the server's presigned link, good for an
+   *  hour from the read that returned it. Absent on a seed row, which holds a
+   *  filename and no bytes. */
+  url?: string | null;
 }
 
 /* ===================================================== subscriptions === */
@@ -86,8 +94,13 @@ export type SubSource = "sales" | "website";
  *  not a claim about one — nothing has happened to it yet. */
 export type InstallmentStatus = "paid" | "due" | "fail_to_pay" | "cancelled";
 
+/** `pending` and `expired` are the SERVER's own words for a purchased plan —
+ *  bought and not yet paid for, and lapsed past its expiry. They are here
+ *  because the record says them; `completed` and `defaulting` stay because a
+ *  sale collected in installments can still be either. */
 export type SubscriptionStatus =
-  | "active" | "completed" | "defaulting" | "cancelled" | "refunded";
+  | "active" | "completed" | "defaulting" | "cancelled" | "refunded"
+  | "pending" | "expired";
 
 /** The payment that settled one installment. One installment, one payment,
  *  in full — the 1:1 rule at the correct unit. There is no part-payment
@@ -193,8 +206,8 @@ export interface SalaryAccount {
    *  through payroll without being permanent. The two are NOT a clean
    *  partition of the world — permanent staff are on payroll too — and the
    *  split is here because the business asked to filter by it, not because it
-   *  is a taxonomy this module would have invented. It is a vocabulary in
-   *  `vocabularies.json` so a third value is data rather than a code change. */
+   *  is a taxonomy this module would have invented. It is the server's
+   *  `employment-types` list so a third value is data rather than a code change. */
   engagement: string;
   joinedAt: string;
   monthlyGrossPaise: number;
@@ -378,10 +391,11 @@ export interface CompanyTxn {
 
 /* =========================================================== refunds === */
 
-/** Where the refund came from. `subscription` is tied to a recorded
- *  installment payment; `manual` is raised by hand and names its own payee —
- *  a duplicate bank transfer, a cancelled order taken off-platform. */
-export type RefundOrigin = "subscription" | "manual";
+/** Where the refund came from, as the server computes it. `subscription` is
+ *  tied to a plan payment; `deal_payment` to a payment on a deal's ledger;
+ *  `manual` is raised by hand and names its own payee — a duplicate bank
+ *  transfer, a cancelled order taken off-platform. */
+export type RefundOrigin = "subscription" | "deal_payment" | "manual";
 
 export type RefundState =
   | "requested" | "approved" | "declined" | "paid";
@@ -464,5 +478,7 @@ export interface MonthPoint {
   otherInPaise: number;
   refundsPaise: number;
   netPaise: number;
-  newCustomers: number;
+  /** null: no payment on the server names its customer, so a first payment
+   *  cannot be told from a repeat. Never a zero somebody decided on. */
+  newCustomers: number | null;
 }

@@ -41,7 +41,7 @@ export default function RefundDetail({ id, p, onParams }: {
   }
 
   const r = row.r;
-  const writable = can("finance-refunds", "edit");
+  const writable = can("finance-refunds", "decide");
   const sa = isSuperAdmin();
   const deciding = r.state === "requested";
 

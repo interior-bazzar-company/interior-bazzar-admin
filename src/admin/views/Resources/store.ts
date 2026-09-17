@@ -49,16 +49,32 @@
    where it is filled in. Until that page exists the link resolves to nothing, and
    the screen says so rather than implying otherwise.
 
-   NO API YET — everything comes from src/content/resources/*.json, and this file
-   is the only one that knows that. See src/proto/v-2.2.0.0/BACKEND-INTEGRATION.md.
+   ON THE BACKEND (2026-09-15). `bootResources()` reads every form from
+   `GET resources/?member=all` and the answers one member at a time
+   (`?member=<id>`, the only read that returns them); the writes are the
+   resources/ endpoints. Ids keep the `RES-` / `RSP-` prefixes the routes switch
+   on, over the server's integer ids. A department is an rbac ROLE — the server
+   stores role ids, so a name that is not a role is refused.
+
+   A FILE ANSWER is uploaded on submit by a presigned PUT (the Finance receipt
+   route); the server checks it against its field, stores the key and reads it
+   back as a signed URL.
+
+   STILL LOCAL — no backend: the share link's token (derived below, never
+   authorisation; Resource has no token column), and the static labels in
+   vocabularies.json (submitted/pending). Field types and tag suggestions are
+   served (vocab/resource-field-types, vocab/resource-tag-suggestions).
    ============================================================================= */
 import { useEffect, useState } from "react";
-import formsDoc from "../../../content/resources/forms.json";
-import responsesDoc from "../../../content/resources/responses.json";
 import vocabDoc from "../../../content/resources/vocabularies.json";
 import config from "../../../config";
-import { TODAY, meId, readMembers } from "../Team/store";
-import type { Member } from "../Team/store";
+import AdminOpsService, { call } from "../../../api/modules/adminOps";
+import { CommonService } from "../../../api/modules/common";
+import type { ApiResponseType } from "../../../types/reqResType";
+import type { ResourceResponseRow, ResourceRow } from "../../../api/modules/adminOps";
+import { errMessage } from "../../../api/apiService";
+import { bootTeam, loadFailure, meId, readMembers, scopedTo } from "../Team/store";
+import type { LoadPart, Member } from "../Team/store";
 
 /* ------------------------------------------------------------------ types -- */
 
@@ -102,7 +118,8 @@ export interface FileAnswer {
   fileName: string;
   mimeType: string;
   sizeKb: number;
-  /** MUST become a signed, expiring read. See BACKEND-INTEGRATION.md § Module 8. */
+  /** From the server, a signed, expiring read of the stored key. In the fill
+   *  dialog, before submit, a local object URL. */
   url: string;
 }
 
@@ -176,11 +193,15 @@ const toneMap = (rows: ToneRow[]) => {
 
 export const VOCAB = vocabDoc as unknown as Record<string, ToneRow[]>;
 /** SUGGESTIONS, NOT A VOCABULARY. Tags are free text; these are the ones worth
- *  offering on an empty field so nobody has to invent a word for "onboarding". */
-export const TAG_SUGGESTIONS = (VOCAB.tagSuggestions || []).map((r) => r.label);
-export const RESOURCE_STATE = toneMap(VOCAB.resourceStates);
+ *  offering on an empty field so nobody has to invent a word for "onboarding".
+ *  From `GET vocab/resource-tag-suggestions/`, filled in place by bootResources. */
+export const TAG_SUGGESTIONS: string[] = [];
+/** From `GET vocab/resource-states/`, filled in place by bootResources. */
+export const RESOURCE_STATE: Record<string, { label: string; tone: string }> = {};
 export const ROW_STATE = toneMap(VOCAB.responseStates);
-export const FIELD_TYPES = VOCAB.fieldTypes as unknown as { key: FieldType; label: string }[];
+/** From `GET vocab/resource-field-types/` — the server's own FIELD_TYPES, so the
+ *  builder offers exactly the types a save accepts. Filled in place by bootResources. */
+export const FIELD_TYPES: { key: FieldType; label: string }[] = [];
 
 export const labelOf = (map: Record<string, { label: string }>, key: string) =>
   (map[key] || { label: key }).label;
@@ -218,28 +239,148 @@ export const typeLabel = (t: FieldType) =>
 
 /* ------------------------------------------------------------------ store -- */
 
-const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
-
 interface Snap { resources: Resource[]; responses: ResourceResponse[] }
 
-const seed = (): Snap => ({
-  resources: clone(formsDoc.resources) as unknown as Resource[],
-  responses: clone(responsesDoc.responses) as unknown as ResourceResponse[],
-});
-
-let snap: Snap = seed();
+let snap: Snap = { resources: [], responses: [] };
 
 /** Bumped on every write so the hooks below re-render. */
 let version = 0;
 const listeners = new Set<() => void>();
 const touch = () => { version++; listeners.forEach((f) => f()); };
 
-/** Restores the authored seed. Used by the checks, never by a screen. */
-export function resetStore() { snap = seed(); touch(); }
-
 let seq = 0;
 const nextId = (prefix: string) =>
   prefix + "-" + (Date.now().toString(36) + (seq++).toString(36)).toUpperCase();
+
+/* ------------------------------------------------------------- the load -- */
+
+const RES = "RES-", RSP = "RSP-";
+const serverId = (id: string) => Number(id.replace(/^(RES|RSP)-/, ""));
+
+const toResource = (r: ResourceRow): Resource => ({
+  resourceId: RES + r.id,
+  title: r.title,
+  description: r.description || "",
+  tags: r.tags || [],
+  departments: (r.roles || []).map((x) => x.name),
+  state: r.state.key as ResourceState,
+  version: r.version,
+  fields: (r.fields || []) as ResourceField[],
+  createdAt: r.createdAt || "",
+  createdById: r.createdBy ? String(r.createdBy.id) : "",
+  openedAt: r.openedAt,
+  closedAt: r.closedAt,
+});
+
+const toResponse = (x: ResourceResponseRow): ResourceResponse => ({
+  responseId: RSP + x.id,
+  resourceId: RES + x.resource,
+  version: x.version,
+  memberId: String(x.member.id),
+  submittedAt: x.submittedAt || "",
+  answers: (x.answers || []) as Answer[],
+});
+
+/** Role name -> id, for the writes. From the roles list, and from every roster
+ *  row and form that names a role, so a viewer without the roles grant has them. */
+const ROLE_IDS: Record<string, number> = {};
+
+let booting: Promise<void> | null = null;
+let loadSeq = 0;
+/** How the forms and answers stand (Team's `LoadPart`): `own` when the server
+ *  refused everybody's and answered with the viewer's own. */
+let part: LoadPart = { state: "loading" };
+
+async function load(current: () => boolean): Promise<void> {
+  await bootTeam();
+  /* Asserted, not annotated: a closure assigns these, and TS would otherwise
+     narrow them to `null` for the rest of the function. */
+  let wideErr = null as unknown, ownErr = null as unknown, answersErr = null as unknown;
+  const [all, roles, users, states, tagSuggestions, fieldTypes] = await Promise.all([
+    call(AdminOpsService.resources({ member: "all" })).catch((e) => { wideErr = e; return null; }),
+    call(AdminOpsService.listRoles()).catch(() => null),
+    call(AdminOpsService.users()).catch(() => null),
+    call(AdminOpsService.vocab("resource-states")).catch(() => null),
+    call(AdminOpsService.vocab("resource-tag-suggestions")).catch(() => null),
+    call(AdminOpsService.vocab("resource-field-types")).catch(() => null),
+  ]);
+  let resources: ResourceRow[];
+  let responses: ResourceResponseRow[];
+  if (all) {
+    resources = all.resources;
+    /* ponytail: one read per roster member, the only way the server returns
+       answers; a single "every response" read replaces this if the roster grows. */
+    const each = await Promise.all(readMembers().map((m) =>
+      call(AdminOpsService.resources({ member: m.memberId })).then((r) => r.responses || [])
+        .catch((e) => { if (answersErr === null) answersErr = e; return []; })));
+    const seen: Record<number, boolean> = {};
+    responses = ([] as ResourceResponseRow[]).concat(...each).filter((x) => (seen[x.id] ? false : (seen[x.id] = true)));
+  } else {
+    const own = await call(AdminOpsService.resources({})).catch((e) => { ownErr = e; return null; });
+    resources = own ? own.resources : [];
+    responses = own ? own.responses || [] : [];
+  }
+  if (!current()) return;
+  (roles ? roles.roles : []).forEach((r) => { ROLE_IDS[r.name] = r.id; });
+  (users || []).forEach((u) => (u.roles || []).forEach((r) => { ROLE_IDS[r.name] = r.id; }));
+  resources.forEach((r) => (r.roles || []).forEach((x) => { ROLE_IDS[x.name] = x.id; }));
+  if (states) {
+    Object.keys(RESOURCE_STATE).forEach((k) => { delete RESOURCE_STATE[k]; });
+    states.items.forEach((x) => { RESOURCE_STATE[x.key] = { label: x.label, tone: x.tone || "" }; });
+  }
+  if (tagSuggestions) {
+    TAG_SUGGESTIONS.splice(0, TAG_SUGGESTIONS.length,
+      ...tagSuggestions.items.filter((x) => x.isActive !== false).map((x) => x.label));
+  }
+  if (fieldTypes) {
+    FIELD_TYPES.splice(0, FIELD_TYPES.length,
+      ...fieldTypes.items.map((x) => ({ key: x.key as FieldType, label: x.label })));
+  }
+  snap = { resources: resources.map(toResource), responses: responses.map(toResponse) };
+  /* Everybody's forms, or — refused — the viewer's own; a failure is never an empty list. */
+  const wideRefused = !all && loadFailure(wideErr).state === "denied";
+  part = all ? (answersErr === null ? { state: "ok", own: false } : loadFailure(answersErr))
+    : ownErr !== null ? loadFailure(wideRefused ? ownErr : wideErr)
+      : wideRefused ? { state: "ok", own: true } : loadFailure(wideErr);
+  touch();
+}
+
+/** Load (once) or reload (`force`). Never throws; only the newest load lands. */
+export function bootResources(force = false): Promise<void> {
+  if (booting && !force) return booting;
+  const mine = ++loadSeq;
+  booting = load(() => mine === loadSeq).catch((e) => {
+    if (mine !== loadSeq) return;
+    part = loadFailure(e);
+    touch();
+  });
+  return booting;
+}
+
+/** Try again: loading until the re-read lands. */
+export function retryResources(): Promise<void> {
+  part = { state: "loading" };
+  touch();
+  return bootResources(true);
+}
+
+/** A server write: fold the response in now, re-read in the background. */
+async function live<R, T>(req: () => Promise<ApiResponseType<R>>, apply: (r: R) => T): Promise<Result<T>> {
+  try {
+    const out = apply(await call(req()));
+    touch();
+    void bootResources(true);
+    return ok(out);
+  } catch (e) {
+    return err("refused", errMessage(e));
+  }
+}
+
+function roleIdsOf(names: string[]): number[] | string {
+  const missing = names.filter((n) => ROLE_IDS[n] === undefined);
+  if (missing.length) return "There is no role called “" + missing[0] + "”. A department is a role.";
+  return names.map((n) => ROLE_IDS[n]);
+}
 
 /* ------------------------------------------------------------------ reads -- */
 
@@ -290,7 +431,7 @@ export function audienceOf(r: Pick<Resource, "departments">): Member[] {
   const want = r.departments || [];
   return readMembers()
     .filter((m) => m.status === "active")
-    .filter((m) => !want.length || want.indexOf(m.department) >= 0)
+    .filter((m) => !want.length || m.roles.some((role) => want.indexOf(role) >= 0))
     .sort((x, y) => (x.name < y.name ? -1 : 1));
 }
 
@@ -377,9 +518,8 @@ export function shareLink(resourceId: string, memberId: string): string {
 export const isShareable = (r: Resource): boolean => r.state === "open";
 
 /* ----------------------------------------------------------------- writes -- */
-/* SIMULATED. Every one of these writes the in-memory snapshot and returns the
-   same Result shape the live calls will, so going live is a swap inside this
-   file and not a change to any screen. */
+/* Every one of these is a server write (`live`) returning a Result, so a
+   refusal reaches the screen in the server's own words. */
 
 export interface ResourceDraft {
   title: string;
@@ -406,167 +546,72 @@ const badDraft = (d: ResourceDraft): string | null => {
   return null;
 };
 
-export function createResource(d: ResourceDraft): Result<Resource> {
+const draftBody = (d: ResourceDraft, roles: number[]) => ({
+  title: d.title.trim(), description: d.description.trim(), tags: cleanTags(d.tags), roles, fields: d.fields,
+});
+const putResource = (row: ResourceRow): Resource => {
+  const r = toResource(row);
+  snap.resources = snap.resources.filter((x) => x.resourceId !== r.resourceId).concat([r]);
+  return r;
+};
+
+/** A new form is OPEN on the server — nothing goes out by accident, because the
+ *  only thing that reaches anybody is a link a person copies and sends. */
+export function createResource(d: ResourceDraft): Promise<Result<Resource>> {
   const bad = badDraft(d);
-  if (bad) return err("invalid", bad);
-  const r: Resource = {
-    resourceId: nextId("RES"),
-    title: d.title.trim(),
-    description: d.description.trim(),
-    tags: cleanTags(d.tags),
-    departments: cleanTags(d.departments),
-    /* OPEN, NOT DRAFT. It was created as a draft for the first day on the
-       reasoning that nothing should go out by accident — but nothing goes out
-       at all: there is no notification, and the only thing that reaches anybody
-       is a link a person copies and sends. A draft state in front of that is a
-       step with nothing behind it, and it made a brand-new resource invisible on
-       the one table this module has. `draft` still exists and `closeResource`
-       still works; nothing arrives in it by default any more. */
-    state: "open",
-    version: 1,
-    fields: clone(d.fields),
-    createdAt: TODAY + "T00:00:00+05:30",
-    createdById: meId(),
-    openedAt: TODAY + "T00:00:00+05:30",
-    closedAt: null,
-  };
-  snap.resources = snap.resources.concat([r]);
-  touch();
-  return ok(r);
+  if (bad) return Promise.resolve(err("invalid", bad));
+  const roles = roleIdsOf(cleanTags(d.departments));
+  if (typeof roles === "string") return Promise.resolve(err("unknown_role", roles));
+  return live(() => AdminOpsService.createResource(draftBody(d, roles)), putResource);
 }
 
-/** THE VERSION BUMP LIVES HERE. Editing the fields of a resource somebody has
- *  already answered makes a new version rather than rewriting the old one — a
- *  response is evidence, and evidence that changes shape later is not evidence.
- *  Editing only the title, purpose or audience does NOT bump: none of those is
- *  something anybody answered. */
-export function updateResource(id: string, d: ResourceDraft): Result<Resource> {
+/** THE VERSION BUMP is the server's: editing the fields of a form somebody
+ *  already answered makes a new version, and a closed form is not edited. */
+export function updateResource(id: string, d: ResourceDraft): Promise<Result<Resource>> {
   const bad = badDraft(d);
-  if (bad) return err("invalid", bad);
-  const list = snap.resources.slice();
-  const r = list.filter((x) => x.resourceId === id)[0];
-  if (!r) return err("not_found", "No such resource.");
-  if (r.state === "closed") return err("closed", "This resource is closed. Reopen it to edit.");
-  const fieldsChanged = JSON.stringify(r.fields) !== JSON.stringify(d.fields);
-  const answered = responsesFor(id).length > 0;
-  const next: Resource = {
-    ...r,
-    title: d.title.trim(),
-    description: d.description.trim(),
-    tags: cleanTags(d.tags),
-    departments: cleanTags(d.departments),
-    fields: clone(d.fields),
-    version: fieldsChanged && answered ? r.version + 1 : r.version,
-  };
-  snap.resources = list.map((x) => (x.resourceId === id ? next : x));
-  touch();
-  return ok(next);
+  if (bad) return Promise.resolve(err("invalid", bad));
+  if (!resourceOf(id)) return Promise.resolve(err("not_found", "No such resource."));
+  const roles = roleIdsOf(cleanTags(d.departments));
+  if (typeof roles === "string") return Promise.resolve(err("unknown_role", roles));
+  return live(() => AdminOpsService.updateResource(serverId(id), draftBody(d, roles)), putResource);
 }
 
-export function openResource(id: string): Result<Resource> {
-  const list = snap.resources.slice();
-  const r = list.filter((x) => x.resourceId === id)[0];
-  if (!r) return err("not_found", "No such resource.");
-  if (r.state === "open") return err("already_open", "It is already open.");
-  const next: Resource = {
-    ...r,
-    state: "open",
-    closedAt: null,
-    openedAt: r.openedAt || TODAY + "T00:00:00+05:30",
-  };
-  snap.resources = list.map((x) => (x.resourceId === id ? next : x));
-  touch();
-  return ok(next);
+const setState = (id: string, to: "open" | "closed" | "outdated"): Promise<Result<Resource>> =>
+  resourceOf(id)
+    ? live(() => AdminOpsService.setResourceState(serverId(id), to), putResource)
+    : Promise.resolve(err("not_found", "No such resource."));
+
+export const openResource = (id: string) => setState(id, "open");
+/** Closing stops new submissions and keeps every one already made. */
+export const closeResource = (id: string) => setState(id, "closed");
+/** MARK IT WRONG, not merely finished: it keeps every answer, sorts last and
+ *  refuses submissions. Reopening undoes it. */
+export const outdateResource = (id: string) => setState(id, "outdated");
+
+/** START AGAIN FROM ONE THAT WORKED. The copy is a DRAFT with no responses. */
+export const duplicateResource = (id: string): Promise<Result<Resource>> =>
+  resourceOf(id)
+    ? live(() => AdminOpsService.duplicateResource(serverId(id)), putResource)
+    : Promise.resolve(err("not_found", "No such resource."));
+
+/** A form nobody answered can go; one that HAS answers is refused (by the server
+ *  too) — delete the responses first, or mark it outdated. */
+export function deleteResource(id: string): Promise<Result<string>> {
+  if (!resourceOf(id)) return Promise.resolve(err("not_found", "No such resource."));
+  return live(() => AdminOpsService.deleteResource(serverId(id)), () => {
+    snap.resources = snap.resources.filter((x) => x.resourceId !== id);
+    return id;
+  });
 }
 
-/** Closing stops new submissions and keeps every one already made. It is not a
- *  delete, and there is no delete for anything answered. */
-export function closeResource(id: string): Result<Resource> {
-  const list = snap.resources.slice();
-  const r = list.filter((x) => x.resourceId === id)[0];
-  if (!r) return err("not_found", "No such resource.");
-  if (r.state === "closed") return err("already_closed", "It is already closed.");
-  const next: Resource = { ...r, state: "closed", closedAt: TODAY + "T00:00:00+05:30" };
-  snap.resources = list.map((x) => (x.resourceId === id ? next : x));
-  touch();
-  return ok(next);
-}
-
-/** MARK IT WRONG, not merely finished. An outdated resource keeps every answer
- *  and stops being something anybody should send — it sorts last, it refuses
- *  submissions, and its links stop working. Reopening undoes it, because a form
- *  marked outdated by mistake should not need rebuilding. */
-export function outdateResource(id: string): Result<Resource> {
-  const list = snap.resources.slice();
-  const r = list.filter((x) => x.resourceId === id)[0];
-  if (!r) return err("not_found", "No such resource.");
-  if (r.state === "outdated") return err("already_outdated", "It is already marked outdated.");
-  const next: Resource = { ...r, state: "outdated", closedAt: TODAY + "T00:00:00+05:30" };
-  snap.resources = list.map((x) => (x.resourceId === id ? next : x));
-  touch();
-  return ok(next);
-}
-
-/** START AGAIN FROM ONE THAT WORKED. The commonest reason a resource goes
- *  outdated is that a new version of it is needed, so the action that replaces
- *  it is next to the one that retires it. The copy is a DRAFT and carries no
- *  responses — it is a new form, not a fork of an old one's history. */
-export function duplicateResource(id: string): Result<Resource> {
-  const r = resourceOf(id);
-  if (!r) return err("not_found", "No such resource.");
-  const copy: Resource = {
-    ...clone(r),
-    resourceId: nextId("RES"),
-    title: r.title + " (copy)",
-    state: "draft",
-    version: 1,
-    createdAt: TODAY + "T00:00:00+05:30",
-    createdById: meId(),
-    openedAt: null,
-    closedAt: null,
-  };
-  snap.resources = snap.resources.concat([copy]);
-  touch();
-  return ok(copy);
-}
-
-/** A RESOURCE NOBODY ANSWERED CAN GO, whatever state it is in — an open form
- *  with no takers is a mistake to be cleared away, not a record to be kept.
- *
- *  One that HAS answers cannot, and the refusal says how many and what to do
- *  instead: those answers are the record of what people were asked, and a
- *  cascade that quietly took nine submissions with one click is not a delete
- *  button, it is a trap. Deleting the responses first is a deliberate act with
- *  its own confirmation, and afterwards this succeeds. */
-export function deleteResource(id: string): Result<string> {
-  const r = resourceOf(id);
-  if (!r) return err("not_found", "No such resource.");
-  const n = responsesFor(id).length;
-  if (n)
-    return err("has_responses", "It holds " + n + (n === 1 ? " response" : " responses")
-      + ". Delete " + (n === 1 ? "it" : "them") + " first, or mark this outdated to retire it and keep the record.");
-  snap.resources = snap.resources.filter((x) => x.resourceId !== id);
-  touch();
-  return ok(id);
-}
-
-/** DELETING A SUBMISSION IS HOW SPACE IS FREED, and it is the only thing in this
- *  module that destroys evidence — so it returns what it reclaimed, in kilobytes,
- *  and the screen says the number out loud afterwards. An answer removed is a
- *  question that reads as never asked; the person goes back to pending and their
- *  link works again, which is the honest consequence and not a side effect to
- *  hide.
- *
- *  The files go with it. A response deleted while its uploads stayed on a disk
- *  would free nothing and leave a PAN card behind — the server must unlink the
- *  objects in the same transaction. */
-export function deleteResponse(id: string): Result<number> {
-  const x = responseOf(id);
-  if (!x) return err("not_found", "No such response.");
-  const freedKb = x.answers.reduce((a, an) => a + (an.file ? an.file.sizeKb : 0), 0);
-  snap.responses = snap.responses.filter((y) => y.responseId !== id);
-  touch();
-  return ok(freedKb);
+/** DELETING A SUBMISSION IS HOW SPACE IS FREED, and it returns what it
+ *  reclaimed, in kilobytes, so the screen can say the number out loud. */
+export function deleteResponse(id: string): Promise<Result<number>> {
+  if (!responseOf(id)) return Promise.resolve(err("not_found", "No such response."));
+  return live(() => AdminOpsService.deleteResourceResponse(serverId(id)), (r) => {
+    snap.responses = snap.responses.filter((y) => y.responseId !== id);
+    return r.freedKb || 0;
+  });
 }
 
 /** WHAT COUNTS AS ANSWERED, written once. A file field is answered by its
@@ -577,58 +622,48 @@ export function answered(f: ResourceField, values: Record<string, string>, files
   return f.type === "file" ? !!(files && files[f.fieldId]) : !!String(values[f.fieldId] || "").trim();
 }
 
-export function submitResponse(
+/** Straight to S3 with a presigned PUT, then the API is told where it landed —
+ *  the same route (and intent) as Finance receipts and invoice proofs. A file the
+ *  browser gives no type is sent as octet-stream: the PUT must carry the type
+ *  the URL was signed for. */
+async function uploadAnswer(picked: File): Promise<string> {
+  const file = picked.type ? picked : new File([picked], picked.name, { type: "application/octet-stream" });
+  const res = await CommonService.getUploadUrl({ fileName: file.name, fileType: file.type, for: "PaymentScreenshot" });
+  if (!res.response) throw new Error(res.message || "Could not get an upload URL.");
+  await CommonService.uploadToS3(res.data.uploadUrl, file);
+  return res.data.fileUrl;
+}
+
+/** Your own answers only — the server files a response for the caller. Each
+ *  picked file (`blobs`, by fieldId) is uploaded first; the server checks it
+ *  against its field, keeps the key and hands back a signed read. */
+export async function submitResponse(
   resourceId: string, memberId: string, values: Record<string, string>,
-  files?: Record<string, FileAnswer>,
-): Result<ResourceResponse> {
+  files: Record<string, FileAnswer> = {}, blobs: Record<string, File> = {},
+): Promise<Result<ResourceResponse>> {
   const r = resourceOf(resourceId);
   if (!r) return err("not_found", "No such resource.");
-  if (r.state !== "open") return err("not_open", r.state === "outdated"
-    ? "This resource is marked outdated. Nothing more can be submitted to it."
-    : "This resource is not open for submissions.");
-  if (responsesFor(resourceId).filter((x) => x.memberId === memberId).length)
-    return err("already_submitted", "That member has already submitted this one.");
-  /* A file field is answered by its FILE, not by the text beside it — a required
-     upload with a filename typed into it and nothing attached is not answered. */
-  const missing = r.fields.filter((f) => f.required && !answered(f, values, files)).map((f) => f.label);
-  /* THE CAP IS ENFORCED, not merely printed. A limit shown on the form and not
-     checked on the way in is a suggestion, and the server has to check it too —
-     this one only stops an honest mistake reaching the store. */
-  const tooBig = r.fields.filter((f) => {
-    const up = files && files[f.fieldId];
-    return f.type === "file" && up && f.maxMb !== null && up.sizeKb > f.maxMb * 1024;
-  })[0];
-  if (tooBig) {
-    const up = files![tooBig.fieldId];
-    return err("too_big", "“" + tooBig.label + "” takes files up to "
-      + tooBig.maxMb + " MB. That one is " + fmtSize(up.sizeKb) + ".");
+  if (memberId !== meId()) return err("not_own", "Only your own answers can be submitted.");
+  const ids = Object.keys(files);
+  for (const id of ids) {
+    const f = r.fields.filter((x) => x.fieldId === id)[0];
+    if (!blobs[id]) return err("no_file", "Pick " + files[id].fileName + " again — it is uploaded when you submit.");
+    /* Before the upload, not after it: a 40 MB file should not travel to be refused. */
+    if (f && f.maxMb !== null && files[id].sizeKb > f.maxMb * 1024)
+      return err("too_big", "“" + f.label + "” takes files up to " + f.maxMb + " MB.");
   }
-  if (missing.length)
-    return err("incomplete", missing.length === 1
-      ? "“" + missing[0] + "” is required."
-      : missing.length + " required fields are empty, starting with “" + missing[0] + "”.");
-  const x: ResourceResponse = {
-    responseId: nextId("RSP"),
-    resourceId,
-    version: r.version,
-    memberId,
-    submittedAt: TODAY + "T00:00:00+05:30",
-    /* The label is copied, not referenced. See the header. And a file answer
-       keeps BOTH: `value` is the name so every reader can print it without
-       knowing the type, `file` is the thing itself. */
-    answers: r.fields.map((f) => {
-      const file = f.type === "file" && files ? files[f.fieldId] || null : null;
-      return {
-        fieldId: f.fieldId,
-        label: f.label,
-        value: file ? file.fileName : String(values[f.fieldId] || ""),
-        file,
-      };
-    }),
-  };
-  snap.responses = snap.responses.concat([x]);
-  touch();
-  return ok(x);
+  const sent: Record<string, FileAnswer> = {};
+  let at = "";
+  try {
+    for (const id of ids) { at = files[id].fileName; sent[id] = { ...files[id], url: await uploadAnswer(blobs[id]) }; }
+  } catch {
+    return err("upload_failed", at + " could not be uploaded, so nothing was submitted. Try again.");
+  }
+  return live(() => AdminOpsService.submitResourceResponse(serverId(resourceId), { values, files: sent }), (row) => {
+    const x = toResponse(row);
+    snap.responses = snap.responses.concat([x]);
+    return x;
+  });
 }
 
 /* ------------------------------------------------------------------ hooks -- */
@@ -642,8 +677,10 @@ function useVersion() {
   }, []);
 }
 
-export function useResources(): Resource[] { useVersion(); return snap.resources; }
-export function useResponses(): ResourceResponse[] { useVersion(); return snap.responses; }
+export function useResources(): Resource[] { useVersion(); void bootResources(); return snap.resources; }
+export function useResponses(): ResourceResponse[] { useVersion(); void bootResources(); return snap.responses; }
+/** How the forms stand for one member's page — own-only is "not in your access" on anybody else's. */
+export function useResourcesLoad(memberId?: string): LoadPart { useVersion(); void bootResources(); return scopedTo(part, memberId); }
 
 /* --------------------------------------------------------------- helpers -- */
 
@@ -696,7 +733,7 @@ export const departmentsNamed = (): string[] =>
 export const departmentsInUse = (): string[] =>
   Array.from(new Set(readMembers()
     .filter((m) => m.status === "active")
-    .map((m) => m.department)
+    .reduce((a: string[], m) => a.concat(m.roles), [])
     .filter(Boolean))).sort();
 
 /** Every file anybody has sent in, newest first. What the module holds, read as

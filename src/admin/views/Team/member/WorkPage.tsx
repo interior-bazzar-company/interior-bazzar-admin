@@ -111,18 +111,18 @@ function TagManager({ m }: { m: Member }) {
                   options={tones}
                   value={t.colourToken || "slate"}
                   ariaLabel={"Tone for " + t.label}
-                  onChange={(v) => act(setTagTone(t.tagId, v))}
+                  onChange={(v) => { void setTagTone(t.tagId, v).then(act); }}
                 />
               )}
             </td>
             <td className="acts">
               <span className="inline-flex items-center gap-2">
                 {t.archivedAt ? (
-                  <Button color="secondary" size="xs" ico="undo" onClick={() => act(restoreTag(t.tagId))}>Restore</Button>
+                  <Button color="secondary" size="xs" ico="undo" onClick={() => { void restoreTag(t.tagId).then(act); }}>Restore</Button>
                 ) : (
                   <>
                     <Button color="secondary" size="xs" onClick={() => shell.modal(<RenameTagModal t={t} />, "sm")}>Rename…</Button>
-                    <Button color="secondary" size="xs" ico="archive" onClick={() => act(archiveTag(t.tagId))}>Archive</Button>
+                    <Button color="secondary" size="xs" ico="archive" onClick={() => { void archiveTag(t.tagId).then(act); }}>Archive</Button>
                   </>
                 )}
               </span>

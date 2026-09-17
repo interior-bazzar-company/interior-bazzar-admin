@@ -92,7 +92,7 @@ export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, 
   ];
 
   return (
-    <Frame view="users" onView={onView} toast={toast}
+    <Frame view="users" onView={onView}
       counts={bandCounts(totals.data)}
       title="Users Management"
       /* THE SCOPE, UNFILTERED ON PURPOSE: how big the base is and how much of

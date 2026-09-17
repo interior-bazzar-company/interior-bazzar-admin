@@ -91,9 +91,9 @@ export default function Editor({ mode, templateId }: {
 
   const add = () => setClauses(clauses.concat([emptyClause()]));
 
-  const save = () => {
+  const save = async () => {
     const draft = { title, kind, purpose, clauses };
-    const r = existing ? updateTemplate(existing.templateId, draft) : createTemplate(draft);
+    const r = existing ? await updateTemplate(existing.templateId, draft) : await createTemplate(draft);
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
     shell.toast(existing ? "Changes saved." : "Template created as a draft.", "ok");
     go(ROUTE);

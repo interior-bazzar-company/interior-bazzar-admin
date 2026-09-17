@@ -2,10 +2,14 @@
    Users Management — the data module.
    -----------------------------------------------------------------------------
    THE ONLY FILE IN THIS MODULE THAT KNOWS WHERE ITS OWN RECORDS COME FROM.
-   Every view imports from here; no view imports JSON. When the API lands, the
-   four imports below become AdminOpsService calls and the write simulation
-   underneath comes out — the views, the CSS and the URL scheme do not move.
-   See src/proto/v-2.2.0.0/BACKEND-INTEGRATION.md.
+   Every view imports from here; no view imports JSON. THE RECORDS, THE VALUE
+   LISTS, THE ANALYTICS, THE AUDIT AND EVERY WRITE ARE THE SERVER'S now
+   (`/admin/platform-users/`, `/admin/users/vocabularies/`,
+   `/admin/users/analytics/`, `/admin/audit/`) — the views, the CSS and the URL
+   scheme did not move for any of it. One bundled file is left, and what is in
+   it is what no table stands behind: the deactivate reasons, the metric
+   definitions, the city suggestions, the category group headings and the
+   username rules.
 
    THIS MODULE IS THE REGISTER OF WHO EXISTS
    -----------------------------------------
@@ -20,19 +24,18 @@
    now has exactly two answers: active, or deactivated. There is no stored
    classification column in users.json and there must never be one.
 
-   `NOW` is the SERVER's date (v2/total-users `asOf`), planted when that read
-   lands; until then it is the browser clock, which is the same day in practice.
+   `NOW` is the SERVER's date (v2/total-users `asOf`, and the analytics read's),
+   planted when that read lands; until then it is the browser clock, which is
+   the same day in practice.
    Every age and every registration window is computed against it, and this
    stays the only place that decides what "now" means.
    ============================================================================= */
 import { useEffect, useState, useSyncExternalStore } from "react";
 import vocabDoc from "../../../content/users/vocabularies.json";
-import analyticsDoc from "../../../content/users/analytics.json";
-import auditDoc from "../../../content/users/audit.json";
 import AdminOpsService, { call } from "../../../api/modules/adminOps";
 import type {
-  AuditEntry, OpenDecision, PlatformUserItem, PlatformUserRecord, PlatformUsersPage, UserCommercial,
-  UsersVocabularies, ValueLabel,
+  AuditEntry, OpenDecision, PlatformUserItem, PlatformUserRecord, PlatformUsersPage, UserCommercial, VocabItem,
+  UsersAnalytics, UsersVocabularies, ValueLabel,
 } from "../../../api/modules/adminOps";
 import { AdminService } from "../../../api/modules/admin";
 import type { UserTotals } from "../../../api/modules/admin";
@@ -40,7 +43,12 @@ import { errMessage } from "../../../api/apiService";
 import { getSession } from "../../auth/session";
 import config from "../../../config";
 
-/* ============================================================== types === */
+/* ============================================================== types ===
+   THE WRITES ARE ENDPOINTS NOW (2026-09-16), not a simulation. Each one returns
+   a PROMISE of the module's Result — "" when it landed, the server's own
+   sentence when it refused — and folds the record the server answers with back
+   into the snapshot, so what the screen shows after a save is what is stored
+   rather than what the browser hoped it stored. */
 
 /** What a row IS, derived — never stored. Two answers, and the second one is a
  *  fact about the ACCOUNT rather than about a commercial relationship. Whether
@@ -147,11 +155,58 @@ export interface UserRow {
 export type Params = Record<string, string | undefined>;
 
 /* ========================================================= vocabulary === */
-/* Read once and re-exported as plain constants: these are STATIC COPY, not
-   placeholder records, so nothing here becomes backend work. Only the labels
-   and cautions live in the file — the behaviour lives in this module. */
+/* What is left in the bundled file has no backend list behind it: the
+   deactivate reasons, the metric definitions, the city suggestions per state,
+   the two category group headings and the username rules. Everything else below
+   is planted from the server — including the event types, which are now
+   DERIVED from the audit rows themselves (see `rememberType`). */
 
-export const VOCAB = vocabDoc;
+/** One action as the timeline draws it: the sentence the server derived for it,
+ *  and a tone.
+ *
+ *  AN AUDIT ROW CARRIES NO COLOUR and there is no column to put one in. What it
+ *  does carry is a `verb` — the server's own small set — and `destructive`, the
+ *  same rule the trail's severity filter and its facet count use. So the tone is
+ *  read off those two rather than stored: an action added to any module renders
+ *  with the right colour the day it is written, with no list to come back and
+ *  edit and no row to seed. */
+export interface EventType { key: string; label: string; tone: string }
+const EVENT_TYPES: EventType[] = [];
+/** The reasons offered when an account is switched off. ROWS NOW
+ *  (`GET /admin/vocab/user-deactivate-reasons/`, PanelVocab scope
+ *  `user_deactivate_reason`) — the bundled four are gone. Mutated in place
+ *  rather than reassigned, because `VOCAB` below holds the array itself and the
+ *  dialog reads it through that. What gets STORED is still the sentence
+ *  somebody picked, on the account and on the audit line; the list only offers
+ *  it. Empty until the read lands, and the dialog's free-text box is the
+ *  fallback — a reason was always typeable. */
+const DEACTIVATE_REASONS: string[] = [];
+const TONE_BY_VERB: Record<string, string> = { removed: "stop", refused: "warn", approved: "ok" };
+
+export function auditTone(e: AuditEntry): string {
+  /* The registration line is not an admin action — nobody in this console did
+     it — so it is drawn as a system fact, the way the bundled list drew it. */
+  if (e.synthetic) return "sys";
+  if (e.destructive) return "stop";
+  return TONE_BY_VERB[e.verb] || "";
+}
+
+/** Remembers how to draw an action the first time an entry carrying it lands.
+ *  The screens look a type up by key, which is what the bundled list of labels
+ *  and tones used to answer. */
+function rememberType(key: string, e: AuditEntry): void {
+  if (EVENT_TYPES.some((t) => t.key === key)) return;
+  EVENT_TYPES.push({ key, label: e.label || e.action || key, tone: auditTone(e) });
+}
+
+export const VOCAB = { ...vocabDoc, eventTypes: EVENT_TYPES, deactivateReasons: DEACTIVATE_REASONS };
+
+/** Plants the deactivate reasons. Its own function so a check can state "the
+ *  list arrived" without standing up a server. */
+export function applyDeactivateReasons(items: { label: string }[]): void {
+  DEACTIVATE_REASONS.length = 0;
+  (items || []).forEach((r) => DEACTIVATE_REASONS.push(r.label));
+}
 
 /* ------------------------------------------------------- the value lists ---
    SIX LISTS COME FROM THE SERVER, not from the file above: the account states
@@ -163,7 +218,8 @@ export const VOCAB = vocabDoc;
    the ES live bindings every consumer already imports — the same move
    BusinessEnquiries made. THERE IS NO FALLBACK TO THE JSON: empty means the
    read has not landed or has failed, and the filter bar says which. A panel
-   that quietly shows bundled options cannot tell you whether it is wired up. */
+   that quietly shows bundled options cannot tell you whether it is wired up.
+   The profile facets' option lists follow the same rule (`applyFacetOptions`). */
 export interface VocabOption { key: string; label: string; tone?: string; meaning?: string }
 export interface TagOption { slug: string; label: string; tone: string; help: string }
 
@@ -234,21 +290,10 @@ export interface FacetOption { key: string; label: string; hint?: string; group?
 export interface FacetGroup { key: string; label: string; note?: string }
 
 /* The vocabularies a field may point at, by the name it uses in the schema.
-   Looked up rather than imported directly so `"vocab": "segments"` in the JSON
-   is the whole wiring. */
-const VOCABS: Record<string, FacetOption[]> = {
-  businessTypes: vocabDoc.businessTypes as FacetOption[],
-  segments: vocabDoc.segments as FacetOption[],
-  categories: vocabDoc.categories as FacetOption[],
-  /* Strings in the file, options here. Keywords are free text: the "key" IS
-     the label, and the list is a suggestion rather than a constraint. */
-  keywordSuggestions: (vocabDoc.keywordSuggestions as string[])
-    .map((k) => ({ key: k, label: k })),
-  states: vocabDoc.states as FacetOption[],
-  cities: vocabDoc.cities as FacetOption[],
-  dealsIn: vocabDoc.dealsIn as FacetOption[],
-  positioning: vocabDoc.positioning as FacetOption[],
-};
+   Looked up rather than imported directly so `"vocab": "segments"` in the
+   schema is the whole wiring. FROM THE SERVER, planted by `applyFacetOptions`:
+   empty until the reads land, with no fallback to a bundled list. */
+const VOCABS: Record<string, FacetOption[]> = {};
 
 /** Whole-state coverage, as one entry in the row's city list. A SENTINEL
  *  VALUE rather than a flag on the row, so the picker, the chips, the record
@@ -504,21 +549,24 @@ export function validateFacets(patch: Partial<UserProfile>): string {
 }
 export let TAGS: TagOption[] = [];
 export let CITIES: VocabOption[] = [];
-export const BUSINESS_TYPES = vocabDoc.businessTypes;
-export const SEGMENTS = vocabDoc.segments;
-export const CATEGORIES = vocabDoc.categories;
-export const CATEGORY_GROUPS = vocabDoc.categoryGroups;
-export const KEYWORD_SUGGESTIONS = vocabDoc.keywordSuggestions;
-export const STATE_CITIES = vocabDoc.stateCities as Record<string, string[]>;
-export const STATES = vocabDoc.states as { key: string; label: string }[];
-export const USERNAME_RULES = vocabDoc.usernameRules;
-export const RESERVED_USERNAMES = vocabDoc.reservedUsernames as string[];
+/* City suggestions per state, derived server-side from the (state, city) pairs
+   actually saved (users/vocabularies/ `stateCities`). Keyed by the state's NAME,
+   which is what a coverage row stores. Filled IN PLACE by applyUsersVocab and
+   empty until then: an unknown state has no suggestions, typing still works. */
+export const STATE_CITIES: Record<string, string[]> = {};
+/** The states a coverage row may name, from seller-options (planted with the
+ *  facet lists below). */
+export let STATES: FacetOption[] = [];
+/** `min`/`max` from `users/vocabularies/` (the profile PATCH enforces the same
+ *  numbers); `help` is the panel's own sentence. Unbounded until the read lands,
+ *  so the form refuses nothing the server has not said — the server refuses anyway. */
+export const USERNAME_RULES = { ...vocabDoc.usernameRules, min: 0, max: Infinity };
+/** From `users/vocabularies/` `reservedUsernames`; empty until it answers. */
+export const RESERVED_USERNAMES: string[] = [];
 export let REGISTERED_RANGES: VocabOption[] = [];
 export let SORT_OPTIONS: VocabOption[] = [];
 export const METRICS = vocabDoc.metricDefinitions;
 export let OPEN_DECISIONS: OpenDecision[] = [];
-export const PROFILE_SCHEMA_VERSION = vocabDoc.profileSchemaVersion;
-export const ANALYTICS = analyticsDoc;
 
 /* A SYNTHETIC ROW RATHER THAN `CLASSIFICATIONS[0]`: the list is empty until the
    read lands, and a pill whose label is `undefined` is worse than one that
@@ -544,13 +592,10 @@ export function applyServerDate(asOf: string): void {
 }
 export const DAY = 86400000;
 
-/* ONE CLOCK. Derivation runs on `NOW` — the payload's `asOf` — and writes
-   used to stamp the browser clock, so a note added today printed "in 4 days"
-   on a timeline that lives in August. Writes now stamp NOW plus the time
-   elapsed since load: same clock, still strictly ordered. When the API lands,
-   both come from the server. */
-const LOADED_AT = Date.now();
-export const stamp = () => new Date(NOW + (Date.now() - LOADED_AT)).toISOString();
+/* ONE CLOCK, and it is the SERVER's: `NOW` is planted from the `asOf` both the
+   totals read and the analytics read carry. Nothing in this module stamps a
+   moment of its own any more — every write is an endpoint, so every stored
+   stamp on a record or an audit line is the server's own. */
 
 export const daysBetween = (a: number, b: number) => Math.round((b - a) / DAY);
 export const ts = (iso: string | null | undefined) => (iso ? new Date(iso).getTime() : NaN);
@@ -561,16 +606,14 @@ export const ts = (iso: string | null | undefined) => (iso ? new Date(iso).getTi
    subscribes to. Nothing is persisted: a reload restores the seed, and the
    proto banner on every screen says so. */
 
-type Snapshot = { users: PlatformUser[]; audit: AuditEvent[]; version: number };
+type Snapshot = { users: PlatformUser[]; version: number };
 
 /* THE ROWS START EMPTY. They are planted by `applyUsersPage` when the server
    answers -- there is no bundled fallback, so an empty directory means the read
-   has not landed, failed, or found nobody, and the screen says which. */
-const seed = (): Snapshot => ({
-  users: [],
-  audit: JSON.parse(JSON.stringify(auditDoc.events)) as AuditEvent[],
-  version: 0,
-});
+   has not landed, failed, or found nobody, and the screen says which. THE AUDIT
+   IS NOT IN HERE EITHER: it is read live from `GET /admin/audit/`, per record
+   and across the module, so nothing on a timeline is a fixture. */
+const seed = (): Snapshot => ({ users: [], version: 0 });
 
 let snap: Snapshot = seed();
 const listeners = new Set<() => void>();
@@ -579,26 +622,30 @@ const emit = () => { snap = { ...snap, version: snap.version + 1 }; listeners.fo
 const subscribe = (fn: () => void) => { listeners.add(fn); return () => { listeners.delete(fn); }; };
 const getVersion = () => snap.version;
 
-/** Throws away every in-tab edit: back to the page exactly as the server sent it. */
+/** Back to the page exactly as the server sent it. Nothing is thrown away by
+ *  doing this any more — the writes are the server's — so it is a re-read of
+ *  what already arrived rather than an undo. */
 export function resetStore() { snap = { ...seed(), users: clone(heldUsers) }; emit(); }
 
 /* Plain readers over the same snapshot the hooks subscribe to. They exist so
-   the check suite can assert the write simulation without pretending to be
-   React — scripts/check-users-derivation.cjs calls exactly these, so what it
-   asserts is what the screens see and not a parallel reimplementation of it. */
+   the check suite can assert the derivation without pretending to be React —
+   scripts/check-users-derivation.cjs calls exactly these, so what it asserts is
+   what the screens see and not a parallel reimplementation of it. */
 export const readUsers = (): PlatformUser[] => snap.users;
-export const readAudit = (): AuditEvent[] => snap.audit;
 export const readUser = (id: string): PlatformUser | null =>
   snap.users.filter((u) => u.userId === id)[0] || null;
 
-/** Who the simulated write is attributed to. The session name, never a guess. */
+/** Who a write is attributed to ON SCREEN. The server attributes the stored row
+ *  to the authenticated admin; this is the session's own name, for the sentence
+ *  a dialog shows back. */
 export function actor(): { name: string; role: string } {
   const s = getSession();
   return { name: s?.user?.name || "You", role: s?.role || "Operations" };
 }
 
-let seq = 0;
-const nextId = (prefix: string) => prefix + "-" + (Date.now().toString(36) + (seq++).toString(36)).toUpperCase();
+/** The account's pk, read back out of `IB-U-<pk>`. Every write addresses the
+ *  server by it; 0 means the id is not one this module issued. */
+const pkOf = (userId: string): number => Number((/^IB-U-(\d+)$/.exec(userId) || [])[1] || 0);
 
 /* ========================================================= derivation === */
 
@@ -851,10 +898,57 @@ export function applyUsersVocab(v: UsersVocabularies): void {
   /* Cities arrive as the strings people actually typed; the controls want a
      key and a label, and for a city those are the same thing. */
   CITIES = (v.cities || []).map((c) => ({ key: c, label: c }));
+  Object.keys(STATE_CITIES).forEach((k) => { delete STATE_CITIES[k]; });
+  Object.assign(STATE_CITIES, v.stateCities || {});
   REGISTERED_RANGES = v.registeredRanges || [];
   SORT_OPTIONS = v.sortOptions || [];
   PROFILE_FIELDS = (v.profileFields || []) as unknown as ProfileField[];
   OPEN_DECISIONS = v.openDecisions || [];
+  if (v.usernameRules) Object.assign(USERNAME_RULES, { min: v.usernameRules.min, max: v.usernameRules.max });
+  RESERVED_USERNAMES.splice(0, RESERVED_USERNAMES.length, ...(v.reservedUsernames || []));
+}
+
+/** One option as the server sends it: seller-options rows, and taxonomy rows
+ *  (which also carry `isActive`). */
+export interface ServerOption { value: string; label: string; meta?: unknown; isActive?: boolean }
+
+/**
+ * Plants the profile facets' option lists. Each comes from the list the
+ * record's stored values are drawn from, so an option `key` IS a stored value:
+ *
+ *   businessTypes      <- seller-options businessTypes     (Business.sellerType)
+ *   dealsIn            <- seller-options businessModels    (Business.businessModel)
+ *   positioning        <- seller-options serviceSegments   (Business.serviceSegments)
+ *   keywordSuggestions <- seller-options serviceKeywords   (the seller wizard's suggestions)
+ *   states             <- seller-options states            (State.name)
+ *   segments           <- admin taxonomy segments          (Business.businessSegment)
+ *   categories         <- admin taxonomy categories + seller-options productCategories
+ *                         and serviceCategories            (all three are what the record merges)
+ *
+ * `taxonomy` is null when that read was refused -- it is its own permission.
+ * Its own function so a check can state "the lists arrived" without a server.
+ */
+export function applyFacetOptions(so: Record<string, ServerOption[]>, taxonomy: Record<string, ServerOption[]> | null): void {
+  const opts = (list: ServerOption[] | undefined, group?: string): FacetOption[] =>
+    (list || []).filter((o) => o.isActive !== false).map((o) => {
+      const hint = (o.meta as { desc?: string } | undefined)?.desc;
+      return { key: o.value, label: o.label, ...(hint ? { hint } : {}), ...(group ? { group } : {}) };
+    });
+  VOCABS.businessTypes = opts(so.businessTypes);
+  /* The record expands `both` into products + services, so `both` is never a stored value. */
+  VOCABS.dealsIn = opts((so.businessModels || []).filter((o) => o.value !== "both"));
+  VOCABS.positioning = opts(so.serviceSegments);
+  VOCABS.keywordSuggestions = opts(so.serviceKeywords);
+  VOCABS.states = STATES = opts(so.states);
+  /* ponytail: taxonomy/ caps segments at 300, so a stored segment past the cap is
+     not suggested (4 on the local db). Segments is an open field, so it still
+     saves and labels; page the taxonomy read if suggestions must be complete. */
+  VOCABS.segments = opts(taxonomy?.segments);
+  /* The server has no category grouping, so the bundled two headings carry it:
+     the engine taxonomy and the product families are what they work in, the
+     service categories (Residential, Commercial, ...) what kind of space. */
+  VOCABS.categories = opts(taxonomy?.categories, "industry")
+    .concat(opts(so.productCategories, "industry"), opts(so.serviceCategories, "sector"));
 }
 
 export async function bootUsersVocab(force = false): Promise<void> {
@@ -862,7 +956,21 @@ export async function bootUsersVocab(force = false): Promise<void> {
   vocabStarted = true;
   vocab = { ready: false, error: null };
   try {
-    applyUsersVocab(await call<UsersVocabularies>(AdminOpsService.usersVocabularies()));
+    const [v, so, taxonomy, reasons] = await Promise.all([
+      call<UsersVocabularies>(AdminOpsService.usersVocabularies()),
+      /* Neither option read takes the directory's filters down with it: a failed
+         seller-options read leaves the form with nothing to pick from, and a
+         role without taxonomy access gets no segment or engine-category suggestions. */
+      call(AdminOpsService.sellerOptions()).catch(() => ({})),
+      call<Record<string, ServerOption[]>>(AdminOpsService.taxonomy()).catch(() => null),
+      /* Nor does this one: the deactivate dialog's chips are a shortcut past
+         its text box, and the box is what actually carries the reason. */
+      call<{ items: VocabItem[] }>(AdminOpsService.vocab("user-deactivate-reasons"))
+        .catch(() => ({ items: [] })),
+    ]);
+    applyUsersVocab(v);
+    applyFacetOptions(so, taxonomy);
+    applyDeactivateReasons(reasons.items);
     vocab = { ready: true, error: null };
   } catch (e) {
     vocab = { ready: false, error: errMessage(e) };
@@ -914,8 +1022,23 @@ function queryOf(p: Params): string {
 
 /** A list row, or a record, which carries the identity facts on top. */
 type ServerUserItem = PlatformUserItem & Partial<Pick<PlatformUserRecord,
-  "deactivatedReason" | "deactivatedAt" | "isVerified" | "authUserId" | "registrationSource" | "commercial">>
+  "deactivatedReason" | "deactivatedAt" | "isVerified" | "authUserId" | "registrationSource"
+  | "commercial" | "notes">>
   & { profile: { updatedAt?: string | null } };
+
+/** PUBLISHED once the go-live checklist is met, INCOMPLETE while it is not,
+ *  and "" when there is nothing to grade at all (a buyer holds no profile).
+ *
+ *  DERIVED, NEVER STORED, and from the one score the rest of this module
+ *  already reads: the server's persisted completeness. A stored status column
+ *  beside a computed score is two answers to one question, and the seed already
+ *  carries one row where the two disagree. There is deliberately no third
+ *  answer: "hidden" is a visibility decision and no fact on the record says one
+ *  was ever taken. */
+function profileStatusOf(completeness: number | null | undefined): string {
+  if (completeness === null || completeness === undefined) return "";
+  return completeness >= 100 ? "published" : "incomplete";
+}
 
 /** A server row in the directory's own shape. Everything the list does not send
  *  is EMPTY -- no invented values -- and fills in as the record's divs move. */
@@ -933,13 +1056,33 @@ function fromServer(r: ServerUserItem): PlatformUser {
     identity: { name: r.identity.name, email: r.identity.email, emailVerified: !!r.isVerified,
                 phone: r.identity.phone, phoneVerified: !!r.isVerified },
     profile: {
-      profileId: "", schemaVersion: "", profileStatus: "",
+      /* THE ACCOUNT'S OWN UNIQUE ID (CustomUser.unique_id), not a second id
+         minted for the profile: one account holds one business profile, so a
+         separate key would be a new thing to keep in step for no new fact. Only
+         the record read carries it — a directory row has no identity section to
+         print it in, so it is empty there rather than guessed. */
+      profileId: r.authUserId ?? "",
+      /* NOT DERIVABLE. There is no version on the schema — UserProfileField has
+         no such column and UM-OD-09 ("profile v1 is the field set on these
+         screens") is the decision that would put one there. A fingerprint of
+         the rows would be a number nobody agreed to, so this stays empty and
+         says so. */
+      schemaVersion: "",
+      profileStatus: profileStatusOf(r.completeness),
       username: r.profile.username, about: null, businessName: null, businessType: null,
       dealsIn: [], segments: [], categories: [], searchKeywords: [],
       targetAreas: r.profile.targetAreas, positioning: [], updatedBy: null, updatedAt: r.profile.updatedAt ?? null,
     },
-    tags: r.tags.map((t) => ({ slug: t.slug, assignedBy: "", assignedAt: "" })),
-    notes: [],
+    /* WHO TAGGED SOMEBODY IS PART OF THE RECORD -- the assignment row carries
+       it and the record's Tags card prints it, so it travels with the chip. */
+    tags: r.tags.map((t) => ({ slug: t.slug, assignedBy: t.assignedBy, assignedAt: t.assignedAt || "" })),
+    /* THE RECORD READ IS THE LIST. A directory row carries no notes, so it
+       reads as none until the record lands — which is where the tab that shows
+       them lives anyway. */
+    notes: (r.notes || []).map((n) => ({
+      noteId: n.noteId, author: n.author, authorRole: n.authorRole,
+      at: n.at || "", text: n.text,
+    })),
     commercial: r.commercial ?? { salesOwner: null, dealRefs: [], invoices: [] },
     completeness: r.completeness,
     missingFields: r.missingFields || [],
@@ -953,30 +1096,46 @@ export function applyUsersPage(users: PlatformUser[]): void {
   snap = { ...snap, users: clone(users) };
 }
 
+/** Reads one page and plants it. Its own function because a WRITE re-reads the
+ *  same query afterwards: the row on the directory carries the account status,
+ *  the tags and the go-live score, so a save on the record moves the list too. */
+function loadPage(key: string, quiet = false): Promise<void> {
+  pageKey = key;
+  if (!quiet) {
+    pageState = { ...pageState, loading: true, error: null };
+    emit();
+  }
+  return call<PlatformUsersPage>(AdminOpsService.platformUsers(key))
+    .then((r) => {
+      if (pageKey !== key) return;   // a newer query has taken over
+      applyUsersPage(r.users.map(fromServer));
+      pageState = {
+        loading: false, error: null, total: r.total, pageNo: r.pageNo, pageSize: r.pageSize,
+        pages: Math.max(1, Math.ceil(r.total / Math.max(1, r.pageSize))),
+      };
+      emit();
+    })
+    .catch((e) => {
+      if (pageKey !== key) return;
+      pageState = { ...pageState, loading: false, error: errMessage(e) };
+      emit();
+    });
+}
+
+/** The background re-read after a write. QUIET: the record is already showing
+ *  what was stored, and flipping the directory into its loading state behind an
+ *  open dialog would blank the row somebody just saved. */
+function reloadPage(): Promise<void> {
+  return pageKey === null ? Promise.resolve() : loadPage(pageKey, true);
+}
+
 /** Fetches the page the URL describes, once per distinct query. */
 export function useUsersPage(p: Params): UsersPageState {
   useVersion();
   const key = queryOf(p);
   useEffect(() => {
     if (key === pageKey) return;
-    pageKey = key;
-    pageState = { ...pageState, loading: true, error: null };
-    emit();
-    call<PlatformUsersPage>(AdminOpsService.platformUsers(key))
-      .then((r) => {
-        if (pageKey !== key) return;   // a newer query has taken over
-        applyUsersPage(r.users.map(fromServer));
-        pageState = {
-          loading: false, error: null, total: r.total, pageNo: r.pageNo, pageSize: r.pageSize,
-          pages: Math.max(1, Math.ceil(r.total / Math.max(1, r.pageSize))),
-        };
-        emit();
-      })
-      .catch((e) => {
-        if (pageKey !== key) return;
-        pageState = { ...pageState, loading: false, error: errMessage(e) };
-        emit();
-      });
+    void loadPage(key);
   }, [key]);
   return pageState;
 }
@@ -1007,7 +1166,6 @@ export function applyUserRecord(r: PlatformUserRecord): void {
   const p = r.profile;
   const merge = (u: PlatformUser): PlatformUser => u.userId !== r.userId ? u : {
     ...fromServer(r),
-    notes: u.notes, tags: u.tags,
     accountUsername: r.accountUsername,
     profile: {
       ...fromServer(r).profile,
@@ -1079,17 +1237,22 @@ export function useAllRows(): UserRow[] {
  *  added to any module renders as a sentence here the day it is written,
  *  without a vocabulary edit. */
 const auditType = (e: AuditEntry): string =>
-  e.synthetic ? "REGISTERED" : (e.label || e.action);
+  e.synthetic ? "REGISTERED" : (e.action || e.label);
 
 /** Server entry -> the shape this module's screens already read. Keys and
  *  types are unchanged; only where they come from has moved. */
 function toEvent(e: AuditEntry, userId: string): AuditEvent {
+  const type = auditType(e);
+  /* HOW TO DRAW IT, remembered as it arrives: the server's own sentence for the
+     action and a tone derived from its verb. No stored map, and nothing to seed
+     -- see `rememberType`. */
+  rememberType(type, e);
   return {
     /* Stable and unique per row. The registration line has no id of its own
        because there is no stored row behind it. */
     eventId: e.id === null ? "AU-REG-" + userId : "AU-" + e.id,
     userId,
-    type: auditType(e),
+    type,
     actor: e.actorName || e.actor || "System",
     actorRole: e.role || "System",
     at: e.ts || "",
@@ -1125,50 +1288,83 @@ export function useTimeline(userId: string | null): AuditEvent[] {
   return rows;
 }
 
-/** The module-wide audit slice Analytics shows: the same stream across every
- *  user, most recent first. */
+/** The module-wide feed Analytics shows: the same trail, narrowed on the server
+ *  to rows ABOUT A PLATFORM ACCOUNT (`subject=platform`).
+ *
+ *  Narrowed there rather than here for the reason every filter in this module is
+ *  on the server: a page of twenty rows filtered in the browser answers "the
+ *  last twenty things that happened anywhere, of which these were about users",
+ *  which is a different question and a shorter list. A row about a staff member
+ *  belongs on the Team screens, and a row about a plan price is about no person
+ *  at all.
+ *
+ *  The names come from the audit row itself (`subjectName`), so somebody who is
+ *  not on the loaded page still reads as a person rather than as an id. */
 export function useRecentActivity(limit: number): (AuditEvent & { userName: string })[] {
-  useVersion();
-  const nameOf = (id: string) => {
-    const u = snap.users.filter((x) => x.userId === id)[0];
-    return u ? u.identity.name : id;
-  };
-  return snap.audit.map((e) => ({ ...e, userName: nameOf(e.userId) }))
-    .sort((a, b) => ts(b.at) - ts(a.at)).slice(0, limit);
+  const [rows, setRows] = useState<(AuditEvent & { userName: string })[]>([]);
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      try {
+        const got = await call(AdminOpsService.audit({ subject: "platform", pageSize: limit }));
+        if (!live) return;
+        setRows(got.entries.map((e) => {
+          const userId = "IB-U-" + e.subjectUser;
+          return { ...toEvent(e, userId), userName: e.subjectName || e.subjectUsername || userId };
+        }));
+      } catch {
+        /* A refused or failed read shows the feed's own empty state. Inventing
+           activity because a read did not land is the one outcome worth
+           avoiding on a screen that says what just happened. */
+        if (live) setRows([]);
+      }
+    })();
+    return () => { live = false; };
+  }, [limit]);
+  return rows;
 }
 
 /* ============================================================= writes ===
-   EVERY FUNCTION BELOW IS A SIMULATION and the screens say so. Each one is
-   named for the transaction it stands in for (UM-T07, UM-T12) and does the
-   same sequence in the same order, so the endpoint that replaces it has a
-   worked example rather than a guess. Nothing here writes money, nothing here
-   touches a staff role, and nothing here records what anybody bought. */
+   EVERY FUNCTION BELOW IS AN ENDPOINT (2026-09-16). Each one refuses locally
+   first — the same rules the form applies, so a mistake is answered without a
+   round trip — then sends ONLY WHAT MOVED, folds the record the server answers
+   with into the snapshot, and re-reads the page behind it.
+
+   THE SERVER IS THE LAST LINE, never this file. It re-checks every rule against
+   the profile schema rows and refuses the whole patch on one bad field, so what
+   is here is the same check said EARLIER, not instead. Nothing here writes
+   money, nothing here touches a staff role, and nothing here records what
+   anybody bought. */
 
 const findUser = (id: string) => snap.users.filter((u) => u.userId === id)[0] || null;
 
-function pushAudit(userId: string, type: string, note: string) {
-  const a = actor();
-  /* Typed explicitly rather than inferred from the literal: without the
-     annotation TS narrows `note` to `string` and then refuses to concat the
-     seeded rows, whose note is nullable. The annotation is the fix; widening
-     the seed's type to match the literal would have been the bug. */
-  const row: AuditEvent = {
-    eventId: nextId("AU"), userId, type,
-    actor: a.name, actorRole: a.role, at: stamp(), note,
-  };
-  snap.audit = [row].concat(snap.audit);
+/** Folds one server record in and tells the screens. The page behind it is
+ *  re-read in the background because the directory row carries the account
+ *  status, the tags and the go-live score, and a write can move all three. */
+function landed(record: PlatformUserRecord): void {
+  applyUserRecord(record);
+  emit();
+  /* AND AGAIN WHEN THE PAGE LANDS. A directory row carries none of the business
+     profile — no About, no facets — so the reload would otherwise overwrite the
+     open record with the thinner row and blank the fields somebody just saved,
+     until they navigated away and back. */
+  void reloadPage().then(() => { applyUserRecord(record); emit(); });
 }
 
-/** UM-T07 · Profile update. Validate → apply → recompute completeness → audit
- *  the CHANGED FIELD SET. A correction nobody can see is worse than none, so
- *  the diff goes into the audit note and the note text never does. */
-export function updateProfile(userId: string, patch: Partial<UserProfile>): string {
+/**
+ * UM-T07 · Profile update. `PATCH platform-users/<pk>/`.
+ *
+ * Validate → send the changed fields → fold the stored record back in. A
+ * correction nobody can see is worse than none, so the server writes an audit
+ * line carrying the before and the after of every field that moved.
+ */
+export async function updateProfile(userId: string, patch: Partial<UserProfile>): Promise<string> {
   const u = findUser(userId);
   if (!u) return "That user no longer exists.";
   /* ONLY EDITABLE SCHEMA FIELDS. `profileId`, `schemaVersion`,
-     `profileStatus` and the audit stamps are the store's to write, not a
-     caller's — a patch naming them is refused whole, the way the endpoint
-     422s it (UM-T07). */
+     `profileStatus` and the audit stamps are not fields of the record at all —
+     a patch naming one is refused whole, which is what the endpoint does with
+     it too (UM-T07). */
   const editable = PROFILE_FIELDS.filter((f) => f.editable).map((f) => f.key);
   const strayKeys = Object.keys(patch).filter((k) => editable.indexOf(k) < 0);
   if (strayKeys.length) {
@@ -1182,108 +1378,129 @@ export function updateProfile(userId: string, patch: Partial<UserProfile>): stri
     clean[k] = typeof v === "string" ? (v.trim() || null) : v;
   });
   patch = clean as Partial<UserProfile>;
-  /* BEFORE anything is touched. The form checks the same rules as you type,
-     but the form is not the last line — this function is what an import or a
-     bulk edit would call, and a facet that only the dialog validates is a
-     facet nothing validates. */
+  /* BEFORE anything is sent. The form checks the same rules as you type, but
+     the form is not the last line — this function is what an import or a bulk
+     edit would call, and a facet only the dialog validates is a facet the
+     browser never validates. */
   const invalid = validateFacets(patch);
   if (invalid) return invalid;
   /* UNIQUENESS IS NOT A FIELD RULE, so it is not in validateFacets: that
-     function answers "is this value well formed", which needs nothing but the
-     value, and this one needs the whole table. Checked here because the
-     username is a public address — two profiles at one URL is not a
-     validation nicety, it is one of them being unreachable. */
+     answers "is this value well formed", which needs nothing but the value.
+     This needs the whole table — and the loaded page is only part of it, which
+     is why the server checks it again and its answer is the one that counts. */
   if (patch.username && usernameTaken(String(patch.username), userId)) {
     return "That username belongs to another profile. Nothing has been saved.";
   }
-  const changed: string[] = [];
+  const changed: Record<string, unknown> = {};
   (Object.keys(patch) as (keyof UserProfile)[]).forEach((k) => {
     const before = JSON.stringify(u.profile[k] ?? null);
     const after = JSON.stringify(patch[k] ?? null);
-    if (before !== after) changed.push(String(k));
+    if (before !== after) changed[String(k)] = patch[k] ?? null;
   });
-  if (!changed.length) return "";
-  const a = actor();
-  u.profile = { ...u.profile, ...patch, updatedBy: a.name, updatedAt: stamp() };
-  const { pct } = completenessOf(u.profile);
-  /* A hidden profile stays hidden: an admin correcting a field on a
-     deactivated account must not republish it. */
-  if (String(u.profile.profileStatus) !== "hidden") {
-    u.profile.profileStatus = pct >= 100 ? "published" : "incomplete";
+  /* THE CHANGED FIELDS ONLY. The form hands over every field it renders, and
+     sending the untouched ones would ask the server to write fields nobody
+     edited — including Location, which is derived from the business address
+     and its shops and has nowhere to be written back to. That would refuse a
+     save somebody made to a different field entirely. */
+  if (!Object.keys(changed).length) return "";
+  try {
+    landed(await call(AdminOpsService.updatePlatformUserProfile(pkOf(userId), changed)));
+    return "";
+  } catch (e) {
+    return errMessage(e);
   }
-  const labels = changed.map((k) => {
-    const f = PROFILE_FIELDS.filter((x) => x.key === k)[0];
-    return f ? f.label : k;
-  });
-  pushAudit(userId, "PROFILE_UPDATED", "Admin edit: " + labels.join(", ") + ".");
-  snap.users = snap.users.slice();
-  emit();
-  return "";
 }
 
-/** UM-T12 · Internal note. Append-only; there is no edit and no delete, here
- *  or in the API this stands in for. A note somebody later softened is worth
- *  less than one nobody can change. */
-export function addNote(userId: string, text: string): string {
-  const u = findUser(userId);
-  if (!u) return "That user no longer exists.";
+/** UM-T12 · Internal note. `POST platform-users/<pk>/notes/`.
+ *
+ *  A note is a body of text, an author and a moment, and there is a model that
+ *  holds the three now (interior_admin Note, subjectType `platform_user`). The
+ *  author is the SERVER's — the signed-in admin — and is what decides later who
+ *  may change it; the audit line records that a note was written and by whom,
+ *  never what it says.
+ *
+ *  The record comes back carrying its notes, so the tab shows what was stored
+ *  rather than what this tab hoped it stored. */
+export async function addNote(userId: string, text: string): Promise<string> {
+  if (!findUser(userId)) return "That user no longer exists.";
   if (!text.trim()) return "A note needs some text.";
-  const a = actor();
-  u.notes = [{
-    noteId: nextId("NT"), author: a.name, authorRole: a.role,
-    at: stamp(), text: text.trim(),
-  }].concat(u.notes);
-  /* The FACT, never the text. This timeline is the one surface a
-     business-scoped read could plausibly reach one day (UM-BR-17). */
-  pushAudit(userId, "NOTE", "Internal note added. Text is deliberately not logged.");
-  snap.users = snap.users.slice();
-  emit();
-  return "";
+  try {
+    landed(await call(AdminOpsService.addPlatformUserNote(pkOf(userId), text.trim())));
+    return "";
+  } catch (e) {
+    return errMessage(e);
+  }
 }
 
-export function setTags(userId: string, slugs: string[]): string {
+/** The operational tags this account carries, as a SET: whatever the dialog
+ *  hands back is the answer, and add/remove is derived from what is already
+ *  there — on this side to skip a no-op call, and again on the server, which is
+ *  where the assignment rows are actually written. */
+export async function setTags(userId: string, slugs: string[]): Promise<string> {
   const u = findUser(userId);
   if (!u) return "That user no longer exists.";
-  const known = TAGS.map((t) => t.slug);
-  const stray = slugs.filter((x) => known.indexOf(x) < 0);
-  if (stray.length) return "Unknown tag: " + stray.join(", ") + ". Tags are a closed list.";
-  const a = actor();
   const before = u.tags.map((t) => t.slug);
   const added = slugs.filter((s) => before.indexOf(s) < 0);
   const removed = before.filter((s) => slugs.indexOf(s) < 0);
+  /* Checked on what is BEING ADDED. A tag retired after it was applied is still
+     on this account, and refusing the whole save because of one would leave the
+     dialog unable to remove anything else. */
+  const known = TAGS.map((t) => t.slug);
+  const stray = added.filter((x) => known.indexOf(x) < 0);
+  if (stray.length) return "Unknown tag: " + stray.join(", ") + ". Tags are a closed list.";
   if (!added.length && !removed.length) return "";
-  u.tags = slugs.map((s) => {
-    const kept = u.tags.filter((t) => t.slug === s)[0];
-    return kept || { slug: s, assignedBy: a.name, assignedAt: stamp() };
-  });
-  pushAudit(userId, "TAGGED", [
-    added.length ? "Added " + added.join(", ") : null,
-    removed.length ? "Removed " + removed.join(", ") : null,
-  ].filter(Boolean).join(". ") + ".");
-  snap.users = snap.users.slice();
-  emit();
-  return "";
+  try {
+    landed(await call(AdminOpsService.setPlatformUserTags(pkOf(userId), slugs)));
+    return "";
+  } catch (e) {
+    return errMessage(e);
+  }
 }
 
 /** Account status. Soft by construction: the profile, the commercial
- *  references and the audit trail all stay. Hard deletion is a governed
- *  privacy process and has no button. */
-export function setUserStatus(userId: string, status: "active" | "deactivated", reason: string): string {
+ *  references and the audit trail all stay, and the server revokes the
+ *  account's sessions so a live token cannot outlast the decision. Hard
+ *  deletion is a governed privacy process and has no button. */
+export async function setUserStatus(userId: string, status: "active" | "deactivated", reason: string): Promise<string> {
   const u = findUser(userId);
   if (!u) return "That user no longer exists.";
   if (u.userStatus === status) return "";
   if (status === "deactivated" && !reason.trim()) return "Deactivating an account needs a reason.";
-  const at = stamp();
-  u.userStatus = status;
-  u.deactivatedAt = status === "deactivated" ? at : null;
-  u.deactivatedReason = status === "deactivated" ? reason.trim() : null;
-  pushAudit(userId, status === "deactivated" ? "USER_DEACTIVATED" : "USER_REACTIVATED",
-    status === "deactivated"
-      ? "Reason: " + reason.trim() + ". Soft — profile, commercial links and audit are retained."
-      : "Account re-enabled. Nothing outside this module was changed by this action.");
-  snap.users = snap.users.slice();
-  emit();
-  return "";
+  try {
+    landed(await call(AdminOpsService.setPlatformUserStatus(pkOf(userId), status, reason.trim())));
+    return "";
+  } catch (e) {
+    return errMessage(e);
+  }
+}
+
+/* --------------------------------------------------------- the catalogue ---
+   The list everybody picks from, which is a different thing from the tags on
+   one account. Both writes re-read the vocabulary afterwards, because every
+   picker and every chip in this module is drawn from it. */
+
+export async function createTag(tag: { label: string; tone?: string; help?: string }): Promise<string> {
+  if (!tag.label.trim()) return "A tag needs a label.";
+  try {
+    await call(AdminOpsService.createUserTag({ ...tag, label: tag.label.trim() }));
+    await bootUsersVocab(true);
+    return "";
+  } catch (e) {
+    return errMessage(e);
+  }
+}
+
+/** Retire a tag, or bring it back. RETIRING KEEPS EVERY ASSIGNMENT: the
+ *  accounts carrying it still carry it, it just stops being offered — deleting
+ *  the row would rewrite who was ever tagged. */
+export async function setTagActive(slug: string, isActive: boolean): Promise<string> {
+  try {
+    await call(AdminOpsService.updateUserTag(slug, { isActive }));
+    await bootUsersVocab(true);
+    return "";
+  } catch (e) {
+    return errMessage(e);
+  }
 }
 
 /* ======================================================= the date range ===
@@ -1305,7 +1522,78 @@ export interface MonthRow {
   bySource: Record<string, number>;
 }
 
-export const MONTHS = ANALYTICS.months as unknown as MonthRow[];
+/* ===================================================== the series, live ===
+   `GET /admin/users/analytics/` — the monthly series counted from the accounts
+   themselves: registrations from each account's own creation stamp, the channel
+   from `registrationSource` ("" is NOT RECORDED and is shown as that, never
+   folded into a channel), and profile completion graded against the required
+   rows of the profile schema. Nothing on that page is stored anywhere and
+   nothing on it is estimated.
+
+   `let`, not `const`, so the assignment when the read lands is visible through
+   the ES live bindings every consumer already imports — the same move the value
+   lists above make. Empty until it lands, and the arithmetic below answers for
+   an empty series rather than throwing on it. */
+export let MONTHS: MonthRow[] = [];
+/** The channels the split is keyed by, as the server names them ("" = Not
+ *  recorded). Its own list rather than REGISTRATION_SOURCES because it also
+ *  carries the channels that only exist on old rows. */
+let ANALYTICS_SOURCES: VocabOption[] = [];
+/** The whole population, counted by the server NOW: not the page the directory
+ *  happens to have loaded, and not the range. Null until the read lands. */
+let ANALYTICS_BASE: Counts | null = null;
+
+/** The base counts for the tiles, or the loaded page's own counts while the
+ *  read is in flight. The server's answer is the honest one — the page is 20
+ *  rows of a population that is not. */
+export const baseCounts = (rows: UserRow[]): Counts => ANALYTICS_BASE || countsOf(rows);
+
+/** Plants a fetched payload. Its own function so a check can state "the
+ *  analytics arrived" without standing up a server. */
+export function applyUsersAnalytics(a: UsersAnalytics): void {
+  MONTHS = (a.months || []) as MonthRow[];
+  ANALYTICS_SOURCES = (a.sources || []).map((r) => ({ key: r.key, label: r.label }));
+  ANALYTICS_BASE = a.base || null;
+  if (a.asOf) applyServerDate(a.asOf);
+}
+
+/** The series grouped by year, which is how the month picker lays it out. Here
+ *  rather than memoised inside that control: the months are read from the
+ *  server and arrive after it has already rendered once, and grouping a dozen
+ *  rows is cheaper than the bug where the grid stays empty for good. */
+export function monthsByYear(): { year: string; months: MonthRow[] }[] {
+  const out: { year: string; months: MonthRow[] }[] = [];
+  MONTHS.forEach((m) => {
+    const y = m.month.slice(0, 4);
+    const row = out.filter((r) => r.year === y)[0];
+    if (row) row.months.push(m); else out.push({ year: y, months: [m] });
+  });
+  return out;
+}
+
+export interface AnalyticsState { ready: boolean; error: string | null }
+let analytics: AnalyticsState = { ready: false, error: null };
+let analyticsStarted = false;
+
+export async function bootUsersAnalytics(force = false): Promise<void> {
+  if (analyticsStarted && !force) return;
+  analyticsStarted = true;
+  analytics = { ready: false, error: null };
+  try {
+    applyUsersAnalytics(await call<UsersAnalytics>(AdminOpsService.usersAnalytics()));
+    analytics = { ready: true, error: null };
+  } catch (e) {
+    analytics = { ready: false, error: errMessage(e) };
+  }
+  emit();
+}
+
+/** Subscribes the analytics face to the read, and starts it on first mount. */
+export function useUsersAnalytics(): AnalyticsState {
+  useVersion();
+  useEffect(() => { void bootUsersAnalytics(); }, []);
+  return analytics;
+}
 
 export interface Rate { value: number | null; num: number; den: number }
 export interface RangeTotals {
@@ -1330,6 +1618,10 @@ const rate = (num: number, den: number): Rate => ({ value: den > 0 ? num / den :
 const sum = (rows: MonthRow[], f: (m: MonthRow) => number) => rows.reduce((a, m) => a + f(m), 0);
 
 export function clampRange(from: string, to: string): { from: string; to: string } {
+  /* NO SERIES, NO RANGE. Until the read lands there is no month to clamp to,
+     and answering with a month nobody has any figures for would draw a chart of
+     zeros that reads like a platform nobody signed up to. */
+  if (!MONTHS.length) return { from: "", to: "" };
   let a = idx(from) < 0 ? 0 : idx(from);
   let b = idx(to) < 0 ? MONTHS.length - 1 : idx(to);
   if (a > b) { const t = a; a = b; b = t; }
@@ -1341,6 +1633,14 @@ export function rangeTotals(fromMonth: string, toMonth: string): RangeTotals {
   const a = idx(from), b = idx(to);
   const rows = MONTHS.slice(a, b + 1);
   const n = rows.length;
+  if (!n) {
+    /* An empty series answers with empty totals and a rate of NULL — which
+       prints as "n/a", the one honest reading of a figure nobody has yet. */
+    return {
+      months: [], from, to, monthCount: 0, label: "", registrations: 0, profileCompleted: 0,
+      completion: rate(0, 0), bySource: [], prev: null,
+    };
+  }
   const prevRows = a - n >= 0 ? MONTHS.slice(a - n, a) : null;
   const last = rows[rows.length - 1];
 
@@ -1355,7 +1655,10 @@ export function rangeTotals(fromMonth: string, toMonth: string): RangeTotals {
     completion: rate(sum(rows, (m) => m.profileCompleted), sum(rows, (m) => m.registrations)),
     bySource: srcKeys.map((k) => ({
       key: k,
-      label: REGISTRATION_SOURCES.filter((s) => s.key === k)[0]?.label || k,
+      /* The payload's own channel names first: they cover the ones the value
+         list no longer offers, and "" (never recorded) is one of them. */
+      label: ANALYTICS_SOURCES.filter((s) => s.key === k)[0]?.label
+        || REGISTRATION_SOURCES.filter((s) => s.key === k)[0]?.label || k,
       registrations: sum(rows, (m) => m.bySource[k] || 0),
     })),
     prev: prevRows ? {
@@ -1374,6 +1677,7 @@ export const RANGE_PRESETS = [
 ];
 
 export function presetRange(months: number): { from: string; to: string } {
+  if (!MONTHS.length) return { from: "", to: "" };
   const b = MONTHS.length - 1;
   const a = Math.max(0, b - months + 1);
   return { from: MONTHS[a].month, to: MONTHS[b].month };
@@ -1383,6 +1687,9 @@ export function presetRange(months: number): { from: string; to: string } {
  *  Derived rather than stored, so a range arrived at by the calendar that
  *  happens to equal a preset lights that preset up. */
 export function presetOf(from: string, to: string): string {
+  /* With no series every preset resolves to the same empty range, so one of
+     them would light up as though it were the span on screen. */
+  if (!MONTHS.length) return "";
   const hit = RANGE_PRESETS.filter((p) => {
     const r = presetRange(p.months);
     return r.from === from && r.to === to;

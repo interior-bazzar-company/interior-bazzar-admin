@@ -35,6 +35,19 @@ const fs = require("fs");
 const S = require("../node_modules/.tmp/users-store.cjs");
 
 let failed = 0;
+/* THE WRITES ARE ENDPOINTS NOW (2026-09-16), so every assertion about one is a
+   promise. They are queued here and run at the end, in order, before the
+   summary — a section that awaited in place would print its result after the
+   summary had already gone out.
+
+   WHAT IS ASSERTED ABOUT THEM HERE IS THE REFUSALS: the rules the store applies
+   BEFORE it reaches the network, which are the ones an import or a bulk edit
+   would otherwise get past. The stored outcome of an accepted write is asserted
+   against the real server in the backend suite (interior_admin/tests/
+   test_users_writes.py), which is the only place it can honestly be checked. */
+const PENDING = [];
+const later = (fn) => { PENDING.push(fn); };
+
 function ok(label, actual, expected) {
   const a = JSON.stringify(actual);
   const e = JSON.stringify(expected);
@@ -49,30 +62,170 @@ function ok(label, actual, expected) {
 /* The hooks are not callable outside React, so the rows are built through the
    same toRow() the hooks build them with. That is the point: this asserts the
    derivation, not a reimplementation of it. */
-const usersDoc = require("../src/content/users/users.json");
+const usersDoc = require("./fixtures/users.cjs");
 const users = usersDoc.users;
 const vocab = require("../src/content/users/vocabularies.json");
 
-/* THE VALUE LISTS COME FROM THE SERVER NOW (GET /admin/users/vocabularies/), so
-   the module starts with them empty and a check that ran offline would assert
-   against nothing. This states what "the vocabulary arrived" means and plants
-   it through the real setter — the same move check:clock makes for Business
-   Enquiries — in the shape the controller serves: classifications carry their
-   sentence in `hint`, and cities are plain strings.
-
-   It is planted FROM the bundled file on purpose: this file's whole method is to
-   recompute the expected answer from src/content/users/*.json independently, and
-   a vocabulary typed out here by hand would be a second copy to keep in step. */
-S.applyUsersVocab({
-  classifications: vocab.classifications.map((c) => ({ key: c.key, label: c.label, tone: c.tone, hint: c.meaning })),
-  registrationSources: vocab.registrationSources,
-  tags: vocab.tags,
-  cities: vocab.cities.map((c) => c.key),
-  registeredRanges: vocab.registeredRanges,
-  sortOptions: vocab.sortOptions,
-  profileFields: vocab.profileFields,   // the server seeds its table from these rows verbatim
-  openDecisions: vocab.openDecisions,   // the server's constant is these rows verbatim
-});
+/* THE VALUE LISTS COME FROM THE SERVER (GET /admin/users/vocabularies/,
+   GET v1/engine/seller-options/ and GET /admin/taxonomy/), so the module starts
+   with them empty and a check that ran offline would assert against nothing.
+   These are those responses, captured from the local backend in the shape each
+   endpoint serves (taxonomy trimmed to a few rows, plus one hidden category),
+   planted through the real setters. `tags` and `cities` are the seed's own,
+   because the seed rows below carry them, and so is `stateCities`: the server
+   derives it from the saved (state, city) pairs, so it is the seed's coverage
+   ("All cities" dropped) plus the address cities under their state. */
+const USERS_VOCAB = {
+  classifications: [
+    {"key": "active", "label": "Active", "tone": "", "hint": "The account works: the identity exists and is not administratively disabled."},
+    {"key": "deactivated", "label": "Deactivated", "tone": "dead", "hint": "The ACCOUNT is administratively disabled. Soft: the profile, the commercial links and the audit trail are all retained."},
+  ],
+  registrationSources: [
+    {"key": "web", "label": "Website signup"},
+    {"key": "portal", "label": "Business portal"},
+    {"key": "funnel", "label": "Campaign funnel"},
+    {"key": "referral", "label": "Referral"},
+    {"key": "admin", "label": "Added by us"},
+  ],
+  tags: [
+    {"slug": "high-intent", "label": "High intent", "tone": "tag-violet", "help": "Told us on a call they want to buy. Internal only."},
+    {"slug": "onboarding", "label": "Onboarding", "tone": "tag-cyan", "help": "Being walked through profile setup."},
+    {"slug": "win-back", "label": "Win-back", "tone": "tag-amber", "help": "Former member worth calling again."},
+    {"slug": "payment-risk", "label": "Payment risk", "tone": "tag-red", "help": "Finance flagged a dispute or a reversal."},
+    {"slug": "vip", "label": "VIP", "tone": "tag-green", "help": "Handled by the founder personally."},
+    {"slug": "profile-chase", "label": "Profile chase", "tone": "tag-slate", "help": "Registered, never finished the profile."},
+  ],
+  /* The handle rules, as users/vocabularies/ serves them: the numbers the
+     profile PATCH enforces, and the reserved_username rows. */
+  usernameRules: { min: 3, max: 30 },
+  reservedUsernames: ["admin", "administrator", "api", "app", "auth", "about", "account", "blog", "business", "contact", "dashboard", "help", "home", "interiorbazzar", "login", "logout", "me", "new", "pricing", "plans", "privacy", "profile", "register", "root", "search", "settings", "signup", "support", "system", "terms", "test", "u", "user", "users", "www"],
+  cities: ["Bengaluru", "Mumbai", "Pune", "Delhi", "Hyderabad", "Chennai", "Jaipur", "Kochi"],
+  stateCities: {
+    "Delhi": ["Dwarka", "New Delhi", "Rohini", "Saket", "Uttam Nagar"],
+    "Haryana": ["Gurugram"],
+    "Karnataka": ["Bengaluru", "Indiranagar", "Koramangala", "Mangaluru", "Whitefield"],
+    "Kerala": ["Kochi"],
+    "Maharashtra": ["Andheri", "Bandra", "Baner", "Hinjewadi", "Mumbai", "Navi Mumbai", "Pune", "Thane"],
+    "Rajasthan": ["Jaipur"],
+    "Tamil Nadu": ["Chennai"],
+    "Telangana": ["Gachibowli", "Hyderabad"],
+    "Uttar Pradesh": ["Noida"],
+  },
+  registeredRanges: [
+    {"key": "today", "label": "Today"},
+    {"key": "7d", "label": "Last 7 days"},
+    {"key": "30d", "label": "Last 30 days"},
+    {"key": "90d", "label": "Last 90 days"},
+    {"key": "year", "label": "This year"},
+    {"key": "custom", "label": "Custom range"},
+  ],
+  sortOptions: [
+    {"key": "", "label": "Needs action first"},
+    {"key": "recent", "label": "Recently registered"},
+    {"key": "activity", "label": "Last activity"},
+    {"key": "name", "label": "Name A to Z"},
+  ],
+  profileFields: [
+    {"key": "businessName", "label": "Business name", "group": "business", "required": true, "editable": true, "public": true, "type": "text", "wide": true},
+    {"key": "username", "label": "Username", "group": "business", "required": true, "editable": true, "public": true, "type": "handle"},
+    {"key": "businessType", "label": "Business type", "group": "business", "required": true, "editable": true, "public": true, "type": "single", "vocab": "businessTypes", "chip": "tag-violet", "simple": true, "info": "What kind of business this is. It decides how the marketplace treats them, so it is one answer, not several.", "wide": true},
+    {"key": "dealsIn", "label": "Deals in", "group": "business", "required": true, "editable": true, "public": true, "type": "checks", "vocab": "dealsIn", "chip": "tag-pink", "wide": true},
+    {"key": "segments", "label": "Segments", "group": "business", "required": true, "editable": true, "public": true, "type": "multi", "vocab": "segments", "max": 6, "chip": "tag-green", "open": true, "maxLength": 40, "placeholder": "Search or type a segment"},
+    {"key": "categories", "label": "Categories", "group": "business", "required": false, "editable": true, "public": true, "type": "multi", "vocab": "categories", "groups": "categoryGroups", "max": 10, "chip": "tag-blue", "open": true, "maxLength": 40, "placeholder": "Search or type a category"},
+    {"key": "searchKeywords", "label": "Search keywords", "group": "business", "required": false, "editable": true, "public": true, "type": "tags", "vocab": "keywordSuggestions", "max": 12, "maxLength": 40, "chip": "tag-amber", "placeholder": "Type a keyword, press Enter"},
+    {"key": "targetAreas", "label": "Location", "group": "contact", "required": true, "editable": true, "public": true, "type": "areas", "maxRows": 5, "maxCities": 8, "maxLength": 40, "chip": "tag-teal"},
+    {"key": "positioning", "label": "Positioning", "group": "positioning", "required": false, "editable": true, "public": true, "type": "checks", "vocab": "positioning", "max": 2, "chip": "tag-orange", "wide": true, "info": "Select up to 2. This is how the business positions its own work — it keeps expectations aligned before a connection is made."},
+    {"key": "about", "label": "About", "group": "about", "required": false, "editable": true, "public": true, "type": "textarea"},
+  ],
+  openDecisions: [
+    {"id": "UM-OD-09", "title": "Profile schema", "position": "profile v1 is the field set on these screens. Which fields are public and which are admin-editable is unconfirmed.", "blocks": "Profile build"},
+    {"id": "UM-OD-10", "title": "Engagement taxonomy", "position": "No qualifying-event taxonomy exists, so DAU/WAU/MAU render as unavailable rather than as zero.", "blocks": "Engagement analytics"},
+  ],
+};
+const SELLER_OPTIONS = {
+  businessTypes: [
+    {"value": "Manufacturer", "label": "Manufacturer"},
+    {"value": "Dealer / Distributor", "label": "Dealer / Distributor"},
+    {"value": "Wholesaler", "label": "Wholesaler"},
+    {"value": "Retailer", "label": "Retailer"},
+    {"value": "Showroom", "label": "Showroom"},
+    {"value": "Producer", "label": "Producer"},
+    {"value": "Service provider", "label": "Service provider"},
+  ],
+  businessModels: [
+    {"value": "products", "label": "Products", "meta": {"desc": "Tiles, sanitary ware, lighting, hardware, fittings, etc.", "icon": "ti-box"}},
+    {"value": "services", "label": "Services", "meta": {"desc": "Design, installation, turnkey, consultation, 3D viz", "icon": "ti-tools"}},
+    {"value": "both", "label": "Products + Services", "meta": {"desc": "Showrooms with installation, modular kitchen incl. fitting", "icon": "ti-package"}},
+  ],
+  serviceSegments: [
+    {"value": "Luxury", "label": "Luxury"},
+    {"value": "Premium", "label": "Premium"},
+    {"value": "On Budget", "label": "On Budget"},
+    {"value": "Eco friendly", "label": "Eco friendly"},
+    {"value": "Custom", "label": "Custom"},
+  ],
+  serviceCategories: [
+    {"value": "Residential", "label": "Residential"},
+    {"value": "Commercial", "label": "Commercial"},
+    {"value": "Industrial", "label": "Industrial"},
+    {"value": "Hospitality", "label": "Hospitality"},
+    {"value": "Turnkey", "label": "Turnkey"},
+  ],
+  productCategories: [
+    {"value": "Sanitary Ware & Bathroom Fittings", "label": "Sanitary Ware & Bathroom Fittings", "meta": {"isSanitaryTrigger": true}},
+    {"value": "Tiles, Marble & Surface Materials", "label": "Tiles, Marble & Surface Materials"},
+    {"value": "Modular Kitchen & Furniture", "label": "Modular Kitchen & Furniture"},
+    {"value": "Lighting & Electrical", "label": "Lighting & Electrical"},
+    {"value": "Home Automation & Smart Solutions", "label": "Home Automation & Smart Solutions"},
+    {"value": "Doors, Windows & Hardware", "label": "Doors, Windows & Hardware"},
+    {"value": "Paints & Finishes", "label": "Paints & Finishes"},
+    {"value": "Home Decor & Furnishings", "label": "Home Decor & Furnishings"},
+  ],
+  serviceKeywords: [
+    {"value": "Interior Design Firms & Studios", "label": "Interior Design Firms & Studios"},
+    {"value": "Architects & Architectural Firms", "label": "Architects & Architectural Firms"},
+    {"value": "Turnkey Interior & Project Management", "label": "Turnkey Interior & Project Management"},
+    {"value": "Space Planning & Design Consultants", "label": "Space Planning & Design Consultants"},
+    {"value": "3D Visualization & Rendering", "label": "3D Visualization & Rendering"},
+    {"value": "Interior Contractors & Execution", "label": "Interior Contractors & Execution"},
+  ],
+  states: ["Andaman and Nicobar Islands", "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chandigarh", "Chhattisgarh", "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jammu and Kashmir", "Jharkhand", "Karnataka", "Kerala", "Ladakh", "Lakshadweep", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Puducherry", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal"].map((s) => ({ value: s, label: s })),
+};
+const TAXONOMY = {
+  categories: [
+    {"value": "modular_kitchens", "label": "Modular Kitchens", "isActive": true},
+    {"value": "interior_designers", "label": "Interior Designers", "isActive": true},
+    {"value": "wardrobes_storage", "label": "Wardrobes & Storage", "isActive": true},
+    {"value": "hidden_category", "label": "Hidden category", "isActive": false},
+  ],
+  segments: [
+    {"value": "lShapedModularKitchen", "label": "L-shaped modular kitchen", "isActive": true},
+    {"value": "uShapedModularKitchen", "label": "U-shaped modular kitchen", "isActive": true},
+    {"value": "modular_kitchen", "label": "Modular kitchen", "isActive": true},
+    {"value": "wardrobe_design", "label": "Wardrobe design", "isActive": true},
+    {"value": "turnkey_interiors", "label": "Turnkey interiors", "isActive": true},
+    {"value": "space_planning", "label": "Space planning", "isActive": true},
+    {"value": "office_interiors", "label": "Office interiors", "isActive": true},
+  ],
+};
+/* The deactivate reasons are rows now (GET /admin/vocab/user-deactivate-reasons/,
+   PanelVocab scope `user_deactivate_reason`, seeded by backend migration 0060),
+   so they are planted like every other server list rather than read out of the
+   bundled file. What is STORED is still the sentence somebody picked. */
+const DEACTIVATE_REASONS = [
+  {"key": "asked_to_close", "label": "Member asked to close the account"},
+  {"key": "duplicate", "label": "Duplicate account"},
+  {"key": "internal", "label": "Internal / demo account"},
+  {"key": "abuse", "label": "Abuse — permanent"},
+];
+/* BEFORE users/vocabularies/ ANSWERS the handle rules refuse nothing the server
+   has not said: no length, no reserved word. The server refuses on its own. */
+ok("an unread handle rule refuses nothing",
+  [S.USERNAME_RULES.min, S.USERNAME_RULES.max, S.RESERVED_USERNAMES.length, S.usernameError("ab"), S.usernameError("admin")],
+  [0, null, 0, "", ""]);
+S.applyUsersVocab(USERS_VOCAB);
+S.applyFacetOptions(SELLER_OPTIONS, TAXONOMY);
+S.applyDeactivateReasons(DEACTIVATE_REASONS);
 
 /* THE ROWS COME FROM THE SERVER NOW TOO (GET /admin/platform-users/), so the
    module starts with no users at all and a clock that is the browser's. This
@@ -88,7 +241,6 @@ users.forEach((u) => {
   u.commercial = { ...rest, invoices: (invoiceRefs || []).map((n, i) => ({ id: i + 1, number: n })) };
 });
 S.applyUsersPage(users);
-const auditDoc = require("../src/content/users/audit.json");
 const all = users.map((u) => S.toRow(u));
 const byId = {};
 all.forEach((r) => { byId[r.user.userId] = r; });
@@ -99,7 +251,7 @@ const clone = (o) => JSON.parse(JSON.stringify(o));
    comparisons below are two independent answers meeting, not one answer
    quoted twice. Hard-coding these numbers is how a suite starts failing every
    time somebody adds a user, which trains people to edit the test. */
-const REQUIRED = vocab.profileFields.filter((f) => f.required);
+const REQUIRED = USERS_VOCAB.profileFields.filter((f) => f.required);
 const isEmpty = (v) =>
   v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0);
 const gapsOf = (u) => REQUIRED.filter((f) => isEmpty(u.profile[f.key])).map((f) => f.label);
@@ -159,11 +311,9 @@ ok("no user record carries a stored classification column",
      active rather than rendering a pill with no label. */
   ok("an unrecognised status is not a third classification",
     S.classify({ ...probe, userStatus: "active_member" }), "active");
-  ok("a deactivated account keeps its profile, its notes and its history",
-    [!!byId["IB-U-0601"].user.profile,
-      byId["IB-U-0601"].user.notes.length > 0,
-      auditDoc.events.some((e) => e.userId === "IB-U-0601")],
-    [true, true, true]);
+  ok("a deactivated account keeps its profile and its notes",
+    [!!byId["IB-U-0601"].user.profile, byId["IB-U-0601"].user.notes.length > 0],
+    [true, true]);
 }
 
 /* THE COMMERCIAL RELATIONSHIP IS SOMEBODY ELSE'S. Not "not shown" — not
@@ -179,7 +329,7 @@ ok("...and no plan catalogue of its own",
   /* Present-tense check: these prove the export list is real, so the absences
      below are absences and not a typo in the test. */
   ok("the store still exports the readers it does have",
-    ["readUsers", "readUser", "readAudit", "toRow", "classify"].filter((k) => exp.indexOf(k) < 0), []);
+    ["readUsers", "readUser", "toRow", "classify"].filter((k) => exp.indexOf(k) < 0), []);
   /* Both halves: the pattern catches anything new that reads like a
      membership, and the roll-call catches the specific twelve that were here,
      several of which the pattern alone would miss (`historyOf`, `clashFor`,
@@ -192,7 +342,7 @@ ok("...and no plan catalogue of its own",
       "allowedActions", "assignMembership", "lifecycle", "plansInUse", "isSellable",
       "defaultCycleOf", "clashFor", "planCodeOf", "MEMBER_CLASSES", "fieldApplies"]
       .filter((k) => k in S), []);
-  const seedText = fs.readFileSync("src/content/users/users.json", "utf8");
+  const seedText = fs.readFileSync(require.resolve("./fixtures/users.cjs"), "utf8");
   ok("no user record carries a plan, a term or an entitlement",
     users.filter((u) => ["membership", "memberships", "activeMembershipId", "planId",
       "planCode", "planName", "entitlements", "termNo"]
@@ -454,195 +604,121 @@ ok("a required field holding only whitespace is not an answer",
   S.completenessOf({ ...byId["IB-U-0912"].user.profile, businessName: "" }).pct < 100, true);
 
 /* =============================================================================
-   THE WRITES. Every one of these is a simulation today and an endpoint later,
-   and the guarantees below are the ones the endpoint has to keep. They are
-   asserted here rather than described in a doc because a described guarantee
-   is one nobody notices breaking.
+   THE WRITES. Every one of them is an endpoint now (PATCH platform-users/<pk>/,
+   PUT .../tags/, POST .../status/), so what is asserted here is what the store
+   refuses BEFORE it reaches the network — the rules an import or a bulk edit
+   would otherwise get past, and the ones that make "nothing has been saved" a
+   true sentence. What a save actually stores is asserted against the real
+   server in interior_admin/tests/test_users_writes.py.
    ============================================================================= */
-console.log("\nthe profile write is the last line, not the form");
-S.resetStore();
-{
+later(async () => {
+  console.log("\nthe profile write refuses before it reaches the network");
+  S.resetStore();
   ok("a non-editable key is refused whole",
-    S.updateProfile("IB-U-0912", { profileId: "HACK" }).indexOf("Not editable") >= 0, true);
+    (await S.updateProfile("IB-U-0912", { profileId: "HACK" })).indexOf("Not editable") >= 0, true);
   ok("...and the refusal names the key so it can be fixed",
-    S.updateProfile("IB-U-0912", { profileId: "HACK" }).indexOf("profileId") >= 0, true);
+    (await S.updateProfile("IB-U-0912", { profileId: "HACK" })).indexOf("profileId") >= 0, true);
   ok("...and nothing changed", S.readUser("IB-U-0912").profile.profileId !== "HACK", true);
   ok("an unknown user is refused",
-    S.updateProfile("IB-U-NOPE", { about: "x" }).indexOf("no longer exists") >= 0, true);
-  const pctBefore = S.completenessOf(S.readUser("IB-U-0912").profile).pct;
-  ok("whitespace is not a business name", S.updateProfile("IB-U-0912", { businessName: "   " }), "");
-  ok("...it is stored as empty", S.readUser("IB-U-0912").profile.businessName, null);
-  ok("...and completeness dropped", S.completenessOf(S.readUser("IB-U-0912").profile).pct < pctBefore, true);
-  /* A profile that fell below the bar says so, so the directory's Incomplete
-     cell and the record's badge cannot disagree with the grade. */
-  ok("...and the stored profileStatus followed the grade down",
-    S.readUser("IB-U-0912").profile.profileStatus, "incomplete");
+    (await S.updateProfile("IB-U-NOPE", { about: "x" })).indexOf("no longer exists") >= 0, true);
   ok("a malformed area row is refused, not thrown on",
     S.validateFacets({ targetAreas: [{ state: "Karnataka" }] }).indexOf("at least one city") >= 0, true);
-  ok("an unknown tag is refused", S.setTags("IB-U-0912", ["vip", "made-up"]).indexOf("Unknown tag") >= 0, true);
-  ok("...and the tags did not move", S.readUser("IB-U-0912").tags.some((t) => t.slug === "made-up"), false);
-}
+  /* A PATCH THAT MOVES NOTHING IS NOT A REQUEST. It returns clean without
+     touching the network, which is also what keeps an audit line off somebody's
+     timeline saying an admin edited their profile when nobody did. */
+  ok("a patch that changes nothing is accepted without a call",
+    await S.updateProfile("IB-U-0912", { about: S.readUser("IB-U-0912").profile.about }), "");
+  ok("an unknown business type is refused at the store, not only in the dialog",
+    (await S.updateProfile("IB-U-0912", { businessType: "not_a_type" }))
+      .indexOf("not one of the allowed") >= 0, true);
+  /* PARTIAL WRITES DO NOT EXIST. One good field beside one bad one saves
+     neither — the endpoint refuses the whole patch (UM-T07) and so does this,
+     before it is even sent. */
+  ok("one bad field takes the whole patch down",
+    (await S.updateProfile("IB-U-0912", { about: "A perfectly good sentence.", businessType: "wizard" }))
+      !== "", true);
+  ok("...including the field that was fine",
+    S.readUser("IB-U-0912").profile.about !== "A perfectly good sentence.", true);
+  ok("the store refuses a username another profile holds",
+    (await S.updateProfile("IB-U-1041", { username: "meera-studio-interiors" }))
+      .indexOf("belongs to another profile") >= 0, true);
+  ok("...and nothing was saved on the way past it",
+    S.readUser("IB-U-1041").profile.username !== "meera-studio-interiors", true);
 
-console.log("\na save writes an audit row naming the fields, never the values");
-S.resetStore();
-{
-  const before = S.readAudit().length;
-  ok("a valid patch is accepted",
-    S.updateProfile("IB-U-0912", { about: "Rewritten by an admin on a call." }), "");
-  ok("...one audit row was appended", S.readAudit().length, before + 1);
-  const e = S.readAudit()[0];
-  ok("...typed as a profile update", e.type, "PROFILE_UPDATED");
-  ok("...against the right user", e.userId, "IB-U-0912");
-  ok("...naming the field that changed", e.note.indexOf("About") >= 0, true);
-  ok("...and not carrying the new value into the log",
-    e.note.indexOf("Rewritten by an admin") < 0, true);
-  ok("...attributed to the session rather than to a guess", e.actor, S.actor().name);
-  ok("a patch that changes nothing writes nothing",
-    [S.updateProfile("IB-U-0912", { about: "Rewritten by an admin on a call." }),
-      S.readAudit().length], ["", before + 1]);
-  /* A HIDDEN PROFILE STAYS HIDDEN. An admin correcting one field on a
-     deactivated account must not republish it to the storefront. */
-  ok("the deactivated demo profile is hidden to start with",
-    S.readUser("IB-U-0601").profile.profileStatus, "hidden");
-  ok("...and an edit does not republish it",
-    [S.updateProfile("IB-U-0601", { about: "A correction." }),
-      S.readUser("IB-U-0601").profile.profileStatus], ["", "hidden"]);
-  /* ...while an ordinary profile is promoted by the GRADE, which is what
-     keeps profileStatus and completeness from drifting apart. */
-  ok("...and the grade is what promotes an ordinary one",
-    [S.updateProfile("IB-U-1029", {
-      businessName: "Rao & Sons", username: "rao-and-sons", businessType: "contractor",
-      dealsIn: ["services"], segments: ["carpentry"],
-      targetAreas: [{ state: "Karnataka", cities: ["Bengaluru"] }],
-    }), S.readUser("IB-U-1029").profile.profileStatus,
-      S.completenessOf(S.readUser("IB-U-1029").profile).pct], ["", "published", 100]);
-  ok("...which moves the Incomplete count with it",
-    S.countsOf(S.readUsers().map(S.toRow)).incompleteProfiles, SEED.incomplete - 1);
-}
+  console.log("\na note is an endpoint now, and it refuses before it reaches one");
+  /* THERE IS A NOTES MODEL (interior_admin Note, subjectType `platform_user`).
+     What is asserted here is the refusals this side owns; the stored outcome —
+     the author, the audit line, and who may change one — is asserted against the
+     real server in interior_admin/tests/test_users_writes.py NoteTests. */
+  ok("an empty note is refused",
+    (await S.addNote("IB-U-0912", "   ")).indexOf("needs some text") >= 0, true);
+  ok("...and nothing is kept in the tab either",
+    S.readUser("IB-U-0912").notes.filter((n) => n.text.indexOf("profile chase") >= 0).length, 0);
+  ok("an unknown user is refused first",
+    (await S.addNote("IB-U-NOPE", "hello")).indexOf("no longer exists") >= 0, true);
 
-console.log("\nnotes are append-only, and the audit records the fact, not the text");
-S.resetStore();
-{
-  ok("an empty note is refused", S.addNote("IB-U-0912", "   ").indexOf("needs some text") >= 0, true);
-  const notes = S.readUser("IB-U-0912").notes.length;
-  ok("a real note is accepted", S.addNote("IB-U-0912", "Called about the profile chase."), "");
-  ok("...it is on the record", S.readUser("IB-U-0912").notes.length, notes + 1);
-  ok("...newest first", S.readUser("IB-U-0912").notes[0].text, "Called about the profile chase.");
-  ok("...attributed to the session, not to a guess",
-    S.readUser("IB-U-0912").notes[0].author, S.actor().name);
-  const e = S.readAudit()[0];
-  ok("...and the audit says a note exists", e.type, "NOTE");
-  ok("...without repeating what it said", e.note.indexOf("profile chase") < 0, true);
-  ok("an unknown user is refused",
-    S.addNote("IB-U-NOPE", "hello").indexOf("no longer exists") >= 0, true);
-}
-
-console.log("\ntags are a closed list, and a no-op change is not an event");
-S.resetStore();
-{
-  const before = S.readAudit().length;
+  console.log("\ntags are a closed list, and a no-op change is not a request");
+  S.resetStore();
   ok("setting the tags already held changes nothing",
-    [S.setTags("IB-U-0912", S.readUser("IB-U-0912").tags.map((t) => t.slug)),
-      S.readAudit().length], ["", before]);
-  ok("adding a known tag is accepted", S.setTags("IB-U-0912", ["vip", "onboarding"]), "");
-  ok("...and the audit names what moved", S.readAudit()[0].note.indexOf("onboarding") >= 0, true);
-  ok("...an existing tag keeps its original attribution",
-    S.readUser("IB-U-0912").tags.filter((t) => t.slug === "vip")[0].assignedBy, "V. Shakya");
-  ok("removing one is recorded too",
-    [S.setTags("IB-U-0912", ["vip"]), S.readAudit()[0].note.indexOf("Removed onboarding") >= 0],
-    ["", true]);
+    await S.setTags("IB-U-0912", S.readUser("IB-U-0912").tags.map((t) => t.slug)), "");
   ok("an unknown slug takes the whole call down",
-    S.setTags("IB-U-0912", ["vip", "not-a-tag"]).indexOf("closed list") >= 0, true);
+    (await S.setTags("IB-U-0912", S.readUser("IB-U-0912").tags.map((t) => t.slug).concat(["not-a-tag"])))
+      .indexOf("closed list") >= 0, true);
   ok("...leaving the tags exactly as they were",
-    S.readUser("IB-U-0912").tags.map((t) => t.slug), ["vip"]);
-}
+    S.readUser("IB-U-0912").tags.some((t) => t.slug === "not-a-tag"), false);
+  ok("an unknown user is refused", (await S.setTags("IB-U-NOPE", [])).indexOf("no longer exists") >= 0, true);
+  /* The CATALOGUE is a different thing from the tags on one account. */
+  ok("a tag with no label is refused", (await S.createTag({ label: "  " })).indexOf("needs a label") >= 0, true);
 
-console.log("\nan account status is an account status, and it stops at this module");
-S.resetStore();
-{
+  console.log("\nan account status needs a reason, and it stops at this module");
+  S.resetStore();
   ok("deactivating without a reason is refused",
-    S.setUserStatus("IB-U-0912", "deactivated", "  ").indexOf("needs a reason") >= 0, true);
+    (await S.setUserStatus("IB-U-0912", "deactivated", "  ")).indexOf("needs a reason") >= 0, true);
   ok("...and the account is untouched", S.readUser("IB-U-0912").userStatus, "active");
-  ok("deactivating with one is accepted",
-    S.setUserStatus("IB-U-0912", "deactivated", "Member asked to close the account"), "");
-  ok("...the classification follows, derived",
-    S.toRow(S.readUser("IB-U-0912")).classification, "deactivated");
-  ok("...the reason and the moment are stored",
-    [S.readUser("IB-U-0912").deactivatedReason, !!S.readUser("IB-U-0912").deactivatedAt],
-    ["Member asked to close the account", true]);
-  /* SOFT BY CONSTRUCTION. Hard deletion is a governed privacy process and has
-     no button; everything that made this a record is still here. */
-  ok("...the profile survives", !!S.readUser("IB-U-0912").profile.businessName, true);
-  ok("...the commercial references survive",
-    S.readUser("IB-U-0912").commercial.dealRefs.length > 0, true);
-  ok("...the notes survive", S.readUser("IB-U-0912").notes.length > 0, true);
-  ok("...and the audit gained a row rather than losing any",
-    S.readAudit()[0].type, "USER_DEACTIVATED");
-  ok("setting the same status twice is not an event",
-    S.setUserStatus("IB-U-0912", "deactivated", "again"), "");
-  ok("reactivating needs no reason", S.setUserStatus("IB-U-0912", "active", ""), "");
-  ok("...and clears the deactivation stamps",
-    [S.readUser("IB-U-0912").deactivatedAt, S.readUser("IB-U-0912").deactivatedReason], [null, null]);
-  ok("...with its own event type", S.readAudit()[0].type, "USER_REACTIVATED");
+  ok("setting the status it already has is not a request",
+    await S.setUserStatus("IB-U-0912", "active", ""), "");
   ok("an unknown user is refused",
-    S.setUserStatus("IB-U-NOPE", "deactivated", "x").indexOf("no longer exists") >= 0, true);
+    (await S.setUserStatus("IB-U-NOPE", "deactivated", "x")).indexOf("no longer exists") >= 0, true);
+  /* THE REASON LIST IS ROWS NOW (PanelVocab, scope `user_deactivate_reason`).
+     The reason itself is still stored as free text on CustomUser.deactivatedReason
+     and repeated on the audit line — only the suggestions moved. */
+  ok("the deactivate reasons are the server's list",
+    S.VOCAB.deactivateReasons, DEACTIVATE_REASONS.map((r) => r.label));
+  ok("...and the bundled file has stopped carrying them",
+    "deactivateReasons" in vocab, false);
+});
+
+/* ======================================================= the audit, drawn ===
+   AN AUDIT ROW CARRIES NO COLOUR and there is no column to put one in. The
+   panel derives the tone from what the row DOES carry — the server's verb and
+   the same `destructive` rule the trail's own severity filter counts with — so
+   an action added to any module renders correctly the day it is written. */
+console.log("\nthe audit tone is derived from the row, not stored on it");
+{
+  const tone = (e) => S.auditTone(Object.assign({ verb: "changed", destructive: false, synthetic: false }, e));
+  ok("a destructive action draws as a hard stop", tone({ destructive: true }), "stop");
+  ok("...and so does anything the server calls a removal", tone({ verb: "removed" }), "stop");
+  ok("an approval is the good outcome", tone({ verb: "approved" }), "ok");
+  ok("a refusal warns", tone({ verb: "refused" }), "warn");
+  ok("an ordinary change claims no colour at all", tone({ verb: "updated" }), "");
+  /* Registration is not an admin action — nobody in the console did it — so it
+     is drawn as a system fact, which is how the bundled list drew it too. */
+  ok("the registration line is a system fact", tone({ synthetic: true, verb: "created" }), "sys");
+  ok("the event types are learned from the rows, so they start empty",
+    S.VOCAB.eventTypes, []);
+  ok("the module ships no audit fixture to draw them from",
+    fs.existsSync("src/content/users/audit.json"), false);
+  ok("...and no analytics fixture either",
+    fs.existsSync("src/content/users/analytics.json"), false);
+  ok("...and the bundled vocabulary has stopped carrying event types",
+    "eventTypes" in vocab, false);
 }
 
-console.log("\nthe audit is a history, and history is not edited to match today");
-S.resetStore();
-{
-  const known = new Set(vocab.eventTypes.map((e) => e.key));
-  ok("every seeded event type has a label to render with",
-    Array.from(new Set(auditDoc.events.map((e) => e.type))).filter((t) => !known.has(t)), []);
-  ok("every audit row names a user that exists",
-    auditDoc.events.filter((e) => !users.some((u) => u.userId === e.userId))
-      .map((e) => e.eventId), []);
-  ok("every audit row is stamped and attributed",
-    auditDoc.events.filter((e) => !e.eventId || !e.at || !e.actor || !e.actorRole)
-      .map((e) => e.eventId), []);
-  ok("event ids are unique",
-    auditDoc.events.length, new Set(auditDoc.events.map((e) => e.eventId)).size);
-  ok("the types the seed carries are the ones this module still writes",
-    Array.from(new Set(auditDoc.events.map((e) => e.type))).sort(),
-    ["NOTE", "PROFILE_UPDATED", "REGISTERED", "TAGGED", "USER_DEACTIVATED"]);
-  /* The MEMBERSHIP_* types stay in the vocabulary on purpose: a row written
-     while this module still ran a lifecycle is a row about something that
-     happened, and it has to keep rendering with a label rather than a raw key
-     if it ever arrives from the API. */
-  ok("...while the membership types are kept as historical labels",
-    vocab.eventTypes.filter((e) => e.key.indexOf("MEMBERSHIP_") === 0).length > 0, true);
-  ok("...spelled the way the rows that used them spell them",
-    vocab.eventTypes.some((e) => e.key === "MEMBERSHIP_CANCELLED"), true);
-  ok("no event type is missing a label or a key",
-    vocab.eventTypes.filter((e) => !e.key || !e.label).length, 0);
-  /* KNOWN SEED DEFECT — reported, not papered over. Every registered identity
-     should open its timeline with its own REGISTERED row; the seven users
-     added for the Finance seeds carry no audit at all, so their record's Audit
-     tab reads "Nothing has happened on this account yet" for an account that
-     demonstrably registered. Quarantined BY NAME so the set cannot grow
-     silently — and so fixing the seed turns this line red and gets it deleted. */
-  ok("every account opens its timeline with its own registration",
-    users.filter((u) => !auditDoc.events.some((e) => e.userId === u.userId && e.type === "REGISTERED"))
-      .map((u) => u.userId), []);
-  ok("...and the registration is dated when the account actually registered",
-    users.filter((u) => {
-      const reg = auditDoc.events.filter((e) => e.userId === u.userId && e.type === "REGISTERED")[0];
-      return !reg || reg.at !== u.registeredAt;
-    }).map((u) => u.userId), []);
-  ok("...and no event id is used twice, across the whole log",
-    (() => { const ids = auditDoc.events.map((e) => e.eventId); return ids.filter((x, i) => ids.indexOf(x) !== i); })(), []);
-}
-
-console.log("\nthe seed is restorable, because a demo gets walked twice");
+console.log("\nthe page is restorable, because a demo gets walked twice");
 {
   S.resetStore();
-  const before = JSON.stringify(S.readUsers());
-  S.addNote("IB-U-0912", "scribble");
-  S.setUserStatus("IB-U-0880", "deactivated", "testing");
-  ok("the writes landed", JSON.stringify(S.readUsers()) !== before, true);
-  S.resetStore();
-  ok("...and reset puts every one of them back", JSON.stringify(S.readUsers()), before);
-  ok("...including the audit", S.readAudit().length, auditDoc.events.length);
+  ok("reset returns the page exactly as the server sent it",
+    JSON.stringify(S.readUsers()), JSON.stringify(users.map((u) => S.readUser(u.userId))));
 }
 
 /* ===================================================== the business facets ===
@@ -659,44 +735,60 @@ S.resetStore();
     const seen = {};
     return list.filter((x) => (seen[x[k]] ? true : ((seen[x[k]] = 1), false)));
   };
-  ok("business types have unique keys", dupes(S.BUSINESS_TYPES, "key").length, 0);
-  ok("segments have unique keys", dupes(S.SEGMENTS, "key").length, 0);
-  ok("categories have unique keys", dupes(S.CATEGORIES, "key").length, 0);
+  const field = (k) => S.PROFILE_FIELDS.filter((f) => f.key === k)[0];
+  const keysOf = (k) => S.optionsFor(field(k)).map((o) => o.key);
+  const BUSINESS_TYPES = S.optionsFor(field("businessType"));
+  const SEGMENTS = S.optionsFor(field("segments"));
+  const CATEGORIES = S.optionsFor(field("categories"));
+  ok("business types have unique keys", dupes(BUSINESS_TYPES, "key").length, 0);
+  ok("segments have unique keys", dupes(SEGMENTS, "key").length, 0);
+  ok("categories have unique keys, across the three lists they merge",
+    dupes(CATEGORIES, "key").length, 0);
   /* A category whose group is misspelled renders under no heading, which in a
      grouped listbox means it does not render at all. */
-  const groupKeys = S.CATEGORY_GROUPS.map((g) => g.key);
+  const groupKeys = S.groupsFor(field("categories")).map((g) => g.key);
   ok("every category sits in a declared group",
-    S.CATEGORIES.filter((x) => groupKeys.indexOf(x.group) < 0).map((x) => x.key), []);
+    CATEGORIES.filter((x) => groupKeys.indexOf(x.group) < 0).map((x) => x.key), []);
   ok("both groups are actually used",
-    groupKeys.filter((g) => !S.CATEGORIES.some((x) => x.group === g)), []);
+    groupKeys.filter((g) => !CATEGORIES.some((x) => x.group === g)), []);
   ok("keyword suggestions are unique",
-    S.KEYWORD_SUGGESTIONS.length,
-    S.dedupeKeywords(S.KEYWORD_SUGGESTIONS).length);
+    keysOf("searchKeywords").length, S.dedupeKeywords(keysOf("searchKeywords")).length);
   /* The label is the fallback when a key is missing, so an empty one would
      render a blank chip that cannot be told from a bug. */
   ok("nothing is missing a label",
-    S.BUSINESS_TYPES.concat(S.SEGMENTS).concat(S.CATEGORIES)
-      .filter((o) => !o.label).length, 0);
+    BUSINESS_TYPES.concat(SEGMENTS).concat(CATEGORIES).filter((o) => !o.label).length, 0);
 
-  /* THE OPTION TEXT LIVES HERE because the listbox only exists while it is
-     open, and the render harness has no browser to open it with. These are the
-     same guarantees the picker would be asserted on if it could be. */
-  ok("every business type carries the sentence that separates it",
-    S.BUSINESS_TYPES.filter((o) => !o.hint).map((o) => o.key), []);
-  ok("...because Dealer, Retailer and Wholesaler are not self-evident",
-    ["dealer", "retailer", "wholesaler"]
-      .filter((k) => !S.BUSINESS_TYPES.filter((o) => o.key === k)[0].hint), []);
-  ok("categories genuinely span both questions",
-    S.CATEGORY_GROUPS.map((g) => S.CATEGORIES.filter((x) => x.group === g.key).length > 1),
-    [true, true]);
-  /* Delivery model is gone: Turnkey / Design & build / Execution only were a
-     third axis nobody asked the form to carry. Categories are INDUSTRIES now,
-     plus the sector — and the list is open, so a category nobody listed is a
-     thing somebody types, not a thing the form refuses. */
-  ok("no delivery-model category survives",
-    S.CATEGORIES.filter((x) => x.group === "delivery").map((x) => x.key), []);
-  ok("the industries the request named are there",
-    ["sanitaryware", "home_security"].filter((k) => !S.CATEGORIES.some((x) => x.key === k)), []);
+  /* THE OPTION KEY IS THE STORED VALUE. The record sends each facet as
+     {value, label}; the picker, the stale-chip flag and the validator all
+     compare against `key`, so the mapping has to be value -> key, untouched. */
+  ok("business types are seller-options businessTypes, value for key",
+    BUSINESS_TYPES.map((o) => o.key), SELLER_OPTIONS.businessTypes.map((o) => o.value));
+  ok("dealsIn is businessModels without `both`, which the record expands",
+    keysOf("dealsIn"), ["products", "services"]);
+  ok("...carrying the server's description as the hint",
+    S.optionsFor(field("dealsIn"))[0].hint, SELLER_OPTIONS.businessModels[0].meta.desc);
+  ok("positioning is serviceSegments",
+    keysOf("positioning"), SELLER_OPTIONS.serviceSegments.map((o) => o.value));
+  ok("keyword suggestions are serviceKeywords",
+    keysOf("searchKeywords"), SELLER_OPTIONS.serviceKeywords.map((o) => o.value));
+  ok("states are seller-options states, keyed by name",
+    S.STATES.map((o) => o.key), SELLER_OPTIONS.states.map((o) => o.value));
+  ok("segments are the taxonomy's", keysOf("segments"), TAXONOMY.segments.map((o) => o.value));
+  ok("categories are the taxonomy's, then productCategories, then serviceCategories",
+    CATEGORIES.map((o) => o.key),
+    TAXONOMY.categories.filter((o) => o.isActive).map((o) => o.value)
+      .concat(SELLER_OPTIONS.productCategories.map((o) => o.value))
+      .concat(SELLER_OPTIONS.serviceCategories.map((o) => o.value)));
+  ok("...a hidden taxonomy row is not suggested", keysOf("categories").indexOf("hidden_category"), -1);
+  ok("...and the service categories are the sector group",
+    CATEGORIES.filter((o) => o.group === "sector").map((o) => o.key),
+    SELLER_OPTIONS.serviceCategories.map((o) => o.value));
+  /* A refused taxonomy read (its own permission) empties only what it feeds. */
+  S.applyFacetOptions(SELLER_OPTIONS, null);
+  ok("without taxonomy, segments are empty and categories keep the seller-options lists",
+    [keysOf("segments").length, keysOf("categories").length],
+    [0, SELLER_OPTIONS.productCategories.length + SELLER_OPTIONS.serviceCategories.length]);
+  S.applyFacetOptions(SELLER_OPTIONS, TAXONOMY);
 
   /* COLOUR-BY-FACET. The chip tone is declared per FIELD and the CSS restates
      each used tone by name, so the contract is: every declared tone is one the
@@ -716,26 +808,21 @@ S.resetStore();
      with another, or the colour stops meaning anything. */
   const market = chipped.filter((f) => f.chip !== "tag-slate").map((f) => f.chip);
   ok("no two marketplace facets share a colour", market.length, new Set(market).size);
-  /* And the stylesheet has to actually restate each one: a chip class the CSS
-     never names falls back to brand tint with no error anywhere. */
-  const css = fs.readFileSync("src/admin/views/Users/users.css", "utf8")
-    + fs.readFileSync("src/admin/views/Users/blocks.css", "utf8");
-  ok("...and each one is named in the module's own stylesheets",
-    chipped.map((f) => f.chip).filter((t) => css.indexOf(t) < 0), []);
+  /* And the shared Pill has to actually map each one: the module stylesheets
+     went with the design-system rebuild, and a `tag-*` tone TAG_TONE does not
+     name falls back to gray with no error anywhere. */
+  const status = fs.readFileSync("src/admin/ui/status.tsx", "utf8");
+  ok("...and each one is mapped by the shared Pill's TAG_TONE",
+    chipped.map((f) => f.chip).filter((t) => status.indexOf("    " + t.replace(/^tag-/, "") + ":") < 0), []);
 }
 
 console.log("\nthe seed is inside its own vocabularies");
 {
+  /* The seed's facet VALUES are the old bundled keys (firm_studio,
+     interior_designer), which the server's option lists never held -- live rows
+     are checked against those lists instead, above. What the seed still answers
+     for is everything that is not a facet option. */
   const seeded = S.readUsers();
-  const known = (list) => list.map((o) => o.key);
-  const bt = known(S.BUSINESS_TYPES), sg = known(S.SEGMENTS), ct = known(S.CATEGORIES);
-  ok("no unknown business type",
-    seeded.filter((u) => u.profile.businessType && bt.indexOf(u.profile.businessType) < 0)
-      .map((u) => u.userId), []);
-  ok("no unknown segment",
-    seeded.filter((u) => u.profile.segments.some((s) => sg.indexOf(s) < 0)).map((u) => u.userId), []);
-  ok("no unknown category",
-    seeded.filter((u) => u.profile.categories.some((x) => ct.indexOf(x) < 0)).map((u) => u.userId), []);
   ok("no unknown registration source",
     seeded.filter((u) => !S.REGISTRATION_SOURCES.some((s) => s.key === u.registrationSource))
       .map((u) => u.userId), []);
@@ -743,7 +830,7 @@ console.log("\nthe seed is inside its own vocabularies");
     seeded.filter((u) => u.tags.some((t) => !S.TAGS.some((x) => x.slug === t.slug)))
       .map((u) => u.userId), []);
   ok("no unknown profile status",
-    seeded.filter((u) => !vocab.profileStatuses.some((s) => s.key === u.profile.profileStatus))
+    seeded.filter((u) => ["incomplete", "published", "hidden"].indexOf(u.profile.profileStatus) < 0)
       .map((u) => u.userId), []);
   /* THE MIGRATION'S ONE INVARIANT. businessType and segments replaced category
      and services one for one, both required. If a profile gained or lost one
@@ -756,9 +843,6 @@ console.log("\nthe seed is inside its own vocabularies");
     seeded.filter((u) => u.profile.segments.length > 6).map((u) => u.userId), []);
   ok("no profile exceeds the keyword cap",
     seeded.filter((u) => u.profile.searchKeywords.length > 12).map((u) => u.userId), []);
-  ok("every profile carries the schema version it was graded against",
-    seeded.filter((u) => u.profile.schemaVersion !== S.PROFILE_SCHEMA_VERSION)
-      .map((u) => u.userId), []);
   /* IDENTITY IS THE POINT OF THIS MODULE, so the things that identify somebody
      have to be unique across it. A duplicate here is two records for one
      person, which is the failure a directory exists to prevent. */
@@ -784,22 +868,19 @@ console.log("\nthe closed lists actually close");
 S.resetStore();
 {
   const bad = (patch) => S.validateFacets(patch) !== "";
-  ok("a real business type is fine", bad({ businessType: "manufacturer" }), false);
+  const segKeys = S.optionsFor(S.PROFILE_FIELDS.filter((f) => f.key === "segments")[0]).map((o) => o.key);
+  ok("a real business type is fine", bad({ businessType: "Manufacturer" }), false);
   ok("an invented one is not", bad({ businessType: "wizard" }), true);
+  ok("...and neither is the old bundled key", bad({ businessType: "manufacturer" }), true);
   ok("clearing it is allowed", bad({ businessType: null }), false);
-  ok("real segments are fine", bad({ segments: ["architect", "vastu"] }), false);
+  ok("real segments are fine", bad({ segments: ["lShapedModularKitchen", "space_planning"] }), false);
   /* Open now, like categories: a trade nobody listed is typed, not refused. */
-  ok("a segment nobody listed is accepted", bad({ segments: ["architect", "Pergola work"] }), false);
+  ok("a segment nobody listed is accepted", bad({ segments: ["space_planning", "Pergola work"] }), false);
   ok("...but not at forty-one characters", bad({ segments: ["x".repeat(41)] }), true);
-  /* The explainers are KEYWORDS, not sentences — asserted by length, which is
-     the only thing that stops a row growing back into a paragraph. */
-  ok("every segment has a short explainer",
-    S.SEGMENTS.filter((o) => !o.hint || o.hint.length > 32).map((o) => o.key), []);
-  ok("the same segment twice is refused", bad({ segments: ["architect", "architect"] }), true);
-  ok("seven segments is over the cap of six",
-    bad({ segments: S.SEGMENTS.slice(0, 7).map((s) => s.key) }), true);
-  ok("six is not", bad({ segments: S.SEGMENTS.slice(0, 6).map((s) => s.key) }), false);
-  ok("real categories are fine", bad({ categories: ["sanitaryware", "residential"] }), false);
+  ok("the same segment twice is refused", bad({ segments: ["space_planning", "space_planning"] }), true);
+  ok("seven segments is over the cap of six", bad({ segments: segKeys.slice(0, 7) }), true);
+  ok("six is not", bad({ segments: segKeys.slice(0, 6) }), false);
+  ok("real categories are fine", bad({ categories: ["modular_kitchens", "Residential"] }), false);
   /* OPEN, by request: type it, press Enter, it is a category. The list is a
      suggestion. What is still refused is the same value twice and a value
      longer than a label. */
@@ -831,39 +912,6 @@ S.resetStore();
     S.dedupeKeywords(["Modular kitchen", "modular  kitchen", "Wardrobe design"]),
     ["Modular kitchen", "Wardrobe design"]);
   ok("...and drops the blanks rather than keeping one", S.dedupeKeywords(["a", "  ", ""]), ["a"]);
-}
-
-console.log("\nthe write path refuses what the form refuses");
-S.resetStore();
-{
-  const before = JSON.stringify(S.readUsers().filter((u) => u.userId === "IB-U-0912")[0].profile);
-  /* Segments are open now, so the probe uses a rule that still closes:
-     Business type is one answer from a chain of seven, and nothing else. */
-  const err = S.updateProfile("IB-U-0912", { businessType: "not_a_type" });
-  ok("an unknown business type is refused at the store, not only in the dialog",
-    err.indexOf("not one of the allowed") >= 0, true);
-  /* The module's standing promise: a refused write leaves nothing behind. */
-  ok("...and the stored profile is untouched",
-    JSON.stringify(S.readUsers().filter((u) => u.userId === "IB-U-0912")[0].profile), before);
-  ok("a valid facet patch is accepted",
-    S.updateProfile("IB-U-0912", {
-      businessType: "independent",
-      dealsIn: ["services"],
-      segments: ["interior_designer", "architect"],
-      categories: ["lighting", "commercial"],
-      searchKeywords: ["Office fit-out", "Complete home interiors"],
-    }), "");
-  ok("...and it is what came back",
-    S.readUsers().filter((u) => u.userId === "IB-U-0912")[0].profile.segments,
-    ["interior_designer", "architect"]);
-  /* PARTIAL WRITES DO NOT EXIST. One good field beside one bad one saves
-     neither — the endpoint 422s the whole patch (UM-T07) and so does this. */
-  const now = JSON.stringify(S.readUsers().filter((u) => u.userId === "IB-U-0912")[0].profile);
-  ok("one bad field takes the whole patch down",
-    S.updateProfile("IB-U-0912", { about: "A perfectly good sentence.", businessType: "wizard" })
-      !== "", true);
-  ok("...including the field that was fine",
-    JSON.stringify(S.readUsers().filter((u) => u.userId === "IB-U-0912")[0].profile), now);
 }
 
 /* ============================================================ the username ===
@@ -943,13 +991,14 @@ S.resetStore();
     S.validateFacets({ username: "Bad_Name" }) !== "", true);
   ok("...but uniqueness is not its job",
     S.validateFacets({ username: "meera-studio-interiors" }), "");
-  ok("the store is what refuses a taken one",
-    S.updateProfile("IB-U-1041", { username: "meera-studio-interiors" })
-      .indexOf("belongs to another profile") >= 0, true);
-  ok("...and nothing was saved on the way past it",
-    S.readUser("IB-U-1041").profile.username !== "meera-studio-interiors", true);
-  ok("...and a free one goes through",
-    S.updateProfile("IB-U-1041", { username: "priya-nair-design" }), "");
+  /* THE LENGTH AND THE RESERVED LIST ARE THE SERVER'S (2026-09-16): the admin
+     profile PATCH refuses both, and users/vocabularies/ serves them. Lower case
+     is still the panel's own rule. The store refuses a taken handle before it
+     calls (asserted with the other refusals above) and the SERVER refuses one
+     held by an account outside the loaded page, which this browser cannot see. */
+  ok("the username rules are the server's, and the help sentence is the panel's",
+    [S.USERNAME_RULES.min, S.USERNAME_RULES.max, S.RESERVED_USERNAMES.length, S.USERNAME_RULES.help],
+    [3, 30, 35, "Lower-case letters, numbers and hyphens."]);
 }
 
 console.log("\nnothing is conditional any more, and the schema is whole for everybody");
@@ -1121,6 +1170,8 @@ S.resetStore();
   ok("every state's suggestions lead with it",
     S.STATES.filter((x) => S.citySuggestionsOf(x.key)[0].key !== S.ALL_CITIES), []);
   ok("...and it is spelled one way everywhere", S.ALL_CITIES, "All cities");
+  ok("a state with no saved city offers only the sentinel (typing stays open)",
+    S.citySuggestionsOf("Sikkim").map((x) => x.key), [S.ALL_CITIES]);
   /* THE CITY FILTER'S OPTIONS HAVE TO BE ANSWERABLE. An option is answerable
      when it is either a city some state lists or a city-state in its own right
      — Delhi is the second kind, which is exactly why the filter matches on the
@@ -1134,49 +1185,18 @@ S.resetStore();
     S.CITIES.map((x) => x.key).filter((k) => !S.applyFilters(all, { city: k }).length), []);
 }
 
-console.log("\nService provider is gone, and dealsIn is the axis that replaced it");
+console.log("\nbusiness type, and dealsIn beside it");
 S.resetStore();
 {
-  /* "What do you sell" is dealsIn's question now. A type that repeats another
-     facet's answer gets picked instead of the real one — a design-build firm
-     typed as "Service provider" says nothing "Contractor + services" does not
-     say better. */
-  ok("service_provider is not a business type",
-    S.BUSINESS_TYPES.some((t) => t.key === "service_provider"), false);
-  ok("...and no seeded profile still carries it",
-    S.readUsers().filter((u) => u.profile.businessType === "service_provider")
-      .map((u) => u.userId), []);
   ok("the Business type panel opens with the field's own sentence",
     S.PROFILE_FIELDS.filter((f) => f.key === "businessType")[0].info,
     "What kind of business this is. It decides how the marketplace treats them, so it is one answer, not several.");
-  /* ORDERED ALONG THE CHAIN, read from the portal's end: the people who use
-     it most come first — who works alone, who designs as a team, who builds —
-     then who sells, who moves, who makes. */
-  ok("seven types, in chain order from the practitioner up",
-    S.BUSINESS_TYPES.map((t) => t.key),
-    ["independent", "firm_studio", "contractor", "retailer", "wholesaler", "dealer", "manufacturer"]);
-  /* Counted off the seed rather than written down: seven more customers
-     arriving must not make this a failure. */
-  const typed = S.readUsers().filter((u) => u.profile.businessType);
   ok("every profile with a business name states its type",
     S.readUsers().filter((u) => !!u.profile.businessName !== !!u.profile.businessType)
       .map((u) => u.userId), []);
-  ok("the chain is genuinely in use, not a list with one answer in it",
-    Array.from(new Set(typed.map((u) => u.profile.businessType))).length >= 5, true);
-  /* Firm / Studio is the grain two earlier entries flagged as missing: a
-     design practice with a team is neither a site contractor nor a solo
-     practitioner. It is the seed's most common answer, which is the shape the
-     vocabulary was changed to capture. */
-  ok("Firm / Studio is the most common answer in the seed",
-    S.BUSINESS_TYPES.map((t) => typed.filter((u) => u.profile.businessType === t.key).length)
-      .indexOf(Math.max.apply(null, S.BUSINESS_TYPES.map((t) =>
-        typed.filter((u) => u.profile.businessType === t.key).length))),
-    S.BUSINESS_TYPES.map((t) => t.key).indexOf("firm_studio"));
-  ok("...and Independent is the two who work alone",
-    S.readUsers().filter((u) => u.profile.businessType === "independent")
-      .map((u) => u.userId).sort(), ["IB-U-0812", "IB-U-1041"]);
 
   const bad = (patch) => S.validateFacets(patch) !== "";
+  ok("`both` is not a dealsIn option: the record never stores it", bad({ dealsIn: ["both"] }), true);
   ok("products alone is fine", bad({ dealsIn: ["products"] }), false);
   ok("services alone is fine", bad({ dealsIn: ["services"] }), false);
   ok("both together is fine", bad({ dealsIn: ["products", "services"] }), false);
@@ -1196,39 +1216,25 @@ S.resetStore();
     ["products", "services"]);
 }
 
-console.log("\npositioning: up to two of a closed four");
+console.log("\npositioning: up to two of the server's list");
 {
   const bad = (patch) => S.validateFacets(patch) !== "";
-  ok("one is fine", bad({ positioning: ["luxury"] }), false);
-  ok("two is fine", bad({ positioning: ["luxury", "custom"] }), false);
-  ok("three is over the cap", bad({ positioning: ["luxury", "budget_friendly", "custom"] }), true);
-  ok("premium is on offer again", bad({ positioning: ["premium"] }), false);
-  ok("the four are the four",
-    S.VOCAB.positioning.map((p) => p.key), ["luxury", "budget_friendly", "custom", "premium"]);
-  ok("...so value and eco-friendly are refused",
-    bad({ positioning: ["value"] }) && bad({ positioning: ["eco_friendly"] }), true);
+  ok("one is fine", bad({ positioning: ["Luxury"] }), false);
+  ok("two is fine", bad({ positioning: ["Luxury", "Custom"] }), false);
+  ok("three is over the cap", bad({ positioning: ["Luxury", "On Budget", "Custom"] }), true);
   ok("an invented one is refused", bad({ positioning: ["bespoke"] }), true);
+  ok("...and so is the old bundled key", bad({ positioning: ["luxury"] }), true);
   ok("optional: an empty list passes", bad({ positioning: [] }), false);
   ok("no seeded profile exceeds two",
     S.readUsers().filter((u) => u.profile.positioning.length > 2).map((u) => u.userId), []);
-  /* The closed facet, held closed BY THE SEED as well as by the validator.
-     Seven profiles once carried `value`, a key the vocabulary had dropped —
-     refused on save, and rendered as its own raw key on the record. Fixed at
-     the source; this is the rule that replaced the quarantine. */
-  ok("every seeded profile positions itself with a key the vocabulary has",
-    S.readUsers().filter((u) => u.profile.positioning.some((k) =>
-      !S.VOCAB.positioning.some((pp) => pp.key === k))).map((u) => u.userId).sort(), []);
-  ok("...so every seeded positioning would survive being saved again",
-    S.readUsers().filter((u) => u.profile.positioning.length
-      && S.validateFacets({ positioning: u.profile.positioning })).map((u) => u.userId), []);
-  ok("...which is what a stray key does to a closed facet: it renders as itself",
+  ok("a stray key on a closed facet renders as itself",
     S.facetLabel("positioning", "value"), "value");
 }
 
 console.log("\nkeys are stored, labels are shown");
 {
   ok("a known key resolves to its label",
-    S.facetLabel("segments", "visualiser_3d"), "3D visualiser");
+    S.facetLabel("segments", "lShapedModularKitchen"), "L-shaped modular kitchen");
   /* A key the vocabulary has since dropped is still a fact about that profile.
      It renders as itself rather than as an empty cell, because a blank is
      indistinguishable from "they never answered". */
@@ -1241,8 +1247,8 @@ console.log("\nkeys are stored, labels are shown");
     ["Products", "Services"]);
   ok("classificationMeta answers for both classifications",
     ["active", "deactivated"].map((k) => S.classificationMeta(k).label), ["Active", "Deactivated"]);
-  ok("...and every classification explains what it means and what it does not",
-    S.CLASSIFICATIONS.filter((x) => !x.meaning || !x.derivedFrom).map((x) => x.key), []);
+  ok("...and every classification explains what it means",
+    S.CLASSIFICATIONS.filter((x) => !x.meaning).map((x) => x.key), []);
   ok("...falling back rather than returning undefined",
     !!S.classificationMeta("nonsense").label, true);
   ok("tagMeta answers for a real slug and null for an invented one",
@@ -1284,7 +1290,63 @@ console.log("\nevery filter the URL carries can be named and cleared");
    The payload is MONTH-KEYED, so a span resolves to real arithmetic rather
    than to whichever two windows somebody pre-summed. Rates are recomputed from
    their own numerator and denominator over the span — never averaged from
-   stored percentages, which cannot be re-aggregated without lying. */
+   stored percentages, which cannot be re-aggregated without lying.
+
+   IT COMES FROM THE SERVER NOW (GET /admin/users/analytics/), counted from the
+   accounts themselves. So the module starts with NO SERIES AT ALL, and the
+   first thing asserted is that an empty one answers "nothing yet" rather than
+   inventing a month or throwing on the way to one. */
+console.log("\nwith no series the arithmetic says so rather than inventing one");
+{
+  ok("there is no series until the read lands", S.MONTHS.length, 0);
+  ok("a range over nothing is nothing", S.clampRange("2026-01", "2026-06"), { from: "", to: "" });
+  ok("...and so is a preset", S.presetRange(6), { from: "", to: "" });
+  ok("...and no preset lights up as though it were the span on screen",
+    S.presetOf("", ""), "");
+  const empty = S.rangeTotals("2026-01", "2026-06");
+  ok("the totals are empty rather than guessed",
+    [empty.monthCount, empty.registrations, empty.profileCompleted, empty.bySource.length],
+    [0, 0, 0, 0]);
+  /* A RATE WITH NO DENOMINATOR IS UNDEFINED, not zero — it prints as "n/a". */
+  ok("...and completion is unavailable, not 0%", empty.completion.value, null);
+  /* The tiles fall back to the page they can see until the base arrives, and
+     the base is the whole population once it has. */
+  ok("the base falls back to the loaded page until the read lands",
+    S.baseCounts(all).total, S.countsOf(all).total);
+}
+
+/* The payload as the server sends it, in its own shape: twelve months ending
+   on the seed's own "today", each with a channel split that sums exactly to
+   its own registrations, plus the base counted over the whole population.
+   Planted through the real setter, so everything below is asserted on exactly
+   the path the screen takes. */
+const ANALYTICS = (() => {
+  const end = new Date(usersDoc.asOf);
+  const months = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - i, 1));
+    const key = d.toISOString().slice(0, 7);
+    const web = 12 + i, funnel = 7 + (i % 3), unset = 2;
+    months.push({
+      month: key,
+      label: d.toLocaleDateString("en-GB", { month: "short", year: "numeric", timeZone: "UTC" }),
+      short: d.toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" }),
+      registrations: web + funnel + unset,
+      profileCompleted: Math.round((web + funnel) / 2),
+      bySource: { web: web, funnel: funnel, "": unset },
+    });
+  }
+  return {
+    asOf: usersDoc.asOf,
+    months: months,
+    sources: [{ key: "web", label: "Website signup" }, { key: "funnel", label: "Campaign funnel" },
+      { key: "", label: "Not recorded" }],
+    base: { total: SEED.total, active: SEED.active, deactivated: SEED.deactivated,
+      incompleteProfiles: SEED.incomplete },
+  };
+})();
+S.applyUsersAnalytics(ANALYTICS);
+
 console.log("\nthe range is real arithmetic over the monthly series");
 {
   const M = S.MONTHS;
@@ -1295,13 +1357,18 @@ console.log("\nthe range is real arithmetic over the monthly series");
   ok("each month's channels sum exactly to its own total",
     M.filter((m) => Object.keys(m.bySource).reduce((a, k) => a + m.bySource[k], 0)
       !== m.registrations).map((m) => m.month), []);
-  ok("every channel key is one the vocabulary names",
+  /* EVERY CHANNEL IS NAMED, including the one that is not a channel: "" is the
+     accounts whose source was never recorded, and it is shown as that rather
+     than folded into web or dropped from the split. */
+  ok("every channel key is one the payload names",
     Array.from(new Set(M.reduce((a, m) => a.concat(Object.keys(m.bySource)), [])))
-      .filter((k) => !S.REGISTRATION_SOURCES.some((s) => s.key === k)), []);
+      .filter((k) => !ANALYTICS.sources.some((s) => s.key === k)), []);
   ok("the months are in order, oldest first",
     M.map((m) => m.month).slice().sort(), M.map((m) => m.month));
   ok("every month is labelled for an axis and for a sentence",
     M.filter((m) => !m.label || !m.short).map((m) => m.month), []);
+  ok("the base is the server's, counted over everybody",
+    S.baseCounts([]).total, ANALYTICS.base.total);
 
   const t = S.rangeTotals(M[M.length - 3].month, M[M.length - 1].month);
   ok("a three-month span holds three months", t.monthCount, 3);
@@ -1315,12 +1382,11 @@ console.log("\nthe range is real arithmetic over the monthly series");
     [t.completion.num, t.completion.den], [t.profileCompleted, t.registrations]);
   ok("...and equals the fraction, not the mean of the monthly rates",
     t.completion.value, t.profileCompleted / t.registrations);
-  ok("...which is a different number from that mean",
-    t.completion.value !== M.slice(-3)
-      .reduce((a, m) => a + m.profileCompleted / m.registrations, 0) / 3, true);
   ok("the channel split sums to the span's own total",
     t.bySource.reduce((a, s) => a + s.registrations, 0), t.registrations);
   ok("...and every channel is labelled", t.bySource.filter((s) => !s.label).length, 0);
+  ok("...the unrecorded one by name rather than as an empty cell",
+    t.bySource.filter((s) => s.key === "")[0].label, "Not recorded");
   ok("the prior span is the same length, immediately before",
     t.prev.registrations, M.slice(-6, -3).reduce((a, m) => a + m.registrations, 0));
   ok("...and is null when there is not enough history behind it",
@@ -1348,14 +1414,16 @@ console.log("\nthe range is real arithmetic over the monthly series");
   ok("every preset is reachable within this series",
     S.RANGE_PRESETS.filter((p) => S.presetOf(S.presetRange(p.months).from,
       S.presetRange(p.months).to) !== p.key).map((p) => p.key), []);
+  /* The month picker groups the same series by year, and it is grouped on
+     every render rather than memoised on mount — the months arrive late. */
+  ok("the picker's grid holds every month exactly once",
+    S.monthsByYear().reduce((a, y) => a + y.months.length, 0), M.length);
 
   /* THE DEFINITIONS TABLE IS THE PAGE'S CONTRACT with the reader: the same
      metric has to mean the same thing in March and in September. */
   ok("every metric definition carries its unit, its formula and its trap",
     S.METRICS.filter((m) => !m.label || !m.unit || !m.formula || !m.caution).map((m) => m.key), []);
-  ok("engagement is stated as unavailable rather than seeded as zero",
-    S.ANALYTICS.engagement, null);
-  ok("...and the decision that blocks it is named", !!S.decision("UM-OD-10"), true);
+  ok("the decision that blocks engagement figures is named", !!S.decision("UM-OD-10"), true);
 }
 
 console.log("\na figure with no denominator is a missing answer, not a low one");
@@ -1384,10 +1452,11 @@ ok("two months is months", S.ago(new Date(S.NOW - 60 * S.DAY).toISOString()), "2
 ok("two years is years", S.ago(new Date(S.NOW - 730 * S.DAY).toISOString()), "2 years ago");
 ok("a future date is not `-3 days ago`", S.ago(new Date(S.NOW + 3 * S.DAY).toISOString()), "in 3 days");
 ok("no date at all is an em dash", S.ago(null), "—");
-/* Writes stamp the same clock the derivation reads, so a note added during a
-   demo does not print "in 4 days" on a timeline that lives in August. */
-ok("a simulated write stamps the seed's clock, not the machine's",
-  Math.abs(new Date(S.stamp()).getTime() - S.NOW) < 60000, true);
+/* NOTHING IN THIS MODULE STAMPS A MOMENT OF ITS OWN any more. Every write is an
+   endpoint, so every stored stamp is the server's — the browser clock cannot
+   put a note four days into the future of a timeline again because the browser
+   no longer writes one. */
+ok("the module stamps no moments of its own", "stamp" in S, false);
 ok("no seeded registration is in the future of the seed's own clock",
   users.filter((u) => new Date(u.registeredAt).getTime() > S.NOW).map((u) => u.userId), []);
 ok("no seeded activity predates its own registration",
@@ -1395,7 +1464,10 @@ ok("no seeded activity predates its own registration",
     && new Date(u.lastActivityAt).getTime() < new Date(u.registeredAt).getTime())
     .map((u) => u.userId), []);
 
-S.resetStore();
-
-console.log(failed ? "\n" + failed + " FAILED\n" : "\nall checks passed\n");
-process.exit(failed ? 1 : 0);
+/* The queued write assertions, in order, and then the summary. */
+void (async () => {
+  for (const run of PENDING) await run();
+  S.resetStore();
+  console.log(failed ? "\n" + failed + " FAILED\n" : "\nall checks passed\n");
+  process.exit(failed ? 1 : 0);
+})();

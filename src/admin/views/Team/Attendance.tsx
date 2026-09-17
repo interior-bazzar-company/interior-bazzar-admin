@@ -29,8 +29,8 @@
    look like" are read with the same eyes and moved between constantly. The
    queue and the window ARE different questions and keep their tabs.
 
-   NO API YET — everything comes from src/content/team/attendance.json through
-   store.ts, which is the only file that knows that.
+   ON THE BACKEND — attendance days, settings and leave through store.ts
+   (bootTeam), which is the only file that knows that.
    ============================================================================= */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";

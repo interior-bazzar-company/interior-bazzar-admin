@@ -180,6 +180,12 @@ export interface AuditEntry {
   subjectUser: number | null;
   subjectUsername: string | null;
   subjectName: string;
+  /** The record the row is about when that record is NOT a person — an
+   *  agreement, a salary account, a run, a slip, a subscription, a refund.
+   *  Null on the rows that are about no record at all. This pair is what a
+   *  history tab is filtered by, and why none of them has an events table. */
+  subjectType?: string | null;
+  subjectId?: string | null;
   /** True only for the registration line, which is derived from the account's
    *  own creation stamp rather than stored — no admin ever performed it. */
   synthetic: boolean;
@@ -305,6 +311,8 @@ export interface DealRow {
   valuePaise: number | null;
   owner: DealPersonRef | null;
   coOwner: DealPersonRef | null;
+  /** The platform account this deal sells to; null until somebody links it. */
+  customer?: DealPersonRef | null;
   nextActionDate: string | null;
   nextActionNote: string;
   expectedClose: string | null;
@@ -556,7 +564,13 @@ export interface DealPaymentsListResponse { payments: DealPaymentRow[]; total: n
 
 /** One row of any GET v1/admin/vocab/<list>/ value list. `scope` names the
  *  consumer a row was added for ('' = every consumer); `?scope=` filters on it. */
-export interface VocabItem { key: string; label: string; tone: string; hint?: string; displayOrder?: number; isActive?: boolean; scope?: string }
+export interface VocabItem {
+  key: string; label: string; tone: string; hint?: string; displayOrder?: number; isActive?: boolean; scope?: string;
+  /** Only on vocab/expense-tag-kinds: where money under the kind lands. */
+  landsIn?: string;
+  /** Only on vocab/subscription-sources: the tag's short word. */
+  short?: string;
+}
 
 /** GET v1/admin/users/vocabularies/ — every option list the Users directory's
  *  filter bar offers. `cities` are the ones on record, folded to one entry per
@@ -566,6 +580,11 @@ export interface UserTagItem { slug: string; label: string; tone: string; help: 
  *  staff are not in it) as the Users directory renders it. `userId` is
  *  "IB-U-<pk>"; `completeness` is null when the account holds no business, shop
  *  or architect profile to grade. */
+/** One tag ON an account: which tag, who put it there and when. `assignedBy` is
+ *  the assigner's NAME (the record prints it under the chip) and is "" when the
+ *  assignment carries no assigner — applied outside the panel, or by an account
+ *  since removed. Blank means not recorded, never "the system". */
+export interface UserTagOnRecord { slug: string; assignedBy: string; assignedAt: string | null }
 export interface PlatformUserItem {
   userId: string;
   pk: number;
@@ -574,7 +593,7 @@ export interface PlatformUserItem {
   lastActivityAt: string | null;
   identity: { name: string; email: string | null; phone: string | null };
   profile: { username: string | null; targetAreas: { state: string; cities: string[] }[] };
-  tags: { slug: string }[];
+  tags: UserTagOnRecord[];
   completeness: number | null;
   /** The go-live checklist items the graded entity has not met, by label. */
   missingFields?: string[];
@@ -591,10 +610,20 @@ export interface UserCommercial {
 }
 /** GET v1/admin/platform-users/<pk>/ — the row above plus the account's login
  *  username and the business profile it holds (a business first, else a shop). */
+/** One internal note on an account (interior_admin Note, subjectType
+ *  `platform_user`). `authorRole` is read off the author's role at READ time,
+ *  not stored beside the note; `authorId` is who may change it — its author, or
+ *  full access, and nobody else. */
+export interface UserNoteRow {
+  noteId: string; author: string; authorRole: string; at: string | null; text: string;
+  authorId: number | null;
+}
 export interface PlatformUserRecord extends PlatformUserItem {
   accountUsername: string;
   deactivatedReason: string | null;
   deactivatedAt: string | null;
+  /** The account's internal notes, newest first. The record read IS the list. */
+  notes: UserNoteRow[];
   /** ONE flag for the account (an OTP entered on the login name), not per channel. */
   isVerified: boolean;
   /** CustomUser.unique_id. */
@@ -622,21 +651,53 @@ export interface UsersVocabularies {
   registrationSources: VocabItem[];
   tags: UserTagItem[];
   cities: string[];
+  /** {state name: [city]} — per-state city suggestions, derived from the saved (state, city) pairs. */
+  stateCities?: Record<string, string[]>;
   registeredRanges: { key: string; label: string }[];
   sortOptions: { key: string; label: string }[];
   /** The profile schema rows (the ProfileField shape the Users store reads). */
   profileFields?: Record<string, unknown>[];
   /** Decisions not yet taken, named on the screens they affect. */
   openDecisions?: OpenDecision[];
+  /** A public handle's length, as the profile PATCH enforces it. */
+  usernameRules?: { min: number; max: number };
+  /** Handles no profile may take (PanelVocab `reserved_username`), refused case-insensitively. */
+  reservedUsernames?: string[];
 }
 export interface OpenDecision { id: string; title: string; position: string; blocks: string }
 
+/** One month of GET v1/admin/users/analytics/. MONTH-KEYED so any span the panel
+ *  asks for is real arithmetic rather than a pre-summed window; `bySource` sums
+ *  exactly to `registrations`, with "" the accounts whose channel was never
+ *  recorded. */
+export interface UsersAnalyticsMonth {
+  month: string; label: string; short: string;
+  registrations: number;
+  /** Registered that month AND holding every required profile field today. */
+  profileCompleted: number;
+  bySource: Record<string, number>;
+}
+export interface UsersAnalytics {
+  /** The server's own "now", so every window is computed against its clock. */
+  asOf: string;
+  months: UsersAnalyticsMonth[];
+  /** Every channel the split is keyed by, "" = Not recorded. */
+  sources: { key: string; label: string }[];
+  /** The whole population, counted NOW — not the page the directory loaded. */
+  base: { total: number; active: number; deactivated: number; incompleteProfiles: number };
+}
+
 /** A plan purchase (TransectionData) as `payments/` returns it. Money is a
  *  RUPEE string here, not paise — the legacy model stores it that way. */
+/** WHO PAID a plan purchase. TransectionData has no user column; the plan row
+ *  carrying the same transactionId names the buyer, and the server joins it.
+ *  Null when no plan row names the payment — never a guessed customer. */
+export interface PayerRef { userId: number | null; name: string; business: string; planStatus: string }
 export interface PlanPaymentRow {
   id: number; orderId: string; transactionId: string; amount: string; paymentFor: string;
   orderStatus: string; paymentMethod: string; refundStatus: string; refundAmount: string;
   verifiedAt: string | null; createdAt: string;
+  payer?: PayerRef | null;
 }
 export interface PlanPaymentsListResponse { payments: PlanPaymentRow[]; total: number; pageNo: number; pageSize: number; }
 
@@ -655,6 +716,14 @@ export interface InstallmentsListResponse { installments: InstallmentRow[]; tota
 export interface IncomeRow {
   id: number; kind: VocabItem; amountPaise: number; description: string; party: string; mode: VocabItem;
   reference: string; valueDate: string; account: VocabItem; state: VocabItem; recordedAt: string;
+  receipt?: { url: string | null; name: string; mime: string; bytes: number };
+  cancelReason?: string; cancelledBy?: { id: number; username: string } | null; cancelledAt?: string | null;
+  recordedBy?: { id: number; username: string } | null;
+}
+/** POST income/. The receipt is already in S3 (presigned PUT). */
+export interface IncomeRecordInput {
+  kind: string; amountPaise: number; description: string; party?: string; mode: string; reference: string;
+  valueDate: string; account: string; receiptUrl: string; receiptName?: string; receiptMime: string; receiptBytes?: number;
 }
 export interface IncomeListResponse { income: IncomeRow[]; total: number; pageNo: number; pageSize: number; }
 
@@ -667,6 +736,28 @@ export interface WorkItemRow {
   /** team/d2: the item it rolls up into, and progress derived by the server
    *  (milestone = completed children ÷ all; target = EOD deltas ÷ value; task 0|100). */
   parent?: number | null; progress?: number | null;
+  description?: string; createdBy?: DealPersonRef | null; blockedBy?: number | null;
+  cancelledReason?: string; cancelledAt?: string | null; createdAt?: string; updatedAt?: string;
+  /** WHAT it waits for, beside WHICH task it waits on. Empty when nothing blocks it. */
+  blockedReason?: string;
+  /** The task's own steps. `progress` above counts them (a completed task is
+   *  100 whatever they say); ids are stable across every checklist write. */
+  checklist?: WorkCheckLine[];
+  /** Soft edges OUT of this task. Stored on this end only — the far end reads
+   *  them by scanning and prints the inverse label from the relation's vocab
+   *  row (`hint` on GET vocab/work-link-relations/). */
+  itemLinks?: WorkItemLink[];
+}
+export interface WorkCheckLine { id: string; text: string; done: boolean }
+export interface WorkItemLink { itemId: number; relation: string }
+/** PATCH work/<id>/. `rowVersion` is required; a key sent as null clears it
+ *  (blockedBy, parent); `tags` and `links` are the FULL list. */
+export interface WorkUpdateInput {
+  rowVersion: number; title?: string; description?: string; assignee?: number; priority?: string;
+  startDate?: string | null; dueDate?: string | null; kind?: string; targetValue?: number | null;
+  targetUnit?: string; tags?: number[]; links?: WorkLink[]; blockedBy?: number | null; parent?: number | null;
+  /** Written with `blockedBy` and dropped with it. */
+  blockedReason?: string;
 }
 export interface WorkTagRef { id: number; slug: string; label: string; tone: VocabItem }
 export interface WorkTagRow extends WorkTagRef { owner: DealPersonRef; createdAt: string; archivedAt: string | null }
@@ -676,7 +767,7 @@ export interface WorkLink { url: string; label: string }
 export interface WorkCreateInput {
   title: string; description?: string; assignee?: number; priority?: string; startDate?: string | null;
   dueDate?: string | null; kind?: string; targetValue?: number | null; targetUnit?: string;
-  tags?: number[]; links?: WorkLink[];
+  tags?: number[]; links?: WorkLink[]; blockedBy?: number | null; parent?: number | null;
 }
 /* ── who owes a plan / report, leave, agreements (overview/d6) ── */
 export interface WorkSettingsRow {
@@ -686,19 +777,169 @@ export interface WorkSettingsRow {
   reportsTo: DealPersonRef | null; updatedAt: string;
   designation?: VocabItem | null; employmentType?: VocabItem | null;
 }
+/** One line of what a salary is MADE of. `kind` decides which side it falls
+ *  on: net is gross minus the deductions, and the run does that arithmetic. */
+export interface SalaryComponentRow {
+  key: string; label: string; kind: "earning" | "deduction"; amountPaise: number;
+}
+/** Where the salary is sent. SENSITIVE: every field but the bank's name comes
+ *  back as its last four characters and the whole value never leaves the
+ *  server — so this is what a screen may print, not what it may edit back. */
+export interface PayToRef {
+  bankName: string; accountMasked: string; ifsc: string; upi: string; pan: string; uan: string;
+}
 /** GET salaries/accounts/?member= (team/d2) — finance-salaries.view. */
-export interface SalaryAccountRow { id: number; member: DealPersonRef; employeeCode: string; monthlyGrossPaise: number; isActive: boolean }
+export interface SalaryAccountRow {
+  id: number; member: DealPersonRef; employeeCode: string; monthlyGrossPaise: number;
+  isActive: boolean; createdAt?: string | null;
+  /** Who opened it, off the audit trail; null when the trail has no opening. */
+  openedBy?: DealPersonRef | null;
+  components?: SalaryComponentRow[];
+  /** Σ the deduction components, and gross minus them. */
+  deductionsPaise?: number; monthlyNetPaise?: number;
+  payTo?: PayToRef;
+}
+/** GET subs/ — one purchased plan (BusinessPlan / ShopPlan / ArchitectPlan /
+ *  AutomationPlan), with the gateway payment that bought it where there is
+ *  one. `amount` is a RUPEE string, as the plan row stores it. */
+export interface SubPaymentRef {
+  orderId: string; transactionId: string; amount: string; orderStatus: string;
+  paymentMethod: string; refundStatus: string; refundAmount: string;
+  createdAt: string | null; verifiedAt: string | null; refundedAt: string | null;
+  /** The admin who verified a MANUAL payment; null for a gateway one. */
+  verifiedBy?: { id: number; username: string } | null;
+  /** Set when an admin reversed it (orderStatus REVERSED): it no longer counts. */
+  reversedAt?: string | null; reversalReason?: string;
+}
+export interface SubRow {
+  id: number; family: string; amount: string; status: string; isActive: boolean;
+  user: string | null; userId: number | null; customer: string | null;
+  entityName: string | null; planId: number | null; planTitle: string | null;
+  durationMonths: number | null; buyIntent: string | null; transactionId: string | null;
+  /** How the sale happened, computed by the server off `buyIntent`. */
+  source: SubSourceKey;
+  startedAt: string | null; recordedAt: string | null; expireDate: string | null;
+  payment: SubPaymentRef | null;
+  /** The commitment recorded over this purchase, when one has been — where it
+   *  stands, whether it renews, and why it stopped. Null until somebody
+   *  records one. */
+  subscription: SubscriptionRow | null;
+}
+/** An accepted quotation as a subscription reads it (subs Chain.py). */
+export interface SubQuotationRef {
+  id: number; quotationNumber: string | null; dealRef: string; planName: string; termMonths: number;
+  installments: number; installmentGapMonths: number; grandTotalPaise: number; quotationDate: string;
+}
+/** One row of a quotation's schedule, with the deal-ledger payment behind it. */
+export interface SubInstallmentRow {
+  id: number; seq: number; count: number; amountPaise: number; dueDate: string;
+  /** InstallmentStatus key: due · paid · failed · cancelled. */
+  status: string; invoiceNumber: string | null; paidAt: string | null; failedAt: string | null;
+  failureReason: string | null; failureNote: string;
+  payment: { id: number; amountPaise: number; mode: string; reference: string; paymentDate: string;
+    recordedBy: string | null; recordedAt: string | null } | null;
+}
+/** An invoice raised on a chain's quotation. `carriesSeq` = the installment it
+ *  already settles; null when nothing does. */
+export interface SubChainInvoice {
+  id: number; invoiceNumber: string | null; status: string; quotationNumber: string | null; dealRef: string;
+  billingName: string; description: string; placeOfSupply: string; invoiceDate: string; dueDate: string;
+  paymentDate: string | null; taxablePaise: number; grandTotalPaise: number; carriesSeq: number | null;
+}
+/** GET subscriptions/chains/ — an accepted quotation on a deal linked to its customer. */
+export interface SubChainRow {
+  userId: number; quotation: SubQuotationRef; invoices: SubChainInvoice[]; subscriptionId: number | null;
+}
+/** interior_admin.Subscription — the recurring commitment ON TOP of a plan
+ *  purchase, or over an accepted QUOTATION (migration 0063). A purchase is one
+ *  payment, so its installment line is derived from that payment; a quotation's
+ *  schedule is its own Installment rows, read back as `installments`. */
+export interface SubscriptionRow {
+  id: number; family: string | null; purchaseId: number | null; userId: number | null;
+  /** The account holder's name, or their username. */
+  customer?: string;
+  quotation?: SubQuotationRef | null;
+  /** The quotation's schedule; null on a purchase. */
+  installments?: SubInstallmentRow[] | null;
+  state: VocabItem | null; cycleMonths: number;
+  startedOn: string | null; renewsOn: string | null;
+  cancelledAt: string | null; cancelReason: string;
+  soldBy: { id: number; username: string } | null;
+  recordedBy: { id: number; username: string } | null;
+  recordedAt: string | null; updatedAt: string | null;
+  /** While `defaulting`: what the fail to pay recorded — an
+   *  installment-failure-reasons key and the evidence — read back off the audit
+   *  trail. Null in any other state. */
+  failure?: { reason: string; note: string; at: string | null; by: { id: number; username: string } | null } | null;
+  /** Only on GET subscriptions/ — the purchase this stands over, with the
+   *  payment that bought it. */
+  purchase?: SubRow | null;
+  /** Only on GET subscriptions/ — the purchase's `source`; null with no purchase. */
+  source?: SubSourceKey | null;
+}
+/** vocab/subscription-sources keys. */
+export type SubSourceKey = "sales" | "website";
+/** vocab/refund-origins keys. */
+export type RefundOriginKey = "subscription" | "deal_payment" | "manual";
+export interface SubscriptionsListResponse {
+  subscriptions: SubscriptionRow[]; total: number; pageNo: number; pageSize: number;
+}
+export interface SubsListResponse {
+  subs: SubRow[]; total: number; pageNo: number; pageSize: number; family: string;
+  analytics: { activeCount: number; expiredCount: number; pendingCount: number; totalCount: number; revenue: number };
+}
+/** The slip's OWN copy of how its figures were reached, frozen when the run
+ *  was built. `basePaise` is the full month's gross and never moves — it is
+ *  what loss of pay pro-rates against, which is why applying it twice is safe
+ *  and why a later raise cannot reach back into the month. */
+export interface PayslipBreakdown {
+  earnings?: SalaryComponentRow[]; deductions?: SalaryComponentRow[]; basePaise?: number;
+  incentivePaise?: number; adjustmentPaise?: number; adjustmentReason?: string;
+  remark?: string; issuedAt?: string | null;
+}
+/** GET salaries/slips/?month=&member= — finance-salaries.view. One payslip.
+ *  `mode`/`reference`/`paidFrom`/`receipt` are filled when it is paid. */
+export interface PayslipRow {
+  id: number; runId: number; month: string; accountId: number; member: DealPersonRef;
+  employeeCode: string; grossPaise: number; deductionsPaise: number; netPaise: number;
+  paidDays: number; lopDays: number; paidAt: string | null; held: boolean;
+  mode: VocabItem | null; reference: string;
+  breakdown?: PayslipBreakdown;
+  /** The slip has no column for it — it rides the audit trail with the hold,
+   *  and the server reads that trail back by subject. */
+  heldReason?: string;
+  paidFrom?: VocabItem | null;
+  /** The transfer receipt, a private Attachment read back as a signed URL. */
+  receipt?: { id: number; fileName: string; mimeType: string; sizeKb: number; url: string } | null;
+}
+export interface PayslipsResponse { slips: PayslipRow[]; total: number }
+/** POST salaries/runs/ — the run just built and every slip on it. */
+export interface SalaryRunBuildResponse { run: SalaryRunRow; slips: PayslipRow[] }
+/** POST salaries/slips/<id>/pay/ — the slip, and the run it may have closed. */
+export interface PayslipPayResponse { slip: PayslipRow; run: SalaryRunRow }
 /** GET resources/?member= (team/d2): the member's forms (audience or answered) and their responses. */
 export interface ResourceRow {
   id: number; title: string; description: string; tags: string[]; roles: { id: number; name: string }[];
   state: VocabItem; version: number; fields: unknown[]; createdAt: string | null; openedAt: string | null;
-  closedAt: string | null; responses: number | null;
+  closedAt: string | null; responses: number | null; createdBy?: DealPersonRef | null;
 }
-export interface ResourceResponseRow { id: number; resource: number; version: number; member: DealPersonRef; submittedAt: string | null }
+export interface ResourceAnswerRow {
+  fieldId: string; label: string; value: string;
+  file?: { fileName: string; mimeType: string; sizeKb: number; url: string } | null;
+}
+export interface ResourceResponseRow {
+  id: number; resource: number; version: number; member: DealPersonRef; submittedAt: string | null;
+  answers?: ResourceAnswerRow[];
+}
+/** POST/PUT resources/. `roles` are rbac Role ids; empty = every active member. */
+export interface ResourceDraftInput {
+  title: string; description: string; tags: string[]; roles: number[]; fields: unknown[];
+}
 /** GET incentives/?member= (team/d2) — finance-salaries.view. Money in paise. */
 export interface IncentiveRow {
   id: number; member: DealPersonRef; month: string; workItem: { id: number; title: string } | null; basis: string;
   amountPaise: number; state: VocabItem; decidedAt: string | null; paidAt: string | null;
+  createdBy?: DealPersonRef | null; createdAt?: string; decidedBy?: DealPersonRef | null;
 }
 export interface LeaveRow {
   id: number; member: DealPersonRef; kind: VocabItem; fromDate: string; toDate: string; reason: string;
@@ -720,6 +961,39 @@ export interface AgreementRow {
   id: number; member: DealPersonRef; kind: VocabItem; title: string; version: number; state: VocabItem;
   sentAt: string | null; sentBy: DealPersonRef | null; viewedAt: string | null; signedAt: string | null;
   signedName: string; expiresAt: string | null; createdAt: string;
+  /** The document frozen at send, the signing token and the signer's address —
+   *  every list row is the caller's own or read with full access. */
+  body: string; token: string; signerIp: string | null;
+  /** The template row it was rendered from; "" for a body typed by hand.
+   *  Provenance that survives a rename, which kind + title did not. */
+  templateKey: string;
+}
+/** POST agreements/ — full access. `body` is the panel's rendered template;
+ *  `expiresAt` a date (end of that day), omitted = seven days. */
+export interface AgreementSendInput {
+  member: number; kind: string; title: string; body: string; version?: number; expiresAt?: string;
+  /** The NotificationTemplate key. The one-live-copy guard keys off it. */
+  templateKey?: string;
+}
+/** GET agreements/templates/ — the WORDING, reused. A NotificationTemplate row
+ *  on channel `agreement`; `key` is what an Agreement's `templateKey` holds. */
+export interface AgreementTemplateRow {
+  key: string; title: string; kind: string; purpose: string;
+  state: "draft" | "active" | "retired"; version: number;
+  clauses: { clauseId: string; heading: string; text: string }[];
+  createdAt: string; updatedAt: string | null;
+}
+export interface AgreementTemplateInput {
+  title: string; kind: string; purpose?: string;
+  clauses: { clauseId?: string; heading?: string; text: string }[];
+}
+/** GET member-documents/ (team/d1). `file` is a SIGNED, expiring read of a
+ *  private object — never a bare URL — and null when no file was handed over. */
+export interface MemberDocumentRow {
+  id: number; member: DealPersonRef; kind: VocabItem & { required: boolean }; label: string; fileName: string;
+  sizeKb: number; uploadedAt: string; uploadedBy: DealPersonRef | null; verifiedBy: DealPersonRef | null;
+  verifiedAt: string | null;
+  file: { fileName: string; mimeType: string; sizeKb: number; url: string } | null;
 }
 /** GET overview/operations/ (overview/d7): the Operations card's counts, on the
  *  server's clock. Counts only; `leave` ignores the role filter. */
@@ -751,13 +1025,28 @@ export interface WorkListResponse { items: WorkItemRow[]; total: number; pageNo:
 /* ── the finance section's own reads (overview/d5) ───────────────────────── */
 /** A spend row's tag carries its KIND, because `excluded` spend (taxes,
  *  statutory) leaves the bank without changing any operating figure. */
-export interface SpendTagRef extends VocabItem { kind: string; budgetPaise: number }
+export interface SpendTagRef extends VocabItem { kind: string; budgetPaise: number; custom?: boolean }
+/** One row of the `expense-tags` value list. `custom` is the tags made in the
+ *  panel rather than shipped with the seed. */
+export interface ExpenseTagRow extends SpendTagRef { proofRequired: boolean; custom: boolean }
 export interface SpendRow {
   id: number; label: string; amountPaise: number; tag: SpendTagRef | null; category: string;
   kind: string; state: "recorded" | "cancelled"; mode: VocabItem | null; reference: string;
   account: VocabItem | null; valueDate: string | null;
   bill: { url: string | null; name: string; mime: string; bytes: number };
   cancelReason: string; cancelledAt: string | null; recordedAt: string | null;
+  /** Who the money went TO — the debit's half of the party a credit has always
+   *  carried. "" when nobody was named. */
+  party?: string;
+  /** Rupees, the same figure as amountPaise. */
+  amount?: number;
+  cancelledBy?: { id: number; username: string } | null; recordedBy?: { id: number; username: string } | null;
+}
+/** POST revenue/expense/ as the spend record. `amount` is RUPEES; the bill is an S3 key. */
+export interface ExpenseInput {
+  label: string; amount: number; category?: string; kind?: string; incurredAt?: string;
+  tag?: string; mode?: string; reference?: string; account?: string; party?: string;
+  billUrl?: string; billName?: string; billMime?: string; billBytes?: number;
 }
 export interface SpendTagTotal {
   key: string; label: string; kind: string; budgetPaise: number; spentPaise: number; n: number;
@@ -779,16 +1068,46 @@ export interface SalariesResponse {
   /** Every unpaid slip in every run, held slips left out (overview/d8). */
   owed: { paise: number; people: number };
 }
+/** EXACTLY ONE of `payment` / `dealPayment` / `payeeName` says who is owed —
+ *  a plan payment, a deal payment, or a name and nothing else behind it. */
 export interface RefundRow {
   id: number; amountPaise: number; ground: VocabItem; detail: string; state: VocabItem;
-  payment: { id: number; orderId: string; transactionId: string; amountPaise: number; orderStatus: string; paymentFor: string };
+  /** Which of the three below is filled, computed by the server. */
+  origin: RefundOriginKey;
+  payment: { id: number; orderId: string; transactionId: string; amountPaise: number; orderStatus: string; paymentFor: string } | null;
+  dealPayment?: {
+    id: number; dealId: number; invoiceId: number; amountPaise: number;
+    reference: string; mode: string; paymentDate: string | null;
+    /** The deal's ref and its contact — the only name a deal payment holds,
+     *  and therefore who the money is going back to. */
+    deal: string; party: string;
+  } | null;
+  /** Who the money goes to when no payment row names them. */
+  payeeName?: string;
   requestedAt: string; decidedAt: string | null; decisionNote: string;
   settledAt: string | null; mode: VocabItem | null; reference: string;
+  /** Which of our own accounts the money left, recorded on settlement. */
+  account?: VocabItem | null;
+  requestedBy?: { id: number; username: string } | null; decidedBy?: { id: number; username: string } | null;
+  settledBy?: { id: number; username: string } | null;
+  /** The payer of the plan payment this reverses — the refund's payee. */
+  payer?: PayerRef | null;
 }
+/** One line of GET bank/statements/<id>/ `rows`. */
+export interface BankLineRow {
+  id: number; date: string; direction: "credit" | "debit"; amountPaise: number; reference: string;
+  narration: string; counterparty: string;
+  match: { kind: "payment" | "deal-payment" | "income" | "spend" | "none"; id: number | null; label: string };
+  matchedHow: string;
+  resolution: { kind: VocabItem; reason: string; at: string } | null;
+}
+export interface BankStatementDetail extends BankStatementRow { rows: BankLineRow[] }
 export interface RefundsListResponse {
   refunds: RefundRow[]; total: number; pageNo: number; pageSize: number;
   /** Approved and not yet sent — all of it, whenever it was asked for. */
   owed: { n: number; paise: number }; toDecide: number;
+  /** The window a refund is read against, and whether a partial refund is accepted. */
+  policy: { windowDays: number; partial: boolean };
 }
 export interface BankTotals {
   lines: number; matched: number; matchedPct: number | null; unexplained: number; variancePaise: number;
@@ -805,8 +1124,10 @@ export interface AttendanceDayRow {
   id: number | null; member: DealPersonRef; businessDate: string; startedAt: string | null; endedAt: string | null;
   breakMinutes: number; workedMinutes: number | null; isLate: boolean; lateByMinutes: number;
   /** The label is the backend's (team/d2); the key is what code compares. */
-  state: { key: "working" | "on_break" | "ended" | "unclosed" | "absent" | "not_started" | "on_leave"; label: string; tone: string };
+  state: { key: "working" | "on_break" | "ended" | "unclosed" | "absent" | "not_started" | "on_leave" | "weekly_off"; label: string; tone: string };
   source: VocabItem | null;
+  breaks?: { startedAt: string; endedAt: string | null; minutes: number }[];
+  correctedBy?: DealPersonRef | null; correctedAt?: string | null; correctionNote?: string;
 }
 export interface AttendanceDaysResponse { days: AttendanceDayRow[]; total: number; pageNo: number; pageSize: number; }
 /** The rare repair path only — an issued invoice that somehow has no ledger
@@ -865,6 +1186,49 @@ export class AdminOpsService {
   static salaryAccounts(params: { member?: string } = {}) {
     return apiService.getGetApiResponse<{ accounts: SalaryAccountRow[] }>(`${base}/salaries/accounts/${qs(params)}`);
   }
+  /** POST salaries/accounts/ — finance-salaries.approve. One account per member.
+   *  `components` earnings must add up to `monthlyGrossPaise`; `payTo` goes in
+   *  whole and only ever comes back masked. */
+  static createSalaryAccount(data: {
+    member: number; employeeCode: string; monthlyGrossPaise: number;
+    components?: SalaryComponentRow[]; payTo?: Partial<PayToRef>;
+  }) {
+    return apiService.getPostApiResponse<SalaryAccountRow>(`${base}/salaries/accounts/`, data);
+  }
+  /** PATCH salaries/accounts/<id>/ — revise or close one. `reason` is mandatory
+   *  when `isActive` goes false; it rides the audit trail. */
+  static updateSalaryAccount(id: number, data: {
+    employeeCode?: string; monthlyGrossPaise?: number; isActive?: boolean; reason?: string;
+    components?: SalaryComponentRow[]; payTo?: Partial<PayToRef>;
+  }) {
+    return apiService.getPatchApiResponse<SalaryAccountRow>(`${base}/salaries/accounts/${id}/`, data);
+  }
+  /** GET salaries/slips/?month=&member= — every payslip, newest month first. */
+  static payslips(params: { month?: string; member?: string } = {}) {
+    return apiService.getGetApiResponse<PayslipsResponse>(`${base}/salaries/slips/${qs(params)}`);
+  }
+  /** POST salaries/runs/ — build one month: a slip per active account. */
+  static buildSalaryRun(month: string) {
+    return apiService.getPostApiResponse<SalaryRunBuildResponse>(`${base}/salaries/runs/`, { month });
+  }
+  /** POST salaries/slips/<id>/pay/ — finance-salaries.pay. The run closes
+   *  itself when its last slip is paid.
+   *  `incentivePaise` adds and `adjustmentPaise` corrects either way (negative
+   *  recovers an advance, and then `adjustmentReason` is mandatory); both land
+   *  on the slip's frozen breakdown rather than inside the gross. `receipt*`
+   *  is one presigned upload, kept as a private Attachment. */
+  static payPayslip(id: number, data: {
+    mode: string; reference?: string; paidFrom?: string;
+    incentivePaise?: number; adjustmentPaise?: number; adjustmentReason?: string; remark?: string;
+    receiptUrl?: string; receiptName?: string; receiptMime?: string; receiptSizeKb?: number;
+  }) {
+    return apiService.getPostApiResponse<PayslipPayResponse>(`${base}/salaries/slips/${id}/pay/`, data);
+  }
+  /** POST salaries/slips/<id>/lop/ — finance-salaries.approve. Days not worked
+   *  and not paid, pro-rated against the slip's own frozen `basePaise`. */
+  static setPayslipLop(id: number, days: number) {
+    return apiService.getPostApiResponse<PayslipPayResponse>(`${base}/salaries/slips/${id}/lop/`, { days });
+  }
   /** GET access-requests/ — team.requests; anyone else gets a 403. */
   static accessRequests(params: { state?: string } = {}) {
     return apiService.getGetApiResponse<AccessRequestsResponse>(`${base}/access-requests/${qs(params)}`);
@@ -906,6 +1270,19 @@ export class AdminOpsService {
   static audit(params: {
     module?: string; role?: string; search?: string; destructive?: string;
     dateFrom?: string; dateTo?: string; pageNo?: number; pageSize?: number;
+    /** "platform" narrows the whole read to rows about a platform ACCOUNT —
+     *  not the panel's own staff, and not the rows that are about no person at
+     *  all (a plan price, a taxonomy row). A scope, not a facet: the facet
+     *  counts are taken inside it. */
+    subject?: string;
+    /** ONE RECORD'S HISTORY, when that record is not a person — an agreement
+     *  (`agreement`), its template (`agreement_template`), a work tag
+     *  (`work_tag`), a salary account (`salary_account`), a run
+     *  (`salary_run`), a slip (`payslip`), a subscription (`subscription`), a
+     *  refund (`refund`). BOTH are needed: a type alone reads every
+     *  agreement's trail at once. This pair is why a history tab needs no
+     *  events table. */
+    subjectType?: string; subjectId?: string;
   } = {}) {
     return apiService.getGetApiResponse<AuditResponse>(`${base}/audit/${qs(params)}`);
   }
@@ -938,7 +1315,7 @@ export class AdminOpsService {
   static revenue(params: { start?: string; end?: string } = {}) {
     return apiService.getGetApiResponse<RevenueOverview>(`${base}/revenue/${qs(params)}`);
   }
-  static addExpense(data: { label: string; amount: number; category?: string; kind?: string; incurredAt?: string }) {
+  static addExpense(data: ExpenseInput) {
     return apiService.getPostApiResponse<any>(`${base}/revenue/expense/`, data);
   }
   static setAssumptions(data: Partial<RevenueAssumptions>) {
@@ -1037,6 +1414,47 @@ export class AdminOpsService {
   }
   static platformUser(pk: number) {
     return apiService.getGetApiResponse<PlatformUserRecord>(`${base}/platform-users/${pk}/`);
+  }
+  /** Correct one account's business profile. The body is {schema key: value} and
+   *  WHICH keys are accepted is the profile schema itself (users/vocabularies/
+   *  `profileFields`): a key that is not a row, a row that is not editable, or a
+   *  row with no column behind it refuses the whole patch — there is no partial
+   *  write. Answers with the record as it now stands. */
+  static updatePlatformUserProfile(pk: number, patch: Record<string, unknown>) {
+    return apiService.getPatchApiResponse<PlatformUserRecord>(`${base}/platform-users/${pk}/`, patch);
+  }
+  /** The WHOLE set of operational tags this account carries. Add and remove are
+   *  derived from what it already holds, so one call is both. */
+  static setPlatformUserTags(pk: number, slugs: string[]) {
+    return apiService.getPutApiResponse<PlatformUserRecord>(`${base}/platform-users/${pk}/tags/`, { slugs });
+  }
+  /** The ACCOUNT switch. A reason is required to deactivate and is stored on the
+   *  account and on the audit line; reactivating needs none. Soft: the profile,
+   *  the tags and the trail all stay. */
+  static setPlatformUserStatus(pk: number, status: "active" | "deactivated", reason: string) {
+    return apiService.getPostApiResponse<PlatformUserRecord>(
+      `${base}/platform-users/${pk}/status/`, { status, reason });
+  }
+  /** One internal note on an account. The author and the moment are the
+   *  server's; the list comes back on the record, so this answers with it. */
+  static addPlatformUserNote(pk: number, text: string) {
+    return apiService.getPostApiResponse<PlatformUserRecord>(
+      `${base}/platform-users/${pk}/notes/`, { text });
+  }
+  /** Add one tag to the catalogue. The slug is derived from the label and is what
+   *  every assignment keys on, so it is never edited afterwards. */
+  static createUserTag(tag: { label: string; tone?: string; help?: string }) {
+    return apiService.getPostApiResponse<UserTagItem>(`${base}/users/tags/`, tag);
+  }
+  /** Retire a tag, bring it back, or correct what it says. Retiring keeps every
+   *  assignment it already has — it only stops being offered. */
+  static updateUserTag(slug: string, patch: { isActive?: boolean; label?: string; tone?: string; help?: string }) {
+    return apiService.getPatchApiResponse<UserTagItem>(
+      `${base}/users/tags/${encodeURIComponent(slug)}/`, patch);
+  }
+  /** The Users analytics payload, counted from the accounts themselves. */
+  static usersAnalytics() {
+    return apiService.getGetApiResponse<UsersAnalytics>(`${base}/users/analytics/`);
   }
 
   // ── Businesses ──
@@ -1153,7 +1571,45 @@ export class AdminOpsService {
   }
 
   // ── Subscriptions ──
-  static subs(params: { family?: string; status?: string; pageNo?: number; pageSize?: number } = {}) { return apiService.getGetApiResponse<any>(`${base}/subs/${qs(params)}`); }
+  /** The PURCHASES, each carrying whatever commitment stands over it. */
+  static subs(params: { family?: string; status?: string; pageNo?: number; pageSize?: number } = {}) { return apiService.getGetApiResponse<SubsListResponse>(`${base}/subs/${qs(params)}`); }
+  /** The COMMITMENTS, each joined to its purchase and that purchase's payment. */
+  static subscriptions(params: { state?: string; pageNo?: number; pageSize?: number } = {}) {
+    return apiService.getGetApiResponse<SubscriptionsListResponse>(`${base}/subscriptions/${qs(params)}`);
+  }
+  /** POST subscriptions/ — record one by hand against a purchase that already
+   *  exists, or over an accepted `quotation` (with `paidCount`, checked against
+   *  the ledger). The customer is NOT sent: it is the purchase's or the deal's. */
+  static recordSubscription(data: {
+    family?: string; purchase?: number; quotation?: number; paidCount?: number; state?: string;
+    cycleMonths?: number; startedOn?: string; renewsOn?: string; soldBy?: number; note?: string;
+  }) {
+    return apiService.getPostApiResponse<SubscriptionRow>(`${base}/subscriptions/`, data);
+  }
+  /** POST subscriptions/<id>/state/ — `defaulting` is what a fail to pay
+   *  records. Cancelling is its own verb because it needs a reason. */
+  static setSubscriptionState(id: number, data: { state: string; reason?: string; note?: string }) {
+    return apiService.getPostApiResponse<SubscriptionRow>(`${base}/subscriptions/${id}/state/`, data);
+  }
+  static cancelSubscription(id: number, reason: string) {
+    return apiService.getPostApiResponse<SubscriptionRow>(`${base}/subscriptions/${id}/cancel/`, { reason });
+  }
+  /** GET subscriptions/chains/ — what a sale is recorded from (finance.view). */
+  static subscriptionChains() {
+    return apiService.getGetApiResponse<{ chains: SubChainRow[] }>(`${base}/subscriptions/chains/`);
+  }
+  /** POST subscriptions/<id>/installments/<seq>/pay/ — settle one with the issued invoice that billed it. */
+  static paySubscriptionInstallment(id: number, seq: number, invoice: string) {
+    return apiService.getPostApiResponse<SubscriptionRow>(`${base}/subscriptions/${id}/installments/${seq}/pay/`, { invoice });
+  }
+  /** POST subscriptions/<id>/installments/<seq>/fail/ — the deal's own fail rule. */
+  static failSubscriptionInstallment(id: number, seq: number, data: { reason: string; note: string }) {
+    return apiService.getPostApiResponse<SubscriptionRow>(`${base}/subscriptions/${id}/installments/${seq}/fail/`, data);
+  }
+  /** POST subscriptions/<id>/reverse/ — a recorded payment was wrong (finance.reverse). No money moves. */
+  static reverseSubscriptionPayment(id: number, data: { seq?: number; reason: string }) {
+    return apiService.getPostApiResponse<SubscriptionRow>(`${base}/subscriptions/${id}/reverse/`, data);
+  }
 
   // ── Routing / Quarantine (LeadQuery) ──
   static routing(params: { status?: string; tier?: string; pageNo?: number } = {}) { return apiService.getGetApiResponse<any>(`${base}/routing/${qs(params)}`); }
@@ -1435,6 +1891,15 @@ export class AdminOpsService {
   static cancelSpend(id: number, reason: string) {
     return apiService.getPostApiResponse<SpendRow>(`${base}/spend/${id}/cancel/`, { reason });
   }
+  /** The expense-tag table. The list is `vocab("expense-tags")`; these two
+   *  write it — a tag is created, re-budgeted, and switched off or back on,
+   *  never deleted and never re-kinded. */
+  static createExpenseTag(data: { label: string; kind: string; budgetPaise?: number; proofRequired?: boolean }) {
+    return apiService.getPostApiResponse<ExpenseTagRow>(`${base}/spend/tags/`, data);
+  }
+  static updateExpenseTag(key: string, data: { budgetPaise?: number; isActive?: boolean }) {
+    return apiService.getPatchApiResponse<ExpenseTagRow>(`${base}/spend/tags/${key}/`, data);
+  }
   /** Payroll runs. `start`/`end` are MONTHS (YYYY-MM) on the date a run was
    *  paid — a June run paid in August is August's money out. */
   static salaries(params: { start?: string; end?: string; state?: string } = {}) {
@@ -1447,7 +1912,10 @@ export class AdminOpsService {
   static decideRefund(id: number, data: { state: "approved" | "declined"; note?: string }) {
     return apiService.getPostApiResponse<RefundRow>(`${base}/refunds/${id}/decide/`, data);
   }
-  static settleRefund(id: number, data: { mode: string; reference: string }) {
+  /** `account` is which of our own accounts the money left. Optional on the
+   *  server because CompanyAccount ships empty and is filled per environment —
+   *  a key that names nothing is still refused. */
+  static settleRefund(id: number, data: { mode: string; reference: string; account?: string }) {
     return apiService.getPostApiResponse<RefundRow>(`${base}/refunds/${id}/settle/`, data);
   }
   /** Statements and how much of the bank the records explain. */
@@ -1467,6 +1935,21 @@ export class AdminOpsService {
   static createWork(data: WorkCreateInput) {
     return apiService.getPostApiResponse<WorkItemRow>(`${base}/work/`, data);
   }
+  /** ONE SOFT EDGE OUT of this task, stored on this end only. `relation` is a
+   *  key from `vocab("work-link-relations")`. Refused: an unknown relation, a
+   *  task that is not there, itself, and a pair already linked. No rowVersion —
+   *  the call names the exact edge, so there is no update to lose. */
+  static addWorkLink(id: number, data: { itemId: number; relation: string }) {
+    return apiService.getPostApiResponse<WorkItemRow>(`${base}/work/${id}/links/`, data);
+  }
+  static removeWorkLink(id: number, toId: number) {
+    return apiService.getDeleteApiResponse<WorkItemRow>(`${base}/work/${id}/links/${toId}/`);
+  }
+  /** THE WHOLE LIST, IN ORDER. Add, rename, tick, remove and reorder are all
+   *  this one write; a line keeps the id it is sent with. */
+  static setWorkChecklist(id: number, data: { rowVersion: number; lines: { id?: string; text: string; done?: boolean }[] }) {
+    return apiService.getPutApiResponse<WorkItemRow>(`${base}/work/${id}/checklist/`, data);
+  }
   /** `owner` omitted = the caller's own tags; an id or `all` needs work.all. */
   static workTags(params: { owner?: string; includeArchived?: boolean } = {}) {
     return apiService.getGetApiResponse<{ tags: WorkTagRow[] }>(`${base}/work/tags/${qs(params)}`);
@@ -1478,6 +1961,20 @@ export class AdminOpsService {
   /** One value list, whole (interior_admin VocabViews LISTS). */
   static vocab(name: string) {
     return apiService.getGetApiResponse<{ items: VocabItem[] }>(`${base}/vocab/${name}/`);
+  }
+  /** The letterhead (VocabViews.CompanyView): these five fields and nothing else; gstin "" while unregistered. */
+  static company() {
+    return apiService.getGetApiResponse<{ brand: string; name: string; address: string; cin: string; gstin: string }>(
+      `${base}/company/`);
+  }
+  /** The Finance panel's words (VocabViews.FinanceVocabulariesView): formulas, cautions, decisions, log labels. */
+  static financeVocabularies() {
+    type Def = { key: string; label: string; unit: string; formula: string; caution: string };
+    return apiService.getGetApiResponse<{
+      slipRule: string; eventTypes: { key: string; label: string; tone: string }[];
+      metricDefinitions: Def[]; kpiDefinitions: (Def & { group: string; goodDirection: string })[];
+      payrollMetricDefinitions: Def[]; openDecisions: { id: string; title: string; position: string; status: string }[];
+    }>(`${base}/finance/vocabularies/`);
   }
   /** Own settings row, or everyone's for full access. */
   static attendanceSettings() {
@@ -1506,6 +2003,62 @@ export class AdminOpsService {
   static agreements(params: { member?: string; state?: string; expiresFrom?: string; expiresTo?: string; pageNo?: number; pageSize?: number } = {}) {
     return apiService.getGetApiResponse<Paged<"agreements", AgreementRow>>(`${base}/agreements/${qs(params)}`);
   }
+  /** Full access. One live copy per member per TEMPLATE (per kind + title when
+   *  the body was typed by hand and carries no template key). */
+  static sendAgreement(data: AgreementSendInput) {
+    return apiService.getPostApiResponse<AgreementRow>(`${base}/agreements/`, data);
+  }
+  /** The wording, reused. Reading is agreements.view; every write is full access. */
+  static agreementTemplates() {
+    return apiService.getGetApiResponse<{ templates: AgreementTemplateRow[] }>(`${base}/agreements/templates/`);
+  }
+  static createAgreementTemplate(data: AgreementTemplateInput) {
+    return apiService.getPostApiResponse<AgreementTemplateRow>(`${base}/agreements/templates/`, data);
+  }
+  /** Only what is SENT is written — putting one in use is `{ state: "active" }`.
+   *  Editing the clauses of a template something was sent from bumps its version;
+   *  the copies already out keep the wording they went out with. */
+  static updateAgreementTemplate(key: string, data: Partial<AgreementTemplateInput> & { state?: string }) {
+    return apiService.getPatchApiResponse<AgreementTemplateRow>(
+      `${base}/agreements/templates/${encodeURIComponent(key)}/`, data);
+  }
+  /** Only a template nothing was ever sent from; anything else retires. */
+  static deleteAgreementTemplate(key: string) {
+    return apiService.getDeleteApiResponse<{ key: string; deleted: boolean }>(
+      `${base}/agreements/templates/${encodeURIComponent(key)}/`);
+  }
+  /** The member opening their own copy; the first open is recorded. */
+  static viewAgreement(id: number) {
+    return apiService.getPostApiResponse<AgreementRow>(`${base}/agreements/${id}/view/`, {});
+  }
+  /** The member themself; the server records the time and the address. */
+  static signAgreement(id: number, signedName: string) {
+    return apiService.getPostApiResponse<AgreementRow>(`${base}/agreements/${id}/sign/`, { signedName });
+  }
+  /** Full access; a signed copy cannot be revoked. */
+  static revokeAgreement(id: number) {
+    return apiService.getPostApiResponse<AgreementRow>(`${base}/agreements/${id}/revoke/`, {});
+  }
+  /** `member` omitted = own; an id or `all` is full access only. */
+  static memberDocuments(params: { member?: string } = {}) {
+    return apiService.getGetApiResponse<{ documents: MemberDocumentRow[] }>(`${base}/member-documents/${qs(params)}`);
+  }
+  /** Your own, or another member's with full access. The file is already in our
+   *  bucket via a presigned PUT (CommonService.getUploadUrl, intent
+   *  MemberDocument); the server keeps its key as a PRIVATE Attachment and hands
+   *  back a signed read. Omit `fileUrl` and the row is recorded with no file. */
+  static recordMemberDocument(data: {
+    member?: number; kind: string; label: string;
+    fileUrl?: string; fileName?: string; mimeType?: string; sizeKb?: number }) {
+    return apiService.getPostApiResponse<MemberDocumentRow>(`${base}/member-documents/`, data);
+  }
+  /** Full access, never your own. */
+  static verifyMemberDocument(id: number) {
+    return apiService.getPostApiResponse<MemberDocumentRow>(`${base}/member-documents/${id}/verify/`, {});
+  }
+  static removeMemberDocument(id: number) {
+    return apiService.getDeleteApiResponse<{ id: number; deleted: boolean }>(`${base}/member-documents/${id}/`);
+  }
   /** `member` omitted = the caller's own days; an id or `all` is full access only.
    *  `includeMissing` also returns the days nobody opened (absent / not started
    *  / on leave) and then needs `start` and `end`. `role` = rbac role name. */
@@ -1525,6 +2078,163 @@ export class AdminOpsService {
   static reverseDealPayment(id: number, reason: string) {
     return apiService.getPostApiResponse<{ reversalId: number; payment: DealPaymentRow }>(
       `${base}/payments/deal-ledger/${id}/reverse/`, { reason });
+  }
+
+  // ── Team writes (work, tags, attendance, leave, daily plans/reports, incentives) ──
+  static updateWork(id: number, data: WorkUpdateInput) {
+    return apiService.getPatchApiResponse<WorkItemRow>(`${base}/work/${id}/`, data);
+  }
+  /** Checked against the WorkTransition rows; a stale `rowVersion` is refused. */
+  static setWorkStatus(id: number, data: { rowVersion: number; to: string; reason?: string }) {
+    return apiService.getPostApiResponse<WorkItemRow>(`${base}/work/${id}/status/`, data);
+  }
+  static archiveWorkTag(id: number) {
+    return apiService.getPostApiResponse<WorkTagRow>(`${base}/work/tags/${id}/archive/`, {});
+  }
+  /** Rename and/or recolour an ACTIVE tag; the slug follows the label. */
+  static updateWorkTag(id: number, data: { label?: string; tone?: string }) {
+    return apiService.getPatchApiResponse<WorkTagRow>(`${base}/work/tags/${id}/`, data);
+  }
+  /** Refused while an active tag of the same owner holds the slug. */
+  static restoreWorkTag(id: number) {
+    return apiService.getPostApiResponse<WorkTagRow>(`${base}/work/tags/${id}/restore/`, {});
+  }
+  /** The caller's own day only. */
+  static attendanceDayAction(action: "open" | "break" | "resume" | "end") {
+    return apiService.getPostApiResponse<AttendanceDayRow>(`${base}/attendance/day/${action}/`, {});
+  }
+  /** Full access only. Times are HH:MM in the member's local time. */
+  static correctAttendanceDay(data: { member: number; date: string; startedAt: string; endedAt?: string; breakMinutes?: number; note: string }) {
+    return apiService.getPostApiResponse<AttendanceDayRow>(`${base}/attendance/days/correct/`, data);
+  }
+  static putAttendanceSettings(userId: number, data: {
+    dayStartsAt: string; graceMinutes: number; expectedHoursPerDay: number; joiningDate?: string | null;
+    autoCloseAt: string; timezone?: string; reportsTo?: number | null; designation?: string | null; employmentType?: string | null;
+  }) {
+    return apiService.getPutApiResponse<WorkSettingsRow>(`${base}/attendance/settings/${userId}/`, data);
+  }
+  /** The caller's own request. */
+  static requestLeave(data: { kind: string; fromDate: string; toDate: string; reason?: string }) {
+    return apiService.getPostApiResponse<LeaveRow>(`${base}/leave/`, data);
+  }
+  static withdrawLeave(id: number) {
+    return apiService.getPostApiResponse<LeaveRow>(`${base}/leave/${id}/withdraw/`, {});
+  }
+  static decideLeave(id: number, data: { state: "approved" | "rejected"; note?: string }) {
+    return apiService.getPostApiResponse<LeaveRow>(`${base}/leave/${id}/decide/`, data);
+  }
+  /** The caller's own plan, one per date; `workItem` must be one of their own tasks. */
+  static submitDailyPlan(data: {
+    businessDate?: string; expectedOutcome?: string; blockers?: string; notes?: string;
+    lines: { title: string; priority?: string; workItem?: number | null }[];
+  }) {
+    return apiService.getPostApiResponse<DailyPlanRow>(`${base}/daily-plans/`, data);
+  }
+  /** One more line on the caller's own plan, for their own today. */
+  static addDailyPlanLine(id: number, data: { title: string; priority?: string; workItem?: number | null }) {
+    return apiService.getPostApiResponse<DailyPlanRow>(`${base}/daily-plans/${id}/lines/`, data);
+  }
+  static submitDailyReport(data: {
+    businessDate?: string; pendingWork?: string; pendingReason?: string; achievement?: string; blockers?: string;
+    supportNeeded?: string; tomorrowPriority?: string; notes?: string;
+    lines: { title: string; done?: boolean; targetDelta?: number | null; workItem?: number | null }[];
+  }) {
+    return apiService.getPostApiResponse<DailyReportRow>(`${base}/daily-reports/`, data);
+  }
+  static acknowledgeDailyReport(id: number) {
+    return apiService.getPostApiResponse<DailyReportRow>(`${base}/daily-reports/${id}/acknowledge/`, {});
+  }
+  static proposeIncentive(data: { member: number; month: string; amountPaise: number; workItem?: number | null; basis?: string }) {
+    return apiService.getPostApiResponse<IncentiveRow>(`${base}/incentives/`, data);
+  }
+  static approveIncentive(id: number) {
+    return apiService.getPostApiResponse<IncentiveRow>(`${base}/incentives/${id}/approve/`, {});
+  }
+  static payIncentive(id: number) {
+    return apiService.getPostApiResponse<IncentiveRow>(`${base}/incentives/${id}/pay/`, {});
+  }
+
+  // ── Resources writes ──
+  static createResource(data: ResourceDraftInput) {
+    return apiService.getPostApiResponse<ResourceRow>(`${base}/resources/`, data);
+  }
+  static updateResource(id: number, data: ResourceDraftInput) {
+    return apiService.getPutApiResponse<ResourceRow>(`${base}/resources/${id}/`, data);
+  }
+  /** Refused while the resource holds responses. */
+  static deleteResource(id: number) {
+    return apiService.getDeleteApiResponse<{ id: number; deleted: boolean }>(`${base}/resources/${id}/`);
+  }
+  static setResourceState(id: number, to: "open" | "closed" | "outdated") {
+    return apiService.getPostApiResponse<ResourceRow>(`${base}/resources/${id}/state/`, { to });
+  }
+  static duplicateResource(id: number) {
+    return apiService.getPostApiResponse<ResourceRow>(`${base}/resources/${id}/duplicate/`, {});
+  }
+  /** The caller's own answer. Files must already be in S3 (get-upload-url, intent PaymentScreenshot);
+   *  `url` is the upload's fileUrl — stored as its key, read back as a signed URL. */
+  static submitResourceResponse(id: number, data: {
+    values: Record<string, string>; files?: Record<string, { fileName: string; mimeType: string; sizeKb: number; url: string }>;
+  }) {
+    return apiService.getPostApiResponse<ResourceResponseRow>(`${base}/resources/${id}/responses/`, data);
+  }
+  static deleteResourceResponse(id: number) {
+    return apiService.getDeleteApiResponse<{ id: number; freedKb: number }>(`${base}/resources/responses/${id}/`);
+  }
+
+  // ── Finance writes (income, refunds, bank, installments, payslips) ──
+  static recordIncome(data: IncomeRecordInput) {
+    return apiService.getPostApiResponse<IncomeRow>(`${base}/income/`, data);
+  }
+  static incomeRow(id: number) {
+    return apiService.getGetApiResponse<IncomeRow>(`${base}/income/${id}/`);
+  }
+  static cancelIncome(id: number, reason: string) {
+    return apiService.getPostApiResponse<IncomeRow>(`${base}/income/${id}/cancel/`, { reason });
+  }
+  /** EXACTLY ONE of `payment` (a plan purchase), `dealPayment` (the deal
+   *  ledger) or `payeeName` (nothing behind it) — naming none or two is
+   *  refused. `amountPaise` omitted = the whole payment, and it is mandatory
+   *  on a by-hand refund because there is nothing to derive it from. */
+  static requestRefund(data: {
+    payment?: number; dealPayment?: number; payeeName?: string;
+    ground: string; amountPaise?: number; detail?: string;
+  }) {
+    return apiService.getPostApiResponse<RefundRow>(`${base}/refunds/`, data);
+  }
+  static bankStatement(id: number) {
+    return apiService.getGetApiResponse<BankStatementDetail>(`${base}/bank/statements/${id}/`);
+  }
+  static importBankStatement(data: {
+    account: string; fromDate: string; toDate: string;
+    lines: { date: string; direction: "credit" | "debit"; amountPaise: number; reference?: string; narration?: string; counterparty?: string }[];
+  }) {
+    return apiService.getPostApiResponse<BankStatementDetail>(`${base}/bank/statements/`, data);
+  }
+  static closeBankStatement(id: number) {
+    return apiService.getPostApiResponse<BankStatementRow>(`${base}/bank/statements/${id}/close/`, {});
+  }
+  static resolveBankLine(id: number, data: { kind: string; reason: string }) {
+    return apiService.getPostApiResponse<BankLineRow>(`${base}/bank/lines/${id}/resolve/`, data);
+  }
+  /** Stored rows only — a computed installment (`id: null`) cannot be failed. */
+  static failInstallment(id: number, data: { reason: string; note: string }) {
+    return apiService.getPostApiResponse<InstallmentRow>(`${base}/installments/${id}/fail/`, data);
+  }
+  /** `reason` is the only record a hold has — the slip carries no column for
+   *  it, so it goes on the audit trail with the action. */
+  static holdPayslip(id: number, reason = "") {
+    return apiService.getPostApiResponse<unknown>(`${base}/salaries/slips/${id}/hold/`, { reason });
+  }
+  static releasePayslip(id: number) {
+    return apiService.getPostApiResponse<unknown>(`${base}/salaries/slips/${id}/release/`, {});
+  }
+
+  /** GET v1/engine/seller-options/ — the option lists a seller profile is filled
+   *  from, each item `{value, label, meta}`. Public; auth is sent anyway. */
+  static sellerOptions() {
+    return apiService.getGetApiResponse<Record<string, { value: string; label: string; meta?: unknown }[]>>(
+      "v1/engine/seller-options/");
   }
 
   // ── Content (blog) ──

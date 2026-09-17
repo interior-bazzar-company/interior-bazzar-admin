@@ -33,8 +33,8 @@
    — they are named, they are commented, and the exact figure always travels
    beside them as `display` so nothing rounded is ever printed as an amount.
 
-   ONE CLOCK. `PERIOD`, `fmtMonth()`, `fmtDate()` and `ago()` all read `asOf`
-   from module.json, so a screenshot taken next March still says August 2026.
+   ONE CLOCK. `PERIOD` and `ago()` read the store's clock: the server's once
+   read, the browser's until then.
    ============================================================================= */
 import { useShell } from "../../shell/ShellContext";
 import {

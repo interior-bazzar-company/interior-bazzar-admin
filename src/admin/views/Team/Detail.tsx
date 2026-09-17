@@ -35,7 +35,7 @@ import {
 import { cx } from "@/utils/cx";
 import { useShell } from "../../shell/ShellContext";
 import {
-  KIND, PRIORITY, PRIORITY_SCALE, TODAY, addCheckLine, addLink, addResourceLink,
+  KIND, LINK_RELATIONS, PRIORITY, PRIORITY_SCALE, TODAY, addCheckLine, addLink, addResourceLink,
   blockerOf, checkCount, childrenOf, createTag, fmtDate, isDelayed, isTerminal, labelOf,
   linkLabelOf, linksOf, parentOf, parentOptions, readMember, removeCheckLine, removeLink,
   removeResourceLink, setBlockedBy, tagItem, tagsOwnedBy, toggleCheckLine, updateItem, useItem,
@@ -209,7 +209,7 @@ export function ItemDrawer({ itemId, onClose, onOpen }: {
                   <span className="label-mono shrink-0">{linkLabelOf(link.relation, outward)}</span>
                   <ItemLink item={other} onOpen={onOpen} className="min-w-0 flex-1" />
                   <IconButton ico="x" size="xs" label={"Remove this link to " + other.title}
-                    onClick={() => removeLink(link.linkId)} />
+                    onClick={() => void removeLink(link.linkId)} />
                 </li>
               ))}
             </ul>
@@ -294,8 +294,8 @@ function EditItemModal({ item, all }: { item: WorkItem; all: WorkItem[] }) {
     const cur = item.parentId ? all.filter((i) => i.itemId === item.parentId)[0] : null;
     return cur && !opts.some((o) => o.itemId === cur.itemId) ? [cur].concat(opts) : opts;
   }, [item.kind, item.itemId, item.parentId, all]);
-  const save = () => {
-    const r = updateItem(item.itemId, {
+  const save = async () => {
+    const r = await updateItem(item.itemId, {
       title, assigneeId: who, priority: pri as Priority,
       startDate: start || null, dueDate: due || null,
       parentId: item.kind === "target" ? null : (parent || null),
@@ -377,8 +377,8 @@ function CheckList({ item }: { item: WorkItem }) {
   const shell = useShell();
   const [draft, setDraft] = useState("");
   const lines = item.checklist || [];
-  const add = () => {
-    const r = addCheckLine(item.itemId, draft);
+  const add = async () => {
+    const r = await addCheckLine(item.itemId, draft);
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
     setDraft("");
   };
@@ -392,12 +392,12 @@ function CheckList({ item }: { item: WorkItem }) {
                   and the text beside it is the obvious thing to press. */}
               <Checkbox
                 checked={l.done}
-                onChange={() => toggleCheckLine(item.itemId, l.lineId)}
+                onChange={() => void toggleCheckLine(item.itemId, l.lineId)}
                 className="min-w-0 flex-1"
                 label={<span className={cx(l.done && "text-quaternary line-through")}>{l.text}</span>}
               />
               <IconButton ico="x" size="xs" label={"Remove step: " + l.text}
-                onClick={() => removeCheckLine(item.itemId, l.lineId)} />
+                onClick={() => void removeCheckLine(item.itemId, l.lineId)} />
             </li>
           ))}
         </ul>
@@ -429,8 +429,8 @@ function LinkList({ item }: { item: WorkItem }) {
   const shell = useShell();
   const [label, setLabel] = useState("");
   const [url, setUrl] = useState("");
-  const add = () => {
-    const r = addResourceLink(item.itemId, label, url);
+  const add = async () => {
+    const r = await addResourceLink(item.itemId, label, url);
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
     setLabel(""); setUrl("");
   };
@@ -504,10 +504,10 @@ function TagPicker({ item, mine, on, tags }: {
   const shell = useShell();
   const [draft, setDraft] = useState("");
   const [tone, setTone] = useState("slate");
-  const add = () => {
-    const r = createTag(item.assigneeId, draft, tone);
+  const add = async () => {
+    const r = await createTag(item.assigneeId, draft, tone);
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
-    tagItem(item.itemId, r.data.tagId, true);
+    void tagItem(item.itemId, r.data.tagId, true);
     setDraft(""); setTone("slate");
   };
   const others = tags.filter((t) => t.ownerId !== item.assigneeId && !t.archivedAt
@@ -558,8 +558,8 @@ function WaitModal({ item, all }: { item: WorkItem; all: WorkItem[] }) {
   const [pick, setPick] = useState(item.blockedByItemId || "");
   const [why, setWhy] = useState(item.blockedReason || "");
   const options = all.filter((i) => i.itemId !== item.itemId && !isTerminal(i.status));
-  const save = (clear?: boolean) => {
-    const r = setBlockedBy(item.itemId, clear ? null : pick || null, why);
+  const save = async (clear?: boolean) => {
+    const r = await setBlockedBy(item.itemId, clear ? null : pick || null, why);
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
     shell.closeLayer();
     shell.toast(clear ? "No longer waiting." : "Waiting on another item.");
@@ -598,12 +598,12 @@ function WaitModal({ item, all }: { item: WorkItem; all: WorkItem[] }) {
 function LinkModal({ item, all }: { item: WorkItem; all: WorkItem[] }) {
   const shell = useShell();
   const [pick, setPick] = useState("");
-  const [rel, setRel] = useState<LinkRelation>("relates_to");
+  const [rel, setRel] = useState<LinkRelation>(LINK_RELATIONS.length ? LINK_RELATIONS[0].key : "relates_to");
   const options = all.filter((i) => i.itemId !== item.itemId
     && i.itemId !== item.parentId && i.parentId !== item.itemId
     && i.itemId !== item.blockedByItemId);
-  const save = () => {
-    const r = addLink(item.itemId, pick, rel);
+  const save = async () => {
+    const r = await addLink(item.itemId, pick, rel);
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
     shell.closeLayer();
     shell.toast("Linked.");
@@ -623,8 +623,7 @@ function LinkModal({ item, all }: { item: WorkItem; all: WorkItem[] }) {
       <FormSection>
         <FormField id="lkRel" label="Relation">
           <SelectInput id="lkRel" value={rel} onChange={(v) => setRel(v as LinkRelation)}
-            options={(["relates_to", "duplicates", "follows"] as LinkRelation[])
-              .map((k) => ({ v: k, l: linkLabelOf(k, true) }))} />
+            options={LINK_RELATIONS.map((r) => ({ v: r.key, l: linkLabelOf(r.key, true) }))} />
         </FormField>
         <FormField id="lkTo" label="Item" req
           hint="Gates nothing. A follows edge draws a sequence; it never blocks the work.">

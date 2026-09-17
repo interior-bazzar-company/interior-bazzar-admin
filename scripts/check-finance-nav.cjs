@@ -23,16 +23,24 @@ const fs = require("fs");
 const ROOT = path.join(__dirname, "..");
 const TMP = path.join(ROOT, "node_modules", ".tmp");
 
-/* What the deployed server sends today. Finance is NOT in it — every one of
-   the five keys is a client-side proto row, which is the condition being
-   tested. */
-const SERVER_MODULES = [
+/* What the server sends a session holding view on everything. Four Finance
+   sections are real Module rows (interior_admin/module_seed.py); Analytics is
+   still a client-side proto row. */
+const OTHER_MODULES = [
   { key: "deals", label: "Deals", groupLabel: "Sales", displayOrder: 10, actions: ["view"] },
   { key: "invoices", label: "Invoices", groupLabel: "Sales", displayOrder: 30, actions: ["view"] },
   { key: "plans", label: "Plans", groupLabel: "Catalogue", displayOrder: 50, actions: ["view"] },
   { key: "team", label: "Members", groupLabel: "Settings", displayOrder: 60, actions: ["view"] },
   { key: "audit", label: "Audit log", groupLabel: "Settings", displayOrder: 80, actions: ["view"] },
 ];
+const FINANCE_ROWS = [
+  { key: "finance", label: "Subscriptions", groupLabel: "Finance", displayOrder: 38, actions: ["view"] },
+  { key: "finance-transactions", label: "Other Transaction", groupLabel: "Finance", displayOrder: 39, actions: ["view"] },
+  { key: "finance-salaries", label: "Salaries A/C", groupLabel: "Finance", displayOrder: 40, actions: ["view"] },
+  { key: "finance-refunds", label: "Refunds", groupLabel: "Finance", displayOrder: 41, actions: ["view"] },
+];
+const SERVER_MODULES = OTHER_MODULES.concat(FINANCE_ROWS);
+const SERVED = FINANCE_ROWS.map((m) => m.key);
 
 /* The five, in the order money moves through the company. */
 const SECTIONS = [
@@ -62,10 +70,10 @@ const stub = path.join(__dirname, "team-nav-session-stub.ts").replace(/\\/g, "/"
 
 fs.mkdirSync(TMP, { recursive: true });
 fs.writeFileSync(entry,
-  'import { __setSession } from "' + stub + '";\n'
+  'import { __setSession, can } from "' + stub + '";\n'
   + 'import { getModules, getItems, getGroupOf } from "' + path.join(ROOT, "src/admin/shell/modules.ts").replace(/\\/g, "/") + '";\n'
   + 'import { PROTO_MODULES } from "' + path.join(ROOT, "src/admin/auth/session.ts").replace(/\\/g, "/") + '";\n'
-  + "export { __setSession, getModules, getItems, getGroupOf, PROTO_MODULES };\n");
+  + "export { __setSession, getModules, getItems, getGroupOf, PROTO_MODULES, can };\n");
 
 esbuild.build({
   entryPoints: [entry],
@@ -108,8 +116,39 @@ esbuild.build({
   /* ---- the proto gate --------------------------------------------------- */
   /* A key in PROTO_ROWS but not PROTO_MODULES is dropped silently by
      getModules(). That is the failure this whole file is here for. */
-  eq("every section carries the proto gate, so none is silently dropped",
-    SECTIONS.filter((s) => !M.PROTO_MODULES.has(s.key)).map((s) => s.key), []);
+  eq("every section is proto-gated or served, so none is silently dropped",
+    SECTIONS.filter((s) => !M.PROTO_MODULES.has(s.key) && SERVED.indexOf(s.key) < 0).map((s) => s.key), []);
+  eq("...and a served section is NOT proto-gated, so the server's grant decides",
+    SERVED.filter((k) => M.PROTO_MODULES.has(k)), []);
+
+  /* ---- a session without the grant -------------------------------------- */
+  /* The leak this gate closed: the sidebar offered subscriptions, payroll,
+     spend and refunds to everyone while the server refused anyone without the
+     grant. */
+  M.__setSession({ modules: OTHER_MODULES });
+  eq("no Finance grant shows only the proto section",
+    M.getModules().filter((g) => g.group === "Finance")[0].items.map((i) => i.key), ["finance-analytics"]);
+
+  /* ---- what `edit` means where the server names each write --------------- */
+  const holding = (key, actions) => { M.__setSession({ modules: [{ key, label: key, groupLabel: "Finance", displayOrder: 1, actions }] }); };
+  holding("finance-salaries", ["view"]);
+  ok("payroll view alone cannot edit", !M.can("finance-salaries", "edit"));
+  holding("finance-salaries", ["view", "pay"]);
+  ok("payroll pay opens the edit gate", M.can("finance-salaries", "edit"));
+  holding("finance-salaries", ["view", "propose"]);
+  ok("...propose does not: no view accepts it", !M.can("finance-salaries", "edit"));
+  holding("finance-transactions", ["view", "record"]);
+  ok("recording is not cancelling", !M.can("finance-transactions", "edit") && M.can("finance-transactions", "record"));
+  holding("finance-transactions", ["view", "cancel"]);
+  ok("cancel opens a transaction's edit gate", M.can("finance-transactions", "edit"));
+  holding("finance-refunds", ["request"]);
+  ok("no verb counts without view", !M.can("finance-refunds", "request"));
+  holding("finance", ["view"]);
+  ok("subscriptions view alone cannot edit", !M.can("finance", "edit"));
+  holding("finance", ["view", "edit"]);
+  ok("...edit is a real verb there, and reversing is not part of it",
+    M.can("finance", "edit") && !M.can("finance", "reverse"));
+  M.__setSession({ modules: SERVER_MODULES });
 
   /* ---- icons ------------------------------------------------------------ */
   eq("each row has a real icon rather than the doc fallback",
@@ -130,14 +169,14 @@ esbuild.build({
   /* A real Module row must win, or the sidebar doubles the entry up. */
   M.__setSession({
     modules: SERVER_MODULES.concat([
-      { key: "finance-salaries", label: "Payroll", groupLabel: "Finance", displayOrder: 95, actions: ["view"] },
+      { key: "finance-analytics", label: "Money analytics", groupLabel: "Finance", displayOrder: 95, actions: ["view"] },
     ]),
   });
   const fin2 = M.getModules().filter((g) => g.group === "Finance")[0];
   eq("a real server row replaces the proto one rather than doubling it",
-    fin2.items.filter((i) => i.key === "finance-salaries").length, 1);
+    fin2.items.filter((i) => i.key === "finance-analytics").length, 1);
   eq("...and the server's label wins",
-    fin2.items.filter((i) => i.key === "finance-salaries")[0].label, "Payroll");
+    fin2.items.filter((i) => i.key === "finance-analytics")[0].label, "Money analytics");
 
   /* ---- the maps agree --------------------------------------------------- */
   M.__setSession({ modules: SERVER_MODULES });

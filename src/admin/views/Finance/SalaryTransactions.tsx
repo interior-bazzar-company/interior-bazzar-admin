@@ -107,8 +107,8 @@ function HoldSlipModal({ slip, onClose, onDone }: {
       onClose={onClose} err={err}
       footer={<>
         <Cancel onClose={onClose} />
-        <Button color="primary" isDisabled={!reason.trim()} onClick={() => {
-          const e = setSlipHold(slip.slipId, true, reason);
+        <Button color="primary" isDisabled={!reason.trim()} onClick={async () => {
+          const e = await setSlipHold(slip.slipId, true, reason);
           if (e) return setErr(e);
           onDone(fmtMonth(slip.month) + "'s slip is on hold. It is out of what "
             + slip.memberName + " is owed until somebody releases it.", "ok");
@@ -153,8 +153,8 @@ export default function SalaryTransactions({ p, onUnfilter, onParams }: {
   };
   const hold = (x: SlipRow) =>
     modal(<HoldSlipModal slip={x.s} onClose={closeLayer} onDone={done} />);
-  const release = (x: SlipRow) => {
-    const e = setSlipHold(x.s.slipId, false, "");
+  const release = async (x: SlipRow) => {
+    const e = await setSlipHold(x.s.slipId, false, "");
     toast(e || fmtMonth(x.s.month) + "'s slip is released — " + inr(x.s.netPaise)
       + " counts as owed again.", e ? "bad" : "ok");
   };

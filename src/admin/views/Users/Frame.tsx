@@ -16,8 +16,6 @@
    ============================================================================= */
 import type { ReactNode } from "react";
 import { Card, FilterBar, PageHeader, Tabs } from "../../ui";
-import { ProtoBar } from "./bits";
-import { resetStore } from "./store";
 import type { Params, UserRow } from "./store";
 
 /* TWO FACES. The directory and the dashboard over it — one population, asked
@@ -52,7 +50,7 @@ export function ViewBand({ view, onView, counts }: {
 }
 
 export function Frame({
-  view, onView, counts, cmd, bands, children, toast,
+  view, onView, counts, cmd, bands, children,
   title, meta, actions, search, right, chips,
 }: {
   view: string;
@@ -63,7 +61,6 @@ export function Frame({
   /** Full-bleed bands between the filter bar and the body: the stat strip. */
   bands?: ReactNode;
   children: ReactNode;
-  toast?: (msg: ReactNode, tone?: string) => void;
   /** The page title. Defaults to the face's own name. */
   title?: ReactNode;
   /** The line under the title: the scope, unfiltered. */
@@ -79,8 +76,6 @@ export function Frame({
 }) {
   return (
     <div className="flex flex-col gap-4">
-      <ProtoBar onReset={() => { resetStore(); if (toast) toast("Back to the seed."); }} />
-
       <PageHeader
         title={title || (view === "analytics" ? "Users analytics" : "Users Management")}
         meta={meta}

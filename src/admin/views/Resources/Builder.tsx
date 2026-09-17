@@ -41,7 +41,7 @@ import { FieldCard, Suggestions, TypeMark } from "./bits";
 import {
   ACCEPT_KINDS, ACCEPT_LABEL, DEFAULT_MAX_MB, FIELD_TYPES, TAG_SUGGESTIONS, audienceOf,
   cleanTags, createResource, departmentsInUse, departmentsNamed, emptyField, resourceOf,
-  responsesFor, tagsInUse, typeLabel, updateResource,
+  responsesFor, tagsInUse, typeLabel, updateResource, useResources,
 } from "./store";
 import type { AcceptKind, FieldType, ResourceField } from "./store";
 
@@ -53,6 +53,9 @@ export default function Builder({ mode, resourceId }: {
 }) {
   const shell = useShell();
   const wide = useBreakpoint("lg");
+  /* Field types and tag suggestions are served lists (bootResources). Subscribing
+     is what fills them on a page opened straight at the builder. */
+  useResources();
   const existing = mode === "edit" && resourceId ? resourceOf(resourceId) : null;
 
   const [title, setTitle] = useState(existing ? existing.title : "");
@@ -151,11 +154,11 @@ export default function Builder({ mode, resourceId }: {
       </DrawerShell>, undefined, "md"),
   };
 
-  const save = () => {
+  const save = async () => {
     const draft = { title, description, tags, departments, fields };
-    const res = existing
+    const res = await (existing
       ? updateResource(existing.resourceId, draft)
-      : createResource(draft);
+      : createResource(draft));
     if (!res.ok) { shell.toast(res.message, "bad"); return; }
     shell.toast(existing ? "Changes saved." : "Form created.", "ok");
     go(ROUTE + "?form=" + res.value.resourceId);

@@ -116,8 +116,7 @@ export function TodayPlanMenu({ who }: { who?: string } = {}) {
       /* Before the plan is in the line is a draft and goes in with the rest;
          after, there is a record to append to and it goes straight on. */
       if (done) {
-        const r = addPlanLine(me, t);
-        if (!r.ok) shell.toast(r.message, "bad");
+        void addPlanLine(me, t).then((r) => { if (!r.ok) shell.toast(r.message, "bad"); });
       } else {
         setExtra((v) => v.concat([t]));
       }
@@ -132,14 +131,14 @@ export function TodayPlanMenu({ who }: { who?: string } = {}) {
   /* Adding after the plan is in appends to it — same minting rule, same
      linking — rather than being refused with "change the work items instead",
      which is true of the record and useless as an answer. */
-  const put = () => {
+  const put = async () => {
     /* A typed line is not a loose note: `submitPlan` matches it against what is
        already open and assigned to you and LINKS if it finds one, and otherwise
        mints a task due today in your name. Either way it is a real record the
        board and the EOD both see. */
     const lines = chosen.map((i) => ({ title: i.title, priority: i.priority }))
       .concat(extra.map((t) => ({ title: t, priority: "medium" as Priority })));
-    const r = submitPlan(me, { lines });
+    const r = await submitPlan(me, { lines });
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
     setOpen(false);
     shell.toast("Today's plan is in — " + lines.length + " to do.");

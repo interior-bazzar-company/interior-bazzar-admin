@@ -22,7 +22,6 @@ import AdminOpsService, { call } from "../../../api/modules/adminOps";
 import type { AdminUserRow } from "../../../api/modules/adminOps";
 import { useDealsApi, render as refetchDeals } from "../Deals/useDeals";
 import type { DealsApiState } from "../Deals/useDeals";
-import { fmtDate as finFmtDate, todayIso as finToday } from "../Finance/store";
 import { ensureAdopted } from "../Team/adopt";
 import { useIntakeCounts } from "../BusinessEnquiries/store";
 import { can } from "../../auth/session";
@@ -70,9 +69,8 @@ export function clocks(): { deals: Clock; finance: Clock; financeLive: Clock; te
     /* The executive snapshot's money and health (live.ts) run on the real
        clock. */
     money: { kind: "live", today: real, label: "live · " + fmtDate(real) },
-    /* No section reads the seeds any more (d8); kept only because the
-       snapshot's "vs prev Nd" reads `periods.finance.days`. */
-    finance: { kind: "seed", today: finToday(), label: "seed · as of " + finFmtDate(finToday()) },
+    /* Kept only because the snapshot's "vs prev Nd" reads `periods.finance.days`. */
+    finance: { kind: "live", today: real, label: "live · " + fmtDate(real) },
   };
 }
 
@@ -82,9 +80,6 @@ export function clocks(): { deals: Clock; finance: Clock; financeLive: Clock; te
    unfiltered, sorted by name. A member is "in" a role when their account holds
    it (`GET /admin/users/` roles[]), so the filter below matches on that and a
    member with two roles appears under both.
-
-   `content/team/members.json` still seeds the Team store, but nothing on this
-   control reads its `department` field any more.
 
    `state` drives the control's own loading / error / empty drawing:
    `off` when the Team section is not in this session's access (the control

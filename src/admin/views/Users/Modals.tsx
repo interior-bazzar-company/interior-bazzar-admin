@@ -36,6 +36,13 @@ export function NoteModal({ row, onClose, onDone }: {
 }) {
   const [text, setText] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  /* An endpoint now (POST platform-users/<pk>/notes/), so a refusal is the
+     server's sentence, said the way this dialog says everything else. */
+  const save = async () => {
+    const e = await addNote(row.user.userId, text);
+    if (e) return setErr(e);
+    onDone("Note added. It is on the record and it is not going anywhere near a customer.", "ok");
+  };
   return (
     <ModalShell
       title="Add an internal note"
@@ -44,11 +51,8 @@ export function NoteModal({ row, onClose, onDone }: {
       actions={
         <>
           <Button color="secondary" data-close="1" onClick={onClose}>Cancel</Button>
-          <Button color="primary" isDisabled={!text.trim()} onClick={() => {
-            const e = addNote(row.user.userId, text);
-            if (e) return setErr(e);
-            onDone("Note added. It is on the record and it is not going anywhere near a customer.", "ok");
-          }}>Add note</Button>
+          <Button color="primary" isDisabled={!text.trim()}
+            onClick={() => void save()}>Add note</Button>
         </>
       }
     >
@@ -76,6 +80,13 @@ export function TagsModal({ row, onClose, onDone }: {
   const [slugs, setSlugs] = useState<string[]>(row.user.tags.map((t) => t.slug));
   const toggle = (s: string) =>
     setSlugs((v) => (v.indexOf(s) >= 0 ? v.filter((x) => x !== s) : v.concat([s])));
+  /* The set is written by `PUT platform-users/<pk>/tags/`, so a refusal is the
+     server's sentence and it is said the way this dialog says everything else:
+     through the toast it closes on. */
+  const save = async () => {
+    const e = await setTags(row.user.userId, slugs);
+    onDone(e || "Tags updated.", e ? "bad" : "ok");
+  };
   return (
     <ModalShell
       title="Operational tags"
@@ -84,10 +95,8 @@ export function TagsModal({ row, onClose, onDone }: {
       actions={
         <>
           <Button color="secondary" data-close="1" onClick={onClose}>Cancel</Button>
-          <Button color="primary" count={slugs.length || undefined} onClick={() => {
-            setTags(row.user.userId, slugs);
-            onDone("Tags updated.", "ok");
-          }}>Save tags</Button>
+          <Button color="primary" count={slugs.length || undefined}
+            onClick={() => void save()}>Save tags</Button>
         </>
       }
     >
@@ -124,6 +133,16 @@ export function DeactivateModal({ row, onClose, onDone }: {
   const off = row.user.userStatus === "deactivated";
   const [reason, setReason] = useState("");
   const [err, setErr] = useState<string | null>(null);
+  /* The switch is `POST platform-users/<pk>/status/`. On a refusal the dialog
+     stays open carrying the server's reason: the account did not move. */
+  const save = async () => {
+    const e = await setUserStatus(row.user.userId, off ? "active" : "deactivated", reason);
+    if (e) { setErr(e); return; }
+    onDone(off
+      ? "Account re-enabled."
+      : "Account deactivated. Profile, links and history are all retained.",
+      off ? "ok" : "warn");
+  };
   return (
     <ModalShell
       title={off ? "Reactivate this account" : "Deactivate this account"}
@@ -136,14 +155,7 @@ export function DeactivateModal({ row, onClose, onDone }: {
           <Button color="secondary" data-close="1" onClick={onClose}>Cancel</Button>
           <Button color={off ? "primary" : "primary-destructive"}
             isDisabled={!off && !reason.trim()}
-            onClick={() => {
-              const e = setUserStatus(row.user.userId, off ? "active" : "deactivated", reason);
-              if (e) return setErr(e);
-              onDone(off
-                ? "Account re-enabled."
-                : "Account deactivated. Profile, links and history are all retained.",
-                off ? "ok" : "warn");
-            }}>
+            onClick={() => void save()}>
             {off ? "Reactivate account" : "Deactivate account"}
           </Button>
         </>

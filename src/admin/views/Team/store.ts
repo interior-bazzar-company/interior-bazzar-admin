@@ -2,17 +2,31 @@
    Team — the data module for the operational half.
    -----------------------------------------------------------------------------
    THE ONLY FILE IN THIS MODULE THAT KNOWS WHERE ITS OWN RECORDS COME FROM.
-   Every view imports from here; no view imports JSON and no view fetches. When
-   the API lands, the five imports below become AdminOpsService calls and the
-   write simulation underneath comes out — the views, the CSS and the URL scheme
-   do not move. See src/proto/v-2.2.0.0/BACKEND-INTEGRATION.md § Module 7.
+   Every view imports from here; no view imports JSON and no view fetches.
 
-   THIS FILE DOES NOT OWN THE IDENTITY HALF. `#/team` and `#/roles` are LIVE and
-   read `AdminOpsService.users()` / `.listRoles()` directly, as they always have.
-   `members.json` here stands in for the ONE thing that endpoint cannot answer:
-   every member rather than only those the signed-in admin created, plus the
-   employment block that has no column on the server yet. The day the team-wide
-   endpoint exists, `MEMBERS` below becomes that call and nothing else changes.
+   ON THE BACKEND (2026-09-15). `bootTeam()` reads, once per page load and again
+   after every write: the roster (`users/` + `attendance/settings/`), attendance
+   days, work items and tags, daily plans and reports, leave, agreements,
+   incentives, the value lists, and the server clock. Each row is mapped into
+   the shapes below, so every derivation in this file is unchanged. A list the
+   viewer may not read in full (`member=all` refused) falls back to their own.
+
+   NOTHING IS LOCAL ANY MORE (2026-09-16). Item↔item links, task checklists and
+   the "waiting on" reason were kept per item in this tab because the backend had
+   no column; they live on `WorkItem.extras` now and every one of the three is a
+   server write like the rest. An EDGE IS STORED ON ONE END ONLY — the task it
+   points from — and the far end is read by scanning the items this store
+   already holds, printing the relation from that side with the inverse label
+   the vocabulary row carries in `hint`.
+
+   MEMBER DOCUMENTS: the row AND the file. The bytes go straight to our bucket
+   with a presigned PUT and the server keeps the key as a PRIVATE attachment;
+   what comes back is a signed, expiring read. No identity document is ever on a
+   URL anybody holding it can open for ever.
+
+   AGREEMENT TEMPLATES ARE ROWS TOO (`agreements/templates/`). A copy records the
+   `templateKey` it was rendered from, so provenance survives a rename — which
+   matching back on kind + title did not.
 
    THE THREE RULES THIS FILE EXISTS TO ENFORCE
    -------------------------------------------
@@ -29,25 +43,18 @@
       recorded. A stored percentage that disagrees with the children is the bug
       this prevents, and it is the one nobody notices for a month.
 
-   `NOW` is the seed's own `asOf`, not the browser clock — Friday 28 August
-   2026, 14:20 IST. Every elapsed time, late flag and "today" is computed
-   against it, so the fixture reads the same next month and a screenshot taken
-   in December still makes sense. The API will send its own `asOf`, and there is
-   a server-time endpoint already (`GET /engine/server-time/`) whose whole
-   purpose is that the client computes a skew and never trusts `Date`.
+   `NOW` is the server's clock (`GET engine/server-time/`), read as a skew so
+   the client never trusts `Date`; "today" is that instant in Asia/Kolkata.
    ============================================================================= */
 import { useSyncExternalStore } from "react";
-import membersDoc from "../../../content/team/members.json";
-import attendanceDoc from "../../../content/team/attendance.json";
-import workDoc from "../../../content/team/work.json";
-import plansDoc from "../../../content/team/plans.json";
-import reportsDoc from "../../../content/team/reports.json";
-import tagsDoc from "../../../content/team/tags.json";
-import leaveDoc from "../../../content/team/leave.json";
-import agreementsDoc from "../../../content/team/agreements.json";
-import documentsDoc from "../../../content/team/documents.json";
-import payDoc from "../../../content/team/pay.json";
-import linksDoc from "../../../content/team/links.json";
+import AdminOpsService, { call } from "../../../api/modules/adminOps";
+import type {
+  AdminUserRow, AgreementRow, AttendanceDayRow, DailyPlanRow, DailyReportRow, IncentiveRow, LeaveRow,
+  MemberDocumentRow, VocabItem, WorkItemRow, WorkSettingsRow, WorkTagRow,
+} from "../../../api/modules/adminOps";
+import { CommonService } from "../../../api/modules/common";
+import { AppExceptions, errMessage } from "../../../api/apiService";
+import type { ApiResponseType } from "../../../types/reqResType";
 import vocabDoc from "../../../content/team/vocabularies.json";
 import { can, getSession } from "../../auth/session";
 
@@ -162,6 +169,9 @@ export interface WorkItem {
    *  checklist says what is left of it. It is what makes a task's progress a
    *  number rather than a coin-flip between 0 and 100 — see `progressOf`. */
   checklist?: CheckLine[];
+  /** The soft edges OUT of this item. Both directions are derived from these
+   *  across every item the store holds — see `linksOf`. */
+  itemLinks?: { itemId: string; relation: LinkRelation }[];
   /** Where the work actually lives: the brief, the folder, the board. A URL
    *  with a name on it, because a bare link in a list of six is a link nobody
    *  clicks. Distinct from `attachments`, which are files this panel holds,
@@ -206,6 +216,9 @@ export interface MemberDocument {
   label: string;
   fileName: string;
   sizeKb: number;
+  /** A SIGNED, EXPIRING read of a private object, or null when the row carries
+   *  no file. Never a bare URL: these are identity papers. */
+  file: { fileName: string; mimeType: string; sizeKb: number; url: string } | null;
   uploadedAt: string;
   uploadedById: string;
   verifiedById: string | null;
@@ -257,17 +270,22 @@ export interface Tag {
  *  and a name, never as markup. */
 export interface Attachment { url: string; label: string }
 
-export type LinkRelation = "relates_to" | "duplicates" | "follows";
+/** A `work_link_relation` key. A string, not a union: the list is the server's
+ *  and a row added there must not need a type edit here. */
+export type LinkRelation = string;
 
 /** A soft edge between two items. It never touches rollup and gates nothing:
  *  `parentId` and `blockedByItemId` are the two strong links, and an edge here
- *  may not restate either of them. */
+ *  may not restate either of them.
+ *
+ *  STORED ON ONE END. `linkId` is not a record id — there is no edge row — it
+ *  is the pair, `from:to`, which is what identifies an edge and what removing
+ *  one needs. */
 export interface WorkLink {
   linkId: string;
   fromItemId: string;
   toItemId: string;
   relation: LinkRelation;
-  createdAt: string;
 }
 
 export interface LeaveRequest {
@@ -305,42 +323,23 @@ export interface DailyReport {
 
 export const DAY = 86400000;
 
-/* THE DEMO CLOCK ROLLS FORWARD, WHOLE WEEKS AT A TIME, IN THE BROWSER ONLY.
-   The seed is authored around Friday 28 August 2026, 14:20 IST, and every rule
-   in it (who is late, what is due, which day is over) is relative to that
-   frame. Shifting by exact weeks keeps every weekday what it was and lands
-   "today" on the most recent same weekday, so the panel reads current without
-   a single derivation changing. Node (the check suite) gets no shift: the
-   assertions pin the authored frame. */
-const plusDays = (ymd: string, n: number): string => {
-  const p = ymd.split("-");
-  const dt = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]) + n);
-  return dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0") + "-" + String(dt.getDate()).padStart(2, "0");
-};
-const AS_OF = new Date(membersDoc.asOf).getTime();
-export const SHIFT_DAYS = (() => {
-  if (typeof window === "undefined") return 0;
-  const r = new Date();
-  const real = new Date(r.getFullYear(), r.getMonth(), r.getDate()).getTime();
-  const p = membersDoc.asOf.slice(0, 10).split("-");
-  const seeded = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2])).getTime();
-  const days = Math.round((real - seeded) / DAY);
-  return days > 0 ? Math.floor(days / 7) * 7 : 0;
-})();
-export const NOW = AS_OF + SHIFT_DAYS * DAY;
+/* THE SERVER'S CLOCK, as a skew over the browser's. Until the server answers
+   the skew is zero; `bootTeam` sets it. `NOW` and `TODAY` are live bindings, so
+   every importer reads the corrected value. */
+const istDate = (ms: number) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date(ms));
+let SKEW = 0;
+export const now = () => Date.now() + SKEW;
+export const stamp = () => new Date(now()).toISOString();
+export let NOW = now();
 
-/* Writes stamp NOW plus the time elapsed since the module loaded: the same
-   clock as every derivation, and still strictly ordered, so a break opened in
-   this tab cannot land before the day that contains it. */
-const LOADED_AT = Date.now();
-export const stamp = () => new Date(NOW + (Date.now() - LOADED_AT)).toISOString();
-export const now = () => NOW + (Date.now() - LOADED_AT);
-
-/** The business date, IST, as a plain YYYY-MM-DD. Derived from the payload's
- *  own `asOf` rather than the browser, and never from a UTC instant on the
- *  client — that is the off-by-one that puts a Friday evening's work on
- *  Saturday for anybody west of the office. */
-export const TODAY = plusDays(membersDoc.asOf.slice(0, 10), SHIFT_DAYS);
+/** The business date, IST, as a plain YYYY-MM-DD — never a UTC slice of an
+ *  instant, which puts a Friday evening's work on Saturday. */
+export let TODAY = istDate(NOW);
+function setClock(epochMs: number) {
+  SKEW = epochMs - Date.now();
+  NOW = now();
+  TODAY = istDate(NOW);
+}
 /** A day from a URL, clamped to today. The picker's `max` stops the mouse, not
  *  a hand-edited address, and a future day must never be asked who was absent. */
 export const clampDay = (d?: string): string => (d && d <= TODAY ? d : TODAY);
@@ -407,14 +406,23 @@ export const addDays = (d: string, n: number) => {
   const dt = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2]) + n);
   return dt.getFullYear() + "-" + String(dt.getMonth() + 1).padStart(2, "0") + "-" + String(dt.getDate()).padStart(2, "0");
 };
-export const isWeekend = (d: string) => {
-  const n = fmtDayName(d);
-  return n === "Sat" || n === "Sun";
-};
+/** The weekly off. SUNDAY ONLY — the backend's rule (attendance/days marks an
+ *  unopened Sunday `weekly_off`; Saturday is a working day). */
+export const isWeekend = (d: string) => fmtDayName(d) === "Sun";
 
 /* ======================================================== vocabulary === */
 
-export const VOCAB = vocabDoc;
+/* The value lists. `attendanceStates` and the derived `delayed` stage have no
+   server list and stay in vocabularies.json; every other list, link relations
+   included, is filled from `GET vocab/<name>/` by bootTeam. The exported maps
+   and arrays are filled IN PLACE, so importers holding them see the rows. */
+type VocabRow = { key: string; label: string; tone: string; hint?: string; required?: boolean };
+export const VOCAB = {
+  ...vocabDoc,
+  leaveKinds: [] as VocabRow[],
+  documentKinds: [] as VocabRow[],
+  tagTones: [] as VocabRow[],
+};
 
 type ToneRow = { key: string; label: string; tone: string };
 const toneMap = (rows: ToneRow[]) => {
@@ -422,39 +430,75 @@ const toneMap = (rows: ToneRow[]) => {
   rows.forEach((r) => { o[r.key] = r; });
   return o;
 };
+const refill = <T,>(target: Record<string, T>, rows: (T & { key: string })[]) => {
+  Object.keys(target).forEach((k) => { delete target[k]; });
+  rows.forEach((r) => { target[r.key] = r; });
+};
 export const ATT_STATE = toneMap(vocabDoc.attendanceStates as ToneRow[]);
-/** All five stages, the derived one included — labels and tones come from the
- *  vocabulary so a relabel server-side needs no code edit here. */
+/** All five stages, the derived one included — the four stored ones from the
+ *  server, `delayed` from vocabularies.json. */
 export const WORK_STATUS = toneMap(vocabDoc.workStatuses as ToneRow[]);
-export const LEAVE_STATE = toneMap(vocabDoc.leaveStates as ToneRow[]);
-export const LEAVE_KIND = toneMap(vocabDoc.leaveKinds as unknown as ToneRow[]);
-export const AGREEMENT_KIND = toneMap(vocabDoc.agreementKinds as unknown as ToneRow[]);
-export const AGREEMENT_STATE = toneMap(vocabDoc.agreementStates as ToneRow[]);
-export const DOCUMENT_KIND = toneMap(vocabDoc.documentKinds as unknown as ToneRow[]);
+export const LEAVE_STATE: Record<string, ToneRow> = {};
+export const LEAVE_KIND: Record<string, ToneRow> = {};
+export const AGREEMENT_KIND: Record<string, ToneRow> = {};
+export const AGREEMENT_STATE: Record<string, ToneRow> = {};
+export const DOCUMENT_KIND: Record<string, ToneRow> = {};
 /** The documents a member is expected to have handed over. Vocabulary, not a
  *  constant here: adding one server-side must not need a code edit. */
-export const REQUIRED_DOCS: string[] = (vocabDoc.documentKinds as { key: string; required?: boolean }[])
-  .filter((r) => r.required).map((r) => r.key);
-export const LINK_RELATION = toneMap(vocabDoc.linkRelations as unknown as ToneRow[]);
+export const REQUIRED_DOCS: string[] = [];
+/** `work_link_relation`, in order, from the server. The INVERSE label rides in
+ *  each row's `hint` — which is what lets one stored edge be read from both
+ *  ends. A row added there appears in the picker without a deploy. */
+export const LINK_RELATIONS: VocabRow[] = [];
 /** The label read from the side you are standing on: "Follows" out, "Followed
  *  by" back. Direction is presentation; the stored edge does not flip. */
 export const linkLabelOf = (key: string, outward: boolean): string => {
-  const row = (vocabDoc.linkRelations as { key: string; label: string; inverse?: string }[])
-    .filter((r) => r.key === key)[0];
+  const row = LINK_RELATIONS.filter((r) => r.key === key)[0];
   if (!row) return key;
-  return outward ? row.label : (row.inverse || row.label);
+  return outward ? row.label : (row.hint || row.label);
 };
 /** Soft cap on a member's active tags — warned past, never blocked (TM-OD-22). */
 export const TAG_CAP = 20;
-export const PRIORITY = toneMap(vocabDoc.priorities as ToneRow[]);
-/** THE SCALE IN ORDER, loudest first. Three screens listed the priorities by
- *  hand and two of them stopped at `high` — so `urgent` could be seeded and
- *  sorted on but never chosen in the create dialog or picked in the filter.
- *  One list, read from the vocabulary's own `rank`, so the next value added
- *  there appears everywhere at once. */
-export const PRIORITY_SCALE: Priority[] = (vocabDoc.priorities as (ToneRow & { rank: number })[])
-  .slice().sort((a, b) => a.rank - b.rank).map((r) => r.key as Priority);
-export const KIND = toneMap(vocabDoc.workKinds as unknown as ToneRow[]);
+/** How long a sent agreement stays signable. The dialog says seven days, so the
+ *  send says seven days: one number, not two that drift apart. */
+export const AGREEMENT_DAYS = 7;
+export const PRIORITY: Record<string, ToneRow & { rank: number }> = {};
+/** THE SCALE IN ORDER, loudest first — the server list's displayOrder, so the
+ *  next value added there appears everywhere at once. */
+export const PRIORITY_SCALE: Priority[] = [];
+export const KIND: Record<string, ToneRow> = {};
+/** `work-transitions`, flat server rows grouped by where they start. */
+const TRANSITIONS: { from: string; to: string; requiresReason: boolean; label: string }[] = [];
+
+function applyVocab(lists: Record<string, VocabItem[]>) {
+  const rows = (name: string) => (lists[name] || []).filter((r) => r.isActive !== false)
+    .slice().sort((a, b) => (a.displayOrder || 0) - (b.displayOrder || 0))
+    .map((r) => ({ ...r, tone: r.tone || "" })) as (VocabRow & VocabItem)[];
+  if (lists["leave-kinds"]) { VOCAB.leaveKinds = rows("leave-kinds"); refill(LEAVE_KIND, VOCAB.leaveKinds); }
+  if (lists["leave-states"]) refill(LEAVE_STATE, rows("leave-states"));
+  if (lists["agreement-kinds"]) refill(AGREEMENT_KIND, rows("agreement-kinds"));
+  if (lists["agreement-states"]) refill(AGREEMENT_STATE, rows("agreement-states"));
+  if (lists["document-kinds"]) {
+    VOCAB.documentKinds = rows("document-kinds");
+    refill(DOCUMENT_KIND, VOCAB.documentKinds);
+    REQUIRED_DOCS.splice(0, REQUIRED_DOCS.length, ...VOCAB.documentKinds.filter((r) => r.required).map((r) => r.key));
+  }
+  if (lists["work-tag-tones"]) VOCAB.tagTones = rows("work-tag-tones");
+  if (lists["work-link-relations"]) LINK_RELATIONS.splice(0, LINK_RELATIONS.length, ...rows("work-link-relations"));
+  if (lists["work-kinds"]) refill(KIND, rows("work-kinds"));
+  if (lists["work-priorities"]) {
+    const ps = rows("work-priorities");
+    refill(PRIORITY, ps.map((r, n) => ({ ...r, rank: n + 1 })));
+    PRIORITY_SCALE.splice(0, PRIORITY_SCALE.length, ...ps.map((r) => r.key as Priority));
+  }
+  if (lists["work-statuses"]) rows("work-statuses").forEach((r) => { WORK_STATUS[r.key] = r; });
+  if (lists["work-transitions"]) {
+    const ts = (lists["work-transitions"] as unknown as { from: string; to: string; requiresReason?: boolean; label?: string; isActive?: boolean }[])
+      .filter((t) => t.isActive !== false);
+    TRANSITIONS.splice(0, TRANSITIONS.length, ...ts.map((t) => ({
+      from: t.from, to: t.to, requiresReason: !!t.requiresReason, label: t.label || "" })));
+  }
+}
 
 export const labelOf = (map: Record<string, ToneRow>, k: string) => (map[k] ? map[k].label : k);
 export const toneOf = (map: Record<string, ToneRow>, k: string) => (map[k] ? map[k].tone : "");
@@ -462,8 +506,8 @@ export const toneOf = (map: Record<string, ToneRow>, k: string) => (map[k] ? map
 /* ============================================================== state === */
 /* One mutable snapshot for this browser tab. Every write replaces the arrays it
    touches and bumps `version`, which is what useSyncExternalStore subscribes
-   to. Nothing is persisted: a reload restores the seed, and the proto banner on
-   every face says so in the same words. */
+   to. Every array is filled by bootTeam; nothing in this store is a local
+   stand-in any more (see the header). */
 
 type Snapshot = {
   members: Member[];
@@ -475,54 +519,393 @@ type Snapshot = {
   leave: LeaveRequest[];
   agreements: Agreement[];
   documents: MemberDocument[];
-  links: WorkLink[];
-  /** In the snapshot so a roster adoption re-keys it with everything else —
-   *  but nothing in this file ever writes it. Team reads pay. */
+  /** Incentives from the server, one record per member. */
   pay: Pay[];
   version: number;
 };
 
-const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
-
-/* Every date in the seed moves with the clock. Anything that starts like a
-   date — date-only or a full ISO instant — shifts by the same whole weeks the
-   clock moved; wall-clock strings ("09:30") and prose are untouched. */
-const DATED = /^\d{4}-\d{2}-\d{2}/;
-const shiftValue = (v: unknown): unknown => {
-  if (typeof v === "string" && DATED.test(v)) return plusDays(v.slice(0, 10), SHIFT_DAYS) + v.slice(10);
-  if (Array.isArray(v)) return v.map(shiftValue);
-  if (v && typeof v === "object") {
-    const o: Record<string, unknown> = {};
-    Object.keys(v).forEach((k) => { o[k] = shiftValue((v as Record<string, unknown>)[k]); });
-    return o;
-  }
-  return v;
-};
-const seedRows = <T,>(rows: T[]): T[] => (SHIFT_DAYS ? (shiftValue(rows) as T[]) : rows);
-
-const seed = (): Snapshot => ({
-  members: seedRows(clone(membersDoc.members)) as Member[],
-  days: seedRows(clone(attendanceDoc.days)) as AttendanceDay[],
-  items: seedRows(clone(workDoc.items)) as WorkItem[],
-  plans: seedRows(clone(plansDoc.plans)) as DailyPlan[],
-  reports: seedRows(clone(reportsDoc.reports)) as DailyReport[],
-  tags: seedRows(clone(tagsDoc.tags)) as Tag[],
-  leave: seedRows(clone(leaveDoc.leave)) as LeaveRequest[],
-  agreements: seedRows(clone(agreementsDoc.agreements)) as Agreement[],
-  documents: seedRows(clone(documentsDoc.documents)) as MemberDocument[],
-  links: seedRows(clone(linksDoc.links)) as WorkLink[],
-  pay: seedRows(clone(payDoc.pay)) as Pay[],
+let snap: Snapshot = {
+  members: [], days: [], items: [], plans: [], reports: [], tags: [], leave: [], agreements: [],
+  documents: [],
+  pay: [],
   version: 0,
-});
-
-let snap: Snapshot = seed();
+};
 const listeners = new Set<() => void>();
 const emit = () => { snap = { ...snap, version: snap.version + 1 }; listeners.forEach((l) => l()); };
-const subscribe = (fn: () => void) => { listeners.add(fn); return () => { listeners.delete(fn); }; };
+/* The first subscriber starts the load, so any face that reads this store —
+   Team, Resources, Agreements, the Overview — gets live rows without asking. */
+const subscribe = (fn: () => void) => { listeners.add(fn); void bootTeam(); return () => { listeners.delete(fn); }; };
 const getVersion = () => snap.version;
 
-/** Re-seed. Local scaffolding only — it exists so a demo can be walked twice. */
-export function resetStore() { snap = seed(); emit(); }
+/* ------------------------------------------------------------- the load --- */
+
+const str = (id: number | string | null | undefined) => (id == null ? null : String(id));
+const orNull = (v: string | null | undefined) => (v ? v : null);
+
+function toMember(u: AdminUserRow, s: WorkSettingsRow | undefined): Member {
+  const designation = (s && s.designation) || u.designation;
+  const employment = (s && s.employmentType) || u.employmentType;
+  const boss = s ? s.reportsTo : u.reportsTo;
+  return {
+    memberId: String(u.id),
+    name: u.name || u.username,
+    email: u.email || "",
+    phone: u.phone || "",
+    username: u.username,
+    designation: designation ? designation.label : "",
+    /* The panel's "department" is the member's rbac roles (team/d1). */
+    department: (u.roles || []).map((r) => r.name).join(", "),
+    employmentType: employment ? employment.key : "",
+    joiningDate: (s && s.joiningDate) || "",
+    reportsTo: boss ? String(boss.id) : null,
+    workLocation: "",
+    expectedHoursPerDay: s ? s.expectedHoursPerDay : 0,
+    dayStartsAt: s ? s.dayStartsAt : "",
+    graceMinutes: s ? s.graceMinutes : 0,
+    autoCloseAt: s ? s.autoCloseAt : "",
+    timezone: s ? s.timezone : "Asia/Kolkata",
+    status: u.isActive === false ? "inactive" : "active",
+    isFullAccess: !!u.isSuperAdmin,
+    roles: (u.roles || []).map((r) => r.name),
+    addedAt: u.addedAt || "",
+    lastLogin: u.lastLogin || null,
+  };
+}
+
+const toDay = (d: AttendanceDayRow): AttendanceDay => ({
+  attendanceId: String(d.id),
+  memberId: String(d.member.id),
+  businessDate: d.businessDate,
+  startedAt: d.startedAt as string,
+  endedAt: d.endedAt,
+  breaks: (d.breaks || []).map((b) => ({ startedAt: b.startedAt, endedAt: b.endedAt, minutes: b.minutes })),
+  workedMinutes: d.workedMinutes,
+  breakMinutes: d.breakMinutes,
+  isLate: d.isLate,
+  lateByMinutes: d.lateByMinutes,
+  source: d.source && d.source.key === "corrected" ? "corrected" : "self",
+  correctedBy: d.correctedBy ? String(d.correctedBy.id) : undefined,
+  correctedAt: d.correctedAt || undefined,
+  correctionReason: d.correctionNote || undefined,
+});
+
+function toItem(w: WorkItemRow): WorkItem {
+  const id = String(w.id);
+  return {
+    itemId: id,
+    kind: w.kind.key as WorkKind,
+    title: w.title,
+    description: w.description || null,
+    assigneeId: String(w.assignee.id),
+    createdById: w.createdBy ? String(w.createdBy.id) : "",
+    parentId: str(w.parent),
+    status: w.status.key as WorkStatus,
+    priority: w.priority.key as Priority,
+    startDate: w.startDate,
+    dueDate: w.dueDate,
+    completedAt: w.completedAt,
+    expectedOutcome: null,
+    blockedByItemId: str(w.blockedBy),
+    blockedReason: w.blockedReason || undefined,
+    cancelledReason: w.cancelledReason || undefined,
+    cancelledAt: w.cancelledAt || undefined,
+    targetValue: w.targetValue ?? undefined,
+    targetUnit: w.targetUnit || undefined,
+    /* The server keeps a target's progress as a share; the value is read back
+       from it so `progressOf` and the "12 of 40" line agree with the server. */
+    currentValue: w.kind.key === "target" && w.targetValue
+      ? Math.round(((w.progress || 0) / 100) * w.targetValue) : undefined,
+    tagIds: (w.tags || []).map((t) => String(t.id)),
+    /* `lineId` here, `id` on the wire — the rename happens once, at this
+       boundary, so no screen has to know both names. */
+    checklist: (w.checklist || []).map((l) => ({ lineId: l.id, text: l.text, done: l.done })),
+    itemLinks: (w.itemLinks || []).map((l) => ({ itemId: String(l.itemId), relation: l.relation })),
+    links: (w.links || []).map((l, n) => ({ linkId: id + "-L" + n, label: l.label || l.url, url: l.url })),
+    rowVersion: w.rowVersion,
+    createdAt: w.createdAt || "",
+  };
+}
+
+const toTag = (t: WorkTagRow): Tag => ({
+  tagId: String(t.id), ownerId: String(t.owner.id), slug: t.slug, label: t.label,
+  colourToken: t.tone ? t.tone.key : "slate", createdAt: t.createdAt, archivedAt: t.archivedAt,
+});
+
+const toPlan = (p: DailyPlanRow): DailyPlan => ({
+  planId: String(p.id), memberId: String(p.member.id), businessDate: p.businessDate,
+  expectedOutcome: orNull(p.expectedOutcome), blockers: orNull(p.blockers), notes: orNull(p.notes),
+  submittedAt: p.submittedAt,
+  lines: p.lines.map((l) => ({
+    lineId: String(l.id), ordinal: l.ordinal + 1, title: l.title,
+    priority: (l.priority ? l.priority.key : "medium") as Priority, workItemId: str(l.workItemId),
+  })),
+});
+
+const toReport = (r: DailyReportRow): DailyReport => ({
+  reportId: String(r.id), memberId: String(r.member.id), businessDate: r.businessDate,
+  pendingWork: orNull(r.pendingWork), pendingReason: orNull(r.pendingReason), achievement: orNull(r.achievement),
+  blockers: orNull(r.blockers), supportNeeded: orNull(r.supportNeeded), tomorrowPriority: orNull(r.tomorrowPriority),
+  notes: orNull(r.notes), submittedAt: r.submittedAt,
+  acknowledgedById: r.acknowledgedBy ? String(r.acknowledgedBy.id) : null, acknowledgedAt: r.acknowledgedAt,
+  lines: r.lines.map((l) => ({
+    lineId: String(l.id), workItemId: str(l.workItemId), title: l.title, done: l.done, targetDelta: l.targetDelta,
+  })),
+});
+
+const toLeave = (l: LeaveRow): LeaveRequest => ({
+  leaveId: String(l.id), memberId: String(l.member.id), fromDate: l.fromDate, toDate: l.toDate,
+  kind: l.kind.key, reason: l.reason, state: l.state.key as LeaveState,
+  decidedById: l.decidedBy ? String(l.decidedBy.id) : null, decidedAt: l.decidedAt,
+  decisionNote: orNull(l.decisionNote), requestedAt: l.createdAt,
+});
+
+/* The body, the token and the signer's address come back too: every row the
+   list returns is the reader's own or read with full access. */
+const toAgreement = (a: AgreementRow): Agreement => ({
+  agreementId: String(a.id), memberId: String(a.member.id), kind: a.kind.key, title: a.title,
+  templateId: a.templateKey || null, body: a.body || "", version: a.version,
+  state: a.state.key as AgreementState,
+  sentAt: a.sentAt, sentById: a.sentBy ? String(a.sentBy.id) : null, viewedAt: a.viewedAt,
+  signedAt: a.signedAt, signedName: orNull(a.signedName), signerIp: a.signerIp,
+  expiresAt: a.expiresAt ? a.expiresAt.slice(0, 10) : null, token: a.token || "", fileName: "",
+});
+
+/** The row a member handed over, and its file: `file.url` is a signed read the
+ *  server minted, valid for minutes, never the object's own address. */
+const toDocument = (d: MemberDocumentRow): MemberDocument => ({
+  documentId: String(d.id), memberId: String(d.member.id), kind: d.kind.key, label: d.label,
+  fileName: d.fileName, sizeKb: d.sizeKb, file: d.file || null, uploadedAt: d.uploadedAt,
+  uploadedById: d.uploadedBy ? String(d.uploadedBy.id) : "",
+  verifiedById: d.verifiedBy ? String(d.verifiedBy.id) : null, verifiedAt: d.verifiedAt,
+});
+
+function toPay(rows: IncentiveRow[]): Pay[] {
+  const by: Record<string, Pay> = {};
+  rows.forEach((i) => {
+    const id = String(i.member.id);
+    if (!by[id]) by[id] = { memberId: id, annualCtc: 0, currency: "INR", effectiveFrom: "", account: null, payslips: [], incentives: [] };
+    by[id].incentives.push({
+      incentiveId: String(i.id), month: i.month, workItemId: i.workItem ? String(i.workItem.id) : null,
+      basis: i.basis, amount: i.amountPaise / 100, state: i.state.key,
+    });
+  });
+  return Object.keys(by).map((k) => by[k]);
+}
+
+/** Every page of a list endpoint. ponytail: sequential pages of the whole
+ *  history; window by date if a list ever runs to many thousands. */
+async function pages<R extends { total: number }, T>(page: (n: number) => Promise<R>, pick: (r: R) => T[]): Promise<T[]> {
+  const out: T[] = [];
+  for (let n = 1; ; n++) {
+    const got = await page(n);
+    const rows = pick(got) || [];
+    out.push(...rows);
+    if (!rows.length || out.length >= got.total) return out;
+  }
+}
+
+/* ---------------------------------------------------------- load status --- */
+
+/** How one read stands. A refusal (4xx, or a logical `response:false`) is a
+ *  fact about the VIEWER; a 5xx or a dead network is a failure. Neither is an
+ *  empty record, so neither may be drawn as one. `own` marks a wide read the
+ *  server refused and answered with the viewer's own rows instead. */
+export type LoadPart =
+  | { state: "loading" }
+  | { state: "ok"; own: boolean }
+  | { state: "denied"; message: string }
+  | { state: "error"; message: string };
+
+const LOADED: LoadPart = { state: "ok", own: false };
+const refused = (e: unknown) => e instanceof AppExceptions && e.code > 0 && e.code < 500;
+export const loadFailure = (e: unknown): LoadPart =>
+  (refused(e) ? { state: "denied", message: errMessage(e) } : { state: "error", message: errMessage(e) });
+
+/** A read that holds only the viewer's own rows is "not in your access" on
+ *  anybody else's page — never their empty record. */
+export const scopedTo = (p: LoadPart, memberId?: string): LoadPart =>
+  (p.state === "ok" && p.own && memberId && memberId !== meId() ? { state: "denied", message: "" } : p);
+
+type Got<T> = [T, LoadPart];
+
+/** Everyone's rows, or — when the server refuses the wide read — the viewer's
+ *  own, or nothing. The rows are what they always were; the part says which. */
+async function wide<T>(all: () => Promise<T[]>, own: () => Promise<T[]>): Promise<Got<T[]>> {
+  try {
+    return [await all(), LOADED];
+  } catch (e) {
+    try {
+      const rows = await own();
+      return [rows, refused(e) ? { state: "ok", own: true } : loadFailure(e)];
+    } catch (e2) {
+      return [[], loadFailure(refused(e) ? e2 : e)];
+    }
+  }
+}
+
+async function one<T>(p: Promise<T>, empty: T): Promise<Got<T>> {
+  try { return [await p, LOADED]; } catch (e) { return [empty, loadFailure(e)]; }
+}
+
+/** The lists a page can ask about. Attendance days are not here: the one page
+ *  that shows them reads its own window (liveMember.ts). */
+export type TeamList = "members" | "items" | "tags" | "plans" | "reports" | "leave" | "agreements"
+  | "documents" | "incentives" | "vocab";
+const TEAM_LISTS: TeamList[] = ["members", "items", "tags", "plans", "reports", "leave", "agreements",
+  "documents", "incentives", "vocab"];
+const allParts = (p: LoadPart) => Object.fromEntries(TEAM_LISTS.map((k) => [k, p])) as Record<TeamList, LoadPart>;
+let parts = allParts({ state: "loading" });
+
+/** Loading before a failure before a refusal: while anything is still coming
+ *  the page waits, and a failure is offered a retry before a refusal is stated. */
+export function loadOf(lists: TeamList[], memberId?: string): LoadPart {
+  const got = lists.map((k) => scopedTo(parts[k], memberId));
+  return got.filter((p) => p.state === "loading")[0]
+    || got.filter((p) => p.state === "error")[0]
+    || got.filter((p) => p.state === "denied")[0]
+    || LOADED;
+}
+
+/** Try again: every list reads as loading until the re-read lands. A background
+ *  re-read after a write does NOT do this — the page keeps what it shows. */
+export function retryTeam(): Promise<void> {
+  parts = allParts({ state: "loading" });
+  emit();
+  return bootTeam(true);
+}
+
+const VOCAB_LISTS = ["leave-kinds", "leave-states", "agreement-kinds", "agreement-states", "document-kinds",
+  "work-tag-tones", "work-kinds", "work-priorities", "work-statuses", "work-transitions",
+  "work-link-relations"];
+
+export type TeamBoot = "idle" | "loading" | "ready" | "error";
+let bootState: TeamBoot = "idle";
+let booting: Promise<void> | null = null;
+export const teamBootState = () => bootState;
+
+async function load(current: () => boolean): Promise<void> {
+  const me = getSession()?.user;
+  const t = await call(AdminOpsService.serverTime()).catch(() => null);
+  if (t) setClock(t.epochMs);
+
+  const [vocabGot, usersGot, settingsGot, [days], itemsGot, tagsGot, plansGot, reportsGot, leaveGot,
+    agreementsGot, documentsGot, incentivesGot] = await Promise.all([
+    Promise.all(VOCAB_LISTS.map((n) => one(call(AdminOpsService.vocab(n)).then((r) => [n, r.items] as const), null))),
+    one(call(AdminOpsService.users()), null),
+    one(call(AdminOpsService.attendanceSettings()).then((r) => r.settings), [] as WorkSettingsRow[]),
+    wide((() => pages((n) => call(AdminOpsService.attendanceDays({ member: "all", pageNo: n, pageSize: 1000 })), (r) => r.days)),
+      () => pages((n) => call(AdminOpsService.attendanceDays({ pageNo: n, pageSize: 1000 })), (r) => r.days)),
+    wide(() => pages((n) => call(AdminOpsService.work({ assignee: "all", pageNo: n, pageSize: 500 })), (r) => r.items),
+      () => pages((n) => call(AdminOpsService.work({ pageNo: n, pageSize: 500 })), (r) => r.items)),
+    wide(() => call(AdminOpsService.workTags({ owner: "all", includeArchived: true })).then((r) => r.tags),
+      () => call(AdminOpsService.workTags({ includeArchived: true })).then((r) => r.tags)),
+    wide(() => pages((n) => call(AdminOpsService.dailyPlans({ member: "all", pageNo: n, pageSize: 1000 })), (r) => r.plans),
+      () => pages((n) => call(AdminOpsService.dailyPlans({ pageNo: n, pageSize: 1000 })), (r) => r.plans)),
+    wide(() => pages((n) => call(AdminOpsService.dailyReports({ member: "all", pageNo: n, pageSize: 1000 })), (r) => r.reports),
+      () => pages((n) => call(AdminOpsService.dailyReports({ pageNo: n, pageSize: 1000 })), (r) => r.reports)),
+    wide(() => pages((n) => call(AdminOpsService.leave({ member: "all", pageNo: n, pageSize: 1000 })), (r) => r.leave),
+      () => pages((n) => call(AdminOpsService.leave({ pageNo: n, pageSize: 1000 })), (r) => r.leave)),
+    wide(() => pages((n) => call(AdminOpsService.agreements({ member: "all", pageNo: n, pageSize: 1000 })), (r) => r.agreements),
+      () => pages((n) => call(AdminOpsService.agreements({ pageNo: n, pageSize: 1000 })), (r) => r.agreements)),
+    wide(() => call(AdminOpsService.memberDocuments({ member: "all" })).then((r) => r.documents),
+      () => call(AdminOpsService.memberDocuments()).then((r) => r.documents)),
+    one(call(AdminOpsService.incentives()).then((r) => r.incentives), [] as IncentiveRow[]),
+  ]);
+
+  if (!current()) return;
+  const vocab = vocabGot.map(([v]) => v);
+  const users = usersGot[0], settings = settingsGot[0], items = itemsGot[0], tags = tagsGot[0];
+  const plans = plansGot[0], reports = reportsGot[0], leave = leaveGot[0], agreements = agreementsGot[0];
+  const documents = documentsGot[0], incentives = incentivesGot[0];
+  applyVocab(Object.fromEntries(vocab.filter(Boolean) as (readonly [string, VocabItem[]])[]));
+
+  const settingsOf = (id: number) => settings.filter((s) => s.member.id === id)[0];
+  let roster = users || [];
+  /* Without team.view the roster is refused; the viewer is still a member. */
+  if (me && !roster.some((u) => String(u.id) === String(me.id))) {
+    roster = roster.concat([{
+      id: Number(me.id), username: me.username || "", role: "", isSuperAdmin: !!getSession()?.isFullAccess,
+      isVerified: true, name: me.name || me.username || "", email: me.email || "", phone: "", roles: [],
+    }]);
+  }
+
+  snap = {
+    ...snap,
+    members: roster.map((u) => toMember(u, settingsOf(u.id))),
+    days: days.filter((d) => d.id != null && !!d.startedAt).map(toDay),
+    items: items.map(toItem),
+    tags: tags.map(toTag),
+    plans: plans.map(toPlan),
+    reports: reports.map(toReport),
+    leave: leave.map(toLeave),
+    agreements: agreements.map(toAgreement),
+    documents: documents.map(toDocument),
+    pay: toPay(incentives),
+  };
+  /* A refused roster still holds the viewer (above), so it reads as their own
+     rows; the work settings only ever fail, they are never refused wider. */
+  parts = {
+    members: usersGot[1].state === "denied" ? { state: "ok", own: true }
+      : usersGot[1].state === "ok" && settingsGot[1].state !== "ok" ? settingsGot[1] : usersGot[1],
+    items: itemsGot[1], tags: tagsGot[1], plans: plansGot[1], reports: reportsGot[1], leave: leaveGot[1],
+    agreements: agreementsGot[1], documents: documentsGot[1], incentives: incentivesGot[1],
+    vocab: vocabGot.map(([, p]) => p).filter((p) => p.state !== "ok")[0] || LOADED,
+  };
+  bootState = users || roster.length ? "ready" : "error";
+  emit();
+}
+
+/** Load (once) or reload (`force`) everything this store serves. Never throws.
+ *  Overlapping reloads are allowed; only the newest one lands. */
+let loadSeq = 0;
+export function bootTeam(force = false): Promise<void> {
+  if (booting && !force) return booting;
+  if (bootState === "idle") bootState = "loading";
+  const mine = ++loadSeq;
+  booting = load(() => mine === loadSeq).catch((e) => {
+    bootState = "error";
+    if (mine === loadSeq) parts = allParts(loadFailure(e));
+    emit();
+  });
+  return booting;
+}
+
+/* ------------------------------------------------------------ writes, live --- */
+
+export type Refusal = { ok: false; code: string; message: string };
+export type Ok<T> = { ok: true; data: T };
+export type Result<T> = Ok<T> | Refusal;
+const err = (code: string, message: string): Refusal => ({ ok: false, code, message });
+const ok = <T,>(data: T): Ok<T> => ({ ok: true, data });
+
+/** Run a server write. `apply` folds the response into the snapshot at once and
+ *  returns what the screen reads; a full re-read follows in the background so
+ *  every derived view (rollups, counts) agrees with the server. */
+async function live<R, T>(req: () => Promise<ApiResponseType<R>>, apply: (r: R) => T): Promise<Result<T>> {
+  try {
+    const r = await call(req());
+    const out = apply(r);
+    emit();
+    void bootTeam(true);
+    return ok(out);
+  } catch (e) {
+    return err("refused", errMessage(e));
+  }
+}
+
+/* Writes to one work item go one at a time, each sending the rowVersion the
+   previous one left — two quick tag clicks must not refuse each other. */
+const itemQueue: Record<string, Promise<unknown>> = {};
+function serial<T>(itemId: string, fn: () => Promise<T>): Promise<T> {
+  const next = (itemQueue[itemId] || Promise.resolve()).then(fn, fn);
+  itemQueue[itemId] = next.catch(() => undefined);
+  return next;
+}
+const putItem = (w: WorkItemRow): WorkItem => {
+  const i = toItem(w);
+  snap.items = snap.items.filter((x) => x.itemId !== i.itemId).concat([i]);
+  return i;
+};
 
 /* Plain readers over the same snapshot the hooks subscribe to. The check suite
    calls exactly these, so what it asserts is what the screens see and not a
@@ -536,7 +919,10 @@ export const readTags = (): Tag[] => snap.tags;
 export const readLeave = (): LeaveRequest[] => snap.leave;
 export const readAgreements = (): Agreement[] => snap.agreements;
 export const readDocuments = (): MemberDocument[] => snap.documents;
-export const readLinks = (): WorkLink[] => snap.links;
+/** Every edge the store can see, derived from the items that carry them. */
+export const readLinks = (): WorkLink[] =>
+  snap.items.flatMap((i) => (i.itemLinks || []).map((e) => ({
+    linkId: i.itemId + ":" + e.itemId, fromItemId: i.itemId, toItemId: e.itemId, relation: e.relation })));
 export const readMember = (id: string): Member | null =>
   snap.members.filter((m) => m.memberId === id)[0] || null;
 export const readItem = (id: string): WorkItem | null =>
@@ -544,18 +930,10 @@ export const readItem = (id: string): WorkItem | null =>
 
 /* ============================================================== scope === */
 
-/** Who is looking. The session's own id where the seed knows it, and otherwise
- *  a designated member so the prototype is walkable signed in as anybody — the
- *  fallback is scaffolding and goes with the seed. */
-let adoptedMe: string | null = null;
+/** Who is looking: the signed-in account's id. */
 export function meId(): string {
   const s = getSession();
-  const byId = s?.user?.id != null ? String(s.user.id) : null;
-  if (byId && snap.members.some((m) => m.memberId === byId)) return byId;
-  const byName = snap.members.filter((m) => m.name === s?.user?.name)[0];
-  if (byName) return byName.memberId;
-  if (adoptedMe && snap.members.some((m) => m.memberId === adoptedMe)) return adoptedMe;
-  return "58";
+  return s?.user?.id != null ? String(s.user.id) : "";
 }
 
 /** TM-OD-01, answered 2026-08-30: a senior sees their own reports, one level,
@@ -1146,16 +1524,25 @@ export function normaliseUrl(raw: string): string | null {
 
 export interface LinkedItem { link: WorkLink; other: WorkItem; outward: boolean }
 
-/** Both directions of every edge touching an item, with the row the edge
- *  points at resolved live. A dangling edge renders nothing rather than a
- *  dead id. */
-export function linksOf(itemId: string, all = snap.links): LinkedItem[] {
+/** Both directions of every edge touching an item, with the row the edge points
+ *  at resolved live. A dangling edge renders nothing rather than a dead id.
+ *
+ *  THE INWARD HALF IS A SCAN, and it is free: the edge is stored on one end
+ *  only, and the list being scanned is the one this store already holds. An
+ *  edge written on a task the viewer may not read is not in that list and does
+ *  not show — which is the same line every other read in this module draws. */
+export function linksOf(itemId: string, all = snap.items): LinkedItem[] {
   const out: LinkedItem[] = [];
-  all.forEach((l) => {
-    const outward = l.fromItemId === itemId;
-    if (!outward && l.toItemId !== itemId) return;
-    const other = readItem(outward ? l.toItemId : l.fromItemId);
-    if (other) out.push({ link: l, other, outward });
+  all.forEach((i) => {
+    (i.itemLinks || []).forEach((e) => {
+      const outward = i.itemId === itemId;
+      if (!outward && e.itemId !== itemId) return;
+      const other = readItem(outward ? e.itemId : i.itemId);
+      if (other) {
+        out.push({ link: { linkId: i.itemId + ":" + e.itemId, fromItemId: i.itemId, toItemId: e.itemId,
+          relation: e.relation }, other, outward });
+      }
+    });
   });
   return out;
 }
@@ -1491,113 +1878,31 @@ export function attentionOf(rows: ReviewRow[]): Attention {
   };
 }
 
-/* ================================================ the write simulation ===
-   Everything below lands in this browser tab and is discarded on reload. It
-   exists so the screens can be walked end to end and so the transitions are
-   stated somewhere executable rather than only in a document. Each function
-   returns { ok } or { ok:false, code, message } in the shape the API's error
-   contract uses, so the views' refusal handling is the real one. */
+/* ========================================================== the writes ===
+   Every write returns a Promise of the same { ok } / { ok:false, code, message }
+   shape the screens already branch on. Nothing here mints an id: item↔item
+   links, checklists and the "waiting on" reason are the server's now. */
 
-export type Refusal = { ok: false; code: string; message: string };
-export type Ok<T> = { ok: true; data: T };
-export type Result<T> = Ok<T> | Refusal;
-const err = (code: string, message: string): Refusal => ({ ok: false, code, message });
-const ok = <T,>(data: T): Ok<T> => ({ ok: true, data });
+/* The attendance clock is the caller's own day, on the server's clock and
+   against their own work settings — the memberId is who the screen thinks it
+   is acting for, and anybody else is refused rather than silently swapped. */
+const ownDay = (memberId: string, action: "open" | "break" | "resume" | "end"): Promise<Result<AttendanceDay>> =>
+  memberId !== meId()
+    ? Promise.resolve(err("not_own_day", "Only your own day can be clocked."))
+    : live(() => AdminOpsService.attendanceDayAction(action), (d) => {
+      const day = toDay(d);
+      snap.days = snap.days.filter((x) => x.attendanceId !== day.attendanceId).concat([day]);
+      return day;
+    });
 
-let seq = 0;
-const nextId = (prefix: string) => prefix + "-" + (Date.now().toString(36) + (seq++).toString(36)).toUpperCase();
+export const openDay = (memberId: string) => ownDay(memberId, "open");
+export const startBreak = (memberId: string) => ownDay(memberId, "break");
+export const resumeDay = (memberId: string) => ownDay(memberId, "resume");
+export const endDay = (memberId: string) => ownDay(memberId, "end");
 
-/** THE RECORD INSIDE *THIS* ARRAY. Every mutator finds its row in the list it
- *  is about to write back, never in a second read — the prototype lost every
- *  member edit for exactly that reason (defect T-1), because two reads of one
- *  store hand back objects from two different parses and mutating one saves
- *  the other. */
-const findDay = (list: AttendanceDay[], memberId: string, date: string) =>
-  list.filter((d) => d.memberId === memberId && d.businessDate === date)[0] || null;
-
-export function openDay(memberId: string): Result<AttendanceDay> {
-  const days = snap.days.slice();
-  const existing = findDay(days, memberId, TODAY);
-  /* IDEMPOTENT, not a conflict. A second tab, or a second device, must get the
-     SAME open day back — refusing it would make the honest fix (press it
-     again) look like a bug. */
-  if (existing) return ok(existing);
-  const m = readMember(memberId);
-  if (!m) return err("member_not_found", "No such member.");
-  if (m.status !== "active") return err("account_inactive", "This account is not active.");
-  const at = now();
-  const threshold = atClock(TODAY, m.dayStartsAt) + m.graceMinutes * 60000;
-  const day: AttendanceDay = {
-    attendanceId: nextId("ATT"),
-    memberId, businessDate: TODAY,
-    startedAt: new Date(at).toISOString(),
-    endedAt: null, breaks: [], workedMinutes: null, breakMinutes: 0,
-    /* Computed at open, against this member's own start time, and stored. */
-    isLate: at > threshold,
-    lateByMinutes: at > threshold ? Math.round((at - threshold) / 60000) : 0,
-    source: "self",
-  };
-  days.push(day);
-  snap.days = days;
-  emit();
-  return ok(day);
-}
-
-export function startBreak(memberId: string): Result<AttendanceDay> {
-  const days = snap.days.slice();
-  const d = findDay(days, memberId, TODAY);
-  if (!d) return err("day_not_open", "Start the day before taking a break.");
-  if (d.endedAt) return err("day_ended", "The day is already closed.");
-  if (openBreakOf(d)) return err("already_on_break", "A break is already running.");
-  d.breaks = d.breaks.concat([{ startedAt: new Date(now()).toISOString(), endedAt: null, minutes: null }]);
-  snap.days = days;
-  emit();
-  return ok(d);
-}
-
-export function resumeDay(memberId: string): Result<AttendanceDay> {
-  const days = snap.days.slice();
-  const d = findDay(days, memberId, TODAY);
-  if (!d) return err("day_not_open", "No open day.");
-  const open = openBreakOf(d);
-  if (!open) return err("not_on_break", "No break is running.");
-  const at = now();
-  open.endedAt = new Date(at).toISOString();
-  open.minutes = Math.max(0, Math.round((at - ts(open.startedAt)) / 60000));
-  d.breakMinutes = breaksClosedMinutes(d);
-  snap.days = days;
-  emit();
-  return ok(d);
-}
-
-export function endDay(memberId: string): Result<AttendanceDay> {
-  const days = snap.days.slice();
-  const d = findDay(days, memberId, TODAY);
-  if (!d) return err("day_not_open", "No open day to close.");
-  if (d.endedAt) return err("day_ended", "The day is already closed.");
-  const at = now();
-  /* Closing the day closes a running break at the same instant. Leaving it open
-     reports a nine-hour lunch, which is the only way this arithmetic can
-     produce a number nobody recognises. */
-  const open = openBreakOf(d);
-  if (open) {
-    open.endedAt = new Date(at).toISOString();
-    open.minutes = Math.max(0, Math.round((at - ts(open.startedAt)) / 60000));
-  }
-  d.endedAt = new Date(at).toISOString();
-  d.breakMinutes = breaksClosedMinutes(d);
-  d.workedMinutes = Math.max(0, Math.round((at - ts(d.startedAt)) / 60000) - d.breakMinutes);
-  snap.days = days;
-  emit();
-  return ok(d);
-}
-
-/** WHERE THIS ITEM MAY GO NEXT, read from the same vocabulary row that
- *  `setItemStatus` enforces with. A control that offers a move the store will
- *  refuse is a control that lies, and hard-coding the four rows into a menu is
- *  how the offer and the rule drift apart — which already happened once in this
- *  module, when the drawer's footer had no branch for cancelled → planned and a
- *  cancelled item became a dead end the store would have allowed out of.
+/** WHERE THIS ITEM MAY GO NEXT, read from the same server rows that
+ *  `work/<id>/status/` enforces with. A control that offers a move the server
+ *  will refuse is a control that lies.
  *
  *  DELAY IS NOT IN HERE AND CANNOT BE. It is derived from the due date, nothing
  *  writes it, and there is no row for it: an item in Delay is offered the moves
@@ -1605,370 +1910,320 @@ export function endDay(memberId: string): Result<AttendanceDay> {
 export interface Transition { to: WorkStatus; requiresReason: boolean; label: string }
 
 export function transitionsFrom(from: WorkStatus): Transition[] {
-  const rows = vocabDoc.workTransitions as
-    { from: string; to: string[]; requiresReason?: boolean; label?: string }[];
-  const row = rows.filter((t) => t.from === from)[0];
-  if (!row) return [];
-  return row.to.map((to) => ({
-    to: to as WorkStatus,
-    requiresReason: !!row.requiresReason || to === "cancelled",
-    /* The row's own verb when it has one — "Reopen", "Restore" — because
-       "Completed → In progress" is not what a person calls that. */
-    label: row.label || labelOf(WORK_STATUS, to),
+  return TRANSITIONS.filter((t) => t.from === from).map((t) => ({
+    to: t.to as WorkStatus,
+    requiresReason: t.requiresReason || t.to === "cancelled",
+    label: t.label || labelOf(WORK_STATUS, t.to),
   }));
 }
 
-export function setItemStatus(itemId: string, to: WorkStatus, reason?: string): Result<WorkItem> {
-  const items = snap.items.slice();
-  const i = items.filter((x) => x.itemId === itemId)[0];
-  if (!i) return err("item_not_found", "No such work item.");
-  const row = (vocabDoc.workTransitions as { from: string; to: string[]; requiresReason?: boolean }[])
-    .filter((t) => t.from === i.status)[0];
-  if (!row || row.to.indexOf(to) < 0)
-    return err("invalid_transition", labelOf(WORK_STATUS, i.status) + " cannot become " + labelOf(WORK_STATUS, to) + ".");
-  const needsReason = row.requiresReason || to === "cancelled";
-  if (needsReason && !(reason || "").trim())
-    return err("reason_required", "This change needs a reason.");
-  i.status = to;
-  i.rowVersion += 1;
-  if (to === "completed") i.completedAt = new Date(now()).toISOString();
-  if (to === "cancelled") { i.cancelledReason = reason; i.cancelledAt = new Date(now()).toISOString(); }
-  if (to === "in_progress") i.completedAt = null;
-  snap.items = items;
-  emit();
-  return ok(i);
+export function setItemStatus(itemId: string, to: WorkStatus, reason?: string): Promise<Result<WorkItem>> {
+  const first = readItem(itemId);
+  if (!first) return Promise.resolve(err("item_not_found", "No such work item."));
+  const move = transitionsFrom(first.status).filter((t) => t.to === to)[0];
+  if (!move)
+    return Promise.resolve(err("invalid_transition", labelOf(WORK_STATUS, first.status) + " cannot become " + labelOf(WORK_STATUS, to) + "."));
+  if (move.requiresReason && !(reason || "").trim())
+    return Promise.resolve(err("reason_required", "This change needs a reason."));
+  return serial(itemId, () => live(
+    () => AdminOpsService.setWorkStatus(Number(itemId), { rowVersion: (readItem(itemId) as WorkItem).rowVersion, to, reason: reason || "" }),
+    putItem));
 }
 
-/** Waiting on another item. A field with a reason, not a stage — the stage
- *  keeps saying where the work is, and this says who it is stuck behind. */
-export function setBlockedBy(itemId: string, blockerId: string | null, reason?: string): Result<WorkItem> {
-  const items = snap.items.slice();
-  const i = items.filter((x) => x.itemId === itemId)[0];
-  if (!i) return err("item_not_found", "No such work item.");
+/** Waiting on another item: WHICH task, and WHAT for. Both are the server's
+ *  now, and the reason is dropped when the blocker is — a sentence about a
+ *  block that is gone is a note about nothing. */
+export function setBlockedBy(itemId: string, blockerId: string | null, reason?: string): Promise<Result<WorkItem>> {
+  const i = readItem(itemId);
+  if (!i) return Promise.resolve(err("item_not_found", "No such work item."));
   if (blockerId) {
-    if (blockerId === itemId) return err("self_block", "An item cannot wait on itself.");
-    const b = items.filter((x) => x.itemId === blockerId)[0];
-    if (!b) return err("blocker_not_found", "No such item to wait on.");
-    if (!(reason || "").trim()) return err("reason_required", "Say what it is waiting for.");
-    i.blockedByItemId = blockerId;
-    i.blockedReason = reason;
-    i.blockedAt = new Date(now()).toISOString();
-  } else {
-    i.blockedByItemId = null;
-    delete i.blockedReason;
-    delete i.blockedAt;
+    if (blockerId === itemId) return Promise.resolve(err("self_block", "An item cannot wait on itself."));
+    if (!readItem(blockerId)) return Promise.resolve(err("blocker_not_found", "No such item to wait on."));
+    if (!(reason || "").trim()) return Promise.resolve(err("reason_required", "Say what it is waiting for."));
   }
-  i.rowVersion += 1;
-  snap.items = items;
-  emit();
-  return ok(i);
+  return serial(itemId, () => live(
+    () => AdminOpsService.updateWork(Number(itemId), {
+      rowVersion: (readItem(itemId) as WorkItem).rowVersion,
+      blockedBy: blockerId ? Number(blockerId) : null,
+      blockedReason: blockerId ? (reason || "").trim() : "" }),
+    putItem));
 }
 
-/** A tag is born here and nowhere else — one keystroke from the picker. A
- *  member may only tag with their own tags, which is what (ownerId, slug)
- *  identity means in practice. */
-export function createTag(ownerId: string, label: string, tone?: string): Result<Tag> {
-  const clean = label.trim();
-  if (!clean) return err("tag_empty", "A tag needs a name.");
-  const slug = clean.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  const dup = snap.tags.filter((t) => t.ownerId === ownerId && t.slug === slug && !t.archivedAt)[0];
-  if (dup) return ok(dup);
-  const t: Tag = {
-    tagId: nextId("TG"), ownerId, slug, label: clean, colourToken: tone || "slate",
-    createdAt: new Date(now()).toISOString(), archivedAt: null,
-  };
-  snap.tags = snap.tags.concat([t]);
-  emit();
-  return ok(t);
+/** A tag is born here — one keystroke from the picker. A member may only tag
+ *  with their own tags; the server returns an existing active tag of the same
+ *  name rather than making a second. */
+export function createTag(ownerId: string, label: string, tone?: string): Promise<Result<Tag>> {
+  if (!label.trim()) return Promise.resolve(err("tag_empty", "A tag needs a name."));
+  return live(
+    () => AdminOpsService.createWorkTag({ label: label.trim(), tone: tone || "slate", owner: Number(ownerId) || undefined }),
+    (t) => {
+      const tag = toTag(t);
+      snap.tags = snap.tags.filter((x) => x.tagId !== tag.tagId).concat([tag]);
+      return tag;
+    });
 }
 
-export function tagItem(itemId: string, tagId: string, on: boolean): Result<WorkItem> {
-  const items = snap.items.slice();
-  const i = items.filter((x) => x.itemId === itemId)[0];
-  if (!i) return err("item_not_found", "No such work item.");
-  const have = i.tagIds || [];
-  i.tagIds = on ? (have.indexOf(tagId) < 0 ? have.concat([tagId]) : have)
-                : have.filter((t) => t !== tagId);
-  i.rowVersion += 1;
-  snap.items = items;
-  emit();
-  return ok(i);
+export function tagItem(itemId: string, tagId: string, on: boolean): Promise<Result<WorkItem>> {
+  if (!readItem(itemId)) return Promise.resolve(err("item_not_found", "No such work item."));
+  return serial(itemId, () => {
+    const i = readItem(itemId) as WorkItem;
+    const have = i.tagIds || [];
+    const next = on ? (have.indexOf(tagId) < 0 ? have.concat([tagId]) : have) : have.filter((t) => t !== tagId);
+    return live(() => AdminOpsService.updateWork(Number(itemId), { rowVersion: i.rowVersion, tags: next.map(Number) }), putItem);
+  });
 }
 
-export function archiveTag(tagId: string): Result<Tag> {
-  const tags = snap.tags.slice();
-  const t = tags.filter((x) => x.tagId === tagId)[0];
-  if (!t) return err("tag_not_found", "No such tag.");
-  t.archivedAt = new Date(now()).toISOString();
-  snap.tags = tags;
-  emit();
-  return ok(t);
+export function archiveTag(tagId: string): Promise<Result<Tag>> {
+  if (!readTag(tagId)) return Promise.resolve(err("tag_not_found", "No such tag."));
+  return live(() => AdminOpsService.archiveWorkTag(Number(tagId)), (t) => {
+    const tag = toTag(t);
+    snap.tags = snap.tags.map((x) => (x.tagId === tag.tagId ? tag : x));
+    return tag;
+  });
 }
 
-/** Rename keeps the record and its history; the slug follows the label. A
- *  rename that would collide with another of the owner's active tags is
- *  refused rather than silently merged. */
-export function renameTag(tagId: string, label: string): Result<Tag> {
-  const clean = label.trim();
-  if (!clean) return err("tag_empty", "A tag needs a name.");
-  const tags = snap.tags.slice();
-  const t = tags.filter((x) => x.tagId === tagId)[0];
-  if (!t) return err("tag_not_found", "No such tag.");
-  const slug = clean.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  const dup = tags.filter((x) => x.ownerId === t.ownerId && x.slug === slug
-    && !x.archivedAt && x.tagId !== tagId)[0];
-  if (dup) return err("tag_exists", "You already hold a tag called " + dup.label + ".");
-  t.label = clean;
-  t.slug = slug;
-  snap.tags = tags;
-  emit();
-  return ok(t);
-}
+/** One row, so every item wearing the tag follows a rename. The slug follows
+ *  the label on the server; a name another ACTIVE tag of theirs already holds
+ *  is refused rather than made into a second `call`. */
+const writeTag = (tagId: string, req: () => Promise<ApiResponseType<WorkTagRow>>): Promise<Result<Tag>> => {
+  if (!readTag(tagId)) return Promise.resolve(err("tag_not_found", "No such tag."));
+  return live(req, (t) => {
+    const tag = toTag(t);
+    snap.tags = snap.tags.map((x) => (x.tagId === tag.tagId ? tag : x));
+    return tag;
+  });
+};
 
-export function restoreTag(tagId: string): Result<Tag> {
-  const tags = snap.tags.slice();
-  const t = tags.filter((x) => x.tagId === tagId)[0];
-  if (!t) return err("tag_not_found", "No such tag.");
-  const dup = tags.filter((x) => x.ownerId === t.ownerId && x.slug === t.slug
-    && !x.archivedAt && x.tagId !== tagId)[0];
-  if (dup) return err("tag_exists", "An active tag already holds that name.");
-  t.archivedAt = null;
-  snap.tags = tags;
-  emit();
-  return ok(t);
-}
+export const renameTag = (tagId: string, label: string): Promise<Result<Tag>> =>
+  (label.trim()
+    ? writeTag(tagId, () => AdminOpsService.updateWorkTag(Number(tagId), { label: label.trim() }))
+    : Promise.resolve(err("tag_empty", "A tag needs a name.")));
 
-export function setTagTone(tagId: string, tone: string): Result<Tag> {
-  const tags = snap.tags.slice();
-  const t = tags.filter((x) => x.tagId === tagId)[0];
-  if (!t) return err("tag_not_found", "No such tag.");
-  t.colourToken = tone;
-  snap.tags = tags;
-  emit();
-  return ok(t);
-}
+/** Archiving freed the slug, so a restore can find it taken — the server says
+ *  so rather than leaving two active tags of one name. */
+export const restoreTag = (tagId: string): Promise<Result<Tag>> =>
+  writeTag(tagId, () => AdminOpsService.restoreWorkTag(Number(tagId)));
 
-/* --------------------------------------------------------- documents --- */
+export const setTagTone = (tagId: string, tone: string): Promise<Result<Tag>> =>
+  writeTag(tagId, () => AdminOpsService.updateWorkTag(Number(tagId), { tone }));
 
-/** SENDING FREEZES THE DOCUMENT — and now there is a document to freeze. The
- *  body is copied in, not referenced: a template edit afterwards makes a new
- *  version and never rewrites what is already out there, which is the rule this
- *  function has claimed since before templates existed.
- *
- *  `version` is the TEMPLATE's version at the moment of sending, so an agreement
- *  can say which draft of the NDA somebody actually signed. */
+/* --------------------------------------------------------- agreements --- */
+
+/** Folds one agreement row back into the snapshot — every write answers with
+ *  the whole record, so no screen patches a copy of it. */
+const putAgreement = (row: AgreementRow): Agreement => {
+  const a = toAgreement(row);
+  snap.agreements = snap.agreements.filter((x) => x.agreementId !== a.agreementId).concat([a]);
+  return a;
+};
+
+/** SEND ONE COPY TO ONE MEMBER. The body is the panel's own rendering of its
+ *  local template, frozen by the server at send — there is no template model
+ *  there, which is exactly why the document travels with the row. */
 export function sendAgreement(
-  memberId: string, kind: string, title: string,
-  from?: { templateId: string; body: string; version: number },
-): Result<Agreement> {
-  if (!title.trim()) return err("validation_failed", "A title is required.");
-  if (!readMember(memberId)) return err("member_not_found", "No such member.");
-  const a: Agreement = {
-    agreementId: nextId("AG"), memberId, kind, title: title.trim(),
-    templateId: from ? from.templateId : null,
-    body: from ? from.body : "",
-    version: from ? from.version : 1,
-    state: "sent", sentAt: new Date(now()).toISOString(), sentById: meId(),
-    viewedAt: null, signedAt: null, signedName: null, signerIp: null,
-    expiresAt: addDays(TODAY, 7), token: "tok_" + nextId("t").toLowerCase(),
-    fileName: title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-") + ".pdf",
-  };
-  snap.agreements = snap.agreements.concat([a]);
-  emit();
-  return ok(a);
+  memberId: string, kind: string, title: string, from?: { templateId: string; body: string; version: number },
+): Promise<Result<Agreement>> {
+  if (!title.trim()) return Promise.resolve(err("validation_failed", "An agreement needs a title."));
+  if (!from || !from.body) return Promise.resolve(err("no_body", "There is nothing to sign. Send it from a template."));
+  return live(() => AdminOpsService.sendAgreement({
+    member: Number(memberId), kind, title: title.trim(), body: from.body, version: from.version,
+    expiresAt: addDays(TODAY, AGREEMENT_DAYS),
+  }), putAgreement);
 }
 
-/** The signature is the member's, so the name they type is stored beside the
- *  time and the address it came from. A signed agreement is never editable. */
-/** OPENING IS A MOMENT ON THE RECORD. `viewedAt` was read in four places and
- *  written in none, so every unsigned agreement stayed "not opened" forever and
- *  the member page's nudge about it was always true. The stand-in sign dialog
- *  is the only place a member reads the document today, so it is what records
- *  the reading; the real link page will call the same thing. */
-export function markViewed(agreementId: string): Result<Agreement> {
-  const list = snap.agreements.slice();
-  const a = list.filter((x) => x.agreementId === agreementId)[0];
-  if (!a) return err("not_found", "No such agreement.");
-  /* Only a copy that can still be signed: an expired link records nothing. */
-  if (a.state !== "sent" || (a.expiresAt && (a.expiresAt as string) < TODAY)) return ok(a);
-  a.state = "viewed";
-  a.viewedAt = new Date(now()).toISOString();
-  snap.agreements = list;
-  emit();
-  return ok(a);
+/** Opening the document is the reading, and the FIRST open is the one recorded.
+ *  The member's own copy only — nobody opens somebody else's for them. */
+export function markViewed(agreementId: string): Promise<Result<Agreement>> {
+  const a = snap.agreements.filter((x) => x.agreementId === agreementId)[0];
+  if (!a) return Promise.resolve(err("not_found", "No such agreement."));
+  if (a.memberId !== meId() || a.viewedAt || a.state === "signed") return Promise.resolve(ok(a));
+  return live(() => AdminOpsService.viewAgreement(Number(agreementId)), putAgreement);
 }
 
-export function signAgreement(agreementId: string, name: string): Result<Agreement> {
-  const list = snap.agreements.slice();
-  const a = list.filter((x) => x.agreementId === agreementId)[0];
-  if (!a) return err("agreement_not_found", "No such agreement.");
-  if (a.state === "signed") return err("already_signed", "It is already signed.");
-  if (a.state === "revoked") return err("revoked", "That link was revoked.");
-  if (!name.trim() || name.trim().length < 2) return err("name_required", "Type your full name to sign.");
-  a.state = "signed";
-  a.signedName = name.trim();
-  a.signedAt = new Date(now()).toISOString();
-  a.signerIp = "127.0.0.1";
-  a.expiresAt = null;
-  snap.agreements = list;
-  emit();
-  return ok(a);
+/** Typing the name is the signature. The time and the address it came from are
+ *  the server's — a signature the client dated would be worth nothing. */
+export function signAgreement(agreementId: string, name: string): Promise<Result<Agreement>> {
+  const a = snap.agreements.filter((x) => x.agreementId === agreementId)[0];
+  if (!a) return Promise.resolve(err("not_found", "No such agreement."));
+  if (a.memberId !== meId()) return Promise.resolve(err("not_own", "Only the member it was sent to can sign it."));
+  if (name.trim().length < 2) return Promise.resolve(err("validation_failed", "Type your full name to sign."));
+  return live(() => AdminOpsService.signAgreement(Number(agreementId), name.trim()), putAgreement);
 }
 
-export function revokeAgreement(agreementId: string): Result<Agreement> {
-  const list = snap.agreements.slice();
-  const a = list.filter((x) => x.agreementId === agreementId)[0];
-  if (!a) return err("agreement_not_found", "No such agreement.");
-  if (a.state === "signed") return err("already_signed", "A signed agreement cannot be revoked.");
-  a.state = "revoked";
-  a.expiresAt = null;
-  snap.agreements = list;
-  emit();
-  return ok(a);
+export function revokeAgreement(agreementId: string): Promise<Result<Agreement>> {
+  const a = snap.agreements.filter((x) => x.agreementId === agreementId)[0];
+  if (!a) return Promise.resolve(err("not_found", "No such agreement."));
+  if (a.state === "signed") return Promise.resolve(err("already_signed", "A signed agreement cannot be revoked."));
+  return live(() => AdminOpsService.revokeAgreement(Number(agreementId)), putAgreement);
 }
 
-export function addDocument(memberId: string, kind: string, label: string): Result<MemberDocument> {
+/* ------------------------------------------------------------ documents --- */
+/* THE ROW AND THE FILE, AND THE FILE IS PRIVATE. The bytes go straight to our
+   bucket with a presigned PUT (intent MemberDocument) and the server keeps the
+   key as a private attachment; a read hands back a signed, expiring URL. No
+   size is invented — what is recorded is the file's own, in whole kilobytes. */
+
+/** A document is up to 5 MB, the same ceiling every other upload here takes. */
+export const DOCUMENT_MAX_KB = 5 * 1024;
+
+/** ONE ROW PER UPLOAD, AND THE READ SHOWS THE NEWEST — `documentsFor` is
+ *  newest-first, so a replaced document keeps the old row as the trail. */
+export async function addDocument(memberId: string, kind: string, label: string,
+  file?: File): Promise<Result<MemberDocument>> {
   if (!label.trim()) return err("validation_failed", "A label is required.");
-  /* ONE ROW PER UPLOAD, AND THE READ SHOWS THE NEWEST. "Replace" used to append
-     while the page read the OLDEST row of a kind, so a replaced PAN card went on
-     file invisibly and the stale one kept showing as handed over and checked.
-     The fix is on the read (`documentsFor` is newest-first), not an overwrite:
-     an identity document that was checked on Monday and replaced on Tuesday
-     keeps Monday's row — who verified what, and when — as the audit trail. */
-  const r: MemberDocument = {
-    documentId: nextId("DOC"), memberId, kind, label: label.trim(),
-    fileName: label.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-") + ".pdf",
-    sizeKb: 240, uploadedAt: new Date(now()).toISOString(), uploadedById: memberId,
-    verifiedById: null, verifiedAt: null,
-  };
-  snap.documents = snap.documents.concat([r]);
-  emit();
-  return ok(r);
+  let up: { fileUrl: string; fileName: string; mimeType: string; sizeKb: number } | undefined;
+  if (file) {
+    /* Refused BEFORE the upload, not after it: a 40 MB scan should not travel
+       to be turned away. */
+    if (file.size > DOCUMENT_MAX_KB * 1024) return err("too_big", "A document is up to 5 MB.");
+    if (!file.size) return err("empty_file", "That file is empty.");
+    try {
+      /* The PUT has to carry the type the URL was signed for; a file the
+         browser gives no type is sent as octet-stream. */
+      const picked = file.type ? file : new File([file], file.name, { type: "application/octet-stream" });
+      const got = await CommonService.getUploadUrl({
+        fileName: picked.name, fileType: picked.type, for: "MemberDocument" });
+      if (!got.response) throw new Error(got.message || "Could not get an upload URL.");
+      await CommonService.uploadToS3(got.data.uploadUrl, picked);
+      up = { fileUrl: got.data.fileUrl, fileName: picked.name, mimeType: picked.type,
+        /* Whole kilobytes, rounded UP: a 300-byte file is 1 KB, never 0, and 0
+           is what the server reads as "no file at all". */
+        sizeKb: Math.ceil(picked.size / 1024) };
+    } catch (e) {
+      return err("upload_failed", errMessage(e));
+    }
+  }
+  return live(() => AdminOpsService.recordMemberDocument({
+    member: Number(memberId) || undefined, kind, label: label.trim(), ...up,
+  }), (d) => {
+    const row = toDocument(d);
+    snap.documents = snap.documents.concat([row]);
+    return row;
+  });
 }
 
-/** The member may delete what they handed over. That is the half that travels
- *  member → company, and it is theirs. */
-export function deleteDocument(documentId: string): Result<string> {
-  const before = snap.documents.length;
-  snap.documents = snap.documents.filter((r) => r.documentId !== documentId);
-  if (snap.documents.length === before) return err("document_not_found", "No such document.");
-  emit();
-  return ok(documentId);
+export function deleteDocument(documentId: string): Promise<Result<string>> {
+  if (!snap.documents.some((r) => r.documentId === documentId))
+    return Promise.resolve(err("document_not_found", "No such document."));
+  return live(() => AdminOpsService.removeMemberDocument(Number(documentId)), () => {
+    snap.documents = snap.documents.filter((r) => r.documentId !== documentId);
+    return documentId;
+  });
 }
 
-export function verifyDocument(documentId: string): Result<MemberDocument> {
-  const list = snap.documents.slice();
-  const r = list.filter((x) => x.documentId === documentId)[0];
-  if (!r) return err("document_not_found", "No such document.");
-  r.verifiedById = meId();
-  r.verifiedAt = new Date(now()).toISOString();
-  snap.documents = list;
-  emit();
-  return ok(r);
+/** Checked by somebody else, never by the person who handed it over. */
+export function verifyDocument(documentId: string): Promise<Result<MemberDocument>> {
+  if (!snap.documents.some((r) => r.documentId === documentId))
+    return Promise.resolve(err("document_not_found", "No such document."));
+  return live(() => AdminOpsService.verifyMemberDocument(Number(documentId)), (d) => {
+    const row = toDocument(d);
+    snap.documents = snap.documents.map((x) => (x.documentId === row.documentId ? row : x));
+    return row;
+  });
 }
 
-/* ------------------------------------------------------------- links --- */
+/* ------------------------------------------------------- item↔item links --- */
 
 /** An edge may not restate a strong link: the parent and the blocker already
- *  carry meaning, and the same pair drawn twice would eventually disagree. */
-export function addLink(fromItemId: string, toItemId: string, relation: LinkRelation): Result<WorkLink> {
-  if (fromItemId === toItemId) return err("self_link", "An item cannot link to itself.");
+ *  carry meaning, and the same pair drawn twice would eventually disagree.
+ *
+ *  The server refuses an unknown relation, a task that is not there, a self
+ *  link and a pair already linked; the two checks here are the ones it has no
+ *  reason to know about, and they answer without a round trip. */
+export function addLink(fromItemId: string, toItemId: string, relation: LinkRelation): Promise<Result<WorkLink>> {
+  const refuse = (code: string, message: string) => Promise.resolve(err(code, message));
+  if (fromItemId === toItemId) return refuse("self_link", "An item cannot link to itself.");
   const a = readItem(fromItemId), b = readItem(toItemId);
-  if (!a || !b) return err("item_not_found", "No such work item.");
+  if (!a || !b) return refuse("item_not_found", "No such work item.");
   if (a.parentId === toItemId || b.parentId === fromItemId)
-    return err("is_parent", "That is already the parent link.");
+    return refuse("is_parent", "That is already the parent link.");
   if (a.blockedByItemId === toItemId || b.blockedByItemId === fromItemId)
-    return err("is_blocker", "That is already the waiting-on link.");
-  const dup = snap.links.filter((l) => l.relation === relation
-    && ((l.fromItemId === fromItemId && l.toItemId === toItemId)
-      || (l.fromItemId === toItemId && l.toItemId === fromItemId)))[0];
-  if (dup) return ok(dup);
-  const link: WorkLink = {
-    linkId: nextId("LN"), fromItemId, toItemId, relation,
-    createdAt: new Date(now()).toISOString(),
-  };
-  snap.links = snap.links.concat([link]);
-  emit();
-  return ok(link);
+    return refuse("is_blocker", "That is already the waiting-on link.");
+  return serial(fromItemId, () => live(
+    () => AdminOpsService.addWorkLink(Number(fromItemId), { itemId: Number(toItemId), relation }),
+    (w) => {
+      putItem(w);
+      return { linkId: fromItemId + ":" + toItemId, fromItemId, toItemId, relation };
+    }));
 }
 
-export function removeLink(linkId: string): Result<string> {
-  const before = snap.links.length;
-  snap.links = snap.links.filter((l) => l.linkId !== linkId);
-  if (snap.links.length === before) return err("link_not_found", "No such link.");
-  emit();
-  return ok(linkId);
+/** `linkId` is the pair — there is no edge row to address. */
+export function removeLink(linkId: string): Promise<Result<string>> {
+  const [from, to] = linkId.split(":");
+  if (!from || !to) return Promise.resolve(err("link_not_found", "No such link."));
+  return serial(from, () => live(
+    () => AdminOpsService.removeWorkLink(Number(from), Number(to)),
+    (w) => { putItem(w); return linkId; }));
 }
 
 /* ------------------------------------------------------------- leave --- */
 
+/** The server files leave for the caller only. */
 export function requestLeave(memberId: string, input: {
   fromDate: string; toDate: string; kind: string; reason: string;
-}): Result<LeaveRequest> {
-  if (!input.fromDate || !input.toDate) return err("dates_required", "Both dates are needed.");
-  if (input.toDate < input.fromDate) return err("bad_range", "The last day is before the first.");
-  if (!input.reason.trim()) return err("reason_required", "A leave request needs a reason.");
-  /* THE SAME RULE THE FORM DREW, ENFORCED. The form warns early because that is
-     kinder; this refuses because a form is not a gate — the dates can be edited
-     after the warning renders, and a second tab never saw it at all. */
+}): Promise<Result<LeaveRequest>> {
+  const refuse = (code: string, message: string) => Promise.resolve(err(code, message));
+  if (memberId !== meId()) return refuse("not_own", "Leave can only be requested for yourself.");
+  if (!input.fromDate || !input.toDate) return refuse("dates_required", "Both dates are needed.");
+  if (input.toDate < input.fromDate) return refuse("bad_range", "The last day is before the first.");
+  if (!input.reason.trim()) return refuse("reason_required", "A leave request needs a reason.");
+  /* THE SAME RULE THE FORM DREW, ENFORCED — a day already clocked cannot also
+     be a day away. The server checks the overlap with other requests. */
   const clash = leaveClash(memberId, input.fromDate, input.toDate);
   if (clash.worked.length)
-    return err("day_worked", "They clocked in on " + fmtDate(clash.worked[0])
+    return refuse("day_worked", "They clocked in on " + fmtDate(clash.worked[0])
       + ". A leave record over an attendance row makes that day both worked and away.");
-  if (clash.taken.length)
-    return err("already_requested", fmtDate(clash.taken[0]) + " is already covered by another request.");
-  const l: LeaveRequest = {
-    leaveId: nextId("LV"), memberId, fromDate: input.fromDate, toDate: input.toDate,
-    kind: input.kind, reason: input.reason.trim(), state: "requested",
-    decidedById: null, decidedAt: null, decisionNote: null,
-    requestedAt: new Date(now()).toISOString(),
-  };
-  snap.leave = snap.leave.concat([l]);
-  emit();
-  return ok(l);
+  return live(() => AdminOpsService.requestLeave({
+    kind: input.kind, fromDate: input.fromDate, toDate: input.toDate, reason: input.reason.trim() }), (l) => {
+    const row = toLeave(l);
+    snap.leave = snap.leave.concat([row]);
+    return row;
+  });
 }
 
-/** A decision needs a decider. Rejecting also needs a sentence — a refusal
- *  nobody explained is one the member has to come and ask about. */
-export function decideLeave(leaveId: string, state: LeaveState, byId: string, note?: string): Result<LeaveRequest> {
-  const list = snap.leave.slice();
-  const l = list.filter((x) => x.leaveId === leaveId)[0];
-  if (!l) return err("leave_not_found", "No such request.");
-  if (l.state !== "requested") return err("already_decided", "That request is already " + l.state + ".");
+/** Approve, refuse, or — the requester's own move — withdraw. Refusing needs a
+ *  sentence: a refusal nobody explained is one the member has to ask about. */
+export function decideLeave(leaveId: string, state: LeaveState, _byId: string, note?: string): Promise<Result<LeaveRequest>> {
+  const l = snap.leave.filter((x) => x.leaveId === leaveId)[0];
+  if (!l) return Promise.resolve(err("leave_not_found", "No such request."));
+  if (l.state !== "requested") return Promise.resolve(err("already_decided", "That request is already " + l.state + "."));
   if (state === "rejected" && !(note || "").trim())
-    return err("reason_required", "Say why it is refused.");
-  l.state = state;
-  l.decidedById = state === "withdrawn" ? null : byId;
-  l.decidedAt = new Date(now()).toISOString();
-  l.decisionNote = (note || "").trim() || null;
-  snap.leave = list;
-  emit();
-  return ok(l);
+    return Promise.resolve(err("reason_required", "Say why it is refused."));
+  const put = (row: LeaveRow) => {
+    const next = toLeave(row);
+    snap.leave = snap.leave.map((x) => (x.leaveId === next.leaveId ? next : x));
+    return next;
+  };
+  if (state === "withdrawn") return live(() => AdminOpsService.withdrawLeave(Number(leaveId)), put);
+  if (state !== "approved" && state !== "rejected")
+    return Promise.resolve(err("invalid_state", "A request is approved, refused or withdrawn."));
+  return live(() => AdminOpsService.decideLeave(Number(leaveId), { state, note: (note || "").trim() }), put);
 }
 
 /* ------------------------------------------------- checklist and links --- */
 
-/** THE ONE STORED THING IN A DERIVED MODULE. A tick is an act somebody
- *  performed and there is nothing to compute it from — unlike delay, progress
- *  and stage, which are all read from other facts. It writes the item's own
- *  row, so the board, the list and the bar all move together. */
-function withItem(itemId: string, fn: (i: WorkItem) => string | null): Result<WorkItem> {
-  const list = snap.items.slice();
-  const i = list.filter((x) => x.itemId === itemId)[0];
-  if (!i) return err("item_not_found", "No such item.");
-  const why = fn(i);
-  if (why) return err("validation_failed", why);
-  i.rowVersion = (i.rowVersion || 0) + 1;
-  snap.items = list;
-  emit();
-  return ok(i);
+/** THE WHOLE LIST, IN ORDER, IN ONE WRITE. Adding, ticking, renaming, dropping
+ *  and reordering are all this call; the server keeps the ids it is sent, so a
+ *  line survives every one of them. A new line goes up with an empty id and is
+ *  given one there. */
+function withChecklist(itemId: string, fn: (lines: CheckLine[]) => CheckLine[] | string): Promise<Result<WorkItem>> {
+  const i = readItem(itemId);
+  if (!i) return Promise.resolve(err("item_not_found", "No such item."));
+  const out = fn((i.checklist || []).slice());
+  if (typeof out === "string") return Promise.resolve(err("validation_failed", out));
+  return serial(itemId, () => live(() => AdminOpsService.setWorkChecklist(Number(itemId), {
+    rowVersion: (readItem(itemId) as WorkItem).rowVersion,
+    lines: out.map((l) => ({ id: l.lineId, text: l.text, done: l.done })),
+  }), putItem));
 }
 
+/** The whole list at once — what a reorder or a rename sends. */
+export const setChecklist = (itemId: string, lines: CheckLine[]): Promise<Result<WorkItem>> =>
+  withChecklist(itemId, () => lines);
+
 /** WHO MAY ROLL UP UNDER WHOM — depth 3, target ▸ milestone ▸ task — written
- *  once. It was in four places (both dialogs, createItem, updateItem) and had
- *  already drifted: the store let a milestone sit under a milestone while the
- *  dialogs never offered it. `selfId` is the item being re-parented; a new
- *  item has no descendants, so without it the loop check is skipped. */
+ *  once. `selfId` is the item being re-parented; a new item has no descendants,
+ *  so without it the loop check is skipped. */
 export function parentError(kind: WorkKind, parentId: string | null | undefined, selfId?: string): string | null {
   if (!parentId) return null;
   if (selfId && parentId === selfId) return "An item cannot roll up to itself.";
@@ -1978,9 +2233,6 @@ export function parentError(kind: WorkKind, parentId: string | null | undefined,
   if (kind === "target") return "A target is always top level.";
   if (kind === "milestone" && p.kind !== "target") return "A milestone rolls up to a target.";
   if (selfId) {
-    /* Walk UP from the proposed parent: if this item is one of its ancestors
-       the new edge closes a loop. Depth-bounded — no subtree is enumerated —
-       and the visited set guards a tree that is already broken. */
     const seen = new Set<string>();
     for (let cur: WorkItem | null = p; cur && !seen.has(cur.itemId); cur = cur.parentId ? readItem(cur.parentId) : null) {
       if (cur.itemId === selfId) return "That would make the item roll up to itself.";
@@ -1990,441 +2242,244 @@ export function parentError(kind: WorkKind, parentId: string | null | undefined,
   return null;
 }
 /** The parents a dialog may offer an item of `kind`: open, of a kind that may
- *  hold it, never itself and never anything under it — the same rule the
- *  store applies on save, so the list cannot offer what the store refuses. */
+ *  hold it, never itself and never anything under it. */
 export function parentOptions(kind: WorkKind, all: WorkItem[], selfId?: string): WorkItem[] {
   return all.filter((i) => !isTerminal(i.status) && i.itemId !== selfId
     && (kind === "task" ? i.kind !== "task" : i.kind === "target")
     && !(selfId && parentError(kind, i.itemId, selfId)));
 }
 
-/** EDITING WHAT WAS CREATED. Nothing could change after creation — a typo in
- *  the title, a wrong due date, the wrong person — was permanent. The rules are
- *  createItem's. The kind is not among them: a kind decides what may sit under
- *  an item, so changing it would orphan children without saying so. Handing an
- *  item to somebody else drops the tags the last person owned, the rule the
- *  create dialog already applies. */
+/** EDITING WHAT WAS CREATED. The kind is not editable: it decides what may sit
+ *  under an item. Handing an item to somebody else drops the tags the last
+ *  person owned — tags are the owner's own. */
 export interface ItemPatch {
   title?: string; assigneeId?: string; priority?: Priority;
   startDate?: string | null; dueDate?: string | null; parentId?: string | null;
-  /** Plain text with the description marks in it — see workBits/RichText.
-   *  It was settable at create and nowhere afterwards, so the one field on the
-   *  record that holds what the work actually IS was write-once. */
   description?: string | null;
 }
-export function updateItem(itemId: string, patch: ItemPatch): Result<WorkItem> {
-  return withItem(itemId, (i) => {
-    /* EVERY CHECK BEFORE ANY WRITE. `withItem` hands over the live record, and
-       a refusal after a field was already set left a half-applied edit on an
-       item the screen went on showing — reassigned and de-tagged, under a
-       toast saying nothing had happened. A finished item is not edited either:
-       every other verb on the drawer is gated the same way, and a completed
-       item re-dated or re-parented moves a rollup somebody already signed off. */
-    if (isTerminal(i.status)) return "It is " + labelOf(WORK_STATUS, i.status).toLowerCase() + ". Reopen or restore it first.";
-    const title = patch.title !== undefined ? patch.title.trim() : i.title;
-    if (!title) return "A title is required.";
-    const assigneeId = patch.assigneeId !== undefined ? patch.assigneeId : i.assigneeId;
-    if (assigneeId !== i.assigneeId) {
-      const m = readMember(assigneeId);
-      if (!m) return "No such member.";
-      if (m.status !== "active") return "That member is not active.";
-    }
-    const start = patch.startDate !== undefined ? patch.startDate : i.startDate;
-    const due = patch.dueDate !== undefined ? patch.dueDate : i.dueDate;
-    if (start && due && start > due) return "It cannot be due before it starts.";
-    const parentId = patch.parentId !== undefined ? patch.parentId : i.parentId;
-    if (parentId !== i.parentId) {
-      const bad = parentError(i.kind, parentId, i.itemId);
-      if (bad) return bad;
-    }
-    i.title = title;
-    if (assigneeId !== i.assigneeId) {
-      i.assigneeId = assigneeId;
-      const theirs = tagsOwnedBy(assigneeId).map((t) => t.tagId);
-      const kept = (i.tagIds || []).filter((t) => theirs.indexOf(t) >= 0);
-      i.tagIds = kept.length ? kept : undefined;
-    }
-    if (patch.priority !== undefined) i.priority = patch.priority;
-    if (patch.description !== undefined) i.description = patch.description;
-    i.startDate = start;
-    i.dueDate = due;
-    i.parentId = parentId;
-    return null;
+export function updateItem(itemId: string, patch: ItemPatch): Promise<Result<WorkItem>> {
+  const i = readItem(itemId);
+  const refuse = (m: string) => Promise.resolve(err("validation_failed", m));
+  if (!i) return Promise.resolve(err("item_not_found", "No such item."));
+  if (isTerminal(i.status)) return refuse("It is " + labelOf(WORK_STATUS, i.status).toLowerCase() + ". Reopen or restore it first.");
+  const title = patch.title !== undefined ? patch.title.trim() : i.title;
+  if (!title) return refuse("A title is required.");
+  const assigneeId = patch.assigneeId !== undefined ? patch.assigneeId : i.assigneeId;
+  if (assigneeId !== i.assigneeId) {
+    const m = readMember(assigneeId);
+    if (!m) return refuse("No such member.");
+    if (m.status !== "active") return refuse("That member is not active.");
+  }
+  const start = patch.startDate !== undefined ? patch.startDate : i.startDate;
+  const due = patch.dueDate !== undefined ? patch.dueDate : i.dueDate;
+  if (start && due && start > due) return refuse("It cannot be due before it starts.");
+  const parentId = patch.parentId !== undefined ? patch.parentId : i.parentId;
+  if (parentId !== i.parentId) {
+    const bad = parentError(i.kind, parentId, i.itemId);
+    if (bad) return refuse(bad);
+  }
+  return serial(itemId, () => {
+    const cur = readItem(itemId) as WorkItem;
+    const theirs = tagsOwnedBy(assigneeId).map((t) => t.tagId);
+    return live(() => AdminOpsService.updateWork(Number(itemId), {
+      rowVersion: cur.rowVersion,
+      title,
+      assignee: Number(assigneeId),
+      priority: patch.priority !== undefined ? patch.priority : cur.priority,
+      description: patch.description !== undefined ? patch.description || "" : cur.description || "",
+      startDate: start,
+      dueDate: due,
+      parent: parentId ? Number(parentId) : null,
+      tags: assigneeId !== cur.assigneeId ? (cur.tagIds || []).filter((t) => theirs.indexOf(t) >= 0).map(Number) : undefined,
+    }), putItem);
   });
 }
 
-export function addCheckLine(itemId: string, text: string): Result<WorkItem> {
-  return withItem(itemId, (i) => {
-    if (!text.trim()) return "Write the step first.";
-    i.checklist = (i.checklist || []).concat([
-      { lineId: nextId("CK"), text: text.trim(), done: false },
-    ]);
-    return null;
+/** A new line has no id: the server mints it, which is what keeps every other
+ *  line's id stable across the same write. */
+export const addCheckLine = (itemId: string, text: string): Promise<Result<WorkItem>> =>
+  withChecklist(itemId, (lines) => (text.trim()
+    ? lines.concat([{ lineId: "", text: text.trim(), done: false }])
+    : "Write the step first."));
+
+export const toggleCheckLine = (itemId: string, lineId: string): Promise<Result<WorkItem>> =>
+  withChecklist(itemId, (lines) => (lines.some((l) => l.lineId === lineId)
+    ? lines.map((l) => (l.lineId === lineId ? { ...l, done: !l.done } : l))
+    : "No such step."));
+
+export const renameCheckLine = (itemId: string, lineId: string, text: string): Promise<Result<WorkItem>> =>
+  withChecklist(itemId, (lines) => (!text.trim() ? "Write the step first."
+    : lines.map((l) => (l.lineId === lineId ? { ...l, text: text.trim() } : l))));
+
+export const removeCheckLine = (itemId: string, lineId: string): Promise<Result<WorkItem>> =>
+  withChecklist(itemId, (lines) => lines.filter((l) => l.lineId !== lineId));
+
+/** A URL ATTACHED TO ONE ITEM — `addLink` above relates two ITEMS instead.
+ *  It normalises rather than refuses: a bare `docs.google.com/…` is https, and
+ *  the name falls back to the host. The server holds the whole list. */
+export function addResourceLink(itemId: string, label: string, url: string): Promise<Result<WorkItem>> {
+  if (!readItem(itemId)) return Promise.resolve(err("item_not_found", "No such item."));
+  if (!url.trim()) return Promise.resolve(err("validation_failed", "Paste the address."));
+  const u = normaliseUrl(url);
+  if (!u) return Promise.resolve(err("validation_failed", "That is not a web address — links have to be http or https."));
+  return serial(itemId, () => {
+    const i = readItem(itemId) as WorkItem;
+    const links = (i.links || []).map((l) => ({ url: l.url, label: l.label }))
+      .concat([{ url: u, label: label.trim() || hostOf(u) }]);
+    return live(() => AdminOpsService.updateWork(Number(itemId), { rowVersion: i.rowVersion, links }), putItem);
   });
 }
 
-export function toggleCheckLine(itemId: string, lineId: string): Result<WorkItem> {
-  return withItem(itemId, (i) => {
-    const line = (i.checklist || []).filter((l) => l.lineId === lineId)[0];
-    if (!line) return "No such step.";
-    line.done = !line.done;
-    return null;
+export function removeResourceLink(itemId: string, linkId: string): Promise<Result<WorkItem>> {
+  if (!readItem(itemId)) return Promise.resolve(err("item_not_found", "No such item."));
+  return serial(itemId, () => {
+    const i = readItem(itemId) as WorkItem;
+    const links = (i.links || []).filter((l) => l.linkId !== linkId).map((l) => ({ url: l.url, label: l.label }));
+    return live(() => AdminOpsService.updateWork(Number(itemId), { rowVersion: i.rowVersion, links }), putItem);
   });
 }
 
-export function removeCheckLine(itemId: string, lineId: string): Result<WorkItem> {
-  return withItem(itemId, (i) => {
-    i.checklist = (i.checklist || []).filter((l) => l.lineId !== lineId);
-    return null;
-  });
-}
-
-/** A URL ATTACHED TO ONE ITEM. `addLink` above is a different thing entirely
- *  — that one relates two ITEMS to each other.
- *
- *  IT NORMALISES, IT DOES NOT REFUSE. This used to demand a scheme outright,
- *  which is why Add did nothing you could act on: `docs.google.com/brief` —
- *  what a person actually pastes, and exactly what the create dialog's own link
- *  field accepts, because that one runs `normaliseUrl` — came back as "the
- *  address needs to start with http://". Two fields for one idea, disagreeing
- *  about what a link is. Now both go through `normaliseUrl`, so http and https
- *  are still the only schemes that survive and a bare host is completed rather
- *  than rejected.
- *
- *  AND THE NAME IS OPTIONAL. Refusing to save a pasted URL because nobody typed
- *  a word for it is the same refusal from the other side; the host is a name,
- *  and it is the one the create dialog already falls back to. */
-export function addResourceLink(itemId: string, label: string, url: string): Result<WorkItem> {
-  return withItem(itemId, (i) => {
-    if (!url.trim()) return "Paste the address.";
-    const u = normaliseUrl(url);
-    if (!u) return "That is not a web address — links have to be http or https.";
-    i.links = (i.links || []).concat([
-      { linkId: nextId("LN"), label: label.trim() || hostOf(u), url: u },
-    ]);
-    return null;
-  });
-}
-
-export function removeResourceLink(itemId: string, linkId: string): Result<WorkItem> {
-  return withItem(itemId, (i) => {
-    i.links = (i.links || []).filter((l) => l.linkId !== linkId);
-    return null;
-  });
-}
-
-export function createItem(input: Partial<WorkItem> & {
-  title: string; assigneeId: string; kind: WorkKind;
-  /** Plain text, one per line to be. The dialog cannot mint ids. */
-  steps?: string[];
-}): Result<WorkItem> {
+/** Creating an item. The create dialog posts through liveWork.ts; this is the
+ *  same write for anything else that makes one. Steps become the task's
+ *  checklist in a second write — the create route takes no extras. */
+export async function createItem(input: Partial<WorkItem> & {
+  title: string; assigneeId: string; kind: WorkKind; steps?: string[];
+}): Promise<Result<WorkItem>> {
   if (!input.title.trim()) return err("validation_failed", "A title is required.");
-  const assignee = readMember(input.assigneeId);
-  if (!assignee) return err("member_not_found", "No such member.");
-  if (assignee.status !== "active") return err("assignee_inactive", "That member is not active.");
   const badParent = parentError(input.kind, input.parentId);
   if (badParent) return err("invalid_parent", badParent);
-  const item: WorkItem = {
-    itemId: nextId("W"),
-    kind: input.kind,
-    title: input.title.trim(),
-    description: input.description || null,
-    assigneeId: input.assigneeId,
-    createdById: meId(),
-    parentId: input.parentId || null,
-    status: "planned",
-    priority: input.priority || "medium",
-    startDate: input.startDate || null,
-    dueDate: input.dueDate || null,
-    completedAt: null,
-    expectedOutcome: input.expectedOutcome || null,
-    targetValue: input.targetValue,
-    targetUnit: input.targetUnit,
-    tagIds: input.tagIds && input.tagIds.length ? input.tagIds : undefined,
-    attachments: input.attachments && input.attachments.length ? input.attachments : undefined,
-    /* STEPS ARRIVE AS TEXT AND LEAVE AS LINES. Minting ids is this file's job,
-       so the dialog hands over strings and the lines are built here in the
-       same shape `addCheckLine` writes one at a time. Only a task carries
-       them: `progressOf` reads a milestone's children and a target's value,
-       so steps on either would be a control that moves nothing. */
-    checklist: input.kind === "task" && input.steps && input.steps.length
-      ? input.steps.map((t) => t.trim()).filter(Boolean)
-          .map((t) => ({ lineId: nextId("CK"), text: t, done: false }))
-      : undefined,
-    currentValue: input.kind === "target" ? 0 : undefined,
-    rowVersion: 1,
-    createdAt: new Date(now()).toISOString(),
-  };
-  snap.items = snap.items.concat([item]);
-  emit();
-  return ok(item);
+  const made = await live(() => AdminOpsService.createWork({
+    title: input.title.trim(), description: input.description || "", assignee: Number(input.assigneeId) || undefined,
+    priority: input.priority || "medium", kind: input.kind, startDate: input.startDate || null, dueDate: input.dueDate || null,
+    targetValue: input.kind === "target" ? input.targetValue ?? null : null,
+    targetUnit: input.kind === "target" ? input.targetUnit || "" : "",
+    tags: (input.tagIds || []).map(Number),
+    links: (input.attachments || []).map((a) => ({ url: a.url, label: a.label })),
+    parent: input.parentId ? Number(input.parentId) : undefined,
+  }), putItem);
+  const steps = (input.steps || []).map((t) => t.trim()).filter(Boolean);
+  if (!made.ok || input.kind !== "task" || !steps.length) return made;
+  /* The task exists either way: a checklist that would not save is not a
+     reason to lose the task, so the refusal is swallowed and the item stands. */
+  const withSteps = await setChecklist(made.data.itemId,
+    steps.map((t) => ({ lineId: "", text: t, done: false })));
+  return withSteps.ok ? withSteps : made;
 }
 
-/** ONE LINE OF A PLAN, minted the one way. Pulled out of `submitPlan` so that
- *  appending to a plan already in uses exactly the same rule — two copies of
- *  "link if it exists, otherwise create" is how the second copy comes to forget
- *  the linking half.
+/** ONE MORE LINE ON A PLAN ALREADY FILED — your own, and today's only: a past
+ *  day's plan is what somebody meant that morning and stays as filed.
  *
- *  Link an existing open item with the same title rather than minting a second
- *  copy of it: a plan that quietly forks a task is how one piece of work becomes
- *  two that each look half-done. `items` is mutated — the caller owns the
- *  snapshot copy and commits it. */
-function makePlanLine(
-  items: WorkItem[], memberId: string, rawTitle: string, priority: Priority, ordinal: number,
-): PlanLine {
-  const title = rawTitle.trim();
-  const match = items.filter((i) =>
-    i.assigneeId === memberId && !isTerminal(i.status) &&
-    i.title.trim().toLowerCase() === title.toLowerCase())[0];
-  const lineId = nextId("PL");
-  if (match) return { lineId, ordinal, title, priority, workItemId: match.itemId };
-  const made: WorkItem = {
-    itemId: nextId("W"), kind: "task", title, description: null,
-    assigneeId: memberId, createdById: memberId, parentId: null, status: "planned",
-    priority, startDate: TODAY, dueDate: TODAY, completedAt: null,
-    expectedOutcome: null, sourcePlanLineId: lineId, rowVersion: 1,
-    createdAt: new Date(now()).toISOString(),
-  };
-  items.push(made);
-  return { lineId, ordinal, title: made.title, priority, workItemId: made.itemId };
+ *  Same minting rule as `submitPlan`: a line matching an open task of theirs
+ *  points at it, anything else becomes a task due today first, so the line the
+ *  server stores points at work the board shows. */
+export async function addPlanLine(memberId: string, title: string, priority: Priority = "medium"): Promise<Result<DailyPlan>> {
+  if (memberId !== meId()) return err("not_own", "Only your own plan can be added to.");
+  const plan = planFor(memberId, TODAY);
+  if (!plan) return err("no_plan", "There is no plan for today to add to.");
+  const t = title.trim();
+  if (!t) return err("validation_failed", "Write the line first.");
+  const workItem = await lineTask(memberId, t, priority);
+  if (typeof workItem !== "number") return workItem;
+  return live(() => AdminOpsService.addDailyPlanLine(Number(plan.planId), { title: t, priority, workItem }), (p) => {
+    const next = toPlan(p);
+    snap.plans = snap.plans.map((x) => (x.planId === next.planId ? next : x));
+    return next;
+  });
 }
 
-/** ADD ONE MORE THING TO TODAY, whether or not the plan has gone in.
- *
- *  `submitPlan` refuses a second submit and tells you to change the work items
- *  instead, which is true of the RECORD and useless as an answer: the note is
- *  where somebody is standing when they think of the next thing, and until now
- *  it went read-only the moment the plan was filed. A day is not sealed at
- *  9am. This appends — same minting rule, same linking — and leaves
- *  `submittedAt` alone, because the plan was still filed when it was filed. */
-export function addPlanLine(
-  memberId: string, title: string, priority: Priority = "medium",
-): Result<DailyPlan> {
-  if (!title.trim()) return err("validation_failed", "Give it a name.");
-  const existing = planFor(memberId, TODAY);
-  const items = snap.items.slice();
-  const line = makePlanLine(items, memberId, title, priority,
-    (existing ? existing.lines.length : 0) + 1);
-  const plan: DailyPlan = existing
-    ? { ...existing, lines: existing.lines.concat([line]) }
-    : {
-      planId: nextId("PLAN"), memberId, businessDate: TODAY,
-      expectedOutcome: null, blockers: null, notes: null,
-      submittedAt: null, lines: [line],
-    };
-  snap.items = items;
-  snap.plans = snap.plans.filter((p) => p.planId !== plan.planId).concat([plan]);
-  emit();
-  return ok(plan);
+/** The task a plan line points at: one of the member's own open tasks with the
+ *  same title, or a new task due today. A refusal comes back as the Refusal. */
+async function lineTask(memberId: string, title: string, priority: Priority): Promise<number | Refusal> {
+  const match = snap.items.filter((i) => i.assigneeId === memberId && !isTerminal(i.status)
+    && i.title.trim().toLowerCase() === title.toLowerCase())[0];
+  if (match) return Number(match.itemId);
+  try {
+    const made = await call(AdminOpsService.createWork({
+      title, priority, kind: "task", startDate: TODAY, dueDate: TODAY }));
+    putItem(made);
+    return made.id;
+  } catch (e) {
+    void bootTeam(true);
+    return err("refused", errMessage(e));
+  }
 }
 
-export function submitPlan(memberId: string, input: {
+/** A plan line is a real task. A line matching an open task of yours links to
+ *  it; any other line becomes a task due today, made first, so the plan the
+ *  server stores points at work the board shows. Your own plan only. */
+export async function submitPlan(memberId: string, input: {
   lines: { title: string; priority: Priority }[];
   expectedOutcome?: string; blockers?: string;
-}): Result<DailyPlan> {
+}): Promise<Result<DailyPlan>> {
+  if (memberId !== meId()) return err("not_own", "Only your own plan can be filed.");
   const existing = planFor(memberId, TODAY);
   if (existing && existing.submittedAt)
     return err("already_submitted", "Today's plan is in. Change the work items instead.");
   const lines = input.lines.filter((l) => l.title.trim());
   if (!lines.length) return err("validation_failed", "Add at least one line.");
 
-  const items = snap.items.slice();
-  const planLines: PlanLine[] = lines.map((l, n) =>
-    makePlanLine(items, memberId, l.title, l.priority, n + 1));
-
-  const plan: DailyPlan = {
-    planId: existing ? existing.planId : nextId("PLAN"),
-    memberId, businessDate: TODAY,
-    expectedOutcome: input.expectedOutcome || null,
-    blockers: input.blockers || null,
-    notes: null,
-    submittedAt: new Date(now()).toISOString(),
-    lines: planLines,
-  };
-  snap.items = items;
-  snap.plans = snap.plans.filter((p) => p.planId !== plan.planId).concat([plan]);
-  emit();
-  return ok(plan);
+  const built: { title: string; priority: Priority; workItem: number | null }[] = [];
+  for (const l of lines) {
+    const title = l.title.trim();
+    const match = snap.items.filter((i) => i.assigneeId === memberId && !isTerminal(i.status)
+      && i.title.trim().toLowerCase() === title.toLowerCase())[0];
+    if (match) { built.push({ title, priority: l.priority, workItem: Number(match.itemId) }); continue; }
+    try {
+      const made = await call(AdminOpsService.createWork({
+        title, priority: l.priority, kind: "task", startDate: TODAY, dueDate: TODAY }));
+      putItem(made);
+      built.push({ title, priority: l.priority, workItem: made.id });
+    } catch (e) {
+      void bootTeam(true);
+      return err("refused", errMessage(e));
+    }
+  }
+  return live(() => AdminOpsService.submitDailyPlan({
+    businessDate: TODAY, expectedOutcome: input.expectedOutcome || "", blockers: input.blockers || "", lines: built,
+  }), (p) => {
+    const plan = toPlan(p);
+    snap.plans = snap.plans.filter((x) => x.planId !== plan.planId).concat([plan]);
+    return plan;
+  });
 }
 
+/** Your own end-of-day report. The lines are what the board already says; the
+ *  server stores them as written. */
 export function submitReport(memberId: string, input: {
   lines: { workItemId: string | null; title: string; done: boolean; targetDelta?: number | null }[];
   pendingWork?: string; pendingReason?: string; achievement?: string;
   blockers?: string; supportNeeded?: string; tomorrowPriority?: string;
-}): Result<DailyReport> {
+}): Promise<Result<DailyReport>> {
+  if (memberId !== meId()) return Promise.resolve(err("not_own", "Only your own report can be filed."));
   const existing = reportFor(memberId, TODAY);
   if (existing && existing.submittedAt)
-    return err("already_submitted", "Today's report is in.");
-  const undone = input.lines.filter((l) => !l.done);
-  if (undone.length && !(input.pendingReason || "").trim())
-    return err("validation_failed", "Say why the unticked lines did not get done.");
-
-  const items = snap.items.slice();
-  input.lines.forEach((l) => {
-    if (!l.done || !l.workItemId) return;
-    const i = items.filter((x) => x.itemId === l.workItemId)[0];
-    /* Ticking a line COMPLETES the item. The report and the board cannot
-       disagree about what got done, because there is one write. */
-    if (i && !isTerminal(i.status)) {
-      i.status = "completed";
-      i.completedAt = new Date(now()).toISOString();
-      i.rowVersion += 1;
-    }
-    /* A target moves only here — the EOD delta is its one writer. */
-    if (l.targetDelta && i && i.parentId) {
-      const parent = items.filter((x) => x.itemId === i.parentId)[0];
-      if (parent && parent.kind === "target") parent.currentValue = (parent.currentValue || 0) + l.targetDelta;
-    } else if (l.targetDelta && i && i.kind === "target") {
-      i.currentValue = (i.currentValue || 0) + l.targetDelta;
-    }
-  });
-
-  const report: DailyReport = {
-    reportId: existing ? existing.reportId : nextId("EOD"),
-    memberId, businessDate: TODAY,
-    pendingWork: input.pendingWork || null,
-    pendingReason: input.pendingReason || null,
-    achievement: input.achievement || null,
-    blockers: input.blockers || null,
-    supportNeeded: input.supportNeeded || null,
-    tomorrowPriority: input.tomorrowPriority || null,
-    notes: null,
-    submittedAt: new Date(now()).toISOString(),
-    acknowledgedById: null, acknowledgedAt: null,
+    return Promise.resolve(err("already_submitted", "Today's report is in."));
+  if (input.lines.some((l) => !l.done) && !(input.pendingReason || "").trim())
+    return Promise.resolve(err("validation_failed", "Say why the unticked lines did not get done."));
+  return live(() => AdminOpsService.submitDailyReport({
+    businessDate: TODAY,
+    pendingWork: input.pendingWork || "", pendingReason: input.pendingReason || "", achievement: input.achievement || "",
+    blockers: input.blockers || "", supportNeeded: input.supportNeeded || "", tomorrowPriority: input.tomorrowPriority || "",
     lines: input.lines.map((l) => ({
-      lineId: nextId("ER"), workItemId: l.workItemId, title: l.title,
-      done: l.done, targetDelta: l.targetDelta ?? null,
-    })),
-  };
-  snap.items = items;
-  snap.reports = snap.reports.filter((r) => r.reportId !== report.reportId).concat([report]);
-  emit();
-  return ok(report);
+      title: l.title, done: l.done, targetDelta: l.targetDelta ?? null,
+      workItem: l.workItemId ? Number(l.workItemId) : null })),
+  }), (r) => {
+    const report = toReport(r);
+    snap.reports = snap.reports.filter((x) => x.reportId !== report.reportId).concat([report]);
+    return report;
+  });
 }
 
-export function acknowledgeReport(reportId: string): Result<DailyReport> {
-  const reports = snap.reports.slice();
-  const r = reports.filter((x) => x.reportId === reportId)[0];
-  if (!r) return err("report_not_found", "No such report.");
-  if (!r.submittedAt) return err("not_submitted", "A draft cannot be acknowledged.");
-  if (r.acknowledgedById) return ok(r);
-  r.acknowledgedById = meId();
-  r.acknowledgedAt = new Date(now()).toISOString();
-  snap.reports = reports;
-  emit();
-  return ok(r);
-}
-
-/* ========================================================== adoption === */
-
-export interface LivePerson {
-  id: number | string; name: string; email?: string; phone?: string;
-  username?: string; isSuperAdmin?: boolean;
-}
-
-/** The order the seed's eight slots are handed to live people. The signed-in
- *  user takes the first — D. Kapoor's slot, the senior the demo is written
- *  around: the leave inbox, the sent agreements, the EODs waiting to be read
- *  all point at whoever holds it. */
-export const ADOPT_SLOTS = ["58", "41", "52", "86", "63", "70", "74", "79"];
-
-/** RE-KEY THE SEED ONTO A LIVE ROSTER, in one pass. Mapped slots take the live
- *  person's identity and keep the seed's operational history; unmapped slots
- *  are dropped — their identity-bound rows (attendance, leave, tags, documents,
- *  pay, plans, reports) go with them, and their work items are reassigned so
- *  the board stays rich. Secondary references (who decided, sent, verified,
- *  acknowledged) repoint to the signed-in user when their author was dropped.
- *  People beyond eight get a thin record with no history. */
-export function adoptRoster(people: LivePerson[]): void {
-  if (!people.length) return;
-  const ids = people.map((p) => String(p.id));
-  const map: Record<string, string> = {};
-  ADOPT_SLOTS.forEach((slot, i) => { if (i < ids.length) map[slot] = ids[i]; });
-  const meNew = map["58"];
-  const keptNew: string[] = ADOPT_SLOTS.filter((sl) => map[sl]).map((sl) => map[sl]);
-  const mapped = (id: string | null | undefined): boolean => id != null && map[id] !== undefined;
-  /* A secondary reference: mapped ids follow the map, dropped seed ids repoint
-     to the signed-in user, anything else passes through. */
-  const re = (id: string | null | undefined): string | null => {
-    if (id == null) return null;
-    if (map[id] !== undefined) return map[id];
-    return ADOPT_SLOTS.indexOf(id) >= 0 ? meNew : id;
-  };
-
-  const members: Member[] = [];
-  ADOPT_SLOTS.forEach((slot, i) => {
-    if (!map[slot]) return;
-    const m = snap.members.filter((x) => x.memberId === slot)[0];
-    const p = people[i];
-    if (!m) return;
-    const boss = m.reportsTo === null ? null : re(m.reportsTo);
-    members.push({
-      ...m,
-      memberId: map[slot],
-      name: p.name || m.name,
-      email: p.email || m.email,
-      phone: p.phone || m.phone,
-      username: p.username || m.username,
-      isFullAccess: p.isSuperAdmin != null ? !!p.isSuperAdmin : m.isFullAccess,
-      reportsTo: boss === map[slot] ? null : boss,
-    });
+export function acknowledgeReport(reportId: string): Promise<Result<DailyReport>> {
+  const r = snap.reports.filter((x) => x.reportId === reportId)[0];
+  if (!r) return Promise.resolve(err("report_not_found", "No such report."));
+  if (!r.submittedAt) return Promise.resolve(err("not_submitted", "A draft cannot be acknowledged."));
+  if (r.acknowledgedById) return Promise.resolve(ok(r));
+  return live(() => AdminOpsService.acknowledgeDailyReport(Number(reportId)), (x) => {
+    const report = toReport(x);
+    snap.reports = snap.reports.map((y) => (y.reportId === report.reportId ? report : y));
+    return report;
   });
-  people.slice(ADOPT_SLOTS.length).forEach((p) => {
-    members.push({
-      memberId: String(p.id), name: p.name, email: p.email || "", phone: p.phone || "",
-      username: p.username || "", designation: "Member", department: "",
-      employmentType: "full_time", joiningDate: TODAY, reportsTo: meNew === String(p.id) ? null : meNew,
-      workLocation: "office", expectedHoursPerDay: 8, dayStartsAt: "09:30",
-      graceMinutes: 15, autoCloseAt: "20:00", timezone: "Asia/Kolkata",
-      status: "active", isFullAccess: !!p.isSuperAdmin, roles: [],
-      addedAt: stamp(), lastLogin: null,
-    });
-  });
-
-  const days = snap.days.filter((d) => mapped(d.memberId)).map((d) => ({
-    ...d, memberId: map[d.memberId],
-    correctedBy: d.correctedBy ? (re(d.correctedBy) as string) : d.correctedBy,
-  }));
-
-  let robin = 0;
-  const items = snap.items.map((i) => ({
-    ...i,
-    assigneeId: mapped(i.assigneeId) ? map[i.assigneeId] : keptNew[robin++ % keptNew.length],
-    createdById: re(i.createdById) as string,
-  }));
-
-  const tags = snap.tags.filter((t) => mapped(t.ownerId))
-    .map((t) => ({ ...t, ownerId: map[t.ownerId] }));
-  const liveTagIds = tags.map((t) => t.tagId);
-  items.forEach((i) => {
-    if (i.tagIds) i.tagIds = i.tagIds.filter((id) => liveTagIds.indexOf(id) >= 0);
-  });
-
-  const plans = snap.plans.filter((p) => mapped(p.memberId))
-    .map((p) => ({ ...p, memberId: map[p.memberId] }));
-  const reports = snap.reports.filter((r) => mapped(r.memberId)).map((r) => ({
-    ...r, memberId: map[r.memberId],
-    acknowledgedById: r.acknowledgedById ? re(r.acknowledgedById) : r.acknowledgedById,
-  }));
-  const leave = snap.leave.filter((l) => mapped(l.memberId)).map((l) => ({
-    ...l, memberId: map[l.memberId],
-    decidedById: l.decidedById ? re(l.decidedById) : l.decidedById,
-  }));
-  const agreements = snap.agreements.filter((a) => mapped(a.memberId)).map((a) => ({
-    ...a, memberId: map[a.memberId],
-    sentById: a.sentById ? re(a.sentById) : a.sentById,
-  }));
-  const documents = snap.documents.filter((r) => mapped(r.memberId)).map((r) => ({
-    ...r, memberId: map[r.memberId],
-    uploadedById: re(r.uploadedById) as string,
-    verifiedById: r.verifiedById ? re(r.verifiedById) : r.verifiedById,
-  }));
-  const pay = snap.pay.filter((p) => mapped(p.memberId))
-    .map((p) => ({ ...p, memberId: map[p.memberId] }));
-
-  adoptedMe = meNew;
-  snap = { ...snap, members, days, items, tags, plans, reports, leave, agreements, documents, pay };
-  emit();
 }
 
 /* ============================================================== hooks === */
@@ -2435,6 +2490,8 @@ export function adoptRoster(people: LivePerson[]): void {
 export const useVersion = () => useSyncExternalStore(subscribe, getVersion, getVersion);
 
 export function useMembers(): Member[] { useVersion(); return snap.members; }
+/** How the lists a page reads stand, for one member's page (see `loadOf`). */
+export function useTeamLoad(lists: TeamList[], memberId?: string): LoadPart { useVersion(); return loadOf(lists, memberId); }
 export function useMe(): Member | null { useVersion(); return readMember(meId()); }
 export function useDayRows(date: string, scope: Scope): DayRow[] { useVersion(); return dayRows(date, scope); }
 export function useWork(f: WorkFilter, scope: Scope): WorkItem[] { useVersion(); return workRows(f, scope); }
@@ -2445,7 +2502,7 @@ export function usePlans(): DailyPlan[] { useVersion(); return snap.plans; }
 export function useReports(): DailyReport[] { useVersion(); return snap.reports; }
 export function useAgreements(): Agreement[] { useVersion(); return snap.agreements; }
 export function useDocuments(): MemberDocument[] { useVersion(); return snap.documents; }
-export function useLinks(): WorkLink[] { useVersion(); return snap.links; }
+export function useLinks(): WorkLink[] { useVersion(); return readLinks(); }
 export function useItems(): WorkItem[] { useVersion(); return snap.items; }
 export function useReview(date: string, scope: Scope): ReviewRow[] { useVersion(); return reviewRows(date, scope); }
 export function useMyDay(date = TODAY): { day: AttendanceDay | null; state: AttendanceState; worked: number | null; breakMins: number } {

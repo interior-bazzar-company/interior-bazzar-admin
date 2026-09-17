@@ -37,8 +37,8 @@ export default function LeavePage({ m, viewer }: { m: Member; viewer: Viewer }) 
   const canDecide = viewer !== "self" && (m.reportsTo === me || viewer === "admin");
   const waiting = rows.filter((l) => l.state === "requested");
 
-  const withdraw = (l: LeaveRequest) => {
-    const r = decideLeave(l.leaveId, "withdrawn", me);
+  const withdraw = async (l: LeaveRequest) => {
+    const r = await decideLeave(l.leaveId, "withdrawn", me);
     shell.toast(r.ok ? "Withdrawn." : (r as { message: string }).message, r.ok ? "" : "bad");
   };
 

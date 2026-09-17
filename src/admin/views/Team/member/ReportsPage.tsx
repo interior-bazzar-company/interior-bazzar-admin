@@ -80,8 +80,8 @@ export default function ReportsPage({ m, viewer }: { m: Member; viewer: Viewer }
   const todayReport = !!(tr && tr.submittedAt);
   const todayEodDue = eodDue(TODAY, m);
 
-  const ack = (r: DailyReport) => {
-    const x = acknowledgeReport(r.reportId);
+  const ack = async (r: DailyReport) => {
+    const x = await acknowledgeReport(r.reportId);
     shell.toast(x.ok ? "Marked as read." : (x as { message: string }).message, x.ok ? "" : "bad");
   };
 

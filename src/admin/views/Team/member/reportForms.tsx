@@ -56,8 +56,8 @@ export function PlanModal({ m }: { m: Member }) {
 
   const usable = lines.filter((l) => l.title.trim()).length;
 
-  const save = () => {
-    const r = submitPlan(m.memberId, { lines, expectedOutcome: outcome, blockers });
+  const save = async () => {
+    const r = await submitPlan(m.memberId, { lines, expectedOutcome: outcome, blockers });
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
     shell.closeLayer();
     shell.toast("Plan submitted.");
@@ -176,8 +176,8 @@ export function EodModal({ m }: { m: Member }) {
      ones — so this asks exactly that and nothing more. */
   const blocked = !!undone && !pending.trim();
 
-  const save = () => {
-    const r = submitReport(m.memberId, {
+  const save = async () => {
+    const r = await submitReport(m.memberId, {
       lines: named.map((l) => ({ ...l, targetDelta: null })),
       pendingReason: pending,
       achievement: win,

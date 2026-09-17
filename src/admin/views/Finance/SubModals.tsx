@@ -27,13 +27,14 @@ import { go } from "../../ui/nav";
 import { Cancel, Dlg, Field, Fs, Pick } from "./dialog";
 import type { Done } from "./dialog";
 import {
-  ACCOUNTS, FAILURE_REASONS, MODES,
+  COMPANY_ACCOUNTS, FAILURE_REASONS, MODES,
   cancelSubscription, fmtDate, inr, markFailToPay,
   useUsers, previewSchedule, recordSubscription, chainsFor, attachableInvoices, attachableForInstallment, readInvoice, recordInstallmentPayment, reversePayment, superAdminOnly, todayIso,
 } from "./store";
 import type { Installment, InstallmentPayment, Subscription } from "./store";
 
-const accountOptions = ACCOUNTS.filter((a) => a.active)
+/** The server's company accounts, read at render — the list fills after import. */
+const accountOptions = () => COMPANY_ACCOUNTS.filter((a) => a.active)
   .map((a) => ({ v: a.accountId, l: a.masked + " · " + a.name }));
 
 /* ===================================================== record a sale === */
@@ -55,7 +56,7 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
   const [payMode, setPayMode] = useState(MODES[0] || "NEFT");
   const [payRef, setPayRef] = useState("");
   const [payDate, setPayDate] = useState(todayIso());
-  const [payAccount, setPayAccount] = useState(accountOptions[0] ? accountOptions[0].v : "");
+  const [payAccount, setPayAccount] = useState(accountOptions()[0] ? accountOptions()[0].v : "");
   const [startDate, setStartDate] = useState(todayIso());
   const [remark, setRemark] = useState("");
   const [err, setErr] = useState<string | null>(null);
@@ -150,14 +151,14 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
     ? { quoted: quote.grandTotalPaise, billed: paise }
     : null;
 
-  const submit = () => {
+  const submit = async () => {
     if (!invoice) {
       setErr("Attach the invoice this subscription was raised on. It is what says how much the customer owes, and nothing here types that figure.");
       return;
     }
     /* A quotation is what a salesperson closed, and only chained sales are
        recordable here — so the channel is a fact, not a question. */
-    const r = recordSubscription({
+    const r = await recordSubscription({
       userId,
       source: "sales",
       planId, planName, cycleMonths: months,
@@ -363,7 +364,7 @@ export function RecordSubModal({ onClose, onDone }: { onClose: () => void; onDon
               <SelectInput ariaLabel="Paid via" value={payMode} onChange={setPayMode} options={MODES.slice()} />
             </Field>
             <Field label="Credited to">
-              <SelectInput ariaLabel="Credited to" value={payAccount} onChange={setPayAccount} options={accountOptions} />
+              <SelectInput ariaLabel="Credited to" value={payAccount} onChange={setPayAccount} options={accountOptions()} />
             </Field>
             <Field label="Reference / UTR">
               <Input mono value={payRef} ph="NEFT0019AUG2213" ariaLabel="Reference or UTR" onChange={setPayRef} />
@@ -470,8 +471,8 @@ export function RecordInstallmentModal({ sub, inst, onClose, onDone }: {
   });
   const attached = already || offers.filter((i) => i.invoiceNumber === attachNo)[0] || null;
 
-  const submit = () => {
-    const r = recordInstallmentPayment({
+  const submit = async () => {
+    const r = await recordInstallmentPayment({
       subscriptionId: sub.subscriptionId, seq: inst.seq,
       valueDate,
       invoiceNumber: already || !attached ? null : attached.invoiceNumber,
@@ -580,8 +581,8 @@ export function FailToPayModal({ sub, inst, onClose, onDone }: {
   const [evidence, setEvidence] = useState("");
   const [err, setErr] = useState<string | null>(null);
 
-  const submit = () => {
-    const e = markFailToPay(sub.subscriptionId, inst.seq, reason, evidence);
+  const submit = async () => {
+    const e = await markFailToPay(sub.subscriptionId, inst.seq, reason, evidence);
     if (e) { setErr(e); return; }
     onDone(
       "Installment " + inst.seq + " of " + inst.of + " recorded as fail to pay · "
@@ -650,8 +651,8 @@ export function ReversePaymentModal({ sub, inst, pay, onClose, onDone }: {
   const [err, setErr] = useState<string | null>(null);
   const blocked = superAdminOnly("Reversing a payment");
 
-  const submit = () => {
-    const e = reversePayment(pay.paymentId, reason);
+  const submit = async () => {
+    const e = await reversePayment(pay.paymentId, reason);
     if (e) { setErr(e); return; }
     onDone(
       pay.paymentId + " reversed · " + inr(pay.amountPaise) + ". Installment " + inst.seq
@@ -721,8 +722,8 @@ export function CancelSubModal({ sub, onClose, onDone }: {
   const paid = sub.installments.filter((i) => i.status === "paid");
   const paidPaise = paid.reduce((n, i) => n + i.amountPaise, 0);
 
-  const submit = () => {
-    const e = cancelSubscription(sub.subscriptionId, reason);
+  const submit = async () => {
+    const e = await cancelSubscription(sub.subscriptionId, reason);
     if (e) { setErr(e); return; }
     onDone(
       sub.subscriptionId + " cancelled · " + unpaid.length + " unpaid installment"

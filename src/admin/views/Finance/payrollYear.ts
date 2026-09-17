@@ -22,15 +22,14 @@
    and nothing else.
 
    ONE CLOCK, still. Every "has this month started" question below goes through
-   `todayIso()`, which reads `asOf` from module.json. The browser clock is
-   never consulted, so a screenshot taken next March still says August 2026.
+   `todayIso()`: the server's date once read, the browser's until then.
 
    INTEGER PAISE everywhere, as in the rest of the module. The only divisions
    are averages and shares, and each one is named and rounded where it is
    taken.
    ============================================================================= */
 import {
-  PERIOD, fixedOf, incentiveOf, monthOf, readRuns, readSalaryAccounts, todayIso, useVersion,
+  fixedOf, incentiveOf, monthOf, readRuns, readSalaryAccounts, todayIso, useVersion,
 } from "./store";
 
 /* =========================================================== the year === */
@@ -73,8 +72,10 @@ export const yearMonths = (year: string): string[] => {
  *  in it — a promise this page no longer keeps. */
 export const yearLabel = (year: string) => year;
 
-/** The year the module's own clock is in. Never the browser's. */
-export const CURRENT_YEAR = yearOf(PERIOD.key);
+/** The year the module's own clock is in (`todayIso()`: the server's date once
+ *  read, else the browser's). Should that ever be "", the browser's year picks
+ *  the axis — never a figure. */
+export const currentYear = (): string => yearOf(monthOf(todayIso())) || String(new Date().getFullYear());
 
 /** Every year the payroll records actually touch, newest first. The current
  *  year is always offered even when no run has been opened in it — an empty
@@ -82,14 +83,14 @@ export const CURRENT_YEAR = yearOf(PERIOD.key);
 export function payrollYears(): string[] {
   const seen: Record<string, true> = {};
   readRuns().forEach((r) => { seen[yearOf(r.month)] = true; });
-  seen[CURRENT_YEAR] = true;
+  seen[currentYear()] = true;
   return Object.keys(seen).sort().reverse();
 }
 
 /** Guards a `?year=` taken off the URL. An unknown year falls back to the
  *  current one rather than rendering twelve empty columns nobody asked for. */
 export const resolveYear = (raw: string | undefined): string =>
-  (raw && payrollYears().indexOf(raw) >= 0 ? raw : CURRENT_YEAR);
+  (raw && payrollYears().indexOf(raw) >= 0 ? raw : currentYear());
 /* ======================================================== the year read === */
 
 /** One month of payroll.

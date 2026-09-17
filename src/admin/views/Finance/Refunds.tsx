@@ -56,7 +56,7 @@ export default function Refunds({ p, onFilter, onSearch, onUnfilter, onParams }:
   const { toast, modal, closeLayer } = useShell();
   const q = useRefundQueue();
   const ov = useOverview();
-  const writable = can("finance-refunds", "edit");
+  const writable = can("finance-refunds", "request");
 
   const rows = filterRows(q.all, p);
   const shown = rows.slice().sort((a, b) =>

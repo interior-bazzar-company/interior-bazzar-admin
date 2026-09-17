@@ -30,8 +30,8 @@
    scale-for-display helper feeding the chart kit; it is named, and it is never
    printed as an amount.
 
-   ONE CLOCK. Which months have started comes from `asOf` in module.json, so a
-   screenshot taken next March still says the year ended in August 2026.
+   ONE CLOCK. Which months have started comes from the store's `todayIso()`:
+   the server's date once read, the browser's until then.
    ============================================================================= */
 import { ChartFrame, SelectInput, Tiles } from "../../ui";
 import type { TileProps } from "../../ui";

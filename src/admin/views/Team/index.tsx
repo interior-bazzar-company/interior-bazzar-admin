@@ -26,8 +26,7 @@
    ===================================================================== */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
-import AdminOpsService from "../../../api/modules/adminOps";
-import { errMessage } from "../../../api/apiService";
+import AdminOpsService, { call } from "../../../api/modules/adminOps";
 import {
   Button, EmptyState, FilterBar, FilterChips, ListSkeleton, ListTable, MoreMenu, PageHeader,
   Pagination, Person, Pill, Rail, SearchField, Select, StatStrip, Tabs, TbTitle, fmtDate, qs,
@@ -38,7 +37,9 @@ import { useShell } from "../../shell/ShellContext";
 import { RoleChips } from "../teamShared";
 import type { Member, Ops, Role } from "../teamShared";
 import MemberPage from "./MemberPage";
-import { useMembers } from "./store";
+import { loadFailure, useMembers } from "./store";
+import type { LoadPart } from "./store";
+import { LoadNotice } from "./loadState";
 import { opOf } from "./member/ops";
 import {
   MemberDeleteModal, MemberEditModal, MemberNewModal, MemberRolesModal, MemberSendCredentialsModal,
@@ -56,6 +57,8 @@ export default function Team() {
   const [tick, setTick] = useState(0);
   const [rows, setRows] = useState<Member[] | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
+  /* A roster read that failed or was refused (team/d5) — said, never drawn as "No team members". */
+  const [failed, setFailed] = useState<LoadPart | null>(null);
   const [page, setPage] = useState(1);
 
   const p: Record<string, string> = {
@@ -79,15 +82,16 @@ export default function Team() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([AdminOpsService.users(), AdminOpsService.listRoles()])
+    Promise.all([call(AdminOpsService.users()), call(AdminOpsService.listRoles())])
       .then(([u, r]) => {
         if (cancelled) return;
-        setRows(u.data);
-        setRoles(r.data.roles);
+        setRows(u);
+        setRoles(r.roles);
+        setFailed(null);
       })
       /* An empty list is a claim ("nobody here"); a failed read is not. Say
          which one this is, or a down service reads as an empty team. */
-      .catch((e) => { if (!cancelled) { setRows([]); setRoles([]); toast(errMessage(e), "bad"); } });
+      .catch((e) => { if (!cancelled) { setRows([]); setRoles([]); setFailed(loadFailure(e)); } });
     return () => { cancelled = true; };
   }, [tick]);
 
@@ -167,6 +171,11 @@ export default function Team() {
     return "#/team" + qs(q);
   }
   if (!rows) return <ListSkeleton />;
+  if (failed) {
+    return (
+      <LoadNotice what="The team" part={failed} onRetry={() => { setFailed(null); setRows(null); setTick((t) => t + 1); }} />
+    );
+  }
 
   /* A ROW IS A PERSON AND IT OPENS THEIR PAGE. The drawer is gone: identity,
      access, attendance, work, reports, documents and pay are one screen with

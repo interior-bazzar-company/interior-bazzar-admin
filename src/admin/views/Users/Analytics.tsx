@@ -23,7 +23,7 @@
    `rangeTotals()`, which sums the monthly series and recomputes each rate from
    its own numerator and denominator.
    ============================================================================= */
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useShell } from "../../shell/ShellContext";
 import { ActivityFeed, Button, ChartFrame, EmptyState, Notice, Table, Tiles } from "../../ui";
 import { go } from "../../ui/nav";
@@ -34,8 +34,8 @@ import type { BarRow, Series } from "../charts";
 import DateRange from "./DateRange";
 import {
   METRICS, VOCAB,
-  ago, bandCounts, clampRange, countsOf, delta, pct, presetRange, rangeTotals,
-  useRecentActivity, useUserTotals,
+  ago, bandCounts, baseCounts, clampRange, delta, pct, presetRange, rangeTotals,
+  useRecentActivity, useUserTotals, useUsersAnalytics,
 } from "./store";
 
 const dir = (extra: Record<string, string>) =>
@@ -51,9 +51,16 @@ const GROWTH: Series[] = [
 
 export default function Analytics({ rows, p, onView, onParams }: FaceProps) {
   const { toast } = useShell();
-  const c = countsOf(rows);
+  /* THE SERIES AND THE BASE COME FROM THE SERVER (`GET users/analytics/`),
+     counted over every account rather than over the page the directory
+     happens to have loaded. `rows` is the fallback until that read lands. */
+  const analytics = useUsersAnalytics();
+  const c = baseCounts(rows);
   const recent = useRecentActivity(6);
   const totals = useUserTotals();
+  useEffect(() => {
+    if (analytics.error) toast("The analytics did not load: " + analytics.error, "bad");
+  }, [analytics.error, toast]);
 
   /* The range lives in the URL like every other control in this module, so a
      narrowed dashboard is a link somebody can send. Six months is the default
@@ -64,10 +71,14 @@ export default function Analytics({ rows, p, onView, onParams }: FaceProps) {
      across — so one click from a narrowed list would have handed this control
      two ISO dates and meant something entirely different by them. Two meanings
      for one param is a bug waiting for the first person who uses both. */
+  /* THE MONTHS ARRIVE. `ready` is read inside the memo, and is a dependency of
+     it, because the series is empty until the analytics read lands — a range
+     computed against an empty series would keep answering for one after it
+     filled in. */
   const range = useMemo(() => {
-    const fallback = presetRange(6);
+    const fallback = analytics.ready ? presetRange(6) : { from: "", to: "" };
     return clampRange(p.start || fallback.from, p.end || fallback.to);
-  }, [p.start, p.end]);
+  }, [p.start, p.end, analytics.ready]);
   const t = useMemo(() => rangeTotals(range.from, range.to), [range]);
 
   /* One navigation for the pair. Setting them one at a time would navigate
@@ -87,7 +98,7 @@ export default function Analytics({ rows, p, onView, onParams }: FaceProps) {
     }));
 
   return (
-    <Frame view="analytics" onView={onView} toast={toast}
+    <Frame view="analytics" onView={onView}
       counts={bandCounts(totals.data)}
       title="Users analytics"
       meta={<>

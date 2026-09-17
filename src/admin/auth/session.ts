@@ -55,13 +55,13 @@ export const HIDDEN_MODULES = new Set(["design", "payments"]);
  *  module has no server data to leak and no server write to authorise. It has
  *  to come out on the commit that gives it either.
  *
- *  `users` (Business Ops · Users Management) qualifies today on both counts and
- *  on nothing else: every record it renders is a fixture in
- *  src/content/users/*.json, and every write it performs lands in the browser
- *  tab and is discarded on reload. The moment `GET /admin/users` exists this
- *  key comes out, in the same commit — see
- *  src/proto/v-2.2.0.0/BACKEND-INTEGRATION.md, where it is listed as work
- *  rather than as design.
+ *  `users` (Business Ops · Users Management) came out 2026-09-16, and it is the
+ *  clearest example of why a key in this set has to leave on the commit that
+ *  gives the module either server data or a server write. It had both — every
+ *  record and every write had been the server's since 2026-09-14 — while the
+ *  key sat here answering `can("users")` true for everybody. What was missing
+ *  was the Module row, which backend migration 0061 now seeds: two verbs, view
+ *  and edit, and the panel reads the session's real grant for both.
  *
  *  `attendance`, `work` and `reports` (the Team group's operational half)
  *  qualify on the same two counts and, for now, more cleanly than anything that
@@ -76,11 +76,11 @@ export const HIDDEN_MODULES = new Set(["design", "payments"]);
  *  nothing else. It is the newest entry here and it comes out the same way the
  *  others do.
  *
- *  `agreements` is the same case again, with one wrinkle worth naming: the
- *  AGREEMENTS it reads are real Team records, not fixtures — but they are Team
- *  fixtures, and every write still lands in the tab. The templates beside them
- *  are src/content/agreements/templates.json. It comes out with `team`'s own
- *  server data, whichever lands first.
+ *  `agreements` is the same case again, with the wrinkle now gone: the
+ *  AGREEMENTS it reads are real Team records, and since 2026-09-16 the
+ *  TEMPLATES beside them are server rows too (`agreements/templates/`), so
+ *  nothing behind this key is a fixture any more. It comes out with `team`'s
+ *  own server data, whichever lands first.
  *
  *  NOTE what is deliberately NOT here: `team` and `roles`. Both have real
  *  Module rows on the server and real grants issued against them, so adding
@@ -91,12 +91,24 @@ export const PROTO_MODULES = new Set<string>([
      (interior_admin migration 0026), so `can("overview")` now reads the
      session's own grant. Full access holds it without a grant row; any other
      role only when its cell is ticked in the roles editor. A session without
-     it is forwarded to its first allowed page — see `homeRoute()`. */
-  "users",
-  "finance",
-  "finance-salaries",
-  "finance-transactions",
-  "finance-refunds",
+     it is forwarded to its first allowed page — see `homeRoute()`.
+
+     `users` CAME OUT 2026-09-16 (backend migration 0061). Its views have always
+     carried @requires("users", …); what was missing was the Module row, so the
+     server refused every role but full access while `can("users")` here said
+     yes to everyone. Two verbs — view and edit — and the panel now gates on the
+     session's real grant, which is what makes a read-only Users role possible.
+
+     `finance-salaries`, `finance-transactions` and `finance-refunds` CAME OUT
+     2026-09-17, for the same reason: their Module rows and verbs are seeded
+     (module_seed.py) and every view carries @requires on them, so the sidebar
+     was showing everyone three sections the server then refused.
+
+     `finance` (Subscriptions) CAME OUT 2026-09-17 with its Module row (backend
+     migration 0064: view / edit / reverse) and @requires on every subscription
+     endpoint, which were full-access only until then. `edit` is a real verb
+     there, so it needs no EDIT_MEANS entry. `finance-analytics` has no Module
+     row yet. */
   "finance-analytics",
   "attendance",
   "work",
@@ -173,6 +185,17 @@ export function isZeroAccess(s: MePermissions): boolean {
   return !s.modules.some((m) => m.actions.length > 0);
 }
 
+/** WHAT `edit` MEANS on a module whose server verbs are named per write. The
+ *  Finance screens gate every write on one `can(key, "edit")`, but the server
+ *  has no `edit` there: payroll writes are approve / pay / hold (`propose` is
+ *  seeded and no view accepts it), and a transaction's detail write is cancel.
+ *  ponytail: any held write verb opens every button and the server refuses the
+ *  one not held; per-verb gates when the Finance markup is reopened. */
+export const EDIT_MEANS: Record<string, string[]> = {
+  "finance-salaries": ["approve", "pay", "hold"],
+  "finance-transactions": ["cancel"],
+};
+
 export function can(moduleKey: string, action?: string): boolean {
   if (!session) return false;
   /* A frontend-first module the server has no Module row for. See
@@ -183,7 +206,8 @@ export function can(moduleKey: string, action?: string): boolean {
   /* `view` is the gate: without it the module is not this session's at all, so
      no other verb on it counts however it got granted. */
   if (held.indexOf("view") < 0) return false;
-  return held.indexOf(action || "view") >= 0;
+  const want = action || "view";
+  return ((want === "edit" && EDIT_MEANS[moduleKey]) || [want]).some((v) => held.indexOf(v) >= 0);
 }
 export const canWrite = (moduleKey: string, action?: string) => can(moduleKey, action || "edit");
 

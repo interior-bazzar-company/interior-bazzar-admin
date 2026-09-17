@@ -25,3 +25,7 @@ export const THEMES = [
   { id: "system", label: "System", hint: "Follow the operating system" },
 ];
 export const bootAppearance = noop;
+/* AdminShell imports the popover slots at module scope too. */
+export const PopHead = ({ children }: { children: ReactNode }) => <>{children}</>;
+export const PopBody = PopHead;
+export const PopFoot = PopHead;

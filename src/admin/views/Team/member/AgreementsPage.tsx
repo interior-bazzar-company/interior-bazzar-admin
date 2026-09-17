@@ -46,8 +46,8 @@ export default function AgreementsPage({ m, viewer }: { m: Member; viewer: Viewe
   const unopened = rows.filter((a) => a.state === "sent" && !a.viewedAt && !isExpired(a));
   const expired = rows.filter(isExpired);
 
-  const revoke = (a: Agreement) => {
-    const r = revokeAgreement(a.agreementId);
+  const revoke = async (a: Agreement) => {
+    const r = await revokeAgreement(a.agreementId);
     shell.toast(r.ok ? "Revoked. The link is dead." : (r as { message: string }).message, r.ok ? "" : "bad");
   };
 

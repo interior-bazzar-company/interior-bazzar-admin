@@ -352,8 +352,8 @@ function ResourceActions({ r, shell }: { r: Resource; shell: ReturnType<typeof u
   const pending = rowsFor(r).filter((x) => x.state === "pending");
   const answered = responsesFor(r.resourceId).length;
 
-  const act = (fn: () => { ok: boolean; message?: string }, said?: string) => {
-    const res = fn() as { ok: boolean; message?: string };
+  const act = async (fn: () => Promise<{ ok: boolean; message?: string }>, said?: string) => {
+    const res = await fn();
     if (!res.ok) shell.toast(res.message, "bad");
     else if (said) shell.toast(said, "ok");
   };
@@ -432,8 +432,8 @@ function ConfirmDeleteResource({ r }: { r: Resource }) {
       actions={
         <>
           <Button color="secondary" onClick={() => shell.closeLayer()}>Keep it</Button>
-          <Button color="primary-destructive" onClick={() => {
-            const res = deleteResource(r.resourceId);
+          <Button color="primary-destructive" onClick={async () => {
+            const res = await deleteResource(r.resourceId);
             shell.closeLayer();
             if (!res.ok) shell.toast(res.message, "bad");
             else shell.toast("Deleted.", "ok");
@@ -604,8 +604,8 @@ function ConfirmDeleteResponse({ r, x }: { r: Resource; x: ResourceResponse }) {
       actions={
         <>
           <Button color="secondary" onClick={() => shell.closeLayer()}>Keep it</Button>
-          <Button color="primary-destructive" onClick={() => {
-            const res = deleteResponse(x.responseId);
+          <Button color="primary-destructive" onClick={async () => {
+            const res = await deleteResponse(x.responseId);
             shell.closeLayer();
             if (!res.ok) { shell.toast(res.message, "bad"); return; }
             shell.toast(res.value
@@ -649,8 +649,8 @@ function FormFace({ r, p, onFilter }: {
   }
   if (p.state) rows = rows.filter((x) => x.state === p.state);
 
-  const act = (fn: () => { ok: boolean; message?: string }) => {
-    const res = fn() as { ok: boolean; message?: string };
+  const act = async (fn: () => Promise<{ ok: boolean; message?: string }>) => {
+    const res = await fn();
     if (!res.ok) shell.toast(res.message, "bad");
   };
 

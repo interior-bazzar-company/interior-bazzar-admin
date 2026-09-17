@@ -2,21 +2,13 @@
    Overview — the derivations. Pure, and the only arithmetic on the page.
    -----------------------------------------------------------------------------
    THE OVERVIEW OWNS NO RECORDS. Every figure here is computed from what the
-   modules already hold — the Deals API's list, the Finance store, the Team
-   store — by calling THEIR derivations wherever one exists (overview(),
-   subTotals(), workTotals(), isDelayed(), attentionOf() …) so that a tile on
-   this page and the module it drills into cannot disagree. What is new here is
-   only the arithmetic no module does on its own: a period window, the
-   comparison with the period before it, the join between a deal's owner and a
-   team member, and the ranked attention list.
+   backend returns (the deals list here, the money and team reads in live.ts
+   and financeLive.ts). What is new here is only the arithmetic no module does
+   on its own: a period window, the comparison with the period before it, the
+   join between a deal's owner and a team member, and the ranked attention list.
 
-   FOUR CLOCKS, STATED. Deals and Enquiries are live and run on the real clock.
-   Finance and Team are frontend-first seeds with their own fixed `asOf`, so
-   "the last 30 days" lands on different calendar dates in each. Rather than
-   pretend one clock, every function takes `today` as an argument, the page
-   passes each source its own, and each section stamps the clock it ran on.
-   The check suite pins `today` for the same reason the Enquiries clock check
-   does — see scripts/check-overview.cjs.
+   ONE CLOCK. Every section reads the backend on the real clock; every function
+   still takes `today` as an argument so a check can pin it.
 
    Everything takes `today` and returns plain data. No hook, no React, no
    fetch: scripts/check-overview.cjs bundles this file and asserts the rules.
@@ -24,20 +16,6 @@
 import { STAGES } from "../Deals/adapter";
 import type { DealStageVocab } from "../../../api/modules/adminOps";
 import { inr } from "../../ui/format";
-import {
-  atRisk, installmentRows, matchedPct, monthPoints, overview, refundQueue, runsNewestFirst,
-  salaryTotals, subTotals,
-} from "../Finance/store";
-import type { MonthPoint, Overview as FinOverview, RiskRow, SubTotals } from "../Finance/store";
-import {
-  attendanceTotals, attentionOf, dayRows, isDelayed, isTerminal, leaveQueue, missingDocs,
-  readAgreements, readItems, readLeave, readMembers, reviewRows, spanRows, spanTotals,
-  unopenedAgreements, workTotals,
-} from "../Team/store";
-import type {
-  Agreement, Attention, AttendanceState, AttendanceTotals, LeaveQueue, LeaveRequest, Member,
-  SpanTotals, WorkItem, WorkTotals,
-} from "../Team/store";
 import metricsDoc from "../../../content/overview/metrics.json";
 
 /* ------------------------------------------------------------ vocabulary --- */
@@ -264,109 +242,8 @@ export function dealMetrics(list: DealRec[], p: Period, today: string, stages: D
   };
 }
 
-/* --------------------------------------------------------------- finance --- */
-export interface MoneyPoint { key: string; label: string; collected: number; out: number; net: number }
-export interface FinanceMetrics {
-  cur: FinOverview; prev: FinOverview; totals: SubTotals; flow: MoneyPoint[]; months: MonthPoint[];
-  risk: RiskRow[]; dueSoon: { n: number; paise: number }; overdue: { n: number; paise: number };
-  failed: { n: number; paise: number }; refundsOwed: { n: number; paise: number }; refundsOpen: number;
-  matched: number | null; bankUnexplained: number;
-}
-export function financeMetrics(p: Period, today: string): FinanceMetrics {
-  const cur = overview(p.from, p.to);
-  const prev = overview(p.prevFrom, p.prevTo);
-  const flow = bucketsOf(p).map((b) => {
-    const o = overview(b.from, b.to);
-    return { key: b.key, label: b.label, collected: o.collectedPaise + o.otherInPaise, out: o.outPaise, net: o.netPaise };
-  });
-  const all = monthPoints();
-  const want = Math.min(12, Math.max(3, Math.ceil(p.days / 30)));
-  const months = all.slice(-want);
-  const inst = installmentRows();
-  const sum = (rows: typeof inst) => rows.reduce((a, r) => a + r.i.amountPaise, 0);
-  const due = inst.filter((r) => r.i.status === "due");
-  const soon = due.filter((r) => r.i.dueDate >= today && r.i.dueDate <= addDays(today, 30));
-  const late = due.filter((r) => r.i.dueDate < today);
-  const failed = inst.filter((r) => r.i.status === "fail_to_pay");
-  const rq = refundQueue();
-  const risk = atRisk(p.from, p.to);
-  const unexplained = risk.find((r) => r.key === "unexplained");
-  return {
-    cur, prev, totals: subTotals(), flow, months, risk,
-    dueSoon: { n: soon.length, paise: sum(soon) }, overdue: { n: late.length, paise: sum(late) },
-    failed: { n: failed.length, paise: sum(failed) },
-    refundsOwed: { n: rq.approved.length, paise: rq.approved.reduce((a, r) => a + r.r.amountPaise, 0) },
-    refundsOpen: rq.open.length, matched: matchedPct(),
-    bankUnexplained: unexplained ? Number(String(unexplained.count).replace(/\D/g, "")) || 0 : 0,
-  };
-}
-
-export interface Payroll { owedPaise: number; people: number; openRun: string | null; openRunPaise: number }
-/** Read only when the session holds Salaries A/C — the caller gates it. */
-export function payrollMetrics(): Payroll {
-  const t = salaryTotals();
-  const open = runsNewestFirst().find((r) => r.state === "open") || null;
-  return { owedPaise: t.unpaidPaise, people: t.unpaidPeople, openRun: open ? open.month : null, openRunPaise: open ? open.totalNetPaise : 0 };
-}
-
 /* ------------------------------------------------------------------ team --- */
 export interface OwnerStat { open: number; won: number; value: number; collected: number }
-export interface TeamRow {
-  m: Member; open: number; late: number; done: number; dueWeek: number;
-  onTime: number | null; state: AttendanceState | null; deals: OwnerStat | null;
-}
-export interface TeamMetrics {
-  members: Member[]; departments: string[]; today: AttendanceTotals; work: WorkTotals; span: SpanTotals;
-  done: number; dueWeek: number; rows: TeamRow[]; maxOpen: number; attention: Attention; leave: LeaveQueue;
-  unopened: Agreement[]; expiring: Agreement[]; docsMissing: { m: Member; missing: string[] }[];
-  onLeaveSoon: LeaveRequest[]; dueSoonByMember: { m: Member; n: number }[];
-}
-/** `rolesOf` is memberId -> the role names that account holds on the server
- *  (`GET /admin/users/` roles[]). The Department filter is a ROLE filter: the
- *  backend has no department, so a picked value is a role name, and a member
- *  is in it when they hold that role. Somebody with two roles is in both. */
-export function teamMetrics(p: Period, today: string, dept: string | undefined, owners: Map<string, OwnerStat>,
-  rolesOf: Map<string, string[]>): TeamMetrics {
-  const active = readMembers().filter((m) => m.status === "active");
-  const departments = Array.from(new Set(active.map((m) => m.department).filter(Boolean))).sort();
-  const members = dept
-    ? active.filter((m) => (rolesOf.get(String(m.memberId)) || []).indexOf(dept) >= 0)
-    : active;
-  const ids = new Set(members.map((m) => m.memberId));
-  const items = readItems().filter((i) => ids.has(i.assigneeId));
-  const openItems = items.filter((i) => !isTerminal(i.status));
-  const weekTo = addDays(today, 7);
-  const dueWeekOf = (rows: WorkItem[]) => rows.filter((i) => !isTerminal(i.status) && !!i.dueDate && i.dueDate >= today && i.dueDate <= weekTo);
-  const doneOf = (rows: WorkItem[]) => rows.filter((i) => i.status === "completed" && inRange(i.completedAt, p.from, p.to));
-  const day = dayRows(today, "all").filter((r) => ids.has(r.member.memberId));
-  const span = spanRows(p.from, p.to, "all").filter((r) => ids.has(r.member.memberId));
-  const review = reviewRows(today, "all").filter((r) => ids.has(r.member.memberId));
-  const rows: TeamRow[] = members.map((m) => {
-    const mine = items.filter((i) => i.assigneeId === m.memberId);
-    const sp = span.find((r) => r.member.memberId === m.memberId);
-    const d = day.find((r) => r.member.memberId === m.memberId);
-    return {
-      m, open: mine.filter((i) => !isTerminal(i.status)).length, late: mine.filter((i) => isDelayed(i, today)).length,
-      done: doneOf(mine).length, dueWeek: dueWeekOf(mine).length,
-      onTime: sp && sp.present ? Math.round(((sp.present - sp.late) / sp.present) * 100) : null,
-      state: d ? d.state : null, deals: owners.get(m.memberId) || owners.get(m.name) || null,
-    };
-  }).sort((a, b) => (b.deals?.collected || 0) - (a.deals?.collected || 0) || b.done - a.done || a.late - b.late);
-  const expTo = addDays(today, 7);
-  return {
-    members, departments, today: attendanceTotals(day), work: workTotals(items), span: spanTotals(span),
-    done: doneOf(items).length, dueWeek: dueWeekOf(items).length, rows,
-    maxOpen: Math.max(0, ...rows.map((r) => r.open)), attention: attentionOf(review), leave: leaveQueue("all"),
-    unopened: unopenedAgreements("all").filter((a) => ids.has(a.memberId)),
-    expiring: readAgreements().filter((a) => (a.state === "sent" || a.state === "viewed") && !!a.expiresAt
-      && a.expiresAt.slice(0, 10) >= today && a.expiresAt.slice(0, 10) <= expTo && ids.has(a.memberId)),
-    docsMissing: members.map((m) => ({ m, missing: missingDocs(m.memberId) })).filter((x) => x.missing.length),
-    onLeaveSoon: readLeave().filter((l) => l.state === "approved" && ids.has(l.memberId) && l.toDate >= today && l.fromDate <= addDays(today, 14)),
-    dueSoonByMember: members.map((m) => ({ m, n: dueWeekOf(openItems.filter((i) => i.assigneeId === m.memberId)).length }))
-      .filter((x) => x.n > 0).sort((a, b) => b.n - a.n),
-  };
-}
-
 /* ---------------------------------------------------------------- health --- */
 export type Tone = "ok" | "warn" | "bad" | "mute";
 export interface HealthCell { key: string; label: string; tone: Tone; why: string; to: string }

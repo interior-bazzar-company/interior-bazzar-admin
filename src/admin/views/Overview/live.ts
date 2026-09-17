@@ -7,8 +7,9 @@
 
      Collected   deal payments (paymentDate; a payment and its reversal cancel
                  out, whatever their dates) + plan purchases (PAID or REFUNDED,
-                 by verifiedAt, rupees less any refund, ₹0 free plans are not
-                 payments) + other income (recorded, by valueDate, every kind).
+                 by verifiedAt, at their full amount — see planCashPaise — ₹0
+                 free plans are not payments) + other income (recorded, by
+                 valueDate, every kind).
                  "N payments" counts the first two only — income is not a
                  customer payment.
      Receivable  installments still due or failed whose due date is in the
@@ -31,7 +32,8 @@ import { useEffect, useState } from "react";
 import AdminOpsService, { call } from "../../../api/modules/adminOps";
 import type {
   AdminUserRow, AgreementRow, AttendanceDayRow, DailyPlanRow, DailyReportRow, DealPaymentRow, IncomeRow, InstallmentRow,
-  LeaveRow, OverviewOperations, OverviewSignals, PlanPaymentRow, PlanPaymentsListResponse, WorkItemRow, WorkSettingsRow,
+  LeaveRow, OverviewOperations, OverviewSignals, PlanPaymentRow, PlanPaymentsListResponse, RefundRow, WorkItemRow,
+  WorkSettingsRow,
 } from "../../../api/modules/adminOps";
 import { addDays, healthOf, todayLocal } from "./derive";
 import type { AttentionTeam, DealMetrics, HealthCell, OwnerStat, Period } from "./derive";
@@ -40,13 +42,15 @@ export type LiveState = "off" | "loading" | "ready" | "error";
 
 interface Raw {
   ledger: DealPaymentRow[]; plans: PlanPaymentRow[]; income: IncomeRow[]; installments: InstallmentRow[];
+  /** Plan payments that have a SETTLED refund request — see planCashPaise. */
+  settled: Set<number>;
   days: AttendanceDayRow[]; work: WorkItemRow[];
   /** Tasks FINISHED inside the period, asked of the server by completion date
    *  (overview/d4). `work` above stays the whole book, which is what the
    *  Delivery health cell and the open / overdue counts read. */
   doneWork: WorkItemRow[];
 }
-const NONE: Raw = { ledger: [], plans: [], income: [], installments: [], days: [], work: [], doneWork: [] };
+const NONE: Raw = { ledger: [], plans: [], income: [], installments: [], settled: new Set(), days: [], work: [], doneWork: [] };
 
 /** Every page of a list endpoint. ponytail: sequential pages; fine at
  *  hundreds of rows, parallelise if a list ever runs to thousands. */
@@ -77,8 +81,12 @@ export function useLive(p: Period, on: { money: boolean; team: boolean }) {
         every((n) => call<PlanPaymentsListResponse>(AdminOpsService.payments({ ...span, status: "PAID,REFUNDED", pageNo: n, pageSize: 100 })), (r) => r.payments),
         every((n) => call(AdminOpsService.income({ ...span, state: "recorded", pageNo: n, pageSize: 500 })), (r) => r.income),
         every((n) => call(AdminOpsService.installments({ status: "due,failed", pageNo: n, pageSize: 500 })), (r) => r.installments),
-      ]).then(([ledger, plans, income, installments]) => {
-        if (live) setS((x) => ({ ...x, money: "ready", raw: { ...x.raw, ledger, plans, income, installments } }));
+        /* Refused (no refunds grant) is an empty set: every REFUNDED payment
+           then nets its refund off, which is the only place it is counted. */
+        every((n) => call(AdminOpsService.refunds({ pageNo: n, pageSize: 500 })), (r) => r.refunds).catch(() => [] as RefundRow[]),
+      ]).then(([ledger, plans, income, installments, refunds]) => {
+        const settled = settledRefundPayments(refunds);
+        if (live) setS((x) => ({ ...x, money: "ready", raw: { ...x.raw, ledger, plans, income, installments, settled } }));
       }).catch(() => { if (live) setS((x) => ({ ...x, money: "error" })); });
     }
     if (on.team) {
@@ -112,6 +120,22 @@ export const within = (d: string, from: string, to: string) => !!d && d >= from 
 /** "19500.0" rupees -> 1950000 paise. */
 export const paiseOf = (rupees: string | null | undefined) => Math.round((parseFloat(rupees || "0") || 0) * 100);
 
+/** The plan payments a settled refund request points at. */
+export const settledRefundPayments = (refunds: { settledAt: string | null; payment: { id: number } | null }[]) =>
+  new Set(refunds.filter((r) => !!r.settledAt && !!r.payment).map((r) => (r.payment as { id: number }).id));
+
+/** A plan purchase's cash IN, in paise — its full amount. THE ONE RULE for it;
+ *  the snapshot, the Finance section and Finance Analytics all call this.
+ *
+ *  A refund is money OUT on the day it is sent (its settled refund request),
+ *  so it is not also taken off the payment: doing both took every refund off
+ *  net twice. The exception is a payment marked REFUNDED with no settled
+ *  request behind it — the one-step refund from before requests existed —
+ *  which nothing else counts, so it still nets off here. The server's net-cash
+ *  trajectory (SignalsController) applies the same rule. */
+export const planCashPaise = (x: PlanPaymentRow, settled: Set<number>) =>
+  paiseOf(x.amount) - (x.orderStatus === "REFUNDED" && !settled.has(x.id) ? paiseOf(x.refundAmount) : 0);
+
 export interface MoneyWindow { collectedPaise: number; otherInPaise: number; collectedN: number }
 export interface LiveMoney {
   cur: MoneyWindow; prev: MoneyWindow;
@@ -122,7 +146,7 @@ export interface LiveMoney {
 function windowOf(r: Raw, from: string, to: string): MoneyWindow {
   const deal = r.ledger.filter((x) => x.type === "payment" && !x.reversed && within(ymd(x.paymentDate), from, to));
   const plans = r.plans
-    .map((x) => ({ at: ymd(x.verifiedAt), net: paiseOf(x.amount) - (x.orderStatus === "REFUNDED" ? paiseOf(x.refundAmount) : 0) }))
+    .map((x) => ({ at: ymd(x.verifiedAt), net: planCashPaise(x, r.settled) }))
     .filter((x) => x.net > 0 && within(x.at, from, to));
   const income = r.income.filter((x) => within(ymd(x.valueDate), from, to));
   return {

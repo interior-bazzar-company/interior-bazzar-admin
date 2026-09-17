@@ -24,18 +24,26 @@
    blanked — a document with a hole in it is worse than one with a stray brace,
    because only the second is obvious.
 
-   NO API YET — templates come from src/content/agreements/templates.json and
-   the agreements from src/content/team/agreements.json, and those two files are
-   the only thing either store knows about their origin.
+   BOTH HALVES ARE LIVE (2026-09-16). Agreements come from the backend through
+   Team's store, and sending, opening, signing and revoking are its writes
+   (`agreements/`, `/view/`, `/sign/`, `/revoke/`). The templates are rows too
+   now — `agreements/templates/`, a NotificationTemplate on channel
+   `agreement` — so a wording edited on one machine is the wording every other
+   one sends. A copy records the `templateKey` it came from, which is what
+   provenance and the one-live-copy guard key off: matching back on kind + title
+   lost every copy the moment somebody renamed the template.
    ============================================================================= */
 import { useEffect, useState } from "react";
+import AdminOpsService, { call } from "../../../api/modules/adminOps";
+import type { AgreementTemplateRow } from "../../../api/modules/adminOps";
+import { errMessage } from "../../../api/apiService";
+import type { ApiResponseType } from "../../../types/reqResType";
 import config from "../../../config";
-import templatesDoc from "../../../content/agreements/templates.json";
 import {
-  AGREEMENT_KIND, TODAY, fmtDate, labelOf, meId, readAgreements, readMember, readMembers,
+  AGREEMENT_KIND, TODAY, fmtDate, labelOf, loadFailure, readAgreements, readMember, readMembers,
   revokeAgreement, sendAgreement, signAgreement, toneOf, useAgreements,
 } from "../Team/store";
-import type { Agreement, Member, Result } from "../Team/store";
+import type { Agreement, LoadPart, Member, Result } from "../Team/store";
 
 export type { Agreement, Member };
 export {
@@ -54,6 +62,7 @@ export interface Clause {
 }
 
 export interface Template {
+  /** The NotificationTemplate `key`. An agreement's `templateId` is this. */
   templateId: string;
   title: string;
   kind: string;
@@ -63,23 +72,15 @@ export interface Template {
   version: number;
   clauses: Clause[];
   createdAt: string;
-  createdById: string;
 }
 
 /* ------------------------------------------------------------------ store -- */
 
-const clone = <T,>(v: T): T => JSON.parse(JSON.stringify(v)) as T;
-
-let templates: Template[] = clone(templatesDoc.templates) as unknown as Template[];
+let templates: Template[] = [];
 
 let version = 0;
 const listeners = new Set<() => void>();
 const touch = () => { version++; listeners.forEach((f) => f()); };
-
-export function resetTemplates() {
-  templates = clone(templatesDoc.templates) as unknown as Template[];
-  touch();
-}
 
 let seq = 0;
 const nextId = (prefix: string) =>
@@ -92,6 +93,53 @@ const nextId = (prefix: string) =>
 const ok = <T,>(data: T): Result<T> => ({ ok: true, data });
 const err = (code: string, message: string): Result<never> =>
   ({ ok: false, code, message } as unknown as Result<never>);
+
+const toTemplate = (t: AgreementTemplateRow): Template => ({
+  templateId: t.key, title: t.title, kind: t.kind, purpose: t.purpose,
+  state: t.state as TemplateState, version: t.version,
+  clauses: (t.clauses || []).map((c) => ({ clauseId: c.clauseId, heading: c.heading, text: c.text })),
+  createdAt: t.createdAt,
+});
+
+/** Load (once) or reload (`force`) the wording. Never throws: a refused read
+ *  leaves the list empty and every face shows its own empty state rather than
+ *  wording nobody wrote. */
+let booting: Promise<void> | null = null;
+/** How the wording stands: a refused or failed read is said, never drawn as "no template". */
+let templatesPart: LoadPart = { state: "loading" };
+export function bootTemplates(force = false): Promise<void> {
+  if (booting && !force) return booting;
+  booting = call(AdminOpsService.agreementTemplates())
+    .then((r) => { templates = (r.templates || []).map(toTemplate); templatesPart = { state: "ok", own: false }; touch(); })
+    .catch((e) => { templatesPart = loadFailure(e); touch(); });
+  return booting;
+}
+
+/** Try again: loading until the re-read lands. */
+export function retryTemplates(): Promise<void> {
+  templatesPart = { state: "loading" };
+  touch();
+  return bootTemplates(true);
+}
+
+/** One server write, folded in at once, with a full re-read behind it — the
+ *  same shape Team's `live` has, because these screens branch on one Result. */
+async function live<R, T>(req: () => Promise<ApiResponseType<R>>, apply: (r: R) => T): Promise<Result<T>> {
+  try {
+    const out = apply(await call(req()));
+    touch();
+    void bootTemplates(true);
+    return ok(out);
+  } catch (e) {
+    return err("refused", errMessage(e));
+  }
+}
+
+const putTemplate = (row: AgreementTemplateRow): Template => {
+  const t = toTemplate(row);
+  templates = templates.filter((x) => x.templateId !== t.templateId).concat([t]);
+  return t;
+};
 
 /* ------------------------------------------------------------------ reads -- */
 
@@ -182,8 +230,9 @@ export const isSendable = (a: Agreement): boolean =>
   (a.state === "sent" || a.state === "viewed") && !isExpired(a);
 
 /* ----------------------------------------------------------------- writes -- */
-/* SIMULATED, like every other frontend-first module here: these write memory and
-   return the shape the live calls will. */
+/* Server writes. Every refusal below is the one the server has no reason to
+   know about; the rest — an empty title, a clause with no text, a retired
+   template, a template something has been sent from — are its own. */
 
 export interface TemplateDraft {
   title: string;
@@ -202,103 +251,78 @@ const bad = (d: TemplateDraft): string | null => {
   return null;
 };
 
-export function createTemplate(d: TemplateDraft): Result<Template> {
+/** A NEW TEMPLATE IS A DRAFT, and this one really is a draft: unlike a resource,
+ *  sending an agreement is a deliberate second act, so there is nothing for a
+ *  new template to be prematurely open to. */
+export function createTemplate(d: TemplateDraft): Promise<Result<Template>> {
   const why = bad(d);
-  if (why) return err("invalid", why);
-  const t: Template = {
-    templateId: nextId("TPL"),
-    title: d.title.trim(),
-    kind: d.kind,
-    purpose: d.purpose.trim(),
-    /* A DRAFT, and this one really is a draft: unlike a resource, sending an
-       agreement is a deliberate second act, so there is nothing for a new
-       template to be prematurely open to. */
-    state: "draft",
-    version: 1,
-    clauses: clone(d.clauses),
-    createdAt: TODAY + "T00:00:00+05:30",
-    createdById: meId(),
-  };
-  templates = templates.concat([t]);
-  touch();
-  return ok(t);
+  if (why) return Promise.resolve(err("invalid", why));
+  return live(() => AdminOpsService.createAgreementTemplate({
+    title: d.title.trim(), kind: d.kind, purpose: d.purpose.trim(),
+    clauses: d.clauses.map((c) => ({ clauseId: c.clauseId, heading: c.heading, text: c.text })),
+  }), putTemplate);
 }
 
 /** THE VERSION BUMP. Editing the clauses of a template that has ever been sent
  *  makes a new version; the copies already out there keep the wording they went
  *  out with. Editing only the title or the purpose does not bump — neither is
  *  something anybody signed. */
-export function updateTemplate(id: string, d: TemplateDraft): Result<Template> {
+export function updateTemplate(id: string, d: TemplateDraft): Promise<Result<Template>> {
   const why = bad(d);
-  if (why) return err("invalid", why);
+  if (why) return Promise.resolve(err("invalid", why));
   const t = templateOf(id);
-  if (!t) return err("not_found", "No such template.");
-  if (t.state === "retired") return err("retired", "This template is retired. Reinstate it to edit.");
-  const changed = JSON.stringify(t.clauses) !== JSON.stringify(d.clauses);
-  const everSent = sentFrom(id).length > 0;
-  const next: Template = {
-    ...t,
-    title: d.title.trim(),
-    kind: d.kind,
-    purpose: d.purpose.trim(),
-    clauses: clone(d.clauses),
-    version: changed && everSent ? t.version + 1 : t.version,
-  };
-  templates = templates.map((x) => (x.templateId === id ? next : x));
-  touch();
-  return ok(next);
+  if (!t) return Promise.resolve(err("not_found", "No such template."));
+  if (t.state === "retired") return Promise.resolve(err("retired", "This template is retired. Reinstate it to edit."));
+  /* THE VERSION BUMP is the server's: it knows what has been sent from this
+     template, and a count this tab happens to hold is not that fact. */
+  return live(() => AdminOpsService.updateAgreementTemplate(id, {
+    title: d.title.trim(), kind: d.kind, purpose: d.purpose.trim(),
+    clauses: d.clauses.map((c) => ({ clauseId: c.clauseId, heading: c.heading, text: c.text })),
+  }), putTemplate);
 }
 
-export function activateTemplate(id: string): Result<Template> {
+const setState = (id: string, state: TemplateState, already: string): Promise<Result<Template>> => {
   const t = templateOf(id);
-  if (!t) return err("not_found", "No such template.");
-  if (t.state === "active") return err("already_active", "It is already in use.");
-  const next: Template = { ...t, state: "active" };
-  templates = templates.map((x) => (x.templateId === id ? next : x));
-  touch();
-  return ok(next);
-}
+  if (!t) return Promise.resolve(err("not_found", "No such template."));
+  if (t.state === state) return Promise.resolve(err("already_" + state, already));
+  return live(() => AdminOpsService.updateAgreementTemplate(id, { state }), putTemplate);
+};
+
+export const activateTemplate = (id: string): Promise<Result<Template>> =>
+  setState(id, "active", "It is already in use.");
 
 /** Retiring stops it being sent and keeps every copy already signed. It is not
  *  a delete, and there is no delete for anything that has been sent. */
-export function retireTemplate(id: string): Result<Template> {
-  const t = templateOf(id);
-  if (!t) return err("not_found", "No such template.");
-  if (t.state === "retired") return err("already_retired", "It is already retired.");
-  const next: Template = { ...t, state: "retired" };
-  templates = templates.map((x) => (x.templateId === id ? next : x));
-  touch();
-  return ok(next);
-}
+export const retireTemplate = (id: string): Promise<Result<Template>> =>
+  setState(id, "retired", "It is already retired.");
 
-export function deleteTemplate(id: string): Result<string> {
+export function deleteTemplate(id: string): Promise<Result<string>> {
   const t = templateOf(id);
-  if (!t) return err("not_found", "No such template.");
-  const n = sentFrom(id).length;
-  if (n) return err("has_sent", "It has been sent " + n + (n === 1 ? " time" : " times")
-    + ". Retire it instead — deleting would leave those signatures pointing at nothing.");
-  templates = templates.filter((x) => x.templateId !== id);
-  touch();
-  return ok(id);
+  if (!t) return Promise.resolve(err("not_found", "No such template."));
+  return live(() => AdminOpsService.deleteAgreementTemplate(id), (r) => {
+    templates = templates.filter((x) => x.templateId !== r.key);
+    return r.key;
+  });
 }
 
 /** SEND ONE COPY TO ONE MEMBER. The body is rendered and frozen here, which is
  *  the moment the template stops mattering to this document. */
-export function sendTemplate(templateId: string, memberId: string): Result<Agreement> {
+export function sendTemplate(templateId: string, memberId: string): Promise<Result<Agreement>> {
+  const refuse = (code: string, message: string) => Promise.resolve(err(code, message));
   const t = templateOf(templateId);
-  if (!t) return err("not_found", "No such template.");
+  if (!t) return refuse("not_found", "No such template.");
   if (t.state !== "active")
-    return err("not_active", t.state === "draft"
+    return refuse("not_active", t.state === "draft"
       ? "This template is still a draft. Put it in use before sending it."
       : "This template is retired and cannot be sent.");
   const m = readMember(memberId);
-  if (!m) return err("member_not_found", "No such member.");
+  if (!m) return refuse("member_not_found", "No such member.");
   /* One live copy per person per template. A second would give them two links
      to the same obligation and no rule for which signature counts. */
   const live = sentFrom(templateId).filter((a) =>
     a.memberId === memberId && a.state !== "revoked");
   if (live.length)
-    return err("already_out", live[0].state === "signed"
+    return refuse("already_out", live[0].state === "signed"
       ? m.name + " has already signed this one."
       : m.name + " already has this out for signature. Revoke it first to send a new copy.");
   const body = renderBody(t.clauses, m.name, TODAY);
@@ -316,11 +340,15 @@ function useVersion() {
   useEffect(() => {
     const f = () => set(version);
     listeners.add(f);
+    /* The first subscriber starts the load, the way Team's store does — any
+       face that reads the wording gets live rows without asking for them. */
+    void bootTemplates();
     return () => { listeners.delete(f); };
   }, []);
 }
 
 export function useTemplates(): Template[] { useVersion(); return templates; }
+export function useTemplatesLoad(): LoadPart { useVersion(); return templatesPart; }
 
 /* --------------------------------------------------------------- helpers -- */
 

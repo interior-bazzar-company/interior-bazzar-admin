@@ -4,8 +4,9 @@
    THE SAME SIX TILES, THE SAME TWO PLOTS, THE SAME EXCEPTION LIST — read from
    the API instead of the Finance seed store, on the REAL clock:
 
-     In      deal payments + plan purchases (net of what was refunded) + other
-             income, by the date each landed.
+     In      deal payments + plan purchases (full amount; a refund is counted
+             once, under Out — see live.ts planCashPaise) + other income, by
+             the date each landed.
      Out     spend that is not `excluded` + salary runs PAID inside the period
              + refunds actually settled. Taxes leave the bank and are counted
              apart, because they change no operating figure.
@@ -28,7 +29,7 @@ import type {
   BankTotals, DealPaymentRow, IncomeRow, InstallmentRow, PlanPaymentRow, PlanPaymentsListResponse,
   RefundRow, SalariesResponse, SalaryRunRow, SpendRow, SpendTagTotal,
 } from "../../../api/modules/adminOps";
-import { every, paiseOf, within, ymd } from "./live";
+import { every, planCashPaise, settledRefundPayments, within, ymd } from "./live";
 import type { LiveState } from "./live";
 import { inr } from "../../ui/format";
 import { addDays, bucketsOf, todayLocal } from "./derive";
@@ -133,8 +134,11 @@ const sum = <T,>(xs: T[], f: (x: T) => number) => xs.reduce((a, x) => a + f(x), 
 
 function windowOf(r: Raw, from: string, to: string): MoneyWindow {
   const deal = r.ledger.filter((x) => x.type === "payment" && !x.reversed && within(ymd(x.paymentDate), from, to));
+  /* One Set for the whole window, not one per payment: windowOf runs per bucket
+     and per month, and the refund list does not change inside a call. */
+  const settled = settledRefundPayments(r.refunds);
   const plans = r.plans
-    .map((x) => ({ at: ymd(x.verifiedAt), net: paiseOf(x.amount) - (x.orderStatus === "REFUNDED" ? paiseOf(x.refundAmount) : 0) }))
+    .map((x) => ({ at: ymd(x.verifiedAt), net: planCashPaise(x, settled) }))
     .filter((x) => x.net > 0 && within(x.at, from, to));
   const income = r.income.filter((x) => within(ymd(x.valueDate), from, to));
 

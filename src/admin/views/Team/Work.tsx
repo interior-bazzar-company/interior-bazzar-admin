@@ -27,7 +27,7 @@
    timeline is a date grid behind a lane column — both need their width, and on
    both the same information is already on screen in a better shape.
 
-   NO API YET — src/content/team/*.json through store.ts.
+   ON THE BACKEND through store.ts (bootTeam).
    ============================================================================= */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";

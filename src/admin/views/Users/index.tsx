@@ -22,8 +22,9 @@
    Analytics, and `#/users` opens on the list, which is what the address reads
    like and what somebody arriving here is usually after.
 
-   NO API YET. Everything comes from src/content/users/*.json through store.ts,
-   which is the only file that knows that. See src/proto/v-2.2.0.0/.
+   EVERY READ AND EVERY WRITE IS THE SERVER'S, through store.ts, which stays the
+   only file that knows where anything comes from. The one bundled file left
+   holds what no table stands behind (see the store's own header).
    ============================================================================= */
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";

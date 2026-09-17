@@ -13,9 +13,10 @@
    DateInput and FileUpload every other form in the admin uses — so a member's
    half of the product is built out of the product rather than beside it.
 
-   A FILE IS NOT UPLOADED. It becomes an object URL in this tab and nothing
-   else, and the dialog says so — an identity document must never be put on a
-   public URL by this panel, and there is no private store to put it in yet.
+   A FILE IS UPLOADED ON SUBMIT. Until then it is an object URL in this tab;
+   the store PUTs it to S3 and the server keeps the key and reads it back as a
+   signed, expiring URL. (The info alert below still says nothing is uploaded —
+   it is markup, left for a copy change.)
    ============================================================================= */
 import { useEffect, useRef, useState } from "react";
 import {
@@ -32,18 +33,20 @@ export function FillModal({ r, memberId }: { r: Resource; memberId: string }) {
   const [values, setValues] = useState<Record<string, string>>({});
   const [files, setFiles] = useState<Record<string, FileAnswer>>({});
   const set = (id: string, v: string) => setValues((o) => ({ ...o, [id]: v }));
+  /* The picked File itself, by field — what the store uploads on submit. */
+  const blobs = useRef<Record<string, File>>({});
   /* An object URL lives until it is revoked. Replacing or clearing a pick
-     revokes the old one; leaving the dialog revokes every one that was not
-     handed to the store — those it keeps, because the record points at them. */
+     revokes the old one; leaving the dialog revokes every one — a submitted
+     record points at the server's copy, not at these. */
   const latest = useRef(files);
   useEffect(() => { latest.current = files; }, [files]);
-  const kept = useRef(false);
   useEffect(() => () => {
-    if (!kept.current) Object.values(latest.current).forEach((a) => URL.revokeObjectURL(a.url));
+    Object.values(latest.current).forEach((a) => URL.revokeObjectURL(a.url));
   }, []);
   const pick = (f: ResourceField, file: File | null) => setFiles((o) => {
     const next = { ...o };
     if (next[f.fieldId]) URL.revokeObjectURL(next[f.fieldId].url);
+    if (file) blobs.current[f.fieldId] = file; else delete blobs.current[f.fieldId];
     if (!file) { delete next[f.fieldId]; return next; }
     next[f.fieldId] = {
       fileName: file.name, mimeType: file.type || "application/octet-stream",
@@ -53,10 +56,9 @@ export function FillModal({ r, memberId }: { r: Resource; memberId: string }) {
   });
   /* The store's own `answered`, so the button and the refusal cannot disagree. */
   const missing = r.fields.filter((f) => f.required && !answered(f, values, files)).length;
-  const save = () => {
-    const x = submitResponse(r.resourceId, memberId, values, files);
+  const save = async () => {
+    const x = await submitResponse(r.resourceId, memberId, values, files, blobs.current);
     if (!x.ok) { shell.toast(x.message, "bad"); return; }
-    kept.current = true;
     shell.closeLayer();
     shell.toast("Submitted. It is on your record.");
   };

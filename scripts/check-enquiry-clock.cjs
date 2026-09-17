@@ -18,7 +18,9 @@
    ========================================================================== */
 const path = require('path');
 const S = require(path.join(__dirname, '..', 'node_modules', '.tmp', 'enquiry-store.cjs'));
-const seed = require(path.join(__dirname, '..', 'src/content/business-enquiries/enquiries.json'));
+/* The bundled seed went with the move onto the API; the rows are a fixture
+   now, dated relative to the moment this runs. See scripts/enquiry-fixture. */
+const FIX = require(path.join(__dirname, 'enquiry-fixture.cjs'));
 
 const fails = [];
 const ok = (c, m) => { if (!c) fails.push(m); };
@@ -94,7 +96,7 @@ ok(S.receivedLabel({ received: 'custom', from: '2026-08-01' }) === 'since 2026-0
 ok(S.receivedLabel({}) === '', 'a chip appeared with no range set');
 
 /* ---- and it reaches the real filter ------------------------------------- */
-const rows = seed.enquiries;
+const rows = FIX.rows;
 const older = S.filterEnquiries(rows, { received: 'older' });
 const recent = S.filterEnquiries(rows, { received: '30d' });
 ok(older.length + recent.length === rows.length,

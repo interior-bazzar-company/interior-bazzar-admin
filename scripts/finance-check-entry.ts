@@ -15,3 +15,13 @@
    ============================================================================= */
 export * from "../src/admin/views/Finance/store";
 export * from "../src/admin/views/Finance/payrollYear";
+/* The plan-payment cash rule every money figure shares. */
+export { planCashPaise, settledRefundPayments } from "../src/admin/views/Overview/live";
+
+/* The one service every read goes through, EXPORTED so the suite can answer
+   it with fixture rows instead of a server — the same module instance the
+   store calls, which is what makes the stub reach it. */
+export { default as AdminOpsService } from "../src/api/modules/adminOps";
+/* ...and the upload leg, for the same reason: a payslip receipt goes straight
+   to storage with a presigned PUT, and the suite answers that instead of S3. */
+export { CommonService } from "../src/api/modules/common";

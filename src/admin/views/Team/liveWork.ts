@@ -7,15 +7,14 @@
    `GET users/`, kinds and priorities from the value lists, tags from the
    assignee's own `GET work/tags/`.
 
-   What does NOT happen: the item is not pushed into the seed snapshot in
-   store.ts. The Work screen still lists the seed, so a task made here appears
-   there only once that screen reads the backend. `store.createItem` stays the
-   seed's own writer (scripts/check-team-derivation.cjs exercises it).
+   After a create, the Team store re-reads the backend, so the new item is on
+   the board and its drawer opens.
    ============================================================================= */
 import { useEffect, useState } from "react";
 import AdminOpsService, { call } from "../../../api/modules/adminOps";
 import type { VocabItem } from "../../../api/modules/adminOps";
 import { getSession } from "../../auth/session";
+import { bootTeam } from "./store";
 import type { Attachment, Result } from "./store";
 
 type Row = { key: string; label: string; tone: string };
@@ -98,6 +97,7 @@ export async function createWorkTag(owner: string, label: string, tone: string):
   try {
     const t = await call(AdminOpsService.createWorkTag({ label, tone, owner: Number(owner) || undefined }));
     tagListeners.forEach((l) => l());
+    await bootTeam(true);
     return { ok: true, data: { tagId: String(t.id) } };
   } catch (e) {
     return refused(e, "The tag could not be made.");
@@ -116,6 +116,7 @@ export async function createWorkItem(input: {
       targetUnit: input.kind === "target" ? input.targetUnit || "" : "",
       tags: input.tagIds.map(Number), links: input.attachments.map((a) => ({ url: a.url, label: a.label })),
     }));
+    await bootTeam(true);
     return { ok: true, data: { itemId: String(row.id), title: row.title } };
   } catch (e) {
     return refused(e, "The item could not be created.");

@@ -9,9 +9,9 @@
      — absent, and the URL is refused with the same sentence. A reporting line
      is not a grant to read somebody's Aadhaar.
    · **No public URL, ever.** Every other file in this panel is a publicly
-     readable object; these must be private objects behind a short-lived signed
-     read. Until that exists there is no open/download control here, because a
-     button that worked would be the leak.
+     readable object; these are private objects behind a short-lived signed
+     read. "Open" asks for a fresh one each time, because the link the list
+     read minted dies after about an hour and this page can sit open longer.
 
    REQUIRED IS A VOCABULARY, NOT A GATE. Which kinds are required is a list in
    vocabularies.json, so it changes without a deploy — and NOTHING in the panel
@@ -19,10 +19,12 @@
    a missing scan. It shows as missing here, on the roster row and in the
    roster's filter, and that is the whole enforcement.
    ============================================================================= */
+import AdminOpsService, { call } from "../../../../api/modules/adminOps";
+import { errMessage } from "../../../../api/apiService";
 import { Alert, Button, ListTable, Pill, Rail } from "../../../ui";
 import { useShell } from "../../../shell/ShellContext";
 import {
-  REQUIRED_DOCS, DOCUMENT_KIND, deleteDocument, fmtDate, labelOf, missingDocs, readMember,
+  REQUIRED_DOCS, DOCUMENT_KIND, bootTeam, deleteDocument, fmtDate, labelOf, missingDocs, readMember,
   documentsFor, useDocuments, verifyDocument,
 } from "../store";
 import type { Member, MemberDocument } from "../store";
@@ -38,14 +40,39 @@ export default function DocumentsPage({ m, viewer }: { m: Member; viewer: Viewer
   const other = all.filter((r) => REQUIRED_DOCS.indexOf(r.kind) < 0);
   const unverified = all.filter((r) => !r.verifiedById);
 
-  const remove = (r: MemberDocument) => {
-    const x = deleteDocument(r.documentId);
+  const remove = async (r: MemberDocument) => {
+    const x = await deleteDocument(r.documentId);
     shell.toast(x.ok ? "Deleted." : (x as { message: string }).message, x.ok ? "" : "bad");
   };
-  const verify = (r: MemberDocument) => {
-    const x = verifyDocument(r.documentId);
+  const verify = async (r: MemberDocument) => {
+    const x = await verifyDocument(r.documentId);
     shell.toast(x.ok ? "Marked as checked." : (x as { message: string }).message, x.ok ? "" : "bad");
   };
+  /* A FRESH SIGNED READ ON EVERY OPEN — the one in the snapshot may be dead.
+     The tab opens inside the click (after an await the browser would block
+     it) and is pointed at the file once the new link is back. */
+  const open = async (r: MemberDocument) => {
+    const tab = window.open("", "_blank");
+    if (!tab) {
+      shell.toast("The browser blocked the new tab. Allow pop-ups for this panel and try again.", "bad");
+      return;
+    }
+    tab.opener = null;
+    try {
+      const got = await call(AdminOpsService.memberDocuments({ member: r.memberId }));
+      const fresh = got.documents.filter((d) => String(d.id) === r.documentId)[0];
+      if (fresh && fresh.file) { tab.location.replace(fresh.file.url); return; }
+      tab.close();
+      shell.toast("That document is no longer on the record.", "bad");
+      void bootTeam(true);
+    } catch (e) {
+      tab.close();
+      shell.toast(errMessage(e), "bad");
+    }
+  };
+  const openBtn = (r: MemberDocument) => (r.file
+    ? <Button color="secondary" size="xs" ico="ext" data-act="doc-open" data-ref={r.documentId} onClick={() => open(r)}>Open</Button>
+    : null);
 
   return (
     <div className="flex flex-col gap-5">
@@ -61,10 +88,9 @@ export default function DocumentsPage({ m, viewer }: { m: Member; viewer: Viewer
           )
           : null} />
 
-      <Alert tone="warn" ico="lock" title="Nothing here is downloadable from this panel yet, and that is on purpose">
-        Every stored object in this backend is readable by anyone holding its URL. Identity documents
-        need private objects behind a signed, short-lived read, and the open control arrives with
-        that and not before it.
+      <Alert tone="info" ico="lock" title="These files are private">
+        Open fetches a signed link that works for about an hour and only for this file. Do not paste
+        it anywhere — anyone holding it can read the document until it runs out.
       </Alert>
 
       {/* REQUIRED FIRST, and the missing ones are rows rather than a warning
@@ -100,6 +126,7 @@ export default function DocumentsPage({ m, viewer }: { m: Member; viewer: Viewer
                 <td><Checked r={r} /></td>
                 <td className="acts">
                   <span className="inline-flex items-center gap-2">
+                    {r ? openBtn(r) : null}
                     {!r && viewer === "self" ? (
                       <Button color="primary" size="xs" ico="upload" onClick={() =>
                         shell.modal(<AddDocumentModal memberId={m.memberId} kind={kind} />)}>Upload</Button>
@@ -141,6 +168,7 @@ export default function DocumentsPage({ m, viewer }: { m: Member; viewer: Viewer
               <td><Checked r={r} /></td>
               <td className="acts">
                 <span className="inline-flex items-center gap-2">
+                  {openBtn(r)}
                   {viewer === "admin" && !r.verifiedById
                     ? <Button color="secondary" size="xs" onClick={() => verify(r)}>Mark as checked</Button> : null}
                   {viewer === "self"

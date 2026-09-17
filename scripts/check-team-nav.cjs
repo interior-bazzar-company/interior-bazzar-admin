@@ -22,10 +22,16 @@ const OUT = path.join(ROOT, "node_modules", ".tmp", "team-nav.cjs");
 /* What the deployed server sends today: `team`, `roles` and `audit` all arrive
    with groupLabel "Settings". That is the input the override has to correct. */
 const SERVER_MODULES = [
+  /* Since interior_admin migration 0026 the Overview is a server row too. */
+  { key: "overview", label: "Overview", groupLabel: "", displayOrder: 0, actions: ["view"] },
   { key: "deals", label: "Deals", groupLabel: "Sales", displayOrder: 10, actions: ["view"] },
   { key: "quotations", label: "Quotations", groupLabel: "Sales", displayOrder: 20, actions: ["view"] },
   { key: "invoices", label: "Invoices", groupLabel: "Sales", displayOrder: 30, actions: ["view"] },
   { key: "business-enquiries", label: "Business enquiries", groupLabel: "Client Ops", displayOrder: 40, actions: ["view"] },
+  /* Since interior_admin migration 0061 Users Management is a server row too —
+     it left PROTO_MODULES in the same commit, so this is where Business Ops
+     comes from now. */
+  { key: "users", label: "Users Management", groupLabel: "Business Ops", displayOrder: 36, actions: ["view"] },
   { key: "plans", label: "Plans", groupLabel: "Catalogue", displayOrder: 50, actions: ["view"] },
   { key: "team", label: "Team", groupLabel: "Settings", displayOrder: 60, actions: ["view"] },
   { key: "roles", label: "Roles", groupLabel: "Settings", displayOrder: 70, actions: ["view"] },
@@ -110,10 +116,10 @@ esbuild.build({
   const of = (n) => (groups.find((g) => g.group === n) || { items: [] }).items.map((i) => i.key);
   const items0 = A.getItems();
 
-  /* Business Ops and Finance are here because `users` and `finance` are proto
-     rows too — this is the whole sidebar, not just Team's slice of it. */
+  /* Business Ops is a SERVER row now (`users`, migration 0061) and Finance is
+     still proto — this is the whole sidebar, not just Team's slice of it. */
   /* The unlabelled group is the Overview row — the landing page, above every
-     section, with no heading over it. See PROTO_ROWS in shell/modules.ts. */
+     section, with no heading over it. The server sends it (groupLabel ""). */
   eq("group order", names,
     ["", "Sales", "Client Ops", "Business Ops", "Team", "Resources", "Finance", "Catalogue", "Settings"]);
   eq("the unlabelled group holds the Overview row and nothing else", of(""), ["overview"]);

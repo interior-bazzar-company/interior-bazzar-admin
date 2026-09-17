@@ -15,8 +15,7 @@
      · severity outranks money in the attention list, and money ranks inside it
      · payroll never reaches the page without the Salaries A/C gate
 
-   Deals are a fixture (the API is live, so the seed cannot be read here);
-   Finance and Team are the real stores on their own clocks.
+   Every source is live on the page, so every source is a fixture here.
 
      node scripts/check-overview.cjs
    ============================================================================= */
@@ -64,6 +63,13 @@ const DEALS = [
   deal({ id: "D10", who: "Jai", stage: 5, value: L(2), owner: "Asha", created: "2026-07-10", since: "2026-09-03", stalled: true, close: "2026-08-01", collected: L(2) }),
 ];
 
+/* The deals response's own stage vocabulary (overview/d9): what ends a deal
+   is `isTerminal`, and the funnel follows `displayOrder`. dealMetrics reads
+   nothing else to decide open vs closed, so the fixture has to carry it. */
+const VOCAB = [
+  ["new", 1, false], ["followup", 2, false], ["slot", 3, false], ["installment", 4, false], ["won", 5, true], ["lost", 6, true],
+].map(([key, displayOrder, isTerminal]) => ({ key, label: key, tone: "", hint: "", displayOrder, isTerminal }));
+
 esbuild.build({
   entryPoints: [path.join(ROOT, "src", "admin", "views", "Overview", "derive.ts")],
   bundle: true, platform: "node", format: "cjs",
@@ -107,17 +113,19 @@ esbuild.build({
 
   /* ------------------------------------------------------------- deals --- */
   head("Deals · the fixture");
-  const m = S.dealMetrics(DEALS, p30, TODAY);
+  const m = S.dealMetrics(DEALS, p30, TODAY, VOCAB);
   eq("open is every deal before Won", m.open, 5);
   eq("pipeline value sums valued open deals only", m.openValue, L(4.8) + L(4.8) + L(2) + L(0.8));
   eq("...and counts the unvalued one", m.unquoted, 1);
+  eq("the snapshot's pipeline is open now AND created in the period (d3)", m.openInPeriod, { n: 3, value: L(4.8) + L(4.8) + L(0.8), unquoted: 0, stalled: 1 });
+  eq("a vocabulary that marks nothing final leaves every deal open", S.dealMetrics(DEALS, p30, TODAY, []).open, DEALS.length);
   eq("stalled counts open deals only, so the stalled Won deal is not one", [m.stalled, m.stalledValue], [1, L(4.8)]);
   eq("won in period is by the date the deal reached Won", [m.won.n, m.won.value], [2, L(5)]);
   eq("won in the previous period is the same rule on the earlier window", [m.wonPrev.n, m.wonPrev.value], [1, 0]);
   eq("lost is counted the same way", [m.lost.n, m.lostPrev.n], [1, 1]);
   eq("conversion is won over closed, to one decimal", [m.conversion, m.conversionPrev], [66.7, 50]);
   eq("average won ignores the won deal with no value", m.avgWon, L(2.5));
-  eq("conversion over nothing closed is null", S.dealMetrics([DEALS[0]], p30, TODAY).conversion, null);
+  eq("conversion over nothing closed is null", S.dealMetrics([DEALS[0]], p30, TODAY, VOCAB).conversion, null);
 
   eq("at risk ranks by money, then by days", m.atRisk.map((r) => r.d.deal_id), ["D2", "D4", "D3"]);
   eq("...with one reason each, stalled first", m.atRisk.map((r) => r.reason), ["stalled", "close_passed", "next_overdue"]);
@@ -137,54 +145,44 @@ esbuild.build({
     m.flow.reduce((a, f) => a + f.created, 0), m.flow.reduce((a, f) => a + f.won, 0), m.flow.reduce((a, f) => a + f.lost, 0),
   ], [3, 2, 1]);
   eq("collected and outstanding are the API's own per-deal figures, summed", [m.collected, m.outstanding], [L(6), L(1)]);
-  const none = S.dealMetrics([], p30, TODAY);
+  const none = S.dealMetrics([], p30, TODAY, VOCAB);
   eq("an empty list derives cleanly — zeros and nulls, no NaN", [none.open, none.openValue, none.conversion, none.avgWon, none.atRisk.length], [0, 0, null, null, 0]);
 
-  /* ----------------------------------------------------------- finance --- */
-  head("Finance · the real store, on its own clock");
-  const F = require(path.join(ROOT, "node_modules", ".tmp", "overview-derive.cjs"));
-  void F;
-  const finToday = "2026-08-25";
-  const pf = S.periodFor("30d", finToday);
-  const f = S.financeMetrics(pf, finToday);
-  ok("the period roll-up is Finance's own overview() for the same window", f.cur.netPaise === f.cur.collectedPaise + f.cur.otherInPaise - f.cur.salaryPaise - f.cur.otherOutPaise - f.cur.refundsPaidPaise);
-  eq("the money-flow buckets add up to the period's collections", f.flow.reduce((a, b) => a + b.collected, 0), f.cur.collectedPaise + f.cur.otherInPaise);
-  eq("...and to its outgoings", f.flow.reduce((a, b) => a + b.out, 0), f.cur.outPaise);
-  ok("months shown is between 3 and 12", f.months.length >= 3 && f.months.length <= 12);
-  ok("due soon is forward from the Finance clock, not the machine's", f.dueSoon.n >= 0 && f.dueSoon.paise >= 0);
-  ok("failed installments carry a count and an amount together", (f.failed.n === 0) === (f.failed.paise === 0));
-  ok("refunds owed are the approved-not-paid queue", f.refundsOwed.n >= 0);
-  ok("unexplained bank lines come off Finance's own risk table", typeof f.bankUnexplained === "number");
-  const pay = S.payrollMetrics();
-  eq("the August run is open on the seed, so payroll reads an open run", pay.openRun, "2026-08");
-  ok("payroll owed is a paise figure", typeof pay.owedPaise === "number" && pay.owedPaise >= 0);
-
-  /* -------------------------------------------------------------- team --- */
-  head("Team · the real store, on its own clock");
-  const T = require(path.join(ROOT, "node_modules", ".tmp", "overview-derive.cjs"));
-  void T;
-  const teamToday = "2026-08-28";
-  const pt = S.periodFor("30d", teamToday);
-  const t = S.teamMetrics(pt, teamToday, undefined, new Map([["58", { open: 1, won: 2, value: L(3), collected: L(4) }]]));
-  eq("every active member has a row", t.rows.length, t.members.length);
-  ok("the busiest member sets the load ceiling", t.maxOpen === Math.max(...t.rows.map((r) => r.open)));
-  ok("overdue on a row uses the board's own rule", t.rows.every((r) => r.late <= r.open));
-  ok("a member's deals are joined by id", t.rows.some((r) => r.m.memberId === "58" && r.deals && r.deals.collected === L(4)));
-  ok("on-time is null with no attendance, never 0", t.rows.every((r) => r.onTime === null || (r.onTime >= 0 && r.onTime <= 100)));
-  const depts = t.departments;
-  ok("departments come off the roster", depts.length > 1);
-  const narrowed = S.teamMetrics(pt, teamToday, depts[0], new Map());
-  ok("a department filter narrows the rows", narrowed.rows.length < t.rows.length && narrowed.rows.every((r) => r.m.department === depts[0]));
-  ok("attention is the Reports page's own roll-up", t.attention && Array.isArray(t.attention.delayed) && Array.isArray(t.attention.noEod));
-  ok("due-soon by member lists only members with something due", t.dueSoonByMember.every((x) => x.n > 0));
+  /* -------------------------------------------------- live-shaped inputs --- */
+  /* The shapes live.ts / financeLive.ts hand the attention list and signals. */
+  const finToday = TODAY;
+  const f = {
+    failed: { n: 1, paise: L(1) }, overdue: { n: 2, paise: L(2) },
+    refundsOwed: { n: 1, paise: 50000 }, refundsOpen: 1, bankUnexplained: 1, matched: 50,
+    cur: { collectedPaise: L(10), otherInPaise: 0 }, prev: { collectedPaise: L(10), otherInPaise: 0 },
+  };
+  const pay = { openRun: "2026-09", owedPaise: L(1), people: 2, openRunPaise: L(2) };
+  const teamToday = TODAY;
+  const t = {
+    members: [{ memberId: "1", name: "A. Rao" }, { memberId: "2", name: "B. Sen" }],
+    rows: [{ m: { memberId: "1", name: "A. Rao" }, open: 3, late: 1 }, { m: { memberId: "2", name: "B. Sen" }, open: 1, late: 1 }],
+    attention: {
+      delayed: [
+        { itemId: "10", title: "Call back", assigneeId: "1", priority: "high", dueDate: "2026-09-01" },
+        { itemId: "11", title: "Send quote", assigneeId: "2", priority: "urgent", dueDate: "2026-09-02" },
+      ],
+      noEod: [], noPlan: [], unacknowledged: [],
+    },
+    today: { unclosed: 0 }, leave: { total: 0, unrouted: [] }, expiring: [],
+  };
 
   /* ------------------------------------------------------------ health --- */
   head("Health");
   const H = (deals, fin, team) => S.healthOf(deals, fin, team).map((h) => h.key + ":" + h.tone);
-  eq("pipeline: under 15% stalled is ok", H({ open: 10, stalled: 1 }, null, null), ["pipeline:ok"]);
-  eq("pipeline: under 35% is a watch", H({ open: 10, stalled: 3 }, null, null), ["pipeline:warn"]);
-  eq("pipeline: more is a problem", H({ open: 10, stalled: 5 }, null, null), ["pipeline:bad"]);
-  eq("pipeline: no open deals is mute, not ok", H({ open: 0, stalled: 0 }, null, null), ["pipeline:mute"]);
+  /* Pipeline reads openInPeriod -- the same deals as the Pipeline value tile
+     (d3) -- not the whole open book, so the whole-book figures are set to
+     disagree and must be ignored. */
+  const pl = (n, stalled) => ({ open: 99, stalled: 0, openInPeriod: { n, value: 0, unquoted: 0, stalled } });
+  eq("pipeline: under 15% stalled is ok", H(pl(10, 1), null, null), ["pipeline:ok"]);
+  eq("pipeline: under 35% is a watch", H(pl(10, 3), null, null), ["pipeline:warn"]);
+  eq("pipeline: more is a problem", H(pl(10, 5), null, null), ["pipeline:bad"]);
+  eq("pipeline: no open deals in the period is mute, not ok", H(pl(0, 0), null, null), ["pipeline:mute"]);
+  eq("pipeline: the fixture's period deals, 1 of 3 stalled, is a watch", [S.healthOf(m, null, null)[0].tone, S.healthOf(m, null, null)[0].why], ["warn", "1 of 3 open deals stalled"]);
   eq("collections: a failed installment is a problem; past due alone is a watch", [
     H(null, { failed: { n: 1 }, overdue: { n: 0 } }, null)[0], H(null, { failed: { n: 0 }, overdue: { n: 2 } }, null)[0], H(null, { failed: { n: 0 }, overdue: { n: 0 } }, null)[0],
   ], ["collections:bad", "collections:warn", "collections:ok"]);
@@ -222,13 +220,16 @@ esbuild.build({
 
   /* ----------------------------------------------------------- signals --- */
   head("Planning signals");
-  const sig = S.planningSignals(m, f, null, t, TODAY);
-  eq("expected to close reads this calendar month", sig.find((s) => s.id === "close").value, "₹2.80L");
-  ok("obligations say when payroll is withheld", sig.find((s) => s.id === "obligations").sub.indexOf("payroll not in your access") >= 0);
-  ok("...and name the figure when it is not", S.planningSignals(null, f, pay, null, TODAY).find((s) => s.id === "obligations").sub.indexOf("payroll") >= 0);
-  ok("the trajectory carries a sparkline of the last three months", (sig.find((s) => s.id === "trajectory") || { spark: [] }).spark.length === 3);
-  ok("workload and capacity come from the Team store", sig.some((s) => s.id === "workload") && sig.some((s) => s.id === "capacity"));
-  eq("no sources is no signals", S.planningSignals(null, null, null, null, TODAY), []);
+  const src = { deals: m, trajectory: null, obligations: { dueSoon: { n: 1, paise: L(1) }, owedPaise: null }, workload: null, away: null };
+  const sig = S.planningSignals(src, TODAY);
+  ok("expected to close reads this calendar month", !!sig.find((x) => x.id === "close"));
+  ok("obligations say when payroll is withheld", sig.find((x) => x.id === "obligations").sub.indexOf("payroll not in your access") >= 0);
+  ok("...and name the figure when it is not", S.planningSignals({ ...src, obligations: { dueSoon: { n: 0, paise: 0 }, owedPaise: L(1) } }, TODAY)
+    .find((x) => x.id === "obligations").sub.indexOf("payroll owed") >= 0);
+  ok("the trajectory carries a sparkline of the last three months", (S.planningSignals({ ...src,
+    trajectory: [{ month: "2026-07", netPaise: 1 }, { month: "2026-08", netPaise: 2 }, { month: "2026-09", netPaise: 3 }] }, TODAY)
+    .find((x) => x.id === "trajectory") || { spark: [] }).spark.length === 3);
+  eq("no sources is no signals", S.planningSignals({ deals: null, trajectory: null, obligations: null, workload: null, away: null }, TODAY), []);
 
   console.log(failed ? "\n" + failed + " FAILED\n" : "\nall checks passed\n");
   process.exit(failed ? 1 : 0);

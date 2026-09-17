@@ -30,7 +30,7 @@
    outstanding once the member's own day is over, which is why `eodDue` takes
    the member and the clock rather than testing for a row.
 
-   NO API YET — src/content/team/{plans,reports}.json through store.ts.
+   ON THE BACKEND — daily plans and reports through store.ts (bootTeam).
    ============================================================================= */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
@@ -310,8 +310,8 @@ function ReviewCard({ r }: { r: ReviewRow }) {
               ) : null}
               {rep.acknowledgedById ? null : (
                 <div className="mt-auto pt-1">
-                  <Button color="secondary" size="xs" ico="eye" onClick={() => {
-                    const res = acknowledgeReport(rep.reportId);
+                  <Button color="secondary" size="xs" ico="eye" onClick={async () => {
+                    const res = await acknowledgeReport(rep.reportId);
                     shell.toast(res.ok ? "Marked read" : res.message, res.ok ? undefined : "bad");
                   }}>Mark read</Button>
                 </div>
@@ -373,8 +373,8 @@ function Actions({ rows }: { rows: ReviewRow[] }) {
     what: r.member.name,
     why: "A report nobody read is worse than one nobody wrote — the person who wrote it believes it was read.",
     act: (
-      <Button color="secondary" size="xs" ico="eye" onClick={() => {
-        const res = acknowledgeReport((r.report as { reportId: string }).reportId);
+      <Button color="secondary" size="xs" ico="eye" onClick={async () => {
+        const res = await acknowledgeReport((r.report as { reportId: string }).reportId);
         shell.toast(res.ok ? "Marked read" : res.message, res.ok ? undefined : "bad");
       }}>Mark read</Button>
     ),

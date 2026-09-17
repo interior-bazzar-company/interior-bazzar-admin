@@ -92,12 +92,16 @@ export function TxnMenu({ txn, sa, onCancel, onOpen, onCopied }: {
   return (
     <ActionMenu forWhat={txn.txnId} items={[
       onOpen && { icon: "invoice", label: "Open the record", act: onOpen },
-      /* DISABLED, ALWAYS, AND IT SAYS WHY. The panel holds a filename and not
-         the bytes, so a download would produce nothing — and an item that
-         silently does nothing is worse than one that explains. */
-      { icon: "download", label: "Download receipt", act: () => {}, disabled: true,
+      /* THE FILE ITSELF. The read hands back a signed link to the receipt in
+         storage; a row with no receipt has none, and the item says so rather
+         than opening nothing. */
+      { icon: "download", label: "Download receipt",
+        act: () => { if (txn.bill?.url) window.open(txn.bill.url, "_blank", "noopener"); },
+        disabled: !txn.bill?.url,
         title: txn.bill
-          ? "The panel holds the file's name, not the file. Download arrives with the document store."
+          ? (txn.bill.url
+            ? "Opens the receipt held in storage."
+            : "This row carries the file's name and no link to it.")
           : "There is no receipt on this row." },
       /* THE ONE THING THAT CHANGES A POSTED ROW, and it changes only its
          standing: every figure stays as posted and the row stays in the ledger. */
@@ -130,9 +134,11 @@ export function ProtoBar({ onReset }: { onReset?: () => void }) {
         ? <Button color="secondary" size="xs" onClick={onReset}>Reset</Button>
         : undefined}
     >
-      <b className="font-semibold text-primary">Nothing here is live.</b> Records come from{" "}
-      <span className="font-mono">src/content/finance/</span> and every action writes to this tab
-      only. Team members and invoices are read from the live modules; the chain links open them.
+      <b className="font-semibold text-primary">Live and seed, side by side.</b> Other Transaction,
+      Refunds, the bank statements and Analytics read and write the server, on the server's clock.
+      What is still backed by{" "}
+      <span className="font-mono">src/content/finance/</span> runs on the seed clock and its actions
+      write to this tab only.
     </Alert>
   );
 }
@@ -179,7 +185,8 @@ export function OriginTag({ k }: { k: string }) {
   const m = originMeta(k);
   return (
     <span className="inline-flex items-center">
-      <Tag label={k === "manual" ? "BY HAND" : "SUBSCRIPTION"} tone={k === "manual" ? "orange" : "slate"} />
+      <Tag label={k === "manual" ? "BY HAND" : k === "deal_payment" ? "DEAL PAYMENT" : "SUBSCRIPTION"}
+        tone={k === "manual" ? "orange" : k === "deal_payment" ? "indigo" : "slate"} />
       {m ? <span className="sr-only">{m.label}</span> : null}
     </span>
   );

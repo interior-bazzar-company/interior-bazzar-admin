@@ -77,8 +77,8 @@ export function StatusPicker({ item, sm }: { item: WorkItem; sm?: boolean }) {
      and the menu has to say which. */
   const derived = stage !== item.status;
 
-  const move = (to: WorkStatus, reason?: string) => {
-    const r = setItemStatus(item.itemId, to, reason);
+  const move = async (to: WorkStatus, reason?: string) => {
+    const r = await setItemStatus(item.itemId, to, reason);
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
     shell.toast(item.title + " is now " + labelOf(WORK_STATUS, to).toLowerCase() + ".");
   };

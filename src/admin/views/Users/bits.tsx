@@ -13,28 +13,9 @@
    ============================================================================= */
 import type { ReactNode } from "react";
 import { cx } from "@/utils/cx";
-import { Alert, Button, Icon, Meter, Person, Pill, Tags } from "../../ui";
+import { Icon, Meter, Person, Pill, Tags } from "../../ui";
 import { classificationMeta, decision, primaryCityOf, tagMeta } from "./store";
 import type { Classification, MonthRow, UserRow } from "./store";
-
-/* ------------------------------------------------------------- banner --- */
-
-/** Deliberately loud, and never dismissible. A demo that reads as live is
- *  worse than no demo. */
-export function ProtoBar({ onReset }: { onReset?: () => void }) {
-  return (
-    <Alert
-      tone="warn"
-      title="Nothing here is live."
-      action={onReset && import.meta.env.DEV
-        ? <Button size="xs" color="secondary" ico="refresh" onClick={onReset}>Reset</Button>
-        : undefined}
-    >
-      Records come from <span className="font-mono">src/content/users/</span> and every action
-      writes to this tab only.
-    </Alert>
-  );
-}
 
 /* -------------------------------------------------------------- state --- */
 

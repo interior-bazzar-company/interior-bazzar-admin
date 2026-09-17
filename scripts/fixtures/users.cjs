@@ -1,4 +1,9 @@
-{
+/* The Users check's fixture page: the registered-user records the panel used
+   to bundle as src/content/users/users.json, kept for the derivation check
+   only. A .cjs and not a .json because .gitignore ignores every .json outside
+   src/content ("no JSON in the repo"), which would silently leave this file
+   out of every commit. The object below is the original JSON, verbatim. */
+module.exports = {
   "$comment": "Stands in for GET /api/v1/admin/users (the directory page) and GET /api/v1/admin/users/{id} (the workspace). ONE row per registered identity — `authUserId` is the link to Authentication, never a copy of it, and there is deliberately NO classification column anywhere in this file: Active and Deactivated are DERIVED at read time from `userStatus` by classify() in store.ts (UM-FR-003, UM-AD-02). This file carries NO membership, plan, term or entitlement field of any kind — what a customer bought is a subscription and that is a Finance record; two modules holding one fact is how they end up disagreeing. `notes[]` and `tags[]` are INTERNAL: they must never appear on a customer-facing profile response (UM-BR-17), which is why they live beside the profile and not inside it. `commercial` holds READ-ONLY references into Deals / Invoicing / Finance — no amount is stored here, because this module owns no money (UM-BR-06). Names, emails and phone numbers are FICTIONAL but complete and unmasked, so duplicate checks and search have something real to work on.",
   "generatedAt": "2026-08-25T09:00:00+05:30",
   "asOf": "2026-08-25T09:00:00+05:30",
@@ -1901,4 +1906,4 @@
       }
     }
   ]
-}
+};

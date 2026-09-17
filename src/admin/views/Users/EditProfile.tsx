@@ -175,7 +175,11 @@ export default function EditProfile({ row, onClose, onDone }: {
     onClose();
   };
 
-  const submit = () => {
+  /* ASYNC NOW: the save is `PATCH platform-users/<pk>/` and the server is what
+     accepts or refuses it. The dialog stays open on a refusal with the server's
+     own sentence in it — nothing has been written, so there is nothing to
+     close over. */
+  const submit = async () => {
     setErr(null);
     if (missingRequired.length) {
       /* NOTHING IS WRITTEN. Not the valid fields, not partially — the stored
@@ -185,7 +189,7 @@ export default function EditProfile({ row, onClose, onDone }: {
       return;
     }
     setBusy(true);
-    const e = updateProfile(row.user.userId, toPatch(draft, fields));
+    const e = await updateProfile(row.user.userId, toPatch(draft, fields));
     if (e) { setErr(e); setBusy(false); return; }
     onDone("Profile saved.", "ok");
   };
@@ -288,7 +292,7 @@ export default function EditProfile({ row, onClose, onDone }: {
           <Button color="secondary" data-close="1" onClick={close}>Cancel</Button>
           <Button color="primary" isLoading={busy}
             isDisabled={busy || !!facetErr || handleTaken || missingRequired.length > 0}
-            onClick={submit}>
+            onClick={() => void submit()}>
             Save changes
           </Button>
         </>

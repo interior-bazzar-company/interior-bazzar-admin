@@ -24,13 +24,13 @@ import {
   Avatar, Button, Card, EmptyState, Icon, KvList, LinkChip, MoreMenu, Notice,
   PageHeader, PaneLoading, Pill, Table, Tabs, Tag, Timeline, ActivityFeed,
 } from "../../ui";
-import { Assumed, ClassPill, Completeness, ProtoBar, TagChips } from "./bits";
+import { Assumed, ClassPill, Completeness, TagChips } from "./bits";
 import EditProfile from "./EditProfile";
 import { DeactivateModal, NoteModal, TagsModal } from "./Modals";
 import {
   PROFILE_FIELDS, REGISTRATION_SOURCES, VOCAB,
   ago, facetLabel, fmtDate, fmtDateTime, labelsFor, primaryCityOf, profileUrl,
-  resetStore, useTimeline, useUserRecord, useUsersPageState,
+  useTimeline, useUserRecord, useUsersPageState,
 } from "./store";
 import type { Params, ProfileField, TargetArea, UserRow } from "./store";
 
@@ -76,7 +76,6 @@ export default function Detail({ id, p, rows, onParams }: {
   if (!row && listing.loading) {
     return (
       <div className="flex flex-col gap-4">
-        <ProtoBar />
         <PaneLoading label="Loading the user…" />
       </div>
     );
@@ -85,7 +84,6 @@ export default function Detail({ id, p, rows, onParams }: {
   if (!row) {
     return (
       <div className="flex flex-col gap-4">
-        <ProtoBar />
         <EmptyState icon="search" title="No user at that address"
           body={<>There is no record for <span className="font-mono">{id}</span>.</>}
           action={<Button color="primary" onClick={() => navGo("#/users")}>Back to the directory</Button>} />
@@ -129,8 +127,6 @@ export default function Detail({ id, p, rows, onParams }: {
 
   return (
     <div className="flex flex-col gap-4">
-      <ProtoBar onReset={() => { resetStore(); toast("Back to the seed."); }} />
-
       {/* The record header: the face leads, the states sit under the name with
           the identity line, and the actions close the row. Back is the topbar's
           module title — one way up, panel-wide. */}

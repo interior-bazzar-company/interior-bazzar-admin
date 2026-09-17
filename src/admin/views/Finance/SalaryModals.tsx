@@ -29,7 +29,7 @@ import { Cancel, Dlg, Field, Fs, RupeeInput, toPaise } from "./dialog";
 import type { Done } from "./dialog";
 import {
   daysInMonth,
-  ACCOUNTS, PAY_VIA, closeSalaryAccount, dueOf, fmtMonth, inr, isSuperAdmin, monthOf,
+  PAY_VIA, closeSalaryAccount, dueOf, fmtMonth, inr, isSuperAdmin, monthOf, payFromAccounts,
   openRun, openSalaryRun, paySalary, proofAccepted, salaryMemberOptions, setLop,
   superAdminOnly, todayIso, upsertSalaryAccount, useRuns, useSalaryRows,
 } from "./store";
@@ -172,7 +172,7 @@ export function SalaryAccountModal({ account, onClose, onDone }: {
   const gross = liveSum(earn);
   const dedTotal = liveSum(ded);
 
-  const submit = () => {
+  const submit = async () => {
     const e = compile(earn, "earnings");
     if (e.bad) return setErr(e.bad);
     const d = compile(ded, "deduction");
@@ -180,7 +180,7 @@ export function SalaryAccountModal({ account, onClose, onDone }: {
     const id = Number(memberId);
     if (!Number.isInteger(id) || id <= 0)
       return setErr("The Team member id is a whole number above zero. It is the join to the Team record and nothing else stands in for it.");
-    const r = upsertSalaryAccount({
+    const r = await upsertSalaryAccount({
       memberId: id, memberName, employeeCode: code.trim(), designation: designation.trim(),
       joinedAt, department: department.trim(), earnings: e.list, deductions: d.list,
       bank: {
@@ -299,8 +299,8 @@ export function CloseAccountModal({ account, onClose, onDone }: {
       onClose={onClose} err={err}
       footer={<>
         <Cancel onClose={onClose} />
-        <Button color="primary-destructive" isDisabled={!reason.trim()} onClick={() => {
-          const e = closeSalaryAccount(account.salaryAccountId, reason);
+        <Button color="primary-destructive" isDisabled={!reason.trim()} onClick={async () => {
+          const e = await closeSalaryAccount(account.salaryAccountId, reason);
           if (e) return setErr(e);
           onDone(account.memberName + "'s account is closed. No run picks it up again, and every slip it already carries stays exactly where it is.", "ok");
         }}>Close the account</Button>
@@ -377,8 +377,8 @@ export function OpenRunModal({ onClose, onDone }: { onClose: () => void; onDone:
       onClose={onClose} err={err}
       footer={<>
         <Cancel onClose={onClose} />
-        <Button color="primary" onClick={() => {
-          const r = openSalaryRun(month);
+        <Button color="primary" onClick={async () => {
+          const r = await openSalaryRun(month);
           if (r.error) return setErr(r.error);
           onDone(r.runId + " is open · " + active.length + " slips · " + inr(total) + " net. Nobody has been paid yet.", "ok");
         }}>Open the run</Button>
@@ -459,8 +459,8 @@ export function LopModal({ slip, onClose, onDone }: {
       onClose={onClose} err={err}
       footer={<>
         <Cancel onClose={onClose} />
-        <Button color="primary" isDisabled={!valid} onClick={() => {
-          const e = setLop(slip.slipId, n);
+        <Button color="primary" isDisabled={!valid} onClick={async () => {
+          const e = await setLop(slip.slipId, n);
           if (e) return setErr(e);
           onDone(slip.memberName + " · " + n + " day" + (n === 1 ? "" : "s") + " loss of pay"
             + (preview ? " · net " + inr(preview.net) : "") + ". The run total moved with it.", "ok");
@@ -512,10 +512,12 @@ export function PaySalaryModal({ row, onClose, onDone }: {
   row: SalaryRow; onClose: () => void; onDone: Done;
 }) {
   const [via, setVia] = useState(PAY_VIA[0].key);
-  const [proof, setProof] = useState<{ filename: string; mime: string; bytes: number } | null>(null);
+  /* `file` rides along because the receipt is UPLOADED when the payment is
+     recorded — a name with no bytes behind it stores nothing. */
+  const [proof, setProof] = useState<{ filename: string; mime: string; bytes: number; file: File } | null>(null);
   const [remark, setRemark] = useState("");
-  const [accountId, setAccountId] = useState(
-    (ACCOUNTS.filter((a) => a.active && a.type === "bank")[0] || ACCOUNTS[0]).accountId);
+  /* NOTHING PRESELECTED: the person picks the account the money left. */
+  const [accountId, setAccountId] = useState("");
   /* Adjustments as rows somebody ADDS, not blanks that sit there. One row
      per kind at most — the write takes one incentive and one deduction, and a
      second row of either would be two numbers pretending to be one. */
@@ -532,8 +534,7 @@ export function PaySalaryModal({ row, onClose, onDone }: {
   const gate = superAdminOnly("Paying a salary");
   /* Cash leaves the cash account and there is nothing to choose, so the picker
      is not shown rather than shown with one option. */
-  const cashAccount = (ACCOUNTS.filter((a) => a.active && a.type === "cash")[0]
-    || ACCOUNTS.filter((a) => a.active)[0]).accountId;
+  const cashAccount = "";
   const payingFrom = via === "cash" ? cashAccount : accountId;
   const d = dueOf(row);
   /* Oldest first, because that is the order the write pays them in and a
@@ -561,7 +562,7 @@ export function PaySalaryModal({ row, onClose, onDone }: {
       + paid.months + " month" + (paid.months === 1 ? "" : "s")
       + " numbered, hashed and frozen.", "ok");
     const viaLabel = (PAY_VIA.filter((v) => v.key === paid.via)[0] || PAY_VIA[0]).label;
-    const from = ACCOUNTS.filter((x) => x.accountId === paid.from)[0];
+    const from = payFromAccounts().filter((x) => x.accountId === paid.from)[0];
     return (
       <Dlg title="Paid successfully" sub={<>{row.a.designation} · {row.a.memberName}</>}
         onClose={close}
@@ -597,8 +598,8 @@ export function PaySalaryModal({ row, onClose, onDone }: {
       footer={<>
         <Cancel onClose={onClose} />
         <Button color="primary" isDisabled={!!gate || !proof || overdrawn}
-          onClick={() => {
-            const e = paySalary(row.a.salaryAccountId, {
+          onClick={async () => {
+            const e = await paySalary(row.a.salaryAccountId, {
               via, accountId: payingFrom, proof: proof || { filename: "", mime: "" }, remark,
               incentive: incPaise > 0 ? { label: "Incentive", amountPaise: incPaise } : null,
               deduction: dedPaise > 0 ? { label: "Deduction", amountPaise: dedPaise } : null,
@@ -655,8 +656,8 @@ export function PaySalaryModal({ row, onClose, onDone }: {
         ) : (
           <Field label="Paid from">
             <SelectInput ariaLabel="Paid from" value={accountId} onChange={setAccountId}
-              options={ACCOUNTS.filter((a) => a.active)
-                .map((a) => ({ v: a.accountId, l: a.masked + " · " + a.name }))} />
+              options={[{ v: "", l: "Pick an account…" }].concat(payFromAccounts().filter((a) => a.active)
+                .map((a) => ({ v: a.accountId, l: a.masked + " · " + a.name })))} />
           </Field>
         )}
 
@@ -673,7 +674,7 @@ export function PaySalaryModal({ row, onClose, onDone }: {
                 return;
               }
               setErr(null);
-              setProof({ filename: f.name, mime: f.type, bytes: f.size });
+              setProof({ filename: f.name, mime: f.type, bytes: f.size, file: f });
             }} />
         </Field>
       </Fs>

@@ -10,7 +10,7 @@ import { Cancel, Dlg, Field, Fs, Pick, RupeeInput, toPaise } from "./dialog";
 import type { Done } from "./dialog";
 import { Check, Derived, Fine, Money, OriginTag, PickList, PickRow } from "./bits";
 import {
-  ACCOUNTS, MODES, REFUND_GROUNDS, REFUND_POLICY,
+  COMPANY_ACCOUNTS, MODES, REFUND_GROUNDS, REFUND_POLICY,
   createManualRefund, decideRefund, fmtDate, inr, readPayment, readPayments, recordRefundTransfer, refundStanding,
   refundPolicyCheck, requestRefund,
 } from "./store";
@@ -40,9 +40,9 @@ export function RequestRefundModal({ onClose, onDone }: { onClose: () => void; o
 
   const pc = paymentId ? refundPolicyCheck(paymentId, ground) : null;
 
-  const submit = () => {
+  const submit = async () => {
     if (!paymentId) { setErr("Pick which payment this refunds."); return; }
-    const res = requestRefund(paymentId, ground, detail);
+    const res = await requestRefund(paymentId, ground, detail);
     if (res.error || !res.refundId) { setErr(res.error || "Could not raise the request."); return; }
     const amt = readPayment(paymentId)?.pay.amountPaise || 0;
     onDone(res.refundId + " requested — " + inr(amt) + " to review.", "ok");
@@ -116,10 +116,10 @@ export function ManualRefundModal({ onClose, onDone }: { onClose: () => void; on
   const [detail, setDetail] = useState("");
   const [err, setErr] = useState<string | null>(null);
 
-  const submit = () => {
+  const submit = async () => {
     const paise = toPaise(amount);
     if (paise === null) { setErr("Enter a whole amount in rupees, above zero."); return; }
-    const res = createManualRefund(payeeName, paise, ground, detail);
+    const res = await createManualRefund(payeeName, paise, ground, detail);
     if (res.error || !res.refundId) { setErr(res.error || "Could not raise the refund."); return; }
     onDone(res.refundId + " raised — " + inr(paise) + " to " + payeeName.trim() + ".", "ok");
   };
@@ -170,12 +170,12 @@ export function DecideRefundModal({ r, verdict, onClose, onDone }: {
   const [err, setErr] = useState<string | null>(null);
   const approving = verdict === "approve";
 
-  const submit = () => {
+  const submit = async () => {
     if (!approving && !note.trim()) {
       setErr("Say why this is refused — the requester only sees this note.");
       return;
     }
-    const res = decideRefund(r.refundId, verdict, note);
+    const res = await decideRefund(r.refundId, verdict, note);
     if (res) { setErr(res); return; }
     onDone(r.refundId + (approving ? " approved." : " declined."), approving ? "ok" : "warn");
   };
@@ -204,14 +204,14 @@ export function DecideRefundModal({ r, verdict, onClose, onDone }: {
 /** FN-T15 · Only this write makes a refund `paid`, and only this write moves
  *  it out of "approved, not sent". */
 export function RecordTransferModal({ r, onClose, onDone }: { r: Refund; onClose: () => void; onDone: Done }) {
-  const activeAccounts = ACCOUNTS.filter((a) => a.active);
+  const activeAccounts = COMPANY_ACCOUNTS.filter((a) => a.active);
   const [mode, setMode] = useState<string>(MODES[0] || "NEFT");
   const [reference, setReference] = useState("");
   const [accountId, setAccountId] = useState<string>(activeAccounts[0]?.accountId || "");
   const [err, setErr] = useState<string | null>(null);
 
-  const submit = () => {
-    const res = recordRefundTransfer(r.refundId, mode, reference, accountId);
+  const submit = async () => {
+    const res = await recordRefundTransfer(r.refundId, mode, reference, accountId);
     if (res) { setErr(res); return; }
     onDone(inr(r.amountPaise) + " recorded as paid to " + r.payee.name + ".", "ok");
   };

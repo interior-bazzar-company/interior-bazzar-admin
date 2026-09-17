@@ -207,12 +207,20 @@ export function StatStrip({ cells, className }: { cells: (StatCell | "sep")[]; c
                         {body}
                     </div>
                 );
-                return c.tip ? (
+                if (!c.tip) return cell;
+                /* The tooltip's trigger is itself a <button>, so a cell that is
+                   also a link must BE the trigger — a button inside a button is
+                   invalid HTML and React warns on every render. */
+                return (
                     <UITooltip key={i} title={c.tip} placement="bottom">
-                        <TooltipTrigger className="shrink-0 rounded-lg">{cell}</TooltipTrigger>
+                        {c.to ? (
+                            <TooltipTrigger className={cx(cls, "focus-visible:outline-solid")} data-go={c.to} aria-pressed={c.on || undefined} onPress={() => go(c.to as string)}>
+                                {body}
+                            </TooltipTrigger>
+                        ) : (
+                            <TooltipTrigger className="shrink-0 rounded-lg">{cell}</TooltipTrigger>
+                        )}
                     </UITooltip>
-                ) : (
-                    cell
                 );
             })}
         </div>

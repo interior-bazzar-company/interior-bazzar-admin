@@ -216,8 +216,8 @@ function TemplatesFace({ p, onFilter }: {
 function TemplateActions({ t, shell }: { t: Template; shell: ReturnType<typeof useShell> }) {
   const out = sentFrom(t.templateId).length;
 
-  const act = (fn: () => { ok: boolean; message?: string }, said: string) => {
-    const r = fn() as { ok: boolean; message?: string };
+  const act = async (fn: () => Promise<{ ok: boolean; message?: string }>, said: string) => {
+    const r = await fn();
     if (!r.ok) shell.toast(r.message, "bad"); else shell.toast(said, "ok");
   };
 
@@ -226,17 +226,17 @@ function TemplateActions({ t, shell }: { t: Template; shell: ReturnType<typeof u
       disabled: t.state === "retired", title: t.state === "retired" ? "Reinstate it first" : undefined },
     ...(t.state === "active"
       ? [{ icon: "lock", label: "Retire", tone: "dgr",
-          act: () => act(() => retireTemplate(t.templateId), "Retired.") }]
+          act: () => void act(() => retireTemplate(t.templateId), "Retired.") }]
       : [{ icon: "unlock", label: t.state === "draft" ? "Put in use" : "Reinstate",
-          act: () => act(() => activateTemplate(t.templateId), "In use.") }]),
+          act: () => void act(() => activateTemplate(t.templateId), "In use.") }]),
     { icon: "x", label: "Delete", tone: "dgr",
-      act: () => {
+      act: async () => {
         if (out) {
           shell.toast("It has been sent " + out + (out === 1 ? " time" : " times")
             + ". Retire it instead — deleting would leave those signatures pointing at nothing.", "bad");
           return;
         }
-        const r = deleteTemplate(t.templateId);
+        const r = await deleteTemplate(t.templateId);
         if (!r.ok) shell.toast(r.message, "bad"); else shell.toast("Deleted.", "ok");
       },
       title: out ? "It has been sent — retire it instead" : "Nobody has been sent this" },
@@ -287,8 +287,8 @@ function SendModal({ t }: { t: Template }) {
               <span className="min-w-0 flex-1"><Who m={m} /></span>
               {live
                 ? <StatePill a={live} />
-                : <Button size="xs" color="primary" onClick={() => {
-                    const r = sendTemplate(t.templateId, m.memberId);
+                : <Button size="xs" color="primary" onClick={async () => {
+                    const r = await sendTemplate(t.templateId, m.memberId);
                     if (!r.ok) { shell.toast(r.message, "bad"); return; }
                     shell.closeLayer();
                     shell.toast("Sent to " + m.name + ".", "ok");
@@ -467,8 +467,8 @@ function DeedPage({ agreementId }: { agreementId: string }) {
       if (said) shell.toast(said, "ok");
     } });
   if (a.state !== "signed" && a.state !== "revoked") acts.push({ icon: "x", label: "Revoke", tone: "bad",
-    title: "The link stops working immediately", act: () => {
-      const r = revokeAgreement(a.agreementId);
+    title: "The link stops working immediately", act: async () => {
+      const r = await revokeAgreement(a.agreementId);
       if (!r.ok) shell.toast(r.message, "bad");
       else shell.toast("Revoked. The link stops working.", "ok");
     } });

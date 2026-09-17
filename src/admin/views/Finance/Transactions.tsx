@@ -62,7 +62,7 @@ function carry(p: Params): Params {
 
 export default function Transactions({ p, onFilter, onSearch, onUnfilter, onParams }: FaceProps) {
   const { toast, modal, closeLayer } = useShell();
-  const writable = can("finance-transactions", "edit");
+  const writable = can("finance-transactions", "record");
   const sa = isSuperAdmin();
   const tab = p.tab === "tags" ? "tags" : "transactions";
   /* Called unconditionally, once, regardless of which tab is showing — a

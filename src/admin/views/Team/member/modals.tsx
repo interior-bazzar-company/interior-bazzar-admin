@@ -20,7 +20,7 @@
 import { useEffect, useState } from "react";
 import {
   Alert, Button, Checkbox, DateInput, FieldRow, FileUpload, FormField, FormSection, Input,
-  ModalShell, Notice, SelectInput, Tag,
+  ModalShell, Notice, SelectInput, Skeleton, Tag,
 } from "../../../ui";
 import { useShell } from "../../../shell/ShellContext";
 import {
@@ -28,7 +28,8 @@ import {
   datesIn, decideLeave, fmtDate, labelOf, leaveClash, leaveOverlap, markViewed, meId, renameTag,
   requestLeave, signAgreement,
 } from "../store";
-import { bodyOf, sendTemplate, useTemplates } from "../../Agreements/store";
+import { bodyOf, retryTemplates, sendTemplate, useTemplates, useTemplatesLoad } from "../../Agreements/store";
+import { LoadNotice } from "../loadState";
 import { Sheet } from "../../Agreements/bits";
 import type { Agreement, LeaveRequest, LeaveState, Tag as TagRecord } from "../store";
 
@@ -65,8 +66,8 @@ export function LeaveRequestModal({ memberId }: { memberId: string }) {
   const clash = backwards ? { worked: [], taken: [] } : leaveClash(memberId, from, to);
   const blocked = backwards || !!clash.worked.length || !!clash.taken.length;
 
-  const save = () => {
-    const r = requestLeave(memberId, { fromDate: from, toDate: to, kind, reason: why });
+  const save = async () => {
+    const r = await requestLeave(memberId, { fromDate: from, toDate: to, kind, reason: why });
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
     shell.closeLayer();
     shell.toast("Requested. It is with your senior now.");
@@ -130,8 +131,8 @@ export function LeaveDecideModal({ l, state }: { l: LeaveRequest; state: LeaveSt
   const reject = state === "rejected";
   const clashes = reject ? [] : leaveOverlap(l);
 
-  const save = () => {
-    const r = decideLeave(l.leaveId, state, meId(), note);
+  const save = async () => {
+    const r = await decideLeave(l.leaveId, state, meId(), note);
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
     shell.closeLayer();
     shell.toast(reject ? "Refused. They can see why." : "Approved.");
@@ -191,10 +192,13 @@ export function SendAgreementModal({ memberId }: { memberId: string }) {
      could send a second "NDA" beside the first with nothing in it to sign. It
      is the Agreements module's own send now, pointed at one person. */
   const templates = useTemplates().filter((t) => t.state === "active");
-  const [templateId, setTemplateId] = useState(templates.length ? templates[0].templateId : "");
+  const load = useTemplatesLoad();
+  const [picked, setTemplateId] = useState(templates.length ? templates[0].templateId : "");
+  /* The list can land after the dialog opened: nothing picked yet means the first one. */
+  const templateId = picked || (templates.length ? templates[0].templateId : "");
   const t = templates.filter((x) => x.templateId === templateId)[0] || null;
-  const save = () => {
-    const r = sendTemplate(templateId, memberId);
+  const save = async () => {
+    const r = await sendTemplate(templateId, memberId);
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
     shell.closeLayer();
     shell.toast("Sent. The link expires in seven days.");
@@ -207,7 +211,11 @@ export function SendAgreementModal({ memberId }: { memberId: string }) {
       actions={<Foot label="Send" disabled={!t} onSave={save} onClose={() => shell.closeLayer()} />}
     >
       <FormSection>
-        {templates.length ? (
+        {load.state === "loading" ? (
+          <Skeleton className="h-10 rounded-lg" />
+        ) : load.state !== "ok" ? (
+          <LoadNotice what="Agreement templates" part={load} onRetry={retryTemplates} />
+        ) : templates.length ? (
           <FormField id="agTpl" label="Template" hint={t ? t.purpose : undefined}>
             <SelectInput id="agTpl" value={templateId} onChange={setTemplateId}
               options={templates.map((x) => ({ v: x.templateId, l: x.title + " · v" + x.version }))} />
@@ -241,10 +249,10 @@ export function SignAgreementModal({ a }: { a: Agreement }) {
 
   /* Opening the document is the reading. Recorded once, and only while it can
      still be signed — a revoked or expired link records nothing. */
-  useEffect(() => { if (!closed) markViewed(a.agreementId); }, [a.agreementId, closed]);
+  useEffect(() => { if (!closed) void markViewed(a.agreementId); }, [a.agreementId, closed]);
 
-  const save = () => {
-    const r = signAgreement(a.agreementId, name);
+  const save = async () => {
+    const r = await signAgreement(a.agreementId, name);
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
     shell.closeLayer();
     shell.toast("Signed. A copy is on the record.");
@@ -326,8 +334,9 @@ export function AddDocumentModal({ memberId, kind: seed }: { memberId: string; k
   const shell = useShell();
   const [kind, setKind] = useState(seed || "pan");
   const [label, setLabel] = useState(labelOf(DOCUMENT_KIND, seed || "pan"));
-  const save = () => {
-    const r = addDocument(memberId, kind, label);
+  const [file, setFile] = useState<File | null>(null);
+  const save = async () => {
+    const r = await addDocument(memberId, kind, label, file || undefined);
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
     shell.closeLayer();
     shell.toast("On file. It goes back to the unchecked queue.");
@@ -349,21 +358,19 @@ export function AddDocumentModal({ memberId, kind: seed }: { memberId: string; k
         <FormField id="rsLabel" label="Name it" req>
           <Input id="rsLabel" value={label} onChange={setLabel} />
         </FormField>
-        <FormField label="File" hint="The file itself lands once private-object storage is decided.">
-          {/* THE DROP ZONE IS DRAWN AND DELIBERATELY INERT. Nothing in this
-              panel may put an identity document on a public URL, so the control
-              records the intent and the store records the row — the bytes wait
-              for a signed, short-lived read. */}
+        <FormField label="File" hint={file ? file.name : "Optional — the row is recorded either way."}>
+          {/* THE BYTES GO STRAIGHT TO OUR BUCKET and the server keeps the key as
+              a private object; nothing here ever puts an identity document on a
+              public URL. Reading one back is a signed, short-lived link. */}
           <FileUpload
-            disabled
             accept="image/*,.pdf"
-            hint="PDF or an image, up to 5 MB — enabled with private storage."
-            onFiles={() => { /* inert until private objects exist */ }}
+            hint="PDF or an image, up to 5 MB."
+            onFiles={(picked) => setFile(picked[0] || null)}
           />
         </FormField>
         <Notice tone="warn" ico="lock" text={
-          <><b>Nothing in this panel may put an identity document on a public URL.</b> The row is
-            recorded now; the file arrives with private objects behind a signed read.</>
+          <><b>Nothing in this panel may put an identity document on a public URL.</b> The file is
+            stored as a private object and read back through a signed, short-lived link.</>
         } />
       </FormSection>
     </ModalShell>
@@ -376,8 +383,8 @@ export function NewTagModal({ ownerId }: { ownerId: string }) {
   const shell = useShell();
   const [name, setName] = useState("");
   const [tone, setTone] = useState("slate");
-  const save = () => {
-    const r = createTag(ownerId, name, tone);
+  const save = async () => {
+    const r = await createTag(ownerId, name, tone);
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
     shell.closeLayer();
     shell.toast(r.data.label + " created.");
@@ -404,8 +411,8 @@ export function NewTagModal({ ownerId }: { ownerId: string }) {
 export function RenameTagModal({ t }: { t: TagRecord }) {
   const shell = useShell();
   const [name, setName] = useState(t.label);
-  const save = () => {
-    const r = renameTag(t.tagId, name);
+  const save = async () => {
+    const r = await renameTag(t.tagId, name);
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
     shell.closeLayer();
     shell.toast("Renamed.");

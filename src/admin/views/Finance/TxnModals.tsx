@@ -17,7 +17,7 @@ import { Cancel, Dlg, Field, Fs, Pick, RupeeInput, toPaise } from "./dialog";
 import type { Done } from "./dialog";
 import { Check, Fine, Ledger, LedgerRow, Money, PaidReceipt, ProofField, TagChip } from "./bits";
 import {
-  ACCOUNTS, CREDIT_KINDS, MODES, TAG_KINDS,
+  COMPANY_ACCOUNTS, CREDIT_KINDS, MODES, TAG_KINDS,
   PROOF_MAX_BYTES, addTag, cancelTransaction, deactivateTag, fileSize,
   isSuperAdmin, proofAccepted, proofTooBig, recordTransaction,
   setBudget as setTagBudget, todayIso, useTagTotals, useTags, useTxnRows,
@@ -35,7 +35,7 @@ interface TxnForm {
   direction: "out" | "in"; tagKey: string; amount: string; description: string;
   party: string; mode: string; reference: string; valueDate: string;
   accountId: string; creditKind: string;
-  bill: { filename: string; mime: string; bytes: number } | null;
+  bill: { filename: string; mime: string; bytes: number; file: File } | null;
 }
 function TxnFields({ f, set, tags, onErr }: {
   f: TxnForm; set: (patch: Partial<TxnForm>) => void; tags: Tag[];
@@ -128,7 +128,7 @@ function TxnFields({ f, set, tags, onErr }: {
       </Field>
       <Field label="Account">
         <SelectInput ariaLabel="Account" value={f.accountId} onChange={(v) => set({ accountId: v })}
-          options={ACCOUNTS.filter((a) => a.active || a.accountId === f.accountId)
+          options={COMPANY_ACCOUNTS.filter((a) => a.active || a.accountId === f.accountId)
             .map((a) => ({ v: a.accountId, l: a.masked + " · " + a.name }))} />
       </Field>
 
@@ -156,7 +156,7 @@ function TxnFields({ f, set, tags, onErr }: {
               onErr(file.name + " is " + fileSize(file.size) + ". The limit is " + fileSize(PROOF_MAX_BYTES) + ".");
               return;
             }
-            set({ bill: { filename: file.name, mime: file.type, bytes: file.size } });
+            set({ bill: { filename: file.name, mime: file.type, bytes: file.size, file } });
           }} />
       </Field>
 
@@ -191,7 +191,7 @@ export function TxnModal({ onClose, onDone }: { onClose: () => void; onDone: Don
   const [f, setF] = useState<TxnForm>({
     direction: "out", tagKey: "", amount: "", description: "", party: "",
     mode: MODES[0] || "NEFT", reference: "", valueDate: todayIso(),
-    accountId: ACCOUNTS.filter((a) => a.active)[0]?.accountId || "", creditKind: "", bill: null,
+    accountId: COMPANY_ACCOUNTS.filter((a) => a.active)[0]?.accountId || "", creditKind: "", bill: null,
   });
   const [err, setErr] = useState("");
   /* Set once the write has gone through. The dialog then STOPS being a form —
@@ -203,7 +203,7 @@ export function TxnModal({ onClose, onDone }: { onClose: () => void; onDone: Don
   const set = (patch: Partial<TxnForm>) => { setF((prev) => ({ ...prev, ...patch })); setErr(""); };
   const isIn = f.direction === "in";
   const tag = tags.filter((t) => t.tagKey === f.tagKey)[0] || null;
-  const account = ACCOUNTS.filter((x) => x.accountId === f.accountId)[0] || null;
+  const account = COMPANY_ACCOUNTS.filter((x) => x.accountId === f.accountId)[0] || null;
   const paise = toPaise(f.amount);
 
   /* ============================================== done: the receipt === */
@@ -230,12 +230,12 @@ export function TxnModal({ onClose, onDone }: { onClose: () => void; onDone: Don
     );
   }
 
-  const submit = () => {
+  const submit = async () => {
     /* toPaise returns null on anything that is not a clean rupee amount — a
        half-typed "1,2" or an empty box never becomes a number, let alone NaN
        in the field the person is still looking at. */
     if (paise === null) { setErr("Enter the amount in whole rupees (paise to two decimals), above zero."); return; }
-    const res = recordTransaction({
+    const res = await recordTransaction({
       direction: f.direction, tagKey: f.tagKey, amountPaise: paise, description: f.description,
       party: f.party, mode: f.mode, reference: f.reference, valueDate: f.valueDate,
       accountId: f.accountId, creditKind: isIn ? f.creditKind || null : null,
@@ -294,8 +294,8 @@ export function CancelTxnModal({ txn, onClose, onDone }: {
   const [err, setErr] = useState("");
   const sa = isSuperAdmin();
 
-  const submit = () => {
-    const res = cancelTransaction(txn.txnId, reason);
+  const submit = async () => {
+    const res = await cancelTransaction(txn.txnId, reason);
     if (res) { setErr(res); return; }
     onDone(txn.txnId + " cancelled. It stays on the record and stops counting.", "ok");
   };
@@ -334,10 +334,10 @@ export function TagModal({ onClose, onDone }: { onClose: () => void; onDone: Don
   const [proofRequired, setProofRequired] = useState(false);
   const [err, setErr] = useState("");
 
-  const submit = () => {
+  const submit = async () => {
     const budgetPaise = budget.trim() ? toPaise(budget) : null;
     if (budget.trim() && budgetPaise === null) { setErr("A budget is a whole rupee amount, or leave it blank for none."); return; }
-    const res = addTag(label, kind, budgetPaise, proofRequired);
+    const res = await addTag(label, kind, budgetPaise, proofRequired);
     if (res.error) { setErr(res.error); return; }
     onDone(label.trim() + " created.", "ok");
   };
@@ -381,9 +381,9 @@ export function BudgetModal({ tag, onClose, onDone }: { tag: Tag; onClose: () =>
   const proposedPaise = budget.trim() ? toPaise(budget) : null;
   const pctOfProposed = proposedPaise ? Math.round((spentPaise / proposedPaise) * 100) : null;
 
-  const submit = () => {
+  const submit = async () => {
     if (budget.trim() && proposedPaise === null) { setErr("A budget is a whole rupee amount, or leave it blank to remove it."); return; }
-    const res = setTagBudget(tag.tagKey, proposedPaise);
+    const res = await setTagBudget(tag.tagKey, proposedPaise);
     if (res) { setErr(res); return; }
     onDone("Budget for " + tag.label + " updated.", "ok");
   };
@@ -426,8 +426,8 @@ export function DeactivateTagModal({ tag, onClose, onDone }: { tag: Tag; onClose
   const sa = isSuperAdmin();
   const [err, setErr] = useState("");
 
-  const submit = () => {
-    const res = deactivateTag(tag.tagKey);
+  const submit = async () => {
+    const res = await deactivateTag(tag.tagKey);
     if (res) { setErr(res); return; }
     onDone(tag.label + " deactivated.", "ok");
   };

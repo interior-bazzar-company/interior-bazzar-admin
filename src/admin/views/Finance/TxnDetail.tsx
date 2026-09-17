@@ -152,13 +152,12 @@ export default function TxnDetail({ id, p, onParams }: {
                       <span className="truncate text-xs text-tertiary">{t.bill.type} · attached {fmtDateTime(t.bill.uploadedAt)}</span>
                     </span>
                   </div>
-                  {/* NO FILE BEHIND THE NAME YET, and the page says so rather
-                      than offering a download that would do nothing. The
-                      filename is the whole record a receipt exists until
-                      there is somewhere to put the bytes. */}
+                  {/* THE FILE IS IN STORAGE and the menu above opens it. The link
+                      the read hands back is signed and short-lived, which is why
+                      the page points at the action rather than printing a URL. */}
                   <Fine className="mt-3">
-                    The panel holds the name, not the file. Download arrives with the document
-                    store — until then this is the record that a receipt exists.
+                    The file is held in storage. <b>Download receipt</b>, on the actions menu above,
+                    opens it.
                   </Fine>
                 </>
               ) : row.missingBill ? (

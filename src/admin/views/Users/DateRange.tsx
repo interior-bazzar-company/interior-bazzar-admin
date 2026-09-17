@@ -28,8 +28,7 @@
 import { useMemo, useState } from "react";
 import { Button, Icon, Popover } from "../../ui";
 import { ChoiceChip, MonthGrid } from "./bits";
-import { MONTHS, RANGE_PRESETS, presetOf, presetRange } from "./store";
-import type { MonthRow } from "./store";
+import { MONTHS, RANGE_PRESETS, monthsByYear, presetOf, presetRange } from "./store";
 
 export default function DateRange({ from, to, onPick }: {
   from: string;
@@ -40,16 +39,10 @@ export default function DateRange({ from, to, onPick }: {
   const [hover, setHover] = useState<string | null>(null);
 
   /* Grouped by year so the grid reads like a calendar rather than a list of
-     twelve buttons. */
-  const years = useMemo(() => {
-    const out: { year: string; months: MonthRow[] }[] = [];
-    MONTHS.forEach((m) => {
-      const y = m.month.slice(0, 4);
-      const row = out.filter((r) => r.year === y)[0];
-      if (row) row.months.push(m); else out.push({ year: y, months: [m] });
-    });
-    return out;
-  }, []);
+     twelve buttons. NOT MEMOISED: the months are read from the server and
+     arrive after this control has already rendered once, so a grid memoised on
+     mount would stay empty for good. */
+  const years = monthsByYear();
 
   const preset = presetOf(from, to);
   const label = useMemo(() => {

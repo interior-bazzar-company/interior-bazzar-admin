@@ -4,6 +4,490 @@ Newest first. One entry per feature. Format: [LOG-FORMAT.md](LOG-FORMAT.md).
 
 ---
 
+## 2026-09-17
+
+### Finance imports no JSON: its last file, vocabularies.json, is served
+
+**Area:** every Finance section — the section titles, the i tips on Overview / KPI / Payroll tiles, the decision notes on Analytics, the slip rule on a salary account, the "Just happened" feed
+**Files:** `src/admin/views/Finance/store.ts`, `src/api/modules/adminOps/index.ts`, `src/content/finance/vocabularies.json` (deleted), `scripts/check-finance-ledger.cjs`, `scripts/check-live-stores.ts`; backend `interior_admin/Controllers/Finance/FinanceVocabulary.py` (new), `interior_admin/Views/VocabViews.py`, `interior_admin/urls.py`, `interior_admin/tests/test_finance_vocabularies.py` (new)
+
+**What changed**
+No markup changed. Nearly all wording is the same, and the section names and every formula, caution and decision are word for word.
+- **Section titles** come from the sidebar's own labels (`moduleLabel`).
+- **Installment statuses** come from `vocab/installment-statuses`. **Salary-run states** come from `vocab/salary-run-states`, a list newly registered on rows the server already had. These use the server's words: an installment failure now reads **Failed**, not "Fail to pay", and a run's `open` tone is `warn`. No screen shows either one today: subscription installments come back empty and nothing renders `RunPill`.
+- **The rest** comes from a new endpoint, `GET finance/vocabularies/`: the slip rule, the metric / KPI / payroll definitions, the decision register and the session log's event labels. The server serves them as Python constants.
+- **Unused event types were dropped.** 22 of the 34 event types named seed writes that no longer exist. Only the 12 the store still logs are served.
+- **Before the server answers**, a tip renders nothing and a decision note shows only its id.
+
+**Temp data**
+Removed from the files, now read from the server: `finance/vocabularies.json`, all of it. Finance has no content folder left.
+
+**Backend needed**
+None, it is live. `GET /api/v1/admin/finance/vocabularies/` and `vocab/salary-run-states/` need no migration.
+
+**Verified**
+`check:finance` 227/227, `check:finance-render` every surface, `check:live` against the local backend (words filled, KPIs all defined, section names match the sidebar), `tsc -b` clean, backend `test_finance_vocabularies` + `test_served_lists` + `test_company` 20/20. Loaded `/finance-analytics` in the browser: the served decision text and KPI groups render and the page throws no errors.
+
+## 2026-09-16
+
+### Finance, Resources and Users read their last data lists off the server
+
+**Area:** `/finance` (Subscriptions), `/finance-transactions`, `/finance-refunds`, the fail-to-pay and settle/record dialogs; `/resources/new` and `/resources/<id>/edit` (the builder); `/users/<id>` → Edit profile (the username)
+**Files:** `src/admin/views/Finance/{store,types}.ts`, `src/admin/views/Resources/store.ts`, `src/admin/views/Resources/Builder.tsx` (one hook call, no markup), `src/admin/views/Finance/bits.tsx` (`OriginTag`'s label, see below), `src/admin/views/Users/store.ts`, `src/api/modules/adminOps/index.ts`, `src/content/{finance,resources,users}/vocabularies.json`, `scripts/check-finance-ledger.cjs`, `scripts/check-users-derivation.cjs`, `scripts/check-live-stores.ts`; backend `interior_admin/{vocab_seed,models}.py`, `interior_admin/migrations/0062_seed_panel_lists.py`, `interior_admin/Views/VocabViews.py`, `interior_admin/Controllers/{Refunds/RefundsController,Subs/SubsController,Users/UsersController,Resources/ResourcesController}.py`, `interior_admin/tests/test_served_lists.py`, `interior_admin/tests/test_finance_detail.py`, `interior_deals_billing/vocab_seed.py`, `interior_deals_billing/migrations/0006_reword_failure_reason_hints.py`
+
+**What changed**
+Every dropdown on these screens now offers what the server serves, in the same words it offered
+before. Nothing a person sees was re-labelled.
+
+**The lists the server enforces are served from the code that enforces them**, not from rows, so a
+picker can no longer offer a value a write refuses: `vocab/expense-tag-kinds` is `ExpenseTag.KINDS`
+with the panel's lands-in and help beside it, `vocab/resource-field-types` is the builder's
+`FIELD_TYPES`, `vocab/subscription-sources` and `vocab/refund-origins` sit beside the rule that
+computes each row's value. **Every refund row now carries `origin` and every `subs/` and
+`subscriptions/` row `source`, computed by the server** — the panel's own `payment ? subscription :
+manual` and `buyIntent` rules are deleted. Refunds gain a third origin, **deal payment** ("Against
+a deal payment"), which the Origin filter now offers; before, a deal-payment refund filed as "Raised
+by hand".
+
+**The server now enforces the username rules** on the admin profile PATCH: under 3, over 30, or a
+reserved handle (case-insensitive) is refused in words. The rules and the 35 reserved handles are
+read from `users/vocabularies/`. Until that read lands the form refuses nothing on length or the
+reserved list — the server still does. Seller signup, the seller wizard and public slug paths are
+untouched.
+
+**Subscription states are the panel's seven on the server too** (migration 0062 rewrote 0060's
+five, including `cancelled` from `dead` to `mute`), and `POST subscriptions/<id>/state/` refuses
+`completed` and `refunded`: both follow from the purchase and are never set by hand.
+
+The refund policy is `{windowDays: 30, partial: true}` on the refunds read — `partial` is true
+because the server has always accepted a partial refund; the bundled file said false.
+
+The Resources builder subscribes to its store now: its field types used to be bundled and are not,
+so a page opened straight at `/resources/new` would otherwise have drawn an empty Kind picker.
+
+**The origin tag knows the third origin.** `OriginTag` in `Finance/bits.tsx` picked its label with
+a hard-coded `k === "manual" ? "BY HAND" : "SUBSCRIPTION"`, so a deal-payment refund's tag read
+SUBSCRIPTION once the server started sending `deal_payment`. It now reads **DEAL PAYMENT** (indigo;
+the hue means nothing by contract, it only has to differ). BY HAND and SUBSCRIPTION are unchanged.
+Changed with the user's go-ahead: it is the one markup line in this entry.
+
+**The failure reasons keep their full sentences.** The fail-to-pay dialog now prints the server's
+`InstallmentFailureReason` hints, which were shorter than the bundled help ("The gateway returned a
+decline." without "The card or account exists; the payment was refused."). Migration
+`interior_deals_billing` `0006_reword_failure_reason_hints` gives the four rows the panel's wording
+and touches nothing else; the same hints show wherever those rows are read.
+
+**Temp data**
+Removed from the files, now read from the server: `finance/vocabularies.json` → `modes`,
+`failureReasons`, `subscriptionStatuses`, `tagKinds`, `subscriptionSources`, `refundOrigins`,
+`refundPolicy`; `resources/vocabularies.json` → `tagSuggestions`, `fieldTypes`;
+`users/vocabularies.json` → `reservedUsernames`, `usernameRules.min`/`max`. Deleted because nothing
+read them: `finance` → `moduleRule`, `roles`, `generatedAt` (and the `MODULE_RULE`/`ROLES`
+exports); `resources` → `generatedAt`.
+Still in the files, all **static copy** (labels, not placeholder records): `usernameRules.help`; the
+rest of the three files unchanged. Their `$comment` keys were left as they were and two now describe
+removed keys (`resources` `$comment`/`$comment_tags`). Per-file status:
+[BACKEND-INTEGRATION.md](BACKEND-INTEGRATION.md) → Finance, Users and Resources `vocabularies.json`.
+
+**Backend needed**
+none — live via `AdminOpsService.vocab()` (`payment-modes`, `installment-failure-reasons`,
+`subscription-states`, `expense-tag-kinds`, `subscription-sources`, `refund-origins`,
+`resource-tag-suggestions`, `resource-field-types`), `.refunds()` (`origin`, `policy`), `.subs()` /
+`.subscriptions()` (`source`) and `.usersVocabularies()` (`usernameRules`, `reservedUsernames`).
+Deploy note: migrations `interior_admin` `0062_seed_panel_lists` and `interior_deals_billing` `0006_reword_failure_reason_hints` are data migrations and must run with the deploy.
+
+**Open decisions**
+none. The three this needed were answered by the user before it was built: username rules enforced
+on the admin profile PATCH only, code constants rather than a settings table, and "Against a deal
+payment" as the third origin's label.
+
+**Verified**
+Backend: `test_served_lists` 14 tests OK (each code list's keys against its validation source, the
+0062 rows, `origin` for all three refund kinds, the `source` rule on both reads, `policy`, the PATCH
+refusing 2 / 31 characters and `login`/`Admin`, the state verb refusing both derived states), plus
+one more added the same day: recording a subscription (`POST subscriptions/`) refuses to START in
+`completed` or `refunded` too, so neither door can set a derived state by hand.
+Related modules (`test_refunds`, `test_finance_ops`, `test_finance_detail`, `test_resources`,
+`test_users_writes`, `test_users_directory`, `test_api_enforcement`, `test_permissions` plus the new
+file) 202 OK; whole `interior_admin` suite 547 OK. `makemigrations --check --dry-run`: No changes
+detected. `test_finance_detail`'s state-order assertion was updated to the seven. Migration applied to
+the local `db_prod.sqlite3` (backed up first); over HTTP every new list answers its rows, refund rows
+carry `origin`, all 53 `subs/` rows carry `source`, `users/vocabularies/` carries the rules and 35
+reserved handles.
+Panel: `tsc -b` clean; `eslint` on the changed files 0 new (the 82 `no-explicit-any` errors in
+`adminOps/index.ts` are pre-existing); `npm run check` exit 0 (finance 220, users 408, every render
+smoke and the rest green); `npm run check:live` against the local backend, 32 checks passed.
+Playwright on a real Vite build with a real token: `/finance-transactions` Rolls-up-to offers Fixed ·
+Reinvestment · Variable · Excluded; `/finance-refunds` Origin offers the three; `/finance` Status
+offers the seven and Source Sales · Website, SALES/WEB tags drawn; `/resources/new` Kind offers the
+seven types (empty before the hook call was added); Edit profile refuses "ab" and "dashboard" and
+cuts 31 characters to 30. No console errors.
+The two follow-ups: `interior_deals_billing` tests plus `test_served_lists` 59 OK; migration 0006
+applied to `db_prod.sqlite3` (backed up first) and `vocab/installment-failure-reasons/` answers the
+four full sentences; `tsc -b` clean, `check:finance-render` renders every surface, `eslint` on
+`bits.tsx` clean.
+Not verified: a deal-payment refund on screen, so the DEAL PAYMENT tag has not been seen drawn (none
+exists locally); a settled payment mode or a
+recorded fail-to-pay round-trip (read-only session, no write made); a server without the 0062
+migration, where the Subscriptions Status filter would show the old five.
+
+### Finance and Users stop importing their seed files
+
+**Area:** `/finance*` (every face), the salary pay dialog, payslips, the subscription letterhead, the record-subscription and record-installment dialogs; `/users/<id>` → Edit profile (city suggestions)
+**Files:** `src/admin/views/Finance/{store.ts,payrollYear.ts,SubModals.tsx,SalaryModals.tsx,Analytics.tsx,Payroll.tsx}`, `src/admin/views/Users/store.ts`, `src/api/modules/adminOps/index.ts`, `src/content/finance/{module,invoices,quotations}.json` (deleted), `src/content/users/users.json` (moved to `scripts/fixtures/users.cjs`), `src/content/users/vocabularies.json`, `scripts/check-finance-ledger.cjs`, `scripts/check-users-derivation.cjs`; backend `interior_admin/Views/VocabViews.py` (`CompanyView`), `interior_admin/urls.py`, `interior_admin/Controllers/Users/UsersController.py`, `interior_admin/tests/{test_company,test_users_directory}.py`
+
+**What changed**
+- **One clock.** Finance reads the server's time once anything has fetched it, the browser's until then. Activity entries were stamped 25 Aug (the seed's `asOf`) even on live pages. Payroll opens on the browser's year until the server date lands.
+- **Only real company accounts.** The seed accounts are gone, so an environment with none shows an empty list. The salary pay dialog preselects nothing ("Pick an account…"). A cash salary names no account and is not refused for it — for a short while after the preselection went, every cash salary was.
+- **The letterhead is the server's.** `GET /admin/company/` returns brand, name, address, CIN and GSTIN, and never PAN, bank or UPI. GSTIN reads empty while it is unset.
+- **No seed customers, quotations or invoices.** The customer picker reads platform users and invoice lookups read live invoices. Both record dialogs still refuse to save, and their lists are empty rather than joined by guessing an email.
+- **City suggestions are the cities actually saved** (addresses, shops, service areas), per state, deduplicated. Typed cities are still accepted.
+The bill threshold (₹25,000) is a named constant in the store: the server enforces nothing like it.
+
+**Temp data**
+Deleted: `finance/module.json`, `finance/invoices.json`, `finance/quotations.json`. `users/users.json` is now `scripts/fixtures/users.cjs`, a check fixture and not panel content — a `.cjs` because `.gitignore` ignores every `.json` outside `src/content`, which would have left it out of every commit. `users/vocabularies.json` → `stateCities` removed.
+
+**Backend needed**
+- `GET /api/v1/admin/company/` → `{brand, name, address, cin, gstin}` — new, replaces `invoices.json` `company`
+- `GET /api/v1/admin/users/vocabularies/` → gains `stateCities` — replaces the bundled list
+- Still missing, so the record dialogs keep refusing: a link from a deal to a platform account, and an installment schedule.
+
+**Open decisions**
+none open. Decided by the user: the browser clock and year as fallbacks; no account preselection; remove the seeds rather than build the quotation → subscription chain; derive cities rather than add a City table.
+
+**Verified**
+`test_company` 2 OK (five keys, no PAN/bank/UPI, signed-out refused); `test_users_directory` 21 OK; `tsc -b` clean; `npm run check` exit 0, including a new check that a cash salary gets past the account step. Playwright on `/finance`, `/finance-salaries`, `/finance-transactions`, `/finance-refunds`, `/finance-analytics`: no console errors, and the pay dialog opens with no account chosen. Over HTTP `stateCities` answers 9 states and 21 cities. Not verified: a real cash salary paid end to end.
+
+### Refunds without a plan payment, spend party, payroll detail and subscriptions — on the new columns
+
+**Area:** `/finance-refunds` (request, settle, detail), `/finance-transactions` (record spend), `/finance-salaries` (accounts, runs, pay, loss of pay), `/finance` Subscriptions (record, cancel, defaulting)
+**Files:** `src/admin/views/Finance/{store.ts,RefundModals.tsx,SalaryModals.tsx,SubModals.tsx}`, `src/api/modules/adminOps/index.ts`, `scripts/check-finance-ledger.cjs`, `scripts/finance-check-entry.ts`; backend `interior_admin/Controllers/{Refunds,Revenue,Spend,Salaries,Subs}/**`, `interior_admin/Views/{SalariesViews,OpsModulesViews}.py`, `interior_admin/urls.py`, `interior_admin/tests/test_finance_detail.py`
+
+**What changed**
+- **A refund can be raised against a deal payment, or by hand to a named payee**, and must name exactly one of payment / deal payment / payee. Settlement stores the account it was paid from — the dialog always collected it and it was dropped.
+- **Spend records who it was paid to.**
+- **A salary has components.** Earnings must add up to the monthly gross; deductions come off it, so net = gross − deductions. Bank, PAN and UAN are stored and masked on every read. A run freezes each slip's breakdown; loss of pay pro-rates against the slip's own base; paying a slip takes an incentive, an adjustment with its reason, a remark, the account it left, and the receipt (a private attachment, read back signed).
+- **A subscription is a record over a plan purchase**: record one by hand, change its state, mark it defaulting, cancel it with a reason. Account, run, subscription and refund history read the audit trail by subject.
+
+**Temp data**
+none — every write here reaches the server.
+
+**Backend needed**
+- `POST /api/v1/admin/refunds/` → `payment` | `dealPayment` | `payeeName`; `POST refunds/<id>/settle/` → `account`
+- `POST /api/v1/admin/salaries/slips/<id>/lop/`, `PaySlip` and salary-account writes → components, payTo, breakdown, receipt
+- `GET|POST /api/v1/admin/subscriptions/`, `POST subscriptions/<id>/state/`, `POST subscriptions/<id>/cancel/`
+- Still missing: an installment schedule (recording an installment payment, failing installment 2+), a payment-reversal path on plan payments.
+
+**Open decisions**
+- The settle account and a slip's paid-from account are optional on the server, because company accounts start empty on a fresh environment. The panel always sends one when the server lists any.
+- Subscription writes are full-access only (the legacy gate on `subs/`); a `subscriptions` permission row needs a seeding migration.
+- A deal-payment refund's tag read BY HAND at this point (corrected in "Finance, Resources and Users read their last data lists off the server").
+
+**Verified**
+`test_finance_detail` 40 OK; related Finance modules 118 OK; whole `interior_admin` suite 530 OK; `makemigrations --check` clean; `npm run check:finance` 222 passed; a scripted round trip of 33 assertions against the local backend (by-hand and deal refunds settled, components mismatch refused, masking, loss of pay twice, pay with incentive/recovery/receipt, subscription record/duplicate/defaulting/cancel), every row deleted afterwards and nothing put in S3. Not verified: a real receipt upload from a browser (the dev bucket's CORS blocks localhost).
+
+### Task links, checklists, the waiting-on reason, document files and agreement templates — on the new columns
+
+**Area:** `/team` work detail (links, checklist, blocked-by), a member's Documents and Agreements pages, `/agreements` (templates, send, sign)
+**Files:** `src/admin/views/Team/{store.ts,Detail.tsx,TodayPlan.tsx}`, `src/admin/views/Team/member/{WorkPage,modals,AgreementsPage,DocumentsPage}.tsx`, `src/admin/views/Agreements/{store.ts,index.tsx,Editor.tsx}`, `src/api/modules/adminOps/index.ts`, `src/content/team/links.json` (deleted), `src/content/agreements/templates.json` (deleted), `src/content/team/vocabularies.json`, `scripts/check-live-stores.ts`; backend `interior_admin/Controllers/{Work,Agreements,MemberDocuments}/**`, `interior_admin/Views/{WorkViews,MemberDocumentsViews,DailyWorkViews}.py`, `interior_admin/management/commands/seed_admin_content.py`, `app_ib/Controllers/UrlGenrator/UrlGenrator.py`, `interior_admin/tests/test_team_extras.py`
+
+**What changed**
+- **Tasks link to tasks** (relates to / duplicates / follows, from the server's list). The edge is stored on the task it points from; the other end reads it with the inverse label.
+- **Checklists save as a whole list** — add, rename, tick, remove and reorder are one call, ids survive, a stale save is refused. A completed task reads 100% whatever its lines say.
+- **The waiting-on reason is stored** beside the task it waits on, and clears when the block clears.
+- **A member document carries its file**: uploaded to its own folder, private, read back through an expiring signed link, removed with the record. The upload cap is 5 MB.
+- **Agreement templates live on the server** as template rows; a sent agreement remembers its template by key, so renaming a template no longer lets a second copy out.
+- Tag and agreement actions are audited by subject; opening an agreement is recorded the first time.
+The add-document dialog's file picker was disabled on purpose and is now enabled, with the two sentences that said it was inert reworded — the one markup change, made because recording a real size was otherwise unreachable.
+
+**Temp data**
+Deleted: `team/links.json`, `agreements/templates.json`. `team/vocabularies.json` → `linkRelations` removed.
+
+**Backend needed**
+- `POST /api/v1/admin/work/<id>/links/`, `DELETE work/<id>/links/<toId>/`, `PUT work/<id>/checklist/`, `PATCH work/<id>/` → `blockedReason`
+- `POST /api/v1/admin/member-documents/` → `fileUrl`, `mimeType` (stored as a private attachment)
+- `GET|POST /api/v1/admin/agreements/templates/`, `PATCH|DELETE agreements/templates/<key>/`
+- Deploy: `seed_admin_content` must run, or Agreements has no templates to send.
+
+**Open decisions**
+- No Team or Agreements screen renders a history section; the read works, the markup does not exist.
+- The document drop zone opens, but no download control exists yet on the Documents page.
+
+**Verified**
+`test_team_extras` 16 OK plus Team neighbours 55 OK; `makemigrations --check` clean; `check:live` 26 passed; a live round trip of every new write (links and their refusals, checklist rename/reorder/stale, reason set and clear, template create/rename guard, send with template key, document refusal and signed read), every row deleted after. Not verified: a real file uploaded from a browser (dev bucket CORS).
+
+### Notes, service areas and a permission row for Users — on the new columns
+
+**Area:** `/users/<id>` (Notes tab, Edit profile → coverage), the deactivate dialog, Roles → Users Management
+**Files:** `src/admin/views/Users/{store.ts,Modals.tsx}`, `src/admin/auth/session.ts`, `src/api/modules/adminOps/index.ts`, `src/content/users/vocabularies.json`, `scripts/check-users-derivation.cjs`, `scripts/check-team-nav.cjs`; backend `interior_admin/Controllers/Users/**`, `interior_admin/Views/UsersViews.py`, `interior_admin/module_seed.py`, `interior_admin/migrations/0061_seed_users_module.py`, `interior_admin/tests/test_users_writes.py`
+
+**What changed**
+- **Internal notes are saved.** The author is recorded; only the author or full access can change one; the audit line names the note, never its text. Edit and delete exist on the server but the tab has no control for them.
+- **Coverage is writable** city by city, validated against the real state list. The read still merges the address and each shop, so nothing that showed before disappeared.
+- **Deactivate reasons come from the server.**
+- **The Users module has a permission row** (`view`, `edit`). Before it every Users endpoint was full-access only. `users` left the panel's proto-module list, so `can("users")` reads the real grant.
+- Profile id and status are derived from what the account already holds. A tag's history reads by subject.
+
+**Temp data**
+`users/vocabularies.json` → `deactivateReasons` removed.
+
+**Backend needed**
+- `POST /api/v1/admin/platform-users/<pk>/notes/`, `PATCH|DELETE platform-users/<pk>/notes/<noteId>/`
+- `PATCH /api/v1/admin/platform-users/<pk>/` → `targetAreas` (stored as service areas)
+- Deploy: migration `0061_seed_users_module` before the panel, then tick `users.view` / `users.edit` for the roles that need them — no role holds them yet.
+
+**Open decisions**
+- The profile schema has no version; `schemaVersion` stays empty rather than inventing one.
+- The note dialog still says "No edit and no delete, here or at the API" — true of the screen, no longer of the API.
+- Coverage can only grow: a city from the address or a shop is not this screen's to remove.
+
+**Verified**
+`test_users_writes` 58 OK and Users neighbours 77 OK; `makemigrations --check` clean after 0061; `npm run check` exit 0 (`check:users` all passed); a live round trip on a throwaway account (coverage refused and saved, note added/edited/deleted, tag history, deactivate and reactivate), then deleted. Proved both ways: a role with only `users.view` reads everything and is refused every write.
+
+### The admin schema gets four shared tables instead of a dozen
+
+**Area:** no screen of its own — the backend the three entries above build on
+**Files:** backend `interior_admin/models.py`, `interior_admin/migrations/{0059_attachment_note_panelvocab_subscription_and_more,0060_seed_panel_vocab}.py`, `interior_admin/vocab_seed.py`, `interior_admin/Views/VocabViews.py`, `interior_admin/Controllers/Audit/{AuditController,Validators/AuditValidators}.py`, `interior_business/models.py`, `interior_business/migrations/0014_business_serviceareas.py`
+
+**What changed**
+The gaps the panel still had asked for about twelve tables. They became four, plus fields on existing models:
+- **PanelVocab** holds every new value list, told apart by `scope`. **Attachment** is one file row for any record. **Note** is what a person wrote about a record. **Subscription** is the commitment over a plan purchase.
+- **The audit trail can point at any record** (`subjectType`, `subjectId`), so a history tab is a filtered read, not an events table.
+- New fields: `Agreement.templateKey`, `WorkItem.extras`, `SalaryAccount.components`/`payTo`, `Payslip.breakdown`/`paidFrom`, `RefundRequest.dealPayment`/`payeeName`/`account`, `Expense.party`, `Business.serviceAreas`. `RefundRequest.payment` became optional — the one loosening. Nothing was dropped, renamed or rewritten.
+
+**Temp data**
+none.
+
+**Backend needed**
+none — this is the backend. Deploy: `migrate`.
+
+**Open decisions**
+The JSON fields cannot answer cross-record questions ("which tasks link to this one", "who serves this city"). When one is needed, that field becomes a table. Subscription has no installment rows by design: every plan sold today is one payment.
+
+**Verified**
+Migrations generated and applied to the local database after a backup; `makemigrations --check` clean; 187 module tests OK after the change; the audit subject filter and the three seeded lists checked over HTTP.
+
+### The Overview's info-tips describe the live numbers, and the check suite runs again
+
+**Area:** `/` (Overview) — every ⓘ; `npm run check`
+**Files:** `src/content/overview/metrics.json`, `src/admin/views/Overview/financeLive.ts`, `scripts/check-overview.cjs`, `scripts/check-overview-nav.cjs`, `scripts/check-team-nav.cjs`, `scripts/team-nav-session-stub.ts`, `scripts/um-smoke.tsx`, `scripts/fn-smoke.tsx`, `scripts/check-enquiry-{clock,export,wiring}.cjs`, `scripts/enquiry-fixture.cjs` (new), `scripts/check-enquiry-seed.cjs` (deleted), `package.json`
+
+**What changed**
+- **All 23 definitions rewritten to what the code computes.** Several were wrong, not just stale: Receivable claimed all-time and counts the period; Team claimed the founder is included and superusers are excluded; the attention thresholds said "a fifth" where the code uses 15 points and 20%.
+- **`check:overview` passes** — the check passed no stage vocabulary (every deal read as open) and the health cell had moved to the period's open deals.
+- **The nav checks and the Users/Finance render sweeps run again.** The sweeps asserted bundled seed records that no longer exist; they now prove every route, tab and face renders.
+- **The enquiry checks read a fixture**, since the enquiry content was deleted in an earlier commit; the seed check went with its subject.
+- The refund set is built once per window rather than once per plan payment.
+
+**Temp data**
+`overview/metrics.json` — static copy (definitions), permanent.
+
+**Backend needed**
+none.
+
+**Open decisions**
+- Two markup strings still say "Seed clocks elsewhere" and "today on the Team clock"; there are no seed clocks.
+- Collected reads lower for a session without refund access, because every refunded payment then nets its refund off.
+- The Collections "watch" band may be unreachable: the server marks a past-due installment failed, not due.
+
+**Verified**
+`npm run check` exit 0, 17 steps, 1052 assertions (overview 73, overview-nav 19). Two mid-run Finance failures were another change landing underneath and cleared.
+
+### Users: profile edits, tags, deactivation, analytics and the activity feed
+
+**Area:** `/users/<id>` (Edit profile, tags, deactivate), `/users?view=analytics`, the "Just happened" feed
+**Files:** `src/admin/views/Users/{store.ts,Analytics.tsx,DateRange.tsx,EditProfile.tsx,Modals.tsx,index.tsx}`, `src/api/modules/adminOps/index.ts`, `src/content/users/{analytics,audit}.json` (deleted), `src/content/users/vocabularies.json`, `scripts/check-users-derivation.cjs`; backend `interior_admin/Controllers/Users/**`, `interior_admin/Controllers/Audit/**`, `interior_admin/Views/UsersViews.py`, `interior_admin/tests/test_users_writes.py`
+
+**What changed**
+- **An admin can edit a user's profile**: only fields the profile schema marks editable, validated per field, all or nothing, with an audit row of before → after.
+- **Tags** are created, retired and set per user, recording who assigned them. **Deactivation** stores its reason and revokes sessions.
+- **Analytics are counted from real rows**: months from registration dates, completion from the schema's required fields against stored values, sign-up source as recorded ("Not recorded" when blank).
+- **The feed can be limited to platform users**; action colours come from each action's verb.
+The browser pass caught a real bug: a background reload overwrote the open record with the thinner list row.
+
+**Temp data**
+Deleted: `users/analytics.json`, `users/audit.json`.
+
+**Backend needed**
+- `PATCH /api/v1/admin/platform-users/<pk>/`, `PUT platform-users/<pk>/tags/`, `POST platform-users/<pk>/status/`
+- `POST /api/v1/admin/users/tags/`, `PATCH users/tags/<slug>/`, `GET users/analytics/`, `GET audit/?subject=platform`
+
+**Open decisions**
+- Notes and multi-city coverage had no table yet (added the same day, see above).
+- Username rules stayed local: the server had none (enforced on the server in "Finance, Resources and Users read their last data lists off the server").
+- Two incomplete-profile counts on one page use different rules: the tile uses the go-live checklist, the funnel the schema's required fields.
+
+**Verified**
+68 backend tests OK; `tsc` clean; `check:users` 406 passed; live round trips on a throwaway account, deleted after; headless Chrome over analytics, the directory and a record.
+
+### Payroll and Subscriptions read and write the server
+
+**Area:** `/finance-salaries` (accounts, runs, slips, hold/release/pay), `/finance` Subscriptions
+**Files:** `src/admin/views/Finance/{store.ts,payrollYear.ts,types.ts,SalaryModals.tsx,SalaryTransactions.tsx}`, `src/api/modules/adminOps/index.ts`, `src/content/finance/{salaries,subscriptions}.json` (deleted), `src/content/team/members.json` (deleted), `src/content/finance/vocabularies.json`, `scripts/check-finance-ledger.cjs`, `scripts/finance-check-entry.ts`; backend `interior_admin/Controllers/{Salaries,Subs}/**`, `interior_admin/Views/SalariesViews.py`, `interior_admin/urls.py`, `interior_admin/tests/test_salaries_screen.py`
+
+**What changed**
+- **Payroll is server-backed**: payslips read by month and member; salary accounts opened, revised and closed (closing needs a reason); a month's run built from active accounts; slips paid once, never while held, and the run closes itself when the last is paid. The salary picker is the live team roster.
+- **The Subscriptions tab is the plan purchases**, each with its payment, cycle, start, expiry and status.
+Writes the columns could not hold yet (components, bank details, incentives, a receipt, loss of pay) were refused in words rather than swallowed — added the same day, see above.
+
+**Temp data**
+Deleted: `finance/salaries.json`, `finance/subscriptions.json`, `team/members.json`.
+
+**Backend needed**
+- `GET /api/v1/admin/salaries/slips/`, `POST|PATCH salaries/accounts/`, `POST salaries/runs/`, `POST salaries/slips/<id>/pay/`
+- `GET /api/v1/admin/subs/` → gains customer, plan, cycle, dates and the payment
+
+**Open decisions**
+- A built run has no deductions until accounts carry components, so net equals gross.
+- The panel asked `can("finance-salaries","edit")`, a verb that does not exist; only full access saw the write buttons.
+
+**Verified**
+`test_salaries_screen` 13 OK, 65 with neighbours; `check:finance` 179 passed (the rest asserted deleted fixtures); API round trips of every write and refusal, and in the panel hold → release → pay and open → close an account; local DB restored after.
+
+### Finance operations write to the server
+
+**Area:** `/finance-transactions` (tags, record, cancel, receipts), `/finance-refunds` (request, payee), bank import, `/finance-analytics` help text
+**Files:** `src/admin/views/Finance/{store.ts,TxnModals.tsx,RefundModals.tsx,TxnDetail.tsx,Transactions.tsx,Refunds.tsx,RefundDetail.tsx,bits.tsx}`, `src/api/modules/adminOps/index.ts`, `src/content/finance/vocabularies.json`, `scripts/check-finance-ledger.cjs`; backend `interior_admin/Controllers/{Spend,Refunds,Payments}/**`, `interior_admin/Views/SpendViews.py`, `interior_admin/models.py` (`ExpenseTag.as_dict`), `interior_admin/urls.py`, `interior_admin/tests/test_finance_ops.py`
+
+**What changed**
+- **Expense tags** are created, budgeted, deactivated and reactivated; a panel-made tag reads Custom instead of every tag reading Shipped.
+- **A refund can be requested** — the endpoint existed, the picker had no payments in it.
+- **Refund payee** is the plan row's customer where one names them, blank rather than guessed otherwise. **Income rows** show their kind. **Download receipt** opens the stored file.
+- **Bank statements** parse from CSV and post to the import endpoint; no button calls it yet.
+- The banner no longer says "Nothing here is live", and the metric formulas describe what the code computes.
+The panel checked two permission verbs the server does not have, so every limited-access session saw a read-only Finance; it now asks `record`, `request` and `decide`.
+
+**Temp data**
+Deleted: `finance/transactions.json`, `finance/refunds.json`, `finance/bank.json` (in "Team, Resources, Finance and Users read the backend", 2026-09-15). `finance/vocabularies.json` text rewritten — static copy.
+
+**Backend needed**
+- `POST /api/v1/admin/spend/tags/`, `PATCH spend/tags/<key>/`
+- `GET refunds/` and `GET payments/` → gain `payer`
+- Still missing: a paid-from account on settlement, a party on spend, refunds not against a plan payment (added the same day, see above).
+
+**Open decisions**
+- A receipt link is signed for about an hour; a tab left open opens a stale link.
+- Bank import and tag reactivation have no control on screen.
+
+**Verified**
+`test_finance_ops` 14 OK, 101 with neighbours; `check:finance` 338 passed; saves proven end to end locally: tag create/budget/off/on, a real presigned PUT and a spend recorded with that bill then cancelled, income recorded and cancelled, a statement imported, a refund requested → approved → settled on a throwaway payment. Everything deleted after, including the S3 object.
+
+### Team: tags, documents, agreements and plan lines write to the server
+
+**Area:** `/team` (work tags), a member's Documents, Agreements and Today pages, `/agreements`
+**Files:** `src/admin/views/Team/{store.ts,TodayPlan.tsx}`, `src/admin/views/Team/member/{WorkPage,modals,AgreementsPage,DocumentsPage}.tsx`, `src/admin/views/Agreements/{store.ts,index.tsx}`, `src/api/modules/adminOps/index.ts`, `src/content/team/documents.json` (deleted), `scripts/check-live-stores.ts`; backend `interior_admin/Controllers/{Work,Agreements,DailyWork,MemberDocuments}/**`, `interior_admin/Views/{WorkViews,DailyWorkViews,MemberDocumentsViews}.py`, `interior_admin/urls.py`, `interior_admin/tests/{test_team_agreements,test_daily_work}.py`
+
+**What changed**
+- **Tags** are renamed (the slug follows), recoloured and restored.
+- **Member documents** are recorded, verified (never your own) and removed — a record without its file at this point.
+- **Agreements** are sent (body frozen, seven-day expiry), opened, signed (name and IP recorded) and revoked from the panel; the list returns the document.
+- **A line can be added to today's plan**, creating its task the way filing a plan does.
+No write in Team refuses for want of an endpoint any more.
+
+**Temp data**
+Deleted: `team/documents.json`.
+
+**Backend needed**
+- `PATCH /api/v1/admin/work/tags/<id>/`, `POST work/tags/<id>/restore/`
+- `GET|POST /api/v1/admin/member-documents/`, `DELETE member-documents/<id>/`, `POST member-documents/<id>/verify/`
+- `POST /api/v1/admin/agreements/`, `POST agreements/<id>/{view,sign,revoke}/`
+- `POST /api/v1/admin/daily-plans/<id>/lines/`
+
+**Open decisions**
+- Signing happens inside the panel; the public signing page has no endpoint.
+- Documents are gated on `attendance.view` until a `team.documents` verb exists.
+- An existing test asserted the list hides the token; showing the document reverses that, so it now asserts the token is present.
+
+**Verified**
+`test_team_agreements` 8 OK plus Team neighbours 63 OK; `check:live` 19 passed; a live round trip of every write, rows deleted after.
+
+## 2026-09-15
+
+### Data forms accept file answers
+
+**Area:** `/resources/<id>` → Fill (a file field)
+**Files:** `src/admin/views/Resources/{store.ts,Fill.tsx}`, `src/api/modules/adminOps/index.ts`; backend `interior_admin/Controllers/Resources/{ResourcesController,Validators/ResourcesValidators}.py`, `interior_admin/tests/test_resources.py`
+
+**What changed**
+A picked file uploads through the presigned PUT and is submitted as the answer. The server checks it against its field: a real file field, a name, within `maxMb`, a type in `accept`, and a URL in our bucket with the key shape the upload endpoint issues. Reads return a signed, expiring link; deleting a response reports the stored size freed. `Fill.tsx` keeps the picked files and hands them to the store (wiring only).
+
+**Temp data**
+none.
+
+**Backend needed**
+- `POST /api/v1/admin/resources/<id>/responses/` → file answers `{key, fileName, mimeType, sizeKb}`
+- Still missing: a share-link token — a signed link needs no column, but it means an endpoint reachable without signing in, which is undecided.
+
+**Open decisions**
+- **The dev bucket serves uploads publicly** — an uploaded file opened without a signature. The signed read adds nothing until the bucket is private.
+- Uploads share the payment-screenshot folder, so deleting a response does not delete the object.
+- The Fill dialog still says "Nothing is uploaded…", and Submit is not disabled while a file uploads.
+
+**Verified**
+`test_resources` 3 OK (9 refusals, stored shape, signed read); `check:live` 17 passed; the store run from Node against the local backend and the dev bucket: refusals, a real upload, the signed URL returning the exact bytes; the form, audit rows and S3 objects deleted after. Not verified: the upload from a browser — the dev bucket's CORS allows only testadmin.
+
+### A refund comes off net cash once, not twice
+
+**Area:** `/` (Overview) — Collected, Net, money flow; `/finance-analytics`; the Overview's net-cash trajectory signal
+**Files:** `src/admin/views/Overview/{live,financeLive}.ts`, `src/admin/views/Finance/store.ts`, `src/content/finance/vocabularies.json`, `scripts/check-finance-ledger.cjs`, `scripts/finance-check-entry.ts`; backend `interior_admin/Controllers/Overview/SignalsController.py`, `interior_admin/tests/test_overview_signals.py`
+
+**What changed**
+A settled refund was netted off its plan payment in Collected **and** counted as money out, so net fell by twice the refund. The rule is now one helper (`planCashPaise`, `live.ts`) used by the Overview snapshot, its Finance section and Finance Analytics, and the same rule on the server: a plan payment counts at its full amount, a refund is money out on the day it settles. A payment refunded the old one-step way, with no refund request behind it, still nets its refund off, since nothing else counts it.
+
+**Temp data**
+`finance/vocabularies.json` → the Collected formula no longer says it subtracts refunds. Static copy.
+
+**Backend needed**
+none — already live; `SignalsController.trajectory` changed to match.
+
+**Open decisions**
+- A session without refund access reads every refunded payment as the old one-step kind, so its Collected is lower than a full-access session's for the same period.
+
+**Verified**
+`check:finance` 334 passed, including four new refund assertions; `test_overview_signals` 4 OK (its expected figure had encoded the double count). Local data: the one refunded payment (₹19,500, ₹500 refunded) now counts in full in Nov 2025, and September still shows ₹500 out.
+
+### A stat cell with both a link and a tooltip is one button, not two nested
+
+**Area:** the stat strips on `/business-enquiries`, `/users`, `/finance`, `/finance-salaries`, `/finance-transactions`, `/finance-refunds`
+**Files:** `src/admin/ui/data.tsx`
+
+**What changed**
+A `StatStrip` cell with both `to` and `tip` rendered a link button inside the tooltip's trigger button — invalid HTML, and React warned on every render. The cell now is the trigger. It is one Tab stop instead of two, and the focus ring is restored (`focus-visible:outline-solid`, since the trigger's `outline-hidden` removed it).
+
+**Temp data**
+none.
+
+**Backend needed**
+none.
+
+**Open decisions**
+none.
+
+**Verified**
+A DOM scan over those routes finds 0 nested buttons and 0 console errors; screenshots before and after match; click navigation, keyboard focus, and the tooltip on focus all work.
+
+### Team, Resources, Finance and Users read the backend
+
+**Area:** `/team` and every member page, `/resources`, `/agreements` (the list), `/finance*` (transactions, refunds, bank, analytics), `/users` (filter options), `/` (Overview)
+**Files:** `src/api/modules/adminOps/index.ts`, `src/admin/views/Team/{store,adopt,liveWork}.ts` and the Team `.tsx` files that now await a write, `src/admin/views/Resources/{store.ts,Builder.tsx,Fill.tsx,index.tsx}`, `src/admin/views/Agreements/store.ts`, `src/admin/views/Finance/{store,payrollYear,types}.ts`, `TxnModals.tsx`, `RefundModals.tsx`, `src/admin/views/Users/store.ts`, `src/admin/views/Overview/{derive,store}.ts`, `package.json`, `scripts/check-live-stores.ts` (new), deleted checks `scripts/{check-team-derivation,check-resources,check-agreements}.cjs` and the `tm`/`rs`/`ag` smokes
+
+**What changed**
+The stores stopped seeding from bundled files. Team boots its roster, attendance, work items, tags, plans, reports, leave, agreements and incentives from the server and writes through it (open/break/end a day, status, tags, leave, plans, reports, acknowledgements); Resources reads and writes its forms and responses; Finance's transactions, refunds, bank lines and analytics are live; the Users filter options come from the seller options and taxonomy. The Overview dropped its dead seed arithmetic and reads one live clock.
+**A simulated write is named as one:** anything with no endpoint yet refused with "…is not available on the server yet." (tag rename/restore/recolour, sending/signing/revoking an agreement, adding a plan line, a file answer) — each built later, see the entries above.
+
+**Temp data**
+Deleted: `team/{attendance,work,plans,reports,tags,leave,agreements,pay}.json`, `resources/{forms,responses}.json`, `finance/{transactions,refunds,bank}.json`; pruned `team/vocabularies.json`, `resources/vocabularies.json`, `users/vocabularies.json`. Left then, as stand-ins: `team/{documents,links,members}.json`, `agreements/templates.json`, `finance/{invoices,module,quotations,salaries,subscriptions}.json`, `users/{analytics,audit,users}.json` — all gone by 2026-09-16.
+
+**Backend needed**
+none new — live via the existing `AdminOpsService` reads and writes (`users/`, `attendance/*`, `work/*`, `leave/*`, `daily-plans/`, `daily-reports/*`, `agreements/`, `incentives/*`, `resources/*`, `refunds/*`, `bank/*`, `income/*`, `spend/*`, `payments/*`, `engine/seller-options/`). Per-file status: [BACKEND-INTEGRATION.md](BACKEND-INTEGRATION.md).
+
+**Open decisions**
+- Resource responses are read by fanning out one read per member; a single all-members read would replace it.
+- One archived tag named `smoke-check` was left in the local database by the round trip.
+
+**Verified**
+Against the local backend: Team boots 8 members, 72 days, 25 items, 3 plans, 3 reports, 2 leave, 4 agreements; a tag round trip and a refusal; a full Resources round trip, cleaned up; a Finance refusal surfaced in words. `check:live` 17 passed; all 21 routes loaded in Chrome with 0 failed API calls. The pre-existing `check-overview` deals/health failure and the broken render and nav smokes were not fixed here (repaired 2026-09-16).
+
 ## 2026-09-09
 
 ### The quotation page loses its furniture, and the document says what the plan includes

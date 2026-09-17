@@ -1,13 +1,15 @@
 /* =============================================================================
    check:overview-nav · the Overview is the landing page and the first row.
    -----------------------------------------------------------------------------
-   The Overview has no server Module row: it is a proto row (PROTO_ROWS) under
-   an EMPTY group label, ranked first by GROUP_ORDER, gated by PROTO_MODULES,
-   and HOME_ROUTE points at it. Every part of that is a silent failure — a key
-   missing from PROTO_MODULES drops the row without an error, a group label
-   absent from GROUP_ORDER files the row at the bottom, and a HOME_ROUTE that
-   still says "deals" boots the panel past the page. Modelled on
-   scripts/check-finance-nav.cjs, which exists for the same reason.
+   Since interior_admin migration 0026 the Overview is a SERVER Module row
+   (key overview, groupLabel "", displayOrder 0, one action: view) and no
+   longer a proto row: PROTO_MODULES dropped the key, so can("overview") reads
+   the session's own grant. GROUP_ORDER still ranks the empty group first,
+   HOME_ROUTE still points at it, and homeRoute() forwards a session without
+   the grant to its first allowed page. Every part of that is a silent
+   failure — a group label absent from GROUP_ORDER files the row at the
+   bottom, and a homeRoute() that ignores the grant loops a redirect. Modelled
+   on scripts/check-finance-nav.cjs, which exists for the same reason.
 
      node scripts/check-overview-nav.cjs
    ============================================================================= */
@@ -18,14 +20,16 @@ const fs = require("fs");
 const ROOT = path.join(__dirname, "..");
 const TMP = path.join(ROOT, "node_modules", ".tmp");
 
-/* What the deployed server sends today. No overview row in it. */
-const SERVER_MODULES = [
+/* What the deployed server sends a session that holds the Overview. */
+const OVERVIEW_ROW = { key: "overview", label: "Overview", groupLabel: "", displayOrder: 0, actions: ["view"] };
+const OTHERS = [
   { key: "deals", label: "Deals", groupLabel: "Sales", displayOrder: 10, actions: ["view"] },
   { key: "invoices", label: "Invoices", groupLabel: "Sales", displayOrder: 30, actions: ["view"] },
   { key: "plans", label: "Plans", groupLabel: "Catalogue", displayOrder: 50, actions: ["view"] },
   { key: "team", label: "Members", groupLabel: "Settings", displayOrder: 60, actions: ["view"] },
   { key: "audit", label: "Audit log", groupLabel: "Settings", displayOrder: 80, actions: ["view"] },
 ];
+const SERVER_MODULES = [OVERVIEW_ROW].concat(OTHERS);
 
 let failed = 0;
 const eq = (what, got, want) => {
@@ -47,9 +51,9 @@ const stub = path.join(__dirname, "team-nav-session-stub.ts").replace(/\\/g, "/"
 fs.mkdirSync(TMP, { recursive: true });
 fs.writeFileSync(entry,
   'import { __setSession } from "' + stub + '";\n'
-  + 'import { getModules, getItems, getGroupOf, HOME_ROUTE } from "' + path.join(ROOT, "src/admin/shell/modules.ts").replace(/\\/g, "/") + '";\n'
+  + 'import { getModules, getItems, getGroupOf, HOME_ROUTE, homeRoute } from "' + path.join(ROOT, "src/admin/shell/modules.ts").replace(/\\/g, "/") + '";\n'
   + 'import { PROTO_MODULES } from "' + path.join(ROOT, "src/admin/auth/session.ts").replace(/\\/g, "/") + '";\n'
-  + "export { __setSession, getModules, getItems, getGroupOf, HOME_ROUTE, PROTO_MODULES };\n");
+  + "export { __setSession, getModules, getItems, getGroupOf, HOME_ROUTE, homeRoute, PROTO_MODULES };\n");
 
 esbuild.build({
   entryPoints: [entry],
@@ -83,10 +87,11 @@ esbuild.build({
   eq("it wears the home icon, not the doc fallback", row && row.icon, "home");
 
   /* ---- the gate --------------------------------------------------------- */
-  ok("overview carries the proto gate, so can() answers true for every session", M.PROTO_MODULES.has("overview"));
+  ok("overview is NOT proto-gated any more — the server row carries the grant", !M.PROTO_MODULES.has("overview"));
 
   /* ---- the landing route ------------------------------------------------ */
   eq("HOME_ROUTE boots the panel to the Overview", M.HOME_ROUTE, "overview");
+  eq("...and a session holding it lands there", M.homeRoute(), "overview");
   ok("getItems resolves the route the redirect points at", !!M.getItems()[M.HOME_ROUTE]);
   eq("getGroupOf files it under no group", M.getGroupOf()["overview"], null);
 
@@ -96,15 +101,17 @@ esbuild.build({
   const keys = groups.flatMap((g) => g.items.map((i) => i.key));
   eq("no key appears twice anywhere in the sidebar", keys.filter((k, i) => keys.indexOf(k) !== i), []);
 
-  /* ---- the day the server sends a row ----------------------------------- */
-  M.__setSession({
-    modules: SERVER_MODULES.concat([
-      { key: "overview", label: "Home", groupLabel: "", displayOrder: 1, actions: ["view"] },
-    ]),
-  });
+  /* ---- a session without the grant -------------------------------------- */
+  M.__setSession({ modules: OTHERS });
+  const without = M.getModules();
+  eq("no server row, no Overview row — the proto stand-in is not reached", without.flatMap((g) => g.items).filter((i) => i.key === "overview").length, 0);
+  eq("...and homeRoute forwards to the first page the sidebar allows", M.homeRoute(), "deals");
+
+  /* ---- the server's label ----------------------------------------------- */
+  M.__setSession({ modules: [Object.assign({}, OVERVIEW_ROW, { label: "Home" })].concat(OTHERS) });
   const again = M.getModules();
   const rows = again.flatMap((g) => g.items).filter((i) => i.key === "overview");
-  eq("a real server row replaces the proto one rather than doubling it", rows.length, 1);
+  eq("the row appears once", rows.length, 1);
   eq("...and the server's label wins", rows[0] && rows[0].label, "Home");
   eq("...and it still sits first", again[0].items[0].key, "overview");
 

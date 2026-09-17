@@ -71,17 +71,23 @@ if (detail.indexOf('<RecordMenu e={e} />') < 0)
    `followUpDue()`, which is merely "has a callback set" and therefore includes
    the late ones. The cell read 0 and returned 1 row.
 
-   So each cell is asserted twice: its count equals the length of the list its
-   own filter produces, and it has help text to hover. Both run against the real
-   `countsOf()` and `filterEnquiries()` from the bundled store, not against a
-   re-implementation of them here — a test that reimplements the rule it is
+   So each cell is asserted the one way that still holds locally: its count
+   equals the length of the list its own filter produces, against the real
+   `countsOf()` and `filterEnquiries()` from the bundled store — not against a
+   re-implementation of them here, since a test that reimplements the rule it is
    checking passes on the day the rule changes.
+
+   THE HELP TEXT IS NOT ASSERTED HERE ANY MORE. `attentionCells` used to live in
+   src/content/business-enquiries/vocabularies.json; the module reads the
+   vocabulary off the API now, so "every cell has something to hover" is a claim
+   about a response, not about a file in this repo, and a check that cannot read
+   the source of truth is worse than no check. The rows are a fixture for the
+   same reason — see scripts/enquiry-fixture.cjs.
    ========================================================================== */
 const S = require(path.join(__dirname, '..', 'node_modules/.tmp/enquiry-store.cjs'));
-const seed = require(path.join(__dirname, '..', 'src/content/business-enquiries/enquiries.json'));
-const voc = require(path.join(__dirname, '..', 'src/content/business-enquiries/vocabularies.json'));
+const FIX = require(path.join(__dirname, 'enquiry-fixture.cjs'));
 
-const all = seed.enquiries;
+const all = FIX.rows;
 const m = S.countsOf(all);
 
 /* The cell table, restated independently of List.tsx on purpose: this is the
@@ -98,30 +104,12 @@ const CELLS = [
   { k: 'rejected',         n: m.invalid,                          f: { status: 'invalid' } },
 ];
 
-const help = {};
-(voc.attentionCells || []).forEach((c) => { help[c.key] = c; });
-
 for (const c of CELLS) {
   const got = S.filterEnquiries(all, c.f).length;
   if (got !== c.n)
     fails.push('strip cell "' + c.k + '" reads ' + c.n + ' but pressing it returns '
       + got + ' row(s) — the count and its own filter disagree');
-
-  const h = help[c.k];
-  if (!h) fails.push('strip cell "' + c.k + '" has no entry in vocabularies.attentionCells — nothing to hover');
-  else {
-    if (!h.counts || h.counts.length < 25)
-      fails.push('attentionCells."' + c.k + '".counts is missing or too short to explain the number');
-    if (!h.does || h.does.length < 15)
-      fails.push('attentionCells."' + c.k + '".does is missing — the tooltip would not say what pressing it does');
-  }
 }
-
-/* And nothing orphaned: help for a cell that no longer exists is help nobody
-   will ever see, and it rots silently. */
-for (const k of Object.keys(help))
-  if (!CELLS.some((c) => c.k === k))
-    fails.push('attentionCells has an entry for "' + k + '", which is not a cell in the strip');
 
 if (fails.length) {
   console.error('check:wiring — ' + fails.length + ' problem(s)\n');
@@ -129,4 +117,4 @@ if (fails.length) {
   process.exit(1);
 }
 console.log('check:wiring — popover triggers wired; '
-  + CELLS.length + ' strip cells agree with their own filters and all carry help text');
+  + CELLS.length + ' strip cells agree with their own filters');

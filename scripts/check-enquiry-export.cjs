@@ -18,8 +18,10 @@
    ========================================================================== */
 const path = require('path');
 const X = require(path.join(__dirname, '..', 'node_modules', '.tmp', 'enquiry-export.cjs'));
-const seed = require(path.join(__dirname, '..', 'src/content/business-enquiries/enquiries.json'));
-const voc = require(path.join(__dirname, '..', 'src/content/business-enquiries/vocabularies.json'));
+/* The bundled seed and vocabulary went with the move onto the API. Both are a
+   fixture now: the rules below are about which COLUMNS exist and what may
+   never be in one, and neither needs the shipped rows. */
+const FIX = require(path.join(__dirname, 'enquiry-fixture.cjs'));
 
 const fails = [];
 const ok = (c, m) => { if (!c) fails.push(m); };
@@ -32,7 +34,7 @@ X.applyVocabulary({
   /* The real labels, not the keys echoed back: the CSV prints what a person
      reads, so a check planting `label: key` would pass on a file that shipped
      `no_match` in a column headed Status. */
-  statuses: voc.statuses,
+  statuses: FIX.VOCAB.statuses,
   urgency: [
     { key: 'within_30d', label: 'Within 30 days' },
     { key: '30_90d', label: '30–90 days' },
@@ -60,7 +62,7 @@ X.applyVocabulary({
   ],
 });
 
-const rows = seed.enquiries;
+const rows = FIX.rows;
 const all = ['core', 'requirement', 'handling', 'assignment'];
 
 /* ---- 1. contact is genuinely absent unless asked for -------------------- */

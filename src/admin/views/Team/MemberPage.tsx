@@ -46,8 +46,11 @@ import {
 } from "./memberModals";
 /* THE SEED IS FOR THE OPERATION PAGES ONLY (layer 3, their own divs). This page's
    header, launcher figures, record and "waiting on somebody" read the API. */
-import { fmtDate, fmtHM, readMember, useMembers } from "./store";
-import type { Member } from "./store";
+import { fmtDate, fmtHM, readMember, retryTeam, useMembers, useTeamLoad } from "./store";
+import type { LoadPart, Member, TeamList } from "./store";
+import { LoadNotice, OpSkeleton } from "./loadState";
+import { retryResources, useResourcesLoad } from "../Resources/store";
+import { retryPayroll, usePayrollLoad } from "../Finance/store";
 import { useMemberReads, windowPct } from "./liveMember";
 import type { MemberReads, Part } from "./liveMember";
 import { MemberStrip, OpHead, OpNav, OpRefused, memberHref, rupees, workHref } from "./member/frame";
@@ -66,7 +69,7 @@ export default function MemberPage({ id, sub, live, roles, ops }: {
   id: string; sub: string; live: LiveMember | null; roles: Role[]; ops: Ops;
 }) {
   useMembers();
-  /* Only the operation pages below take this seed record. */
+  /* The operation pages below take the store's record of this member. */
   const m = readMember(id);
   const q = useMemberReads(live);
   const session = getSession();
@@ -132,19 +135,81 @@ export default function MemberPage({ id, sub, live, roles, ops }: {
       ) : op && !opAllowed(op.key, viewer) ? (
         <OpRefused label={op.label} />
       ) : op ? (
-        /* Attendance reads the server (team/d3); the other op pages still take the seed record. */
+        /* Attendance reads its own window (team/d3); the other op pages read the Team store. */
         op.key === "attendance" ? (
           <div className="flex flex-col gap-4">
             <AttendancePage q={q} live={live} viewer={viewer} />
           </div>
-        ) : m ? (
-          <div className="flex flex-col gap-4">
-            <OpBody op={op.key} m={m} viewer={viewer} />
-          </div>
-        ) : <NotAdopted live={live as LiveMember} roles={roles} sub={sub} />
+        ) : (
+          <OpGate op={op.key} label={op.label} id={id} m={m} live={live as LiveMember} roles={roles} sub={sub} viewer={viewer} />
+        )
       ) : (
         <Overview q={q} live={live} roles={roles} viewer={viewer} />
       )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------ the op pages' own reads --- */
+
+/** What each operation page reads from the Team store (team/d5). */
+const OP_LISTS: Record<string, TeamList[]> = {
+  work: ["members", "items", "tags"],
+  leave: ["members", "leave"],
+  reports: ["members", "plans", "reports"],
+  agreements: ["members", "agreements"],
+  documents: ["members", "documents", "vocab"],
+  resources: ["members"],
+  pay: ["members", "incentives"],
+};
+
+/** THE PAGE ONLY RENDERS ON DATA IT HAS. Until the reads land it shimmers; a
+ *  refused read says "not in your access", a failed one offers Try again — an
+ *  empty list is only ever drawn for a read that came back empty. */
+function OpGate({ op, label, id, m, live, roles, sub, viewer }: {
+  op: string; label: string; id: string; m: Member | null; live: LiveMember; roles: Role[]; sub: string; viewer: Viewer;
+}) {
+  const part = useTeamLoad(OP_LISTS[op] || ["members"], id);
+  if (part.state !== "ok") return <OpState label={label} part={part} onRetry={retryTeam} />;
+  if (!m) return <NotAdopted live={live} roles={roles} sub={sub} />;
+  if (op === "resources") return <ResourcesGate label={label} m={m} viewer={viewer} />;
+  if (op === "pay") return <PayGate label={label} m={m} viewer={viewer} />;
+  return (
+    <div className="flex flex-col gap-4">
+      <OpBody op={op} m={m} viewer={viewer} />
+    </div>
+  );
+}
+
+/** Resources keep their own store: the same three states over its read. */
+function ResourcesGate({ label, m, viewer }: { label: string; m: Member; viewer: Viewer }) {
+  const part = useResourcesLoad(m.memberId);
+  if (part.state !== "ok") return <OpState label={label} part={part} onRetry={retryResources} />;
+  return (
+    <div className="flex flex-col gap-4">
+      <OpBody op="resources" m={m} viewer={viewer} />
+    </div>
+  );
+}
+
+/** Pay reads Finance's payroll, and asking for its state is what starts that
+ *  read — a pay page opened first used to find Finance empty and say so. */
+function PayGate({ label, m, viewer }: { label: string; m: Member; viewer: Viewer }) {
+  const part = usePayrollLoad();
+  if (part.state !== "ok") return <OpState label={label} part={part} onRetry={retryPayroll} />;
+  return (
+    <div className="flex flex-col gap-4">
+      <OpBody op="pay" m={m} viewer={viewer} />
+    </div>
+  );
+}
+
+function OpState({ label, part, onRetry }: { label: string; part: LoadPart; onRetry: () => void }) {
+  if (part.state === "loading") return <OpSkeleton />;
+  return (
+    <div className="flex flex-col gap-4">
+      <OpHead title={label} />
+      <LoadNotice what={label} part={part} onRetry={onRetry} />
     </div>
   );
 }
