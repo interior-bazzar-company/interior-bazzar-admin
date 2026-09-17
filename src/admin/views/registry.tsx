@@ -18,7 +18,9 @@
 import { lazy, Suspense } from "react";
 import type { ComponentType } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { Button, EmptyState, Notice, PageHeader, PaneLoading } from "../ui";
+import { Button, EmptyState, Notice, PageHeader, PaneLoading, ReasonModal } from "../ui";
+import AdminOpsService, { call } from "../../api/modules/adminOps";
+import { useShell } from "../shell/ShellContext";
 import { getItems, homeRoute, HOME_ROUTE } from "../shell/modules";
 import type { ModuleItem } from "../shell/modules";
 import { can, useNav } from "../shell/AdminShell";
@@ -143,7 +145,41 @@ function Denied({ item }: { item: ModuleItem }) {
             Settings → Team.
           </>
         }
+        action={<RequestAccess item={item} />}
       />
     </div>
+  );
+}
+
+/* ASKING FROM WHERE YOU WERE REFUSED. The request is for the module's `view`,
+   the gate every other verb sits behind, and it lands in Members → Access
+   requests for someone holding team.requests to approve into a role. A refusal
+   (already asked, already held, unknown module) stays in the dialog. */
+function RequestAccess({ item }: { item: ModuleItem }) {
+  const { modal, closeLayer, toast } = useShell();
+  return (
+    <Button
+      color="primary"
+      ico="unlock"
+      data-act="request-access"
+      onClick={() =>
+        modal(
+          <ReasonModal
+            heading={"Request access to " + item.label}
+            sub="An Admin reviews it and adds you to a role that holds it."
+            label="Why do you need it?"
+            confirmLabel="Send request"
+            onClose={closeLayer}
+            run={async (reason) => {
+              await call(AdminOpsService.createAccessRequest({ module: item.key, action: "view", reason }));
+              closeLayer();
+              toast("Request sent. An Admin will review it.");
+            }}
+          />,
+        )
+      }
+    >
+      Request access
+    </Button>
   );
 }
