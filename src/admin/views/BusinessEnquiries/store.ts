@@ -568,11 +568,18 @@ export async function loadPage(query: EnquiryQuery, force = false): Promise<void
  *  CURRENT FILTERS, and "how much came in today" has to mean the same thing
  *  whatever the operator has narrowed the list to.
  *  ponytail: two requests on mount. One endpoint returning both windows would
- *  be better; it is not worth a backend change for two integers. */
-export function useIntakeCounts(): { today: number; week: number } {
-  const [n, setN] = useState({ today: 0, week: 0 });
+ *  be better; it is not worth a backend change for two integers.
+ *
+ *  `state` and `retry` are for a reader that has to tell "0" from "not yet" and
+ *  "failed" — the Overview's Enquiries tile (overview/d11). The topbar reads
+ *  only the two numbers, which stay 0 until the counts land. */
+export type IntakeState = "loading" | "ready" | "error";
+export function useIntakeCounts(): { today: number; week: number; state: IntakeState; retry: () => void } {
+  const [n, setN] = useState<{ today: number; week: number; state: IntakeState }>({ today: 0, week: 0, state: "loading" });
+  const [nonce, setNonce] = useState(0);
   useEffect(() => {
     let live = true;
+    setN((x) => ({ ...x, state: "loading" }));
     const count = async (received: string) => {
       const got = await call<EnquiriesResponse<Enquiry>>(
         BusinessEnquiriesService.enquiries<Enquiry>({ pageNo: 1, pageSize: 1, received }));
@@ -581,15 +588,17 @@ export function useIntakeCounts(): { today: number; week: number } {
     void (async () => {
       try {
         const [today, week] = await Promise.all([count("today"), count("7d")]);
-        if (live) setN({ today, week });
+        if (live) setN({ today, week, state: "ready" });
       } catch {
         /* A topbar figure is not worth a failure screen; the boot gate already
-           says when the backend is unreachable. Zeros stand. */
+           says when the backend is unreachable. Zeros stand — and `state` says
+           they are not a count. */
+        if (live) setN((x) => ({ ...x, state: "error" }));
       }
     })();
     return () => { live = false; };
-  }, []);
-  return n;
+  }, [nonce]);
+  return { ...n, retry: () => setNonce((k) => k + 1) };
 }
 
 export function useEnquiryPage(query: EnquiryQuery): PageState {

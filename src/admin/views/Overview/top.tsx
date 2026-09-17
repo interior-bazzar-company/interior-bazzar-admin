@@ -95,8 +95,14 @@ export function Snapshot({ d }: { d: OverviewData }) {
         ))}
         {/* The intake counter answers with a total or with nothing; a backend
             that returns no total leaves the topbar's own zeros standing, so
-            the tile prints a zero rather than the word `undefined`. */}
-        {d.intake
+            the tile prints a zero rather than the word `undefined`. While the
+            counts are answering, or when they failed, the tile says so
+            rather than printing those zeros as a count (d11). */}
+        {d.intake && d.intake.state === "loading"
+          ? <Loading k="Enquiries · 7 days" tip="enquiries" />
+          : d.intake && d.intake.state === "error"
+          ? <Kpi k="Enquiries · 7 days" tip="enquiries" {...NA} s="could not load" foot={<Retry onPress={d.intake.retry} />} />
+          : d.intake
           ? <Kpi k="Enquiries · 7 days" tip="enquiries" v={String(Number(d.intake.week) || 0)} s={(Number(d.intake.today) || 0) + " today"}
               to="#/business-enquiries?received=7d" />
           : <Kpi k="Enquiries · 7 days" tip="enquiries" {...NA} s="not in your access" />}

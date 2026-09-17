@@ -146,7 +146,8 @@ export interface OverviewData {
   ops: OverviewOperations | null;
   opsState: OpsState;
   retryOps: () => void;
-  intake: { today: number; week: number } | null;
+  /** The two intake counts plus their loading / error state (d11). */
+  intake: ReturnType<typeof useIntakeCounts> | null;
   health: HealthCell[];
   /** Empty while any source it reads is still answering (overview/d6). */
   attention: AttentionItem[];
