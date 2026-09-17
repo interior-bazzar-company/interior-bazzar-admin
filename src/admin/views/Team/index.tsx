@@ -75,7 +75,7 @@ export default function Team() {
   }, [closeLayer, toast, modal, go]);
 
   useMembers();
-  const requests = usePendingRequests();
+  const [requests, reloadRequests] = usePendingRequests();
 
   useEffect(() => {
     let cancelled = false;
@@ -334,7 +334,7 @@ export default function Team() {
           )}
         </>
       ) : (
-        <AccessRequests q={requests} />
+        <AccessRequests q={requests} reload={reloadRequests} roles={roles} ops={ops} />
       )}
     </div>
   );

@@ -869,6 +869,16 @@ export class AdminOpsService {
   static accessRequests(params: { state?: string } = {}) {
     return apiService.getGetApiResponse<AccessRequestsResponse>(`${base}/access-requests/${qs(params)}`);
   }
+  /** POST access-requests/ — any panel member, for themselves. Refused when the
+   *  action is unknown, already held, or already waiting. */
+  static createAccessRequest(data: { module: string; action: string; reason?: string }) {
+    return apiService.getPostApiResponse<AccessRequestRow>(`${base}/access-requests/`, data);
+  }
+  /** POST access-requests/<id>/decide/ — team.requests, never your own. Approve
+   *  adds the member to `role`, an active role holding module.action. */
+  static decideAccessRequest(id: number, data: { state: "approved" | "rejected"; role?: number }) {
+    return apiService.getPostApiResponse<AccessRequestRow>(`${base}/access-requests/${id}/decide/`, data);
+  }
   static user(id: number) {
     return apiService.getGetApiResponse<AdminUserRow>(`${base}/users/${id}`);
   }
