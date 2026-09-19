@@ -323,7 +323,7 @@ function Today({ rows, p, bar, onFilter }: {
           title={narrowed ? "No member matches" : "Nobody has clocked in"}
           body={narrowed
             ? "Clear the filters to see the whole day."
-            : "The first Start day of the morning opens a row here."}
+            : "A row appears when somebody opens the panel for the first time today."}
           action={narrowed
             ? <Button color="secondary" ico="x" onClick={() => onFilter("*", "")}>Clear the filters</Button>
             : undefined} />

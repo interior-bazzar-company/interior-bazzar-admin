@@ -181,8 +181,11 @@ export function liveFinance(r: Raw, p: Period, months: string[]): LiveFinance {
   const over = r.byTag.filter((t) => t.overBudget);
 
   const risk: RiskRow[] = [
+    /* Not `#/finance?flag=failed`: that queue filters SUBSCRIPTIONS and these
+       are installments off accepted quotations, most of which have no
+       subscription recorded against them yet -- see derive.ts attentionOf. */
     { key: "failed", label: "Fail to pay", paise: paise(failed), figure: null,
-      count: plural(failed.length, "installment"), tone: "bad", to: "#/finance?flag=failed" },
+      count: plural(failed.length, "installment"), tone: "bad", to: "#/invoices?new=1" },
     { key: "due_next", label: "Due next 30 days", paise: paise(soon), figure: null,
       count: plural(soon.length, "installment"), tone: "mute", to: "#/finance?flag=due" },
   ];

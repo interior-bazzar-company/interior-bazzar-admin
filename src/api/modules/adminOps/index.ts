@@ -2100,8 +2100,12 @@ export class AdminOpsService {
     return apiService.getPostApiResponse<WorkTagRow>(`${base}/work/tags/${id}/restore/`, {});
   }
   /** The caller's own day only. */
-  static attendanceDayAction(action: "open" | "break" | "resume" | "end") {
-    return apiService.getPostApiResponse<AttendanceDayRow>(`${base}/attendance/day/${action}/`, {});
+  /** `auto` marks an open the PANEL did (the shell, on first load of a business
+   *  date) rather than one a person pressed. The server only believes an
+   *  automatic open inside the member's working window; a deliberate one is
+   *  never refused for the hour it arrives at. */
+  static attendanceDayAction(action: "open" | "break" | "resume" | "end", auto?: boolean) {
+    return apiService.getPostApiResponse<AttendanceDayRow>(`${base}/attendance/day/${action}/`, auto ? { auto: true } : {});
   }
   /** Full access only. Times are HH:MM in the member's local time. */
   static correctAttendanceDay(data: { member: number; date: string; startedAt: string; endedAt?: string; breakMinutes?: number; note: string }) {

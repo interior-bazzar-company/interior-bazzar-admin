@@ -443,6 +443,17 @@ async function payrollAndSubs() {
       allSlips().filter((x) => x.p.month !== x.r.month).map((x) => x.p.slipId), []);
     ok("net is gross minus deductions, never CTC divided by twelve",
       allSlips().filter((x) => x.p.netPaise !== x.p.grossPaise - x.p.deductionsPaise).map((x) => x.p.slipId), []);
+    /* THE DOCUMENT'S OWN ARITHMETIC HAS TO LAND ON THE TRANSFER. Slip.tsx sums
+       the slip's LINES rather than trusting the totals beside them, which is
+       right -- and left a slip whose breakdown was never written (everything
+       not built by BuildRun: six of the eight below) summing an EMPTY
+       deductions array to zero and printing the gross as NET PAY. A ₹52,000
+       slip against a ₹45,760 transfer, with the 12% appearing under no name.
+       Every slip's lines now reconcile to the net the server computed. */
+    ok("a slip with no frozen deduction lines still shows what came off it",
+      allSlips().map((x) => S.readSlip(x.p.slipId))
+        .filter((s) => money(s.earnings) + money(s.incentives || []) - money(s.deductions) !== s.netPaise)
+        .map((s) => s.slipId), []);
     ok("paid days and loss of pay account for every day of the month the slip is for",
       allSlips().filter((x) => x.p.paidDays + x.p.lopDays !== S.daysInMonth(x.p.month)).map((x) => x.p.slipId), []);
     ok("a slip issued to a closed account stays on the record",

@@ -84,11 +84,15 @@ export function Finance({ d }: { d: OverviewData }) {
           now={f.cur.netPaise} before={f.prev.netPaise} of={of} to="#/finance-analytics" />
         <Kpi k="In" tip="collected" v={<Money paise={inNow} />} s={inr(f.cur.collectedPaise, { compact: true }) + " subscriptions"}
           now={inNow} before={inPrev} of={of} to="#/finance" />
-        <Kpi k="Out" v={<Money paise={f.cur.outPaise} />} s={inr(f.cur.otherOutPaise, { compact: true }) + " spend · " + inr(f.cur.refundsPaidPaise, { compact: true }) + " refunds"}
+        {/* THE CAPTION NAMES EVERY PART OF THE FIGURE ABOVE IT. Salary is the
+            largest component of `outPaise` and was the one this line left out,
+            so the tile read "₹3.08L" over "₹1.28L spend · ₹500 refunds" and
+            invited the reader to look for the missing ₹1.79L. */}
+        <Kpi k="Out" v={<Money paise={f.cur.outPaise} />} s={inr(f.cur.salaryPaise, { compact: true }) + " salary · " + inr(f.cur.otherOutPaise, { compact: true }) + " spend · " + inr(f.cur.refundsPaidPaise, { compact: true }) + " refunds"}
           now={f.cur.outPaise} before={f.prev.outPaise} good="down" of={of} to="#/finance-transactions" />
         <Kpi k="Due in 30 days" tip="duesoon" v={<Money paise={f.dueSoon.paise} />} s={f.dueSoon.n + " installment" + (f.dueSoon.n === 1 ? "" : "s")} to="#/finance?flag=due" />
         <Kpi k="Failed to pay" v={f.failed.n ? <Money paise={f.failed.paise} /> : "—"} s={f.failed.n ? f.failed.n + " installment" + (f.failed.n === 1 ? "" : "s") : "nothing bounced"}
-          tone={f.failed.n ? "bad" : "ok"} to="#/finance?flag=failed" />
+          tone={f.failed.n ? "bad" : "ok"} to={f.failed.n ? "#/invoices?new=1" : undefined} />
         <Kpi k="Refunds owed" v={f.refundsOwed.n ? <Money paise={f.refundsOwed.paise} /> : "—"}
           s={f.refundsOwed.n ? f.refundsOwed.n + " approved, not sent" : f.refundsOpen ? f.refundsOpen + " request" + (f.refundsOpen === 1 ? "" : "s") + " to decide" : "nothing waiting"}
           tone={f.refundsOwed.n ? "warn" : undefined} to="#/finance-refunds" />

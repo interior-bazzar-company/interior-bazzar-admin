@@ -132,9 +132,19 @@ export interface OwnerRow { name: string; open: number; value: number; won: numb
 export interface StageRow { stage: number; key: string; label: string; tone: string; n: number; value: number }
 export interface DealMetrics {
   total: number; open: number; openValue: number; unquoted: number;
-  /** The snapshot's Pipeline value (d3, 2026-09-11): deals still open NOW that
-   *  were created inside the period. `open` / `openValue` above stay the whole
-   *  open book for the sections that read it. */
+  /** The snapshot's Pipeline value and the Pipeline health cell.
+   *
+   *  A PIPELINE IS A LEVEL, NOT A FLOW. This was "open now AND created inside
+   *  the period" (d3, 2026-09-11), which is a category error: Collected, Won
+   *  and Conversion are things that HAPPENED in a window and belong in one,
+   *  and the pipeline is what is standing at this moment and does not. The
+   *  consequence was one page stating both "PIPELINE ₹0" and "14 open ·
+   *  ₹46.31L" off the same rows, and a health cell reading "0 of 1 open deals
+   *  stalled" whose own link opened all of them.
+   *
+   *  Kept under this name because two tiles read these keys; it is now the
+   *  whole open book, the same figures `open` / `openValue` / `stalled`
+   *  carry. */
   openInPeriod: { n: number; value: number; unquoted: number; stalled: number };
   stalled: number; stalledValue: number;
   won: { n: number; value: number }; wonPrev: { n: number; value: number };
@@ -162,7 +172,6 @@ export function dealMetrics(list: DealRec[], p: Period, today: string, stages: D
   const final = new Set(stages.filter((s) => s.isTerminal).map((s) => s.key));
   const isOpen = (d: DealRec) => !final.has(keyOf(d));
   const open = list.filter(isOpen);
-  const openNew = open.filter((d) => inRange(d.created_at, p.from, p.to));
   const wonNow = closedIn(list, "won", p.from, p.to);
   const lostNow = closedIn(list, "lost", p.from, p.to);
   const wonPrev = closedIn(list, "won", p.prevFrom, p.prevTo);
@@ -224,8 +233,8 @@ export function dealMetrics(list: DealRec[], p: Period, today: string, stages: D
     total: list.length, open: open.length, openValue: sumValue(open),
     unquoted: open.filter((d) => d.deal_value === null).length,
     openInPeriod: {
-      n: openNew.length, value: sumValue(openNew), unquoted: openNew.filter((d) => d.deal_value === null).length,
-      stalled: openNew.filter((d) => d.is_stalled).length,
+      n: open.length, value: sumValue(open), unquoted: open.filter((d) => d.deal_value === null).length,
+      stalled: stalled.length,
     },
     stalled: stalled.length, stalledValue: sumValue(stalled),
     won: { n: wonNow.length, value: sumValue(wonNow) }, wonPrev: { n: wonPrev.length, value: sumValue(wonPrev) },
@@ -257,8 +266,8 @@ export interface HealthTeam {
 export function healthOf(deals: DealMetrics | null, fin: HealthMoney | null, team: HealthTeam | null): HealthCell[] {
   const out: HealthCell[] = [];
   if (deals) {
-    /* The same deals as the Pipeline value tile: open now, created in the
-       period (d3, 2026-09-11). */
+    /* The same deals as the Pipeline value tile, and the same ones
+       `#/deals?stalled=1` opens: the whole open book, at this moment. */
     const { n, stalled } = deals.openInPeriod;
     const share = n ? (stalled / n) * 100 : null;
     out.push({
@@ -269,7 +278,11 @@ export function healthOf(deals: DealMetrics | null, fin: HealthMoney | null, tea
   }
   if (fin) {
     out.push({
-      key: "collections", label: "Collections", to: "#/finance?flag=" + (fin.failed.n ? "failed" : "due"),
+      /* Failed goes to the Invoices pick page and not to `?flag=failed` -- see
+         the attention item below for why that queue cannot list these. The
+         `due` branch is left where it was: it is the same mismatch and is not
+         in scope here. */
+      key: "collections", label: "Collections", to: fin.failed.n ? "#/invoices?new=1" : "#/finance?flag=due",
       tone: fin.failed.n ? "bad" : fin.overdue.n ? "warn" : "ok",
       why: fin.failed.n ? fin.failed.n + " failed installment" + (fin.failed.n === 1 ? "" : "s")
         : fin.overdue.n ? fin.overdue.n + " installment" + (fin.overdue.n === 1 ? "" : "s") + " past due" : "nothing failed or past due",
@@ -360,10 +373,22 @@ export function attentionItems(deals: DealMetrics | null, fin: AttentionMoney | 
     }
   }
   if (fin) {
+    /* WHERE THIS LANDS IS NOT THE SUBSCRIPTIONS QUEUE. The count comes from
+       the INSTALLMENTS endpoint -- every schedule row on every accepted
+       quotation, stored or computed. `#/finance?flag=failed` filters
+       SUBSCRIPTIONS, which exist only once somebody records one against an
+       issued invoice, so the queue answered "Nothing is failing right now" to
+       the same reader this line had just told six things were. Different
+       populations, one label.
+
+       The Invoices pick page is the list that actually holds them: every deal
+       with an accepted quotation and money still uncollected, per quotation,
+       with the "n of 4 already invoiced" count -- and it is where the failed
+       row is acted on. */
     if (fin.failed.n) push({
       id: "fin:failed", area: "finance", severity: "bad", title: cmp(fin.failed.paise) + " failed to pay",
-      sub: plural(fin.failed.n, "installment") + " bounced and not retried", metric: inr(fin.failed.paise),
-      to: "#/finance?flag=failed", toLabel: "Subscriptions", rank: fin.failed.paise,
+      sub: plural(fin.failed.n, "installment") + " past its due date and not billed", metric: inr(fin.failed.paise),
+      to: "#/invoices?new=1", toLabel: "Bill it", rank: fin.failed.paise,
     });
     if (fin.overdue.n) push({
       id: "fin:overdue", area: "finance", severity: "warn", title: cmp(fin.overdue.paise) + " past due",

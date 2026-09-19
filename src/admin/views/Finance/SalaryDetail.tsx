@@ -20,7 +20,7 @@ import { can, useNav } from "../../shell/AdminShell";
 import { Alert, Button, Card, EmptyState, Icon, KvList, ListTable, Pill, Tabs } from "../../ui";
 import { go } from "../../ui/nav";
 import { Rec, Blocks } from "./Frame";
-import { EventList, Fine, Ledger, LedgerRow, Money, ProtoBar } from "./bits";
+import { EventList, Fine, Ledger, LedgerRow, Money } from "./bits";
 import { CloseAccountModal, SalaryAccountModal } from "./SalaryModals";
 import {
   SLIP_RULE, ago, fmtDate, fmtDateTime, fmtMonth, incentiveOf, inr, slipsOf, useSalaryAccount,
@@ -59,7 +59,6 @@ export default function SalaryDetail({ id, p, onParams }: {
   if (!row) {
     return (
       <div className="flex min-w-0 flex-col gap-4">
-        <ProtoBar />
         <EmptyState icon="search" title="No salary account at that address"
           body={<>There is no record for <span className="font-mono tnum">{id}</span>.</>}
           action={<Button color="primary" onClick={() => navGo(back)}>Back to Salaries A/C</Button>} />

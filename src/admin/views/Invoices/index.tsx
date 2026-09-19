@@ -136,13 +136,25 @@ function InvoicesList() {
   const yrs = head ? "" : " yours";
 
   const byStatus: Record<string, number> = {};
-  let invoiced = 0, received = 0, overdue = 0;
+  /* `invoiced` and `received` are the SAME SUM over the same rows, because
+     Issue writes the deal-payment ledger row in its own transaction: an issued
+     invoice is a paid one, which is why the list labels that status "Paid".
+     `outstanding` was `invoiced - received` and could therefore only ever
+     print ₹0 -- a cell that was arithmetically dead from the day it was
+     written, on the page a customer's unbilled money is read off.
+
+     What is genuinely outstanding on this page is the DRAFTS: an invoice that
+     names money, cites its quotation, carries a due date the overdue cell
+     already counts against -- and has never been issued, so nothing was ever
+     asked for. On DL-2515 that is the ₹2,80,693 the page was reporting as ₹0
+     while flagging both of those drafts overdue in the cell beside it. */
+  let invoiced = 0, received = 0, overdue = 0, outstanding = 0;
   all.forEach((inv) => {
     byStatus[inv.status] = (byStatus[inv.status] || 0) + 1;
     if (inv.status === "issued") { invoiced += inv.grandTotalPaise; received += inv.grandTotalPaise; }
+    if (inv.status === "draft") outstanding += inv.grandTotalPaise;
     if (isOverdue(inv)) overdue += 1;
   });
-  const outstanding = invoiced - received;
   function route(k: string, v: string) {
     const q2: Record<string, string> = { ...params };
     q2[k] = String(params[k] || "") === String(v) ? "" : v;
@@ -175,8 +187,8 @@ function InvoicesList() {
        to everyone but its owner and a full-access admin. The label says whose
        books it covers rather than implying nothing is stuck anywhere. */
     { k: "outstanding" + mine, v: inr(outstanding, { compact: true }), tone: outstanding ? "bad" : "",
-      title: "Stuck after Issue -- needs Log payment on the deal"
-        + (head ? "" : " — covers YOUR invoices only; one stuck on a deal that is not yours is not counted here") },
+      title: "Drafted and never issued -- money named on an invoice nobody has asked for"
+        + (head ? "" : " — covers YOUR invoices only; a draft on a deal that is not yours is not counted here") },
   ];
 
   const chips = Object.keys(params).filter((k) => params[k]).length > 0;

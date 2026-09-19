@@ -6,7 +6,7 @@
    only what happened and, when it applies, the reason somebody wrote it off.
    A row that should not stand is CANCELLED and the correct one is recorded
    fresh; nothing is ever rewritten and nothing is ever deleted.
-   `Rec` from Frame.tsx supplies the id bar, the ProtoBar and Back; this file
+   `Rec` from Frame.tsx supplies the id bar and Back; this file
    supplies only what a company transaction means.
    ============================================================================= */
 import type { ReactNode } from "react";
@@ -15,7 +15,7 @@ import { can } from "../../shell/AdminShell";
 import { Alert, Button, Card, EmptyState, Icon, KvList, Tabs, qs } from "../../ui";
 import { go } from "../../ui/nav";
 import { Blocks, Rec } from "./Frame";
-import { Dir, EventList, Fine, Money, ProtoBar, TagChip, TxnMenu, TxnPill } from "./bits";
+import { Dir, EventList, Fine, Money, TagChip, TxnMenu, TxnPill } from "./bits";
 import { CancelTxnModal } from "./TxnModals";
 import {
   BILL_THRESHOLD_PAISE, CREDIT_KINDS,
@@ -48,7 +48,6 @@ export default function TxnDetail({ id, p, onParams }: {
   if (!row) {
     return (
       <div className="flex min-w-0 flex-col gap-4">
-        <ProtoBar />
         <EmptyState icon="search" title="No transaction at that address"
           body={<>There is no record for <span className="font-mono tnum">{id}</span>.</>}
           action={<Button color="primary" onClick={() => go(back)}>Back to transactions</Button>} />

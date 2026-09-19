@@ -12,7 +12,7 @@ import { can } from "../../shell/AdminShell";
 import { Alert, Button, Card, EmptyState, KvList, Tabs, qs } from "../../ui";
 import { go } from "../../ui/nav";
 import { Blocks, Rec } from "./Frame";
-import { ActionMenu, Check, EventList, Fine, Money, OriginTag, ProtoBar, RefundPill } from "./bits";
+import { ActionMenu, Check, EventList, Fine, Money, OriginTag, RefundPill } from "./bits";
 import {
   DecideRefundModal, RecordTransferModal,
 } from "./RefundModals";
@@ -32,7 +32,6 @@ export default function RefundDetail({ id, p, onParams }: {
   if (!row) {
     return (
       <div className="flex min-w-0 flex-col gap-4">
-        <ProtoBar />
         <EmptyState icon="search" title="No refund at that address"
           body={<>There is no request for <span className="font-mono tnum">{id}</span>.</>}
           action={<Button color="primary" onClick={() => go(back)}>Back to Refunds</Button>} />

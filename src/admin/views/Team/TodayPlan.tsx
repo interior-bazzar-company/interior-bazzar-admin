@@ -37,8 +37,8 @@ import { cx } from "@/utils/cx";
 import { Button, Card, Checkbox, Icon, IconButton, Input, Pill } from "../../ui";
 import { useShell } from "../../shell/ShellContext";
 import {
-  TODAY, addPlanLine, fmtDate, isDelayed, isTerminal, meId, readMember, submitPlan,
-  usePlan, useWork,
+  TODAY, addPlanLine, fmtDate, isDelayed, isTerminal, meId, openDay, readMember, submitPlan,
+  useMyDay, usePlan, useWork,
 } from "./store";
 import type { Priority, WorkItem } from "./store";
 import { EodModal } from "./member/reportForms";
@@ -71,6 +71,11 @@ export function TodayPlanMenu({ who }: { who?: string } = {}) {
   const me = who || meId();
   const plan = usePlan(me);
   const mine = useWork({ member: me }, "all");
+  /* Today's attendance row, for the backup button below and nothing else. The
+     day is normally opened by the shell the moment the panel mounts
+     (shell/AdminShell.tsx), so on a normal morning it is already here by the
+     time this note is first opened and the button never draws. */
+  const { day } = useMyDay();
 
   const [open, setOpen] = useState(false);
 
@@ -127,6 +132,10 @@ export function TodayPlanMenu({ who }: { who?: string } = {}) {
 
   const chosen = openTasks.filter((i) => picked[i.itemId]);
   const total = chosen.length + extra.length;
+  /* An open day can be closed whether or not a plan was ever filed. Closing
+     used to ride along with the plan button, which left a member who planned
+     nothing no way to end their day from here at all. */
+  const canClose = !!day && !day.endedAt;
 
   /* Adding after the plan is in appends to it — same minting rule, same
      linking — rather than being refused with "change the work items instead",
@@ -142,6 +151,20 @@ export function TodayPlanMenu({ who }: { who?: string } = {}) {
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
     setOpen(false);
     shell.toast("Today's plan is in — " + lines.length + " to do.");
+  };
+
+  /* THE BACKUP, NOT THE NORMAL PATH. Opening the panel is the mark
+     (shell/AdminShell.tsx); this is here for the morning that request did not
+     land -- no work settings yet, a dead network, a refusal. Same endpoint, so
+     pressing it cannot make a second row, and it is gone the moment one exists.
+
+     IT SAYS IF IT LANDED LATE. Lateness is stamped at this instant and never
+     recomputed, so somebody starting their day by hand at eleven has a right to
+     hear that now rather than read it in a report next week. */
+  const startDay = async () => {
+    const r = await openDay(me);
+    if (!r.ok) { shell.toast(r.message, "bad"); return; }
+    shell.toast(r.data.isLate ? "Day started — marked late." : "Day started.");
   };
 
   const endDay = () => {
@@ -220,6 +243,12 @@ export function TodayPlanMenu({ who }: { who?: string } = {}) {
               <div className="flex items-center gap-3">
                 <span className="text-xs text-tertiary tnum">{footNote}</span>
                 <span className="flex-1" />
+                {/* ONLY WHEN THE MARK IS MISSING. On a normal morning the first
+                    boot opened the day and this is not drawn at all. */}
+                {day ? null : <Button color="secondary" size="xs" onClick={startDay}>Start day</Button>}
+                {!done && canClose
+                  ? <Button color="secondary" size="xs" onClick={endDay}>End the day…</Button>
+                  : null}
                 {done
                   ? <Button color="primary" size="xs" onClick={endDay}>End the day…</Button>
                   : <Button color="primary" size="xs" isDisabled={!total} onClick={put}>Put the plan in</Button>}

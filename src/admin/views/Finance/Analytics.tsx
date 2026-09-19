@@ -196,19 +196,27 @@ function Overview() {
   });
 
   /* Zero-spend tags are dropped rather than drawn as empty tracks. A tag with
-     nothing against it this month is not a small bar, it is not a bar. */
-  const spendRows: BarRow[] = tags.rows.filter((r) => r.spentPaise > 0).map((r) => ({
-    key: r.tag.tagKey,
-    label: <TagChip k={r.tag.tagKey} />,
-    value: Math.round(r.spentPaise / 100),
-    hint: r.pctOfBudget === null
-      ? <>{r.n} payment{r.n === 1 ? "" : "s"}</>
-      : <span className={r.overBudget ? "text-error-primary" : undefined}>{r.pctOfBudget}% of budget</span>,
-    /* The hover line is a description too, and it was a sentence. Four facts,
-       separated, is what a tooltip is for. */
-    title: inr(r.spentPaise) + " · " + r.n + " payment" + (r.n === 1 ? "" : "s")
-      + " · " + r.tag.kind + (r.overBudget ? " · over budget" : ""),
-  }));
+     nothing against it this month is not a small bar, it is not a bar.
+
+     EXCLUDED TAGS ARE DROPPED TOO -- tax and statutory money is counted apart
+     from spend on every other figure in this module, and drawing it as a bar
+     under a total that does not contain it is how the same month came to have
+     two different "spend" numbers on one screen. Transactions shows it on its
+     own `Excluded spend` cell. */
+  const spendRows: BarRow[] = tags.rows
+    .filter((r) => r.spentPaise > 0 && r.tag.kind !== "excluded")
+    .map((r) => ({
+      key: r.tag.tagKey,
+      label: <TagChip k={r.tag.tagKey} />,
+      value: Math.round(r.spentPaise / 100),
+      hint: r.pctOfBudget === null
+        ? <>{r.n} payment{r.n === 1 ? "" : "s"}</>
+        : <span className={r.overBudget ? "text-error-primary" : undefined}>{r.pctOfBudget}% of budget</span>,
+      /* The hover line is a description too, and it was a sentence. Four facts,
+         separated, is what a tooltip is for. */
+      title: inr(r.spentPaise) + " · " + r.n + " payment" + (r.n === 1 ? "" : "s")
+        + " · " + r.tag.kind + (r.overBudget ? " · over budget" : ""),
+    }));
 
   return (
     <div className="flex min-w-0 flex-col gap-5">

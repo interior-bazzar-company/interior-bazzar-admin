@@ -377,7 +377,7 @@ const pending = (key: string, label: string, to: string, st: LiveState): HealthC
 export function liveHealth(deals: DealMetrics | null, money: LiveMoney | null, moneySt: LiveState,
   team: LiveTeam | null, teamSt: LiveState): HealthCell[] {
   const out = healthOf(deals, money, team);
-  if (moneySt === "loading" || moneySt === "error") out.push(pending("collections", "Collections", "#/finance?flag=failed", moneySt));
+  if (moneySt === "loading" || moneySt === "error") out.push(pending("collections", "Collections", "#/finance?flag=due", moneySt));
   if (teamSt === "loading" || teamSt === "error") {
     out.push(pending("team", "Team", "#/attendance?face=history", teamSt));
     out.push(pending("delivery", "Delivery", "#/work?status=delayed", teamSt));

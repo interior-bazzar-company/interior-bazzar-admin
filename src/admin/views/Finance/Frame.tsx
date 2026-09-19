@@ -17,8 +17,7 @@ import type { ReactNode } from "react";
 import { Card, PageHeader, Segmented, Tabs } from "../../ui";
 import { MoreMenu } from "../../ui/menu";
 import type { MenuItem } from "../../ui/menu";
-import { ProtoBar } from "./bits";
-import { RECORD_TYPES, resetStore } from "./store";
+import { RECORD_TYPES } from "./store";
 import type { Params } from "./store";
 
 /* THE SECTIONS AND THEIR ROUTES. Each is its own sidebar row and its own
@@ -73,8 +72,8 @@ export function SubTabs({ items, cur, onPick, right }: {
 }
 
 /** The workspace a section renders inside — the panel's page skeleton, in
- *  order: the proto notice, the header, the filters, the strip, the body. */
-export function Frame({ title, meta, actions, tabs, cmd, bands, children, toast }: {
+ *  order: the header, the filters, the strip, the body. */
+export function Frame({ title, meta, actions, tabs, cmd, bands, children }: {
   /** What this section is. Absent on a face that is only a body (a record's
    *  sub-page supplies its own header). */
   title?: ReactNode;
@@ -94,7 +93,6 @@ export function Frame({ title, meta, actions, tabs, cmd, bands, children, toast 
 }) {
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      <ProtoBar onReset={() => { resetStore(); if (toast) toast("Back to the seed."); }} />
       {title !== undefined ? (
         <PageHeader className="mb-0" title={title} meta={meta} actions={actions} tabs={tabs} />
       ) : tabs}
@@ -147,7 +145,6 @@ export function Rec({ id, pills, sub, back, actions, menu, children }: {
 }) {
   return (
     <div className="flex min-w-0 flex-col gap-4">
-      <ProtoBar />
       <PageHeader
         className="mb-0"
         back={{ label: "Back", to: back }}

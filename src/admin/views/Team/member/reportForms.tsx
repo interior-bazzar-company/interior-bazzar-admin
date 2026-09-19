@@ -28,7 +28,7 @@ import { cx } from "@/utils/cx";
 import { go } from "../../../ui/nav";
 import { useShell } from "../../../shell/ShellContext";
 import {
-  TODAY, fmtHM, fmtTime, meId, submitPlan, submitReport, usePlan, useReport, useReview, useWork,
+  TODAY, endDay, fmtHM, fmtTime, meId, submitPlan, submitReport, usePlan, useReport, useReview, useWork,
 } from "../store";
 import type { Member, Priority, WorkItem } from "../store";
 
@@ -185,8 +185,21 @@ export function EodModal({ m }: { m: Member }) {
       tomorrowPriority: tomorrow,
     });
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
+    /* THE REPORT IS THE RECORD; CLOSING FOLLOWS IT. Filing the EOD is the
+       member marking their own day done -- nothing auto-closes a forgotten day,
+       by design, and nothing here closes one that is already closed or was
+       never opened.
+
+       IT NEVER FAILS THE REPORT. The report is filed either way: an unclosed
+       day is a question somebody can still answer, a lost report is gone. So
+       the refusal is said out loud rather than swallowed or rolled back. */
+    const closed = day && !day.endedAt ? await endDay(m.memberId) : null;
     shell.closeLayer();
-    shell.toast("Report submitted.");
+    if (closed && !closed.ok) {
+      shell.toast("Report filed, but the day did not close: " + closed.message, "bad");
+      return;
+    }
+    shell.toast(closed ? "Report submitted, day closed." : "Report submitted.");
   };
 
   if (report && report.submittedAt) {

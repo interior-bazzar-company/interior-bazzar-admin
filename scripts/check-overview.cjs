@@ -117,7 +117,12 @@ esbuild.build({
   eq("open is every deal before Won", m.open, 5);
   eq("pipeline value sums valued open deals only", m.openValue, L(4.8) + L(4.8) + L(2) + L(0.8));
   eq("...and counts the unvalued one", m.unquoted, 1);
-  eq("the snapshot's pipeline is open now AND created in the period (d3)", m.openInPeriod, { n: 3, value: L(4.8) + L(4.8) + L(0.8), unquoted: 0, stalled: 1 });
+  /* A PIPELINE IS A LEVEL. It was "open now AND created in the period" (d3),
+     which printed ₹0 on the snapshot while the Deals section below it showed
+     the same rows as ₹46.31L. It is the whole open book now, and the tile and
+     `openValue` can no longer disagree. */
+  eq("the snapshot's pipeline is the whole open book, not a slice of the period", m.openInPeriod,
+     { n: m.open, value: m.openValue, unquoted: m.unquoted, stalled: m.stalled });
   eq("a vocabulary that marks nothing final leaves every deal open", S.dealMetrics(DEALS, p30, TODAY, []).open, DEALS.length);
   eq("stalled counts open deals only, so the stalled Won deal is not one", [m.stalled, m.stalledValue], [1, L(4.8)]);
   eq("won in period is by the date the deal reached Won", [m.won.n, m.won.value], [2, L(5)]);
@@ -174,15 +179,20 @@ esbuild.build({
   /* ------------------------------------------------------------ health --- */
   head("Health");
   const H = (deals, fin, team) => S.healthOf(deals, fin, team).map((h) => h.key + ":" + h.tone);
-  /* Pipeline reads openInPeriod -- the same deals as the Pipeline value tile
-     (d3) -- not the whole open book, so the whole-book figures are set to
-     disagree and must be ignored. */
+  /* Pipeline reads openInPeriod, the same deals as the Pipeline value tile:
+     the whole open book. The whole-book fields are set to disagree here so a
+     cell that went back to reading them would fail rather than pass by
+     coincidence. */
   const pl = (n, stalled) => ({ open: 99, stalled: 0, openInPeriod: { n, value: 0, unquoted: 0, stalled } });
   eq("pipeline: under 15% stalled is ok", H(pl(10, 1), null, null), ["pipeline:ok"]);
   eq("pipeline: under 35% is a watch", H(pl(10, 3), null, null), ["pipeline:warn"]);
   eq("pipeline: more is a problem", H(pl(10, 5), null, null), ["pipeline:bad"]);
-  eq("pipeline: no open deals in the period is mute, not ok", H(pl(0, 0), null, null), ["pipeline:mute"]);
-  eq("pipeline: the fixture's period deals, 1 of 3 stalled, is a watch", [S.healthOf(m, null, null)[0].tone, S.healthOf(m, null, null)[0].why], ["warn", "1 of 3 open deals stalled"]);
+  eq("pipeline: no open deals at all is mute, not ok", H(pl(0, 0), null, null), ["pipeline:mute"]);
+  eq("pipeline: the fixture's open deals, 1 of 5 stalled, is a watch", [S.healthOf(m, null, null)[0].tone, S.healthOf(m, null, null)[0].why], ["warn", "1 of 5 open deals stalled"]);
+  /* The cell's own link opens every stalled deal, unfiltered -- so the count
+     it prints has to be over every open deal, or it sends the reader to a list
+     longer than the number it just quoted. */
+  eq("pipeline: the cell links to the deals it counted", S.healthOf(m, null, null)[0].to, "#/deals?stalled=1");
   eq("collections: a failed installment is a problem; past due alone is a watch", [
     H(null, { failed: { n: 1 }, overdue: { n: 0 } }, null)[0], H(null, { failed: { n: 0 }, overdue: { n: 2 } }, null)[0], H(null, { failed: { n: 0 }, overdue: { n: 0 } }, null)[0],
   ], ["collections:bad", "collections:warn", "collections:ok"]);

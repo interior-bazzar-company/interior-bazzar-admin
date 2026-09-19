@@ -116,6 +116,42 @@ export default function AdminShell() {
   const go = useCallback((hash: string) => navigate(hashToPath(hash)), [navigate]);
   useEffect(() => setGo(go), [go]);
 
+  /* ATTENDANCE IS MARKED BY BEING HERE (2026-09-18). Opening the panel for the
+     first time on a business date opens that member's attendance day. Signing
+     in does NOT: a session can be a day old, a token refresh is not a person,
+     and somebody checking one number at 23:40 has not started a shift -- so the
+     mark is the shell mounting, which is a thing a person did just now.
+
+     LATENESS IS STAMPED AT THIS INSTANT and never recomputed, against that
+     member's own dayStartsAt + graceMinutes (AttendanceController._late). A
+     member who was at their desk at nine and opened the panel at eleven is
+     late, and that is the decision, not a bug.
+
+     ONE POST, AND THE SERVER DECIDES WHETHER TO BELIEVE IT. It is idempotent
+     behind a unique (member, businessDate) and returns the day that already
+     exists, so checking first would cost a second request to learn what this
+     one says. `auto` is what makes it checkable: the server takes an automatic
+     open only inside that member's working window -- from 15 minutes before
+     their start to half a day after it -- and not at all on an approved leave
+     day (AttendanceController.Open). Opening the panel at 23:40, or at 00:30,
+     or on your leave, now records NOTHING rather than a day nobody worked.
+     Nothing is read from the response either way.
+
+     IT IS SILENT, AND THAT IS WHY THERE IS A BUTTON. Nobody asked for this
+     request, so a toast about it would be the panel complaining about its own
+     housekeeping. When it does not land -- no work settings yet, a dead
+     network, a refusal -- Today's plan shows Start day, and that IS the
+     message. A refusal is not retried on this load; a person is.
+
+     NOT IMPORTED FROM Team/store. The entry chunk carries the shell, the
+     library and nothing else (views/registry.tsx), and reaching that store for
+     this would pull all of it, plus its ~23-request boot, onto every panel load
+     including the ones that never open a Team route. */
+  useEffect(() => {
+    if (!getSession()?.user) return;
+    void call(AdminOpsService.attendanceDayAction("open", true)).catch(() => undefined);
+  }, []);
+
   const here = location.pathname + location.search;
   const search = useMemo(() => new URLSearchParams(location.search), [location.search]);
   const isDeep = !!(id || search.get("new") || search.get("mode") || search.get("view") === "tags");

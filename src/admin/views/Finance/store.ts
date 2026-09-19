@@ -755,7 +755,16 @@ function liveSlip(s: PayslipRow, acc: SalaryAccount | null): Payslip {
   const adjustmentLabel = b.adjustmentReason || "Adjustment";
   const incentives = oneLine("incentive", "Incentive", incentive)
     .concat(adjustment > 0 ? [{ key: "adjustment", label: adjustmentLabel, amountPaise: adjustment }] : []);
-  const deductions = sideOf(b.deductions, "deduction")
+  /* A SLIP WITH NO FROZEN LINES STILL HAD DEDUCTIONS TAKEN. `deductionsPaise`
+     is the server's own figure and the one net was computed from
+     (net = gross - deductions + incentive + adjustment); the breakdown is a
+     copy of what it was MADE of, and a slip written outside BuildRun carries
+     the figure with nothing behind it. Reading the empty array alone printed
+     zero deductions and therefore the GROSS as NET PAY -- a payslip claiming a
+     transfer 12% larger than the one that happened. Falls back exactly the way
+     `base` does above. */
+  const dedLines = sideOf(b.deductions, "deduction");
+  const deductions = (dedLines.length ? dedLines : oneLine("deductions", "Deductions", s.deductionsPaise))
     .concat(adjustment < 0 ? [{ key: "adjustment", label: adjustmentLabel, amountPaise: -adjustment }] : []);
   return {
     slipId: SLIP + s.id,
@@ -1776,7 +1785,17 @@ export function tagTotals(from = livePeriodOf().from, to = livePeriodOf().to): {
       pctOfBudget: tag.budgetPaise ? Math.round((spentPaise / tag.budgetPaise) * 100) : null,
     };
   }).sort((a, b) => b.spentPaise - a.spentPaise);
-  return { rows, totalPaise: rows.reduce((n, r) => n + r.spentPaise, 0) };
+  /* THE TOTAL IS OPERATING SPEND, the same split `overview()` takes below: a
+     tag whose kind is `excluded` is tax and statutory money, counted APART
+     from spend everywhere else in this module. Summing it in here made the
+     by-tag panel head print a figure that disagreed with the Out and Other
+     Transaction figures on the same screen, for the same month, off the same
+     rows. The ROWS still carry every tag -- the budget editor and the tag
+     pickers read them, and an excluded tag has a budget like any other. */
+  return {
+    rows,
+    totalPaise: rows.reduce((n, r) => n + (r.tag.kind === "excluded" ? 0 : r.spentPaise), 0),
+  };
 }
 
 /* ======================================================== refund rows === */

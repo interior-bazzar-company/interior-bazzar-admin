@@ -120,29 +120,6 @@ export function TxnMenu({ txn, sa, onCancel, onOpen, onCopied }: {
   );
 }
 
-/* -------------------------------------------------------------- notices --- */
-
-/** Deliberately loud, never dismissible — and now the panel's own Alert, so
- *  the sentence that says "none of this is live" is drawn the same way as
- *  every other condition a page states about itself. */
-export function ProtoBar({ onReset }: { onReset?: () => void }) {
-  return (
-    <Alert
-      tone="info"
-      className="text-xs"
-      action={onReset && import.meta.env.DEV
-        ? <Button color="secondary" size="xs" onClick={onReset}>Reset</Button>
-        : undefined}
-    >
-      <b className="font-semibold text-primary">Live and seed, side by side.</b> Other Transaction,
-      Refunds, the bank statements and Analytics read and write the server, on the server's clock.
-      What is still backed by{" "}
-      <span className="font-mono">src/content/finance/</span> runs on the seed clock and its actions
-      write to this tab only.
-    </Alert>
-  );
-}
-
 /* ---------------------------------------------------------------- pills --- */
 /* Every state in this module is the panel's ONE Pill, wearing the tone the
    store's own vocabulary assigns it. The five names below survive because a
