@@ -10,7 +10,7 @@ import {
 } from "../../ui";
 import type { MenuItem, StatCell } from "../../ui";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
-import { getSession } from "../../auth/session";
+import { scopeLabel, scopeOf, scopeOnly, wideScope } from "../../auth/session";
 import { useShell } from "../../shell/ShellContext";
 import { ListSkeleton } from "../../ui";
 import { STATUS_LABEL, STATUS_TONE, useInvoicesList } from "./api";
@@ -107,8 +107,11 @@ function InvoicesList() {
      to its own rows, so the picker would be a one-option list filtering
      nothing. Locked controls are ABSENT here, not greyed -- same as
      Quotations. */
-  const session = getSession();
-  const head = !!(session && session.isFullAccess);
+  /* WIDER THAN THIS PERSON — the test that decides both the Owner filter and
+     the wording below. It used to be `isFullAccess`, which pinned every other
+     role to its own rows whatever the roles grid said: accounts own no deals
+     at all, so they read 0 everywhere and could not bill anybody. */
+  const head = wideScope("invoices");
   const owners = useMemo(() => {
     const m = new Map<number, string>();
     all.forEach((x) => { if (x.owner) m.set(x.owner.id, x.owner.name); });
@@ -131,9 +134,13 @@ function InvoicesList() {
      identically-worded cells. The labels carry the scope: `mine` marks the
      money cells, `only` ends the tooltips, and both are empty for a full-access
      viewer — whose wording is unchanged. Same pattern as Quotations. */
-  const mine = head ? "" : " · yours";
-  const only = head ? "" : " — yours only";
-  const yrs = head ? "" : " yours";
+  /* THE LABELS CARRY THE SCOPE, and there are three of it, not two. "yours"
+     over a list that is not yours is the wording that had a manager reporting
+     the company pipeline as empty; `all` gets no qualifier because the
+     unqualified reading is then the true one. */
+  const mine = scopeLabel("invoices");
+  const only = scopeOnly("invoices");
+  const yrs = scopeOf("invoices") === "all" ? "" : mine.replace(" · ", " ");
 
   const byStatus: Record<string, number> = {};
   /* `invoiced` and `received` are the SAME SUM over the same rows, because
@@ -183,12 +190,12 @@ function InvoicesList() {
       title: "Written to the deal ledger by Issue itself, in the same transaction -- not recomputed here" + only },
     "sep",
     /* An ALARM, and a scoped one: it can only ever ring about invoices this
-       session can see, so an invoice stuck on somebody else's deal is invisible
-       to everyone but its owner and a full-access admin. The label says whose
-       books it covers rather than implying nothing is stuck anywhere. */
+       session can see, so an invoice stuck outside that scope is invisible
+       here. The label says whose books it covers rather than implying nothing
+       is stuck anywhere. */
     { k: "outstanding" + mine, v: inr(outstanding, { compact: true }), tone: outstanding ? "bad" : "",
       title: "Drafted and never issued -- money named on an invoice nobody has asked for"
-        + (head ? "" : " — covers YOUR invoices only; a draft on a deal that is not yours is not counted here") },
+        + (head ? "" : " — covers " + only.replace(" — ", "") + "; a draft on a deal outside that is not counted here") },
   ];
 
   const chips = Object.keys(params).filter((k) => params[k]).length > 0;

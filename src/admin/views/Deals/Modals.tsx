@@ -126,6 +126,16 @@ export function useActs(p: Params) {
 
     /* --------------------------------------------------------- ownership */
     reassign(ref: string) { modal(<ReassignModal dealRef={ref} onClose={close} done={done} />); },
+    /* THE HANDOVER. Operates on the rows currently FILTERED, which is the same
+       set Export CSV takes — so the manager's move is: filter Owner to the
+       person who left, then reassign what comes back. There is deliberately no
+       per-row checkbox: the filter already expresses "this person's open
+       deals" better than fourteen ticks do, and it is the control that was
+       missing in the first place. */
+    bulkReassign(rows: any[]) {
+      modal(<BulkReassignModal rows={rows} onClose={close}
+        onSaved={(msg: string) => { close(); shell.toast(msg); render(); }} />);
+    },
 
     /* ------------------------------------------------------------- tags */
     tags(ref: string) {
@@ -805,6 +815,85 @@ function CloseModal({ dealRef, onClose, done }: {
    split percentage: nothing server-side stores one, and a number that decides
    somebody's commission is the last thing to invent a home for.
    ====================================================================== */
+/* ==========================================================================
+   BULK REASSIGN — the leaver's pipeline, in one operation.
+   --------------------------------------------------------------------------
+   A sales manager doing a handover had to open fourteen dialogs, so it did not
+   get done and the deals sat with somebody who had left. The batch takes the
+   ROWS ON SCREEN rather than a selection of its own, because the Owner filter
+   above already says which deals these are.
+
+   PARTIAL SUCCESS IS SHOWN, not swallowed: the server moves what it can and
+   names every ref it did not, with the reason. A handover that quietly moved
+   eleven of fourteen is how a pipeline goes missing.
+   ====================================================================== */
+function BulkReassignModal({ rows, onClose, onSaved }: {
+  rows: any[]; onClose: () => void; onSaved: (msg: string) => void;
+}) {
+  const [err, setErr] = useState<Refusal | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [people, setPeople] = useState<{ id: number; name: string }[] | null>(null);
+  const [owner, setOwner] = useState("");
+  const [skipped, setSkipped] = useState<{ ref: string; why: string }[] | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    call(AdminOpsService.dealAssignees())
+      .then((d) => { if (!cancelled) setPeople(d.people.map((u) => ({ id: u.id, name: u.name }))); })
+      .catch((e: unknown) => { if (!cancelled) { setPeople([]); setErr(refusalOf(e)); } });
+    return () => { cancelled = true; };
+  }, []);
+
+  const refs: string[] = rows.map((d) => d.deal_id).filter(Boolean);
+
+  const commit = () => {
+    setErr(null); setSkipped(null); setBusy(true);
+    call(AdminOpsService.dealBulkOwner({
+      refs, ownerId: Number(owner), reason: val("brReason"),
+    }))
+      .then((d) => {
+        if (d.skipped.length) { setSkipped(d.skipped); setBusy(false); return; }
+        onSaved(d.moved.length + " deal" + (d.moved.length === 1 ? "" : "s") +
+          " moved to " + d.owner.name + ".");
+      })
+      .catch((e: unknown) => { setErr(refusalOf(e)); setBusy(false); });
+  };
+
+  return (
+    <ModalShell ico="recon" title="Reassign these deals" mono
+      sub={<>{refs.length} deal{refs.length === 1 ? "" : "s"} · the rows this filter returned</>}
+      onClose={onClose}
+      actions={<Commit onClose={onClose} onGo={commit} busy={busy}
+        label={"Move " + refs.length} busyLabel="Moving…" act="dl-bulk-reassign-go" />}
+    >
+      <div className="flex flex-col gap-5">
+        <ErrSlot err={err} />
+        <Notice ico="shield">
+          <b>This moves every deal in the list behind this dialog.</b> Narrow it with the
+          filters first — Owner is the one this was built for. Each move is written to
+          that deal's timeline and to the audit log, with the reason below.
+        </Notice>
+        {people === null ? <PaneLoading label="Loading the team…" /> : null}
+        {skipped
+          ? <Alert tone="warn" title={skipped.length + " were not moved"}>
+              {skipped.map((x) => x.ref + " — " + x.why).join("; ")}. Everything else moved.
+            </Alert>
+          : null}
+        <FormField label="New owner" req hint="They become the sole owner. A co-owner who is already this person is cleared.">
+          <SelectInput ariaLabel="New owner" value={owner} onChange={setOwner}
+            options={[{ v: "", l: "— pick somebody —" }].concat(
+              (people || []).map((m) => ({ v: String(m.id), l: m.name })))} />
+        </FormField>
+        <FormField id="brReason" label="Reason" req
+          hint="Mandatory, and enforced by the server. It lands on every deal's timeline and in the audit log.">
+          <Textarea id="brReason" rows={3} ph="Nikhil has left; his open pipeline moves to Neha." />
+        </FormField>
+        <KvList pairs={[["Deals", refs.slice(0, 12).join(", ") + (refs.length > 12 ? ` +${refs.length - 12} more` : "")]]} />
+      </div>
+    </ModalShell>
+  );
+}
+
 function ReassignModal({ dealRef, onClose, done }: {
   dealRef: string; onClose: () => void; done: (m: string, r?: string | null) => void;
 }) {
@@ -822,17 +911,20 @@ function ReassignModal({ dealRef, onClose, done }: {
   const [owner, setOwner] = useState("");
   const [co, setCo] = useState("__keep");
 
-  /* The team list, from the admin user endpoint — the same roster Settings →
-     Team shows. The deals list only knows the owners who happen to appear on
-     the loaded page, which is not who you can hand a deal TO. */
+  /* WHO THIS SESSION MAY HAND A DEAL TO, from deals/assignees/ — which comes
+     with `deals.view`, the grant somebody reassigning a deal already holds by
+     definition.
+
+     It used to read the admin USER endpoint, the Settings → Team roster. But
+     Reassign is gated on `deals.close`, not on team-module access, so a sales
+     role without a /users/ grant was refused it every time — and both
+     dropdowns then held nothing but "— leave as it is —". Neither could be
+     operated at all, which is how the manual workaround for every other
+     scoping gap on this screen came to be unusable too. */
   useEffect(() => {
     let cancelled = false;
-    call(AdminOpsService.users())
-      .then((rows) => { if (!cancelled) setPeople(rows.map((u) => ({ id: u.id, name: u.name || u.username }))); })
-      /* Reassign is gated on `deals.close`, NOT on team-module access, so a
-         sales head whose role has no /users/ grant lands here every time. It
-         used to fail silently: the "Loading the team…" line vanished and left
-         two selects holding nothing but "— leave as it is —". Say so. */
+    call(AdminOpsService.dealAssignees())
+      .then((d) => { if (!cancelled) setPeople(d.people.map((u) => ({ id: u.id, name: u.name }))); })
       .catch((e: unknown) => { if (!cancelled) { setPeople([]); setTeamErr(refusalOf(e)); } });
     return () => { cancelled = true; };
   }, []);
@@ -875,8 +967,8 @@ function ReassignModal({ dealRef, onClose, done }: {
         {people === null ? <PaneLoading label="Loading the team…" /> : null}
         {teamErr
           ? <Alert tone="bad" title="The team list could not be loaded.">
-              This dialog reads the same roster as Settings → Team, which your role may not
-              include — there is nobody to pick from until an Admin grants it.{" "}
+              This dialog reads the people inside your own deal scope. There is nobody to
+              pick from until it loads.{" "}
               <span className="font-mono">{teamErr.detail}</span>
             </Alert>
           : null}

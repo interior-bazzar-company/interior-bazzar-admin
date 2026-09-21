@@ -17,7 +17,7 @@ import { inr } from "../../ui/format";
 import { errMessage } from "../../../api/apiService";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
-import { getSession } from "../../auth/session";
+import { scopeLabel } from "../../auth/session";
 import { call } from "./api";
 
 type DealHit = {
@@ -82,8 +82,6 @@ export default function PickDeal() {
   /* Applied at render, not in the fetch: the two requests race, and the deals
      usually land first. */
   const list = hits && hits.filter((d) => !(chains[d.ref] && chains[d.ref].live));
-  const session = getSession();
-  const head = !!(session && session.isFullAccess);
 
   const pick = (ref: string) => {
     setErr(null); setBusy(ref);
@@ -117,7 +115,7 @@ export default function PickDeal() {
       <Table
         cols={[{ label: "Customer" }, { label: "Deal" }, { label: "Stage" },
           { label: "Deal value", cls: "n" },
-          { label: head ? "Quotations" : "Quotations · yours", cls: "c" }, { label: "", cls: "acts" }]}
+          { label: "Quotations" + scopeLabel("quotations"), cls: "c" }, { label: "", cls: "acts" }]}
         empty={list === null
           ? { icon: "deal", title: "Searching…", body: "" }
           : { icon: "deal", title: "No open deals match",

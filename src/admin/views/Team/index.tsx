@@ -57,6 +57,10 @@ export default function Team() {
   const [tick, setTick] = useState(0);
   const [rows, setRows] = useState<Member[] | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
+  /* The role registry was REFUSED, as opposed to being empty. The difference
+     decides whether "no roles" is a fact about this company or a fact about
+     the reader's own grant. */
+  const [rolesDenied, setRolesDenied] = useState(false);
   /* A roster read that failed or was refused (team/d5) — said, never drawn as "No team members". */
   const [failed, setFailed] = useState<LoadPart | null>(null);
   const [page, setPage] = useState(1);
@@ -80,18 +84,25 @@ export default function Team() {
   useMembers();
   const [requests, reloadRequests] = usePendingRequests();
 
+  /* TWO READS, NOT ONE PROMISE.ALL. The members list is this page; the role
+     REGISTRY is a lookup it uses to name what each member holds, and it is
+     gated on `roles.view` — which a sales manager does not have. Bundled into
+     one Promise.all, that refusal rejected the pair and the whole page
+     rendered "Permission denied" to somebody holding `team.view`. The roles
+     grid said they could open Members; the page said they could not; the
+     server had allowed it all along.
+
+     So they settle independently: a refused registry costs the role labels and
+     the role filter, not the team. `rolesDenied` is what stops the empty
+     registry from being read as "this member holds nothing" further down. */
   useEffect(() => {
     let cancelled = false;
-    Promise.all([call(AdminOpsService.users()), call(AdminOpsService.listRoles())])
-      .then(([u, r]) => {
-        if (cancelled) return;
-        setRows(u);
-        setRoles(r.roles);
-        setFailed(null);
-      })
-      /* An empty list is a claim ("nobody here"); a failed read is not. Say
-         which one this is, or a down service reads as an empty team. */
-      .catch((e) => { if (!cancelled) { setRows([]); setRoles([]); setFailed(loadFailure(e)); } });
+    call(AdminOpsService.users())
+      .then((u) => { if (!cancelled) { setRows(u); setFailed(null); } })
+      .catch((e) => { if (!cancelled) { setRows([]); setFailed(loadFailure(e)); } });
+    call(AdminOpsService.listRoles())
+      .then((r) => { if (!cancelled) { setRoles(r.roles); setRolesDenied(false); } })
+      .catch(() => { if (!cancelled) { setRoles([]); setRolesDenied(true); } });
     return () => { cancelled = true; };
   }, [tick]);
 
@@ -182,7 +193,7 @@ export default function Team() {
      its own launcher, and the admin actions moved into its header. */
   if (id) {
     const u = rows.find((x) => String(x.id) === id) || null;
-    return <MemberPage id={id} sub={sub || ""} live={u} roles={roles} ops={ops} />;
+    return <MemberPage id={id} sub={sub || ""} live={u} roles={roles} rolesDenied={rolesDenied} ops={ops} />;
   }
 
   /* -------------------------------------------------------------- rows -- */
@@ -218,7 +229,10 @@ export default function Team() {
     { k: "documents short", v: noDocs, dot: noDocs ? "warn" : "neutral", tone: noDocs ? "warn" : "",
       title: "Members missing at least one required document. Nothing blocks on it." },
     "sep",
-    { k: "roles", v: roles.length, to: "#/roles", title: "Open Roles" },
+    /* "0 roles" over a registry this session was REFUSED is the same lie as an
+       empty list over a failed read — say nothing rather than nothing-exists. */
+    { k: "roles", v: rolesDenied ? "—" : roles.length, to: "#/roles",
+      title: rolesDenied ? "Reading the role registry needs Roles · View" : "Open Roles" },
   ];
 
   const addMember = can("team", "create")
@@ -236,7 +250,7 @@ export default function Team() {
         title="Members"
         meta={<>
           <span>{rows.length} on the roster</span>
-          <span>{roles.length} role{roles.length === 1 ? "" : "s"}</span>
+          {rolesDenied ? null : <span>{roles.length} role{roles.length === 1 ? "" : "s"}</span>}
           {filtered ? <span>{list.length} shown</span> : null}
         </>}
         actions={tab === "members" ? addMember : null}

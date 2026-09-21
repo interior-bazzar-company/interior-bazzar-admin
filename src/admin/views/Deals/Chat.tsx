@@ -28,7 +28,7 @@ import { can } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import { ChainStrip } from "../chainStrip";
 import {
-  D, STAGE, chanOf, daysFrom, fullAccess, hasFilters, head, inr, omit, place, refusalOf,
+  D, STAGE, chanOf, daysFrom, dealScope, widerThanOwn, hasFilters, head, inr, omit, place, refusalOf,
   relativeDate, render, setChan, urgency, useDealApi, useDealDocs, useFilters, usePop
 } from "./useDeals";
 import type { DealDocsState } from "./useDeals";
@@ -56,6 +56,19 @@ const FRAME = "flex h-full min-h-0 flex-col";
  *  screen at once and this is ignored. */
 type Pane = "list" | "thread" | "info";
 
+/* WHOSE LIST IS EMPTY — one copy, read by the full-page state and by the list
+   pane, which had drifted into saying different things. "No deals assigned to
+   you" is only true on an `own` scope: on a manager's team list it says the
+   list is about the reader when it is about the desk they run, and that is the
+   string that got an empty team pipeline reported as an empty company. */
+function emptyCopy(): [string, string] {
+  return ({
+    own: ["No deals assigned to you", "Deals you own or co-own appear here, each with its whole conversation beside it."],
+    team: ["No deals on your team", "Deals owned by you or by anyone reporting to you appear here, each with its whole conversation beside it."],
+    all: ["No deals yet", "Nothing in the pipeline yet."],
+  } as Record<string, [string, string]>)[dealScope()];
+}
+
 export function ChatWorkspace({ id, p, api }: {
   id: string | null; p: Params; api: DealsApiState;
 }) {
@@ -76,10 +89,10 @@ export function ChatWorkspace({ id, p, api }: {
      and claim the pipeline is empty when it is not. The full-page state is for
      the one case it is true: no filters, no deals. */
   const filtered = hasFilters(p);
-  /* Scope-aware, for the same reason the table's is: a non-full-access session
-     receives only the deals it owns or co-owns, so an empty scope is "none are
-     yours", not "the pipeline is empty". */
-  const mine = !fullAccess();
+  /* Scope-aware, and THREE readings, not two — the same set List's table
+     uses. "No deals assigned to you" on a manager's team list is the string
+     that got the company pipeline reported as empty. */
+  const empty = emptyCopy();
 
   /* The empty state is a DOCUMENT, not a workspace — there are no panes to fill
      the window with — so it brings back the gutters and the reading column the
@@ -92,8 +105,8 @@ export function ChatWorkspace({ id, p, api }: {
         actions={canCreate
           ? <Button color="primary" ico="plus" data-act="dl-create" onClick={() => acts.create()}>New deal</Button>
           : null} />
-      <EmptyState icon="chat" title={mine ? "No deals assigned to you" : "No deals yet"}
-        body={(mine ? "Deals you own or co-own appear here, each with its whole conversation beside it." : "Nothing in the pipeline yet.") +
+      <EmptyState icon="chat" title={empty[0]}
+        body={empty[1] +
           (canCreate ? " Create one for an inbound call, a walk-in or a referral." : " Once one exists, its chat opens here.")}
         action={canCreate
           ? <Button color="primary" ico="plus" data-act="dl-create" onClick={() => acts.create()}>New deal</Button>
@@ -230,11 +243,11 @@ function ListPane({ list, activeRef, p, api, cls, onPick }: {
             control one drag away. `overscroll-x-contain` keeps that drag off
             the browser's back gesture.
 
-            Owner is full-access only — see fullAccess() in useDeals.ts: a scoped
-            session's own deals are all it can be shown, so the picker would
-            filter nothing. */}
+            Owner is offered to anyone whose scope is wider than themselves —
+            see widerThanOwn() in useDeals.ts. On an `own` list the picker
+            collapses to one name and filters nothing. */}
         <div className="flex items-center gap-1.5 overflow-x-auto overscroll-x-contain pb-1 scrollbar-thin">
-          {LIST_FILTERS.map((name) => (name === "owner" && !fullAccess() ? null : (
+          {LIST_FILTERS.map((name) => (name === "owner" && !widerThanOwn() ? null : (
             <span key={name} className="shrink-0">
               <Select name={name} label={CHIP_LABEL[name] || name} value={p[name]} onFilter={onFilter}
                 options={selectOptions(name, api)}
@@ -244,6 +257,7 @@ function ListPane({ list, activeRef, p, api, cls, onPick }: {
         </div>
         {hasFilters(p)
           ? <FilterChips params={omit(p, ["view", "page"])} onUnfilter={onUnfilter}
+              values={{ owner: Object.fromEntries(api.owners.map((o) => [String(o.id), o.name])) }}
               labels={{ q: "Search", stage: "Stage", owner: "Owner", priority: "Priority",
                 next: "Next action", stalled: "Stalled", sort: "Sort", tag: "List" }} />
           : null}
@@ -256,8 +270,7 @@ function ListPane({ list, activeRef, p, api, cls, onPick }: {
                   renders with NO filters set — a deal ref in the URL keeps the
                   workspace mounted over an empty scope — so it cannot blame the
                   filters unconditionally. */}
-              {hasFilters(p) ? "No deals match these filters."
-                : fullAccess() ? "No deals yet." : "No deals assigned to you."}</p>}
+              {hasFilters(p) ? "No deals match these filters." : emptyCopy()[0] + "."}</p>}
       </div>
     </aside>
   );

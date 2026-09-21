@@ -65,8 +65,8 @@ import PayPage from "./member/PayPage";
 import ReportsPage from "./member/ReportsPage";
 import WorkPage from "./member/WorkPage";
 
-export default function MemberPage({ id, sub, live, roles, ops }: {
-  id: string; sub: string; live: LiveMember | null; roles: Role[]; ops: Ops;
+export default function MemberPage({ id, sub, live, roles, rolesDenied, ops }: {
+  id: string; sub: string; live: LiveMember | null; roles: Role[]; rolesDenied?: boolean; ops: Ops;
 }) {
   useMembers();
   /* The operation pages below take the store's record of this member. */
@@ -127,7 +127,7 @@ export default function MemberPage({ id, sub, live, roles, ops }: {
       />
 
       {!hasRecord ? (
-        <NotAdopted live={live as LiveMember} roles={roles} sub={sub} />
+        <NotAdopted live={live as LiveMember} roles={roles} rolesDenied={rolesDenied} sub={sub} />
       ) : sub && !op ? (
         <Alert tone="warn" title="No such page">
           There is no “{sub}” page for a member. The link may be stale.
@@ -141,10 +141,10 @@ export default function MemberPage({ id, sub, live, roles, ops }: {
             <AttendancePage q={q} live={live} viewer={viewer} />
           </div>
         ) : (
-          <OpGate op={op.key} label={op.label} id={id} m={m} live={live as LiveMember} roles={roles} sub={sub} viewer={viewer} />
+          <OpGate op={op.key} label={op.label} id={id} m={m} live={live as LiveMember} roles={roles} rolesDenied={rolesDenied} sub={sub} viewer={viewer} />
         )
       ) : (
-        <Overview q={q} live={live} roles={roles} viewer={viewer} />
+        <Overview q={q} live={live} roles={roles} rolesDenied={rolesDenied} viewer={viewer} />
       )}
     </div>
   );
@@ -166,12 +166,13 @@ const OP_LISTS: Record<string, TeamList[]> = {
 /** THE PAGE ONLY RENDERS ON DATA IT HAS. Until the reads land it shimmers; a
  *  refused read says "not in your access", a failed one offers Try again — an
  *  empty list is only ever drawn for a read that came back empty. */
-function OpGate({ op, label, id, m, live, roles, sub, viewer }: {
-  op: string; label: string; id: string; m: Member | null; live: LiveMember; roles: Role[]; sub: string; viewer: Viewer;
+function OpGate({ op, label, id, m, live, roles, rolesDenied, sub, viewer }: {
+  op: string; label: string; id: string; m: Member | null; live: LiveMember; roles: Role[];
+  rolesDenied?: boolean; sub: string; viewer: Viewer;
 }) {
   const part = useTeamLoad(OP_LISTS[op] || ["members"], id);
   if (part.state !== "ok") return <OpState label={label} part={part} onRetry={retryTeam} />;
-  if (!m) return <NotAdopted live={live} roles={roles} sub={sub} />;
+  if (!m) return <NotAdopted live={live} roles={roles} rolesDenied={rolesDenied} sub={sub} />;
   if (op === "resources") return <ResourcesGate label={label} m={m} viewer={viewer} />;
   if (op === "pay") return <PayGate label={label} m={m} viewer={viewer} />;
   return (
@@ -234,8 +235,8 @@ const partNote = (p: Part<unknown>): string =>
   p.state === "loading" ? "Loading…" : p.state === "denied" ? "Not in your access" : p.state === "error" ? "Could not load" : "";
 const todayOf = (q: MemberReads) => (q.clock.state === "ok" ? q.clock.data.today : "");
 
-function Overview({ q, live, roles, viewer }: {
-  q: MemberReads; live: LiveMember; roles: Role[]; viewer: Viewer;
+function Overview({ q, live, roles, rolesDenied, viewer }: {
+  q: MemberReads; live: LiveMember; roles: Role[]; rolesDenied?: boolean; viewer: Viewer;
 }) {
   const today = todayOf(q);
   const settings = q.settings.state === "ok" ? q.settings.data : null;
@@ -286,7 +287,7 @@ function Overview({ q, live, roles, viewer }: {
       {/* ACCESS IS NOT ON THE MEMBER'S OWN VIEW. Somebody reading their own
           permission matrix learns exactly which verb to go and ask for, and the
           panel gains nothing by telling them. */}
-      {live ? <IdentityBlock live={live} roles={roles} showAccess={viewer !== "self"} /> : null}
+      {live ? <IdentityBlock live={live} roles={roles} rolesDenied={rolesDenied} showAccess={viewer !== "self"} /> : null}
     </div>
   );
 }
@@ -569,20 +570,20 @@ function opStats(q: MemberReads, live: LiveMember): Record<string, Stat> {
 
 /** The live row exists but the operational store has no record — a fetch still
  *  in flight, or an id the adoption never saw. Identity still renders. */
-function NotAdopted({ live, roles, sub }: { live: LiveMember; roles: Role[]; sub: string }) {
+function NotAdopted({ live, roles, rolesDenied, sub }: { live: LiveMember; roles: Role[]; rolesDenied?: boolean; sub: string }) {
   return (
     <div className="flex flex-col gap-5">
       {sub ? <OpHead title="Nothing here yet" /> : null}
       <Alert tone="info" title="No operational record yet">
         Attendance, work, leave and pay arrive with the API.
       </Alert>
-      <IdentityBlock live={live} roles={roles} showAccess />
+      <IdentityBlock live={live} roles={roles} rolesDenied={rolesDenied} showAccess />
     </div>
   );
 }
 
-function IdentityBlock({ live: u, roles, showAccess }: {
-  live: LiveMember; roles: Role[]; showAccess: boolean;
+function IdentityBlock({ live: u, roles, rolesDenied, showAccess }: {
+  live: LiveMember; roles: Role[]; rolesDenied?: boolean; showAccess: boolean;
 }) {
   /* The account card is half the page when Effective access stands beside it
      and the whole page when it does not — so its facts run in one column or
@@ -614,7 +615,7 @@ function IdentityBlock({ live: u, roles, showAccess }: {
 
       {showAccess ? (
         <Card title="Effective access" sub="What happens when they click, not what their roles are called.">
-          <EffectiveAccess u={u} roles={roles} />
+          <EffectiveAccess u={u} roles={roles} rolesDenied={rolesDenied} />
         </Card>
       ) : null}
     </div>
@@ -659,8 +660,20 @@ function grantsOfMember(u: LiveMember, roles: Role[]): Record<string, string[]> 
   return out;
 }
 
-function EffectiveAccess({ u, roles }: { u: LiveMember; roles: Role[] }) {
+function EffectiveAccess({ u, roles, rolesDenied }: { u: LiveMember; roles: Role[]; rolesDenied?: boolean }) {
   const s = getSession();
+  /* AN UNREADABLE REGISTRY IS NOT AN EMPTY ONE. Resolving a member's grants
+     needs the role rows, and `roles.view` is a grant of its own — so a reader
+     without it would have been shown "No access to anything" about somebody
+     who has plenty. That is the exact wrong answer on the screen an admin
+     opens to find out what a person can do. */
+  if (rolesDenied)
+    return (
+      <Alert tone="warn" ico="lock" title="This cannot be resolved with your access">
+        Working out what a member holds means reading the role registry, and your role does not
+        include Roles. Ask an admin — nothing here says this member has no access.
+      </Alert>
+    );
   if (u.isActive === false)
     return (
       <Alert tone="warn" ico="lock" title="This account is inactive">
@@ -688,7 +701,14 @@ function EffectiveAccess({ u, roles }: { u: LiveMember; roles: Role[] }) {
   return (
     <ul className="flex flex-col divide-y divide-border-secondary">
       {mods.map((mod) => {
-        const acts = (grants[mod.key] || []).filter((a) => a !== "view");
+        /* `view` PRINTS LIKE ANY OTHER VERB. It used to be filtered out here,
+           on the reasoning that it is implied by the module being listed —
+           but it is not implied, it is THE GATE, and this is the screen an
+           admin opens during an outage to find out what somebody can actually
+           do. First, and by name. */
+        const held = grants[mod.key] || [];
+        const acts = (held.indexOf("view") >= 0 ? ["view"] : [])
+          .concat(held.filter((a) => a !== "view"));
         return (
           <li key={mod.key} className="flex items-start gap-2.5 py-2 first:pt-0 last:pb-0">
             <Icon name="check" size="sm" className="mt-0.5 shrink-0 text-fg-success-primary" />

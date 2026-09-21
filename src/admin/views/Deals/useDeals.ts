@@ -22,7 +22,7 @@ import { fmtDate, inr as inrFmt } from "../../ui/format";
 import { go } from "../../ui/nav";
 import { can } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
-import { currentActor, getSession } from "../../auth/session";
+import { currentActor, scopeLabel, scopeOf, wideScope } from "../../auth/session";
 import AdminOpsService from "../../../api/modules/adminOps";
 import type {
   DealPersonRef, DealPriorityVocab, DealStageVocab, DealTagVocab, InvoiceRow, QuotationRow
@@ -85,14 +85,24 @@ export const actor = currentActor;
    The owner FILTER used to hang off this too and no longer does — see
    fullAccess() below for why the two questions came apart. */
 export function head() { return can("deals", "close"); }
-/* SEES THE WHOLE PIPELINE — which is no longer the same question as head().
-   The API scopes Deals to owner/co-owner now, so a sales lead holding
-   `deals.close` still only receives their own rows. The head-level ACTIONS
-   (reassign, the stall sweep, export) stay on head(); anything that FILTERS or
-   DESCRIBES the whole pipeline has to ask this instead, or it offers an Owner
-   picker with one entry in it and calls an empty scope an empty company.
-   The same signal Quotations and Invoices gate their Owner filter on. */
-export function fullAccess() { const s = getSession(); return !!(s && s.isFullAccess); }
+/* SEES MORE THAN THEIR OWN DEALS — which is not the same question as head(),
+   and is no longer the same question as full access either.
+
+   The API scopes Deals by the deal's OWNER, and how wide that goes is now a
+   granted thing: `own` (owner or co-owner), `team` (the actor's reporting
+   subtree) or `all`. This used to read `isFullAccess`, which pinned every
+   other role to `own` however the roles grid was ticked — so a sales manager
+   with seven Deals verbs opened her team's pipeline, was shown nothing, and
+   reported the company as having no deals.
+
+   The head-level ACTIONS (reassign, the stall sweep, export) stay on head().
+   Anything that FILTERS or DESCRIBES a wider pipeline asks THIS, or it offers
+   an Owner picker with one entry in it. The same signal Quotations and
+   Invoices gate their Owner filter on.  */
+export function widerThanOwn() { return wideScope("deals"); }
+/** The scope as a word, for the copy: "" / " · your team" / " · yours". */
+export function dealScopeLabel(sep?: string) { return scopeLabel("deals", sep); }
+export function dealScope() { return scopeOf("deals"); }
 /* THE one definition of "this list is narrowed". List's table and both of
    Chat's empty states branch on it, and while each kept its own copy they
    drifted: the table's forgot `tag`, so filtering by a List that matched
@@ -486,6 +496,8 @@ export function useDealsApi(p: Params): DealsApiState {
         list: data.deals.map(adaptDeal),
         counts,
         stages: data.stages, priorities: data.priorities, tags: data.tags,
+        // Placeholder until the roster lands (below); the rows are all that is
+        // in hand this tick and an empty picker is worse than a short one.
         owners: ownersFromRows(data.deals),
       });
     }).catch(() => {
@@ -496,6 +508,28 @@ export function useDealsApi(p: Params): DealsApiState {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
+
+  /* THE OWNER ROSTER, from the server, ONCE — not derived from the loaded
+     rows. Deriving it had a limitation that bit the moment the picker became
+     useful: picking an owner narrows the rows, which narrows the roster to
+     that one person, so a filter could be set and never widened again. And an
+     owner whose deals were all on another page was simply missing. The
+     endpoint answers for the whole scope and does not move with the filters,
+     so it is outside the effect above. */
+  useEffect(() => {
+    let cancelled = false;
+    AdminOpsService.dealAssignees()
+      .then((res) => {
+        const r = apiOk(res);
+        if (cancelled || !r.ok || !r.data.people.length) return;
+        setState((s) => ({ ...s, owners: r.data.people }));
+      })
+      /* Falls back to the owners on the page. A roster that will not load is
+         not a failed list — nothing on screen is wrong, the picker is just
+         short again. */
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [version]);
 
   return state;
 }

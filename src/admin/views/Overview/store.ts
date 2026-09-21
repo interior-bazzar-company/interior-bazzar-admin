@@ -25,7 +25,7 @@ import type { DealsApiState } from "../Deals/useDeals";
 import { ensureAdopted } from "../Team/adopt";
 import { useIntakeCounts } from "../BusinessEnquiries/store";
 import { can } from "../../auth/session";
-import { getSession } from "../../auth/session";
+import { getSession, wideScope } from "../../auth/session";
 import { fmtDate } from "../../ui/format";
 import { attentionItems, dealMetrics, periodFor, planningSignals, todayLocal } from "./derive";
 import {
@@ -301,6 +301,9 @@ export function useOverview(p: Params): OverviewData {
     ownerOptions: api.owners.map((o) => ({ v: String(o.id), l: o.name })),
     departments: dept.names,
     departmentsState: dept.state,
-    isFullAccess: !!(s && s.isFullAccess),
+    /* The Overview's deal figures come from the same scoped list Deals does,
+       so its Owner picker is offered on the same test: wider than yourself,
+       not full access. The key keeps its name — index.tsx reads it. */
+    isFullAccess: wideScope("deals"),
   };
 }

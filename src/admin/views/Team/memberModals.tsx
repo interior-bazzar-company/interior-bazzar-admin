@@ -23,6 +23,7 @@ import { useState } from "react";
 /* `call` unwraps the envelope: a refusal (HTTP 200, response:false) throws,
    so it lands in ErrSlot instead of a success toast (team/d2). */
 import AdminOpsService, { call } from "../../../api/modules/adminOps";
+import { can } from "../../auth/session";
 import { Button, FieldRow, FormField, FormSection, Input, ModalShell, Notice } from "../../ui";
 import { ErrSlot, RolePicks, errOf, readRolePicks, val } from "../teamShared";
 import type { EngineErr, Member, Ops, Role } from "../teamShared";
@@ -31,6 +32,19 @@ import type { EngineErr, Member, Ops, Role } from "../teamShared";
 export function MemberNewModal({ roles, ops }: { roles: Role[]; ops: Ops }) {
   const [err, setErr] = useState<EngineErr | null>(null);
   const [busy, setBusy] = useState(false);
+  /* ASSIGNING A ROLE IS ITS OWN GRANT, and the server checks it on the PAYLOAD
+     rather than on the method: `POST users/` passes on `team.create`, then
+     refuses with 403 if the body carries a role and the caller lacks
+     `team.roles` (AdminUserViews). So a role holder with create-but-not-roles
+     met an enabled form, a role picker, and a refusal on every attempt — the
+     grid says `create` is ticked and has no column that could have said
+     otherwise, because a checkbox per verb cannot express a gate that depends
+     on what you typed.
+
+     The picker is ABSENT rather than disabled, like every other locked control
+     in this panel, and the member is created with no role — which the server
+     does allow — with a line saying who can finish the job. */
+  const mayAssign = can("team", "roles");
 
   async function create() {
     if (busy) return;
@@ -40,7 +54,7 @@ export function MemberNewModal({ roles, ops }: { roles: Role[]; ops: Ops }) {
       await call(AdminOpsService.createUser({
         username: val("tmUser"), password: val("tmPass"),
         name: val("tmName"), email: val("tmEmail"), phone: val("tmPhone"),
-        roles: readRolePicks(),
+        roles: mayAssign ? readRolePicks() : [],
       }));
       ops.done("Member created.");
     } catch (e) {
@@ -92,10 +106,14 @@ export function MemberNewModal({ roles, ops }: { roles: Role[]; ops: Ops }) {
         </FormSection>
 
         <FormSection title="Role" desc="Effective access is the union of every role held.">
-          <RolePicks roles={roles} />
-          <Notice ico="shield" text={
-            <><b>A member with no role can sign in and do nothing.</b> That is deliberate — a successful
-              login never implies access to anything — but it is rarely what you want.</>
+          {mayAssign ? <RolePicks roles={roles} /> : null}
+          <Notice ico="shield" text={mayAssign
+            ? <><b>A member with no role can sign in and do nothing.</b> That is deliberate — a successful
+                login never implies access to anything — but it is rarely what you want.</>
+            : <><b>Your role can add a member but not give them a role.</b> Assigning one needs
+                Team · Manage roles, which yours does not include — so this creates the account and
+                an admin assigns the role afterwards. The account can sign in and do nothing until
+                they do.</>
           } />
         </FormSection>
       </div>

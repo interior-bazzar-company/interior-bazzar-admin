@@ -17,7 +17,7 @@ import type { StatCell } from "../../ui";
 import { go } from "../../ui/nav";
 import { can } from "../../shell/AdminShell";
 import {
-  ALL_STAGES, D, STAGE, STRIP_STAGES, daysFrom, dealHash, fullAccess, hasFilters, head, inr,
+  ALL_STAGES, D, STAGE, STRIP_STAGES, daysFrom, dealHash, dealScope, widerThanOwn, hasFilters, head, inr,
   localSort, merge, omit, place, useDealCounts, useFilters
 } from "./useDeals";
 import type { Counts, DealsApiState, Params } from "./useDeals";
@@ -199,6 +199,14 @@ export function DealsList({ id, p, api }: {
      — the server answers it, and its refusal is the honest one. */
   const menu = [
     { icon: "download", label: "Export CSV", act: () => acts.exportCsv(rows), title: "The rows currently filtered" },
+    /* THE HANDOVER, on the same set Export takes. A manager moving a leaver's
+       pipeline filters Owner to them and reassigns what comes back — one
+       operation, which is what this menu was missing while offering an export
+       and a cron job. Same grant as the single-deal Reassign. */
+    ...(head() && rows.length
+      ? [{ icon: "recon", label: "Reassign these deals…", act: () => acts.bulkReassign(rows),
+           title: "Hand the " + rows.length + " rows currently filtered to one owner" }]
+      : []),
     ...(head()
       ? [{ icon: "clock", label: "Run the stall sweep now", act: () => acts.stallJob(), title: "The same sweep cron runs nightly" }]
       : []),
@@ -212,7 +220,11 @@ export function DealsList({ id, p, api }: {
           <>
             <span className="tnum">{api.counts.total} in the pipeline</span>
             {rows.length !== api.counts.total ? <span className="tnum">{rows.length} match these filters</span> : null}
-            {fullAccess() ? null : <Pill xs tone="neutral" text="your deals only" />}
+            {/* SAY WHOSE PIPELINE THIS IS, and only when it is not everyone's.
+                "your deals only" over a manager's team list is a lie that got
+                the company pipeline reported as empty. */}
+            {dealScope() === "all" ? null
+              : <Pill xs tone="neutral" text={dealScope() === "team" ? "your team's deals" : "your deals only"} />}
           </>
         }
         actions={
@@ -230,12 +242,16 @@ export function DealsList({ id, p, api }: {
         filters={
           <>
             <Select name="stage" label="Stage" value={p.stage} onFilter={onFilter} options={stageOptions(api.stages)} />
-            {/* FULL ACCESS, not head(): `deals.close` still authorises reassign
-                and export, but it no longer means you receive other people's
-                deals — so for a scoped session this picker would collapse to
-                their own name and filter nothing. Absent, not greyed, like
-                every other locked control here. */}
-            {fullAccess()
+            {/* OFFERED TO ANYONE WHOSE SCOPE IS WIDER THAN THEMSELVES, which
+                was full access only and is now whatever the role grants: on an
+                `own` list this picker collapses to one name and filters
+                nothing, and on a team list it is the control the handover
+                needs. Absent, not greyed, like every other locked control
+                here.
+                Options come from `api.owners` — the roster for this scope, not
+                the owners that happen to be on the loaded page, or a manager
+                could not filter to somebody whose deals are all on page two. */}
+            {widerThanOwn()
               ? <Select name="owner" label="Owner" value={p.owner} onFilter={onFilter} options={api.owners.map((o) => ({ v: String(o.id), l: o.name }))} />
               : null}
             <Select name="priority" label="Priority" value={p.priority} onFilter={onFilter} options={priorityOptions(api.priorities)} />
@@ -253,7 +269,11 @@ export function DealsList({ id, p, api }: {
           <Button color="secondary" ico="tag" data-act="dl-tags" onClick={() => go(tagsHash)}>Lists</Button>
         }
         chips={
+          /* `values` maps the owner id back to the person. The chip printed
+             the raw param, so filtering by Nikhil read "Owner 40" — an
+             internal id on the one control whose whole job is naming people. */
           <FilterChips params={omit(p, ["view", "page"])} onUnfilter={onUnfilter}
+            values={{ owner: Object.fromEntries(api.owners.map((o) => [String(o.id), o.name])) }}
             labels={{ q: "Search", stage: "Stage", owner: "Owner", priority: "Priority",
               next: "Next action", stalled: "Stalled", sort: "Sort", tag: "List" }} />
         }
@@ -291,19 +311,25 @@ function DealsTable({ list, sel, p, onCreate, onClearFilters, acts }: {
 }) {
   const filtered = hasFilters(p);
   const canCreate = can("deals", "create");
-  /* A scoped session is only ever sent the deals it owns or co-owns, so "No
-     deals yet" would be a claim about a pipeline this viewer cannot see — and
-     the usual reason the list is empty for them is that nothing is theirs, not
-     that nothing exists. Full access keeps the literal reading. */
-  const mine = !fullAccess();
+  /* A scoped session is only sent the deals its scope reaches, so "No deals
+     yet" would be a claim about a pipeline this viewer cannot see. But "No
+     deals assigned to you" is the opposite lie on a TEAM list — it says the
+     list is about the reader when it is about the desk they run, which is how
+     an empty team pipeline got reported as an empty company. Three scopes,
+     three sentences, and only `all` gets the literal reading. */
+  const scope = dealScope();
+  const empty = {
+    own: ["No deals assigned to you", "Deals you own or co-own appear here."],
+    team: ["No deals on your team", "Deals owned by you or by anyone reporting to you appear here."],
+    all: ["No deals yet", "Nothing in the pipeline yet."],
+  }[scope];
 
   if (!list.length) return (
     <EmptyState icon="deal"
-      title={filtered ? "No deals match these filters" : mine ? "No deals assigned to you" : "No deals yet"}
+      title={filtered ? "No deals match these filters" : empty[0]}
       body={filtered
         ? "Nothing in the pipeline matches. Clear a filter to widen the search."
-        : (mine ? "Deals you own or co-own appear here." : "Nothing in the pipeline yet.") +
-          (canCreate ? " Create one for an inbound call, a walk-in or a referral." : "")}
+        : empty[1] + (canCreate ? " Create one for an inbound call, a walk-in or a referral." : "")}
       action={filtered
         ? <Button color="secondary" data-unfilter="*" onClick={onClearFilters}>Clear all filters</Button>
         : (canCreate ? <Button color="primary" ico="plus" data-act="dl-create" onClick={onCreate}>New deal</Button> : null)} />

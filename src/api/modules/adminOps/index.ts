@@ -1687,6 +1687,22 @@ export class AdminOpsService {
   static dealOwner(ref: string, data: { ownerId?: number; coOwnerId?: number | null; reason: string }) {
     return apiService.getPostApiResponse<DealRow>(`${base}/deals/${encodeURIComponent(ref)}/owner/`, data);
   }
+  /** The people inside THIS session's deal scope, plus that scope as a word.
+   *  Gated on `deals.view`, unlike the Team roster — which is why the Reassign
+   *  dialog's two dropdowns used to come up empty for a sales role. Also feeds
+   *  the Owner filter, so it lists people whose deals are all on another page. */
+  static dealAssignees() {
+    return apiService.getGetApiResponse<{ people: DealPersonRef[]; scope: "own" | "team" | "all" }>(
+      `${base}/deals/assignees/`);
+  }
+  /** Hand a batch of deals to one owner — the handover when somebody leaves.
+   *  Partial success is normal: `skipped` names every ref that did not move
+   *  and why. Needs deals.close, same as the single-deal Reassign. */
+  static dealBulkOwner(data: { refs: string[]; ownerId: number; reason: string }) {
+    return apiService.getPostApiResponse<{
+      moved: string[]; skipped: { ref: string; why: string }[]; owner: DealPersonRef;
+    }>(`${base}/deals/reassign/`, data);
+  }
   static dealTag(ref: string, slug: string, apply: boolean) {
     return apiService.getPostApiResponse<DealRow>(
       `${base}/deals/${encodeURIComponent(ref)}/tags/`, { slug, apply });

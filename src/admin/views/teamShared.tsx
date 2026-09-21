@@ -150,14 +150,72 @@ export function ActionMatrix({ mods, grants, editable }: { mods: RoleModuleDef[]
 
   const allBtn = "ml-1 cursor-pointer rounded px-1 font-mono text-2xs font-medium text-quaternary outline-focus-ring hover:text-brand-secondary focus-visible:outline-2";
 
+  /* A VERTICAL WHEEL SCROLLS THIS SIDEWAYS. The browser only does that by
+     itself for a trackpad's horizontal gesture or shift+wheel, and this strip
+     is 28 columns wide — so on a mouse the last seven verbs (approve, cancel,
+     close, decide, pay, reverse, roles) simply could not be reached. Only
+     applied while there IS horizontal overflow and the gesture is not already
+     horizontal, so it never steals a legitimate scroll. */
+  function onWheel(e: React.WheelEvent<HTMLDivElement>) {
+    const el = e.currentTarget;
+    if (el.scrollWidth <= el.clientWidth) return;
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+    const before = el.scrollLeft;
+    el.scrollLeft += e.deltaY;
+    // Only swallow the event if we actually consumed it, or the page stops
+    // scrolling once the strip is at either end.
+    if (el.scrollLeft !== before) e.preventDefault();
+  }
+
+  /* HOME AND END. Arrow keys already work on a focused scroll container, but
+     Chrome maps Home/End to the VERTICAL axis only — and on a strip whose
+     whole problem is that the last seven verbs are off the right edge, "jump
+     to the end" is the gesture somebody reaches for first. Forty pixels a
+     press was the alternative. */
+  function onKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    if (e.key !== "Home" && e.key !== "End") return;
+    const el = e.currentTarget;
+    if (el.scrollWidth <= el.clientWidth) return;
+    el.scrollLeft = e.key === "End" ? el.scrollWidth : 0;
+    e.preventDefault();
+  }
+
   return (
-    <div className="w-full overflow-x-auto rounded-xl bg-primary ring-1 ring-secondary">
-      <table className="w-full border-collapse text-sm" id={editable ? "rlMatrix" : undefined}>
+    /* THE STRIP HAS TO OVERFLOW BEFORE IT CAN SCROLL. `overflow-x-auto` was
+       already here and did nothing, because the table under it was `w-full`:
+       width:100% tells the table to FIT this box, so 28 columns squashed to
+       fit instead of running past the edge, and there was nothing to scroll.
+       `w-max min-w-full` is the pair that says "as wide as your content, and
+       never narrower than the box".
+
+       `tabIndex`/`role`/`aria-label` make it a focusable scroll region, which
+       is what gives it arrow keys — before this the only way to move it was to
+       tab a checkbox into focus and let the browser reveal it.
+
+       `scrollbar-thin` is the visible bar: the utility exists for exactly this
+       and was never applied here, so on Windows the overflow read as "cut off"
+       rather than "there is more". */
+    <div className="max-h-[70vh] w-full overflow-auto scrollbar-thin rounded-xl bg-primary ring-1 ring-secondary outline-focus-ring focus-visible:outline-2"
+      tabIndex={0} role="region" aria-label="Permissions by module and verb — scrolls horizontally"
+      onWheel={onWheel} onKeyDown={onKeyDown}>
+      {/* border-collapse STAYS. The row dividers below are on `<tr>`, and a
+          separate-border table does not paint those — switching would have
+          silently dropped every line between the modules. Sticky cells inside
+          a collapsed table are supported in the Chrome this panel targets. */}
+      <table className="w-max min-w-full border-collapse text-sm" id={editable ? "rlMatrix" : undefined}>
         <thead>
           <tr className="border-b border-secondary bg-secondary">
-            <th className="label-mono sticky left-0 z-10 bg-secondary px-3 py-2 text-left">Module</th>
+            {/* THE CORNER. Pinned on BOTH axes, and above everything else —
+                it is the one cell that has to survive a scroll in either
+                direction. */}
+            <th className="label-mono sticky top-0 left-0 z-30 bg-secondary px-3 py-2 text-left">Module</th>
             {cols.map((c) => (
-              <th className="px-2 py-2 text-center" key={c.key} title={c.minLevel >= 3 ? "Sensitive" : c.minLevel === 1 ? "Read" : "Write"}>
+              /* PINNED TO THE TOP. Twenty-one module rows are taller than the
+                 drawer, so reading Agreements meant scrolling the verb names
+                 off the screen and counting columns to work out which tick was
+                 which. The bounded height on the wrapper is what gives these
+                 something to stick to. */
+              <th className="sticky top-0 z-20 bg-secondary px-2 py-2 text-center" key={c.key} title={c.minLevel >= 3 ? "Sensitive" : c.minLevel === 1 ? "Read" : "Write"}>
                 <Pill xs tone={levelTone(c.minLevel)} text={c.key} />
                 {editable ? (
                   <div>

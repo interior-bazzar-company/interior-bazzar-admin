@@ -16,7 +16,7 @@ import {
 import type { MenuItem, StatCell } from "../../ui";
 import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
-import { getSession } from "../../auth/session";
+import { scopeLabel, scopeOf, scopeOnly, wideScope } from "../../auth/session";
 import { STATUS_LABEL, STATUS_TONE, useQuotationsList } from "./api";
 import type { QuotationRow } from "./api";
 import { daysUntil, expiringSoon, filterQuotations, partyLine, summarize } from "./helpers";
@@ -105,8 +105,11 @@ function QuotationsList() {
   /* Owner is a full-access control only: every other session is already scoped
      to its own rows, so the picker would be a one-option list filtering
      nothing. Locked controls are ABSENT here, not greyed. */
-  const session = getSession();
-  const head = !!(session && session.isFullAccess);
+  /* WIDER THAN THIS PERSON — the test that decides both the Owner filter and
+     the wording below. It used to be `isFullAccess`, which pinned every other
+     role to its own rows whatever the roles grid said: accounts own no deals
+     at all, so they read 0 everywhere and could not bill anybody. */
+  const head = wideScope("quotations");
   const owners = useMemo(() => {
     const m = new Map<number, string>();
     all.forEach((x) => { if (x.owner) m.set(x.owner.id, x.owner.name); });
@@ -121,9 +124,13 @@ function QuotationsList() {
      labels carry the scope instead: `mine` marks the money cells, `only` ends
      the tooltips. Both are empty for a full-access viewer, which leaves that
      wording exactly as it was. */
-  const mine = head ? "" : " · yours";
-  const only = head ? "" : " — yours only";
-  const yrs = head ? "" : " yours";
+  /* THE LABELS CARRY THE SCOPE, and there are three of it, not two. "yours"
+     over a list that is not yours is the wording that had a manager reporting
+     the company pipeline as empty; `all` gets no qualifier because the
+     unqualified reading is then the true one. */
+  const mine = scopeLabel("quotations");
+  const only = scopeOnly("quotations");
+  const yrs = scopeOf("quotations") === "all" ? "" : mine.replace(" · ", " ");
 
   const { byStatus, expiring, awaitingPaise, agreedPaise } = summarize(all);
   function route(k: string, v: string) {

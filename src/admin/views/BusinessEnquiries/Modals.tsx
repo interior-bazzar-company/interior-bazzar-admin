@@ -13,7 +13,7 @@
    under a row lock and answers 422 business_not_eligible; this dialog does it
    against the same five rules and shows the working.
    ============================================================================= */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert, Button, FormField, FormSection, Input, ModalShell, Notice, Radio, SelectInput, Textarea,
 } from "../../ui";
@@ -24,6 +24,33 @@ import {
 } from "./store";
 
 import type { Candidate, Enquiry, MatchRun } from "./store";
+
+/* ======================================================= THE REFUSAL ===
+   WHERE A REFUSAL HAS TO APPEAR: where the person is looking, which is the
+   button they just pressed.
+
+   Every dialog in this file already captured its refusal — `useWrite` sets
+   `err` and `ok` never runs — and every one of them rendered it as the LAST
+   thing in a long scrolling body, under an InfoNote, while the Confirm button
+   sits in the pinned footer. So a 403 on assignment drew a message below the
+   fold: the dialog appeared to accept a mandatory reason, do nothing, and
+   close. It was reported three times in a day as a write that silently failed,
+   and the error was on screen the whole time, two screens down.
+
+   Top of the body, `role="alert"` so it is announced, and it scrolls itself
+   into view — the body may already be scrolled down when the press happens. */
+function Refused({ err }: { err: string }) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (err && ref.current) ref.current.scrollIntoView({ block: "nearest" });
+  }, [err]);
+  if (!err) return null;
+  return (
+    <div ref={ref} role="alert">
+      <Notice tone="bad" text={err} />
+    </div>
+  );
+}
 
 /* ============================================================== ASSIGN === */
 /* BE-T03. Seven steps, all of it or none of it: lock the enquiry, revalidate
@@ -82,6 +109,7 @@ export function AssignModal({ e, run, c, onClose, onDone }: {
       }
     >
       <div className="flex flex-col gap-4">
+        <Refused err={go.err} />
         <div className="flex flex-col">
           <GuardCheck ok={subOk}>Subscription {subOk ? <>still <b>active</b></> : <>is <b>{b?.subscription}</b></>} — rechecked now, not at ranking time</GuardCheck>
           <GuardCheck ok={statusOk}>Account status {statusOk ? <><b>active</b></> : <><b>{b?.status}</b></>}, category and service area still match</GuardCheck>
@@ -140,7 +168,6 @@ export function AssignModal({ e, run, c, onClose, onDone }: {
             went. Such changes affect future matching only.
           </p>
         </InfoNote>
-        {go.err ? <Notice tone="bad" text={go.err} /> : null}
       </div>
     </ModalShell>
   );
@@ -195,6 +222,7 @@ export function ReassignModal({ e, run, onClose, onDone }: {
       }
     >
       <div className="flex flex-col gap-4">
+        <Refused err={go.err} />
         <div className="flex flex-col">
           <GuardCheck ok>The current assignment is <b>closed, not deleted</b>.</GuardCheck>
           <GuardCheck ok><b>{current?.businessName}'s capacity is released</b> and the new business's is taken.</GuardCheck>
@@ -276,7 +304,6 @@ export function ReassignModal({ e, run, onClose, onDone }: {
               value={note} onChange={setNote} />
           </FormField>
         </FormSection>
-        {go.err ? <Notice tone="bad" text={go.err} /> : null}
       </div>
     </ModalShell>
   );
@@ -320,6 +347,7 @@ export function OutcomeModal({ e, onClose, onDone }: {
       }
     >
       <div className="flex flex-col gap-4">
+        <Refused err={go.err} />
         <FormSection title="What happened">
           <div className="flex flex-col gap-3">
             {(["converted", "not_converted"] as const).map((k) => (
@@ -349,7 +377,6 @@ export function OutcomeModal({ e, onClose, onDone }: {
           bazzar revenue, and no analytics rollup may infer our revenue from this column. Ours is their
           subscription, which lives in Plans.
         </InfoNote>
-        {go.err ? <Notice tone="bad" text={go.err} /> : null}
       </div>
     </ModalShell>
   );
@@ -393,6 +420,7 @@ export function InvalidateModal({ e, onClose, onDone }: {
       }
     >
       <div className="flex flex-col gap-4">
+        <Refused err={go.err} />
         {hasException ? (
           <Alert tone="bad" title="This enquiry is an exception, not a rejection.">
             Nothing passed hard eligibility — the customer did nothing wrong and the enquiry is real,
@@ -415,7 +443,6 @@ export function InvalidateModal({ e, onClose, onDone }: {
           Reopening needs a controlled admin policy that does not exist yet. The record, its snapshot
           and its whole event timeline stay exactly as they are — nothing is deleted.
         </InfoNote>
-        {go.err ? <Notice tone="bad" text={go.err} /> : null}
       </div>
     </ModalShell>
   );

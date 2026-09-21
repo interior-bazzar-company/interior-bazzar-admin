@@ -208,8 +208,13 @@ export function ItemDrawer({ itemId, onClose, onOpen }: {
                 <li key={link.linkId} className="flex items-center gap-2 py-2">
                   <span className="label-mono shrink-0">{linkLabelOf(link.relation, outward)}</span>
                   <ItemLink item={other} onOpen={onOpen} className="min-w-0 flex-1" />
+                  {/* The refusal is SAID. Dropping a link was `void`-ed like the
+                      checklist toggles were, so a 403 removed nothing and
+                      reported nothing. */}
                   <IconButton ico="x" size="xs" label={"Remove this link to " + other.title}
-                    onClick={() => void removeLink(link.linkId)} />
+                    onClick={() => void removeLink(link.linkId).then((r) => {
+                      if (!r.ok) shell.toast(r.message, "bad");
+                    })} />
                 </li>
               ))}
             </ul>
@@ -382,6 +387,16 @@ function CheckList({ item }: { item: WorkItem }) {
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
     setDraft("");
   };
+  /* EVERY WRITE ON THIS LIST SAYS WHEN IT WAS REFUSED. Ticking and dropping a
+     line were `void`-ed — the store already turned the server's 403 into a
+     Result with a message on it, and the call site threw that away. The box
+     then sprang back on the next re-render with nothing said, which is how a
+     task edit was lost in silence three times in one afternoon. `add` always
+     did this; these two now do the same. */
+  const report = async (write: Promise<{ ok: boolean; message?: string }>) => {
+    const r = await write;
+    if (!r.ok) shell.toast(r.message || "Refused.", "bad");
+  };
   return (
     <div className="flex flex-col gap-2">
       {lines.length ? (
@@ -392,12 +407,12 @@ function CheckList({ item }: { item: WorkItem }) {
                   and the text beside it is the obvious thing to press. */}
               <Checkbox
                 checked={l.done}
-                onChange={() => void toggleCheckLine(item.itemId, l.lineId)}
+                onChange={() => void report(toggleCheckLine(item.itemId, l.lineId))}
                 className="min-w-0 flex-1"
                 label={<span className={cx(l.done && "text-quaternary line-through")}>{l.text}</span>}
               />
               <IconButton ico="x" size="xs" label={"Remove step: " + l.text}
-                onClick={() => void removeCheckLine(item.itemId, l.lineId)} />
+                onClick={() => void report(removeCheckLine(item.itemId, l.lineId))} />
             </li>
           ))}
         </ul>
@@ -507,7 +522,11 @@ function TagPicker({ item, mine, on, tags }: {
   const add = async () => {
     const r = await createTag(item.assigneeId, draft, tone);
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
-    void tagItem(item.itemId, r.data.tagId, true);
+    void tagItem(item.itemId, r.data.tagId, true).then((t) => {
+      // Same silence as the checklist had: a tag that would not attach used to
+      // look like one that did, until the next read put it back.
+      if (!t.ok) shell.toast(t.message, "bad");
+    });
     setDraft(""); setTone("slate");
   };
   const others = tags.filter((t) => t.ownerId !== item.assigneeId && !t.archivedAt

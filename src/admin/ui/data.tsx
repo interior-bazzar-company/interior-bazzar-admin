@@ -248,7 +248,7 @@ export function Toolbar({ children, className }: { children?: ReactNode; classNa
 
 /* A selected filter chip carries the brand on its EDGE — the only chip that
    may wear the brand at all, because it marks a choice the OPERATOR made. */
-export function FilterChips({ params, labels, onUnfilter, className }: { params: Record<string, string | undefined>; labels?: Record<string, string>; onUnfilter?: (key: string) => void; className?: string }) {
+export function FilterChips({ params, labels, values, onUnfilter, className }: { params: Record<string, string | undefined>; labels?: Record<string, string>; values?: Record<string, Record<string, string>>; onUnfilter?: (key: string) => void; className?: string }) {
     const keys = Object.keys(params).filter((k) => params[k] && k !== "tab");
     if (!keys.length) return null;
     return (
@@ -256,7 +256,12 @@ export function FilterChips({ params, labels, onUnfilter, className }: { params:
             {keys.map((k) => (
                 <span key={k} className="inline-flex items-center gap-1 rounded-full bg-primary py-0.5 pr-1 pl-2.5 text-xs ring-1 ring-brand ring-inset">
                     <span className="text-tertiary">{(labels && labels[k]) || k}</span>
-                    <span className="font-medium text-primary">{params[k]}</span>
+                    {/* `values` turns a param that is an ID back into what it
+                        names. Without it an Owner chip read "Owner 40" — the
+                        internal id, on the one filter whose entire job is
+                        naming a person. No entry, no change: most params
+                        already print as themselves. */}
+                    <span className="font-medium text-primary">{(values && values[k] && values[k][params[k] as string]) || params[k]}</span>
                     <button
                         type="button"
                         className="flex cursor-pointer items-center justify-center rounded-full p-0.5 text-fg-quaternary outline-focus-ring hover:bg-primary_hover hover:text-fg-quaternary_hover focus-visible:outline-2"
