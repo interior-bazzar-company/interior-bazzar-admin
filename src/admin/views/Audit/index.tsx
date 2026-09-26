@@ -35,9 +35,6 @@ import { useShell } from "../../shell/ShellContext";
 import { moduleLabel } from "../../shell/modules";
 
 const PAGE_SIZE = 40;
-/** How many rows one Export may pull. The log grows without limit, so the
- *  export names its own ceiling rather than pretending it has none. */
-const EXPORT_MAX = 1000;
 
 const CHIP_LABELS = { q: "Search", module: "Module", role: "Actor role", sev: "Kind" };
 
@@ -53,6 +50,37 @@ const DESTRUCTIVE = /delete|reject|cancel|archive|revoke|remove|reverse/i;
 function actionLabel(action: string, moduleKey: string) {
   const singular = moduleKey.replace(/s$/, "");
   return action.replace(new RegExp("^" + singular + "_"), "").replace(/_/g, " ");
+}
+
+const INR = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" });
+
+/** `valuePaise` -> "value", `placeOfSupply` -> "place of supply". Field keys
+ *  are a server's internal name, not a sentence — this is the one place every
+ *  module's audit diff gets read, so it is spelled out here rather than once
+ *  per module. */
+function fieldLabel(field: string) {
+  const bare = field.replace(/Paise$/, "");
+  return bare
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/^./, (c) => c.toUpperCase());
+}
+
+/** `{field: [before, after]}` -> "Field: before → after, Field two: x → y".
+ *  A `…Paise` field is money and prints as money — everything else prints as
+ *  the server sent it, since a raw id or free string still says more than
+ *  nothing. Same plain-text treatment as `detail` otherwise — never parsed
+ *  for markup, just printed. */
+function changesLine(changes: Record<string, [unknown, unknown]> | null | undefined) {
+  if (!changes) return null;
+  const money = (field: string, v: unknown) =>
+    field.endsWith("Paise") && typeof v === "number";
+  const fmt = (field: string, v: unknown) => {
+    if (v === null || v === undefined || v === "") return "—";
+    return money(field, v) ? INR.format((v as number) / 100) : String(v);
+  };
+  return Object.entries(changes)
+    .map(([field, [before, after]]) => fieldLabel(field) + ": " + fmt(field, before) + " → " + fmt(field, after))
+    .join(", ");
 }
 
 /** "17 Aug 2026, 06:41". The row is a forensic record — the time matters as
@@ -179,30 +207,25 @@ export default function Audit() {
       title: "How many modules the filtered log reaches" },
   ];
 
-  /* THE WHOLE FILTERED LOG, not the page on screen — asking the server again
-     rather than exporting the forty rows that happen to be rendered. If that
-     second call is refused, the page in hand is still written out and the
-     receipt says how many rows it holds. */
+  /* THE WHOLE FILTERED LOG, not the page on screen — the server builds the
+     file itself (IST stamps, module labels already resolved) and says how
+     many rows it wrote in `X-Row-Count`; this just downloads it as-is. */
   const csv = async () => {
     if (exporting) return;
     setExporting(true);
-    let list = rows || [];
-    let whole = false;
     try {
-      const d = await call(AdminOpsService.audit(query(1, Math.min(total || PAGE_SIZE, EXPORT_MAX))));
-      if (d.entries) { list = d.entries; whole = true; }
-    } catch { /* the page in hand is still worth having */ }
-    const head = ["when", "module", "action", "actor", "role", "detail"];
-    const lines = [head].concat(list.map((a) => [
-      a.ts || "", a.module, a.action, a.actor || "system", a.role || "", a.detail || "",
-    ]));
-    const text = lines.map((r) => r.map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(",")).join("\n");
-    const el = document.createElement("a");
-    el.href = "data:text/csv;charset=utf-8," + encodeURIComponent(text);
-    el.download = "audit-log.csv"; el.click();
-    shell.toast(whole && list.length < total
-      ? "Exported the first " + list.length + " of " + total + " entries — narrow the filters for the rest."
-      : "Exported " + list.length + " entr" + (list.length === 1 ? "y" : "ies") + ".");
+      const { csv: text, rowCount } = await AdminOpsService.auditExport(query(1, PAGE_SIZE));
+      const el = document.createElement("a");
+      el.href = "data:text/csv;charset=utf-8," + encodeURIComponent(text);
+      el.download = "audit-log.csv"; el.click();
+      /* `rowCount` is X-Row-Count off the response. Null only if a proxy in
+         front of the API ever strips it — the CSV's own line count (minus the
+         header row) still says how many entries came down. */
+      const n = rowCount ?? Math.max(0, text.trim().split("\n").length - 1);
+      shell.toast("Exported " + n + " entr" + (n === 1 ? "y" : "ies") + ".");
+    } catch (e: unknown) {
+      shell.toast(errMessage(e), "bad");
+    }
     setExporting(false);
   };
 
@@ -273,8 +296,22 @@ export default function Audit() {
                   </td>
                   {/* The detail is the record. It is written by the controller that
                       acted, carries the reference (`deal=DL-2501`, `plan=7`), and is
-                      rendered as the plain text it is — never parsed for markup. */}
-                  <td className="mono text-secondary">{a.detail || "—"}</td>
+                      rendered as the plain text it is — never parsed for markup.
+                      Reason, the before -> after diff and the IP ride under it in the
+                      same cell, same treatment, only when the row actually carries
+                      them — most rows still won't. */}
+                  <td className="mono text-secondary">
+                    {a.detail || "—"}
+                    {a.reason
+                      ? <div className="mt-1 text-xs text-tertiary">reason: {a.reason}</div>
+                      : null}
+                    {a.changes
+                      ? <div className="mt-1 text-xs text-tertiary">{changesLine(a.changes)}</div>
+                      : null}
+                    {a.ip
+                      ? <div className="mt-1 text-xs text-tertiary">ip: {a.ip}</div>
+                      : null}
+                  </td>
                   <td>
                     {a.actor
                       ? <Person sm name={a.actor} sub={a.role || undefined} />
@@ -291,6 +328,18 @@ export default function Audit() {
             pageSize={PAGE_SIZE} shown={rows.length}
             onPage={(n) => write(p, n)} />
         </>
+      ) : error ? (
+        /* A FAILED READ IS NOT AN EMPTY LOG. Both used to render at once: the
+           red "Could not load the log" alert sat directly above "Nothing
+           recorded yet — the trail fills as sensitive actions are taken", and
+           the second one is the reassuring sentence. Somebody checking whether
+           an action had been recorded read the wrong half and concluded the
+           audit trail was not being written. When the read failed, the honest
+           answer is that we do not know what is in the log. */
+        <EmptyState icon="alert"
+          title="The log could not be read"
+          body="This is not the same as an empty log — entries may well exist. Try again, and if it keeps failing the audit read itself is broken."
+          action={<Button color="secondary" ico="refresh" onClick={() => write(p, page)}>Try again</Button>} />
       ) : (
         <EmptyState icon="history"
           title={filtered ? "No entries match" : "Nothing recorded yet"}

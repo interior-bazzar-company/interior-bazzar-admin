@@ -174,7 +174,7 @@ export default function TxnDetail({ id, p, onParams }: {
 
           <Alert tone="info" ico="lock" title="A recorded row is never edited or deleted.">
             Nothing here can be changed after the fact. A row that should not stand is cancelled —
-            in the actions menu, Super Admin, with a reason — which leaves every figure on it
+            in the actions menu, with full access and a reason — which leaves every figure on it
             exactly as posted and stops it counting. The correct figures are a new row, recorded
             the ordinary way.
           </Alert>

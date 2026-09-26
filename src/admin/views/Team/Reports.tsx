@@ -45,7 +45,7 @@ import type { StatCell } from "../../ui";
 import { ColumnChart } from "../charts";
 import { go } from "../../ui/nav";
 import {
-  TODAY, acknowledgeReport, addDays, attentionOf, clampDay, fmtDate, fmtDayName, fmtHM, fmtTime,
+  TODAY, acknowledgeReport, canAcknowledge, addDays, attentionOf, clampDay, fmtDate, fmtDayName, fmtHM, fmtTime,
   meId, pendingLeave, readMember, reportSpanDays, reportSpanRows, reportSpanTotals, scopeLabel,
   scopeOf, unopenedAgreements, useAgreements, useLeave, useReports, useReview,
 } from "./store";
@@ -297,10 +297,17 @@ function ReviewCard({ r }: { r: ReviewRow }) {
           </header>
           {rep && rep.submittedAt ? (
             <>
-              {rep.achievement ? <p className="text-sm text-secondary">{rep.achievement}</p> : null}
+              {rep.achievement ? <p className="text-sm text-secondary"><span className="label-mono mr-1.5">Win</span>{rep.achievement}</p> : null}
+              {rep.pendingWork ? <p className="text-sm text-secondary"><span className="label-mono mr-1.5">Left over</span>{rep.pendingWork}</p> : null}
+              {rep.pendingReason ? <p className="text-sm text-secondary"><span className="label-mono mr-1.5">Why not done</span>{rep.pendingReason}</p> : null}
               {rep.blockers ? (
                 <p className="text-sm text-warning-primary">
                   <span className="label-mono mr-1.5">Blocked</span>{rep.blockers}
+                </p>
+              ) : null}
+              {rep.supportNeeded ? (
+                <p className="text-sm text-warning-primary">
+                  <span className="label-mono mr-1.5">Needs help</span>{rep.supportNeeded}
                 </p>
               ) : null}
               {rep.tomorrowPriority ? (
@@ -308,7 +315,8 @@ function ReviewCard({ r }: { r: ReviewRow }) {
                   <span className="label-mono mr-1.5">Tomorrow</span>{rep.tomorrowPriority}
                 </p>
               ) : null}
-              {rep.acknowledgedById ? null : (
+              {rep.notes ? <p className="text-sm text-tertiary"><span className="label-mono mr-1.5">Notes</span>{rep.notes}</p> : null}
+              {rep.acknowledgedById || !canAcknowledge(r.member.memberId) ? null : (
                 <div className="mt-auto pt-1">
                   <Button color="secondary" size="xs" ico="eye" onClick={async () => {
                     const res = await acknowledgeReport(rep.reportId);
@@ -364,11 +372,13 @@ function Actions({ rows }: { rows: ReviewRow[] }) {
   leave.forEach((l) => list.push({
     key: "lv" + l.leaveId, kind: "Leave", tone: "warn",
     what: readMember(l.memberId)?.name || l.memberId,
-    why: <>Undecided from {fmtDate(l.fromDate)} — those days read as absent until you answer.</>,
+    why: l.state === "escalated"
+      ? <>Escalated to the Admin{l.decisionNote ? " — " + l.decisionNote : ""}. From {fmtDate(l.fromDate)}.</>
+      : <>Undecided from {fmtDate(l.fromDate)} — those days read as absent until you answer.</>,
     act: <Button color="secondary" size="xs" onClick={() => go("#/attendance?face=requests")}>Decide</Button>,
   }));
 
-  a.unacknowledged.forEach((r) => list.push({
+  a.unacknowledged.filter((r) => canAcknowledge(r.member.memberId)).forEach((r) => list.push({
     key: "un" + r.member.memberId, kind: "Unread EOD", tone: "info",
     what: r.member.name,
     why: "A report nobody read is worse than one nobody wrote — the person who wrote it believes it was read.",
@@ -383,14 +393,14 @@ function Actions({ rows }: { rows: ReviewRow[] }) {
   a.noEod.forEach((r) => list.push({
     key: "eo" + r.member.memberId, kind: "EOD due", tone: "warn",
     what: r.member.name, why: "Their day is over and nothing has come back.",
-    act: <Button color="tertiary" size="xs" onClick={() => go("#/team/" + r.member.memberId + "/reports")}>Open</Button>,
+    act: <Button color="tertiary" size="xs" onClick={() => go("#/work")}>Open</Button>,
   }));
 
   a.noPlan.forEach((r) => list.push({
     key: "np" + r.member.memberId, kind: "No plan", tone: "warn",
     what: r.member.name,
     why: "Anybody with no reporting line is excluded — a number that always shows the founder delinquent is one people learn to ignore.",
-    act: <Button color="tertiary" size="xs" onClick={() => go("#/team/" + r.member.memberId + "/reports")}>Open</Button>,
+    act: <Button color="tertiary" size="xs" onClick={() => go("#/work")}>Open</Button>,
   }));
 
   a.waiting.forEach((i) => list.push({

@@ -211,6 +211,12 @@ export interface SalaryAccount {
   engagement: string;
   joinedAt: string;
   monthlyGrossPaise: number;
+  /** THE SERVER'S OWN NET AND DEDUCTIONS, kept apart from the component lines
+   *  because they are separate settled fields (`_account_dict`) and not a sum
+   *  this module is entitled to re-do. Undefined only where a row predates
+   *  them; `toSalaryRow` falls back to Σ components then. */
+  deductionsPaise?: number;
+  monthlyNetPaise?: number;
   earnings: SalaryComponent[];
   deductions: SalaryComponent[];
   /** Where the money goes. `upi` is optional because not everybody has one
@@ -234,6 +240,10 @@ export type RunState = "open" | "paid";
  *  month's slip. */
 export interface Payslip {
   slipId: string;
+  /** The number ALLOTTED to this document, persisted by the server. Null on a
+   *  draft, which legitimately has none — and null on any row served before
+   *  the field existed, so every reader falls back to `slipId`. */
+  slipNumber?: string | null;
   salaryAccountId: string;
   memberId: number;
   memberName: string;

@@ -16,6 +16,7 @@
    on every keystroke would version a document a hundred times.
    ============================================================================= */
 import { useMemo, useState } from "react";
+import { getSession } from "../../auth/session";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import {
@@ -25,7 +26,7 @@ import {
 import { go } from "../../ui/nav";
 import { Sheet } from "./index";
 import {
-  AGREEMENT_KIND, createTemplate, emptyClause, labelOf, readMembers, renderBody,
+  AGREEMENT_KIND, createTemplate, emptyClause, labelOf, renderBody,
   sentFrom, templateOf, updateTemplate, TODAY_PLACEHOLDER,
 } from "./store";
 import type { Clause } from "./store";
@@ -55,12 +56,11 @@ export default function Editor({ mode, templateId }: {
     parent: ROUTE,
   }, templateId || "new");
 
-  /* A real name, so the preview shows the sentence that ships rather than the
-     one with braces in it. */
-  const sample = useMemo(() => {
-    const m = readMembers().filter((x) => x.status === "active")[0];
-    return m ? m.name : "the member";
-  }, []);
+  /* THE SIGNED-IN USER'S OWN NAME, so the preview shows the sentence that
+     ships rather than a stand-in nobody here is. It used to take the first
+     active row off the roster, which is whoever that happens to be — often a
+     seed account — not the person reading the preview. */
+  const sample = useMemo(() => getSession()?.user?.name || "the member", []);
   const preview = useMemo(() => renderBody(clauses, sample, TODAY_PLACEHOLDER),
     [clauses, sample]);
 

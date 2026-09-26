@@ -70,13 +70,19 @@ const COMP_TEXT: Record<string, string> = {
 };
 
 /** Completeness, with what is missing rather than only the percentage — 60%
- *  tells nobody what to ask the customer for. */
-export function Completeness({ pct, missing, bare }: { pct: number; missing: string[]; bare?: boolean }) {
+ *  tells nobody what to ask the customer for.
+ *
+ *  TWO DIFFERENT METRICS WEAR THIS BAR, and they are not two readings of one
+ *  number: the record header shows the SERVER's go-live checklist (eight items,
+ *  `app_ib/algorithms/completion.py`) and the edit dialog shows how much of the
+ *  profile SCHEMA is filled in. 85% and 50% for the same business are both
+ *  right. `label` is what this one is measuring, and every caller states it. */
+export function Completeness({ pct, missing, bare, label }: { pct: number; missing: string[]; bare?: boolean; label: string }) {
   const tone: "ok" | "warn" | "bad" = pct >= 100 ? "ok" : pct >= 60 ? "warn" : "bad";
   return (
     <span className="inline-flex min-w-0 items-center gap-2">
       <span className="w-14 shrink-0">
-        <Meter value={pct} tone={COMP_BAR[tone]} label="Profile completeness" />
+        <Meter value={pct} tone={COMP_BAR[tone]} label={label} />
       </span>
       <span className={cx("shrink-0 text-xs font-medium tnum", COMP_TEXT[tone])}>{pct}%</span>
       {bare || !missing.length ? null : (

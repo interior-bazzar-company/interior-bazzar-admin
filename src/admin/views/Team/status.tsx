@@ -28,7 +28,7 @@ import { Dropdown } from "@/components/base/dropdown/dropdown";
 import { Button, FormField, ModalShell, Pill, Textarea } from "../../ui";
 import { useShell } from "../../shell/ShellContext";
 import {
-  WORK_STATUS, labelOf, setItemStatus, stageOf, toneOf, transitionsFrom,
+  WORK_STATUS, labelOf, meId, setItemStatus, stageOf, toneOf, transitionsFrom,
 } from "./store";
 import type { WorkItem, WorkStatus } from "./store";
 
@@ -95,7 +95,13 @@ export function StatusPicker({ item, sm }: { item: WorkItem; sm?: boolean }) {
   /* NOTHING TO OFFER IS NOT A BUTTON. Every stored status has at least one move
      today, but a vocabulary is data and a row could lose its last one; a chip
      that opens an empty menu is worse than a chip that plainly does not open. */
-  if (!moves.length) return <Pill text={labelOf(WORK_STATUS, stage)} tone={toneOf(WORK_STATUS, stage)} />;
+  /* ONLY THE ASSIGNEE OR WHO SET IT MAY MOVE A STAGE — the server refuses
+     anybody else, so for them the chip is a read-out, not a menu. */
+  const me = meId();
+  const mayMove = item.assigneeId === me || item.createdById === me;
+  const pill = <Pill xs={sm} text={labelOf(WORK_STATUS, stage)} tone={toneOf(WORK_STATUS, stage)}
+    title={stage === "blocked" && item.blockedReason ? "Blocked: " + item.blockedReason : undefined} />;
+  if (!moves.length || !mayMove) return pill;
 
   return (
     /* `stopPropagation` on the wrapper: this sits inside a row that is itself a
@@ -118,6 +124,11 @@ export function StatusPicker({ item, sm }: { item: WorkItem; sm?: boolean }) {
           <Pill xs={sm} text={labelOf(WORK_STATUS, stage)} tone={toneOf(WORK_STATUS, stage)} />
         </Button>
         <Dropdown.Popover placement="bottom left" className="w-max min-w-52">
+          {stage === "blocked" && item.blockedReason ? (
+            <p className="border-b border-secondary px-3 py-2 text-xs text-tertiary">
+              Blocked: <b className="font-medium text-secondary">{item.blockedReason}</b>
+            </p>
+          ) : null}
           {derived ? (
             <p className="border-b border-secondary px-3 py-2 text-xs text-tertiary">
               Delay is read from the due date. Stored: <b className="font-medium text-secondary">{labelOf(WORK_STATUS, item.status)}</b>

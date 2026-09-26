@@ -154,24 +154,42 @@ export function Waterfall({ steps, unit, height = 240 }: { steps: WaterStep[]; u
     return { s, from, to, lo: Math.min(from, to), hi: Math.max(from, to) };
   });
   const peak = Math.max(1, ...laid.map((l) => l.hi));
-  const scale = niceScale(peak);
-  const data = laid.map((l) => ({ name: l.s.label, base: l.lo, delta: Math.max(l.hi - l.lo, 0), kind: l.s.kind, display: l.s.display ?? fmt(l.s.value), sub: l.s.sub }));
-  const fillOf = (k: WaterStep["kind"]) => (k === "in" ? "fill-chart-pos" : k === "out" ? "fill-chart-neg" : "fill-chart-1");
+  /* A CLOSING FIGURE CAN BE NEGATIVE, and it has to look it. Everything is
+     plotted as a distance above `floor` — recharts stacks a negative member of
+     a stack into its own downward stack, so a −₹75,800 total used to come out
+     as a bar of the same height pointing UP. Shifting the whole chart keeps
+     every value non-negative; the axis prints the true figure, and the zero
+     rule below says where nothing is. `floor` is 0 whenever nothing dips, so
+     a chart that never went negative is drawn exactly as before. */
+  const floor = Math.min(0, ...laid.map((l) => l.lo));
+  const scale = niceScale(peak - floor);
+  const data = laid.map((l) => ({
+    name: l.s.label, base: l.lo - floor, delta: Math.max(l.hi - l.lo, 0), kind: l.s.kind,
+    /* A closing figure below zero is money the period LOST: red, like the
+       steps that took it there, never the neutral "total" hue. */
+    down: l.s.kind === "total" && l.to < 0,
+    display: l.s.display ?? fmt(l.s.value), sub: l.s.sub,
+  }));
+  const fillOf = (d: { kind: string; down: boolean }) =>
+    (d.kind === "in" ? "fill-chart-pos" : d.kind === "out" || d.down ? "fill-chart-neg" : "fill-chart-1");
   return (
     <figure aria-labelledby={id + "-cap"} className="flex min-w-0 flex-col gap-2">
       <div style={{ height }} className="min-w-0">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 18, right: 8, bottom: 0, left: 0 }} barCategoryGap="30%">
             <XAxis dataKey="name" axisLine={false} tickLine={false} tick={AXIS_TICK} interval={0} />
-            <YAxis axisLine={false} tickLine={false} tick={AXIS_TICK} width={AXIS_W} ticks={scale.steps} domain={[0, scale.max]} tickFormatter={fmt} />
+            <YAxis axisLine={false} tickLine={false} tick={AXIS_TICK} width={AXIS_W} ticks={scale.steps} domain={[0, scale.max]} tickFormatter={(v: number) => fmt(Math.round((v + floor) * 100) / 100)} />
             {scale.steps.map((s) => (
               <ReferenceLine key={s} y={s} className={GRID} strokeWidth={1} />
             ))}
+            {/* ZERO, when the chart goes below it — otherwise the grid's own
+                bottom line already is zero. */}
+            {floor < 0 ? <ReferenceLine y={-floor} className="stroke-chart-axis" strokeWidth={1} /> : null}
             {/* the connectors: from this step's closing level to the next step's opening */}
             {laid.map((l, i) => {
               const next = laid[i + 1];
               if (!next || next.s.kind === "total") return null;
-              return <ReferenceLine key={"c" + i} segment={[{ x: l.s.label, y: l.to }, { x: next.s.label, y: l.to }]} className="stroke-chart-axis" strokeDasharray="3 3" strokeWidth={1} />;
+              return <ReferenceLine key={"c" + i} segment={[{ x: l.s.label, y: l.to - floor }, { x: next.s.label, y: l.to - floor }]} className="stroke-chart-axis" strokeDasharray="3 3" strokeWidth={1} />;
             })}
             <RTooltip
               cursor={{ className: "fill-bg-secondary" }}
@@ -191,7 +209,7 @@ export function Waterfall({ steps, unit, height = 240 }: { steps: WaterStep[]; u
             <Bar dataKey="base" stackId="w" className="fill-transparent" isAnimationActive={false} />
             <Bar dataKey="delta" stackId="w" radius={[3, 3, 0, 0]} maxBarSize={44} isAnimationActive={false}>
               {data.map((d, i) => (
-                <Cell key={i} className={fillOf(d.kind as WaterStep["kind"])} />
+                <Cell key={i} className={fillOf(d)} />
               ))}
               <LabelList
                 dataKey="display"

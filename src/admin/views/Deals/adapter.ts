@@ -194,12 +194,35 @@ function escHtml(s: string) {
    whatsapp / email) — real now, unlike the old local-engine version's
    coloured-but-fake channel tabs (see Chat.tsx). Meaningless on non-REMARK
    rows, left undefined there. */
+/** Clock time of an ISO timestamp, in the reader's own zone, or "" when the
+ *  server sent a bare date (seeded rows carry `2026-06-24 00:00:00`, which is
+ *  not a time anybody chose). */
+function timeOf(iso: string): string {
+  if (!iso || iso.length <= 10) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const hhmm = d.toTimeString().slice(0, 5);
+  return hhmm === "00:00" ? "" : hhmm;
+}
+
+/** `by` carries WHO, and now also WHEN within the day. Four entries dated
+ *  "21 Sep" with no time read as one indistinguishable block — you could not
+ *  tell a handover from the correction that reversed it twenty seconds later.
+ *  The time goes on the meta line, beside the name, because that line is
+ *  already "who did this"; `at` keeps feeding D.fmtDate(), which slices the
+ *  first ten characters and is unaffected by the full timestamp. */
+const withTime = (by: string, iso: string): string => {
+  const t = timeOf(iso);
+  return t ? by + " · " + t : by;
+};
+
 export function adaptTimeline(transitions: DealTransition[], remarks: DealRemark[]) {
   const out: { kind: string; tone: string; at: string; by: string; text: string; channel?: string }[] = [];
   remarks.forEach((r) => {
     out.push({
       kind: r.typeKey === "system" ? "SYSTEM" : "REMARK", tone: "",
-      at: r.createdAt, by: r.author ? r.author.name : (r.typeLabel || "System"),
+      at: r.createdAt,
+      by: withTime(r.author ? r.author.name : (r.typeLabel || "System"), r.createdAt),
       text: r.text, channel: r.typeKey,
     });
   });
@@ -207,17 +230,19 @@ export function adaptTimeline(transitions: DealTransition[], remarks: DealRemark
     out.push({
       kind: "STAGE", tone: t.toStageKey === "won" ? "ok" : t.toStageKey === "lost" ? "bad" : "",
       at: t.enteredAt,
-      by: t.actor ? t.actor.name + (t.actorRole ? " · " + t.actorRole : "") : (t.actorRole || "System"),
+      by: withTime(
+        t.actor ? t.actor.name + (t.actorRole ? " · " + t.actorRole : "") : (t.actorRole || "System"),
+        t.enteredAt),
       text: escHtml(t.fromStageLabel || "—") + " → <b>" + escHtml(t.toStageLabel) + "</b>" +
         (t.reason ? " · " + escHtml(t.reason) : ""),
     });
   });
   /* Sort on the FULL ISO timestamp — two events on the same day must keep
-     their real order — and only then trim to date-only, because the row
-     renders through D.fmtDate(), which is the same date-only parser that
-     turned stage_since into NaN. Truncating before the sort would silently
-     scramble same-day events. */
+     their real order. `at` is left whole rather than trimmed to date-only:
+     D.fmtDate() slices its first ten characters anyway, so the rendered date
+     is identical, and the timestamp stays available to anything that groups by
+     day (Chat.tsx does its own slice). Trimming it here only threw the time
+     away for every reader downstream. */
   return out
-    .sort((a, b) => ((a.at || "") < (b.at || "") ? 1 : (a.at || "") > (b.at || "") ? -1 : 0))
-    .map((e) => ({ ...e, at: dateOnly(e.at) || "" }));
+    .sort((a, b) => ((a.at || "") < (b.at || "") ? 1 : (a.at || "") > (b.at || "") ? -1 : 0));
 }

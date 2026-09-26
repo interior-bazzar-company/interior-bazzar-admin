@@ -173,6 +173,9 @@ export type Enquiry = {
   createdAt: string;
   activeAssignmentId: string | null;
   assignments: Assignment[];
+  /* Present only when the customer restated the requirement AFTER it was
+     handed to a business: the holder is working from an older snapshot. */
+  requirementChange?: { at: string; by: string; note: string };
   outcome: {
     assignmentId: string; firstContactAt: string | null;
     status: string; outcome: string | null; reason: string | null;
@@ -221,7 +224,9 @@ export type Business = {
   businessId: string; name: string; categories: string[]; serviceArea: string[];
   plan: string; subscription: string; renewsAt: string | null; status: string;
   suspendedAt?: string;
-  capacity: { configured: number; active: number; period: string };
+  /* `source` says whether the plan set the allowance or the rule-set floor did. */
+  capacity: { configured: number; active: number; period: string; source?: "plan" | "default" };
+  expiredAt?: string | null; lapsedPlan?: string;
   /* Both NULLABLE, because the server refuses to invent an operational record:
      a business nobody has measured reports no acknowledgement time rather than
      0 hours, and one with no decided lead reports no ratio rather than "0 of 0".
@@ -234,6 +239,9 @@ export type Business = {
 export type StatusRow = {
   key: StatusKey; label: string; tone: string; step: number;
   meaning: string; advance: string; terminal?: boolean;
+  /* A final OUTCOME that is not a dead end: the lifecycle rail still draws it as
+     the last step, but the record can be offered on (Not Converted). */
+  reopenable?: boolean;
   /* An exceptional state that is NOT a step on the way anywhere — the lifecycle
      rail leaves it out rather than implying every enquiry passes through it. */
   offRamp?: boolean;
@@ -327,9 +335,11 @@ export const contactOutcomeOf = (key: string): OutcomeRow =>
 export const transitionOf = (from: string) =>
   VOCAB.transitions.filter((t) => t.from === from)[0] || { from, to: [] as string[], guard: "" };
 
-/** Terminal states carry a reason and cannot move. Reopening needs an admin
- *  policy that does not exist in v1, so the screens do not offer it. */
-export const isTerminal = (k: string) => !!statusOf(k).terminal;
+/** Terminal states carry a reason and cannot move — except a `reopenable` one,
+ *  which is an outcome the record can still leave (Not Converted: the business
+ *  turned it down, so the enquiry can go to somebody else). The rail reads
+ *  `.terminal` directly and is unaffected. */
+export const isTerminal = (k: string) => !!statusOf(k).terminal && !statusOf(k).reopenable;
 
 /* ============================================================ THE STORE ===
    A module-level singleton, exactly like admin/auth/session.ts — the views
@@ -661,6 +671,31 @@ export function useMatchRun(id: string | null): MatchRun | null {
  *  session. The list's Business filter is built from this and not from the rows
  *  on screen — with a page, those name only the businesses this page happens to
  *  mention, and the filter you wanted would not be in the dropdown. */
+/** What a hand-pick should be WARNED about, mirroring the server's
+ *  `enquiry_match.warnings` (which also writes them on the timeline). Category
+ *  and service area are not refusals — overriding them is what a hand-pick is
+ *  for — but the dialog must not assert a match nobody checked. */
+const GENERALIST = ["interior", "turnkey", "design", "architect", "execution"];
+export function assignWarnings(e: Enquiry, b: Business | undefined): string[] {
+  if (!b) return [];
+  const fold = (v?: string | null) => (v || "").trim().toLowerCase();
+  const out: string[] = [];
+  const want = fold(e.requirement.category);
+  const declared = b.categories.map(fold).filter(Boolean);
+  if (want && !declared.length) out.push("No categories on this profile — category fit is unchecked");
+  else if (want && !declared.some((d) => d === want || d.includes(want) || want.includes(d)
+    || GENERALIST.some((w) => d.includes(w)))) {
+    out.push("Declares " + b.categories.join(", ") + " — request is " + e.requirement.category);
+  }
+  const where = [fold(e.requirement.city), fold(e.requirement.state)].filter(Boolean);
+  const area = b.serviceArea.map(fold).filter(Boolean);
+  if (where.length && !where.some((w) => area.some((a) => a === w || a.includes(w) || w.includes(a)))) {
+    out.push("Serves " + (b.serviceArea.join(", ") || "no area on file") + " — customer is in "
+      + (e.requirement.city || e.requirement.state));
+  }
+  return out;
+}
+
 export const businessDirectory = (): Business[] => store.businesses;
 
 export const businessById = (id: string) =>
@@ -851,6 +886,7 @@ export type Counts = {
   live: number;
   noEligible: number;
   converted: number;
+  notConverted: number;
   invalid: number;
 };
 
@@ -872,6 +908,7 @@ export function countsFromServer(c: ServerCounts): Counts {
     live: by.assigned || 0,
     noEligible: c.noEligible,
     converted: by.converted || 0,
+    notConverted: by.not_converted || 0,
     invalid: by.invalid || 0,
   };
 }
@@ -908,6 +945,7 @@ export function countsOf(list: Enquiry[]): Counts {
     live: byStatus.assigned || 0,
     noEligible: byStatus.no_match || 0,
     converted: byStatus.converted || 0,
+    notConverted: byStatus.not_converted || 0,
     invalid: byStatus.invalid || 0,
   };
 }

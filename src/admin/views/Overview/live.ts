@@ -36,6 +36,10 @@ import type {
   WorkSettingsRow,
 } from "../../../api/modules/adminOps";
 import { addDays, healthOf, todayLocal } from "./derive";
+/* ONE ON-TIME RULE for the whole panel — Attendance Analytics owns it, this
+   page reads it, so "76% arrived on time" and "ON TIME 0%" can only ever
+   differ by the days each one counts, never by the arithmetic. */
+import { onTimePctOf } from "../Team/store";
 import type { AttentionTeam, DealMetrics, HealthCell, OwnerStat, Period } from "./derive";
 
 export type LiveState = "off" | "loading" | "ready" | "error";
@@ -188,7 +192,7 @@ export function liveTeam(r: Raw, dept: string | undefined, rolesOf: Map<string, 
   const items = r.work.filter((i) => inDept(i.assignee.id));
   const key = (i: WorkItemRow) => i.status?.key;
   return {
-    span: { onTimePct: present.length ? Math.round(((present.length - late) / present.length) * 100) : null },
+    span: { onTimePct: onTimePctOf(present.length, late) },
     work: {
       total: items.length,
       completed: items.filter((i) => key(i) === "completed").length,
@@ -230,7 +234,7 @@ export function liveTeamRows(r: Raw, people: AdminUserRow[], dept: string | unde
       open: mine.filter((i) => TERMINAL.indexOf(i.status?.key) < 0).length,
       late: mine.filter((i) => i.delayed).length,
       done: r.doneWork.filter((i) => String(i.assignee.id) === id).length,
-      onTime: present.length ? Math.round(((present.length - late) / present.length) * 100) : null,
+      onTime: onTimePctOf(present.length, late),
       /* The day's name is the backend's own label (team/d2), weekly off
          included -- not a list kept here (d14). */
       stateLabel: now ? now.state.label : "",
@@ -277,7 +281,7 @@ export function useAttentionLive(today: string, on: { reports: boolean; full: bo
       on.reports ? every((n) => call(AdminOpsService.dailyPlans({ member: "all", ...day, pageNo: n, pageSize: 500 })), (r) => r.plans) : none,
       on.reports ? every((n) => call(AdminOpsService.dailyReports({ member: "all", ...day, pageNo: n, pageSize: 500 })), (r) => r.reports) : none,
       on.full ? every((n) => call(AdminOpsService.attendanceDays({ member: "all", ...day, pageNo: n, pageSize: 1000 })), (r) => r.days) : none,
-      on.full ? every((n) => call(AdminOpsService.leave({ member: "all", state: "requested", pageNo: n, pageSize: 500 })), (r) => r.leave) : none,
+      on.full ? every((n) => call(AdminOpsService.leave({ member: "all", state: "requested,escalated", pageNo: n, pageSize: 500 })), (r) => r.leave) : none,
       on.full ? every((n) => call(AdminOpsService.agreements({
         member: "all", state: "sent,viewed", expiresFrom: today, expiresTo: addDays(today, 7), pageNo: n, pageSize: 500 })), (r) => r.agreements) : none,
       /* Own row only without full access -- which is then nobody's manager. */

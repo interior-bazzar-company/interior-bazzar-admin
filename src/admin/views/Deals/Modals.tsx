@@ -196,15 +196,18 @@ function useDeal(ref: string) {
 
 /** The two footer buttons every dialog here ends on, in the panel's order:
  *  cancel first, the commit last and primary. */
-function Commit({ onClose, onGo, busy, label, busyLabel, act, dealRef, ico, tone }: {
+function Commit({ onClose, onGo, busy, label, busyLabel, act, dealRef, ico, tone, blocked, why }: {
   onClose: () => void; onGo: () => void; busy?: boolean; label: string; busyLabel: string;
   act: string; dealRef?: string; ico?: string; tone?: "bad";
+  /** Not yet answerable — the dialog is missing something it needs. Refusing
+   *  the click beats accepting it and answering with a made-up "400". */
+  blocked?: boolean; why?: string;
 }) {
   return (
     <>
       <Button color="secondary" data-close="1" isDisabled={busy} onClick={onClose}>Cancel</Button>
-      <Button color={tone === "bad" ? "primary-destructive" : "primary"} ico={ico}
-        data-act={act} data-ref={dealRef} isDisabled={busy} onClick={onGo}>
+      <Button color={tone === "bad" ? "primary-destructive" : "primary"} ico={ico} title={blocked ? why : undefined}
+        data-act={act} data-ref={dealRef} isDisabled={busy || blocked} onClick={onGo}>
         {busy ? busyLabel : label}
       </Button>
     </>
@@ -745,14 +748,23 @@ function CloseModal({ dealRef, onClose, done }: {
   const [err, setErr] = useState<Refusal | null>(null);
   const [busy, setBusy] = useState(false);
   const [as, setAs] = useState<string>("");
+  /* Tracked rather than read off the DOM at submit time, so the button can say
+     up front that a reason is needed instead of the dialog answering a press
+     with a fabricated HTTP error. Both answers survive a failed submit — the
+     outcome already chosen is never cleared. */
+  const [reason, setReason] = useState("");
   if (loading) return <Opening title="Close deal" dealRef={dealRef} onClose={onClose} />;
   if (!dl) return <Gone title="Close deal" dealRef={dealRef} onClose={onClose} />;
 
+  /* NO INVENTED HTTP STATUS FOR A QUESTION THE DIALOG ITSELF CAN SEE.
+     Pressing Close deal with nothing chosen answered "400 — Choose Won or
+     Lost.", which reads as the server rejecting the deal when in fact nothing
+     had been sent. Both answers gate the button instead, with the reason why
+     on it, so neither made-up refusal can be reached; ErrSlot is left for what
+     the server actually says. */
   const commit = () => {
-    if (!as) return setErr({ http: 400, code: "", detail: "Choose Won or Lost." });
-    const why = String(val("clReason") || "").trim();
-    if (!why) return setErr({ http: 400, code: "",
-      detail: "A reason is required — say why this deal is being closed." });
+    const why = reason.trim();
+    if (!as || !why) return;
     setErr(null); setBusy(true);
     const to = Number(as);
     call(AdminOpsService.dealStage(dealRef, apiStageKey(String(to)) as string, why))
@@ -779,6 +791,8 @@ function CloseModal({ dealRef, onClose, done }: {
     <ModalShell ico="alert" tone="error" title="Close deal" mono
       sub={<>{dealRef} · Won or Lost, and reversible either way</>} onClose={onClose}
       actions={<Commit onClose={onClose} onGo={commit} busy={busy} tone="bad"
+        blocked={!as || !reason.trim()}
+        why={!as ? "Choose Won or Lost first" : "Say why this deal is being closed"}
         label="Close deal" busyLabel="Closing…" act="dl-close-go" dealRef={dealRef} />}
     >
       <div className="flex flex-col gap-4">
@@ -794,7 +808,8 @@ function CloseModal({ dealRef, onClose, done }: {
             : null}
         </div>
         <FormField id="clReason" label="Reason" req>
-          <Textarea id="clReason" rows={3} ph="Chose a local vendor on price." />
+          <Textarea id="clReason" rows={3} ph="Chose a local vendor on price."
+            value={reason} onChange={setReason} />
         </FormField>
         <Notice ico="shield" text={<>
           <b>Closing sets a stage, it does not freeze anything.</b> Remarks can still be added

@@ -58,7 +58,7 @@ export default function RefundDetail({ id, p, onParams }: {
 
      DISABLED RATHER THAN HIDDEN without Super Admin: somebody who cannot see
      the action cannot ask for it either. */
-  const saTitle = sa ? undefined : "Deciding a refund is Super Admin only.";
+  const saTitle = sa ? undefined : "Deciding a refund requires full access.";
   const actions = writable ? (
     <ActionMenu forWhat={r.refundId} items={[
       deciding && { icon: "check", label: "Approve", act: () => openDecide("approve"),
@@ -163,7 +163,7 @@ export default function RefundDetail({ id, p, onParams }: {
                 ["Note", r.decisionNote || <span className="text-quaternary">No note.</span>],
               ]} />
             ) : (
-              <Fine>Not yet decided. {deciding ? "Waiting on Super Admin." : ""}</Fine>
+              <Fine>Not yet decided. {deciding ? "Waiting on someone with full access." : ""}</Fine>
             )}
 
             {r.state === "approved" && !r.settlement ? (

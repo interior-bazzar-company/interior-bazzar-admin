@@ -103,7 +103,9 @@ export default function AccessRequests({ q, reload, roles, ops }: {
               <td className="cell-1"><Person name={r.member.name} sub={r.member.username} to={"#/team/" + r.member.id} /></td>
               <td>{asked(r)}</td>
               <td className="max-w-80 whitespace-normal">{r.reason || <span className="text-quaternary">—</span>}</td>
-              <td className="tnum">{fmtDate(r.createdAt)}</td>
+              {/* The date alone does not say "this has been sitting for five
+                  days"; a request nobody decides is the thing worth seeing. */}
+              <td className="tnum">{fmtDate(r.createdAt)}<WaitedFor since={r.createdAt} /></td>
               <td className="acts">
                 {r.member.id === me ? (
                   <span className="text-xs text-quaternary">Yours — someone else decides</span>
@@ -164,14 +166,40 @@ export default function AccessRequests({ q, reload, roles, ops }: {
   );
 }
 
+/** How long a pending request has been waiting. Quiet under a day, and it
+ *  reads as a warning once somebody has been waiting a week. */
+function WaitedFor({ since }: { since: string }) {
+  const days = Math.floor((Date.now() - new Date(since).getTime()) / 86400000);
+  if (days < 1) return null;
+  return (
+    <span className={"ml-2 text-xs " + (days >= 7 ? "text-warning-primary" : "text-tertiary")}>
+      waiting {days} day{days === 1 ? "" : "s"}
+    </span>
+  );
+}
+
 /* ---------------------------------------------------------------- approve -- */
-/* Only roles the server would accept are offered: active, and holding the
-   action (a full-access role holds every one). Narrow roles first, so the
-   default pick is never the one that hands over the whole panel. */
+/* NOT BY WAY OF ADMIN, AND NOT BLIND.
+   A full-access role "holds" every action, so Admin used to satisfy any
+   request and sat in this dropdown: a plea to VIEW one module was one click
+   from the whole panel. It is filtered out here and refused by the server too
+   (AccessRequestsController.Decide) — a dropdown is not an authorization.
+   What is left is ordered NARROWEST FIRST, counting the actions each role
+   actually carries, so the default pick is the smallest one that does the job;
+   and the chosen role's full grant list is on screen before Approve, with
+   everything beyond the request marked, because "they get the whole role" is
+   only a fair warning if the reader can see what the whole role is. */
+const actionsOf = (x: Role): string[] =>
+  Object.keys(x.modules || {})
+    .flatMap((k) => (x.modules[k] || []).map((a) => k + "." + a))
+    .sort();
+
 function ApproveModal({ r, roles, ops, reload }: { r: AccessRequestRow; roles: Role[]; ops: Ops; reload: () => void }) {
+  const asked = r.module.key + "." + r.action;
   const fit = roles
-    .filter((x) => x.isActive && (x.isFullAccess || (x.modules[r.module.key] || []).indexOf(r.action) >= 0))
-    .sort((a, b) => Number(a.isFullAccess) - Number(b.isFullAccess) || a.name.localeCompare(b.name));
+    .filter((x) => x.isActive && !x.isFullAccess && !x.isSystem
+      && (x.modules[r.module.key] || []).indexOf(r.action) >= 0)
+    .sort((a, b) => actionsOf(a).length - actionsOf(b).length || a.name.localeCompare(b.name));
   const [role, setRole] = useState(fit.length ? String(fit[0].id) : "");
   const [err, setErr] = useState<EngineErr | null>(null);
   const [busy, setBusy] = useState(false);
@@ -211,14 +239,16 @@ function ApproveModal({ r, roles, ops, reload }: { r: AccessRequestRow; roles: R
       <ErrSlot err={err} />
       {fit.length ? (
         <div className="flex flex-col gap-4">
-          <FormField id="arRole" label="Add them to" hint={"Active roles that hold " + r.module.key + "." + r.action + "."}>
+          <FormField id="arRole" label="Add them to"
+            hint={"Active roles that hold " + asked + ", fewest extra permissions first."}>
             <SelectInput id="arRole" value={role} onChange={setRole}
-              options={fit.map((x) => ({ v: String(x.id), l: x.name + (x.isFullAccess ? " (full access)" : "") }))} />
+              options={fit.map((x) => ({
+                v: String(x.id),
+                l: x.name + " · " + actionsOf(x).length + " permission"
+                  + (actionsOf(x).length === 1 ? "" : "s"),
+              }))} />
           </FormField>
-          <Notice tone="warn" ico="alert" text={
-            <><b>They get the whole role.</b> Everything {picked ? picked.name : "it"} grants comes with it, not
-              only the one action asked for.</>
-          } />
+          {picked ? <Grants role={picked} asked={asked} /> : null}
         </div>
       ) : (
         <Notice tone="warn" ico="alert" text={
@@ -227,6 +257,29 @@ function ApproveModal({ r, roles, ops, reload }: { r: AccessRequestRow; roles: R
         } />
       )}
     </ModalShell>
+  );
+}
+
+/** EVERYTHING THE CHOSEN ROLE CARRIES, with the extras called out. The asked-for
+ *  action is listed first and marked; the rest is what comes along with it. */
+function Grants({ role, asked }: { role: Role; asked: string }) {
+  const all = actionsOf(role);
+  const extras = all.filter((a) => a !== asked);
+  return (
+    <div className="flex flex-col gap-2">
+      <Notice tone={extras.length ? "warn" : "info"} ico="alert" text={
+        extras.length
+          ? <><b>They get the whole role.</b> {role.name} also grants {extras.length} permission
+            {extras.length === 1 ? "" : "s"} beyond the one asked for.</>
+          : <>{role.name} grants exactly the action asked for and nothing else.</>
+      } />
+      <div className="flex flex-wrap gap-1.5">
+        <span className="rounded bg-success-primary px-1.5 py-0.5 font-mono text-xs text-primary">{asked}</span>
+        {extras.map((a) => (
+          <span key={a} className="rounded bg-secondary px-1.5 py-0.5 font-mono text-xs text-tertiary">{a}</span>
+        ))}
+      </div>
+    </div>
   );
 }
 

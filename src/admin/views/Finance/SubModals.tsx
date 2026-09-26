@@ -607,8 +607,8 @@ export function FailToPayModal({ sub, inst, onClose, onDone }: {
           on a schedule.
         </Check>
         <Check>
-          It does <b>not</b> suspend the membership. Entitlements belong to Users and nobody has
-          decided to withdraw them — <b className="font-mono">FN-OD-15</b>.
+          It does <b>not</b> suspend the membership. Entitlements belong to Users, and whether a
+          failed payment should withdraw them is still an open decision.
         </Check>
         <Check warn>
           It moves {sub.subscriptionId} to <b>Defaulting</b> the moment it is saved, and takes it
@@ -692,7 +692,7 @@ export function ReversePaymentModal({ sub, inst, pay, onClose, onDone }: {
 
       {blocked
         ? <Alert tone="warn" ico="shield" title={blocked}>
-            Ask a Super Admin to do it, or ask for the grant. The button stays visible so you know
+            Ask someone with full access to do it, or ask for the grant. The button stays visible so you know
             the action exists.
           </Alert>
         : null}

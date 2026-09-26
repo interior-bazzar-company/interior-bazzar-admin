@@ -5,6 +5,8 @@
 // mePermissions(). Keep in sync with interior_admin/urls.py.
 import appUrl from "../../endpoints";
 import apiService, { AppExceptions } from "../../apiService";
+import { fetchWithAuthRetry } from "../../apiService/authHelper/fetchWithAuthRetry";
+import config from "../../../config";
 import type { ApiResponseType } from "../../../types/reqResType";
 
 const base = appUrl.admin; // "v1/admin"
@@ -133,6 +135,26 @@ export interface AdminUserRow {
   /** team/d2; absent with no work-settings row, like `reportsTo`. */
   employmentType?: { key: string; label: string; tone: string } | null;
 }
+/** GET users/orphans/ — team.status, same gate as suspend/delete. Records still
+ *  owned by an account off the team roster (deleted/suspended/unknown), plus
+ *  the records nobody owns at all. */
+export interface OrphanDealRow { ref: string; contact: string; valuePaise: number | null; stage: string }
+export interface OrphanOwnerRow {
+  id: number; username: string; name: string; why: "deleted" | "suspended" | "not a team member" | "unknown";
+  deals: OrphanDealRow[]; quotations: number; invoices: number; enquiries: number; tasks: number;
+  valuePaise: number;
+}
+/** GET users/<id>/owned/ — same shape the delete/suspend refusal's `data.owns`
+ *  carries, read ahead of time so the delete dialog knows whether to ask for a
+ *  successor before the person even presses the destructive button. */
+export interface OwnedCounts { deals: number; quotations: number; invoices: number; enquiries: number; tasks: number }
+export interface OwnedByResponse { owns: OwnedCounts }
+export interface OrphansResponse {
+  /** Sorted by `valuePaise` descending. */
+  owners: OrphanOwnerRow[];
+  unassigned: { deals: OrphanDealRow[]; quotations: number; invoices: number; enquiries: number };
+}
+
 /** One row of GET access-requests/ (team/d1): a member asking for one module action. */
 export interface AccessRequestRow {
   id: number;
@@ -189,6 +211,12 @@ export interface AuditEntry {
   /** True only for the registration line, which is derived from the account's
    *  own creation stamp rather than stored — no admin ever performed it. */
   synthetic: boolean;
+  /** Why the actor did it, when they were asked and answered. */
+  reason?: string | null;
+  /** `{field: [before, after]}`. Null on rows that changed nothing a diff can
+   *  show — a create, a login, an action that only ever has one state. */
+  changes?: Record<string, [unknown, unknown]> | null;
+  ip?: string | null;
 }
 export interface AuditAction {
   action: string; label: string; verb: string; destructive: boolean;
@@ -518,6 +546,11 @@ export interface InvoiceRow {
   paymentDate: string | null; paymentMode: string; paymentReference: string;
   subtotalPaise: number; taxableTotalPaise: number;
   cgstPaise: number; sgstPaise: number; igstPaise: number; taxTotalPaise: number; grandTotalPaise: number;
+  /** WHAT ACTUALLY ARRIVED, summed from the payment ledger — never inferred
+   *  from `status`. Issuing used to write the payment itself, so every issued
+   *  invoice read as received; it does not any more, and this is the only
+   *  honest source for "paid", "outstanding" and "overdue". */
+  receivedPaise: number;
   notes: string; terms: string;
   owner: DealPersonRef | null; createdBy: DealPersonRef | null; createdAt: string;
   issuedBy: DealPersonRef | null; issuedAt: string | null;
@@ -607,6 +640,14 @@ export interface UserCommercial {
   salesOwner: string | null;
   dealRefs: string[];
   invoices: { id: number; number: string | null }[];
+  /** The enquiry allowance on a business account: how many enquiries its plan
+   *  lets it be given this period and how many it has been. A count, never
+   *  money. Absent on an account with no business. */
+  leadQuota?: {
+    plan: string; subscription: string; renewsAt: string | null; expiredAt: string | null;
+    allowance: number; used: number; remaining: number; period: string;
+    source: "plan" | "default";
+  };
 }
 /** GET v1/admin/platform-users/<pk>/ — the row above plus the account's login
  *  username and the business profile it holds (a business first, else a shop). */
@@ -911,6 +952,12 @@ export interface PayslipRow {
   paidFrom?: VocabItem | null;
   /** The transfer receipt, a private Attachment read back as a signed URL. */
   receipt?: { id: number; fileName: string; mimeType: string; sizeKb: number; url: string } | null;
+  /** The document number the server allots. Absent on a draft, which has none
+   *  yet, and absent from a server that does not persist one. */
+  slipNumber?: string | null;
+  /** Where THIS slip's money was sent, frozen with the slip. Masked, like the
+   *  account's own — the whole values never leave the server. */
+  payTo?: PayToRef | null;
 }
 export interface PayslipsResponse { slips: PayslipRow[]; total: number }
 /** POST salaries/runs/ — the run just built and every slip on it. */
@@ -1160,9 +1207,8 @@ export class AdminOpsService {
   static updateRole(id: number, data: { name?: string; modules: RoleModules; isActive?: boolean }) {
     return apiService.getPutApiResponse<AdminRole>(`${base}/roles/`, { id, ...data });
   }
-  // Contract-specified (§3); not yet wired server-side as of this write — see report.
-  static deleteRole(id: number) {
-    return apiService.getDeleteApiResponse<{ id: number; deleted: boolean }>(`${base}/roles/`, { id });
+  static deleteRole(id: number, reason: string) {
+    return apiService.getDeleteApiResponse<{ id: number; deleted: boolean }>(`${base}/roles/`, { id, reason });
   }
 
   // ── Team members (interior_admin/urls.py → AdminUserViews) ──
@@ -1252,14 +1298,46 @@ export class AdminOpsService {
   static updateUser(id: number, data: Partial<AdminUserInput>) {
     return apiService.getPutApiResponse<AdminUserRow>(`${base}/users/${id}`, data);
   }
-  static deleteUser(id: number) {
-    return apiService.getDeleteApiResponse<{ id: number; deleted: boolean }>(`${base}/users/${id}`);
+  /** `reason` is mandatory (the server refuses without one). If the account
+   *  still owns deals/quotations/invoices/enquiries/open tasks, the server
+   *  refuses again unless `reassignTo` names another active team member —
+   *  the refusal's `data.owns` gives the counts, or read `ownedBy(id)` ahead
+   *  of the attempt to decide whether to ask for a successor at all. */
+  static deleteUser(id: number, data: { reason: string; reassignTo?: number }) {
+    return apiService.getDeleteApiResponse<{ id: number; deleted: boolean }>(`${base}/users/${id}`, data);
+  }
+  /** GET users/<id>/owned/ — team.view. Counts of what this person owns. */
+  static ownedBy(id: number) {
+    return apiService.getGetApiResponse<OwnedByResponse>(`${base}/users/${id}/owned/`);
+  }
+  /** POST users/<id>/suspend/ — team.status. Switches the login off and ends
+   *  every session; `reason` is mandatory and the same ownership refusal as
+   *  `deleteUser` applies (`data.owns` on a 4xx with no `reassignTo`). */
+  static suspendUser(id: number, data: { reason: string; reassignTo?: number }) {
+    return apiService.getPostApiResponse<{ moved: OwnedCounts }>(`${base}/users/${id}/suspend/`, data);
+  }
+  /** POST users/<id>/reinstate/ — team.status. Turns the login back on. */
+  static reinstateUser(id: number, data: { reason: string }) {
+    return apiService.getPostApiResponse<unknown>(`${base}/users/${id}/reinstate/`, data);
+  }
+  /** POST users/<id>/view-as/ — team.roles, full access only; refused on a
+   *  superuser/full-access target. This call is only the audit of STARTING a
+   *  view-as session — it does not itself change what later requests see.
+   *  The caller still has to turn on `X-View-As` for GETs (admin/viewAs.ts). */
+  static viewAsUser(id: number, data: { reason: string }) {
+    return apiService.getPostApiResponse<{ id: number; username: string; readOnly: boolean }>(
+      `${base}/users/${id}/view-as/`, data);
   }
   /** Issues + emails a fresh password; the current one stops working the
    * moment it succeeds. There is no path that returns the password value —
    * unlike the old local engine, this cannot be "shown once" in a dialog. */
   static sendUserCredentials(id: number) {
     return apiService.getPostApiResponse<unknown>(`${base}/users/${id}/send-credentials/`, {});
+  }
+  /** GET users/orphans/ — team.status. Who owns records off the roster, and
+   *  what has no owner at all. */
+  static orphans() {
+    return apiService.getGetApiResponse<OrphansResponse>(`${base}/users/orphans/`);
   }
 
   // ── Audit ──
@@ -1285,6 +1363,22 @@ export class AdminOpsService {
     subjectType?: string; subjectId?: string;
   } = {}) {
     return apiService.getGetApiResponse<AuditResponse>(`${base}/audit/${qs(params)}`);
+  }
+  /** Same filters as `audit()`, but the server hands back the finished CSV —
+   *  IST timestamps, module labels resolved, every matching row rather than
+   *  one page — plus `X-Row-Count` for how many rows it holds. Goes around
+   *  `apiService`: the response body IS the file, not the {response,data}
+   *  envelope every other admin-ops read answers with, so there is no JSON to
+   *  unwrap and `call()` does not apply. */
+  static async auditExport(params: Parameters<typeof AdminOpsService.audit>[0] = {}) {
+    const res = await fetchWithAuthRetry(
+      `${config.BASE_URL}/${base}/audit/export/${qs(params)}`,
+      { method: "GET" },
+    );
+    if (!res.ok) throw new AppExceptions("Could not export the log.", res.status, false);
+    const csv = await res.text();
+    const headerCount = res.headers.get("X-Row-Count");
+    return { csv, rowCount: headerCount ? parseInt(headerCount, 10) : null };
   }
   /** ONE ACCOUNT'S slice of the same trail — every entry whose SUBJECT is that
    *  user, same envelope, same filters, same paging.
@@ -1348,12 +1442,13 @@ export class AdminOpsService {
   }
   // Archive: out of the catalogue and never buyable again, still listed for admins;
   // existing subscribers keep the plan, and the records naming it stay explainable.
-  static archivePlan(id: number) {
-    return apiService.getDeleteApiResponse<PlanRow>(`${base}/plans/${id}/`);
+  // `reason` is required by the archive direction only.
+  static archivePlan(id: number, reason: string) {
+    return apiService.getDeleteApiResponse<PlanRow>(`${base}/plans/${id}/`, { reason });
   }
-  // Restore an archived plan. It comes back OFF sale — never a silent re-launch.
-  static setPlanArchived(id: number, archived: boolean) {
-    return apiService.getPostApiResponse<PlanRow>(`${base}/plans/${id}/archive/`, { archived });
+  // Restore an archived plan (archived:false) needs no reason; archiving (true) does.
+  static setPlanArchived(id: number, archived: boolean, reason?: string) {
+    return apiService.getPostApiResponse<PlanRow>(`${base}/plans/${id}/archive/`, { archived, reason });
   }
 
   // ── House banners (real HomeHeroBanner hero slides) ──
@@ -2072,8 +2167,8 @@ export class AdminOpsService {
   static verifyMemberDocument(id: number) {
     return apiService.getPostApiResponse<MemberDocumentRow>(`${base}/member-documents/${id}/verify/`, {});
   }
-  static removeMemberDocument(id: number) {
-    return apiService.getDeleteApiResponse<{ id: number; deleted: boolean }>(`${base}/member-documents/${id}/`);
+  static removeMemberDocument(id: number, reason: string) {
+    return apiService.getDeleteApiResponse<{ id: number; deleted: boolean }>(`${base}/member-documents/${id}/`, { reason });
   }
   /** `member` omitted = the caller's own days; an id or `all` is full access only.
    *  `includeMissing` also returns the days nobody opened (absent / not started
@@ -2120,6 +2215,10 @@ export class AdminOpsService {
    *  date) rather than one a person pressed. The server only believes an
    *  automatic open inside the member's working window; a deliberate one is
    *  never refused for the hour it arrives at. */
+  /** Sign in for the day at the time you really started: `startedAt` is "HH:MM", not in the future, `note` required. */
+  static openAttendanceDayAt(data: { startedAt: string; note: string }) {
+    return apiService.getPostApiResponse<AttendanceDayRow>(`${base}/attendance/day/open/`, data);
+  }
   static attendanceDayAction(action: "open" | "break" | "resume" | "end", auto?: boolean) {
     return apiService.getPostApiResponse<AttendanceDayRow>(`${base}/attendance/day/${action}/`, auto ? { auto: true } : {});
   }
@@ -2134,11 +2233,14 @@ export class AdminOpsService {
     return apiService.getPutApiResponse<WorkSettingsRow>(`${base}/attendance/settings/${userId}/`, data);
   }
   /** The caller's own request. */
-  static requestLeave(data: { kind: string; fromDate: string; toDate: string; reason?: string }) {
+  static requestLeave(data: { kind: string; fromDate: string; toDate: string; reason?: string; member?: number }) {
     return apiService.getPostApiResponse<LeaveRow>(`${base}/leave/`, data);
   }
   static withdrawLeave(id: number) {
     return apiService.getPostApiResponse<LeaveRow>(`${base}/leave/${id}/withdraw/`, {});
+  }
+  static escalateLeave(id: number, data: { note: string }) {
+    return apiService.getPostApiResponse<LeaveRow>(`${base}/leave/${id}/escalate/`, data);
   }
   static decideLeave(id: number, data: { state: "approved" | "rejected"; note?: string }) {
     return apiService.getPostApiResponse<LeaveRow>(`${base}/leave/${id}/decide/`, data);

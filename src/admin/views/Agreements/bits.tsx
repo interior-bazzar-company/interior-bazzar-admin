@@ -104,7 +104,7 @@ export function Sheet({ title, clauses, compact, children }: {
  *  panel's: a signature line that went dark with the theme would be the one
  *  part of the document that was not the document. */
 export function SignatureLine({ a, hint }: { a: Agreement; hint?: ReactNode }) {
-  const signed = a.state === "signed";
+  const signed = stateOf(a) === "signed";
   return (
     <div className="mt-8 flex flex-col gap-1.5 border-t border-neutral-200 pt-5">
       <span aria-hidden="true" className="h-px w-full max-w-64 bg-neutral-400" />
@@ -153,7 +153,7 @@ export function BlankSignature({ text }: { text?: ReactNode }) {
  *  what would be captured, so an operator chasing a signature can see exactly
  *  what they are still waiting for. */
 export function Evidence({ a }: { a: Agreement }) {
-  const signed = a.state === "signed";
+  const signed = stateOf(a) === "signed";
   const none = (t: string) => <span className="text-quaternary italic">{t}</span>;
   const rows: [string, ReactNode][] = [
     ["Signed by", signed ? <span className="font-semibold text-primary">{a.signedName}</span> : none("not yet signed")],

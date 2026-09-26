@@ -118,15 +118,11 @@ function InvoicesList() {
     return Array.from(m, ([v, l]) => ({ v: String(v), l }));
   }, [all]);
 
-  /* Received is neither estimated nor recomputed here: Issue writes ONE ledger
-     row for the whole grand total in the same transaction that freezes the
-     invoice (InvoicesController.Issue), so an issued invoice is fully received
-     and anything else is nothing -- the same rule MoneyCell states on every
-     row. Outstanding is what that leaves over, and it is zero unless the
-     ledger write right after Issue failed.
-     ponytail: reads zero even in that repair case, because the list row
-     carries no ledger figure. Add `receivedPaise` to _invoice_dict and sum it
-     here if the stuck case ever has to be visible from the list. */
+  /* Received is neither estimated nor inferred: `receivedPaise` is the
+     server's own sum over the payment ledger, on every row. It used to be
+     read off `status`, because Issue wrote the ledger row itself — so the
+     ponytail note that used to sit here, asking for exactly this field, has
+     been taken up. */
   /* And EVERY figure here is counted over what the API actually returned, which
      for anything short of full access is only the deals this session owns or
      co-owns. A sales session's strip therefore states ITS OWN invoicing, not
@@ -143,23 +139,26 @@ function InvoicesList() {
   const yrs = scopeOf("invoices") === "all" ? "" : mine.replace(" · ", " ");
 
   const byStatus: Record<string, number> = {};
-  /* `invoiced` and `received` are the SAME SUM over the same rows, because
-     Issue writes the deal-payment ledger row in its own transaction: an issued
-     invoice is a paid one, which is why the list labels that status "Paid".
-     `outstanding` was `invoiced - received` and could therefore only ever
-     print ₹0 -- a cell that was arithmetically dead from the day it was
-     written, on the page a customer's unbilled money is read off.
-
-     What is genuinely outstanding on this page is the DRAFTS: an invoice that
-     names money, cites its quotation, carries a due date the overdue cell
-     already counts against -- and has never been issued, so nothing was ever
-     asked for. On DL-2515 that is the ₹2,80,693 the page was reporting as ₹0
-     while flagging both of those drafts overdue in the cell beside it. */
-  let invoiced = 0, received = 0, overdue = 0, outstanding = 0;
+  let invoiced = 0, received = 0, overdue = 0, outstanding = 0, unbilled = 0;
   all.forEach((inv) => {
     byStatus[inv.status] = (byStatus[inv.status] || 0) + 1;
-    if (inv.status === "issued") { invoiced += inv.grandTotalPaise; received += inv.grandTotalPaise; }
-    if (inv.status === "draft") outstanding += inv.grandTotalPaise;
+    /* ISSUED IS WHAT WAS ASKED FOR; RECEIVED IS WHAT ARRIVED; THE GAP BETWEEN
+       THEM IS OUTSTANDING. All three used to be something else. `received`
+       was a copy of `invoiced` because issuing wrote the ledger row itself, so
+       the two could never differ and the page showed three invoices fully
+       received while Subscriptions showed ₹0 collected. `outstanding` was the
+       sum of DRAFTS — money nobody has been asked for, including ₹14,56,119
+       on a deal still at stage New — which is a real number but not this one.
+       `receivedPaise` is the server's own sum over the payment ledger. */
+    if (inv.status === "issued") {
+      invoiced += inv.grandTotalPaise;
+      received += inv.receivedPaise;
+      outstanding += Math.max(0, inv.grandTotalPaise - inv.receivedPaise);
+    }
+    /* Drafts keep their own cell rather than being folded into outstanding or
+       dropped: an invoice that names money and was never issued is worth
+       seeing, it just is not owed by anybody yet. */
+    if (inv.status === "draft") unbilled += inv.grandTotalPaise;
     if (isOverdue(inv)) overdue += 1;
   });
   function route(k: string, v: string) {
@@ -177,25 +176,31 @@ function InvoicesList() {
     "sep",
     { k: "draft", v: byStatus.draft || 0, dot: "", to: route("status", "draft"), on: p.status === "draft",
       title: "Draft invoices" + only },
-    { k: "paid", v: byStatus.issued || 0, dot: "ok", to: route("status", "issued"), on: p.status === "issued",
-      title: "Issued invoices, their payment already on the ledger" + only },
+    { k: "issued", v: byStatus.issued || 0, dot: "info", to: route("status", "issued"), on: p.status === "issued",
+      title: "Raised and sent — paid or not" + only },
     "sep",
     { k: "overdue", v: overdue, dot: overdue ? "bad" : "", tone: overdue ? "bad" : "",
       to: route("status", "overdue"), on: p.status === "overdue",
-      title: "Past its due date with the money still not logged" + only },
+      title: "Issued, past its due date, and not paid in full" + only },
     "sep",
     { k: "invoiced" + mine, v: inr(invoiced, { compact: true }), title: "Issued and not cancelled" + only },
     "sep",
     { k: "received" + mine, v: inr(received, { compact: true }), tone: "ok",
-      title: "Written to the deal ledger by Issue itself, in the same transaction -- not recomputed here" + only },
+      title: "Summed from the payment ledger — a recorded payment, not an issued document" + only },
     "sep",
     /* An ALARM, and a scoped one: it can only ever ring about invoices this
        session can see, so an invoice stuck outside that scope is invisible
        here. The label says whose books it covers rather than implying nothing
        is stuck anywhere. */
     { k: "outstanding" + mine, v: inr(outstanding, { compact: true }), tone: outstanding ? "bad" : "",
-      title: "Drafted and never issued -- money named on an invoice nobody has asked for"
-        + (head ? "" : " — covers " + only.replace(" — ", "") + "; a draft on a deal outside that is not counted here") },
+      title: "Issued and not yet paid — what customers actually owe"
+        + (head ? "" : " — covers " + only.replace(" — ", "") + "; an invoice on a deal outside that is not counted here") },
+    "sep",
+    /* DRAFTED AND NEVER SENT. Its own cell, plainly labelled, because it used
+       to BE the outstanding figure — ₹17.86L of money nobody had asked for,
+       printed where customers' debt belongs. */
+    { k: "unbilled" + mine, v: inr(unbilled, { compact: true }),
+      title: "Named on a draft nobody has issued — not owed by anyone yet" + only },
   ];
 
   const chips = Object.keys(params).filter((k) => params[k]).length > 0;
@@ -305,10 +310,10 @@ function InvoicesTable({ rows, p, go, onUnfilter, openPick }: {
         return (
           <tr key={inv.id} className="clickable" data-go={to} onClick={() => go(to)}>
             <Rail tone={over ? "bad" : inv.status === "issued" ? "ok" : undefined}
-              title={over ? "Past its due date and still a draft — never issued" : undefined} />
+              title={over ? "Issued, past its due date, and not paid in full" : undefined} />
             <td className="cell-1">
               <span className="font-mono tnum">
-                {inv.invoiceNumber || <span className="font-sans font-normal text-quaternary">Assigned on issue</span>}
+                {inv.invoiceNumber || <span className="font-sans font-normal text-quaternary">Draft</span>}
               </span>
               <div className="cell-2">{inv.billing.name || "—"}
                 {lineOf(inv) ? <span className="text-quaternary"> · {lineOf(inv)}</span> : null}</div>
@@ -339,13 +344,16 @@ function InvoicesTable({ rows, p, go, onUnfilter, openPick }: {
   );
 }
 
-/* Past its due date with the money still not logged. Drafts count -- an
-   invoice nobody issued, whose own due date has already passed, is the most
-   overdue thing on this page: money that was never even asked for. Issued
-   means the ledger row is already written, so it can never be overdue. Used by
-   both the strip and the row rail, so the two can never disagree. */
+/* ISSUED, PAST ITS DUE DATE, AND NOT PAID IN FULL.
+   This was the exact inverse: drafts counted and issued invoices never could,
+   on the reasoning that "issued means the ledger row is already written". It
+   was, because issuing wrote it — so the one state that can genuinely be
+   overdue was the one state excluded, and five drafts nobody had sent were
+   flagged instead. A draft has never been sent to anybody; it cannot be late.
+   Used by both the strip and the row rail, so the two cannot disagree. */
 function isOverdue(inv: InvoiceRow): boolean {
-  return inv.status === "draft" && daysFrom(inv.dueDate) < 0;
+  return inv.status === "issued" && inv.receivedPaise < inv.grandTotalPaise
+    && daysFrom(inv.dueDate) < 0;
 }
 
 /* What this invoice is FOR, under the customer's name -- the plan line's own
@@ -356,14 +364,20 @@ function lineOf(inv: InvoiceRow): string {
   const setup = addonsOf(inv).length ? " + setup" : "";
   if (plan.remark) return plan.remark + setup;
   if (plan.installmentCount) return "Installment " + plan.installmentSeq + " of " + plan.installmentCount + setup;
-  return inr(plan.amountPaise) + setup;
+  /* SAY WHICH FIGURE THIS IS. The plan line is the amount BEFORE tax and the
+     AMOUNT column beside it is the grand total AFTER it, so the row read
+     "Sneha Pillai · ₹1,20,000" next to ₹1,41,600 with nothing to explain the
+     gap — two different numbers for one invoice, both unlabelled. */
+  return inr(plan.amountPaise) + " + GST" + setup;
 }
 
-/* Amount and how much of it has landed, one cell. Received is all-or-nothing
-   by construction: Issue writes ONE ledger row for the whole grand total in
-   the same transaction that freezes the invoice (InvoicesController.Issue),
-   so an issued invoice is fully received and anything else is nothing. No
-   figure here is estimated. */
+/* Amount and how much of it has landed, one cell — both read off the invoice,
+   neither estimated. `receivedPaise` is the server's sum over the payment
+   ledger. It used to be inferred from `status`, because issuing wrote the
+   ledger row itself, so every issued invoice printed "fully received" whether
+   or not a rupee had arrived. Partial payment is now representable, so the
+   meter is a real proportion rather than a bar that is only ever empty or
+   full. */
 function MoneyCell({ inv }: { inv: InvoiceRow }) {
   const amt = inr(inv.grandTotalPaise);
   if (inv.status === "cancelled")
@@ -373,16 +387,20 @@ function MoneyCell({ inv }: { inv: InvoiceRow }) {
     </>;
   if (inv.status !== "issued")
     return <>
-      <div>{amt}</div>
-      <div className="cell-2 text-right font-medium">nothing received</div>
+      <div>{amt} <span className="text-quaternary">inc. GST</span></div>
+      <div className="cell-2 text-right font-medium">not issued</div>
     </>;
-  /* Received is all-or-nothing by construction, so the meter is only ever
-     empty or full — it is here because a column of full bars is read at a
-     glance and a column of the word "received" is not. */
+  const got = inv.receivedPaise;
+  const pct = inv.grandTotalPaise > 0
+    ? Math.min(100, Math.round((got / inv.grandTotalPaise) * 100)) : 0;
   return <>
-    <div>{amt}</div>
-    <Meter value={100} tone="ok" className="mt-1" />
-    <div className="cell-2 text-right">fully received</div>
+    <div>{amt} <span className="text-quaternary">inc. GST</span></div>
+    {got > 0 ? <Meter value={pct} tone={pct >= 100 ? "ok" : "warn"} className="mt-1" /> : null}
+    <div className="cell-2 text-right">
+      {got <= 0 ? "awaiting payment"
+        : pct >= 100 ? "fully received"
+        : inr(got) + " received"}
+    </div>
   </>;
 }
 

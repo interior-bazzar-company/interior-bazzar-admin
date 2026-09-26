@@ -178,9 +178,16 @@ export default function Detail({ id, p, rows, onParams }: {
             <Card
               title="Business profile"
               sub={u.accountUsername}
+              /* NAMED FOR WHAT IT MEASURES. This is the SERVER's go-live
+                 checklist (completion.py), not the schema score the edit
+                 dialog shows — two different questions, so they carry two
+                 different names rather than being forced to one number. */
               right={row.completeness === null
                 ? <span className="text-sm text-tertiary">No business profile</span>
-                : <Completeness pct={row.completeness} missing={row.missingFields} />}
+                : <span className="inline-flex min-w-0 items-center gap-2">
+                    <span className="label-mono">Go-live checklist</span>
+                    <Completeness label="Go-live checklist" pct={row.completeness} missing={row.missingFields} />
+                  </span>}
             >
               <KvList pairs={([
                 /* The username is an ADDRESS, so on the record it is the thing
@@ -285,6 +292,27 @@ export default function Detail({ id, p, rows, onParams }: {
             pointers to the records that hold that, and following one is how you see it — nothing
             on this screen creates, edits or reverses any of it.
           </>} />
+
+          {u.commercial.leadQuota ? (
+            <Card title="Enquiry allowance" sub="a count of enquiries, not money"
+              className="lg:col-span-2"
+              right={<Icon name="link" size="sm" className="text-fg-quaternary" />}>
+              <KvList pairs={[
+                ["Plan", u.commercial.leadQuota.plan || "No plan"],
+                ["Subscription", u.commercial.leadQuota.subscription === "active"
+                  ? "Active" + (u.commercial.leadQuota.renewsAt ? " · renews " + u.commercial.leadQuota.renewsAt : "")
+                  : "Expired" + (u.commercial.leadQuota.expiredAt ? " · " + u.commercial.leadQuota.expiredAt : "")],
+                ["Given this " + (u.commercial.leadQuota.period || "month"),
+                  <b className="font-semibold">
+                    {u.commercial.leadQuota.used} of {u.commercial.leadQuota.allowance}
+                  </b>],
+                ["Remaining", String(u.commercial.leadQuota.remaining)],
+                ["Allowance set by", u.commercial.leadQuota.source === "plan"
+                  ? "The plan"
+                  : "The default — this plan states no lead allowance"],
+              ]} />
+            </Card>
+          ) : null}
         </div>
       ) : null}
 

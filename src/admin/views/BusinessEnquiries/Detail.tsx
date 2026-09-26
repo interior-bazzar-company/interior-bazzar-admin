@@ -258,7 +258,7 @@ export default function Detail({ id, listHash, prev, next, pos }: {
           {!isTerminal(e.status)
             ? <Button color="secondary-destructive"
                 onClick={() => modal(<InvalidateModal e={e} onClose={closeLayer} onDone={done} />)}>
-                Reject
+                Mark invalid
               </Button>
             : <span className="text-sm text-tertiary">
                 {/* The guard's own first sentence is the word "Terminal", so
@@ -287,11 +287,25 @@ function EnquiryTab({ e, run, onAssign, onQualified }: {
      same two columns, opposite jobs — which is why the branch is here and not
      two separate routes. */
   const working = isWorking(e.status);
+  /* An Assigned enquiry is evidence, but the customer can still change their
+     mind — the record accepts a RESTATEMENT (details only) and tells the holder. */
+  const restatable = e.status === "assigned" && can("business-enquiries", "edit");
 
   return (
     <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-5">
       <div className="flex flex-col gap-4 lg:col-span-3">
-        {working ? <RequirementForm e={e} /> : <RequirementBlock e={e} />}
+        {/* The customer changed their mind after this went out: say so before
+            anything else, because the holder is working from an older copy. */}
+        {e.requirementChange ? (
+          <InfoNote tone="warn" ico="alert"
+            short={<><b>Requirement changed after delivery.</b> {e.requirementChange.note}</>}>
+            Restated {dateTimeLabel(e.requirementChange.at)}
+            {e.requirementChange.by ? " by " + e.requirementChange.by : ""}. The business holding this
+            enquiry was notified and its log carries the change; the frozen qualification and the match
+            score are the ones it was handed out on.
+          </InfoNote>
+        ) : null}
+        {working || restatable ? <RequirementForm e={e} restating={restatable} /> : <RequirementBlock e={e} />}
         {working ? null : <SnapshotBlock e={e} />}
         {/* The log stays readable for the life of the record. It is the answer
             to "how do we know this was real?", and that question is asked long

@@ -286,7 +286,7 @@ function QuotationsTable({ rows, p, go, onUnfilter, openPick }: {
             <Rail tone={lapsed ? "bad" : expiringSoon(q) ? "warn" : q.status === "accepted" ? "ok" : undefined}
               title={lapsed ? "Lapsed" : expiringSoon(q) ? "Lapses within three days" : undefined} />
             <td className="cell-1">
-              <span className="font-mono tnum">{q.quotationNumber || <span className="font-sans font-normal text-quaternary">Assigned on issue</span>}</span>
+              <span className="font-mono tnum">{q.quotationNumber || <span className="font-sans font-normal text-quaternary">Draft</span>}</span>
               <div className="cell-2">{partyLine(q)}</div>
             </td>
             <td>

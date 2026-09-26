@@ -20,18 +20,18 @@
 import { useEffect, useState } from "react";
 import {
   Alert, Button, Checkbox, DateInput, FieldRow, FileUpload, FormField, FormSection, Input,
-  ModalShell, Notice, SelectInput, Skeleton, Tag,
+  ModalShell, Notice, SelectInput, Skeleton, Tag, Textarea,
 } from "../../../ui";
 import { useShell } from "../../../shell/ShellContext";
 import {
   AGREEMENT_KIND, LEAVE_KIND, DOCUMENT_KIND, TODAY, VOCAB, addDays, addDocument, createTag,
-  datesIn, decideLeave, fmtDate, labelOf, leaveClash, leaveOverlap, markViewed, meId, renameTag,
-  requestLeave, signAgreement,
+  datesIn, decideLeave, deleteDocument, escalateLeave, fmtDate, labelOf, leaveClash, leaveOverlap, markViewed, meId, renameTag,
+  recordLeave, requestLeave, signAgreement,
 } from "../store";
 import { bodyOf, retryTemplates, sendTemplate, useTemplates, useTemplatesLoad } from "../../Agreements/store";
 import { LoadNotice } from "../loadState";
 import { Sheet } from "../../Agreements/bits";
-import type { Agreement, LeaveRequest, LeaveState, Tag as TagRecord } from "../store";
+import type { Agreement, LeaveRequest, LeaveState, MemberDocument, Tag as TagRecord } from "../store";
 
 /* ------------------------------------------------------------- chrome --- */
 
@@ -182,6 +182,79 @@ export function LeaveDecideModal({ l, state }: { l: LeaveRequest; state: LeaveSt
   );
 }
 
+/** Take a request, or a decision on it, to the Admin. The note is required. */
+export function LeaveEscalateModal({ l }: { l: LeaveRequest }) {
+  const shell = useShell();
+  const [note, setNote] = useState("");
+  const save = async () => {
+    const r = await escalateLeave(l.leaveId, note);
+    if (!r.ok) { shell.toast(r.message, "bad"); return; }
+    shell.closeLayer();
+    shell.toast("Escalated. Only the Admin decides it now.");
+  };
+  return (
+    <ModalShell
+      title="Escalate to the Admin"
+      sub={fmtDate(l.fromDate) + (l.toDate !== l.fromDate ? " to " + fmtDate(l.toDate) : "")}
+      ico="alert"
+      onClose={() => shell.closeLayer()}
+      actions={<Foot label="Escalate" disabled={!note.trim()} onSave={save} onClose={() => shell.closeLayer()} />}
+    >
+      <FormSection>
+        <blockquote className="rounded-lg border-l-2 border-brand bg-secondary px-3.5 py-3 text-sm text-secondary">
+          {l.reason}
+        </blockquote>
+        <FormField id="lvEsc" label="What should the Admin weigh?" req
+          hint="Recorded with the request. Afterwards only full access can approve or refuse it.">
+          <Input id="lvEsc" autoFocus value={note} onChange={setNote} />
+        </FormField>
+      </FormSection>
+    </ModalShell>
+  );
+}
+
+/** An admin records leave for somebody; it lands approved. */
+export function LeaveRecordModal({ memberId }: { memberId: string }) {
+  const shell = useShell();
+  const [from, setFrom] = useState(TODAY);
+  const [to, setTo] = useState(TODAY);
+  const [kind, setKind] = useState("casual");
+  const [why, setWhy] = useState("");
+  const backwards = to < from;
+  const save = async () => {
+    const r = await recordLeave(memberId, { fromDate: from, toDate: to, kind, reason: why });
+    if (!r.ok) { shell.toast(r.message, "bad"); return; }
+    shell.closeLayer();
+    shell.toast("Recorded and approved.");
+  };
+  return (
+    <ModalShell
+      title="Record leave"
+      ico="calendar"
+      onClose={() => shell.closeLayer()}
+      actions={<Foot label="Record" disabled={backwards} onSave={save} onClose={() => shell.closeLayer()} />}
+    >
+      <FormSection>
+        <FieldRow>
+          <FormField id="lrFrom" label="First day" req>
+            <DateInput id="lrFrom" value={from} onChange={setFrom} className="w-full" />
+          </FormField>
+          <FormField id="lrTo" label="Last day" req err={backwards ? "The last day is before the first." : undefined}>
+            <DateInput id="lrTo" value={to} onChange={setTo} className="w-full" />
+          </FormField>
+        </FieldRow>
+        <FormField id="lrKind" label="Kind">
+          <SelectInput id="lrKind" value={kind} onChange={setKind}
+            options={(VOCAB.leaveKinds as { key: string }[]).map((k) => ({ v: k.key, l: labelOf(LEAVE_KIND, k.key) }))} />
+        </FormField>
+        <FormField id="lrWhy" label="Reason" hint="It lands approved and names you as the one who granted it.">
+          <Input id="lrWhy" value={why} onChange={setWhy} />
+        </FormField>
+      </FormSection>
+    </ModalShell>
+  );
+}
+
 /* --------------------------------------------------------- agreements --- */
 
 export function SendAgreementModal({ memberId }: { memberId: string }) {
@@ -270,7 +343,9 @@ export function SignAgreementModal({ a }: { a: Agreement }) {
       >
         {a.state === "signed" ? (
           <Alert tone="ok" ico="check"
-            title={"Already signed by " + a.signedName + " on " + fmtDate((a.signedAt || "").slice(0, 10))}>
+            title={"Already signed"
+              + (a.signedName ? " by " + a.signedName : "")
+              + (a.signedAt ? " on " + fmtDate((a.signedAt || "").slice(0, 10)) : "")}>
             The signed copy is the record — there is no second signature box, because a document that
             can be signed twice has two versions of the truth.
           </Alert>
@@ -372,6 +447,37 @@ export function AddDocumentModal({ memberId, kind: seed }: { memberId: string; k
           <><b>Nothing in this panel may put an identity document on a public URL.</b> The file is
             stored as a private object and read back through a signed, short-lived link.</>
         } />
+      </FormSection>
+    </ModalShell>
+  );
+}
+
+/** Delete is real, not a soft withdraw, so it takes a written reason like every
+ *  other destructive action in the panel — matching Deals' Reassign dialog. */
+export function RemoveDocumentModal({ r }: { r: MemberDocument }) {
+  const shell = useShell();
+  const [reason, setReason] = useState("");
+  const save = async () => {
+    const x = await deleteDocument(r.documentId, reason);
+    if (!x.ok) { shell.toast(x.message, "bad"); return; }
+    shell.closeLayer();
+    shell.toast("Deleted.");
+  };
+  return (
+    <ModalShell
+      title="Delete document"
+      sub={r.label}
+      ico="alert"
+      tone="error"
+      onClose={() => shell.closeLayer()}
+      actions={<Foot label="Delete" tone="bad" disabled={!reason.trim()} onSave={save} onClose={() => shell.closeLayer()} />}
+    >
+      <FormSection>
+        <FormField id="rmDocReason" label="Reason" req
+          hint="Mandatory, and enforced by the server. It is kept on the record.">
+          <Textarea id="rmDocReason" rows={3} autoFocus value={reason} onChange={setReason}
+            ph="Wrong file uploaded; replaced with the correct scan." />
+        </FormField>
       </FormSection>
     </ModalShell>
   );

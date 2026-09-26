@@ -24,6 +24,7 @@ import { useShell } from "../shell/ShellContext";
 import { getItems, homeRoute, HOME_ROUTE } from "../shell/modules";
 import type { ModuleItem } from "../shell/modules";
 import { can, useNav } from "../shell/AdminShell";
+import { getSession } from "../auth/session";
 
 const Overview = lazy(() => import("./Overview"));
 const Audit = lazy(() => import("./Audit"));
@@ -77,7 +78,9 @@ export function ViewHost() {
   const item = getItems()[route];
 
   if (!item) return <NotFound route={route} />;
-  if (!can(item.key)) {
+  /* Your own record (#/team/<your id>) is always yours to open — "My account" in the profile menu. */
+  const own = route === "team" && location.pathname.split("/").filter(Boolean)[1] === String(getSession()?.user?.id ?? "");
+  if (!own && !can(item.key)) {
     /* THE HOME PAGE FORWARDS instead of refusing: a session without the
        Overview grant that lands on it (a bookmark, a typed URL, `?next=`
        after sign-in) goes to its own first page. Every other module still
@@ -127,7 +130,7 @@ function ComingSoon({ item }: { item: ModuleItem }) {
       <PageHeader title={item.label} meta="Nothing to show here yet." />
       <Notice tone="warn">
         <b>{item.label} is in your access, but this panel has no surface for it yet.</b> Every screen here reads live records from the server, and there is no{" "}
-        {item.label.toLowerCase()} API to read. The nav slot stays so the route never dies — the screen comes back when the data behind it is real.
+        {item.label.toLowerCase()} API to read. This screen comes back once the data behind it is real.
       </Notice>
     </div>
   );
@@ -141,8 +144,8 @@ function Denied({ item }: { item: ModuleItem }) {
         title="You do not have access to this module"
         body={
           <>
-            {item.label} is not in your effective access for this session. Access is granted by role, not requested per page — ask an Admin to review your role in
-            Settings → Team.
+            {item.label} is not in your effective access for this session. Access is granted by role, not requested per page — send a request below and an
+            Admin will review it under Team → Access requests.
           </>
         }
         action={<RequestAccess item={item} />}

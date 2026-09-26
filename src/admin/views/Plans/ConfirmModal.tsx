@@ -10,11 +10,13 @@
    ===================================================================== */
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { Alert, Button, ModalShell } from "../../ui";
+import { Alert, Button, FormField, ModalShell, Textarea } from "../../ui";
 import { errMessage } from "../../../api/apiService";
+import { val } from "../teamShared";
 
 export default function ConfirmModal({
-  heading, sub, notice, tone, ico, confirmLabel, confirmCls, act, run, onClose
+  heading, sub, notice, tone, ico, confirmLabel, confirmCls, act, run, onClose,
+  reasonId, reasonPh
 }: {
   heading: string;
   sub: string;
@@ -28,9 +30,14 @@ export default function ConfirmModal({
   act: string;
   run: () => Promise<unknown>;
   onClose: () => void;
+  /** When set, this dialog asks for a written reason before it will confirm —
+   *  same pattern as Deals' Reassign. Read it back with `val(reasonId)`. */
+  reasonId?: string;
+  reasonPh?: string;
 }) {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [reasonFilled, setReasonFilled] = useState(false);
   const destructive = /dgr|danger|dest/.test(confirmCls);
   const noticeTone = tone === "bad" || tone === "warn" || tone === "ok" ? tone : "info";
 
@@ -48,6 +55,7 @@ export default function ConfirmModal({
           data-act={act}
           isLoading={busy}
           showTextWhileLoading
+          isDisabled={!!reasonId && !reasonFilled}
           onClick={() => {
             setErr(null); setBusy(true);
             run().catch((e: unknown) => { setErr(errMessage(e)); setBusy(false); });
@@ -58,6 +66,13 @@ export default function ConfirmModal({
       <div className="flex flex-col gap-3">
         {err ? <div id="plErr"><Alert tone="bad" title={err} /></div> : null}
         <Alert tone={noticeTone} ico={ico}>{notice}</Alert>
+        {reasonId ? (
+          <FormField id={reasonId} label="Reason" req
+            hint="Mandatory, and enforced by the server. It is kept on the record.">
+            <Textarea id={reasonId} rows={3} ph={reasonPh}
+              onChange={() => setReasonFilled(!!val(reasonId).trim())} />
+          </FormField>
+        ) : null}
       </div>
     </ModalShell>
   );

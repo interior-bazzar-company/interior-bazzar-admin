@@ -301,7 +301,7 @@ export function CancelTxnModal({ txn, onClose, onDone }: {
   };
 
   return (
-    <Dlg title={"Cancel " + txn.txnId} sub="Super Admin." onClose={onClose} err={err}
+    <Dlg title={"Cancel " + txn.txnId} sub="Full access only." onClose={onClose} err={err}
       footer={<><Cancel onClose={onClose} />
         {/* Disabled without a reason, because the store refuses without one —
             a button that is going to say no is better off saying so first. */}
@@ -309,7 +309,7 @@ export function CancelTxnModal({ txn, onClose, onDone }: {
           onClick={submit}>Cancel the transaction</Button></>}>
 
       {sa ? null : (
-        <Alert tone="warn" ico="shield" title="Cancelling a transaction is Super Admin only.">
+        <Alert tone="warn" ico="shield" title="Cancelling a transaction requires full access.">
           The button stays visible so it is clear the action exists and who to ask.
         </Alert>
       )}
@@ -433,7 +433,7 @@ export function DeactivateTagModal({ tag, onClose, onDone }: { tag: Tag; onClose
   };
 
   return (
-    <Dlg title={"Deactivate " + tag.label} sub="Super Admin." onClose={onClose} err={err}
+    <Dlg title={"Deactivate " + tag.label} sub="Full access only." onClose={onClose} err={err}
       footer={<>
         <Cancel onClose={onClose} />
         <Button color="primary-destructive" isDisabled={!sa} onClick={submit}>
@@ -448,7 +448,7 @@ export function DeactivateTagModal({ tag, onClose, onDone }: { tag: Tag; onClose
         <Check warn>Nobody will be able to file a new transaction under {tag.label} once this is saved.</Check>
       </div>
       {sa ? null : (
-        <Alert tone="warn" ico="shield" title="Deactivating a tag is Super Admin only.">
+        <Alert tone="warn" ico="shield" title="Deactivating a tag requires full access.">
           The button stays visible so it is clear the action exists and who to ask.
         </Alert>
       )}

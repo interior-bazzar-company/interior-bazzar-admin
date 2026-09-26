@@ -141,7 +141,7 @@ export default function Transactions({ p, onFilter, onSearch, onUnfilter, onPara
       tip: <>Recorded transactions with no bill attached. One above {inr(BILL_THRESHOLD_PAISE)}
         blocks the period from closing, which is the whole reason this is a queue and not a
         note.</> },
-    { k: <>Excluded spend <b className="tnum">{inr(o.excludedPaise)}</b></>,
+    { k: <>Excluded spend (tax &amp; statutory) <b className="tnum">{inr(o.excludedPaise)}</b></>,
       tip: <>Taxes and statutory payments, filed under tags whose kind is <b>excluded</b>.
         Cash out of the door like any other, and deliberately not part of the operating
         picture — so it is stated here rather than quietly left inside a total.</> },
@@ -433,7 +433,7 @@ function TagLine({ r, writable, onBudget, onDeactivate }: {
               disabled: !writable || !sa,
               title: !writable ? "Deactivating a tag needs Finance edit rights."
                 : sa ? "Existing rows keep the tag; nothing new can be filed under it."
-                  : "Deactivating a tag is Super Admin only." },
+                  : "Deactivating a tag requires full access." },
           ]} />
         ) : <Pill xs tone="neutral" text="Inactive" />}
       </td>

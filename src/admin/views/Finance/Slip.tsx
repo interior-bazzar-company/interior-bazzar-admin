@@ -97,12 +97,15 @@ export default function Slip({ id, p }: {
      the choice a person made in the dialog, and it was stored and never once
      displayed. */
   const via = payViaMeta(slip.via || "");
+  /* THE ALLOTTED NUMBER when there is one, the row's own id otherwise. A draft
+     has neither and says so in the footnote below — it is not a document yet. */
+  const slipNo = slip.slipNumber || slip.slipId;
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
       {/* Above the document, and out of the print entirely. */}
       <div className="flex flex-wrap items-center gap-2 print:hidden">
-        <span className="font-mono text-sm font-semibold text-primary tnum">{slip.slipId}</span>
+        <span className="font-mono text-sm font-semibold text-primary tnum">{slipNo}</span>
         <Pill dot tone={draft ? "warn" : "ok"} text={draft ? "Draft" : "Paid"} />
         <span className="flex-1" />
         <MoreMenu items={[
@@ -117,7 +120,7 @@ export default function Slip({ id, p }: {
             }
             : {
               icon: "share", label: "Share with the member",
-              act: () => toast(slip.memberName + " would get " + slip.slipId + " at their registered email. Nothing was sent — no mail transport is wired to this module yet.", "info"),
+              act: () => toast(slip.memberName + " would get " + slipNo + " at their registered email. Nothing was sent — no mail transport is wired to this module yet.", "info"),
             },
         ]} />
         <Button color="primary" ico="chevl" onClick={() => navGo(back)}>Back</Button>
@@ -156,7 +159,7 @@ export default function Slip({ id, p }: {
                 <div className="mt-0.5 text-xs text-neutral-600">Draft</div>
               ) : (
                 <>
-                  <div className="mt-0.5 font-mono text-xs tnum text-neutral-700">{slip.slipId}</div>
+                  <div className="mt-0.5 font-mono text-xs tnum text-neutral-700">{slipNo}</div>
                   <div className="text-xs text-neutral-600">Issued {fmtDateTime(slip.issuedAt)}</div>
                 </>
               )}
@@ -291,7 +294,7 @@ export default function Slip({ id, p }: {
                 + " for this month, not payable again unless earned again, and not reduced by loss of pay. "
               : ""}
             {draft
-              ? "This is a draft. No payment has been made, no slip number has been allotted and no hash has been computed. It is not a record of anything yet.\n"
+              ? "This is a draft. No payment has been made and no slip number has been allotted yet. It is not a record of anything yet.\n"
               : "This payslip is computer-generated and needs no signature.\n"}
             {"The earnings and deductions above were frozen onto this slip when it was issued. "
               + "A later revision to the salary account does not change them, which is why this "

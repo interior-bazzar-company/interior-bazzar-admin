@@ -31,7 +31,8 @@ import PlanModal from "./PlanModal";
 import ConfirmModal from "./ConfirmModal";
 import { call, familiesOf, rangeOf, usePlans } from "./api";
 import type { Plan } from "./api";
-import { familyLabel, sorter, statusOf, urgency } from "./helpers";
+import { val } from "../teamShared";
+import { countsOf, familyLabel, sorter, statusOf, urgency } from "./helpers";
 import { DurationChips, PlanStatus, PriceRange, railTone } from "./bits";
 
 const CHIP_LABELS = { q: "Search", fam: "Family", status: "Status", sort: "Sort" };
@@ -95,13 +96,14 @@ export default function Plans() {
       return modal(<ConfirmModal
         heading="Archive plan" sub={pl.title} onClose={closeLayer}
         ico="lock" confirmLabel="Archive" confirmCls="pri" act="pl-archive-go"
+        reasonId="plArchiveReason" reasonPh="Superseded by the 2026 family; nobody should buy this one now."
         notice={<>
           <b>Archived, not deleted, because history points at it.</b> {lines} quotation line
           {lines === 1 ? "" : "s"} and {members} membership{members === 1 ? "" : "s"} name this plan.
           Deleting it would leave those records pointing at something that does not exist —
           archiving keeps them explainable and takes it out of the catalogue.
         </>}
-        run={() => call(AdminOpsService.archivePlan(ref)).then(() => done("Archived.", ref))} />);
+        run={() => call(AdminOpsService.archivePlan(ref, val("plArchiveReason"))).then(() => done("Archived.", ref))} />);
     }
     if (a === "pl-restore") {
       /* Restored OFF sale on purpose — see PlansController.SetArchived. Said here
@@ -178,8 +180,12 @@ export default function Plans() {
 
   /* Counted over the LIVE catalogue: an archived plan is not one of the things
      we sell, and folding it into the family tallies would overstate every one. */
-  const live = plans.filter((x) => !x.archived);
-  const onSale = live.filter((x) => x.active).length;
+  const live = plans.filter((x) => statusOf(x) !== "archived");
+  /* ONE DERIVED COUNT for the header AND the strip — see helpers.countsOf.
+     Every plan lands in exactly one of on sale / off sale / archived, so the
+     three sum to `total` and the first cell is explicitly the SUBTOTAL those
+     first two make (which is also exactly what the list below shows). */
+  const c = countsOf(plans);
   const byFam: Record<string, number> = {};
   live.forEach((x) => { byFam[x.family] = (byFam[x.family] || 0) + 1; });
 
@@ -194,7 +200,10 @@ export default function Plans() {
      separator with nothing on either side of it is not drawn — an empty
      catalogue must read as empty, not as broken furniture. */
   const cells: (StatCell | "sep")[] = [
-    { k: "plans", v: live.length, to: route("fam", ""), on: !p.fam && !p.status },
+    { k: "in the catalogue", v: c.inCatalogue, to: route("fam", ""), on: !p.fam && !p.status,
+      title: "On sale plus off sale — what this list shows. " + c.archived
+        + " archived plan" + (c.archived === 1 ? " is" : "s are") + " outside it, "
+        + c.total + " in total." },
   ];
   if (families.length) {
     cells.push("sep");
@@ -205,13 +214,13 @@ export default function Plans() {
   }
   cells.push(
     "sep",
-    { k: "on sale", v: onSale,
+    { k: "on sale", v: c.active,
       dot: "ok", to: route("status", "active"), on: p.status === "active",
       title: "Live on the public plans page" },
-    { k: "off sale", v: live.length - onSale,
+    { k: "off sale", v: c.off,
       dot: "neutral", to: route("status", "off"), on: p.status === "off",
       title: "Hidden from buyers — existing subscribers unaffected" },
-    { k: "archived", v: plans.filter((x) => x.archived).length,
+    { k: "archived", v: c.archived,
       dot: "neutral", to: route("status", "archived"), on: p.status === "archived",
       title: "Out of the catalogue for good — still readable, and restorable" },
   );
@@ -225,8 +234,10 @@ export default function Plans() {
       <PageHeader
         title="Plans"
         meta={<>
-          <span>{live.length} in the catalogue</span>
-          <span>{onSale} on sale</span>
+          <span>{c.total} plan{c.total === 1 ? "" : "s"}</span>
+          <span>{c.inCatalogue} in the catalogue</span>
+          <span>{c.active} on sale</span>
+          {c.archived ? <span>{c.archived} archived</span> : null}
           {chips ? <span>{rows.length} shown</span> : null}
         </>}
         actions={can("plans", "create")

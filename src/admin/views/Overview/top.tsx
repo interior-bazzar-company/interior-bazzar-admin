@@ -42,6 +42,7 @@ export function Snapshot({ d }: { d: OverviewData }) {
   const ds = dealState(d);
   const ofD = "vs prev " + d.periods.deals.days + "d";
   const ofF = "vs prev " + d.periods.finance.days + "d";
+  const wonK = "Won · " + d.periods.deals.label;
   const fin = d.money, deals = d.deals;
 
   /* One of four states for a deals tile: answering, refused, failed, or a
@@ -77,8 +78,13 @@ export function Snapshot({ d }: { d: OverviewData }) {
             s={deals!.openInPeriod.n + " open" + (deals!.openInPeriod.unquoted ? " · " + deals!.openInPeriod.unquoted + " without a value" : "")}
             to="#/deals?view=board" />
         ))}
-        {dealTile("Won", "won", () => (
-          <Kpi k="Won" tip="won" v={String(deals!.won.n)} s={<Money paise={deals!.won.value} />}
+        {/* NAMED FOR ITS WINDOW. This counts deals that REACHED won inside the
+            period; "Pipeline by stage" below counts where every deal stands
+            now. Both are right and they disagree by design, so the windowed
+            one carries its period the way "Enquiries · 7 days" does — an
+            unlabelled "WON 0" beside "Won 2" reads as a contradiction. */}
+        {dealTile(wonK, "won", () => (
+          <Kpi k={wonK} tip="won" v={String(deals!.won.n)} s={<Money paise={deals!.won.value} />}
             now={deals!.won.n} before={deals!.wonPrev.n} kind="n" of={ofD} to="#/deals?stage=5"
             foot={deals!.wonSeries.length > 1 ? <Spark values={deals!.wonSeries} tone="s1" label="Won per slice" /> : null} />
         ))}
@@ -172,7 +178,9 @@ export function Performance({ d }: { d: OverviewData }) {
         </ChartFrame>
 
         <ChartFrame
-          title={<span className="inline-flex items-center gap-1.5">Pipeline by stage<Tip k="funnel" /></span>}
+          /* "· now" because this one is NOT period-scoped: it is where every
+             deal stands at this moment, whatever window is selected. */
+          title={<span className="inline-flex items-center gap-1.5">Pipeline by stage · now<Tip k="funnel" /></span>}
           right={ds === "ok" && m!.stalled
             ? <Go to="#/deals?stalled=1" cls="warn">{m!.stalled} stalled · <Money paise={m!.stalledValue} /></Go>
             : null}

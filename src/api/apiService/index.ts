@@ -1,6 +1,7 @@
 import config from "../../config";
 import { fetchWithAuthRetry } from "./authHelper/fetchWithAuthRetry";
 import type { ApiResponseType, RequestOptions } from "../../types/reqResType";
+import { getViewAs } from "../../admin/viewAs";
 
 export class AppExceptions extends Error {
   public code: number;
@@ -156,6 +157,11 @@ export class ApiService {
 
     if (method === "GET") {
       headers["Content-Type"] = "application/json";
+      // Read-only impersonation (Team's "See as this member"): the server keys
+      // its read-only, filtered response on this header and refuses it outright
+      // on any other method, so it is only ever added here.
+      const viewAs = getViewAs();
+      if (viewAs) headers["X-View-As"] = String(viewAs.id);
       return { method, headers };
     }
 

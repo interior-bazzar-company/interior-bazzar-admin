@@ -163,7 +163,7 @@ function priorityOptions(apiPriorities: { key: string; label: string }[]) {
 function DealsDenied() {
   return (
     <EmptyState icon="shield" title="You do not have access to this module"
-      body="Deals is not in your effective access for this session. Access is granted by role, not requested per page — ask an Admin to review your role in Settings → Team." />
+      body="Deals is not in your effective access for this session. Access is granted by role, not requested per page — ask an Admin to review your role under Team → Access requests." />
   );
 }
 

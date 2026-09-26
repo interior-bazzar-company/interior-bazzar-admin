@@ -9,7 +9,7 @@
 import { useState } from "react";
 import AdminOpsService, { call } from "../../../api/modules/adminOps";
 import type { RolesModuleDef } from "../../../api/modules/adminOps";
-import { Alert, Button, FormField, FormSection, Input, ModalShell, SelectInput } from "../../ui";
+import { Alert, Button, FormField, FormSection, Input, ModalShell, SelectInput, Textarea } from "../../ui";
 import { ActionMatrix, ErrSlot, errOf, readActionMatrix, val } from "../teamShared";
 import type { EngineErr, Ops, Role } from "../teamShared";
 
@@ -98,7 +98,9 @@ export function RoleDeleteModal({ role, ops }: { role: Role; ops: Ops }) {
     setBusy(true);
     setErr(null);
     try {
-      await call(AdminOpsService.deleteRole(role.id));
+      const reason = val("rlDelReason");
+      if (!reason.trim()) { setErr({ http: 0, message: "Say why — the reason is kept on the record." }); setBusy(false); return; }
+      await call(AdminOpsService.deleteRole(role.id, reason));
       ops.done("Role deleted.", "#/roles");
     } catch (e) {
       setErr(errOf(e));
@@ -135,6 +137,10 @@ export function RoleDeleteModal({ role, ops }: { role: Role; ops: Ops }) {
             grants nothing but keeps its name and its matrix.
           </Alert>
         )}
+        <FormField id="rlDelReason" label="Reason" req
+          hint="Mandatory, and enforced by the server. It is kept on the record.">
+          <Textarea id="rlDelReason" rows={3} ph="Duplicate of Sales Manager; nobody should have been on it." />
+        </FormField>
       </div>
     </ModalShell>
   );

@@ -39,6 +39,7 @@ import { can, canWrite, clearSession, getSession, grantsOf } from "../auth/sessi
 import { LS, THEMES, PopBody, PopFoot, PopHead, currentTheme, setTheme, useShell } from "./ShellContext";
 import { CommandPalette } from "./CommandPalette";
 import ErrorBoundary from "../../components/shared/ErrorBoundary";
+import { ViewAsBanner } from "./ViewAsBanner";
 
 /* ------------------------------------------------------------------- gate */
 /* The single permission gate for the whole panel, resolved server-side and
@@ -351,6 +352,7 @@ export default function AdminShell() {
               </div>
             </header>
 
+            <ViewAsBanner />
             <BannerDock />
 
             <div
@@ -754,7 +756,7 @@ function AccountButton({ session, railed }: { session: MePermissions | null; rai
           </div>
           <MenuDivider />
           <MenuSection>
-            <MenuRow ico="user" label="My account" to="#/team" onClick={() => { shell.closePop(); go("#/team"); }} />
+            <MenuRow ico="user" label="My account" to={"#/team/" + (user ? user.id : "")} onClick={() => { shell.closePop(); go("#/team/" + (user ? user.id : "")); }} />
             {can("roles") ? <MenuRow ico="shield" label="Effective access" to="#/roles" onClick={() => { shell.closePop(); go("#/roles"); }} /> : null}
             <MenuRow
               ico="ext"

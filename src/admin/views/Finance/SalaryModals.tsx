@@ -322,7 +322,7 @@ export function CloseAccountModal({ account, onClose, onDone }: {
         </Check>
         <Check warn>
           <b>Final settlement is not computed here.</b> Notice pay, leave encashment and gratuity are
-          outside this module — FN-OD-05. If money is still owed it goes out as a run or as an Other
+          outside this module. If money is still owed it goes out as a run or as an Other
           Transaction, and that happens before this.
         </Check>
       </div>
@@ -615,7 +615,7 @@ export function PaySalaryModal({ row, onClose, onDone }: {
       </>}>
 
       {isSuperAdmin() ? null : (
-        <Alert tone="warn" ico="lock" title="This one is Super Admin.">
+        <Alert tone="warn" ico="lock" title="This one needs full access.">
           It sends {inr(d.pendingPaise)} out of the company and stamps {months.length} document
           {months.length === 1 ? "" : "s"} in the same write. The button stays where it is so it is
           clear what exists and who to ask.

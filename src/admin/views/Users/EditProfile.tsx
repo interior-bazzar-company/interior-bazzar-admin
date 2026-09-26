@@ -305,12 +305,14 @@ export default function EditProfile({ row, onClose, onDone }: {
           ? <Notice tone="warn" text="That username belongs to another profile." />
           : null}
 
-        {/* THE NUMBER THE DIRECTORY GRADES ON, live. It is the one figure on
-            this form, so it is on the instrument ground rather than in the
-            flow of the fields. */}
+        {/* HOW MUCH OF THIS FORM IS FILLED IN, live — and NOT the go-live
+            checklist the record header shows. The two measure different
+            things (this one the profile schema's required fields, that one
+            the server's eight-item checklist), so they carry different names
+            and are not expected to agree. */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg bg-secondary px-3.5 py-2.5 ring-1 ring-secondary ring-inset">
-          <span className="label-mono">Completeness</span>
-          <Completeness pct={live.pct} missing={live.missing} />
+          <span className="label-mono">Required fields filled</span>
+          <Completeness label="Required profile fields filled" pct={live.pct} missing={live.missing} />
         </div>
 
         {GROUPS.map((g) => {

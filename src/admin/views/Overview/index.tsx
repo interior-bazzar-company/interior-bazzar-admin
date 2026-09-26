@@ -36,7 +36,7 @@ import { PRESETS } from "./derive";
 import { useOverview } from "./store";
 import type { Params } from "./store";
 import { Stamp, Tip } from "./bits";
-import { Snapshot, Performance } from "./top";
+import { Retry, Snapshot, Performance } from "./top";
 import { DealsIntel } from "./deals";
 import { TeamIntel, Operations } from "./team";
 import { Finance } from "./money";
@@ -96,7 +96,8 @@ export default function Overview() {
             </span>
             <span aria-hidden="true" className="text-quaternary">·</span>
             <span className="label-mono inline-flex items-center gap-1.5">
-              Seed clocks elsewhere
+              Finance
+              <Stamp clock={d.clocks.finance} />
               <Tip k="clock" />
             </span>
             {d.attention.length ? (
@@ -169,7 +170,10 @@ export default function Overview() {
                 <Skeleton className="h-9 rounded-lg" w={150} />
               </span>
             ) : d.departmentsState === "error" ? (
-              <span className="text-xs text-error-primary">Departments did not load</span>
+              <span className="inline-flex items-center gap-1">
+                <span className="text-xs text-error-primary">Departments did not load</span>
+                <Retry onPress={d.retryDepartments} />
+              </span>
             ) : d.departmentsState === "ready" && !d.departments.length ? (
               <span className="text-xs text-tertiary">No departments</span>
             ) : null}

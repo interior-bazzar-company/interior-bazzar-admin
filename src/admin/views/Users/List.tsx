@@ -171,7 +171,7 @@ export default function List({ rows, p, onView, onFilter, onSearch, onUnfilter, 
           <th>User</th>
           <th>Handle</th>
           <th>Account</th>
-          <th>Profile</th>
+          <th>Go-live checklist</th>
           <th>Works in</th>
           <th>Registered</th>
           <th>Last seen</th>
@@ -263,7 +263,7 @@ function Row({ r, p, toast }: {
           /* Nothing to grade: no business, shop or architect profile. A bar at
              0% would read as a profile somebody abandoned. */
           ? <span className="text-sm text-tertiary">No business profile</span>
-          : <Completeness pct={r.completeness} missing={r.missingFields} bare />}
+          : <Completeness label="Go-live checklist" pct={r.completeness} missing={r.missingFields} bare />}
       </td>
       <td>
         {city ? (

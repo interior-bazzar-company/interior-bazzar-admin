@@ -94,7 +94,6 @@ export function TodayPlanMenu({ who }: { who?: string } = {}) {
      what makes the entry continuous. */
   const [extra, setExtra] = useState<string[]>([]);
   const [draft, setDraft] = useState("");
-  const [adding, setAdding] = useState(false);
 
   const done = !!(plan && plan.submittedAt);
 
@@ -105,7 +104,7 @@ export function TodayPlanMenu({ who }: { who?: string } = {}) {
       const seed: Record<string, boolean> = {};
       openTasks.forEach((i) => { if (rank(i) < 2) seed[i.itemId] = true; });
       setPicked(seed);
-      setExtra([]); setDraft(""); setAdding(false);
+      setExtra([]); setDraft("");
     }
     setOpen(true);
   };
@@ -115,7 +114,7 @@ export function TodayPlanMenu({ who }: { who?: string } = {}) {
      rather than a click per item. Escape closes the row; blur commits whatever
      is in it, because losing what somebody just typed is worse than an extra
      line they can remove. */
-  const commit = (keepGoing: boolean) => {
+  const commit = () => {
     const t = draft.trim();
     if (t) {
       /* Before the plan is in the line is a draft and goes in with the rest;
@@ -127,11 +126,12 @@ export function TodayPlanMenu({ who }: { who?: string } = {}) {
       }
     }
     setDraft("");
-    setAdding(keepGoing);
   };
 
   const chosen = openTasks.filter((i) => picked[i.itemId]);
-  const total = chosen.length + extra.length;
+  /* The line still in the box counts: Put the plan in must not wait for an Enter. */
+  const pending = draft.trim();
+  const total = chosen.length + extra.length + (pending && !done ? 1 : 0);
   /* An open day can be closed whether or not a plan was ever filed. Closing
      used to ride along with the plan button, which left a member who planned
      nothing no way to end their day from here at all. */
@@ -146,7 +146,7 @@ export function TodayPlanMenu({ who }: { who?: string } = {}) {
        mints a task due today in your name. Either way it is a real record the
        board and the EOD both see. */
     const lines = chosen.map((i) => ({ title: i.title, priority: i.priority }))
-      .concat(extra.map((t) => ({ title: t, priority: "medium" as Priority })));
+      .concat(extra.concat(pending ? [pending] : []).map((t) => ({ title: t, priority: "medium" as Priority })));
     const r = await submitPlan(me, { lines });
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
     setOpen(false);
@@ -291,22 +291,13 @@ export function TodayPlanMenu({ who }: { who?: string } = {}) {
                 </p>
               )}
 
-              {adding ? (
-                <div className="flex items-center gap-2 px-1 py-1.5">
-                  <span aria-hidden="true" className="size-4 shrink-0 rounded bg-primary ring-1 ring-primary ring-inset" />
-                  <Input className="min-w-0 flex-1" value={draft} autoFocus ph="Task" ariaLabel="Add a task"
-                    onChange={setDraft}
-                    onBlur={() => commit(false)}
-                    onEnter={() => commit(true)} />
-                </div>
-              ) : (
-                <button type="button"
-                  className="flex cursor-pointer items-center gap-2 rounded-md px-1 py-2 text-left text-sm font-medium text-tertiary outline-focus-ring transition duration-100 hover:bg-primary_hover hover:text-secondary focus-visible:outline-2 focus-visible:-outline-offset-2"
-                  onClick={() => setAdding(true)}>
-                  <Icon name="plus" size="sm" className="text-fg-quaternary" />
-                  Add a task
-                </button>
-              )}
+              <div className="flex items-center gap-2 px-1 py-1.5">
+                <Icon name="plus" size="sm" className="shrink-0 text-fg-quaternary" />
+                <Input className="min-w-0 flex-1" value={draft} ph="Type a task, press Enter" ariaLabel="Add a task"
+                  onChange={setDraft}
+                  onBlur={commit}
+                  onEnter={commit} />
+              </div>
             </div>
           </Card>
         </AriaDialog>

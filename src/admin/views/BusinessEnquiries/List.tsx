@@ -156,7 +156,8 @@ export function AttnStrip({ m, p }: { m: Counts; p: Params }) {
     cell("assigned", "Assigned", "assigned", m.byStatus.assigned || 0),
     "sep",
     { ...cell("converted", "Converted", "converted", m.converted), tone: m.converted ? "ok" : undefined },
-    cell("rejected", "Rejected", "invalid", m.invalid),
+    cell("not converted", "Not Converted", "not_converted", m.notConverted),
+    cell("invalid", "Invalid", "invalid", m.invalid),
   ];
 
   return <StatStrip cells={cells} />;
@@ -440,6 +441,10 @@ function Row({ e, p, sel, load }: {
   const tone = attentionTone(e.status);
   const holder = assignedName(e);
   const held = holder ? load[holder] || 0 : 0;
+  /* The business's own counter, so this tooltip and the assign dialog quote one
+     figure — "6 live against a cap of 4" beside a counter reading 0 of 4 was
+     two different questions answered as one. */
+  const quota = holder ? businessDirectory().filter((b) => b.name === holder)[0]?.capacity : undefined;
   const terminal = statusOf(e.status).terminal;
 
   return (
@@ -501,8 +506,13 @@ function Row({ e, p, sel, load }: {
         ) : holder ? (
           <div
             className="mt-1 flex items-center gap-1 text-xs text-tertiary"
-            title={holder + " is holding " + held + " live enquir" + (held === 1 ? "y" : "ies")
-              + " right now, across the whole queue — not just the rows in view."}
+            title={quota
+              ? holder + " has been given " + quota.active + " of " + quota.configured
+                + " enquiries this " + (quota.period || "month")
+                + (quota.source === "plan" ? " (set by their plan)" : " (default allowance — their plan sets none)")
+                + ". Same figure the assign dialog and the business record show."
+              : holder + " is holding " + held + " live enquir" + (held === 1 ? "y" : "ies")
+                + " right now, across the whole queue — not just the rows in view."}
           >
             <Icon name="arrow" size="xs" className="shrink-0 text-fg-quaternary" />
             <span className="max-w-32 truncate">{holder}</span>

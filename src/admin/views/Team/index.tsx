@@ -36,6 +36,7 @@ import { can, useNav, usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import { RoleChips } from "../teamShared";
 import type { Member, Ops, Role } from "../teamShared";
+import { getSession } from "../../auth/session";
 import MemberPage from "./MemberPage";
 import { loadFailure, useMembers } from "./store";
 import type { LoadPart } from "./store";
@@ -44,7 +45,9 @@ import { opOf } from "./member/ops";
 import {
   MemberDeleteModal, MemberEditModal, MemberNewModal, MemberRolesModal, MemberSendCredentialsModal,
 } from "./memberModals";
+import { MemberReinstateModal, MemberSuspendModal, MemberViewAsModal, isFullAccessMember } from "./member/statusModals";
 import AccessRequests, { pendingRequests, usePendingRequests } from "./AccessRequests";
+import Orphans from "./Orphans";
 
 const CHIP_LABELS = { q: "Search", role: "Role", dept: "Department" };
 const PAGE_SIZE = 25;
@@ -69,7 +72,7 @@ export default function Team() {
     q: sp.get("q") || "", role: sp.get("role") || "", dept: sp.get("dept") || "",
     tab: sp.get("tab") || "",
   };
-  const tab = p.tab === "requests" ? "requests" : "members";
+  const tab = p.tab === "requests" ? "requests" : p.tab === "orphans" && can("team", "status") ? "orphans" : "members";
 
   const ops = useMemo<Ops>(() => {
     const refresh = () => setTick((t) => t + 1);
@@ -182,6 +185,13 @@ export default function Team() {
     return "#/team" + qs(q);
   }
   if (!rows) return <ListSkeleton />;
+  const mine = getSession()?.user;
+  /* No team.view: the roster is refused, but the viewer's own record still opens. */
+  if (failed && mine && id === String(mine.id)) {
+    const me = { id: Number(mine.id), username: mine.username || "", role: "", isSuperAdmin: !!getSession()?.isFullAccess,
+      isVerified: true, name: mine.name || mine.username || "", email: mine.email || "", phone: "", roles: [] };
+    return <MemberPage id={id} sub={sub || ""} live={me as unknown as Member} members={[me as unknown as Member]} roles={roles} rolesDenied={rolesDenied} ops={ops} />;
+  }
   if (failed) {
     return (
       <LoadNotice what="The team" part={failed} onRetry={() => { setFailed(null); setRows(null); setTick((t) => t + 1); }} />
@@ -193,7 +203,7 @@ export default function Team() {
      its own launcher, and the admin actions moved into its header. */
   if (id) {
     const u = rows.find((x) => String(x.id) === id) || null;
-    return <MemberPage id={id} sub={sub || ""} live={u} roles={roles} rolesDenied={rolesDenied} ops={ops} />;
+    return <MemberPage id={id} sub={sub || ""} live={u} members={rows} roles={roles} rolesDenied={rolesDenied} ops={ops} />;
   }
 
   /* -------------------------------------------------------------- rows -- */
@@ -259,6 +269,12 @@ export default function Team() {
         tabs={<Tabs cur={tab} items={[
           { k: "members", label: "Members", n: rows.length, quiet: true, to: tabTo("members") },
           { k: "requests", label: "Access requests", n: waiting, to: tabTo("requests") },
+          /* Same gate as suspend/delete (`team.status`) — the report reads
+             who left the roster while still owning records, which is the same
+             sensitivity as removing them from it. */
+          ...(can("team", "status")
+            ? [{ k: "orphans", label: "Orphaned records", quiet: true, to: tabTo("orphans") }]
+            : []),
         ]} />}
       />
 
@@ -333,7 +349,7 @@ export default function Team() {
                           : <span className="text-quaternary">never</span>}
                       </td>
                       <td className="acts" onClick={(e) => e.stopPropagation()}>
-                        <RowMenu u={u} roles={roles} ops={ops} />
+                        <RowMenu u={u} roles={roles} members={rows} ops={ops} />
                       </td>
                     </tr>
                   );
@@ -356,6 +372,8 @@ export default function Team() {
             />
           )}
         </>
+      ) : tab === "orphans" ? (
+        <Orphans />
       ) : (
         <AccessRequests q={requests} reload={reloadRequests} roles={roles} ops={ops} />
       )}
@@ -368,7 +386,9 @@ export default function Team() {
 /* Locked actions are ABSENT, not greyed — a disabled row action invites a
    click and a support ticket. Delete goes last and apart: `MoreMenu` pulls a
    `bad` item under its own separator. */
-function RowMenu({ u, roles, ops }: { u: Member; roles: Role[]; ops: Ops }) {
+function RowMenu({ u, roles, members, ops }: { u: Member; roles: Role[]; members: Member[]; ops: Ops }) {
+  const mine = getSession()?.user;
+  const isSelf = mine != null && String(mine.id) === String(u.id);
   const items: MenuItem[] = [
     { icon: "user", label: "Open member", act: () => ops.go("#/team/" + u.id) },
   ];
@@ -378,6 +398,17 @@ function RowMenu({ u, roles, ops }: { u: Member; roles: Role[]; ops: Ops }) {
     items.push({ icon: "shield", label: "Roles", act: () => ops.modal(<MemberRolesModal u={u} roles={roles} ops={ops} />) });
   if (can("team", "edit"))
     items.push({ icon: "lock", label: "Send new password", act: () => ops.modal(<MemberSendCredentialsModal u={u} ops={ops} />) });
+  /* Full access only, and never on yourself or another full-access holder —
+     the server refuses both anyway (view_as_forbidden), this just does not
+     invite the click. */
+  if (!!getSession()?.isFullAccess && !isSelf && !isFullAccessMember(u, roles))
+    items.push({ icon: "eye", label: "See as this member", act: () => ops.modal(<MemberViewAsModal u={u} ops={ops} />) });
+  if (can("team", "status") && !isSelf) {
+    if (u.isActive === false)
+      items.push({ icon: "lock", label: "Reinstate member", act: () => ops.modal(<MemberReinstateModal u={u} ops={ops} />) });
+    else
+      items.push({ icon: "lock", label: "Suspend member", tone: "bad", act: () => ops.modal(<MemberSuspendModal u={u} members={members} ops={ops} />) });
+  }
   if (can("team", "status"))
     items.push({ icon: "trash", label: "Delete member", tone: "bad", act: () => ops.modal(<MemberDeleteModal u={u} ops={ops} />) });
   return <MoreMenu small align="right" items={items} />;

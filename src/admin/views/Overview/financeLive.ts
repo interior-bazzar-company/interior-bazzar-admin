@@ -25,6 +25,7 @@
    ============================================================================= */
 import { useEffect, useState } from "react";
 import AdminOpsService, { call } from "../../../api/modules/adminOps";
+import { AppExceptions } from "../../../api/apiService";
 import type {
   BankTotals, DealPaymentRow, IncomeRow, InstallmentRow, PlanPaymentRow, PlanPaymentsListResponse,
   RefundRow, SalariesResponse, SalaryRunRow, SpendRow, SpendTagTotal,
@@ -35,16 +36,40 @@ import { inr } from "../../ui/format";
 import { addDays, bucketsOf, todayLocal } from "./derive";
 import type { Period } from "./derive";
 
+/* EIGHT READS, THREE PERMISSION SYSTEMS, ONE TILE. A session can legitimately
+   hold Finance and still be refused one of these — so the fan-out is settled,
+   not all-or-nothing: a refusal takes out the sections that read it and
+   nothing else. `Gap` is what each source did, and money.tsx turns it into the
+   panel's own two sentences — "not in your access" for a refusal, "could not
+   load" (with Retry) for a failure. */
+export type FinanceSource =
+  "ledger" | "plans" | "income" | "spend" | "salaries" | "refunds" | "installments" | "bank";
+export type Gap = "ok" | "denied" | "error";
+export type Gaps = Record<FinanceSource, Gap>;
+const ALL_OK: Gaps = {
+  ledger: "ok", plans: "ok", income: "ok", spend: "ok",
+  salaries: "ok", refunds: "ok", installments: "ok", bank: "ok",
+};
+
 interface Raw {
   ledger: DealPaymentRow[]; plans: PlanPaymentRow[]; income: IncomeRow[]; spend: SpendRow[];
   byTag: SpendTagTotal[]; salaries: SalariesResponse | null; refunds: RefundRow[];
   owed: { n: number; paise: number }; toDecide: number;
   installments: InstallmentRow[]; bank: BankTotals | null;
+  gaps: Gaps;
 }
 const NONE: Raw = {
   ledger: [], plans: [], income: [], spend: [], byTag: [], salaries: null, refunds: [],
-  owed: { n: 0, paise: 0 }, toDecide: 0, installments: [], bank: null,
+  owed: { n: 0, paise: 0 }, toDecide: 0, installments: [], bank: null, gaps: ALL_OK,
 };
+
+/** A settled read: its value or the empty stand-in, and what happened. A 403 is
+ *  a REFUSAL and says so; anything else is a failure worth retrying. */
+function settled<T, E>(r: PromiseSettledResult<T>, empty: E): [T | E, Gap] {
+  if (r.status === "fulfilled") return [r.value, "ok"];
+  const e = r.reason;
+  return [empty, e instanceof AppExceptions && e.code === 403 ? "denied" : "error"];
+}
 
 /** How many months "Net by month" draws for this period — the seed rule, kept:
  *  three at least, twelve at most, one per thirty days between. */
@@ -82,7 +107,10 @@ export function useFinanceLive(p: Period, on: boolean) {
     let live = true;
     setS((x) => ({ ...x, state: "loading" }));
     const window = { start: span.start, end: span.end };
-    Promise.all([
+    /* allSettled, NOT all: one refused sub-read used to reject the whole tile,
+       which then printed "could not load" beside honest "not in your access"
+       tiles for exactly the same reason. */
+    Promise.allSettled([
       every((n) => call(AdminOpsService.dealPayments({ ...window, pageNo: n, pageSize: 200 })), (r) => r.payments),
       every((n) => call<PlanPaymentsListResponse>(AdminOpsService.payments({ ...window, status: "PAID,REFUNDED", pageNo: n, pageSize: 100 })), (r) => r.payments),
       every((n) => call(AdminOpsService.income({ ...window, state: "recorded", pageNo: n, pageSize: 500 })), (r) => r.income),
@@ -91,19 +119,39 @@ export function useFinanceLive(p: Period, on: boolean) {
       call(AdminOpsService.refunds({ pageSize: 500 })),
       every((n) => call(AdminOpsService.installments({ status: "due,failed", pageNo: n, pageSize: 500 })), (r) => r.installments),
       call(AdminOpsService.bankStatements()),
-    ]).then(([ledger, plans, income, spend, salaries, refunds, installments, bank]) => {
+    ]).then((rs) => {
       if (!live) return;
+      const [ledger, gLedger] = settled(rs[0], [] as DealPaymentRow[]);
+      const [plans, gPlans] = settled(rs[1], [] as PlanPaymentRow[]);
+      const [income, gIncome] = settled(rs[2], [] as IncomeRow[]);
+      const [spend, gSpend] = settled(rs[3], null);
+      const [salaries, gSalaries] = settled(rs[4], null);
+      const [refunds, gRefunds] = settled(rs[5], null);
+      const [installments, gInstallments] = settled(rs[6], [] as InstallmentRow[]);
+      const [bank, gBank] = settled(rs[7], null);
+      const gaps: Gaps = {
+        ledger: gLedger, plans: gPlans, income: gIncome, spend: gSpend,
+        salaries: gSalaries, refunds: gRefunds, installments: gInstallments, bank: gBank,
+      };
+      /* The WHOLE tile only fails when nothing landed and something genuinely
+         broke. Everything refused is a tile full of "not in your access",
+         which is the truth and not a load failure. */
+      const list = Object.values(gaps);
+      const dead = !list.some((g) => g === "ok") && list.some((g) => g === "error");
       setS({
-        state: "ready",
+        state: dead ? "error" : "ready",
         raw: {
-          ledger, plans, income, spend: spend.spend, byTag: spend.byTag, salaries,
-          refunds: refunds.refunds, owed: refunds.owed, toDecide: refunds.toDecide,
-          installments, bank: bank.totals,
+          ledger, plans, income, spend: spend ? spend.spend : [], byTag: spend ? spend.byTag : [], salaries,
+          refunds: refunds ? refunds.refunds : [],
+          owed: refunds ? refunds.owed : { n: 0, paise: 0 },
+          toDecide: refunds ? refunds.toDecide : 0,
+          installments, bank: bank ? bank.totals : null,
+          gaps,
         },
       });
     }).catch(() => { if (live) setS((x) => ({ ...x, state: "error" })); });
     return () => { live = false; };
-  }, [span.start, span.end, on, nonce]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [span.start, span.end, on, nonce]);
 
   return { ...s, retry: () => setNonce((n) => n + 1) };
 }
@@ -127,6 +175,9 @@ export interface LiveFinance {
   refundsOwed: { n: number; paise: number }; refundsOpen: number;
   risk: RiskRow[];
   matched: number | null; bankUnexplained: number;
+  /** What each source did — a section whose read was refused says so rather
+   *  than drawing a zero. */
+  gaps: Gaps;
 }
 export interface LivePayroll { owedPaise: number; people: number; openRun: string | null; openRunPaise: number }
 
@@ -180,7 +231,9 @@ export function liveFinance(r: Raw, p: Period, months: string[]): LiveFinance {
   const cur = windowOf(r, p.from, p.to);
   const over = r.byTag.filter((t) => t.overBudget);
 
-  const risk: RiskRow[] = [
+  /* A READ THAT DID NOT LAND CONTRIBUTES NO ROWS. "0 installments" off a
+     refused installments read is a claim, not a count. */
+  const risk: RiskRow[] = r.gaps.installments !== "ok" ? [] : [
     /* Not `#/finance?flag=failed`: that queue filters SUBSCRIPTIONS and these
        are installments off accepted quotations, most of which have no
        subscription recorded against them yet -- see derive.ts attentionOf. */
@@ -224,12 +277,15 @@ export function liveFinance(r: Raw, p: Period, months: string[]): LiveFinance {
     risk,
     matched: r.bank ? r.bank.matchedPct : null,
     bankUnexplained: r.bank ? r.bank.unexplained : 0,
+    gaps: r.gaps,
   };
 }
 
 /** The payroll line under the exception list: the run that is open, and what
  *  it still owes. Null when the session cannot see salaries. */
 export function livePayroll(r: Raw): LivePayroll | null {
+  /* A refused or failed salaries read is NOT "no run open · nothing owed". */
+  if (r.gaps.salaries !== "ok") return null;
   const open: SalaryRunRow | null = r.salaries?.openRun || null;
   return {
     owedPaise: open ? open.owedPaise : 0, people: open ? open.unpaidPeople : 0,

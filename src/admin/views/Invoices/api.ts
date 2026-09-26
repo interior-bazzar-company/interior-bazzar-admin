@@ -19,8 +19,15 @@ import { AppExceptions } from "../../../api/apiService";
 export { call };
 export type { InvoiceRow };
 
-export const STATUS_LABEL: Record<string, string> = { draft: "Draft", issued: "Paid", cancelled: "Cancelled" };
-export const STATUS_TONE: Record<string, string> = { draft: "", issued: "ok", cancelled: "dead" };
+/* `issued` USED TO READ "Paid", and that single word carried the whole
+   contradiction: issuing wrote the payment ledger row itself, so the status
+   really did mean paid — while Subscriptions, counting actual money, showed ₹0
+   collected across all 54. Issuing does not write the ledger any more, so an
+   issued invoice is a demand that may or may not have been met, and whether
+   it has is `receivedPaise`, not a status. The tone drops from ok to info for
+   the same reason: green over an unpaid invoice is the same claim in colour. */
+export const STATUS_LABEL: Record<string, string> = { draft: "Draft", issued: "Issued", cancelled: "Cancelled" };
+export const STATUS_TONE: Record<string, string> = { draft: "", issued: "info", cancelled: "dead" };
 
 export function rupeesToPaise(v: string): number {
   const n = parseFloat(String(v || "").replace(/[^\d.]/g, ""));

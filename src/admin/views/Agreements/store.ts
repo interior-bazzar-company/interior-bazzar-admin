@@ -170,11 +170,27 @@ export const allAgreements = (): Agreement[] =>
 
 export interface Totals { sent: number; signed: number; waiting: number; revoked: number }
 
+/** WAITING IS THREE DERIVED STATES, not the raw `sent` one: a copy that has
+ *  been opened is still waiting, and so is one the member signed without
+ *  naming themselves (`pending_signature`). The stat cell counts this and the
+ *  list now FILTERS on it — they used to disagree, so pressing "waiting · 5"
+ *  opened a list of 3. */
+export const isWaiting = (a: Agreement): boolean => {
+  const s = stateOf(a);
+  return s === "sent" || s === "viewed" || s === "pending_signature";
+};
+
 export function totalsOf(list: Agreement[]): Totals {
+  /* Every copy lands in exactly one bucket, so the parts always sum to the
+     whole: `stateOf` already folds an out-of-date link into "expired" and a
+     `signed` row with nobody named into "pending signature" — counting the
+     raw `a.state` here instead double-booked an expired copy into both
+     "waiting" and "expired", which is why the totals line could read more
+     states than there were documents. */
   return {
     sent: list.length,
-    signed: list.filter((a) => a.state === "signed").length,
-    waiting: list.filter((a) => a.state === "sent" || a.state === "viewed").length,
+    signed: list.filter((a) => stateOf(a) === "signed").length,
+    waiting: list.filter(isWaiting).length,
     revoked: list.filter((a) => a.state === "revoked").length,
   };
 }
@@ -362,16 +378,24 @@ export const emptyClause = (): Clause =>
 
 export const AGREEMENT_STATE_LABEL: Record<string, string> = {
   draft: "Draft", sent: "Sent", viewed: "Opened", signed: "Signed",
+  pending_signature: "Pending signature",
   revoked: "Revoked", expired: "Expired",
+  /* Not a stored state — the strip's bucket, named so the filter it sets
+     reads as words rather than as a slug. */
+  waiting: "Waiting",
 };
 
 /** What a reader needs to know in one word, expiry included — which is derived
- *  and therefore never in the stored state. */
+ *  and therefore never in the stored state.
+ *
+ *  "Signed" is a claim about a person, not a flag: a record whose state says
+ *  `signed` but carries no `signedName` has no signer to point to, so it reads
+ *  as still pending rather than contradicting itself on screen. */
 export const stateOf = (a: Agreement): string =>
-  isExpired(a) ? "expired" : a.state;
+  isExpired(a) ? "expired" : a.state === "signed" && !a.signedName ? "pending_signature" : a.state;
 
 export const STATE_TONE: Record<string, string> = {
-  draft: "", sent: "info", viewed: "info", signed: "ok",
+  draft: "", sent: "info", viewed: "info", signed: "ok", pending_signature: "info",
   revoked: "", expired: "warn",
 };
 

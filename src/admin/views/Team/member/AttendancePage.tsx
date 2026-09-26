@@ -103,7 +103,7 @@ export default function AttendancePage({ q, live, viewer }: { q: MemberReads; li
       <Tiles list={[
         { k: "Present", v: String(tot.present), s: "of " + rows.length + " days listed" },
         { k: "Late", v: String(tot.late), s: "against their own " + (settings ? settings.dayStartsAt : "—") + " start", tone: tot.late ? "warn" : "" },
-        { k: "Absent", v: String(tot.absent), s: covered ? covered + " other days covered by leave" : "derived, never stored", tone: tot.absent ? "bad" : "" },
+        { k: "Absent", v: String(tot.absent), s: covered ? covered + " other days covered by leave" : "for this window", tone: tot.absent ? "bad" : "" },
         { k: "Unclosed", v: String(tot.unclosed), s: "nothing auto-closes", tone: tot.unclosed ? "warn" : "" },
       ]} />
 

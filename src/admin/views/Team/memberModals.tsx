@@ -19,12 +19,13 @@
    UNCONTROLLED — `val(id)` reads them out of the DOM at save, and
    `readRolePicks()` reads `#tmRoles` — so every field keeps its id.
    ===================================================================== */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 /* `call` unwraps the envelope: a refusal (HTTP 200, response:false) throws,
    so it lands in ErrSlot instead of a success toast (team/d2). */
 import AdminOpsService, { call } from "../../../api/modules/adminOps";
+import type { OwnedCounts } from "../../../api/modules/adminOps";
 import { can } from "../../auth/session";
-import { Button, FieldRow, FormField, FormSection, Input, ModalShell, Notice } from "../../ui";
+import { Alert, Button, FieldRow, FormField, FormSection, Input, ModalShell, Notice, PaneLoading, SelectInput, Textarea } from "../../ui";
 import { ErrSlot, RolePicks, errOf, readRolePicks, val } from "../teamShared";
 import type { EngineErr, Member, Ops, Role } from "../teamShared";
 
@@ -272,16 +273,49 @@ export function MemberSendCredentialsModal({ u, ops }: { u: Member; ops: Ops }) 
 /* Real, and hard: unlike the local engine's philosophy ("deactivated, never
    deleted" — because there was no server to enforce anything else), the real
    endpoint IS a delete. There is no deactivate endpoint to prefer instead. */
+/** Counts as {deals, quotations, invoices, enquiries, tasks} — the labels
+ *  the "still owns records" refusal names. */
+const OWNS_LABELS: [keyof OwnedCounts, string][] = [
+  ["deals", "deal"], ["quotations", "quotation"], ["invoices", "invoice"],
+  ["enquiries", "enquiry"], ["tasks", "open task"],
+];
+
 export function MemberDeleteModal({ u, ops }: { u: Member; ops: Ops }) {
   const [err, setErr] = useState<EngineErr | null>(null);
   const [busy, setBusy] = useState(false);
+  /* CHECKED AHEAD OF THE ATTEMPT, not read off a refused delete's response —
+     the real endpoint's refusal carries `data.owns`, but this panel's fetch
+     layer (AdminOpsService.call) only ever keeps a refusal's message, never
+     its data. `ownedBy` is the same counts read early, which the server's own
+     docstring says is the intended order: know before you ask who inherits. */
+  const [owns, setOwns] = useState<OwnedCounts | null>(null);
+  const [ownsErr, setOwnsErr] = useState<EngineErr | null>(null);
+  const [people, setPeople] = useState<Member[] | null>(null);
+  const [heir, setHeir] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    call(AdminOpsService.ownedBy(u.id)).then((d) => { if (!cancelled) setOwns(d.owns); })
+      .catch((e: unknown) => { if (!cancelled) { setOwns({ deals: 0, quotations: 0, invoices: 0, enquiries: 0, tasks: 0 }); setOwnsErr(errOf(e)); } });
+    call(AdminOpsService.users())
+      .then((rows) => { if (!cancelled) setPeople(rows.filter((m) => m.id !== u.id && m.isActive !== false)); })
+      .catch(() => { if (!cancelled) setPeople([]); });
+    return () => { cancelled = true; };
+  }, [u.id]);
+
+  const held = owns ? OWNS_LABELS.filter(([k]) => owns[k] > 0) : [];
+  const mustReassign = held.length > 0;
+
   async function remove() {
     if (busy) return;
+    const reason = val("tmDelReason");
+    if (!reason.trim()) { setErr({ http: 0, message: "Say why — the reason is kept on the record." }); return; }
+    if (mustReassign && !heir) { setErr({ http: 0, message: "Pick who takes over their records first." }); return; }
     setBusy(true);
     setErr(null);
     try {
-      await call(AdminOpsService.deleteUser(u.id));
-      ops.done("Member deleted.", "#/team");
+      await call(AdminOpsService.deleteUser(u.id, { reason, reassignTo: heir ? Number(heir) : undefined }));
+      ops.done("Member removed — signed out and blocked from signing in.", "#/team");
     } catch (e) {
       setErr(errOf(e));
     } finally {
@@ -305,10 +339,42 @@ export function MemberDeleteModal({ u, ops }: { u: Member; ops: Ops }) {
       }
     >
       <ErrSlot err={err} />
-      <Notice tone="bad" ico="alert" text={
-        <><b>This removes the account outright.</b> There is no “deactivate instead” option on this
-          endpoint — deals, quotations and invoices they own keep naming them by id regardless.</>
-      } />
+      <div className="flex flex-col gap-4">
+        {/* This used to read "removes the account outright", which was true of
+            the old hard delete and is no longer: the endpoint now marks the
+            account deleted and switches it off, so the records it owns keep
+            naming somebody instead of coming back Unassigned. Saying otherwise
+            made an ordinary removal look unrecoverable. */}
+        <Notice tone="bad" ico="alert" text={
+          <><b>They lose access immediately.</b> Every signed-in device is signed out and the account
+            can no longer sign in. The row is kept, marked deleted, so their past work still names
+            them — this is not a way to erase somebody.</>
+        } />
+        {owns === null ? <PaneLoading label="Checking what they still own…" /> : null}
+        {ownsErr ? (
+          <Alert tone="bad" title="Could not check what this account owns.">
+            <span className="font-mono">{ownsErr.message}</span> — the delete may still be refused if
+            they turn out to own something.
+          </Alert>
+        ) : null}
+        {mustReassign ? (
+          <>
+            <Alert tone="warn" title="Still holding records the server will not let this drop.">
+              {held.map(([k, l]) => owns![k] + " " + l + (owns![k] === 1 ? "" : "s")).join(", ")}. Pick
+              who takes them over below, or the server refuses the delete.
+            </Alert>
+            <FormField label="Reassign their records to" req>
+              <SelectInput ariaLabel="Reassign to" value={heir} onChange={setHeir}
+                options={[{ v: "", l: people === null ? "Loading…" : "— choose a successor —" }]
+                  .concat((people || []).map((m) => ({ v: String(m.id), l: m.name })))} />
+            </FormField>
+          </>
+        ) : null}
+        <FormField id="tmDelReason" label="Reason" req
+          hint="Mandatory, and enforced by the server. It is kept on the record.">
+          <Textarea id="tmDelReason" rows={3} ph="Left the company; access revoked on 2026-09-20." />
+        </FormField>
+      </div>
     </ModalShell>
   );
 }

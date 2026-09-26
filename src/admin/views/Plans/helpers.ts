@@ -22,9 +22,16 @@ export function money(rupees: number) { return rupees ? "₹" + IN.format(rupees
  *  genuinely zero rather than free. */
 export const inr = (rupees: number) => "₹" + IN.format(rupees);
 
-/** "autogrowth" → "Autogrowth". The server's families are free strings, so
- *  there is no label table to fall out of sync with them. */
-export const familyLabel = (k: string) => (k ? k.charAt(0).toUpperCase() + k.slice(1) : "—");
+/** "autogrowth"/"automation" → "AutoGrowth", the one name this product family
+ *  goes by everywhere else in the panel (deals, tasks). Everything else is
+ *  title-cased as-is, since the server's families are free strings and there
+ *  is no fuller label table to fall out of sync with them. */
+export const familyLabel = (k: string) => {
+  if (!k) return "—";
+  const low = k.toLowerCase();
+  if (low === "autogrowth" || low === "automation") return "AutoGrowth";
+  return k.charAt(0).toUpperCase() + k.slice(1);
+};
 
 export const STATUS_LABEL: Record<string, string> = {
   active: "On sale", off: "Off sale", archived: "Archived"
@@ -32,6 +39,29 @@ export const STATUS_LABEL: Record<string, string> = {
 /* Archived outranks on/off sale: an archived plan cannot be bought whatever its
    isActive flag says, so showing it as "on sale" would be a lie. */
 export const statusOf = (pl: Plan) => (pl.archived ? "archived" : pl.active ? "active" : "off");
+
+/** THE COUNTS, ONCE — the header and the stat strip read this and nothing
+ *  else, so they cannot state two different sizes of the same catalogue.
+ *
+ *  `statusOf` is a total function over the three states, so on sale + off sale
+ *  + archived IS every plan: the parts sum to the whole by construction rather
+ *  than by three filters over raw flags that can overlap (an archived plan
+ *  still carries `active`, which is how "23 plans · 23 on sale · 3 archived"
+ *  came to describe 26 things as 23). The same fix `Agreements/totalsOf` got. */
+export interface PlanCounts {
+  /** Every plan there is. */
+  total: number;
+  /** On sale + off sale — what the page's default list shows. */
+  inCatalogue: number;
+  active: number;
+  off: number;
+  archived: number;
+}
+export function countsOf(list: Plan[]): PlanCounts {
+  const n = (s: string) => list.filter((x) => statusOf(x) === s).length;
+  const active = n("active"), off = n("off"), archived = n("archived");
+  return { total: list.length, inCatalogue: active + off, active, off, archived };
+}
 
 /** "17 Aug 2026", or "—". One formatter for every date this module prints. */
 export function dateLabel(iso: string) {

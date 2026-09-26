@@ -143,10 +143,17 @@ export default function Finance() {
             <TbStat k="Total paid" v={inr(totals.paidAllPaise)} tone="ok"
               title={"Every rupee ever paid out as salary, summed off the paid slips. "
                 + inr(totals.paidPaise) + " of it in " + PERIOD.label + "."} />
+            {/* "Everybody is paid up" is a claim about people, and with no
+                salary accounts at all there are no people to make it about.
+                The screen read "0 accounts, 0 slips, Monthly payroll Rs 0" and
+                still said everybody was paid — reassurance where the honest
+                answer was that there is nothing here yet. */}
             <TbStat k="Total unpaid" v={totals.unpaidPaise ? inr(totals.unpaidPaise) : "—"} tone="warn"
               title={totals.unpaidPeople
                 ? totals.unpaidPeople + " " + (totals.unpaidPeople === 1 ? "person is" : "people are") + " owed, arrears included."
-                : "Everybody is paid up."} />
+                : totals.membersAll
+                  ? "Everybody is paid up."
+                  : "No salary accounts yet — nothing is owed because nobody is set up."} />
           </>
         ) : view === "subscriptions" ? (
           /* THE SAME THREE-FIGURE HEADER SALARIES A/C CARRIES: how many, what

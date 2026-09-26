@@ -20,6 +20,7 @@
    ============================================================================= */
 import { useCallback, useMemo } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
+import { can } from "../../auth/session";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import {
@@ -36,7 +37,7 @@ import {
   AGREEMENT_KIND, AGREEMENT_STATE_LABEL, activateTemplate, agreementOf, allAgreements,
   bodyOf, deleteTemplate, fmtDate, fmtWhen, isExpired, isSendable, labelOf, readMember,
   readMembers, readTemplates, retireTemplate, revokeAgreement, sendTemplate, sentFrom,
-  signLink, stateOf, templateOf, totalsOf, useAgreements, useTemplates,
+  isWaiting, signLink, stateOf, templateOf, totalsOf, useAgreements, useTemplates,
 } from "./store";
 import type { Agreement, Template } from "./store";
 
@@ -47,7 +48,13 @@ export default function Agreements() {
 
   if (id === "new") return <Editor mode="create" />;
   if (id && sub === "edit") return <Editor mode="edit" templateId={id} />;
-  if (id && id.indexOf("AG-") === 0) return <DeedPage agreementId={id} />;
+  /* A NUMBER IS A SENT COPY. This tested `id.indexOf("AG-") === 0`, a leftover
+     from the local engine where copies were AG-0001; the API numbers them, so
+     /agreements/10 never matched and fell through to the Templates list —
+     DeedPage was complete all along and simply unreachable, which is why no
+     sent letter could be read. Template ids are dotted keys
+     (`agreement.nda-2026`) and "new" is a word, so digits tell them apart. */
+  if (id && /^\d+$/.test(id)) return <DeedPage agreementId={id} />;
   return <Workspace deepLink={id || null} />;
 }
 
@@ -90,6 +97,7 @@ function Workspace({ deepLink }: { deepLink: string | null }) {
   const onFilter = (name: string, value: string) => goto({ [name]: value || undefined });
 
   const waiting = totalsOf(allAgreements()).waiting;
+  const sentCount = allAgreements().length;
   const params = wanted ? { ...p, tpl: wanted } : p;
 
   return (
@@ -99,13 +107,19 @@ function Workspace({ deepLink }: { deepLink: string | null }) {
         meta={waiting
           ? <span className="tnum">{waiting} waiting on a signature</span>
           : <span>Every copy signed</span>}
-        actions={<Button color="primary" ico="plus" onClick={() => go(ROUTE + "/new")}>New template</Button>}
+        actions={can("agreements", "create")
+          ? <Button color="primary" ico="plus" onClick={() => go(ROUTE + "/new")}>New template</Button>
+          : null}
         tabs={
-        /* A number means somebody has not signed yet. Nothing else here is
-           waiting on anybody. */
+        /* THE BADGE IS THE TAB'S OWN COUNT. It carried `waiting` while the
+           summary strip inside the same tab said "8 sent · 5 waiting", so the
+           two numbers beside each other never matched and the badge looked
+           like a broken total. Waiting is still the interesting figure, but it
+           is already on the strip under its own word; a count next to "Sent"
+           reads as how many were sent. */
         <Tabs cur={face}
           items={FACES.map((x) => ({ k: x.k, label: x.label, icon: x.icon,
-            n: x.k === "sent" ? waiting : undefined }))}
+            n: x.k === "sent" ? sentCount : undefined }))}
           onPick={(k) => goto({ face: k === "templates" ? undefined : k,
             q: undefined, state: undefined, tpl: undefined })} />
         } />
@@ -221,7 +235,7 @@ function TemplateActions({ t, shell }: { t: Template; shell: ReturnType<typeof u
     if (!r.ok) shell.toast(r.message, "bad"); else shell.toast(said, "ok");
   };
 
-  const items: MenuItem[] = [
+  const items: MenuItem[] = !can("agreements", "create") ? [] : [
     { icon: "doc", label: "Edit", act: () => go(ROUTE + "/" + t.templateId + "/edit"),
       disabled: t.state === "retired", title: t.state === "retired" ? "Reinstate it first" : undefined },
     ...(t.state === "active"
@@ -242,14 +256,30 @@ function TemplateActions({ t, shell }: { t: Template; shell: ReturnType<typeof u
       title: out ? "It has been sent — retire it instead" : "Nobody has been sent this" },
   ];
 
+  /* A BUTTON THAT CANNOT WORK IS WORSE THAN NO BUTTON. A view-only role was
+     shown 17 working-looking Send buttons and got a refusal per click; the
+     panel could not tell, because `agreements` published no verb but `view`
+     until the server registered send/create (backend migration 0074). */
+  const maySend = can("agreements", "send");
+  /* THE REASON HAS TO REACH THE SCREEN. `title` on <Button> goes nowhere: the
+     wrapper spreads into Untitled UI's button, which does not forward it, so
+     neither this reason nor the older "Put it in use first" has ever produced
+     a tooltip. A disabled button also fires no hover events of its own, so the
+     title belongs on a wrapping span either way. */
+  const why = !maySend
+    ? "Your role can view agreements but not send them. Ask an Admin for Agreements · send."
+    : t.state === "active" ? "Send it to somebody"
+      : t.state === "draft" ? "Put this template in use before sending it."
+        : "This template is retired. Reinstate it before sending.";
   return (
     <span className="inline-flex items-center justify-end gap-1.5">
-      <Button size="xs" color="secondary" ico="ext" isDisabled={t.state !== "active"}
-        title={t.state === "active" ? "Send it to somebody" : "Put it in use first"}
-        onClick={() => shell.modal(<SendModal t={t} />)}>
-        Send
-      </Button>
-      <MoreMenu small ico items={items} aria-label={"Actions for " + t.title} />
+      <span title={why} className="inline-flex">
+        <Button size="xs" color="secondary" ico="ext" isDisabled={!maySend || t.state !== "active"}
+          onClick={() => shell.modal(<SendModal t={t} />)}>
+          Send
+        </Button>
+      </span>
+      {items.length ? <MoreMenu small ico items={items} aria-label={"Actions for " + t.title} /> : null}
     </span>
   );
 }
@@ -291,7 +321,11 @@ function SendModal({ t }: { t: Template }) {
                     const r = await sendTemplate(t.templateId, m.memberId);
                     if (!r.ok) { shell.toast(r.message, "bad"); return; }
                     shell.closeLayer();
-                    shell.toast("Sent to " + m.name + ".", "ok");
+                    /* NOTHING IS EMAILED — the dialog says so, so the send is
+                       only half done until somebody has the link. The toast
+                       carries it, because the moment you know who it went to
+                       is the moment you want to paste it to them. */
+                    shell.toast(<Sent a={r.data} name={m.name} />, "ok");
                     go(ROUTE + "/" + r.data.agreementId);
                   }}>Send</Button>}
             </div>
@@ -299,6 +333,27 @@ function SendModal({ t }: { t: Template }) {
         })}
       </div>
     </ModalShell>
+  );
+}
+
+/** Copy a signing link and always say what happened. `shareOrCopy` answers
+ *  null when the platform share sheet took it, which used to mean the Link
+ *  button reported nothing at all on the machines that have one. */
+async function copyLink(a: Agreement, shell: ReturnType<typeof useShell>) {
+  const said = await shareOrCopy(signLink(a), a.title);
+  shell.toast(said || "Link shared.", "ok");
+}
+
+/** The confirmation after a send: what went out, to whom, and the link that
+ *  actually delivers it. */
+function Sent({ a, name }: { a: Agreement; name: string }) {
+  const shell = useShell();
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      <span><b>{a.title}</b> sent to {name}.</span>
+      <button type="button" className="underline underline-offset-2"
+        onClick={() => void copyLink(a, shell)}>Copy link</button>
+    </span>
   );
 }
 
@@ -314,7 +369,11 @@ function SentFace({ p, onFilter }: {
   let rows = allAgreements();
 
   if (p.tpl) rows = rows.filter((a) => a.templateId === p.tpl);
-  if (p.state) rows = rows.filter((a) => stateOf(a) === p.state);
+  /* `waiting` is the strip's own bucket, not a stored state — three derived
+     states together (store.isWaiting). It is filtered by the SAME predicate
+     the cell counts with, so the count and the list it opens agree. */
+  if (p.state === "waiting") rows = rows.filter(isWaiting);
+  else if (p.state) rows = rows.filter((a) => stateOf(a) === p.state);
   if (p.q) {
     const q = p.q.toLowerCase();
     rows = rows.filter((a) => {
@@ -335,7 +394,7 @@ function SentFace({ p, onFilter }: {
     { k: "signed", v: t.signed, dot: t.signed ? "ok" : "",
       to: ROUTE + qs({ ...p, face: "sent", state: "signed" }), on: p.state === "signed" },
     { k: "waiting", v: t.waiting, dot: t.waiting ? "info" : "",
-      to: ROUTE + qs({ ...p, face: "sent", state: "sent" }), on: p.state === "sent" },
+      to: ROUTE + qs({ ...p, face: "sent", state: "waiting" }), on: p.state === "waiting" },
     { k: "expired", v: expired, dot: expired ? "warn" : "",
       to: ROUTE + qs({ ...p, face: "sent", state: "expired" }), on: p.state === "expired" },
     { k: "revoked", v: t.revoked },
@@ -349,7 +408,7 @@ function SentFace({ p, onFilter }: {
           <Select name="tpl" label="Template" value={p.tpl} onFilter={onFilter}
             options={readTemplates().map((x) => ({ v: x.templateId, l: x.title }))} />
           <Select name="state" label="State" value={p.state} onFilter={onFilter}
-            options={["sent", "viewed", "signed", "expired", "revoked"]
+            options={["waiting", "sent", "viewed", "signed", "expired", "revoked"]
               .map((k) => ({ v: k, l: AGREEMENT_STATE_LABEL[k] }))} />
         </>}
         chips={p.q || p.tpl || p.state
@@ -369,12 +428,19 @@ function SentFace({ p, onFilter }: {
             { label: "Signed by" },
             { label: "", cls: "acts", w: "120px" },
           ]}
+          /* Agreements.view reads the whole module now (server, 24 Sep), so
+             the narrowed-to-your-own case this used to explain cannot arise:
+             an empty list here means nothing has been sent. The advice to go
+             and send one is still only advice somebody able to send can act
+             on. */
           empty={{
             icon: "inbox",
             title: p.q || p.tpl || p.state ? "Nothing matches that" : "Nothing has been sent",
             body: p.q || p.tpl || p.state
               ? "Clear the filter to see every copy."
-              : "Put a template in use and send it from its row. Each copy appears here with its own link.",
+              : can("agreements", "send")
+                ? "Put a template in use and send it from its row. Each copy appears here with its own link."
+                : "Nothing has been sent yet. Copies appear here as they go out.",
           }}
           rows={rows.map((a) => {
             const m = readMember(a.memberId);
@@ -401,10 +467,7 @@ function SentFace({ p, onFilter }: {
                   {isSendable(a) ? (
                     <Button size="xs" color="secondary" ico="link"
                       title={"Copy the link for " + (m ? m.name : "them")}
-                      onClick={async () => {
-                        const said = await shareOrCopy(signLink(a), a.title);
-                        if (said) shell.toast(said, "ok");
-                      }}>Link</Button>
+                      onClick={() => void copyLink(a, shell)}>Link</Button>
                   ) : <span className="text-quaternary">—</span>}
                 </td>
               </tr>
@@ -462,10 +525,7 @@ function DeedPage({ agreementId }: { agreementId: string }) {
   if (m) acts.push({ icon: "user", label: m.name.split(" ")[0] + "’s record",
     act: () => go("#/team/" + m.memberId + "/agreements") });
   if (isSendable(a)) acts.push({ icon: "link", label: "Copy link",
-    title: "The member signs through it", act: async () => {
-      const said = await shareOrCopy(signLink(a), a.title);
-      if (said) shell.toast(said, "ok");
-    } });
+    title: "The member signs through it", act: () => void copyLink(a, shell) });
   if (a.state !== "signed" && a.state !== "revoked") acts.push({ icon: "x", label: "Revoke", tone: "bad",
     title: "The link stops working immediately", act: async () => {
       const r = await revokeAgreement(a.agreementId);

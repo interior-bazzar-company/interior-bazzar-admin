@@ -37,7 +37,7 @@ import { useShell } from "../../shell/ShellContext";
 import {
   KIND, LINK_RELATIONS, PRIORITY, PRIORITY_SCALE, TODAY, addCheckLine, addLink, addResourceLink,
   blockerOf, checkCount, childrenOf, createTag, fmtDate, isDelayed, isTerminal, labelOf,
-  linkLabelOf, linksOf, parentOf, parentOptions, readMember, removeCheckLine, removeLink,
+  linkLabelOf, linksOf, parentOf, parentOptions, readItems, readMember, removeCheckLine, removeLink,
   removeResourceLink, setBlockedBy, tagItem, tagsOwnedBy, toggleCheckLine, updateItem, useItem,
   useLinks, useMembers, useTags, useWork,
 } from "./store";
@@ -113,6 +113,9 @@ export function ItemDrawer({ itemId, onClose, onOpen }: {
   if (parent) {
     facts.push(["Rolls up to", <ItemLink key="up" item={parent} onOpen={onOpen} />]);
   }
+  if (item.status === "blocked" && item.blockedReason) {
+    facts.push(["Blocked because", <span key="bs">{item.blockedReason}</span>]);
+  }
   if (blocker) {
     facts.push(["Waiting on", <ItemLink key="blk" item={blocker} onOpen={onOpen} />]);
   }
@@ -125,8 +128,11 @@ export function ItemDrawer({ itemId, onClose, onOpen }: {
       onClose={onClose}
       actions={!isTerminal(item.status) ? (
         <>
-          <Button color="secondary" ico="lock" onClick={() => shell.modal(<WaitModal item={item} all={all} />, "sm")}>
-            {blocker ? "Waiting on…" : "Wait on…"}
+          <Button color="secondary" ico="lock" onClick={() => shell.modal(<WaitModal item={item} />, "sm")}>
+            {/* NAMED FOR WHAT IT ACTUALLY DOES: it blocks this task on ANY
+                team member's open task, not only the viewer's own. "Wait on…"
+                said neither whose nor what. */}
+            {blocker ? "Waiting on another task…" : "Wait on another task…"}
           </Button>
           <Button color="secondary" ico="link" onClick={() => shell.modal(<LinkModal item={item} all={all} />, "sm")}>
             Link…
@@ -185,7 +191,7 @@ export function ItemDrawer({ itemId, onClose, onOpen }: {
 
         {item.description ? (
           <section>
-            <SectionHead title="Details" />
+            <SectionHead title="Notes / answer" />
             <RichText text={item.description} />
           </section>
         ) : null}
@@ -359,9 +365,9 @@ function EditItemModal({ item, all }: { item: WorkItem; all: WorkItem[] }) {
 
         {/* The same field and the same bar as the create dialog, so a
             description reads and is written the same on both screens. */}
-        <FormField id="eiDesc" label="Details" tip={<MarkBar ta={ta} value={desc} set={setDesc} />}>
+        <FormField id="eiDesc" label="Notes / answer" tip={<MarkBar ta={ta} value={desc} set={setDesc} />}>
           <Textarea id="eiDesc" rows={4} value={desc}
-            ph="What does done look like?" onChange={setDesc} />
+            ph="Notes, or the answer once it is done" onChange={setDesc} />
         </FormField>
       </FormSection>
     </ModalShell>
@@ -381,10 +387,15 @@ function EditItemModal({ item, all }: { item: WorkItem; all: WorkItem[] }) {
 function CheckList({ item }: { item: WorkItem }) {
   const shell = useShell();
   const [draft, setDraft] = useState("");
+  /* Shown under the field as well as toasted: the toast lands behind the drawer
+     and a refused add looked exactly like an add that did nothing. */
+  const [err, setErr] = useState("");
   const lines = item.checklist || [];
   const add = async () => {
+    if (!draft.trim()) { setErr("Write the step first."); return; }
+    setErr("");
     const r = await addCheckLine(item.itemId, draft);
-    if (!r.ok) { shell.toast(r.message, "bad"); return; }
+    if (!r.ok) { setErr(r.message); shell.toast(r.message, "bad"); return; }
     setDraft("");
   };
   /* EVERY WRITE ON THIS LIST SAYS WHEN IT WAS REFUSED. Ticking and dropping a
@@ -421,9 +432,10 @@ function CheckList({ item }: { item: WorkItem }) {
       )}
       <div className="flex items-center gap-2">
         <Input value={draft} ph="Add a step" ariaLabel="Add a step" className="flex-1"
-          onChange={setDraft} onEnter={add} />
-        <Button color="secondary" size="sm" isDisabled={!draft.trim()} onClick={add}>Add</Button>
+          onChange={(v) => { setDraft(v); setErr(""); }} onEnter={add} />
+        <Button color="secondary" size="sm" onClick={add}>Add</Button>
       </div>
+      {err ? <p role="alert" className="text-xs text-error-primary">{err}</p> : null}
     </div>
   );
 }
@@ -572,11 +584,14 @@ function TagPicker({ item, mine, on, tags }: {
   );
 }
 
-function WaitModal({ item, all }: { item: WorkItem; all: WorkItem[] }) {
+function WaitModal({ item }: { item: WorkItem }) {
   const shell = useShell();
   const [pick, setPick] = useState(item.blockedByItemId || "");
   const [why, setWhy] = useState(item.blockedReason || "");
-  const options = all.filter((i) => i.itemId !== item.itemId && !isTerminal(i.status));
+  /* ANY TEAM MEMBER'S TASK, not just the ones in the viewer's scope: the store
+     already loads everything the account may read (assignee=all with work.all,
+     its own otherwise), so the raw snapshot is the honest list. */
+  const options = readItems().filter((i) => i.itemId !== item.itemId && !isTerminal(i.status));
   const save = async (clear?: boolean) => {
     const r = await setBlockedBy(item.itemId, clear ? null : pick || null, why);
     if (!r.ok) { shell.toast(r.message, "bad"); return; }
@@ -585,7 +600,7 @@ function WaitModal({ item, all }: { item: WorkItem; all: WorkItem[] }) {
   };
   return (
     <ModalShell
-      title="Waiting on"
+      title="Waiting on another task"
       ico="lock"
       onClose={() => shell.closeLayer()}
       danger={item.blockedByItemId
@@ -599,7 +614,7 @@ function WaitModal({ item, all }: { item: WorkItem; all: WorkItem[] }) {
       }
     >
       <FormSection>
-        <FormField id="tmWaitOn" label="Item">
+        <FormField id="tmWaitOn" label="Task" hint="Any open task, whoever it belongs to.">
           <SelectInput id="tmWaitOn" value={pick} onChange={setPick}
             options={[{ v: "", l: "—" }].concat(options.map((i) => ({ v: i.itemId, l: i.title })))} />
         </FormField>

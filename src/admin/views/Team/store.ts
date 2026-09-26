@@ -66,11 +66,11 @@ export type AttendanceState =
 export type WorkKind = "task" | "milestone" | "target";
 /** FOUR stored values. `blocked` is not among them: waiting on someone is a
  *  relationship, not a stage, and it lives on `blockedByItemId`. */
-export type WorkStatus = "planned" | "in_progress" | "completed" | "cancelled";
+export type WorkStatus = "planned" | "in_progress" | "blocked" | "completed" | "cancelled";
 /** The five stages a person sees. `delayed` is derived and takes precedence,
  *  so an item is in exactly one of them. */
 export type WorkStage = WorkStatus | "delayed";
-export type LeaveState = "requested" | "approved" | "rejected" | "withdrawn";
+export type LeaveState = "requested" | "approved" | "rejected" | "withdrawn" | "escalated";
 /** FOUR, AND `urgent` IS NEW. It sits above `high` rather than replacing it:
  *  a scale whose top value is also its common value has no top value, and
  *  every existing item keeps the priority it was given. `medium` reads as
@@ -788,7 +788,7 @@ async function load(current: () => boolean): Promise<void> {
   const t = await call(AdminOpsService.serverTime()).catch(() => null);
   if (t) setClock(t.epochMs);
 
-  const [vocabGot, usersGot, settingsGot, [days], itemsGot, tagsGot, plansGot, reportsGot, leaveGot,
+  const [vocabGot, usersGot, settingsGot, [days, daysPart], itemsGot, tagsGot, plansGot, reportsGot, leaveGot,
     agreementsGot, documentsGot, incentivesGot] = await Promise.all([
     Promise.all(VOCAB_LISTS.map((n) => one(call(AdminOpsService.vocab(n)).then((r) => [n, r.items] as const), null))),
     one(call(AdminOpsService.users()), null),
@@ -812,6 +812,15 @@ async function load(current: () => boolean): Promise<void> {
     one(call(AdminOpsService.incentives()).then((r) => r.incentives), [] as IncentiveRow[]),
   ]);
 
+  /* Today, with the people nobody has opened a day for (includeMissing). Only
+     asked when the wide read above was not refused — a viewer with no reports
+     gets an error for `member=all`. Its members top up a roster the viewer may
+     not read (no team.view), so "Everyone" is not just them. */
+  const todayMissing = daysPart.state === "ok" && !daysPart.own
+    ? await call(AdminOpsService.attendanceDays({ member: "all", start: TODAY, end: TODAY, includeMissing: "true", pageSize: 1000 }))
+      .then((r) => r.days).catch(() => [] as AttendanceDayRow[])
+    : [];
+
   if (!current()) return;
   const vocab = vocabGot.map(([v]) => v);
   const users = usersGot[0], settings = settingsGot[0], items = itemsGot[0], tags = tagsGot[0];
@@ -827,6 +836,17 @@ async function load(current: () => boolean): Promise<void> {
       id: Number(me.id), username: me.username || "", role: "", isSuperAdmin: !!getSession()?.isFullAccess,
       isVerified: true, name: me.name || me.username || "", email: me.email || "", phone: "", roles: [],
     }]);
+  }
+  if (!users) {
+    const known = new Set(roster.map((u) => u.id));
+    todayMissing.forEach((d) => {
+      if (known.has(d.member.id)) return;
+      known.add(d.member.id);
+      roster = roster.concat([{
+        id: d.member.id, username: d.member.username || "", role: "", isSuperAdmin: false,
+        isVerified: true, name: d.member.name || d.member.username || "", email: "", phone: "", roles: [],
+      }]);
+    });
   }
 
   snap = {
@@ -1066,11 +1086,11 @@ export function dayRows(date: string, scope: Scope, at = now()): DayRow[] {
 
 export interface AttendanceTotals {
   present: number; working: number; onBreak: number; ended: number;
-  late: number; absent: number; onLeave: number; unclosed: number; total: number;
+  late: number; absent: number; notStarted: number; onLeave: number; unclosed: number; total: number;
 }
 
 export function attendanceTotals(rows: DayRow[]): AttendanceTotals {
-  const t: AttendanceTotals = { present: 0, working: 0, onBreak: 0, ended: 0, late: 0, absent: 0, onLeave: 0, unclosed: 0, total: rows.length };
+  const t: AttendanceTotals = { present: 0, working: 0, onBreak: 0, ended: 0, late: 0, absent: 0, notStarted: 0, onLeave: 0, unclosed: 0, total: rows.length };
   rows.forEach((r) => {
     if (r.day) t.present++;
     if (r.state === "working") t.working++;
@@ -1078,6 +1098,7 @@ export function attendanceTotals(rows: DayRow[]): AttendanceTotals {
     if (r.state === "ended") t.ended++;
     if (r.state === "unclosed") t.unclosed++;
     if (r.state === "absent") t.absent++;
+    if (r.state === "not_started") t.notStarted++;
     if (r.state === "on_leave") t.onLeave++;
     if (r.day && r.day.isLate) t.late++;
   });
@@ -1171,6 +1192,17 @@ export function spanRows(from: string, to: string, scope: Scope): SpanRow[] {
   return Array.from(out.values());
 }
 
+/** THE ONE ON-TIME RULE, for every surface that prints one: days somebody was
+ *  present and NOT late, over the days they were present. Null with nothing
+ *  present — a percentage of no attendance is 0% on screen and a lie in the
+ *  reader's head, and any figure at all for somebody with no rows is invented.
+ *  Attendance Analytics and the Overview's team reads both call this, so the
+ *  two cannot drift into different arithmetic again. */
+export function onTimePctOf(present: number, late: number): number | null {
+  if (!present) return null;
+  return Math.round(((present - late) / present) * 100);
+}
+
 export interface SpanTotals {
   members: number; days: number; present: number; late: number; absent: number;
   onLeave: number; unclosed: number; worked: number; expected: number;
@@ -1191,10 +1223,8 @@ export function spanTotals(rows: SpanRow[]): SpanTotals {
     t.onLeave += r.onLeave; t.unclosed += r.unclosed;
     t.worked += r.worked; t.expected += r.expected;
   });
-  if (t.present) {
-    t.onTimePct = Math.round(((t.present - t.late) / t.present) * 100);
-    t.avgDay = Math.round(t.worked / t.present);
-  }
+  t.onTimePct = onTimePctOf(t.present, t.late);
+  if (t.present) t.avgDay = Math.round(t.worked / t.present);
   return t;
 }
 
@@ -1370,10 +1400,12 @@ export function onLeave(memberId: string, date: string): LeaveRequest | null {
 export const leaveOn = (date: string, ids: string[]): LeaveRequest[] =>
   snap.leave.filter((l) => l.state === "approved" && ids.indexOf(l.memberId) >= 0
     && date >= l.fromDate && date <= l.toDate);
-export const pendingLeave = (scope: Scope): LeaveRequest[] => {
-  const ids = membersInScope(scope).map((m) => m.memberId);
-  return snap.leave.filter((l) => l.state === "requested" && ids.indexOf(l.memberId) >= 0);
-};
+/** THE ONE QUEUE — requested + escalated. The server already scopes `snap.leave`
+ *  to what this viewer may see (HR and managers see the team), so it is not
+ *  narrowed again here; only their own rows are left out unless they see all. */
+export const pendingLeave = (scope: Scope): LeaveRequest[] =>
+  snap.leave.filter((l) => (l.state === "requested" || l.state === "escalated")
+    && (scope === "all" || l.memberId !== meId()));
 
 /** Every date a range covers, inclusive. Field arithmetic through addDays, not
  *  `new Date(...).toISOString()`: this panel runs at +05:30, where an ISO
@@ -1401,7 +1433,7 @@ export interface LeaveClash { worked: string[]; taken: string[] }
 export function leaveClash(memberId: string, from: string, to: string): LeaveClash {
   const days = datesIn(from, to);
   const live = snap.leave.filter((l) => l.memberId === memberId
-    && (l.state === "requested" || l.state === "approved"));
+    && (l.state === "requested" || l.state === "approved" || l.state === "escalated"));
   return {
     worked: days.filter((d) => !!dayFor(memberId, d)),
     taken: days.filter((d) => live.some((l) => d >= l.fromDate && d <= l.toDate)),
@@ -1431,7 +1463,7 @@ export function leaveOverlap(l: LeaveRequest): LeaveOverlap[] {
  *  whoever holds the deciding verb instead of falling down a hole. Surfacing
  *  the list is what stops that being silent. */
 export const unroutedLeave = (): LeaveRequest[] =>
-  snap.leave.filter((l) => l.state === "requested" && !(readMember(l.memberId) || { reportsTo: "x" }).reportsTo);
+  snap.leave.filter((l) => (l.state === "requested" || l.state === "escalated") && !(readMember(l.memberId) || { reportsTo: "x" }).reportsTo);
 
 /** THE WHOLE QUEUE, SPLIT AND DE-DUPLICATED — one function, so the tab's count
  *  and the list under it cannot disagree.
@@ -1896,6 +1928,15 @@ const ownDay = (memberId: string, action: "open" | "break" | "resume" | "end"): 
     });
 
 export const openDay = (memberId: string) => ownDay(memberId, "open");
+/** Check in at a stated time (HH:MM) with the reason it is not now. */
+export const openDayAt = (memberId: string, startedAt: string, note: string): Promise<Result<AttendanceDay>> =>
+  memberId !== meId()
+    ? Promise.resolve(err("not_own_day", "Only your own day can be clocked."))
+    : live(() => AdminOpsService.openAttendanceDayAt({ startedAt, note }), (d) => {
+      const day = toDay(d);
+      snap.days = snap.days.filter((x) => x.attendanceId !== day.attendanceId && !(x.memberId === day.memberId && x.businessDate === day.businessDate)).concat([day]);
+      return day;
+    });
 export const startBreak = (memberId: string) => ownDay(memberId, "break");
 export const resumeDay = (memberId: string) => ownDay(memberId, "resume");
 export const endDay = (memberId: string) => ownDay(memberId, "end");
@@ -2027,7 +2068,7 @@ export function sendAgreement(
   if (!from || !from.body) return Promise.resolve(err("no_body", "There is nothing to sign. Send it from a template."));
   return live(() => AdminOpsService.sendAgreement({
     member: Number(memberId), kind, title: title.trim(), body: from.body, version: from.version,
-    expiresAt: addDays(TODAY, AGREEMENT_DAYS),
+    expiresAt: addDays(TODAY, AGREEMENT_DAYS), templateKey: from.templateId || undefined,
   }), putAgreement);
 }
 
@@ -2102,10 +2143,11 @@ export async function addDocument(memberId: string, kind: string, label: string,
   });
 }
 
-export function deleteDocument(documentId: string): Promise<Result<string>> {
+export function deleteDocument(documentId: string, reason: string): Promise<Result<string>> {
   if (!snap.documents.some((r) => r.documentId === documentId))
     return Promise.resolve(err("document_not_found", "No such document."));
-  return live(() => AdminOpsService.removeMemberDocument(Number(documentId)), () => {
+  if (!reason.trim()) return Promise.resolve(err("validation_failed", "Say why — the reason is kept on the record."));
+  return live(() => AdminOpsService.removeMemberDocument(Number(documentId), reason), () => {
     snap.documents = snap.documents.filter((r) => r.documentId !== documentId);
     return documentId;
   });
@@ -2186,7 +2228,7 @@ export function requestLeave(memberId: string, input: {
 export function decideLeave(leaveId: string, state: LeaveState, _byId: string, note?: string): Promise<Result<LeaveRequest>> {
   const l = snap.leave.filter((x) => x.leaveId === leaveId)[0];
   if (!l) return Promise.resolve(err("leave_not_found", "No such request."));
-  if (l.state !== "requested") return Promise.resolve(err("already_decided", "That request is already " + l.state + "."));
+  if (l.state !== "requested" && l.state !== "escalated") return Promise.resolve(err("already_decided", "That request is already " + l.state + "."));
   if (state === "rejected" && !(note || "").trim())
     return Promise.resolve(err("reason_required", "Say why it is refused."));
   const put = (row: LeaveRow) => {
@@ -2198,6 +2240,42 @@ export function decideLeave(leaveId: string, state: LeaveState, _byId: string, n
   if (state !== "approved" && state !== "rejected")
     return Promise.resolve(err("invalid_state", "A request is approved, refused or withdrawn."));
   return live(() => AdminOpsService.decideLeave(Number(leaveId), { state, note: (note || "").trim() }), put);
+}
+
+/** The member's own history from the server, merged in — the team-wide read may have been refused. */
+export async function loadLeaveFor(memberId: string): Promise<void> {
+  try {
+    const r = await call(AdminOpsService.leave({ member: memberId, pageSize: 500 }));
+    snap.leave = snap.leave.filter((x) => x.memberId !== memberId).concat(r.leave.map(toLeave));
+    emit();
+  } catch { /* the page keeps what the store already has */ }
+}
+
+/** An escalated request is the Admin's alone to decide. */
+export const canDecideLeave = (l: LeaveRequest): boolean =>
+  l.state === "requested" || (l.state === "escalated" && !!getSession()?.isFullAccess);
+
+/** An admin records leave for somebody; the server lands it approved. */
+export function recordLeave(memberId: string, input: {
+  fromDate: string; toDate: string; kind: string; reason: string;
+}): Promise<Result<LeaveRequest>> {
+  if (!input.fromDate || !input.toDate) return Promise.resolve(err("dates_required", "Both dates are needed."));
+  if (input.toDate < input.fromDate) return Promise.resolve(err("bad_range", "The last day is before the first."));
+  return live(() => AdminOpsService.requestLeave({ ...input, reason: input.reason.trim(), member: Number(memberId) }), (l) => {
+    const row = toLeave(l);
+    snap.leave = snap.leave.concat([row]);
+    return row;
+  });
+}
+
+/** Take a request, or a decision on it, to the Admin. A note is required. */
+export function escalateLeave(leaveId: string, note: string): Promise<Result<LeaveRequest>> {
+  if (!note.trim()) return Promise.resolve(err("reason_required", "Say what the Admin should weigh."));
+  return live(() => AdminOpsService.escalateLeave(Number(leaveId), { note: note.trim() }), (row) => {
+    const next = toLeave(row);
+    snap.leave = snap.leave.map((x) => (x.leaveId === next.leaveId ? next : x));
+    return next;
+  });
 }
 
 /* ------------------------------------------------- checklist and links --- */
@@ -2468,6 +2546,14 @@ export function submitReport(memberId: string, input: {
     snap.reports = snap.reports.filter((x) => x.reportId !== report.reportId).concat([report]);
     return report;
   });
+}
+
+/** Only the author's manager (per reportsTo) or a full-access user may mark a report read; never the author. */
+export function canAcknowledge(memberId: string): boolean {
+  if (memberId === meId()) return false;
+  if (getSession()?.isFullAccess) return true;
+  const m = readMember(memberId);
+  return !!m && !!m.reportsTo && m.reportsTo === meId();
 }
 
 export function acknowledgeReport(reportId: string): Promise<Result<DailyReport>> {

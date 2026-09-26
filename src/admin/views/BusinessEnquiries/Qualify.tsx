@@ -44,7 +44,7 @@ import type { ContactEntry, Enquiry } from "./store";
 /* Local state, one explicit Save. Not autosave-on-blur: an operator typing a
    locality while still on the call should not be generating an event per
    keystroke, and the event log is the reason the edit is worth anything. */
-export function RequirementForm({ e }: { e: Enquiry }) {
+export function RequirementForm({ e, restating = false }: { e: Enquiry; restating?: boolean }) {
   const [r, setR] = useState(e.requirement);
   const [c, setC] = useState(e.customer);
   const [urgency, setUrgency] = useState(e.qualification.urgency || "");
@@ -66,9 +66,14 @@ export function RequirementForm({ e }: { e: Enquiry }) {
 
   return (
     <Card
-      title="Requirement · as received, and as confirmed"
+      title={restating ? "Requirement · restated by the customer" : "Requirement · as received, and as confirmed"}
       right={
         <InfoDot label="Why is this editable?">
+          {restating ? <p>
+            This enquiry is with a business. Use this only when the customer has changed what they want:
+            the change is stored, listed on the timeline, added to the holder's log and sent to them as a
+            notification. The qualification stays frozen.
+          </p> : null}
           What the form captured is what the customer typed while skimming a page. Correct it here from
           what they actually told you — every change is listed field by field in the timeline, so a
           correction is visible rather than silent. It stops being editable the moment this enquiry is
@@ -415,7 +420,7 @@ function QualifyFoot({ e, ready, missing, writes, onQualified }: {
             ? (
               <p className="mt-2">
                 Attempted {e.contactLog.length} time{e.contactLog.length === 1 ? "" : "s"}, never reached.
-                If this stays true, the honest end is <b className="font-semibold text-primary">Rejected</b> with
+                If this stays true, the honest end is <b className="font-semibold text-primary">Invalid</b> with
                 a reason — not a qualification nobody can stand behind.
               </p>
             )

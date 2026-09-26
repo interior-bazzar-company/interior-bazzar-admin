@@ -24,13 +24,13 @@ import { errMessage } from "../../../../api/apiService";
 import { Alert, Button, ListTable, Pill, Rail } from "../../../ui";
 import { useShell } from "../../../shell/ShellContext";
 import {
-  REQUIRED_DOCS, DOCUMENT_KIND, bootTeam, deleteDocument, fmtDate, labelOf, missingDocs, readMember,
+  REQUIRED_DOCS, DOCUMENT_KIND, bootTeam, fmtDate, labelOf, missingDocs, readMember,
   documentsFor, useDocuments, verifyDocument,
 } from "../store";
 import type { Member, MemberDocument } from "../store";
 import type { Viewer } from "./ops";
 import { OpHead } from "./frame";
-import { AddDocumentModal } from "./modals";
+import { AddDocumentModal, RemoveDocumentModal } from "./modals";
 
 export default function DocumentsPage({ m, viewer }: { m: Member; viewer: Viewer }) {
   const shell = useShell();
@@ -40,10 +40,9 @@ export default function DocumentsPage({ m, viewer }: { m: Member; viewer: Viewer
   const other = all.filter((r) => REQUIRED_DOCS.indexOf(r.kind) < 0);
   const unverified = all.filter((r) => !r.verifiedById);
 
-  const remove = async (r: MemberDocument) => {
-    const x = await deleteDocument(r.documentId);
-    shell.toast(x.ok ? "Deleted." : (x as { message: string }).message, x.ok ? "" : "bad");
-  };
+  // Real deletes take a reason (like every destructive action in the panel),
+  // so this opens a dialog rather than deleting on the click itself.
+  const remove = (r: MemberDocument) => shell.modal(<RemoveDocumentModal r={r} />);
   const verify = async (r: MemberDocument) => {
     const x = await verifyDocument(r.documentId);
     shell.toast(x.ok ? "Marked as checked." : (x as { message: string }).message, x.ok ? "" : "bad");

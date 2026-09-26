@@ -589,7 +589,7 @@ export function ReadyLine({ blockers, verb }: { blockers: { text: string; code?:
       <ul className="flex list-disc flex-col gap-1 pl-5 text-sm text-tertiary">
         {blockers.map((b) => (
           <li key={b.code ? b.code + b.text : b.text}>
-            {b.text} {b.code ? <span className="font-mono text-xs text-quaternary">422 {b.code}</span> : null}
+            {b.text}
           </li>
         ))}
       </ul>

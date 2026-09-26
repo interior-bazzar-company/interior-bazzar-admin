@@ -50,7 +50,7 @@ import {
   KIND, PRIORITY, PRIORITY_SCALE, TODAY, WORK_STATUS, addDays,
   blockerOf, checkCount, eventsOn, fmtDate, fmtMonth, gridDays,
   isDelayed, isTerminal, isWeekend, labelOf, lanesOf, leaveOn, meId, membersInScope, monthStep,
-  normaliseUrl, parentOf, progressOf, readMember, scopeLabel, stageOf, tagsOf,
+  normaliseUrl, parentOf, progressOf, readMember, scopeLabel, scopeOf, stageOf, tagsOf,
   toneOf, useItem, useMembers, useTags, useWork, workTotals,
 } from "./store";
 import type {
@@ -119,7 +119,7 @@ const tabPatch = (k: string): Record<string, string | undefined> =>
 
 /** Lifecycle order, not the order the five were listed in: Delay is work that
  *  is not finished, so it sits before the two terminal columns. */
-const STAGES: WorkStage[] = ["planned", "in_progress", "delayed", "completed", "cancelled"];
+const STAGES: WorkStage[] = ["planned", "in_progress", "blocked", "delayed", "completed", "cancelled"];
 /** The params that put a chip in the band. */
 const FILTERS = ["q", "kind", "priority", "due", "tag", "member", "status", "parent", "wait"];
 const GROUPS = [
@@ -232,7 +232,7 @@ export default function Work() {
           <>
             <span className="font-medium text-secondary tnum">{rows.length} in view</span>
             {t.delayed ? <span className="text-warning-primary tnum">{t.delayed} in delay</span> : null}
-            <span>{scopeLabel("all", all.length)}</span>
+            <span>{scopeLabel(scopeOf("work"), all.length)}</span>
           </>
         }
         actions={
@@ -691,7 +691,7 @@ export function NewItemModal({ kind: initial, date }: {
   /* A day was clicked: it is both the start and the due date, so the item lands
      on the day somebody pointed at rather than near it. */
   const [start, setStart] = useState(date || "");
-  const [due, setDue] = useState(date || addDays(todayReal(), 3));
+  const [due, setDue] = useState(date || todayReal());
   const [tv, setTv] = useState("");
   const [tu, setTu] = useState("");
   const [desc, setDesc] = useState("");
@@ -784,11 +784,11 @@ export function NewItemModal({ kind: initial, date }: {
             inside it: a <label> full of buttons steals every press. */}
         <div className="flex w-full min-w-0 flex-col gap-1.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <label htmlFor="niDesc" className="text-sm font-medium text-secondary">Details</label>
+            <label htmlFor="niDesc" className="text-sm font-medium text-secondary">Notes / answer</label>
             <MarkBar ta={ta} value={desc} set={setDesc} />
           </div>
           <TextAreaBase id="niDesc" ref={ta} rows={3} size="sm" value={desc}
-            placeholder="What does done look like?" onChange={(e) => setDesc(e.target.value)} />
+            placeholder="Notes, or the answer once it is done" onChange={(e) => setDesc(e.target.value)} />
         </div>
 
         <div className="flex w-full min-w-0 flex-col gap-1.5">
@@ -930,6 +930,7 @@ function Chip({ ev, onOpen }: { ev: CalEvent; onOpen: (id: string) => void }) {
     <CalChip title={i.title} kind={i.kind}
       edge={ev.edge || undefined}
       tone={wait && st === "delayed" ? "bad" : toneOf(WORK_STATUS, st) || "neutral"}
+      who={nameOf(i.assigneeId)}
       onOpen={() => onOpen(i.itemId)} />
   );
 }
@@ -1109,7 +1110,7 @@ function TimelineFace({ rows, onOpen }: { rows: WorkItem[]; onOpen: (id: string)
                         <span className="truncate">{host.title}</span>
                       </b>
                       <span className="truncate text-xs text-tertiary">
-                        {labelOf(KIND, host.kind)} · {noteOf(host)}{host.dueDate ? " · due " + fmtDate(host.dueDate) : ""}
+                        {labelOf(KIND, host.kind)} · {readMember(host.assigneeId)?.name || "unassigned"} · {noteOf(host)}{host.dueDate ? " · due " + fmtDate(host.dueDate) : ""}
                       </span>
                     </>
                   ) : (
@@ -1128,7 +1129,7 @@ function TimelineFace({ rows, onOpen }: { rows: WorkItem[]; onOpen: (id: string)
                     if (!s) return null;
                     return (
                       <LaneBar key={b.i.itemId + k} title={b.i.title}
-                        sub={b.win ? undefined : nameOf(b.i.assigneeId)}
+                        sub={nameOf(b.i.assigneeId)}
                         left={s.left} width={s.width} top={7 + k * 22}
                         tone={toneOf(WORK_STATUS, stageOf(b.i)) || "neutral"}
                         window={b.win} onOpen={() => onOpen(b.i.itemId)} />
@@ -1180,7 +1181,7 @@ function List({ rows, all, onOpen, narrowed, onClear }: {
           <th>Stage</th>
           <th>Priority</th>
           <th>Due</th>
-          <th>Member</th>
+          <th>Assigned to</th>
         </tr>
       }>
       {rows.map((i) => {

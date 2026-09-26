@@ -91,13 +91,20 @@ interface Departments {
    *  row per active account (d4), and this is the same read. */
   people: AdminUserRow[];
   state: DeptState;
+  /** Read it again. Without this the Team section's own Retry re-ran the
+   *  attendance and task reads and left the roster exactly as failed — which
+   *  is a button that does nothing, because the roster is what the section
+   *  waits on. */
+  retry: () => void;
 }
 const NO_ROLES = new Map<string, string[]>();
 const NO_PEOPLE: AdminUserRow[] = [];
 
+type DeptRead = Omit<Departments, "retry">;
 function useDepartments(enabled: boolean): Departments {
-  const [d, setD] = useState<Departments>({
+  const [d, setD] = useState<DeptRead>({
     names: [], rolesOf: NO_ROLES, people: NO_PEOPLE, state: enabled ? "loading" : "off" });
+  const [nonce, setNonce] = useState(0);
   useEffect(() => {
     if (!enabled) { setD({ names: [], rolesOf: NO_ROLES, people: NO_PEOPLE, state: "off" }); return; }
     let live = true;
@@ -115,8 +122,8 @@ function useDepartments(enabled: boolean): Departments {
          seed departments in their place. */
       .catch(() => { if (live) setD({ names: [], rolesOf: NO_ROLES, people: NO_PEOPLE, state: "error" }); });
     return () => { live = false; };
-  }, [enabled]);
-  return d;
+  }, [enabled, nonce]);
+  return { ...d, retry: () => setNonce((n) => n + 1) };
 }
 
 /** A source the planning signals are waiting on or lost (d8): its tiles are
@@ -161,6 +168,7 @@ export interface OverviewData {
   departments: string[];
   /** Loading / error / empty for the Department control. */
   departmentsState: DeptState;
+  retryDepartments: () => void;
   isFullAccess: boolean;
 }
 
@@ -293,14 +301,17 @@ export function useOverview(p: Params): OverviewData {
        attendance and tasks. Whichever is still answering decides the state. */
     teamState: dept.state === "error" ? "error" : dept.state === "loading" ? "loading" : live.team,
     ops: ops.data, opsState: ops.state, retryOps: ops.retry,
-    money, moneyState: live.money, retryLive: live.retry,
+    /* BOTH READS, because the section waits on both. `retryLive` is the Team
+       section's and the two money tiles' one button. */
+    money, moneyState: live.money, retryLive: () => { live.retry(); dept.retry(); },
     intake: gates.enquiries ? intake : null,
     health, attention, attentionState, signals, signalWaits,
-    retryAttention: () => { refetchDeals(); live.retry(); finance.retry(); attnLive.retry(); },
+    retryAttention: () => { refetchDeals(); live.retry(); dept.retry(); finance.retry(); attnLive.retry(); },
     retryDeals: refetchDeals,
     ownerOptions: api.owners.map((o) => ({ v: String(o.id), l: o.name })),
     departments: dept.names,
     departmentsState: dept.state,
+    retryDepartments: dept.retry,
     /* The Overview's deal figures come from the same scoped list Deals does,
        so its Owner picker is offered on the same test: wider than yourself,
        not full access. The key keeps its name — index.tsx reads it. */

@@ -718,6 +718,8 @@ function liveSalaryAccount(a: SalaryAccountRow): SalaryAccount {
     engagement: (m && m.employmentType) || "",
     joinedAt: (m && m.joiningDate) || "",
     monthlyGrossPaise: a.monthlyGrossPaise,
+    deductionsPaise: a.deductionsPaise,
+    monthlyNetPaise: a.monthlyNetPaise,
     earnings: earnings.length ? earnings : oneLine("monthly_gross", "Monthly gross", a.monthlyGrossPaise),
     deductions: sideOf(a.components, "deduction"),
     bank: {
@@ -768,6 +770,11 @@ function liveSlip(s: PayslipRow, acc: SalaryAccount | null): Payslip {
     .concat(adjustment < 0 ? [{ key: "adjustment", label: adjustmentLabel, amountPaise: -adjustment }] : []);
   return {
     slipId: SLIP + s.id,
+    /* THE ALLOTTED NUMBER, when the server has allotted one. A draft has none
+       — that is a fact about the draft, not a gap — so the document says so
+       rather than printing the row's internal id as if it were a document
+       number. Optional on the wire, so this works before and after it lands. */
+    slipNumber: s.slipNumber || null,
     salaryAccountId: accountIdOf(s.accountId),
     memberId: s.member.id,
     memberName: (acc && acc.memberName) || s.member.name || s.member.username,
@@ -790,9 +797,13 @@ function liveSlip(s: PayslipRow, acc: SalaryAccount | null): Payslip {
     via: via ? via.key : undefined,
     reference: s.reference,
     accountId: s.paidFrom ? s.paidFrom.key : "",
-    /* WHERE IT WAS SENT is the account's, not the slip's: the slip freezes the
-       figures, and the bank details are read live off the account — masked. */
-    bank: acc ? acc.bank : { masked: "", ifsc: "", name: "" },
+    /* WHERE IT WAS SENT, off the SLIP where the server sends it (`slip.payTo`)
+       — the account is the fallback for a slip that predates the field. Both
+       are masked; the whole account number never leaves the server. */
+    bank: s.payTo
+      ? { masked: s.payTo.accountMasked, ifsc: s.payTo.ifsc, name: s.payTo.bankName,
+          upi: s.payTo.upi || undefined }
+      : acc ? acc.bank : { masked: "", ifsc: "", name: "" },
     pan: acc ? acc.pan : "", uan: acc ? acc.uan : null,
     remark: b.remark || undefined,
     /* THE RECEIPT IS A REAL FILE now: a private Attachment, read back as a
@@ -1276,11 +1287,11 @@ export const countedPayments = (): PaymentHit[] =>
 export function actor(): { name: string; role: string } {
   const s = getSession();
   if (!s) return { name: "K. Iyer", role: "Finance" };
-  return { name: s.user?.name || "Finance", role: s.isFullAccess ? "Super Admin" : (s.role || "Finance") };
+  return { name: s.user?.name || "Finance", role: s.isFullAccess ? "Full access" : (s.role || "Finance") };
 }
 export const isSuperAdmin = () => { const s = getSession(); return !s || !!s.isFullAccess; };
 export function superAdminOnly(what: string): string {
-  return isSuperAdmin() ? "" : what + " is Super Admin only. (super_admin_required)";
+  return isSuperAdmin() ? "" : what + " requires full access.";
 }
 
 /* THE RECORD'S OWN TIMELINE IS THE SERVER'S NOW. `pushEvent` wrote an event
@@ -1510,14 +1521,22 @@ export function toSalaryRow(a: SalaryAccount): SalaryRow {
     .flatMap((r) => r.slips.filter((s) => s.salaryAccountId === a.salaryAccountId).map((s) => ({ s, r })))
     .sort((x, y) => y.r.month.localeCompare(x.r.month));
   const paid = slips.filter((x) => x.r.state === "paid")[0] || null;
-  const ded = a.deductions.reduce((n, d) => n + d.amountPaise, 0);
+  /* THE SERVER'S OWN FIGURES FIRST. `_account_dict` sends `deductionsPaise`
+     and `monthlyNetPaise` as separate, settled fields; Σ the deduction
+     COMPONENTS is only a fallback, and an account whose components never came
+     back summed to zero — which printed the GROSS under "Monthly net" and left
+     the account header disagreeing with the revise dialog. They look the same
+     only while deductions are ₹0. */
+  const ded = typeof a.deductionsPaise === "number"
+    ? a.deductionsPaise
+    : a.deductions.reduce((n, d) => n + d.amountPaise, 0);
   return {
     a,
     lastSlip: slips[0]?.s || null,
     lastPaidAt: paid?.s.paidAt || null,
     inOpenRun: snap.salaryRuns.some((r) => r.state === "open" && r.slips.some((s) => s.salaryAccountId === a.salaryAccountId)),
     monthlyDeductionsPaise: ded,
-    monthlyNetPaise: a.monthlyGrossPaise - ded,
+    monthlyNetPaise: typeof a.monthlyNetPaise === "number" ? a.monthlyNetPaise : a.monthlyGrossPaise - ded,
     slipsN: slips.length,
   };
 }
@@ -2057,7 +2076,7 @@ export function kpis(from = livePeriodOf().from, to = livePeriodOf().to): Kpi[] 
     /* Deliberately null. Runway needs a reconciled cash balance and several
        closed months of burn; a placeholder here is a decision made on a wrong
        number — FN-OD-07. */
-    mk("runway", null, null, "Needs a reconciled cash balance and a burn history the records do not carry yet — FN-OD-07."),
+    mk("runway", null, null, "Needs a reconciled cash balance and a burn history the records do not carry yet."),
     mk("new_customers", null, null, noIdentity),
     mk("cac", null, null, noIdentity),
     mk("website_share", pctOf(websitePaise, o.collectedPaise), null,
@@ -2180,6 +2199,11 @@ export interface Recon {
   lines: { line: BankLine; match: LineMatch }[];
   bankOnly: { line: BankLine; match: LineMatch }[];
   matchedN: number;
+  /** THIS STATEMENT'S share, to go beside THIS statement's line count. The
+   *  server's `bankMatchedPct` (matchedPct() below) is the aggregate over
+   *  every statement — a different question, and printing it over "0 of 1
+   *  lines" made one of the two look wrong. Null with no lines. */
+  matchedPct: number | null;
   variancePaise: number;
   canClose: boolean;
   resolutions: Resolution[];
@@ -2190,13 +2214,14 @@ export function reconciliation(stmtId?: string): Recon {
   const all = live.statements;
   const stmt = (stmtId ? all.filter((s) => s.stmtId === stmtId)[0] : all.filter((s) => !s.closed)[0])
     || all[0] || null;
-  if (!stmt) return { stmt: null, lines: [], bankOnly: [], matchedN: 0, variancePaise: 0, canClose: false, resolutions: [] };
+  if (!stmt) return { stmt: null, lines: [], bankOnly: [], matchedN: 0, matchedPct: null, variancePaise: 0, canClose: false, resolutions: [] };
   const lines = stmt.lines.map((line) => ({ line, match: lineMatch(line.lineId) }));
   const resolved = new Set(live.resolutions.map((r) => r.targetId));
   const bankOnly = lines.filter((l) => l.match.kind === "none" && !resolved.has(l.line.lineId));
+  const matchedN = lines.filter((l) => l.match.kind !== "none").length;
   return {
-    stmt, lines, bankOnly,
-    matchedN: lines.filter((l) => l.match.kind !== "none").length,
+    stmt, lines, bankOnly, matchedN,
+    matchedPct: lines.length ? Math.round((matchedN / lines.length) * 1000) / 10 : null,
     variancePaise: bankOnly.reduce((n, l) => n + (l.line.dir === "credit" ? l.line.amountPaise : -l.line.amountPaise), 0),
     canClose: bankOnly.length === 0,
     resolutions: live.resolutions,

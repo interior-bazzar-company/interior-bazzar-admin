@@ -12,21 +12,23 @@
    dates the derivation reads, not from anything stored on a day. What you see
    is what the derivation sees.
    ============================================================================= */
+import { useEffect } from "react";
 import { Alert, Button, Card, ListTable, Pill } from "../../../ui";
 import { cx } from "@/utils/cx";
 import { useShell } from "../../../shell/ShellContext";
 import {
-  LEAVE_KIND, LEAVE_STATE, TODAY, addDays, datesIn, decideLeave, fmtDate, isWeekend, labelOf,
-  leaveFor, meId, onLeave, readMember, toneOf, useLeave,
+  LEAVE_KIND, LEAVE_STATE, TODAY, addDays, canDecideLeave, datesIn, decideLeave, fmtDate, isWeekend, labelOf,
+  leaveFor, loadLeaveFor, meId, onLeave, readMember, toneOf, useLeave,
 } from "../store";
 import type { LeaveRequest, Member } from "../store";
 import type { Viewer } from "./ops";
 import { OpHead } from "./frame";
-import { LeaveDecideModal, LeaveRequestModal } from "./modals";
+import { LeaveDecideModal, LeaveEscalateModal, LeaveRecordModal, LeaveRequestModal } from "./modals";
 
 export default function LeavePage({ m, viewer }: { m: Member; viewer: Viewer }) {
   const shell = useShell();
   useLeave();
+  useEffect(() => { void loadLeaveFor(m.memberId); }, [m.memberId]);
   const rows = leaveFor(m.memberId).slice().reverse();
   const me = meId();
 
@@ -35,7 +37,7 @@ export default function LeavePage({ m, viewer }: { m: Member; viewer: Viewer }) 
      it goes through the same two buttons — the difference is only that a
      senior's authority is derived and an admin's is granted. */
   const canDecide = viewer !== "self" && (m.reportsTo === me || viewer === "admin");
-  const waiting = rows.filter((l) => l.state === "requested");
+  const waiting = rows.filter((l) => canDecideLeave(l));
 
   const withdraw = async (l: LeaveRequest) => {
     const r = await decideLeave(l.leaveId, "withdrawn", me);
@@ -54,7 +56,14 @@ export default function LeavePage({ m, viewer }: { m: Member; viewer: Viewer }) 
               Request leave
             </Button>
           )
-          : null} />
+          : viewer === "admin"
+            ? (
+              <Button color="primary" ico="plus"
+                onClick={() => shell.modal(<LeaveRecordModal memberId={m.memberId} />)}>
+                Record leave
+              </Button>
+            )
+            : null} />
 
       {waiting.length && canDecide ? (
         <Alert tone="warn" ico="clock"
@@ -82,7 +91,7 @@ export default function LeavePage({ m, viewer }: { m: Member; viewer: Viewer }) 
               <td className="rail">
                 <i aria-hidden="true" className={cx(
                   "absolute inset-y-1.5 left-0 w-[3px] rounded-r-full",
-                  l.state === "requested" ? "bg-utility-yellow-500" : "bg-transparent",
+                  l.state === "requested" || l.state === "escalated" ? "bg-utility-yellow-500" : "bg-transparent",
                 )} />
               </td>
               <td className="cell-1">
@@ -94,25 +103,29 @@ export default function LeavePage({ m, viewer }: { m: Member; viewer: Viewer }) 
               <td>{labelOf(LEAVE_KIND, l.kind)}</td>
               <td>
                 <Pill xs dot text={labelOf(LEAVE_STATE, l.state)} tone={tone} />
-                {decider ? <span className="block cell-2">by {decider.name}</span> : null}
+                {decider ? <span className="block cell-2">{l.state === "escalated" ? "escalated by " : "by "}{decider.name}</span> : null}
               </td>
               <td className="cell-1">
                 {l.reason}
                 {l.decisionNote ? <span className="block cell-2">{l.decisionNote}</span> : null}
               </td>
               <td className="acts">
-                {l.state === "requested" && canDecide ? (
+                {canDecide && l.state !== "withdrawn" && l.state !== "escalated" ? (
+                  <Button color="tertiary" size="xs" onClick={() =>
+                    shell.modal(<LeaveEscalateModal l={l} />)}>Escalate…</Button>
+                ) : null}
+                {l.state === "requested" || l.state === "escalated" ? (canDecide && canDecideLeave(l) ? (
                   <span className="inline-flex items-center gap-2">
                     <Button color="secondary" size="xs" onClick={() =>
                       shell.modal(<LeaveDecideModal l={l} state="rejected" />)}>Refuse…</Button>
                     <Button color="primary" size="xs" onClick={() =>
                       shell.modal(<LeaveDecideModal l={l} state="approved" />)}>Approve…</Button>
                   </span>
-                ) : null}
+                ) : l.state === "escalated" ? <span className="text-quaternary">with the Admin</span> : null) : null}
                 {l.state === "requested" && viewer === "self"
                   ? <Button color="secondary" size="xs" onClick={() => withdraw(l)}>Withdraw</Button>
                   : null}
-                {l.state !== "requested" ? <span className="text-quaternary">decided</span> : null}
+                {l.state === "approved" || l.state === "rejected" || l.state === "withdrawn" ? <span className="text-quaternary">decided</span> : null}
               </td>
             </tr>
           );

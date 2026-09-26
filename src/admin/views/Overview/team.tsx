@@ -126,6 +126,8 @@ export function Operations({ d }: { d: OverviewData }) {
               </Eyebrow>
               <StatLine label="Present" n={t.today.present} to="#/attendance" tone="ok" />
               <StatLine label="Late" n={t.today.late} to="#/attendance" tone="warn" />
+              {/* Same buckets as #/attendance: everyone with no day who is neither absent nor on leave yet. */}
+              <StatLine label="Not started" n={Math.max(0, t.members - t.today.present - t.today.absent - t.today.onLeave)} to="#/attendance?state=not_started" />
               <StatLine label="Absent" n={t.today.absent} to="#/attendance" tone="bad" />
               <StatLine label="On leave" n={t.today.onLeave} to="#/attendance" />
               <StatLine label="Day never closed" n={t.today.unclosed} to="#/attendance" tone="warn" />

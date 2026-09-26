@@ -38,7 +38,7 @@ import { useSearchParams } from "react-router-dom";
 import { usePageChrome } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import {
-  Alert, Button, ChartFrame, DateInput, EmptyState, FilterBar, FilterChips, IconButton,
+  Alert, Button, ChartFrame, DateInput, EmptyState, FilterBar, FilterChips, FormField, IconButton, Input,
   ListTable, PageHeader, Pill, Rail, SearchField, SectionHead, Segmented, Select, StatStrip,
   Tabs, TbTitle, Tiles, qs,
 } from "../../ui";
@@ -46,14 +46,14 @@ import type { StatCell } from "../../ui";
 import { ColumnChart } from "../charts";
 import { go } from "../../ui/nav";
 import {
-  LEAVE_KIND, TODAY, addDays, attendanceTotals, clampDay, datesIn, dayFor, fmtDate, fmtDayName,
+  LEAVE_KIND, TODAY, addDays, canDecideLeave, attendanceTotals, clampDay, datesIn, dayFor, fmtDate, fmtDayName,
   fmtMonth, isWeekend, labelOf, leaveOverlap, leaveQueue, fmtHM, fmtTime, meId, monthStep,
   readMember, arrivalSpread, earliestAttendance, scopeLabel, scopeOf, spanDays, spanRows,
-  spanTotals, stateOf, useDayRows, useLeave, useMe, useMembers, workedOf,
+  spanTotals, stateOf, openDayAt, useDayRows, useLeave, useMe, useMembers, workedOf,
   now as clockNow,
 } from "./store";
 import type { DayRow, LeaveRequest, Member, Scope, SpanRow } from "./store";
-import { LeaveDecideModal } from "./member/modals";
+import { LeaveDecideModal, LeaveEscalateModal } from "./member/modals";
 import { BarScale, DayBar, Meter, StatePill, Who } from "./bits";
 import { HeatGrid, HeatLegend, SortHead, StackBars } from "./workBits";
 import type { HeatCell, HeatRow, StackDay } from "./workBits";
@@ -224,6 +224,7 @@ function Today({ rows, p, bar, onFilter }: {
     { k: "ended", v: t.ended, dot: "neutral", to: p.state === "ended" ? at({}) : at({ state: "ended" }), on: p.state === "ended" },
     "sep",
     { k: "late", v: t.late, dot: t.late ? "warn" : "neutral", to: p.late ? at({}) : at({ late: "1" }), on: !!p.late },
+    { k: "not started", v: t.notStarted, dot: "neutral", to: p.state === "not_started" ? at({}) : at({ state: "not_started" }), on: p.state === "not_started" },
     { k: "absent", v: t.absent, dot: t.absent ? "bad" : "neutral", to: p.state === "absent" ? at({}) : at({ state: "absent" }), on: p.state === "absent" },
     { k: "on leave", v: t.onLeave, dot: t.onLeave ? "info" : "neutral", to: p.state === "on_leave" ? at({}) : at({ state: "on_leave" }), on: p.state === "on_leave" },
     { k: "unclosed", v: t.unclosed, dot: t.unclosed ? "warn" : "neutral", to: p.state === "unclosed" ? at({}) : at({ state: "unclosed" }), on: p.state === "unclosed" },
@@ -233,6 +234,7 @@ function Today({ rows, p, bar, onFilter }: {
 
   return (
     <>
+      {p.date === undefined && rows.some((r) => r.member.memberId === meId()) ? <CheckIn /> : null}
       <StatStrip cells={cells} />
 
       <FilterBar
@@ -311,7 +313,7 @@ function Today({ rows, p, bar, onFilter }: {
                       tone={r.state === "on_break" ? "info"
                         : r.worked >= r.member.expectedHoursPerDay * 60 ? "ok" : "warn"}
                       label={<>{fmtHM(r.worked)} of {r.member.expectedHoursPerDay}h</>} />
-                  ) : <span className="text-quaternary">no row</span>}
+                  ) : <span className="text-quaternary">—</span>}
                 </td>
                 <td><DayBar row={r} nowH={nowH} /></td>
               </tr>
@@ -336,6 +338,41 @@ function Today({ rows, p, bar, onFilter }: {
         </Alert>
       ) : null}
     </>
+  );
+}
+
+/** CHECK IN AT THE TIME YOU REALLY STARTED. Signing in already opens the day
+ *  (shell), so this is the correction: a stated time, and a reason when it is
+ *  not now. The server refuses a future time and a missing note. */
+const hhmm = (at: number) => new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit", hour12: false }).format(at);
+function CheckIn() {
+  const shell = useShell();
+  const me = meId();
+  const [at, setAt] = useState(() => hhmm(clockNow()));
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const changed = at !== hhmm(clockNow());
+  const submit = async () => {
+    setBusy(true);
+    const r = await openDayAt(me, at, note.trim());
+    setBusy(false);
+    if (!r.ok) { shell.toast(r.message, "bad"); return; }
+    setNote("");
+    shell.toast(r.data.isLate ? "Checked in at " + at + " — marked late." : "Checked in at " + at + ".");
+  };
+  return (
+    <div className="flex flex-wrap items-end gap-3 rounded-lg p-3 ring-1 ring-secondary">
+      <FormField id="ciAt" label="Start time">
+        <Input id="ciAt" type="time" value={at} mono onChange={setAt} />
+      </FormField>
+      <FormField id="ciNote" label="Reason" req cls="min-w-56 flex-1">
+        <Input id="ciNote" value={note} ph={changed ? "Why the time differs from now" : "Why you are stating it"} onChange={setNote} />
+      </FormField>
+      <Button color="primary" isDisabled={busy || !at || !note.trim()} onClick={submit}>Check in</Button>
+      <p className="basis-full text-xs text-tertiary">
+        Signing in starts your day automatically. If that time is wrong, state when you really started and why.
+      </p>
+    </div>
   );
 }
 
@@ -391,7 +428,7 @@ function Month({ members, me, scope, date, bar, onPick }: {
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <SectionHead className="mb-0" title={fmtMonth(date, true)}
-          desc={days.length + " working days · weekends are not counted (leave and holidays are out of v1)"} />
+          desc={days.length + " working days · weekends are not counted (holidays are out of v1; approved leave is shown as On leave)"} />
         {bar}
       </div>
 
@@ -697,16 +734,30 @@ function LeaveTable({ list, unrouted }: { list: LeaveRequest[]; unrouted?: boole
                 </span>
               ) : null}
               {unrouted ? <span className="cell-2 block text-warning-primary!">Waiting on an admin.</span> : null}
+              {l.state === "escalated" ? (
+                <span className="cell-2 block text-warning-primary!">
+                  Escalated{l.decidedById ? " by " + (readMember(l.decidedById)?.name || "a manager") : ""}
+                  {l.decisionNote ? " — " + l.decisionNote : ""}
+                </span>
+              ) : null}
             </td>
             <td className="acts">
               <span className="inline-flex items-center gap-2">
                 {m ? (
                   <Button color="tertiary" size="xs" onClick={() => go("#/team/" + m.memberId + "/leave")}>Open</Button>
                 ) : null}
-                <Button color="secondary" size="xs"
-                  onClick={() => shell.modal(<LeaveDecideModal l={l} state="rejected" />)}>Refuse…</Button>
-                <Button color="primary" size="xs"
-                  onClick={() => shell.modal(<LeaveDecideModal l={l} state="approved" />)}>Approve…</Button>
+                {l.state === "requested" ? (
+                  <Button color="tertiary" size="xs"
+                    onClick={() => shell.modal(<LeaveEscalateModal l={l} />)}>Escalate…</Button>
+                ) : null}
+                {canDecideLeave(l) ? (
+                  <>
+                    <Button color="secondary" size="xs"
+                      onClick={() => shell.modal(<LeaveDecideModal l={l} state="rejected" />)}>Refuse…</Button>
+                    <Button color="primary" size="xs"
+                      onClick={() => shell.modal(<LeaveDecideModal l={l} state="approved" />)}>Approve…</Button>
+                  </>
+                ) : <span className="text-quaternary">with the Admin</span>}
               </span>
             </td>
           </tr>

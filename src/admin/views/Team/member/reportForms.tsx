@@ -22,7 +22,7 @@
    ============================================================================= */
 import { useMemo, useState } from "react";
 import {
-  Alert, Button, FormField, FormSection, IconButton, Icon, Input, ModalShell, Notice, SelectInput,
+  Alert, Button, FormField, FormSection, IconButton, Icon, Input, ModalShell, Notice, SelectInput, Textarea,
 } from "../../../ui";
 import { cx } from "@/utils/cx";
 import { go } from "../../../ui/nav";
@@ -265,21 +265,23 @@ export function EodModal({ m }: { m: Member }) {
         {undone ? (
           <FormField id="tmPending" label="Why did the unticked lines not get done?" req
             hint={undone + " line" + (undone > 1 ? "s" : "") + " unticked."}>
-            <Input id="tmPending" value={pending}
+            <Textarea id="tmPending" value={pending} rows={3}
               ph="The reason, not an apology. It is what a senior reads first."
               onChange={setPending} />
           </FormField>
         ) : null}
 
         <FormField id="tmWin" label="Biggest win today" tip="optional">
-          <Input id="tmWin" value={win} onChange={setWin} />
+          <Textarea id="tmWin" rows={3} value={win} onChange={setWin} />
         </FormField>
         <FormField id="tmHelp" label="Blocked on, or need help with" tip="optional">
-          <Input id="tmHelp" value={help} onChange={setHelp} />
+          <Textarea id="tmHelp" rows={3} value={help} onChange={setHelp} />
         </FormField>
         <FormField id="tmTomorrow" label="Tomorrow's first priority" tip="optional">
-          <Input id="tmTomorrow" value={tomorrow} onChange={setTomorrow} />
+          <Textarea id="tmTomorrow" rows={3} value={tomorrow} onChange={setTomorrow} />
         </FormField>
+
+        <Notice ico="clock" text="Submitting this report also ends your day on the clock." />
 
         {/* READ FROM THE CLOCK, and there is no field for it on purpose. */}
         <Notice ico="clock" text={day

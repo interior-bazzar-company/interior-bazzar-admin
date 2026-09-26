@@ -99,8 +99,8 @@ export default function Refunds({ p, onFilter, onSearch, onUnfilter, onParams }:
     { k: <>Awaiting a decision</>, v: q.open.length,
       dot: q.open.length ? "info" : undefined,
       on: p.flag === "awaiting", to: cellHash({ flag: "awaiting" }),
-      tip: <>Raised and not yet decided. <b>Nothing here has moved money.</b> Only a Super Admin
-        decides, and never the requester.</> },
+      tip: <>Raised and not yet decided. <b>Nothing here has moved money.</b> Only someone with
+        full access decides, and never the requester.</> },
     { k: <>Approved, not sent <b className="tnum">{inr(ov.refundsOwedPaise)}</b></>,
       v: ov.refundsOwedN, dot: ov.refundsOwedN ? "warn" : undefined,
       on: p.flag === "owed", to: cellHash({ flag: "owed" }),

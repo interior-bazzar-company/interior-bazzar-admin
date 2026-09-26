@@ -9,6 +9,7 @@
    rather than in Business performance because a reader asking about cash is
    asking about cash, not about deals.
    ============================================================================= */
+import type { ReactElement } from "react";
 import { Card, ChartFrame, Icon, ListSkeleton, ListTable, Rail } from "../../ui";
 import { inr } from "../../ui/format";
 import { shortMonth } from "./derive";
@@ -16,6 +17,7 @@ import { ColumnChart, SignedColumns } from "../charts";
 import type { ColumnPoint, Series, SignedPoint } from "../charts";
 import { Gone, Go, Kpi, Loading, Money, PlotSkeleton, Section, Stamp, Tip, Empty, rowLink } from "./bits";
 import type { OverviewData } from "./store";
+import type { FinanceSource, Gaps } from "./financeLive";
 import { Retry } from "./top";
 
 /** Lakh to two places for the axis; the exact figure rides as `display`. */
@@ -27,6 +29,16 @@ const MONEY: Series[] = [
   { key: "in", label: "In", slot: 1 },
   { key: "out", label: "Out", slot: 3 },
 ];
+
+/** The worst thing that happened to the sources a figure is made of. A refusal
+ *  outranks a failure: "not in your access" is a fact about the session and
+ *  retrying it changes nothing. */
+const worstGap = (g: Gaps, keys: FinanceSource[]) =>
+  keys.some((k) => g[k] === "denied") ? "denied"
+    : keys.some((k) => g[k] === "error") ? "error" : "ok";
+
+/** In and Out — and therefore Net — read every money source there is. */
+const MONEY_SOURCES: FinanceSource[] = ["ledger", "plans", "income", "spend", "salaries", "refunds"];
 
 const RISK_TONE: Record<string, string> = {
   bad: "text-error-primary",
@@ -68,6 +80,19 @@ export function Finance({ d }: { d: OverviewData }) {
   const money: ColumnPoint[] = f.flow.map((x) => ({ key: x.key, label: x.label, values: { in: thousands(x.collected), out: thousands(x.out) } }));
   const anyMoney = money.some((p) => p.values.in || p.values.out);
   const net: SignedPoint[] = f.months.map((m) => ({ key: m.month, label: shortMonth(m.month), value: lakh(m.netPaise), display: inr(m.netPaise) }));
+  /* ONE DENIAL DOES NOT KILL THE TILE (d5). Each figure is drawn only when the
+     reads behind it landed; a refused read says "not in your access" — the
+     same words the snapshot's own gated tiles use — and a failed one says it
+     could not load and offers the read again. */
+  const tile = (k: string, tip: string | undefined, keys: FinanceSource[], render: () => ReactElement) => {
+    const g = worstGap(f.gaps, keys);
+    if (g === "ok") return render();
+    if (g === "denied") return <Kpi k={k} tip={tip} v="—" tone="mute" s="not in your access" />;
+    return <Kpi k={k} tip={tip} v="—" tone="mute" s="could not load" foot={<Retry onPress={d.retryFinance} />} />;
+  };
+  const moneyGap = worstGap(f.gaps, MONEY_SOURCES);
+  const riskGap = worstGap(f.gaps, ["installments", "spend", "refunds", "bank"]);
+
   const years: { label: string; n: number }[] = [];
   f.months.forEach((m) => {
     const y = m.month.slice(0, 4);
@@ -79,23 +104,35 @@ export function Finance({ d }: { d: OverviewData }) {
     <Section id="ov-finance" title="Finance" desc={d.periods.financeLive.label + " · cash, not profit"}
       right={<><Stamp clock={d.clocks.financeLive} /><Go to="#/finance-analytics">Analytics</Go></>}>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <Kpi k="Net" tip="net" v={<Money paise={f.cur.netPaise} />} tone={f.cur.netPaise < 0 ? "bad" : undefined}
-          s={f.cur.salaryN ? undefined : "no salary run paid into this period"}
-          now={f.cur.netPaise} before={f.prev.netPaise} of={of} to="#/finance-analytics" />
-        <Kpi k="In" tip="collected" v={<Money paise={inNow} />} s={inr(f.cur.collectedPaise, { compact: true }) + " subscriptions"}
-          now={inNow} before={inPrev} of={of} to="#/finance" />
+        {tile("Net", "net", MONEY_SOURCES, () => (
+          <Kpi k="Net" tip="net" v={<Money paise={f.cur.netPaise} />} tone={f.cur.netPaise < 0 ? "bad" : undefined}
+            s={f.cur.salaryN ? undefined : "no salary run paid into this period"}
+            now={f.cur.netPaise} before={f.prev.netPaise} of={of} to="#/finance-analytics" />
+        ))}
+        {tile("In", "collected", ["ledger", "plans", "income", "refunds"], () => (
+          <Kpi k="In" tip="collected" v={<Money paise={inNow} />} s={inr(f.cur.collectedPaise, { compact: true }) + " subscriptions"}
+            now={inNow} before={inPrev} of={of} to="#/finance" />
+        ))}
         {/* THE CAPTION NAMES EVERY PART OF THE FIGURE ABOVE IT. Salary is the
             largest component of `outPaise` and was the one this line left out,
             so the tile read "₹3.08L" over "₹1.28L spend · ₹500 refunds" and
             invited the reader to look for the missing ₹1.79L. */}
-        <Kpi k="Out" v={<Money paise={f.cur.outPaise} />} s={inr(f.cur.salaryPaise, { compact: true }) + " salary · " + inr(f.cur.otherOutPaise, { compact: true }) + " spend · " + inr(f.cur.refundsPaidPaise, { compact: true }) + " refunds"}
-          now={f.cur.outPaise} before={f.prev.outPaise} good="down" of={of} to="#/finance-transactions" />
-        <Kpi k="Due in 30 days" tip="duesoon" v={<Money paise={f.dueSoon.paise} />} s={f.dueSoon.n + " installment" + (f.dueSoon.n === 1 ? "" : "s")} to="#/finance?flag=due" />
-        <Kpi k="Failed to pay" v={f.failed.n ? <Money paise={f.failed.paise} /> : "—"} s={f.failed.n ? f.failed.n + " installment" + (f.failed.n === 1 ? "" : "s") : "nothing bounced"}
-          tone={f.failed.n ? "bad" : "ok"} to={f.failed.n ? "#/invoices?new=1" : undefined} />
-        <Kpi k="Refunds owed" v={f.refundsOwed.n ? <Money paise={f.refundsOwed.paise} /> : "—"}
-          s={f.refundsOwed.n ? f.refundsOwed.n + " approved, not sent" : f.refundsOpen ? f.refundsOpen + " request" + (f.refundsOpen === 1 ? "" : "s") + " to decide" : "nothing waiting"}
-          tone={f.refundsOwed.n ? "warn" : undefined} to="#/finance-refunds" />
+        {tile("Out", undefined, ["spend", "salaries", "refunds"], () => (
+          <Kpi k="Out" v={<Money paise={f.cur.outPaise} />} s={inr(f.cur.salaryPaise, { compact: true }) + " salary · " + inr(f.cur.otherOutPaise, { compact: true }) + " spend · " + inr(f.cur.refundsPaidPaise, { compact: true }) + " refunds"}
+            now={f.cur.outPaise} before={f.prev.outPaise} good="down" of={of} to="#/finance-transactions" />
+        ))}
+        {tile("Due in 30 days", "duesoon", ["installments"], () => (
+          <Kpi k="Due in 30 days" tip="duesoon" v={<Money paise={f.dueSoon.paise} />} s={f.dueSoon.n + " installment" + (f.dueSoon.n === 1 ? "" : "s")} to="#/finance?flag=due" />
+        ))}
+        {tile("Failed to pay", undefined, ["installments"], () => (
+          <Kpi k="Failed to pay" v={f.failed.n ? <Money paise={f.failed.paise} /> : "—"} s={f.failed.n ? f.failed.n + " installment" + (f.failed.n === 1 ? "" : "s") : "nothing bounced"}
+            tone={f.failed.n ? "bad" : "ok"} to={f.failed.n ? "#/invoices?new=1" : undefined} />
+        ))}
+        {tile("Refunds owed", undefined, ["refunds"], () => (
+          <Kpi k="Refunds owed" v={f.refundsOwed.n ? <Money paise={f.refundsOwed.paise} /> : "—"}
+            s={f.refundsOwed.n ? f.refundsOwed.n + " approved, not sent" : f.refundsOpen ? f.refundsOpen + " request" + (f.refundsOpen === 1 ? "" : "s") + " to decide" : "nothing waiting"}
+            tone={f.refundsOwed.n ? "warn" : undefined} to="#/finance-refunds" />
+        ))}
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -103,7 +140,11 @@ export function Finance({ d }: { d: OverviewData }) {
           title={<span className="inline-flex items-center gap-1.5">Money in and out<Tip k="moneyflow" /></span>}
           right={<Stamp clock={d.clocks.financeLive} />}
         >
-          {anyMoney
+          {moneyGap === "denied"
+            ? <Empty title="Not in your access." why="Part of what this plot adds up was refused, so it is not drawn." />
+            : moneyGap === "error"
+            ? <Empty title="Money in and out did not load." why={<Retry onPress={d.retryFinance} />} />
+            : anyMoney
             ? <ColumnChart series={MONEY} points={money} labelSeries="in" unit="₹ thousand · in is collections plus other income, out is salaries, spend and refunds" />
             : <Empty title="No money moved in this period." why="Nothing was collected or paid out between these dates on the Finance clock." />}
         </ChartFrame>
@@ -111,7 +152,11 @@ export function Finance({ d }: { d: OverviewData }) {
           title="Net by month"
           right={<span className="label-mono">{f.months.length} month{f.months.length === 1 ? "" : "s"}</span>}
         >
-          {f.months.length > 1
+          {moneyGap === "denied"
+            ? <Empty title="Not in your access." why="Part of what nets out here was refused, so the trend is not drawn." />
+            : moneyGap === "error"
+            ? <Empty title="Net by month did not load." why={<Retry onPress={d.retryFinance} />} />
+            : f.months.length > 1
             ? <SignedColumns points={net} groups={years} unit="₹ lakh · collected + other income − salaries − spend − refunds" />
             : <Empty title="One month is not a trend." why="Appears as months accumulate in the records." />}
         </ChartFrame>
@@ -139,7 +184,12 @@ export function Finance({ d }: { d: OverviewData }) {
           ) : (
             <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <span className="label-mono">Payroll</span>
-              <span className="text-sm text-tertiary">Withheld — needs Salaries A/C access.</span>
+              {f.gaps.salaries === "error" ? (
+                <><span className="text-sm text-tertiary">The salaries read did not land.</span>
+                  <Retry onPress={d.retryFinance} /></>
+              ) : (
+                <span className="text-sm text-tertiary">Withheld — needs Salaries A/C access.</span>
+              )}
             </span>
           )
         }
@@ -170,6 +220,10 @@ export function Finance({ d }: { d: OverviewData }) {
               </tr>
             ))}
           </ListTable>
+        ) : riskGap === "denied" ? (
+          <Empty title="Not in your access." why="The reads this list is built from were refused, so it cannot say anything is fine." />
+        ) : riskGap === "error" ? (
+          <Empty title="This list did not load." why={<Retry onPress={d.retryFinance} />} />
         ) : (
           <Empty title="Everything is where it should be." tone="ok" />
         )}

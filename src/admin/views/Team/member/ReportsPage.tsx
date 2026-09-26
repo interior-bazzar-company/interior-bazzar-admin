@@ -25,7 +25,7 @@ import { cx } from "@/utils/cx";
 import { useShell } from "../../../shell/ShellContext";
 import { EodModal, PlanModal } from "./reportForms";
 import {
-  TODAY, acknowledgeReport, addDays, eodDue, fmtDate, fmtDayName, isWeekend, planFor,
+  TODAY, acknowledgeReport, canAcknowledge, addDays, eodDue, fmtDate, fmtDayName, isWeekend, planFor,
   planFor as planOn, readMember, reportFor, useReports,
 } from "../store";
 import type { DailyPlan, DailyReport, Member } from "../store";
@@ -69,7 +69,7 @@ export default function ReportsPage({ m, viewer }: { m: Member; viewer: Viewer }
   /* Acknowledging is the reporting line's act. An admin may do it too, because
      somebody has to when the senior is away — but nobody acknowledges their
      own, which would make the whole record circular. */
-  const canAck = viewer !== "self";
+  const canAck = viewer !== "self" && canAcknowledge(m.memberId);
 
   /* What the two buttons above say depends on what is already in. A primary
      button for something already submitted is a button that lies about being
@@ -261,12 +261,12 @@ function ReportHalf({ report, due, m, canAck, onAck }: {
             {report.lines.length ? null : <li className="text-sm text-quaternary">No lines.</li>}
           </ul>
           {report.achievement ? <Note label="Achieved" body={report.achievement} /> : null}
-          {report.pendingWork
-            ? <Note label="Left over"
-              body={report.pendingWork + (report.pendingReason ? " — " + report.pendingReason : "")} />
-            : null}
+          {report.pendingWork ? <Note label="Left over" body={report.pendingWork} /> : null}
+          {report.pendingReason ? <Note label="Why not done" body={report.pendingReason} /> : null}
           {report.blockers ? <Note label="Blocked" body={report.blockers} bad /> : null}
           {report.supportNeeded ? <Note label="Needs" body={report.supportNeeded} /> : null}
+          {report.tomorrowPriority ? <Note label="Tomorrow" body={report.tomorrowPriority} /> : null}
+          {report.notes ? <Note label="Notes" body={report.notes} /> : null}
 
           <div className="mt-1 flex items-center">
             {reader ? (

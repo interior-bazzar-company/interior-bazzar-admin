@@ -111,7 +111,7 @@ export function TxnMenu({ txn, sa, onCancel, onOpen, onCopied }: {
           ? "It is already cancelled."
           : sa
             ? "Write this row off with a reason. It keeps every figure it was posted with and stops counting."
-            : "Cancelling a transaction is Super Admin only." },
+            : "Cancelling a transaction requires full access." },
       { icon: "copy", label: "Copy row id", act: () => {
         void navigator?.clipboard?.writeText?.(txn.txnId);
         onCopied(txn.txnId + " copied.");
@@ -193,7 +193,7 @@ export function TagChip({ k, big }: { k: string; big?: boolean }) {
 }
 
 export function Role({ sa, children }: { sa?: boolean; children?: ReactNode }) {
-  return <Pill xs tone={sa ? "sys" : "neutral"} text={children || (sa ? "Super Admin" : "Finance")} />;
+  return <Pill xs tone={sa ? "sys" : "neutral"} text={children || (sa ? "Full access" : "Finance")} />;
 }
 
 /** THE BANK STATEMENT'S WORDS, not this module's own. A credit is money
@@ -238,7 +238,7 @@ export function Assumed({ id, children }: { id: string; children?: ReactNode }) 
   const d = decision(id);
   return (
     <Alert tone="info" className="text-xs">
-      <b className="font-mono font-semibold text-primary">{id}</b> {children || (d ? d.position : null)}
+      <b className="font-semibold text-primary">{d ? d.title : id}</b> {children || (d ? d.position : null)}
     </Alert>
   );
 }

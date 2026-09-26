@@ -177,7 +177,8 @@ export function KindIcon({ kind, className }: { kind: string; className?: string
 
 export function StagePill({ item }: { item: WorkItem }) {
   const st: WorkStage = stageOf(item);
-  return <Pill dot text={labelOf(WORK_STATUS, st)} tone={toneOf(WORK_STATUS, st) || "neutral"} />;
+  return <Pill dot text={labelOf(WORK_STATUS, st)} tone={toneOf(WORK_STATUS, st) || "neutral"}
+    title={st === "blocked" ? item.blockedReason : undefined} />;
 }
 
 /** LOUD ONLY WHEN IT IS LOUD. Low says nothing — "not urgent" is the default
@@ -536,12 +537,10 @@ export function TaskCard({ item, parent, onOpen }: {
       ) : null}
       {item.kind !== "task" ? <ProgressWindow item={item} /> : null}
       <span className="flex flex-wrap items-center gap-1.5">
-        {m ? (
-          <span className="inline-flex items-center gap-1.5 text-xs text-tertiary">
-            <Avatar name={m.name} xs />
-            {m.name.split(" ").slice(-1)[0]}
-          </span>
-        ) : null}
+        <span className="inline-flex min-w-0 items-center gap-1.5 text-xs text-tertiary" title={"Assigned to " + (m ? m.name : "nobody")}>
+          {m ? <Avatar name={m.name} xs /> : null}
+          <span className="truncate">Assigned to {m ? m.name : "nobody"}</span>
+        </span>
         <span className="flex-1" />
         <span className={cx("text-xs tnum", late ? "font-medium text-warning-primary" : "text-quaternary")}>
           {item.dueDate ? ago(item.dueDate) : "no date"}
@@ -570,8 +569,8 @@ const CHIP_TONE: Record<string, string> = {
 /** ONE EVENT ON ONE DAY. A chip, not a row: a month cell holds three of these
  *  and the title has to survive being clipped, so the kind glyph and the edge
  *  word come first and the title takes whatever is left. */
-export function CalChip({ title, kind, edge, tone, onOpen }: {
-  title: string; kind?: string; edge?: string; tone?: string; onOpen?: () => void;
+export function CalChip({ title, kind, edge, tone, who, onOpen }: {
+  title: string; kind?: string; edge?: string; tone?: string; who?: string; onOpen?: () => void;
 }) {
   const cls = cx(
     "flex w-full items-center gap-1 rounded-md px-1.5 py-0.5 text-left text-xs ring-1 ring-inset transition duration-100",
@@ -583,11 +582,13 @@ export function CalChip({ title, kind, edge, tone, onOpen }: {
       {kind ? <KindIcon kind={kind} className="size-3 stroke-[2.5px] text-current opacity-70" /> : null}
       {edge ? <em className="shrink-0 not-italic opacity-70">{edge}</em> : null}
       <span className="min-w-0 flex-1 truncate">{title}</span>
+      {who ? <span className="shrink-0 opacity-70">{who}</span> : null}
     </>
   );
+  const tip = who ? title + " — assigned to " + who : title;
   return onOpen
-    ? <button type="button" className={cls} title={title} onClick={onOpen}>{body}</button>
-    : <span className={cls} title={title}>{body}</span>;
+    ? <button type="button" className={cls} title={tip} onClick={onOpen}>{body}</button>
+    : <span className={cls} title={tip}>{body}</span>;
 }
 
 /** ONE DAY IN THE MONTH GRID. Today is marked on the ring and the number —

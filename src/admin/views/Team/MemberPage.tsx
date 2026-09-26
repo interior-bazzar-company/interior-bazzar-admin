@@ -44,6 +44,7 @@ import type { WorkItemRow } from "../../../api/modules/adminOps";
 import {
   MemberDeleteModal, MemberEditModal, MemberRolesModal, MemberSendCredentialsModal,
 } from "./memberModals";
+import { MemberReinstateModal, MemberSuspendModal, MemberViewAsModal, isFullAccessMember } from "./member/statusModals";
 /* THE SEED IS FOR THE OPERATION PAGES ONLY (layer 3, their own divs). This page's
    header, launcher figures, record and "waiting on somebody" read the API. */
 import { fmtDate, fmtHM, readMember, retryTeam, useMembers, useTeamLoad } from "./store";
@@ -65,8 +66,8 @@ import PayPage from "./member/PayPage";
 import ReportsPage from "./member/ReportsPage";
 import WorkPage from "./member/WorkPage";
 
-export default function MemberPage({ id, sub, live, roles, rolesDenied, ops }: {
-  id: string; sub: string; live: LiveMember | null; roles: Role[]; rolesDenied?: boolean; ops: Ops;
+export default function MemberPage({ id, sub, live, members, roles, rolesDenied, ops }: {
+  id: string; sub: string; live: LiveMember | null; members?: LiveMember[]; roles: Role[]; rolesDenied?: boolean; ops: Ops;
 }) {
   useMembers();
   /* The operation pages below take the store's record of this member. */
@@ -100,6 +101,16 @@ export default function MemberPage({ id, sub, live, roles, rolesDenied, ops }: {
     menu.push({ icon: "shield", label: "Roles", act: () => ops.modal(<MemberRolesModal u={live} roles={roles} ops={ops} />) });
   if (live && can("team", "edit"))
     menu.push({ icon: "lock", label: "Send new password", act: () => ops.modal(<MemberSendCredentialsModal u={live} ops={ops} />) });
+  /* Full access only, and never on yourself or another full-access holder —
+     the server refuses both anyway (view_as_forbidden). */
+  if (live && !!getSession()?.isFullAccess && viewer !== "self" && !isFullAccessMember(live, roles))
+    menu.push({ icon: "eye", label: "See as this member", act: () => ops.modal(<MemberViewAsModal u={live} ops={ops} />) });
+  if (live && can("team", "status") && viewer !== "self") {
+    if (live.isActive === false)
+      menu.push({ icon: "lock", label: "Reinstate member", act: () => ops.modal(<MemberReinstateModal u={live} ops={ops} />) });
+    else
+      menu.push({ icon: "lock", label: "Suspend member", tone: "dgr", act: () => ops.modal(<MemberSuspendModal u={live} members={members || [live]} ops={ops} />) });
+  }
   if (live && can("team", "status"))
     menu.push({ icon: "trash", label: "Delete member", tone: "dgr", act: () => ops.modal(<MemberDeleteModal u={live} ops={ops} />) });
 
@@ -371,7 +382,7 @@ function NeedsYou({ q, live, viewer }: { q: MemberReads; live: LiveMember; viewe
   } else blocked(q.work, "work", "Work");
 
   if (q.leave.state === "ok") {
-    const waiting = q.leave.data.filter((l) => l.state?.key === "requested");
+    const waiting = q.leave.data.filter((l) => l.state?.key === "requested" || l.state?.key === "escalated");
     if (waiting.length) {
       rows.push({
         tone: "warn", op: "leave",
@@ -515,7 +526,7 @@ function opStats(q: MemberReads, live: LiveMember): Record<string, Stat> {
   } else out.work = miss(q.work);
 
   if (q.leave.state === "ok") {
-    const pendingLv = q.leave.data.filter((l) => l.state?.key === "requested").length;
+    const pendingLv = q.leave.data.filter((l) => l.state?.key === "requested" || l.state?.key === "escalated").length;
     out.leave = {
       v: pendingLv ? pendingLv + " waiting" : String(q.leave.data.length),
       s: pendingLv ? "undecided" : "on record",

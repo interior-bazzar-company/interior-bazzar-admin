@@ -50,7 +50,7 @@ import { BarRows, SignedColumns, Spark, Waterfall } from "../charts";
 import type { BarRow, SignedPoint, WaterStep } from "../charts";
 import {
   PERIOD, accountOf, ago, delta, eventMeta, fmtDate, fmtMonth, inr, kpiSeries, pct, todayIso,
-  useActivity, useAtRisk, useKpis, useMatchedPct, useMonthPoints, useOverview,
+  useActivity, useAtRisk, useKpis, useMonthPoints, useOverview,
   useReconciliation, useTagTotals, useTaxSummary, useWaterfall,
 } from "./store";
 import type { Kpi } from "./store";
@@ -173,7 +173,11 @@ function Overview() {
   const months = useMonthPoints();
   const tags = useTagTotals();
   const recon = useReconciliation();
-  const matched = useMatchedPct();
+  /* THE SAME SCOPE ON BOTH SIDES. This is ONE statement's share, printed over
+     that statement's line count; the aggregate figure the server keeps over
+     every statement answers a different question and sat here reading as a
+     contradiction ("33.3%" above "0 of 1 lines"). */
+  const matched = recon.matchedPct;
   const tax = useTaxSummary();
   const activity = useActivity(8);
 
@@ -325,7 +329,7 @@ function Overview() {
                   <span className="text-tertiary">matched to a record</span>
                   <span className={recon.bankOnly.length ? "text-error-primary" : "text-quaternary"}>
                     {recon.bankOnly.length
-                      ? recon.bankOnly.length + " unexplained · the window cannot close"
+                      ? recon.bankOnly.length + " unexplained · this period cannot be closed yet"
                       : "every line ties to a record"}
                   </span>
                 </div>

@@ -19,7 +19,7 @@ import {
 } from "../../ui";
 import { BusinessSearch, Disclose, GuardCheck, InfoNote } from "./bits";
 import {
-  RULES, VOCAB, assign, businessById, invalidate, needsOverrideReason,
+  RULES, VOCAB, assign, assignWarnings, businessById, invalidate, needsOverrideReason,
   reassign, recordOutcome, statusOf, useWrite,
 } from "./store";
 
@@ -83,6 +83,7 @@ export function AssignModal({ e, run, c, onClose, onDone }: {
   const statusOk = !!b && b.status === "active";
   const capOk = !!b && b.capacity.active < b.capacity.configured;
   const noActive = !e.activeAssignmentId;
+  const warned = assignWarnings(e, b);
 
   return (
     <ModalShell
@@ -112,9 +113,13 @@ export function AssignModal({ e, run, c, onClose, onDone }: {
         <Refused err={go.err} />
         <div className="flex flex-col">
           <GuardCheck ok={subOk}>Subscription {subOk ? <>still <b>active</b></> : <>is <b>{b?.subscription}</b></>} — rechecked now, not at ranking time</GuardCheck>
-          <GuardCheck ok={statusOk}>Account status {statusOk ? <><b>active</b></> : <><b>{b?.status}</b></>}, category and service area still match</GuardCheck>
+          <GuardCheck ok={statusOk}>Account status {statusOk ? <><b>active</b></> : <><b>{b?.status}</b></>} — rechecked now</GuardCheck>
+          {warned.length
+            ? warned.map((w) => <GuardCheck key={w} ok={false}>{w} — <b>not confirmed</b>, your call</GuardCheck>)
+            : <GuardCheck ok>Category and service area match this enquiry</GuardCheck>}
           <GuardCheck ok={capOk}>
-            Capacity {capOk ? "available" : "full"} — <b>{b?.capacity.active} of {b?.capacity.configured}</b> this {b?.capacity.period}, row locked for this transaction
+            Allowance {capOk ? "available" : "used up"} — <b>{b?.capacity.active} of {b?.capacity.configured}</b> this {b?.capacity.period}
+            {b?.capacity.source ? (b.capacity.source === "plan" ? " (set by their plan)" : " (default — their plan sets none)") : ""}
           </GuardCheck>
           <GuardCheck ok={noActive}>No active assignment exists on this enquiry</GuardCheck>
           <GuardCheck ok={!needsReason}>
@@ -397,7 +402,7 @@ export function InvalidateModal({ e, onClose, onDone }: {
 
   return (
     <ModalShell
-      title="Reject this enquiry"
+      title="Mark this enquiry invalid"
       sub={<>{e.enquiryId} · {e.customer.name}</>}
       ico="alert"
       tone="error"
@@ -414,7 +419,7 @@ export function InvalidateModal({ e, onClose, onDone }: {
             onClick={() => go.run(
               () => invalidate(e.enquiryId, reason, note.trim()),
               () => onDone("Marked invalid, with a stored reason."))}>
-            Reject
+            Mark invalid
           </Button>
         </>
       }

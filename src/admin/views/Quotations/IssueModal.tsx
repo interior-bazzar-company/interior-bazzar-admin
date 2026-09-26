@@ -54,7 +54,7 @@ export default function IssueModal({ q, onClose, run }: {
               <ul className="mt-1.5 flex list-disc flex-col gap-1 pl-4">
                 {blockers.map((b) => (
                   <li key={b.code + b.text}>
-                    {b.text} <span className="font-mono text-xs tnum">422 {b.code}</span>
+                    {b.text}
                   </li>
                 ))}
               </ul>
