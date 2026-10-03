@@ -153,7 +153,27 @@ export default function QuotationDetail({ id, tab, params }: {
             ? <MoreMenu items={items} label="Actions" data-act="qt-more"
                 aria-label="Everything this quotation can do" />
             : null}
-          <Button color="primary" ico="quote" onClick={() => go(to({ mode: "preview" }))}>
+          {q.status === "accepted" ? (
+            <Button
+              color="primary"
+              ico="cash"
+              onClick={() => {
+                toast("Creating tax invoice…");
+                call(AdminOpsService.createInvoice(q.dealRef, q.id))
+                  .then((row) => {
+                    toast("Tax invoice drafted.");
+                    go("#/invoices/" + row.id + "?mode=edit");
+                  })
+                  .catch((e: unknown) => {
+                    toast(errMessage(e), "bad");
+                    go("#/invoices?new=1&deal=" + encodeURIComponent(q.dealRef));
+                  });
+              }}
+            >
+              Convert to Tax Invoice ➔
+            </Button>
+          ) : null}
+          <Button color={q.status === "accepted" ? "secondary" : "primary"} ico="quote" onClick={() => go(to({ mode: "preview" }))}>
             {isDraft ? "Preview & issue" : "View document"}
           </Button>
         </>} />

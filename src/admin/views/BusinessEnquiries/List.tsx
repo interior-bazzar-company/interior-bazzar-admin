@@ -30,7 +30,7 @@ import { useShell } from "../../shell/ShellContext";
 import ExportModal from "./ExportModal";
 import { can } from "../../shell/AdminShell";
 import {
-  AgeCell, attentionTone, InfoNote, ProtoBar, SourceChip, StatusPill, statusDot, TagChips,
+  AgeCell, attentionTone, ContactNumber, InfoNote, ProtoBar, SourceChip, StatusPill, statusDot, TagChips,
   TierBadge, UrgencyChip,
 } from "./bits";
 import { RowMenu } from "./menus";
@@ -465,8 +465,9 @@ function Row({ e, p, sel, load }: {
             they are neither. `whitespace-nowrap` is also what tells the table
             how wide this column has to be — without it the browser takes the
             space for the prose columns and wraps the identity instead. */}
-        <div className="cell-2 font-mono whitespace-nowrap">
-          {e.enquiryId} · {e.customer.phone}
+        <div className="cell-2 font-mono whitespace-nowrap flex items-center gap-1.5">
+          <span>{e.enquiryId} ·</span>
+          <ContactNumber phone={e.customer.phone} name={e.customer.name} />
         </div>
         {/* THE CHIP LINE: where it came from, then how the work is going.
             Provenance lost its own column — it is never sorted on, and that

@@ -683,7 +683,7 @@ export function toRow(user: PlatformUser): UserRow {
      engine persists, and "what is missing" is that checklist's unmet items as
      the server sent them -- not a guess made from profile fields. */
   const { pct, missing } = user.completeness !== undefined
-    ? { pct: user.completeness, missing: user.missingFields || [] }
+    ? { pct: typeof user.completeness === "number" ? Math.round(user.completeness) : null, missing: user.missingFields || [] }
     : completenessOf(user.profile);
   return {
     user,

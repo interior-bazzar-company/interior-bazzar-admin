@@ -20,7 +20,7 @@
    offers no field for it. A report that lets somebody type their own hours is
    not a record of anything.
    ============================================================================= */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Alert, Button, FormField, FormSection, IconButton, Icon, Input, ModalShell, Notice, SelectInput, Textarea,
 } from "../../../ui";
@@ -160,7 +160,15 @@ export function EodModal({ m }: { m: Member }) {
      happened: `submitReport` completes a ticked line's item, so a line that is
      done here is done because the item is already terminal, and that loop is
      now a no-op. One writer, and it is the board. */
-  const lines = seedLines;
+  const [lines, setLines] = useState(seedLines);
+  useEffect(() => {
+    setLines(seedLines);
+  }, [seedLines]);
+
+  const toggleDone = (index: number) => {
+    setLines((prev) => prev.map((l, i) => (i === index ? { ...l, done: !l.done } : l)));
+  };
+
   const [pending, setPending] = useState("");
   const [win, setWin] = useState("");
   const [help, setHelp] = useState("");
@@ -224,7 +232,7 @@ export function EodModal({ m }: { m: Member }) {
   return (
     <ModalShell
       title="End of day"
-      sub="What moved today, read from the board"
+      sub="What moved today, pre-filled from morning plan & board"
       ico="doc"
       onClose={() => shell.closeLayer()}
       actions={
@@ -241,17 +249,24 @@ export function EodModal({ m }: { m: Member }) {
           </Alert>
         ) : null}
 
-        {/* WHAT THE DAY ACTUALLY DID, read off the board. Ticks are not
-            controls here — they are the item's own status, drawn. */}
+        {/* WHAT THE DAY ACTUALLY DID, pre-filled from morning plan & board.
+            Click on any line to toggle its completion status. */}
         <ul className="flex flex-col divide-y divide-border-secondary rounded-xl bg-primary px-3 ring-1 ring-secondary">
           {lines.map((l, i) => (
             <li key={i} className="flex items-center gap-2.5 py-2.5">
-              <Icon name={l.done ? "checkcircle" : "clock"} size="sm"
-                className={cx("shrink-0", l.done ? "text-fg-success-primary" : "text-fg-quaternary")} />
-              <b className={cx("min-w-0 flex-1 truncate text-sm font-medium",
-                l.done ? "text-quaternary line-through" : "text-primary")}>
-                {l.title || "Untitled"}
-              </b>
+              <button
+                type="button"
+                onClick={() => toggleDone(i)}
+                className="flex items-center gap-2 text-left min-w-0 flex-1 hover:opacity-80 transition-opacity"
+                title="Click to toggle status"
+              >
+                <Icon name={l.done ? "checkcircle" : "clock"} size="sm"
+                  className={cx("shrink-0", l.done ? "text-fg-success-primary" : "text-fg-quaternary")} />
+                <b className={cx("min-w-0 flex-1 truncate text-sm font-medium",
+                  l.done ? "text-quaternary line-through" : "text-primary")}>
+                  {l.title || "Untitled"}
+                </b>
+              </button>
               {l.workItemId ? (
                 <Button color="link-color" size="xs" onClick={() => openWork(l.workItemId as string)}>open</Button>
               ) : null}

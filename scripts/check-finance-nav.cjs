@@ -38,6 +38,7 @@ const FINANCE_ROWS = [
   { key: "finance-transactions", label: "Other Transaction", groupLabel: "Finance", displayOrder: 39, actions: ["view"] },
   { key: "finance-salaries", label: "Salaries A/C", groupLabel: "Finance", displayOrder: 40, actions: ["view"] },
   { key: "finance-refunds", label: "Refunds", groupLabel: "Finance", displayOrder: 41, actions: ["view"] },
+  { key: "finance-analytics", label: "Analytics", groupLabel: "Finance", displayOrder: 42, actions: ["view"] },
 ];
 const SERVER_MODULES = OTHER_MODULES.concat(FINANCE_ROWS);
 const SERVED = FINANCE_ROWS.map((m) => m.key);
@@ -126,8 +127,8 @@ esbuild.build({
      spend and refunds to everyone while the server refused anyone without the
      grant. */
   M.__setSession({ modules: OTHER_MODULES });
-  eq("no Finance grant shows only the proto section",
-    M.getModules().filter((g) => g.group === "Finance")[0].items.map((i) => i.key), ["finance-analytics"]);
+  eq("no Finance grant shows no Finance group",
+    M.getModules().filter((g) => g.group === "Finance"), []);
 
   /* ---- what `edit` means where the server names each write --------------- */
   const holding = (key, actions) => { M.__setSession({ modules: [{ key, label: key, groupLabel: "Finance", displayOrder: 1, actions }] }); };
@@ -168,7 +169,7 @@ esbuild.build({
   /* ---- the day the server sends a row ----------------------------------- */
   /* A real Module row must win, or the sidebar doubles the entry up. */
   M.__setSession({
-    modules: SERVER_MODULES.concat([
+    modules: OTHER_MODULES.concat(FINANCE_ROWS.filter((r) => r.key !== "finance-analytics")).concat([
       { key: "finance-analytics", label: "Money analytics", groupLabel: "Finance", displayOrder: 95, actions: ["view"] },
     ]),
   });

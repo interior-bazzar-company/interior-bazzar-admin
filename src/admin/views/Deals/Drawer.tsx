@@ -25,7 +25,7 @@ import {
   useEngineTick, val
 } from "./useDeals";
 import type { Params } from "./useDeals";
-import { Fig, Rich, StagePipeline, TagChips, orDash } from "./bits";
+import { ContactNumber, Fig, Rich, StagePipeline, TagChips, orDash } from "./bits";
 import { useActs } from "./Modals";
 import { PrioMenu, StageMenu } from "./menus";
 
@@ -120,7 +120,7 @@ export function DealDrawer({ dealRef, p }: { dealRef: string; p: Params }) {
             ["Owner", <>{dl.owner_id || "—"}{dl.co_owner_id
               ? <span className="text-tertiary"> + {dl.co_owner_id}</span> : null}</>],
             ["Business", orDash(dl.business_name)],
-            ["Phone", <span className="font-mono tnum">{dl.phone}</span>],
+            ["Phone", <ContactNumber phone={dl.phone} name={dl.customer_name} />],
             ["Email", dl.email
               ? <a className="rounded text-brand-secondary outline-focus-ring hover:underline focus-visible:outline-2" href={"mailto:" + dl.email}>{dl.email}</a>
               : null],

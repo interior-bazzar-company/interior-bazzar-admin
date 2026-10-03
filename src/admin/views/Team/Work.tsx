@@ -50,8 +50,8 @@ import {
   KIND, PRIORITY, PRIORITY_SCALE, TODAY, WORK_STATUS, addDays,
   blockerOf, checkCount, eventsOn, fmtDate, fmtMonth, gridDays,
   isDelayed, isTerminal, isWeekend, labelOf, lanesOf, leaveOn, meId, membersInScope, monthStep,
-  normaliseUrl, parentOf, progressOf, readMember, scopeLabel, scopeOf, stageOf, tagsOf,
-  toneOf, useItem, useMembers, useTags, useWork, workTotals,
+  normaliseUrl, parentOf, progressOf, readMember, scopeLabel, scopeOf, setItemStatus, stageOf, tagsOf,
+  toneOf, updateItem, useItem, useMembers, useTags, useWork, workTotals,
 } from "./store";
 import type {
   Attachment, CalEvent, Member, Tag, WorkItem, WorkStage,
@@ -152,6 +152,53 @@ export default function Work() {
   const { drawer: openDrawer, closeLayer, layerKind } = shell;
   const open = useItem(p.item || null);
   const me = meId();
+
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const toggleSelect = useCallback((id: string) => {
+    setSelectedTaskIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  }, []);
+  const toggleSelectAll = useCallback(() => {
+    if (selectedTaskIds.length === rows.length) {
+      setSelectedTaskIds([]);
+    } else {
+      setSelectedTaskIds(rows.map((r) => r.itemId));
+    }
+  }, [selectedTaskIds.length, rows]);
+
+  const handleBulkReschedule = async (days: number = 7) => {
+    const toUpdate = rows.filter((r) => selectedTaskIds.includes(r.itemId));
+    let count = 0;
+    for (const item of toUpdate) {
+      const baseDate = item.dueDate || TODAY;
+      const nextDue = addDays(baseDate, days);
+      const res = await updateItem(item.itemId, { dueDate: nextDue });
+      if (res.ok) count++;
+    }
+    shell.toast(`Rescheduled ${count} task${count === 1 ? "" : "s"} by +${days} days.`);
+    setSelectedTaskIds([]);
+  };
+
+  const handleBulkComplete = async () => {
+    let count = 0;
+    for (const id of selectedTaskIds) {
+      const res = await setItemStatus(id, "completed");
+      if (res.ok) count++;
+    }
+    shell.toast(`Marked ${count} task${count === 1 ? "" : "s"} as completed.`);
+    setSelectedTaskIds([]);
+  };
+
+  const handleBulkArchive = async () => {
+    let count = 0;
+    for (const id of selectedTaskIds) {
+      const res = await setItemStatus(id, "cancelled", "Bulk archived/stale cleanup");
+      if (res.ok) count++;
+    }
+    shell.toast(`Archived/cancelled ${count} task${count === 1 ? "" : "s"}.`);
+    setSelectedTaskIds([]);
+  };
 
   useEffect(() => { ensureAdopted(); }, []);
 
@@ -291,7 +338,49 @@ export default function Work() {
         : tab === "analysis" ? <Analysis rows={rows} all={all} members={members} />
           : tab === "calendar" ? <CalendarFace rows={rows} me={me} p={p} goto={goto} onOpen={openItem} members={members} />
             : tab === "board" ? <Board rows={rows} all={all} group={p.group || ""} onOpen={openItem} />
-              : <List rows={rows} all={all} onOpen={openItem} narrowed={narrowed} onClear={() => onFilter("*", "")} />}
+              : <List rows={rows} all={all} onOpen={openItem} narrowed={narrowed} onClear={() => onFilter("*", "")}
+                  selectedIds={selectedTaskIds} onToggleSelect={toggleSelect} onToggleSelectAll={toggleSelectAll} />}
+
+      {selectedTaskIds.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-3 px-4 py-2.5 rounded-xl bg-slate-900 text-white shadow-2xl backdrop-blur border border-slate-700/60">
+          <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-800 text-slate-200 border border-slate-700">
+            {selectedTaskIds.length} selected
+          </span>
+          <div className="h-4 w-px bg-slate-700" />
+          <button
+            type="button"
+            onClick={() => handleBulkReschedule(7)}
+            className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-100 transition-colors border border-slate-700 active:scale-95"
+          >
+            <Icon name="calendar" size="xs" />
+            Reschedule (+7d)
+          </button>
+          <button
+            type="button"
+            onClick={handleBulkComplete}
+            className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors active:scale-95"
+          >
+            <Icon name="check" size="xs" />
+            Mark Completed
+          </button>
+          <button
+            type="button"
+            onClick={handleBulkArchive}
+            className="flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white transition-colors active:scale-95"
+          >
+            <Icon name="trash" size="xs" />
+            Archive / Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => setSelectedTaskIds([])}
+            className="text-xs text-slate-400 hover:text-slate-200 ml-1 px-1.5 py-1"
+            title="Clear selection"
+          >
+            ✕ Clear
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -1154,9 +1243,12 @@ function TimelineFace({ rows, onOpen }: { rows: WorkItem[]; onOpen: (id: string)
 
 /* ----------------------------------------------------------------- list --- */
 
-function List({ rows, all, onOpen, narrowed, onClear }: {
+function List({
+  rows, all, onOpen, narrowed, onClear, selectedIds, onToggleSelect, onToggleSelectAll,
+}: {
   rows: WorkItem[]; all: WorkItem[]; onOpen: (id: string) => void;
   narrowed: boolean; onClear: () => void;
+  selectedIds: string[]; onToggleSelect: (id: string) => void; onToggleSelectAll: () => void;
 }) {
   if (!rows.length) {
     return (
@@ -1167,10 +1259,20 @@ function List({ rows, all, onOpen, narrowed, onClear }: {
         action={narrowed ? <Button color="secondary" ico="x" onClick={onClear}>Clear the filters</Button> : undefined} />
     );
   }
+  const allSelected = rows.length > 0 && selectedIds.length === rows.length;
   return (
     <ListTable min="1040px"
       head={
         <tr>
+          <th className="w-10 px-3 py-2 text-center">
+            <input
+              type="checkbox"
+              aria-label="Select all tasks in view"
+              className="size-4 rounded border-secondary text-brand-primary focus:ring-brand-primary/20"
+              checked={allSelected}
+              onChange={onToggleSelectAll}
+            />
+          </th>
           <th className="rail" />
           <th>Item</th>
           {/* PROGRESS SITS BESIDE THE THING IT IS ABOUT. Last in the row it was
@@ -1189,14 +1291,24 @@ function List({ rows, all, onOpen, narrowed, onClear }: {
         const parent = parentOf(i, all);
         const late = isDelayed(i);
         const tone = late && blockerOf(i) ? "bad" : late ? "warn" : undefined;
+        const isChecked = selectedIds.includes(i.itemId);
         /* A TASK HAS A REAL PERCENTAGE. The dash is kept for the one case that
            still has nothing to say: an open task with no steps on it. */
         const bare = i.kind === "task" && !checkCount(i).total && i.status !== "completed";
         return (
-          <tr key={i.itemId} className={cx("clickable", i.status === "cancelled" && "opacity-60")}
+          <tr key={i.itemId} className={cx("clickable", i.status === "cancelled" && "opacity-60", isChecked && "bg-brand-primary/5")}
             tabIndex={0} role="link"
             onClick={() => onOpen(i.itemId)}
             onKeyDown={(e) => { if (e.key === "Enter") onOpen(i.itemId); }}>
+            <td className="w-10 px-3 py-2 text-center" onClick={(e) => e.stopPropagation()}>
+              <input
+                type="checkbox"
+                aria-label={"Select " + i.title}
+                className="size-4 rounded border-secondary text-brand-primary focus:ring-brand-primary/20"
+                checked={isChecked}
+                onChange={() => onToggleSelect(i.itemId)}
+              />
+            </td>
             <Rail tone={tone} />
             <td className="cell-1">
               <span className="flex min-w-0 items-center gap-2">

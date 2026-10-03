@@ -37,16 +37,19 @@ import {
   Alert, Button, FieldRow, FormField, FormSection, InfoDot, Input, ModalShell, Pill, Segmented,
   SelectInput, Textarea,
 } from "../../ui";
+import { useShell } from "../../shell/ShellContext";
 import { InfoNote, VocabInput } from "./bits";
 import {
-  MANUAL_VIA, SOURCES, STATES, VOCAB, createEnquiry, findEarlierFrom, knownCategory, knownCity,
-  place, sourceOf, statusOf,
+  CHANNELS, CONTACT_OUTCOMES, MANUAL_VIA, SOURCES, STATES, VOCAB, assign, businessDirectory,
+  createEnquiry, findEarlierFrom, knownCategory, knownCity, logContact, markQualified, place,
+  setCheck, sourceOf, statusOf,
 } from "./store";
 
 export default function NewEnquiryModal({ onClose, onDone }: {
   onClose: () => void;
   onDone: (id: string, msg: string) => void;
 }) {
+  const { toast } = useShell();
   const [source, setSource] = useState("own");
   const [via, setVia] = useState(MANUAL_VIA[0].key);
   const [f, setF] = useState({
@@ -54,12 +57,53 @@ export default function NewEnquiryModal({ onClose, onDone }: {
     category: "", service: "", city: "", state: "", locality: "", pincode: "",
     projectType: "", intent: "", urgency: "", text: "",
   });
+  const [assignToBusinessId, setAssignToBusinessId] = useState<string>("");
+  const [isPreQualified, setIsPreQualified] = useState<boolean>(true);
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
   const set = (k: keyof typeof f) => (v: string) => setF({ ...f, [k]: v });
   const src = sourceOf(source);
+
+  const allBusinesses = businessDirectory();
+  const assignableBusinesses = useMemo(() => {
+    return allBusinesses.filter(
+      (b) => b.subscription === "active" && b.status === "active" && (b.capacity.active < b.capacity.configured)
+    );
+  }, [allBusinesses]);
+
+  const { recommendedBusinesses, otherBusinesses } = useMemo(() => {
+    const fCity = (f.city || "").trim().toLowerCase();
+    const fState = (f.state || "").trim().toLowerCase();
+
+    const isMatch = (b: (typeof assignableBusinesses)[0]) => {
+      if (!fCity && !fState) return true;
+      const areas = (b.serviceArea || []).map((a) => a.toLowerCase());
+      // Universal coverage
+      const isUniversal = areas.length === 0 || areas.some((a) =>
+        a.includes("all region") || a.includes("all india") || a.includes("national") || a.includes("pan india")
+      );
+      if (isUniversal) return true;
+
+      // Match city or state against any service area
+      return areas.some((a) => {
+        if (fCity && (a.includes(fCity) || fCity.includes(a))) return true;
+        if (fState && (a.includes(fState) || fState.includes(a))) return true;
+        return false;
+      });
+    };
+
+    const rec: typeof assignableBusinesses = [];
+    const others: typeof assignableBusinesses = [];
+
+    assignableBusinesses.forEach((b) => {
+      if (isMatch(b)) rec.push(b);
+      else others.push(b);
+    });
+
+    return { recommendedBusinesses: rec, otherBusinesses: others };
+  }, [assignableBusinesses, f.city, f.state]);
 
   /* Live, as the number is typed — so the operator has this person's history in
      front of them while they are still on the call, which is when it is worth
@@ -69,6 +113,51 @@ export default function NewEnquiryModal({ onClose, onDone }: {
   const needsName = !f.name.trim();
   const needsPhone = f.phone.replace(/[^0-9]/g, "").length < 10;
   const blocked = needsName || needsPhone;
+
+  const handleCreation = async () => {
+    const id = await createEnquiry({ source, via: src.manual ? via : null, ...f });
+    if (isPreQualified || assignToBusinessId) {
+      try {
+        // Resolve channel from vocabulary (default to 'call')
+        const channelKey = (src.manual && via === "whatsapp")
+          ? "whatsapp"
+          : (src.manual && via === "email")
+            ? "email"
+            : (CHANNELS[0]?.key || "call");
+
+        // Resolve reached outcome from vocabulary (default to 'connected')
+        const outcomeKey = CONTACT_OUTCOMES.find((o) => o.reached)?.key || "connected";
+
+        // 1. Log the inbound intake call so contactLog is populated
+        await logContact(id, {
+          channel: channelKey,
+          direction: "inbound",
+          outcome: outcomeKey,
+          response: f.text || (f.service ? `${f.service} in ${f.city || "local area"}` : "Direct intake conversation"),
+          note: "Customer verified during direct intake call",
+        });
+
+        // 2. Set all 4 qualification checklist checks
+        await setCheck(id, "genuine", true);
+        await setCheck(id, "reachable", true);
+        await setCheck(id, "requirement", true);
+        await setCheck(id, "urgency", true);
+
+        // 3. Mark the enquiry as Qualified (freezes snapshot)
+        const summary = f.text || (f.service ? `${f.service} (${f.category || "General"})` : "Pre-qualified intake");
+        await markQualified(id, summary);
+
+        // 4. If a business was selected, assign immediately
+        if (assignToBusinessId) {
+          await assign(id, assignToBusinessId, "Directly assigned at creation");
+        }
+      } catch (e) {
+        console.error("Direct qualification/assignment failed:", e);
+        throw new Error(e instanceof Error ? e.message : "Failed to qualify and assign enquiry.");
+      }
+    }
+    return id;
+  };
 
   /* THIS ONE REACHES THE SERVER, which is why it has a busy state and a failure
      state and none of the other actions in this module do. A create that
@@ -80,10 +169,36 @@ export default function NewEnquiryModal({ onClose, onDone }: {
     setBusy(true);
     setErr("");
     try {
-      const id = await createEnquiry({ source, via: src.manual ? via : null, ...f });
-      onDone(id, "Enquiry " + id + " created — it is yours, and it still needs qualifying.");
+      const id = await handleCreation();
+      onDone(id, "Enquiry " + id + " created" + (assignToBusinessId ? " and assigned." : " — ready in queue."));
     } catch (e) {
       setErr(e instanceof Error ? e.message : "The enquiry was not created.");
+      setBusy(false);
+    }
+  };
+
+  const submitAndAddAnother = async () => {
+    if (blocked || busy) { setTouched(true); return; }
+    setBusy(true);
+    setErr("");
+    try {
+      const id = await handleCreation();
+      // Keep City, State, Category, Source, Via; reset client specifics
+      setF((prev) => ({
+        ...prev,
+        name: "",
+        phone: "",
+        email: "",
+        locality: "",
+        pincode: "",
+        text: "",
+      }));
+      setAssignToBusinessId("");
+      setTouched(false);
+      toast("Enquiry " + id + " created. Ready for next call.", "ok");
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "The enquiry was not created.");
+    } finally {
       setBusy(false);
     }
   };
@@ -98,6 +213,9 @@ export default function NewEnquiryModal({ onClose, onDone }: {
       actions={
         <>
           <Button color="secondary" data-close="1" isDisabled={busy} onClick={onClose}>Cancel</Button>
+          <Button color="secondary" isDisabled={busy || blocked} onClick={submitAndAddAnother}>
+            Save & Add Another
+          </Button>
           <Button color="primary" ico="plus" data-act="be-create-go" isLoading={busy} onClick={submit}>
             Create enquiry
           </Button>
@@ -214,6 +332,53 @@ export default function NewEnquiryModal({ onClose, onDone }: {
             <Textarea id="ne-text" rows={3} value={f.text}
               ph="In their words, as close as you can." onChange={set("text")} />
           </FormField>
+        </FormSection>
+
+        {/* ------------------------------------------- direct assignment --- */}
+        <FormSection title="Direct vendor & triage assignment" desc="Optionally assign to a matching seller immediately.">
+          <FormField
+            id="ne-assign"
+            label="Assign immediately to business"
+            hint={
+              f.city
+                ? `Showing ${recommendedBusinesses.length} recommended for ${f.city} first, followed by other active businesses.`
+                : "Select any active subscribed business to assign immediately on creation."
+            }
+          >
+            <SelectInput
+              id="ne-assign"
+              value={assignToBusinessId}
+              onChange={setAssignToBusinessId}
+              options={[
+                { v: "", l: "— Leave Unassigned (Queue for standard triage) —" },
+                ...(f.city || f.state
+                  ? [
+                      ...recommendedBusinesses.map((b) => ({
+                        v: b.businessId,
+                        l: `★ ${b.name} (${(b.serviceArea || []).join(", ") || "All regions"} · ${b.capacity?.active || 0}/${b.capacity?.configured || 0} active)`,
+                      })),
+                      ...otherBusinesses.map((b) => ({
+                        v: b.businessId,
+                        l: `${b.name} (${(b.serviceArea || []).join(", ") || "All regions"} · ${b.capacity?.active || 0}/${b.capacity?.configured || 0} active)`,
+                      })),
+                    ]
+                  : assignableBusinesses.map((b) => ({
+                      v: b.businessId,
+                      l: `${b.name} (${(b.serviceArea || []).join(", ") || "All regions"} · ${b.capacity?.active || 0}/${b.capacity?.configured || 0} active)`,
+                    }))),
+              ]}
+            />
+          </FormField>
+
+          <label className="flex items-center gap-2 cursor-pointer text-sm text-secondary">
+            <input
+              type="checkbox"
+              checked={isPreQualified}
+              onChange={(e) => setIsPreQualified(e.target.checked)}
+              className="size-4 rounded border-secondary text-brand-solid focus:ring-brand"
+            />
+            <span>Mark as Pre-Qualified (bypasses manual checklist for direct phone call)</span>
+          </label>
         </FormSection>
 
         {/* ------------------------------------------------ their history --- */}

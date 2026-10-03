@@ -34,12 +34,13 @@ export interface ProgressBarProps {
  * A basic progress bar component.
  */
 export const ProgressBarBase = ({ value, min = 0, max = 100, className, progressClassName }: ProgressBarProps) => {
-    const percentage = ((value - min) * 100) / (max - min);
+    const rawVal = typeof value === "number" ? Math.round(value) : 0;
+    const percentage = Math.max(0, Math.min(100, Math.round(((value - min) * 100) / (max - min || 1))));
 
     return (
         <div
             role="progressbar"
-            aria-valuenow={value}
+            aria-valuenow={rawVal}
             aria-valuemin={min}
             aria-valuemax={max}
             className={cx("h-2 w-full overflow-hidden rounded-md bg-quaternary", className)}

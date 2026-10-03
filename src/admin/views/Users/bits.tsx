@@ -78,13 +78,14 @@ const COMP_TEXT: Record<string, string> = {
  *  profile SCHEMA is filled in. 85% and 50% for the same business are both
  *  right. `label` is what this one is measuring, and every caller states it. */
 export function Completeness({ pct, missing, bare, label }: { pct: number; missing: string[]; bare?: boolean; label: string }) {
-  const tone: "ok" | "warn" | "bad" = pct >= 100 ? "ok" : pct >= 60 ? "warn" : "bad";
+  const roundedPct = Math.round(Number(pct) || 0);
+  const tone: "ok" | "warn" | "bad" = roundedPct >= 100 ? "ok" : roundedPct >= 60 ? "warn" : "bad";
   return (
     <span className="inline-flex min-w-0 items-center gap-2">
       <span className="w-14 shrink-0">
-        <Meter value={pct} tone={COMP_BAR[tone]} label={label} />
+        <Meter value={roundedPct} tone={COMP_BAR[tone]} label={label} />
       </span>
-      <span className={cx("shrink-0 text-xs font-medium tnum", COMP_TEXT[tone])}>{pct}%</span>
+      <span className={cx("shrink-0 text-xs font-medium tnum", COMP_TEXT[tone])}>{roundedPct}%</span>
       {bare || !missing.length ? null : (
         <span className="truncate text-xs text-tertiary">no {missing.join(", ").toLowerCase()}</span>
       )}

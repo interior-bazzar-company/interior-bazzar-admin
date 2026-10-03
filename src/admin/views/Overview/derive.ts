@@ -269,7 +269,7 @@ export function healthOf(deals: DealMetrics | null, fin: HealthMoney | null, tea
     /* The same deals as the Pipeline value tile, and the same ones
        `#/deals?stalled=1` opens: the whole open book, at this moment. */
     const { n, stalled } = deals.openInPeriod;
-    const share = n ? (stalled / n) * 100 : null;
+    const share = n ? Math.round((stalled / n) * 100) : null;
     out.push({
       key: "pipeline", label: "Pipeline", to: "#/deals?stalled=1",
       tone: share === null ? "mute" : share < 15 ? "ok" : share < 35 ? "warn" : "bad",
@@ -296,7 +296,7 @@ export function healthOf(deals: DealMetrics | null, fin: HealthMoney | null, tea
       why: ot === null ? "no attendance in the period" : Math.round(ot) + "% arrived on time",
     });
     const share = team.work.total - team.work.completed - team.work.cancelled;
-    const pct = share ? (team.work.delayed / share) * 100 : null;
+    const pct = share ? Math.round((team.work.delayed / share) * 100) : null;
     out.push({
       key: "delivery", label: "Delivery", to: "#/work?status=delayed",
       tone: pct === null ? "mute" : pct < 10 ? "ok" : pct < 30 ? "warn" : "bad",

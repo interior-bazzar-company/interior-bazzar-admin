@@ -26,6 +26,7 @@
    figure on the sheet is the one the server last computed, and the rail says so.
    ===================================================================== */
 import { useState } from "react";
+import { cx } from "@/utils/cx";
 import AdminOpsService from "../../../api/modules/adminOps";
 import type { QuotationSaveInput } from "../../../api/modules/adminOps";
 import {
@@ -345,11 +346,39 @@ function PlanBlock({ plan, plans, busy, onChange, count, onCount, onHsn, onTerm 
                 options={[{ v: "pct", l: "%" }, { v: "amt", l: "₹" }]} />
             </div>
           </FormField>
-          <FormField id="pInstallments" label="Payments" hint="How many payments the total splits into.">
-            <SelectInput id="pInstallments" defaultValue={String(count)}
-              onChange={(x) => onCount(Number(x))}
-              options={COUNTS.map((k) => ({ v: String(k), l: k === 1 ? "1 (full amount)" : k + " payments" }))} />
-          </FormField>
+          <div className="flex flex-col gap-2">
+            <FormField id="pInstallments" label="Payments" hint="How many payments the total splits into.">
+              <SelectInput id="pInstallments" defaultValue={String(count)}
+                onChange={(x) => onCount(Number(x))}
+                options={COUNTS.map((k) => ({ v: String(k), l: k === 1 ? "1 (full amount)" : k + " payments" }))} />
+            </FormField>
+            <div className="flex flex-wrap items-center gap-1.5 pt-1">
+              <span className="text-xs font-medium text-tertiary">Quick splits:</span>
+              {[
+                { label: "100% Full", count: 1 },
+                { label: "50 / 50", count: 2 },
+                { label: "50 / 30 / 20", count: 3 },
+              ].map((preset) => (
+                <button
+                  key={preset.count}
+                  type="button"
+                  onClick={() => {
+                    const el = document.getElementById("pInstallments") as HTMLSelectElement | null;
+                    if (el) el.value = String(preset.count);
+                    onCount(preset.count);
+                  }}
+                  className={cx(
+                    "rounded-md px-2 py-0.5 text-xs font-medium transition-colors ring-1 ring-inset",
+                    count === preset.count
+                      ? "bg-brand-secondary text-brand-primary ring-brand-primary font-semibold"
+                      : "bg-secondary text-secondary ring-secondary hover:bg-tertiary"
+                  )}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
           {/* Only when there is a gap to set — a placeholder field holding a
               dash was a question with no answer, drawn to fill the grid. */}
           {count > 1 ? (
@@ -360,6 +389,41 @@ function PlanBlock({ plan, plans, busy, onChange, count, onCount, onHsn, onTerm 
             </FormField>
           ) : null}
         </FieldRow>
+        {count > 1 ? (
+          <div className="rounded-lg bg-secondary/50 p-3 ring-1 ring-secondary">
+            <div className="text-xs font-semibold text-secondary mb-1.5">Estimated installment schedule (based on net {inr(n.net)}):</div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {count === 2 ? (
+                <>
+                  <div className="text-xs text-secondary bg-primary p-2 rounded border border-secondary">
+                    <span className="font-semibold text-primary">1. Advance (50%):</span> {inr(Math.round(n.net * 0.5))}
+                  </div>
+                  <div className="text-xs text-secondary bg-primary p-2 rounded border border-secondary">
+                    <span className="font-semibold text-primary">2. Handover (50%):</span> {inr(Math.round(n.net * 0.5))}
+                  </div>
+                </>
+              ) : count === 3 ? (
+                <>
+                  <div className="text-xs text-secondary bg-primary p-2 rounded border border-secondary">
+                    <span className="font-semibold text-primary">1. Advance (50%):</span> {inr(Math.round(n.net * 0.5))}
+                  </div>
+                  <div className="text-xs text-secondary bg-primary p-2 rounded border border-secondary">
+                    <span className="font-semibold text-primary">2. Milestone (30%):</span> {inr(Math.round(n.net * 0.3))}
+                  </div>
+                  <div className="text-xs text-secondary bg-primary p-2 rounded border border-secondary">
+                    <span className="font-semibold text-primary">3. Handover (20%):</span> {inr(Math.round(n.net * 0.2))}
+                  </div>
+                </>
+              ) : (
+                Array.from({ length: count }).map((_, idx) => (
+                  <div key={idx} className="text-xs text-secondary bg-primary p-2 rounded border border-secondary">
+                    <span className="font-semibold text-primary">Payment {idx + 1} ({Math.round(100 / count)}%):</span> {inr(Math.round(n.net / count))}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        ) : null}
       </FormSection>
       {/* ponytail: no schedule strip. The prototype draws the due dates under
           these two controls; the API returns no schedule, and inventing the

@@ -37,7 +37,7 @@ import type { InvoiceRow, QuotationRow } from "../../../api/modules/adminOps";
 import { STATUS_LABEL as Q_LABEL } from "../Quotations/api";
 import { STATUS_LABEL as I_LABEL } from "../Invoices/api";
 import type { DealsApiState, Params } from "./useDeals";
-import { ChainCard, ChainDots, MoneyCellCtx, Rich, StagePipeline, TagChips, orDash } from "./bits";
+import { ChainCard, ChainDots, ContactNumber, MoneyCellCtx, Rich, StagePipeline, TagChips, orDash } from "./bits";
 import { useActs } from "./Modals";
 import { CHIP_LABEL, GateBody, MoreMenu, PrioMenu, StageMenu, selectOptions } from "./menus";
 
@@ -767,7 +767,7 @@ function CtxPane({ dl, p, cls }: { dl: any; p: Params; cls: string }) {
           ["Email", dl.email
             ? <a className="rounded text-brand-secondary outline-focus-ring hover:underline focus-visible:outline-2" href={"mailto:" + dl.email}>{dl.email}</a>
             : null],
-          ["Phone", <span className="font-mono tnum">{dl.phone}</span>],
+          ["Phone", <ContactNumber phone={dl.phone} name={dl.customer_name} />],
           ["Location", place(dl)],
         ]} />
       </section>

@@ -27,7 +27,7 @@ import {
 import { can, useNav } from "../../shell/AdminShell";
 import { useShell } from "../../shell/ShellContext";
 import {
-  BlockHead, FrozenBar, InfoNote, LifecycleRail, PanelNote, SourceChip, StatusPill, TagChips,
+  BlockHead, ContactNumber, FrozenBar, InfoNote, LifecycleRail, PanelNote, SourceChip, StatusPill, TagChips,
   TierBadge, UrgencyChip,
 } from "./bits";
 import { RecordMenu } from "./menus";
@@ -103,7 +103,7 @@ export default function Detail({ id, listHash, prev, next, pos }: {
                 {e.customer.name}
               </h2>
               <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-tertiary">
-                <span className="font-mono">{e.customer.phone}</span>
+                <ContactNumber phone={e.customer.phone} name={e.customer.name} />
                 {e.customer.email ? <><span aria-hidden="true">·</span><span className="font-mono">{e.customer.email}</span></> : null}
                 <span aria-hidden="true">·</span>
                 <SourceChip source={e.source} full />

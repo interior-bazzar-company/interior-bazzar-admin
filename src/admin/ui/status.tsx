@@ -336,7 +336,7 @@ export function Pipeline({ stages, current, compact }: { stages: { k: string; la
 /* THE PROGRESS BAR — brand by default (progress toward a target is what the
    brand is for) and a status tone only when the bar ITSELF is the judgement. */
 export function Meter({ value, max, tone, label, className }: { value: number; max?: number; tone?: "ok" | "warn" | "bad"; label?: string; className?: string }) {
-    const pct = Math.max(0, Math.min(100, ((value || 0) / (max || 100)) * 100));
+    const pct = Math.max(0, Math.min(100, Math.round(((value || 0) / (max || 100)) * 100)));
     const fill = tone === "bad" ? "bg-fg-error-primary" : tone === "warn" ? "bg-fg-warning-primary" : tone === "ok" ? "bg-fg-success-primary" : "bg-fg-brand-primary";
     return <ProgressBarBase value={pct} className={cx("h-1.5", className)} progressClassName={fill} aria-label={label} />;
 }

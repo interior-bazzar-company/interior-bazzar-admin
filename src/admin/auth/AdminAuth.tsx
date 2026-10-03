@@ -250,17 +250,23 @@ export default function AdminAuth() {
                 </Alert>
               ) : null}
             </div>
-            <div className="mt-5 flex flex-col gap-4">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleLogin();
+              }}
+              className="mt-5 flex flex-col gap-4"
+            >
               <FormField id="loginEmail" label="Username or work email">
-                <Input id="loginEmail" type="text" ph="you@interiorbazzar.com" value={who} onChange={setWho} onEnter={handleLogin} autoFocus />
+                <Input id="loginEmail" type="text" ph="you@interiorbazzar.com" value={who} onChange={setWho} autoFocus />
               </FormField>
               <FormField id="loginPass" label="Password">
-                <Input id="loginPass" type="password" ph="••••••••" value={pass} onChange={setPass} onEnter={handleLogin} />
+                <Input id="loginPass" type="password" ph="••••••••" value={pass} onChange={setPass} />
               </FormField>
-            </div>
-            <Button color="primary" size="lg" block className="mt-6" isLoading={busy} showTextWhileLoading onClick={handleLogin}>
-              {busy ? "Signing in…" : "Sign in"}
-            </Button>
+              <Button type="submit" color="primary" size="lg" block className="mt-2" isLoading={busy} showTextWhileLoading>
+                {busy ? "Signing in…" : "Sign in"}
+              </Button>
+            </form>
             <p className="mt-6 border-t border-secondary pt-5 text-sm text-tertiary">Accounts are created by an admin — there is no public sign-up. Lost your password? Ask an admin to reset it.</p>
           </div>
 

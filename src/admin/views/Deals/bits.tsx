@@ -423,3 +423,35 @@ export function StageColumn({ stage, items, sel, p }: { stage: number; items: an
     </section>
   );
 }
+
+/* 1-click calling & WhatsApp messaging */
+export function ContactNumber({ phone, name, className }: { phone?: string | null; name?: string | null; className?: string }) {
+  if (!phone) return <span className="text-quaternary">—</span>;
+  const digits = String(phone).replace(/[^0-9]/g, "");
+  const waPhone = digits.startsWith("91") && digits.length > 10 ? digits : digits.length === 10 ? `91${digits}` : digits;
+
+  return (
+    <span className={cx("inline-flex items-center gap-1.5", className)} onClick={(e) => e.stopPropagation()}>
+      <a
+        href={`tel:${phone}`}
+        className="font-mono text-secondary hover:text-brand-secondary hover:underline"
+        title="Call number"
+      >
+        {phone}
+      </a>
+      {digits.length >= 10 ? (
+        <a
+          href={`https://wa.me/${waPhone}?text=${encodeURIComponent(
+            `Hello ${name || ""}, this is InteriorBazzar regarding your deal.`
+          )}`}
+          target="_blank"
+          rel="noreferrer"
+          title="Chat on WhatsApp"
+          className="inline-flex items-center text-utility-green-600 hover:text-utility-green-700 hover:scale-110 transition-transform"
+        >
+          <Icon name="message" size="xs" />
+        </a>
+      ) : null}
+    </span>
+  );
+}
