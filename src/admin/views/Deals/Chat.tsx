@@ -850,6 +850,11 @@ function CtxPane({ dl, p, cls }: { dl: any; p: Params; cls: string }) {
             type="button"
             className="flex w-full cursor-pointer items-center justify-center gap-2 rounded-lg border border-brand bg-brand-primary/10 px-3 py-2 text-xs font-semibold text-brand-secondary outline-focus-ring transition duration-100 hover:bg-brand-primary/20 focus-visible:outline-2 focus-visible:outline-offset-2"
             onClick={() => {
+              if (dl.customer) {
+                const usernameStr = typeof dl.customer === "object" ? dl.customer.username : dl.customer;
+                shell.toast(`A business account (@${usernameStr}) is already created for this deal.`, "warn");
+                return;
+              }
               if (dl.stage !== STAGE.WON) {
                 shell.toast("Only Won deals can create a business account.", "warn");
                 return;

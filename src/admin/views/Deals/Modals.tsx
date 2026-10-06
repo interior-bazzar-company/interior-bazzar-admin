@@ -1041,6 +1041,12 @@ export function CreateBusinessModal({
   // Auto-fill from deal data & submission
   useEffect(() => {
     if (!dl) return;
+    if (dl.customer) {
+      const usernameStr = typeof dl.customer === "object" ? dl.customer.username : dl.customer;
+      shell.toast(`A business account (@${usernameStr}) is already created for this deal.`, "warn");
+      onClose();
+      return;
+    }
     let subData: any = {};
     if (dl.submission) {
       try {
@@ -1095,6 +1101,12 @@ export function CreateBusinessModal({
   };
 
   const commit = () => {
+    if (dl && dl.customer) {
+      const usernameStr = typeof dl.customer === "object" ? dl.customer.username : dl.customer;
+      shell.toast(`A business account (@${usernameStr}) is already created for this deal.`, "warn");
+      onClose();
+      return;
+    }
     if (dl && dl.stage !== STAGE.WON) {
       shell.toast("Only Won deals can create a business account.", "warn");
       return;
@@ -1123,10 +1135,21 @@ export function CreateBusinessModal({
       .then((res) => {
         setBusy(false);
         if (res.response === false) {
+          const detail = (res.data as any)?.message || "Could not create business account.";
+          if (
+            detail.toLowerCase().includes("already linked") ||
+            detail.toLowerCase().includes("already created") ||
+            detail.toLowerCase().includes("already exists")
+          ) {
+            shell.toast(detail, "warn");
+            onClose();
+            render();
+            return;
+          }
           setErr({
             http: 400,
             code: "creation_failed",
-            detail: (res.data as any)?.message || "Could not create business account.",
+            detail,
           });
           return;
         }
@@ -1135,7 +1158,19 @@ export function CreateBusinessModal({
       })
       .catch((e) => {
         setBusy(false);
-        setErr(refusalOf(e));
+        const refusal = refusalOf(e);
+        if (
+          refusal.detail &&
+          (refusal.detail.toLowerCase().includes("already linked") ||
+            refusal.detail.toLowerCase().includes("already created") ||
+            refusal.detail.toLowerCase().includes("already exists"))
+        ) {
+          shell.toast(refusal.detail, "warn");
+          onClose();
+          render();
+          return;
+        }
+        setErr(refusal);
       });
   };
 
